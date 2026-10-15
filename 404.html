@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page not found | Stalemate</title>
+    <meta name="description" content="That square is empty. Return to Stalemate’s homepage, music or shows.">
+    <meta name="theme-color" content="#171410">
+    <meta name="robots" content="noindex">
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <script>
+        (function () {
+            var PROJECT_BASE = '/StalemateSite/';
+            var path = location.pathname || '/';
+            var base = (PROJECT_BASE !== '/' && (path === PROJECT_BASE.slice(0, -1) || path.indexOf(PROJECT_BASE) === 0))
+                ? PROJECT_BASE
+                : '/';
+            var tag = document.createElement('base');
+            tag.href = base;
+            document.head.insertBefore(tag, document.head.firstChild);
+        }());
+    </script>
+    <noscript>
+        <link rel="stylesheet" href="/StalemateSite/styles.css">
+    </noscript>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&amp;family=IBM+Plex+Sans:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body id="top" class="lost-page-body">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <header class="site-header">
+        <div class="site-header__inner page-shell">
+            <a class="brand" href="./" aria-label="Stalemate home">
+                <img src="assets/mark.svg" alt="" class="brand__mark" id="logo" width="64" height="64">
+                <span class="brand__text"><strong>Stalemate</strong><small>Empty square</small></span>
+            </a>
+            <nav class="site-nav" aria-label="Primary navigation">
+                <a href="./">Home</a>
+                <a href="#music-link">Music</a>
+                <a href="#shows-link">Shows</a>
+            </nav>
+        </div>
+    </header>
+    <main id="main-content" class="lost-page">
+        <div class="page-shell">
+            <p class="board-square">404 · Off the board</p>
+            <h1>That square is empty.</h1>
+            <p>The page is not on this site. Head home, or jump to music or shows.</p>
+            <div class="ska-belt" aria-hidden="true"></div>
+            <div class="button-row">
+                <a class="button button--tickets" id="shows-link" href="./#shows">Get tickets</a>
+                <a class="button button--listen" id="music-link" href="./#music">Listen</a>
+                <a class="button button--ghost" href="./">Back to the homepage</a>
+            </div>
+        </div>
+    </main>
+    <script src="site-base.js" defer></script>
+    <script src="script.js" defer></script>
+</body>
+</html>

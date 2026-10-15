@@ -1,0 +1,63 @@
+// @vitest-environment node
+
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
+
+const repoRoot = join(fileURLToPath(new URL('../..', import.meta.url)));
+const PUBLIC_HTML = [
+    'index.html',
+    'qr/index.html',
+    'epk/index.html',
+    '404.html',
+    'embed-placeholder.html'
+];
+const PUBLIC_CLIENT_TEXT = [
+    ...PUBLIC_HTML,
+    'script.js',
+    'show-state.js',
+    'site-base.js',
+    'styles.css'
+];
+
+function targetBlankTags(html) {
+    return [...html.matchAll(/<a\b[^>]*\btarget=["']_blank["'][^>]*>/gi)].map((match) => match[0]);
+}
+
+describe('public surface security', () => {
+    it('never links the other Stalemate band or a guessed Spotify artist', async () => {
+        for (const relativePath of PUBLIC_CLIENT_TEXT) {
+            const source = await readFile(join(repoRoot, relativePath), 'utf8');
+            expect(source, relativePath).not.toContain('4rwTyXLXW0blHBUjQdJmA7');
+            expect(source, relativePath).not.toMatch(/open\.spotify\.com/i);
+            expect(source, relativePath).not.toContain('/private/');
+        }
+    });
+
+    it('keeps preview frames sandboxed and local until a real provider URL exists', async () => {
+        for (const relativePath of ['index.html', 'qr/index.html']) {
+            const html = await readFile(join(repoRoot, relativePath), 'utf8');
+            const iframes = [...html.matchAll(/<iframe\b[^>]*>/gi)].map((match) => match[0]);
+            expect(iframes.length, relativePath).toBeGreaterThan(0);
+            for (const tag of iframes) {
+                expect(tag, relativePath).toContain('embed-placeholder.html');
+                expect(tag, relativePath).toContain('sandbox="allow-scripts"');
+                expect(tag, relativePath).toContain('referrerpolicy="strict-origin-when-cross-origin"');
+                expect(tag, relativePath).not.toMatch(/youtube|spotify|apple\.com/i);
+            }
+        }
+    });
+
+    it('isolates every new-tab link and rejects script or data URLs', async () => {
+        for (const relativePath of PUBLIC_HTML) {
+            const html = await readFile(join(repoRoot, relativePath), 'utf8');
+            expect(html, relativePath).not.toMatch(/href=["']javascript:/i);
+            expect(html, relativePath).not.toMatch(/href=["']data:/i);
+            for (const tag of targetBlankTags(html)) {
+                expect(tag, relativePath).toMatch(/\brel=["'][^"']*noopener[^"']*["']/i);
+                expect(tag, relativePath).toMatch(/\brel=["'][^"']*noreferrer[^"']*["']/i);
+            }
+        }
+    });
+});

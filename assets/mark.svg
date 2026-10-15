@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="markTitle">
+  <title id="markTitle">Stalemate king on a two-tone board</title>
+  <rect width="32" height="32" fill="#171410"/>
+  <rect x="32" width="32" height="32" fill="#f4f0e6"/>
+  <rect y="32" width="32" height="32" fill="#f4f0e6"/>
+  <rect x="32" y="32" width="32" height="32" fill="#171410"/>
+  <path fill="#009ee8" d="M30 12h4v4h4v4h-4v4h-4v-4h-4v-4h4z"/>
+  <path fill="#171410" d="M22 36h20l-2 14H24z"/>
+  <path fill="#f4f0e6" d="M24 36h16l-1.6 12H25.6z"/>
+  <rect x="20" y="50" width="24" height="4" fill="#ed2765"/>
+</svg>
