@@ -291,13 +291,13 @@ textarea:focus-visible {
 .button--hot {
     background: var(--pink);
     color: var(--cream);
-    transform: rotate(-0.6deg);
+    transform: rotate(-0.35deg);
 }
 
 .button--listen {
     background: var(--blue);
     color: var(--ink);
-    transform: rotate(0.6deg);
+    transform: rotate(0.35deg);
 }
 
 .button--hot::after,
@@ -347,10 +347,10 @@ textarea:focus-visible {
 .hero {
     position: relative;
     overflow: hidden;
-    min-height: min(78vh, 42rem);
+    min-height: 0;
     display: grid;
-    align-items: end;
-    padding: 4.5rem 0 3.5rem;
+    align-items: start;
+    padding: 2.35rem 0 2.5rem;
     background: var(--ink);
 }
 
@@ -372,7 +372,7 @@ textarea:focus-visible {
     inset: 0;
     z-index: 1;
     pointer-events: none;
-    opacity: 0.16;
+    opacity: 0.09;
     background-image: url("assets/grain.svg");
     background-size: 180px 180px;
     mix-blend-mode: overlay;
@@ -393,8 +393,8 @@ textarea:focus-visible {
     position: relative;
     z-index: 2;
     display: grid;
-    gap: 2rem;
-    align-items: end;
+    gap: 1.15rem;
+    align-items: start;
 }
 
 .hero__copy {
@@ -403,27 +403,27 @@ textarea:focus-visible {
 
 .board-square {
     display: inline-block;
-    margin-bottom: 0.7rem;
-    padding: 0.22rem 0.55rem;
+    margin-bottom: 0.45rem;
+    padding: 0.18rem 0.5rem;
     background: var(--cream);
     color: var(--ink);
     font-family: var(--display);
-    font-size: 0.95rem;
+    font-size: 0.88rem;
     font-weight: 700;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    transform: rotate(-2deg);
-    box-shadow: 3px 3px 0 var(--pink);
+    transform: rotate(-1deg);
+    box-shadow: 2px 2px 0 var(--pink);
 }
 
 .hero h1 {
-    margin: 0 0 0.55rem;
+    margin: 0 0 0.4rem;
     max-width: 100%;
     font-family: var(--display);
-    font-size: clamp(2.6rem, 12vw, 7rem);
+    font-size: clamp(2.35rem, 9vw, 5.35rem);
     font-weight: 800;
-    line-height: 0.88;
-    letter-spacing: 0.06em;
+    line-height: 0.86;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
     overflow-wrap: anywhere;
     -webkit-text-stroke: 3px var(--ink);
@@ -434,11 +434,11 @@ textarea:focus-visible {
 }
 
 .hero__tag {
-    margin: 0 0 0.85rem;
+    margin: 0 0 0.45rem;
     color: var(--cream);
     font-family: var(--display);
-    font-size: clamp(1.05rem, 2.1vw, 1.35rem);
-    font-weight: 600;
+    font-size: clamp(1.05rem, 2.1vw, 1.3rem);
+    font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     text-shadow: 2px 2px 0 rgba(237, 39, 101, 0.45);
@@ -449,10 +449,11 @@ textarea:focus-visible {
 }
 
 .hero__lede {
-    margin: 0 0 1.6rem;
-    max-width: 28rem;
+    margin: 0;
+    max-width: 32rem;
     color: var(--cream);
-    font-size: 1.1rem;
+    font-size: 1.05rem;
+    line-height: 1.45;
 }
 
 .hero-show {
@@ -461,8 +462,8 @@ textarea:focus-visible {
         "video"
         "next"
         "ctas";
-    gap: 1.15rem;
-    margin: 1.5rem 0 0;
+    gap: 0.85rem;
+    margin: 1rem 0 0;
     max-width: 100%;
 }
 
@@ -488,7 +489,8 @@ textarea:focus-visible {
     aspect-ratio: 16 / 9;
     overflow: hidden;
     background: #000;
-    border: 1px solid var(--line-strong);
+    border: 2px solid var(--cream);
+    box-shadow: 4px 4px 0 var(--pink);
 }
 
 .hero-video__player {
@@ -502,8 +504,8 @@ textarea:focus-visible {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.55rem 0.85rem;
-    margin-top: 0.7rem;
+    gap: 0.4rem 0.65rem;
+    margin-top: 0.5rem;
 }
 
 .hero-video__label {
@@ -520,31 +522,39 @@ textarea:focus-visible {
     margin: 0;
     color: var(--lime);
     font-family: var(--display);
-    font-size: clamp(1.1rem, 3.2vw, 1.3rem);
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    line-height: 1.15;
+    font-size: clamp(1.15rem, 3.2vw, 1.4rem);
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    line-height: 1.05;
     text-transform: uppercase;
 }
 
 .hero-next {
     display: grid;
-    gap: 1.15rem;
     min-width: 0;
     max-width: 28rem;
 }
 
+.hero-show-card {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.panel.hero-show-card {
+    padding: 1.05rem 1.1rem 1.15rem;
+}
+
 .hero-countdown {
-    padding: 1rem 1rem 1.05rem;
-    border: 1px solid var(--line-strong);
-    background: var(--ink);
+    padding: 0;
+    border: 0;
+    background: transparent;
 }
 
 .countdown-kicker {
-    margin: 0 0 0.65rem;
+    margin: 0 0 0.45rem;
     color: var(--lime);
     font-family: var(--display);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 700;
     letter-spacing: 0.16em;
     text-transform: uppercase;
@@ -562,10 +572,10 @@ textarea:focus-visible {
 .countdown-clock li {
     display: grid;
     justify-items: center;
-    gap: 0.15rem;
+    gap: 0.1rem;
     min-width: 0;
-    padding: 0.35rem 0.15rem 0.4rem;
-    background: var(--surface);
+    padding: 0.3rem 0.1rem 0.32rem;
+    background: var(--ink);
 }
 
 .countdown-clock span {
@@ -588,33 +598,53 @@ textarea:focus-visible {
 }
 
 .countdown-fallback {
-    margin: 0.65rem 0 0;
+    margin: 0.5rem 0 0;
     color: var(--muted);
-    font-size: 0.95rem;
+    font-size: 0.92rem;
+}
+
+.countdown-clock:not([hidden]) ~ .countdown-fallback {
+    display: none;
 }
 
 .next-show-block {
+    display: grid;
+    gap: 0.28rem;
     margin: 0;
 }
 
-.panel.next-show-block .next-show-event {
-    margin: 0 0 0.45rem;
+.next-show-block .board-square {
+    width: max-content;
+    margin-bottom: 0.25rem;
+}
+
+.hero-show-card .next-show-event {
+    margin: 0;
     color: var(--cream);
     font-family: var(--display);
-    font-size: clamp(1.7rem, 5vw, 2.15rem);
-    font-weight: 700;
-    line-height: 0.95;
-    letter-spacing: 0.06em;
+    font-size: clamp(1.65rem, 4.6vw, 2.05rem);
+    font-weight: 800;
+    line-height: 0.92;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
     overflow-wrap: break-word;
 }
 
-.panel.next-show-block time {
+.hero-show-card .next-show-block p {
+    margin: 0;
+    color: var(--muted);
+}
+
+.hero-show-card .next-show-event {
+    color: var(--cream);
+}
+
+.hero-show-card .next-show-block time {
     color: var(--cream);
     font-family: var(--display);
-    font-size: 1.15rem;
+    font-size: 1.08rem;
     font-weight: 700;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
 }
 
@@ -623,8 +653,9 @@ textarea:focus-visible {
     z-index: 1;
     top: 0;
     right: -3.5rem;
+    bottom: 0;
     width: min(62vw, 42rem);
-    height: min(92%, 40rem);
+    height: auto;
     margin: 0;
     pointer-events: none;
 }
@@ -651,24 +682,26 @@ textarea:focus-visible {
 .hero-board figcaption {
     position: absolute;
     z-index: 1;
-    left: 38%;
-    bottom: 9%;
+    top: 1.35rem;
+    right: 8%;
+    left: auto;
+    bottom: auto;
     margin: 0;
-    padding: 0.28rem 0.55rem;
+    padding: 0.22rem 0.5rem;
     background: var(--lime);
     color: var(--ink);
     font-family: var(--display);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 700;
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    transform: rotate(2.4deg);
-    box-shadow: 3px 3px 0 var(--pink);
+    transform: rotate(1.4deg);
+    box-shadow: 2px 2px 0 var(--pink);
 }
 
 /* Sections */
 .content-section {
-    padding: 4.25rem 0 4.5rem;
+    padding: 2.75rem 0 3rem;
     background: var(--ink);
 }
 
@@ -687,8 +720,8 @@ textarea:focus-visible {
 
 .section-heading {
     display: grid;
-    gap: 0.55rem;
-    margin-bottom: 2rem;
+    gap: 0.4rem;
+    margin-bottom: 1.1rem;
 }
 
 .section-heading .board-square {
@@ -700,8 +733,8 @@ textarea:focus-visible {
 #shows .section-heading .board-square,
 #follow .board-square {
     background: var(--lime);
-    box-shadow: 3px 3px 0 var(--blue);
-    transform: rotate(-2.2deg);
+    box-shadow: 2px 2px 0 var(--blue);
+    transform: rotate(-1.2deg);
 }
 
 #video .board-square,
@@ -1136,21 +1169,27 @@ textarea:focus-visible {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    .hero {
+        padding: 2.75rem 0 2.85rem;
+    }
+
     .hero__copy {
-        max-width: 58rem;
+        max-width: min(64rem, 100%);
     }
 
     .hero-show {
-        grid-template-columns: minmax(0, 1.35fr) minmax(16.5rem, 1fr);
+        grid-template-columns: minmax(0, 1.45fr) minmax(17.25rem, 0.95fr);
         grid-template-areas:
             "video next"
             "ctas next";
         align-items: start;
-        gap: 1.15rem 1.6rem;
+        gap: 0.75rem 1.25rem;
     }
 
-    .hero-next {
+    .hero-next,
+    .hero-show-card {
         max-width: none;
+        height: 100%;
     }
 }
 
@@ -1162,16 +1201,16 @@ textarea:focus-visible {
     .hero-board {
         top: -0.25rem;
         right: -1.5rem;
-        width: min(58vw, 14rem);
-        height: 9.5rem;
+        width: min(52vw, 12.5rem);
+        height: 8.25rem;
     }
 
     .hero-board::after {
-        background: linear-gradient(180deg, transparent 0%, transparent 42%, rgba(var(--ink-rgb), 0.55) 70%, rgba(var(--ink-rgb), 1) 86%);
+        background: linear-gradient(180deg, transparent 0%, transparent 36%, rgba(var(--ink-rgb), 0.62) 64%, rgba(var(--ink-rgb), 1) 82%);
     }
 
     .hero h1 {
-        font-size: clamp(1.85rem, 9vw, 3.4rem);
+        font-size: clamp(2.15rem, 11vw, 3.4rem);
         letter-spacing: 0.02em;
         -webkit-text-stroke-width: 2px;
         text-shadow: 2px 2px 0 var(--pink);
@@ -1195,12 +1234,12 @@ textarea:focus-visible {
     }
 
     .hero {
-        padding: 3.25rem 0 2.75rem;
-        min-height: min(72vh, 36rem);
+        padding: 1.75rem 0 2rem;
+        min-height: 0;
     }
 
     .content-section {
-        padding: 3.25rem 0 3.5rem;
+        padding: 2.25rem 0 2.5rem;
     }
 
     .button-row .button {
