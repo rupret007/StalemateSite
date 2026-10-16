@@ -15,10 +15,10 @@ const GAMES = [
     ['Turdanoid', 'play/TurdAnoid.html', /^Turdanoid\b/],
     ['Turdomania', 'play/turdomania.html', /^Turdomania$/],
     ['Turdtris', 'play/turdtris.html', /^Turdtris$/],
-    ['blackjack', 'play/turdjack.html', /^Crapjack 21$/],
-    ['rummy', 'play/turdrummy.html', /^TurdRummy/],
-    ['spades', 'play/turdspades.html', /^TurdSpades$/],
-    ['crazy eights', 'play/crapeights.html', /^Crappy Eights$/]
+    ['Crapjack 21', 'play/turdjack.html', /^Crapjack 21$/],
+    ['TurdRummy', 'play/turdrummy.html', /^TurdRummy/],
+    ['TurdSpades', 'play/turdspades.html', /^TurdSpades$/],
+    ['Crappy Eights', 'play/crapeights.html', /^Crappy Eights$/]
 ];
 
 test('every link on every page resolves and every external link is our Stalemate', async ({ page, request, baseURL }) => {
@@ -105,3 +105,25 @@ test('Games nav goes straight to all seven game cards in one click', async ({ pa
         await expect(cards.first()).toBeInViewport();
     }
 });
+
+// Every game chip is a real 44px target: taps just inside each edge land on that same link, never a neighbor.
+for (const vp of [{ width: 320, height: 640 }, { width: 390, height: 844 }, { width: 1366, height: 900 }]) {
+    test(`game chips own their whole tap box at ${vp.width}px`, async ({ page }) => {
+        await page.setViewportSize(vp);
+        await page.goto('/');
+        const list = page.locator('#games .games-card__list');
+        await list.scrollIntoViewIfNeeded();
+        const misses = await list.locator('a').evaluateAll((as) => as.flatMap((a) => {
+            const r = a.getBoundingClientRect();
+            const out = [];
+            if (r.height < 44 || r.width < 44) out.push(`${a.textContent} is ${r.width}x${r.height}`);
+            const midX = r.left + r.width / 2, midY = r.top + r.height / 2;
+            for (const [edge, x, y] of [['top', midX, r.top + 1], ['bottom', midX, r.bottom - 1], ['left', r.left + 1, midY], ['right', r.right - 1, midY]]) {
+                const hit = document.elementFromPoint(x, y);
+                if (!hit || hit.closest('a') !== a) out.push(`${a.textContent} ${edge} edge hits ${hit && (hit.closest('a')?.textContent || hit.tagName)}`);
+            }
+            return out;
+        }));
+        expect(misses).toEqual([]);
+    });
+}

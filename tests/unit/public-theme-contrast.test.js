@@ -73,8 +73,8 @@ describe('public dark theme contrast', () => {
         expect(tokens.blue).toBe('#009ee8');
         expect(tokens.lime).toBe('#b5dc08');
         expect(tokens.pink).toBe('#ed2765');
-        expect(tokens['ska-dark']).toBe('#171410');
-        expect(tokens['ska-light']).toBe('#f4f0e6');
+        expect(tokens['checker-dark']).toBe('#171410');
+        expect(tokens['checker-light']).toBe('#f4f0e6');
         expect(contrast(tokens.ink, '#000000')).toBeGreaterThanOrEqual(1.12);
         expect(contrast(tokens.cream, tokens.ink)).toBeGreaterThan(contrast(tokens.ink, '#000000'));
 

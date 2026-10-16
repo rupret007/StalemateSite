@@ -20,11 +20,11 @@
     --amber: #c98a24;
     --line: rgba(244, 240, 230, 0.36);
     --line-strong: rgba(244, 240, 230, 0.5);
-    --ska-dark: #171410;
-    --ska-light: #f4f0e6;
-    --ska-tile: 8px;
-    --ska-band: 24px;
-    --ska-hero-tile: 56px;
+    --checker-dark: #171410;
+    --checker-light: #f4f0e6;
+    --checker-tile: 8px;
+    --checker-band: 24px;
+    --checker-hero-tile: 56px;
     --display: "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
     --body: "Source Sans 3", "Segoe UI", sans-serif;
     --shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
@@ -126,12 +126,12 @@ textarea:focus-visible {
 .checker-belt,
 .checker-rule {
     height: 32px;
-    background-color: var(--ska-dark);
+    background-color: var(--checker-dark);
     background-image: repeating-conic-gradient(
-        var(--ska-dark) 0% 25%,
-        var(--ska-light) 0% 50%
+        var(--checker-dark) 0% 25%,
+        var(--checker-light) 0% 50%
     );
-    background-size: var(--ska-tile) var(--ska-tile);
+    background-size: var(--checker-tile) var(--checker-tile);
     -webkit-mask-image: url("assets/torn.svg");
     mask-image: url("assets/torn.svg");
     -webkit-mask-size: 100% 100%;
@@ -159,11 +159,11 @@ textarea:focus-visible {
     z-index: 50;
     min-height: 4.5rem;
     padding-top: env(safe-area-inset-top, 0px);
-    border-bottom: var(--ska-band) solid transparent;
+    border-bottom: var(--checker-band) solid transparent;
     background:
         linear-gradient(rgba(var(--ink-rgb), 0.94), rgba(var(--ink-rgb), 0.94)) padding-box,
-        repeating-conic-gradient(var(--ska-dark) 0% 25%, var(--ska-light) 0% 50%) border-box;
-    background-size: auto, var(--ska-tile) var(--ska-tile);
+        repeating-conic-gradient(var(--checker-dark) 0% 25%, var(--checker-light) 0% 50%) border-box;
+    background-size: auto, var(--checker-tile) var(--checker-tile);
     backdrop-filter: blur(16px);
 }
 
@@ -360,8 +360,8 @@ textarea:focus-visible {
     bottom: 0;
     height: 6px;
     background-image: repeating-conic-gradient(
-        var(--ska-dark) 0% 25%,
-        var(--ska-light) 0% 50%
+        var(--checker-dark) 0% 25%,
+        var(--checker-light) 0% 50%
     );
     background-size: 6px 6px;
 }
@@ -717,10 +717,10 @@ textarea:focus-visible {
     height: 100%;
     border: 0;
     background-image: repeating-conic-gradient(
-        var(--ska-dark) 0% 25%,
-        var(--ska-light) 0% 50%
+        var(--checker-dark) 0% 25%,
+        var(--checker-light) 0% 50%
     );
-    background-size: var(--ska-hero-tile) var(--ska-hero-tile);
+    background-size: var(--checker-hero-tile) var(--checker-hero-tile);
     box-shadow: none;
 }
 
@@ -853,12 +853,12 @@ textarea:focus-visible {
     top: -1px;
     left: -1px;
     right: -1px;
-    height: var(--ska-tile);
+    height: var(--checker-tile);
     background-image: repeating-conic-gradient(
-        var(--ska-dark) 0% 25%,
-        var(--ska-light) 0% 50%
+        var(--checker-dark) 0% 25%,
+        var(--checker-light) 0% 50%
     );
-    background-size: var(--ska-tile) var(--ska-tile);
+    background-size: var(--checker-tile) var(--checker-tile);
 }
 
 .panel h3 {
@@ -1013,11 +1013,11 @@ textarea:focus-visible {
     place-items: center;
     padding: 1.75rem 1.25rem;
     border: 1px solid var(--line);
-    border-top: var(--ska-tile) solid transparent;
+    border-top: var(--checker-tile) solid transparent;
     background:
         linear-gradient(var(--surface), var(--surface)) padding-box,
-        repeating-conic-gradient(var(--ska-dark) 0% 25%, var(--ska-light) 0% 50%) border-box;
-    background-size: auto, var(--ska-tile) var(--ska-tile);
+        repeating-conic-gradient(var(--checker-dark) 0% 25%, var(--checker-light) 0% 50%) border-box;
+    background-size: auto, var(--checker-tile) var(--checker-tile);
     color: var(--muted);
     text-align: center;
 }
@@ -1036,12 +1036,12 @@ textarea:focus-visible {
     left: 0;
     right: 0;
     bottom: 0;
-    height: var(--ska-band);
+    height: var(--checker-band);
     background-image: repeating-conic-gradient(
-        var(--ska-dark) 0% 25%,
-        var(--ska-light) 0% 50%
+        var(--checker-dark) 0% 25%,
+        var(--checker-light) 0% 50%
     );
-    background-size: var(--ska-tile) var(--ska-tile);
+    background-size: var(--checker-tile) var(--checker-tile);
 }
 
 .footer-layout {
@@ -1129,8 +1129,8 @@ textarea:focus-visible {
     width: min(40vw, 22rem);
     height: 100%;
     background-image: repeating-conic-gradient(
-        var(--ska-dark) 0% 25%,
-        var(--ska-light) 0% 50%
+        var(--checker-dark) 0% 25%,
+        var(--checker-light) 0% 50%
     );
     background-size: 48px 48px;
     pointer-events: none;
@@ -1449,7 +1449,7 @@ textarea:focus-visible {
     width: 112px;
     aspect-ratio: 1;
     border: 3px solid var(--cream);
-    background: repeating-conic-gradient(var(--ska-dark) 0 25%, var(--ska-light) 0 50%) 0 0 / 28px 28px;
+    background: repeating-conic-gradient(var(--checker-dark) 0 25%, var(--checker-light) 0 50%) 0 0 / 28px 28px;
 }
 .games-card__body h2 { margin: 0.2em 0; }
 .games-card__body p { margin: 0.35em 0; }
@@ -1462,8 +1462,8 @@ textarea:focus-visible {
 /* Games promo (homepage block, moved up under Listen) */
 .games-section { position: relative; }
 .games-section::before {
-    content: ""; display: block; height: var(--ska-band);
-    background: repeating-conic-gradient(var(--ska-dark) 0 25%, var(--ska-light) 0 50%) 0 0 / var(--ska-band) var(--ska-band);
+    content: ""; display: block; height: var(--checker-band);
+    background: repeating-conic-gradient(var(--checker-dark) 0 25%, var(--checker-light) 0 50%) 0 0 / var(--checker-band) var(--checker-band);
     margin-bottom: 28px;
 }
 .games-section .games-card {
@@ -1558,4 +1558,8 @@ textarea:focus-visible {
     .hero-show-card .next-show-block p { margin: 0.1rem 0; font-size: 0.875rem; }
 }
 
-.games-card__list a { display: inline-flex; align-items: center; min-height: 44px; margin-block: -8px; /* 44px tap box; negative margin keeps the sentence line spacing */ font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.games-card .games-card__list { display: flex; padding-inline-start: 0; margin-inline: 0; flex-wrap: wrap; gap: 8px; margin: 0.5em 0; padding: 0; list-style: none; }
+.games-card__list li { margin: 0; }
+/* Real 44px tap chips with 8px gaps: no overlapping hit areas. */
+.games-card__list a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border: 2px solid currentColor; border-radius: 999px; font-weight: 700; text-decoration: none; }
+.games-card__list a:hover, .games-card__list a:focus-visible { background: var(--lime); color: #171410; border-color: var(--lime); }

@@ -101,7 +101,7 @@ test('homepage Games card and nav link go to /play/, which stays noindex and out
     await expect(navLinks.last()).toHaveAttribute('href', 'play/#hub-games');
     const games = page.locator('#games');
     await expect(games.locator('.board-square')).toHaveText('Games');
-    await expect(games).toContainText('Turdanoid: our free arcade game. Plays in the browser, nothing to download.');
+    await expect(games).toContainText('Free, in the browser, scored by Stalemate songs.');
     await expect(games).toContainText('Brick-breaker, but gross.');
     await expect(games.locator('.games-card__thumb')).toBeVisible();
     const play = games.getByRole('link', { name: 'Play Turdanoid' });
@@ -116,7 +116,10 @@ test('homepage Games card and nav link go to /play/, which stays noindex and out
         expect(await img.evaluate((i) => i.complete && i.naturalWidth)).toBe(480);
     }
     const box = await games.locator('.games-card').boundingBox();
-    expect(box.height).toBeLessThan((page.viewportSize().width <= 760) ? 700 : 480);
+    // Phone limit raised 700 -> 740 (Oct 2026, PR #22): the seven game names are now real 44px
+    // tap chips with 8px gaps (Karen: no overlapping hit areas), which wrap to extra rows on phones.
+    // Desktop still fits the original 480.
+    expect(box.height).toBeLessThan((page.viewportSize().width <= 760) ? 740 : 480);
     // Countdown, show and Manic hero stay first; Games follows, then Listen and the band.
     expect(await page.locator('main > section').evaluateAll((s) => s.map((e) => e.id))).toEqual(['home', 'games', 'listen', 'about']);
     expect(await page.locator('a[href*="play"]').evaluateAll((a) => a.map((e) => e.getAttribute('href')))).toEqual(['play/#hub-games', 'play/TurdAnoid.html', 'play/turdomania.html', 'play/turdtris.html', 'play/turdjack.html', 'play/turdrummy.html', 'play/turdspades.html', 'play/crapeights.html', 'play/TurdAnoid.html', 'play/', 'play/TurdAnoid.html', 'play/turdomania.html']);
