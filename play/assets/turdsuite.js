@@ -1,5 +1,5 @@
 /* ============================================================
-   TurdAnoid Suite — shared runtime
+   Turdanoid Suite — shared runtime
    Loaded by every game. Provides:
    - Suite.toast(msg)       small floating message at the top
    - Suite.hype(msg, ms)    big center callout
