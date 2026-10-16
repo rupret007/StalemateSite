@@ -47,3 +47,4 @@ body:not(.is-host) .host-only{display:none}
 .tiles{display:flex;flex-wrap:wrap;gap:10px}
 .tile span{left:50%;transform:translateX(-50%);bottom:6px;border-radius:4px}
 [hidden]{display:none!important}
+.tiles .tile{margin:0;width:96px}
