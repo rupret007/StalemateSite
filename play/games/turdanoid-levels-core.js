@@ -26,14 +26,15 @@
     'Sewer Maze'
   ];
 
-  const CAMPAIGN_COLS = 11;
+  const CAMPAIGN_COLS = 9;
   const BALL_BASE_SPEED = 5.4;
   const BALL_PER_LEVEL = 0.16;
   const BALL_MAX_BONUS = 3.0;
 
   /**
    * Cell alphabet for campaign grids.
-   * . empty  1-4 HP  M metal(4)  X steel  D drip(2)  G gold(3)  T tar(3)
+   * . empty  1-4 HP  M metal(4)  S silver(2)  X steel (indestructible)
+   * D drip(2)  G gold(3)  T tar(3)  a-f one-hit colour bricks (palette 0-5)
    */
   const CELL_TYPES = {
     1: { hp: 1 },
@@ -44,443 +45,85 @@
     X: { hp: 99, metal: true, material: 'metal', indestructible: true },
     D: { hp: 2, hazard: 'drip', material: 'slime' },
     G: { hp: 3, material: 'gold' },
-    T: { hp: 3, material: 'tar' }
+    T: { hp: 3, material: 'tar' },
+    S: { hp: 2, metal: true, material: 'metal', silver: true },
+    a: { hp: 1, color: 0 },
+    b: { hp: 1, color: 1 },
+    c: { hp: 1, color: 2 },
+    d: { hp: 1, color: 3 },
+    e: { hp: 1, color: 4 },
+    f: { hp: 1, color: 5 }
   };
 
+  /*
+   * Hand-designed 9-column campaign modelled on Arkanoid (Taito, 1986):
+   * World 1 teaches with flat colour bands and clusters, World 2 adds 2-hit
+   * tiles and the first silver/metal fittings, Worlds 3-5 move to shaped
+   * pictures with steel (gold-style indestructible) frames, drips and tar.
+   * Letters a-f are 1-hit colour bricks so clusters read as one colour.
+   * See docs/arkanoid-level-research.md.
+   */
   const CAMPAIGN = [
-    {
-      level: 1,
-      name: 'Fresh Tiles',
-      pattern: 'Lesson Wall',
-      blurb: 'Two clean rows. Learn the bounce.',
-      grid: [
-        '11111111111',
-        '11111111111'
-      ]
-    },
-    {
-      level: 2,
-      name: 'Aim Gaps',
-      pattern: 'Split Lanes',
-      blurb: 'Three rows with two aim holes.',
-      grid: [
-        '1111.1.1111',
-        '11111111111',
-        '1111.1.1111'
-      ]
-    },
-    {
-      level: 3,
-      name: 'Soap Pyramid',
-      pattern: 'Pyramid',
-      blurb: 'First shaped wall. Work the sides in.',
-      grid: [
-        '11111111111',
-        '.111111111.',
-        '..1111111..',
-        '...11111...',
-        '....111....'
-      ]
-    },
-    {
-      level: 4,
-      name: 'Pipe Lane',
-      pattern: 'Tunnel',
-      blurb: 'Hollow pipe with a mid strut.',
-      grid: [
-        '11111111111',
-        '11.......11',
-        '11..111..11',
-        '11.......11',
-        '11111111111'
-      ]
-    },
-    {
-      level: 5,
-      name: 'Ripple',
-      pattern: 'Wave',
-      blurb: 'First 2-hit tiles ride the wave.',
-      grid: [
-        '.112111211.',
-        '11111111111',
-        '.121.1.121.',
-        '11111111111'
-      ]
-    },
-    {
-      level: 6,
-      name: 'Tile Keep',
-      pattern: 'Fortress',
-      blurb: 'Bathroom world boss. Steel corners, 2-hit core.',
-      grid: [
-        'X111111111X',
-        '11.22222.11',
-        'X1.......1X',
-        '11.22222.11',
-        'X111111111X'
-      ]
-    },
-    {
-      level: 7,
-      name: 'Downspout',
-      pattern: 'Columns',
-      blurb: 'Vertical pipes of 2-hit bricks.',
-      grid: [
-        '.2.2.2.2.2.',
-        '11111111111',
-        '2.2.2.2.2.2',
-        '11111111111',
-        '.2.2.2.2.2.'
-      ]
-    },
-    {
-      level: 8,
-      name: 'Manhole',
-      pattern: 'Ring',
-      blurb: 'A ring you can shoot through.',
-      grid: [
-        '.122222221.',
-        '12.......21',
-        '2....2....2',
-        '12.......21',
-        '.122222221.',
-        '.12.....21.'
-      ]
-    },
-    {
-      level: 9,
-      name: 'Iron Joints',
-      pattern: 'Metal Accents',
-      blurb: 'First metal fittings. Four hits each.',
-      grid: [
-        '.111211111.',
-        '11M11111M11',
-        '.111111111.',
-        '11M11111M11',
-        '.111211111.'
-      ]
-    },
-    {
-      level: 10,
-      name: 'Sewer Maze',
-      pattern: 'Corridors',
-      blurb: 'Two shafts. Clear the corridors, not the walls.',
-      grid: [
-        '111.212.111',
-        '1.1.2.1.2.1',
-        '111.212.111',
-        '1.1.2.2.1.1',
-        '111.212.111',
-        '1.1.1.1.1.1',
-        '111.212.111'
-      ]
-    },
-    {
-      level: 11,
-      name: 'Drip Line',
-      pattern: 'Hazard Box',
-      blurb: 'First slime drip. Break it to shut the leak.',
-      grid: [
-        '12121212121',
-        '1111D111111',
-        '12121212121',
-        '.121212121.',
-        '12121212121'
-      ]
-    },
-    {
-      level: 12,
-      name: 'Pump Station',
-      pattern: 'Fortress',
-      blurb: 'Sewer world boss. Dual drips behind a 2-hit shell.',
-      grid: [
-        'X222222222X',
-        '2D.22222.D2',
-        'X2.2...2.2X',
-        '22.22222.22',
-        'X222222222X'
-      ]
-    },
-    {
-      level: 13,
-      name: 'Lagoon Gem',
-      pattern: 'Diamond',
-      blurb: 'A 2-hit diamond with twin drips in the core.',
-      grid: [
-        '....323....',
-        '...22322...',
-        '..2222222..',
-        '.2222D2222.',
-        '..222D222..',
-        '...22322...',
-        '....323....'
-      ]
-    },
-    {
-      level: 14,
-      name: 'Toxic Cross',
-      pattern: 'Cross',
-      blurb: 'A 3-hit cross. Arms first, then the dripping hub.',
-      grid: [
-        '..1.333.1..',
-        '....333....',
-        '....333....',
-        '3333D3D3333',
-        '....333....',
-        '....333....',
-        '..1.333.1..'
-      ]
-    },
-    {
-      level: 15,
-      name: 'Hourglass Vat',
-      pattern: 'Hourglass',
-      blurb: 'Pour through the waist. Three drips in the neck.',
-      grid: [
-        '22222222222',
-        '.222...222.',
-        '..22...22..',
-        '...2D2D2...',
-        '..22.D.22..',
-        '.222...222.',
-        '22222222222'
-      ]
-    },
-    {
-      level: 16,
-      name: 'Iron Gate',
-      pattern: 'Steel Lanes',
-      blurb: 'First steel lanes. Shoot the open columns.',
-      grid: [
-        'X.3333333.X',
-        'X.3.222.3.X',
-        'X.3.DDD.3.X',
-        'X.3.222.3.X',
-        'X.3333333.X',
-        'X.3.....3.X',
-        'X.3333333.X'
-      ]
-    },
-    {
-      level: 17,
-      name: 'Eddy',
-      pattern: 'Spiral',
-      blurb: 'A 3-hit box around a 2-hit eddy of drips.',
-      grid: [
-        '33333333333',
-        '3.........3',
-        '3.2222222.3',
-        '3.2.DDD.2.3',
-        '3.2222222.3',
-        '3.........3',
-        '.2.2.2.2.2.'
-      ]
-    },
-    {
-      level: 18,
-      name: 'Sludge Citadel',
-      pattern: 'Fortress',
-      blurb: 'Toxic world boss. Steel frame, four drips, 3-hit caps.',
-      grid: [
-        'X333333333X',
-        'X2D22222D2X',
-        'X2.2X.X2.2X',
-        'X2D22222D2X',
-        'X333333333X',
-        'X2.......2X',
-        'X222222222X'
-      ]
-    },
-    {
-      level: 19,
-      name: 'Jawbreaker',
-      pattern: 'Gold Checker',
-      blurb: 'Candy gold mixed with 2-hits. Four drips.',
-      grid: [
-        'G2G1G2G1G2G',
-        '2G21G2G12G1',
-        'G2G1D2D1G2G',
-        '2GD1G2G1DG1',
-        'G2G1G2G1G2G'
-      ]
-    },
-    {
-      level: 20,
-      name: 'Sugar Zig',
-      pattern: 'Zigzag',
-      blurb: 'A descending candy staircase over a 3-hit shelf.',
-      grid: [
-        '333........',
-        '.333.......',
-        '..333.D....',
-        '...333.D...',
-        '....333.D..',
-        '.....333.D.',
-        '......33333',
-        '33333333333',
-        '22222222222'
-      ]
-    },
-    {
-      level: 21,
-      name: 'Sticky Swirl',
-      pattern: 'Swirl',
-      blurb: 'Nested 3-hit rings. Five drips in the coils.',
-      grid: [
-        '22222222222',
-        '3.........3',
-        '3.333D333.3',
-        '3.3.D.D.3.3',
-        '3.333D333.3',
-        '3....D....3',
-        '33333333333'
-      ]
-    },
-    {
-      level: 22,
-      name: 'Candy Vault',
-      pattern: 'Vault',
-      blurb: 'Steel frame around gold and five drips.',
-      grid: [
-        'X.........X',
-        'X222222222X',
-        'X3D33333D3X',
-        'X333D33333X',
-        'X3D3G3G3D3X',
-        'X333333333X',
-        'X3.......3X',
-        'X222222222X'
-      ]
-    },
-    {
-      level: 23,
-      name: 'Caramel Wall',
-      pattern: 'Dense Wall',
-      blurb: 'A thick 3-hit caramel slab. Few gaps.',
-      grid: [
-        '33333333333',
-        '3D3222323D3',
-        '3333D333333',
-        '3D3222323D3',
-        '33333333333'
-      ]
-    },
-    {
-      level: 24,
-      name: 'Cotton Keep',
-      pattern: 'Fortress',
-      blurb: 'Candy world boss. Gold turrets, six drips.',
-      grid: [
-        'X444444444X',
-        'X3D33333D3X',
-        'XG.3.D.3.GX',
-        'X3D33333D3X',
-        'X333D33333X',
-        'X3.3.3.3.3X',
-        'X333333333X'
-      ]
-    },
-    {
-      level: 25,
-      name: 'Gilded Stairs',
-      pattern: 'Steps',
-      blurb: 'Gold steps over a 3-hit throne floor.',
-      grid: [
-        'GGG........',
-        '.GGG.......',
-        '..GGG.D....',
-        '...GGG.D...',
-        '....GGG.D..',
-        '.....GGG.D.',
-        '......GGG.D',
-        '33333333333',
-        '33333333333',
-        'D4444444...'
-      ]
-    },
-    {
-      level: 26,
-      name: 'Royal Skull',
-      pattern: 'Skull',
-      blurb: 'A 4-hit skull with gold eyes and a dripping grin.',
-      grid: [
-        '..4444444..',
-        '.44.....44.',
-        '44.GG.GG.44',
-        '44.GG.GG.44',
-        '.44.DDD.44.',
-        '..44DDD44..',
-        '...4...4...',
-        '.233333332.'
-      ]
-    },
-    {
-      level: 27,
-      name: 'Throne Guard',
-      pattern: 'Gauntlet',
-      blurb: 'Steel posts and seven drips. Stay in the lanes.',
-      grid: [
-        'X333333333X',
-        '3.3.....3.3',
-        'X4.4...4.4X',
-        '4D.44444.D4',
-        'X4.444D4.4X',
-        '4D.44444.D4',
-        'X4.D...D.4X',
-        '3.3.....3.3',
-        'X333333333X'
-      ]
-    },
-    {
-      level: 28,
-      name: 'Crown Jewel',
-      pattern: 'Framed Diamond',
-      blurb: 'Gold gems in a 4-hit crown, steel sides.',
-      grid: [
-        'X.........X',
-        'X322222223X',
-        'X3D33333D3X',
-        'X444434444X',
-        'X4D4G4G4D4X',
-        'X4444D4444X',
-        'X3D33333D3X',
-        'X333333333X'
-      ]
-    },
-    {
-      level: 29,
-      name: 'Royal Gauntlet',
-      pattern: 'Three Lanes',
-      blurb: 'Three shafts. Eight drips. Do not get boxed in.',
-      grid: [
-        '33.33.33.33',
-        '44.DD.DD.44',
-        'XX.33.33.XX',
-        '33.33.33.33',
-        '33.33333.33',
-        'XX.DD.DD.XX',
-        '33.33.33.33',
-        '33.33.33.33',
-        '44.44444.44'
-      ]
-    },
-    {
-      level: 30,
-      name: 'Golden Throne',
-      pattern: 'Final Fortress',
-      blurb: 'Campaign finale. Gold, steel, eight drips.',
-      grid: [
-        'X3X33333X3X',
-        '4G4.....4G4',
-        'X4D4.D.4D4X',
-        '4G4.GDG.4G4',
-        'X4D4...4D4X',
-        '4G4.GGG.4G4',
-        'X4D4...4D4X',
-        '4G4.....4G4',
-        'X4X44444X4X'
-      ]
-    }
+    { level: 1, name: 'Fresh Tiles', pattern: 'Lesson Bands', blurb: 'Two colour bands. Learn the bounce.',
+      grid: ['aaaaaaaaa', 'bbbbbbbbb', '...ccc...'] },
+    { level: 2, name: 'Rainbow Rows', pattern: 'Colour Bands', blurb: 'Four bands with an aim gap.',
+      grid: ['ddddddddd', 'ccccccccc', 'bbbb.bbbb', 'aaaa.aaaa'] },
+    { level: 3, name: 'Soap Pyramid', pattern: 'Pyramid', blurb: 'First shaped wall. Work the sides in.',
+      grid: ['fffffffff', 'eeeeeeeee', '.ddddddd.', '..ccccc..', '...bbb...', '....a....'] },
+    { level: 4, name: 'Four Corners', pattern: 'Colour Clusters', blurb: 'Four colour blocks and a cross.',
+      grid: ['aaa...bbb', 'aaa...bbb', 'aaa.e.bbb', '...eee...', 'ccc.e.ddd', 'ccc...ddd', 'ccc...ddd'] },
+    { level: 5, name: 'Ripple', pattern: 'Wave', blurb: 'First 2-hit tiles ride the bands.',
+      grid: ['.f2fff2f.', 'eeeeeeeee', 'd2d.d.d2d', 'ccccccccc', 'bbbbbbbbb'] },
+    { level: 6, name: 'Tile Keep', pattern: 'Fortress', blurb: 'Bathroom boss. Steel corners, 2-hit walls.',
+      grid: ['X2222222X', '2a.....a2', 'X.bbbbb.X', '2a.....a2', 'X2222222X', '..ccccc..'] },
+    { level: 7, name: 'Downspout', pattern: 'Columns', blurb: 'Pipes of 2-hit tiles between bands.',
+      grid: ['2.2.2.2.2', 'aaaaaaaaa', '.2.2.2.2.', 'bbbbbbbbb', '2.2.2.2.2', 'ccccccccc'] },
+    { level: 8, name: 'Manhole', pattern: 'Ring', blurb: 'A 2-hit ring around a soft core.',
+      grid: ['..22222..', '.2ddddd2.', '2d.....d2', '2d..e..d2', '2d.....d2', '.2ddddd2.', '..22222..'] },
+    { level: 9, name: 'Iron Joints', pattern: 'Metal Accents', blurb: 'First metal fittings. Four hits each.',
+      grid: ['.aaaaaaa.', 'bMbbbbbMb', '.ccc2ccc.', 'dMdddddMd', '.eeeeeee.', 'fffffffff'] },
+    { level: 10, name: 'Sewer Maze', pattern: 'Corridors', blurb: 'Silver spine, colour corridors.',
+      grid: ['aaa.S.aaa', 'a2a.S.a2a', 'bbb.S.bbb', 'b2b.S.b2b', 'ccc.S.ccc', 'c2c...c2c', 'ddddddddd', 'eeeeeeeee'] },
+    { level: 11, name: 'Drip Line', pattern: 'Hazard Bands', blurb: 'First slime drip. Break it to stop the leak.',
+      grid: ['2a2a2a2a2', 'aaaaDaaaa', '2b2b2b2b2', '.b2b2b2b.', '2c2c2c2c2', 'ccccccccc'] },
+    { level: 12, name: 'Pump Station', pattern: 'Fortress', blurb: 'Sewer boss. Two drips behind a steel frame.',
+      grid: ['X2222222X', '2D.222.D2', 'X2.2S2.2X', '22.222.22', 'X2222222X', '..33333..'] },
+    { level: 13, name: 'Soft Serve', pattern: 'Swirl', blurb: 'The classic swirl, built in 3-hit tiles.',
+      grid: ['....3....', '...333...', '..D222D..', '.2222222.', '333333333', '.2222222.', 'eeeeeeeee'] },
+    { level: 14, name: 'Space Turd', pattern: 'Invader', blurb: 'An invader with drippy feet.',
+      grid: ['..3...3..', '...3.3...', '..33333..', '.3DS3SD3.', '333333333', '3.33333.3', '3.3...3.3', '..3...3..'] },
+    { level: 15, name: 'Plunger', pattern: 'Plunger', blurb: 'Metal cup, 3-hit handle.',
+      grid: ['.MMMMMMM.', 'MD33333DM', '...333...', '...333...', '...333...', '..33333..', 'fffffffff', 'eeeeeeeee'] },
+    { level: 16, name: 'Throne Room', pattern: 'Toilet', blurb: 'Silver seat, steel feet.',
+      grid: ['33333....', '3SSS3....', '33333....', '.3333333.', '.3DSSSD3.', '..44444..', '..44444..', '...X.X...', '..XX.XX..'] },
+    { level: 17, name: 'Love Log', pattern: 'Heart', blurb: 'A 4-hit heart that drips.',
+      grid: ['.33...33.', '3443.3443', '344434443', '344444443', '.3444443.', '..3D4D3..', '...3D3...', '....3....'] },
+    { level: 18, name: 'Porcelain Gate', pattern: 'Castle', blurb: 'Lagoon boss. Steel battlements, silver gate.',
+      grid: ['X.X.X.X.X', '444444444', '4D44S44D4', '444S.S444', '44S...S44', '44S...S44', '444.D.444', 'XX4...4XX'] },
+    { level: 19, name: 'Tar Pit', pattern: 'Tar Bands', blurb: 'Sticky tar bands, gold glints.',
+      grid: ['TTTDTDTTT', '3G33333G3', 'TTTTTTTTT', '3D33333D3', 'TTTTTTTTT', '444444444', '3.......3'] },
+    { level: 20, name: 'Hourglass', pattern: 'Hourglass', blurb: 'Steel pinch in the middle.',
+      grid: ['444444444', '.4444444.', '..D444D..', '...X4X...', '...X4X...', '..34443..', '.3344433.', '333DGD333', 'TTTTTTTTT'] },
+    { level: 21, name: 'Diamond Flush', pattern: 'Diamond', blurb: 'A gold-cored diamond in steel brackets.',
+      grid: ['X..444..X', 'X.44444.X', '..44G44..', '.44GDG44.', '444D4D444', '.44GDG44.', '..44G44..', 'X.44444.X', 'X..444..X'] },
+    { level: 22, name: 'Skull Bowl', pattern: 'Skull', blurb: '4-hit skull, gold eyes, dripping grin.',
+      grid: ['..44444..', '.4444444.', '44GG4GG44', '44GG4GG44', '.4444444.', '..4DDD4..', '..4.D.4..', '.TTTTTTT.', 'MMMMMMMMM'] },
+    { level: 23, name: 'Clog Lattice', pattern: 'Mesh', blurb: 'Steel lattice with tar pockets.',
+      grid: ['4T4T4T4T4', 'X4X4X4X4X', '4D4G4G4D4', 'X.X.X.X.X', '4T4T4T4T4', 'X4X4X4X4X', '4G4D4D4G4', '444444444', 'MMMMMMMMM'] },
+    { level: 24, name: 'Royal Flush', pattern: 'Crown', blurb: 'Candy boss. A crown of gold and steel.',
+      grid: ['4.4.4.4.4', '4X4X4X4X4', '444444444', '4GDG4GDG4', '444444444', 'MMMMMMMMM', 'TTTTTTTTT', 'X..DDD..X', '444444444'] },
+    { level: 25, name: 'Twin Pipes', pattern: 'Split', blurb: 'Two steel pipes split the board.',
+      grid: ['444X4X444', '4G4XDX4G4', '44DX4XD44', 'MM4X4X4MM', '444X4X444', 'MM4X4X4MM', '44D444D44', 'TTTTTTTTT', 'TTTTTTTTT'] },
+    { level: 26, name: 'Sludge Spiral', pattern: 'Spiral', blurb: 'Follow the spiral in to the gold core.',
+      grid: ['444444444', '44..D..44', '4.44444.4', '4.4DGD4.4', '4.4G4G4.4', '4.4D4D4.4', '4.44444.4', '4.44444.4', 'MMMMMMMMM'] },
+    { level: 27, name: 'Cathedral', pattern: 'Arches', blurb: 'Steel arches over gold windows.',
+      grid: ['XX44444XX', 'X4GGGGG4X', '44G4D4G44', '44GD4DG44', '44G4D4G44', 'X4GGGGG4X', '4.4.D.4.4', 'MMMMMMMMM', '444444444'] },
+    { level: 28, name: 'Septic Fort', pattern: 'Fortress', blurb: 'Every wall fights back.',
+      grid: ['X4X4X4X4X', '4DMMMMMD4', '4M44G44M4', '4MGDGDGM4', '4M44G44M4', '4DMMMMMD4', '444444444', 'GGGGGGGGG', '4X4.4.4X4'] },
+    { level: 29, name: 'Last Wipe', pattern: 'Gauntlet', blurb: 'Dense tar and gold before the king.',
+      grid: ['GGGGGGGGG', '4D4G4G4D4', 'MMMMMMMMM', '4G4D4D4G4', '444444444', 'GDGGGGGDG', 'MMMMMMMMM', 'X4X4X4X4X', '444444444'] },
+    { level: 30, name: 'Sewer King', pattern: 'Boss Wall', blurb: 'Final boss. Gold, steel and eight drips.',
+      grid: ['44GGGGG44', 'DMMMMMMMD', '4G4D4D4G4', 'MMMMMMMMM', 'G4DGGGD4G', '4D44G44D4', 'MMMMMMMMM', 'GGGGGGGGG', '4X44444X4'] }
   ];
 
   function allPatternNames() {
@@ -584,6 +227,22 @@
     return CELL_TYPES[ch] || null;
   }
 
+  /**
+   * Plain multi-hit tiles get one colour per hit count (2 cyan, 3 orange,
+   * 4 pink) so shapes read as clusters, like Arkanoid, instead of random tints.
+   */
+  const HP_COLOR = { 2: 1, 3: 3, 4: 4 };
+
+  function cellColor(spec) {
+    if (Number.isInteger(spec.color)) {
+      return spec.color;
+    }
+    if (!spec.material && Object.hasOwn(HP_COLOR, spec.hp)) {
+      return HP_COLOR[spec.hp];
+    }
+    return null;
+  }
+
   function normalizeDefinition(raw) {
     const grid = (raw.grid || []).map((row) => String(row));
     const cols = grid.reduce((max, row) => Math.max(max, row.length), 0) || CAMPAIGN_COLS;
@@ -604,6 +263,38 @@
   }
 
   const DEFINITIONS = CAMPAIGN.map(normalizeDefinition);
+
+  /** Smallest brick the campaign may draw, measured on a 320px phone. */
+  const MIN_BRICK_W = 28;
+  const MIN_BRICK_H = 20;
+  /** Tallest wall; keeps 20px bricks inside 60% of a 320x480 phone (304x464 canvas). */
+  const MAX_ROWS = 9;
+
+  /**
+   * Brick placement for a playfield. Fewer, wider columns (9) with a 0.7
+   * height ratio so a 320px phone still gets ~28x20 bricks.
+   */
+  function brickGeometry(width, height, cols = CAMPAIGN_COLS, rows = 1) {
+    const W = Math.max(1, Number(width) || 0);
+    const H = Math.max(1, Number(height) || 0);
+    const n = Math.max(1, Math.floor(cols) || CAMPAIGN_COLS);
+    const top = 70;
+    const padX = Math.max(8, Math.round(W * 0.03));
+    const gap = W < 420 ? 4 : 6;
+    let rowGap = 4;
+    const bw = (W - padX * 2 - gap * (n - 1)) / n;
+    let bh = Math.max(MIN_BRICK_H, Math.min(32, Math.round(bw * 0.7)));
+    const maxWallH = H * 0.6 - top;
+    const r = Math.max(1, Math.min(MAX_ROWS, Math.floor(rows) || 1));
+    // Short phones: tighten the row gap first, then shrink toward (never below) MIN_BRICK_H.
+    if (r * (bh + rowGap) > maxWallH) {
+      rowGap = 2;
+    }
+    if (r * (bh + rowGap) > maxWallH) {
+      bh = Math.max(MIN_BRICK_H, Math.floor(maxWallH / r - rowGap));
+    }
+    return { top, padX, gap, rowGap, bw, bh };
+  }
 
   function definitionForLevel(level) {
     const lv = Math.max(1, Math.min(DEFINITIONS.length, Math.floor(level || 1)));
@@ -632,7 +323,8 @@
           metal: !!spec.metal,
           indestructible: !!spec.indestructible,
           hazard: spec.hazard || null,
-          material: spec.material || null
+          material: spec.material || null,
+          color: cellColor(spec)
         });
       }
     }
@@ -842,6 +534,10 @@
     EXTRA_PATTERN_NAMES,
     CELL_TYPES,
     CAMPAIGN_COLS,
+    MIN_BRICK_W,
+    MIN_BRICK_H,
+    MAX_ROWS,
+    brickGeometry,
     allPatternNames,
     shouldPlaceBrick,
     computeBallSpeed,

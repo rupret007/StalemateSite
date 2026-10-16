@@ -196,6 +196,9 @@
     .hud .right,.hud .center{margin-right:0;text-align:center}
     .hud .col{padding:3px 7px 4px;min-width:0;flex:1 1 0;align-items:center;background:transparent;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;border-radius:0}
     .hud .col + .col{border-left:1px solid rgba(232,197,106,.18)}
+    /* The HUD box already starts right of the back pill (left:68px). turdsuite.css
+       also pads it by the pill reserve, which squeezed SCORE/LEVEL/LIVES together at 320px. */
+    #playShell .hud{padding-left:2px !important}
     .hud .lbl{display:block;position:static;width:auto;height:auto;overflow:visible;clip:auto;font-size:.66em;letter-spacing:.06em;text-shadow:0 1px 4px #000}
   }
   @media (max-width:420px){
@@ -657,11 +660,11 @@ const HYPE_LINES = [
 ];
 const PICKUP_QUIPS = {
   enlarge: ["BIG SEAT ENERGY","WIDER, FRIEND","LARGEST POSSIBLE LOAD"],
-  slow:    ["SLO-MO POO","TIME-OUT TURD","DECELERATE THE FECES"],
-  laser:   ["LASER COLON","PEW PEW POO","BEAM ME UP, SCATTY"],
-  paper:   ["TP DEPLOY","2-PLY ARSENAL","CHARMIN UNLEASHED"],
-  catch:   ["STICKY SITUATION","GLUED TO THE THRONE","HOLD IT"],
-  multi:   ["MULTIBALL!","TURD STORM","LITTERED LANDING"],
+  slow:    ["SPRAY & SLAY","FEBREEZE THE BALL","LAVENDER LOCKDOWN"],
+  laser:   ["TP CANNON!","2-PLY ARTILLERY","UNROLL THE FURY"],
+  paper:   ["SPITWADS!","WET WILLY WAR","PTOO PTOO"],
+  catch:   ["PLUNGER GRIP","SUCTION SECURED","HOLD IT"],
+  multi:   ["MOSH PIT!","CIRCLE PIT","STAGE DIVE ×3"],
   shield:  ["SEAT SHIELD","BUM-PROOF GLASS","ANTI-DROP DEPLOYED"],
   life:    ["EXTRA TURD!","ONE MORE FLUSH","BONUS DOOKIE"],
   fire:    ["FIRE BUTT","SPICY DEPLOY","CHILI AFTERMATH"],
@@ -669,12 +672,14 @@ const PICKUP_QUIPS = {
   shrink:  ["TINY SEAT 😬","SQUISHED!","SMOL CHEEKS"],
   speed:   ["TURBO TURD","FULL CHARGE","ROCKET FUELED CURRY"],
   plunger: ["PLUNGER PARTY","MAGNET MODE","COME TO PAPA"],
-  flush:   ["MEGA FLUSH!","ROW REMOVED","BOTTOM-OUT"],
+  flush:   ["MEGA WIPE!","WIPED CLEAN","ROW REMOVED"],
   hotdog:  ["HOT DOG ROCKETS","WIENER WARFARE","KETCHUP DEPLOY"],
   ghost:   ["GHOST POO","NO-CLIP MODE","BOO-DOOKIE"],
   skunk:   ["STINK CLOUD","ODOR BOMB","FRAGRANCE OF DOOM"],
   gold:    ["GOLD RUSH!","DOUBLE DOOKIE","2× POINTS"],
   reverse: ["BACKWARDS!","UH-OH","CONTROLS SCRAMBLED"],
+  warp:    ["FLUSHED!","DOWN THE PIPES","SEE YOU NEXT ROUND"],
+  chord:   ["KERRANG!","TURN IT TO 11","WALL OF SOUND"],
 };
 const GAME_OVER_QUIPS = [
   "Looks like you got plunged.",
@@ -779,6 +784,9 @@ const sfx = {
   bounce:()=>playProfile('wall'),
   metal: ()=>playProfile('metal'),
   gold:  ()=>playProfile('gold'),
+  // Flush Warp: a gurgling downward glide. Power Chord: a crunchy two-note power chord.
+  flushWarp: ()=>{ beep(620,0.35,'sine',0.07,-520); setTimeout(()=>beep(300,0.3,'triangle',0.06,-200),180); },
+  chord: ()=>{ beep(110,0.4,'sawtooth',0.07,0); beep(165,0.4,'sawtooth',0.06,0); beep(220,0.35,'square',0.04,0); },
 };
 
 /* ---- DOM helpers ---- */
@@ -1067,7 +1075,7 @@ function drawTitleAttract(rts){
       vx: titleDemoBall.vx, vy: titleDemoBall.vy, fire: 0, ghost: 0, trail: [], squash: 0
     }, { reducedMotion: true });
     TSPRITE.paintCapsule(ctx, {
-      x: W * 0.14, y: wallBottom + 22, col: '#5ec8e0', e: '🔫', lab: 'Laser', wob: now * 0.004
+      x: W * 0.14, y: wallBottom + 22, col: '#5ec8e0', e: '🧻', lab: 'TP', wob: now * 0.004
     }, now, { reducedMotion: calm });
     TSPRITE.paintCapsule(ctx, {
       x: W * 0.86, y: wallBottom + 18, col: '#ff6d5a', e: '🔥', lab: 'Fire', wob: now * 0.004 + 1.2
@@ -1138,8 +1146,8 @@ function scalePointerLerp(ts, perFrame){
   return 1 - Math.pow(1 - base, Math.max(0, ts));
 }
 function paddleKeepsTimedSize(){
-  // Enlarge/Shrink chips survive a wall clear the same way Slow/Fire/Ghost do.
-  // Death is the path that clears activePowers and returns to base width.
+  // Round advance (finishClearTally) and death both clear activePowers first,
+  // so this only keeps size across a direct newLevel() rebuild (QA/restart churn).
   return !!(activePowers.big || activePowers.shrink);
 }
 function computeTimedBallSpeed(baseSpeed){
@@ -1164,8 +1172,8 @@ function syncTimedBallSpeeds(){
 function newBall(stuck=true){
   const r = Math.max(8, Math.min(11, W*0.018));
   const baseSpeed = 5.4 + Math.min(level*0.16, 3.0);
-  // Timed power chips survive a wall clear, so the replacement ball must
-  // keep the ball-scoped effects they still advertise.
+  // Death and round changes clear activePowers first; any chip still alive
+  // (direct newLevel() rebuilds) keeps its ball-scoped effect on the new ball.
   const speed = computeTimedBallSpeed(baseSpeed);
   const ang = -Math.PI/2 + (Math.random()-0.5)*0.4;
   return {
@@ -1195,10 +1203,13 @@ function newLevel(){
   const campaign = TLEVELS && TLEVELS.definitionForLevel ? TLEVELS.definitionForLevel(level) : null;
   const cols = campaign ? campaign.cols : Math.max(8, Math.min(13, Math.floor(W/52)));
   const rows = campaign ? campaign.rows : Math.min(10, 4 + Math.floor(level/2));
-  const top = 70;
-  const padX = Math.max(10, W*0.04);
-  const bw = (W - padX*2)/cols - 6;
-  const bh = Math.max(16, Math.min(26, H*0.028));
+  const geo = TLEVELS && TLEVELS.brickGeometry ? TLEVELS.brickGeometry(W, H, cols, rows) : null;
+  const top = geo ? geo.top : 70;
+  const padX = geo ? geo.padX : Math.max(10, W*0.04);
+  const gapX = geo ? geo.gap : 6;
+  const gapY = geo ? geo.rowGap : 5;
+  const bw = geo ? geo.bw : (W - padX*2)/cols - 6;
+  const bh = geo ? geo.bh : Math.max(16, Math.min(26, H*0.028));
   const pat = campaign ? campaign.pattern : PATTERN_NAMES[(level-1) % PATTERN_NAMES.length];
   brickSpriteCache.clear();
   if(gameMode === 'boss'){
@@ -1213,11 +1224,13 @@ function newLevel(){
   }
 
   function add(c,r,hp,flags){
-    const x = padX + c*(bw+6) + 3;
-    const y = top + r*(bh+5);
+    const x = geo ? padX + c*(bw+gapX) : padX + c*(bw+6) + 3;
+    const y = top + r*(bh+gapY);
     const wi = TWORLDS ? TWORLDS.worldIndexForLevel(level) : 0;
     const forced = flags && flags.material;
-    const colors = BRICK_ART ? BRICK_ART.assignBrickStyle(r, rows, c, level, Math.random, wi) : brickColors(r, rows);
+    const swatch = flags && Number.isInteger(flags.color) && BRICK_ART && BRICK_ART.ROW_PALETTES[flags.color];
+    const colors = swatch ? { c1: swatch[0], c2: swatch[1], glow: swatch[2], material: 'sewer' }
+      : (BRICK_ART ? BRICK_ART.assignBrickStyle(r, rows, c, level, Math.random, wi) : brickColors(r, rows));
     const brick = {x,y,w:bw,h:bh,hp,maxHp:hp,c1:colors.c1,c2:colors.c2,glow:colors.glow,material:forced || colors.material||'sewer',wob:Math.random()*Math.PI*2,hitFlash:0,metal:!!(flags&&flags.metal),indestructible:!!(flags&&flags.indestructible),hazard:flags&&flags.hazard||null,hazardCd:0};
     if(forced) paintSpecialBrick(brick);
     bricks.push(brick);
@@ -1465,20 +1478,20 @@ function powerChipTitle(type, fallback){
 function updatePowers(){
   const f = 60*8;
   const items = [];
-  if(activePowers.big)     items.push(powerChip('📏 Big', activePowers.big, f*2.5, powerChipTitle('enlarge', 'Big paddle')));
-  if(activePowers.slow)    items.push(powerChip('🐌 Slow', activePowers.slow, f, powerChipTitle('slow', 'Slow ball')));
-  if(activePowers.laser)   items.push(powerChip('🔫 Laser', activePowers.laser, f, powerChipTitle('laser', 'Laser')));
-  if(activePowers.paper)   items.push(powerChip('🧻 TP', activePowers.paper, f, powerChipTitle('paper', 'Toilet paper')));
-  if(activePowers.sticky)  items.push(powerChip('🧲 Catch', activePowers.sticky, f, powerChipTitle('catch', 'Sticky catch')));
-  if(activePowers.fire)    items.push(powerChip('🔥 Fire', activePowers.fire, f, powerChipTitle('fire', 'Fire ball')));
-  if(activePowers.shield)  items.push(powerChip('🛡️ Shield', activePowers.shield, f*1.5, powerChipTitle('shield', 'Shield')));
-  if(activePowers.hotdog)  items.push(powerChip('🌭 Dogs', activePowers.hotdog, f, powerChipTitle('hotdog', 'Hot dog rockets')));
-  if(activePowers.plunger) items.push(powerChip('🪠 Magnet', activePowers.plunger, f*1.2, powerChipTitle('plunger', 'Plunger magnet')));
-  if(activePowers.ghost)   items.push(powerChip('👻 Ghost', activePowers.ghost, 60*5, powerChipTitle('ghost', 'Ghost ball')));
-  if(activePowers.gold)    items.push(powerChip('💰 2×', activePowers.gold, 60*6, powerChipTitle('gold', 'Gold rush')));
-  if(activePowers.shrink)  items.push(powerChip('😬 Shrunk', activePowers.shrink, f, powerChipTitle('shrink', 'Shrink paddle')));
-  if(activePowers.fast)    items.push(powerChip('💨 Speed', activePowers.fast, f, powerChipTitle('speed', 'Speed up')));
-  if(activePowers.reverse) items.push(powerChip('🔄 Reversed', activePowers.reverse, 60*5, powerChipTitle('reverse', 'Reversed controls')));
+  if(activePowers.big)     items.push(powerChip('🍑 Wide', activePowers.big, f*2.5, powerChipTitle('enlarge', 'Wide Load')));
+  if(activePowers.slow)    items.push(powerChip('🌸 Fresh', activePowers.slow, f, powerChipTitle('slow', 'Air Freshener')));
+  if(activePowers.laser)   items.push(powerChip('🧻 TP', activePowers.laser, f, powerChipTitle('laser', 'TP Cannon')));
+  if(activePowers.paper)   items.push(powerChip('💦 Wads', activePowers.paper, f, powerChipTitle('paper', 'Spitwad Spread')));
+  if(activePowers.sticky)  items.push(powerChip('🪠 Catch', activePowers.sticky, f, powerChipTitle('catch', 'Plunger Catch')));
+  if(activePowers.fire)    items.push(powerChip('🌶️ Chili', activePowers.fire, f, powerChipTitle('fire', 'Chili Fire')));
+  if(activePowers.shield)  items.push(powerChip('🛡️ Cover', activePowers.shield, f*1.5, powerChipTitle('shield', 'Seat Cover')));
+  if(activePowers.hotdog)  items.push(powerChip('🌭 Dogs', activePowers.hotdog, f, powerChipTitle('hotdog', 'Wiener Rockets')));
+  if(activePowers.plunger) items.push(powerChip('🧲 Magnet', activePowers.plunger, f*1.2, powerChipTitle('plunger', 'Dookie Magnet')));
+  if(activePowers.ghost)   items.push(powerChip('👻 Ghost', activePowers.ghost, 60*5, powerChipTitle('ghost', 'Ghost Poo')));
+  if(activePowers.gold)    items.push(powerChip('💰 2×', activePowers.gold, 60*6, powerChipTitle('gold', 'Golden Throne')));
+  if(activePowers.shrink)  items.push(powerChip('😬 Shrunk', activePowers.shrink, f, powerChipTitle('shrink', 'Shrinkage')));
+  if(activePowers.fast)    items.push(powerChip('💨 Curry', activePowers.fast, f, powerChipTitle('speed', 'Bad Curry')));
+  if(activePowers.reverse) items.push(powerChip('🔄 Backwash', activePowers.reverse, 60*5, powerChipTitle('reverse', 'Backwash')));
   elPowers.innerHTML = items.length ? items.join('') : '';
 }
 
@@ -1567,7 +1580,11 @@ function finishClearTally(){
   if(level > 30){ levelTransition = false; gameOver(true); return; }
   levelTransition = false;
   stink = Math.max(0, stink - 0.3);
+  // Jeff's rule (like Arkanoid): every timed power-up ends when the round changes.
+  activePowers = {};
+  paddle.w = paddle.baseW;
   newLevel();
+  updatePowers();
   updateHud();
 }
 function skipClearTally(){
@@ -1686,29 +1703,32 @@ function launch(){
 // Each power-up has an `unlock` level. Standard Arkanoid kit appears from L1.
 // Goofier and more powerful options unlock later so players keep discovering things.
 const POWERS = [
-  // ---- Standard Arkanoid kit (level 1+) ----
-  {t:'enlarge', e:'📏', lab:'BG', col:'#9effc8', unlock:1, weight:3},
-  {t:'slow',    e:'🐌', lab:'SL', col:'#7ae6ff', unlock:1, weight:2},
-  {t:'catch',   e:'🧲', lab:'CT', col:'#ffd76a', unlock:1, weight:2},
-  {t:'multi',   e:'🌀', lab:'MB', col:'#b290ff', unlock:1, weight:2},
-  {t:'life',    e:'❤️', lab:'+1', col:'#ff7ab6', unlock:1, weight:0.6},
-  {t:'laser',   e:'🔫', lab:'LZ', col:'#ff7ab6', unlock:1, weight:2.5},
+  // ---- Classic Arkanoid kit, bathroom-punk edition (level 1+) ----
+  // E expand / S slow / C catch / D disruption / P extra life / L laser
+  {t:'enlarge', name:'Wide Load',       e:'🍑', lab:'WL', col:'#9effc8', unlock:1, weight:3,   blurb:'Fat paddle'},
+  {t:'slow',    name:'Air Freshener',   e:'🌸', lab:'AF', col:'#7ae6ff', unlock:1, weight:2,   blurb:'Ball slows in the mist'},
+  {t:'catch',   name:'Plunger Catch',   e:'🪠', lab:'PC', col:'#ffd76a', unlock:1, weight:2,   blurb:'Ball sticks; tap to shoot'},
+  {t:'multi',   name:'Mosh Pit',        e:'🤘', lab:'MP', col:'#b290ff', unlock:1, weight:2,   blurb:'Three balls slam around'},
+  {t:'life',    name:'Spare Roll',      e:'❤️', lab:'+1', col:'#ff7ab6', unlock:1, weight:0.6, blurb:'Extra life'},
+  {t:'laser',   name:'TP Cannon',       e:'🧻', lab:'TP', col:'#ffffff', unlock:1, weight:2.5, blurb:'Fire unspooling TP rolls'},
   // ---- Themed combat (level 2+) ----
-  {t:'paper',   e:'🧻',  lab:'TP', col:'#ffffff', unlock:2, weight:2},
-  {t:'shield',  e:'🛡️', lab:'SH', col:'#7ae6ff', unlock:2, weight:1.4},
-  {t:'fire',    e:'🔥',  lab:'FR', col:'#ff9d74', unlock:2, weight:1.6},
-  // ---- Creative funny set (level 3-5) ----
-  {t:'bomb',    e:'💣',  lab:'BM', col:'#ffd76a', unlock:3, weight:1.4},
-  {t:'plunger', e:'🪠',  lab:'MG', col:'#b290ff', unlock:3, weight:1.6},
-  {t:'flush',   e:'🚽',  lab:'FL', col:'#7ae6ff', unlock:4, weight:1.2},
-  {t:'hotdog',  e:'🌭',  lab:'HD', col:'#ff9d74', unlock:4, weight:1.5},
-  {t:'ghost',   e:'👻',  lab:'GH', col:'#cdd5ff', unlock:5, weight:1.3},
-  {t:'skunk',   e:'🦨',  lab:'SK', col:'#7af1c4', unlock:5, weight:1.4},
-  {t:'gold',    e:'💰',  lab:'2×', col:'#ffd76a', unlock:6, weight:1.0},
+  {t:'paper',   name:'Spitwad Spread',  e:'💦', lab:'SW', col:'#cfe8ff', unlock:2, weight:2,   blurb:'Wet wads fly out in a V'},
+  {t:'shield',  name:'Seat Cover',      e:'🛡️', lab:'SC', col:'#7ae6ff', unlock:2, weight:1.4, blurb:'Bounces one miss back'},
+  {t:'fire',    name:'Chili Fire',      e:'🌶️', lab:'CF', col:'#ff9d74', unlock:2, weight:1.6, blurb:'Balls burn through bricks'},
+  // ---- Creative funny set (level 3-6) ----
+  {t:'bomb',    name:'Cherry Bomb',     e:'💣', lab:'CB', col:'#ffd76a', unlock:3, weight:1.4, blurb:'Blast the middle'},
+  {t:'plunger', name:'Dookie Magnet',   e:'🧲', lab:'DM', col:'#b290ff', unlock:3, weight:1.6, blurb:'Pulls capsules to you'},
+  {t:'warp',    name:'Flush Warp',      e:'🚽', lab:'FW', col:'#5ec8ff', unlock:3, weight:0.5, blurb:'Flush the round, skip ahead'},
+  {t:'flush',   name:'Mega Wipe',       e:'🧽', lab:'MW', col:'#7ae6ff', unlock:4, weight:1.2, blurb:'Wipes the bottom row'},
+  {t:'hotdog',  name:'Wiener Rockets',  e:'🌭', lab:'WR', col:'#ff9d74', unlock:4, weight:1.5, blurb:'Arcing sausage missiles'},
+  {t:'chord',   name:'Power Chord',     e:'🎸', lab:'PW', col:'#ff5fa2', unlock:4, weight:1.0, blurb:'Every brick takes a hit'},
+  {t:'ghost',   name:'Ghost Poo',       e:'👻', lab:'GP', col:'#cdd5ff', unlock:5, weight:1.3, blurb:'Ball phases through'},
+  {t:'skunk',   name:'Skunk Cloud',     e:'🦨', lab:'SK', col:'#7af1c4', unlock:5, weight:1.4, blurb:'Stink eats bricks'},
+  {t:'gold',    name:'Golden Throne',   e:'💰', lab:'2×', col:'#ffd76a', unlock:6, weight:1.0, blurb:'Double points'},
   // ---- Bad ones (level 6+) ----
-  {t:'shrink',  e:'😬',  lab:'XS', col:'#ff7ab6', unlock:6, bad:true, weight:1},
-  {t:'speed',   e:'💨',  lab:'SP', col:'#ff9d74', unlock:6, bad:true, weight:1},
-  {t:'reverse', e:'🔄',  lab:'RV', col:'#b290ff', unlock:8, bad:true, weight:0.8},
+  {t:'shrink',  name:'Shrinkage',       e:'😬', lab:'XS', col:'#ff7ab6', unlock:6, bad:true, weight:1,   blurb:'Tiny paddle'},
+  {t:'speed',   name:'Bad Curry',       e:'💨', lab:'BC', col:'#ff9d74', unlock:6, bad:true, weight:1,   blurb:'Ball speeds up'},
+  {t:'reverse', name:'Backwash',        e:'🔄', lab:'BW', col:'#b290ff', unlock:8, bad:true, weight:0.8, blurb:'Controls flip'},
 ];
 function powerDef(type){
   return POWERS.find(p => p.t === type);
@@ -1880,7 +1900,11 @@ function applyPower(p){
     case 'shrink':  activePowers.shrink  = f; paddle.w = Math.max(56, paddle.w*0.65); break;
     case 'speed':   activePowers.fast    = f; syncTimedBallSpeeds(); break;
     case 'reverse': activePowers.reverse = 60*5; break;
+    case 'warp':    flushWarp(); break;
+    case 'chord':   powerChord(); break;
   }
+  const def = powerDef(p.t);
+  if(def && def.name) floatText(def.name.toUpperCase(), paddle.x, paddle.y - 48, def.col);
   const bank = PICKUP_QUIPS[p.t] || [p.t.toUpperCase()];
   const quip = bank[Math.floor(Math.random()*bank.length)];
   if(quip) showToast(quip);
@@ -1919,6 +1943,54 @@ function megaFlush(){
   updateHud();
 }
 
+/* Flush Warp (Arkanoid's B capsule): the whole wall swirls down the drain. */
+function flushWarp(){
+  if(gameMode === 'boss') { score += 1000; floatText('+1000', W/2, H/2, '#5ec8ff'); return; }
+  const cx = W/2, cy = H*0.35;
+  for(let i=bricks.length-1;i>=0;i--){
+    const b = bricks[i];
+    if(steel(b)) continue;
+    bricks.splice(i,1);
+    killBrick(b);
+    score += brickDestroyPoints();
+  }
+  for(let i=0;i<60;i++){
+    const a = i/60*Math.PI*6, rr = 20 + i*2.2;
+    particles.push({ x: cx + Math.cos(a)*rr, y: cy + Math.sin(a)*rr,
+      vx: -Math.sin(a)*2.4 - Math.cos(a)*1.2, vy: Math.cos(a)*2.4 - Math.sin(a)*1.2,
+      g: 0, life: 50+Math.random()*20, r: 2.5+Math.random()*2, col: i%3 ? '#5ec8ff' : '#ffffff' });
+  }
+  powerups = [];
+  shake = Math.max(shake, 8);
+  setHype('FLUSHED! WARPING…', 70);
+  if(sfx.flushWarp) sfx.flushWarp(); else sfx.break();
+  updateHud();
+}
+
+/* Power Chord: one big amp blast, every breakable brick takes a hit. */
+function powerChord(){
+  shake = Math.max(shake, 16);
+  flash = 1;
+  particles.push({x:paddle.x, y:paddle.y, r:0, vr:26, life:28, col:'#ff5fa2', shock:true});
+  for(let i=bricks.length-1;i>=0;i--){
+    const b = bricks[i];
+    if(steel(b)) continue;
+    b.hp -= 1;
+    b.hitFlash = 1;
+    if(b.hp <= 0){
+      bricks.splice(i,1);
+      killBrick(b);
+      const earned = brickDestroyPoints();
+      score += earned;
+    } else {
+      spawnBrickBits(b);
+    }
+  }
+  floatText('🎸 KERRANG!', W/2, H*0.45, '#ff5fa2');
+  if(sfx.chord) sfx.chord(); else sfx.break();
+  updateHud();
+}
+
 function spawnStinkCloud(){
   // A persistent cloud that sits in the play area and damages bricks it touches.
   particles.push({
@@ -1938,9 +2010,10 @@ function spawnStinkCloud(){
   fart();
 }
 const BALL_HUES = ['#8a5a30','#7ae6ff','#ff7ab6','#ffd76a'];
+const MAX_BALLS = 6;
 function spawnMulti(){
   const src = balls[0]; if(!src) return;
-  for(let i=0;i<2;i++){
+  for(let i=0;i<2 && balls.length < MAX_BALLS;i++){
     const ang = Math.atan2(src.vy, src.vx) + (i?-0.4:0.4);
     const sp = Math.hypot(src.vx,src.vy);
     balls.push({
@@ -2068,8 +2141,8 @@ function fireLaser(){
   if(!activePowers.laser) return;
   if(fireLaser._cd && performance.now()-fireLaser._cd<170) return;
   fireLaser._cd = performance.now();
-  lasers.push({x:paddle.x-22, y:paddle.y-4, vy:-12, life:60});
-  lasers.push({x:paddle.x+22, y:paddle.y-4, vy:-12, life:60});
+  lasers.push({x:paddle.x-22, y:paddle.y-4, y0:paddle.y-4, vy:-12, life:60, tp:true});
+  lasers.push({x:paddle.x+22, y:paddle.y-4, y0:paddle.y-4, vy:-12, life:60, tp:true});
   sfx.laser();
 }
 function firePaper(){
@@ -2317,6 +2390,7 @@ function step(dt){
     if(lives <= 0){ gameOver(false); return; }
     paddle.w = paddle.baseW;
     activePowers = {}; updatePowers();
+    powerups = []; lasers = []; paddleShots = [];
     balls = [ newBall(true) ];
     waitingLaunch = true;
     btnLaunch.classList.add('show');
@@ -2332,8 +2406,10 @@ function step(dt){
     }
     if(p.y > H + 20){ powerups.splice(i,1); continue; }
     if(p.y + 12 >= paddle.y && p.y < paddle.y + paddle.h && Math.abs(p.x - paddle.x) < paddle.w/2 + 12){
-      applyPower(p);
       powerups.splice(i,1);
+      applyPower(p);
+      // Flush Warp clears every falling capsule, so no earlier entries remain.
+      if(powerups.length === 0) break;
     }
   }
 
@@ -2490,6 +2566,10 @@ function step(dt){
     tryLightHaptic(28);
     lifeGrace = LIFE_GRACE_FRAMES;
     if(lives <= 0){ gameOver(false); return; }
+    // Same reset as a lost ball: a drip death also drops every power-up.
+    paddle.w = paddle.baseW;
+    activePowers = {}; updatePowers();
+    powerups = []; lasers = []; paddleShots = [];
     balls = [ newBall(true) ];
     waitingLaunch = true;
     btnLaunch.classList.add('show');
@@ -2738,12 +2818,21 @@ function render(){
   for(const d of dyingBricks){ drawDyingBrick(d); }
   for(const p of powerups){ drawPowerup(p); }
   for(const l of lasers){
-    ctx.fillStyle = '#ff7ab6';
-    ctx.shadowColor = '#ff7ab6'; ctx.shadowBlur = 12;
-    roundRect(ctx, l.x-2.5, l.y, 5, 18, 2.5); ctx.fill();
+    // TP Cannon: a spinning roll that unspools a wavy paper tail behind it.
+    const tail = Math.min(70, (l.y0 != null ? l.y0 - l.y : 40));
+    ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    for(let k=0;k<=tail;k+=6){
+      const wx = l.x + Math.sin((l.y + k)*0.18) * 3.5;
+      if(k===0) ctx.moveTo(wx, l.y+8); else ctx.lineTo(wx, l.y + 8 + k);
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 8;
+    roundRect(ctx, l.x-6, l.y-2, 12, 12, 4); ctx.fill();
     ctx.shadowBlur = 0;
-    ctx.fillStyle = '#fff';
-    roundRect(ctx, l.x-1, l.y+2, 2, 14, 1); ctx.fill();
+    ctx.fillStyle = '#b8a890';
+    ctx.beginPath(); ctx.arc(l.x, l.y+4, 2.5, 0, 6.283); ctx.fill();
   }
   for(const s of paddleShots){
     ctx.save(); ctx.translate(s.x,s.y); ctx.rotate(s.rot);
@@ -2852,7 +2941,8 @@ function render(){
   }
   ctx.globalAlpha = 1;
 
-  if(waitingLaunch && state==='playing'){
+  // The HTML #mobileLaunch pill already says TAP TO LAUNCH; draw the canvas hint only when it is hidden.
+  if(waitingLaunch && state==='playing' && !(btnLaunch && btnLaunch.classList.contains('show'))){
     const t = (typeof TurdanoidTheme !== 'undefined' && TurdanoidTheme.TOKENS) || {};
     const txt = 'TAP / SPACE TO LAUNCH';
     ctx.font = `bold 12px ${t.font || '"Segoe UI", system-ui, sans-serif'}`;
@@ -3471,6 +3561,13 @@ document.body.addEventListener('touchmove', e=>{ if(e.touches.length < 2) e.prev
     get paddle(){ return paddle; },
     get powerups(){ return powerups; },
     get floats(){ return floats; },
+    get lasers(){ return lasers; },
+    set lasers(v){ lasers = v; },
+    get maxBalls(){ return MAX_BALLS; },
+    get paddleShots(){ return paddleShots; },
+    get particles(){ return particles; },
+    fireAll,
+    get powerDefs(){ return POWERS.map(p => ({...p})); },
     get W(){ return W; },
     get H(){ return H; },
     get gameMode(){ return gameMode; },
