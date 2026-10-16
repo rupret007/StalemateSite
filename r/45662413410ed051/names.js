@@ -21,12 +21,12 @@
         (r) => `${pick(TITLES, r)}${pick(NOUNS, r)}`,
         (r) => `${pick(TITLES, r)}${pick(LOTS, r)}-a-Lot`,
         (r) => `${pick(NOUNS, r)}Mc${pick(MCS, r)}`,
-        (r) => `${pick(ADJS, r)}${pick(ADJS, r)}${pick(NOUNS, r)}`,
-        (r) => pick(CLASSICS, r)
+        (r) => `${pick(ADJS, r)}${pick(ADJS, r)}${pick(NOUNS, r)}`
     ];
     // Returns {name, legendary}. rnd is injectable for tests.
     function roll(rnd = Math.random) {
         if (rnd() < 0.02) return { name: pick(LEGENDARY, rnd), legendary: true };
+        if (rnd() < 0.05) return { name: pick(CLASSICS, rnd), legendary: false };
         for (let i = 0; i < 20; i += 1) {
             const name = pick(shapes, rnd)(rnd);
             if (name.length >= 3 && name.length <= MAX) return { name, legendary: false };

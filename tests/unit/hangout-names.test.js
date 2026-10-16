@@ -19,9 +19,12 @@ describe('StaleNames', () => {
         expect(bad).toEqual([]);
     }, 120000);
     it('rolls vary, legendaries are rare but real', () => {
+        // Seeded (mulberry32) so CI is deterministic; same thresholds.
+        let seed = 0x5a1e;
+        const rnd = () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
         const seen = new Set();
         let legend = 0;
-        for (let i = 0; i < 5000; i += 1) { const r = roll(); seen.add(r.name); if (r.legendary) { legend += 1; expect(LEGENDARY).toContain(r.name); } expect(checkNick(r.name).ok, r.name).toBe(true); }
+        for (let i = 0; i < 5000; i += 1) { const r = roll(rnd); seen.add(r.name); if (r.legendary) { legend += 1; expect(LEGENDARY).toContain(r.name); } expect(checkNick(r.name).ok, r.name).toBe(true); }
         expect(seen.size).toBeGreaterThan(3000);
         expect(legend).toBeGreaterThan(30);
         expect(legend).toBeLessThan(250);
