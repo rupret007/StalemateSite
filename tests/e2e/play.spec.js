@@ -82,13 +82,11 @@ test('game over offers Listen to Manic, the Oct 24 show and Share score next to 
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.clock.setFixedTime(new Date('2026-10-16T12:00:00-05:00'));
+    // Returning player: first-run coach already seen, so it can't cover the end screen.
+    await page.addInitScript(() => localStorage.setItem('turdanoid_v3_coach_v1', '1'));
     await page.goto('/play/TurdAnoid.html');
     await page.locator('#btnStart').click();
-    const coachNext = page.locator('#btnCoachNext');
-    for (let i = 0; i < 5 && (await coachNext.isVisible()); i++) {
-        await coachNext.click();
-    }
-    await expect(coachNext).toBeHidden();
+    await expect(page.locator('#btnCoachNext')).toBeHidden();
     await page.evaluate(() => window.gameOver(false));
     const end = page.locator('#endScreen');
     await expect(end.locator('#btnRestart')).toBeVisible();
