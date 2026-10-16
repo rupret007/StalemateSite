@@ -31,6 +31,24 @@ test('homepage is a finished band page with hometown, show and real links', asyn
     await expect(page.locator('#home')).toContainText('Rockin’ October');
     await expect(page.locator('#home')).toContainText('Los Amigo’s');
     await expect(page.locator('.hero__tag')).toContainText('Originals. Punk rock. Lewisville / Flower Mound.');
+    const socials = [
+        ['Instagram', 'https://www.instagram.com/stalemate.punk/'],
+        ['YouTube', 'https://www.youtube.com/@stalemate.punkband'],
+        ['Facebook', 'https://www.facebook.com/stalemate.band/']
+    ];
+    for (const [name, href] of socials) {
+        const header = page.locator('.site-header a.social-link[href="' + href + '"]');
+        const hero = page.locator('#home a.social-link[href="' + href + '"]');
+        const footer = page.locator('.site-footer a.social-link[href="' + href + '"]');
+        await expect(header).toBeVisible();
+        await expect(hero).toBeVisible();
+        await expect(footer).toBeVisible();
+        expect((await header.boundingBox()).height).toBeGreaterThanOrEqual(44);
+        expect((await hero.boundingBox()).height).toBeGreaterThanOrEqual(44);
+        expect((await footer.boundingBox()).height).toBeGreaterThanOrEqual(44);
+        await expect(header).toHaveAttribute('rel', /noopener/);
+        await expect(header).toContainText(name);
+    }
     await expect(page.locator('body')).not.toContainText(/two-tone/i);
     await expect(page.locator('body')).not.toContainText(/SoCal|Southern California|do not link|other act|Head2Wall/i);
     expect(await page.locator('meta[name="description"]').getAttribute('content')).not.toMatch(/SoCal/);
@@ -45,6 +63,11 @@ test('homepage is a finished band page with hometown, show and real links', asyn
     expect(metadata.name).toBe('Stalemate');
     expect(metadata.foundingLocation.name).toMatch(/Lewisville/);
     expect(metadata.description).not.toMatch(/SoCal|Southern California|same name/i);
+    expect(metadata.sameAs).toEqual(expect.arrayContaining([
+        'https://www.instagram.com/stalemate.punk/',
+        'https://www.youtube.com/@stalemate.punkband',
+        'https://www.facebook.com/stalemate.band/'
+    ]));
     await expect(page.locator('body')).not.toContainText('4rwTyXLXW0blHBUjQdJmA7');
 });
 

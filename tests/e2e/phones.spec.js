@@ -46,6 +46,16 @@ test('phone homepage keeps the video-show hero usable without overflow', async (
     }
     expect((await page.locator('#home a.button--listen').boundingBox()).height).toBeGreaterThanOrEqual(44);
     expect((await page.locator('#home a.button--hot').boundingBox()).height).toBeGreaterThanOrEqual(44);
+    for (const href of [
+        'https://www.instagram.com/stalemate.punk/',
+        'https://www.youtube.com/@stalemate.punkband',
+        'https://www.facebook.com/stalemate.band/'
+    ]) {
+        const link = page.locator('#home a.social-link[href="' + href + '"]');
+        await expect(link).toBeVisible();
+        expect((await link.boundingBox()).height).toBeGreaterThanOrEqual(44);
+        expect((await page.locator('.site-header a.social-link[href="' + href + '"]').boundingBox()).height).toBeGreaterThanOrEqual(44);
+    }
 
     await expect(page.locator('.hero-show__tie')).toContainText('Hear it live Oct 24 at Los Amigo’s, Plano');
     await expect(page.locator('body')).not.toContainText(/ticket/i);

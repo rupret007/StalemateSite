@@ -53,6 +53,9 @@ describe('content boundaries', () => {
         expect(home).toContain('assets/manic.mp4');
         expect(home).toContain('Hear it live Oct 24');
         expect(home).toContain('at Los Amigo’s, Plano');
+        expect(home).toContain('https://www.instagram.com/stalemate.punk/');
+        expect(home).toContain('https://www.youtube.com/@stalemate.punkband');
+        expect(home).toContain('https://www.facebook.com/stalemate.band/');
         expect(home).toContain('class="hero-video__player"');
         expect(home).not.toMatch(/\bautoplay\b/);
         expect(home).not.toMatch(/id="(music|video|follow|merch)"/);

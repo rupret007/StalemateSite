@@ -41,7 +41,8 @@ describe('public surface security', () => {
             const html = await readFile(join(repoRoot, relativePath), 'utf8');
             const iframes = [...html.matchAll(/<iframe\b[^>]*>/gi)].map((match) => match[0]);
             expect(iframes, relativePath).toEqual([]);
-            expect(html, relativePath).not.toMatch(/youtube|spotify|apple\.com/i);
+            expect(html, relativePath).not.toMatch(/youtube-nocookie|open\.spotify\.com|apple\.com/i);
+            expect(html, relativePath).not.toContain('4rwTyXLXW0blHBUjQdJmA7');
         }
     });
 

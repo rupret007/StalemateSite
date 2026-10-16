@@ -4,7 +4,7 @@ Official site for **Stalemate** — a punk rock band from **Lewisville / Flower 
 
 ## Public surfaces
 
-- `/` — stage hero with the Manic lyric video paired to the Oct 24 countdown and next-show block, plus about
+- `/` — stage hero with the Manic lyric video paired to the Oct 24 countdown and next-show block, plus about. Socials: Instagram, YouTube, Facebook (from [linktr.ee/stalemateband](https://linktr.ee/stalemateband))
 - `/qr/` — printed-flyer landing for Rockin’ October
 - `/epk/` — press kit (short + long bio, marks, stage plot, rider)
 - `404.html` — not-on-the-set page
@@ -20,7 +20,7 @@ Do not publish guesses for any of these:
 - A public YouTube watch URL for the Manic lyric video (the band channel lists Andrea and It’s Been Only 18)
 - ICS for Rockin’ October
 - Booking email
-- Instagram / TikTok / Facebook handles
+- TikTok handle
 
 The homepage countdown and next-show block hide after `2026-10-24T16:45:00-05:00` and leave no empty slot. The Manic lyric video stays.
 
