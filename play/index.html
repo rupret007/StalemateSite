@@ -702,7 +702,7 @@
 <script src="../js/music-preference.js"></script>
 </head>
 <body class="suite-ambient suite-no-zoom">
-<nav class="stalemate-strip" aria-label="Stalemate"><a href="../" class="sm-home"><img src="../assets/mark.svg" alt="" width="22" height="22"> stalemate.band</a><button type="button" class="stalemate-music-toggle" data-music-toggle aria-label="Site music on or off">Music on</button><a href="https://www.youtube.com/@stalemate.punkband" class="sm-listen" rel="noopener">Listen to Manic</a></nav>
+<nav class="stalemate-strip" aria-label="Stalemate"><a href="../" class="sm-home"><img src="../assets/mark.svg" alt="" width="22" height="22"> stalemate.band</a><button type="button" class="stalemate-music-toggle" data-music-toggle aria-label="Site music on or off">Music on</button><button type="button" class="sm-listen" data-site-play="manic" data-site-play-label="Listen to Manic" aria-label="Play Manic here">Listen to Manic</button></nav>
   <div class="shell">
     <header class="masthead">
       <h1><span class="logo">💩</span> Turdanoid</h1>
@@ -1024,6 +1024,8 @@
       bootHubModules();
     }
   </script>
+<script src="../site-base.js" defer></script>
+<script src="../js/site-player.js" defer></script>
 <script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>
 <script src="../js/track.js" defer></script>
 <script src="stalemate/play-track.js" defer></script>

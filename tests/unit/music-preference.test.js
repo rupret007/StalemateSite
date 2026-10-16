@@ -64,6 +64,11 @@ describe('music toggle markup', () => {
         }
     });
 
+    it('loads the shared site player on the homepage and play hub', () => {
+        expect(readFileSync(path.join(repoRoot, 'index.html'), 'utf8')).toContain('js/site-player.js');
+        expect(readFileSync(path.join(repoRoot, 'play/index.html'), 'utf8')).toContain('js/site-player.js');
+    });
+
     it('loads music preference on every vendored play page', () => {
         const playDir = path.join(repoRoot, 'play');
         expect(readFileSync(path.join(playDir, 'VENDORED.txt'), 'utf8')).toContain('Turdanoid');

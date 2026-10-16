@@ -72,7 +72,7 @@ describe('vendored /play/ copy', () => {
   });
   it('strip "Listen to Manic" link meets WCAG AA 4.5:1 on the strip background', () => {
     const css = readFileSync(join(dir, 'stalemate-strip.css'), 'utf8');
-    const fg = css.match(/\.sm-listen\{color:#([0-9a-f]{6})\}/i)[1];
+    const fg = css.match(/\.sm-listen\{[^}]*color:#([0-9a-f]{6})/i)[1];
     const bg = css.match(/\.stalemate-strip\{[^}]*background:#([0-9a-f]{6})/i)[1];
     const lum = (h) => {
       const c = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)

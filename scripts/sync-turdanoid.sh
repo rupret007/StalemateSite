@@ -30,7 +30,8 @@ if grep -qi 'changelog' index.html; then echo "changelog strip failed" >&2; exit
 # Light Stalemate strip on the hub only; game pages keep their own full-screen UI untouched
 for f in index.html; do
   sed -i 's|</head>|<link rel="stylesheet" href="stalemate-strip.css">\n</head>|' "$f"
-  perl -0pi -e 's|(<body[^>]*>)|$1\n<nav class="stalemate-strip" aria-label="Stalemate"><a href="../" class="sm-home"><img src="../assets/mark.svg" alt="" width="22" height="22"> stalemate.band</a><button type="button" class="stalemate-music-toggle" data-music-toggle aria-label="Site music on or off">Music on</button><a href="https://www.youtube.com/\@stalemate.punkband" class="sm-listen" rel="noopener">Listen to Manic</a></nav>|' "$f"
+  perl -0pi -e 's|(<body[^>]*>)|$1\n<nav class="stalemate-strip" aria-label="Stalemate"><a href="../" class="sm-home"><img src="../assets/mark.svg" alt="" width="22" height="22"> stalemate.band</a><button type="button" class="stalemate-music-toggle" data-music-toggle aria-label="Site music on or off">Music on</button><button type="button" class="sm-listen" data-site-play="manic" data-site-play-label="Listen to Manic" aria-label="Play Manic here">Listen to Manic</button></nav>|' "$f"
+  sed -i 's|</body>|<script src="../site-base.js" defer></script>\n<script src="../js/site-player.js" defer></script>\n</body>|' "$f"
 done
 cp "$ROOT/scripts/stalemate-strip.css" "$DEST/stalemate-strip.css"
 # Stalemate overlay (music + checkerboard), re-applied on every sync

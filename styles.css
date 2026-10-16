@@ -1459,6 +1459,13 @@ textarea:focus-visible {
     border-radius: 10px;
     background: transparent;
 }
+.hero-video__play {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
 .hero-video__teaser {
     margin: 0.5rem 0 0;
     font-weight: 700;

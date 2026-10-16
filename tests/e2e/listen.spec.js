@@ -1,14 +1,24 @@
 const { test, expect, tapHeight } = require('./fixtures');
 
 const TRACKS = [
-    ['Andrea', 'https://music.apple.com/us/album/andrea/1718463871?i=1718463872', '6GBydFSUtZ7wZ7pSAvbytw'],
-    ['It’s Only Been 18', 'https://music.apple.com/us/album/its-been-only-18/1718464113?i=1718464114', '00i8GYyog0bCGJnhtqNJKo']
+    ['Andrea', 'andrea', 'https://music.apple.com/us/album/andrea/1718463871?i=1718463872', '6GBydFSUtZ7wZ7pSAvbytw'],
+    ['It’s Only Been 18', 'only-been-18', 'https://music.apple.com/us/album/its-been-only-18/1718464113?i=1718464114', '00i8GYyog0bCGJnhtqNJKo']
 ];
 const SPOTIFY_ARTIST = 'https://open.spotify.com/artist/5cZqYe3bDw3xcKIk4aPHNH';
-const ALLOWED_SPOTIFY = new Set([SPOTIFY_ARTIST, ...TRACKS.map(([, , id]) => `https://open.spotify.com/track/${id}`)]);
+const ALLOWED_SPOTIFY = new Set([SPOTIFY_ARTIST, ...TRACKS.map(([, , , id]) => `https://open.spotify.com/track/${id}`)]);
 
-test('listen section loads Apple Music players only on tap', async ({ page }) => {
-    await page.route('https://embed.music.apple.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<p>player</p>' }));
+test('hero PLAY HERE starts same-origin Manic audio on first tap', async ({ page }) => {
+    await page.goto('/');
+    const play = page.locator('#home [data-site-play="manic"]').first();
+    await expect(play).toHaveText(/PLAY HERE/);
+    await play.click();
+    await expect.poll(() => page.evaluate(() => {
+        const el = document.getElementById('stalemate-site-player');
+        return el && !el.paused && el.src.includes('/play/stalemate/manic.m4a');
+    })).toBe(true);
+});
+
+test('listen section plays on-site audio only on tap', async ({ page }) => {
     await page.goto('/');
     const section = page.locator('#listen');
     await expect(section).toBeVisible();
@@ -24,10 +34,9 @@ test('listen section loads Apple Music players only on tap', async ({ page }) =>
     await expect(gamesLink).toHaveAttribute('href', '#games');
     expect(tapHeight(await gamesLink.boundingBox())).toBeGreaterThanOrEqual(44);
 
-
     const rows = section.locator('[data-listen-track]');
     await expect(rows).toHaveCount(TRACKS.length);
-    for (const [index, [title, href, spotifyId]] of TRACKS.entries()) {
+    for (const [index, [title, playId, href, spotifyId]] of TRACKS.entries()) {
         const row = rows.nth(index);
         await expect(row.locator('h3')).toHaveText(title);
         const link = row.locator('a', { hasText: 'Apple Music' });
@@ -36,18 +45,20 @@ test('listen section loads Apple Music players only on tap', async ({ page }) =>
         const spotify = row.locator('a', { hasText: 'Spotify' });
         await expect(spotify).toHaveAttribute('href', `https://open.spotify.com/track/${spotifyId}`);
         expect(tapHeight(await spotify.boundingBox())).toBeGreaterThanOrEqual(46);
-        expect(tapHeight(await row.locator('[data-listen-load]').boundingBox())).toBeGreaterThanOrEqual(46);
+        const playBtn = row.locator('[data-site-play]');
+        await expect(playBtn).toHaveAttribute('data-site-play', playId);
+        expect(tapHeight(await playBtn.boundingBox())).toBeGreaterThanOrEqual(46);
     }
     await expect(section.locator('a[href="https://music.apple.com/us/album/my-mom-says-were-cool/1718884118"]')).toBeVisible();
-    // 'Over 18' (1997) was a mix-up with It's Only Been 18 and is removed for good.
     const html = await page.content();
     for (const gone of ['Over 18', 'over-18-1997', '1718884699', '5d7NzhgfZgFBvKiYa63xea']) expect(html).not.toContain(gone);
 
-    await rows.first().locator('[data-listen-load]').click();
-    const frame = rows.first().locator('iframe');
-    await expect(frame).toHaveCount(1);
-    await expect(frame).toHaveAttribute('src', 'https://embed.music.apple.com/us/album/andrea/1718463871?i=1718463872');
-    await expect(section.locator('iframe')).toHaveCount(1);
+    await rows.first().locator('[data-site-play]').click();
+    await expect.poll(() => page.evaluate(() => {
+        const el = document.getElementById('stalemate-site-player');
+        return el && el.src.includes('/play/stalemate/andrea.m4a');
+    })).toBe(true);
+    await expect(section.locator('iframe')).toHaveCount(0);
 
     const fits = await page.evaluate(() => Math.max(document.body.scrollWidth, document.documentElement.scrollWidth) <= innerWidth + 1);
     expect(fits).toBe(true);
