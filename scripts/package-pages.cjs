@@ -19,6 +19,8 @@ const FILES = [
     'assets/favicon.svg',
     'assets/grain.svg',
     'assets/hero-stage.svg',
+    'assets/manic-poster.jpg',
+    'assets/manic.mp4',
     'assets/mark.svg',
     'assets/og.svg',
     'assets/torn.svg',

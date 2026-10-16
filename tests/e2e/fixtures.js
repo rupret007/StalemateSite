@@ -9,7 +9,11 @@ const test = base.extend({
         }
         await use(page);
     },
-    launchOptions: async ({ launchOptions }, use) => {
+    launchOptions: async ({ launchOptions, browserName }, use) => {
+        if (browserName !== 'chromium') {
+            await use(launchOptions);
+            return;
+        }
         await use({
             ...launchOptions,
             args: [

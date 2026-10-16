@@ -13,7 +13,7 @@ describe('CI and Pages workflow', () => {
 
         expect(yaml).toContain('node-version: 24');
         expect(yaml).toContain('npm test');
-        expect(yaml).toContain('npx playwright install --with-deps chromium');
+        expect(yaml).toContain('npx playwright install --with-deps chromium webkit');
         expect(yaml).toMatch(/needs:\s*test/);
         expect(yaml).toContain("github.event_name == 'push'");
         expect(yaml).toContain("github.ref == 'refs/heads/main'");

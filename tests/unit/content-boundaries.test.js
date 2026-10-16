@@ -48,6 +48,11 @@ describe('content boundaries', () => {
         expect(home).toContain('Rockin’ October');
         expect(home).toContain('Los Amigo’s');
         expect(home).toContain('Festival info');
+        expect(home).toContain('assets/manic.mp4');
+        expect(home).toContain('Hear it live Oct 24');
+        expect(home).toContain('at Los Amigo’s, Plano');
+        expect(home).toContain('class="hero-video__player"');
+        expect(home).not.toMatch(/\bautoplay\b/);
         expect(home).not.toMatch(/id="(music|video|follow|merch)"/);
         expect(home).not.toContain('data-embed');
         expect(home).not.toContain('<form');

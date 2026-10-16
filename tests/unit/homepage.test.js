@@ -71,6 +71,10 @@ describe('homepage script behavior', () => {
         expect(document.querySelector('form')).toBeNull();
         expect(document.querySelector('#music')).toBeNull();
         expect(document.querySelector('#merch')).toBeNull();
+        const video = document.querySelector('.hero-video__player');
+        expect(video).toBeTruthy();
+        expect(video.hasAttribute('autoplay')).toBe(false);
+        expect(video.querySelector('source').getAttribute('src')).toBe('assets/manic.mp4');
     });
 });
 
