@@ -2,7 +2,6 @@ const { test, expect, tapHeight } = require('./fixtures');
 
 const TRACKS = [
     ['Andrea', 'https://music.apple.com/us/album/andrea/1718463871?i=1718463872', '6GBydFSUtZ7wZ7pSAvbytw'],
-    ['Over 18', 'https://music.apple.com/us/album/over-18-1997/1718884118?i=1718884699', '5d7NzhgfZgFBvKiYa63xea'],
     ['It’s Only Been 18', 'https://music.apple.com/us/album/its-been-only-18/1718464113?i=1718464114', '00i8GYyog0bCGJnhtqNJKo']
 ];
 const SPOTIFY_ARTIST = 'https://open.spotify.com/artist/5cZqYe3bDw3xcKIk4aPHNH';
@@ -35,6 +34,9 @@ test('listen section loads Apple Music players only on tap', async ({ page }) =>
         expect(tapHeight(await row.locator('[data-listen-load]').boundingBox())).toBeGreaterThanOrEqual(46);
     }
     await expect(section.locator('a[href="https://music.apple.com/us/album/my-mom-says-were-cool/1718884118"]')).toBeVisible();
+    // 'Over 18' (1997) was a mix-up with It's Only Been 18 and is removed for good.
+    const html = await page.content();
+    for (const gone of ['Over 18', 'over-18-1997', '1718884699', '5d7NzhgfZgFBvKiYa63xea']) expect(html).not.toContain(gone);
 
     await rows.first().locator('[data-listen-load]').click();
     const frame = rows.first().locator('iframe');
