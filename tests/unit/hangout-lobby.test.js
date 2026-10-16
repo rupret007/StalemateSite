@@ -64,6 +64,10 @@ describe('filter', () => {
         for (const t of ['sit on my face', 'come sit on my face', 'sit on ur face', 'wanna ride my face', 'facesitting', 's i t on my face', 'nice ass', 'nice ass, Bravo', 'Bravo has a nice ass', 'sexy butt']) expect(checkText(t).verdict, t).toBe('block');
         for (const ok of ['nice ass riff', 'big ass amp', 'that was a nice ass solo', 'great ass-riff dude', 'sit on my amp while I tune', 'nice ass guitar tone']) expect(checkText(ok).verdict, ok).toBe('ok');
     });
+    it('the music exception for "ass" does not cover a person after the music word', () => {
+        for (const t of ['nice ass guitar girl', 'nice ass bass player', 'nice ass band chick', 'nice ass guitar tone babe', 'great ass stage guy', 'big ass drum boy']) expect(checkText(t).verdict, t).not.toBe('ok');
+        for (const ok of ['nice ass riff', 'big ass amp', 'nice ass guitar tone', 'nice ass riff, dude!', 'great ass-riff dude', 'nice ass solo bro']) expect(checkText(ok).verdict, ok).toBe('ok');
+    });
     it('blocks spelled-out phone numbers but not count-ins or set lists', () => {
         for (const t of ['two one four five five five oh one nine nine', '2 one 4 555 oh 1 9 9', 'call me at two-one-four, five five five, zero one nine nine', 'text eight 1 seven 5 5 5 1 2 3 4']) expect(checkText(t).verdict, t).toBe('block');
         for (const ok of ['one two three four five six seven eight', 'take 5, the set is 1 2 3 4 songs', 'I saw them at 7 or 8, no 9', 'one more song!']) expect(checkText(ok).verdict, ok).toBe('ok');
@@ -496,6 +500,33 @@ describe('auto-lockdown when no band op for 24h', () => {
         const band2 = join('Singer', { role: 'band' });
         cmd(band2, 'msg', ['Bravo', 'band', 'here']);
         expect(got(b).some((m) => m.t === 'pm-request' && m.from === 'Singer' && m.band)).toBe(true);
+    });
+    it('fails closed on malformed bans and budget in storage', () => {
+        const fanTalks = () => { const f = join('Fan'); const p = join('Pal'); say(f, 'hi'); return lines(p).includes('hi'); };
+        for (const bans of ['nope', [{ mask: 42 }], [null], [{ mask: 'dev:x', until: 'later' }], [{ mask: 'weird:x' }]]) {
+            boot();
+            L.restore({ lock: 'off', bans, budget: { day: '', requests: 0 } });
+            expect(L._debug.net.lock, JSON.stringify(bans)).toBe('readonly');
+            expect(Array.isArray(L._debug.net.bans)).toBe(true);
+            expect(L._debug.net.bans.every((b) => typeof b.mask === 'string')).toBe(true);
+            expect(fanTalks()).toBe(false);
+        }
+        boot();
+        L.restore({ lock: 'off', bans: [{ mask: 'dev:dev-Troll', reason: 'x', by: 'Drummer', at: 1 }, { mask: 'oops' }] });
+        expect(L._debug.net.bans.map((b) => b.mask)).toEqual(['dev:dev-Troll']); // good bans survive
+        expect(join('Troll').refused.reason).toBe('banned');
+        for (const budget of ['x', null, { day: 5, requests: 0 }, { day: '', requests: -1 }, { day: '', requests: 'lots' }, { day: '' }]) {
+            boot();
+            L.restore({ lock: 'off', bans: [], budget });
+            expect(L._debug.net.lock, JSON.stringify(budget)).toBe('readonly');
+            expect(L.budgetLevel()).toBe('closed');
+            expect(join('Fan').refused.reason).toBe('budget');
+            expect(join('Drummer', { role: 'band' }).refused).toBeUndefined();
+        }
+        boot();
+        L.restore({ lock: 'off', bans: [], budget: { day: '', requests: 3 } });
+        expect(L._debug.net.lock).toBe('off'); // well-formed state is respected
+        expect(L.budgetLevel()).toBe('ok');
     });
     it('fails closed: empty or wiped storage restores read-only until a band op unlocks', () => {
         for (const wiped of [{}, undefined, { bans: [] }, { lock: 'bogus' }]) {
