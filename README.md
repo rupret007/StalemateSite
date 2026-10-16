@@ -9,7 +9,7 @@ Official site for **Stalemate** — a punk rock band with original songs. Featur
 
 No press kit, EPK, or QR landing. Those pages are not published.
 
-The public pages carry only confirmed facts. No empty shelves, stub forms, dummy embeds or fill-in copy.
+The public pages carry only confirmed facts. No empty shelves, dummy embeds or fill-in copy. The homepage contact form posts to [FormSubmit](https://formsubmit.co/) (`stalemate.punk@gmail.com`); the first real submission emails Jeff a one-time activation link he must click.
 
 ## Facts still needed
 

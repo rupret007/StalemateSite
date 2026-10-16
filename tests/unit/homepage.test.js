@@ -63,12 +63,15 @@ describe('homepage script behavior', () => {
         expect(brand.contains(fallbacks[0])).toBe(true);
     });
 
-    it('has no dummy preview embeds or stub forms', () => {
+    it('has no dummy preview embeds and ships a real contact form', () => {
         const { document } = loadHomepage();
         expect(document.querySelector('[data-embed]')).toBeNull();
         expect(document.querySelector('[data-load-preview]')).toBeNull();
         expect(document.querySelector('iframe')).toBeNull();
-        expect(document.querySelector('form')).toBeNull();
+        const form = document.querySelector('[data-contact-form]');
+        expect(form).toBeTruthy();
+        expect(form.getAttribute('action')).toBe('https://formsubmit.co/stalemate.punk@gmail.com');
+        expect(form.querySelector('input[name="_honey"]')).toBeTruthy();
         expect(document.querySelector('#music')).toBeNull();
         expect(document.querySelector('#merch')).toBeNull();
         expect(document.querySelector('meta[name="viewport"]').getAttribute('content')).toMatch(/viewport-fit=cover/);

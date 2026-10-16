@@ -997,7 +997,8 @@ textarea:focus-visible {
     font-weight: 700;
 }
 
-.mail-form input {
+.mail-form input,
+.mail-form textarea {
     min-height: 44px;
     width: 100%;
     padding: 0.65rem 0.8rem;
@@ -1005,6 +1006,58 @@ textarea:focus-visible {
     background: var(--ink);
     color: var(--cream);
     font: inherit;
+}
+
+.mail-form textarea {
+    min-height: 8rem;
+    resize: vertical;
+}
+
+.contact-form__honeypot {
+    position: absolute;
+    left: -10000px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+.contact-layout {
+    display: grid;
+    gap: 1.25rem;
+}
+
+.contact-thanks {
+    padding: 1.25rem 1.35rem;
+    max-width: 28rem;
+}
+
+.contact-alt {
+    margin: 1rem 0 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.65rem;
+}
+
+.site-footer--play {
+    margin-top: 1rem;
+    padding: 0.75rem 0 0;
+    text-align: center;
+}
+
+.site-footer--play nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem 1.25rem;
+}
+
+.site-footer--play a {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    font-weight: 700;
+    color: var(--accent);
 }
 
 .merch-shelf {
