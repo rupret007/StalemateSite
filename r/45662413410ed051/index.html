@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+    <meta name="googlebot" content="noindex, nofollow">
+    <meta name="referrer" content="no-referrer">
+    <!-- Hidden preview. Not linked from anywhere on the public site. -->
+    <meta name="hangout-relay" content="">
+    <meta name="hangout-turn" content="">
+    <title>Hang Out · Stalemate</title>
+    <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="room.css">
+</head>
+<body>
+    <header class="hang-head">
+        <img src="../../assets/mark.svg" alt="" width="40" height="40">
+        <div>
+            <h1>Hang Out</h1>
+            <p class="tag">Draw together. Watch together. Yell at each other. Bring your own bad ideas.</p>
+        </div>
+        <a class="show-link" data-next-show href="../../#home">Next show: Sat Oct 24 · Los Amigo’s, Plano →</a>
+    </header>
+
+    <section class="gate" data-gate>
+        <div class="gate-card">
+            <h2 data-gate-title>Start a room</h2>
+            <p data-gate-copy>Make a private room, copy the invite, text it to your people. No accounts, no app.</p>
+            <label>Your name <input data-name maxlength="24" placeholder="Punk #12" autocomplete="nickname"></label>
+            <button class="btn btn--big" data-enter type="button">Start a room</button>
+            <p class="status" data-gate-status role="status"></p>
+        </div>
+    </section>
+
+    <main class="room" data-room hidden>
+        <div class="bar">
+            <span class="peers" data-peers>Just you</span>
+            <button class="btn" data-copy type="button">Copy invite link</button>
+            <span class="status" data-status role="status"></span>
+        </div>
+
+        <section class="panel watch" aria-label="Watch together">
+            <h2>Watch</h2>
+            <div class="screen"><div id="yt-player" data-yt></div><video data-file playsinline controls hidden></video></div>
+            <form class="load" data-load>
+                <input data-url placeholder="Paste any YouTube link" aria-label="YouTube link">
+                <button class="btn" type="submit">Play for everyone</button>
+            </form>
+            <div class="picks" data-picks>
+                <button type="button" class="pick" data-pick-file="manic">Manic (Stalemate)</button>
+                <button type="button" class="pick" data-pick-yt="BtnyqIHTDMM">Andrea</button>
+                <button type="button" class="pick" data-pick-yt="Dws9G6UFyUQ">It’s Only Been 18</button>
+                <button type="button" class="pick" data-pick-yt="oh5p5f5_-7A">Bob Ross: paint along</button>
+            </div>
+        </section>
+
+        <section class="panel draw" aria-label="Draw together">
+            <h2>Draw</h2>
+            <canvas data-canvas width="1200" height="800" aria-label="Shared drawing canvas"></canvas>
+            <div class="tools">
+                <div class="swatches" data-swatches></div>
+                <label>Brush <input type="range" min="2" max="40" value="6" data-size></label>
+                <button class="btn btn--ghost" type="button" data-clear>Wipe it</button>
+                <button class="btn btn--ghost" type="button" data-save>Save PNG</button>
+            </div>
+        </section>
+
+        <section class="panel call" aria-label="Camera and mic">
+            <h2>Faces &amp; voices</h2>
+            <p class="small">Off until you turn it on. Up to 4 people on camera. Video goes straight between browsers when it can.</p>
+            <div class="tiles" data-tiles></div>
+            <div class="tools">
+                <button class="btn" type="button" data-mic>Turn on my mic</button>
+                <button class="btn" type="button" data-cam>Turn on my camera</button>
+                <button class="btn btn--ghost" type="button" data-hangup hidden>Turn both off</button>
+            </div>
+        </section>
+
+        <section class="panel chat" aria-label="Chat">
+            <h2>Chat</h2>
+            <ol class="log" data-log aria-live="polite"></ol>
+            <form class="say" data-say>
+                <input data-text maxlength="400" placeholder="Say something dumb" aria-label="Message">
+                <button class="btn" type="submit">Send</button>
+            </form>
+        </section>
+    </main>
+
+    <dialog class="ask" data-ask>
+        <h2 data-ask-title>Use your camera?</h2>
+        <p data-ask-copy></p>
+        <div class="tools">
+            <button class="btn" data-ask-yes type="button">OK, ask my browser</button>
+            <button class="btn btn--ghost" data-ask-no type="button">Not now</button>
+        </div>
+    </dialog>
+
+    <script src="sync-core.js"></script>
+    <script src="room.js"></script>
+</body>
+</html>
