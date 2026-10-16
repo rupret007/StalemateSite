@@ -116,6 +116,10 @@ const server = http.createServer((request, response) => {
     sendFile(request, response, path.join(ROOT, '404.html'), 404);
 });
 
+// Outlive client keep-alive pools so a loaded CI runner never reuses a socket the server just closed.
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
+
 server.listen(PORT, '127.0.0.1', () => {
     process.stdout.write(`Stalemate test server on http://127.0.0.1:${PORT}\n`);
 });
