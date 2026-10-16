@@ -3,6 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { disallowedEmbedAttributes } from './streaming-allowlist.js';
 import { describe, expect, it } from 'vitest';
 
 const repoRoot = join(fileURLToPath(new URL('../..', import.meta.url)));
@@ -23,13 +24,14 @@ describe('content boundaries', () => {
     it('keeps confirmed facts and finished CTAs without template slots or member names', async () => {
         const home = await readFile(join(repoRoot, 'index.html'), 'utf8');
         const readme = await readFile(join(repoRoot, 'README.md'), 'utf8');
-        expect(home).toContain('Better Than Now');
+        expect(home).not.toMatch(/Better Than Now|named cut|on this page|A lyric video\. A Saturday set\.|Originals\. Punk rock\. Live\./);
         expect(home).toContain('Manic');
         expect(home).toMatch(/punk rock/i);
-        expect(home).toContain('Originals. Punk rock. Live.');
-        expect(home).toContain('The songs are ours');
-        expect(home).toContain('Stalemate writes the songs');
-        expect(home).toContain('Dallas-area punk rock');
+        expect(home).toContain('All originals. All too loud.');
+        expect(home).toContain('We wrote these. Sorry in advance.');
+        expect(home).toContain('Original punk rock, played loud and a little sloppy.');
+        expect(home).not.toContain('Stalemate writes the songs');
+        expect(home).toContain('Dallas-area punk rock. Loud on purpose.');
         expect(home).not.toMatch(/Lewisville|Flower Mound/);
         expect((home.match(/Dallas-area/g) || []).length).toBe(1);
         expect(home).not.toContain('foundingLocation');
@@ -42,14 +44,14 @@ describe('content boundaries', () => {
         expect(home).toContain('href="#about">About');
         expect(home).not.toMatch(/href=["'][^"']*(epk|qr)[^"']*["']/i);
         expect(home).not.toMatch(/Press kit|QR landing|>Press</);
-        expect(home).toContain('http://rockinoctober.com');
+        expect(home).toContain('https://rockinoctober.com');
         expect(home).toContain('class="button button--listen"');
         expect(home).toContain('2026-10-24T16:45:00-05:00');
         expect(home).toContain('Rockin’ October');
         expect(home).toContain('Los Amigo’s');
-        expect(home).toContain('Festival info');
+        expect(home).toContain('Show details');
         expect(home).toContain('assets/manic.mp4');
-        expect(home).toContain('Hear it live Oct 24');
+        expect(home).toContain('Hear it loud Oct 24');
         expect(home).toContain('at Los Amigo’s, Plano');
         expect(home).toContain('https://www.instagram.com/stalemate.punk/');
         expect(home).toContain('https://www.youtube.com/@stalemate.punkband');
@@ -57,7 +59,7 @@ describe('content boundaries', () => {
         expect(home).toContain('class="hero-video__player"');
         expect(home).not.toMatch(/\bautoplay\b/);
         expect(home).not.toMatch(/id="(music|video|follow|merch)"/);
-        expect(home).not.toContain('data-embed');
+        expect(disallowedEmbedAttributes(home)).toEqual([]);
         expect(home).not.toContain('<form');
         expect(home).not.toMatch(/\[(DATE\/VENUE|MAILING LIST TOOL|MERCH|BOOKING EMAIL|HANDLE|STREAM LINK|CITY) NEEDED\]/);
         expect(home).not.toMatch(/\bTBA\b|coming soon|\blorem\b|\bplaceholder\b|\byour\b|\benter\b/i);

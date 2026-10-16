@@ -5,6 +5,7 @@ const SAMPLE_SELECTORS = [
     'h2',
     '.hero__lede',
     '.board-square',
+    '.next-show-block .board-square',
     '.button--hot',
     '.button--listen',
     '.site-nav a',
@@ -90,4 +91,18 @@ const contrastScript = `(() => {
 test('sampled homepage text meets AA against the dark canvas', async ({ page }) => {
     await page.goto('/');
     expect(await page.evaluate(contrastScript)).toEqual([]);
+});
+
+test('next-up sticker uses dark text on lime with AA contrast', async ({ page }) => {
+    await page.goto('/');
+    const ratio = await page.locator('.next-show-block .board-square').evaluate((el) => {
+        const parse = (v) => (v.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+        const lum = ([r, g, b]) => [r, g, b].map((c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; })
+            .reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
+        const style = getComputedStyle(el);
+        const a = lum(parse(style.color));
+        const b = lum(parse(style.backgroundColor));
+        return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    });
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
 });

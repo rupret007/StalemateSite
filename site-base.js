@@ -4,7 +4,7 @@
     'use strict';
 
     const PROJECT_BASE = '/StalemateSite/';
-    const PUBLIC_ORIGIN = 'https://rupret007.github.io';
+    const PUBLIC_ORIGIN = 'https://stalemate.band';
 
     function normalizeBase(value) {
         if (value === '/' || value === '' || value == null) return '/';
@@ -30,7 +30,7 @@
     }
 
     function publicUrl() {
-        return `${PUBLIC_ORIGIN}${normalizeBase(PROJECT_BASE)}`;
+        return `${PUBLIC_ORIGIN}/`;
     }
 
     const api = Object.freeze({

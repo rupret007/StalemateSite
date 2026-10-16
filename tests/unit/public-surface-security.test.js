@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { disallowedStreamingUrls, disallowedEmbedAttributes } from './streaming-allowlist.js';
 
 const repoRoot = join(fileURLToPath(new URL('../..', import.meta.url)));
 const PUBLIC_HTML = [
@@ -28,7 +29,7 @@ describe('public surface security', () => {
         for (const relativePath of PUBLIC_CLIENT_TEXT) {
             const source = await readFile(join(repoRoot, relativePath), 'utf8');
             expect(source, relativePath).not.toContain('4rwTyXLXW0blHBUjQdJmA7');
-            expect(source, relativePath).not.toMatch(/open\.spotify\.com/i);
+            expect(disallowedStreamingUrls(source), relativePath).toEqual([]);
             expect(source, relativePath).not.toContain('/private/');
         }
     });
@@ -38,7 +39,8 @@ describe('public surface security', () => {
             const html = await readFile(join(repoRoot, relativePath), 'utf8');
             const iframes = [...html.matchAll(/<iframe\b[^>]*>/gi)].map((match) => match[0]);
             expect(iframes, relativePath).toEqual([]);
-            expect(html, relativePath).not.toMatch(/youtube-nocookie|open\.spotify\.com|apple\.com/i);
+            expect(html, relativePath).not.toMatch(/youtube-nocookie/i);
+            expect(disallowedStreamingUrls(html), relativePath).toEqual([]);
             expect(html, relativePath).not.toContain('4rwTyXLXW0blHBUjQdJmA7');
         }
     });
@@ -53,5 +55,20 @@ describe('public surface security', () => {
                 expect(tag, relativePath).toMatch(/\brel=["'][^"']*noreferrer[^"']*["']/i);
             }
         }
+    });
+
+    it('allowlist still rejects the other band, stray apple.com URLs and unknown Spotify IDs', () => {
+        expect(disallowedStreamingUrls('<a href="https://open.spotify.com/artist/4rwTyXLXW0blHBUjQdJmA7">x</a>')).not.toEqual([]);
+        expect(disallowedStreamingUrls('<a href="https://open.spotify.com/artist/0000000000000000000000">x</a>')).not.toEqual([]);
+        expect(disallowedStreamingUrls('<a href="https://open.spotify.com/track/1j60Wu27zoYlmkd7wrgAe9">x</a>')).not.toEqual([]);
+        expect(disallowedStreamingUrls('<a href="https://www.apple.com/iphone/">x</a>')).not.toEqual([]);
+        expect(disallowedStreamingUrls('<a href="https://music.apple.com/us/artist/stalemate/999">x</a>')).not.toEqual([]);
+        expect(disallowedStreamingUrls('<iframe src="https://embed.music.apple.com/us/album/other/123"></iframe>')).not.toEqual([]);
+        expect(disallowedStreamingUrls('see music.apple.com/us/album/x/1')).not.toEqual([]);
+        expect(disallowedStreamingUrls('<a href="https://open.spotify.com/artist/5cZqYe3bDw3xcKIk4aPHNH">ok</a>')).toEqual([]);
+        expect(disallowedEmbedAttributes('<div data-embed="x"></div>')).not.toEqual([]);
+        expect(disallowedEmbedAttributes('<button data-listen-load data-embed-src="https://embed.music.apple.com/us/album/other/1">x</button>')).not.toEqual([]);
+        expect(disallowedEmbedAttributes('<button data-embed-src="https://embed.music.apple.com/us/album/andrea/1718463871?i=1718463872">x</button>')).not.toEqual([]);
+        expect(disallowedEmbedAttributes('<button data-listen-load data-embed-src="https://embed.music.apple.com/us/album/andrea/1718463871?i=1718463872">x</button>')).toEqual([]);
     });
 });

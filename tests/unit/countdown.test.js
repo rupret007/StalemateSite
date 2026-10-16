@@ -33,7 +33,7 @@ function nextShowMarkup() {
         </div>
         <aside data-next-show-block>
             <p>Rockin’ October</p>
-            <a href="http://rockinoctober.com">Festival info</a>
+            <a href="https://rockinoctober.com">Festival info</a>
         </aside>
     </div>`;
 }
