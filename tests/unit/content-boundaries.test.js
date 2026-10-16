@@ -9,24 +9,15 @@ const repoRoot = join(fileURLToPath(new URL('../..', import.meta.url)));
 
 const PUBLIC_COPY = [
     'index.html',
-    'qr/index.html',
-    'epk/index.html',
     '404.html',
-    'embed-placeholder.html',
     'script.js',
     'show-state.js',
     'countdown.js',
     'site-base.js',
-    'epk/stage-plot.txt',
-    'epk/tech-rider.txt',
     'assets/og.svg',
     'assets/hero-stage.svg',
     'assets/mark.svg'
 ];
-
-function words(text) {
-    return text.trim().split(/\s+/).filter(Boolean);
-}
 
 describe('content boundaries', () => {
     it('keeps confirmed facts and finished CTAs without template slots or member names', async () => {
@@ -47,7 +38,10 @@ describe('content boundaries', () => {
         expect(home).not.toMatch(/Ska \/ punk/i);
         expect(home).not.toMatch(/ska\/punk/i);
         expect(home).not.toMatch(/ticket/i);
+        expect(home).toContain('href="#top">Home');
         expect(home).toContain('href="#about">About');
+        expect(home).not.toMatch(/href=["'][^"']*(epk|qr)[^"']*["']/i);
+        expect(home).not.toMatch(/Press kit|QR landing|>Press</);
         expect(home).toContain('http://rockinoctober.com');
         expect(home).toContain('class="button button--listen"');
         expect(home).toContain('2026-10-24T16:45:00-05:00');
@@ -86,20 +80,11 @@ describe('content boundaries', () => {
         }
     });
 
-    it('keeps the EPK short bio inside 50–75 words and lists press assets', async () => {
-        const epk = await readFile(join(repoRoot, 'epk/index.html'), 'utf8');
-        const short = epk.match(/<h2 id="short-bio-title">[\s\S]*?<p>([\s\S]*?)<\/p>/)[1];
-        const count = words(short.replace(/<[^>]+>/g, '')).length;
-        expect(count).toBeGreaterThanOrEqual(50);
-        expect(count).toBeLessThanOrEqual(75);
-        expect(epk).toContain('Long bio');
-        expect(epk).toContain('original songs');
-        expect(epk).not.toMatch(/Lewisville|Flower Mound/);
-        expect(epk).toContain('stage-plot.txt');
-        expect(epk).toContain('tech-rider.txt');
-        expect(epk).not.toContain('[BOOKING EMAIL NEEDED]');
-        const epkBody = epk.split(/<body[^>]*>/i)[1] || '';
-        expect(epkBody).not.toMatch(/SoCal|Southern California|do not link|other act|two-tone/i);
+    it('does not publish press, EPK, or QR pages', async () => {
+        const { access } = await import('node:fs/promises');
+        for (const relativePath of ['epk/index.html', 'qr/index.html', 'embed-placeholder.html']) {
+            await expect(access(join(repoRoot, relativePath))).rejects.toMatchObject({ code: 'ENOENT' });
+        }
     });
 
     it('keeps Lewisville and Flower Mound off every public surface', async () => {

@@ -1,7 +1,0 @@
-Stalemate stage plot
-[STAGE PLOT NEEDED]
-
-This is a placeholder until the band supplies a drawn stage plot.
-
-Inputs, wedges, DI boxes and power drops are not documented yet.
-Do not invent a lineup or input list here.

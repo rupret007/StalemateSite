@@ -8,8 +8,6 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = join(fileURLToPath(new URL('../..', import.meta.url)));
 const PUBLIC_HTML = [
     'index.html',
-    'qr/index.html',
-    'epk/index.html',
     '404.html'
 ];
 const TEXT_ON_DARK = ['cream', 'muted', 'blue', 'blue-bright', 'lime', 'amber'];

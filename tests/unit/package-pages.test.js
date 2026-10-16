@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -14,8 +14,9 @@ describe('GitHub Pages package', () => {
         const script = readFileSync(join(repoRoot, 'scripts/package-pages.cjs'), 'utf8');
         expect(script).toContain('index.html');
         expect(script).toContain('404.html');
-        expect(script).toContain('qr/index.html');
-        expect(script).toContain('epk/index.html');
+        expect(script).not.toContain('qr/index.html');
+        expect(script).not.toContain('epk/index.html');
+        expect(script).not.toContain('embed-placeholder.html');
         expect(script).toContain('.nojekyll');
         expect(script).toContain('countdown.js');
         expect(script).toContain('assets/hero-stage.svg');
@@ -37,6 +38,9 @@ describe('GitHub Pages package', () => {
         expect(result.status, result.stderr).toBe(0);
         expect(readFileSync(join(repoRoot, 'dist/index.html'), 'utf8')).toContain('Stalemate');
         expect(readFileSync(join(repoRoot, 'dist/.nojekyll'), 'utf8')).toBeDefined();
+        expect(existsSync(join(repoRoot, 'dist/epk'))).toBe(false);
+        expect(existsSync(join(repoRoot, 'dist/qr'))).toBe(false);
+        expect(existsSync(join(repoRoot, 'dist/embed-placeholder.html'))).toBe(false);
         rmSync(join(repoRoot, 'dist'), { recursive: true, force: true });
         expect(mkdtempSync(join(tmpdir(), 'stalemate-'))).toBeTruthy();
     });
@@ -47,7 +51,7 @@ describe('GitHub Pages package', () => {
             encoding: 'utf8'
         });
         expect(result.status, result.stderr).toBe(0);
-        for (const relativePath of ['index.html', '404.html', 'qr/index.html', 'epk/index.html', 'embed-placeholder.html']) {
+        for (const relativePath of ['index.html', '404.html']) {
             const html = readFileSync(join(repoRoot, 'dist', relativePath), 'utf8');
             expect(html, relativePath).not.toMatch(/SoCal/);
             expect(html, relativePath).not.toMatch(/Lewisville|Flower Mound/);

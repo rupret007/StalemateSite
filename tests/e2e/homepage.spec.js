@@ -75,8 +75,29 @@ test('homepage is a finished band page with originals, show and real links', asy
     await expect(page.locator('body')).not.toContainText('4rwTyXLXW0blHBUjQdJmA7');
 });
 
+test('nav and footer have no press, EPK, or QR links', async ({ page }) => {
+    for (const path of ['/', '/missing']) {
+        await page.goto(path);
+        const chrome = page.locator('.site-nav, .site-footer nav');
+        await expect(chrome.getByRole('link', { name: /press|epk|qr/i })).toHaveCount(0);
+        const hrefs = await chrome.locator('a').evaluateAll((links) => links.map((link) => link.getAttribute('href') || ''));
+        expect(hrefs.join('\n'), path).not.toMatch(/epk|\/qr|press/i);
+        await expect(page.locator('a[href*="epk"], a[href*="qr/"]')).toHaveCount(0);
+        await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Home' })).toBeVisible();
+        await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'About' })).toBeVisible();
+    }
+});
+
+test('unpublished press and QR paths render the 404 page', async ({ page }) => {
+    for (const path of ['/epk/', '/qr/']) {
+        const response = await page.goto(path);
+        expect(response.status(), path).toBe(404);
+        await expect(page.locator('h1')).toContainText('This page is not on the set');
+    }
+});
+
 test('public pages fail on template placeholder words', async ({ page }) => {
-    for (const path of ['/', '/qr/', '/epk/', '/missing']) {
+    for (const path of ['/', '/missing']) {
         await page.goto(path);
         const text = await page.locator('body').innerText();
         expect(text, path).not.toMatch(PLACEHOLDER_COPY);
