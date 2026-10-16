@@ -3,6 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { disallowedEmbedAttributes } from './streaming-allowlist.js';
 import { describe, expect, it } from 'vitest';
 
 const repoRoot = join(fileURLToPath(new URL('../..', import.meta.url)));
@@ -57,7 +58,7 @@ describe('content boundaries', () => {
         expect(home).toContain('class="hero-video__player"');
         expect(home).not.toMatch(/\bautoplay\b/);
         expect(home).not.toMatch(/id="(music|video|follow|merch)"/);
-        expect(home).not.toContain('data-embed');
+        expect(disallowedEmbedAttributes(home)).toEqual([]);
         expect(home).not.toContain('<form');
         expect(home).not.toMatch(/\[(DATE\/VENUE|MAILING LIST TOOL|MERCH|BOOKING EMAIL|HANDLE|STREAM LINK|CITY) NEEDED\]/);
         expect(home).not.toMatch(/\bTBA\b|coming soon|\blorem\b|\bplaceholder\b|\byour\b|\benter\b/i);
