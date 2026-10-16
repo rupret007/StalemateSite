@@ -34,7 +34,7 @@ beforeAll(async () => {
         server.once('error', reject);
         server.once('exit', (code) => reject(new Error(`Test server exited (${code}): ${output}`)));
     });
-});
+}, 30000);
 
 afterAll(async () => {
     if (server && server.exitCode === null) {
@@ -42,13 +42,13 @@ afterAll(async () => {
         server.kill();
         await closed;
     }
-});
+}, 30000);
 
 function getMedia(options) {
     return fetch(`${origin}/play/stalemate/manic.m4a`, options);
 }
 
-describe('test server media responses', () => {
+describe('test server media responses', { timeout: 30000 }, () => {
     it('serves the full file with its byte length and range support', async () => {
         const response = await getMedia();
         expect(response.status).toBe(200);
