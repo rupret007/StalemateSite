@@ -105,9 +105,9 @@ test('homepage Games card and nav link go to /play/, which stays noindex and out
     await expect(games).toContainText('Brick-breaker, but gross.');
     await expect(games.locator('.games-card__thumb')).toBeVisible();
     const play = games.getByRole('link', { name: 'Play Turdanoid' });
-    await expect(play).toHaveAttribute('href', 'play/');
+    await expect(play).toHaveAttribute('href', 'play/TurdAnoid.html');
     await expect(games.getByRole('heading', { level: 2 })).toHaveText('Seven free arcade games. Zero dignity.');
-    await expect(games.getByRole('link', { name: 'All seven games' })).toHaveAttribute('href', 'play/hub.html');
+    await expect(games.getByRole('link', { name: 'All seven games' })).toHaveAttribute('href', 'play/');
     for (const img of await games.locator('.games-shot img').all()) {
         await img.scrollIntoViewIfNeeded();
         await expect(img).toBeVisible();
@@ -119,7 +119,7 @@ test('homepage Games card and nav link go to /play/, which stays noindex and out
     expect(box.height).toBeLessThan((page.viewportSize().width <= 760) ? 700 : 480);
     // Countdown, show and Manic hero stay first; Games follows, then Listen and the band.
     expect(await page.locator('main > section').evaluateAll((s) => s.map((e) => e.id))).toEqual(['home', 'games', 'listen', 'about']);
-    expect(await page.locator('a[href*="play"]').evaluateAll((a) => a.map((e) => e.getAttribute('href')))).toEqual(['play/', 'play/hub.html', 'play/', 'play/turdomania.html']);
+    expect(await page.locator('a[href*="play"]').evaluateAll((a) => a.map((e) => e.getAttribute('href')))).toEqual(['play/TurdAnoid.html', 'play/turdomania.html', 'play/turdtris.html', 'play/turdjack.html', 'play/turdrummy.html', 'play/turdspades.html', 'play/crapeights.html', 'play/TurdAnoid.html', 'play/', 'play/TurdAnoid.html', 'play/turdomania.html']);
     await expect(page.locator('#home a[href="#games"]')).toHaveCount(0);
     await expect(page.locator('#listen .listen-games-link a')).toHaveAttribute('href', '#games');
     const pkg = fs.readFileSync(path.join(ROOT, 'scripts/package-pages.cjs'), 'utf8');

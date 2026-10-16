@@ -1557,3 +1557,5 @@ textarea:focus-visible {
     .hero-show-card .countdown-clock li { padding-top: 0.2rem; padding-bottom: 0.2rem; }
     .hero-show-card .next-show-block p { margin: 0.1rem 0; font-size: 0.875rem; }
 }
+
+.games-card__list a { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
