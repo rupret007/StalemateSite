@@ -17,7 +17,7 @@ Do not publish guesses for any of these:
 
 - Member names and roles (do not name anyone on the site)
 - Stream / store URLs for Better Than Now and Manic
-- A public YouTube watch URL for the Manic lyric video (the band channel lists Andrea and It’s Been Only 18)
+- A public YouTube watch URL for the Manic lyric video (the band channel lists Andrea and It’s Only Been 18)
 - ICS for Rockin’ October
 - Booking email
 - TikTok handle

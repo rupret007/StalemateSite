@@ -1,12 +1,30 @@
 /* Stalemate overlay for vendored Turdanoid. Applied by scripts/sync-turdanoid.sh after each sync.
-   1) Manic as game music: starts on first tap/key (iOS needs a gesture), loops, follows the game's own mute/sound setting.
+   1) Stalemate songs as game music: Manic on level 1, then Andrea, then It's Only Been 18, rotating per level.
+      Starts on first tap/key (iOS needs a gesture), loops within a level, follows the game's own mute/sound setting,
+      pauses while the tab is hidden.
    2) Black-and-white checkerboard on alternating bricks, mixed with the stock poop sprites. */
 (function () {
   'use strict';
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // ---------- Music ----------
-  var music = new Audio('stalemate/manic.m4a');
+  var PLAYLIST = [
+    { file: 'stalemate/manic.m4a', title: 'Manic' },
+    { file: 'stalemate/andrea.m4a', title: 'Andrea' },
+    { file: 'stalemate/only-been-18.m4a', title: 'It\u2019s Only Been 18' }
+  ];
+  function trackForLevel(n) {
+    n = Math.floor(Number(n));
+    if (!(n >= 1)) n = 1;
+    return PLAYLIST[(n - 1) % PLAYLIST.length];
+  }
+  function currentLevel() {
+    try { return typeof level === 'number' ? level : 1; } catch (e) { return 1; } // the game's top-level `let level`
+  }
+  window.StalematePlaylist = { tracks: PLAYLIST.slice(), trackForLevel: trackForLevel };
+  var music = new Audio();
+  var track = trackForLevel(currentLevel());
+  music.src = track.file;
   music.id = 'stalemate-music';
   music.loop = true;
   music.preload = 'none';
@@ -18,12 +36,22 @@
     try { return typeof window.soundBlocked === 'function' ? !!window.soundBlocked() : false; } catch (e) { return false; }
   }
   function sync() {
-    document.documentElement.dataset.stalemateMusic = music.paused ? 'paused' : 'playing';
+    var d = document.documentElement.dataset;
+    d.stalemateMusic = music.paused ? 'paused' : 'playing';
+    d.stalemateTrack = track.title;
   }
   function apply() {
     if (!started || blocked() || document.hidden) { music.pause(); sync(); return; }
     var p = music.play();
     if (p && p.then) p.then(sync, sync); else sync();
+  }
+  function checkLevel() {
+    var next = trackForLevel(currentLevel());
+    if (next === track) return;
+    track = next;
+    music.pause();
+    music.src = track.file; // new song starts from the top on each level change
+    apply();
   }
   function firstGesture() {
     if (started) return;
@@ -39,6 +67,7 @@
   document.addEventListener('click', function () { setTimeout(apply, 0); }, true);
   document.addEventListener('change', function () { setTimeout(apply, 0); }, true);
   document.addEventListener('visibilitychange', apply);
+  setInterval(checkLevel, 400);
   sync();
 
   // ---------- Checkerboard bricks ----------
