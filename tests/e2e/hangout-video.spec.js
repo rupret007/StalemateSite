@@ -263,3 +263,48 @@ test('phones: portrait tiles, call bar sticks to the bottom in thumb reach, 44px
         await guest.screenshot({ path: `${SHOTS}/03-phone-speaker.png` });
     }
 });
+
+test('camera blocked: one tap joins with voice only and the others see an audio tile', async ({ browser }) => {
+    const host = await openBrowser(browser);
+    await join(host, roomUrl(), 'Jeff');
+    await camOn(host);
+    const guest = await openBrowser(browser);
+    await guest.addInitScript(() => {
+        const real = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+        navigator.mediaDevices.getUserMedia = (c) => (c && c.video ? Promise.reject(new DOMException('Permission denied', 'NotAllowedError')) : real(c));
+    });
+    await join(guest, host.url(), 'Karen');
+    await guest.click('[data-cam]');
+    await guest.click('[data-ask-yes]'); // camera explainer
+    await expect(guest.locator('[data-ask-title]')).toHaveText('Camera’s not available');
+    await guest.click('[data-ask-yes]'); // join with voice
+    await expect(guest.locator('[data-mic]')).toHaveText('Mute my mic');
+    await expect(guest.locator('[data-cam]')).toHaveText('Turn on my camera');
+    await expect(guest.locator('[data-status]')).toContainText('voice only');
+    expect(await guest.evaluate(() => window.__hangout.av.stream.getVideoTracks().length)).toBe(0);
+    // The host sees Karen as an audio tile (initial, no video) and still sends their camera.
+    const karen = host.locator('.tile:not([data-tile="me"])');
+    await expect(karen).toHaveClass(/tile--nocam/, { timeout: 15000 });
+    await expect(karen.locator('.nm')).toHaveText('Karen');
+    await expect.poll(() => guest.evaluate(() => {
+        const v = document.querySelector('.tile:not([data-tile="me"]) video');
+        return v ? v.videoWidth : 0;
+    }), { timeout: 15000 }).toBeGreaterThan(0);
+    await expect.poll(() => host.evaluate(() => [...window.__hangout.av.pcs.values()][0].pc.connectionState), { timeout: 15000 }).toBe('connected');
+});
+
+test('send queue: a signaling burst never loses the offer or answer', async ({ browser }) => {
+    const page = await openBrowser(browser);
+    await join(page, roomUrl(), 'Burst');
+    const kept = await page.evaluate(async () => {
+        const send = window.__hangoutSend;
+        const pace = window.__hangoutPace;
+        pace.tokens = 0; pace.last = Date.now();
+        await send({ type: 'rtc', to: 'x', sdp: { type: 'offer', sdp: 'v=0' } });
+        for (let i = 0; i < 260; i += 1) await send({ type: 'rtc', to: 'x', ice: { candidate: `c${i}` } });
+        await send({ type: 'rtc', to: 'x', sdp: { type: 'answer', sdp: 'v=0' } });
+        return { len: pace.queue.length, ice: pace.queue.filter((q) => q.ice).length };
+    });
+    expect(kept.len).toBeLessThanOrEqual(200);
+    expect(kept.len - kept.ice).toBeGreaterThanOrEqual(2); // offer + answer survived
+});

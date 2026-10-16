@@ -29,6 +29,36 @@
         return Object.assign({ active: true }, enc);
     }
 
+    /* Whole-uplink plan for one sender. A mesh sends one copy per viewer, so cap the
+     * total: at most 2 viewers get the sharp layer (earliest askers first), phones get a
+     * lighter sharp layer, and if the sum still tops the budget every layer is scaled down.
+     * viewers: [{ id, wantHi, hiSince, tier, relayed }]. Returns { [id]: encoding }. */
+    const BUDGET = Object.freeze({ desktop: 2000000, phone: 1200000 });
+    const PHONE_HQ_BPS = 280000;
+    const MAX_HQ = 2;
+    function planUplink(o) {
+        const opts = o || {};
+        const viewers = Array.isArray(opts.viewers) ? opts.viewers : [];
+        const phone = Boolean(opts.phone);
+        const budget = phone ? BUDGET.phone : BUDGET.desktop;
+        const hq = new Set(viewers.filter((v) => v.wantHi && !opts.jam && !opts.screen)
+            .sort((a, b) => (a.hiSince || 0) - (b.hiSince || 0)).slice(0, MAX_HQ).map((v) => v.id));
+        const plan = {};
+        let total = 0;
+        for (const v of viewers) {
+            const enc = encodingFor({ main: hq.has(v.id), cams: opts.cams, tier: v.tier, relayed: v.relayed, screen: opts.screen, jam: opts.jam });
+            if (phone && hq.has(v.id) && enc.maxBitrate > PHONE_HQ_BPS) { enc.maxBitrate = PHONE_HQ_BPS; enc.maxFramerate = Math.min(enc.maxFramerate, 20); }
+            plan[v.id] = enc;
+            if (enc.active) total += enc.maxBitrate;
+        }
+        if (total > budget) {
+            const k = budget / total;
+            for (const enc of Object.values(plan)) if (enc.active) enc.maxBitrate = Math.floor(enc.maxBitrate * k);
+        }
+        return plan;
+    }
+    function uplinkTotal(plan) { return Object.values(plan || {}).reduce((a, e) => a + (e.active ? e.maxBitrate : 0), 0); }
+
     /* Grade a link from getStats numbers. Missing numbers never make it look worse. */
     function gradeLink(s) {
         const st = s || {};
@@ -157,7 +187,18 @@
         return { good: 'Great connection', ok: 'Good connection', weak: 'Shaky connection', bad: 'Very weak: video paused, audio kept' }[tier] || 'Checking…';
     }
 
-    const api = { MAX_CAMS, REACTIONS, TIERS, HOST_KINDS, encodingFor, gradeLink, nextTier, pickSpeaker, mainTile, gridColumns, cleanReaction, rateLimit, handQueue, cleanHostAction, backgroundSupport, backgroundVerdict, micConstraints, musicSdp, qualityLabel };
+    /* Bounded send queue: when full, shed ICE candidates first (oldest first); offers,
+     * answers and everything else only go once no candidates are left to drop. */
+    function enqueue(queue, item, max) {
+        const q = (queue || []).concat([item]);
+        while (q.length > max) {
+            const i = q.findIndex((x) => x && x.ice);
+            q.splice(i >= 0 ? i : 0, 1);
+        }
+        return q;
+    }
+
+    const api = { enqueue, BUDGET, PHONE_HQ_BPS, MAX_HQ, planUplink, uplinkTotal, MAX_CAMS, REACTIONS, TIERS, HOST_KINDS, encodingFor, gradeLink, nextTier, pickSpeaker, mainTile, gridColumns, cleanReaction, rateLimit, handQueue, cleanHostAction, backgroundSupport, backgroundVerdict, micConstraints, musicSdp, qualityLabel };
     if (typeof module === 'object' && module.exports) module.exports = api;
     global.HangoutVideo = api;
 }(typeof window !== 'undefined' ? window : globalThis));

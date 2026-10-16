@@ -115,4 +115,48 @@ describe('hangout video core', () => {
         expect(out.match(/a=fmtp:111/g)).toHaveLength(1);
         expect(V.musicSdp('v=0\r\n')).toBe('v=0\r\n');
     });
+
+    const viewers = (n, hi) => Array.from({ length: n }, (_, i) => ({ id: `v${i}`, wantHi: hi, hiSince: i, tier: 'good' }));
+
+    it('phone speaker with 7 viewers all wanting them big stays inside the phone upload budget', () => {
+        const plan = V.planUplink({ viewers: viewers(7, true), phone: true, cams: 8 });
+        const hq = Object.values(plan).filter((e) => e.scaleResolutionDownBy === 1);
+        expect(hq.length).toBeLessThanOrEqual(V.MAX_HQ);
+        hq.forEach((e) => expect(e.maxBitrate).toBeLessThanOrEqual(300000));
+        expect(V.uplinkTotal(plan)).toBeLessThanOrEqual(1200000);
+        expect(Object.keys(plan)).toHaveLength(7);
+        Object.values(plan).forEach((e) => expect(e.active).toBe(true));
+        // Earliest askers get the sharp layer.
+        expect(plan.v0.scaleResolutionDownBy).toBe(1);
+        expect(plan.v1.scaleResolutionDownBy).toBe(1);
+        expect(plan.v2.scaleResolutionDownBy).toBeGreaterThanOrEqual(2);
+    });
+
+    it('desktop speaker with 7 viewers stays inside the 2 Mbps budget; a small call keeps the full sharp layer', () => {
+        const plan = V.planUplink({ viewers: viewers(7, true), phone: false, cams: 8 });
+        expect(Object.values(plan).filter((e) => e.scaleResolutionDownBy === 1).length).toBeLessThanOrEqual(2);
+        expect(V.uplinkTotal(plan)).toBeLessThanOrEqual(2000000);
+        // Worst desktop case before the budget: 2 x 600k + 5 x 120k = 1.8 Mbps, so nothing needs squeezing.
+        expect(plan.v0.maxBitrate).toBe(600000);
+        const small = V.planUplink({ viewers: viewers(1, true), phone: false, cams: 2 });
+        expect(small.v0.maxBitrate).toBe(600000);
+        const phoneSmall = V.planUplink({ viewers: viewers(1, true), phone: true, cams: 2 });
+        expect(phoneSmall.v0.maxBitrate).toBeLessThanOrEqual(300000);
+        // Screen share: everyone at screen rate, still within budget.
+        const screen = V.planUplink({ viewers: viewers(7, false), phone: false, cams: 8, screen: true });
+        expect(V.uplinkTotal(screen)).toBeLessThanOrEqual(2000000);
+    });
+
+    it('a full send queue sheds ICE candidates before offers, answers or anything else', () => {
+        let q = [];
+        q = V.enqueue(q, { frame: 'offer', ice: false }, 3);
+        q = V.enqueue(q, { frame: 'ice1', ice: true }, 3);
+        q = V.enqueue(q, { frame: 'ice2', ice: true }, 3);
+        q = V.enqueue(q, { frame: 'answer', ice: false }, 3);
+        expect(q.map((x) => x.frame)).toEqual(['offer', 'ice2', 'answer']);
+        q = V.enqueue(q, { frame: 'av', ice: false }, 3);
+        expect(q.map((x) => x.frame)).toEqual(['offer', 'answer', 'av']);
+        q = V.enqueue(q, { frame: 'chat', ice: false }, 3);
+        expect(q.map((x) => x.frame)).toEqual(['answer', 'av', 'chat']); // no ICE left: oldest goes
+    });
 });

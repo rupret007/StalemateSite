@@ -133,20 +133,20 @@
         pace.tokens -= 1;
         return true;
     }
+    const QUEUE_MAX = 200;
     function paceFlush() {
         pace.timer = 0;
-        while (pace.queue.length && app.ws && app.ws.readyState === 1 && paceTake()) app.ws.send(pace.queue.shift());
-        if (pace.queue.length > 200) pace.queue.splice(0, pace.queue.length - 200);
+        while (pace.queue.length && app.ws && app.ws.readyState === 1 && paceTake()) app.ws.send(pace.queue.shift().frame);
         if (pace.queue.length) pace.timer = win.setTimeout(paceFlush, 150);
     }
     async function send(obj) {
         if (!app.ws || app.ws.readyState !== 1) return;
         const frame = JSON.stringify(await H.seal(app.key, obj));
-        pace.queue.push(frame);
+        pace.queue = V.enqueue(pace.queue, { frame, ice: obj.type === 'rtc' && Boolean(obj.ice) }, QUEUE_MAX);
         if (!pace.timer) paceFlush();
     }
 
-    if (isLocal) win.__hangoutSend = send; // local test hook only (localhost)
+    if (isLocal) { win.__hangoutSend = send; win.__hangoutPace = pace; } // local test hooks only (localhost)
 
     function connect() {
         if (!relayBase) {
@@ -278,7 +278,7 @@
         }
         case 'want': {
             const entry = app.av.pcs.get(meta.from);
-            if (entry && entry.wantHi !== Boolean(msg.hi)) { entry.wantHi = Boolean(msg.hi); applyEncoding(entry); }
+            if (entry && entry.wantHi !== Boolean(msg.hi)) { entry.wantHi = Boolean(msg.hi); entry.hiSince = Date.now(); applyEncoding(); }
             return;
         }
         case 'react': {
@@ -742,6 +742,12 @@
                 app.av[kind] = true;
                 ensureAudioCtx();
             } catch (error) {
+                if (kind === 'cam' && !app.av.mic && !app.av.jam) {
+                    // No camera (blocked, missing or busy)? Don't strand them: offer voice only.
+                    const voice = await ask('Camera’s not available', 'Join with just your voice? You can add the camera later.');
+                    if (voice) { app.av.asked.mic = true; await toggle('mic'); }
+                    if (app.av.mic) { say('You’re in with voice only. To add video, allow Camera by the address bar, then tap the camera button.'); return; }
+                }
                 say(kind === 'cam'
                     ? 'Camera’s blocked. Tap the lock or “aA” icon by the address bar, allow Camera, then try again.'
                     : 'Mic’s blocked. Tap the lock or “aA” icon by the address bar, allow Microphone, then try again.');
@@ -862,26 +868,34 @@
             if (!sender && t) entry.senders[kind] = entry.pc.addTrack(t, app.av.stream);
             else if (sender && sender.track !== t) sender.replaceTrack(t).catch(() => {});
         }
-        applyEncoding(entry);
+        applyEncoding();
     }
 
-    function applyEncoding(entry) {
-        for (const kind of ['audio', 'video']) {
-            const sender = entry.senders[kind];
-            if (!sender || !sender.track) continue;
-            const p = sender.getParameters();
-            if (!p.encodings || !p.encodings.length) p.encodings = [{}];
-            if (kind === 'video') {
-                const enc = V.encodingFor({ main: entry.wantHi, cams: camCount(), tier: entry.tier, relayed: entry.relayed, screen: Boolean(app.av.screen), jam: app.av.jam });
-                p.encodings[0].active = enc.active && !app.av.away;
-                if (enc.maxBitrate) p.encodings[0].maxBitrate = app.av.canvas ? Math.min(enc.maxBitrate, CAM_BPS) : enc.maxBitrate;
-                if (enc.maxFramerate) p.encodings[0].maxFramerate = enc.maxFramerate;
-                p.encodings[0].scaleResolutionDownBy = enc.scaleResolutionDownBy;
-                if (app.av.screen) p.degradationPreference = 'maintain-resolution';
-            } else {
-                p.encodings[0].maxBitrate = app.av.music ? MUSIC_BPS : MIC_BPS;
+    /* One uplink plan for all viewers (see HangoutVideo.planUplink), then apply it. */
+    function applyEncoding() {
+        const viewers = [];
+        for (const [id, e] of app.av.pcs) if (e.senders.video && e.senders.video.track) viewers.push({ id, wantHi: e.wantHi, hiSince: e.hiSince, tier: e.tier, relayed: e.relayed });
+        const plan = V.planUplink({ viewers, phone: PHONE, cams: camCount(), screen: Boolean(app.av.screen), jam: app.av.jam });
+        app.av.plan = plan;
+        for (const [id, entry] of app.av.pcs) {
+            for (const kind of ['audio', 'video']) {
+                const sender = entry.senders[kind];
+                if (!sender || !sender.track) continue;
+                const p = sender.getParameters();
+                if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+                if (kind === 'video') {
+                    const enc = plan[id];
+                    if (!enc) continue;
+                    p.encodings[0].active = enc.active && !app.av.away;
+                    if (enc.maxBitrate) p.encodings[0].maxBitrate = app.av.canvas ? Math.min(enc.maxBitrate, CAM_BPS) : enc.maxBitrate;
+                    if (enc.maxFramerate) p.encodings[0].maxFramerate = enc.maxFramerate;
+                    p.encodings[0].scaleResolutionDownBy = enc.scaleResolutionDownBy;
+                    if (app.av.screen) p.degradationPreference = 'maintain-resolution';
+                } else {
+                    p.encodings[0].maxBitrate = app.av.music ? MUSIC_BPS : MIC_BPS;
+                }
+                sender.setParameters(p).catch(() => {});
             }
-            sender.setParameters(p).catch(() => {});
         }
     }
 
@@ -946,7 +960,7 @@
             const remote = pair && stats.get(pair.remoteCandidateId);
             entry.relayed = Boolean((local && local.candidateType === 'relay') || (remote && remote.candidateType === 'relay'));
             if (entry.relayed) app.av.relayed.add(id); else app.av.relayed.delete(id);
-            applyEncoding(entry);
+            applyEncoding();
         } catch (error) { /* stats unavailable */ }
     }
 
@@ -974,7 +988,7 @@
                     if (tier === 'bad') say(`Weak link with ${peerName(id)}: video paused, audio kept.`);
                     if (entry.tier === 'bad') say(`Link with ${peerName(id)} recovered. Video’s back.`);
                     entry.tier = tier;
-                    applyEncoding(entry);
+                    applyEncoding();
                 }
                 entry.stats = { rtt, loss, outKbps };
             } catch (error) { /* closed mid-read */ }
@@ -1348,7 +1362,8 @@
         ui.music.checked = app.av.music;
         if (app.av.mic) await restartMic();
         // Stereo/128 kbps lives in the SDP, so renegotiate each link.
-        for (const entry of app.av.pcs.values()) { try { entry.pc.restartIce(); } catch (error) { /* old browser */ } applyEncoding(entry); }
+        for (const entry of app.av.pcs.values()) { try { entry.pc.restartIce(); } catch (error) { /* old browser */ } }
+        applyEncoding();
         say(app.av.music ? 'Music mode on: no echo cancelling or noise gate. Wear headphones. (Not in time: use WebJam to play together.)' : 'Music mode off.');
     }
 
@@ -1441,7 +1456,7 @@
         // Phones: keep your voice going in the background, rest the camera to save battery.
         if (/Mobi|Android|iPhone|iPad/.test(navigator.userAgent) && app.av.cam && !app.av.screen && !inPip) {
             app.av.away = hidden;
-            for (const entry of app.av.pcs.values()) applyEncoding(entry);
+            applyEncoding();
             send({ type: 'av', av: avFlags() });
         }
         if (!hidden && (app.av.mic || app.av.cam)) wakeLock(true);
