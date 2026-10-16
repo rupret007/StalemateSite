@@ -41,7 +41,7 @@ function copyFile(relativePath) {
     fs.copyFileSync(from, to);
 }
 
-const DIRS = ['play'];
+const DIRS = ['play', 'qr', 'tap'];
 
 emptyDir(DIST);
 for (const relativePath of FILES) {
