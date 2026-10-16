@@ -1,6 +1,6 @@
 # Stalemate site
 
-Official site for **Stalemate** — ska/punk originals. Named cuts: **Better Than Now** and **Manic**. Studio session taped **8 October 2026**. Shows are coming.
+Official site for **Stalemate** — punk rock originals. Named cuts: **Better Than Now** and **Manic**. Studio session taped **8 October 2026**. Shows are coming.
 
 This is **not** the Southern California pop-punk band of the same name. Do not link that act.
 
@@ -32,7 +32,7 @@ Operational tokens (`[DATE/VENUE/TICKET LINK NEEDED]`, `[MAILING LIST TOOL NEEDE
 
 ## Visual identity
 
-Rad Dad’s palette (`#171410` ink, `#f4f0e6` cream, `#009ee8` listen, `#ed2765` tickets, `#b5dc08` focus) with **restrained ska two-tone**: an 8px check under the header, one belt after the hero, and a small 8×8 mark — not card frames or wallpaper. Type is Barlow Condensed + Source Sans 3. Layout is a signed-band grid, not Rad Dad’s festival collage. Copy matches Rad Dad’s confidence and specificity, in Stalemate’s own ska/punk voice — no reused lines or jokes.
+Rad Dad’s palette (`#171410` ink, `#f4f0e6` cream, `#009ee8` listen, `#ed2765` tickets, `#b5dc08` focus) with a **restrained two-tone checkerboard**: an 8px check under the header, one belt after the hero, and a small 8×8 mark — not card frames or wallpaper. Type is Barlow Condensed + Source Sans 3. Layout is a signed-band grid, not Rad Dad’s festival collage. Copy matches Rad Dad’s confidence and specificity, in Stalemate’s own punk rock voice — no reused lines or jokes.
 
 ## Local checks
 

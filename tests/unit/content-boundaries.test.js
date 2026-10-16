@@ -33,7 +33,10 @@ describe('content boundaries', () => {
         const readme = await readFile(join(repoRoot, 'README.md'), 'utf8');
         expect(home).toContain('Better Than Now');
         expect(home).toContain('Manic');
-        expect(home).toMatch(/ska\/punk/i);
+        expect(home).toMatch(/punk rock/i);
+        expect(home).toContain('Originals. Two-tone.');
+        expect(home).not.toMatch(/Ska \/ punk/i);
+        expect(home).not.toMatch(/ska\/punk/i);
         expect(home).toContain('Get tickets');
         expect(home).toContain('class="button button--tickets"');
         expect(home).toContain('class="button button--listen"');

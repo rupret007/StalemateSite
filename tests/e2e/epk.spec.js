@@ -5,7 +5,7 @@ test('EPK carries short and long bios, music, video and booking blanks', async (
     await expect(page).toHaveTitle(/press kit/i);
     await expect(page.locator('#short-bio-title')).toBeVisible();
     await expect(page.locator('#long-bio-title')).toBeVisible();
-    await expect(page.locator('#bio')).toContainText(/ska\/punk/i);
+    await expect(page.locator('#bio')).toContainText(/punk rock/i);
     await expect(page.locator('#bio')).not.toContainText(/\bJeff\b/);
     await expect(page.locator('#bio')).not.toContainText(/\bChe\b/);
     await expect(page.locator('#bio')).not.toContainText(/\bSean\b/);

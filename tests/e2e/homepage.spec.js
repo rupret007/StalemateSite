@@ -9,7 +9,7 @@ test('homepage leads with tickets, songs and honest placeholders', async ({ page
     await expect(page.locator('#home a.button--listen')).toHaveAttribute('href', '#music');
     await expect(page.locator('#music')).toContainText('Better Than Now');
     await expect(page.locator('#music')).toContainText('Manic');
-    await expect(page.locator('#about')).toContainText(/ska\/punk/i);
+    await expect(page.locator('#about')).toContainText(/punk rock/i);
     await expect(page.locator('#about dt')).toHaveCount(0);
     await expect(page.locator('#home')).not.toContainText('[CITY NEEDED');
     await expect(page.locator('#shows')).toContainText('[DATE/VENUE/TICKET LINK NEEDED]');
@@ -63,7 +63,7 @@ test.describe('homepage without JavaScript', () => {
         await expect(page.locator('[data-load-preview]:not([hidden])')).toHaveCount(0);
         await expect(page.locator('[data-share-band]:not([hidden])')).toHaveCount(0);
         await expect(page.locator('#list')).toContainText('[MAILING LIST TOOL NEEDED]');
-        await expect(page.locator('#about')).toContainText(/ska\/punk/i);
+        await expect(page.locator('#about')).toContainText(/punk rock/i);
         await expect(page.locator('#about dt')).toHaveCount(0);
         await expect(page.locator('#merch')).toContainText('Merch placeholder');
     });
