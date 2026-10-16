@@ -115,7 +115,7 @@
   var url = location.origin + location.pathname.replace(/[^/]*$/, '');
   shareBtn.addEventListener('click', function () {
     var text = 'I scored ' + score() + ' in Turdanoid. Brick-breaker, but gross.';
-    var withFile = file ? { files: [file], title: 'Turdanoid', text: text + ' ' + url, url: url } : null;
+    var withFile = file ? { files: [file], title: 'Turdanoid', text: text, url: url } : null;
     if (withFile && navigator.canShare && navigator.canShare(withFile)) {
       navigator.share(withFile).catch(function () {});
     } else if (navigator.share) {

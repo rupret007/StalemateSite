@@ -8,7 +8,8 @@ export const LIVE_HUB_PAGES = [
   'turdjack.html',
   'crapeights.html',
   'turdrummy.html',
-  'turdspades.html'
+  'turdspades.html',
+  'turdomania.html'
 ];
 
 export function parseSafeInt(raw, fallback = 0) {
@@ -79,6 +80,13 @@ export function readHubStatBadge(getItem, href) {
       const played = parseSafeInt(stats.matchesPlayed ?? stats.gamesPlayed);
       if (won > 0) return { text: `${won} match win${won === 1 ? '' : 's'}` };
       return played > 0 ? { text: `${played} played` } : null;
+    }
+    case 'turdomania.html': {
+      const wrap = readJsonObject(getItem, 'turdomania_best_v1');
+      const best = wrap && wrap.best && typeof wrap.best === 'object' ? wrap.best : null;
+      if (!best) return null;
+      const top = Math.max(parseSafeInt(best.easy), parseSafeInt(best.normal), parseSafeInt(best.hard));
+      return top > 0 ? { text: `Best ${top}` } : null;
     }
     default:
       return null;

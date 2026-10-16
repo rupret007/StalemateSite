@@ -10,7 +10,7 @@ SHA="$(git -C "$TMP/t" rev-parse --short HEAD)"
 DEST="$ROOT/play"
 rm -rf "$DEST"; mkdir -p "$DEST"
 cd "$TMP/t"
-cp -r index.html TurdAnoid.html turdtris.html turdjack.html crapeights.html turdrummy.html turdspades.html neon-arkanoid.html hub.html game.js favicon.svg assets games "$DEST/"
+cp -r index.html TurdAnoid.html turdtris.html turdjack.html crapeights.html turdrummy.html turdspades.html turdomania.html neon-arkanoid.html hub.html game.js favicon.svg assets games "$DEST/"
 find "$DEST/games" -name '*.test.*' -delete
 cd "$DEST"
 # Same-origin-only CSP for every vendored page. The games use inline scripts/styles,
@@ -23,7 +23,9 @@ for f in *.html; do
 done
 # Strip the upstream "Latest Changelog" (internal dev notes) from the hub
 perl -0pi -e 's|\s*<details class="changelog">.*?</details>||s' index.html
-if grep -qi 'class="changelog"\|Latest Changelog' index.html; then echo "changelog strip failed" >&2; exit 1; fi
+# ...and its now-dead CSS (block comment through the last .changelog rule, plus the phone override)
+perl -0pi -e 's|\s*/\* -+ Changelog -+ \*/.*?\.changelog li \{[^}]*\}||s; s|\n[ \t]*\.changelog \{[^}]*\}||g' index.html
+if grep -qi 'changelog' index.html; then echo "changelog strip failed" >&2; exit 1; fi
 
 # Light Stalemate strip on the hub only; game pages keep their own full-screen UI untouched
 for f in index.html; do

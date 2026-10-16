@@ -6,3 +6,5 @@ body{background-color:transparent}
 .stalemate-end .stalemate-end__listen{background:#ed2765}
 .stalemate-end a:focus-visible,.stalemate-end button:focus-visible{outline:3px solid #b5dc08;outline-offset:2px}
 .stalemate-end__show{flex-basis:100%;margin:4px 0 0;font-size:13px;color:#f4f0e6;text-align:center}
+/* 320px phones: keep the game-over kicker/title clear of the top-left Hub back pill. */
+@media (max-width:360px){#endScreen .result-kicker,#endScreen h1,#endScreen .quip{padding-left:52px;padding-right:52px}}

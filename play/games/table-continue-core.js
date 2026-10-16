@@ -15,7 +15,8 @@
     'turdjack.html',
     'crapeights.html',
     'turdrummy.html',
-    'turdspades.html'
+    'turdspades.html',
+    'turdomania.html'
   ];
 
   const TABLE_CONTINUE_GAMES = [
