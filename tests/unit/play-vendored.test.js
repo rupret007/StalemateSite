@@ -21,6 +21,7 @@ function assertPlayCsp(policy) {
   }
   expect(policy).toContain(`connect-src 'self' ${ALLOWED_EXTERNAL}`);
   expect(policy).toContain(`img-src 'self' data: blob: ${ALLOWED_EXTERNAL}`);
+  expect(policy).not.toMatch(/http:/);
   expect(policy).not.toMatch(/\*/);
 }
 
