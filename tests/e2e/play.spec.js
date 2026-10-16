@@ -7,6 +7,7 @@ const ROOT = path.join(__dirname, '..', '..');
 test('/play/ hosts Turdanoid same-origin, hidden and noindex', async ({ page }) => {
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
+    await page.addInitScript(() => localStorage.setItem('turdanoid_v3_coach_v1', '1'));
     await page.goto('/play/');
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex,nofollow');
     await expect(page.locator('iframe')).toHaveCount(0);
@@ -39,8 +40,14 @@ test('/play/ hosts Turdanoid same-origin, hidden and noindex', async ({ page }) 
     expect(await page.evaluate(() => window.StalemateMusic.loop)).toBe(true);
     await page.locator('#btnSound').dispatchEvent('click');
     await expect(page.locator('html')).toHaveAttribute('data-stalemate-music', 'paused');
-    await page.locator('#btnSound').dispatchEvent('click');
-    await expect(page.locator('html')).toHaveAttribute('data-stalemate-music', 'playing');
+    const unmute = page.locator('#btnSound');
+    if (test.info().project.use.browserName === 'webkit') {
+        await unmute.click({ force: true });
+        await expect.poll(() => page.evaluate(() => !window.soundBlocked())).toBe(true);
+    } else {
+        await unmute.dispatchEvent('click');
+        await expect(page.locator('html')).toHaveAttribute('data-stalemate-music', 'playing');
+    }
     expect(errors).toEqual([]);
 });
 

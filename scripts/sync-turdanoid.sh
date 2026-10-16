@@ -15,7 +15,7 @@ find "$DEST/games" -name '*.test.*' -delete
 cd "$DEST"
 # Same-origin-only CSP for every vendored page. The games use inline scripts/styles,
 # canvas data:/blob: images and local audio; nothing loads from another host.
-CSP="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'"
+CSP="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'"
 for f in *.html; do
   # noindex + CSP on every vendored page (drop upstream robots meta so there is exactly one)
   sed -i '/<meta name="robots"[^>]*>/d' "$f"
@@ -36,11 +36,15 @@ cp "$ROOT/scripts/stalemate-strip.css" "$DEST/stalemate-strip.css"
 # Stalemate overlay (music + checkerboard), re-applied on every sync
 mkdir -p "$DEST/stalemate"
 cp "$ROOT/scripts/stalemate-overlay/"* "$DEST/stalemate/"
+cp "$ROOT/scripts/play-track.js" "$DEST/stalemate/play-track.js"
 sed -i 's|</head>|<link rel="stylesheet" href="stalemate/stalemate-overlay.css">\n</head>|' TurdAnoid.html
 sed -i 's|</body>|<script src="stalemate/stalemate-overlay.js"></script>\n</body>|' TurdAnoid.html
 # Share image for /play/ links
 for f in index.html TurdAnoid.html; do
   sed -i 's|</head>|<meta property="og:title" content="Turdanoid on stalemate.band">\n<meta property="og:description" content="Brick-breaker, but gross. Free, plays in the browser.">\n<meta property="og:image" content="https://stalemate.band/play/stalemate/og-play.png">\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">\n<meta name="twitter:card" content="summary_large_image">\n</head>|' "$f"
+done
+for f in *.html; do
+  sed -i 's|</body>|<script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>\n<script src="../js/track.js" defer></script>\n<script src="stalemate/play-track.js" defer></script>\n</body>|' "$f"
 done
 printf 'Vendored from github.com/rupret007/Turdanoid@%s (%s). Same owner as this repo; no separate license file upstream.\nDo not edit by hand: run scripts/sync-turdanoid.sh\n' "$SHA" "$REF" > "$DEST/VENDORED.txt"
 echo "Synced Turdanoid $SHA into play/"

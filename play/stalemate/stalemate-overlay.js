@@ -37,6 +37,8 @@
   });
   // The game's own sound button and settings toggles: re-check after they update.
   document.addEventListener('click', function () { setTimeout(apply, 0); }, true);
+  var btnSound = document.getElementById('btnSound');
+  if (btnSound) btnSound.addEventListener('click', function () { apply(); });
   document.addEventListener('change', function () { setTimeout(apply, 0); }, true);
   document.addEventListener('visibilitychange', apply);
   sync();
