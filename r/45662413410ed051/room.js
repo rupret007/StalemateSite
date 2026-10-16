@@ -236,7 +236,11 @@
             H.apply(app.state, { type: 'snapshot', state: { strokes: msg.strokes, chat: msg.chat } });
             if (msg.video && await verifyHost(msg.video.signed)) acceptVideo(msg.video.signed, msg.video.t);
             for (const mod of (Array.isArray(msg.mods) ? msg.mods.slice(0, 4) : [])) {
-                if (mod && mod.body && V.HOST_KINDS.includes(mod.body.kind) && await verifyHost(mod)) applyHostAction(mod.body, mod, false);
+                if (mod && V.cleanHostAction(mod.body) && await verifyHost(mod)) {
+                    applyHostAction(mod.body, mod, false);
+                    // A late joiner's signed snapshot establishes the replay floor too.
+                    app.lastHostSeq = Math.max(app.lastHostSeq, mod.body.seq);
+                }
             }
             redraw();
             renderChat();
@@ -303,6 +307,7 @@
 
     /* ---------------- gate / enter ---------------- */
     function enterRoom() {
+        stopPreCheck();
         ui.gate.hidden = true;
         ui.room.hidden = false;
         doc.body.classList.toggle('is-host', app.isHost);
@@ -698,13 +703,22 @@
         return c;
     }
 
+    // A permission prompt can outlive leaving the call or host moderation.
+    const captureVersion = { audio: 0, video: 0 };
+    function keepCapture(kind, version, stream, restore) {
+        if (version === captureVersion[kind] && !app.av.kicked && (restore || !(app.av.locked && !(app.av.mic || app.av.cam)))) return true;
+        stream.getTracks().forEach((track) => track.stop());
+        return false;
+    }
     function setTrack(kind, track) {
         if (!app.av.stream) app.av.stream = new MediaStream();
         app.av.stream.getTracks().filter((t) => t.kind === kind).forEach((t) => app.av.stream.removeTrack(t));
         if (track) app.av.stream.addTrack(track);
     }
     function stopRaw(kind) {
+        captureVersion[kind] += 1;
         if (kind === 'video') {
+            if (app.av.screen) { app.av.screen.stop(); app.av.screen = null; }
             if (app.av.bg.proc) { const p = app.av.bg.proc; app.av.bg.proc = null; p.destroy().catch(() => {}); }
             if (app.av.rawCam) { app.av.rawCam.stop(); app.av.rawCam = null; }
         }
@@ -712,13 +726,15 @@
         setTrack(kind, null);
     }
 
-    async function toggle(kind) {
-        const turningOn = !app.av[kind];
+    async function toggle(kind, restore) {
+        const turningOn = !app.av[kind] || (kind === 'cam' && Boolean(app.av.screen));
+        const mediaKind = kind === 'cam' ? 'video' : 'audio';
         if (kind === 'cam' && app.av.canvas) { await toggleCanvasCam(); return; }
         if (turningOn) {
             if (app.av.kicked) { say('The host took you off faces in this room. Chat and draw still work.'); return; }
-            if (app.av.locked && !(app.av.mic || app.av.cam)) { say('The host locked faces for now. Chat and draw still work.'); return; }
-            if (!(app.av.mic || app.av.cam) && avCount() >= V.MAX_CAMS) { say(`Faces are full (${V.MAX_CAMS} max). Chat and draw still work.`); return; }
+            if (!restore && app.av.locked && !(app.av.mic || app.av.cam)) { say('The host locked faces for now. Chat and draw still work.'); return; }
+            if (!restore && !(app.av.mic || app.av.cam) && avCount() >= V.MAX_CAMS) { say(`Faces are full (${V.MAX_CAMS} max). Chat and draw still work.`); return; }
+            const version = ++captureVersion[mediaKind];
             if (!app.av.asked[kind]) {
                 const ok = await ask(kind === 'cam' ? 'Turn on your camera?' : 'Turn on your mic?',
                     kind === 'cam'
@@ -728,23 +744,31 @@
                             : 'Tap Allow on the next pop-up. Only this room hears you.');
                 if (!ok) return;
             }
+            if (version !== captureVersion[mediaKind]) return;
             try {
                 if (kind === 'cam') {
                     const got = await navigator.mediaDevices.getUserMedia({ video: camConstraints() });
+                    if (!keepCapture('video', version, got, restore)) return;
+                    stopRaw('video');
                     app.av.rawCam = got.getVideoTracks()[0];
+                    app.av.canvas = false;
                     setTrack('video', app.av.rawCam);
                     if (app.av.bg.choice && app.av.bg.choice !== 'none') setBackground(app.av.bg.choice, true);
                 } else {
                     const got = await navigator.mediaDevices.getUserMedia({ audio: V.micConstraints(app.av.music, prefs().mic) });
+                    if (!keepCapture('audio', version, got)) return;
+                    stopRaw('audio');
                     setTrack('audio', got.getAudioTracks()[0]);
                 }
                 app.av.asked[kind] = true;
                 app.av[kind] = true;
                 ensureAudioCtx();
             } catch (error) {
+                if (version !== captureVersion[mediaKind]) return;
                 if (kind === 'cam' && !app.av.mic && !app.av.jam) {
                     // No camera (blocked, missing or busy)? Don't strand them: offer voice only.
                     const voice = await ask('Camera’s not available', 'Join with just your voice? You can add the camera later.');
+                    if (version !== captureVersion[mediaKind]) return;
                     if (voice) { app.av.asked.mic = true; await toggle('mic'); }
                     if (app.av.mic) { say('You’re in with voice only. To add video, allow Camera by the address bar, then tap the camera button.'); return; }
                 }
@@ -754,15 +778,14 @@
                 return;
             }
         } else {
-            if (kind === 'cam' && app.av.screen) await stopScreen(true);
-            stopRaw(kind === 'cam' ? 'video' : 'audio');
+            stopRaw(mediaKind);
             app.av[kind] = false;
         }
         await refreshAv();
     }
 
     /* "Show my real canvas": the back camera, sharper, shown as a rectangle. */
-    async function toggleCanvasCam() {
+    async function toggleCanvasCam(restore) {
         if (app.av.canvas) {
             stopRaw('video');
             app.av.canvas = false;
@@ -770,19 +793,22 @@
             await refreshAv();
             return;
         }
-        if (app.av.kicked || (app.av.locked && !(app.av.mic || app.av.cam))) { say('Faces are locked by the host right now.'); return; }
-        if (!(app.av.mic || app.av.cam) && avCount() >= V.MAX_CAMS) { say(`Faces are full (${V.MAX_CAMS} max). Chat and draw still work.`); return; }
-        const ok = await ask('Show your real canvas?',
+        if (app.av.kicked || (!restore && app.av.locked && !(app.av.mic || app.av.cam))) { say('Faces are locked by the host right now.'); return; }
+        if (!restore && !(app.av.mic || app.av.cam) && avCount() >= V.MAX_CAMS) { say(`Faces are full (${V.MAX_CAMS} max). Chat and draw still work.`); return; }
+        const version = ++captureVersion.video;
+        const ok = restore || await ask('Show your real canvas?',
             'Point your camera at your easel, sketchbook or lump of clay. Your browser will ask to use the camera. Tap Allow. On phones we try the back camera. Only people in this room see it.');
-        if (!ok) return;
+        if (!ok || version !== captureVersion.video) return;
         try {
             const got = await navigator.mediaDevices.getUserMedia({ video: CANVAS_CAM });
+            if (!keepCapture('video', version, got, restore)) return;
             stopRaw('video');
             app.av.rawCam = got.getVideoTracks()[0];
             setTrack('video', app.av.rawCam);
             app.av.cam = true;
             app.av.canvas = true;
         } catch (error) {
+            if (version !== captureVersion.video) return;
             say('Camera’s blocked. Tap the lock or “aA” icon by the address bar, allow Camera, then try again.');
             return;
         }
@@ -795,30 +821,35 @@
         if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) { say('Screen sharing needs a computer browser (Chrome, Edge, Firefox or Safari).'); return; }
         if (app.av.kicked || (app.av.locked && !(app.av.mic || app.av.cam))) { say('Faces are locked by the host right now.'); return; }
         if (!(app.av.mic || app.av.cam) && avCount() >= V.MAX_CAMS) { say(`Faces are full (${V.MAX_CAMS} max).`); return; }
+        const version = ++captureVersion.video;
         let track;
         try {
             const got = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 8, max: 15 }, width: { max: 1920 }, height: { max: 1080 } }, audio: false });
+            if (!keepCapture('video', version, got)) return;
             track = got.getVideoTracks()[0];
-        } catch (error) { say('Screen share cancelled.'); return; }
+        } catch (error) { if (version === captureVersion.video) say('Screen share cancelled.'); return; }
         try { track.contentHint = 'detail'; } catch (error) { /* older browsers */ }
-        track.addEventListener('ended', () => stopScreen());
-        app.av.screen = track;
+        track.addEventListener('ended', () => { if (app.av.screen === track) stopScreen(); });
         app.av.camWasOn = app.av.cam;
-        if (app.av.rawCam && app.av.bg.proc) { const p = app.av.bg.proc; app.av.bg.proc = null; p.destroy().catch(() => {}); }
-        if (app.av.rawCam) { app.av.rawCam.stop(); app.av.rawCam = null; }
+        app.av.canvasWasOn = app.av.canvas;
+        stopRaw('video');
+        app.av.screen = track;
+        app.av.canvas = false;
         setTrack('video', track);
         app.av.cam = true;
         await refreshAv();
         say('You’re sharing your screen. Everyone sees it big.');
     }
     async function stopScreen(silent) {
-        const t = app.av.screen;
-        if (!t) return;
-        app.av.screen = null;
-        t.stop();
-        setTrack('video', null);
+        if (!app.av.screen) return;
+        stopRaw('video');
         app.av.cam = false;
-        if (app.av.camWasOn && !silent) { app.av.asked.cam = true; await toggle('cam'); return; }
+        app.av.canvas = false;
+        if (app.av.camWasOn && !silent) {
+            if (app.av.canvasWasOn) await toggleCanvasCam(true);
+            else { app.av.asked.cam = true; await toggle('cam', true); }
+            return;
+        }
         await refreshAv();
     }
 
@@ -1035,10 +1066,8 @@
     }
 
     function stopAv() {
-        if (app.av.screen) { app.av.screen.stop(); app.av.screen = null; }
-        if (app.av.bg.proc) { const p = app.av.bg.proc; app.av.bg.proc = null; p.destroy().catch(() => {}); }
-        if (app.av.rawCam) { app.av.rawCam.stop(); app.av.rawCam = null; }
-        if (app.av.stream) app.av.stream.getTracks().forEach((t) => t.stop());
+        stopRaw('video');
+        stopRaw('audio');
         app.av.stream = null;
         app.av.mic = false;
         app.av.cam = false;
@@ -1052,27 +1081,36 @@
 
     /* ---------------- active speaker (Web Audio level meters) ---------------- */
     function ensureAudioCtx() {
-        if (app.av.ac || !win.AudioContext) return app.av.ac;
-        try { app.av.ac = new win.AudioContext(); } catch (error) { app.av.ac = null; }
-        if (app.av.ac && app.av.stream && app.av.mic) watchLevel('me', app.av.stream);
+        if (!app.av.ac && win.AudioContext) {
+            try { app.av.ac = new win.AudioContext(); } catch (error) { app.av.ac = null; }
+        }
+        if (app.av.ac) {
+            watchLevel('me', app.av.mic ? app.av.stream : null);
+            // Remote audio can arrive before a local camera or mic gesture creates the context.
+            for (const [id, entry] of app.av.pcs) watchLevel(id, entry.stream);
+        }
         return app.av.ac;
     }
     function watchLevel(id, stream) {
         const ac = app.av.ac;
-        if (!ac || !stream.getAudioTracks().length) return;
+        const track = stream && stream.getAudioTracks().find((t) => t.readyState === 'live');
         const old = app.av.meters.get(id);
+        if (old && old.track === track) return;
         if (old) { try { old.src.disconnect(); } catch (error) { /* gone */ } }
+        app.av.meters.delete(id);
+        delete app.av.levels[id];
+        if (!ac || !track) return;
         try {
-            const src = ac.createMediaStreamSource(new MediaStream(stream.getAudioTracks()));
+            const src = ac.createMediaStreamSource(new MediaStream([track]));
             const an = ac.createAnalyser();
             an.fftSize = 512;
             src.connect(an);
-            app.av.meters.set(id, { src, an, buf: new Float32Array(an.fftSize) });
+            app.av.meters.set(id, { track, src, an, buf: new Float32Array(an.fftSize) });
         } catch (error) { /* no audio graph */ }
     }
     win.setInterval(() => {
-        if (!app.av.meters.size) return;
-        if (app.av.mic && app.av.stream && !app.av.meters.has('me')) watchLevel('me', app.av.stream);
+        // A muted mic is stopped; turning it back on must meter the replacement track.
+        watchLevel('me', app.av.mic ? app.av.stream : null);
         for (const [id, m] of app.av.meters) {
             m.an.getFloatTimeDomainData(m.buf);
             let sum = 0;
@@ -1271,13 +1309,12 @@
             app.av.mods.spot = signed;
             if (!mine && a.target) say(`The host put ${a.target === me ? 'you' : peerName(a.target)} in the spotlight.`);
         } else if (a.kind === 'mute') {
-            if (a.target === me && app.av.mic) { stopRaw('audio'); app.av.mic = false; refreshAv(); say('The host muted you. You can unmute when you’re ready.'); }
+            if (a.target === me) { stopRaw('audio'); app.av.mic = false; refreshAv(); say('The host muted you. You can unmute when you’re ready.'); }
         } else if (a.kind === 'camoff') {
-            if ((a.target === me || a.target === '*') && app.av.cam) {
-                if (app.av.screen) { app.av.screen.stop(); app.av.screen = null; }
+            if (a.target === me || a.target === '*') {
                 stopRaw('video'); app.av.cam = false; app.av.canvas = false; refreshAv();
                 say('The host turned your camera off.');
-            } else if (a.target === '*' && mine) say('Cameras off for everyone.');
+            }
         } else if (a.kind === 'remove') {
             if (a.target === me) { app.av.kicked = true; stopAv(); refreshAv(); say('The host took you off faces in this room. Chat and draw still work.'); }
             else { app.av.removed.add(a.target); noteAv(a.target, null); closePc(a.target); }
@@ -1336,22 +1373,33 @@
             return;
         }
         savePrefs({ [kind]: deviceId });
+        let pendingCamera = null;
         try {
             if (kind === 'cam' && app.av.cam && !app.av.screen && !app.av.canvas) {
+                const version = ++captureVersion.video;
                 const got = await navigator.mediaDevices.getUserMedia({ video: Object.assign({}, CAM, { deviceId: { exact: deviceId } }) });
+                pendingCamera = got;
+                if (!keepCapture('video', version, got)) return;
                 const old = app.av.rawCam;
+                if (app.av.bg.proc) await app.av.bg.proc.restart({ kind: 'video', track: got.getVideoTracks()[0], element: app.av.bg.el });
+                if (!keepCapture('video', version, got)) return;
                 app.av.rawCam = got.getVideoTracks()[0];
-                if (app.av.bg.proc) await app.av.bg.proc.restart({ kind: 'video', track: app.av.rawCam, element: app.av.bg.el });
                 setTrack('video', app.av.bg.proc ? app.av.bg.proc.processedTrack : app.av.rawCam);
+                pendingCamera = null;
                 if (old) old.stop();
             }
             if (kind === 'mic' && app.av.mic) await restartMic();
             for (const entry of app.av.pcs.values()) syncTracks(entry);
             layout();
-        } catch (error) { say('Couldn’t switch to that device. Is another app using it?'); }
+        } catch (error) {
+            if (pendingCamera) pendingCamera.getTracks().forEach((track) => track.stop());
+            say('Couldn’t switch to that device. Is another app using it?');
+        }
     }
     async function restartMic() {
+        const version = ++captureVersion.audio;
         const got = await navigator.mediaDevices.getUserMedia({ audio: V.micConstraints(app.av.music, prefs().mic) });
+        if (!keepCapture('audio', version, got)) return;
         stopRaw('audio');
         setTrack('audio', got.getAudioTracks()[0]);
         for (const entry of app.av.pcs.values()) syncTracks(entry);
@@ -1463,51 +1511,81 @@
     });
 
     /* ---------------- pre-join check ---------------- */
+    let activeCheck = null;
+    function stopPreCheck() {
+        const check = activeCheck;
+        activeCheck = null;
+        if (check) {
+            if (check.stream) check.stream.getTracks().forEach((t) => t.stop());
+            if (check.pc) check.pc.close();
+            if (check.networkDone) check.networkDone(false);
+            win.clearTimeout(check.timer);
+            win.cancelAnimationFrame(check.frame);
+            if (check.ac) check.ac.close().catch(() => {});
+        }
+        ui.checkVideo.srcObject = null;
+        ui.checkMeter.value = 0;
+        ui.check.hidden = true;
+    }
     async function preCheck() {
+        stopPreCheck();
+        const check = { stream: null, ac: null, pc: null, timer: 0, frame: 0, networkDone: null };
+        activeCheck = check;
         ui.check.hidden = false;
         ui.checkOut.textContent = 'Checking…';
         const lines = [];
-        let stream = null;
         try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: camConstraints(), audio: V.micConstraints(false, prefs().mic) });
+            const stream = await navigator.mediaDevices.getUserMedia({ video: camConstraints(), audio: V.micConstraints(false, prefs().mic) });
+            // A permission prompt can outlive closing the preview or entering the room.
+            if (activeCheck !== check) { stream.getTracks().forEach((t) => t.stop()); return; }
+            check.stream = stream;
             ui.checkVideo.srcObject = stream;
             lines.push('✅ Camera works.');
             const ac = new (win.AudioContext || win.webkitAudioContext)();
+            check.ac = ac;
             const an = ac.createAnalyser();
             ac.createMediaStreamSource(stream).connect(an);
             const buf = new Float32Array(an.fftSize);
             const tick = () => {
-                if (!ui.checkVideo.srcObject) { ac.close(); return; }
+                if (activeCheck !== check) return;
                 an.getFloatTimeDomainData(buf);
                 let peak = 0;
                 buf.forEach((x) => { peak = Math.max(peak, Math.abs(x)); });
                 ui.checkMeter.value = Math.min(1, peak * 3);
-                win.requestAnimationFrame(tick);
+                check.frame = win.requestAnimationFrame(tick);
             };
             tick();
             lines.push('🎤 Say something: the bar should jump.');
         } catch (error) {
+            if (activeCheck !== check) return;
             lines.push('⚠️ Camera or mic is blocked. Allow them by the address bar if you want faces. Chat and draw work either way.');
         }
         ui.checkOut.textContent = lines.join(' ');
         try {
             const t0 = performance.now();
             const pc = new RTCPeerConnection({ iceServers: STUN });
+            check.pc = pc;
             pc.createDataChannel('x');
             const found = new Promise((resolve) => {
+                check.networkDone = resolve;
                 pc.onicecandidate = (e) => { if (e.candidate && / srflx /.test(e.candidate.candidate)) resolve(true); if (!e.candidate) resolve(false); };
-                win.setTimeout(() => resolve(false), 4000);
+                check.timer = win.setTimeout(() => resolve(false), 4000);
             });
             await pc.setLocalDescription(await pc.createOffer());
             const ok = await found;
-            pc.close();
             const ms = Math.round(performance.now() - t0);
             lines.push(ok ? `🌐 Network looks good for direct video (${ms} ms).` : '🌐 Your network may block direct video (work or school Wi-Fi often does). Chat, draw and watch still work.');
         } catch (error) { lines.push('🌐 Couldn’t test the network.'); }
+        finally {
+            if (check.pc) check.pc.close();
+            check.pc = null;
+            check.networkDone = null;
+            win.clearTimeout(check.timer);
+        }
+        if (activeCheck !== check) return;
         if (app.av.jam) lines.push('🎸 Jamming? Plug in an Ethernet cable and use WebJam for the music. Wired beats Wi-Fi by a mile.');
         else lines.push('Tip: headphones stop echo. A wired (Ethernet) connection beats Wi-Fi.');
         ui.checkOut.textContent = lines.join(' ');
-        ui.checkDone.onclick = () => { if (stream) stream.getTracks().forEach((t) => t.stop()); ui.checkVideo.srcObject = null; ui.check.hidden = true; };
     }
 
     ui.canvasCam.addEventListener('click', () => toggleCanvasCam());
@@ -1532,6 +1610,8 @@
     ui.lock.addEventListener('click', () => hostAct({ kind: 'lock', on: !app.av.locked }));
     ui.allCamsOff.addEventListener('click', () => hostAct({ kind: 'camoff', target: '*' }));
     ui.checkBtn.addEventListener('click', () => preCheck());
+    ui.checkDone.addEventListener('click', stopPreCheck);
+    win.addEventListener('pagehide', stopPreCheck);
     ui.hangup.addEventListener('click', async () => { stopAv(); await refreshAv(); });
     V.REACTIONS.forEach((r) => { const b = doc.createElement('button'); b.type = 'button'; b.dataset.r = r; b.textContent = r; b.setAttribute('aria-label', `React ${r}`); ui.reacts.append(b); });
     if (app.av.jam) { ui.jamNote.hidden = false; ui.mic.textContent = 'Talk (browser mic)'; }
