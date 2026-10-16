@@ -8,6 +8,28 @@
         if (initialized) return;
         initialized = true;
 
+        document.querySelectorAll('[data-listen-load]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const row = button.closest('[data-listen-track]');
+                const slot = row && row.querySelector('[data-listen-embed]');
+                const src = button.getAttribute('data-embed-src') || '';
+                if (!slot || !src.startsWith('https://embed.music.apple.com/')) return;
+                if (!slot.querySelector('iframe')) {
+                    const frame = document.createElement('iframe');
+                    frame.src = src;
+                    frame.title = button.getAttribute('data-embed-title') || 'Apple Music player';
+                    frame.height = '175';
+                    frame.loading = 'lazy';
+                    frame.allow = 'autoplay *; encrypted-media *; clipboard-write';
+                    frame.setAttribute('sandbox', 'allow-forms allow-popups allow-same-origin allow-scripts allow-storage-access-by-user-activation allow-top-navigation-by-user-activation');
+                    slot.appendChild(frame);
+                }
+                slot.hidden = false;
+                button.textContent = 'Loaded';
+                button.disabled = true;
+            });
+        });
+
         const logo = document.getElementById('logo');
         function showLogoFallback() {
             if (!logo) return;
@@ -75,7 +97,7 @@
         if (!share || !status || !fallback || !copy) return;
 
         const bandUrl = (window.StalemateSite && window.StalemateSite.publicUrl())
-            || 'https://rupret007.github.io/StalemateSite/';
+            || 'https://stalemate.band/';
         let busy = false;
         let generation = 0;
         share.hidden = false;

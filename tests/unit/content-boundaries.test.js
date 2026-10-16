@@ -42,7 +42,7 @@ describe('content boundaries', () => {
         expect(home).toContain('href="#about">About');
         expect(home).not.toMatch(/href=["'][^"']*(epk|qr)[^"']*["']/i);
         expect(home).not.toMatch(/Press kit|QR landing|>Press</);
-        expect(home).toContain('http://rockinoctober.com');
+        expect(home).toContain('https://rockinoctober.com');
         expect(home).toContain('class="button button--listen"');
         expect(home).toContain('2026-10-24T16:45:00-05:00');
         expect(home).toContain('Rockin’ October');
