@@ -10,6 +10,7 @@ const scriptPath = path.join(repoRoot, 'script.js');
 const rawHtml = fs.readFileSync(htmlPath, 'utf8')
     .replace(/<script\b[^>]*\bsrc=["']script\.js["'][^>]*><\/script>/i, '')
     .replace(/<script\b[^>]*\bsrc=["']show-state\.js["'][^>]*><\/script>/i, '')
+    .replace(/<script\b[^>]*\bsrc=["']countdown\.js["'][^>]*><\/script>/i, '')
     .replace(/<script\b[^>]*\bsrc=["']site-base\.js["'][^>]*><\/script>/i, '');
 const scriptSource = fs.readFileSync(scriptPath, 'utf8');
 const siteBaseSource = fs.readFileSync(path.join(repoRoot, 'site-base.js'), 'utf8');
@@ -62,19 +63,21 @@ describe('homepage script behavior', () => {
         expect(brand.contains(fallbacks[0])).toBe(true);
     });
 
-    it('loads a preview iframe only after an explicit tap', () => {
+    it('has no dummy preview embeds or stub forms', () => {
         const { document } = loadHomepage();
-        const host = document.querySelector('[data-embed]');
-        const button = host.querySelector('[data-load-preview]');
-
-        expect(host.querySelector('iframe')).toBeNull();
-        expect(button.hidden).toBe(false);
-        button.click();
-        expect(host.querySelector('iframe')).toBeTruthy();
-        expect(host.querySelector('iframe').getAttribute('src')).toContain('embed-placeholder.html');
-        expect(button.hidden).toBe(true);
-        button.click();
-        expect(host.querySelectorAll('iframe')).toHaveLength(1);
+        expect(document.querySelector('[data-embed]')).toBeNull();
+        expect(document.querySelector('[data-load-preview]')).toBeNull();
+        expect(document.querySelector('iframe')).toBeNull();
+        expect(document.querySelector('form')).toBeNull();
+        expect(document.querySelector('#music')).toBeNull();
+        expect(document.querySelector('#merch')).toBeNull();
+        expect(document.querySelector('meta[name="viewport"]').getAttribute('content')).toMatch(/viewport-fit=cover/);
+        const video = document.querySelector('.hero-video__player');
+        expect(video).toBeTruthy();
+        expect(video.hasAttribute('autoplay')).toBe(false);
+        expect(video.getAttribute('preload')).toBe('none');
+        expect(video.hasAttribute('playsinline')).toBe(true);
+        expect(video.querySelector('source').getAttribute('src')).toBe('assets/manic.mp4');
     });
 });
 

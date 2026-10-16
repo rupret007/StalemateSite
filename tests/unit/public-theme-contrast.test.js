@@ -120,5 +120,9 @@ describe('public dark theme contrast', () => {
         expect(panelBlock[0]).not.toMatch(/repeating-conic-gradient/);
         expect(css).toMatch(/prefers-reduced-motion:\s*reduce/);
         expect(css).toMatch(/prefers-reduced-motion:\s*no-preference/);
+        expect(css).toContain('safe-area-inset-top');
+        expect(css).toContain('safe-area-inset-bottom');
+        expect(css).toContain('safe-area-inset-left');
+        expect(css).toContain('safe-area-inset-right');
     });
 });

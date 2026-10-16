@@ -17,7 +17,10 @@ describe('GitHub Pages package', () => {
         expect(script).toContain('qr/index.html');
         expect(script).toContain('epk/index.html');
         expect(script).toContain('.nojekyll');
+        expect(script).toContain('countdown.js');
         expect(script).toContain('assets/hero-stage.svg');
+        expect(script).toContain('assets/manic.mp4');
+        expect(script).toContain('assets/manic-poster.jpg');
         expect(script).not.toContain('node_modules');
         expect(script).not.toContain('tests/');
         expect(script).not.toContain('worker/');

@@ -1,4 +1,4 @@
-/* Shared progressive enhancement. Navigation, tickets, music names and
+/* Shared progressive enhancement. Navigation, music names and
    mailing-list copy all work without JavaScript. */
 (function () {
     'use strict';
@@ -100,7 +100,7 @@
             try {
                 await navigator.share({
                     title: 'Stalemate',
-                    text: 'Ska/punk originals from Stalemate.',
+                    text: 'Punk rock originals from Stalemate.',
                     url: bandUrl
                 });
                 if (request === generation) status.textContent = 'Sharing options closed.';

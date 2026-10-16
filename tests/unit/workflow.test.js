@@ -13,7 +13,18 @@ describe('CI and Pages workflow', () => {
 
         expect(yaml).toContain('node-version: 24');
         expect(yaml).toContain('npm test');
-        expect(yaml).toContain('npx playwright install --with-deps chromium');
+        expect(yaml).toContain('npx playwright install --with-deps chromium webkit');
+
+        const playwright = await readFile(join(repoRoot, 'playwright.config.js'), 'utf8');
+        expect(playwright).toContain('webkit-iphone-se');
+        expect(playwright).toContain('webkit-iphone-15');
+        expect(playwright).toContain('webkit-iphone-15-pro-max');
+        expect(playwright).toContain('chromium-android');
+        expect(playwright).toMatch(/phones\\.spec\\.js/);
+        expect(playwright).toContain('width: 375, height: 667');
+        expect(playwright).toContain('width: 393, height: 852');
+        expect(playwright).toContain('width: 430, height: 932');
+        expect(playwright).toContain('width: 360, height: 800');
         expect(yaml).toMatch(/needs:\s*test/);
         expect(yaml).toContain("github.event_name == 'push'");
         expect(yaml).toContain("github.ref == 'refs/heads/main'");

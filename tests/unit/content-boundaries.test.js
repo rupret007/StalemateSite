@@ -15,6 +15,7 @@ const PUBLIC_COPY = [
     'embed-placeholder.html',
     'script.js',
     'show-state.js',
+    'countdown.js',
     'site-base.js',
     'epk/stage-plot.txt',
     'epk/tech-rider.txt',
@@ -28,26 +29,45 @@ function words(text) {
 }
 
 describe('content boundaries', () => {
-    it('keeps the known originals, ticket actions, and operational tokens without naming members or chess kickers', async () => {
+    it('keeps confirmed facts and finished CTAs without template slots or member names', async () => {
         const home = await readFile(join(repoRoot, 'index.html'), 'utf8');
         const readme = await readFile(join(repoRoot, 'README.md'), 'utf8');
         expect(home).toContain('Better Than Now');
         expect(home).toContain('Manic');
-        expect(home).toMatch(/ska\/punk/i);
-        expect(home).toContain('Get tickets');
-        expect(home).toContain('class="button button--tickets"');
+        expect(home).toMatch(/punk rock/i);
+        expect(home).toContain('Lewisville');
+        expect(home).toContain('Flower Mound');
+        expect(home).toContain('Originals. Punk rock.');
+        expect(home).not.toMatch(/Two-tone|two-tone/i);
+        const homeBody = home.split(/<body[^>]*>/i)[1] || '';
+        expect(homeBody).not.toMatch(/SoCal|Southern California|do not link|other act|Head2Wall/i);
+        expect(home).toMatch(/Not the SoCal pop-punk band of the same name/);
+        expect(home).not.toMatch(/Ska \/ punk/i);
+        expect(home).not.toMatch(/ska\/punk/i);
+        expect(home).not.toMatch(/ticket/i);
+        expect(home).toContain('href="#about">About');
+        expect(home).toContain('http://rockinoctober.com');
         expect(home).toContain('class="button button--listen"');
-        expect(home).toContain('[DATE/VENUE/TICKET LINK NEEDED]');
-        expect(home).toContain('[MAILING LIST TOOL NEEDED]');
-        expect(home).toContain('[MERCH NEEDED]');
+        expect(home).toContain('2026-10-24T16:45:00-05:00');
+        expect(home).toContain('Rockin’ October');
+        expect(home).toContain('Los Amigo’s');
+        expect(home).toContain('Festival info');
+        expect(home).toContain('assets/manic.mp4');
+        expect(home).toContain('Hear it live Oct 24');
+        expect(home).toContain('at Los Amigo’s, Plano');
+        expect(home).toContain('class="hero-video__player"');
+        expect(home).not.toMatch(/\bautoplay\b/);
+        expect(home).not.toMatch(/id="(music|video|follow|merch)"/);
+        expect(home).not.toContain('data-embed');
+        expect(home).not.toContain('<form');
+        expect(home).not.toMatch(/\[(DATE\/VENUE|MAILING LIST TOOL|MERCH|BOOKING EMAIL|HANDLE|STREAM LINK|CITY) NEEDED\]/);
+        expect(home).not.toMatch(/\bTBA\b|coming soon|\blorem\b|\bplaceholder\b|\byour\b|\benter\b/i);
         expect(home).not.toMatch(/A1\s*·/);
         expect(home).not.toMatch(/E4\s*·/);
-        expect(home).not.toContain('[CITY NEEDED');
-        expect(readme).toContain('[DATE/VENUE/TICKET LINK NEEDED]');
-        expect(readme).toContain('[MAILING LIST TOOL NEEDED]');
-        expect(readme).toContain('[MERCH NEEDED]');
-        expect(readme).toContain('[BOOKING EMAIL NEEDED]');
+        expect(readme).toContain('Lewisville');
         expect(readme).toContain('Member names and roles');
+        expect(readme).not.toMatch(/ticket/i);
+        expect(readme).not.toMatch(/\[(MAILING LIST TOOL|MERCH|BOOKING EMAIL|HANDLE) NEEDED\]/);
     });
 
     it('never names band members on public surfaces', async () => {
@@ -67,8 +87,11 @@ describe('content boundaries', () => {
         expect(count).toBeGreaterThanOrEqual(50);
         expect(count).toBeLessThanOrEqual(75);
         expect(epk).toContain('Long bio');
+        expect(epk).toContain('Lewisville');
         expect(epk).toContain('stage-plot.txt');
         expect(epk).toContain('tech-rider.txt');
-        expect(epk).toContain('[BOOKING EMAIL NEEDED]');
+        expect(epk).not.toContain('[BOOKING EMAIL NEEDED]');
+        const epkBody = epk.split(/<body[^>]*>/i)[1] || '';
+        expect(epkBody).not.toMatch(/SoCal|Southern California|do not link|other act|two-tone/i);
     });
 });

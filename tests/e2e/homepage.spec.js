@@ -1,47 +1,65 @@
 const { test, expect } = require('./fixtures');
 
-test('homepage leads with tickets, songs and honest placeholders', async ({ page }) => {
+const PLACEHOLDER_COPY = /\bTBA\b|coming soon|\blorem\b|\bplaceholder\b|\byour\b|\benter\b/i;
+
+test('homepage is a finished band page with hometown, show and real links', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveTitle(/Stalemate/);
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.locator('#band-title')).toContainText('Stalemate');
-    await expect(page.locator('#home a.button--tickets')).toHaveAttribute('href', '#shows');
-    await expect(page.locator('#home a.button--listen')).toHaveAttribute('href', '#music');
-    await expect(page.locator('#music')).toContainText('Better Than Now');
-    await expect(page.locator('#music')).toContainText('Manic');
-    await expect(page.locator('#about')).toContainText(/ska\/punk/i);
+    await expect(page.locator('#home a.button--listen')).toHaveAttribute('href', '#about');
+    await expect(page.locator('#home a.button--hot')).toHaveAttribute('href', 'http://rockinoctober.com');
+    const video = page.locator('.hero-video__player');
+    await expect(video).toBeVisible();
+    await expect(video).not.toHaveAttribute('autoplay');
+    await expect(video).toHaveAttribute('playsinline', '');
+    await expect(video.locator('source')).toHaveAttribute('src', 'assets/manic.mp4');
+    await expect(page.locator('.hero-show__tie')).toContainText('Hear it live Oct 24 at Los Amigo’s, Plano');
+    await expect(page.locator('#about')).toContainText(/punk rock/i);
+    await expect(page.locator('#about')).toContainText('Lewisville');
+    await expect(page.locator('#about')).toContainText('Flower Mound');
+    await expect(page.locator('#about')).toContainText('Better Than Now');
+    await expect(page.locator('#about')).toContainText('Manic');
     await expect(page.locator('#about dt')).toHaveCount(0);
-    await expect(page.locator('#home')).not.toContainText('[CITY NEEDED');
-    await expect(page.locator('#shows')).toContainText('[DATE/VENUE/TICKET LINK NEEDED]');
-    await expect(page.locator('#merch')).toContainText('[MERCH NEEDED]');
-    await expect(page.locator('body')).toContainText('Not the SoCal pop-punk band');
+    await expect(page.locator('#music')).toHaveCount(0);
+    await expect(page.locator('#video')).toHaveCount(0);
+    await expect(page.locator('#follow')).toHaveCount(0);
+    await expect(page.locator('#merch')).toHaveCount(0);
+    await expect(page.locator('[data-embed]')).toHaveCount(0);
+    await expect(page.locator('iframe')).toHaveCount(0);
+    await expect(page.locator('form')).toHaveCount(0);
+    await expect(page.locator('#home')).toContainText('Rockin’ October');
+    await expect(page.locator('#home')).toContainText('Los Amigo’s');
+    await expect(page.locator('.hero__tag')).toContainText('Originals. Punk rock. Lewisville / Flower Mound.');
+    await expect(page.locator('body')).not.toContainText(/two-tone/i);
+    await expect(page.locator('body')).not.toContainText(/SoCal|Southern California|do not link|other act|Head2Wall/i);
+    expect(await page.locator('meta[name="description"]').getAttribute('content')).toMatch(/Not the SoCal pop-punk band/);
+    await expect(page.locator('body')).not.toContainText(/ticket/i);
     await expect(page.locator('body')).not.toContainText(/\bJeff\b/);
     await expect(page.locator('body')).not.toContainText(/\bChe\b/);
     await expect(page.locator('body')).not.toContainText(/\bSean\b/);
     const metadata = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent());
     expect(metadata['@type']).toBe('MusicGroup');
     expect(metadata.name).toBe('Stalemate');
+    expect(metadata.foundingLocation.name).toMatch(/Lewisville/);
     await expect(page.locator('body')).not.toContainText('4rwTyXLXW0blHBUjQdJmA7');
 });
 
-test('preview iframes stay dormant until a tap and stay local', async ({ page }) => {
-    const requested = [];
-    page.on('request', (request) => {
-        if (/youtube|spotify|apple\.com/i.test(request.url())) requested.push(request.url());
-    });
-    await page.goto('/');
-    const song = page.locator('#music [data-embed]').first();
-    await expect(song.locator('iframe')).toHaveCount(0);
-    await song.getByRole('button', { name: 'Load preview' }).click();
-    await expect(song.locator('iframe')).toHaveAttribute('src', /embed-placeholder\.html/);
-    expect(requested).toEqual([]);
+test('public pages fail on template placeholder words', async ({ page }) => {
+    for (const path of ['/', '/qr/', '/epk/', '/missing']) {
+        await page.goto(path);
+        const text = await page.locator('body').innerText();
+        expect(text, path).not.toMatch(PLACEHOLDER_COPY);
+        expect(text, path).not.toMatch(/two-tone/i);
+        expect(text, path).not.toMatch(/SoCal|Southern California|do not link|other act|Head2Wall/i);
+    }
 });
 
 for (const width of [320, 390, 768, 1440]) {
     test(`homepage remains usable without overlap at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 900 });
         await page.goto('/');
-        for (const section of ['#home', '#music', '#shows', '#video', '#about', '#list', '#merch']) {
+        for (const section of ['#home', '#about']) {
             await page.locator(section).scrollIntoViewIfNeeded();
             expect(await page.evaluate(() => Math.max(document.body.scrollWidth, document.documentElement.scrollWidth) <= innerWidth + 1)).toBe(true);
         }
@@ -49,23 +67,74 @@ for (const width of [320, 390, 768, 1440]) {
         for (const link of await nav.getByRole('link').all()) {
             expect((await link.boundingBox()).height).toBeGreaterThanOrEqual(44);
         }
-        const tickets = page.locator('#home a.button--tickets');
-        expect((await tickets.boundingBox()).height).toBeGreaterThanOrEqual(44);
+        const about = page.locator('#home a.button--listen');
+        expect((await about.boundingBox()).height).toBeGreaterThanOrEqual(44);
     });
 }
 
 test.describe('homepage without JavaScript', () => {
     test.use({ javaScriptEnabled: false });
-    test('keeps tickets, songs, list and merch usable', async ({ page }) => {
+    test('keeps about, the show facts and festival link usable', async ({ page }) => {
         await page.goto('/');
-        await expect(page.locator('#home a[href="#shows"]')).toBeVisible();
-        await expect(page.locator('#music')).toContainText('Better Than Now');
-        await expect(page.locator('[data-load-preview]:not([hidden])')).toHaveCount(0);
+        await expect(page.locator('#home a[href="#about"]')).toBeVisible();
+        await expect(page.locator('#home a.button--hot[href="http://rockinoctober.com"]')).toBeVisible();
+        await expect(page.locator('.hero-video__player source')).toHaveAttribute('src', 'assets/manic.mp4');
+        await expect(page.locator('.hero-show__tie')).toContainText('Hear it live Oct 24 at Los Amigo’s, Plano');
+        await expect(page.locator('#about')).toContainText('Better Than Now');
+        await expect(page.locator('[data-load-preview]')).toHaveCount(0);
         await expect(page.locator('[data-share-band]:not([hidden])')).toHaveCount(0);
-        await expect(page.locator('#list')).toContainText('[MAILING LIST TOOL NEEDED]');
-        await expect(page.locator('#about')).toContainText(/ska\/punk/i);
+        await expect(page.locator('#about')).toContainText(/punk rock/i);
         await expect(page.locator('#about dt')).toHaveCount(0);
-        await expect(page.locator('#merch')).toContainText('Merch placeholder');
+        await expect(page.locator('[data-next-show-block]')).toContainText('Rockin’ October');
+        await expect(page.locator('[data-countdown-clock]')).toBeHidden();
+        await expect(page.locator('body')).not.toContainText(/ticket/i);
+        await expect(page.locator('body')).not.toContainText(PLACEHOLDER_COPY);
+    });
+});
+
+test.describe('hero countdown before the set', () => {
+    test.use({ showTime: '2026-10-15T12:00:00-05:00' });
+
+    test('shows the countdown and next-show facts', async ({ page }) => {
+        await page.goto('/');
+        const next = page.locator('[data-next-show]');
+        await expect(next).toBeVisible();
+        await expect(page.locator('[data-countdown]')).toBeVisible();
+        await expect(page.locator('[data-countdown-clock]')).toBeVisible();
+        await expect(page.locator('[data-countdown-days]')).toHaveText('09');
+        await expect(page.locator('[data-next-show-block]')).toContainText('Rockin’ October');
+        await expect(page.locator('[data-next-show-block]')).toContainText('Studio 801');
+        await expect(page.locator('[data-next-show-block]')).toContainText('Los Amigo’s, Plano, TX');
+        await expect(page.locator('[data-next-show-block]')).toContainText('Doors open at 12 PM');
+        await expect(page.locator('[data-next-show-block]')).toContainText('All ages');
+        await expect(page.locator('.hero-show__tie')).toContainText('Hear it live Oct 24 at Los Amigo’s, Plano');
+        await expect(page.locator('.hero-video__player')).toBeVisible();
+        await expect(page.locator('#home a[href="http://rockinoctober.com"]').first()).toBeVisible();
+        await expect(page.locator('#home')).not.toContainText(/ticket/i);
+        await expect(page.locator('#home')).not.toContainText(/\bJeff\b/);
+        const box = await next.boundingBox();
+        expect(box.height).toBeGreaterThan(80);
+    });
+});
+
+test.describe('hero countdown after the set', () => {
+    test.use({ showTime: '2026-10-24T16:45:00-05:00' });
+
+    test('hides the countdown and next-show block without a leftover placeholder', async ({ page }) => {
+        await page.goto('/');
+        await expect(page.locator('[data-next-show]')).toBeHidden();
+        await expect(page.locator('[data-countdown]')).toBeHidden();
+        await expect(page.locator('[data-next-show-block]')).toBeHidden();
+        await expect(page.locator('.hero-show__tie')).toBeHidden();
+        await expect(page.locator('.hero-video__player')).toBeVisible();
+        await expect(page.locator('#home a[href="#about"]')).toBeVisible();
+        await expect(page.locator('#home a.button--hot[href="http://rockinoctober.com"]')).toBeVisible();
+        await expect(page.locator('#home')).not.toContainText('Shows coming soon');
+        expect(await page.locator('[data-next-show]').boundingBox()).toBeNull();
+        await expect(page.locator('[data-upcoming-empty]')).toHaveCount(0);
+        await expect(page.locator('#about')).toContainText('Rockin’ October');
+        await expect(page.locator('body')).not.toContainText(/ticket/i);
+        await expect(page.locator('body')).not.toContainText(PLACEHOLDER_COPY);
     });
 });
 

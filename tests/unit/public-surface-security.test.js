@@ -17,6 +17,7 @@ const PUBLIC_CLIENT_TEXT = [
     ...PUBLIC_HTML,
     'script.js',
     'show-state.js',
+    'countdown.js',
     'site-base.js',
     'styles.css'
 ];
@@ -35,17 +36,12 @@ describe('public surface security', () => {
         }
     });
 
-    it('keeps preview frames sandboxed and local until a real provider URL exists', async () => {
-        for (const relativePath of ['index.html', 'qr/index.html']) {
+    it('ships no preview iframes on the finished public pages', async () => {
+        for (const relativePath of ['index.html', 'qr/index.html', 'epk/index.html', '404.html']) {
             const html = await readFile(join(repoRoot, relativePath), 'utf8');
             const iframes = [...html.matchAll(/<iframe\b[^>]*>/gi)].map((match) => match[0]);
-            expect(iframes.length, relativePath).toBeGreaterThan(0);
-            for (const tag of iframes) {
-                expect(tag, relativePath).toContain('embed-placeholder.html');
-                expect(tag, relativePath).toContain('sandbox="allow-scripts"');
-                expect(tag, relativePath).toContain('referrerpolicy="strict-origin-when-cross-origin"');
-                expect(tag, relativePath).not.toMatch(/youtube|spotify|apple\.com/i);
-            }
+            expect(iframes, relativePath).toEqual([]);
+            expect(html, relativePath).not.toMatch(/youtube|spotify|apple\.com/i);
         }
     });
 

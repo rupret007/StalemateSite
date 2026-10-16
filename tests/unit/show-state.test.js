@@ -13,10 +13,10 @@ function loadShowState() {
         <p data-upcoming-empty>No upcoming dates posted yet.</p>
         <div data-upcoming-shows>
             <article data-show data-placeholder="true" id="placeholder-show">
-                <a data-show-live-action href="#shows">Get tickets when posted</a>
+                <a data-show-live-action href="#shows">Show details</a>
             </article>
             <article data-show data-starts-at="2026-11-01T19:00:00-05:00" data-ends-at="2026-11-01T22:00:00-05:00" id="dated-show">
-                <a data-show-live-action href="https://tickets.example/show">Get tickets</a>
+                <a data-show-live-action href="https://example.com/show">Show details</a>
             </article>
         </div>
         <p data-past-empty>No past dates posted yet.</p>
@@ -51,7 +51,7 @@ describe('dated upcoming and past shows', () => {
         expect(result.upcomingCount).toBeGreaterThanOrEqual(1);
     });
 
-    it('moves a dated show to past after it ends and hides ticket actions', () => {
+    it('moves a dated show to past after it ends and hides live actions', () => {
         const { document, StalemateShowState } = loadShowState();
 
         StalemateShowState.apply(document, Date.parse('2026-10-20T12:00:00-05:00'));
