@@ -159,4 +159,32 @@ describe('hangout video core', () => {
         q = V.enqueue(q, { frame: 'chat', ice: false }, 3);
         expect(q.map((x) => x.frame)).toEqual(['answer', 'av', 'chat']); // no ICE left: oldest goes
     });
+
+    it('treats iPadOS (Mac UA + multi-touch) and touch-first devices as phones, but not a desktop Mac', () => {
+        const mac = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15';
+        expect(V.isPhoneDevice({ ua: mac, maxTouchPoints: 5, cores: 8 })).toBe(true); // iPad in desktop mode
+        expect(V.isPhoneDevice({ ua: mac, maxTouchPoints: 0, fine: true, cores: 8 })).toBe(false); // MacBook
+        expect(V.isPhoneDevice({ ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', maxTouchPoints: 5 })).toBe(true);
+        expect(V.isPhoneDevice({ ua: 'Mozilla/5.0 (Linux; Android 14; Pixel 8)' })).toBe(true);
+        expect(V.isPhoneDevice({ ua: 'Mozilla/5.0 (X11; Linux x86_64)', coarse: true, fine: false, cores: 8 })).toBe(true); // touch-only
+        expect(V.isPhoneDevice({ ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', coarse: true, fine: true, cores: 8 })).toBe(false); // touch laptop with a trackpad
+        expect(V.isPhoneDevice({ ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', cores: 2 })).toBe(true); // weak machine
+    });
+
+    it('counts audio in the uplink budget, including stereo music mode', () => {
+        for (const [phone, budget] of [[true, 1200000], [false, 2000000]]) {
+            for (const audioBps of [32000, 128000]) {
+                const plan = V.planUplink({ viewers: viewers(7, true), phone, cams: 8, audioBps });
+                expect(V.uplinkTotal(plan, audioBps), `${phone ? 'phone' : 'desktop'} @ ${audioBps}`).toBeLessThanOrEqual(budget);
+                Object.values(plan).forEach((e) => expect(e.active).toBe(true));
+            }
+        }
+        // Desktop speech: 1.8 Mbps video + 7 x 32k = 2.024 Mbps, so video trims slightly to fit.
+        const speech = V.planUplink({ viewers: viewers(7, true), phone: false, cams: 8, audioBps: 32000 });
+        expect(speech.v0.maxBitrate).toBeLessThan(600000);
+        // Small call with music: plenty of room, nothing trimmed.
+        const duo = V.planUplink({ viewers: viewers(1, true), phone: false, cams: 2, audioBps: 128000 });
+        expect(duo.v0.maxBitrate).toBe(600000);
+        expect(V.uplinkTotal(duo, 128000)).toBe(728000);
+    });
 });

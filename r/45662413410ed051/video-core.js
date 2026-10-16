@@ -40,7 +40,9 @@
         const opts = o || {};
         const viewers = Array.isArray(opts.viewers) ? opts.viewers : [];
         const phone = Boolean(opts.phone);
-        const budget = phone ? BUDGET.phone : BUDGET.desktop;
+        // Audio rides along to every viewer too; it comes off the top so voices never get squeezed.
+        const audioBps = Number.isFinite(opts.audioBps) ? Math.max(0, opts.audioBps) : 0;
+        const budget = Math.max(0, (phone ? BUDGET.phone : BUDGET.desktop) - audioBps * viewers.length);
         const hq = new Set(viewers.filter((v) => v.wantHi && !opts.jam && !opts.screen)
             .sort((a, b) => (a.hiSince || 0) - (b.hiSince || 0)).slice(0, MAX_HQ).map((v) => v.id));
         const plan = {};
@@ -57,7 +59,21 @@
         }
         return plan;
     }
-    function uplinkTotal(plan) { return Object.values(plan || {}).reduce((a, e) => a + (e.active ? e.maxBitrate : 0), 0); }
+    function uplinkTotal(plan, audioBps) {
+        const list = Object.values(plan || {});
+        return list.reduce((a, e) => a + (e.active ? e.maxBitrate : 0), 0) + (Number(audioBps) || 0) * list.length;
+    }
+
+    /* Phone-class device? Catches iPadOS (reports a Mac UA but has multi-touch), touch-first
+     * (coarse pointer) devices and low-core machines, so they get the lighter defaults. */
+    function isPhoneDevice(d) {
+        const dev = d || {};
+        const ua = String(dev.ua || '');
+        if (/Mobi|Android|iPhone|iPad|iPod/i.test(ua)) return true;
+        if (/Macintosh/.test(ua) && Number(dev.maxTouchPoints) > 1) return true; // iPadOS desktop-mode UA
+        if (dev.coarse && !dev.fine) return true;
+        return Number.isFinite(dev.cores) && dev.cores < 4;
+    }
 
     /* Grade a link from getStats numbers. Missing numbers never make it look worse. */
     function gradeLink(s) {
@@ -198,7 +214,7 @@
         return q;
     }
 
-    const api = { enqueue, BUDGET, PHONE_HQ_BPS, MAX_HQ, planUplink, uplinkTotal, MAX_CAMS, REACTIONS, TIERS, HOST_KINDS, encodingFor, gradeLink, nextTier, pickSpeaker, mainTile, gridColumns, cleanReaction, rateLimit, handQueue, cleanHostAction, backgroundSupport, backgroundVerdict, micConstraints, musicSdp, qualityLabel };
+    const api = { enqueue, isPhoneDevice, BUDGET, PHONE_HQ_BPS, MAX_HQ, planUplink, uplinkTotal, MAX_CAMS, REACTIONS, TIERS, HOST_KINDS, encodingFor, gradeLink, nextTier, pickSpeaker, mainTile, gridColumns, cleanReaction, rateLimit, handQueue, cleanHostAction, backgroundSupport, backgroundVerdict, micConstraints, musicSdp, qualityLabel };
     if (typeof module === 'object' && module.exports) module.exports = api;
     global.HangoutVideo = api;
 }(typeof window !== 'undefined' ? window : globalThis));

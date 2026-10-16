@@ -9,7 +9,8 @@
     const $ = (sel) => doc.querySelector(sel);
     // Capture once; each receiver gets it scaled for how big they show us. Most people are on
     // phones, so phones and low-power devices default lighter (battery + cell data).
-    const PHONE = /Mobi|Android|iPhone|iPad/.test(navigator.userAgent) || (navigator.hardwareConcurrency || 8) < 4;
+    const mq = (q) => { try { return Boolean(win.matchMedia && win.matchMedia(q).matches); } catch (error) { return false; } };
+    const PHONE = V.isPhoneDevice({ ua: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints, coarse: mq('(pointer: coarse)'), fine: mq('(any-pointer: fine)'), cores: navigator.hardwareConcurrency });
     const CAM = PHONE
         ? { width: { ideal: 480, max: 640 }, height: { ideal: 360, max: 480 }, frameRate: { ideal: 15, max: 20 } }
         : { width: { ideal: 640, max: 640 }, height: { ideal: 360, max: 480 }, frameRate: { ideal: 24, max: 24 } };
@@ -906,7 +907,8 @@
     function applyEncoding() {
         const viewers = [];
         for (const [id, e] of app.av.pcs) if (e.senders.video && e.senders.video.track) viewers.push({ id, wantHi: e.wantHi, hiSince: e.hiSince, tier: e.tier, relayed: e.relayed });
-        const plan = V.planUplink({ viewers, phone: PHONE, cams: camCount(), screen: Boolean(app.av.screen), jam: app.av.jam });
+        const audioBps = app.av.mic ? (app.av.music ? MUSIC_BPS : MIC_BPS) : 0;
+        const plan = V.planUplink({ viewers, phone: PHONE, cams: camCount(), screen: Boolean(app.av.screen), jam: app.av.jam, audioBps });
         app.av.plan = plan;
         for (const [id, entry] of app.av.pcs) {
             for (const kind of ['audio', 'video']) {
@@ -1502,7 +1504,7 @@
         const hidden = doc.visibilityState === 'hidden';
         const inPip = Boolean(doc.pictureInPictureElement);
         // Phones: keep your voice going in the background, rest the camera to save battery.
-        if (/Mobi|Android|iPhone|iPad/.test(navigator.userAgent) && app.av.cam && !app.av.screen && !inPip) {
+        if (PHONE && app.av.cam && !app.av.screen && !inPip) {
             app.av.away = hidden;
             applyEncoding();
             send({ type: 'av', av: avFlags() });
