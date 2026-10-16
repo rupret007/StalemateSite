@@ -98,7 +98,7 @@ test('homepage Games card and nav link go to /play/, which stays noindex and out
     const nav = page.getByRole('navigation', { name: 'Primary navigation', exact: true });
     const navLinks = nav.getByRole('link');
     await expect(navLinks.last()).toHaveText('Games');
-    await expect(navLinks.last()).toHaveAttribute('href', '#games');
+    await expect(navLinks.last()).toHaveAttribute('href', 'play/#hub-games');
     const games = page.locator('#games');
     await expect(games.locator('.board-square')).toHaveText('Games');
     await expect(games).toContainText('Turdanoid: our free arcade game. Plays in the browser, nothing to download.');
@@ -119,7 +119,7 @@ test('homepage Games card and nav link go to /play/, which stays noindex and out
     expect(box.height).toBeLessThan((page.viewportSize().width <= 760) ? 700 : 480);
     // Countdown, show and Manic hero stay first; Games follows, then Listen and the band.
     expect(await page.locator('main > section').evaluateAll((s) => s.map((e) => e.id))).toEqual(['home', 'games', 'listen', 'about']);
-    expect(await page.locator('a[href*="play"]').evaluateAll((a) => a.map((e) => e.getAttribute('href')))).toEqual(['play/TurdAnoid.html', 'play/turdomania.html', 'play/turdtris.html', 'play/turdjack.html', 'play/turdrummy.html', 'play/turdspades.html', 'play/crapeights.html', 'play/TurdAnoid.html', 'play/', 'play/TurdAnoid.html', 'play/turdomania.html']);
+    expect(await page.locator('a[href*="play"]').evaluateAll((a) => a.map((e) => e.getAttribute('href')))).toEqual(['play/#hub-games', 'play/TurdAnoid.html', 'play/turdomania.html', 'play/turdtris.html', 'play/turdjack.html', 'play/turdrummy.html', 'play/turdspades.html', 'play/crapeights.html', 'play/TurdAnoid.html', 'play/', 'play/TurdAnoid.html', 'play/turdomania.html']);
     await expect(page.locator('#home a[href="#games"]')).toHaveCount(0);
     await expect(page.locator('#listen .listen-games-link a')).toHaveAttribute('href', '#games');
     const pkg = fs.readFileSync(path.join(ROOT, 'scripts/package-pages.cjs'), 'utf8');
