@@ -71,9 +71,12 @@ describe('homepage script behavior', () => {
         expect(document.querySelector('form')).toBeNull();
         expect(document.querySelector('#music')).toBeNull();
         expect(document.querySelector('#merch')).toBeNull();
+        expect(document.querySelector('meta[name="viewport"]').getAttribute('content')).toMatch(/viewport-fit=cover/);
         const video = document.querySelector('.hero-video__player');
         expect(video).toBeTruthy();
         expect(video.hasAttribute('autoplay')).toBe(false);
+        expect(video.getAttribute('preload')).toBe('none');
+        expect(video.hasAttribute('playsinline')).toBe(true);
         expect(video.querySelector('source').getAttribute('src')).toBe('assets/manic.mp4');
     });
 });
