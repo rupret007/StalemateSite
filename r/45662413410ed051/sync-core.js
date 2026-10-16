@@ -12,7 +12,9 @@
         chatKept: 200,
         driftSeconds: 1.0
     });
-    const COLORS = Object.freeze(['#f4f0e6', '#171410', '#009ee8', '#b5dc08', '#ed2765', '#c98a24', '#7a4a2a', '#2f7d3a']);
+    const COLORS = Object.freeze(['#f4f0e6', '#171410', '#009ee8', '#b5dc08', '#ed2765', '#c98a24', '#7a4a2a', '#2f7d3a',
+        // Bob Ross Paint-Along palette (see bob-ross.js)
+        '#ffffff', '#0c0040', '#021e44', '#000000', '#5f2e1f', '#221b15', '#4e1500', '#0a3410', '#ffec00', '#c79b00', '#ffb800', '#db0000']);
     const FILE_SOURCES = Object.freeze({ manic: { src: '../../assets/manic.mp4', title: 'Stalemate - Manic' } });
 
     function parseYouTubeId(input) {

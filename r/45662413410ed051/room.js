@@ -8,6 +8,7 @@
     const $ = (sel) => doc.querySelector(sel);
     const AV_MAX = 4;
     const CAM = { width: { ideal: 320, max: 320 }, height: { ideal: 240, max: 240 }, frameRate: { ideal: 15, max: 15 } };
+    const CANVAS_CAM = { width: { ideal: 640, max: 640 }, height: { ideal: 480, max: 480 }, frameRate: { ideal: 15, max: 15 }, facingMode: { ideal: 'environment' } };
     const CAM_BPS = 250000;
     const CAM_RELAY_BPS = 100000;
     const MIC_BPS = 32000;
@@ -28,14 +29,20 @@
         log: $('[data-log]'), say: $('[data-say]'), text: $('[data-text]'), tiles: $('[data-tiles]'),
         mic: $('[data-mic]'), cam: $('[data-cam]'), hangup: $('[data-hangup]'), ask: $('[data-ask]'),
         askTitle: $('[data-ask-title]'), askCopy: $('[data-ask-copy]'), askYes: $('[data-ask-yes]'), askNo: $('[data-ask-no]'),
-        yt: $('[data-yt]'), file: $('[data-file]'), tap: $('[data-tap]')
+        yt: $('[data-yt]'), file: $('[data-file]'), tap: $('[data-tap]'),
+        bobToggle: $('[data-bob-toggle]'), bob: $('[data-bob]'), bobNow: $('[data-bob-now]'), bobHold: $('[data-bob-hold]'),
+        bobRewind: $('[data-bob-rewind]'), bobCatchup: $('[data-bob-catchup]'), bobNudge: $('[data-bob-nudge]'),
+        bobEpisodes: $('[data-bob-episodes]'), bobPalette: $('[data-bob-palette]'), bobBrushes: $('[data-bob-brushes]'),
+        canvasCam: $('[data-canvas-cam]')
     };
+    const BOB = win.BobRoss;
 
     const app = {
         state: H.emptyState(), clock: H.createClock(), ws: null, myId: null, key: null, roomId: null,
         hostPub: null, hostPriv: null, isHost: false, lastHostSeq: 0, lastVideoSigned: null,
         names: new Map(), name: '', snapshotDone: false, connected: false,
-        av: { stream: null, mic: false, cam: false, peers: new Set(), pcs: new Map(), ice: null, relayed: new Set() }
+        bob: { on: false, touched: false, lastNudge: 0 },
+        av: { stream: null, mic: false, cam: false, canvas: false, canvasPeers: new Set(), peers: new Set(), pcs: new Map(), ice: null, relayed: new Set() }
     };
     win.__hangout = app; // test hook, read-only use
 
@@ -195,6 +202,9 @@
         case 'av':
             noteAv(meta.from, msg.av);
             return;
+        case 'nudge':
+            if (app.isHost) say(`${app.names.get(meta.from) || 'Someone'} needs a sec. Hit “Hold up!” to pause for everyone.`);
+            return;
         case 'rtc':
             await onRtc(meta.from, msg);
             return;
@@ -284,19 +294,40 @@
     /* ---------------- drawing ---------------- */
     const ctx = ui.canvas.getContext('2d');
     let color = H.COLORS[1];
-    H.COLORS.forEach((c, i) => {
+    function pickColor(c) {
+        color = c;
+        doc.querySelectorAll('.swatch').forEach((s) => s.setAttribute('aria-pressed', String(s.dataset.color === c)));
+    }
+    function addSwatch(parent, c, name) {
         const b = doc.createElement('button');
         b.type = 'button';
         b.className = 'swatch';
+        b.dataset.color = c;
         b.style.background = c;
-        b.setAttribute('aria-label', `Color ${i + 1}`);
+        b.title = name;
+        b.setAttribute('aria-label', name);
         b.setAttribute('aria-pressed', String(c === color));
-        b.addEventListener('click', () => {
-            color = c;
-            ui.swatches.querySelectorAll('.swatch').forEach((s) => s.setAttribute('aria-pressed', String(s === b)));
-        });
-        ui.swatches.append(b);
+        b.addEventListener('click', () => pickColor(c));
+        parent.append(b);
+    }
+    H.COLORS.slice(0, 8).forEach((c, i) => addSwatch(ui.swatches, c, `Color ${i + 1}`));
+    BOB.PALETTE.forEach((p) => addSwatch(ui.bobPalette, p.hex, p.name));
+    function pickBrush(size) {
+        ui.size.value = String(size);
+        ui.bobBrushes.querySelectorAll('.brush').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.size) === size)));
+    }
+    BOB.BRUSHES.forEach((br) => {
+        const b = doc.createElement('button');
+        b.type = 'button';
+        b.className = 'brush';
+        b.dataset.size = String(br.size);
+        b.textContent = br.name;
+        b.title = br.hint;
+        b.setAttribute('aria-pressed', 'false');
+        b.addEventListener('click', () => pickBrush(br.size));
+        ui.bobBrushes.append(b);
     });
+    ui.size.addEventListener('input', () => pickBrush(Number(ui.size.value)));
 
     function sizeCanvas() { redraw(); }
     function drawStroke(stroke, fromIndex = 0) {
@@ -445,6 +476,7 @@
         if (H.apply(app.state, { type: 'video', source: b.source, playing: b.playing, pos: b.pos }, { t }) !== 'video') return;
         app.lastVideoSigned = { signed, t };
         app.lastHostSeq = Math.max(app.lastHostSeq, b.seq || 0);
+        showEpisode();
         await syncToState(true);
     }
 
@@ -466,6 +498,7 @@
         const t = app.clock.relayNow();
         H.apply(app.state, { type: 'video', source, playing, pos }, { t });
         app.lastVideoSigned = { signed, t };
+        showEpisode();
         await send(signed);
     }
 
@@ -501,11 +534,14 @@
     });
 
     /* ---------------- faces & voices: opt-in P2P mesh ---------------- */
-    function avFlags() { return { mic: app.av.mic, cam: app.av.cam }; }
+    function avFlags() { return { mic: app.av.mic, cam: app.av.cam, canvas: app.av.canvas }; }
     function avCount() { return app.av.peers.size + ((app.av.mic || app.av.cam) ? 1 : 0); }
 
     function noteAv(from, av) {
         const on = Boolean(av && (av.mic || av.cam));
+        if (av && av.canvas) app.av.canvasPeers.add(from); else app.av.canvasPeers.delete(from);
+        const t = ui.tiles.querySelector(`[data-tile="${CSS.escape(from)}"]`);
+        if (t) t.classList.toggle('tile--canvas', app.av.canvasPeers.has(from));
         if (on) app.av.peers.add(from); else app.av.peers.delete(from);
         if (!on && !(app.av.mic || app.av.cam)) closePc(from);
         if (on && !app.av.pcs.has(from)) openPc(from);
@@ -540,6 +576,7 @@
 
     async function toggle(kind) {
         const turningOn = !app.av[kind];
+        if (kind === 'cam' && app.av.canvas) { await toggleCanvasCam(); return; }
         if (turningOn) {
             if (!(app.av.mic || app.av.cam) && avCount() >= AV_MAX) { say(`Faces are full (${AV_MAX} max). Chat and draw still work.`); return; }
             const ok = await ask(kind === 'cam' ? 'Turn on your camera?' : 'Turn on your mic?',
@@ -566,13 +603,43 @@
         await refreshAv();
     }
 
+    /* "Show my real canvas": the back camera, a bit sharper, shown as a rectangle not a bubble. */
+    async function toggleCanvasCam() {
+        if (app.av.canvas) {
+            app.av.stream.getVideoTracks().forEach((t) => { t.stop(); app.av.stream.removeTrack(t); });
+            app.av.canvas = false;
+            app.av.cam = false;
+            await refreshAv();
+            return;
+        }
+        if (!(app.av.mic || app.av.cam) && avCount() >= AV_MAX) { say(`Faces are full (${AV_MAX} max). Chat and draw still work.`); return; }
+        const ok = await ask('Show your real canvas?',
+            'Point your camera at your easel, sketchbook or lump of clay. Your browser will ask to use the camera. Tap Allow. On phones we try the back camera. Only people in this room see it.');
+        if (!ok) return;
+        try {
+            const got = await navigator.mediaDevices.getUserMedia({ video: CANVAS_CAM });
+            if (!app.av.stream) app.av.stream = new MediaStream();
+            app.av.stream.getVideoTracks().forEach((t) => { t.stop(); app.av.stream.removeTrack(t); });
+            got.getTracks().forEach((track) => app.av.stream.addTrack(track));
+            app.av.cam = true;
+            app.av.canvas = true;
+        } catch (error) {
+            say('Camera’s blocked. Tap the lock or “aA” icon by the address bar, allow Camera, then try again.');
+            return;
+        }
+        await refreshAv();
+    }
+
     async function refreshAv() {
+        ui.canvasCam.setAttribute('aria-pressed', String(app.av.canvas));
+        ui.canvasCam.textContent = app.av.canvas ? 'Stop showing my canvas' : 'Show my real canvas';
         ui.mic.setAttribute('aria-pressed', String(app.av.mic));
         ui.cam.setAttribute('aria-pressed', String(app.av.cam));
         ui.mic.textContent = app.av.mic ? 'Mute my mic' : 'Turn on my mic';
         ui.cam.textContent = app.av.cam ? 'Turn off my camera' : 'Turn on my camera';
+        ui.cam.disabled = app.av.canvas;
         ui.hangup.hidden = !(app.av.mic || app.av.cam);
-        renderTile('me', app.av.cam ? app.av.stream : null, `${app.name} (you)`, true);
+        renderTile('me', app.av.cam ? app.av.stream : null, app.av.canvas ? `${app.name}’s canvas (you)` : `${app.name} (you)`, true);
         await send({ type: 'av', av: avFlags() });
         if (!(app.av.mic || app.av.cam)) Array.from(app.av.pcs.keys()).filter((id) => !app.av.peers.has(id)).forEach(closePc);
         for (const id of app.av.peers) if (!app.av.pcs.has(id)) openPc(id);
@@ -683,6 +750,7 @@
         app.av.stream = null;
         app.av.mic = false;
         app.av.cam = false;
+        app.av.canvas = false;
         Array.from(app.av.pcs.keys()).forEach(closePc);
         renderTile('me', null);
     }
@@ -702,14 +770,88 @@
             tile.append(v, cap);
             ui.tiles.append(tile);
         }
+        tile.classList.toggle('tile--canvas', id === 'me' ? app.av.canvas : app.av.canvasPeers.has(id));
         const v = tile.querySelector('video');
         if (v.srcObject !== stream) v.srcObject = stream;
         tile.querySelector('span').textContent = label || '';
     }
 
+    ui.canvasCam.addEventListener('click', () => toggleCanvasCam());
     ui.mic.addEventListener('click', () => toggle('mic'));
     ui.cam.addEventListener('click', () => toggle('cam'));
     ui.hangup.addEventListener('click', async () => { stopAv(); await refreshAv(); });
+
+    /* ---------------- Bob Ross Paint-Along ---------------- */
+    function setBob(on, byUser) {
+        app.bob.on = Boolean(on);
+        if (byUser) app.bob.touched = true;
+        doc.body.classList.toggle('bob-mode', app.bob.on);
+        ui.bob.hidden = !app.bob.on;
+        ui.bobToggle.setAttribute('aria-pressed', String(app.bob.on));
+        ui.bobToggle.textContent = app.bob.on ? 'Leave Bob mode' : 'Paint along with Bob';
+        if (app.bob.on) {
+            if (!BOB.PALETTE.some((p) => p.hex === color)) pickColor(BOB.PALETTE[1].hex);
+            const details = ui.bob.querySelector('details');
+            if (details && win.matchMedia && win.matchMedia('(max-width: 820px)').matches) details.open = false;
+        }
+    }
+    function currentEpisode() {
+        const v = app.state.video;
+        return v && v.source && v.source.kind === 'yt' ? BOB.findEpisode(v.source.id) : null;
+    }
+    function showEpisode() {
+        const ep = currentEpisode();
+        if (ep && !app.bob.on && !app.bob.touched) setBob(true);
+        ui.bobNow.textContent = ep ? `Now painting: ${ep.title} · ${BOB.label(ep)}` : 'No happy accidents yet. The host picks an episode.';
+        ui.bobEpisodes.querySelectorAll('.ep').forEach((b) => b.setAttribute('aria-current', String(Boolean(ep) && b.dataset.bobEp === ep.id)));
+        const playing = !app.state.video || Boolean(app.state.video.playing);
+        ui.bobHold.setAttribute('aria-pressed', String(!playing));
+        ui.bobHold.textContent = playing ? 'Hold up! Pause for everyone' : 'Back to painting';
+    }
+    BOB.EPISODES.forEach((ep) => {
+        const li = doc.createElement('li');
+        const b = doc.createElement('button');
+        b.type = 'button';
+        b.className = 'ep';
+        b.dataset.bobEp = ep.id;
+        const t = doc.createElement('b');
+        t.textContent = ep.title;
+        const m = doc.createElement('span');
+        m.className = 'meta';
+        m.textContent = `${BOB.label(ep)} · ${ep.level}`;
+        const d = doc.createElement('span');
+        d.className = 'blurb';
+        d.textContent = ep.blurb;
+        b.append(t, m, d);
+        b.addEventListener('click', () => hostLoad({ kind: 'yt', id: ep.id }));
+        li.append(b);
+        ui.bobEpisodes.append(li);
+    });
+    ui.bobToggle.addEventListener('click', () => setBob(!app.bob.on, true));
+    ui.bobHold.addEventListener('click', async () => {
+        const v = app.state.video;
+        if (!app.isHost || !v) return;
+        const pos = localTime();
+        if (v.playing) { pauseLocal(); await hostPublish(v.source, false, pos); say('Paused for everyone. Beat the devil out of that brush.'); }
+        else { await hostPublish(v.source, true, pos); playLocal(); say('Back to painting.'); }
+    });
+    ui.bobRewind.addEventListener('click', async () => {
+        const v = app.state.video;
+        if (!app.isHost || !v) return;
+        const pos = Math.max(0, localTime() - 15);
+        seekTo(pos);
+        await hostPublish(v.source, v.playing, pos);
+        say('Rewound 15 seconds for everyone.');
+    });
+    ui.bobCatchup.addEventListener('click', async () => { ui.tap.hidden = true; await syncToState(true); say('Caught up with the host.'); });
+    ui.bobNudge.addEventListener('click', async () => {
+        if (Date.now() - app.bob.lastNudge < 10000) { say('Hang tight, the host already got your nudge.'); return; }
+        app.bob.lastNudge = Date.now();
+        await send({ type: 'nudge' });
+        say('Told the host you need a sec.');
+    });
+    showEpisode();
+    app.setBob = setBob;
 
     start();
 }(window, document));

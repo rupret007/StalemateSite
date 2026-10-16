@@ -37,6 +37,7 @@
         <div class="bar">
             <span class="peers" data-peers>Just you</span>
             <button class="btn" data-copy type="button">Copy invite link</button>
+            <button class="btn btn--bob" data-bob-toggle type="button" aria-pressed="false">Paint along with Bob</button>
             <span class="status" data-status role="status"></span>
         </div>
 
@@ -49,6 +50,19 @@
                 <input data-url placeholder="Paste any YouTube link" aria-label="YouTube link">
                 <button class="btn" type="submit">Play for everyone</button>
             </form>
+            <div class="bob" data-bob hidden>
+                <p class="bob-now" data-bob-now>No happy accidents yet. The host picks an episode.</p>
+                <div class="tools">
+                    <button class="btn host-only" type="button" data-bob-hold aria-pressed="false">Hold up! Pause for everyone</button>
+                    <button class="btn btn--ghost host-only" type="button" data-bob-rewind>Back 15s for everyone</button>
+                    <button class="btn guest-only" type="button" data-bob-catchup>Catch me up</button>
+                    <button class="btn btn--ghost guest-only" type="button" data-bob-nudge>I need a sec</button>
+                </div>
+                <details class="episodes host-only" open>
+                    <summary>Pick an episode (fan faves + easy starters)</summary>
+                    <ol class="ep-list" data-bob-episodes></ol>
+                </details>
+            </div>
             <div class="picks host-only" data-picks>
                 <button type="button" class="pick" data-pick-file="manic">Manic (Stalemate)</button>
                 <button type="button" class="pick" data-pick-yt="BtnyqIHTDMM">Andrea</button>
@@ -62,7 +76,9 @@
             <canvas data-canvas width="1200" height="800" aria-label="Shared drawing canvas"></canvas>
             <div class="tools">
                 <div class="swatches" data-swatches></div>
-                <label>Brush <input type="range" min="2" max="40" value="6" data-size></label>
+                <div class="swatches bob-palette" data-bob-palette role="group" aria-label="Bob Ross palette"></div>
+                <label>Brush <input type="range" min="2" max="44" value="6" data-size></label>
+                <div class="brushes" data-bob-brushes role="group" aria-label="Bob brushes"></div>
                 <button class="btn btn--ghost host-only" type="button" data-clear>Wipe it</button>
                 <button class="btn btn--ghost" type="button" data-save>Save PNG</button>
             </div>
@@ -75,6 +91,7 @@
             <div class="tools">
                 <button class="btn" type="button" data-mic>Turn on my mic</button>
                 <button class="btn" type="button" data-cam>Turn on my camera</button>
+                <button class="btn btn--bob" type="button" data-canvas-cam aria-pressed="false">Show my real canvas</button>
                 <button class="btn btn--ghost" type="button" data-hangup hidden>Turn both off</button>
             </div>
         </section>
@@ -99,6 +116,7 @@
     </dialog>
 
     <script src="sync-core.js"></script>
+    <script src="bob-ross.js"></script>
     <script src="room.js"></script>
 </body>
 </html>

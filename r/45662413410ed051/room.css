@@ -48,3 +48,40 @@ body:not(.is-host) .host-only{display:none}
 .tile span{left:50%;transform:translateX(-50%);bottom:6px;border-radius:4px}
 [hidden]{display:none!important}
 .tiles .tile{margin:0;width:96px}
+/* ---------- Bob Ross Paint-Along ---------- */
+.btn--bob{background:var(--blue);color:var(--ink)}
+.btn--bob[aria-pressed=true]{background:var(--pink);color:var(--cream)}
+body.is-host .guest-only{display:none}
+.bob{margin-top:10px;border-top:4px dashed var(--blue);padding-top:8px}
+.bob-now{font-family:var(--display);font-size:1.25rem;text-transform:uppercase;color:var(--lime);margin:0}
+.episodes summary{cursor:pointer;font-weight:700;margin-top:8px;color:var(--cream)}
+.ep-list{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px;max-height:340px;overflow:auto}
+.ep{width:100%;text-align:left;background:var(--raised);color:var(--cream);border:2px solid var(--blue);padding:8px 10px;cursor:pointer;display:grid;gap:2px;min-height:44px;font:inherit}
+.ep[aria-current=true]{border-color:var(--lime);background:#3a3122}
+.ep b{font-family:var(--display);font-size:1.1rem;text-transform:uppercase}
+.ep .meta{color:var(--amber);font-size:.8rem;font-weight:700;letter-spacing:.04em}
+.ep .blurb{color:var(--muted);font-size:.85rem}
+.bob-palette,.brushes{display:none}
+body.bob-mode [data-swatches]{display:none}
+body.bob-mode .bob-palette{display:flex;flex-wrap:wrap}
+body.bob-mode .brushes{display:flex;flex-wrap:wrap;gap:4px}
+.bob-palette .swatch{width:32px;height:32px;border-radius:50%;border:2px solid var(--muted)}
+.brush{background:var(--raised);color:var(--cream);border:2px solid var(--muted);padding:6px 9px;min-height:40px;cursor:pointer;font:inherit;font-size:.85rem}
+.brush[aria-pressed=true]{border-color:var(--lime);color:var(--lime)}
+.tile--canvas,.tiles .tile.tile--canvas{border-radius:6px;width:220px;aspect-ratio:4/3}
+/* Side by side: Bob on the left, your canvas on the right, everything else below. */
+body.bob-mode .room{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+body.bob-mode .watch,body.bob-mode .draw{align-self:start}
+@media (max-width:820px){
+    /* Phone: Bob sticks to the top while you paint under him. */
+    body.bob-mode .watch{position:sticky;top:0;z-index:5;padding:6px}
+    body.bob-mode .watch h2,body.bob-mode .watch .small{display:none}
+    body.bob-mode .room{grid-template-columns:1fr}
+    body.bob-mode .ep-list{max-height:180px;grid-template-columns:1fr}
+}
+@media (max-width:820px){
+    body.bob-mode .watch .load,body.bob-mode .watch .picks{display:none}
+    body.bob-mode .bob{margin-top:6px;padding-top:4px}
+    body.bob-mode .bob .tools{margin-top:4px;gap:6px}
+    body.bob-mode .bob .btn{padding:8px 10px;font-size:.95rem}
+}

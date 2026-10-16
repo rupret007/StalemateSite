@@ -205,3 +205,68 @@ test('crawling every public page from the homepage never reaches the room', asyn
     }
     expect(seen.size).toBeGreaterThan(2);
 });
+
+test('Bob Ross Paint-Along: picker, palette, brushes, pause-for-everyone, catch up and nudge', async ({ browser }) => {
+    const { host, guest } = await hostAndGuest(browser);
+    await expect(host.locator('[data-bob]')).toBeHidden();
+    await host.click('[data-bob-toggle]');
+    await expect(host.locator('[data-bob-episodes] .ep')).toHaveCount(12);
+    await expect(host.locator('[data-bob-palette] .swatch')).toHaveCount(12);
+    await expect(host.locator('[data-bob-palette] [aria-label="Phthalo Blue"]')).toBeVisible();
+    await expect(guest.locator('[data-bob-episodes]')).toBeHidden();
+
+    // Picking an episode loads it for everyone and flips guests into Bob mode.
+    await host.click('[data-bob-ep="uj5FE70BcB0"]');
+    await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-video-id', 'uj5FE70BcB0');
+    await expect(guest.locator('body')).toHaveClass(/bob-mode/);
+    await expect(guest.locator('[data-bob-now]')).toContainText('Waterside Way · S8 E4');
+    await expect(guest.locator('[data-bob-hold]')).toBeHidden();
+    await expect(guest.locator('[data-bob-catchup]')).toBeVisible();
+
+    // Painting in Van Dyke Brown with the fan brush syncs across.
+    await guest.click('[data-bob-palette] [aria-label="Van Dyke Brown"]');
+    await guest.click('[data-bob-brushes] .brush:has-text("Fan brush")');
+    await drawLine(guest);
+    await expect.poll(() => host.evaluate(() => window.__hangout.state.strokes.map((s) => `${s.color}/${s.size}`))).toContain('#221b15/16');
+
+    // Guest nudges, host pauses for everyone, then resumes.
+    await guest.click('[data-bob-nudge]');
+    await expect(host.locator('[data-status]')).toContainText('needs a sec');
+    await host.click('[data-bob-hold]');
+    await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'paused');
+    await expect(host.locator('[data-bob-hold]')).toHaveText('Back to painting');
+    await host.click('[data-bob-hold]');
+    await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+
+    // A guest who wanders off can catch up to the host in one tap.
+    await guest.evaluate(() => { window.__ytLog[0].seekTo(400); });
+    await guest.click('[data-bob-catchup]');
+    await expect.poll(() => guest.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeLessThan(30);
+
+    // Host rewinds 15s for everyone.
+    await host.evaluate(() => window.__ytLog[0].seekTo(100));
+    await host.click('[data-bob-rewind]');
+    await expect.poll(() => guest.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeLessThan(95);
+});
+
+test('show your real canvas: opt-in, rectangular tile for everyone, still capped', async ({ browser }) => {
+    const { host, guest } = await hostAndGuest(browser);
+    await host.click('[data-canvas-cam]');
+    await expect(host.locator('[data-ask-title]')).toHaveText('Show your real canvas?');
+    await host.click('[data-ask-yes]');
+    await expect(host.locator('[data-canvas-cam]')).toHaveText('Stop showing my canvas');
+    const w = await host.evaluate(() => window.__hangout.av.stream.getVideoTracks()[0].getSettings().width);
+    expect(w).toBeLessThanOrEqual(640);
+    await expect(host.locator('[data-tile="me"]')).toHaveClass(/tile--canvas/);
+    await guest.click('[data-mic]');
+    await guest.click('[data-ask-yes]');
+    await expect(guest.locator('[data-tiles] .tile--canvas')).toHaveCount(1, { timeout: 15000 });
+    await expect.poll(() => host.evaluate(() => {
+        const e = [...window.__hangout.av.pcs.values()][0];
+        const s = e && e.pc.getSenders().find((x) => x.track && x.track.kind === 'video');
+        return s ? s.getParameters().encodings[0].maxBitrate : null;
+    }), { timeout: 15000 }).toBeLessThanOrEqual(250000);
+    await host.click('[data-canvas-cam]');
+    expect(await host.evaluate(() => window.__hangout.av.canvas)).toBe(false);
+    await expect(host.locator('[data-tile="me"]')).toHaveCount(0);
+});
