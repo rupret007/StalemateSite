@@ -100,13 +100,13 @@ describe('public dark theme contrast', () => {
     it('keeps public pages on the same dark theme-color and a readable ska checkerboard', async () => {
         const css = await readFile(join(repoRoot, 'styles.css'), 'utf8');
         expect(css).toMatch(/repeating-conic-gradient/);
-        expect(css).toMatch(/\.ska-belt/);
+        expect(css).toMatch(/\.checker-belt/);
         expect(css).toMatch(/\.hero-grid/);
 
         for (const relativePath of PUBLIC_HTML) {
             const html = await readFile(join(repoRoot, relativePath), 'utf8');
             expect(html, relativePath).toContain('<meta name="theme-color" content="#171410">');
-            expect(html, relativePath).toMatch(/ska-belt|ska-rule|hero-board/);
+            expect(html, relativePath).toMatch(/checker-belt|checker-rule|hero-board/);
         }
     });
 

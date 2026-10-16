@@ -123,8 +123,8 @@ textarea:focus-visible {
     transform: translateY(0);
 }
 
-.ska-belt,
-.ska-rule {
+.checker-belt,
+.checker-rule {
     height: 32px;
     background-color: var(--ska-dark);
     background-image: repeating-conic-gradient(
@@ -1184,7 +1184,7 @@ textarea:focus-visible {
     text-shadow: 3px 3px 0 var(--pink);
 }
 
-.lost-page .ska-belt {
+.lost-page .checker-belt {
     margin: 1.5rem 0 1.75rem;
     max-width: 12rem;
 }
@@ -1558,4 +1558,4 @@ textarea:focus-visible {
     .hero-show-card .next-show-block p { margin: 0.1rem 0; font-size: 0.875rem; }
 }
 
-.games-card__list a { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.games-card__list a { display: inline-flex; align-items: center; min-height: 44px; margin-block: -8px; /* 44px tap box; negative margin keeps the sentence line spacing */ font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }

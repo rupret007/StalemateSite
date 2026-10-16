@@ -41,6 +41,9 @@ test('every link on every page resolves and every external link is our Stalemate
             const res = await request.get(u.href);
             expect(res.status(), `${p} "${text}" -> ${u.href}`).toBe(200);
         }
+        // New-tab links can't reach back into our page.
+        const unsafe = await page.locator('a[target="_blank"]').evaluateAll((as) => as.filter((a) => !/\bnoopener\b/.test(a.rel || '')).map((a) => a.href));
+        expect(unsafe, `${p} target=_blank without noopener`).toEqual([]);
         // In-page anchors point at real ids.
         const missing = await page.locator('a[href^="#"]').evaluateAll((as) => as.map((a) => a.getAttribute('href')).filter((h) => h.length > 1 && !document.getElementById(h.slice(1))));
         expect(missing, p).toEqual([]);
@@ -63,6 +66,10 @@ test('homepage Play Turdanoid and every game link open their own game', async ({
         expect(new URL(page.url()).pathname).toBe('/' + href);
         await expect(page).toHaveTitle(title);
         await page.goto('/');
+    }
+    for (const a of await list.locator('a').all()) {
+        const b = await a.boundingBox();
+        expect(b.height, `${await a.textContent()} tap target`).toBeGreaterThanOrEqual(44);
     }
     await games.getByRole('link', { name: 'Play Turdanoid' }).click();
     await expect(page).toHaveURL(/\/play\/TurdAnoid\.html$/);
