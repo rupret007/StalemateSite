@@ -53,7 +53,7 @@
 
     function draw() {
         const s = app.state;
-        $('[data-state]').textContent = `Lobby ${s.lock === 'off' ? 'OPEN' : s.lock === 'readonly' ? 'READ-ONLY' : 'LOCKED'} · Shield ${s.shield ? (s.shieldAuto ? 'UP (auto: no band op for 24h)' : 'UP') : 'down'} · Slow ${s.slow}s · ${s.stats.online} online · Budget ${Math.round(100 * s.budget.requests / s.budget.cap)}% (${s.budget.level})`;
+        $('[data-state]').textContent = `Lobby ${s.lock === 'off' ? 'OPEN' : s.lock === 'readonly' ? (s.lockAuto ? 'READ-ONLY (auto: no band op for 24h)' : 'READ-ONLY') : 'LOCKED'} · Shield ${s.shield ? (s.shieldAuto ? 'UP (auto: no band op for 24h)' : 'UP') : 'down'} · Slow ${s.slow}s · ${s.stats.online} online · Budget ${Math.round(100 * s.budget.requests / s.budget.cap)}% (${s.budget.level})`;
         const reports = $('[data-reports]'); reports.replaceChildren();
         for (const r of s.reports) {
             const li = el('li');

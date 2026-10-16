@@ -8,7 +8,8 @@ test('homepage is a finished band page with originals, show and real links', asy
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.locator('#band-title')).toContainText('Stalemate');
     await expect(page.locator('#home a.button--listen')).toHaveAttribute('href', '#about');
-    await expect(page.locator('#home a.button--hot')).toHaveAttribute('href', 'https://rockinoctober.com');
+    await expect(page.locator('#home a.button--hot')).toHaveCount(2);
+    for (const cta of await page.locator('#home a.button--hot').all()) await expect(cta).toHaveAttribute('href', 'https://rockinoctober.com');
     const video = page.locator('.hero-video__player');
     await expect(video).toBeVisible();
     await expect(video).not.toHaveAttribute('autoplay');
@@ -141,7 +142,8 @@ test.describe('homepage without JavaScript', () => {
     test('keeps about, the show facts and festival link usable', async ({ page }) => {
         await page.goto('/');
         await expect(page.locator('#home a[href="#about"]')).toBeVisible();
-        await expect(page.locator('#home a.button--hot[href="https://rockinoctober.com"]')).toBeVisible();
+        await expect(page.locator('#home a.button--hot[href="https://rockinoctober.com"]')).toHaveCount(2);
+        for (const cta of await page.locator('#home a.button--hot[href="https://rockinoctober.com"]').all()) await expect(cta).toBeVisible();
         await expect(page.locator('.hero-video__player source')).toHaveAttribute('src', 'assets/manic.mp4');
         await expect(page.locator('.hero-show__tie')).toContainText('Hear it loud Oct 24 at Los Amigo’s, Plano');
         await expect(page.locator('#about')).toContainText('Rockin’ October on Saturday, Oct 24, 4:45 PM');
@@ -192,7 +194,13 @@ test.describe('hero countdown after the set', () => {
         await expect(page.locator('.hero-show__tie')).toBeHidden();
         await expect(page.locator('.hero-video__player')).toBeVisible();
         await expect(page.locator('#home a[href="#about"]')).toBeVisible();
-        await expect(page.locator('#home a.button--hot[href="https://rockinoctober.com"]')).toBeVisible();
+        const repeat = page.locator('#home .button-row [data-show-cta]');
+        await expect(repeat).toBeVisible();
+        await expect(repeat).toHaveText('Catch the next show');
+        await expect(repeat).toHaveAttribute('href', 'https://www.instagram.com/stalemate.punk/');
+        await expect(repeat).toHaveAttribute('data-track', 'show-cta-next-fallback');
+        await expect(page.locator('#home')).not.toContainText('See us Oct 24');
+        await expect(page.locator('#home .hero-show__cta a')).toBeHidden();
         await expect(page.locator('#home')).not.toContainText('Shows coming soon');
         expect(await page.locator('[data-next-show]').boundingBox()).toBeNull();
         await expect(page.locator('[data-upcoming-empty]')).toHaveCount(0);
@@ -206,4 +214,42 @@ test('the GitHub Pages project prefix serves the same homepage', async ({ page }
     await page.goto('/StalemateSite/');
     await expect(page.locator('#band-title')).toContainText('Stalemate');
     await expect(page.locator('link[rel="stylesheet"][href="styles.css"]')).toHaveCount(1);
+});
+
+test.describe('repeat show button', () => {
+    test('before the show it says See us Oct 24 and links to the show', async ({ page }) => {
+        await page.goto('/');
+        const repeat = page.locator('#home .button-row [data-show-cta]');
+        await expect(repeat).toHaveText('See us Oct 24');
+        await expect(repeat).toHaveAttribute('href', 'https://rockinoctober.com');
+        await expect(repeat).toHaveAttribute('data-track', 'show-cta-under-video');
+    });
+
+    test('updates when an open page crosses the show time', async ({ page }) => {
+        await page.clock.setFixedTime(new Date('2026-10-24T16:44:59-05:00'));
+        await page.goto('/');
+        const repeat = page.locator('#home .button-row [data-show-cta]');
+        await expect(repeat).toHaveText('See us Oct 24');
+        await page.clock.setFixedTime(new Date('2026-10-24T16:45:01-05:00'));
+        await expect(page.locator('[data-next-show]')).toBeHidden();
+        await expect(repeat).toHaveText('Catch the next show');
+        await expect(repeat).toHaveAttribute('href', 'https://www.instagram.com/stalemate.punk/');
+        await expect(repeat).toHaveAttribute('data-track', 'show-cta-next-fallback');
+    });
+
+    test.describe('after the show with a next show booked', () => {
+        test.use({ showTime: '2026-11-01T12:00:00-05:00' });
+        test('points at the next show', async ({ page }) => {
+            await page.route(/\/(index\.html)?$/, async (route) => {
+                const res = await route.fetch();
+                const html = (await res.text()).replace('data-show-cta ', 'data-show-cta data-next-starts="2026-12-05T20:00:00-06:00" data-next-href="https://example.com/next" data-next-label="See us Dec 5" ');
+                await route.fulfill({ response: res, body: html });
+            });
+            await page.goto('/');
+            const repeat = page.locator('#home .button-row [data-show-cta]');
+            await expect(repeat).toHaveText('See us Dec 5');
+            await expect(repeat).toHaveAttribute('href', 'https://example.com/next');
+            await expect(repeat).toHaveAttribute('data-track', 'show-cta-next');
+        });
+    });
 });

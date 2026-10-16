@@ -60,9 +60,33 @@ function send(response, status, body, headers = {}) {
     response.end(body);
 }
 
-function sendFile(response, filePath, status = 200) {
+function sendFile(request, response, filePath, status = 200) {
     const type = MIME[path.extname(filePath)] || 'application/octet-stream';
-    send(response, status, fs.readFileSync(filePath), { 'Content-Type': type });
+    const contents = fs.readFileSync(filePath);
+    const headers = {
+        'Content-Type': type,
+        'Content-Length': contents.length,
+        'Accept-Ranges': 'bytes'
+    };
+    // WebKit probes media with bytes=0-1 before requesting the remaining file.
+    // Ignore Range on HEAD, error responses, and unsupported multi-range requests.
+    const range = request.method === 'GET' && status === 200
+        && /^bytes=(\d*)-(\d*)$/.exec(request.headers.range || '');
+    if (range && (range[1] || range[2])) {
+        const start = range[1] ? Number(range[1]) : Math.max(0, contents.length - Number(range[2]));
+        const end = range[1] && range[2] ? Math.min(Number(range[2]), contents.length - 1) : contents.length - 1;
+        if (start > end || start >= contents.length) {
+            send(response, 416, undefined, { ...headers, 'Content-Length': 0, 'Content-Range': `bytes */${contents.length}` });
+            return;
+        }
+        send(response, 206, contents.subarray(start, end + 1), {
+            ...headers,
+            'Content-Length': end - start + 1,
+            'Content-Range': `bytes ${start}-${end}/${contents.length}`
+        });
+        return;
+    }
+    send(response, status, request.method === 'HEAD' ? undefined : contents, headers);
 }
 
 const server = http.createServer((request, response) => {
@@ -80,20 +104,25 @@ const server = http.createServer((request, response) => {
     }
 
     if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-        sendFile(response, filePath);
+        sendFile(request, response, filePath);
         return;
     }
 
     if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
         const indexPath = path.join(filePath, 'index.html');
         if (fs.existsSync(indexPath)) {
-            sendFile(response, indexPath);
+            sendFile(request, response, indexPath);
             return;
         }
     }
 
-    sendFile(response, path.join(ROOT, '404.html'), 404);
+    sendFile(request, response, path.join(ROOT, '404.html'), 404);
 });
+
+// Keep idle sockets open longer than any client pool so a reused keep-alive
+// socket is never closed mid-request (undici "other side closed" flake).
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
 
 server.listen(PORT, '127.0.0.1', () => {
     process.stdout.write(`Stalemate test server on http://127.0.0.1:${PORT}\n`);
