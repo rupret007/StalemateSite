@@ -83,7 +83,7 @@ export function computeDropChance(level, remainingBricks) {
 }
 
 /**
- * The 19 power-up types shipped in TurdAnoid.html, with unlock levels,
+ * The 21 power-up types shipped in TurdAnoid.html, with unlock levels,
  * pick weights, and bad-pickup flags.
  */
 export const POWERS = [
@@ -101,8 +101,10 @@ export const POWERS = [
   // Creative funny set (level 3-6)
   { t: 'bomb', unlock: 3, weight: 1.4 },
   { t: 'plunger', unlock: 3, weight: 1.6 },
+  { t: 'warp', unlock: 3, weight: 0.5 },
   { t: 'flush', unlock: 4, weight: 1.2 },
   { t: 'hotdog', unlock: 4, weight: 1.5 },
+  { t: 'chord', unlock: 4, weight: 1.0 },
   { t: 'ghost', unlock: 5, weight: 1.3 },
   { t: 'skunk', unlock: 5, weight: 1.4 },
   { t: 'gold', unlock: 6, weight: 1.0 },
