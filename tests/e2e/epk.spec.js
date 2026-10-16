@@ -9,6 +9,7 @@ test('EPK carries short and long bios, hometown and tech docs', async ({ page })
     await expect(page.locator('#bio')).toContainText('Lewisville');
     await expect(page.locator('#bio')).toContainText('Flower Mound');
     await expect(page.locator('#bio')).toContainText('Better Than Now');
+    await expect(page.locator('body')).not.toContainText(/SoCal|Southern California|do not link|other act|two-tone/i);
     await expect(page.locator('#bio')).not.toContainText(/\bJeff\b/);
     await expect(page.locator('#bio')).not.toContainText(/\bChe\b/);
     await expect(page.locator('#bio')).not.toContainText(/\bSean\b/);

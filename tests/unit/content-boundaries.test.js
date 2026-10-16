@@ -37,7 +37,11 @@ describe('content boundaries', () => {
         expect(home).toMatch(/punk rock/i);
         expect(home).toContain('Lewisville');
         expect(home).toContain('Flower Mound');
-        expect(home).toContain('Originals. Two-tone.');
+        expect(home).toContain('Originals. Punk rock.');
+        expect(home).not.toMatch(/Two-tone|two-tone/i);
+        const homeBody = home.split(/<body[^>]*>/i)[1] || '';
+        expect(homeBody).not.toMatch(/SoCal|Southern California|do not link|other act|Head2Wall/i);
+        expect(home).toMatch(/Not the SoCal pop-punk band of the same name/);
         expect(home).not.toMatch(/Ska \/ punk/i);
         expect(home).not.toMatch(/ska\/punk/i);
         expect(home).not.toMatch(/ticket/i);
@@ -87,5 +91,7 @@ describe('content boundaries', () => {
         expect(epk).toContain('stage-plot.txt');
         expect(epk).toContain('tech-rider.txt');
         expect(epk).not.toContain('[BOOKING EMAIL NEEDED]');
+        const epkBody = epk.split(/<body[^>]*>/i)[1] || '';
+        expect(epkBody).not.toMatch(/SoCal|Southern California|do not link|other act|two-tone/i);
     });
 });

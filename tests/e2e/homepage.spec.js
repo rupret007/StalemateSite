@@ -30,7 +30,10 @@ test('homepage is a finished band page with hometown, show and real links', asyn
     await expect(page.locator('form')).toHaveCount(0);
     await expect(page.locator('#home')).toContainText('Rockin’ October');
     await expect(page.locator('#home')).toContainText('Los Amigo’s');
-    await expect(page.locator('body')).toContainText('Not the SoCal pop-punk band');
+    await expect(page.locator('.hero__tag')).toContainText('Originals. Punk rock. Lewisville / Flower Mound.');
+    await expect(page.locator('body')).not.toContainText(/two-tone/i);
+    await expect(page.locator('body')).not.toContainText(/SoCal|Southern California|do not link|other act|Head2Wall/i);
+    expect(await page.locator('meta[name="description"]').getAttribute('content')).toMatch(/Not the SoCal pop-punk band/);
     await expect(page.locator('body')).not.toContainText(/ticket/i);
     await expect(page.locator('body')).not.toContainText(/\bJeff\b/);
     await expect(page.locator('body')).not.toContainText(/\bChe\b/);
@@ -47,6 +50,8 @@ test('public pages fail on template placeholder words', async ({ page }) => {
         await page.goto(path);
         const text = await page.locator('body').innerText();
         expect(text, path).not.toMatch(PLACEHOLDER_COPY);
+        expect(text, path).not.toMatch(/two-tone/i);
+        expect(text, path).not.toMatch(/SoCal|Southern California|do not link|other act|Head2Wall/i);
     }
 });
 

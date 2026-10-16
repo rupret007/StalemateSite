@@ -2,8 +2,6 @@
 
 Official site for **Stalemate** — a punk rock band from **Lewisville / Flower Mound**. Named cuts: **Better Than Now** and **Manic**. Next date: **Rockin’ October**, Saturday, Oct 24, 2026, Los Amigo’s, Plano, TX. Set 4:45 PM Central.
 
-This is **not** the Southern California pop-punk band of the same name. Do not link that act.
-
 ## Public surfaces
 
 - `/` — stage hero with the Manic lyric video paired to the Oct 24 countdown and next-show block, plus about
@@ -28,7 +26,7 @@ The homepage countdown and next-show block hide after `2026-10-24T16:45:00-05:00
 
 ## Visual identity
 
-Rad Dad’s palette (`#171410` ink, `#f4f0e6` cream, `#009ee8` listen, `#ed2765` hot accent, `#b5dc08` focus). **Punk first, ska as the accent** — and the two-tone checker stays a full-contrast core signature (24px header band, torn 32px belts, large hero field, card top-rails, button feet). Xerox grain and sticker labels sit around the check, never washed over it. Display type stays Barlow Condensed — chunky outline and print-offset shadow, not another band’s lettering. Accent stickers use cream / lime / blue with ink type so they stay AA. Grain and check never sit at full contrast behind body copy. Layout is a signed-band grid, not Rad Dad’s festival collage. Copy matches Rad Dad’s confidence and specificity, in Stalemate’s own punk rock voice — no reused lines or jokes.
+Rad Dad’s palette (`#171410` ink, `#f4f0e6` cream, `#009ee8` listen, `#ed2765` hot accent, `#b5dc08` focus). **Punk first, ska as the accent** — and the checkerboard stays a full-contrast core signature (24px header band, torn 32px belts, large hero field, card top-rails, button feet). Xerox grain and sticker labels sit around the check, never washed over it. Display type stays Barlow Condensed — chunky outline and print-offset shadow, not another band’s lettering. Accent stickers use cream / lime / blue with ink type so they stay AA. Grain and check never sit at full contrast behind body copy. Layout is a signed-band grid, not Rad Dad’s festival collage. Copy matches Rad Dad’s confidence and specificity, in Stalemate’s own punk rock voice — no reused lines or jokes.
 
 ## Local checks
 
