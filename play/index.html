@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Stalemate Playground (preview)</title>
+<link rel="icon" href="../assets/favicon.svg">
+<link rel="stylesheet" href="play.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../">STALEMATE</a>
+  <span class="tag">Playground · preview</span>
+</header>
+<main>
+  <section class="intro">
+    <h1>Break the checkerboard.</h1>
+    <p>Smash every tile that spells the band. Clear it and Manic comes on.</p>
+  </section>
+  <section class="game" aria-label="Stalemate Breakout">
+    <div class="hud" aria-live="polite"><span>Score <b id="score">0</b></span><span>Lives <b id="lives">3</b></span><span>Level <b id="level">1</b></span></div>
+    <canvas id="board" width="360" height="480" role="img" aria-label="Breakout game board. Move with arrow keys or drag. Space to launch or pause."></canvas>
+    <div class="overlay" id="overlay">
+      <p id="msg">Tap or press Space to drop in.</p>
+      <div class="actions">
+        <button id="start" type="button">Play</button>
+        <button id="share" type="button" hidden>Share score</button>
+        <a id="listen" class="btn ghost" href="../#home" hidden>Watch Manic</a>
+      </div>
+    </div>
+  </section>
+  <section class="more">
+    <h2>More from the garage</h2>
+    <div class="cards">
+      <article class="card"><h3>Turdanoid</h3><p>Six browser games, one sewer. Brick-breaker, stacker and card tables.</p><a class="btn" href="https://rupret007.github.io/Turdanoid/" rel="noopener">Play</a></article>
+      <article class="card"><h3>WebJam</h3><p>Our desktop app for jamming and making art together from different houses.</p><span class="soon">Coming soon</span></article>
+    </div>
+  </section>
+</main>
+<script src="play.js"></script>
+</body>
+</html>
