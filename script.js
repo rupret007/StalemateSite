@@ -1,4 +1,4 @@
-/* Shared progressive enhancement. Navigation, tickets, music names and
+/* Shared progressive enhancement. Navigation, music names and
    mailing-list copy all work without JavaScript. */
 (function () {
     'use strict';

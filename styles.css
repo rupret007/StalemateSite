@@ -277,13 +277,13 @@ textarea:focus-visible {
     cursor: pointer;
 }
 
-.button--tickets,
+.button--hot,
 .button--listen {
     position: relative;
     box-shadow: 3px 3px 0 var(--ink);
 }
 
-.button--tickets {
+.button--hot {
     background: var(--pink);
     color: var(--cream);
     transform: rotate(-0.6deg);
@@ -295,7 +295,7 @@ textarea:focus-visible {
     transform: rotate(0.6deg);
 }
 
-.button--tickets::after,
+.button--hot::after,
 .button--listen::after {
     content: "";
     position: absolute;
@@ -530,7 +530,7 @@ textarea:focus-visible {
 
 .hero .board-square,
 #shows .section-heading .board-square,
-#list .board-square {
+#follow .board-square {
     background: var(--lime);
     box-shadow: 3px 3px 0 var(--blue);
     transform: rotate(-2.2deg);
@@ -1038,7 +1038,7 @@ textarea:focus-visible {
     .brand__mark,
     .brand__text small,
     .board-square,
-    .button--tickets,
+    .button--hot,
     .button--listen,
     .hero-board figcaption {
         transform: none;

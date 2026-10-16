@@ -28,7 +28,7 @@ function words(text) {
 }
 
 describe('content boundaries', () => {
-    it('keeps the known originals, ticket actions, and operational tokens without naming members or chess kickers', async () => {
+    it('keeps the known originals, standard band CTAs, and operational tokens without naming members or chess kickers', async () => {
         const home = await readFile(join(repoRoot, 'index.html'), 'utf8');
         const readme = await readFile(join(repoRoot, 'README.md'), 'utf8');
         expect(home).toContain('Better Than Now');
@@ -37,20 +37,24 @@ describe('content boundaries', () => {
         expect(home).toContain('Originals. Two-tone.');
         expect(home).not.toMatch(/Ska \/ punk/i);
         expect(home).not.toMatch(/ska\/punk/i);
-        expect(home).toContain('Get tickets');
-        expect(home).toContain('class="button button--tickets"');
+        expect(home).not.toMatch(/ticket/i);
+        expect(home).toContain('href="#music">Listen');
+        expect(home).toContain('href="#video">Watch');
+        expect(home).toContain('href="#follow">Follow');
+        expect(home).toContain('href="#contact">Contact');
         expect(home).toContain('class="button button--listen"');
-        expect(home).toContain('[DATE/VENUE/TICKET LINK NEEDED]');
+        expect(home).toContain('[DATE/VENUE NEEDED]');
         expect(home).toContain('[MAILING LIST TOOL NEEDED]');
         expect(home).toContain('[MERCH NEEDED]');
         expect(home).not.toMatch(/A1\s*·/);
         expect(home).not.toMatch(/E4\s*·/);
         expect(home).not.toContain('[CITY NEEDED');
-        expect(readme).toContain('[DATE/VENUE/TICKET LINK NEEDED]');
+        expect(readme).toContain('[DATE/VENUE NEEDED]');
         expect(readme).toContain('[MAILING LIST TOOL NEEDED]');
         expect(readme).toContain('[MERCH NEEDED]');
         expect(readme).toContain('[BOOKING EMAIL NEEDED]');
         expect(readme).toContain('Member names and roles');
+        expect(readme).not.toMatch(/ticket/i);
     });
 
     it('never names band members on public surfaces', async () => {

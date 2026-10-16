@@ -6,7 +6,7 @@ This is **not** the Southern California pop-punk band of the same name. Do not l
 
 ## Public surfaces
 
-- `/` — stage hero, Get tickets + Listen, music, upcoming/past shows, video, about, mailing list, merch shelf
+- `/` — stage hero, Listen + Watch, music, shows, video, about, follow, merch shelf
 - `/qr/` — printed-flyer landing (next show, listen, follow)
 - `/epk/` — press kit (short + long bio, stills, music, video, interview, stage plot, rider, booking)
 - `404.html` — not-on-the-set page
@@ -22,17 +22,17 @@ Do not publish guesses for any of these:
 - Stream / store URLs for Better Than Now and Manic
 - Manic lyric-video watch URL
 - Studio interview watch URL
-- Next show date, venue, city, door time, age limit, ticket link, ICS
+- Next show date, venue, city, door time, age limit, ICS
 - Mailing-list tool
 - Merch items
 - Booking email
 - Instagram / TikTok / Facebook handles
 
-Operational tokens (`[DATE/VENUE/TICKET LINK NEEDED]`, `[MAILING LIST TOOL NEEDED]`, `[MERCH NEEDED]`, `[BOOKING EMAIL NEEDED]`, `[HANDLE NEEDED]`) stay in the HTML as screen-reader-only markers so tests can lock them. They are not shown in the hero.
+Operational tokens (`[DATE/VENUE NEEDED]`, `[MAILING LIST TOOL NEEDED]`, `[MERCH NEEDED]`, `[BOOKING EMAIL NEEDED]`, `[HANDLE NEEDED]`) stay in the HTML as screen-reader-only markers so tests can lock them. They are not shown in the hero.
 
 ## Visual identity
 
-Rad Dad’s palette (`#171410` ink, `#f4f0e6` cream, `#009ee8` listen, `#ed2765` tickets, `#b5dc08` focus). **Punk first, ska as the accent** — and the two-tone checker stays a full-contrast core signature (24px header band, torn 32px belts, large hero field, card top-rails, button feet). Xerox grain and sticker labels sit around the check, never washed over it. Display type stays Barlow Condensed — chunky outline and print-offset shadow, not another band’s lettering. Accent stickers use cream / lime / blue with ink type so they stay AA. Grain and check never sit at full contrast behind body copy. Layout is a signed-band grid, not Rad Dad’s festival collage. Copy matches Rad Dad’s confidence and specificity, in Stalemate’s own punk rock voice — no reused lines or jokes.
+Rad Dad’s palette (`#171410` ink, `#f4f0e6` cream, `#009ee8` listen, `#ed2765` hot accent, `#b5dc08` focus). **Punk first, ska as the accent** — and the two-tone checker stays a full-contrast core signature (24px header band, torn 32px belts, large hero field, card top-rails, button feet). Xerox grain and sticker labels sit around the check, never washed over it. Display type stays Barlow Condensed — chunky outline and print-offset shadow, not another band’s lettering. Accent stickers use cream / lime / blue with ink type so they stay AA. Grain and check never sit at full contrast behind body copy. Layout is a signed-band grid, not Rad Dad’s festival collage. Copy matches Rad Dad’s confidence and specificity, in Stalemate’s own punk rock voice — no reused lines or jokes.
 
 ## Local checks
 
@@ -42,7 +42,7 @@ npm run test:install-browsers
 npm test
 ```
 
-Unit tests use Vitest. Browser tests use Playwright against a local server on **4320** (override with `STALEMATE_TEST_PORT`). The server also mounts the site at `/StalemateSite/` so the GitHub Pages project path can be exercised. Navigation, tickets, song names and the mailing-list copy work with JavaScript disabled. Previews load only after an explicit tap.
+Unit tests use Vitest. Browser tests use Playwright against a local server on **4320** (override with `STALEMATE_TEST_PORT`). The server also mounts the site at `/StalemateSite/` so the GitHub Pages project path can be exercised. Navigation, song names and the mailing-list copy work with JavaScript disabled. Previews load only after an explicit tap.
 
 ## GitHub Pages (temporary host)
 

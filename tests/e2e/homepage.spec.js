@@ -1,20 +1,22 @@
 const { test, expect } = require('./fixtures');
 
-test('homepage leads with tickets, songs and honest placeholders', async ({ page }) => {
+test('homepage leads with listen, watch, shows and honest placeholders', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveTitle(/Stalemate/);
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.locator('#band-title')).toContainText('Stalemate');
-    await expect(page.locator('#home a.button--tickets')).toHaveAttribute('href', '#shows');
     await expect(page.locator('#home a.button--listen')).toHaveAttribute('href', '#music');
+    await expect(page.locator('#home a.button--hot')).toHaveAttribute('href', '#video');
     await expect(page.locator('#music')).toContainText('Better Than Now');
     await expect(page.locator('#music')).toContainText('Manic');
     await expect(page.locator('#about')).toContainText(/punk rock/i);
     await expect(page.locator('#about dt')).toHaveCount(0);
     await expect(page.locator('#home')).not.toContainText('[CITY NEEDED');
-    await expect(page.locator('#shows')).toContainText('[DATE/VENUE/TICKET LINK NEEDED]');
+    await expect(page.locator('#shows')).toContainText('[DATE/VENUE NEEDED]');
+    await expect(page.locator('#shows')).toContainText('Shows coming soon');
     await expect(page.locator('#merch')).toContainText('[MERCH NEEDED]');
     await expect(page.locator('body')).toContainText('Not the SoCal pop-punk band');
+    await expect(page.locator('body')).not.toContainText(/ticket/i);
     await expect(page.locator('body')).not.toContainText(/\bJeff\b/);
     await expect(page.locator('body')).not.toContainText(/\bChe\b/);
     await expect(page.locator('body')).not.toContainText(/\bSean\b/);
@@ -41,7 +43,7 @@ for (const width of [320, 390, 768, 1440]) {
     test(`homepage remains usable without overlap at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 900 });
         await page.goto('/');
-        for (const section of ['#home', '#music', '#shows', '#video', '#about', '#list', '#merch']) {
+        for (const section of ['#home', '#music', '#shows', '#video', '#about', '#follow', '#merch']) {
             await page.locator(section).scrollIntoViewIfNeeded();
             expect(await page.evaluate(() => Math.max(document.body.scrollWidth, document.documentElement.scrollWidth) <= innerWidth + 1)).toBe(true);
         }
@@ -49,23 +51,25 @@ for (const width of [320, 390, 768, 1440]) {
         for (const link of await nav.getByRole('link').all()) {
             expect((await link.boundingBox()).height).toBeGreaterThanOrEqual(44);
         }
-        const tickets = page.locator('#home a.button--tickets');
-        expect((await tickets.boundingBox()).height).toBeGreaterThanOrEqual(44);
+        const listen = page.locator('#home a.button--listen');
+        expect((await listen.boundingBox()).height).toBeGreaterThanOrEqual(44);
     });
 }
 
 test.describe('homepage without JavaScript', () => {
     test.use({ javaScriptEnabled: false });
-    test('keeps tickets, songs, list and merch usable', async ({ page }) => {
+    test('keeps listen, watch, follow and merch usable', async ({ page }) => {
         await page.goto('/');
-        await expect(page.locator('#home a[href="#shows"]')).toBeVisible();
+        await expect(page.locator('#home a[href="#music"]')).toBeVisible();
+        await expect(page.locator('#home a[href="#video"]')).toBeVisible();
         await expect(page.locator('#music')).toContainText('Better Than Now');
         await expect(page.locator('[data-load-preview]:not([hidden])')).toHaveCount(0);
         await expect(page.locator('[data-share-band]:not([hidden])')).toHaveCount(0);
-        await expect(page.locator('#list')).toContainText('[MAILING LIST TOOL NEEDED]');
+        await expect(page.locator('#follow')).toContainText('[MAILING LIST TOOL NEEDED]');
         await expect(page.locator('#about')).toContainText(/punk rock/i);
         await expect(page.locator('#about dt')).toHaveCount(0);
         await expect(page.locator('#merch')).toContainText('Merch placeholder');
+        await expect(page.locator('body')).not.toContainText(/ticket/i);
     });
 });
 

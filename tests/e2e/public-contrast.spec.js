@@ -5,7 +5,7 @@ const SAMPLE_SELECTORS = [
     'h2',
     '.hero__lede',
     '.board-square',
-    '.button--tickets',
+    '.button--hot',
     '.button--listen',
     '.site-nav a',
     '.hero__tag',
