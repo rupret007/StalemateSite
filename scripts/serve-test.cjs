@@ -16,6 +16,7 @@ const MIME = {
     '.json': 'application/json; charset=utf-8',
     '.jpg': 'image/jpeg',
     '.jpeg': 'image/jpeg',
+    '.m4a': 'audio/mp4',
     '.mp4': 'video/mp4',
     '.png': 'image/png',
     '.svg': 'image/svg+xml',

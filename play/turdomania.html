@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Turdomania: a free click-to-pop puzzle in the Turdanoid suite. Pop matching piles of 2 or more, bigger piles score more, flush the whole board for a bonus.">
+<meta name="theme-color" content="#1a120c">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="assets/turdsuite.css">
+<script src="games/table-continue-core.js"></script>
+<script src="assets/turdsuite.js"></script>
+<title>Turdomania</title>
+<style>
+:root {
+  --bg-a: #1a120c;
+  --bg-b: #2e2016;
+  --ink: #f6e4c5;
+  --accent: #ffcb87;
+  --accent-2: #8ee8c7;
+  --panel: rgba(24, 14, 9, 0.78);
+  --panel-border: rgba(255, 203, 135, 0.3);
+  --cell: 32px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; min-height: 100%; font-family: 'Trebuchet MS', 'Segoe UI', sans-serif; }
+body {
+  min-height: 100vh; min-height: 100dvh; color: var(--ink);
+  background: radial-gradient(circle at 20% 10%, rgba(255, 185, 108, 0.2), transparent 40%),
+    linear-gradient(180deg, var(--bg-b), var(--bg-a));
+  display: flex; flex-direction: column; align-items: center;
+  padding: max(10px, env(safe-area-inset-top)) 10px max(12px, env(safe-area-inset-bottom));
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+header.hud {
+  width: 100%; max-width: 640px; display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: center; gap: 6px 10px; padding: 4px 52px 8px;
+}
+h1 { font-size: clamp(1.15rem, 5vw, 1.7rem); letter-spacing: .04em; color: var(--accent); text-shadow: 0 2px 0 #000; width: 100%; text-align: center; }
+.stat { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 10px; padding: 4px 10px; font-size: .85rem; min-width: 70px; text-align: center; }
+.stat b { display: block; font-size: 1.05rem; color: #fff; }
+.tagline { font-size: .8rem; opacity: .8; text-align: center; width: 100%; }
+main.tm { display: contents; }
+#boardWrap { position: relative; margin: 6px auto; padding: 6px; border-radius: 14px; background: rgba(0,0,0,.35); border: 2px solid var(--panel-border); }
+#board { position: relative; outline: none; border-radius: 8px; width: var(--board-w, 320px); height: var(--board-h, 384px); }
+#board [role="row"] { display: contents; }
+#board:focus-visible { box-shadow: 0 0 0 3px var(--accent-2); }
+.tile {
+  position: absolute; left: 0; top: 0; width: var(--cell); height: var(--cell);
+  border: 0; padding: 0; border-radius: 22%; cursor: pointer; display: grid; place-items: center;
+  font-size: calc(var(--cell) * 0.66); line-height: 1;
+  background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.35), transparent 60%), var(--k);
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,.25);
+  transition: transform 220ms cubic-bezier(.3,1.3,.5,1), opacity 180ms ease, filter 120ms;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none;
+}
+.tile.hot { filter: brightness(1.25) saturate(1.2); box-shadow: inset 0 -3px 0 rgba(0,0,0,.25), 0 0 0 2px #fff; z-index: 2; }
+.tile.cursor { outline: 3px solid var(--accent-2); outline-offset: -2px; z-index: 3; }
+.tile.popping { opacity: 0; transform: var(--pos) scale(1.6) rotate(25deg) !important; pointer-events: none; }
+.tile.nope { animation: nope 260ms; }
+@keyframes nope { 25% { margin-left: -3px; } 75% { margin-left: 3px; } }
+.float { position: absolute; pointer-events: none; font-weight: 900; color: #fff; text-shadow: 0 2px 0 #000; animation: floatUp 800ms ease-out forwards; z-index: 5; }
+@keyframes floatUp { from { transform: translate(-50%, 0); opacity: 1; } to { transform: translate(-50%, -40px); opacity: 0; } }
+.dock { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; width: 100%; max-width: 640px; }
+.dock button, .dock select, #overlay button {
+  min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--panel-border);
+  background: var(--panel); color: var(--ink); font: inherit; font-weight: 700; cursor: pointer;
+}
+.dock button:disabled { opacity: .45; cursor: default; }
+.dock button:focus-visible, .dock select:focus-visible, #overlay button:focus-visible { outline: 3px solid var(--accent-2); }
+.help { font-size: .75rem; opacity: .7; text-align: center; margin-top: 8px; max-width: 520px; }
+#overlay { position: absolute; inset: 0; display: none; place-items: center; background: rgba(10,6,3,.78); border-radius: 14px; z-index: 10; text-align: center; padding: 12px; }
+#overlay.show { display: grid; }
+#overlay h2 { color: var(--accent); font-size: 1.5rem; margin-bottom: 6px; }
+#overlay p { margin-bottom: 10px; }
+#overlay .row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+body.reduced .tile, body.reduced .float { transition: none !important; animation: none !important; }
+body.reduced .tile.popping { transform: var(--pos) !important; }
+@media (max-width: 360px), (max-height: 600px) {
+  header.hud { padding: 2px 46px 4px; gap: 4px; flex-wrap: nowrap; justify-content: center; }
+  header.hud h1 { display: none; }
+  .stat { min-width: 0; flex: 1 1 0; padding: 2px 6px; font-size: .7rem; line-height: 1.1; }
+  .stat b { font-size: .95rem; }
+  .tagline { display: none; }
+  #boardWrap { margin: 4px auto; padding: 4px; }
+  .dock { margin-top: 6px; gap: 6px; flex-wrap: wrap; }
+  .dock button, .dock select { padding: 0 10px; font-size: .85rem; white-space: nowrap; }
+  .dock select { min-width: 0; flex: 1 1 100%; max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile, .float { transition: none !important; animation: none !important; }
+  .tile.popping { transform: var(--pos) !important; }
+}
+</style>
+</head>
+<body class="suite-ambient">
+<header class="hud">
+  <h1>💩 Turdomania</h1>
+  <div class="stat">Score<b id="score">0</b></div>
+  <div class="stat">Best<b id="best">0</b></div>
+  <div class="stat">Left<b id="left">0</b></div>
+  <p class="tagline" id="tagline">Pop matching piles. Bigger piles stink more. Flush the whole board for +1000.</p>
+</header>
+<main class="tm" aria-label="Turdomania">
+<div id="boardWrap">
+  <div id="board" role="grid" tabindex="0" aria-label="Turdomania board. Arrow keys move, Enter pops a pile, U undoes."></div>
+  <div id="overlay" role="dialog" aria-modal="false" aria-labelledby="overTitle">
+    <div>
+      <h2 id="overTitle">Clogged!</h2>
+      <p id="overText"></p>
+      <div class="row">
+        <button type="button" id="againBtn">Flush &amp; Again</button>
+        <button type="button" id="overUndoBtn">Undo last pop</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="dock" role="toolbar" aria-label="Game controls">
+  <button type="button" id="undoBtn" aria-keyshortcuts="U">↶ Undo</button>
+  <button type="button" id="newBtn" aria-keyshortcuts="N">🚽 New board</button>
+  <label class="sr-only" for="levelSel">Difficulty</label>
+  <select id="levelSel" aria-label="Difficulty">
+    <option value="easy">Squirt · 3 kinds</option>
+    <option value="normal">Log · 4 kinds</option>
+    <option value="hard">Blowout · 5 kinds</option>
+  </select>
+</div>
+<script>
+// Reserve the board's final size before first paint (no layout shift). Mirrors layout() below;
+// tests keep TM_DIMS in sync with games/turdomania-core.js LEVELS.
+window.TM_DIMS = { easy: [8, 10], normal: [10, 12], hard: [12, 14] };
+// One viewport measure for pre-paint, start() and layout(): the smaller of innerWidth/clientWidth,
+// so a transient wider innerWidth on first load can't pick more columns than the screen holds.
+window.tmView = function () {
+  var de = document.documentElement;
+  var w = Math.min(window.innerWidth || Infinity, de.clientWidth || Infinity);
+  var h = Math.min(window.innerHeight || Infinity, de.clientHeight || Infinity);
+  var compact = w <= 360 || h <= 600;
+  return { availW: Math.min(w, 760) - 36, availH: h - (compact ? 170 : 230) };
+};
+window.tmFit = function (levelKey) {
+  var d = TM_DIMS[levelKey] || TM_DIMS.normal;
+  var v = tmView(), availW = v.availW, availH = v.availH;
+  var fit = function (n, avail, floor) { return Math.max(Math.min(n, floor), Math.min(n, Math.floor(avail / 32))); };
+  return { availW: availW, availH: availH, cols: fit(d[0], availW, 6), rows: fit(d[1], availH, 8) };
+};
+(function () {
+  var q = new URLSearchParams(location.search), lvl = q.get('level');
+  if (!TM_DIMS[lvl]) { try { lvl = (JSON.parse(localStorage.getItem('turdomania_prefs_v1') || 'null') || {}).level; } catch (e) { lvl = null; } }
+  var f = tmFit(TM_DIMS[lvl] ? lvl : 'normal');
+  window.TM_INIT = { level: TM_DIMS[lvl] ? lvl : 'normal', cols: f.cols, rows: f.rows };
+  var cell = Math.max(22, Math.min(56, Math.floor(Math.min(f.availW / f.cols, f.availH / f.rows))));
+  var st = document.documentElement.style;
+  st.setProperty('--cell', cell + 'px'); st.setProperty('--board-w', cell * f.cols + 'px'); st.setProperty('--board-h', cell * f.rows + 'px');
+})();
+</script>
+</main>
+<p class="help">Tap a pile of 2+ touching matches. Stuff falls, empty columns slide left. Score = (pile − 2)². Keys: arrows, Enter/Space, U undo, N new.</p>
+<div id="live" class="sr-only" aria-live="polite"></div>
+
+<script type="module">
+import * as Core from './games/turdomania-core.js';
+
+const qs = new URLSearchParams(location.search);
+const boardEl = document.getElementById('board');
+const wrap = document.getElementById('boardWrap');
+const overlay = document.getElementById('overlay');
+const liveEl = document.getElementById('live');
+const els = {
+  score: document.getElementById('score'), best: document.getElementById('best'), left: document.getElementById('left'),
+  undo: document.getElementById('undoBtn'), newBtn: document.getElementById('newBtn'), level: document.getElementById('levelSel'),
+  again: document.getElementById('againBtn'), overUndo: document.getElementById('overUndoBtn'),
+  overTitle: document.getElementById('overTitle'), overText: document.getElementById('overText')
+};
+const reduced = () => qs.get('reducedMotion') === '1' || matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (reduced()) document.body.classList.add('reduced');
+
+function readPrefs() {
+  try { const p = JSON.parse(localStorage.getItem(Core.PREFS_KEY) || 'null'); return p && p.v === 1 ? p : { v: 1 }; } catch { return { v: 1 }; }
+}
+function writePrefs(p) { try { localStorage.setItem(Core.PREFS_KEY, JSON.stringify({ ...p, v: 1 })); } catch { /* full */ } }
+
+// Sound hooks: shared suite synth, which honours the suite mute toggle.
+function sfx(name) {
+  try { if (window.Suite && Suite.audio) Suite.audio().then((a) => a && a.playPreset(name)); } catch { /* no audio */ }
+}
+function announce(msg) {
+  liveEl.textContent = msg;
+  try { if (window.Suite && Suite.announce) Suite.announce(msg); } catch { /* optional */ }
+}
+
+let state = null;
+let cursor = { c: 0, r: 0 };
+let cell = 32;
+const tileEls = new Map();
+const fixedSeed = qs.has('seed') ? Number(qs.get('seed')) >>> 0 : null;
+
+function start(levelKey, seed) {
+  // First board reuses the size reserved before paint; later boards re-measure.
+  const init = window.TM_INIT && window.TM_INIT.level === levelKey ? window.TM_INIT : null;
+  window.TM_INIT = null;
+  const fit = init || (window.tmFit ? window.tmFit(levelKey) : null);
+  state = Core.newGame(levelKey, seed ?? (fixedSeed ?? ((Math.random() * 2 ** 32) >>> 0)), fit && !qs.has('fullsize') ? { cols: fit.cols, rows: fit.rows } : null);
+  boardEl.innerHTML = '';
+  rowEls.length = 0;
+  tileEls.clear();
+  cursor = { c: 0, r: 0 };
+  overlay.classList.remove('show');
+  layout();
+  render();
+  sfx('shuffle');
+}
+
+function layout() {
+  const { availW, availH } = window.tmView();
+  cell = Math.max(22, Math.min(56, Math.floor(Math.min(availW / state.cols, availH / state.rows))));
+  const st = document.documentElement.style;
+  st.setProperty('--cell', cell + 'px');
+  st.setProperty('--board-w', cell * state.cols + 'px');
+  st.setProperty('--board-h', cell * state.rows + 'px');
+}
+
+// Grid semantics: one role="row" per visual row (top to bottom); each tile lives in its row.
+// Rows are display:contents, so tiles stay positioned against #board.
+const rowEls = [];
+function syncRows() {
+  while (rowEls.length < state.rows) {
+    const row = document.createElement('div');
+    row.setAttribute('role', 'row');
+    row.setAttribute('aria-rowindex', rowEls.length + 1);
+    boardEl.appendChild(row);
+    rowEls.push(row);
+  }
+  while (rowEls.length > state.rows) rowEls.pop().remove();
+  boardEl.setAttribute('aria-rowcount', state.rows);
+  boardEl.setAttribute('aria-colcount', state.cols);
+}
+
+function posFor(c, r) { return `translate(${c * cell}px, ${(state.rows - 1 - r) * cell}px)`; }
+
+function render() {
+  syncRows();
+  const live = new Set();
+  state.board.forEach((col, c) => col.forEach((t, r) => {
+    if (!t) return;
+    live.add(t.id);
+    let el = tileEls.get(t.id);
+    const kind = Core.POOP_KINDS[t.kind];
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'tile';
+      el.id = 'tile-' + t.id;
+      el.setAttribute('role', 'gridcell');
+      el.textContent = kind.emoji;
+      el.style.setProperty('--k', kind.color);
+      el.dataset.id = t.id;
+      tileEls.set(t.id, el);
+    }
+    el.classList.remove('popping');
+    el.dataset.col = c; el.dataset.row = r;
+    const rowEl = rowEls[state.rows - 1 - r];
+    if (el.parentNode !== rowEl) {
+      const from = el.parentNode ? el.style.transform : '';
+      rowEl.appendChild(el);
+      if (from) { // re-parenting drops the transition start; replay it from the old spot
+        el.style.transition = 'none';
+        el.style.transform = from;
+        void el.offsetWidth;
+        el.style.transition = '';
+      }
+    }
+    const pos = posFor(c, r);
+    el.style.setProperty('--pos', pos);
+    el.style.transform = pos;
+    el.setAttribute('aria-label', `${kind.name}, column ${c + 1}, row ${r + 1}`);
+    el.setAttribute('aria-colindex', c + 1);
+  }));
+  for (const [id, el] of tileEls) if (!live.has(id)) { el.remove(); tileEls.delete(id); }
+  els.score.textContent = state.score;
+  const best = Core.readBest(localStorage)[state.level];
+  els.best.textContent = Math.max(best, state.score);
+  els.left.textContent = Core.tileCount(state.board);
+  els.undo.disabled = state.history.length === 0;
+  els.level.value = state.level;
+  clampCursor();
+  paintCursor();
+  if (state.over) showOver();
+  window.__turdomania = { state, Core };
+}
+
+function clampCursor() {
+  const cols = state.board.length;
+  if (!cols) { cursor = { c: 0, r: 0 }; return; }
+  cursor.c = Math.max(0, Math.min(cols - 1, cursor.c));
+  const h = state.board[cursor.c].length;
+  cursor.r = Math.max(0, Math.min(h - 1, cursor.r));
+}
+
+function clearHot() { boardEl.querySelectorAll('.hot').forEach((e) => e.classList.remove('hot')); }
+function highlight(c, r) {
+  clearHot();
+  const g = Core.findGroup(state.board, c, r);
+  if (g.length < 2) return g.length;
+  for (const [gc, gr] of g) { const t = state.board[gc][gr]; tileEls.get(t.id)?.classList.add('hot'); }
+  return g.length;
+}
+function paintCursor() {
+  boardEl.querySelectorAll('.cursor').forEach((e) => e.classList.remove('cursor'));
+  const t = Core.cellAt(state.board, cursor.c, cursor.r);
+  if (!t) { boardEl.removeAttribute('aria-activedescendant'); return; }
+  const el = tileEls.get(t.id);
+  if (document.activeElement === boardEl && el) {
+    el.classList.add('cursor');
+    boardEl.setAttribute('aria-activedescendant', el.id);
+    const n = highlight(cursor.c, cursor.r);
+    liveEl.textContent = n >= 2 ? `${Core.POOP_KINDS[t.kind].name} pile of ${n}, worth ${Core.scoreForGroup(n)}` : `${Core.POOP_KINDS[t.kind].name}, loner`;
+  }
+}
+
+function floatText(text, c, r) {
+  if (reduced()) return;
+  const f = document.createElement('div');
+  f.className = 'float';
+  f.textContent = text;
+  f.style.left = c * cell + cell / 2 + 'px';
+  f.style.top = (state.rows - 1 - r) * cell + 'px';
+  f.setAttribute('aria-hidden', 'true');
+  boardEl.appendChild(f);
+  setTimeout(() => f.remove(), 850);
+}
+
+let busy = false;
+function popAt(c, r) {
+  if (busy || !state) return;
+  const res = Core.play(state, c, r);
+  if (!res) {
+    const t = Core.cellAt(state.board, c, r);
+    const el = t && tileEls.get(t.id);
+    if (el && !reduced()) { el.classList.remove('nope'); void el.offsetWidth; el.classList.add('nope'); }
+    sfx('tick');
+    return;
+  }
+  clearHot();
+  const removedEls = res.removed.map((t) => tileEls.get(t.id)).filter(Boolean);
+  removedEls.forEach((el) => el.classList.add('popping'));
+  floatText(res.points ? `+${res.points}` : 'plop', c, r);
+  sfx(res.removed.length >= 6 ? 'ding' : 'blip');
+  state = res.state;
+  if (state.over) Core.recordBest(localStorage, state.level, state.score);
+  const finish = () => {
+    removedEls.forEach((el) => { el.remove(); tileEls.delete(Number(el.dataset.id)); });
+    busy = false;
+    render();
+    announce(`Popped ${res.removed.length}${res.points ? `, +${res.points}` : ''}. Score ${state.score}.`);
+  };
+  if (reduced()) finish();
+  else { busy = true; setTimeout(finish, 170); }
+}
+
+function doUndo() {
+  const prev = state && Core.undo(state);
+  if (!prev) return;
+  state = prev;
+  overlay.classList.remove('show');
+  // Rebuild tiles: undone tiles come back with their old ids.
+  render();
+  sfx('snap');
+  announce('Unflushed. Score ' + state.score);
+}
+
+function showOver() {
+  const left = Core.tileCount(state.board);
+  const best = Core.readBest(localStorage)[state.level];
+  els.overTitle.textContent = state.cleared ? 'Squeaky clean! 🧼' : 'Clogged! 🪠';
+  els.overText.textContent = state.cleared
+    ? `Board flushed. +${Core.CLEAR_BONUS} bonus. Final ${state.score}.${state.score >= best ? ' New best!' : ''}`
+    : `No more matches. ${left} turd${left === 1 ? '' : 's'} left behind. Final ${state.score}.${state.score >= best && state.score > 0 ? ' New best!' : ''}`;
+  overlay.classList.add('show');
+  sfx(state.cleared ? 'win' : 'lose');
+  announce(els.overTitle.textContent + ' ' + els.overText.textContent);
+  setTimeout(() => els.again.focus({ preventScroll: true }), 30);
+}
+
+boardEl.addEventListener('pointerdown', (e) => {
+  const el = e.target.closest('.tile');
+  if (!el) return;
+  e.preventDefault();
+  const c = Number(el.dataset.col), r = Number(el.dataset.row);
+  cursor = { c, r };
+  popAt(c, r);
+});
+boardEl.addEventListener('pointerover', (e) => {
+  if (e.pointerType !== 'mouse') return;
+  const el = e.target.closest('.tile');
+  if (el) highlight(Number(el.dataset.col), Number(el.dataset.row)); else clearHot();
+});
+boardEl.addEventListener('pointerleave', clearHot);
+boardEl.addEventListener('focus', paintCursor);
+boardEl.addEventListener('blur', () => { clearHot(); boardEl.querySelectorAll('.cursor').forEach((x) => x.classList.remove('cursor')); });
+
+document.addEventListener('keydown', (e) => {
+  if (e.target === els.level) return;
+  const k = e.key;
+  if (k === 'u' || k === 'U' || ((e.ctrlKey || e.metaKey) && (k === 'z' || k === 'Z'))) { e.preventDefault(); doUndo(); return; }
+  if (k === 'n' || k === 'N') { e.preventDefault(); start(state.level); return; }
+  if (document.activeElement !== boardEl) return;
+  const moves = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
+  if (moves[k]) { e.preventDefault(); cursor.c += moves[k][0]; cursor.r += moves[k][1]; clampCursor(); paintCursor(); return; }
+  if (k === 'Enter' || k === ' ') { e.preventDefault(); popAt(cursor.c, cursor.r); }
+});
+els.undo.addEventListener('click', doUndo);
+els.overUndo.addEventListener('click', doUndo);
+els.newBtn.addEventListener('click', () => start(state.level));
+els.again.addEventListener('click', () => { start(state.level); boardEl.focus({ preventScroll: true }); });
+els.level.addEventListener('change', () => { writePrefs({ level: els.level.value }); start(els.level.value); });
+let rz = 0;
+window.addEventListener('resize', () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(() => { if (state) { layout(); render(); } }); });
+
+const startLevel = Core.LEVELS[qs.get('level')] ? qs.get('level') : (readPrefs().level || 'normal');
+start(startLevel);
+// Test hook: deterministic actions without hunting pixels.
+window.__turdomaniaPop = (c, r) => popAt(c, r);
+window.__turdomaniaUndo = doUndo;
+</script>
+</body>
+</html>

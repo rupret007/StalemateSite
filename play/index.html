@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#10192d">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="assets/turdsuite.css">
+  <script src="games/table-continue-core.js"></script>
+  <script src="assets/turdsuite.js"></script>
+  <title>Turdanoid — Seven Games, One Sewer</title>
+  <style>
+    :root {
+      --bg-a: #10192d;
+      --bg-b: #1a2b46;
+      --bg-c: #11434c;
+      --ink: #e8f7ff;
+      --muted: #b9d2de;
+      --accent: #78ffd5;
+      --gold: #ffd76a;
+      --panel: rgba(10, 18, 34, 0.62);
+      --panel-border: rgba(120, 255, 213, 0.32);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      color: var(--ink);
+      font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+      background:
+        radial-gradient(circle at 18% 12%, rgba(120, 255, 213, 0.20), transparent 34%),
+        radial-gradient(circle at 82% 10%, rgba(255, 188, 118, 0.18), transparent 28%),
+        linear-gradient(135deg, var(--bg-a), var(--bg-b), var(--bg-c));
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+      position: relative;
+      isolation: isolate;
+    }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      inset: auto;
+      border-radius: 999px;
+      filter: blur(14px);
+      opacity: 0.46;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    body::before {
+      width: 240px;
+      height: 240px;
+      left: -38px;
+      top: 8vh;
+      background:
+        radial-gradient(circle at 35% 35%, rgba(255, 239, 161, 0.62), transparent 26%),
+        radial-gradient(circle at 60% 58%, rgba(120, 255, 213, 0.5), transparent 44%);
+    }
+
+    body::after {
+      width: 300px;
+      height: 300px;
+      right: -56px;
+      bottom: 6vh;
+      background:
+        radial-gradient(circle at 50% 40%, rgba(255, 189, 118, 0.42), transparent 32%),
+        radial-gradient(circle at 45% 60%, rgba(120, 255, 213, 0.36), transparent 48%);
+    }
+
+    .shell {
+      width: min(1180px, 96vw);
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 26px;
+      padding: 22px 22px 18px;
+      box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    .shell::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(120deg, rgba(255, 255, 255, 0.09), transparent 26%, transparent 72%, rgba(255, 255, 255, 0.05)),
+        radial-gradient(circle at 14% 18%, rgba(120, 255, 213, 0.12), transparent 24%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    /* Pipe rail across the top of the shell */
+    .shell::after {
+      content: "";
+      position: absolute;
+      left: 0; right: 0; top: 0;
+      height: 6px;
+      background: linear-gradient(90deg, transparent, rgba(120, 255, 213, 0.55) 20%, rgba(255, 215, 106, 0.55) 50%, rgba(120, 255, 213, 0.55) 80%, transparent);
+      opacity: 0.8;
+      pointer-events: none;
+    }
+
+    /* ---------- Header ---------- */
+    .masthead {
+      text-align: center;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      font-size: clamp(1.7rem, 3.6vw, 2.7rem);
+      margin-bottom: 8px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35em;
+      background: linear-gradient(180deg, #d9fff0 0%, var(--accent) 45%, #56d9a9 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 18px rgba(120, 255, 213, 0.28)) drop-shadow(0 4px 0 rgba(0, 40, 30, 0.45));
+    }
+
+    h1 .logo {
+      display: inline-block;
+      font-size: 1.15em;
+      -webkit-text-fill-color: initial;
+      color: initial;
+      filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.45));
+      animation: logoBob 3.4s ease-in-out infinite;
+      transform-origin: 50% 90%;
+    }
+
+    @keyframes logoBob {
+      0%, 100% { transform: translateY(0) rotate(0); }
+      50% { transform: translateY(-4px) rotate(-6deg); }
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin-bottom: 12px;
+      font-size: 1rem;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .hero-badge {
+      margin: 0;
+      width: fit-content;
+      max-width: 100%;
+      padding: 7px 13px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      letter-spacing: 0.04em;
+      text-align: center;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .hero-badge {
+      border: 1px solid rgba(255, 223, 151, 0.4);
+      background: linear-gradient(180deg, rgba(60, 40, 16, 0.6), rgba(28, 20, 12, 0.6));
+      color: #ffe4af;
+    }
+
+    /* Returning-player shortcut: the suite runtime swaps the reassurance
+       badge for a link straight to the table waiting to be continued. */
+    a.hero-badge.hero-resume {
+      border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+      background: linear-gradient(180deg, rgba(18, 54, 44, 0.72), rgba(10, 32, 26, 0.72));
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 700;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    a.hero-badge.hero-resume:hover,
+    a.hero-badge.hero-resume:focus-visible {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent), 0 10px 24px rgba(0, 0, 0, 0.25);
+      outline: none;
+      transform: translateY(-1px);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      a.hero-badge.hero-resume { transition: none; }
+      a.hero-badge.hero-resume:hover,
+      a.hero-badge.hero-resume:focus-visible { transform: none; }
+    }
+
+    /* ---------- Card grid ---------- */
+    .games {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .game-card {
+      --c: var(--accent);
+      --c2: #7ae6ff;
+      display: flex;
+      flex-direction: column;
+      text-decoration: none;
+      color: var(--ink);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(16, 30, 50, 0.82), rgba(8, 18, 34, 0.9));
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+      box-shadow: 0 18px 34px rgba(2, 10, 20, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      transition: transform 0.28s cubic-bezier(0.2, 1.2, 0.4, 1), box-shadow 0.28s ease, border-color 0.28s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .game-card::before {
+      /* moving sheen */
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.14) 48%, transparent 60%);
+      background-size: 240% 100%;
+      background-position: -120% 0;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 3;
+      transition: opacity 0.2s ease;
+    }
+
+    .game-card::after {
+      content: attr(data-vibe);
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      max-width: 60%;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: rgba(8, 16, 30, 0.78);
+      border: 1px solid rgba(255, 223, 151, 0.3);
+      color: #ffe4af;
+      font-size: 0.64rem;
+      font-weight: 700;
+      line-height: 1.2;
+      text-align: right;
+      letter-spacing: 0.04em;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+      z-index: 4;
+      transform: rotate(2deg);
+    }
+
+    .game-card:hover,
+    .game-card:focus-visible {
+      transform: translateY(-6px) scale(1.012);
+      border-color: color-mix(in srgb, var(--c) 60%, transparent);
+      box-shadow:
+        0 28px 48px rgba(2, 10, 20, 0.5),
+        0 0 0 1px color-mix(in srgb, var(--c) 35%, transparent),
+        0 0 34px color-mix(in srgb, var(--c) 22%, transparent),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      outline: none;
+    }
+
+    .game-card:hover::before,
+    .game-card:focus-visible::before {
+      opacity: 1;
+      animation: cardSheen 0.9s ease forwards;
+    }
+
+    @keyframes cardSheen {
+      to { background-position: 120% 0; }
+    }
+
+    .game-card:active { transform: translateY(-2px) scale(0.995); }
+
+    .game-card.last-played {
+      border-color: color-mix(in srgb, var(--c) 50%, transparent);
+      box-shadow:
+        0 18px 34px rgba(2, 10, 20, 0.32),
+        0 0 0 1px color-mix(in srgb, var(--c) 28%, transparent),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .game-card.last-played .title-row h2::after,
+    .game-card.in-progress .title-row h2::after {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 0.58rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #102016;
+      background: var(--gold);
+      vertical-align: middle;
+    }
+
+    .game-card.last-played .title-row h2::after { content: "Last played"; }
+
+    .game-card.in-progress .title-row h2::after {
+      content: "In progress";
+      background: var(--accent);
+      color: #08221a;
+    }
+
+    /* Cover art */
+    .cover {
+      position: relative;
+      aspect-ratio: 32 / 15;
+      overflow: hidden;
+      background: #0b1727;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .cover svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .cover::after {
+      /* bottom fade so the body text sits on a clean edge */
+      content: "";
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 34%;
+      background: linear-gradient(180deg, transparent, rgba(8, 18, 34, 0.75));
+      pointer-events: none;
+    }
+
+    .body {
+      padding: 12px 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .game-info {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .emoji {
+      display: inline-grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      flex: 0 0 40px;
+      font-size: 1.35rem;
+      border-radius: 12px;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--c) 28%, #0c1a2e), color-mix(in srgb, var(--c) 10%, #0c1a2e));
+      border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      transition: transform 0.25s cubic-bezier(0.2, 1.4, 0.4, 1);
+      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.25));
+    }
+
+    .game-card:hover .emoji { transform: rotate(-10deg) scale(1.08); }
+
+    .game-card h2 {
+      color: var(--c);
+      font-size: 1.18rem;
+      letter-spacing: 0.02em;
+      text-shadow: 0 0 16px color-mix(in srgb, var(--c) 35%, transparent);
+    }
+
+    .game-card p {
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.45;
+      flex: 1;
+    }
+
+    .play {
+      margin-top: 4px;
+      align-self: flex-start;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 12px 7px 14px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #08221a;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--c) 90%, #fff), var(--c));
+      box-shadow: 0 8px 18px color-mix(in srgb, var(--c) 30%, transparent), inset 0 -2px 0 rgba(0, 0, 0, 0.18);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .play i {
+      font-style: normal;
+      transition: transform 0.2s ease;
+    }
+
+    .game-card:hover .play { transform: translateX(2px); box-shadow: 0 12px 24px color-mix(in srgb, var(--c) 42%, transparent), inset 0 -2px 0 rgba(0, 0, 0, 0.18); }
+    .game-card:hover .play i { transform: translateX(3px); }
+
+    /* ---------- Cover art motion (hover) ---------- */
+    .art-ball { transform-box: fill-box; transform-origin: center; }
+    .art-paddle { transform-box: fill-box; transform-origin: center; }
+    .game-card:hover .art-ball { animation: artBounce 0.9s ease-in-out infinite; }
+    .game-card:hover .art-paddle { animation: artPaddle 0.9s ease-in-out infinite; }
+    @keyframes artBounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-22px); } }
+    @keyframes artPaddle { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(14px); } }
+
+    .art-piece { transform-box: fill-box; transform-origin: center; }
+    .game-card:hover .art-piece { animation: artDrop 1.1s cubic-bezier(0.5, 0, 1, 1) infinite; }
+    @keyframes artDrop { 0% { transform: translateY(-8px); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(58px); opacity: 1; } }
+
+    .art-fan-l, .art-fan-r { transform-box: fill-box; transform-origin: 50% 100%; transition: transform 0.35s cubic-bezier(0.2, 1.4, 0.4, 1); }
+    .game-card:hover .art-fan-l { transform: rotate(-14deg) translateX(-8px); }
+    .game-card:hover .art-fan-r { transform: rotate(14deg) translateX(8px); }
+
+    .art-spin { transform-box: fill-box; transform-origin: center; }
+    .game-card:hover .art-spin { animation: artSpin 2.2s linear infinite; }
+    @keyframes artSpin { to { transform: rotate(360deg); } }
+
+    .art-lift { transform-box: fill-box; transform-origin: center; transition: transform 0.35s cubic-bezier(0.2, 1.4, 0.4, 1); }
+    .game-card:hover .art-lift { transform: translateY(-10px); }
+
+    .art-slide { transform-box: fill-box; transform-origin: center; transition: transform 0.4s cubic-bezier(0.2, 1.2, 0.4, 1); }
+    .game-card:hover .art-slide { transform: translateY(-26px); }
+
+    .art-glow { animation: artGlow 2.4s ease-in-out infinite; }
+    @keyframes artGlow { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+
+    .art-bubble { animation: artBubble 5s ease-in-out infinite; }
+    .art-bubble:nth-of-type(2) { animation-delay: -1.7s; animation-duration: 6.2s; }
+    .art-bubble:nth-of-type(3) { animation-delay: -3.1s; animation-duration: 4.4s; }
+    @keyframes artBubble { 0% { transform: translateY(0); opacity: 0; } 20% { opacity: 0.8; } 100% { transform: translateY(-60px); opacity: 0; } }
+
+    .game-card:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      h1 .logo, .art-glow, .art-bubble { animation: none; }
+      .game-card:hover .art-ball, .game-card:hover .art-paddle, .game-card:hover .art-piece, .game-card:hover .art-spin { animation: none; }
+      .game-card, .game-card:hover { transition: none; transform: none; }
+    }
+
+    .footer-note {
+      margin-top: 12px;
+      text-align: center;
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      color: rgba(185, 210, 222, 0.6);
+      text-transform: uppercase;
+    }
+
+    .footer-note a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      color: rgba(232, 247, 255, 0.78);
+      text-underline-offset: 0.2em;
+    }
+
+    .footer-note a:hover,
+    .footer-note a:focus-visible { color: var(--accent); }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 980px) {
+      .games { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    }
+
+    @media (max-width: 820px) {
+      body {
+        padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+      }
+      .shell {
+        width: min(820px, 94vw);
+        padding: 16px 14px 14px;
+        border-radius: 20px;
+      }
+      .game-card h2 { font-size: 1.08rem; }
+      .game-card p { font-size: 0.84rem; }
+      .game-card::after { max-width: 56%; }
+    }
+
+    @media (max-width: 600px) {
+      /* Keep the shell centered on tall phones. The body's min-height lets
+         shorter screens and expanded content grow into normal page scroll. */
+      .shell {
+        width: min(640px, 94vw);
+        padding: 14px 10px 12px;
+        border-radius: 16px;
+      }
+      h1 {
+        display: block;
+        font-size: 1.45rem;
+        letter-spacing: 0.03em;
+        overflow-wrap: anywhere;
+        background: none;
+        color: var(--accent);
+      }
+      .subtitle { display: none; }
+      .hero-badge { font-size: 0.68rem; padding: 6px 10px; }
+      .masthead { margin-bottom: 8px; }
+      .games { grid-template-columns: 1fr; gap: 6px; }
+      .game-card { border-radius: 12px; }
+      .cover, .emoji, .game-card::after,
+      .game-card.last-played .title-row h2::after,
+      .game-card.in-progress .title-row h2::after { display: none; }
+
+      /* The "In progress" / "Last played" badge above is hidden on phones, so
+         the only returning-player cue left is the small "Continue" / "Play again"
+         verb. Give the row itself an edge accent a player can scan straight to:
+         gold for last played, live accent for a table still in progress. When a
+         card is both, .in-progress is declared last and wins — the honest call.
+         Use an absolutely positioned pseudo-element to avoid shrinking
+         the content area and triggering flexbox wrap on tight viewports. */
+      .game-card { min-height: 44px; }
+      .game-card.last-played,
+      .game-card.in-progress {
+        position: relative;
+        background:
+          linear-gradient(90deg, color-mix(in srgb, var(--gold) 13%, transparent), transparent 62%),
+          linear-gradient(180deg, rgba(16, 30, 50, 0.82), rgba(8, 18, 34, 0.9));
+      }
+      .game-card.last-played::before,
+      .game-card.in-progress::before {
+        content: "";
+        position: absolute;
+        inset: auto;
+        left: 0; top: 0; bottom: 0;
+        width: 4px;
+        height: auto;
+        opacity: 1;
+        animation: none;
+        transition: none;
+        background: var(--gold);
+        background-size: auto;
+        background-position: 0 0;
+        border-radius: 12px 0 0 12px;
+        z-index: 5;
+      }
+      .game-card.in-progress {
+        background:
+          linear-gradient(90deg, color-mix(in srgb, var(--accent) 15%, transparent), transparent 62%),
+          linear-gradient(180deg, rgba(16, 30, 50, 0.82), rgba(8, 18, 34, 0.9));
+      }
+      .game-card.in-progress::before {
+        background: var(--accent);
+      }
+      .body {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+      }
+      .game-info { flex: 1 1 8.5rem; min-width: 0; gap: 4px; }
+      .game-card h2 { font-size: 1rem; overflow-wrap: anywhere; }
+      .game-card p {
+        font-size: 0.78rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .play {
+        align-self: center;
+        justify-content: center;
+        margin: 0 0 0 auto;
+        min-width: 66px;
+        padding: 8px 10px;
+        font-size: 0.65rem;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+      }
+      .game-card:hover,
+      .game-card:focus-visible { transform: none; }
+    }
+
+    @media (max-width: 390px) {
+      .shell { width: min(100%, 96vw); padding: 12px 10px 10px; }
+      .meta-row { gap: 6px; }
+      .hero-badge { max-width: 100%; }
+    }
+
+    @media (max-width: 320px) {
+      body {
+        padding: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+      }
+      .shell { padding: 10px 8px 8px; border-radius: 14px; }
+      .game-card h2 { font-size: 0.92rem; }
+      .game-card p { font-size: 0.74rem; }
+      .play { min-width: 58px; padding: 7px 8px; font-size: 0.6rem; }
+    }
+
+    /* Squat phone landscape: two compact columns so seven ≥44px rows stay
+       reachable without horizontal overflow. Vertical scroll is allowed.
+       Width can exceed 600px (844×390), so this block restates the phone-row
+       chrome instead of depending on the portrait 600px query. */
+    @media (max-width: 900px) and (max-height: 430px) and (orientation: landscape) {
+      body {
+        align-items: stretch;
+        padding: max(6px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+      }
+      .shell {
+        width: 100%;
+        max-width: none;
+        padding: 8px 10px 8px;
+      }
+      h1 { font-size: 1.15rem; margin-bottom: 4px; }
+      .subtitle { display: none; }
+      .masthead { margin-bottom: 6px; }
+      .games { grid-template-columns: 1fr 1fr; gap: 6px; }
+      .cover, .emoji, .game-card::after,
+      .game-card.last-played .title-row h2::after,
+      .game-card.in-progress .title-row h2::after { display: none; }
+      .game-card { min-height: 44px; border-radius: 12px; }
+      .game-card.last-played,
+      .game-card.in-progress { position: relative; }
+      .game-card.last-played::before,
+      .game-card.in-progress::before {
+        content: "";
+        position: absolute;
+        inset: auto;
+        left: 0; top: 0; bottom: 0;
+        width: 4px;
+        height: auto;
+        opacity: 1;
+        animation: none;
+        transition: none;
+        background: var(--gold);
+        background-size: auto;
+        background-position: 0 0;
+        border-radius: 12px 0 0 12px;
+        z-index: 5;
+      }
+      .game-card.in-progress::before { background: var(--accent); }
+      .body {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+      }
+      .game-info { flex: 1 1 8.5rem; min-width: 0; gap: 4px; }
+      .game-card h2 { font-size: 0.92rem; overflow-wrap: anywhere; }
+      .game-card p {
+        font-size: 0.74rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .play {
+        align-self: center;
+        margin: 0 0 0 auto;
+        min-width: 58px;
+        padding: 7px 8px;
+        font-size: 0.6rem;
+        white-space: nowrap;
+      }
+      .game-card:hover,
+      .game-card:focus-visible { transform: none; }
+    }
+  </style>
+<link rel="stylesheet" href="stalemate-strip.css">
+<meta property="og:title" content="Turdanoid on stalemate.band">
+<meta property="og:description" content="Brick-breaker, but gross. Free, plays in the browser.">
+<meta property="og:image" content="https://stalemate.band/play/stalemate/og-play.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+<body class="suite-ambient suite-no-zoom">
+<nav class="stalemate-strip" aria-label="Stalemate"><a href="../" class="sm-home"><img src="../assets/mark.svg" alt="" width="22" height="22"> stalemate.band</a><a href="https://www.youtube.com/@stalemate.punkband" class="sm-listen" rel="noopener">Listen to Manic</a></nav>
+  <div class="shell">
+    <header class="masthead">
+      <h1><span class="logo">💩</span> Turdanoid</h1>
+      <p class="subtitle">Seven games. Pick your next round.</p>
+      <div class="meta-row">
+        <p class="hero-badge">No sign-in • works on phone and desktop</p>
+        <button type="button" class="suite-hub-mute" id="suite-hub-mute" aria-pressed="false" aria-label="Sound on, tap to mute suite sounds">🔊 Sound on</button>
+      </div>
+    </header>
+
+    <main class="games" id="hub-games" aria-label="Choose a game">
+      <a href="TurdAnoid.html" class="game-card" data-vibe="Turbo edition. More juice." style="--c:#9effc8;--c2:#7ae6ff">
+        <div class="cover" aria-hidden="true">
+          <svg viewBox="0 0 320 150" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <linearGradient id="ta-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#06141a"/><stop offset="1" stop-color="#15394a"/></linearGradient>
+              <linearGradient id="ta-b1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9effc8"/><stop offset="1" stop-color="#3aa97c"/></linearGradient>
+              <linearGradient id="ta-b2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd76a"/><stop offset="1" stop-color="#bf8a13"/></linearGradient>
+              <linearGradient id="ta-b3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff7ab6"/><stop offset="1" stop-color="#a3306e"/></linearGradient>
+              <linearGradient id="ta-b4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b290ff"/><stop offset="1" stop-color="#5b3eb8"/></linearGradient>
+              <radialGradient id="ta-ball" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#c89466"/><stop offset="0.5" stop-color="#8a5a30"/><stop offset="1" stop-color="#2e1a0c"/></radialGradient>
+              <linearGradient id="ta-seat" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="0.7" stop-color="#dcefe6"/><stop offset="1" stop-color="#85b3a1"/></linearGradient>
+            </defs>
+            <rect width="320" height="150" fill="url(#ta-bg)"/>
+            <g opacity="0.16" fill="#2a5c4c"><rect x="30" y="60" width="90" height="10" rx="5"/><rect x="220" y="86" width="70" height="9" rx="4"/><rect x="150" y="40" width="9" height="70" rx="4"/></g>
+            <g class="art-bubble" fill="rgba(158,255,200,.35)"><circle cx="60" cy="120" r="3"/></g>
+            <g class="art-bubble" fill="rgba(158,255,200,.35)"><circle cx="250" cy="130" r="4"/></g>
+            <g class="art-bubble" fill="rgba(158,255,200,.35)"><circle cx="190" cy="115" r="2.5"/></g>
+            <g>
+              <g fill="url(#ta-b1)"><rect x="20" y="14" width="42" height="12" rx="3"/><rect x="66" y="14" width="42" height="12" rx="3"/><rect x="112" y="14" width="42" height="12" rx="3"/><rect x="158" y="14" width="42" height="12" rx="3"/><rect x="204" y="14" width="42" height="12" rx="3"/><rect x="250" y="14" width="42" height="12" rx="3"/></g>
+              <g fill="url(#ta-b2)"><rect x="20" y="30" width="42" height="12" rx="3"/><rect x="66" y="30" width="42" height="12" rx="3"/><rect x="158" y="30" width="42" height="12" rx="3"/><rect x="204" y="30" width="42" height="12" rx="3"/><rect x="250" y="30" width="42" height="12" rx="3"/></g>
+              <g fill="url(#ta-b3)"><rect x="20" y="46" width="42" height="12" rx="3"/><rect x="112" y="46" width="42" height="12" rx="3"/><rect x="158" y="46" width="42" height="12" rx="3"/><rect x="250" y="46" width="42" height="12" rx="3"/></g>
+              <g fill="url(#ta-b4)"><rect x="66" y="62" width="42" height="12" rx="3"/><rect x="112" y="62" width="42" height="12" rx="3"/><rect x="204" y="62" width="42" height="12" rx="3"/></g>
+              <g fill="#fff" opacity="0.35"><rect x="22" y="15" width="38" height="4" rx="2"/><rect x="68" y="15" width="38" height="4" rx="2"/><rect x="114" y="15" width="38" height="4" rx="2"/><rect x="160" y="15" width="38" height="4" rx="2"/><rect x="206" y="15" width="38" height="4" rx="2"/><rect x="252" y="15" width="38" height="4" rx="2"/></g>
+            </g>
+            <g opacity="0.9"><path d="M133 28l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" fill="#ffd76a"/><g fill="#ffd76a" opacity="0.8"><circle cx="118" cy="42" r="1.6"/><circle cx="147" cy="31" r="1.4"/><circle cx="144" cy="44" r="1.2"/><circle cx="120" cy="29" r="1.2"/></g></g>
+            <g class="art-ball">
+              <ellipse cx="160" cy="112" rx="5" ry="16" fill="rgba(155,195,177,.25)"/>
+              <circle cx="160" cy="98" r="11" fill="url(#ta-ball)"/>
+              <circle cx="158" cy="90" r="5" fill="#b58050"/>
+              <circle cx="156.5" cy="88" r="1.6" fill="#fff" opacity="0.7"/>
+              <circle cx="156" cy="97" r="2.6" fill="#fff"/><circle cx="164" cy="97" r="2.6" fill="#fff"/>
+              <circle cx="156.6" cy="96.6" r="1.2"/><circle cx="164.6" cy="96.6" r="1.2"/>
+            </g>
+            <g class="art-paddle">
+              <rect x="118" y="134" width="84" height="12" rx="6" fill="#000" opacity="0.4" transform="translate(2 3)"/>
+              <rect x="118" y="130" width="84" height="12" rx="6" fill="url(#ta-seat)"/>
+              <rect x="124" y="131" width="72" height="4" rx="2" fill="#fff" opacity="0.7"/>
+              <rect x="152" y="126" width="16" height="4" fill="#bbb"/>
+            </g>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="game-info">
+            <div class="title-row"><span class="emoji">🚽</span><h2>TurdAnoid Turbo</h2></div>
+            <p>Break bricks. Grab boosts.</p>
+          </div>
+          <span class="play">Play <i>→</i></span>
+        </div>
+      </a>
+
+      <a href="turdtris.html" class="game-card" data-vibe="Stack polite, smell rude" style="--c:#ffcb87;--c2:#8ee8c7">
+        <div class="cover" aria-hidden="true">
+          <svg viewBox="0 0 320 150" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <linearGradient id="tt-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#140f0c"/><stop offset="1" stop-color="#2d1f17"/></linearGradient>
+              <linearGradient id="tt-sh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.45"/><stop offset="0.5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.28"/></linearGradient>
+            </defs>
+            <rect width="320" height="150" fill="url(#tt-bg)"/>
+            <g stroke="rgba(255,225,190,.08)"><path d="M100 0V150M120 0V150M140 0V150M160 0V150M180 0V150M200 0V150M220 0V150M0 20H320M0 40H320M0 60H320M0 80H320M0 100H320M0 120H320M0 140H320"/></g>
+            <rect x="99" y="0" width="122" height="150" fill="rgba(255,203,135,.05)"/>
+            <g>
+              <rect x="100" y="130" width="20" height="20" fill="#72dbff"/><rect x="120" y="130" width="20" height="20" fill="#72dbff"/><rect x="140" y="130" width="20" height="20" fill="#72dbff"/><rect x="160" y="130" width="20" height="20" fill="#72dbff"/><rect x="180" y="130" width="20" height="20" fill="#ffb274"/><rect x="200" y="130" width="20" height="20" fill="#ffb274"/>
+              <rect x="100" y="110" width="20" height="20" fill="#83f7ae"/><rect x="120" y="110" width="20" height="20" fill="#83f7ae"/><rect x="140" y="110" width="20" height="20" fill="#ffe181"/><rect x="160" y="110" width="20" height="20" fill="#ffe181"/><rect x="200" y="110" width="20" height="20" fill="#ffb274"/>
+              <rect x="120" y="90" width="20" height="20" fill="#83f7ae"/><rect x="140" y="90" width="20" height="20" fill="#ffe181"/><rect x="160" y="90" width="20" height="20" fill="#ffe181"/><rect x="180" y="90" width="20" height="20" fill="#ff8f99"/><rect x="200" y="90" width="20" height="20" fill="#ff8f99"/>
+              <rect x="140" y="70" width="20" height="20" fill="#7f9dff"/><rect x="180" y="70" width="20" height="20" fill="#ff8f99"/>
+              <rect x="140" y="50" width="20" height="20" fill="#7f9dff"/><rect x="160" y="50" width="20" height="20" fill="#7f9dff"/>
+              <g fill="url(#tt-sh)"><rect x="100" y="130" width="120" height="20"/><rect x="100" y="110" width="80" height="20"/><rect x="200" y="110" width="20" height="20"/><rect x="120" y="90" width="100" height="20"/><rect x="140" y="70" width="20" height="20"/><rect x="180" y="70" width="20" height="20"/><rect x="140" y="50" width="40" height="20"/></g>
+            </g>
+            <g class="art-piece">
+              <g fill="#d6a2ff"><rect x="180" y="10" width="20" height="20"/><rect x="160" y="30" width="20" height="20"/><rect x="180" y="30" width="20" height="20"/><rect x="200" y="30" width="20" height="20"/></g>
+              <g fill="url(#tt-sh)"><rect x="180" y="10" width="20" height="20"/><rect x="160" y="30" width="60" height="20"/></g>
+            </g>
+            <g fill="none" stroke="#d6a2ff" stroke-opacity="0.45" stroke-dasharray="3 3"><rect x="181" y="51" width="18" height="18"/><rect x="161" y="71" width="18" height="18"/><rect x="201" y="71" width="18" height="18"/></g>
+            <g fill="rgba(255,203,135,.75)"><rect x="24" y="24" width="4" height="4"/><rect x="284" y="98" width="4" height="4"/><rect x="60" y="120" width="3" height="3"/></g>
+            <text x="30" y="132" font-family="Trebuchet MS, sans-serif" font-size="12" font-weight="700" fill="#ffcb87" opacity="0.7" letter-spacing="2">LV 12</text>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="game-info">
+            <div class="title-row"><span class="emoji">🧱</span><h2>Turdtris</h2></div>
+            <p>Stack blocks. Clear lines.</p>
+          </div>
+          <span class="play">Play <i>→</i></span>
+        </div>
+      </a>
+
+      <a href="turdjack.html" class="game-card" data-vibe="Casino etiquette optional" style="--c:#8effc2;--c2:#ffbf7a">
+        <div class="cover" aria-hidden="true">
+          <svg viewBox="0 0 320 150" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <linearGradient id="cj-felt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a5a43"/><stop offset="1" stop-color="#0d3a2e"/></linearGradient>
+              <radialGradient id="cj-spot" cx="0.5" cy="0" r="0.8"><stop offset="0" stop-color="#fff" stop-opacity="0.2"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+              <linearGradient id="cj-paper" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e2e9e4"/></linearGradient>
+            </defs>
+            <rect width="320" height="150" fill="url(#cj-felt)"/>
+            <rect width="320" height="150" fill="url(#cj-spot)"/>
+            <path d="M14 36Q70 20 126 36" fill="none" stroke="#ffd76a" stroke-opacity="0.35" stroke-width="2"/>
+            <text x="70" y="24" text-anchor="middle" font-family="Trebuchet MS, sans-serif" font-size="8" font-weight="700" fill="#ffe4af" opacity="0.8" letter-spacing="2.5">PAYS 3:2</text>
+            <g class="art-chip-stack" transform="translate(232 62)">
+              <g><circle cx="0" cy="44" r="18" fill="#a0261f"/><circle cx="0" cy="44" r="18" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="7 9"/><circle cx="0" cy="44" r="9" fill="#c8362d"/></g>
+              <g><circle cx="0" cy="34" r="18" fill="#2b5fb8"/><circle cx="0" cy="34" r="18" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="7 9"/><circle cx="0" cy="34" r="9" fill="#3b78dc"/></g>
+              <g><circle cx="0" cy="24" r="18" fill="#c9962a"/><circle cx="0" cy="24" r="18" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="7 9"/><circle cx="0" cy="24" r="9" fill="#e6b542"/><text x="0" y="28" text-anchor="middle" font-family="Trebuchet MS, sans-serif" font-size="9" font-weight="800" fill="#3a2400">100</text></g>
+            </g>
+            <g transform="translate(60 48)">
+              <rect x="-6" y="-4" width="44" height="62" rx="5" fill="#0f3f31" stroke="#f4f1e6" stroke-width="3"/>
+              <path d="M-2 0L34 54M34 0L-2 54M16 -4V58M-6 27H38" stroke="#18573f" stroke-width="2"/>
+              <text x="16" y="34" text-anchor="middle" font-size="18">💩</text>
+            </g>
+            <g class="art-fan-idle" transform="translate(128 46) rotate(-8)"><g class="art-fan-l">
+              <rect x="-2" y="2" width="52" height="72" rx="6" fill="#000" opacity="0.35"/>
+              <rect width="52" height="72" rx="6" fill="url(#cj-paper)"/>
+              <text x="6" y="16" font-family="Trebuchet MS, sans-serif" font-size="13" font-weight="800" fill="#1f2528">A</text>
+              <text x="6" y="28" font-size="11" fill="#1f2528">♠</text>
+              <text x="26" y="50" text-anchor="middle" font-size="30" fill="#1f2528">♠</text>
+            </g></g>
+            <g transform="translate(158 42) rotate(10)"><g class="art-fan-r">
+              <rect x="-2" y="2" width="52" height="72" rx="6" fill="#000" opacity="0.35"/>
+              <rect width="52" height="72" rx="6" fill="url(#cj-paper)"/>
+              <text x="6" y="16" font-family="Trebuchet MS, sans-serif" font-size="13" font-weight="800" fill="#c8252c">K</text>
+              <text x="6" y="28" font-size="11" fill="#c8252c">♥</text>
+              <text x="26" y="50" text-anchor="middle" font-size="26">👑</text>
+            </g></g>
+            <g class="art-glow"><rect x="118" y="120" width="72" height="22" rx="11" fill="#ffd76a"/><text x="154" y="135" text-anchor="middle" font-family="Trebuchet MS, sans-serif" font-size="12" font-weight="900" fill="#3a2400" letter-spacing="2">21!</text></g>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="game-info">
+            <div class="title-row"><span class="emoji">🃏</span><h2>Crapjack 21</h2></div>
+            <p>Blackjack vs. the dealer.</p>
+          </div>
+          <span class="play">Play <i>→</i></span>
+        </div>
+      </a>
+
+      <a href="crapeights.html" class="game-card" data-vibe="Wild cards, wilder hygiene" style="--c:#7cffb5;--c2:#ff9d74">
+        <div class="cover" aria-hidden="true">
+          <svg viewBox="0 0 320 150" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <linearGradient id="ce-felt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#174e3b"/><stop offset="1" stop-color="#0b3226"/></linearGradient>
+              <radialGradient id="ce-spot" cx="0.5" cy="0" r="0.8"><stop offset="0" stop-color="#fff" stop-opacity="0.18"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+              <linearGradient id="ce-paper" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e2e9e4"/></linearGradient>
+              <linearGradient id="ce-wild" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7ab6"/><stop offset="0.35" stop-color="#ffd76a"/><stop offset="0.7" stop-color="#7ae6ff"/><stop offset="1" stop-color="#b290ff"/></linearGradient>
+            </defs>
+            <rect width="320" height="150" fill="url(#ce-felt)"/>
+            <rect width="320" height="150" fill="url(#ce-spot)"/>
+            <g class="art-spin" fill="none" stroke="#9effc8" stroke-opacity="0.5" stroke-width="3">
+              <path d="M160 24a52 52 0 0 1 52 52" /><path d="M160 128a52 52 0 0 1-52-52"/>
+              <path d="M208 66l6 12-14 0z" fill="#9effc8" stroke="none" opacity="0.8"/><path d="M112 86l-6-12 14 0z" fill="#9effc8" stroke="none" opacity="0.8"/>
+            </g>
+            <g transform="translate(134 40)">
+              <rect x="-3" y="3" width="52" height="72" rx="6" fill="#000" opacity="0.4"/>
+              <rect width="52" height="72" rx="6" fill="url(#ce-paper)"/>
+              <rect x="3" y="3" width="46" height="66" rx="4" fill="none" stroke="url(#ce-wild)" stroke-width="2.5"/>
+              <text x="26" y="48" text-anchor="middle" font-family="Trebuchet MS, sans-serif" font-size="34" font-weight="900" fill="url(#ce-wild)">8</text>
+              <text x="6" y="14" font-size="8" fill="#c8252c">♥</text><text x="40" y="14" font-size="8" fill="#1f2528">♠</text><text x="6" y="68" font-size="8" fill="#1f2528">♣</text><text x="40" y="68" font-size="8" fill="#c8252c">♦</text>
+            </g>
+            <g transform="translate(30 90) rotate(-14)"><g class="art-lift">
+              <rect x="-2" y="2" width="40" height="56" rx="5" fill="#000" opacity="0.35"/><rect width="40" height="56" rx="5" fill="url(#ce-paper)"/>
+              <text x="5" y="14" font-family="Trebuchet MS, sans-serif" font-size="11" font-weight="800" fill="#c8252c">2</text><text x="20" y="38" text-anchor="middle" font-size="18" fill="#c8252c">♦</text>
+            </g></g>
+            <g transform="translate(64 96) rotate(-5)"><g class="art-lift">
+              <rect x="-2" y="2" width="40" height="56" rx="5" fill="#000" opacity="0.35"/><rect width="40" height="56" rx="5" fill="url(#ce-paper)"/>
+              <text x="5" y="14" font-family="Trebuchet MS, sans-serif" font-size="11" font-weight="800" fill="#1f2528">J</text><text x="20" y="38" text-anchor="middle" font-size="16">🃏</text>
+            </g></g>
+            <g transform="translate(230 90) rotate(8)"><g class="art-lift">
+              <rect x="-2" y="2" width="40" height="56" rx="5" fill="#000" opacity="0.35"/><rect width="40" height="56" rx="5" fill="url(#ce-paper)"/>
+              <text x="5" y="14" font-family="Trebuchet MS, sans-serif" font-size="11" font-weight="800" fill="#1f2528">Q</text><text x="20" y="38" text-anchor="middle" font-size="16">👸</text>
+            </g></g>
+            <g transform="translate(266 92) rotate(18)">
+              <rect x="-2" y="2" width="40" height="56" rx="5" fill="#000" opacity="0.35"/><rect width="40" height="56" rx="5" fill="#0f3f31" stroke="#f4f1e6" stroke-width="2.5"/><text x="20" y="34" text-anchor="middle" font-size="14">💩</text>
+            </g>
+            <g class="art-glow"><rect x="120" y="120" width="80" height="20" rx="10" fill="#ff7ab6"/><text x="160" y="134" text-anchor="middle" font-family="Trebuchet MS, sans-serif" font-size="10" font-weight="900" fill="#fff" letter-spacing="2">WILD!</text></g>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="game-info">
+            <div class="title-row"><span class="emoji">🎴</span><h2>Crappy Eights</h2></div>
+            <p>Match cards. Race to 200.</p>
+          </div>
+          <span class="play">Play <i>→</i></span>
+        </div>
+      </a>
+
+      <a href="turdrummy.html" class="game-card" data-vibe="Deadwood meets damp vibes" style="--c:#7bff9f;--c2:#ffd76a">
+        <div class="cover" aria-hidden="true">
+          <svg viewBox="0 0 320 150" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <linearGradient id="tr-felt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14473a"/><stop offset="1" stop-color="#082b21"/></linearGradient>
+              <radialGradient id="tr-spot" cx="0.5" cy="0" r="0.8"><stop offset="0" stop-color="#fff" stop-opacity="0.18"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+              <linearGradient id="tr-paper" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e2e9e4"/></linearGradient>
+              <linearGradient id="tr-meter" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7bff9f"/><stop offset="0.6" stop-color="#ffd76a"/><stop offset="1" stop-color="#ff8f8f"/></linearGradient>
+            </defs>
+            <rect width="320" height="150" fill="url(#tr-felt)"/>
+            <rect width="320" height="150" fill="url(#tr-spot)"/>
+            <g class="art-lift">
+              <rect x="42" y="30" width="150" height="82" rx="10" fill="#7bff9f" fill-opacity="0.12" stroke="#7bff9f" stroke-opacity="0.5" stroke-dasharray="4 4"/>
+              <text x="52" y="24" font-family="Trebuchet MS, sans-serif" font-size="9" font-weight="800" fill="#7bff9f" letter-spacing="2">MELD</text>
+              <g transform="translate(50 40)"><rect x="-2" y="2" width="44" height="62" rx="5" fill="#000" opacity="0.35"/><rect width="44" height="62" rx="5" fill="url(#tr-paper)"/><text x="6" y="15" font-family="Trebuchet MS, sans-serif" font-size="12" font-weight="800" fill="#c8252c">7</text><text x="22" y="42" text-anchor="middle" font-size="20" fill="#c8252c">♥</text></g>
+              <g transform="translate(96 40)"><rect x="-2" y="2" width="44" height="62" rx="5" fill="#000" opacity="0.35"/><rect width="44" height="62" rx="5" fill="url(#tr-paper)"/><text x="6" y="15" font-family="Trebuchet MS, sans-serif" font-size="12" font-weight="800" fill="#c8252c">8</text><text x="22" y="42" text-anchor="middle" font-size="20" fill="#c8252c">♥</text></g>
+              <g transform="translate(142 40)"><rect x="-2" y="2" width="44" height="62" rx="5" fill="#000" opacity="0.35"/><rect width="44" height="62" rx="5" fill="url(#tr-paper)"/><text x="6" y="15" font-family="Trebuchet MS, sans-serif" font-size="12" font-weight="800" fill="#c8252c">9</text><text x="22" y="42" text-anchor="middle" font-size="20" fill="#c8252c">♥</text></g>
+            </g>
+            <g transform="translate(222 48) rotate(6)"><rect x="-2" y="2" width="44" height="62" rx="5" fill="#000" opacity="0.35"/><rect width="44" height="62" rx="5" fill="url(#tr-paper)"/><text x="6" y="15" font-family="Trebuchet MS, sans-serif" font-size="12" font-weight="800" fill="#1f2528">K</text><text x="22" y="42" text-anchor="middle" font-size="18">🤴</text></g>
+            <g transform="translate(254 56) rotate(14)"><rect x="-2" y="2" width="44" height="62" rx="5" fill="#000" opacity="0.35"/><rect width="44" height="62" rx="5" fill="url(#tr-paper)"/><text x="6" y="15" font-family="Trebuchet MS, sans-serif" font-size="12" font-weight="800" fill="#1f2528">2</text><text x="22" y="42" text-anchor="middle" font-size="20" fill="#1f2528">♣</text></g>
+            <g>
+              <text x="42" y="128" font-family="Trebuchet MS, sans-serif" font-size="9" font-weight="800" fill="#d3fff0" letter-spacing="2">DEADWOOD</text>
+              <rect x="110" y="121" width="100" height="9" rx="4.5" fill="#000" opacity="0.4"/>
+              <rect x="110" y="121" width="42" height="9" rx="4.5" fill="url(#tr-meter)"/>
+              <text x="218" y="129" font-family="Trebuchet MS, sans-serif" font-size="10" font-weight="800" fill="#ffd76a">12</text>
+            </g>
+            <g class="art-glow"><rect x="236" y="116" width="64" height="20" rx="10" fill="#7bff9f"/><text x="268" y="130" text-anchor="middle" font-family="Trebuchet MS, sans-serif" font-size="10" font-weight="900" fill="#08221a" letter-spacing="2">GIN!</text></g>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="game-info">
+            <div class="title-row"><span class="emoji">♣️</span><h2>TurdRummy</h2></div>
+            <p>Gin Rummy: meld and knock.</p>
+          </div>
+          <span class="play">Play <i>→</i></span>
+        </div>
+      </a>
+
+      <a href="turdspades.html" class="game-card" data-vibe="Bag patrol on duty" style="--c:#8dffb7;--c2:#b290ff">
+        <div class="cover" aria-hidden="true">
+          <svg viewBox="0 0 320 150" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <linearGradient id="ts-felt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#153f33"/><stop offset="1" stop-color="#07271d"/></linearGradient>
+              <radialGradient id="ts-spot" cx="0.5" cy="0.5" r="0.6"><stop offset="0" stop-color="#fff" stop-opacity="0.16"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+              <linearGradient id="ts-paper" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e2e9e4"/></linearGradient>
+            </defs>
+            <rect width="320" height="150" fill="url(#ts-felt)"/>
+            <rect width="320" height="150" fill="url(#ts-spot)"/>
+            <text x="160" y="92" text-anchor="middle" font-size="86" fill="#000" opacity="0.28">♠</text>
+            <g transform="translate(142 6)"><rect x="-2" y="2" width="36" height="50" rx="4" fill="#000" opacity="0.35"/><rect width="36" height="50" rx="4" fill="url(#ts-paper)"/><text x="5" y="13" font-family="Trebuchet MS, sans-serif" font-size="10" font-weight="800" fill="#1f2528">Q</text><text x="18" y="34" text-anchor="middle" font-size="14">👸</text></g>
+            <g transform="translate(96 50) rotate(-90)"><rect x="-2" y="2" width="36" height="50" rx="4" fill="#000" opacity="0.35"/><rect width="36" height="50" rx="4" fill="url(#ts-paper)"/><text x="5" y="13" font-family="Trebuchet MS, sans-serif" font-size="10" font-weight="800" fill="#c8252c">9</text><text x="18" y="34" text-anchor="middle" font-size="16" fill="#c8252c">♥</text></g>
+            <g transform="translate(224 50) rotate(90)"><rect x="-2" y="2" width="36" height="50" rx="4" fill="#000" opacity="0.35"/><rect width="36" height="50" rx="4" fill="url(#ts-paper)"/><text x="5" y="13" font-family="Trebuchet MS, sans-serif" font-size="10" font-weight="800" fill="#c8252c">4</text><text x="18" y="34" text-anchor="middle" font-size="16" fill="#c8252c">♥</text></g>
+            <g transform="translate(142 118)"><g class="art-slide"><rect x="-2" y="2" width="36" height="50" rx="4" fill="#000" opacity="0.35"/><rect width="36" height="50" rx="4" fill="url(#ts-paper)"/><rect x="2" y="2" width="32" height="46" rx="3" fill="none" stroke="#ffd76a" stroke-width="1.5"/><text x="5" y="13" font-family="Trebuchet MS, sans-serif" font-size="10" font-weight="800" fill="#1f2528">A</text><text x="18" y="34" text-anchor="middle" font-size="16" fill="#1f2528">♠</text></g></g>
+            <g transform="translate(14 20)"><rect width="60" height="18" rx="9" fill="#000" opacity="0.4"/><text x="30" y="12.5" text-anchor="middle" font-family="Trebuchet MS, sans-serif" font-size="8.5" font-weight="800" fill="#d3fff0" letter-spacing="1">BID 4 · 3</text></g>
+            <g transform="translate(246 117)"><rect width="60" height="18" rx="9" fill="#000" opacity="0.4"/><text x="30" y="12.5" text-anchor="middle" font-family="Trebuchet MS, sans-serif" font-size="8.5" font-weight="800" fill="#ffbf7a" letter-spacing="1">BAGS 7</text></g>
+            <g class="art-glow"><rect x="14" y="116" width="96" height="20" rx="10" fill="#b290ff"/><text x="62" y="130" text-anchor="middle" font-family="Trebuchet MS, sans-serif" font-size="9.5" font-weight="900" fill="#fff" letter-spacing="1.5">SPADES BROKEN</text></g>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="game-info">
+            <div class="title-row"><span class="emoji">♠️</span><h2>TurdSpades</h2></div>
+            <p>Spades: bid tricks or Nil.</p>
+          </div>
+          <span class="play">Play <i>→</i></span>
+        </div>
+      </a>
+      <a href="turdomania.html" class="game-card" data-vibe="Plop till it drops" style="--c:#ffcb87;--c2:#8ee8c7">
+        <div class="cover" aria-hidden="true">
+          <svg viewBox="0 0 320 150" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <linearGradient id="tm-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a2717"/><stop offset="1" stop-color="#1a120c"/></linearGradient>
+            </defs>
+            <rect width="320" height="150" fill="url(#tm-bg)"/>
+            <g font-size="22" text-anchor="middle">
+              <g class="art-lift">
+                <rect x="70" y="96" width="30" height="30" rx="7" fill="#8a5a2b"/><text x="85" y="119">💩</text>
+                <rect x="100" y="96" width="30" height="30" rx="7" fill="#8a5a2b"/><text x="115" y="119">💩</text>
+                <rect x="100" y="66" width="30" height="30" rx="7" fill="#8a5a2b"/><text x="115" y="89">💩</text>
+              </g>
+              <rect x="130" y="96" width="30" height="30" rx="7" fill="#e8c64a"/><text x="145" y="119">🌽</text>
+              <rect x="160" y="96" width="30" height="30" rx="7" fill="#58c46b"/><text x="175" y="119">🟢</text>
+              <rect x="160" y="66" width="30" height="30" rx="7" fill="#e8c64a"/><text x="175" y="89">🌽</text>
+              <rect x="190" y="96" width="30" height="30" rx="7" fill="#e9e4d8"/><text x="205" y="119">🧻</text>
+              <rect x="190" y="66" width="30" height="30" rx="7" fill="#58c46b"/><text x="205" y="89">🟢</text>
+              <rect x="220" y="96" width="30" height="30" rx="7" fill="#e9e4d8"/><text x="235" y="119">🧻</text>
+              <rect x="130" y="66" width="30" height="30" rx="7" fill="#58c46b"/><text x="145" y="89">🟢</text>
+              <rect x="130" y="36" width="30" height="30" rx="7" fill="#e9e4d8"/><text x="145" y="59">🧻</text>
+            </g>
+            <g class="art-glow"><rect x="14" y="16" width="72" height="20" rx="10" fill="#ffcb87"/><text x="50" y="30" text-anchor="middle" font-family="Trebuchet MS, sans-serif" font-size="10" font-weight="900" fill="#2a1a0e" letter-spacing="2">+16 PLOP</text></g>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="game-info">
+            <div class="title-row"><span class="emoji">🪠</span><h2>Turdomania</h2></div>
+            <p>Clickomania: pop piles, flush the board.</p>
+          </div>
+          <span class="play">Play <i>→</i></span>
+        </div>
+      </a>
+    </main>
+    <p class="footer-note">Seven games • one sewer • <a href="neon-arkanoid.html">play the original Neon Arkanoid</a></p>
+  </div>
+  <script type="module">
+    import { injectSkipLink, createAnnouncer } from './assets/suite-a11y.js';
+    import { decorateHubStatBadges } from './assets/suite-hub-stats.js';
+    import { wireHubCoverIdleMotion, wireHubAttractHeader } from './assets/suite-hub-attract.js';
+
+    function bootHubModules() {
+      injectSkipLink(document, 'hub-games');
+      decorateHubStatBadges(document, localStorage);
+      wireHubCoverIdleMotion(document);
+      wireHubAttractHeader(document);
+      if (window.Suite) {
+        const live = createAnnouncer(document);
+        const baseAnnounce = window.Suite.announce;
+        window.Suite.announce = function (msg, politeness) {
+          live.announce(msg, politeness);
+          if (typeof baseAnnounce === 'function') baseAnnounce(msg, politeness);
+        };
+      }
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', bootHubModules);
+    } else {
+      bootHubModules();
+    }
+  </script>
+</body>
+</html>

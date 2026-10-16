@@ -1436,3 +1436,25 @@ textarea:focus-visible {
         flex: 1 1 8rem;
     }
 }
+
+/* Games card (Turdanoid) */
+.games-card {
+    display: grid;
+    grid-template-columns: 112px 1fr;
+    gap: 18px;
+    align-items: center;
+    padding: 18px;
+}
+.games-card__thumb {
+    width: 112px;
+    aspect-ratio: 1;
+    border: 3px solid var(--cream);
+    background: repeating-conic-gradient(var(--ska-dark) 0 25%, var(--ska-light) 0 50%) 0 0 / 28px 28px;
+}
+.games-card__body h2 { margin: 0.2em 0; }
+.games-card__body p { margin: 0.35em 0; }
+.games-card__joke { color: var(--lime); font-weight: 700; }
+@media (max-width: 480px) {
+    .games-card { grid-template-columns: 72px 1fr; gap: 14px; padding: 14px; }
+    .games-card__thumb { width: 72px; }
+}

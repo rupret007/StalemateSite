@@ -6,7 +6,7 @@ const baseURL = testBaseURL(process.env);
 
 const phoneProject = (name, use) => ({
     name,
-    testMatch: /(phones|listen)\.spec\.js/,
+    testMatch: /(phones|listen|play)\.spec\.js/,
     use
 });
 
