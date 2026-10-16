@@ -70,6 +70,12 @@ describe('content boundaries', () => {
         expect(readme).not.toMatch(/\[(MAILING LIST TOOL|MERCH|BOOKING EMAIL|HANDLE) NEEDED\]/);
     });
 
+    it('gives social links a 46px floor so tap targets stay at or above 44px', async () => {
+        const css = await readFile(join(repoRoot, 'styles.css'), 'utf8');
+        expect(css).toMatch(/\.social-link\s*\{[^}]*min-height:\s*46px/);
+        expect(css).toMatch(/\.social-link\s*\{[^}]*min-width:\s*46px/);
+    });
+
     it('never names band members on public surfaces', async () => {
         for (const relativePath of PUBLIC_COPY) {
             const source = await readFile(join(repoRoot, relativePath), 'utf8');

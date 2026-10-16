@@ -78,4 +78,8 @@ const test = base.extend({
     }, { auto: true }]
 });
 
-module.exports = { test, expect };
+function tapHeight(box) {
+    return Math.round(box && box.height);
+}
+
+module.exports = { test, expect, tapHeight };

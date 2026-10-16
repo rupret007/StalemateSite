@@ -1,4 +1,4 @@
-const { test, expect } = require('./fixtures');
+const { test, expect, tapHeight } = require('./fixtures');
 
 test('phone homepage keeps the video-show hero usable without overflow', async ({ page }) => {
     await page.goto('/');
@@ -42,10 +42,10 @@ test('phone homepage keeps the video-show hero usable without overflow', async (
 
     const nav = page.getByRole('navigation', { name: 'Primary navigation', exact: true });
     for (const link of await nav.getByRole('link').all()) {
-        expect((await link.boundingBox()).height).toBeGreaterThanOrEqual(44);
+        expect(tapHeight(await link.boundingBox())).toBeGreaterThanOrEqual(44);
     }
-    expect((await page.locator('#home a.button--listen').boundingBox()).height).toBeGreaterThanOrEqual(44);
-    expect((await page.locator('#home a.button--hot').boundingBox()).height).toBeGreaterThanOrEqual(44);
+    expect(tapHeight(await page.locator('#home a.button--listen').boundingBox())).toBeGreaterThanOrEqual(44);
+    expect(tapHeight(await page.locator('#home a.button--hot').boundingBox())).toBeGreaterThanOrEqual(44);
     for (const href of [
         'https://www.instagram.com/stalemate.punk/',
         'https://www.youtube.com/@stalemate.punkband',
@@ -53,8 +53,8 @@ test('phone homepage keeps the video-show hero usable without overflow', async (
     ]) {
         const link = page.locator('#home a.social-link[href="' + href + '"]');
         await expect(link).toBeVisible();
-        expect((await link.boundingBox()).height).toBeGreaterThanOrEqual(44);
-        expect((await page.locator('.site-header a.social-link[href="' + href + '"]').boundingBox()).height).toBeGreaterThanOrEqual(44);
+        expect(tapHeight(await link.boundingBox())).toBeGreaterThanOrEqual(44);
+        expect(tapHeight(await page.locator('.site-header a.social-link[href="' + href + '"]').boundingBox())).toBeGreaterThanOrEqual(44);
     }
 
     await expect(page.locator('.hero-show__tie')).toContainText('Hear it live Oct 24 at Los Amigo’s, Plano');
