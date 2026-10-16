@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -496,6 +497,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
+      min-height: 44px;
     }
 
     .changelog summary::-webkit-details-marker { display: none; }
@@ -1006,37 +1008,6 @@
         </div>
       </a>
     </main>
-
-    <details class="changelog">
-      <summary>Latest Changelog</summary>
-      <ul>
-        <li><strong>1000x shared (round 4):</strong> quick second taps register again (removed touchend zoom guard; CSS <code>touch-action</code>); back pill overlap pass on hub + games.</li>
-        <li><strong>1000x shared (round 3):</strong> hub back pill moves to a top-left icon on phones (no dock overlap); boss-best + Spades stat chips; vitest 30s timeouts; hub polish + pause idle motion when tab hidden.</li>
-        <li><strong>1000x shared (round 2):</strong> premium card paper &amp; toilet-crest backs, felt/chip utilities, hub idle cover motion, Continue hero banner, parallax sewer critters, richer <code>Suite.audio()</code> presets (snap, shuffle, fanfare). Save keys unchanged.</li>
-        <li><strong>1000x shared (round 1):</strong> hub skip link, suite mute toggle, read-only stat chips, opt-in <code>Suite.audio()</code> / <code>Suite.fx()</code>.</li>
-        <li><strong>Hub leftover after the phone resume cue:</strong> when you have a table in progress, the masthead badge turns into a one-tap "Continue &lt;Game&gt;" link — the last game you opened if it is still live, otherwise the first table waiting. First visits keep the "No sign-in" badge. No rules, storage, continue-validation, or layout change.</li>
-        <li><strong>Hub leftover after phone rows:</strong> a marked card's <code>aria-label</code> now spells out the game, its blurb, and the action with its state ("Continue — in progress" / "Play again — last played"). The badge is hidden on phones, so this was the only cue some players had and it used to drop the blurb and the verb. No layout, storage, or continue-rule change.</li>
-        <li><strong>TurdAnoid leftover after Bomb scoring:</strong> Mega Flush now pays its 15 × level bonus for the bottom-row bricks it removes, including Gold Rush 2×, a <code>+points</code> float, and the usual pickup roll. Upper bricks stay on the wall. Arcade mid-run saves stay parked with PR #8.</li>
-        <li><strong>TurdAnoid leftover after #21:</strong> Bomb now pays the destroy bonus for bricks it kills, including Gold Rush 2× and the usual pickup roll. Splash-damaged survivors still score nothing. Arcade mid-run saves stay parked with PR #8.</li>
-        <li><strong>TurdAnoid leftover after #9 / #20:</strong> Enlarge and Shrink keep their paddle size when the next wall builds, so the Big/Shrunk chip matches the bat you serve with. Death still strips both. Arcade mid-run saves stay parked with PR #8.</li>
-        <li><strong>Turdtris leftover after #19:</strong> Hold and Next stay on the thumb dock so a phone run can see the held piece and the incoming piece without scrolling. Hold dims after it is used this piece, and a second tap does not swap. Arcade mid-run saves stay parked with PR #8.</li>
-        <li><strong>Turdtris leftover after #18:</strong> Hold, soft drop, and Pause stay on the thumb dock instead of behind More Controls. A stalled frame cannot dump extra gravity. Game over shows a new-best receipt, and Space or Enter starts the next run. Arcade mid-run saves stay parked with PR #8.</li>
-        <li><strong>Continue leftover after #16:</strong> Crapjack 21 now continues the live hand, so leaving mid-round keeps the cards and the bet together. The hub only says Continue for an unfinished playable table. Restored tables accept a real action. Continue validation is the same on the live suite as in tests. Arcade mid-run saves stay parked with PR #8.</li>
-        <li><strong>Continue leftover after #15:</strong> TurdSpades, TurdRummy, and Crappy Eights save the live table on this device. The hub says Continue when a match is waiting. Returning players skip the welcome guide. Malformed continue data cannot invent a seventh game or run HTML. TurdAnoid now records last-played. Arcade mid-run saves stay parked with PR #8.</li>
-        <li><strong>Playability leftover after Nil:</strong> TurdSpades now plays bot cards one at a time, pauses those turns when the tab hides, and has partners overtake a winning Nil card when they can. The hub marks the last game you opened. The TurdAnoid test hook stays off the public Pages host.</li>
-        <li><strong>Graphics pass:</strong> new hub cover art for every game, a shared ambient sewer backdrop (tiles, bubbles, stink wisps), one card-paper and card-back design across the four card games, felt grain and wooden rails on every table, beveled Turdtris tiles with line-clear bursts, and a richer TurdAnoid sewer with a slime surface, brick wall, and smoke on every kill. Physics, scoring, rules, and controls untouched.</li>
-        <li><strong>Suite-wide v4.0:</strong> shared theme &amp; SFX across every game. Each one now has consistent fart noises, hype callouts, toasts, a back-to-hub pill, and proper iPhone safe-area handling.</li>
-        <li><strong>TurdAnoid Turbo:</strong> full Canvas remaster, 19 power-ups, gentle early difficulty so the player gets hooked.</li>
-        <li><strong>Turdtris / Crapjack / Crappy Eights / TurdRummy / TurdSpades:</strong> all hooked into the shared callout layer (Tetris, T-spin, Bust, Blackjack, Gin, Knock, Spades-broken, Bag-penalty all hype properly).</li>
-        <li>New game added: Crappy Eights (Crazy Eights / Uno-style) with bots, action cards, and match scoring.</li>
-        <li>Mobile controls streamlined across all games with compact menus and fixed quick-action areas.</li>
-        <li>TurdAnoid progression expanded with extra late-game pattern archetypes and mutators.</li>
-        <li>Turdtris level modifiers now branch into distinct mutator styles for deeper late-game chaos.</li>
-        <li>Crapjack added one-tap Quick Start and smarter mobile action flow.</li>
-        <li>Hub now starts with TurdAnoid, removes Neon card from front page, and adds TurdRummy.</li>
-        <li>TurdSpades added with full bidding, trick-taking flow, and team scoring.</li>
-      </ul>
-    </details>
     <p class="footer-note">Six games • one sewer • <a href="neon-arkanoid.html">play the original Neon Arkanoid</a></p>
   </div>
   <script type="module">

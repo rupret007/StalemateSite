@@ -376,6 +376,7 @@ export function installTurdjackKit(win) {
       if (!panel) {return;}
       panel.classList.toggle('open', open);
       panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+      panel.toggleAttribute('inert', !open);
       if (toggle) {toggle.setAttribute('aria-expanded', open ? 'true' : 'false');}
       if (backdrop) {
         backdrop.classList.toggle('show', open);

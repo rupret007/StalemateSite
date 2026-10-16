@@ -13,10 +13,18 @@ cd "$TMP/t"
 cp -r index.html TurdAnoid.html turdtris.html turdjack.html crapeights.html turdrummy.html turdspades.html neon-arkanoid.html hub.html game.js favicon.svg assets games "$DEST/"
 find "$DEST/games" -name '*.test.*' -delete
 cd "$DEST"
+# Same-origin-only CSP for every vendored page. The games use inline scripts/styles,
+# canvas data:/blob: images and local audio; nothing loads from another host.
+CSP="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'"
 for f in *.html; do
-  # noindex on every vendored page
-  sed -i 's|<head>|<head>\n<meta name="robots" content="noindex,nofollow">|' "$f"
+  # noindex + CSP on every vendored page (drop upstream robots meta so there is exactly one)
+  sed -i '/<meta name="robots"[^>]*>/d' "$f"
+  sed -i "s|<head>|<head>\n<meta name=\"robots\" content=\"noindex,nofollow\">\n<meta http-equiv=\"Content-Security-Policy\" content=\"$CSP\">|" "$f"
 done
+# Strip the upstream "Latest Changelog" (internal dev notes) from the hub
+perl -0pi -e 's|\s*<details class="changelog">.*?</details>||s' index.html
+if grep -qi 'class="changelog"\|Latest Changelog' index.html; then echo "changelog strip failed" >&2; exit 1; fi
+
 # Light Stalemate strip on the hub only; game pages keep their own full-screen UI untouched
 for f in index.html; do
   sed -i 's|</head>|<link rel="stylesheet" href="stalemate-strip.css">\n</head>|' "$f"

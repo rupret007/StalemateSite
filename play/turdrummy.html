@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -2153,6 +2154,92 @@
       .action-dock { padding: 6px 10px; }
       .footer-note { display: none; }
     }
+    /* Touch hands expose the whole card target, including after selection.
+       Keep meld order and captions while fitting every choice into the table. */
+    @media (pointer: coarse) and (max-width: 920px) {
+      #playerHand,
+      #playerHand.is-wrapped {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
+        grid-auto-rows: 44px;
+        gap: 2px;
+        align-content: end;
+        align-items: stretch;
+        min-height: 0;
+        padding: 2px;
+      }
+      #playerHand .hand-group { display: contents; }
+      #playerHand .hand-group::after,
+      #playerHand .hand-group-label { display: none; }
+      #playerHand .hand-group .card,
+      #playerHand .hand-group .card.selected {
+        width: 100%;
+        height: 44px;
+        margin: 0;
+        rotate: none;
+        translate: none !important;
+        transform: none !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 0 10px;
+      }
+      #playerHand .card .card-face:first-child {
+        flex-direction: row;
+        width: auto;
+        gap: 2px;
+        font-size: 16px;
+      }
+      #playerHand .card .card-suit,
+      #playerHand .card .card-face:last-child { display: none; }
+      #playerHand .card::after {
+        content: attr(data-hand-group);
+        position: absolute;
+        inset: auto 0 3px;
+        transform: none;
+        padding: 0;
+        border: 0;
+        background: none;
+        box-shadow: none;
+        color: #3b5246;
+        text-shadow: none;
+        font-size: 7px;
+        line-height: 1;
+        letter-spacing: 0;
+        text-align: center;
+        pointer-events: none;
+      }
+    }
+    @media (pointer: coarse) and (max-width: 520px) {
+      /* Keep the hand and its coach above the action dock after enlarging controls. */
+      body:not([data-suite-back="bottom"]):has(.suite-back-pill):has(.title-group) .topbar {
+        padding: 5px 8px;
+      }
+      .topbar .title-group {
+        display: flex;
+        align-items: center;
+        min-height: 44px;
+        padding-left: 50px;
+      }
+      .topbar .top-links { grid-template-columns: repeat(5, minmax(44px, 1fr)); }
+      .status { grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 3px 4px; gap: 2px; }
+      .stat { padding: 2px 3px; }
+      .stat-label { font-size: 8px; margin-bottom: 0; }
+      .stat-label .lbl-full { display: none; }
+      .stat-label .lbl-short { display: inline; }
+      .stat-value { font-size: 12px; line-height: 1.1; }
+      .table-stage { gap: 0; }
+      .table-stage > .tr-drawer { margin: 0 4px 4px; }
+      .zone--opponent { max-height: 24px; }
+      .zone--hand .zone-header { flex-wrap: nowrap; }
+      .tr-deadwood .bar { display: none; }
+      .zone--center .card,
+      .zone--center .back-card { width: 32px; height: 44px; }
+      .zone--center .pile-body { min-height: 44px; }
+      .coach { grid-template-columns: minmax(0, 1fr) 92px; }
+      .coach-actions { display: grid; grid-template-columns: 44px 44px; gap: 4px; }
+      .coach-actions .btn { padding: 2px; font-size: 10px; }
+    }
   </style>
 </head>
 <body class="suite-ambient suite-no-zoom">
@@ -2165,7 +2252,7 @@
       <div class="top-links">
         <a href="./" aria-label="Back to game hub">&#x1F3E0; Hub</a>
         <button class="btn" id="soundToggleBtn" data-sound-toggle aria-pressed="true">&#x1F50A; Sound On</button>
-        <button class="btn" id="difficultyBtn" type="button" aria-label="Bot difficulty" title="Cycle the bot: Easy, Normal, Sharp">&#x1F916; Bot: Normal</button>
+        <button class="btn" id="difficultyBtn" type="button" aria-label="Bot: Normal. Activate to change difficulty." title="Cycle the bot: Easy, Normal, Sharp">&#x1F916; Bot: Normal</button>
         <button class="btn" id="quickGuideBtn">&#x2753; Rules</button>
         <button class="btn" id="newRoundBtn">&#x1F0CF; New Round</button>
         <button class="btn warn" id="resetMatchBtn">&#x21BB; Reset Match</button>
@@ -2642,7 +2729,7 @@
     function updateDifficultyLabel() {
       const label = DIFFICULTY_LABELS[aiLevel] || "Normal";
       el.difficultyBtn.textContent = "\u{1F916} Bot: " + label;
-      el.difficultyBtn.setAttribute("aria-label", "Bot difficulty: " + label + ". Activate to change.");
+      el.difficultyBtn.setAttribute("aria-label", "Bot: " + label + ". Activate to change difficulty.");
     }
 
     function cycleDifficulty() {
@@ -3426,7 +3513,7 @@
           const drop = group.kind === "deadwood" ? 6 : 0;
           at += 1;
           const fan = ` style="--fr:${tilt.rotate}deg;--fy:${tilt.lift + drop}px;--fan-z:${at}"`;
-          return createCardHtml(card, interactive, card.id === state.selectedCardId, `data-hand-id="${card.id}"${fan}`);
+          return createCardHtml(card, interactive, card.id === state.selectedCardId, `data-hand-id="${card.id}" data-hand-group="${group.label}"${fan}`);
         }).join("");
         return `<div class="hand-group hand-group--${group.kind}" data-kind="${group.kind}"><span class="hand-group-label" aria-hidden="true">${group.label}</span>${cards}</div>`;
       }).join("");

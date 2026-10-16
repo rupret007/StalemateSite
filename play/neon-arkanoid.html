@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -482,11 +483,25 @@
             }
         }
 
-        @media (hover: none) and (pointer: coarse) {
-            .btn,
-            .control-btn {
-                min-height: 44px;
-            }
+        /* Keep the canvas and sidebar inside the shell on narrow phones (no sideways scroll). */
+        .play-area > .canvas-wrap,
+        .play-area > .sidebar {
+            max-width: 100%;
+            min-width: 0;
+        }
+        @media (max-width: 1024px) {
+            .play-area { grid-template-columns: minmax(0, 1fr); }
+        }
+
+        button,
+        summary {
+            min-width: 44px !important;
+            min-height: 44px !important;
+        }
+        button:focus-visible,
+        summary:focus-visible {
+            outline: 3px solid #9effc8;
+            outline-offset: 3px;
         }
     </style>
 </head>

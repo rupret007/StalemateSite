@@ -110,6 +110,64 @@
     return { extruded: true, depth: depth, inset: true, glaze: true, fx: fx, fy: fy, fw: fw, fh: fh };
   }
 
+  function titleWallSpec(view) {
+    const W = (view && view.W) || 390;
+    const H = (view && view.H) || 844;
+    const palettes = (view && view.palettes) || [
+      ['#5ec8e0', '#1a6a88'], ['#e8c56a', '#a8781c'],
+      ['#3ecf9a', '#1a7a58'], ['#d878a8', '#7a2858']
+    ];
+    const colors = Array.from({ length: 4 }, (_, row) => {
+      const palette = palettes[row % palettes.length];
+      return [palette[0], palette[1] || palette[0]];
+    });
+    const brickWidth = (W * 0.86 - 6 * 7) / 8;
+    const brickHeight = Math.max(15, brickWidth * 0.44);
+    return { W, H, colors, brickWidth, brickHeight, bottom: H * 0.065 + 12 + 4 * (brickHeight + 6) };
+  }
+
+  function paintTitleWall(ctx, view) {
+    const wall = titleWallSpec(view);
+    for (let row = 0; row < 4; row++) {
+      for (let column = 0; column < 8; column++) {
+        ctx.save();
+        ctx.translate(wall.W * 0.07 + column * (wall.brickWidth + 6), wall.H * 0.065 + 12 + row * (wall.brickHeight + 6));
+        paintBrickBevel(ctx, wall.brickWidth, wall.brickHeight, {
+          c1: wall.colors[row][0], c2: wall.colors[row][1]
+        });
+        ctx.restore();
+      }
+    }
+    return wall.bottom;
+  }
+
+  // The title ball and capsules move, but these 32 glazed bricks never change.
+  // Keep their native-resolution paint once instead of rebuilding 64 gradients each frame.
+  const titleWallCache = { key: '', canvas: null };
+  function paintTitleWallCached(ctx, view) {
+    const doc = root && root.document;
+    if (!doc || !ctx || typeof ctx.drawImage !== 'function' || typeof ctx.getTransform !== 'function') {
+      return paintTitleWall(ctx, view);
+    }
+    const wall = titleWallSpec(view);
+    const scale = Math.max(1, Math.abs(ctx.getTransform().a) || 1);
+    const key = JSON.stringify([wall.W, wall.H, scale, wall.colors]);
+    if (titleWallCache.key !== key) {
+      const off = titleWallCache.canvas || doc.createElement('canvas');
+      off.width = Math.ceil(wall.W * scale);
+      off.height = Math.ceil(wall.bottom * scale);
+      const octx = off.getContext('2d');
+      if (!octx) {return paintTitleWall(ctx, view);}
+      octx.setTransform(scale, 0, 0, scale, 0, 0);
+      paintTitleWall(octx, view);
+      titleWallCache.canvas = off;
+      titleWallCache.key = key;
+    }
+    // Use the physical dimensions so fractional CSS sizes never rescale the cached pixels.
+    ctx.drawImage(titleWallCache.canvas, 0, 0, titleWallCache.canvas.width / scale, titleWallCache.canvas.height / scale);
+    return wall.bottom;
+  }
+
   function paintHpPips(ctx, brick) {
     if (!brick || brick.maxHp <= 1) {
       return 0;
@@ -1011,6 +1069,8 @@
 
   root.TurdanoidSprites = {
     paintBrickBevel,
+    paintTitleWall,
+    paintTitleWallCached,
     paintHpPips,
     paintPaddle,
     paintBall,

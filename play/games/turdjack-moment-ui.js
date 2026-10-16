@@ -18,6 +18,8 @@ export function dismissMomentBanner(banner, timerId) {
   banner.removeAttribute('data-kind');
   banner.textContent = '';
   banner.setAttribute('aria-hidden', 'true');
+  banner.setAttribute('tabindex', '-1');
+  banner.setAttribute('inert', '');
   return null;
 }
 
@@ -38,6 +40,9 @@ export function showMomentBannerUi(banner, copyForKind, kind, reducedMotion, opt
   banner.textContent = copy;
   banner.dataset.kind = kind;
   banner.setAttribute('aria-hidden', 'false');
+  banner.setAttribute('aria-label', `${copy}. Dismiss celebration`);
+  banner.setAttribute('tabindex', '0');
+  banner.removeAttribute('inert');
   banner.classList.remove('show');
   void banner.offsetWidth;
   banner.classList.add('show');
@@ -60,7 +65,9 @@ export function wireMomentBannerSkip(banner, onSkip) {
   if (!banner || banner.__momentSkipWired) {return;}
   banner.__momentSkipWired = true;
   banner.setAttribute('role', 'button');
-  banner.setAttribute('tabindex', '0');
+  const hidden = banner.getAttribute('aria-hidden') === 'true';
+  banner.setAttribute('tabindex', hidden ? '-1' : '0');
+  banner.toggleAttribute('inert', hidden);
   banner.setAttribute('aria-label', 'Dismiss celebration');
 
   const skip = () => {
@@ -73,6 +80,7 @@ export function wireMomentBannerSkip(banner, onSkip) {
   banner.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
+      e.stopPropagation();
       skip();
     }
   });

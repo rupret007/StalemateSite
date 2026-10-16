@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1751,6 +1752,9 @@
       color: #d4ecdf;
     }
 
+    #hintText { cursor: pointer; }
+    #hintText:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
     .sidebar .status::after {
       content: none;
     }
@@ -2813,7 +2817,7 @@
       <section class="table" data-motto="Pit Boss Memo: no clean wins after midnight" data-phase="betting">
         <canvas class="table-fx-canvas" id="tableFxCanvas" aria-hidden="true"></canvas>
         <div class="table-edge-streak" id="tableEdgeStreak" hidden></div>
-        <div class="moment-banner" id="momentBanner" aria-hidden="true"></div>
+        <div class="moment-banner" id="momentBanner" aria-hidden="true" inert></div>
         <div class="status" id="statusText">Place a bet, click Deal, and try not to get hustled by the toilet boss.</div>
 
         <div class="table-stage">
@@ -2821,7 +2825,7 @@
 
           <div class="hand zone-dealer">
             <div class="hand-title">
-              <strong data-icon="🚽" aria-label="Dealer, Toilet Boss">
+              <strong data-icon="🚽" role="heading" aria-level="2" aria-label="Dealer, Toilet Boss">
                 <span class="seat-label-full">Dealer (Toilet Boss)</span>
                 <span class="seat-label-short" aria-hidden="true">Dealer</span>
               </strong>
@@ -2842,7 +2846,7 @@
 
           <div class="hand" id="playerHandWrap">
             <div class="hand-title">
-              <strong data-icon="💩" aria-label="Player, You plus Poop Luck">
+              <strong data-icon="💩" role="heading" aria-level="2" aria-label="Player, You plus Poop Luck">
                 <span class="seat-label-full">Player (You + Poop Luck)</span>
                 <span class="seat-label-short" aria-hidden="true">You</span>
               </strong>
@@ -2857,7 +2861,7 @@
 
           <div class="hand" id="splitHandWrap" hidden>
             <div class="hand-title">
-              <strong data-icon="🧻" aria-label="Split Hand, Backup Turd Luck">
+              <strong data-icon="🧻" role="heading" aria-level="2" aria-label="Split Hand, Backup Turd Luck">
                 <span class="seat-label-full">Split Hand (Backup Turd Luck)</span>
                 <span class="seat-label-short" aria-hidden="true">Split</span>
               </strong>
@@ -2942,7 +2946,7 @@
     </div>
 
     <div class="intel-backdrop" id="intelBackdrop" aria-hidden="true"></div>
-    <div class="intel-slide" id="intelSlide" aria-hidden="true">
+    <div class="intel-slide" id="intelSlide" aria-hidden="true" inert>
       <aside class="sidebar">
         <details class="intel-drawer" id="intelDrawer" open>
           <summary>Strategy, history &amp; rules</summary>
@@ -2953,7 +2957,7 @@
         </label>
         <div>
           <h3 data-icon="🧠">Strategy Hint</h3>
-          <div class="status" id="hintText">Hint: Place a bet to begin.</div>
+          <div class="status" id="hintText" role="button" tabindex="0" title="Explain the strategy hint">Hint: Place a bet to begin.</div>
         </div>
 
         <div>
@@ -2965,21 +2969,21 @@
           <h3 data-icon="⚙️">Table Setup</h3>
           <div class="rule-grid">
             <div class="rule-row">
-              <span>Dealer soft 17</span>
+              <label for="ruleDealer17">Dealer soft 17</label>
               <select id="ruleDealer17">
                 <option value="S17">Stand (S17)</option>
                 <option value="H17">Hit (H17)</option>
               </select>
             </div>
             <div class="rule-row">
-              <span>Blackjack payout</span>
+              <label for="ruleBlackjackPayout">Blackjack payout</label>
               <select id="ruleBlackjackPayout">
                 <option value="1.5">3:2</option>
                 <option value="1.2">6:5</option>
               </select>
             </div>
             <div class="rule-row">
-              <span>Decks</span>
+              <label for="ruleDecks">Decks</label>
               <select id="ruleDecks">
                 <option value="1">1 deck</option>
                 <option value="2">2 decks</option>
@@ -4892,6 +4896,12 @@
         ui.hintText.addEventListener('click', () => {
           const advice = strategyDecision();
           if (advice && turdjackKit && turdjackKit.coachHint) {turdjackKit.coachHint(advice);}
+        });
+        ui.hintText.addEventListener('keydown', (event) => {
+          if (event.code !== 'Enter' && event.code !== 'Space') return;
+          event.preventDefault();
+          event.stopPropagation();
+          ui.hintText.click();
         });
       }
       const helpBtn = document.getElementById('helpBtn');

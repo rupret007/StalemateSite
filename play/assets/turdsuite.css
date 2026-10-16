@@ -481,6 +481,23 @@ body.suite-no-zoom label {
   touch-action: manipulation;
 }
 
+/* Keep every control usable by touch, including compact menus and dialogs.
+   The minimums intentionally survive each game's smaller breakpoint rules. */
+body :is(button, [role="button"], a[href], select, summary, input:not([type="checkbox"]):not([type="radio"])) {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+body :is(.dialog-hub, .footer-note a) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+body label:has(input:is([type="checkbox"], [type="radio"])) {
+  min-width: 44px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
 /* ---------- Phone HUD readability (auto-applied by turdsuite.js) ---------- */
 @media (max-width: 680px) {
   .suite-phone-hud .card-stat,

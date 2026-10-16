@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1411,7 +1412,7 @@ body.desktop-cabinet .status {
     </div>
     <h2 class="sr-live" style="position:absolute;width:1px;height:1px;overflow:hidden">Turdtris Turbo</h2>
     <p>Stack clean, survive level modifiers, and score big with combos and back-to-back clears.</p>
-    <ul>
+    <ul tabindex="0" aria-label="Keyboard and touch controls">
       <li><strong>Move:</strong> Left/Right arrows</li>
       <li><strong>Rotate:</strong> Up or <strong>X</strong> (clockwise), <strong>Z</strong> (counterclockwise)</li>
       <li><strong>Soft Drop:</strong> Down arrow</li>
