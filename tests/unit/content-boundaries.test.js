@@ -35,9 +35,13 @@ describe('content boundaries', () => {
         expect(home).toContain('Better Than Now');
         expect(home).toContain('Manic');
         expect(home).toMatch(/punk rock/i);
-        expect(home).toContain('Lewisville');
-        expect(home).toContain('Flower Mound');
-        expect(home).toContain('Originals. Punk rock.');
+        expect(home).toContain('Originals. Punk rock. Live.');
+        expect(home).toContain('The songs are ours');
+        expect(home).toContain('Stalemate writes the songs');
+        expect(home).toContain('Dallas-area punk rock');
+        expect(home).not.toMatch(/Lewisville|Flower Mound/);
+        expect((home.match(/Dallas-area/g) || []).length).toBe(1);
+        expect(home).not.toContain('foundingLocation');
         expect(home).not.toMatch(/Two-tone|two-tone/i);
         expect(home).not.toMatch(/SoCal|Southern California|do not link|other act|Head2Wall/i);
         expect(home).not.toMatch(/Ska \/ punk/i);
@@ -65,7 +69,8 @@ describe('content boundaries', () => {
         expect(home).not.toMatch(/\bTBA\b|coming soon|\blorem\b|\bplaceholder\b|\byour\b|\benter\b/i);
         expect(home).not.toMatch(/A1\s*·/);
         expect(home).not.toMatch(/E4\s*·/);
-        expect(readme).toContain('Lewisville');
+        expect(readme).toContain('original songs');
+        expect(readme).not.toMatch(/Lewisville|Flower Mound/);
         expect(readme).toContain('Member names and roles');
         expect(readme).not.toMatch(/ticket/i);
         expect(readme).not.toMatch(/\[(MAILING LIST TOOL|MERCH|BOOKING EMAIL|HANDLE) NEEDED\]/);
@@ -88,11 +93,19 @@ describe('content boundaries', () => {
         expect(count).toBeGreaterThanOrEqual(50);
         expect(count).toBeLessThanOrEqual(75);
         expect(epk).toContain('Long bio');
-        expect(epk).toContain('Lewisville');
+        expect(epk).toContain('original songs');
+        expect(epk).not.toMatch(/Lewisville|Flower Mound/);
         expect(epk).toContain('stage-plot.txt');
         expect(epk).toContain('tech-rider.txt');
         expect(epk).not.toContain('[BOOKING EMAIL NEEDED]');
         const epkBody = epk.split(/<body[^>]*>/i)[1] || '';
         expect(epkBody).not.toMatch(/SoCal|Southern California|do not link|other act|two-tone/i);
+    });
+
+    it('keeps Lewisville and Flower Mound off every public surface', async () => {
+        for (const relativePath of [...PUBLIC_COPY, 'README.md']) {
+            const source = await readFile(join(repoRoot, relativePath), 'utf8');
+            expect(source, relativePath).not.toMatch(/Lewisville|Flower Mound/);
+        }
     });
 });

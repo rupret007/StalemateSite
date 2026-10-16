@@ -1,14 +1,14 @@
 const { test, expect } = require('./fixtures');
 
-test('EPK carries short and long bios, hometown and tech docs', async ({ page }) => {
+test('EPK carries short and long bios, originals and tech docs', async ({ page }) => {
     await page.goto('/epk/');
     await expect(page).toHaveTitle(/press kit/i);
     await expect(page.locator('#short-bio-title')).toBeVisible();
     await expect(page.locator('#long-bio-title')).toBeVisible();
     await expect(page.locator('#bio')).toContainText(/punk rock/i);
-    await expect(page.locator('#bio')).toContainText('Lewisville');
-    await expect(page.locator('#bio')).toContainText('Flower Mound');
+    await expect(page.locator('#bio')).toContainText('original songs');
     await expect(page.locator('#bio')).toContainText('Better Than Now');
+    await expect(page.locator('#bio')).not.toContainText(/Lewisville|Flower Mound/);
     await expect(page.locator('body')).not.toContainText(/SoCal|Southern California|do not link|other act|two-tone/i);
     await expect(page.locator('#bio')).not.toContainText(/\bJeff\b/);
     await expect(page.locator('#bio')).not.toContainText(/\bChe\b/);

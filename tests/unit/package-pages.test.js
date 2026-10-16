@@ -50,6 +50,7 @@ describe('GitHub Pages package', () => {
         for (const relativePath of ['index.html', '404.html', 'qr/index.html', 'epk/index.html', 'embed-placeholder.html']) {
             const html = readFileSync(join(repoRoot, 'dist', relativePath), 'utf8');
             expect(html, relativePath).not.toMatch(/SoCal/);
+            expect(html, relativePath).not.toMatch(/Lewisville|Flower Mound/);
         }
         rmSync(join(repoRoot, 'dist'), { recursive: true, force: true });
     });
