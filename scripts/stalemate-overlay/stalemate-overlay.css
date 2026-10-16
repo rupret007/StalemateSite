@@ -1,0 +1,3 @@
+/* Stalemate overlay: checkerboard frame around the stock Turdanoid stage. */
+html{background:repeating-conic-gradient(#111 0 25%,#f4f0e6 0 50%) 0 0/28px 28px}
+body{background-color:transparent}

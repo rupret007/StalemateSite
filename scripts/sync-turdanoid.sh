@@ -23,5 +23,10 @@ for f in index.html; do
   perl -0pi -e 's|(<body[^>]*>)|$1\n<nav class="stalemate-strip" aria-label="Stalemate"><a href="../" class="sm-home"><img src="../assets/mark.svg" alt="" width="22" height="22"> stalemate.band</a><a href="https://www.youtube.com/\@stalemate.punkband" class="sm-listen" rel="noopener">Listen to Manic</a></nav>|' "$f"
 done
 cp "$ROOT/scripts/stalemate-strip.css" "$DEST/stalemate-strip.css"
+# Stalemate overlay (music + checkerboard), re-applied on every sync
+mkdir -p "$DEST/stalemate"
+cp "$ROOT/scripts/stalemate-overlay/"* "$DEST/stalemate/"
+sed -i 's|</head>|<link rel="stylesheet" href="stalemate/stalemate-overlay.css">\n</head>|' TurdAnoid.html
+sed -i 's|</body>|<script src="stalemate/stalemate-overlay.js"></script>\n</body>|' TurdAnoid.html
 printf 'Vendored from github.com/rupret007/Turdanoid@%s (%s). Same owner as this repo; no separate license file upstream.\nDo not edit by hand: run scripts/sync-turdanoid.sh\n' "$SHA" "$REF" > "$DEST/VENDORED.txt"
 echo "Synced Turdanoid $SHA into play/"

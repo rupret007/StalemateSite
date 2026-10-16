@@ -33,6 +33,14 @@ test('/play/ hosts Turdanoid same-origin, hidden and noindex', async ({ page }) 
         await page.keyboard.press('Space');
     }
     await page.waitForTimeout(600);
+    // Stalemate overlay: Manic starts after the first gesture and follows the game's mute button.
+    await expect(page.locator('html')).toHaveAttribute('data-stalemate-music', 'playing');
+    expect(await page.evaluate(() => window.StalemateMusic.src)).toMatch(/\/play\/stalemate\/manic\.m4a$/);
+    expect(await page.evaluate(() => window.StalemateMusic.loop)).toBe(true);
+    await page.locator('#btnSound').dispatchEvent('click');
+    await expect(page.locator('html')).toHaveAttribute('data-stalemate-music', 'paused');
+    await page.locator('#btnSound').dispatchEvent('click');
+    await expect(page.locator('html')).toHaveAttribute('data-stalemate-music', 'playing');
     expect(errors).toEqual([]);
 });
 
