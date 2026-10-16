@@ -23,6 +23,8 @@
     --ska-dark: #171410;
     --ska-light: #f4f0e6;
     --ska-tile: 8px;
+    --ska-band: 16px;
+    --ska-hero-tile: 48px;
     --display: "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
     --body: "Source Sans 3", "Segoe UI", sans-serif;
     --shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
@@ -117,18 +119,10 @@ textarea:focus-visible {
     transform: translateY(0);
 }
 
-.ska-belt {
-    height: var(--ska-tile);
-    background-color: var(--ska-dark);
-    background-image: repeating-conic-gradient(
-        var(--ska-dark) 0% 25%,
-        var(--ska-light) 0% 50%
-    );
-    background-size: var(--ska-tile) var(--ska-tile);
-}
-
+.ska-belt,
 .ska-rule {
-    height: var(--ska-tile);
+    height: var(--ska-band);
+    background-color: var(--ska-dark);
     background-image: repeating-conic-gradient(
         var(--ska-dark) 0% 25%,
         var(--ska-light) 0% 50%
@@ -154,7 +148,7 @@ textarea:focus-visible {
     top: 0;
     z-index: 50;
     min-height: 4.5rem;
-    border-bottom: var(--ska-tile) solid transparent;
+    border-bottom: var(--ska-band) solid transparent;
     background:
         linear-gradient(rgba(var(--ink-rgb), 0.94), rgba(var(--ink-rgb), 0.94)) padding-box,
         repeating-conic-gradient(var(--ska-dark) 0% 25%, var(--ska-light) 0% 50%) border-box;
@@ -302,6 +296,7 @@ textarea:focus-visible {
 /* Hero */
 .hero {
     position: relative;
+    overflow: hidden;
     min-height: min(78vh, 42rem);
     display: grid;
     align-items: end;
@@ -332,7 +327,7 @@ textarea:focus-visible {
 
 .hero-grid {
     position: relative;
-    z-index: 1;
+    z-index: 2;
     display: grid;
     gap: 2rem;
     align-items: end;
@@ -387,23 +382,45 @@ textarea:focus-visible {
 }
 
 .hero-board {
-    justify-self: start;
-    width: min(100%, 10.5rem);
+    position: absolute;
+    z-index: 1;
+    top: 6%;
+    right: -5rem;
+    width: min(54vw, 36rem);
+    height: min(82%, 34rem);
+    margin: 0;
+    pointer-events: none;
 }
 
 .hero-board__face {
-    aspect-ratio: 1;
-    border: 1px solid var(--cream);
+    width: 100%;
+    height: 100%;
+    border: 0;
     background-image: repeating-conic-gradient(
         var(--ska-dark) 0% 25%,
         var(--ska-light) 0% 50%
     );
-    background-size: 12.5% 12.5%;
-    box-shadow: var(--shadow);
+    background-size: var(--ska-hero-tile) var(--ska-hero-tile);
+    box-shadow: none;
+}
+
+.hero-board::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(90deg, rgba(var(--ink-rgb), 0.94) 0%, rgba(var(--ink-rgb), 0.42) 34%, rgba(var(--ink-rgb), 0.08) 62%, rgba(var(--ink-rgb), 0.16) 100%),
+        linear-gradient(180deg, rgba(var(--ink-rgb), 0.4) 0%, transparent 20%, transparent 78%, rgba(var(--ink-rgb), 0.5) 100%);
 }
 
 .hero-board figcaption {
-    margin-top: 0.5rem;
+    position: absolute;
+    z-index: 1;
+    left: 34%;
+    bottom: 10%;
+    margin: 0;
+    padding: 0.28rem 0.5rem;
+    background: rgba(var(--ink-rgb), 0.88);
     color: var(--muted);
     font-family: var(--display);
     font-size: 0.85rem;
@@ -420,6 +437,15 @@ textarea:focus-visible {
 
 .content-section--surface {
     background: var(--ink-soft);
+}
+
+#shows.content-section--surface {
+    background-color: var(--ink-soft);
+    background-image: repeating-conic-gradient(
+        rgba(244, 240, 230, 0.04) 0% 25%,
+        transparent 0% 50%
+    );
+    background-size: 28px 28px;
 }
 
 .section-heading {
@@ -466,9 +492,24 @@ textarea:focus-visible {
 }
 
 .panel {
-    padding: 1.5rem 1.5rem 1.6rem;
+    position: relative;
+    padding: 1.5rem 1.5rem 1.6rem 1.85rem;
     border: 1px solid var(--line-strong);
     background: var(--surface);
+}
+
+.panel::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    left: -1px;
+    width: var(--ska-tile);
+    background-image: repeating-conic-gradient(
+        var(--ska-dark) 0% 25%,
+        var(--ska-light) 0% 50%
+    );
+    background-size: var(--ska-tile) var(--ska-tile);
 }
 
 .panel h3 {
@@ -622,16 +663,35 @@ textarea:focus-visible {
     place-items: center;
     padding: 1.75rem 1.25rem;
     border: 1px solid var(--line);
-    background: var(--surface);
+    border-top: var(--ska-tile) solid transparent;
+    background:
+        linear-gradient(var(--surface), var(--surface)) padding-box,
+        repeating-conic-gradient(var(--ska-dark) 0% 25%, var(--ska-light) 0% 50%) border-box;
+    background-size: auto, var(--ska-tile) var(--ska-tile);
     color: var(--muted);
     text-align: center;
 }
 
 /* Footer */
 .site-footer {
-    padding: 3.25rem 0 3rem;
-    border-top: 1px solid var(--line);
+    position: relative;
+    padding: 3.25rem 0 3.75rem;
+    border-top: 0;
     background: var(--ink-soft);
+}
+
+.site-footer::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: var(--ska-band);
+    background-image: repeating-conic-gradient(
+        var(--ska-dark) 0% 25%,
+        var(--ska-light) 0% 50%
+    );
+    background-size: var(--ska-tile) var(--ska-tile);
 }
 
 .footer-layout {
@@ -701,7 +761,25 @@ textarea:focus-visible {
 /* Inner pages */
 .page-hero {
     position: relative;
+    overflow: hidden;
     padding: 3.25rem 0 2.5rem;
+}
+
+.page-hero::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: -2.5rem;
+    width: min(34vw, 18rem);
+    height: 100%;
+    background-image: repeating-conic-gradient(
+        var(--ska-dark) 0% 25%,
+        var(--ska-light) 0% 50%
+    );
+    background-size: 40px 40px;
+    pointer-events: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 58%);
+    mask-image: linear-gradient(90deg, transparent 0%, #000 58%);
 }
 
 .page-hero h1 {
@@ -778,12 +856,7 @@ textarea:focus-visible {
     }
 
     .hero-grid {
-        grid-template-columns: minmax(0, 1fr) auto;
-    }
-
-    .hero-board {
-        justify-self: end;
-        margin-bottom: 0.35rem;
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 
@@ -794,8 +867,24 @@ textarea:focus-visible {
 }
 
 @media (max-width: 719px) {
-    .header-cta,
+    .header-cta {
+        display: none;
+    }
+
     .hero-board {
+        top: 8%;
+        right: -3.5rem;
+        width: min(54vw, 15.5rem);
+        height: 74%;
+    }
+
+    .hero-board::after {
+        background:
+            linear-gradient(90deg, rgba(var(--ink-rgb), 1) 0%, rgba(var(--ink-rgb), 0.9) 40%, rgba(var(--ink-rgb), 0.22) 70%, rgba(var(--ink-rgb), 0.06) 100%),
+            linear-gradient(180deg, rgba(var(--ink-rgb), 0.4) 0%, transparent 22%, transparent 80%, rgba(var(--ink-rgb), 0.5) 100%);
+    }
+
+    .hero-board figcaption {
         display: none;
     }
 

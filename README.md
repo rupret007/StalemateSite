@@ -32,7 +32,7 @@ Operational tokens (`[DATE/VENUE/TICKET LINK NEEDED]`, `[MAILING LIST TOOL NEEDE
 
 ## Visual identity
 
-Rad Dad’s palette (`#171410` ink, `#f4f0e6` cream, `#009ee8` listen, `#ed2765` tickets, `#b5dc08` focus) with a **restrained two-tone checkerboard**: an 8px check under the header, one belt after the hero, and a small 8×8 mark — not card frames or wallpaper. Type is Barlow Condensed + Source Sans 3. Layout is a signed-band grid, not Rad Dad’s festival collage. Copy matches Rad Dad’s confidence and specificity, in Stalemate’s own punk rock voice — no reused lines or jokes.
+Rad Dad’s palette (`#171410` ink, `#f4f0e6` cream, `#009ee8` listen, `#ed2765` tickets, `#b5dc08` focus) with a **two-tone checkerboard signature**: a 16px band under the header, a large faded field bleeding off the hero (not a floating square), 16px belts after the hero and mid-page, card left-rails, and footer bands. One low-contrast check texture sits in the shows ground only — never full-contrast checker behind body text, and not card wallpaper. Type is Barlow Condensed + Source Sans 3. Layout is a signed-band grid, not Rad Dad’s festival collage. Copy matches Rad Dad’s confidence and specificity, in Stalemate’s own punk rock voice — no reused lines or jokes.
 
 ## Local checks
 
