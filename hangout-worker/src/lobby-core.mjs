@@ -29,6 +29,7 @@ export const LOBBY_LIMITS = Object.freeze({
     reportsToHide: 3,
     listMax: 2000,                    // words per filter list
     banMax: 5000,                     // stored bans
+    roomBanMax: 500,                  // bans per room
     reportsCamOff: 2,
     pmMinLobbyMs: 2 * MIN,
     pmPendingMax: 5,
@@ -496,6 +497,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             const reason = normalize(why.join(' '), 80) || 'banned';
             chan.bans.push({ mask: `dev:${t.dev}`, reason, by: c.nick, at: now() }, { mask: `nick:${lc(t.nick)}`, reason, by: c.nick, at: now() },
                 { mask: `iph:${t.iph}`, nick: t.nick, reason, by: c.nick, at: now(), until: now() + L.ipBan }); // a private window can't dodge it
+            if (chan.bans.length > L.roomBanMax) chan.bans = chan.bans.slice(-L.roomBanMax); // keep the newest
             event(chan, `${c.nick} sets mode +b ${t.nick}`);
             log(c.nick, 'ban', t.nick, reason, chan.name);
             if (chan.members.has(t.id)) { out(t, { t: 'kicked', ch: chan.name, by: c.nick, reason }); leave(t, chan, 'banned'); }
@@ -573,6 +575,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             net.bans.push({ mask: `dev:${t.dev}`, nick: t.nick, reason, by: c.nick, at: now() },
                 { mask: `iph:${t.iph}`, nick: t.nick, reason, by: c.nick, at: now(), until: now() + L.ipBan },
                 { mask: `nick:${lc(t.nick)}`, nick: t.nick, reason, by: c.nick, at: now() });
+            if (net.bans.length > L.banMax) net.bans = net.bans.slice(-L.banMax); // keep the newest
             for (const name of t.channels) event(ch(name), `${t.nick} was banned by ${c.nick} (${reason})`);
             log(c.nick, 'ban', t.nick, reason, 'network');
             saveNet();

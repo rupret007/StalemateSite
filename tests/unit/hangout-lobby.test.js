@@ -595,6 +595,32 @@ describe('auto-lockdown when no band op for 24h', () => {
         expect(L._debug.net.shield).toBe(false);
         expect(L._debug.net.reportsToHide).toBe(5);
     });
+    it('caps bans at runtime too: network list keeps the newest banMax, rooms keep the newest roomBanMax', () => {
+        boot();
+        const band = join('Drummer', { role: 'band', iph: 'bandnet' });
+        L._debug.net.bans.push(...Array.from({ length: 5000 }, (_, i) => ({ mask: `dev:old${i}`, reason: 'x', by: 'B', at: i })));
+        const t = join('Troll', { iph: 'trollnet' });
+        cmd(band, 'gban', ['Troll', 'spam']); // pushes 3 more: 5003 -> 5000
+        const net = L._debug.net.bans;
+        expect(net.length).toBe(5000);
+        expect(net.slice(-3).map((b) => b.mask)).toEqual(['dev:dev-Troll', 'iph:trollnet', 'nick:troll']);
+        expect(net[0].mask).toBe('dev:old3'); // oldest three dropped
+        expect(join('Troll', { iph: 'elsewhere' }).refused.reason).toBe('banned');
+        expect(t.id).toBeTruthy();
+
+        boot();
+        const a = join('Alpha', { iph: 'home' });
+        cmd(a, 'join', ['#art-cap']);
+        const room = L._debug.channels.get('#art-cap');
+        room.bans.push(...Array.from({ length: 500 }, (_, i) => ({ mask: `dev:r${i}`, reason: 'x', by: 'Alpha', at: i })));
+        const v = join('Vandal', { iph: 'vnet' });
+        cmd(v, 'join', ['#art-cap']);
+        cmd(a, 'ban', ['Vandal', 'rude'], '#art-cap');
+        expect(room.bans.length).toBe(500);
+        expect(room.bans.slice(-3).map((b) => b.mask)).toEqual(['dev:dev-Vandal', 'nick:vandal', 'iph:vnet']);
+        expect(room.bans[0].mask).toBe('dev:r3');
+        expect(room.members.has(v.id)).toBe(false);
+    });
     it('caps filter lists and stored bans', () => {
         const base = { lock: 'off', budget: { day: '', requests: 0 } };
         const words = Array.from({ length: 2500 }, (_, i) => `w${i}`);
