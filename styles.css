@@ -664,7 +664,8 @@ textarea:focus-visible {
     margin: 0;
 }
 
-.next-show-block .board-square {
+.hero-show-card .next-show-block .board-square {
+    color: var(--ink);
     width: max-content;
     margin-bottom: 0.25rem;
 }
