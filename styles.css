@@ -1551,3 +1551,9 @@ textarea:focus-visible {
     .hero-show-card { gap: 0.4rem; }
     .panel.hero-show-card { padding: 0.75rem 1rem 0.85rem; }
 }
+@media (max-width: 719px) {
+    .hero-show { margin-top: 0.4rem; }
+    .hero-show-card .countdown-kicker { margin: 0 0 0.2rem; }
+    .hero-show-card .countdown-clock li { padding-top: 0.2rem; padding-bottom: 0.2rem; }
+    .hero-show-card .next-show-block p { margin: 0.1rem 0; font-size: 0.875rem; }
+}

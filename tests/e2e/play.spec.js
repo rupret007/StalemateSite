@@ -109,7 +109,9 @@ test('homepage Games card and nav link go to /play/, which stays noindex and out
     await expect(games.getByRole('heading', { level: 2 })).toHaveText('Seven free arcade games. Zero dignity.');
     await expect(games.getByRole('link', { name: 'All seven games' })).toHaveAttribute('href', 'play/hub.html');
     for (const img of await games.locator('.games-shot img').all()) {
+        await img.scrollIntoViewIfNeeded();
         await expect(img).toBeVisible();
+        await expect.poll(() => img.evaluate((i) => i.complete && i.naturalWidth)).toBe(480);
         await expect(img).toHaveAttribute('loading', 'lazy');
         expect(await img.evaluate((i) => i.complete && i.naturalWidth)).toBe(480);
     }
