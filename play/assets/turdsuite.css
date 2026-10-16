@@ -514,6 +514,10 @@ body.suite-no-zoom label {
 /* ---------- Accessibility: skip link + live region ---------- */
 .suite-skip-link {
   position: absolute;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
   left: max(12px, var(--suite-safe-left));
   top: max(8px, var(--suite-safe-top));
   z-index: 10003;

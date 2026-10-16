@@ -784,6 +784,35 @@
     return spec.id;
   }
 
+  // The world stage (tile wall, wainscot, rail, fixtures, basin) does not change frame to frame,
+  // so render it once per world/size/scale into an offscreen canvas and blit it.
+  const stageCache = { key: '', canvas: null, result: null };
+  function paintWorldStageCached(ctx, world, view) {
+    const doc = root && root.document;
+    if (!doc || !ctx || typeof ctx.drawImage !== 'function' || typeof ctx.getTransform !== 'function') {
+      return paintWorldStage(ctx, world, view);
+    }
+    const W = (view && view.W) || 390;
+    const H = (view && view.H) || 844;
+    const m = ctx.getTransform();
+    const scale = Math.max(1, Math.abs(m.a) || 1);
+    const fixtures = !view || view.fixtures !== false;
+    const key = [worldId(world), W, H, scale, fixtures ? 1 : 0].join('|');
+    if (stageCache.key !== key) {
+      const off = stageCache.canvas || doc.createElement('canvas');
+      off.width = Math.ceil(W * scale);
+      off.height = Math.ceil(H * scale);
+      const octx = off.getContext('2d');
+      octx.setTransform(scale, 0, 0, scale, 0, 0);
+      octx.clearRect(0, 0, W, H);
+      stageCache.result = paintWorldStage(octx, world, view);
+      stageCache.canvas = off;
+      stageCache.key = key;
+    }
+    ctx.drawImage(stageCache.canvas, 0, 0, W, H);
+    return stageCache.result;
+  }
+
   function paintWorldStage(ctx, world, view) {
     const W = (view && view.W) || 390;
     const H = (view && view.H) || 844;
@@ -991,6 +1020,7 @@
     paintBoss,
     paintAtmosphere,
     paintWorldStage,
+    paintWorldStageCached,
     worldStageSpec,
     worldBasinColors,
     worldBubbleColor,

@@ -3,7 +3,7 @@
 <head>
 <meta name="robots" content="noindex,nofollow">
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#061018">
@@ -163,6 +163,7 @@
   .overlay p{max-width:34ch;font-size:clamp(14px,3.4vw,16px);line-height:1.55;letter-spacing:0;color:var(--ink);opacity:.92;margin:12px 0}
   .overlay .quip{color:var(--hot);font-style:italic;font-size:clamp(12px,3vw,14px);margin-top:6px;min-height:1.4em}
   .overlay button{margin-top:22px;padding:14px 34px;font-size:18px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;background:linear-gradient(180deg,#f6e2a4 0%,var(--ta-brass,#e8c56a) 45%,#c89628 100%);color:#1a1408;border:0;border-radius:14px;cursor:pointer;box-shadow:0 12px 28px rgba(232,197,106,.32),inset 0 -3px 0 rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.7);transition:transform .15s,box-shadow .15s;font-family:inherit}
+  .overlay button{min-height:44px}
   .overlay button:hover{transform:translateY(-2px);box-shadow:0 16px 32px rgba(232,197,106,.42),inset 0 -3px 0 rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.7)}
   .overlay button:active{transform:scale(.95)}
   .overlay .stats{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:12px}
@@ -393,7 +394,7 @@ const playShell = document.getElementById('playShell');
 const TLAYOUT = typeof TurdanoidLayout !== 'undefined' ? TurdanoidLayout : null;
 const TQA = typeof TurdanoidQA !== 'undefined' ? TurdanoidQA : null;
 const reducedMotion = typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
-let DPR = Math.max(1, Math.min(window.devicePixelRatio || 1, 2.5));
+let DPR = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
 let W = 0, H = 0;
 let lastTime = 0;
 let running = false;
@@ -824,7 +825,7 @@ function resize(){
   }
   W = Math.max(280, canvasW);
   H = Math.max(380, canvasH);
-  DPR = Math.max(1, Math.min(window.devicePixelRatio||1, 2.5));
+  DPR = Math.max(1, Math.min(window.devicePixelRatio||1, 2));
   cv.width = Math.floor(W*DPR);
   cv.height = Math.floor(H*DPR);
   cv.style.width = W+'px'; cv.style.height = H+'px';
@@ -2550,7 +2551,7 @@ function render(){
     });
   }
   if(TSPRITE && TSPRITE.paintWorldStage){
-    TSPRITE.paintWorldStage(ctx, world, {
+    (TSPRITE.paintWorldStageCached || TSPRITE.paintWorldStage)(ctx, world, {
       W, H, nowMs, reducedMotion: !!(reducedMotion && reducedMotion.matches),
       fixtures: state === 'playing' || state === 'paused'
     });
@@ -3354,11 +3355,19 @@ function roundRect(c,x,y,w,h,r){
 }
 
 /* ---- Loop ---- */
+// Menus (title, pause, end) sit over the canvas, so the backdrop only needs ~12fps there.
+// Full rate resumes the moment play starts. This keeps the main thread free on load.
+const IDLE_FRAME_MS = 83;
+let lastRender = 0;
 function loop(now){
   const dt = Math.min(33, now - lastTime);
   lastTime = now;
-  if(state === 'playing' && !paused){ step(dt); }
-  render();
+  const active = state === 'playing' && !paused;
+  if(active){ step(dt); }
+  if(active || now - lastRender >= IDLE_FRAME_MS){
+    lastRender = now;
+    render();
+  }
   requestAnimationFrame(loop);
 }
 

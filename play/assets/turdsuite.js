@@ -417,7 +417,7 @@
       function sync() {
         const on = muted;
         btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-        btn.setAttribute('aria-label', on ? 'Unmute suite sounds' : 'Mute suite sounds');
+        btn.setAttribute('aria-label', on ? 'Sound off, tap to unmute suite sounds' : 'Sound on, tap to mute suite sounds');
         btn.textContent = on ? '🔇 Sound off' : '🔊 Sound on';
       }
       sync();
