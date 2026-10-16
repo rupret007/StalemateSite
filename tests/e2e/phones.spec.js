@@ -45,7 +45,7 @@ test('phone homepage keeps the video-show hero usable without overflow', async (
         expect(tapHeight(await link.boundingBox())).toBeGreaterThanOrEqual(44);
     }
     expect(tapHeight(await page.locator('#home a.button--listen').boundingBox())).toBeGreaterThanOrEqual(44);
-    expect(tapHeight(await page.locator('#home a.button--hot').boundingBox())).toBeGreaterThanOrEqual(44);
+    for (const cta of await page.locator('#home a.button--hot').all()) expect(tapHeight(await cta.boundingBox())).toBeGreaterThanOrEqual(44);
     for (const href of [
         'https://www.instagram.com/stalemate.punk/',
         'https://www.youtube.com/@stalemate.punkband',
@@ -59,4 +59,29 @@ test('phone homepage keeps the video-show hero usable without overflow', async (
 
     await expect(page.locator('.hero-show__tie')).toContainText('Hear it loud Oct 24 at Los Amigo’s, Plano');
     await expect(page.locator('body')).not.toContainText(/ticket/i);
+});
+
+test('phone first screen shows the countdown, Oct 24 show and Manic video before Games', async ({ page }) => {
+    await page.goto('/');
+    const vh = (await page.viewportSize()).height;
+    const clock = await page.locator('[data-countdown-clock]').boundingBox();
+    const video = await page.locator('.hero-video__player').boundingBox();
+    const games = await page.locator('#games').boundingBox();
+    const home = await page.locator('#home').boundingBox();
+    const card = await page.locator('.hero-show-card').boundingBox();
+    const cta = page.locator('[data-track="show-cta-hero"]');
+    const ctaBox = await cta.boundingBox();
+    const repeat = page.locator('[data-track="show-cta-under-video"]');
+    await expect(repeat).toHaveText('See us Oct 24');
+    await expect(repeat).toHaveAttribute('href', 'https://rockinoctober.com');
+    await expect(cta).toHaveAttribute('href', 'https://rockinoctober.com');
+    expect(clock.y + clock.height, 'countdown fully on the first screen').toBeLessThan(vh);
+    expect(clock.y).toBeLessThan(video.y);
+    expect(card.y).toBeLessThan(video.y);
+    expect(ctaBox.y).toBeLessThan(video.y);
+    expect(tapHeight(ctaBox)).toBeGreaterThanOrEqual(44);
+    expect((await repeat.boundingBox()).y).toBeGreaterThan(video.y + video.height);
+    expect(games.y).toBeGreaterThanOrEqual(home.y + home.height - 1);
+    expect(games.y).toBeGreaterThan(clock.y + clock.height);
+    expect(games.y).toBeGreaterThan(video.y + video.height);
 });

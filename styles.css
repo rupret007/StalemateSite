@@ -1492,8 +1492,8 @@ textarea:focus-visible {
 .games-shot--a { transform: rotate(-2deg); }
 .games-shot--b { transform: rotate(2deg) translateY(18px); }
 .games-shot:hover, .games-shot:focus-visible { transform: rotate(0) scale(1.03); }
-.hero-games-teaser { margin: 14px 0 0; font-weight: 700; }
-.hero-games-teaser a { color: var(--lime); }
+.listen-games-link { margin: 0.5rem 0; font-size: 0.95rem; }
+.listen-games-link a { color: var(--lime); }
 @media (max-width: 760px) {
     .games-section .games-card { grid-template-columns: 1fr; padding: 18px; gap: 18px; box-shadow: 5px 5px 0 var(--pink); }
     .games-card__shots { order: -1; }
@@ -1501,4 +1501,15 @@ textarea:focus-visible {
 }
 @media (prefers-reduced-motion: reduce) {
     .games-shot, .games-shot:hover, .games-shot:focus-visible { transition: none; }
+}
+
+/* Show first: countdown + Oct 24 card, then Manic, then the repeat show button. */
+.hero-show { grid-template-areas: "next" "video" "ctas"; }
+.hero-show__cta { margin: 0.75rem 0 0; }
+.hero-show__cta .button--big { display: flex; justify-content: center; width: 100%; font-size: 1.15rem; min-height: 52px; }
+@media (min-width: 900px) {
+    .hero-show {
+        grid-template-columns: minmax(17.25rem, 0.95fr) minmax(0, 1.45fr);
+        grid-template-areas: "next video" "next ctas";
+    }
 }

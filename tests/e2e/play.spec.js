@@ -115,10 +115,11 @@ test('homepage Games card and nav link go to /play/, which stays noindex and out
     }
     const box = await games.locator('.games-card').boundingBox();
     expect(box.height).toBeLessThan((page.viewportSize().width <= 760) ? 700 : 480);
-    // Music stays first: Games sits right under Listen, above the band blurb.
-    expect(await page.locator('main > section').evaluateAll((s) => s.map((e) => e.id))).toEqual(['home', 'listen', 'games', 'about']);
+    // Countdown, show and Manic hero stay first; Games follows, then Listen and the band.
+    expect(await page.locator('main > section').evaluateAll((s) => s.map((e) => e.id))).toEqual(['home', 'games', 'listen', 'about']);
     expect(await page.locator('a[href*="play"]').evaluateAll((a) => a.map((e) => e.getAttribute('href')))).toEqual(['play/', 'play/hub.html', 'play/', 'play/turdomania.html']);
-    await expect(page.locator('.hero-games-teaser a')).toHaveAttribute('href', '#games');
+    await expect(page.locator('#home a[href="#games"]')).toHaveCount(0);
+    await expect(page.locator('#listen .listen-games-link a')).toHaveAttribute('href', '#games');
     const pkg = fs.readFileSync(path.join(ROOT, 'scripts/package-pages.cjs'), 'utf8');
     expect(pkg).not.toMatch(/play\//);
     for (const f of fs.readdirSync(path.join(ROOT, 'play')).filter((n) => n.endsWith('.html'))) {
@@ -151,6 +152,7 @@ test('game over offers Listen to Manic, the Oct 24 show and Share score next to 
     const extra = end.locator('.stalemate-end');
     await expect(extra.getByRole('link', { name: 'Listen to Manic' })).toHaveAttribute('href', '../#home');
     await expect(extra).toContainText('Oct 24');
+    await expect(extra.getByRole('link', { name: 'Come see us live, Oct 24' })).toHaveAttribute('href', 'https://rockinoctober.com');
     const share = extra.getByRole('button', { name: 'Share score' });
     await expect(share).toBeVisible();
     const h = await share.boundingBox();
