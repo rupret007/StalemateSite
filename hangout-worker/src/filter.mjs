@@ -18,12 +18,14 @@ const THREAT = /\bkys\b|\bkill (?:your ?self|urself|yourself)\b|\b(?:i'?ll|i wil
 // but these phrasings are blocked even though each word alone is in MILD_OK.
 const BODY = String.raw`(?:dick|cock|penis|tits?|titties|boobs?|boobies|pussy|nipples?|clit|balls|ass|butt)`;
 const MUSIC = String.raw`(?:riffs?|solos?|tone|songs?|tracks?|tunes?|sets?|guitars?|bass|basslines?|drums?|drumming|fills?|grooves?|beats?|licks?|chorus|hooks?|jams?|shows?|gigs?|bands?|amps?|pedals?|painting|paintings|drawing|sketch|canvas|vocals?|voice|scream|breakdown|mosh|pit|stage|sound|mix|record|album|ep|cover|playing|chops)`;
+// A music word followed by a person ("nice ass bass player") is about the person, so the exception doesn't apply.
+const PEOPLE = String.raw`(?:girls?|gurls?|guys?|babes?|baby|players?|chicks?|boys?|lad(?:y|ies|s)?|wom[ae]n|m[ae]n|mans|gals?|grls?|hott(?:ie|y)s?|cuties?|kid|kids|person|people|singers?|drummers?|bassists?|guitarists?|vocalists?|shawty|mama|daddy|mommy|she|he|her|him|you|u|ya)`;
 const SEXUAL = new RegExp([
     String.raw`\b(?:suck|lick|blow|ride|touch|grab|rub|stroke|eat|sit on|play with)\s+(?:on\s+)?(?:my|your|ur|his|her|their|this|that)\s+${BODY}\b`,
     String.raw`\b(?:send|show|see|post|share|drop|flash)\s+(?:me\s+|us\s+)?(?:(?:your|ur|ya|some|a|my|them|those)\s+)?(?:${BODY}|nudes?|naked)(?:\s*(?:pics?|pix|pictures?|photos?|vids?))?\b`,
     String.raw`\b(?:dick|cock|tit|titty|boob|nude|nudie)\s*(?:pics?|pix)\b`,
     // "nice ass riff" / "big ass amp" is a compliment on the music; "nice ass" on its own (or at a person) is not.
-    String.raw`\b(?:nice|sexy|hot|great|big|juicy)\s+(?:(?:tits?|titties|boobs?|boobies|rack|dick|cock|pussy|nipples?)\b|(?:ass|butt)\b(?!\s*-?\s*(?:${MUSIC})\b))`,
+    String.raw`\b(?:nice|sexy|hot|great|big|juicy)\s+(?:(?:tits?|titties|boobs?|boobies|rack|dick|cock|pussy|nipples?)\b|(?:ass|butt)\b(?!\s*-?\s*(?:${MUSIC})\b(?!(?:\s+(?:${MUSIC}))?\s+(?:${PEOPLE})\b)))`,
     String.raw`\b(?:sit|sitting|sat|squat|ride|riding)\s+on\s+(?:my|your|ur|his|her|their|this|me|ya)\s+(?:face|lap|dick|cock|mouth)\b|\bface\s*-?\s*sit(?:ting)?\b|\b(?:ride|riding)\s+(?:my|your|ur)\s+face\b`,
     String.raw`\b(?:wanna|wan na|want to|i want to|let'?s|lets|gonna|i'?d|i would|can i|could i)\s+(?:fuck|bang|screw|shag|hook up with)\s*(?:me|you|u|ya|her|him|them|tonight|\?|$)`
 ].join('|'), 'i');
