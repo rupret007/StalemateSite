@@ -1,4 +1,4 @@
-const { test, expect } = require('./fixtures');
+const { test, expect, tapHeight } = require('./fixtures');
 
 const PLACEHOLDER_COPY = /\bTBA\b|coming soon|\blorem\b|\bplaceholder\b|\byour\b|\benter\b/i;
 
@@ -46,9 +46,9 @@ test('homepage is a finished band page with originals, show and real links', asy
         await expect(header).toBeVisible();
         await expect(hero).toBeVisible();
         await expect(footer).toBeVisible();
-        expect((await header.boundingBox()).height).toBeGreaterThanOrEqual(44);
-        expect((await hero.boundingBox()).height).toBeGreaterThanOrEqual(44);
-        expect((await footer.boundingBox()).height).toBeGreaterThanOrEqual(44);
+        expect(tapHeight(await header.boundingBox())).toBeGreaterThanOrEqual(44);
+        expect(tapHeight(await hero.boundingBox())).toBeGreaterThanOrEqual(44);
+        expect(tapHeight(await footer.boundingBox())).toBeGreaterThanOrEqual(44);
         await expect(header).toHaveAttribute('rel', /noopener/);
         await expect(header).toContainText(name);
     }
@@ -117,10 +117,10 @@ for (const width of [320, 390, 768, 1440]) {
         }
         const nav = page.getByRole('navigation', { name: 'Primary navigation', exact: true });
         for (const link of await nav.getByRole('link').all()) {
-            expect((await link.boundingBox()).height).toBeGreaterThanOrEqual(44);
+            expect(tapHeight(await link.boundingBox())).toBeGreaterThanOrEqual(44);
         }
         const about = page.locator('#home a.button--listen');
-        expect((await about.boundingBox()).height).toBeGreaterThanOrEqual(44);
+        expect(tapHeight(await about.boundingBox())).toBeGreaterThanOrEqual(44);
     });
 }
 
