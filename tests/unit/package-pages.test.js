@@ -63,4 +63,25 @@ describe('GitHub Pages package', () => {
         }
         rmSync(join(repoRoot, 'dist'), { recursive: true, force: true });
     });
+
+    it('packages the game screenshots referenced by the homepage', () => {
+        const result = spawnSync(process.execPath, [join(repoRoot, 'scripts/package-pages.cjs')], {
+            cwd: repoRoot,
+            encoding: 'utf8'
+        });
+        try {
+            expect(result.status, result.stderr).toBe(0);
+            const html = readFileSync(join(repoRoot, 'dist/index.html'), 'utf8');
+            const screenshots = [...html.matchAll(/<img\b[^>]*\bsrc="(assets\/games\/[^"]+)"/g)]
+                .map((match) => match[1]);
+            expect(screenshots).toHaveLength(2);
+            for (const screenshot of screenshots) {
+                const packagedPath = join(repoRoot, 'dist', screenshot);
+                expect(existsSync(packagedPath), screenshot).toBe(true);
+                expect(readFileSync(packagedPath)).toEqual(readFileSync(join(repoRoot, screenshot)));
+            }
+        } finally {
+            rmSync(join(repoRoot, 'dist'), { recursive: true, force: true });
+        }
+    });
 });
