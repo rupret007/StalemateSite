@@ -85,3 +85,5 @@ body.bob-mode .watch,body.bob-mode .draw{align-self:start}
     body.bob-mode .bob .tools{margin-top:4px;gap:6px}
     body.bob-mode .bob .btn{padding:8px 10px;font-size:.95rem}
 }
+.namebox{display:flex;gap:6px}.namebox input{flex:1}.dice{min-height:44px;white-space:nowrap}@media (max-width:420px){.namebox{flex-wrap:wrap}.namebox input{flex:1 1 100%}.dice{flex:1}}
+.lobby-link{background:var(--blue)}

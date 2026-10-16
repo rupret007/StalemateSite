@@ -68,6 +68,7 @@ test('without the preview key the room stays shut and never dials the relay', as
 test('a wrong preview key is refused by the relay', async ({ browser }) => {
     const page = await openBrowser(browser);
     await page.goto(`/r/${SLUG}/?preview=wrong-key-wrong-key&relay=ws://127.0.0.1:${relay.port}`);
+    await page.fill('[data-name]', 'Nope');
     await page.click('[data-enter]');
     await expect(page.locator('[data-gate-status]')).toContainText('Couldn’t get in');
 });
@@ -122,6 +123,7 @@ test('host-driven YouTube stays in sync: load, play, pause, seek, late joiner', 
 
     const late = await openBrowser(browser);
     await late.goto(invite);
+    await late.fill('[data-name]', 'Latecomer');
     await late.click('[data-enter]');
     const lYt = late.locator('[data-fake-yt]');
     await expect(lYt).toHaveAttribute('data-video-id', 'oh5p5f5_-7A');
@@ -269,4 +271,24 @@ test('show your real canvas: opt-in, rectangular tile for everyone, still capped
     await host.click('[data-canvas-cam]');
     expect(await host.evaluate(() => window.__hangout.av.canvas)).toBe(false);
     await expect(host.locator('[data-tile="me"]')).toHaveCount(0);
+});
+
+test('the name box starts blank, needs a name, offers a dice name, and is remembered', async ({ browser }) => {
+    const page = await openBrowser(browser);
+    await page.goto(roomUrl());
+    await expect(page.locator('[data-name]')).toHaveValue('');
+    await page.click('[data-enter]');
+    await expect(page.locator('[data-gate-status]')).toContainText('Type a name');
+    await expect(page.locator('[data-room]')).toBeHidden();
+    await expect(page.locator('[data-dice]')).toHaveText('🎲 Make me a name');
+    await expect(page.locator('[data-name]')).toHaveAttribute('placeholder', 'Type a nickname… or roll one →');
+    expect((await page.locator('[data-dice]').boundingBox()).height).toBeGreaterThanOrEqual(44);
+    await page.click('[data-dice]');
+    await expect(page.locator('[data-dice]')).toHaveText('🎲 Roll again');
+    await expect(page.locator('[data-name]')).toHaveValue(/^[A-Z][A-Za-z0-9-]{2,19}$/);
+    await page.fill('[data-name]', 'Remembered');
+    await page.click('[data-enter]');
+    await expect(page.locator('[data-room]')).toBeVisible();
+    await page.goto(roomUrl());
+    await expect(page.locator('[data-name]')).toHaveValue('Remembered');
 });

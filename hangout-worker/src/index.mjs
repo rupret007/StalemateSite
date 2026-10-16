@@ -1,10 +1,19 @@
 // Stalemate hangout relay: a dumb, capped, encrypted-frame broadcaster.
 // One Durable Object per invite room. No video, audio, or files ever pass through here.
 import { admit, createBucket, dayKey, limitsFrom, validFrame } from './core.mjs';
+import { admitLobby, HangoutLobby } from './lobby-do.mjs';
+
+export { HangoutLobby };
 
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
+        // Cloudflare Access protects /lobby-admin*; reaching this means the band member signed in. Send them back.
+        if (url.pathname === '/lobby-admin/login') {
+            const back = String(env.HANGOUT_ADMIN_RETURN || '');
+            return /^https:\/\/(www\.)?stalemate\.band\/r\/[0-9a-f]{16}\/admin\/$/.test(back) && request.headers.get('Cf-Access-Jwt-Assertion') ? Response.redirect(back, 302) : new Response('nope', { status: 404 });
+        }
+        if (url.pathname === '/lobby' || url.pathname === '/lobby-admin') return admitLobby(request, env, url);
         if (url.pathname !== '/room') return new Response('nope', { status: 404 });
         if (request.headers.get('Upgrade') !== 'websocket') return new Response('websocket only', { status: 426 });
         const denied = admit({ url, origin: request.headers.get('Origin'), env, extraOrigins: env.HANGOUT_EXTRA_ORIGINS });

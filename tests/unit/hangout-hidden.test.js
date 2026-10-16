@@ -45,8 +45,8 @@ describe('hidden hangout room', () => {
         expect(robots).not.toMatch(/sitemap/i);
     });
 
-    it('the room page says noindex, nofollow and sends no referrer', () => {
-        const html = readFileSync(join(ROOM, 'index.html'), 'utf8');
+    it.each(['index.html', 'lobby/index.html', 'admin/index.html', 'terms/index.html'])('%s says noindex, nofollow and sends no referrer', (page) => {
+        const html = readFileSync(join(ROOM, page), 'utf8');
         expect(html).toMatch(/<meta name="robots" content="[^"]*noindex[^"]*nofollow[^"]*">/);
         expect(html).toMatch(/<meta name="googlebot" content="noindex, nofollow">/);
         expect(html).toMatch(/<meta name="referrer" content="no-referrer">/);
@@ -54,8 +54,10 @@ describe('hidden hangout room', () => {
     });
 
     it('never commits a preview key or a relay secret', () => {
-        for (const name of readdirSync(ROOM)) {
-            const text = readFileSync(join(ROOM, name), 'utf8');
+        const roomFiles = (dir) => readdirSync(dir).flatMap((n) => (statSync(join(dir, n)).isDirectory() ? roomFiles(join(dir, n)) : [join(dir, n)]));
+        for (const file of roomFiles(ROOM)) {
+            const name = relative(ROOM, file);
+            const text = readFileSync(file, 'utf8');
             expect(text, name).not.toMatch(/preview=[A-Za-z0-9_-]{8,}/);
             expect(text, name).not.toMatch(/HANGOUT_PREVIEW_KEY\s*=/);
         }

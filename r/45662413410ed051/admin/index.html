@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+    <meta name="googlebot" content="noindex, nofollow">
+    <meta name="referrer" content="no-referrer">
+    <!-- Hidden band admin panel. The server only answers band emails signed in through Cloudflare Access. -->
+    <meta name="hangout-relay" content="">
+    <title>Band panel · Hang Out</title>
+    <link rel="icon" href="../../../assets/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../lobby/lobby.css">
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body class="admin">
+    <div class="titlebar"><span>Band panel — #stalemate ops</span><span class="dots" aria-hidden="true">▁ ▢ ✕</span></div>
+    <section class="gate" data-gate>
+        <div class="gate-card">
+            <h1>Band panel</h1>
+            <p class="lede">For the band only. Sign in with the email code from Cloudflare (nothing to install).</p>
+            <a class="btn btn--big" data-signin href="#">Sign in with email code</a>
+            <label class="nickrow">Nick in chat <span class="nickbox"><input data-nick maxlength="16" value="Jeff"></span></label>
+            <button class="btn btn--big" type="button" data-enter>Open the panel</button>
+            <p class="status" data-status role="status"></p>
+        </div>
+    </section>
+    <main class="panel" data-panel hidden>
+        <section class="card big" aria-label="Quick controls">
+            <div class="state" data-state></div>
+            <div class="row">
+                <button class="btn btn--danger btn--big" type="button" data-panic>🛡️ PANIC: shield everything</button>
+                <button class="btn btn--ghost" type="button" data-shieldoff>Lower shield</button>
+            </div>
+            <div class="row">
+                <span>Lobby:</span>
+                <button class="btn btn--small" type="button" data-lobby="unlock">Open</button>
+                <button class="btn btn--small btn--ghost" type="button" data-lobby="readonly">Read-only</button>
+                <button class="btn btn--small btn--danger" type="button" data-lobby="lock">Back soon (lock)</button>
+            </div>
+            <div class="row">
+                <span>Slow mode:</span>
+                <button class="btn btn--small btn--ghost" type="button" data-slow="0">Off</button>
+                <button class="btn btn--small btn--ghost" type="button" data-slow="3">3s</button>
+                <button class="btn btn--small btn--ghost" type="button" data-slow="10">10s</button>
+                <button class="btn btn--small btn--ghost" type="button" data-slow="30">30s</button>
+                <button class="btn btn--small btn--ghost" type="button" data-slow="120">2m</button>
+                <button class="btn btn--small btn--ghost" type="button" data-camoff>📷 All cameras off</button>
+            </div>
+        </section>
+        <nav class="admintabs" role="tablist">
+            <button type="button" data-tab="queue" aria-selected="true">🚩 Queue <span data-qcount></span></button>
+            <button type="button" data-tab="people">People</button>
+            <button type="button" data-tab="rooms">Rooms</button>
+            <button type="button" data-tab="stats">📈 Stats</button>
+            <button type="button" data-tab="filter">Word filter</button>
+            <button type="button" data-tab="log">Mod log</button>
+            <a class="chatlink" data-chatlink href="../lobby/">Open chat →</a>
+        </nav>
+        <section class="card" data-view="queue"><h2>Reports</h2><ul class="list" data-reports></ul><h2>Held by StaleBot</h2><ul class="list" data-held></ul><p class="small" data-queue-empty>All quiet. Nothing to review. 🤘</p></section>
+        <section class="card" data-view="people" hidden><h2>Online</h2><ul class="list" data-users></ul><h2>Bans</h2><ul class="list" data-bans></ul></section>
+        <section class="card" data-view="rooms" hidden><h2>Open rooms</h2><ul class="list" data-rooms></ul><p class="small">Private rooms are end-to-end encrypted, so nobody (us included) can read them; they never show here.</p></section>
+        <section class="card" data-view="stats" hidden>
+            <p class="small">Counts only: no names, devices or IPs. Times in your timezone. Page views live in GoatCounter.</p>
+            <div class="kpis" data-kpis></div>
+            <h2>Visitors per day</h2><div class="bars" data-days></div>
+            <h2>Busiest hours</h2><div class="bars hours" data-hours></div>
+            <h2>Room types started</h2><div class="bars" data-kinds></div>
+            <h2>Busiest rooms</h2><ol class="list" data-busiest></ol>
+            <h2>Moderation</h2><div class="kpis" data-modsum></div>
+        </section>
+        <section class="card" data-view="filter" hidden>
+            <p class="small">Mild swearing is allowed. Slurs, sexual stuff, personal info and non-YouTube links are always blocked.</p>
+            <form class="row" data-filter-form>
+                <input data-filter-word placeholder="word" aria-label="Word">
+                <button class="btn btn--small btn--danger" type="submit" value="block">Block</button>
+                <button class="btn btn--small" type="submit" value="hold">Hold for review</button>
+                <button class="btn btn--small btn--ghost" type="submit" value="allow">Allow</button>
+            </form>
+            <div data-lists></div>
+        </section>
+        <section class="card" data-view="log" hidden><h2>Mod log</h2><ol class="list log" data-modlog></ol></section>
+    </main>
+    <div class="toast" data-toast role="status" hidden></div>
+    <script src="admin.js"></script>
+</body>
+</html>
