@@ -49,6 +49,21 @@ describe('filter', () => {
         }
         expect(checkText('watch https://youtu.be/dQw4w9WgXcQ').verdict).toBe('ok');
     });
+    it('runs the slur matcher on separator-stripped and spaced-out text (Karen #21)', () => {
+        for (const t of ['n.i.g.g.e.r', 'n-i-g-g-e-r', 'f a g g o t', 'n_i_g_g_e_r', 'f.4.g.g.0.t', 'N I G G E R', 'hey f a g g o t']) expect(checkText(t).verdict, t).toBe('block');
+    });
+    it('blocks sexual phrases even when each word alone is mild swearing', () => {
+        for (const t of ['suck my dick', 'send dick pics', 'show me your tits', 'nice boobs', 'wanna fuck?', 's u c k my dick', 'send me ur nudes', 'lick my balls', 'nice rack', 'can i fuck you']) expect(checkText(t).verdict, t).toBe('block');
+        for (const ok of ['damn, cock-up on the bridge', 'tits up, the amp died', 'I wanna fuck shit up', 'what a dick move by the venue', 'f.u.c.k yeah', 's h i t', 'this riff is fucking shit hot']) expect(checkText(ok).verdict, ok).toBe('ok');
+    });
+    it('cunt is swearing, but aimed at a person it is held for a band op like other insults', () => {
+        for (const ok of ['what a cunt of a day', 'that hill is a cunt of a climb haha', 'fucking cunt of a pedal broke']) expect(checkText(ok).verdict, ok).toBe('ok');
+        for (const t of ['you cunt', 'you\'re a fucking cunt', 'shut up cunt', 'fuck off you cunt', 'Bravo is a cunt', 'cunts like you']) expect(checkText(t).verdict, t).toBe('hold');
+    });
+    it('blocks spelled-out phone numbers but not count-ins or set lists', () => {
+        for (const t of ['two one four five five five oh one nine nine', '2 one 4 555 oh 1 9 9', 'call me at two-one-four, five five five, zero one nine nine', 'text eight 1 seven 5 5 5 1 2 3 4']) expect(checkText(t).verdict, t).toBe('block');
+        for (const ok of ['one two three four five six seven eight', 'take 5, the set is 1 2 3 4 songs', 'I saw them at 7 or 8, no 9', 'one more song!']) expect(checkText(ok).verdict, ok).toBe('ok');
+    });
     it('normalises bidi overrides, zero-widths and Zalgo floods', () => {
         expect(normalize('a\u202Eb\u200Bc')).toBe('abc');
         expect(normalize('z\u0301\u0301\u0301\u0301\u0301').length).toBe(3);
@@ -172,6 +187,28 @@ describe('permissions are enforced on the server (forged commands)', () => {
         expect(L._debug.net.shield).toBe(false);
         L.message(fan.id, '{nope');
         expect(closed.at(-1)).toEqual([fan.id, 4400]);
+    });
+    it('a room founder ban covers device, nick AND IP hash, so a private window or new nick cannot dodge it', () => {
+        const a = join('Alpha', { iph: 'home' });
+        const t = join('Troll', { iph: 'trollnet' });
+        cmd(a, 'join', ['#art-ban']);
+        cmd(t, 'join', ['#art-ban']);
+        const room = L._debug.channels.get('#art-ban');
+        cmd(a, 'ban', ['Troll', 'rude'], '#art-ban');
+        expect(room.members.has(t.id)).toBe(false);
+        expect(room.bans.map((b) => b.mask)).toEqual(expect.arrayContaining(['dev:dev-Troll', 'nick:troll', 'iph:trollnet']));
+        const dodge = join('FreshFace', { iph: 'trollnet', dev: 'private-window' });
+        cmd(dodge, 'join', ['#art-ban']);
+        expect(room.members.has(dodge.id)).toBe(false);
+        expect(notices(dodge)).toMatch(/banned from #art-ban/);
+        const other = join('Neighbor', { iph: 'elsewhere' });
+        cmd(other, 'join', ['#art-ban']);
+        expect(room.members.has(other.id)).toBe(true);
+        later(24 * 60 * 60 * 1000 + 1);
+        const back = join('LaterFace', { iph: 'trollnet', dev: 'another-window' });
+        cmd(back, 'join', ['#art-ban']);
+        expect(room.members.has(back.id)).toBe(true); // the IP part expires (shared IPs), the device ban does not
+        expect(L._debug.net.bans.some((b) => b.mask === 'iph:trollnet')).toBe(false); // room ban stays room-only
     });
     it('founders can op, voice, set modes, lock and close only their room', () => {
         const a = join('Alpha');
@@ -432,7 +469,44 @@ describe('auto-lockdown when no band op for 24h', () => {
         expect(L._debug.net.shield).toBe(true);
         expect(L._debug.net.shieldAuto).toBe(true);
         const band = join('Drummer', { role: 'band' });
-        expect(notices(band)).toMatch(/Auto-shield is on/);
+        expect(notices(band)).toMatch(/Auto-lockdown is on/);
+    });
+    it('is a true lock: fans go read-only in the lobby, rooms and PMs; band can still talk and unlock', () => {
+        const fan = join('Fan');
+        const pal = join('Pal');
+        cmd(fan, 'join', ['#hangs']);
+        cmd(pal, 'join', ['#hangs']);
+        later(23 * 60 * 60 * 1000);
+        L.tick();
+        expect(L._debug.net.lock).toBe('off');
+        later(60 * 60 * 1000 + 1);
+        L.tick();
+        expect(L._debug.net.lock).toBe('readonly');
+        expect(L._debug.net.lockAuto).toBe(true);
+        expect(L.adminState().lockAuto).toBe(true);
+        expect(got(fan).some((m) => m.t === 'net' && m.lock === 'readonly')).toBe(true);
+        inbox.clear();
+        say(fan, 'anyone here?');
+        say(fan, 'room chat', '#hangs');
+        expect(lines(pal)).toEqual([]);
+        expect(notices(fan)).toMatch(/read-only/);
+        L.message(fan.id, JSON.stringify({ t: 'cmd', name: 'msg', args: ['Pal', 'psst'], ch: LOBBY }));
+        expect(got(pal).some((m) => m.t === 'pm-request' || m.t === 'pm')).toBe(false);
+        expect(L.modlog.map((e) => e.action)).toContain('auto-lockdown');
+        const snap = L.snapshot();
+        expect(snap.lock).toBe('readonly');
+        expect(snap.lockAuto).toBe(true);
+        const band = join('Drummer', { role: 'band' });
+        expect(notices(band)).toMatch(/fans can read but not talk/);
+        say(band, 'we are back');
+        expect(lines(fan).some((t) => /we are back/.test(t))).toBe(true);
+        expect(L._debug.net.lock).toBe('readonly'); // a band op arriving does not silently reopen it
+        cmd(band, 'lobby', ['unlock']);
+        expect(L._debug.net.lock).toBe('off');
+        expect(L._debug.net.lockAuto).toBe(false);
+        inbox.clear();
+        say(fan, 'yay');
+        expect(lines(pal).some((t) => /yay/.test(t))).toBe(true);
     });
 });
 

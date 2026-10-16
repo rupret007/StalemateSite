@@ -14,6 +14,33 @@ const INSULT = String.raw`(?:idiot|stupid|loser|moron|ugly|fat|trash|garbage|wor
 const DIRECTED = new RegExp(String.raw`\b${AT_YOU}\b(?:\s+\w+){0,3}?\s+(?:a\s+|an\s+|such\s+a\s+|so\s+|are\s+a\s+|r\s+a\s+)?${INSULT}\b|\b(?:shut up|stfu|nobody likes|everyone hates)\s+${AT_YOU}\b`, 'i');
 const THREAT = /\bkys\b|\bkill (?:your ?self|urself|yourself)\b|\b(?:i'?ll|i will|gonna|going to|im gonna|i'm gonna)\s+(?:kill|hurt|find|stab|shoot|beat up|dox)\s+(?:you|u|ya|him|her|them)\b|\bdie in a fire\b|\bhope (?:you|u) die\b|\bi know where (?:you|u) live\b/i;
 
+// Sexual content aimed at someone. Plain words (dick/cock/tit/boob) stay OK as swearing ("cock-up"),
+// but these phrasings are blocked even though each word alone is in MILD_OK.
+const BODY = String.raw`(?:dick|cock|penis|tits?|titties|boobs?|boobies|pussy|nipples?|clit|balls|ass|butt)`;
+const SEXUAL = new RegExp([
+    String.raw`\b(?:suck|lick|blow|ride|touch|grab|rub|stroke|eat|sit on|play with)\s+(?:on\s+)?(?:my|your|ur|his|her|their|this|that)\s+${BODY}\b`,
+    String.raw`\b(?:send|show|see|post|share|drop|flash)\s+(?:me\s+|us\s+)?(?:(?:your|ur|ya|some|a|my|them|those)\s+)?(?:${BODY}|nudes?|naked)(?:\s*(?:pics?|pix|pictures?|photos?|vids?))?\b`,
+    String.raw`\b(?:dick|cock|tit|titty|boob|nude|nudie)\s*(?:pics?|pix)\b`,
+    String.raw`\b(?:nice|sexy|hot|great|big|juicy)\s+(?:tits?|titties|boobs?|boobies|rack|ass|butt|dick|cock|pussy|nipples?)\b`,
+    String.raw`\b(?:wanna|wan na|want to|i want to|let'?s|lets|gonna|i'?d|i would|can i|could i)\s+(?:fuck|bang|screw|shag|hook up with)\s*(?:me|you|u|ya|her|him|them|tonight|\?|$)`
+].join('|'), 'i');
+// Targeted 'cunt' (Jeff: swearing is fine, aimed at a person = held for a band op like other insults).
+const CUNT_AT = /\b(?:is|was|are|r|you|u|ya|ur|youre|you're|ure)\s+(?:(?:a|an|such a|such|total|fucking|fuckin|absolute|right|little|stupid|dumb)\s+){0,3}cunts?\b(?!\s+of\b)|\b(?:shut up|stfu|fuck off|piss off|get lost|go away|bye|oi|hey)\s*,?\s*(?:you\s+)?(?:(?:fucking|fuckin|stupid|dumb|little)\s+)?cunts?\b|\bcunts?\s+like\s+(?:you|u)\b/i;
+// Phone numbers spelled out ("two one four, five five five, oh one nine nine"). Plain ascending count-ins are fine.
+const DIGIT_WORDS = { zero: 0, oh: 0, o: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9 };
+const DTOK = String.raw`(?:zero|oh|one|two|three|four|five|six|seven|eight|nine|\d)`;
+const SPELLED_PHONE = new RegExp(String.raw`(?<![a-z0-9])${DTOK}(?:[\s.,()\/-]*${DTOK}(?![a-z])){6,}`, 'gi');
+function spelledPhone(text) {
+    for (const m of text.match(SPELLED_PHONE) || []) {
+        const toks = m.toLowerCase().match(/zero|oh|one|two|three|four|five|six|seven|eight|nine|\d/g) || [];
+        if (!toks.some((t) => /[a-z]/.test(t))) continue; // all digits: PHONE already handles that
+        const ds = toks.map((t) => (t in DIGIT_WORDS ? DIGIT_WORDS[t] : Number(t)));
+        if (ds.every((d, i) => i === 0 || d === ds[i - 1] + 1)) continue; // "one two three four five six seven"
+        return true;
+    }
+    return false;
+}
+
 const presetMatcher = new RegExpMatcher({
     ...englishDataset.build(),
     ...englishRecommendedTransformers
@@ -40,7 +67,7 @@ const YOUTUBE = /^(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com|youtu\.be)(?:\/\
 
 export function personalInfo(text) {
     if (EMAIL.test(text)) return 'email';
-    if (PHONE.test(text)) return 'phone';
+    if (PHONE.test(text) || spelledPhone(text)) return 'phone';
     if (ADDRESS.test(text)) return 'address';
     if (CONTACT.test(text)) return 'contact';
     return null;
@@ -65,6 +92,17 @@ function squash(text) {
     return text.toLowerCase().replace(/[@4]/g, 'a').replace(/3/g, 'e').replace(/[1!|]/g, 'i').replace(/0/g, 'o').replace(/[5$]/g, 's').replace(/7/g, 't').replace(/[^a-z\s]/g, '');
 }
 
+// Join letters spaced out one at a time: "f a g g o t" / "n . i . g" -> "faggot" / "nig".
+const SEP = String.raw`[\s.\-_*+~,'"\x60/\\|:;]+`;
+const SPACED = new RegExp(String.raw`(?<![\p{L}\p{N}])[\p{L}\p{N}@$!](?:${SEP}[\p{L}\p{N}@$!](?![\p{L}\p{N}])){2,}`, 'gu');
+function collapseSpaced(text) {
+    return text.replace(SPACED, (m) => m.replace(new RegExp(SEP, 'g'), ''));
+}
+// Text variants the preset matcher sees: as typed, leet/separator-stripped, and single-letter-spaced collapsed.
+function variants(text) {
+    return [...new Set([text, squash(text), squash(collapseSpaced(text))])];
+}
+
 // verdict: ok | hold | block. `reason` is for the mod log, never shown to other fans.
 export function checkText(raw, lists = defaultLists(), { handles = true } = {}) {
     const text = normalize(raw);
@@ -78,13 +116,17 @@ export function checkText(raw, lists = defaultLists(), { handles = true } = {}) 
     const allow = lists.allow || [];
     const blockHit = hasWord(text, lists.block || []) || hasWord(squash(text), lists.block || []);
     if (blockHit && !allow.includes(blockHit)) return { verdict: 'block', reason: `word:${blockHit}`, text };
-    for (const m of presetMatcher.getAllMatches(text)) {
-        const w = wordOf(m);
-        if (allow.includes(w) || MILD_OK.includes(w)) continue;
-        if ((lists.hold || []).includes(w)) continue; // handled below
-        return { verdict: 'block', reason: `preset:${w}`, text };
+    const forms = variants(text);
+    if (forms.some((f) => SEXUAL.test(f))) return { verdict: 'block', reason: 'sexual', text };
+    for (const f of forms) {
+        for (const m of presetMatcher.getAllMatches(f)) {
+            const w = wordOf(m);
+            if (allow.includes(w) || MILD_OK.includes(w)) continue;
+            if ((lists.hold || []).includes(w)) continue; // handled below
+            return { verdict: 'block', reason: `preset:${w}`, text };
+        }
     }
-    if (DIRECTED.test(text)) return { verdict: 'hold', reason: 'insult-at-person', text };
+    if (DIRECTED.test(text) || forms.some((f) => CUNT_AT.test(f))) return { verdict: 'hold', reason: 'insult-at-person', text };
     const presetHold = presetMatcher.getAllMatches(text).map(wordOf).find((w) => (lists.hold || []).includes(w) && !allow.includes(w));
     const holdHit = presetHold || hasWord(text, lists.hold || []) || hasWord(squash(text), lists.hold || []);
     if (holdHit && !allow.includes(holdHit)) return { verdict: 'hold', reason: `hold:${holdHit}`, text };

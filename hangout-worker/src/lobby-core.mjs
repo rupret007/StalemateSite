@@ -94,6 +94,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         lock: 'off',                  // off | readonly | closed
         shield: false,
         shieldAuto: false,
+        lockAuto: false,              // auto-lockdown (no band op for 24h): read-only for fans until a band op unlocks
         lists: defaultLists(),
         modlog: [],
         lastBand: now(),
@@ -170,7 +171,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
 
     function adminState() {
         return {
-            lock: net.lock, shield: net.shield, shieldAuto: net.shieldAuto, lastBand: net.lastBand,
+            lock: net.lock, shield: net.shield, shieldAuto: net.shieldAuto, lockAuto: net.lockAuto, lastBand: net.lastBand,
             slow: ch(LOBBY).modes.S, lists: net.lists, reportsToHide: net.reportsToHide,
             budget: { ...net.budget, cap: L.requestBudget, level: budgetLevel() },
             users: [...conns.values()].filter((c) => c.nick).map((c) => ({ nick: c.nick, role: c.role, dev: c.dev.slice(0, 6), away: !!c.away, muted: (net.mutes[c.dev] || 0) > now(), channels: [...c.channels] })),
@@ -226,7 +227,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         const c = { id, dev, iph, role, email, admin: band && admin, nick: '', channels: new Set(), away: '', ignores: new Set(), blocks: new Set(), pmOff: false,
             cams: new Set(), since: now(), lastNick: 0, tokens: L.burst, last: now(), frames: 0, lastSaid: {} };
         conns.set(id, c);
-        if (band) { net.lastBand = now(); if (net.shieldAuto) bot(c, 'Auto-shield is on because no band op was around for a day. /shieldoff when you are ready.'); saveNet(); }
+        if (band) { net.lastBand = now(); if (net.shieldAuto || net.lockAuto) bot(c, 'Auto-lockdown is on because no band op was around for a day: fans can read but not talk. /lobby unlock and /shieldoff when you are ready.'); saveNet(); }
         out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true });
         return { ok: true };
     }
@@ -491,7 +492,8 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             const t = target(c, n); if (!t) return undefined;
             if (isBand(t)) return bot(c, 'You can’t ban a band op.', 'error');
             const reason = normalize(why.join(' '), 80) || 'banned';
-            chan.bans.push({ mask: `dev:${t.dev}`, reason, by: c.nick, at: now() }, { mask: `nick:${lc(t.nick)}`, reason, by: c.nick, at: now() });
+            chan.bans.push({ mask: `dev:${t.dev}`, reason, by: c.nick, at: now() }, { mask: `nick:${lc(t.nick)}`, reason, by: c.nick, at: now() },
+                { mask: `iph:${t.iph}`, nick: t.nick, reason, by: c.nick, at: now(), until: now() + L.ipBan }); // a private window can't dodge it
             event(chan, `${c.nick} sets mode +b ${t.nick}`);
             log(c.nick, 'ban', t.nick, reason, chan.name);
             if (chan.members.has(t.id)) { out(t, { t: 'kicked', ch: chan.name, by: c.nick, reason }); leave(t, chan, 'banned'); }
@@ -598,6 +600,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             const mode = { lock: 'closed', closed: 'closed', readonly: 'readonly', unlock: 'off', off: 'off' }[lc(v)];
             if (!mode) return bot(c, '/lobby lock|readonly|unlock', 'error');
             net.lock = mode;
+            net.lockAuto = false;
             event(ch(LOBBY), `${c.nick} sets the lobby to ${mode === 'off' ? 'open' : mode === 'readonly' ? 'read-only for fans' : 'locked (back soon)'}`);
             for (const x of conns.values()) out(x, { t: 'net', lock: net.lock, shield: net.shield });
             log(c.nick, 'lobby', mode);
@@ -779,6 +782,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             if (!rawText) return out(c, { t: 'pm-open', with: t.nick });
             return deliverPm(c, t, rawText);
         }
+        if (!isBand(c) && (net.lock === 'readonly' || budgetLevel() !== 'ok')) return bot(c, 'The lobby is read-only right now, PMs too.', 'error');
         if (t.pmOff || t.blocks.has(c.dev) || c.blocks.has(t.dev)) return bot(c, `${t.nick} isn't taking PMs.`, 'error');
         if (!isBand(c)) {
             if (net.shield) return bot(c, 'Shield is on: new PM requests are paused.', 'error');
@@ -867,14 +871,23 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         for (const room of [...channels.values()]) if (room.kind !== 'lobby' && room.members.size === 0 && room.emptySince && t - room.emptySince >= L.emptyRoomClose) closeRoom(room, BOT, 'empty for 10 minutes');
         const bandOn = [...conns.values()].some(isBand);
         if (bandOn) net.lastBand = t;
+        if (!bandOn && !net.lockAuto && net.lock === 'off' && t - net.lastBand >= L.noBandShield) {
+            // True lockdown: fans go read-only everywhere (rooms and PMs too), not just slow mode.
+            net.lock = 'readonly';
+            net.lockAuto = true;
+            event(ch(LOBBY), `${BOT} locked the lobby: no band op for 24 hours, so it's read-only for fans until the band is back`);
+            for (const x of conns.values()) out(x, { t: 'net', lock: net.lock, shield: net.shield });
+            log(BOT, 'auto-lockdown', 'readonly', 'no band op online for 24h');
+            saveNet();
+        }
         if (!bandOn && !net.shield && t - net.lastBand >= L.noBandShield) shield(true, BOT, true);
     }
 
     function snapshot() {
-        return { bans: net.bans, kicks: net.kicks, mutes: net.mutes, lock: net.lock, shield: net.shield, shieldAuto: net.shieldAuto, lists: net.lists, lastBand: net.lastBand, budget: net.budget, reportsToHide: net.reportsToHide, stats: net.stats };
+        return { bans: net.bans, kicks: net.kicks, mutes: net.mutes, lock: net.lock, shield: net.shield, shieldAuto: net.shieldAuto, lockAuto: net.lockAuto, lists: net.lists, lastBand: net.lastBand, budget: net.budget, reportsToHide: net.reportsToHide, stats: net.stats };
     }
     function restore(s = {}) {
-        for (const k of ['bans', 'kicks', 'mutes', 'lock', 'shield', 'shieldAuto', 'lists', 'lastBand', 'budget', 'reportsToHide', 'stats']) if (s[k] !== undefined) net[k] = s[k];
+        for (const k of ['bans', 'kicks', 'mutes', 'lock', 'shield', 'shieldAuto', 'lockAuto', 'lists', 'lastBand', 'budget', 'reportsToHide', 'stats']) if (s[k] !== undefined) net[k] = s[k];
     }
     function restoreLog(entries = []) { net.modlog = entries.slice(-L.modlogKeep); }
 
