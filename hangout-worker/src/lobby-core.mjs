@@ -778,11 +778,11 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (lc(to) === lc(BOT)) return handlers.help(c);
         const k = pairKey(c.dev, t.dev);
         const p = pm.get(k);
+        if (!isBand(c) && (net.lock === 'readonly' || budgetLevel() !== 'ok')) return bot(c, 'The lobby is read-only right now, PMs too.', 'error');
         if (p && p.state === 'open') {
             if (!rawText) return out(c, { t: 'pm-open', with: t.nick });
             return deliverPm(c, t, rawText);
         }
-        if (!isBand(c) && (net.lock === 'readonly' || budgetLevel() !== 'ok')) return bot(c, 'The lobby is read-only right now, PMs too.', 'error');
         if (t.pmOff || t.blocks.has(c.dev) || c.blocks.has(t.dev)) return bot(c, `${t.nick} isn't taking PMs.`, 'error');
         if (!isBand(c)) {
             if (net.shield) return bot(c, 'Shield is on: new PM requests are paused.', 'error');
@@ -804,6 +804,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     }
 
     function deliverPm(from, to, rawText) {
+        if (!isBand(from) && (net.lock === 'readonly' || budgetLevel() !== 'ok')) return bot(from, 'The lobby is read-only right now, PMs too.', 'error');
         if (!isBand(from) && (net.mutes[from.dev] || 0) > now()) return bot(from, 'You’re muted for now.', 'error');
         if (to.blocks.has(from.dev)) return bot(from, `${to.nick} isn't taking PMs.`, 'error');
         const v = checkText(rawText, net.lists);
@@ -887,6 +888,8 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         return { bans: net.bans, kicks: net.kicks, mutes: net.mutes, lock: net.lock, shield: net.shield, shieldAuto: net.shieldAuto, lockAuto: net.lockAuto, lists: net.lists, lastBand: net.lastBand, budget: net.budget, reportsToHide: net.reportsToHide, stats: net.stats };
     }
     function restore(s = {}) {
+        // Fail closed: empty or wiped storage comes back read-only for fans until a band op runs /lobby unlock.
+        if (!s || typeof s !== 'object' || !['off', 'readonly', 'closed'].includes(s.lock)) { s = { ...(s && typeof s === 'object' ? s : {}), lock: 'readonly', lockAuto: true }; }
         for (const k of ['bans', 'kicks', 'mutes', 'lock', 'shield', 'shieldAuto', 'lockAuto', 'lists', 'lastBand', 'budget', 'reportsToHide', 'stats']) if (s[k] !== undefined) net[k] = s[k];
     }
     function restoreLog(entries = []) { net.modlog = entries.slice(-L.modlogKeep); }

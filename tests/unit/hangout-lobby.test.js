@@ -60,6 +60,10 @@ describe('filter', () => {
         for (const ok of ['what a cunt of a day', 'that hill is a cunt of a climb haha', 'fucking cunt of a pedal broke']) expect(checkText(ok).verdict, ok).toBe('ok');
         for (const t of ['you cunt', 'you\'re a fucking cunt', 'shut up cunt', 'fuck off you cunt', 'Bravo is a cunt', 'cunts like you']) expect(checkText(t).verdict, t).toBe('hold');
     });
+    it('blocks sit-on-my-face style lines; music compliments with "ass" pass, "nice ass" at a person stays blocked', () => {
+        for (const t of ['sit on my face', 'come sit on my face', 'sit on ur face', 'wanna ride my face', 'facesitting', 's i t on my face', 'nice ass', 'nice ass, Bravo', 'Bravo has a nice ass', 'sexy butt']) expect(checkText(t).verdict, t).toBe('block');
+        for (const ok of ['nice ass riff', 'big ass amp', 'that was a nice ass solo', 'great ass-riff dude', 'sit on my amp while I tune', 'nice ass guitar tone']) expect(checkText(ok).verdict, ok).toBe('ok');
+    });
     it('blocks spelled-out phone numbers but not count-ins or set lists', () => {
         for (const t of ['two one four five five five oh one nine nine', '2 one 4 555 oh 1 9 9', 'call me at two-one-four, five five five, zero one nine nine', 'text eight 1 seven 5 5 5 1 2 3 4']) expect(checkText(t).verdict, t).toBe('block');
         for (const ok of ['one two three four five six seven eight', 'take 5, the set is 1 2 3 4 songs', 'I saw them at 7 or 8, no 9', 'one more song!']) expect(checkText(ok).verdict, ok).toBe('ok');
@@ -470,6 +474,48 @@ describe('auto-lockdown when no band op for 24h', () => {
         expect(L._debug.net.shieldAuto).toBe(true);
         const band = join('Drummer', { role: 'band' });
         expect(notices(band)).toMatch(/Auto-lockdown is on/);
+    });
+    it('already-open PMs stop for fans after auto-lockdown; band PMs still go through', () => {
+        const a = join('Alpha');
+        const b = join('Bravo');
+        later(2 * 60 * 1000 + 1);
+        cmd(a, 'msg', ['Bravo', 'hey']);
+        cmd(b, 'accept', ['Alpha']);
+        cmd(a, 'msg', ['Bravo', 'still', 'open']);
+        expect(got(b).filter((m) => m.t === 'pm').map((m) => m.text)).toContain('still open');
+        const band = join('Drummer', { role: 'band' });
+        L.disconnect(band.id);
+        later(25 * 60 * 60 * 1000);
+        L.tick();
+        expect(L._debug.net.lock).toBe('readonly');
+        inbox.clear();
+        cmd(a, 'msg', ['Bravo', 'after', 'lock']);
+        cmd(a, 'query', ['Bravo', 'after', 'lock']);
+        expect(got(b).some((m) => m.t === 'pm')).toBe(false);
+        expect(notices(a)).toMatch(/read-only/);
+        const band2 = join('Singer', { role: 'band' });
+        cmd(band2, 'msg', ['Bravo', 'band', 'here']);
+        expect(got(b).some((m) => m.t === 'pm-request' && m.from === 'Singer' && m.band)).toBe(true);
+    });
+    it('fails closed: empty or wiped storage restores read-only until a band op unlocks', () => {
+        for (const wiped of [{}, undefined, { bans: [] }, { lock: 'bogus' }]) {
+            boot();
+            L.restore(wiped);
+            expect(L._debug.net.lock).toBe('readonly');
+            const fan = join('Fan');
+            const pal = join('Pal');
+            say(fan, 'hello?');
+            expect(lines(pal)).toEqual([]);
+            const band = join('Drummer', { role: 'band' });
+            expect(notices(band)).toMatch(/fans can read but not talk/);
+            cmd(band, 'lobby', ['unlock']);
+            later(4000);
+            say(fan, 'hello now');
+            expect(lines(pal)).toContain('hello now');
+        }
+        boot();
+        L.restore({ lock: 'off' });
+        expect(L._debug.net.lock).toBe('off'); // a real saved state is respected
     });
     it('is a true lock: fans go read-only in the lobby, rooms and PMs; band can still talk and unlock', () => {
         const fan = join('Fan');
