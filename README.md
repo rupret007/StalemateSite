@@ -1,12 +1,12 @@
 # Stalemate site
 
-Official site for **Stalemate** — punk rock originals. Named cuts: **Better Than Now** and **Manic**. Studio session taped **8 October 2026**. Shows are coming.
+Official site for **Stalemate** — punk rock originals. Named cuts: **Better Than Now** and **Manic**. Studio session taped **8 October 2026**. Next date: **Rockin’ October**, Saturday, Oct 24, 2026, Los Amigo’s, Plano, TX. Set 4:45 PM Central.
 
 This is **not** the Southern California pop-punk band of the same name. Do not link that act.
 
 ## Public surfaces
 
-- `/` — stage hero, Listen + Watch, music, shows, video, about, follow, merch shelf
+- `/` — stage hero, Listen + Watch, set countdown, next-show block, music, shows, video, about, follow, merch shelf
 - `/qr/` — printed-flyer landing (next show, listen, follow)
 - `/epk/` — press kit (short + long bio, stills, music, video, interview, stage plot, rider, booking)
 - `404.html` — not-on-the-set page
@@ -22,13 +22,13 @@ Do not publish guesses for any of these:
 - Stream / store URLs for Better Than Now and Manic
 - Manic lyric-video watch URL
 - Studio interview watch URL
-- Next show date, venue, city, door time, age limit, ICS
+- ICS for Rockin’ October
 - Mailing-list tool
 - Merch items
 - Booking email
 - Instagram / TikTok / Facebook handles
 
-Operational tokens (`[DATE/VENUE NEEDED]`, `[MAILING LIST TOOL NEEDED]`, `[MERCH NEEDED]`, `[BOOKING EMAIL NEEDED]`, `[HANDLE NEEDED]`) stay in the HTML as screen-reader-only markers so tests can lock them. They are not shown in the hero.
+Operational tokens (`[MAILING LIST TOOL NEEDED]`, `[MERCH NEEDED]`, `[BOOKING EMAIL NEEDED]`, `[HANDLE NEEDED]`) stay in the HTML as screen-reader-only markers so tests can lock them. They are not shown in the hero. The homepage countdown and next-show block hide after `2026-10-24T16:45:00-05:00` and leave no empty placeholder.
 
 ## Visual identity
 

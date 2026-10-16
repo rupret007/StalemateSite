@@ -12,8 +12,8 @@ test('homepage leads with listen, watch, shows and honest placeholders', async (
     await expect(page.locator('#about')).toContainText(/punk rock/i);
     await expect(page.locator('#about dt')).toHaveCount(0);
     await expect(page.locator('#home')).not.toContainText('[CITY NEEDED');
-    await expect(page.locator('#shows')).toContainText('[DATE/VENUE NEEDED]');
-    await expect(page.locator('#shows')).toContainText('Shows coming soon');
+    await expect(page.locator('#shows')).toContainText('Rockin’ October');
+    await expect(page.locator('#shows')).toContainText('Los Amigo’s');
     await expect(page.locator('#merch')).toContainText('[MERCH NEEDED]');
     await expect(page.locator('body')).toContainText('Not the SoCal pop-punk band');
     await expect(page.locator('body')).not.toContainText(/ticket/i);
@@ -69,6 +69,50 @@ test.describe('homepage without JavaScript', () => {
         await expect(page.locator('#about')).toContainText(/punk rock/i);
         await expect(page.locator('#about dt')).toHaveCount(0);
         await expect(page.locator('#merch')).toContainText('Merch placeholder');
+        await expect(page.locator('[data-next-show-block]')).toContainText('Rockin’ October');
+        await expect(page.locator('[data-countdown-clock]')).toBeHidden();
+        await expect(page.locator('body')).not.toContainText(/ticket/i);
+    });
+});
+
+test.describe('hero countdown before the set', () => {
+    test.use({ showTime: '2026-10-15T12:00:00-05:00' });
+
+    test('shows the countdown and next-show facts', async ({ page }) => {
+        await page.goto('/');
+        const next = page.locator('[data-next-show]');
+        await expect(next).toBeVisible();
+        await expect(page.locator('[data-countdown]')).toBeVisible();
+        await expect(page.locator('[data-countdown-clock]')).toBeVisible();
+        await expect(page.locator('[data-countdown-days]')).toHaveText('09');
+        await expect(page.locator('[data-next-show-block]')).toContainText('Rockin’ October');
+        await expect(page.locator('[data-next-show-block]')).toContainText('Studio 801');
+        await expect(page.locator('[data-next-show-block]')).toContainText('Los Amigo’s, Plano, TX');
+        await expect(page.locator('[data-next-show-block]')).toContainText('Doors open at 12 PM');
+        await expect(page.locator('[data-next-show-block]')).toContainText('All ages');
+        await expect(page.locator('#home a[href="http://rockinoctober.com"]')).toHaveText('Festival info');
+        await expect(page.locator('#home')).not.toContainText(/ticket/i);
+        await expect(page.locator('#home')).not.toContainText(/\bJeff\b/);
+        const box = await next.boundingBox();
+        expect(box.height).toBeGreaterThan(80);
+    });
+});
+
+test.describe('hero countdown after the set', () => {
+    test.use({ showTime: '2026-10-24T16:45:00-05:00' });
+
+    test('hides the countdown and next-show block without a leftover placeholder', async ({ page }) => {
+        await page.goto('/');
+        await expect(page.locator('[data-next-show]')).toBeHidden();
+        await expect(page.locator('[data-countdown]')).toBeHidden();
+        await expect(page.locator('[data-next-show-block]')).toBeHidden();
+        await expect(page.locator('#home a[href="#music"]')).toBeVisible();
+        await expect(page.locator('#home a[href="#video"]')).toBeVisible();
+        await expect(page.locator('#home')).not.toContainText('Shows coming soon');
+        expect(await page.locator('[data-next-show]').boundingBox()).toBeNull();
+        await expect(page.locator('[data-upcoming-empty]')).toBeVisible();
+        await expect(page.locator('[data-upcoming-empty]')).toContainText('No upcoming dates posted yet.');
+        await expect(page.locator('[data-past-shows]')).toContainText('Rockin’ October');
         await expect(page.locator('body')).not.toContainText(/ticket/i);
     });
 });

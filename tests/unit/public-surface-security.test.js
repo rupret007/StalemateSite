@@ -17,6 +17,7 @@ const PUBLIC_CLIENT_TEXT = [
     ...PUBLIC_HTML,
     'script.js',
     'show-state.js',
+    'countdown.js',
     'site-base.js',
     'styles.css'
 ];

@@ -15,6 +15,7 @@ const PUBLIC_COPY = [
     'embed-placeholder.html',
     'script.js',
     'show-state.js',
+    'countdown.js',
     'site-base.js',
     'epk/stage-plot.txt',
     'epk/tech-rider.txt',
@@ -43,13 +44,17 @@ describe('content boundaries', () => {
         expect(home).toContain('href="#follow">Follow');
         expect(home).toContain('href="#contact">Contact');
         expect(home).toContain('class="button button--listen"');
-        expect(home).toContain('[DATE/VENUE NEEDED]');
+        expect(home).toContain('2026-10-24T16:45:00-05:00');
+        expect(home).toContain('Rockin’ October');
+        expect(home).toContain('Los Amigo’s');
+        expect(home).toContain('http://rockinoctober.com');
+        expect(home).toContain('Festival info');
+        expect(home).not.toContain('[DATE/VENUE NEEDED]');
         expect(home).toContain('[MAILING LIST TOOL NEEDED]');
         expect(home).toContain('[MERCH NEEDED]');
         expect(home).not.toMatch(/A1\s*·/);
         expect(home).not.toMatch(/E4\s*·/);
         expect(home).not.toContain('[CITY NEEDED');
-        expect(readme).toContain('[DATE/VENUE NEEDED]');
         expect(readme).toContain('[MAILING LIST TOOL NEEDED]');
         expect(readme).toContain('[MERCH NEEDED]');
         expect(readme).toContain('[BOOKING EMAIL NEEDED]');

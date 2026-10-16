@@ -4,21 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stalemate | Punk rock originals</title>
-    <meta name="description" content="Stalemate plays punk rock originals. Hear Better Than Now and Manic, watch the studio cuts, and join the list. Not the SoCal pop-punk band of the same name.">
+    <meta name="description" content="Stalemate plays punk rock originals. Hear Better Than Now and Manic. Next: Rockin’ October, Saturday, Oct 24, 2026. Not the SoCal pop-punk band of the same name.">
     <meta name="theme-color" content="#171410">
     <link rel="canonical" href="https://rupret007.github.io/StalemateSite/">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Stalemate">
     <meta property="og:title" content="Stalemate | Punk rock originals">
-    <meta property="og:description" content="Better Than Now. Manic. Shows incoming. Punk rock originals — not the SoCal pop-punk band of the same name.">
+    <meta property="og:description" content="Better Than Now. Manic. Rockin’ October, Oct 24, 2026. Punk rock originals — not the SoCal pop-punk band of the same name.">
     <meta property="og:url" content="https://rupret007.github.io/StalemateSite/">
     <meta property="og:image" content="https://rupret007.github.io/StalemateSite/assets/og.svg">
     <meta property="og:image:type" content="image/svg+xml">
     <meta property="og:image:alt" content="Stalemate wordmark on a two-tone checkerboard">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Stalemate | Punk rock originals">
-    <meta name="twitter:description" content="Better Than Now, Manic, and shows incoming.">
+    <meta name="twitter:description" content="Better Than Now, Manic, and Rockin’ October on Oct 24, 2026.">
     <meta name="twitter:image" content="https://rupret007.github.io/StalemateSite/assets/og.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -75,6 +75,28 @@
                     <div class="button-row">
                         <a class="button button--listen" href="#music">Listen</a>
                         <a class="button button--hot" href="#video">Watch</a>
+                    </div>
+                    <div class="hero-next" data-next-show data-starts-at="2026-10-24T16:45:00-05:00">
+                        <div class="hero-countdown" data-countdown>
+                            <p class="countdown-kicker">Until the set</p>
+                            <p class="sr-only">Stalemate’s set is Saturday, Oct 24, 2026 at 4:45 PM Central.</p>
+                            <ol class="countdown-clock" data-countdown-clock hidden>
+                                <li><span data-countdown-days>00</span><small>Days</small></li>
+                                <li><span data-countdown-hours>00</span><small>Hrs</small></li>
+                                <li><span data-countdown-minutes>00</span><small>Min</small></li>
+                                <li><span data-countdown-seconds>00</span><small>Sec</small></li>
+                            </ol>
+                            <p class="countdown-fallback" data-countdown-fallback>Saturday, Oct 24, 2026 · 4:45 PM Central</p>
+                        </div>
+                        <aside class="next-show-block panel" data-next-show-block>
+                            <p class="board-square">Next</p>
+                            <p class="next-show-event">Rockin’ October</p>
+                            <p>Studio 801 &amp; The Local Show with Chaz</p>
+                            <p><time datetime="2026-10-24T16:45:00-05:00">Saturday, Oct 24, 2026 · 4:45 PM Central</time></p>
+                            <p>Los Amigo’s, Plano, TX</p>
+                            <p>Doors open at 12 PM. All ages (under 18 with a parent or guardian).</p>
+                            <a class="button button--ghost" href="http://rockinoctober.com" target="_blank" rel="noopener noreferrer">Festival info</a>
+                        </aside>
                     </div>
                 </div>
             </div>
@@ -136,10 +158,14 @@
                 <h3 class="board-square">Upcoming</h3>
                 <p data-upcoming-empty hidden>No upcoming dates posted yet.</p>
                 <div class="show-list" data-upcoming-shows>
-                    <article class="panel show-card" data-show data-placeholder="true">
-                        <p class="sr-only">[DATE/VENUE NEEDED]</p>
-                        <p class="show-when">Shows coming soon</p>
-                        <p>The room and the night post together. No guessed booking.</p>
+                    <article class="panel show-card" data-show data-starts-at="2026-10-24T16:45:00-05:00">
+                        <h3>Rockin’ October</h3>
+                        <p class="show-when"><time datetime="2026-10-24T16:45:00-05:00">Saturday, Oct 24, 2026 · 4:45 PM Central</time></p>
+                        <p>Studio 801 &amp; The Local Show with Chaz</p>
+                        <p>Los Amigo’s, Plano, TX. Doors open at 12 PM. All ages (under 18 with a parent or guardian).</p>
+                        <p class="show-actions">
+                            <a class="button button--ghost" data-show-live-action href="http://rockinoctober.com" target="_blank" rel="noopener noreferrer">Festival info</a>
+                        </p>
                     </article>
                 </div>
                 <h3 class="board-square">Past</h3>
@@ -267,6 +293,7 @@
     </footer>
     <script src="site-base.js" defer></script>
     <script src="show-state.js" defer></script>
+    <script src="countdown.js" defer></script>
     <script src="script.js" defer></script>
 </body>
 </html>

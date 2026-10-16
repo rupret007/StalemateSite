@@ -17,6 +17,7 @@ describe('GitHub Pages package', () => {
         expect(script).toContain('qr/index.html');
         expect(script).toContain('epk/index.html');
         expect(script).toContain('.nojekyll');
+        expect(script).toContain('countdown.js');
         expect(script).toContain('assets/hero-stage.svg');
         expect(script).not.toContain('node_modules');
         expect(script).not.toContain('tests/');

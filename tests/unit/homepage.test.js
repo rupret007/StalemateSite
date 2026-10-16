@@ -10,6 +10,7 @@ const scriptPath = path.join(repoRoot, 'script.js');
 const rawHtml = fs.readFileSync(htmlPath, 'utf8')
     .replace(/<script\b[^>]*\bsrc=["']script\.js["'][^>]*><\/script>/i, '')
     .replace(/<script\b[^>]*\bsrc=["']show-state\.js["'][^>]*><\/script>/i, '')
+    .replace(/<script\b[^>]*\bsrc=["']countdown\.js["'][^>]*><\/script>/i, '')
     .replace(/<script\b[^>]*\bsrc=["']site-base\.js["'][^>]*><\/script>/i, '');
 const scriptSource = fs.readFileSync(scriptPath, 'utf8');
 const siteBaseSource = fs.readFileSync(path.join(repoRoot, 'site-base.js'), 'utf8');

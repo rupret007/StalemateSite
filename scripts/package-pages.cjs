@@ -11,6 +11,7 @@ const FILES = [
     '404.html',
     'embed-placeholder.html',
     'index.html',
+    'countdown.js',
     'script.js',
     'show-state.js',
     'site-base.js',

@@ -4,8 +4,8 @@ test('QR is a flyer landing with shows, listen and follow', async ({ page }) => 
     await page.goto('/qr/');
     await expect(page).toHaveTitle(/Stalemate/);
     await expect(page.locator('h1')).toHaveCount(1);
-    await expect(page.locator('#shows')).toContainText('[DATE/VENUE NEEDED]');
-    await expect(page.locator('#shows')).toContainText('Shows coming soon');
+    await expect(page.locator('#shows')).toContainText('Rockin’ October');
+    await expect(page.locator('#shows')).toContainText('Los Amigo’s');
     await expect(page.locator('#listen')).toContainText('Better Than Now');
     await expect(page.locator('#listen')).toContainText('Manic');
     await expect(page.locator('#follow')).toContainText('[HANDLE NEEDED]');
@@ -33,7 +33,7 @@ test.describe('QR without JavaScript', () => {
     test.use({ javaScriptEnabled: false });
     test('keeps shows and listen destinations without loading previews', async ({ page }) => {
         await page.goto('/qr/');
-        await expect(page.locator('#shows')).toContainText('Shows coming soon');
+        await expect(page.locator('#shows')).toContainText('Rockin’ October');
         await expect(page.locator('#listen')).toContainText('Better Than Now');
         await expect(page.locator('[data-load-preview]:not([hidden])')).toHaveCount(0);
         await expect(page.locator('iframe')).toHaveCount(0);

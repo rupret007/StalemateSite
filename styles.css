@@ -450,6 +450,96 @@ textarea:focus-visible {
     font-size: 1.1rem;
 }
 
+.hero-next {
+    display: grid;
+    gap: 1.15rem;
+    margin-top: 1.75rem;
+    max-width: 28rem;
+}
+
+.hero-countdown {
+    padding: 1rem 1rem 1.05rem;
+    border: 1px solid var(--line-strong);
+    background: var(--ink);
+}
+
+.countdown-kicker {
+    margin: 0 0 0.65rem;
+    color: var(--lime);
+    font-family: var(--display);
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}
+
+.countdown-clock {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.countdown-clock li {
+    display: grid;
+    justify-items: center;
+    gap: 0.15rem;
+    min-width: 0;
+    padding: 0.35rem 0.15rem 0.4rem;
+    background: var(--surface);
+}
+
+.countdown-clock span {
+    color: var(--cream);
+    font-family: var(--display);
+    font-size: clamp(1.55rem, 7vw, 2.35rem);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0.04em;
+}
+
+.countdown-clock small {
+    color: var(--muted);
+    font-family: var(--display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.countdown-fallback {
+    margin: 0.65rem 0 0;
+    color: var(--muted);
+    font-size: 0.95rem;
+}
+
+.next-show-block {
+    margin: 0;
+}
+
+.panel.next-show-block .next-show-event {
+    margin: 0 0 0.45rem;
+    color: var(--cream);
+    font-family: var(--display);
+    font-size: clamp(1.7rem, 5vw, 2.15rem);
+    font-weight: 700;
+    line-height: 0.95;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    overflow-wrap: break-word;
+}
+
+.panel.next-show-block time {
+    color: var(--cream);
+    font-family: var(--display);
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
 .hero-board {
     position: absolute;
     z-index: 1;
