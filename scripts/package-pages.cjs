@@ -16,6 +16,8 @@ const FILES = [
     'site-base.js',
     'styles.css',
     'assets/favicon.svg',
+    'assets/games/turdanoid.webp',
+    'assets/games/turdomania.webp',
     'assets/icon-facebook.svg',
     'assets/icon-instagram.svg',
     'assets/icon-youtube.svg',
