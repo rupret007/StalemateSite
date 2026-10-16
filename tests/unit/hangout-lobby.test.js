@@ -563,6 +563,60 @@ describe('auto-lockdown when no band op for 24h', () => {
         expect(L._debug.net.lock).toBe('off'); // well-formed state is respected
         expect(L.adminState().stats.reports.made).toBe(1);
     });
+    it('fails closed on malformed lastBand, kicks, shield and reportsToHide', () => {
+        const base = { lock: 'off', bans: [], budget: { day: '', requests: 0 } };
+        for (const extra of [{ kicks: 'x' }, { kicks: { 'dev-a': 'soon' } }, { shield: 'yes' }, { shieldAuto: 1 }, { reportsToHide: 0 }, { reportsToHide: 'three' }, { reportsToHide: 2.5 }, { reportsToHide: 999 }]) {
+            boot();
+            expect(() => L.restore({ ...base, ...extra }), JSON.stringify(extra)).not.toThrow();
+            expect(L._debug.net.lock, JSON.stringify(extra)).toBe('readonly');
+            expect(() => L.tick()).not.toThrow();
+            const f = join('Fan'); const p = join('Pal');
+            say(f, 'hi');
+            expect(lines(p)).not.toContain('hi');
+        }
+        boot(); L.restore({ ...base, shield: 'yes' });
+        expect(L._debug.net.shield).toBe(true);
+        boot(); L.restore({ ...base, reportsToHide: -4 });
+        expect(L._debug.net.reportsToHide).toBe(3);
+        boot(); L.restore({ ...base, kicks: { 'dev-Troll': clock + 60000, bad: null } });
+        expect(L._debug.net.kicks).toEqual({ 'dev-Troll': clock + 60000 });
+        expect(join('Troll').refused.reason).toBe('kicked');
+        for (const lastBand of ['yesterday', -1, Number.NaN, clock + 365 * 24 * 60 * 60 * 1000, null]) {
+            boot();
+            L.restore({ ...base, lastBand });
+            expect(L._debug.net.lastBand, String(lastBand)).toBe(0); // treated as stale
+            L.tick();
+            expect(L._debug.net.shield).toBe(true); // auto-lockdown fires
+            expect(L._debug.net.lock).toBe('readonly');
+        }
+        boot(); L.restore({ ...base, lastBand: clock - 1000, shield: false, kicks: {}, reportsToHide: 5 });
+        L.tick();
+        expect(L._debug.net.lock).toBe('off'); // well-formed state is respected
+        expect(L._debug.net.shield).toBe(false);
+        expect(L._debug.net.reportsToHide).toBe(5);
+    });
+    it('caps filter lists and stored bans', () => {
+        const base = { lock: 'off', budget: { day: '', requests: 0 } };
+        const words = Array.from({ length: 2500 }, (_, i) => `w${i}`);
+        boot();
+        L.restore({ ...base, bans: [], lists: { block: words, hold: words, allow: words } });
+        for (const k of ['block', 'hold', 'allow']) expect(L._debug.net.lists[k].length).toBe(2000);
+        expect(L._debug.net.lock).toBe('readonly');
+        const bans = Array.from({ length: 6000 }, (_, i) => ({ mask: `dev:d${i}`, reason: 'x', by: 'B', at: i }));
+        boot();
+        L.restore({ ...base, bans });
+        expect(L._debug.net.bans.length).toBe(5000);
+        expect(L._debug.net.bans.at(-1).mask).toBe('dev:d5999'); // newest kept
+        expect(L._debug.net.lock).toBe('readonly');
+        boot();
+        L.restore({ ...base, bans: [], lists: { block: words.slice(0, 2000), hold: [], allow: [] } });
+        expect(L._debug.net.lock).toBe('off'); // exactly at the cap is fine
+        const band = join('Drummer', { role: 'band' });
+        cmd(band, 'filter', ['block', 'onemore']);
+        expect(L._debug.net.lists.block.length).toBe(2000);
+        expect(L._debug.net.lists.block).not.toContain('onemore');
+        expect(notices(band)).toMatch(/list is full/);
+    });
     it('fails closed: empty or wiped storage restores read-only until a band op unlocks', () => {
         for (const wiped of [{}, undefined, { bans: [] }, { lock: 'bogus' }]) {
             boot();

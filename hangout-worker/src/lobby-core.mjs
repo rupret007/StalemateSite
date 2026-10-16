@@ -27,6 +27,8 @@ export const LOBBY_LIMITS = Object.freeze({
     kickCooldown: 10 * MIN,
     ipBan: DAY,
     reportsToHide: 3,
+    listMax: 2000,                    // words per filter list
+    banMax: 5000,                     // stored bans
     reportsCamOff: 2,
     pmMinLobbyMs: 2 * MIN,
     pmPendingMax: 5,
@@ -613,7 +615,10 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             const word = lc(normalize(words.join(' '), 40));
             if (!['block', 'hold', 'allow', 'del'].includes(lc(list)) || !word) return bot(c, `Filter lists: block=${net.lists.block.length} hold=${net.lists.hold.length} allow=${net.lists.allow.length}. /filter block|hold|allow|del word`);
             for (const k of ['block', 'hold', 'allow']) net.lists[k] = net.lists[k].filter((w) => w !== word);
-            if (lc(list) !== 'del') net.lists[lc(list)].push(word);
+            if (lc(list) !== 'del') {
+                if (net.lists[lc(list)].length >= L.listMax) return bot(c, `The ${lc(list)} list is full (${L.listMax}). /filter del a word first.`, 'error');
+                net.lists[lc(list)].push(word);
+            }
             log(c.nick, `filter-${lc(list)}`, word);
             return saveNet();
         },
@@ -898,10 +903,25 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             const list = Array.isArray(s.bans) ? s.bans : [];
             const good = list.filter(okBan);
             if (!Array.isArray(s.bans) || good.length !== list.length) { s.lock = 'readonly'; s.lockAuto = true; }
-            s.bans = good;
+            // Over the cap: keep the newest, and lock read-only since some bans were dropped.
+            if (good.length > L.banMax) { s.lock = 'readonly'; s.lockAuto = true; }
+            s.bans = good.slice(-L.banMax);
         }
         const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
         const failClosed = () => { s.lock = 'readonly'; s.lockAuto = true; };
+        // Kicks: dev -> until (number), same rule as mutes.
+        if (s.kicks !== undefined) {
+            const src = s.kicks && typeof s.kicks === 'object' && !Array.isArray(s.kicks) ? s.kicks : {};
+            const good = Object.fromEntries(Object.entries(src).filter(([, v]) => Number.isFinite(v)));
+            if (src !== s.kicks || Object.keys(good).length !== Object.keys(src).length) failClosed();
+            s.kicks = good;
+        }
+        // Shield / auto flags must be booleans; anything else raises the shield.
+        for (const k of ['shield', 'shieldAuto', 'lockAuto']) if (s[k] !== undefined && typeof s[k] !== 'boolean') { failClosed(); s.shield = true; if (k !== 'shield') s[k] = true; }
+        // lastBand: malformed = stale, so the 24h auto-lockdown fires on the next tick.
+        if (s.lastBand !== undefined && !(Number.isFinite(s.lastBand) && s.lastBand >= 0 && s.lastBand <= now() + MIN)) { s.lastBand = 0; failClosed(); }
+        // reportsToHide: integer 1..20, else the default (and read-only for a band look).
+        if (s.reportsToHide !== undefined && !(Number.isInteger(s.reportsToHide) && s.reportsToHide >= 1 && s.reportsToHide <= 20)) { s.reportsToHide = L.reportsToHide; failClosed(); }
         // Mutes: dev -> until (number). Drop bad entries; any loss locks read-only.
         if (s.mutes !== undefined) {
             const src = isObj(s.mutes) ? s.mutes : {};
@@ -918,8 +938,8 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
                 if (src[k] === undefined) continue;
                 if (!Array.isArray(src[k])) { bad = true; continue; }
                 const words = src[k].filter((w) => typeof w === 'string' && w.length > 0 && w.length <= 40);
-                if (words.length !== src[k].length) bad = true;
-                out[k] = words;
+                if (words.length !== src[k].length || words.length > L.listMax) bad = true;
+                out[k] = words.slice(0, L.listMax);
             }
             if (bad) failClosed();
             s.lists = out;
