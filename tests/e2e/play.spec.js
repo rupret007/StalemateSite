@@ -106,10 +106,22 @@ test('homepage Games card and nav link go to /play/, which stays noindex and out
     await expect(games.locator('.games-card__thumb')).toBeVisible();
     const play = games.getByRole('link', { name: 'Play Turdanoid' });
     await expect(play).toHaveAttribute('href', 'play/');
+    await expect(games.getByRole('heading', { level: 2 })).toHaveText('Seven free arcade games. Zero dignity.');
+    await expect(games.getByRole('link', { name: 'All seven games' })).toHaveAttribute('href', 'play/hub.html');
+    for (const img of await games.locator('.games-shot img').all()) {
+        await img.scrollIntoViewIfNeeded();
+        await expect(img).toBeVisible();
+        await expect.poll(() => img.evaluate((i) => i.complete && i.naturalWidth)).toBe(480);
+        await expect(img).toHaveAttribute('loading', 'lazy');
+        expect(await img.evaluate((i) => i.complete && i.naturalWidth)).toBe(480);
+    }
     const box = await games.locator('.games-card').boundingBox();
-    expect(box.height).toBeLessThan(420);
-    expect(await page.locator('main > section').evaluateAll((s) => s.map((e) => e.id))).toEqual(['home', 'listen', 'about', 'games']);
-    await expect(page.locator('a[href*="play"]')).toHaveCount(1);
+    expect(box.height).toBeLessThan((page.viewportSize().width <= 760) ? 700 : 480);
+    // Countdown, show and Manic hero stay first; Games follows, then Listen and the band.
+    expect(await page.locator('main > section').evaluateAll((s) => s.map((e) => e.id))).toEqual(['home', 'games', 'listen', 'about']);
+    expect(await page.locator('a[href*="play"]').evaluateAll((a) => a.map((e) => e.getAttribute('href')))).toEqual(['play/', 'play/hub.html', 'play/', 'play/turdomania.html']);
+    await expect(page.locator('#home a[href="#games"]')).toHaveCount(0);
+    await expect(page.locator('#listen .listen-games-link a')).toHaveAttribute('href', '#games');
     const pkg = fs.readFileSync(path.join(ROOT, 'scripts/package-pages.cjs'), 'utf8');
     expect(pkg).not.toMatch(/play\//);
     for (const f of fs.readdirSync(path.join(ROOT, 'play')).filter((n) => n.endsWith('.html'))) {
@@ -142,6 +154,7 @@ test('game over offers Listen to Manic, the Oct 24 show and Share score next to 
     const extra = end.locator('.stalemate-end');
     await expect(extra.getByRole('link', { name: 'Listen to Manic' })).toHaveAttribute('href', '../#home');
     await expect(extra).toContainText('Oct 24');
+    await expect(extra.getByRole('link', { name: 'Come see us live, Oct 24' })).toHaveAttribute('href', 'https://rockinoctober.com');
     const share = extra.getByRole('button', { name: 'Share score' });
     await expect(share).toBeVisible();
     const h = await share.boundingBox();

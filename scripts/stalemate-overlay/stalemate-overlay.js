@@ -117,8 +117,12 @@
   box.innerHTML =
     '<a class="stalemate-end__listen" href="../#home">Listen to Manic</a>' +
     '<button type="button" class="stalemate-end__share" id="stalemateShare">Share score</button>' +
-    (Date.now() < SHOW_END ? '<p class="stalemate-end__show">See Stalemate live: Sat, Oct 24, 4:45 PM, Los Amigo’s, Plano</p>' : '');
+    (Date.now() < SHOW_END ? '<p class="stalemate-end__show">See Stalemate live: Sat, Oct 24, 4:45 PM, Los Amigo’s, Plano · <a class="stalemate-end__showlink" href="https://rockinoctober.com" target="_blank" rel="noopener noreferrer">Come see us live, Oct 24</a></p>' : '');
   restart.insertAdjacentElement('afterend', box);
+  var showLink = box.querySelector('.stalemate-end__showlink');
+  if (showLink) showLink.addEventListener('click', function () {
+    if (typeof window.smTrack === 'function') window.smTrack('gameover-turdanoid-show');
+  });
   var shareBtn = box.querySelector('#stalemateShare');
   var file = null;
   function score() {

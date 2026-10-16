@@ -20,6 +20,11 @@ test('listen section loads Apple Music players only on tap', async ({ page }) =>
     for (const href of spotifyHrefs) expect(ALLOWED_SPOTIFY.has(href), href).toBe(true);
     await expect(section.locator(`a[href="${SPOTIFY_ARTIST}"]`)).toBeVisible();
 
+    const gamesLink = section.locator('.listen-games-link a');
+    await expect(gamesLink).toHaveAttribute('href', '#games');
+    expect(tapHeight(await gamesLink.boundingBox())).toBeGreaterThanOrEqual(44);
+
+
     const rows = section.locator('[data-listen-track]');
     await expect(rows).toHaveCount(TRACKS.length);
     for (const [index, [title, href, spotifyId]] of TRACKS.entries()) {
