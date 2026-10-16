@@ -14,11 +14,14 @@ describe('GitHub Pages package', () => {
         const script = readFileSync(join(repoRoot, 'scripts/package-pages.cjs'), 'utf8');
         expect(script).toContain('index.html');
         expect(script).toContain('404.html');
-        expect(script).not.toContain('qr/index.html');
+        expect(script).toContain("'qr', 'tap'");
         expect(script).not.toContain('epk/index.html');
         expect(script).not.toContain('embed-placeholder.html');
         expect(script).toContain('.nojekyll');
         expect(script).toContain('countdown.js');
+        expect(script).toContain('js/count.js');
+        expect(script).toContain('js/track.js');
+        expect(script).toContain('js/site-track.js');
         expect(script).toContain('assets/hero-stage.svg');
         expect(script).toContain('assets/manic.mp4');
         expect(script).toContain('assets/og.png');
@@ -40,7 +43,8 @@ describe('GitHub Pages package', () => {
         expect(readFileSync(join(repoRoot, 'dist/index.html'), 'utf8')).toContain('Stalemate');
         expect(readFileSync(join(repoRoot, 'dist/.nojekyll'), 'utf8')).toBeDefined();
         expect(existsSync(join(repoRoot, 'dist/epk'))).toBe(false);
-        expect(existsSync(join(repoRoot, 'dist/qr'))).toBe(false);
+        expect(readFileSync(join(repoRoot, 'dist/qr/index.html'), 'utf8')).toContain('play/stalemate/manic.m4a');
+        expect(readFileSync(join(repoRoot, 'dist/tap/index.html'), 'utf8')).toContain('../qr/');
         expect(existsSync(join(repoRoot, 'dist/embed-placeholder.html'))).toBe(false);
         rmSync(join(repoRoot, 'dist'), { recursive: true, force: true });
         expect(mkdtempSync(join(tmpdir(), 'stalemate-'))).toBeTruthy();

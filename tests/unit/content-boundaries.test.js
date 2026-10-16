@@ -11,6 +11,8 @@ const repoRoot = join(fileURLToPath(new URL('../..', import.meta.url)));
 const PUBLIC_COPY = [
     'index.html',
     '404.html',
+    'qr/index.html',
+    'tap/index.html',
     'script.js',
     'show-state.js',
     'countdown.js',
@@ -88,9 +90,9 @@ describe('content boundaries', () => {
         }
     });
 
-    it('does not publish press, EPK, or QR pages', async () => {
+    it('does not publish press or EPK pages (the QR keychain landing is intentional)', async () => {
         const { access } = await import('node:fs/promises');
-        for (const relativePath of ['epk/index.html', 'qr/index.html', 'embed-placeholder.html']) {
+        for (const relativePath of ['epk/index.html', 'embed-placeholder.html']) {
             await expect(access(join(repoRoot, relativePath))).rejects.toMatchObject({ code: 'ENOENT' });
         }
     });

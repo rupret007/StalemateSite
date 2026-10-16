@@ -7,18 +7,33 @@ import { describe, expect, it } from 'vitest';
 
 const dir = join(fileURLToPath(new URL('../..', import.meta.url)), 'play');
 const pages = readdirSync(dir).filter((f) => f.endsWith('.html'));
+const ALLOWED_EXTERNAL = 'https://stalemate.goatcounter.com';
+
+function assertPlayCsp(policy) {
+  expect(policy).toContain("default-src 'self'");
+  expect(policy).toContain("object-src 'none'");
+  expect(policy).toMatch(/script-src 'self' 'unsafe-inline'/);
+  const scriptSrc = policy.match(/script-src ([^;]+)/)[1];
+  expect(scriptSrc.trim()).toBe("'self' 'unsafe-inline'");
+  const external = [...policy.matchAll(/https:\/\/[^\s;]+/g)].map((m) => m[0]);
+  for (const origin of external) {
+    expect(origin).toBe(ALLOWED_EXTERNAL);
+  }
+  expect(policy).toContain(`connect-src 'self' ${ALLOWED_EXTERNAL}`);
+  expect(policy).toContain(`img-src 'self' data: blob: ${ALLOWED_EXTERNAL}`);
+  expect(policy).not.toMatch(/http:/);
+  expect(policy).not.toMatch(/\*/);
+}
 
 describe('vendored /play/ copy', () => {
   it('has pages to check', () => expect(pages.length).toBeGreaterThanOrEqual(9));
   for (const f of pages) {
     const html = readFileSync(join(dir, f), 'utf8');
-    it(`${f} is noindex with exactly one robots meta and a same-origin CSP`, () => {
+    it(`${f} is noindex with exactly one robots meta and a strict CSP allowlist`, () => {
       expect(html.match(/<meta name="robots"/g)).toHaveLength(1);
       const csp = html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/);
       expect(csp).not.toBeNull();
-      expect(csp[1]).toContain("default-src 'self'");
-      expect(csp[1]).toContain("object-src 'none'");
-      expect(csp[1]).not.toMatch(/https?:|\*/);
+      assertPlayCsp(csp[1]);
     });
   }
   it('hub ships without the upstream Latest Changelog dev notes', () => {

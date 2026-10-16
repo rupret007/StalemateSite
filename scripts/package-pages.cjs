@@ -15,6 +15,9 @@ const FILES = [
     'script.js',
     'show-state.js',
     'site-base.js',
+    'js/count.js',
+    'js/track.js',
+    'js/site-track.js',
     'styles.css',
     'assets/favicon.svg',
     'assets/icon-facebook.svg',
@@ -42,7 +45,7 @@ function copyFile(relativePath) {
     fs.copyFileSync(from, to);
 }
 
-const DIRS = ['play', 'r'];
+const DIRS = ['play', 'qr', 'tap', 'r'];
 
 emptyDir(DIST);
 for (const relativePath of FILES) {
