@@ -900,6 +900,39 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             if (!Array.isArray(s.bans) || good.length !== list.length) { s.lock = 'readonly'; s.lockAuto = true; }
             s.bans = good;
         }
+        const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+        const failClosed = () => { s.lock = 'readonly'; s.lockAuto = true; };
+        // Mutes: dev -> until (number). Drop bad entries; any loss locks read-only.
+        if (s.mutes !== undefined) {
+            const src = isObj(s.mutes) ? s.mutes : {};
+            const good = Object.fromEntries(Object.entries(src).filter(([, v]) => Number.isFinite(v)));
+            if (!isObj(s.mutes) || Object.keys(good).length !== Object.keys(src).length) failClosed();
+            s.mutes = good;
+        }
+        // Filter lists: block/hold/allow arrays of strings. A lost block word must not quietly reopen it.
+        if (s.lists !== undefined) {
+            const src = isObj(s.lists) ? s.lists : {};
+            const out = defaultLists();
+            let bad = !isObj(s.lists);
+            for (const k of ['block', 'hold', 'allow']) {
+                if (src[k] === undefined) continue;
+                if (!Array.isArray(src[k])) { bad = true; continue; }
+                const words = src[k].filter((w) => typeof w === 'string' && w.length > 0 && w.length <= 40);
+                if (words.length !== src[k].length) bad = true;
+                out[k] = words;
+            }
+            if (bad) failClosed();
+            s.lists = out;
+        }
+        // Stats: shape-check; malformed -> fresh stats (and read-only so a band op takes a look).
+        if (s.stats !== undefined) {
+            const nums = (o) => isObj(o) && Object.values(o).every(Number.isFinite);
+            const st = s.stats;
+            const ok = isObj(st) && isObj(st.hours) && Object.values(st.hours).every((h) => isObj(h) && ['joins', 'peak', 'lines'].every((k) => Number.isFinite(h[k])))
+                && nums(st.kinds) && nums(st.rooms) && nums(st.mod)
+                && isObj(st.reports) && ['made', 'autoHidden', 'dismissed', 'actioned'].every((k) => Number.isFinite(st.reports[k]));
+            if (!ok) { s.stats = { hours: {}, kinds: {}, rooms: {}, mod: {}, reports: { made: 0, autoHidden: 0, dismissed: 0, actioned: 0 } }; failClosed(); }
+        }
         // Budget: malformed counts as spent for today (fans read-only/closed) rather than a fresh free day.
         if (s.budget !== undefined) {
             const b = s.budget;
