@@ -12,11 +12,11 @@ const dests = [
 async function main() {
     const browser = await chromium.launch({ headless: true });
     const shots = [
-        { name: 'after_desktop_home.png', url: 'http://127.0.0.1:4320/', width: 1440, height: 900 },
-        { name: 'after_mobile_home.png', url: 'http://127.0.0.1:4320/', width: 390, height: 844 },
-        { name: 'after_desktop_qr.png', url: 'http://127.0.0.1:4320/qr/', width: 1440, height: 900 },
-        { name: 'after_mobile_epk.png', url: 'http://127.0.0.1:4320/epk/', width: 390, height: 844 },
-        { name: 'after_desktop_404.png', url: 'http://127.0.0.1:4320/missing', width: 1440, height: 900 }
+        { name: process.env.SHOT_PREFIX ? `${process.env.SHOT_PREFIX}_desktop_home.png` : 'after_desktop_home.png', url: 'http://127.0.0.1:4320/', width: 1440, height: 900 },
+        { name: process.env.SHOT_PREFIX ? `${process.env.SHOT_PREFIX}_mobile_home.png` : 'after_mobile_home.png', url: 'http://127.0.0.1:4320/', width: 390, height: 844 },
+        { name: process.env.SHOT_PREFIX ? `${process.env.SHOT_PREFIX}_desktop_qr.png` : 'after_desktop_qr.png', url: 'http://127.0.0.1:4320/qr/', width: 1440, height: 900 },
+        { name: process.env.SHOT_PREFIX ? `${process.env.SHOT_PREFIX}_mobile_epk.png` : 'after_mobile_epk.png', url: 'http://127.0.0.1:4320/epk/', width: 390, height: 844 },
+        { name: process.env.SHOT_PREFIX ? `${process.env.SHOT_PREFIX}_desktop_404.png` : 'after_desktop_404.png', url: 'http://127.0.0.1:4320/missing', width: 1440, height: 900 }
     ];
 
     for (const shot of shots) {

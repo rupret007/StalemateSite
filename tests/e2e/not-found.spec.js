@@ -4,7 +4,7 @@ test('unknown paths render the 404 page with a way home', async ({ page }) => {
     const response = await page.goto('/this-square-is-empty');
     expect(response.status()).toBe(404);
     await expect(page).toHaveTitle(/Page not found/);
-    await expect(page.locator('h1')).toContainText('That square is empty');
+    await expect(page.locator('h1')).toContainText('This page is not on the set');
     await expect(page.locator('#shows-link')).toHaveAttribute('href', './#shows');
     await expect(page.locator('#music-link')).toHaveAttribute('href', './#music');
 });
@@ -12,7 +12,7 @@ test('unknown paths render the 404 page with a way home', async ({ page }) => {
 test('404 under the GitHub Pages prefix still loads styles from the project root', async ({ page }) => {
     const response = await page.goto('/StalemateSite/missing/nested');
     expect(response.status()).toBe(404);
-    await expect(page.locator('h1')).toContainText('That square is empty');
+    await expect(page.locator('h1')).toContainText('This page is not on the set');
     const baseHref = await page.locator('base').getAttribute('href');
     expect(baseHref).toBe('/StalemateSite/');
     await expect(page.locator('link[rel="stylesheet"][href="styles.css"]')).toHaveCount(1);

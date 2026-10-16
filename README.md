@@ -7,16 +7,16 @@ This is **not** the Southern California pop-punk band of the same name. Do not l
 
 ## Public surfaces
 
-- `/` — off-centre hero, Get tickets + Listen, music, upcoming/past shows, video, members, mailing list, merch placeholder
+- `/` — full-bleed stage hero, Get tickets + Listen, music, upcoming/past shows, video, members, mailing list, merch placeholder
 - `/qr/` — printed-flyer landing (next show, listen, follow)
 - `/epk/` — press kit (short + long bio, photos, music, video, interview, stage plot, rider, booking)
-- `404.html` — empty-square not-found page
+- `404.html` — not-on-the-set page
 
 Unknown facts are marked in `[BRACKETS]`. Ticket, stream, social and booking URLs stay blank until the band supplies them.
 
 ## Visual identity
 
-Rad Dad’s palette (`#171410` ink, `#f4f0e6` cream, `#009ee8` listen, `#ed2765` tickets, `#b5dc08` focus) on a **ska two-tone checkerboard**: belts, card frames and an 8×8 hero board. Chess-square labels (A1 Music, E4 Shows) stay. Layout is not Rad Dad’s festival collage.
+Rad Dad’s palette (`#171410` ink, `#f4f0e6` cream, `#009ee8` listen, `#ed2765` tickets, `#b5dc08` focus) with **restrained ska two-tone**: an 8px check under the header, one belt after the hero, and a small 8×8 mark — not card frames or wallpaper. Type is Barlow Condensed + Source Sans 3. Chess-square labels (A1 Music, E4 Shows) stay small. Layout is a signed-band grid, not Rad Dad’s festival collage.
 
 ## Local checks
 

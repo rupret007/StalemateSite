@@ -1,38 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="ogTitle">
-  <title id="ogTitle">Stalemate  Jeff, Che and Sean</title>
+  <title id="ogTitle">Stalemate — Jeff, Che and Sean</title>
   <rect width="1200" height="630" fill="#171410"/>
-  <rect width="1200" height="48" fill="#171410"/>
-  <g>
-    <rect width="48" height="48" fill="#171410"/>
-    <rect x="48" width="48" height="48" fill="#f4f0e6"/>
-    <rect x="96" width="48" height="48" fill="#171410"/>
-    <rect x="144" width="48" height="48" fill="#f4f0e6"/>
-    <rect x="192" width="48" height="48" fill="#171410"/>
-    <rect x="240" width="48" height="48" fill="#f4f0e6"/>
-    <rect x="288" width="48" height="48" fill="#171410"/>
-    <rect x="336" width="48" height="48" fill="#f4f0e6"/>
-    <rect x="384" width="48" height="48" fill="#171410"/>
-    <rect x="432" width="48" height="48" fill="#f4f0e6"/>
-    <rect x="480" width="48" height="48" fill="#171410"/>
-    <rect x="528" width="48" height="48" fill="#f4f0e6"/>
-    <rect x="576" width="48" height="48" fill="#171410"/>
-    <rect x="624" width="48" height="48" fill="#f4f0e6"/>
-    <rect x="672" width="48" height="48" fill="#171410"/>
-    <rect x="720" width="48" height="48" fill="#f4f0e6"/>
-    <rect x="768" width="48" height="48" fill="#171410"/>
-    <rect x="816" width="48" height="48" fill="#f4f0e6"/>
-    <rect x="864" width="48" height="48" fill="#171410"/>
-    <rect x="912" width="48" height="48" fill="#f4f0e6"/>
-    <rect x="960" width="48" height="48" fill="#171410"/>
-    <rect x="1008" width="48" height="48" fill="#f4f0e6"/>
-    <rect x="1056" width="48" height="48" fill="#171410"/>
-    <rect x="1104" width="48" height="48" fill="#f4f0e6"/>
-    <rect x="1152" width="48" height="48" fill="#171410"/>
-  </g>
-  <text x="72" y="280" fill="#f4f0e6" font-family="Impact, Arial Black, sans-serif" font-size="180">STALEMATE</text>
-  <text x="76" y="350" fill="#c9bba9" font-family="Arial, sans-serif" font-size="36">Jeff · Che · Sean · original songs</text>
-  <rect x="72" y="400" width="220" height="56" fill="#ed2765"/>
-  <text x="92" y="438" fill="#f4f0e6" font-family="Arial, sans-serif" font-size="28" font-weight="700">Get tickets</text>
-  <rect x="308" y="400" width="180" height="56" fill="#009ee8"/>
-  <text x="348" y="438" fill="#171410" font-family="Arial, sans-serif" font-size="28" font-weight="700">Listen</text>
+  <rect y="614" width="48" height="16" fill="#171410"/>
+  <rect x="48" y="614" width="48" height="16" fill="#f4f0e6"/>
+  <rect x="96" y="614" width="48" height="16" fill="#171410"/>
+  <rect x="144" y="614" width="48" height="16" fill="#f4f0e6"/>
+  <rect x="192" y="614" width="48" height="16" fill="#171410"/>
+  <rect x="240" y="614" width="48" height="16" fill="#f4f0e6"/>
+  <rect x="288" y="614" width="48" height="16" fill="#171410"/>
+  <rect x="336" y="614" width="48" height="16" fill="#f4f0e6"/>
+  <rect x="384" y="614" width="48" height="16" fill="#171410"/>
+  <rect x="432" y="614" width="48" height="16" fill="#f4f0e6"/>
+  <rect x="480" y="614" width="48" height="16" fill="#171410"/>
+  <rect x="528" y="614" width="48" height="16" fill="#f4f0e6"/>
+  <rect x="576" y="614" width="48" height="16" fill="#171410"/>
+  <rect x="624" y="614" width="48" height="16" fill="#f4f0e6"/>
+  <rect x="672" y="614" width="48" height="16" fill="#171410"/>
+  <rect x="720" y="614" width="48" height="16" fill="#f4f0e6"/>
+  <rect x="768" y="614" width="48" height="16" fill="#171410"/>
+  <rect x="816" y="614" width="48" height="16" fill="#f4f0e6"/>
+  <rect x="864" y="614" width="48" height="16" fill="#171410"/>
+  <rect x="912" y="614" width="48" height="16" fill="#f4f0e6"/>
+  <rect x="960" y="614" width="48" height="16" fill="#171410"/>
+  <rect x="1008" y="614" width="48" height="16" fill="#f4f0e6"/>
+  <rect x="1056" y="614" width="48" height="16" fill="#171410"/>
+  <rect x="1104" y="614" width="48" height="16" fill="#f4f0e6"/>
+  <rect x="1152" y="614" width="48" height="16" fill="#171410"/>
+  <text x="72" y="268" fill="#f4f0e6" font-family="Arial Narrow, Impact, sans-serif" font-size="132" font-weight="700" letter-spacing="6">STALEMATE</text>
+  <text x="76" y="328" fill="#c9bba9" font-family="Arial, sans-serif" font-size="28">Jeff · Che · Sean · Better Than Now · Manic</text>
+  <rect x="72" y="380" width="196" height="52" fill="#ed2765"/>
+  <text x="90" y="414" fill="#f4f0e6" font-family="Arial, sans-serif" font-size="22" font-weight="700">Get tickets</text>
+  <rect x="284" y="380" width="148" height="52" fill="#009ee8"/>
+  <text x="318" y="414" fill="#171410" font-family="Arial, sans-serif" font-size="22" font-weight="700">Listen</text>
 </svg>

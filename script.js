@@ -36,6 +36,13 @@
         window.addEventListener('resize', measureHeader, { passive: true });
         measureHeader();
 
+        if (window.matchMedia) {
+            document.documentElement.classList.toggle(
+                'motion-ok',
+                !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            );
+        }
+
         document.querySelectorAll('[data-load-preview]').forEach((button) => {
             const host = button.closest('[data-embed]') || button.parentElement;
             const template = host?.querySelector('template[data-preview-template]');

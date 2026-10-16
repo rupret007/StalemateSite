@@ -16,6 +16,7 @@ const FILES = [
     'site-base.js',
     'styles.css',
     'assets/favicon.svg',
+    'assets/hero-stage.svg',
     'assets/mark.svg',
     'assets/og.svg',
     'assets/member-che.svg',

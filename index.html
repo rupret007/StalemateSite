@@ -22,7 +22,7 @@
     <meta name="twitter:image" content="https://rupret007.github.io/StalemateSite/assets/og.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&amp;family=IBM+Plex+Sans:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&amp;family=Source+Sans+3:wght@400;600;700&amp;display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <script type="application/ld+json">{
     "@context": "https://schema.org",
@@ -48,23 +48,30 @@
                 <img src="assets/mark.svg" alt="" class="brand__mark" id="logo" width="64" height="64">
                 <span class="brand__text"><strong>Stalemate</strong><small>Jeff · Che · Sean</small></span>
             </a>
-            <nav class="site-nav" aria-label="Primary navigation">
-                <a href="#music">Music</a>
-                <a href="#shows">Shows</a>
-                <a href="#video">Video</a>
-                <a href="#about">About</a>
-                <a href="#list">List</a>
-            </nav>
+            <div class="header-tools">
+                <nav class="site-nav" aria-label="Primary navigation">
+                    <a href="#music">Music</a>
+                    <a href="#shows">Shows</a>
+                    <a href="#video">Video</a>
+                    <a href="#about">About</a>
+                    <a href="#list">List</a>
+                </nav>
+                <a class="button button--tickets header-cta" href="#shows">Get tickets</a>
+            </div>
         </div>
     </header>
 
     <main id="main-content">
         <section class="hero" id="home" aria-labelledby="band-title">
+            <div class="hero__media" aria-hidden="true">
+                <img src="assets/hero-stage.svg" alt="">
+            </div>
             <div class="page-shell hero-grid">
                 <div class="hero__copy">
-                    <p class="board-square">H8 · Next move</p>
-                    <h1 id="band-title">Stalemate<span>Originals. Two-tone. No draw.</span></h1>
-                    <p class="hero__lede">Jeff, Che and Sean. Better Than Now and Manic, plus a ticketed show still being locked in. [CITY NEEDED — DFW unconfirmed]</p>
+                    <p class="board-square">A1 · Originals</p>
+                    <h1 id="band-title">Stalemate</h1>
+                    <p class="hero__tag">Jeff, Che and Sean</p>
+                    <p class="hero__lede">Better Than Now and Manic are the first originals. The next ticketed show is being dated. [CITY NEEDED — DFW unconfirmed]</p>
                     <div class="button-row">
                         <a class="button button--tickets" href="#shows">Get tickets</a>
                         <a class="button button--listen" href="#music">Listen</a>
@@ -72,8 +79,7 @@
                 </div>
                 <figure class="hero-board">
                     <div class="hero-board__face" aria-hidden="true"></div>
-                    <div class="hero-board__files" aria-hidden="true"><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span></div>
-                    <figcaption>Ska two-tone · A1–H8</figcaption>
+                    <figcaption>Two-tone</figcaption>
                 </figure>
             </div>
         </section>
@@ -85,13 +91,13 @@
                 <div class="section-heading">
                     <p class="board-square">A1 · Music</p>
                     <h2 id="music-title">The songs</h2>
-                    <p>Originals first. Stream links stay empty until the band publishes them. Previews load only after you tap.</p>
+                    <p>Two originals. Stream links stay empty until the band publishes them. Previews load only after you tap.</p>
                 </div>
                 <div class="chess-grid chess-grid--music">
                     <article class="panel" aria-labelledby="better-than-now-title">
                         <p class="placeholder-flag">[STREAM LINK NEEDED]</p>
                         <h3 id="better-than-now-title">Better Than Now</h3>
-                        <p>Original. No public store or streaming URL has been supplied for this band.</p>
+                        <p>The first named original. No public store or streaming URL has been supplied for this band.</p>
                         <div class="embed-host" data-embed>
                             <a class="button button--listen" href="#music">Listen when published</a>
                             <button class="button button--ghost" type="button" data-load-preview hidden>Load preview</button>
@@ -113,7 +119,7 @@
                     <article class="panel" aria-labelledby="manic-title">
                         <p class="placeholder-flag">[STREAM LINK NEEDED]</p>
                         <h3 id="manic-title">Manic</h3>
-                        <p>Original, with a lyric-video project still unpublished. Do not confuse this with another band’s catalog.</p>
+                        <p>The second original. A lyric-video cut exists in draft. This is not another band’s catalog.</p>
                         <div class="embed-host" data-embed>
                             <a class="button button--listen" href="#video">Watch the lyric video when published</a>
                             <button class="button button--ghost" type="button" data-load-preview hidden>Load preview</button>
@@ -136,8 +142,6 @@
             </div>
         </section>
 
-        <div class="ska-rule" aria-hidden="true"></div>
-
         <section class="content-section content-section--surface" id="shows" aria-labelledby="shows-title">
             <div class="page-shell">
                 <div class="section-heading">
@@ -151,7 +155,7 @@
                     <article class="panel show-card" data-show data-placeholder="true">
                         <p class="placeholder-flag">[DATE/VENUE/TICKET LINK NEEDED]</p>
                         <p class="show-when">Next ticketed show</p>
-                        <p>Date, venue, city, door time and age limit are not confirmed. Ticket and calendar files will land here — not a guessed booking.</p>
+                        <p>Date, venue, city, door time and age limit are not confirmed. Ticket and calendar files land here — not a guessed booking.</p>
                         <div class="show-actions">
                             <a class="button button--tickets" data-show-live-action href="#shows">Get tickets when posted</a>
                             <span data-show-live-action>Add to calendar [ICS NEEDED]</span>
@@ -164,14 +168,12 @@
             </div>
         </section>
 
-        <div class="ska-rule" aria-hidden="true"></div>
-
         <section class="content-section" id="video" aria-labelledby="video-title">
             <div class="page-shell">
                 <div class="section-heading">
                     <p class="board-square">C3 · Video</p>
                     <h2 id="video-title">Video</h2>
-                    <p>Nothing third-party loads until you ask. Empty frames stay local placeholders.</p>
+                    <p>The Manic lyric video and the 8 October studio interview. Nothing third-party loads until you ask.</p>
                 </div>
                 <div class="chess-grid">
                     <article class="panel" aria-labelledby="manic-video-title">
@@ -212,14 +214,12 @@
             </div>
         </section>
 
-        <div class="ska-rule" aria-hidden="true"></div>
-
         <section class="content-section content-section--surface" id="about" aria-labelledby="about-title">
             <div class="page-shell">
                 <div class="section-heading">
                     <p class="board-square">G6 · About</p>
                     <h2 id="about-title">The band</h2>
-                    <p>Three players. Roles marked where still unconfirmed. Photos are placeholders until the band sends frames.</p>
+                    <p>Three players. Roles marked where still unconfirmed. Photos wait on the band.</p>
                 </div>
                 <p>Stalemate writes original songs. Genre, hometown and the “sounds like” line are still [CONFIRM]. This is not the Southern California pop-punk band of the same name.</p>
                 <dl class="member-grid">
@@ -242,8 +242,6 @@
             </div>
         </section>
 
-        <div class="ska-rule" aria-hidden="true"></div>
-
         <section class="content-section" id="list" aria-labelledby="list-title">
             <div class="page-shell">
                 <div class="section-heading">
@@ -261,14 +259,12 @@
             </div>
         </section>
 
-        <div class="ska-rule" aria-hidden="true"></div>
-
         <section class="content-section content-section--surface" id="merch" aria-labelledby="merch-title">
             <div class="page-shell">
                 <div class="section-heading">
                     <p class="board-square">H8 · Merch</p>
                     <h2 id="merch-title">Merch</h2>
-                    <p>Nothing to sell until there is stock. This square stays empty on purpose.</p>
+                    <p>Nothing to sell until there is stock. This shelf stays empty on purpose.</p>
                 </div>
                 <div class="merch-shelf">
                     <p>Merch placeholder — no items, no fake store. [MERCH NEEDED]</p>
@@ -277,9 +273,12 @@
         </section>
     </main>
 
+    <div class="ska-rule" aria-hidden="true"></div>
+
     <footer class="site-footer">
         <div class="page-shell footer-layout">
-            <p><strong>Stalemate</strong> · Jeff · Che · Sean</p>
+            <p class="footer-brand">Stalemate</p>
+            <p>Jeff · Che · Sean</p>
             <p class="disambiguation">Not the SoCal pop-punk band on Head2Wall Records. This Stalemate is Jeff, Che and Sean [CONFIRM city]. We do not link the other act.</p>
             <nav aria-label="Footer navigation">
                 <a href="epk/">Press kit</a>
