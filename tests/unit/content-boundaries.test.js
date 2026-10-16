@@ -29,7 +29,8 @@ describe('content boundaries', () => {
         expect(home).toMatch(/punk rock/i);
         expect(home).toContain('Originals. Punk rock. Live.');
         expect(home).toContain('The songs are ours');
-        expect(home).toContain('Stalemate writes the songs');
+        expect(home).toContain('Original punk rock, played loud and a little sloppy.');
+        expect(home).not.toContain('Stalemate writes the songs');
         expect(home).toContain('Dallas-area punk rock');
         expect(home).not.toMatch(/Lewisville|Flower Mound/);
         expect((home.match(/Dallas-area/g) || []).length).toBe(1);

@@ -2,7 +2,7 @@ const { test, expect, tapHeight } = require('./fixtures');
 
 const TRACKS = [
     ['Andrea', 'https://music.apple.com/us/album/andrea/1718463871?i=1718463872', '6GBydFSUtZ7wZ7pSAvbytw'],
-    ['Over 18 (1997)', 'https://music.apple.com/us/album/over-18-1997/1718884118?i=1718884699', '5d7NzhgfZgFBvKiYa63xea'],
+    ['Over 18', 'https://music.apple.com/us/album/over-18-1997/1718884118?i=1718884699', '5d7NzhgfZgFBvKiYa63xea'],
     ['It’s Been Only 18', 'https://music.apple.com/us/album/its-been-only-18/1718464113?i=1718464114', '00i8GYyog0bCGJnhtqNJKo']
 ];
 const SPOTIFY_ARTIST = 'https://open.spotify.com/artist/5cZqYe3bDw3xcKIk4aPHNH';
