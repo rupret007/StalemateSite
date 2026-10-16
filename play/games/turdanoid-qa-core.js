@@ -3,25 +3,27 @@
   'use strict';
 
   const POWER_DISPLAY_NAMES = {
-    enlarge: 'Big paddle',
-    slow: 'Slow ball',
-    catch: 'Sticky catch',
-    multi: 'Multiball',
-    life: 'Extra life',
-    laser: 'Laser',
-    paper: 'Toilet paper',
-    shield: 'Shield',
-    fire: 'Fire ball',
-    bomb: 'Bomb',
-    plunger: 'Plunger magnet',
-    flush: 'Mega flush',
-    hotdog: 'Hot dog rockets',
-    ghost: 'Ghost ball',
-    skunk: 'Skunk cloud',
-    gold: 'Gold rush',
-    shrink: 'Shrink paddle',
-    speed: 'Speed up',
-    reverse: 'Reversed controls'
+    enlarge: 'Wide Load',
+    slow: 'Air Freshener',
+    catch: 'Plunger Catch',
+    multi: 'Mosh Pit',
+    life: 'Spare Roll',
+    laser: 'TP Cannon',
+    paper: 'Spitwad Spread',
+    shield: 'Seat Cover',
+    fire: 'Chili Fire',
+    bomb: 'Cherry Bomb',
+    plunger: 'Dookie Magnet',
+    warp: 'Flush Warp',
+    flush: 'Mega Wipe',
+    hotdog: 'Wiener Rockets',
+    chord: 'Power Chord',
+    ghost: 'Ghost Poo',
+    skunk: 'Skunk Cloud',
+    gold: 'Golden Throne',
+    shrink: 'Shrinkage',
+    speed: 'Bad Curry',
+    reverse: 'Backwash'
   };
 
   const POWER_TYPES = Object.keys(POWER_DISPLAY_NAMES);
