@@ -47,6 +47,17 @@ input{background:var(--ink);color:var(--cream);border:2px solid;border-color:var
 .modes{font:.85rem var(--mono);color:var(--muted);margin-right:auto}
 .jam,.activity{background:#1d2a10;border-left:6px solid var(--lime);padding:8px 12px;font-size:.95rem}
 .jam p,.activity p{margin:0 0 8px}
+.act-stage{display:grid;gap:8px}
+.act-video .yt-wrap{position:relative;aspect-ratio:16/9;background:#000;max-height:42vh}
+.act-video .yt-wrap>div{width:100%;height:100%}
+.act-load{display:flex;gap:6px;margin-top:8px}.act-load input{flex:1}
+.bob-picks{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.act-paint canvas{width:100%;max-height:38vh;touch-action:none;background:#f4f0e6;border:2px solid var(--bevel-lo)}
+.act-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.swatches{display:flex;gap:4px;flex-wrap:wrap}
+.swatch{width:36px;height:36px;min-height:36px;border:2px solid var(--ink);cursor:pointer}
+.act-cams{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px}
+.act-cams video{width:100%;aspect-ratio:4/3;background:#000;object-fit:cover;border:2px solid var(--bevel-hi)}
 .jam-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .jam-paste{display:none;gap:6px;margin-top:8px}.am-op .jam-paste{display:flex}.jam-paste input{flex:1}
 .op-only{display:none}.am-op .op-only{display:inline-flex}.am-op form.op-only{display:flex}
