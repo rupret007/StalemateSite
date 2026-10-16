@@ -1,5 +1,5 @@
 /* Stalemate overlay for vendored Turdanoid. Applied by scripts/sync-turdanoid.sh after each sync.
-   1) Stalemate songs as game music: Manic on level 1, then Andrea, then It's Only Been 18, rotating per level.
+   1) Stalemate songs as game music: Manic on level 1, then Andrea, then It's Only Been 18, Wham Bam and Planet of the Flakes, rotating per level.
       Starts on first tap/key (iOS needs a gesture), loops within a level, follows the game's own mute/sound setting,
       pauses while the tab is hidden.
    2) Black-and-white checkerboard on alternating bricks, mixed with the stock poop sprites. */
@@ -11,7 +11,9 @@
   var PLAYLIST = [
     { file: 'stalemate/manic.m4a', title: 'Manic' },
     { file: 'stalemate/andrea.m4a', title: 'Andrea' },
-    { file: 'stalemate/only-been-18.m4a', title: 'It\u2019s Only Been 18' }
+    { file: 'stalemate/only-been-18.m4a', title: 'It\u2019s Only Been 18' },
+    { file: 'stalemate/wham-bam.m4a', title: 'Wham Bam' },
+    { file: 'stalemate/planet-of-the-flakes.m4a', title: 'Planet of the Flakes' }
   ];
   function trackForLevel(n) {
     n = Math.floor(Number(n));

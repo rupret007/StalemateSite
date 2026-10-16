@@ -32,9 +32,9 @@ describe('vendored /play/ copy', () => {
     expect(js).not.toMatch(/text: text \+ ' ' \+ url/);
     expect(js).not.toMatch(/navigator\.share\(\{ files: \[file\] \}\)/);
   });
-  it('ships the Stalemate playlist (Manic, Andrea, It\u2019s Only Been 18) as small same-origin AAC files, identical to the overlay source', () => {
+  it('ships the Stalemate playlist (Manic, Andrea, It\u2019s Only Been 18, Wham Bam, Planet of the Flakes) as small same-origin AAC files, identical to the overlay source', () => {
     const src = join(dir, '..', 'scripts', 'stalemate-overlay');
-    for (const f of ['manic.m4a', 'andrea.m4a', 'only-been-18.m4a']) {
+    for (const f of ['manic.m4a', 'andrea.m4a', 'only-been-18.m4a', 'wham-bam.m4a', 'planet-of-the-flakes.m4a']) {
       const vendored = readFileSync(join(dir, 'stalemate', f));
       expect(vendored.equals(readFileSync(join(src, f)))).toBe(true);
       expect(vendored.subarray(4, 8).toString('latin1')).toBe('ftyp');
@@ -43,7 +43,7 @@ describe('vendored /play/ copy', () => {
     }
     const js = readFileSync(join(dir, 'stalemate', 'stalemate-overlay.js'), 'utf8');
     expect(js).toBe(readFileSync(join(src, 'stalemate-overlay.js'), 'utf8'));
-    const order = ['manic.m4a', 'andrea.m4a', 'only-been-18.m4a'].map((f) => js.indexOf(`'stalemate/${f}'`));
+    const order = ['manic.m4a', 'andrea.m4a', 'only-been-18.m4a', 'wham-bam.m4a', 'planet-of-the-flakes.m4a'].map((f) => js.indexOf(`'stalemate/${f}'`));
     expect(order.every((i) => i > 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order); // Manic first
     expect(js).toContain("title: 'It\\u2019s Only Been 18'");

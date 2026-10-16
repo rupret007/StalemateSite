@@ -66,11 +66,13 @@ test('Turdanoid music rotates Stalemate songs per level, Manic first, and keeps 
     await expect(html).toHaveAttribute('data-stalemate-music', 'playing');
     await expectTrack(3, 'only-been-18.m4a', 'It\u2019s Only Been 18');
     await expect(html).toHaveAttribute('data-stalemate-music', 'playing');
-    await expectTrack(4, 'manic.m4a', 'Manic');
+    await expectTrack(4, 'wham-bam.m4a', 'Wham Bam');
+    await expectTrack(5, 'planet-of-the-flakes.m4a', 'Planet of the Flakes');
+    await expectTrack(6, 'manic.m4a', 'Manic');
     // Muted in the game: a level change switches the song but stays silent.
     await page.locator('#btnSound').dispatchEvent('click');
     await expect(html).toHaveAttribute('data-stalemate-music', 'paused');
-    await expectTrack(5, 'andrea.m4a', 'Andrea');
+    await expectTrack(7, 'andrea.m4a', 'Andrea');
     await page.waitForTimeout(600);
     await expect(html).toHaveAttribute('data-stalemate-music', 'paused');
     await page.locator('#btnSound').dispatchEvent('click');
@@ -86,8 +88,8 @@ test('Turdanoid music rotates Stalemate songs per level, Manic first, and keeps 
         document.dispatchEvent(new Event('visibilitychange'));
     });
     await expect(html).toHaveAttribute('data-stalemate-music', 'playing');
-    expect(await page.evaluate(() => [1, 2, 3, 4, 0, -1, NaN].map((n) => window.StalematePlaylist.trackForLevel(n).title)))
-        .toEqual(['Manic', 'Andrea', 'It\u2019s Only Been 18', 'Manic', 'Manic', 'Manic', 'Manic']);
+    expect(await page.evaluate(() => [1, 2, 3, 4, 5, 6, 0, -1, NaN].map((n) => window.StalematePlaylist.trackForLevel(n).title)))
+        .toEqual(['Manic', 'Andrea', 'It\u2019s Only Been 18', 'Wham Bam', 'Planet of the Flakes', 'Manic', 'Manic', 'Manic', 'Manic']);
     expect(errors).toEqual([]);
 });
 
