@@ -24,6 +24,8 @@ test('/play/ hosts Turdanoid same-origin, hidden and noindex', async ({ page }) 
     expect(box.width).toBeGreaterThan(200);
     const vp = page.viewportSize();
     expect(box.x + box.width).toBeLessThanOrEqual(vp.width + 1);
+    // The game scripts load after the title markup; tap Start once the page has finished loading.
+    await page.waitForLoadState('load');
     await page.locator('#btnStart').click();
     await expect(page.locator('#btnStart')).toBeHidden();
     if (test.info().project.use.hasTouch) {
