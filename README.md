@@ -29,6 +29,31 @@ The homepage countdown and next-show block hide after `2026-10-24T16:45:00-05:00
 
 Rad Dad’s palette (`#171410` ink, `#f4f0e6` cream, `#009ee8` listen, `#ed2765` hot accent, `#b5dc08` focus). **Punk first, ska as the accent** — and the checkerboard stays a full-contrast core signature (24px header band, torn 32px belts, large hero field, card top-rails, button feet). Xerox grain and sticker labels sit around the check, never washed over it. Display type stays Barlow Condensed — chunky outline and print-offset shadow, not another band’s lettering. Accent stickers use cream / lime / blue with ink type so they stay AA. Grain and check never sit at full contrast behind body copy. Layout is a signed-band grid, not Rad Dad’s festival collage. Copy matches Rad Dad’s confidence and specificity, in Stalemate’s own punk rock voice — no reused lines or jokes.
 
+## Analytics
+
+Privacy-safe [GoatCounter](https://www.goatcounter.com/) events (account `stalemate`). No scores, names, or free text — only fixed event slugs.
+
+**Main site**
+
+- `music-apple`, `music-spotify`, `music-youtube`, `music-bandcamp` — streaming links in Listen (not social icons)
+- `manic-video-play` — Manic lyric video play
+- `show-details` — Rockin’ October info links
+- `` `show-tick` + `et-<venue-slug>` `` — admission links when present
+- `nav-home`, `nav-listen`, `nav-about`, `nav-games`, `nav-contact`, … — header/footer in-page nav
+- `social-instagram`, `social-youtube`, `social-facebook`, … — `.social-link` clicks
+- `scroll-home-25`, `scroll-home-50`, `scroll-home-75`, `scroll-home-100` (and `scroll-404-*` on `404.html`)
+
+**Play hub**
+
+- `hub-open` — hub load
+- `hub-card-<game>` — game card clicks (`turdanoid`, `turdtris`, …)
+
+**Per game** (`<g>` = slug: `turdanoid`, `turdtris`, `turdjack`, `crapeights`, `turdrummy`, `turdspades`, `turdomania`, `neon-arkanoid`)
+
+- `play-<g>-start`, `play-<g>-over`, `play-<g>-dur-<bucket>`, `play-<g>-level-<n>` — buckets: `lt30s`, `30s-2m`, `2-5m`, `5-15m`, `15m+`; levels `1`–`9`, `10plus`
+- `gameover-turdanoid-share`, `gameover-turdanoid-listen-manic` — Turdanoid end screen
+- `music-ingame-manic-play`, `music-ingame-mute` — Turdanoid overlay playlist
+
 ## Local checks
 
 ```bash
