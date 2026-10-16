@@ -41,9 +41,14 @@ function copyFile(relativePath) {
     fs.copyFileSync(from, to);
 }
 
+const DIRS = ['play'];
+
 emptyDir(DIST);
 for (const relativePath of FILES) {
     copyFile(relativePath);
+}
+for (const dir of DIRS) {
+    fs.cpSync(path.join(ROOT, dir), path.join(DIST, dir), { recursive: true });
 }
 
 process.stdout.write(`Packaged ${FILES.length} GitHub Pages files into dist/\n`);
