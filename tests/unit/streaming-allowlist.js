@@ -4,7 +4,6 @@ export const OTHER_BAND_SPOTIFY = '4rwTyXLXW0blHBUjQdJmA7';
 const APPLE_PATHS = [
     'artist/stalemate-band/1718455763',
     'album/andrea/1718463871?i=1718463872',
-    'album/over-18-1997/1718884118?i=1718884699',
     'album/its-been-only-18/1718464113?i=1718464114',
     'album/my-mom-says-were-cool/1718884118'
 ];
@@ -13,7 +12,6 @@ export const APPLE_EMBEDS = new Set(APPLE_PATHS.map((p) => `https://embed.music.
 export const SPOTIFY_LINKS = new Set([
     'https://open.spotify.com/artist/5cZqYe3bDw3xcKIk4aPHNH',
     'https://open.spotify.com/track/6GBydFSUtZ7wZ7pSAvbytw',
-    'https://open.spotify.com/track/5d7NzhgfZgFBvKiYa63xea',
     'https://open.spotify.com/track/00i8GYyog0bCGJnhtqNJKo'
 ]);
 // script.js only checks that an embed starts with this origin before injecting it.
