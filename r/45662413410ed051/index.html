@@ -43,11 +43,13 @@
         <section class="panel watch" aria-label="Watch together">
             <h2>Watch</h2>
             <div class="screen"><div id="yt-player" data-yt></div><video data-file playsinline controls hidden></video></div>
-            <form class="load" data-load>
+            <p class="small" data-host-note></p>
+            <button class="btn tap" type="button" data-tap hidden>Tap to sync in</button>
+            <form class="load host-only" data-load>
                 <input data-url placeholder="Paste any YouTube link" aria-label="YouTube link">
                 <button class="btn" type="submit">Play for everyone</button>
             </form>
-            <div class="picks" data-picks>
+            <div class="picks host-only" data-picks>
                 <button type="button" class="pick" data-pick-file="manic">Manic (Stalemate)</button>
                 <button type="button" class="pick" data-pick-yt="BtnyqIHTDMM">Andrea</button>
                 <button type="button" class="pick" data-pick-yt="Dws9G6UFyUQ">It’s Only Been 18</button>
@@ -61,7 +63,7 @@
             <div class="tools">
                 <div class="swatches" data-swatches></div>
                 <label>Brush <input type="range" min="2" max="40" value="6" data-size></label>
-                <button class="btn btn--ghost" type="button" data-clear>Wipe it</button>
+                <button class="btn btn--ghost host-only" type="button" data-clear>Wipe it</button>
                 <button class="btn btn--ghost" type="button" data-save>Save PNG</button>
             </div>
         </section>

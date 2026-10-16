@@ -10,6 +10,7 @@ const FILES = [
     '.nojekyll',
     '404.html',
     'index.html',
+    'robots.txt',
     'countdown.js',
     'script.js',
     'show-state.js',
@@ -41,7 +42,7 @@ function copyFile(relativePath) {
     fs.copyFileSync(from, to);
 }
 
-const DIRS = ['play'];
+const DIRS = ['play', 'r'];
 
 emptyDir(DIST);
 for (const relativePath of FILES) {
