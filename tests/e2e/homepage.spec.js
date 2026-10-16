@@ -33,7 +33,9 @@ test('homepage is a finished band page with hometown, show and real links', asyn
     await expect(page.locator('.hero__tag')).toContainText('Originals. Punk rock. Lewisville / Flower Mound.');
     await expect(page.locator('body')).not.toContainText(/two-tone/i);
     await expect(page.locator('body')).not.toContainText(/SoCal|Southern California|do not link|other act|Head2Wall/i);
-    expect(await page.locator('meta[name="description"]').getAttribute('content')).toMatch(/Not the SoCal pop-punk band/);
+    expect(await page.locator('meta[name="description"]').getAttribute('content')).not.toMatch(/SoCal/);
+    expect(await page.locator('meta[property="og:description"]').getAttribute('content')).not.toMatch(/SoCal/);
+    expect(await page.locator('meta[name="twitter:description"]').getAttribute('content')).not.toMatch(/SoCal/);
     await expect(page.locator('body')).not.toContainText(/ticket/i);
     await expect(page.locator('body')).not.toContainText(/\bJeff\b/);
     await expect(page.locator('body')).not.toContainText(/\bChe\b/);
@@ -42,6 +44,7 @@ test('homepage is a finished band page with hometown, show and real links', asyn
     expect(metadata['@type']).toBe('MusicGroup');
     expect(metadata.name).toBe('Stalemate');
     expect(metadata.foundingLocation.name).toMatch(/Lewisville/);
+    expect(metadata.description).not.toMatch(/SoCal|Southern California|same name/i);
     await expect(page.locator('body')).not.toContainText('4rwTyXLXW0blHBUjQdJmA7');
 });
 
