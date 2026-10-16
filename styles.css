@@ -1391,12 +1391,12 @@ textarea:focus-visible {
 .listen-track__actions .button {
     white-space: nowrap;
 }
-.listen-track__actions .button,
 .listen-album {
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
 }
+.listen-track__actions .button,
 .listen-album .button {
     min-height: 46px;
 }
