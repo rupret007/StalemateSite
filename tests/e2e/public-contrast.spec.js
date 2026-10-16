@@ -8,8 +8,7 @@ const SAMPLE_SELECTORS = [
     '.button--tickets',
     '.button--listen',
     '.site-nav a',
-    '.member dt',
-    '.member dd',
+    '.hero__tag',
     '.footer-layout a'
 ];
 

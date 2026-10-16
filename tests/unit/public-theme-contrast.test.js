@@ -111,4 +111,14 @@ describe('public dark theme contrast', () => {
             expect(html, relativePath).toMatch(/ska-belt|ska-rule|hero-board/);
         }
     });
+
+    it('keeps checkerboard restrained and honors reduced motion', async () => {
+        const css = await readFile(join(repoRoot, 'styles.css'), 'utf8');
+        const panelBlock = css.match(/\.panel\s*\{[^}]+\}/);
+        expect(panelBlock, 'panel token block').not.toBeNull();
+        expect(panelBlock[0]).toMatch(/border:\s*1px\s+solid/);
+        expect(panelBlock[0]).not.toMatch(/repeating-conic-gradient/);
+        expect(css).toMatch(/prefers-reduced-motion:\s*reduce/);
+        expect(css).toMatch(/prefers-reduced-motion:\s*no-preference/);
+    });
 });

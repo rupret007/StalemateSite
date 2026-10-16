@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stalemate | Next show, listen, follow</title>
-    <meta name="description" content="You scanned the Stalemate flyer. Get tickets for the next show, listen to Better Than Now and Manic, or follow the band.">
+    <meta name="description" content="You scanned the Stalemate flyer. Get tickets for the next show, listen to Better Than Now and Manic, or join the list.">
     <meta name="theme-color" content="#171410">
     <link rel="canonical" href="https://rupret007.github.io/StalemateSite/qr/">
     <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
@@ -22,7 +22,7 @@
     <meta name="twitter:image" content="https://rupret007.github.io/StalemateSite/assets/og.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&amp;family=IBM+Plex+Sans:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&amp;family=Source+Sans+3:wght@400;600;700&amp;display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../styles.css">
     <script type="application/ld+json">{
     "@context": "https://schema.org",
@@ -38,7 +38,7 @@
         <div class="site-header__inner page-shell">
             <a class="brand" href="../" aria-label="Stalemate home">
                 <img src="../assets/mark.svg" alt="" class="brand__mark" id="logo" width="64" height="64">
-                <span class="brand__text"><strong>Stalemate</strong><small>Jeff · Che · Sean</small></span>
+                <span class="brand__text"><strong>Stalemate</strong><small>Ska / punk</small></span>
             </a>
             <nav class="site-nav" aria-label="Primary navigation">
                 <a href="#tickets">Tickets</a>
@@ -52,9 +52,9 @@
     <main id="main-content">
         <section class="page-hero" aria-labelledby="qr-title">
             <div class="page-shell">
-                <p class="board-square">QR · Flyer</p>
-                <h1 id="qr-title">You found the band.</h1>
-                <p>Next show, the songs, then follow. Nothing here is the other Stalemate.</p>
+                <p class="board-square">Flyer</p>
+                <h1 id="qr-title">You scanned in.</h1>
+                <p>Tickets when they drop. Better Than Now and Manic. Then the list. Not the other Stalemate.</p>
                 <div class="button-row">
                     <a class="button button--tickets" href="#tickets">Get tickets</a>
                     <a class="button button--listen" href="#listen">Listen</a>
@@ -64,14 +64,14 @@
         <div class="ska-belt" aria-hidden="true"></div>
         <section class="content-section" id="tickets" aria-labelledby="qr-shows-title">
             <div class="page-shell">
-                <p class="board-square">E4 · Shows</p>
+                <p class="board-square">Live</p>
                 <h2 id="qr-shows-title">Next show</h2>
                 <p data-upcoming-empty hidden>No upcoming dates posted yet.</p>
                 <div class="show-list" data-upcoming-shows>
                     <article class="panel show-card" data-show data-placeholder="true">
-                        <p class="placeholder-flag">[DATE/VENUE/TICKET LINK NEEDED]</p>
+                        <p class="sr-only">[DATE/VENUE/TICKET LINK NEEDED]</p>
                         <p class="show-when">Next ticketed show</p>
-                        <p>Date, venue and ticket URL are still blank. This card will not invent a night.</p>
+                        <p>The night posts here. No invented date.</p>
                         <div class="show-actions">
                             <a class="button button--tickets" data-show-live-action href="#tickets">Get tickets when posted</a>
                         </div>
@@ -82,15 +82,14 @@
                 <p data-past-empty hidden></p>
             </div>
         </section>
-        <div class="ska-rule" aria-hidden="true"></div>
         <section class="content-section content-section--surface" id="listen" aria-labelledby="qr-listen-title">
             <div class="page-shell">
-                <p class="board-square">A1 · Music</p>
+                <p class="board-square">The cuts</p>
                 <h2 id="qr-listen-title">Listen</h2>
                 <div class="chess-grid">
                     <article class="panel">
                         <h3>Better Than Now</h3>
-                        <p class="placeholder-flag">[STREAM LINK NEEDED]</p>
+                        <p class="sr-only">[STREAM LINK NEEDED]</p>
                         <div class="embed-host" data-embed>
                             <a class="button button--listen" href="#listen">Listen when published</a>
                             <button class="button button--ghost" type="button" data-load-preview hidden>Load preview</button>
@@ -106,7 +105,7 @@
                     </article>
                     <article class="panel">
                         <h3>Manic</h3>
-                        <p class="placeholder-flag">[STREAM LINK NEEDED]</p>
+                        <p class="sr-only">[STREAM LINK NEEDED]</p>
                         <div class="embed-host" data-embed>
                             <a class="button button--listen" href="#listen">Listen when published</a>
                             <button class="button button--ghost" type="button" data-load-preview hidden>Load preview</button>
@@ -123,20 +122,21 @@
                 </div>
             </div>
         </section>
-        <div class="ska-rule" aria-hidden="true"></div>
         <section class="content-section" id="follow" aria-labelledby="follow-title">
             <div class="page-shell">
-                <p class="board-square">F5 · Follow</p>
+                <p class="board-square">Follow</p>
                 <h2 id="follow-title">Follow</h2>
-                <p class="placeholder-flag">[HANDLE NEEDED]</p>
-                <p>Instagram, TikTok and Facebook handles are not public for this band yet. No guessed profiles, and no link to the other Stalemate.</p>
+                <p class="sr-only">[HANDLE NEEDED]</p>
+                <p>Handles land here when they are public. No guessed profiles. No link to the other Stalemate.</p>
                 <p><a class="text-link" href="../#list">Get early tickets / new songs first <span aria-hidden="true">→</span></a></p>
             </div>
         </section>
     </main>
+    <div class="ska-rule" aria-hidden="true"></div>
     <footer class="site-footer">
         <div class="page-shell footer-layout">
-            <p><strong>Stalemate</strong> · printed QR landing</p>
+            <p class="footer-brand">Stalemate</p>
+            <p>Printed QR landing</p>
             <nav aria-label="Footer navigation">
                 <a href="../">Band homepage</a>
                 <a href="../epk/">Press kit</a>

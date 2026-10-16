@@ -2,7 +2,7 @@
   "name": "stalemate-site",
   "version": "1.0.0",
   "private": true,
-  "description": "Static site for Stalemate (Jeff, Che, Sean).",
+  "description": "Static site for Stalemate ska/punk originals.",
   "scripts": {
     "package:pages": "node scripts/package-pages.cjs",
     "serve:test": "node scripts/serve-test.cjs",

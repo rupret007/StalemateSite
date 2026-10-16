@@ -1,22 +1,38 @@
 # Stalemate site
 
-Official site for **Stalemate** — Jeff (guitar/vocals [CONFIRM]), Che (drums), Sean (bass).
-Originals on the board: **Better Than Now** and **Manic**.
+Official site for **Stalemate** — ska/punk originals. Named cuts: **Better Than Now** and **Manic**. Studio session taped **8 October 2026**. Shows are coming.
 
 This is **not** the Southern California pop-punk band of the same name. Do not link that act.
 
 ## Public surfaces
 
-- `/` — off-centre hero, Get tickets + Listen, music, upcoming/past shows, video, members, mailing list, merch placeholder
+- `/` — stage hero, Get tickets + Listen, music, upcoming/past shows, video, about, mailing list, merch shelf
 - `/qr/` — printed-flyer landing (next show, listen, follow)
-- `/epk/` — press kit (short + long bio, photos, music, video, interview, stage plot, rider, booking)
-- `404.html` — empty-square not-found page
+- `/epk/` — press kit (short + long bio, stills, music, video, interview, stage plot, rider, booking)
+- `404.html` — not-on-the-set page
 
-Unknown facts are marked in `[BRACKETS]`. Ticket, stream, social and booking URLs stay blank until the band supplies them.
+Unknown facts stay off the public page. Needed blanks live in the list below — do not invent them in copy.
+
+## Facts still needed
+
+Do not publish guesses for any of these:
+
+- City / hometown
+- Member names and roles (do not name anyone on the site)
+- Stream / store URLs for Better Than Now and Manic
+- Manic lyric-video watch URL
+- Studio interview watch URL
+- Next show date, venue, city, door time, age limit, ticket link, ICS
+- Mailing-list tool
+- Merch items
+- Booking email
+- Instagram / TikTok / Facebook handles
+
+Operational tokens (`[DATE/VENUE/TICKET LINK NEEDED]`, `[MAILING LIST TOOL NEEDED]`, `[MERCH NEEDED]`, `[BOOKING EMAIL NEEDED]`, `[HANDLE NEEDED]`) stay in the HTML as screen-reader-only markers so tests can lock them. They are not shown in the hero.
 
 ## Visual identity
 
-Rad Dad’s palette (`#171410` ink, `#f4f0e6` cream, `#009ee8` listen, `#ed2765` tickets, `#b5dc08` focus) on a **ska two-tone checkerboard**: belts, card frames and an 8×8 hero board. Chess-square labels (A1 Music, E4 Shows) stay. Layout is not Rad Dad’s festival collage.
+Rad Dad’s palette (`#171410` ink, `#f4f0e6` cream, `#009ee8` listen, `#ed2765` tickets, `#b5dc08` focus) with **restrained ska two-tone**: an 8px check under the header, one belt after the hero, and a small 8×8 mark — not card frames or wallpaper. Type is Barlow Condensed + Source Sans 3. Layout is a signed-band grid, not Rad Dad’s festival collage. Copy matches Rad Dad’s confidence and specificity, in Stalemate’s own ska/punk voice — no reused lines or jokes.
 
 ## Local checks
 
@@ -60,4 +76,4 @@ Do not invent a domain name here. Check availability before buying.
 
 ## What this repo does not include
 
-Che’s Rad Dad server deploy scripts, `worker/`, `private/` areas and historical zips. Fresh static files plus the shared test patterns only.
+Rad Dad server deploy scripts, `worker/`, `private/` areas and historical zips. Fresh static files plus the shared test patterns only.
