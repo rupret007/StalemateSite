@@ -57,6 +57,6 @@ test('phone homepage keeps the video-show hero usable without overflow', async (
         expect(tapHeight(await page.locator('.site-header a.social-link[href="' + href + '"]').boundingBox())).toBeGreaterThanOrEqual(44);
     }
 
-    await expect(page.locator('.hero-show__tie')).toContainText('Hear it live Oct 24 at Los Amigo’s, Plano');
+    await expect(page.locator('.hero-show__tie')).toContainText('Hear it loud Oct 24 at Los Amigo’s, Plano');
     await expect(page.locator('body')).not.toContainText(/ticket/i);
 });

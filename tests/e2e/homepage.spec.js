@@ -14,10 +14,10 @@ test('homepage is a finished band page with originals, show and real links', asy
     await expect(video).not.toHaveAttribute('autoplay');
     await expect(video).toHaveAttribute('playsinline', '');
     await expect(video.locator('source')).toHaveAttribute('src', 'assets/manic.mp4');
-    await expect(page.locator('.hero-show__tie')).toContainText('Hear it live Oct 24 at Los Amigo’s, Plano');
-    await expect(page.locator('#about')).toContainText(/punk rock/i);
-    await expect(page.locator('#about')).toContainText('The songs are ours');
-    await expect(page.locator('#about')).toContainText('Better Than Now');
+    await expect(page.locator('.hero-show__tie')).toContainText('Hear it loud Oct 24 at Los Amigo’s, Plano');
+    await expect(page.locator('#about')).toContainText(/punk/i);
+    await expect(page.locator('#about')).toContainText('We wrote these. Sorry in advance.');
+    await expect(page.locator('body')).not.toContainText(/Better Than Now|named cut|on this page|A lyric video\. A Saturday set\./);
     await expect(page.locator('#about')).toContainText('Manic');
     await expect(page.locator('#about')).not.toContainText(/Lewisville|Flower Mound/);
     await expect(page.locator('#about dt')).toHaveCount(0);
@@ -30,10 +30,10 @@ test('homepage is a finished band page with originals, show and real links', asy
     await expect(page.locator('form')).toHaveCount(0);
     await expect(page.locator('#home')).toContainText('Rockin’ October');
     await expect(page.locator('#home')).toContainText('Los Amigo’s');
-    await expect(page.locator('.hero__tag')).toContainText('Originals. Punk rock. Live.');
+    await expect(page.locator('.hero__tag')).toContainText('All originals. All too loud.');
     await expect(page.locator('.hero__lede')).toHaveText('Original punk rock, played loud and a little sloppy.');
     await expect(page.locator('body')).not.toContainText('Press play on Manic');
-    await expect(page.locator('.site-footer')).toContainText('Dallas-area punk rock');
+    await expect(page.locator('.site-footer')).toContainText('Dallas-area punk rock. Loud on purpose.');
     await expect(page.locator('body')).not.toContainText(/Lewisville|Flower Mound/);
     const socials = [
         ['Instagram', 'https://www.instagram.com/stalemate.punk/'],
@@ -66,7 +66,7 @@ test('homepage is a finished band page with originals, show and real links', asy
     expect(metadata['@type']).toBe('MusicGroup');
     expect(metadata.name).toBe('Stalemate');
     expect(metadata.foundingLocation).toBeUndefined();
-    expect(metadata.description).toMatch(/original songs/i);
+    expect(metadata.description).toBe('Stalemate. Punk rock.');
     expect(metadata.description).not.toMatch(/Lewisville|Flower Mound|SoCal|Southern California|same name/i);
     expect(metadata.sameAs).toEqual(expect.arrayContaining([
         'https://www.instagram.com/stalemate.punk/',
@@ -93,7 +93,7 @@ test('unpublished press and QR paths render the 404 page', async ({ page }) => {
     for (const path of ['/epk/', '/qr/']) {
         const response = await page.goto(path);
         expect(response.status(), path).toBe(404);
-        await expect(page.locator('h1')).toContainText('This page is not on the set');
+        await expect(page.locator('h1')).toContainText('Wrong song.');
     }
 });
 
@@ -132,8 +132,8 @@ test.describe('homepage without JavaScript', () => {
         await expect(page.locator('#home a[href="#about"]')).toBeVisible();
         await expect(page.locator('#home a.button--hot[href="https://rockinoctober.com"]')).toBeVisible();
         await expect(page.locator('.hero-video__player source')).toHaveAttribute('src', 'assets/manic.mp4');
-        await expect(page.locator('.hero-show__tie')).toContainText('Hear it live Oct 24 at Los Amigo’s, Plano');
-        await expect(page.locator('#about')).toContainText('Better Than Now');
+        await expect(page.locator('.hero-show__tie')).toContainText('Hear it loud Oct 24 at Los Amigo’s, Plano');
+        await expect(page.locator('#about')).toContainText('Rockin’ October on Saturday, Oct 24, 4:45 PM');
         await expect(page.locator('[data-load-preview]')).toHaveCount(0);
         await expect(page.locator('[data-share-band]:not([hidden])')).toHaveCount(0);
         await expect(page.locator('#about')).toContainText(/punk rock/i);
@@ -158,9 +158,9 @@ test.describe('hero countdown before the set', () => {
         await expect(page.locator('[data-next-show-block]')).toContainText('Rockin’ October');
         await expect(page.locator('[data-next-show-block]')).toContainText('Studio 801');
         await expect(page.locator('[data-next-show-block]')).toContainText('Los Amigo’s, Plano, TX');
-        await expect(page.locator('[data-next-show-block]')).toContainText('Doors open at 12 PM');
+        await expect(page.locator('[data-next-show-block]')).toContainText('Doors at noon');
         await expect(page.locator('[data-next-show-block]')).toContainText('All ages');
-        await expect(page.locator('.hero-show__tie')).toContainText('Hear it live Oct 24 at Los Amigo’s, Plano');
+        await expect(page.locator('.hero-show__tie')).toContainText('Hear it loud Oct 24 at Los Amigo’s, Plano');
         await expect(page.locator('.hero-video__player')).toBeVisible();
         await expect(page.locator('#home a[href="https://rockinoctober.com"]').first()).toBeVisible();
         await expect(page.locator('#home')).not.toContainText(/ticket/i);
