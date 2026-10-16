@@ -39,9 +39,7 @@ describe('content boundaries', () => {
         expect(home).toContain('Flower Mound');
         expect(home).toContain('Originals. Punk rock.');
         expect(home).not.toMatch(/Two-tone|two-tone/i);
-        const homeBody = home.split(/<body[^>]*>/i)[1] || '';
-        expect(homeBody).not.toMatch(/SoCal|Southern California|do not link|other act|Head2Wall/i);
-        expect(home).toMatch(/Not the SoCal pop-punk band of the same name/);
+        expect(home).not.toMatch(/SoCal|Southern California|do not link|other act|Head2Wall/i);
         expect(home).not.toMatch(/Ska \/ punk/i);
         expect(home).not.toMatch(/ska\/punk/i);
         expect(home).not.toMatch(/ticket/i);

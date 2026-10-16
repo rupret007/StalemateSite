@@ -37,4 +37,17 @@ describe('GitHub Pages package', () => {
         rmSync(join(repoRoot, 'dist'), { recursive: true, force: true });
         expect(mkdtempSync(join(tmpdir(), 'stalemate-'))).toBeTruthy();
     });
+
+    it('omits SoCal from the built HTML', () => {
+        const result = spawnSync(process.execPath, [join(repoRoot, 'scripts/package-pages.cjs')], {
+            cwd: repoRoot,
+            encoding: 'utf8'
+        });
+        expect(result.status, result.stderr).toBe(0);
+        for (const relativePath of ['index.html', '404.html', 'qr/index.html', 'epk/index.html', 'embed-placeholder.html']) {
+            const html = readFileSync(join(repoRoot, 'dist', relativePath), 'utf8');
+            expect(html, relativePath).not.toMatch(/SoCal/);
+        }
+        rmSync(join(repoRoot, 'dist'), { recursive: true, force: true });
+    });
 });
