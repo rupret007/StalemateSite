@@ -20,5 +20,8 @@ describe('v2 signed-band finish', () => {
         expect(css).toMatch(/--display:\s*"Barlow Condensed"/);
         expect(css).toMatch(/--body:\s*"Source Sans 3"/);
         expect(lost).toContain('This page is not on the set.');
+        expect(home).not.toMatch(/\bJeff\b/);
+        expect(home).not.toMatch(/\bChe\b/);
+        expect(home).not.toMatch(/\bSean\b/);
     });
 });

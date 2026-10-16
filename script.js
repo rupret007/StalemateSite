@@ -100,7 +100,7 @@
             try {
                 await navigator.share({
                     title: 'Stalemate',
-                    text: 'Original songs from Stalemate — Jeff, Che and Sean.',
+                    text: 'Ska/punk originals from Stalemate.',
                     url: bandUrl
                 });
                 if (request === generation) status.textContent = 'Sharing options closed.';
