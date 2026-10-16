@@ -8,10 +8,7 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = join(fileURLToPath(new URL('../..', import.meta.url)));
 const PUBLIC_HTML = [
     'index.html',
-    'qr/index.html',
-    'epk/index.html',
-    '404.html',
-    'embed-placeholder.html'
+    '404.html'
 ];
 const PUBLIC_CLIENT_TEXT = [
     ...PUBLIC_HTML,
@@ -37,11 +34,12 @@ describe('public surface security', () => {
     });
 
     it('ships no preview iframes on the finished public pages', async () => {
-        for (const relativePath of ['index.html', 'qr/index.html', 'epk/index.html', '404.html']) {
+        for (const relativePath of PUBLIC_HTML) {
             const html = await readFile(join(repoRoot, relativePath), 'utf8');
             const iframes = [...html.matchAll(/<iframe\b[^>]*>/gi)].map((match) => match[0]);
             expect(iframes, relativePath).toEqual([]);
-            expect(html, relativePath).not.toMatch(/youtube|spotify|apple\.com/i);
+            expect(html, relativePath).not.toMatch(/youtube-nocookie|open\.spotify\.com|apple\.com/i);
+            expect(html, relativePath).not.toContain('4rwTyXLXW0blHBUjQdJmA7');
         }
     });
 

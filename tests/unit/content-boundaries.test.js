@@ -9,24 +9,15 @@ const repoRoot = join(fileURLToPath(new URL('../..', import.meta.url)));
 
 const PUBLIC_COPY = [
     'index.html',
-    'qr/index.html',
-    'epk/index.html',
     '404.html',
-    'embed-placeholder.html',
     'script.js',
     'show-state.js',
     'countdown.js',
     'site-base.js',
-    'epk/stage-plot.txt',
-    'epk/tech-rider.txt',
     'assets/og.svg',
     'assets/hero-stage.svg',
     'assets/mark.svg'
 ];
-
-function words(text) {
-    return text.trim().split(/\s+/).filter(Boolean);
-}
 
 describe('content boundaries', () => {
     it('keeps confirmed facts and finished CTAs without template slots or member names', async () => {
@@ -35,15 +26,22 @@ describe('content boundaries', () => {
         expect(home).toContain('Better Than Now');
         expect(home).toContain('Manic');
         expect(home).toMatch(/punk rock/i);
-        expect(home).toContain('Lewisville');
-        expect(home).toContain('Flower Mound');
-        expect(home).toContain('Originals. Punk rock.');
+        expect(home).toContain('Originals. Punk rock. Live.');
+        expect(home).toContain('The songs are ours');
+        expect(home).toContain('Stalemate writes the songs');
+        expect(home).toContain('Dallas-area punk rock');
+        expect(home).not.toMatch(/Lewisville|Flower Mound/);
+        expect((home.match(/Dallas-area/g) || []).length).toBe(1);
+        expect(home).not.toContain('foundingLocation');
         expect(home).not.toMatch(/Two-tone|two-tone/i);
         expect(home).not.toMatch(/SoCal|Southern California|do not link|other act|Head2Wall/i);
         expect(home).not.toMatch(/Ska \/ punk/i);
         expect(home).not.toMatch(/ska\/punk/i);
         expect(home).not.toMatch(/ticket/i);
+        expect(home).toContain('href="#top">Home');
         expect(home).toContain('href="#about">About');
+        expect(home).not.toMatch(/href=["'][^"']*(epk|qr)[^"']*["']/i);
+        expect(home).not.toMatch(/Press kit|QR landing|>Press</);
         expect(home).toContain('http://rockinoctober.com');
         expect(home).toContain('class="button button--listen"');
         expect(home).toContain('2026-10-24T16:45:00-05:00');
@@ -53,6 +51,9 @@ describe('content boundaries', () => {
         expect(home).toContain('assets/manic.mp4');
         expect(home).toContain('Hear it live Oct 24');
         expect(home).toContain('at Los Amigo’s, Plano');
+        expect(home).toContain('https://www.instagram.com/stalemate.punk/');
+        expect(home).toContain('https://www.youtube.com/@stalemate.punkband');
+        expect(home).toContain('https://www.facebook.com/stalemate.band/');
         expect(home).toContain('class="hero-video__player"');
         expect(home).not.toMatch(/\bautoplay\b/);
         expect(home).not.toMatch(/id="(music|video|follow|merch)"/);
@@ -62,7 +63,8 @@ describe('content boundaries', () => {
         expect(home).not.toMatch(/\bTBA\b|coming soon|\blorem\b|\bplaceholder\b|\byour\b|\benter\b/i);
         expect(home).not.toMatch(/A1\s*·/);
         expect(home).not.toMatch(/E4\s*·/);
-        expect(readme).toContain('Lewisville');
+        expect(readme).toContain('original songs');
+        expect(readme).not.toMatch(/Lewisville|Flower Mound/);
         expect(readme).toContain('Member names and roles');
         expect(readme).not.toMatch(/ticket/i);
         expect(readme).not.toMatch(/\[(MAILING LIST TOOL|MERCH|BOOKING EMAIL|HANDLE) NEEDED\]/);
@@ -78,18 +80,17 @@ describe('content boundaries', () => {
         }
     });
 
-    it('keeps the EPK short bio inside 50–75 words and lists press assets', async () => {
-        const epk = await readFile(join(repoRoot, 'epk/index.html'), 'utf8');
-        const short = epk.match(/<h2 id="short-bio-title">[\s\S]*?<p>([\s\S]*?)<\/p>/)[1];
-        const count = words(short.replace(/<[^>]+>/g, '')).length;
-        expect(count).toBeGreaterThanOrEqual(50);
-        expect(count).toBeLessThanOrEqual(75);
-        expect(epk).toContain('Long bio');
-        expect(epk).toContain('Lewisville');
-        expect(epk).toContain('stage-plot.txt');
-        expect(epk).toContain('tech-rider.txt');
-        expect(epk).not.toContain('[BOOKING EMAIL NEEDED]');
-        const epkBody = epk.split(/<body[^>]*>/i)[1] || '';
-        expect(epkBody).not.toMatch(/SoCal|Southern California|do not link|other act|two-tone/i);
+    it('does not publish press, EPK, or QR pages', async () => {
+        const { access } = await import('node:fs/promises');
+        for (const relativePath of ['epk/index.html', 'qr/index.html', 'embed-placeholder.html']) {
+            await expect(access(join(repoRoot, relativePath))).rejects.toMatchObject({ code: 'ENOENT' });
+        }
+    });
+
+    it('keeps Lewisville and Flower Mound off every public surface', async () => {
+        for (const relativePath of [...PUBLIC_COPY, 'README.md']) {
+            const source = await readFile(join(repoRoot, relativePath), 'utf8');
+            expect(source, relativePath).not.toMatch(/Lewisville|Flower Mound/);
+        }
     });
 });

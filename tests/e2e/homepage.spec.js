@@ -2,7 +2,7 @@ const { test, expect } = require('./fixtures');
 
 const PLACEHOLDER_COPY = /\bTBA\b|coming soon|\blorem\b|\bplaceholder\b|\byour\b|\benter\b/i;
 
-test('homepage is a finished band page with hometown, show and real links', async ({ page }) => {
+test('homepage is a finished band page with originals, show and real links', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveTitle(/Stalemate/);
     await expect(page.locator('h1')).toHaveCount(1);
@@ -16,10 +16,10 @@ test('homepage is a finished band page with hometown, show and real links', asyn
     await expect(video.locator('source')).toHaveAttribute('src', 'assets/manic.mp4');
     await expect(page.locator('.hero-show__tie')).toContainText('Hear it live Oct 24 at Los Amigo’s, Plano');
     await expect(page.locator('#about')).toContainText(/punk rock/i);
-    await expect(page.locator('#about')).toContainText('Lewisville');
-    await expect(page.locator('#about')).toContainText('Flower Mound');
+    await expect(page.locator('#about')).toContainText('The songs are ours');
     await expect(page.locator('#about')).toContainText('Better Than Now');
     await expect(page.locator('#about')).toContainText('Manic');
+    await expect(page.locator('#about')).not.toContainText(/Lewisville|Flower Mound/);
     await expect(page.locator('#about dt')).toHaveCount(0);
     await expect(page.locator('#music')).toHaveCount(0);
     await expect(page.locator('#video')).toHaveCount(0);
@@ -30,7 +30,28 @@ test('homepage is a finished band page with hometown, show and real links', asyn
     await expect(page.locator('form')).toHaveCount(0);
     await expect(page.locator('#home')).toContainText('Rockin’ October');
     await expect(page.locator('#home')).toContainText('Los Amigo’s');
-    await expect(page.locator('.hero__tag')).toContainText('Originals. Punk rock. Lewisville / Flower Mound.');
+    await expect(page.locator('.hero__tag')).toContainText('Originals. Punk rock. Live.');
+    await expect(page.locator('.hero__lede')).toContainText('Press play on Manic');
+    await expect(page.locator('.site-footer')).toContainText('Dallas-area punk rock');
+    await expect(page.locator('body')).not.toContainText(/Lewisville|Flower Mound/);
+    const socials = [
+        ['Instagram', 'https://www.instagram.com/stalemate.punk/'],
+        ['YouTube', 'https://www.youtube.com/@stalemate.punkband'],
+        ['Facebook', 'https://www.facebook.com/stalemate.band/']
+    ];
+    for (const [name, href] of socials) {
+        const header = page.locator('.site-header a.social-link[href="' + href + '"]');
+        const hero = page.locator('#home a.social-link[href="' + href + '"]');
+        const footer = page.locator('.site-footer a.social-link[href="' + href + '"]');
+        await expect(header).toBeVisible();
+        await expect(hero).toBeVisible();
+        await expect(footer).toBeVisible();
+        expect((await header.boundingBox()).height).toBeGreaterThanOrEqual(44);
+        expect((await hero.boundingBox()).height).toBeGreaterThanOrEqual(44);
+        expect((await footer.boundingBox()).height).toBeGreaterThanOrEqual(44);
+        await expect(header).toHaveAttribute('rel', /noopener/);
+        await expect(header).toContainText(name);
+    }
     await expect(page.locator('body')).not.toContainText(/two-tone/i);
     await expect(page.locator('body')).not.toContainText(/SoCal|Southern California|do not link|other act|Head2Wall/i);
     expect(await page.locator('meta[name="description"]').getAttribute('content')).not.toMatch(/SoCal/);
@@ -43,18 +64,46 @@ test('homepage is a finished band page with hometown, show and real links', asyn
     const metadata = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent());
     expect(metadata['@type']).toBe('MusicGroup');
     expect(metadata.name).toBe('Stalemate');
-    expect(metadata.foundingLocation.name).toMatch(/Lewisville/);
-    expect(metadata.description).not.toMatch(/SoCal|Southern California|same name/i);
+    expect(metadata.foundingLocation).toBeUndefined();
+    expect(metadata.description).toMatch(/original songs/i);
+    expect(metadata.description).not.toMatch(/Lewisville|Flower Mound|SoCal|Southern California|same name/i);
+    expect(metadata.sameAs).toEqual(expect.arrayContaining([
+        'https://www.instagram.com/stalemate.punk/',
+        'https://www.youtube.com/@stalemate.punkband',
+        'https://www.facebook.com/stalemate.band/'
+    ]));
     await expect(page.locator('body')).not.toContainText('4rwTyXLXW0blHBUjQdJmA7');
 });
 
+test('nav and footer have no press, EPK, or QR links', async ({ page }) => {
+    for (const path of ['/', '/missing']) {
+        await page.goto(path);
+        const chrome = page.locator('.site-nav, .site-footer nav');
+        await expect(chrome.getByRole('link', { name: /press|epk|qr/i })).toHaveCount(0);
+        const hrefs = await chrome.locator('a').evaluateAll((links) => links.map((link) => link.getAttribute('href') || ''));
+        expect(hrefs.join('\n'), path).not.toMatch(/epk|\/qr|press/i);
+        await expect(page.locator('a[href*="epk"], a[href*="qr/"]')).toHaveCount(0);
+        await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Home' })).toBeVisible();
+        await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'About' })).toBeVisible();
+    }
+});
+
+test('unpublished press and QR paths render the 404 page', async ({ page }) => {
+    for (const path of ['/epk/', '/qr/']) {
+        const response = await page.goto(path);
+        expect(response.status(), path).toBe(404);
+        await expect(page.locator('h1')).toContainText('This page is not on the set');
+    }
+});
+
 test('public pages fail on template placeholder words', async ({ page }) => {
-    for (const path of ['/', '/qr/', '/epk/', '/missing']) {
+    for (const path of ['/', '/missing']) {
         await page.goto(path);
         const text = await page.locator('body').innerText();
         expect(text, path).not.toMatch(PLACEHOLDER_COPY);
         expect(text, path).not.toMatch(/two-tone/i);
         expect(text, path).not.toMatch(/SoCal|Southern California|do not link|other act|Head2Wall/i);
+        expect(text, path).not.toMatch(/Lewisville|Flower Mound/);
     }
 });
 

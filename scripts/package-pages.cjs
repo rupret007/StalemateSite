@@ -9,7 +9,6 @@ const DIST = path.join(ROOT, 'dist');
 const FILES = [
     '.nojekyll',
     '404.html',
-    'embed-placeholder.html',
     'index.html',
     'countdown.js',
     'script.js',
@@ -17,17 +16,16 @@ const FILES = [
     'site-base.js',
     'styles.css',
     'assets/favicon.svg',
+    'assets/icon-facebook.svg',
+    'assets/icon-instagram.svg',
+    'assets/icon-youtube.svg',
     'assets/grain.svg',
     'assets/hero-stage.svg',
     'assets/manic-poster.jpg',
     'assets/manic.mp4',
     'assets/mark.svg',
     'assets/og.svg',
-    'assets/torn.svg',
-    'epk/index.html',
-    'epk/stage-plot.txt',
-    'epk/tech-rider.txt',
-    'qr/index.html'
+    'assets/torn.svg'
 ];
 
 function emptyDir(dir) {

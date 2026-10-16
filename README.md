@@ -1,13 +1,13 @@
 # Stalemate site
 
-Official site for **Stalemate** — a punk rock band from **Lewisville / Flower Mound**. Named cuts: **Better Than Now** and **Manic**. Next date: **Rockin’ October**, Saturday, Oct 24, 2026, Los Amigo’s, Plano, TX. Set 4:45 PM Central.
+Official site for **Stalemate** — a punk rock band with original songs. Featured lyric video: **Manic**. Named cuts: **Better Than Now** and **Manic**. Next date: **Rockin’ October**, Saturday, Oct 24, 2026, Los Amigo’s, Plano, TX. Set 4:45 PM Central.
 
 ## Public surfaces
 
-- `/` — stage hero with the Manic lyric video paired to the Oct 24 countdown and next-show block, plus about
-- `/qr/` — printed-flyer landing for Rockin’ October
-- `/epk/` — press kit (short + long bio, marks, stage plot, rider)
+- `/` — stage hero with the Manic lyric video paired to the Oct 24 countdown and next-show block, plus about. Socials: Instagram, YouTube, Facebook (from [linktr.ee/stalemateband](https://linktr.ee/stalemateband))
 - `404.html` — not-on-the-set page
+
+No press kit, EPK, or QR landing. Those pages are not published.
 
 The public pages carry only confirmed facts. No empty shelves, stub forms, dummy embeds or fill-in copy.
 
@@ -20,7 +20,8 @@ Do not publish guesses for any of these:
 - A public YouTube watch URL for the Manic lyric video (the band channel lists Andrea and It’s Been Only 18)
 - ICS for Rockin’ October
 - Booking email
-- Instagram / TikTok / Facebook handles
+- TikTok handle
+- Press kit / EPK / QR landing (do not publish until the band has them)
 
 The homepage countdown and next-show block hide after `2026-10-24T16:45:00-05:00` and leave no empty slot. The Manic lyric video stays.
 
@@ -51,7 +52,7 @@ When you are ready to publish:
 1. Repo **Settings → Pages → Source: GitHub Actions**.
 2. Merge to `main`. The deploy job uploads the `dist/` package produced by `npm run package:pages`.
 
-Asset links on the homepage, `/qr/` and `/epk/` are **relative**, so they work at `/StalemateSite/` and later at a domain root. `404.html` detects `/StalemateSite/` vs `/` and sets `<base>` so a nested missing path still finds `styles.css`. The project prefix lives in `site-base.js` as `PROJECT_BASE`.
+Asset links on the homepage are **relative**, so they work at `/StalemateSite/` and later at a domain root. `404.html` detects `/StalemateSite/` vs `/` and sets `<base>` so a nested missing path still finds `styles.css`. The project prefix lives in `site-base.js` as `PROJECT_BASE`.
 
 ### Adding a custom domain later
 
