@@ -175,10 +175,20 @@ document.addEventListener('click', function (e) {
     var el = document.querySelector('[data-show-cta]');
     if (!el) return;
     var ends = Date.parse(el.getAttribute('data-show-ends'));
-    if (!(Date.now() >= ends)) return;
-    var next = Date.parse(el.getAttribute('data-next-starts') || '');
-    var useNext = Number.isFinite(next) && Date.now() < next && el.getAttribute('data-next-href');
-    el.setAttribute('href', useNext ? el.getAttribute('data-next-href') : el.getAttribute('data-fallback-href'));
-    el.textContent = useNext ? el.getAttribute('data-next-label') : el.getAttribute('data-fallback-label');
-    el.setAttribute('data-track', useNext ? 'show-cta-next' : 'show-cta-next-fallback');
+    if (!Number.isFinite(ends)) return;
+    function update() {
+        var now = Date.now();
+        if (now < ends) return true;
+        var next = Date.parse(el.getAttribute('data-next-starts') || '');
+        var useNext = Number.isFinite(next) && now < next && el.getAttribute('data-next-href');
+        el.setAttribute('href', useNext ? el.getAttribute('data-next-href') : el.getAttribute('data-fallback-href'));
+        el.textContent = useNext ? el.getAttribute('data-next-label') : el.getAttribute('data-fallback-label');
+        el.setAttribute('data-track', useNext ? 'show-cta-next' : 'show-cta-next-fallback');
+        return Boolean(useNext);
+    }
+    if (update()) {
+        var timer = window.setInterval(function () {
+            if (!update()) window.clearInterval(timer);
+        }, 1000);
+    }
 })();

@@ -214,6 +214,18 @@ test.describe('repeat show button', () => {
         await expect(repeat).toHaveAttribute('data-track', 'show-cta-under-video');
     });
 
+    test('updates when an open page crosses the show time', async ({ page }) => {
+        await page.clock.setFixedTime(new Date('2026-10-24T16:44:59-05:00'));
+        await page.goto('/');
+        const repeat = page.locator('#home .button-row [data-show-cta]');
+        await expect(repeat).toHaveText('See us Oct 24');
+        await page.clock.setFixedTime(new Date('2026-10-24T16:45:01-05:00'));
+        await expect(page.locator('[data-next-show]')).toBeHidden();
+        await expect(repeat).toHaveText('Catch the next show');
+        await expect(repeat).toHaveAttribute('href', 'https://www.instagram.com/stalemate.punk/');
+        await expect(repeat).toHaveAttribute('data-track', 'show-cta-next-fallback');
+    });
+
     test.describe('after the show with a next show booked', () => {
         test.use({ showTime: '2026-11-01T12:00:00-05:00' });
         test('points at the next show', async ({ page }) => {
