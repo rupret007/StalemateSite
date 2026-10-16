@@ -21,6 +21,7 @@ describe('GitHub Pages package', () => {
         expect(script).toContain('countdown.js');
         expect(script).toContain('assets/hero-stage.svg');
         expect(script).toContain('assets/manic.mp4');
+        expect(script).toContain('assets/og.png');
         expect(script).toContain('assets/manic-poster.jpg');
         expect(script).toContain('assets/icon-instagram.svg');
         expect(script).toContain('assets/icon-youtube.svg');

@@ -24,6 +24,7 @@ const FILES = [
     'assets/manic-poster.jpg',
     'assets/manic.mp4',
     'assets/mark.svg',
+    'assets/og.png',
     'assets/og.svg',
     'assets/torn.svg'
 ];
