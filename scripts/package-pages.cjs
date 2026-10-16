@@ -17,6 +17,8 @@ const FILES = [
     'js/count.js',
     'js/track.js',
     'js/site-track.js',
+    'js/contact-mail.js',
+    'js/contact-form.js',
     'styles.css',
     'assets/favicon.svg',
     'assets/games/turdanoid.webp',

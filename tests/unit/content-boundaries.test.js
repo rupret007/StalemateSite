@@ -62,7 +62,8 @@ describe('content boundaries', () => {
         expect(home).not.toMatch(/\bautoplay\b/);
         expect(home).not.toMatch(/id="(music|video|follow|merch)"/);
         expect(disallowedEmbedAttributes(home)).toEqual([]);
-        expect(home).not.toContain('<form');
+        expect(home).toContain('data-contact-form');
+        expect(home).toContain('formsubmit.co/stalemate.punk@gmail.com');
         expect(home).not.toMatch(/\[(DATE\/VENUE|MAILING LIST TOOL|MERCH|BOOKING EMAIL|HANDLE|STREAM LINK|CITY) NEEDED\]/);
         expect(home).not.toMatch(/\bTBA\b|coming soon|\blorem\b|\bplaceholder\b|\byour\b|\benter\b/i);
         expect(home).not.toMatch(/A1\s*·/);
