@@ -44,6 +44,55 @@ test('/play/ hosts Turdanoid same-origin, hidden and noindex', async ({ page }) 
     expect(errors).toEqual([]);
 });
 
+test('Turdanoid music rotates Stalemate songs per level, Manic first, and keeps mute and hidden-tab pauses', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto('/play/TurdAnoid.html');
+    const html = page.locator('html');
+    const src = () => page.evaluate(() => window.StalemateMusic.src);
+    // Nothing plays or loads before a gesture.
+    await expect(html).toHaveAttribute('data-stalemate-music', 'paused');
+    await expect(html).toHaveAttribute('data-stalemate-track', 'Manic');
+    await page.locator('#btnStart').click();
+    await expect(html).toHaveAttribute('data-stalemate-music', 'playing');
+    expect(await src()).toMatch(/\/play\/stalemate\/manic\.m4a$/);
+    const expectTrack = async (lvl, file, title) => {
+        await page.evaluate((n) => { level = n; }, lvl);
+        await expect(html).toHaveAttribute('data-stalemate-track', title);
+        expect(await src()).toMatch(new RegExp(`/play/stalemate/${file.replace('.', '\\.')}$`));
+        expect(await page.evaluate(() => window.StalemateMusic.loop)).toBe(true);
+    };
+    await expectTrack(2, 'andrea.m4a', 'Andrea');
+    await expect(html).toHaveAttribute('data-stalemate-music', 'playing');
+    await expectTrack(3, 'only-been-18.m4a', 'It\u2019s Only Been 18');
+    await expect(html).toHaveAttribute('data-stalemate-music', 'playing');
+    await expectTrack(4, 'wham-bam.m4a', 'Wham Bam');
+    await expectTrack(5, 'planet-of-the-flakes.m4a', 'Planet of the Flakes');
+    await expectTrack(6, 'manic.m4a', 'Manic');
+    // Muted in the game: a level change switches the song but stays silent.
+    await page.locator('#btnSound').dispatchEvent('click');
+    await expect(html).toHaveAttribute('data-stalemate-music', 'paused');
+    await expectTrack(7, 'andrea.m4a', 'Andrea');
+    await page.waitForTimeout(600);
+    await expect(html).toHaveAttribute('data-stalemate-music', 'paused');
+    await page.locator('#btnSound').dispatchEvent('click');
+    await expect(html).toHaveAttribute('data-stalemate-music', 'playing');
+    // Hidden tab pauses; visible again resumes.
+    await page.evaluate(() => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+        document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect(html).toHaveAttribute('data-stalemate-music', 'paused');
+    await page.evaluate(() => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+        document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect(html).toHaveAttribute('data-stalemate-music', 'playing');
+    expect(await page.evaluate(() => [1, 2, 3, 4, 5, 6, 0, -1, NaN].map((n) => window.StalematePlaylist.trackForLevel(n).title)))
+        .toEqual(['Manic', 'Andrea', 'It\u2019s Only Been 18', 'Wham Bam', 'Planet of the Flakes', 'Manic', 'Manic', 'Manic', 'Manic']);
+    expect(errors).toEqual([]);
+});
+
 test('homepage Games card and nav link go to /play/, which stays noindex and out of the Pages package', async ({ page }) => {
     await page.goto('/');
     const nav = page.getByRole('navigation', { name: 'Primary navigation', exact: true });
