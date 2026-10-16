@@ -89,8 +89,19 @@ test('nav and footer have no press, EPK, or QR links', async ({ page }) => {
     }
 });
 
-test('unpublished press and QR paths render the 404 page', async ({ page }) => {
-    for (const path of ['/epk/', '/qr/']) {
+test('keychain QR: /tap/ forwards to /qr/, which cues Manic and links the site and games', async ({ page }) => {
+    await page.goto('/tap/?src=keychain');
+    await expect(page).toHaveURL(/\/qr\/\?src=keychain$/);
+    await expect(page.locator('h1')).toContainText('You found the band.');
+    await expect(page.locator('[data-qr-audio]')).toHaveAttribute('src', '../play/stalemate/manic.m4a');
+    await expect(page.locator('[data-qr-play]')).toBeVisible();
+    expect(tapHeight(await page.locator('[data-qr-play]').boundingBox())).toBeGreaterThanOrEqual(44);
+    await expect(page.locator('main a[href="../play/"]')).toHaveCount(1);
+    await expect(page.locator('main a[href="../"]')).toHaveCount(1);
+});
+
+test('unpublished press paths render the 404 page', async ({ page }) => {
+    for (const path of ['/epk/']) {
         const response = await page.goto(path);
         expect(response.status(), path).toBe(404);
         await expect(page.locator('h1')).toContainText('Wrong song.');
