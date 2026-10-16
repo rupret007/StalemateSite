@@ -1458,3 +1458,47 @@ textarea:focus-visible {
     .games-card { grid-template-columns: 72px 1fr; gap: 14px; padding: 14px; }
     .games-card__thumb { width: 72px; }
 }
+
+/* Games promo (homepage block, moved up under Listen) */
+.games-section { position: relative; }
+.games-section::before {
+    content: ""; display: block; height: var(--ska-band);
+    background: repeating-conic-gradient(var(--ska-dark) 0 25%, var(--ska-light) 0 50%) 0 0 / var(--ska-band) var(--ska-band);
+    margin-bottom: 28px;
+}
+.games-section .games-card {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: 28px; padding: 28px;
+    border: 3px solid var(--lime);
+    box-shadow: 8px 8px 0 var(--pink);
+}
+.games-card__body h2 { font-size: clamp(2rem, 5vw, 3.4rem); line-height: 0.95; }
+.games-card__actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px !important; }
+.games-card__shots { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.games-card__shots .games-card__thumb {
+    position: absolute; width: 72px; right: -14px; top: -14px; z-index: 0;
+}
+.games-shot {
+    position: relative; z-index: 1; display: block;
+    border: 3px solid var(--cream); background: var(--ink);
+    color: var(--cream); text-decoration: none; transition: transform .15s ease;
+}
+.games-shot img { display: block; width: 100%; height: auto; }
+.games-shot span {
+    position: absolute; left: 8px; bottom: 8px; padding: 2px 8px;
+    background: var(--ink); font-family: var(--display); font-weight: 700;
+    text-transform: uppercase; letter-spacing: .04em;
+}
+.games-shot--a { transform: rotate(-2deg); }
+.games-shot--b { transform: rotate(2deg) translateY(18px); }
+.games-shot:hover, .games-shot:focus-visible { transform: rotate(0) scale(1.03); }
+.hero-games-teaser { margin: 14px 0 0; font-weight: 700; }
+.hero-games-teaser a { color: var(--lime); }
+@media (max-width: 760px) {
+    .games-section .games-card { grid-template-columns: 1fr; padding: 18px; gap: 18px; box-shadow: 5px 5px 0 var(--pink); }
+    .games-card__shots { order: -1; }
+    .games-card__shots .games-card__thumb { width: 48px; right: -8px; top: -8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .games-shot, .games-shot:hover, .games-shot:focus-visible { transition: none; }
+}

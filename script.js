@@ -163,3 +163,9 @@
         start();
     }
 }());
+
+// Games promo click events; no-ops until the analytics helper (window.smTrack) is on the page.
+document.addEventListener('click', function (e) {
+    var el = e.target && e.target.closest ? e.target.closest('[data-track]') : null;
+    if (el && typeof window.smTrack === 'function') window.smTrack(el.getAttribute('data-track'));
+});
