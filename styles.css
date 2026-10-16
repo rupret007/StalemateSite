@@ -238,6 +238,33 @@ textarea:focus-visible {
     gap: 0.35rem 0.75rem;
 }
 
+.music-toggle {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0.45rem 0.75rem;
+    border: 3px solid var(--cream);
+    background: var(--ink);
+    color: var(--cream);
+    font-family: var(--display);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 3px 3px 0 var(--pink);
+}
+
+.music-toggle[aria-pressed="false"] {
+    color: var(--lime);
+    border-color: var(--lime);
+    box-shadow: 3px 3px 0 var(--cream);
+}
+
+.music-toggle:focus-visible {
+    outline: 3px solid var(--blue-bright);
+    outline-offset: 2px;
+}
+
 .site-nav {
     display: flex;
     flex-wrap: wrap;
@@ -1252,6 +1279,15 @@ textarea:focus-visible {
 }
 
 @media (max-width: 719px) {
+    .music-toggle {
+        position: fixed;
+        top: max(6px, env(safe-area-inset-top));
+        right: max(6px, env(safe-area-inset-right));
+        z-index: 120;
+        font-size: 0.7rem;
+        padding: 0.35rem 0.6rem;
+    }
+
     .header-cta {
         display: none;
     }

@@ -24,6 +24,10 @@
         }
 
         function start() {
+            if (window.StalemateMusicPref && !window.StalemateMusicPref.isOn()) {
+                render();
+                return;
+            }
             var attempt = audio.play();
             if (attempt && typeof attempt.catch === 'function') {
                 attempt.catch(function () {
@@ -34,7 +38,16 @@
 
         button.addEventListener('click', function () {
             if (status) status.textContent = '';
+            if (window.StalemateMusicPref && !window.StalemateMusicPref.isOn()) {
+                if (status) status.textContent = 'Site music is off. Turn it on in the header.';
+                render();
+                return;
+            }
             if (audio.paused || audio.ended) start(); else audio.pause();
+        });
+        window.addEventListener('stalemate-music-change', function () {
+            if (window.StalemateMusicPref && !window.StalemateMusicPref.isOn()) audio.pause();
+            render();
         });
         audio.addEventListener('play', render);
         audio.addEventListener('pause', render);

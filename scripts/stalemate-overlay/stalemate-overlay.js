@@ -34,7 +34,11 @@
   music.setAttribute('playsinline', '');
   window.StalemateMusic = music;
   var started = false;
+  function siteMusicOff() {
+    try { return localStorage.getItem('stalemate.music') === 'off'; } catch (e) { return false; }
+  }
   function blocked() {
+    if (siteMusicOff()) return true;
     try { return typeof window.soundBlocked === 'function' ? !!window.soundBlocked() : false; } catch (e) { return false; }
   }
   function sync() {
@@ -69,6 +73,10 @@
   document.addEventListener('click', function () { setTimeout(apply, 0); }, true);
   document.addEventListener('change', function () { setTimeout(apply, 0); }, true);
   document.addEventListener('visibilitychange', apply);
+  window.addEventListener('stalemate-music-change', apply);
+  window.addEventListener('storage', function (e) {
+    if (e.key === 'stalemate.music') apply();
+  });
   setInterval(checkLevel, 400);
   sync();
 

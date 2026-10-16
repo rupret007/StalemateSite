@@ -22,6 +22,7 @@ describe('GitHub Pages package', () => {
         expect(script).toContain('js/count.js');
         expect(script).toContain('js/track.js');
         expect(script).toContain('js/site-track.js');
+        expect(script).toContain('js/music-preference.js');
         expect(script).toContain('assets/hero-stage.svg');
         expect(script).toContain('assets/manic.mp4');
         expect(script).toContain('assets/og.png');
