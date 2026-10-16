@@ -890,6 +890,22 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     function restore(s = {}) {
         // Fail closed: empty or wiped storage comes back read-only for fans until a band op runs /lobby unlock.
         if (!s || typeof s !== 'object' || !['off', 'readonly', 'closed'].includes(s.lock)) { s = { ...(s && typeof s === 'object' ? s : {}), lock: 'readonly', lockAuto: true }; }
+        s = { ...s };
+        // Bans: keep only well-formed entries. If any were malformed a ban may be lost, so lock read-only too.
+        if (s.bans !== undefined) {
+            const okBan = (b) => b && typeof b === 'object' && typeof b.mask === 'string' && /^(?:dev|iph|nick):.+/.test(b.mask)
+                && (b.until === undefined || b.until === null || Number.isFinite(b.until));
+            const list = Array.isArray(s.bans) ? s.bans : [];
+            const good = list.filter(okBan);
+            if (!Array.isArray(s.bans) || good.length !== list.length) { s.lock = 'readonly'; s.lockAuto = true; }
+            s.bans = good;
+        }
+        // Budget: malformed counts as spent for today (fans read-only/closed) rather than a fresh free day.
+        if (s.budget !== undefined) {
+            const b = s.budget;
+            const okBudget = b && typeof b === 'object' && typeof b.day === 'string' && Number.isFinite(b.requests) && b.requests >= 0;
+            if (!okBudget) { s.budget = { day: new Date(now()).toISOString().slice(0, 10), requests: L.requestBudget }; s.lock = 'readonly'; s.lockAuto = true; }
+        }
         for (const k of ['bans', 'kicks', 'mutes', 'lock', 'shield', 'shieldAuto', 'lockAuto', 'lists', 'lastBand', 'budget', 'reportsToHide', 'stats']) if (s[k] !== undefined) net[k] = s[k];
     }
     function restoreLog(entries = []) { net.modlog = entries.slice(-L.modlogKeep); }
