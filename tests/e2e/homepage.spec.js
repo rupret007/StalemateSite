@@ -183,7 +183,12 @@ test.describe('hero countdown after the set', () => {
         await expect(page.locator('.hero-show__tie')).toBeHidden();
         await expect(page.locator('.hero-video__player')).toBeVisible();
         await expect(page.locator('#home a[href="#about"]')).toBeVisible();
-        await expect(page.locator('#home .button-row a.button--hot[href="https://rockinoctober.com"]')).toBeVisible();
+        const repeat = page.locator('#home .button-row [data-show-cta]');
+        await expect(repeat).toBeVisible();
+        await expect(repeat).toHaveText('Catch the next show');
+        await expect(repeat).toHaveAttribute('href', 'https://www.instagram.com/stalemate.punk/');
+        await expect(repeat).toHaveAttribute('data-track', 'show-cta-next-fallback');
+        await expect(page.locator('#home')).not.toContainText('See us Oct 24');
         await expect(page.locator('#home .hero-show__cta a')).toBeHidden();
         await expect(page.locator('#home')).not.toContainText('Shows coming soon');
         expect(await page.locator('[data-next-show]').boundingBox()).toBeNull();
@@ -198,4 +203,30 @@ test('the GitHub Pages project prefix serves the same homepage', async ({ page }
     await page.goto('/StalemateSite/');
     await expect(page.locator('#band-title')).toContainText('Stalemate');
     await expect(page.locator('link[rel="stylesheet"][href="styles.css"]')).toHaveCount(1);
+});
+
+test.describe('repeat show button', () => {
+    test('before the show it says See us Oct 24 and links to the show', async ({ page }) => {
+        await page.goto('/');
+        const repeat = page.locator('#home .button-row [data-show-cta]');
+        await expect(repeat).toHaveText('See us Oct 24');
+        await expect(repeat).toHaveAttribute('href', 'https://rockinoctober.com');
+        await expect(repeat).toHaveAttribute('data-track', 'show-cta-under-video');
+    });
+
+    test.describe('after the show with a next show booked', () => {
+        test.use({ showTime: '2026-11-01T12:00:00-05:00' });
+        test('points at the next show', async ({ page }) => {
+            await page.route(/\/(index\.html)?$/, async (route) => {
+                const res = await route.fetch();
+                const html = (await res.text()).replace('data-show-cta ', 'data-show-cta data-next-starts="2026-12-05T20:00:00-06:00" data-next-href="https://example.com/next" data-next-label="See us Dec 5" ');
+                await route.fulfill({ response: res, body: html });
+            });
+            await page.goto('/');
+            const repeat = page.locator('#home .button-row [data-show-cta]');
+            await expect(repeat).toHaveText('See us Dec 5');
+            await expect(repeat).toHaveAttribute('href', 'https://example.com/next');
+            await expect(repeat).toHaveAttribute('data-track', 'show-cta-next');
+        });
+    });
 });

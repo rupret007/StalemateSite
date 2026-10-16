@@ -51,9 +51,9 @@ test('phone homepage keeps the video-show hero usable without overflow', async (
         'https://www.youtube.com/@stalemate.punkband',
         'https://www.facebook.com/stalemate.band/'
     ]) {
-        const link = page.locator('#home a.social-link[href="' + href + '"]');
-        await expect(link).toBeVisible();
-        expect(tapHeight(await link.boundingBox())).toBeGreaterThanOrEqual(44);
+        // Deliberate: the hero socials row is hidden on phones (it duplicates the header) so Manic makes the first screen.
+        await expect(page.locator('#home a.social-link[href="' + href + '"]')).toBeHidden();
+        await expect(page.locator('.site-header a.social-link[href="' + href + '"]')).toBeVisible();
         expect(tapHeight(await page.locator('.site-header a.social-link[href="' + href + '"]').boundingBox())).toBeGreaterThanOrEqual(44);
     }
 
@@ -84,4 +84,17 @@ test('phone first screen shows the countdown, Oct 24 show and Manic video before
     expect(games.y).toBeGreaterThanOrEqual(home.y + home.height - 1);
     expect(games.y).toBeGreaterThan(clock.y + clock.height);
     expect(games.y).toBeGreaterThan(video.y + video.height);
+});
+
+test.describe('390x844 first screen', () => {
+    test.use({ viewport: { width: 390, height: 844 } });
+    test('Manic video top is above the fold with the countdown and show card', async ({ page }) => {
+        await page.goto('/');
+        const video = await page.locator('.hero-video__player').boundingBox();
+        expect(video.y).toBeLessThan(844);
+        expect(844 - video.y, 'a real slice of the video shows').toBeGreaterThanOrEqual(40);
+        const clock = await page.locator('[data-countdown-clock]').boundingBox();
+        expect(clock.y + clock.height).toBeLessThan(video.y);
+        await expect(page.locator('.hero-show__cta a')).toBeVisible();
+    });
 });

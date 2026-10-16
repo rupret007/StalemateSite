@@ -1513,3 +1513,41 @@ textarea:focus-visible {
         grid-template-areas: "next video" "next ctas";
     }
 }
+@media (max-width: 719px) {
+    /* Socials already live in the header; drop the hero copy so Manic makes the first phone screen. */
+    .hero .social-nav--row { display: none; }
+}
+@media (max-width: 719px) {
+    /* Tighter phone spacing so the countdown, show and the top of Manic share the first screen. */
+    .hero { padding-top: 1rem; }
+    .hero-show { margin-top: 0.6rem; gap: 0.6rem; }
+    .panel.hero-show-card { padding: 0.85rem 1rem; }
+    .hero-show-card .hero-show__tie { margin: 0 0 0.35rem; }
+    .hero-show-card .countdown-kicker { margin: 0.2rem 0; }
+    .hero-show-card .next-show-block { margin-top: 0.5rem; }
+    .hero-show-card .next-show-block p { margin: 0.15rem 0; line-height: 1.3; }
+    .hero-show__cta { margin-top: 0.5rem; }
+}
+@media (max-width: 719px) {
+    .hero { padding-top: 0.5rem; }
+    .hero__copy > .board-square { margin-top: 0.25rem; }
+    .hero-show-card .sr-only { margin: 0; }
+    .hero-show-card .next-show-block .board-square { display: none; }
+    .hero-show-card .next-show-event { font-size: 1.75rem; }
+    .hero-show-card .next-show-block p { font-size: 0.9rem; }
+}
+@media (max-width: 719px) {
+    .hero h1 { margin-bottom: 0.15rem; }
+    .hero__tag { margin-bottom: 0.2rem; }
+    .hero-show-card .hero-show__tie { font-size: 1rem; line-height: 1.15; }
+    .hero-show-card .next-show-block { margin-top: 0.35rem; }
+    .hero-show__cta .button--big { min-height: 48px; }
+}
+@media (max-width: 719px) {
+    .hero-show__cta { margin-bottom: 0; }
+    .hero-countdown .sr-only + .countdown-clock, .hero-show-card .hero-countdown { margin-bottom: 0; }
+}
+@media (max-width: 719px) {
+    .hero-show-card { gap: 0.4rem; }
+    .panel.hero-show-card { padding: 0.75rem 1rem 0.85rem; }
+}
