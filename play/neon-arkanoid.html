@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="robots" content="noindex,nofollow">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <title>Neon Arkanoid Turbo</title>
+    <style>
+        :root {
+            --bg-a: #0a1020;
+            --bg-b: #171e3f;
+            --bg-c: #12343a;
+            --ink: #d4f8ff;
+            --accent: #73ffd7;
+            --hot: #ff8f70;
+            --warn: #ffd87a;
+            --panel: rgba(7, 14, 28, 0.72);
+            --panel-border: rgba(122, 245, 220, 0.35);
+            --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            min-height: 100dvh;
+            font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 15% 15%, rgba(117, 226, 255, 0.20), transparent 42%),
+                radial-gradient(circle at 85% 8%, rgba(255, 134, 175, 0.18), transparent 38%),
+                linear-gradient(135deg, var(--bg-a), var(--bg-b) 46%, var(--bg-c));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: clamp(8px, 2.2vw, 18px);
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        .game-shell {
+            width: min(1180px, 96vw);
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+            padding: 16px 16px 18px;
+            backdrop-filter: blur(12px);
+        }
+
+        .title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            gap: 12px;
+        }
+
+        .title-wrap h1 {
+            font-size: clamp(1.1rem, 2vw, 1.6rem);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--accent);
+        }
+
+        .title-wrap p {
+            font-size: 0.86rem;
+            color: rgba(212, 248, 255, 0.84);
+            margin-top: 4px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .mobile-menu {
+            display: none;
+            width: 100%;
+        }
+
+        .mobile-menu details {
+            border: 1px solid rgba(123, 230, 255, 0.35);
+            border-radius: 10px;
+            background: rgba(8, 16, 32, 0.84);
+            padding: 6px 8px;
+        }
+
+        .mobile-menu summary {
+            color: var(--accent);
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .mobile-menu-actions {
+            margin-top: 8px;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .btn {
+            border: 1px solid rgba(115, 255, 215, 0.4);
+            color: var(--accent);
+            background: rgba(10, 19, 36, 0.55);
+            padding: 8px 12px;
+            min-height: 38px;
+            font-size: 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.2s ease, background 0.2s ease;
+        }
+
+        .btn.subtle {
+            border-color: rgba(115, 255, 215, 0.25);
+            color: #d8eef7;
+            background: rgba(8, 16, 30, 0.58);
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            background: rgba(28, 48, 88, 0.7);
+        }
+
+        .hud-grid {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(110px, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .stat-card {
+            background: rgba(8, 16, 32, 0.72);
+            border: 1px solid rgba(123, 230, 255, 0.22);
+            border-radius: 12px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .stat-card .label {
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            opacity: 0.75;
+            letter-spacing: 0.08em;
+        }
+
+        .stat-card .value {
+            margin-top: 4px;
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .stat-card.hot .value { color: var(--hot); }
+        .stat-card.warn .value { color: var(--warn); }
+
+        .status-bar {
+            display: grid;
+            grid-template-columns: 1.3fr 1.1fr 1fr;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .status-item {
+            background: rgba(8, 16, 32, 0.7);
+            border-radius: 12px;
+            border: 1px solid rgba(123, 230, 255, 0.2);
+            padding: 8px 10px;
+            min-height: 45px;
+        }
+
+        .status-item strong {
+            display: block;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            opacity: 0.72;
+        }
+
+        .status-item span {
+            display: block;
+            margin-top: 5px;
+            font-size: 0.88rem;
+        }
+
+        .play-area {
+            display: grid;
+            grid-template-columns: 1fr 250px;
+            gap: 12px;
+            align-items: start;
+        }
+
+        .canvas-wrap {
+            position: relative;
+            border-radius: 18px;
+            overflow: hidden;
+            border: 2px solid rgba(115, 255, 215, 0.35);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06), 0 16px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            background: #070d1a;
+        }
+
+        .sidebar {
+            background: rgba(7, 14, 28, 0.68);
+            border: 1px solid rgba(126, 245, 220, 0.24);
+            border-radius: 16px;
+            padding: 12px;
+            min-height: 520px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .sidebar h3 {
+            font-size: 0.86rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--accent);
+        }
+
+        .power-list {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-content: flex-start;
+            min-height: 72px;
+        }
+
+        .power-chip {
+            border: 1px solid rgba(126, 245, 220, 0.4);
+            border-radius: 999px;
+            font-size: 0.72rem;
+            padding: 5px 9px;
+            color: var(--ink);
+            background: rgba(11, 19, 34, 0.85);
+        }
+
+        .hint-list {
+            font-size: 0.79rem;
+            line-height: 1.45;
+            opacity: 0.88;
+        }
+
+        .hint-list p {
+            margin-bottom: 6px;
+        }
+
+        .overlay {
+            position: absolute;
+            inset: 0;
+            display: none;
+            place-items: center;
+            text-align: center;
+            background: rgba(5, 9, 18, 0.86);
+            border-radius: 16px;
+            padding: 20px;
+        }
+
+        .overlay-card h2 {
+            color: var(--accent);
+            margin-bottom: 12px;
+            font-size: 1.8rem;
+        }
+
+        .overlay-card p {
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+
+        .overlay-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .how-to-play {
+            position: fixed;
+            inset: 0;
+            background: rgba(5, 10, 20, 0.82);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 55;
+            padding: 20px;
+        }
+
+        .how-card {
+            width: min(520px, 100%);
+            background: rgba(9, 18, 36, 0.94);
+            border: 1px solid rgba(127, 245, 220, 0.45);
+            border-radius: 16px;
+            padding: 20px;
+        }
+
+        .how-card h2 {
+            color: var(--accent);
+            margin-bottom: 10px;
+            font-size: 1.3rem;
+        }
+
+        .how-card p {
+            font-size: 0.92rem;
+            line-height: 1.55;
+            margin-bottom: 8px;
+        }
+
+        .how-card ul {
+            margin: 8px 0 12px 20px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .how-card li {
+            margin-bottom: 6px;
+        }
+
+        .guide-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .achievement-toast {
+            position: fixed;
+            left: 50%;
+            bottom: 24px;
+            transform: translate(-50%, 20px);
+            background: rgba(11, 24, 45, 0.95);
+            color: #ffe6a1;
+            border: 1px solid rgba(255, 214, 129, 0.45);
+            border-radius: 999px;
+            padding: 10px 18px;
+            font-size: 0.85rem;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            z-index: 65;
+        }
+
+        .achievement-toast.show {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+
+        .mobile-controls {
+            display: none;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .control-btn {
+            min-width: 90px;
+            min-height: 42px;
+            border: 1px solid rgba(128, 220, 255, 0.45);
+            background: rgba(11, 22, 42, 0.8);
+            color: var(--ink);
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 1024px) {
+            body {
+                padding: clamp(8px, 2.5vw, 12px);
+                padding-bottom: 84px;
+            }
+            .game-shell {
+                width: min(980px, 94vw);
+                padding: 10px;
+                border-radius: 18px;
+            }
+            .play-area {
+                grid-template-columns: 1fr;
+                justify-items: center;
+            }
+            .canvas-wrap {
+                width: min(840px, 94vw);
+                margin: 0 auto;
+            }
+            .sidebar {
+                min-height: auto;
+                width: min(840px, 94vw);
+                padding: 10px;
+            }
+            .hud-grid {
+                grid-template-columns: repeat(3, minmax(90px, 1fr));
+            }
+            .stat-card .value {
+                font-size: 1rem;
+            }
+            .btn {
+                padding: 8px 11px;
+                font-size: 12px;
+            }
+            .status-item span {
+                font-size: 0.8rem;
+            }
+            .status-bar {
+                grid-template-columns: 1fr;
+            }
+            .mobile-controls {
+                display: flex;
+                position: sticky;
+                bottom: max(8px, env(safe-area-inset-bottom));
+                z-index: 32;
+                border: 1px solid rgba(123, 230, 255, 0.25);
+                border-radius: 12px;
+                background: rgba(8, 16, 32, 0.9);
+                padding: 7px;
+            }
+            .control-btn {
+                min-width: 84px;
+                min-height: 42px;
+                padding: 8px 11px;
+                font-size: 0.88rem;
+            }
+        }
+
+        @media (max-width: 680px) {
+            .game-shell {
+                width: min(760px, 94vw);
+                padding: 8px;
+            }
+            .title-row {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .actions {
+                display: none;
+            }
+            .mobile-menu {
+                display: block;
+            }
+            .canvas-wrap {
+                width: min(700px, 95vw);
+            }
+            .sidebar {
+                width: min(700px, 95vw);
+                padding: 8px;
+            }
+            .hud-grid {
+                grid-template-columns: repeat(2, minmax(72px, 1fr));
+                gap: 6px;
+            }
+            .status-item {
+                min-height: 40px;
+                padding: 7px 8px;
+            }
+            .status-item span {
+                font-size: 0.74rem;
+            }
+            .mobile-menu-actions {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            .guide-actions .btn {
+                flex: 1 1 140px;
+            }
+            .control-btn {
+                min-width: 82px;
+                min-height: 42px;
+                padding: 8px 10px;
+                font-size: 0.86rem;
+            }
+        }
+
+        @media (hover: none) and (pointer: coarse) {
+            .btn,
+            .control-btn {
+                min-height: 44px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="how-to-play" id="howToPlay">
+        <div class="how-card">
+            <h2>Neon Arkanoid Turbo</h2>
+            <p>Break all blocks, keep your lives, and chase combo-heavy clears.</p>
+            <ul>
+                <li><strong>Move:</strong> Mouse/touch, <strong>A/D</strong>, or <strong>Left/Right</strong></li>
+                <li><strong>Launch:</strong> <strong>Space</strong> or tap/click</li>
+                <li><strong>Pause:</strong> <strong>P</strong>, <strong>Esc</strong>, or Space while in play</li>
+                <li><strong>Restart:</strong> <strong>R</strong></li>
+                <li><strong>Mute:</strong> <strong>M</strong></li>
+            </ul>
+            <p>Tip: keep the ball alive and stack power-ups to build huge score multipliers.</p>
+            <div class="guide-actions">
+                <button class="btn" onclick="quickStartPlay()">Quick Start</button>
+                <button class="btn subtle" onclick="dismissHowToPlay()">Review Then Start</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-shell">
+        <div class="title-row">
+            <div class="title-wrap">
+                <h1>Neon Arkanoid Turbo</h1>
+                <p>Enhanced gameplay, smarter levels, power stackers, and achievement runs.</p>
+            </div>
+            <div class="actions">
+                <button class="btn subtle" onclick="location.href='./'">🏠 Hub</button>
+                <button class="btn" onclick="showHowToPlay()">❓ How To Play</button>
+                <button class="btn" onclick="togglePause()">⏯ Pause / Resume</button>
+                <button class="btn" id="muteBtn" data-mute-btn onclick="toggleMute()">🔇 Mute</button>
+                <button class="btn" onclick="restartGame()">↻ Restart</button>
+            </div>
+            <div class="mobile-menu">
+                <details>
+                    <summary>Run Menu</summary>
+                    <div class="mobile-menu-actions">
+                        <button class="btn subtle" onclick="location.href='./'">🏠 Hub</button>
+                        <button class="btn" onclick="showHowToPlay()">❓ Guide</button>
+                        <button class="btn" onclick="togglePause()">⏯ Pause</button>
+                        <button class="btn" data-mute-btn onclick="toggleMute()">🔇 Mute</button>
+                        <button class="btn" onclick="restartGame()">↻ Restart</button>
+                    </div>
+                </details>
+            </div>
+        </div>
+
+        <div class="hud-grid">
+            <div class="stat-card"><div class="label">Score</div><div class="value" id="score">0</div></div>
+            <div class="stat-card"><div class="label">High Score</div><div class="value" id="highScore">0</div></div>
+            <div class="stat-card hot"><div class="label">Lives</div><div class="value" id="lives">3</div></div>
+            <div class="stat-card"><div class="label">Level</div><div class="value" id="level">1</div></div>
+            <div class="stat-card warn" id="comboDisplay" style="display:none;"><div class="label">Combo</div><div class="value"><span id="combo">0</span>x</div></div>
+            <div class="stat-card"><div class="label">Best Combo</div><div class="value" id="bestCombo">0</div></div>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <strong>Status</strong>
+                <span id="statusLine">Ready.</span>
+            </div>
+            <div class="status-item">
+                <strong>Objective</strong>
+                <span id="objectiveText">Break all blocks.</span>
+            </div>
+            <div class="status-item">
+                <strong>Mode</strong>
+                <span id="modeText">Pattern: Classic Grid</span>
+            </div>
+        </div>
+
+        <div class="play-area">
+            <div class="canvas-wrap">
+                <canvas id="gameCanvas" width="960" height="640"></canvas>
+
+                <div class="overlay" id="gameOver">
+                    <div class="overlay-card">
+                        <h2 id="endTitle">Run Over</h2>
+                        <p id="endSubtitle">The run got flushed. Reload your luck.</p>
+                        <p>Final Score: <strong id="finalScore">0</strong></p>
+                        <div class="overlay-actions">
+                            <button class="btn" onclick="restartGame()">Play Again</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overlay" id="pauseOverlay">
+                    <div class="overlay-card">
+                        <h2>Paused</h2>
+                        <p>Press Space, P, or Resume to continue.</p>
+                        <div class="overlay-actions">
+                            <button class="btn" onclick="togglePause()">Resume</button>
+                            <button class="btn" onclick="restartGame()">Restart</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <aside class="sidebar">
+                <div>
+                    <h3>Active Powers</h3>
+                    <div class="power-list" id="activePowerList">
+                        <span class="power-chip">None</span>
+                    </div>
+                </div>
+
+                <div>
+                    <h3>Achievements</h3>
+                    <p class="hint-list" id="achievementsList">0 unlocked</p>
+                </div>
+
+                <div>
+                    <h3>Quick Tips</h3>
+                    <div class="hint-list">
+                        <p>Keep the combo running for score multipliers.</p>
+                        <p>Explosive blocks chain clear nearby bricks.</p>
+                        <p>Shield and Magnet power-ups are clutch on harder waves.</p>
+                        <p>Use keyboard control for precision catches.</p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <div class="mobile-controls" id="mobileControls">
+            <button class="control-btn" data-action="left">Left</button>
+            <button class="control-btn" data-action="launch">Launch</button>
+            <button class="control-btn" data-action="right">Right</button>
+        </div>
+    </div>
+
+    <div class="achievement-toast" id="achievementToast"></div>
+
+    <script src="game.js"></script>
+    <script>
+        let guidePausedGame = false;
+
+        function showHowToPlay() {
+            const el = document.getElementById('howToPlay');
+            if (el) el.style.display = 'flex';
+            guidePausedGame = false;
+            if (
+                window.gameInstance &&
+                window.gameInstance.gameRunning &&
+                !window.gameInstance.awaitingLaunch &&
+                !window.gameInstance.paused &&
+                window.gameInstance.togglePause
+            ) {
+                window.gameInstance.togglePause(true);
+                guidePausedGame = true;
+            }
+        }
+
+        function dismissHowToPlay() {
+            const el = document.getElementById('howToPlay');
+            if (el) el.style.display = 'none';
+            if (
+                guidePausedGame &&
+                window.gameInstance &&
+                window.gameInstance.gameRunning &&
+                window.gameInstance.paused &&
+                window.gameInstance.togglePause
+            ) {
+                window.gameInstance.togglePause(false);
+            }
+            guidePausedGame = false;
+        }
+
+        function quickStartPlay() {
+            dismissHowToPlay();
+            if (window.gameInstance && window.gameInstance.awaitingLaunch && window.gameInstance.launchBall) {
+                window.gameInstance.launchBall();
+                if (window.gameInstance.setStatus) {
+                    window.gameInstance.setStatus('Quick start live. Keep the combo chain rolling.');
+                }
+            }
+        }
+
+        window.addEventListener('load', function () {
+            showHowToPlay();
+        });
+    </script>
+</body>
+</html>

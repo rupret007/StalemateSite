@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0e1a2e"/>
+      <stop offset="1" stop-color="#145a52"/>
+    </linearGradient>
+    <linearGradient id="swirl" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#c48a45"/>
+      <stop offset="0.55" stop-color="#8a5a30"/>
+      <stop offset="1" stop-color="#4a2a14"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.35" r="0.55">
+      <stop offset="0" stop-color="#9effc8" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#9effc8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <circle cx="32" cy="28" r="22" fill="url(#glow)"/>
+  <path d="M22 44c0-6 5-10 10-11-2-3-3-5-3-7 0-6 5-10 11-10 6 0 11 4 11 10 0 2-1 4-3 7 5 1 10 5 10 11 0 7-7 12-16 12S22 51 22 44Z" fill="url(#swirl)"/>
+  <ellipse cx="27" cy="38" rx="2.2" ry="3" fill="#2a180c" opacity="0.35"/>
+  <ellipse cx="37" cy="38" rx="2.2" ry="3" fill="#2a180c" opacity="0.35"/>
+  <circle cx="26" cy="17" r="4.5" fill="#78ffd5"/>
+  <circle cx="17" cy="25" r="2.8" fill="#ffe28a"/>
+  <circle cx="47" cy="22" r="2.2" fill="#b290ff" opacity="0.9"/>
+</svg>

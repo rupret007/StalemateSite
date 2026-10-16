@@ -1,0 +1,31 @@
+import './table-continue-core.js';
+
+const api = globalThis.TurdSuiteTableContinue;
+
+export const CONTINUE_KEY = api.CONTINUE_KEY;
+export const GUIDE_SEEN_KEY = api.GUIDE_SEEN_KEY;
+export const CONTINUE_VERSION = api.CONTINUE_VERSION;
+export const CONTINUE_MAX_BYTES = api.CONTINUE_MAX_BYTES;
+export const LIVE_HUB_GAMES = api.LIVE_HUB_GAMES;
+export const TABLE_CONTINUE_GAMES = api.TABLE_CONTINUE_GAMES;
+export const kindForPage = api.kindForPage;
+export const isPlainObject = api.isPlainObject;
+export const cloneJson = api.cloneJson;
+export const finiteInt = api.finiteInt;
+export const cleanString = api.cleanString;
+export const validateSpadesSnapshot = api.validateSpadesSnapshot;
+export const validateRummySnapshot = api.validateRummySnapshot;
+export const validateEightsSnapshot = api.validateEightsSnapshot;
+export const validateJackSnapshot = api.validateJackSnapshot;
+export const validateSnapshot = api.validateSnapshot;
+export const parseContinueStore = api.parseContinueStore;
+export const rememberContinue = api.rememberContinue;
+export const loadContinue = api.loadContinue;
+export const clearContinue = api.clearContinue;
+export const listContinuePages = api.listContinuePages;
+export const listLiveContinuePages = api.listLiveContinuePages;
+export const hasContinue = api.hasContinue;
+export const hasLiveContinue = api.hasLiveContinue;
+export const isLiveSnapshot = api.isLiveSnapshot;
+export const hasSeenGuide = api.hasSeenGuide;
+export const markGuideSeen = api.markGuideSeen;

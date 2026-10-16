@@ -1,0 +1,5 @@
+.stalemate-strip{position:fixed;left:0;right:0;bottom:0;box-sizing:border-box;z-index:9999;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px max(10px,env(safe-area-inset-left));padding-bottom:max(4px,env(safe-area-inset-bottom));background:#171410;color:#f4f0e6;font:700 14px/1 "Arial Narrow",Impact,sans-serif;text-transform:uppercase;letter-spacing:.06em;border-top:4px solid;border-image:repeating-linear-gradient(90deg,#f4f0e6 0 6px,#171410 6px 12px) 4}
+.stalemate-strip a{color:#f4f0e6;text-decoration:none;display:inline-flex;align-items:center;gap:6px;min-height:44px}
+.stalemate-strip .sm-listen{color:#ed2765}
+.stalemate-strip a:focus-visible{outline:3px solid #b5dc08;outline-offset:2px}
+body{padding-bottom:calc(56px + env(safe-area-inset-bottom))!important}
