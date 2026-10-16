@@ -44,12 +44,71 @@ test('/play/ hosts Turdanoid same-origin, hidden and noindex', async ({ page }) 
     expect(errors).toEqual([]);
 });
 
-test('/play/ is not linked from the site and not packaged for Pages', async ({ page }) => {
+test('homepage Games card and nav link go to /play/, which stays noindex and out of the Pages package', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('a[href*="play"]')).toHaveCount(0);
+    const nav = page.getByRole('navigation', { name: 'Primary navigation', exact: true });
+    const navLinks = nav.getByRole('link');
+    await expect(navLinks.last()).toHaveText('Games');
+    await expect(navLinks.last()).toHaveAttribute('href', '#games');
+    const games = page.locator('#games');
+    await expect(games.locator('.board-square')).toHaveText('Games');
+    await expect(games).toContainText('Turdanoid: our free arcade game. Plays in the browser, nothing to download.');
+    await expect(games).toContainText('Brick-breaker, but gross.');
+    await expect(games.locator('.games-card__thumb')).toBeVisible();
+    const play = games.getByRole('link', { name: 'Play Turdanoid' });
+    await expect(play).toHaveAttribute('href', 'play/');
+    const box = await games.locator('.games-card').boundingBox();
+    expect(box.height).toBeLessThan(420);
+    expect(await page.locator('main > section').evaluateAll((s) => s.map((e) => e.id))).toEqual(['home', 'listen', 'about', 'games']);
+    await expect(page.locator('a[href*="play"]')).toHaveCount(1);
     const pkg = fs.readFileSync(path.join(ROOT, 'scripts/package-pages.cjs'), 'utf8');
     expect(pkg).not.toMatch(/play\//);
     for (const f of fs.readdirSync(path.join(ROOT, 'play')).filter((n) => n.endsWith('.html'))) {
         expect(fs.readFileSync(path.join(ROOT, 'play', f), 'utf8'), f).toContain('<meta name="robots" content="noindex,nofollow">');
     }
+});
+
+test('/play/ has a share image', async ({ page, request }) => {
+    for (const p of ['/play/', '/play/TurdAnoid.html']) {
+        await page.goto(p);
+        await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', 'https://stalemate.band/play/stalemate/og-play.png');
+    }
+    const img = await request.get('/play/stalemate/og-play.png');
+    expect(img.status()).toBe(200);
+    expect(img.headers()['content-type']).toContain('image/png');
+});
+
+test('game over offers Listen to Manic, the Oct 24 show and Share score next to Play again', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.clock.setFixedTime(new Date('2026-10-16T12:00:00-05:00'));
+    await page.goto('/play/TurdAnoid.html');
+    await page.locator('#btnStart').click();
+    const coachNext = page.locator('#btnCoachNext');
+    for (let i = 0; i < 5 && (await coachNext.isVisible()); i++) {
+        await coachNext.click();
+    }
+    await expect(coachNext).toBeHidden();
+    await page.evaluate(() => window.gameOver(false));
+    const end = page.locator('#endScreen');
+    await expect(end.locator('#btnRestart')).toBeVisible();
+    const extra = end.locator('.stalemate-end');
+    await expect(extra.getByRole('link', { name: 'Listen to Manic' })).toHaveAttribute('href', '../#home');
+    await expect(extra).toContainText('Oct 24');
+    const share = extra.getByRole('button', { name: 'Share score' });
+    await expect(share).toBeVisible();
+    const h = await share.boundingBox();
+    expect(h.height).toBeGreaterThanOrEqual(44);
+    await page.evaluate(() => {
+        window.__shared = null;
+        navigator.canShare = () => false;
+        navigator.share = (d) => {
+            window.__shared = d;
+            return Promise.resolve();
+        };
+    });
+    await share.click();
+    const shared = await page.evaluate(() => window.__shared);
+    expect(shared.text).toMatch(/^I scored \d+ in Turdanoid/);
+    expect(errors).toEqual([]);
 });

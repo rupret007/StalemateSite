@@ -28,5 +28,9 @@ mkdir -p "$DEST/stalemate"
 cp "$ROOT/scripts/stalemate-overlay/"* "$DEST/stalemate/"
 sed -i 's|</head>|<link rel="stylesheet" href="stalemate/stalemate-overlay.css">\n</head>|' TurdAnoid.html
 sed -i 's|</body>|<script src="stalemate/stalemate-overlay.js"></script>\n</body>|' TurdAnoid.html
+# Share image for /play/ links
+for f in index.html TurdAnoid.html; do
+  sed -i 's|</head>|<meta property="og:title" content="Turdanoid on stalemate.band">\n<meta property="og:description" content="Brick-breaker, but gross. Free, plays in the browser.">\n<meta property="og:image" content="https://stalemate.band/play/stalemate/og-play.png">\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">\n<meta name="twitter:card" content="summary_large_image">\n</head>|' "$f"
+done
 printf 'Vendored from github.com/rupret007/Turdanoid@%s (%s). Same owner as this repo; no separate license file upstream.\nDo not edit by hand: run scripts/sync-turdanoid.sh\n' "$SHA" "$REF" > "$DEST/VENDORED.txt"
 echo "Synced Turdanoid $SHA into play/"

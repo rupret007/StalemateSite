@@ -73,3 +73,54 @@
   };
   if (reduce) document.documentElement.classList.add('stalemate-reduced');
 })();
+
+/* Game over: Listen to Manic + Oct 24 show line + Share score (Web Share API, image pre-rendered so iOS keeps the tap). */
+(function () {
+  'use strict';
+  var end = document.getElementById('endScreen');
+  var restart = document.getElementById('btnRestart');
+  if (!end || !restart) return;
+  var SHOW_END = Date.parse('2026-10-25T00:00:00-05:00');
+  var box = document.createElement('div');
+  box.className = 'stalemate-end';
+  box.innerHTML =
+    '<a class="stalemate-end__listen" href="../#home">Listen to Manic</a>' +
+    '<button type="button" class="stalemate-end__share" id="stalemateShare">Share score</button>' +
+    (Date.now() < SHOW_END ? '<p class="stalemate-end__show">See Stalemate live: Sat, Oct 24, 4:45 PM, Los Amigo’s, Plano</p>' : '');
+  restart.insertAdjacentElement('afterend', box);
+  var shareBtn = box.querySelector('#stalemateShare');
+  var file = null;
+  function score() {
+    var el = document.getElementById('endScore');
+    return el ? el.textContent.trim() : '0';
+  }
+  function render() {
+    var c = document.createElement('canvas');
+    c.width = 1080; c.height = 1080;
+    var g = c.getContext('2d');
+    for (var i = 0; i < 12; i++) for (var j = 0; j < 12; j++) {
+      g.fillStyle = (i + j) % 2 ? '#111' : '#f4f0e6';
+      g.fillRect(i * 90, j * 90, 90, 90);
+    }
+    g.fillStyle = '#171410'; g.fillRect(90, 225, 900, 630);
+    g.textAlign = 'center';
+    g.fillStyle = '#ed2765'; g.font = '900 110px Impact, "Arial Black", sans-serif'; g.fillText('TURDANOID', 540, 370);
+    g.fillStyle = '#f4f0e6'; g.font = '900 150px Impact, "Arial Black", sans-serif'; g.fillText(score(), 540, 560);
+    g.font = '700 54px Impact, "Arial Black", sans-serif'; g.fillText('POINTS. GROSS.', 540, 640);
+    g.fillStyle = '#b5dc08'; g.font = '700 50px Impact, "Arial Black", sans-serif'; g.fillText('stalemate.band/play', 540, 780);
+    if (c.toBlob) c.toBlob(function (b) { file = b ? new File([b], 'turdanoid-score.png', { type: 'image/png' }) : null; }, 'image/png');
+  }
+  function visible() { return !end.hasAttribute('inert') && end.offsetParent !== null; }
+  new MutationObserver(function () { if (visible()) render(); }).observe(end, { attributes: true, attributeFilter: ['class', 'inert', 'style'] });
+  var url = location.origin + location.pathname.replace(/[^/]*$/, '');
+  shareBtn.addEventListener('click', function () {
+    var text = 'I scored ' + score() + ' in Turdanoid. Brick-breaker, but gross.';
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file] }).catch(function () {});
+    } else if (navigator.share) {
+      navigator.share({ text: text, url: url }).catch(function () {});
+    } else if (navigator.clipboard) {
+      navigator.clipboard.writeText(text + ' ' + url).then(function () { shareBtn.textContent = 'Copied!'; }, function () {});
+    }
+  });
+})();
