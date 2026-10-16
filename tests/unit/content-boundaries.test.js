@@ -29,37 +29,36 @@ function words(text) {
 }
 
 describe('content boundaries', () => {
-    it('keeps the known originals, standard band CTAs, and operational tokens without naming members or chess kickers', async () => {
+    it('keeps confirmed facts and finished CTAs without template slots or member names', async () => {
         const home = await readFile(join(repoRoot, 'index.html'), 'utf8');
         const readme = await readFile(join(repoRoot, 'README.md'), 'utf8');
         expect(home).toContain('Better Than Now');
         expect(home).toContain('Manic');
         expect(home).toMatch(/punk rock/i);
+        expect(home).toContain('Lewisville');
+        expect(home).toContain('Flower Mound');
         expect(home).toContain('Originals. Two-tone.');
         expect(home).not.toMatch(/Ska \/ punk/i);
         expect(home).not.toMatch(/ska\/punk/i);
         expect(home).not.toMatch(/ticket/i);
-        expect(home).toContain('href="#music">Listen');
-        expect(home).toContain('href="#video">Watch');
-        expect(home).toContain('href="#follow">Follow');
-        expect(home).toContain('href="#contact">Contact');
+        expect(home).toContain('href="#about">About');
+        expect(home).toContain('http://rockinoctober.com');
         expect(home).toContain('class="button button--listen"');
         expect(home).toContain('2026-10-24T16:45:00-05:00');
         expect(home).toContain('Rockin’ October');
         expect(home).toContain('Los Amigo’s');
-        expect(home).toContain('http://rockinoctober.com');
         expect(home).toContain('Festival info');
-        expect(home).not.toContain('[DATE/VENUE NEEDED]');
-        expect(home).toContain('[MAILING LIST TOOL NEEDED]');
-        expect(home).toContain('[MERCH NEEDED]');
+        expect(home).not.toMatch(/id="(music|video|follow|merch)"/);
+        expect(home).not.toContain('data-embed');
+        expect(home).not.toContain('<form');
+        expect(home).not.toMatch(/\[(DATE\/VENUE|MAILING LIST TOOL|MERCH|BOOKING EMAIL|HANDLE|STREAM LINK|CITY) NEEDED\]/);
+        expect(home).not.toMatch(/\bTBA\b|coming soon|\blorem\b|\bplaceholder\b|\byour\b|\benter\b/i);
         expect(home).not.toMatch(/A1\s*·/);
         expect(home).not.toMatch(/E4\s*·/);
-        expect(home).not.toContain('[CITY NEEDED');
-        expect(readme).toContain('[MAILING LIST TOOL NEEDED]');
-        expect(readme).toContain('[MERCH NEEDED]');
-        expect(readme).toContain('[BOOKING EMAIL NEEDED]');
+        expect(readme).toContain('Lewisville');
         expect(readme).toContain('Member names and roles');
         expect(readme).not.toMatch(/ticket/i);
+        expect(readme).not.toMatch(/\[(MAILING LIST TOOL|MERCH|BOOKING EMAIL|HANDLE) NEEDED\]/);
     });
 
     it('never names band members on public surfaces', async () => {
@@ -79,8 +78,9 @@ describe('content boundaries', () => {
         expect(count).toBeGreaterThanOrEqual(50);
         expect(count).toBeLessThanOrEqual(75);
         expect(epk).toContain('Long bio');
+        expect(epk).toContain('Lewisville');
         expect(epk).toContain('stage-plot.txt');
         expect(epk).toContain('tech-rider.txt');
-        expect(epk).toContain('[BOOKING EMAIL NEEDED]');
+        expect(epk).not.toContain('[BOOKING EMAIL NEEDED]');
     });
 });

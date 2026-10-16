@@ -5,8 +5,7 @@ test('unknown paths render the 404 page with a way home', async ({ page }) => {
     expect(response.status()).toBe(404);
     await expect(page).toHaveTitle(/Page not found/);
     await expect(page.locator('h1')).toContainText('This page is not on the set');
-    await expect(page.locator('#shows-link')).toHaveAttribute('href', './#shows');
-    await expect(page.locator('#music-link')).toHaveAttribute('href', './#music');
+    await expect(page.locator('#about-link')).toHaveAttribute('href', './#about');
 });
 
 test('404 under the GitHub Pages prefix still loads styles from the project root', async ({ page }) => {
@@ -20,9 +19,9 @@ test('404 under the GitHub Pages prefix still loads styles from the project root
 
 test.describe('404 without JavaScript', () => {
     test.use({ javaScriptEnabled: false });
-    test('still offers homepage, music and show links', async ({ page }) => {
+    test('still offers homepage and about links', async ({ page }) => {
         await page.goto('/missing');
         await expect(page.getByRole('link', { name: 'Back to the homepage' })).toBeVisible();
-        await expect(page.locator('#shows-link')).toBeVisible();
+        await expect(page.locator('#about-link')).toBeVisible();
     });
 });

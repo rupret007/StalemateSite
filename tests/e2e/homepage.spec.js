@@ -1,20 +1,29 @@
 const { test, expect } = require('./fixtures');
 
-test('homepage leads with listen, watch, shows and honest placeholders', async ({ page }) => {
+const PLACEHOLDER_COPY = /\bTBA\b|coming soon|\blorem\b|\bplaceholder\b|\byour\b|\benter\b/i;
+
+test('homepage is a finished band page with hometown, show and real links', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveTitle(/Stalemate/);
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.locator('#band-title')).toContainText('Stalemate');
-    await expect(page.locator('#home a.button--listen')).toHaveAttribute('href', '#music');
-    await expect(page.locator('#home a.button--hot')).toHaveAttribute('href', '#video');
-    await expect(page.locator('#music')).toContainText('Better Than Now');
-    await expect(page.locator('#music')).toContainText('Manic');
+    await expect(page.locator('#home a.button--listen')).toHaveAttribute('href', '#about');
+    await expect(page.locator('#home a.button--hot')).toHaveAttribute('href', 'http://rockinoctober.com');
     await expect(page.locator('#about')).toContainText(/punk rock/i);
+    await expect(page.locator('#about')).toContainText('Lewisville');
+    await expect(page.locator('#about')).toContainText('Flower Mound');
+    await expect(page.locator('#about')).toContainText('Better Than Now');
+    await expect(page.locator('#about')).toContainText('Manic');
     await expect(page.locator('#about dt')).toHaveCount(0);
-    await expect(page.locator('#home')).not.toContainText('[CITY NEEDED');
-    await expect(page.locator('#shows')).toContainText('Rockin’ October');
-    await expect(page.locator('#shows')).toContainText('Los Amigo’s');
-    await expect(page.locator('#merch')).toContainText('[MERCH NEEDED]');
+    await expect(page.locator('#music')).toHaveCount(0);
+    await expect(page.locator('#video')).toHaveCount(0);
+    await expect(page.locator('#follow')).toHaveCount(0);
+    await expect(page.locator('#merch')).toHaveCount(0);
+    await expect(page.locator('[data-embed]')).toHaveCount(0);
+    await expect(page.locator('iframe')).toHaveCount(0);
+    await expect(page.locator('form')).toHaveCount(0);
+    await expect(page.locator('#home')).toContainText('Rockin’ October');
+    await expect(page.locator('#home')).toContainText('Los Amigo’s');
     await expect(page.locator('body')).toContainText('Not the SoCal pop-punk band');
     await expect(page.locator('body')).not.toContainText(/ticket/i);
     await expect(page.locator('body')).not.toContainText(/\bJeff\b/);
@@ -23,27 +32,23 @@ test('homepage leads with listen, watch, shows and honest placeholders', async (
     const metadata = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent());
     expect(metadata['@type']).toBe('MusicGroup');
     expect(metadata.name).toBe('Stalemate');
+    expect(metadata.foundingLocation.name).toMatch(/Lewisville/);
     await expect(page.locator('body')).not.toContainText('4rwTyXLXW0blHBUjQdJmA7');
 });
 
-test('preview iframes stay dormant until a tap and stay local', async ({ page }) => {
-    const requested = [];
-    page.on('request', (request) => {
-        if (/youtube|spotify|apple\.com/i.test(request.url())) requested.push(request.url());
-    });
-    await page.goto('/');
-    const song = page.locator('#music [data-embed]').first();
-    await expect(song.locator('iframe')).toHaveCount(0);
-    await song.getByRole('button', { name: 'Load preview' }).click();
-    await expect(song.locator('iframe')).toHaveAttribute('src', /embed-placeholder\.html/);
-    expect(requested).toEqual([]);
+test('public pages fail on template placeholder words', async ({ page }) => {
+    for (const path of ['/', '/qr/', '/epk/', '/missing']) {
+        await page.goto(path);
+        const text = await page.locator('body').innerText();
+        expect(text, path).not.toMatch(PLACEHOLDER_COPY);
+    }
 });
 
 for (const width of [320, 390, 768, 1440]) {
     test(`homepage remains usable without overlap at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 900 });
         await page.goto('/');
-        for (const section of ['#home', '#music', '#shows', '#video', '#about', '#follow', '#merch']) {
+        for (const section of ['#home', '#about']) {
             await page.locator(section).scrollIntoViewIfNeeded();
             expect(await page.evaluate(() => Math.max(document.body.scrollWidth, document.documentElement.scrollWidth) <= innerWidth + 1)).toBe(true);
         }
@@ -51,27 +56,26 @@ for (const width of [320, 390, 768, 1440]) {
         for (const link of await nav.getByRole('link').all()) {
             expect((await link.boundingBox()).height).toBeGreaterThanOrEqual(44);
         }
-        const listen = page.locator('#home a.button--listen');
-        expect((await listen.boundingBox()).height).toBeGreaterThanOrEqual(44);
+        const about = page.locator('#home a.button--listen');
+        expect((await about.boundingBox()).height).toBeGreaterThanOrEqual(44);
     });
 }
 
 test.describe('homepage without JavaScript', () => {
     test.use({ javaScriptEnabled: false });
-    test('keeps listen, watch, follow and merch usable', async ({ page }) => {
+    test('keeps about, the show facts and festival link usable', async ({ page }) => {
         await page.goto('/');
-        await expect(page.locator('#home a[href="#music"]')).toBeVisible();
-        await expect(page.locator('#home a[href="#video"]')).toBeVisible();
-        await expect(page.locator('#music')).toContainText('Better Than Now');
-        await expect(page.locator('[data-load-preview]:not([hidden])')).toHaveCount(0);
+        await expect(page.locator('#home a[href="#about"]')).toBeVisible();
+        await expect(page.locator('#home a.button--hot[href="http://rockinoctober.com"]')).toBeVisible();
+        await expect(page.locator('#about')).toContainText('Better Than Now');
+        await expect(page.locator('[data-load-preview]')).toHaveCount(0);
         await expect(page.locator('[data-share-band]:not([hidden])')).toHaveCount(0);
-        await expect(page.locator('#follow')).toContainText('[MAILING LIST TOOL NEEDED]');
         await expect(page.locator('#about')).toContainText(/punk rock/i);
         await expect(page.locator('#about dt')).toHaveCount(0);
-        await expect(page.locator('#merch')).toContainText('Merch placeholder');
         await expect(page.locator('[data-next-show-block]')).toContainText('Rockin’ October');
         await expect(page.locator('[data-countdown-clock]')).toBeHidden();
         await expect(page.locator('body')).not.toContainText(/ticket/i);
+        await expect(page.locator('body')).not.toContainText(PLACEHOLDER_COPY);
     });
 });
 
@@ -90,7 +94,7 @@ test.describe('hero countdown before the set', () => {
         await expect(page.locator('[data-next-show-block]')).toContainText('Los Amigo’s, Plano, TX');
         await expect(page.locator('[data-next-show-block]')).toContainText('Doors open at 12 PM');
         await expect(page.locator('[data-next-show-block]')).toContainText('All ages');
-        await expect(page.locator('#home a[href="http://rockinoctober.com"]')).toHaveText('Festival info');
+        await expect(page.locator('#home a[href="http://rockinoctober.com"]').first()).toBeVisible();
         await expect(page.locator('#home')).not.toContainText(/ticket/i);
         await expect(page.locator('#home')).not.toContainText(/\bJeff\b/);
         const box = await next.boundingBox();
@@ -106,14 +110,14 @@ test.describe('hero countdown after the set', () => {
         await expect(page.locator('[data-next-show]')).toBeHidden();
         await expect(page.locator('[data-countdown]')).toBeHidden();
         await expect(page.locator('[data-next-show-block]')).toBeHidden();
-        await expect(page.locator('#home a[href="#music"]')).toBeVisible();
-        await expect(page.locator('#home a[href="#video"]')).toBeVisible();
+        await expect(page.locator('#home a[href="#about"]')).toBeVisible();
+        await expect(page.locator('#home a.button--hot[href="http://rockinoctober.com"]')).toBeVisible();
         await expect(page.locator('#home')).not.toContainText('Shows coming soon');
         expect(await page.locator('[data-next-show]').boundingBox()).toBeNull();
-        await expect(page.locator('[data-upcoming-empty]')).toBeVisible();
-        await expect(page.locator('[data-upcoming-empty]')).toContainText('No upcoming dates posted yet.');
-        await expect(page.locator('[data-past-shows]')).toContainText('Rockin’ October');
+        await expect(page.locator('[data-upcoming-empty]')).toHaveCount(0);
+        await expect(page.locator('#about')).toContainText('Rockin’ October');
         await expect(page.locator('body')).not.toContainText(/ticket/i);
+        await expect(page.locator('body')).not.toContainText(PLACEHOLDER_COPY);
     });
 });
 

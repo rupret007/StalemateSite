@@ -1,34 +1,29 @@
 # Stalemate site
 
-Official site for **Stalemate** — punk rock originals. Named cuts: **Better Than Now** and **Manic**. Studio session taped **8 October 2026**. Next date: **Rockin’ October**, Saturday, Oct 24, 2026, Los Amigo’s, Plano, TX. Set 4:45 PM Central.
+Official site for **Stalemate** — a punk rock band from **Lewisville / Flower Mound**. Named cuts: **Better Than Now** and **Manic**. Next date: **Rockin’ October**, Saturday, Oct 24, 2026, Los Amigo’s, Plano, TX. Set 4:45 PM Central.
 
 This is **not** the Southern California pop-punk band of the same name. Do not link that act.
 
 ## Public surfaces
 
-- `/` — stage hero, Listen + Watch, set countdown, next-show block, music, shows, video, about, follow, merch shelf
-- `/qr/` — printed-flyer landing (next show, listen, follow)
-- `/epk/` — press kit (short + long bio, stills, music, video, interview, stage plot, rider, booking)
+- `/` — stage hero, set countdown, next-show block, about
+- `/qr/` — printed-flyer landing for Rockin’ October
+- `/epk/` — press kit (short + long bio, marks, stage plot, rider)
 - `404.html` — not-on-the-set page
 
-Unknown facts stay off the public page. Needed blanks live in the list below — do not invent them in copy.
+The public pages carry only confirmed facts. No empty shelves, stub forms, dummy embeds or fill-in copy.
 
 ## Facts still needed
 
 Do not publish guesses for any of these:
 
-- City / hometown
 - Member names and roles (do not name anyone on the site)
 - Stream / store URLs for Better Than Now and Manic
-- Manic lyric-video watch URL
-- Studio interview watch URL
 - ICS for Rockin’ October
-- Mailing-list tool
-- Merch items
 - Booking email
 - Instagram / TikTok / Facebook handles
 
-Operational tokens (`[MAILING LIST TOOL NEEDED]`, `[MERCH NEEDED]`, `[BOOKING EMAIL NEEDED]`, `[HANDLE NEEDED]`) stay in the HTML as screen-reader-only markers so tests can lock them. They are not shown in the hero. The homepage countdown and next-show block hide after `2026-10-24T16:45:00-05:00` and leave no empty placeholder.
+The homepage countdown and next-show block hide after `2026-10-24T16:45:00-05:00` and leave no empty slot.
 
 ## Visual identity
 
@@ -42,7 +37,7 @@ npm run test:install-browsers
 npm test
 ```
 
-Unit tests use Vitest. Browser tests use Playwright against a local server on **4320** (override with `STALEMATE_TEST_PORT`). The server also mounts the site at `/StalemateSite/` so the GitHub Pages project path can be exercised. Navigation, song names and the mailing-list copy work with JavaScript disabled. Previews load only after an explicit tap.
+Unit tests use Vitest. Browser tests use Playwright against a local server on **4320** (override with `STALEMATE_TEST_PORT`). The server also mounts the site at `/StalemateSite/` so the GitHub Pages project path can be exercised. Navigation and song names work with JavaScript disabled.
 
 ## GitHub Pages (temporary host)
 
@@ -69,7 +64,7 @@ Asset links on the homepage, `/qr/` and `/epk/` are **relative**, so they work a
    ```
 
 3. Set `PROJECT_BASE` in `site-base.js` to `'/'`.
-4. Replace `https://rupret007.github.io/StalemateSite/` in canonical, Open Graph and share URLs with `https://your-domain/`.
+4. Replace `https://rupret007.github.io/StalemateSite/` in canonical, Open Graph and share URLs with the live host.
 5. In Pages settings, add the custom domain and wait for HTTPS.
 
 Do not invent a domain name here. Check availability before buying.

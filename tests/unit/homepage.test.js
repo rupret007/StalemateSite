@@ -63,19 +63,14 @@ describe('homepage script behavior', () => {
         expect(brand.contains(fallbacks[0])).toBe(true);
     });
 
-    it('loads a preview iframe only after an explicit tap', () => {
+    it('has no dummy preview embeds or stub forms', () => {
         const { document } = loadHomepage();
-        const host = document.querySelector('[data-embed]');
-        const button = host.querySelector('[data-load-preview]');
-
-        expect(host.querySelector('iframe')).toBeNull();
-        expect(button.hidden).toBe(false);
-        button.click();
-        expect(host.querySelector('iframe')).toBeTruthy();
-        expect(host.querySelector('iframe').getAttribute('src')).toContain('embed-placeholder.html');
-        expect(button.hidden).toBe(true);
-        button.click();
-        expect(host.querySelectorAll('iframe')).toHaveLength(1);
+        expect(document.querySelector('[data-embed]')).toBeNull();
+        expect(document.querySelector('[data-load-preview]')).toBeNull();
+        expect(document.querySelector('iframe')).toBeNull();
+        expect(document.querySelector('form')).toBeNull();
+        expect(document.querySelector('#music')).toBeNull();
+        expect(document.querySelector('#merch')).toBeNull();
     });
 });
 
