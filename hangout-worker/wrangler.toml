@@ -28,7 +28,25 @@ new_sqlite_classes = ["HangoutLobby"]
 # Lobby (hidden, not deployed). Public ids only here; fill in after creating the Cloudflare Access app.
 # Secrets via `wrangler secret put`: HANGOUT_PREVIEW_KEY, HANGOUT_HMAC_KEY (32+ chars), HANGOUT_TURNSTILE_SECRET,
 # HANGOUT_OWNER_EMAIL, HANGOUT_BAND_EMAILS. Any missing => the lobby answers 503.
+[[durable_objects.bindings]]
+name = "TURN_BUDGET"
+class_name = "HangoutTurnBudget"
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["HangoutTurnBudget"]
+
 [vars]
 HANGOUT_ACCESS_TEAM = ""
 HANGOUT_ACCESS_AUD = ""
 WEBJAM_WEB_ORIGINS = ""
+
+# Open around the clock once configured; server auto-locks after 24h without band presence.
+HANGOUT_OPEN = "1"
+# Preparation only: leave TURN disabled until the deployment checklist is completed.
+HANGOUT_TURN_ENABLED = "0"
+# Shared account TURN admission threshold; preserve headroom for SFU/other consumers.
+HANGOUT_TURN_MONTHLY_GB = "800"
+HANGOUT_CF_ACCOUNT_ID = ""
+# Secrets (never vars): HANGOUT_TURN_KEY_ID, HANGOUT_TURN_API_TOKEN,
+# HANGOUT_TURN_ANALYTICS_TOKEN (separate Account Analytics read token).

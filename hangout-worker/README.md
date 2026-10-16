@@ -9,14 +9,15 @@ A tiny Cloudflare Worker with Durable Objects that forwards **encrypted data fra
 - **Per connection:** up to 8,000 messages, a burst of 30, refilling at 8 a second, and frames of 48 KB or less.
 - **Request budget:** worst case is 200 × 8,000 messages ÷ 20 (WebSocket messages bill 20:1) ≈ 80k request-equivalents, under the free 100k a day.
 
-## Deploy (needs `wrangler login` as Jeff, on the free plan)
-```sh
-cd hangout-worker
-npx wrangler login
-npx wrangler deploy
-npx wrangler secret put HANGOUT_PREVIEW_KEY   # >= 16 random chars, never committed
-```
-Then put the `wss://stalemate-hangout.<account>.workers.dev` URL in the room page's `hangout-relay` meta tag.
+## Deployment preparation (hidden, NOT deployed)
+
+Follow [the ordered deployment checklist](../docs/HANGOUT_DEPLOY.md). This preparation
+must stay hidden and undeployed. The vault helper defaults to names-only dry-run;
+real secret upload and deployment require a separately approved rollout.
+
+`/turn` issues ten-minute Realtime credentials only when explicitly enabled and all
+secrets, signed device admission, rate limits and measured monthly budget checks pass.
+See the checklist for the `hangout-turn` client contract and unresolved client work.
 
 ## Camera bandwidth math
 - **Per stream:** camera at 320×240, 15 fps, 250 kbps, plus mic Opus at 32 kbps, ≈ 0.28 Mbps. On a relayed leg it drops to 160×120 at 10 fps, 100 kbps.
@@ -24,7 +25,7 @@ Then put the `wss://stalemate-hangout.<account>.workers.dev` URL in the room pag
 - **Direct connections** cost $0.
 - **TURN worst case (every leg relayed):** 12 legs × 0.28 Mbps ≈ 1.5 GB an hour, or ≈ 0.6 GB an hour at the relayed low tier.
 - **TURN typical (about 15% of legs relayed):** 0.1–0.25 GB an hour.
-- **Free allowance:** Cloudflare's TURN and SFU share one free 1,000 GB a month. WebJam's TURN Worker caps the account at 800 GB, with 200 GB for web traffic.
+- **Free allowance:** Cloudflare's TURN and SFU share one free 1,000 GB a month. This Worker's admission threshold is 800 GB of account TURN egress plus conservative reservations; it is not a hard spending cap and does not include SFU traffic. See the checklist for shared-usage limitations.
 - **TURN is off by default.** `hangout-turn` is empty, so the room uses direct connections only (STUN) until a capped TURN credential endpoint is approved. If the endpoint says the budget is used up, faces fall back to direct-only, and chat, draw and watch keep working.
 
 ## Lobby (#stalemate) — phase 1, hidden, NOT deployed
