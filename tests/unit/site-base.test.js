@@ -24,6 +24,6 @@ describe('site base path', () => {
         expect(site.normalizeBase('/')).toBe('/');
         expect(site.join('/StalemateSite/', 'styles.css')).toBe('/StalemateSite/styles.css');
         expect(site.join('/', 'styles.css')).toBe('/styles.css');
-        expect(site.publicUrl()).toBe('https://rupret007.github.io/StalemateSite/');
+        expect(site.publicUrl()).toBe('https://stalemate.band/');
     });
 });

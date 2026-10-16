@@ -1339,3 +1339,93 @@ textarea:focus-visible {
         transform: none;
     }
 }
+
+/* Listen: tap-to-load Apple Music rows */
+#listen {
+    background-color: var(--ink);
+    background-image: repeating-conic-gradient(rgba(244, 240, 230, 0.05) 0% 25%, transparent 0% 50%);
+    background-size: 32px 32px;
+}
+#listen .board-square {
+    background: var(--cream);
+    color: var(--ink);
+    box-shadow: 3px 3px 0 var(--pink);
+    transform: rotate(-1.4deg);
+}
+.listen-list {
+    list-style: none;
+    margin: 0 0 1.25rem;
+    padding: 0;
+    display: grid;
+    gap: 0.9rem;
+}
+.listen-track {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.75rem 1rem;
+    align-items: center;
+    padding: 1rem;
+    background: var(--ink-soft);
+    border: 2px solid var(--cream);
+    box-shadow: 4px 4px 0 var(--pink);
+}
+.listen-track__title {
+    margin: 0;
+    font-family: var(--display);
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--cream);
+}
+.listen-track__release {
+    margin: 0.15rem 0 0;
+    color: var(--cream);
+    opacity: 0.8;
+}
+.listen-track__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+.listen-track__actions .button {
+    white-space: nowrap;
+}
+.listen-album {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+.listen-track__actions .button,
+.listen-album .button {
+    min-height: 46px;
+}
+.listen-track__play:disabled {
+    cursor: default;
+    opacity: 0.85;
+}
+.listen-track__embed {
+    grid-column: 1 / -1;
+}
+.listen-track__embed iframe {
+    display: block;
+    width: 100%;
+    max-width: 660px;
+    height: 175px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+}
+.hero-video__teaser {
+    margin: 0.5rem 0 0;
+    font-weight: 700;
+    color: var(--cream);
+}
+@media (max-width: 640px) {
+    .listen-track {
+        grid-template-columns: 1fr;
+    }
+    .listen-track__actions .button {
+        flex: 1 1 8rem;
+    }
+}

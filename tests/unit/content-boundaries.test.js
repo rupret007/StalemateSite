@@ -3,6 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { disallowedEmbedAttributes } from './streaming-allowlist.js';
 import { describe, expect, it } from 'vitest';
 
 const repoRoot = join(fileURLToPath(new URL('../..', import.meta.url)));
@@ -42,7 +43,7 @@ describe('content boundaries', () => {
         expect(home).toContain('href="#about">About');
         expect(home).not.toMatch(/href=["'][^"']*(epk|qr)[^"']*["']/i);
         expect(home).not.toMatch(/Press kit|QR landing|>Press</);
-        expect(home).toContain('http://rockinoctober.com');
+        expect(home).toContain('https://rockinoctober.com');
         expect(home).toContain('class="button button--listen"');
         expect(home).toContain('2026-10-24T16:45:00-05:00');
         expect(home).toContain('Rockin’ October');
@@ -57,7 +58,7 @@ describe('content boundaries', () => {
         expect(home).toContain('class="hero-video__player"');
         expect(home).not.toMatch(/\bautoplay\b/);
         expect(home).not.toMatch(/id="(music|video|follow|merch)"/);
-        expect(home).not.toContain('data-embed');
+        expect(disallowedEmbedAttributes(home)).toEqual([]);
         expect(home).not.toContain('<form');
         expect(home).not.toMatch(/\[(DATE\/VENUE|MAILING LIST TOOL|MERCH|BOOKING EMAIL|HANDLE|STREAM LINK|CITY) NEEDED\]/);
         expect(home).not.toMatch(/\bTBA\b|coming soon|\blorem\b|\bplaceholder\b|\byour\b|\benter\b/i);

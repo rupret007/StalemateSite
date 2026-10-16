@@ -8,7 +8,7 @@ test('homepage is a finished band page with originals, show and real links', asy
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.locator('#band-title')).toContainText('Stalemate');
     await expect(page.locator('#home a.button--listen')).toHaveAttribute('href', '#about');
-    await expect(page.locator('#home a.button--hot')).toHaveAttribute('href', 'http://rockinoctober.com');
+    await expect(page.locator('#home a.button--hot')).toHaveAttribute('href', 'https://rockinoctober.com');
     const video = page.locator('.hero-video__player');
     await expect(video).toBeVisible();
     await expect(video).not.toHaveAttribute('autoplay');
@@ -129,7 +129,7 @@ test.describe('homepage without JavaScript', () => {
     test('keeps about, the show facts and festival link usable', async ({ page }) => {
         await page.goto('/');
         await expect(page.locator('#home a[href="#about"]')).toBeVisible();
-        await expect(page.locator('#home a.button--hot[href="http://rockinoctober.com"]')).toBeVisible();
+        await expect(page.locator('#home a.button--hot[href="https://rockinoctober.com"]')).toBeVisible();
         await expect(page.locator('.hero-video__player source')).toHaveAttribute('src', 'assets/manic.mp4');
         await expect(page.locator('.hero-show__tie')).toContainText('Hear it live Oct 24 at Los Amigo’s, Plano');
         await expect(page.locator('#about')).toContainText('Better Than Now');
@@ -161,7 +161,7 @@ test.describe('hero countdown before the set', () => {
         await expect(page.locator('[data-next-show-block]')).toContainText('All ages');
         await expect(page.locator('.hero-show__tie')).toContainText('Hear it live Oct 24 at Los Amigo’s, Plano');
         await expect(page.locator('.hero-video__player')).toBeVisible();
-        await expect(page.locator('#home a[href="http://rockinoctober.com"]').first()).toBeVisible();
+        await expect(page.locator('#home a[href="https://rockinoctober.com"]').first()).toBeVisible();
         await expect(page.locator('#home')).not.toContainText(/ticket/i);
         await expect(page.locator('#home')).not.toContainText(/\bJeff\b/);
         const box = await next.boundingBox();
@@ -180,7 +180,7 @@ test.describe('hero countdown after the set', () => {
         await expect(page.locator('.hero-show__tie')).toBeHidden();
         await expect(page.locator('.hero-video__player')).toBeVisible();
         await expect(page.locator('#home a[href="#about"]')).toBeVisible();
-        await expect(page.locator('#home a.button--hot[href="http://rockinoctober.com"]')).toBeVisible();
+        await expect(page.locator('#home a.button--hot[href="https://rockinoctober.com"]')).toBeVisible();
         await expect(page.locator('#home')).not.toContainText('Shows coming soon');
         expect(await page.locator('[data-next-show]').boundingBox()).toBeNull();
         await expect(page.locator('[data-upcoming-empty]')).toHaveCount(0);
