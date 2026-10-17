@@ -61,6 +61,9 @@ describe('hidden hangout room', () => {
         }
         const toml = readFileSync(join(repoRoot, 'hangout-worker/wrangler.toml'), 'utf8');
         expect(toml).not.toMatch(/HANGOUT_PREVIEW_KEY\s*=/);
+        const match = toml.match(/^compatibility_date = "(\d{4}-\d{2}-\d{2})"/m);
+        expect(match).not.toBeNull();
+        expect(Date.parse(`${match[1]}T12:00:00Z`)).toBeLessThanOrEqual(Date.now());
     });
 
     it('ships robots.txt and the room directory in the Pages package', () => {

@@ -39,8 +39,8 @@
 
     const app = {
         state: H.emptyState(), clock: H.createClock(), ws: null, myId: null, key: null, roomId: null,
-        hostPub: null, hostPriv: null, isHost: false, lastHostSeq: 0, lastVideoSigned: null,
-        names: new Map(), name: '', snapshotDone: false, snapshotFrom: null, connected: false,
+        hostPub: null, hostPriv: null, isHost: false, lastHostSeq: 0, lastHostSigned: null, lastVideoSigned: null,
+        names: new Map(), name: '', snapshotDone: false, snapshotFrom: null, snapshotHasSeqProof: false, connected: false,
         bob: { on: false, touched: false, lastNudge: 0 },
         av: { stream: null, mic: false, cam: false, canvas: false, canvasPeers: new Set(), peers: new Set(), pcs: new Map(), ice: null, relayed: new Set() }
     };
@@ -183,14 +183,24 @@
             noteAv(meta.from, null);
             showPeers(app.names.size + 1);
             return;
-        case 'snapshot':
+        case 'snapshot': {
             if (app.snapshotDone) return;
-            if (app.snapshotFrom && meta.from !== app.snapshotFrom) return;
-            if (!app.snapshotFrom) app.snapshotFrom = meta.from;
-            if (msg.done || !msg.chunk) app.snapshotDone = true;
-            if (msg.lastHostSeqSigned && await verifyHost(msg.lastHostSeqSigned)) {
-                app.lastHostSeq = Math.max(app.lastHostSeq, msg.lastHostSeqSigned.body.seq || 0);
+            const seqSigned = msg.lastHostSeqSigned;
+            const hasSeqProof = Boolean(
+                seqSigned
+                && Number.isFinite(seqSigned.body?.seq)
+                && await verifyHost(seqSigned)
+            );
+            if (app.snapshotFrom && meta.from !== app.snapshotFrom) {
+                if (!app.snapshotHasSeqProof && hasSeqProof) app.snapshotFrom = meta.from;
+                else return;
             }
+            if (!app.snapshotFrom) app.snapshotFrom = meta.from;
+            if (hasSeqProof) {
+                app.lastHostSeq = Math.max(app.lastHostSeq, seqSigned.body.seq);
+                app.snapshotHasSeqProof = true;
+            }
+            if ((msg.done || !msg.chunk) && app.snapshotHasSeqProof) app.snapshotDone = true;
             H.apply(app.state, {
                 type: 'snapshot',
                 state: { strokes: msg.strokes, chat: msg.chat, append: Boolean(msg.chunk && !msg.first) }
@@ -199,6 +209,7 @@
             redraw();
             renderChat();
             return;
+        }
         case 'stroke':
             if (H.apply(app.state, msg) === 'draw') drawStroke(app.state.strokes.find((s) => s.id === msg.stroke.id));
             return;
@@ -210,6 +221,7 @@
             if (!(await verifyHost(msg))) return;
             if (!(msg.body.seq > app.lastHostSeq)) return; // replay guard
             app.lastHostSeq = msg.body.seq;
+            app.lastHostSigned = msg;
             if (msg.body.kind === 'clear') { H.apply(app.state, { type: 'clear' }); redraw(); say('The host wiped the canvas.'); }
             if (msg.body.kind === 'video') acceptVideo(msg, meta.t);
             return;
@@ -232,7 +244,12 @@
         const chunks = [];
         for (let i = 0; i < strokes.length; i += 100) chunks.push(strokes.slice(i, i + 100));
         if (!chunks.length) chunks.push([]);
-        const lastHostSeqSigned = app.isHost ? await signHost({ kind: 'seq', seq: app.lastHostSeq }) : null;
+        let lastHostSeqSigned = null;
+        if (app.isHost) {
+            lastHostSeqSigned = await signHost({ kind: 'seq', seq: app.lastHostSeq });
+        } else if (app.lastHostSigned && Number.isFinite(app.lastHostSigned.body?.seq)) {
+            lastHostSeqSigned = app.lastHostSigned;
+        }
         chunks.forEach((chunk, i) => {
             const isLast = i === chunks.length - 1;
             send({
@@ -584,6 +601,12 @@
         if (on) {
             app.av.peers.add(from);
             if (!app.av.pcs.has(from)) openPc(from);
+            const entry = app.av.pcs.get(from);
+            if (entry) {
+                if (av && !av.cam) entry.stream.getVideoTracks().forEach((t) => entry.stream.removeTrack(t));
+                pruneStreamTracks(entry.stream);
+                renderTile(from, entry.stream, app.names.get(from) || 'Friend');
+            }
         } else {
             app.av.peers.delete(from);
             closePc(from);
@@ -733,8 +756,10 @@
             entry.stream.addTrack(e.track);
             e.track.onended = () => {
                 entry.stream.removeTrack(e.track);
+                pruneStreamTracks(entry.stream);
                 renderTile(id, entry.stream, app.names.get(id) || 'Friend');
             };
+            pruneStreamTracks(entry.stream);
             renderTile(id, entry.stream, app.names.get(id) || 'Friend');
         };
         pc.onconnectionstatechange = () => {
@@ -806,11 +831,23 @@
         return Boolean(stream && stream.getVideoTracks().some((t) => t.readyState === 'live'));
     }
 
+    function hasLiveAudio(stream) {
+        return Boolean(stream && stream.getAudioTracks().some((t) => t.readyState === 'live'));
+    }
+
+    function pruneStreamTracks(stream) {
+        if (!stream) return;
+        stream.getTracks().filter((t) => t.readyState === 'ended').forEach((t) => stream.removeTrack(t));
+    }
+
+    function shouldRenderTile(id, stream) {
+        if (id === 'me') return Boolean(stream);
+        return hasLiveVideo(stream) || hasLiveAudio(stream);
+    }
+
     function renderTile(id, stream, label, muted) {
         let tile = ui.tiles.querySelector(`[data-tile="${CSS.escape(id)}"]`);
-        if (id === 'me') {
-            if (!stream) { if (tile) tile.remove(); return; }
-        } else if (!hasLiveVideo(stream)) {
+        if (!shouldRenderTile(id, stream)) {
             if (tile) tile.remove();
             return;
         }
