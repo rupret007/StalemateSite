@@ -40,7 +40,7 @@
     const app = {
         state: H.emptyState(), clock: H.createClock(), ws: null, myId: null, key: null, roomId: null,
         hostPub: null, hostPriv: null, isHost: false, lastHostSeq: 0, lastVideoSigned: null,
-        names: new Map(), name: '', snapshotDone: false, connected: false,
+        names: new Map(), name: '', snapshotDone: false, snapshotFrom: null, connected: false,
         bob: { on: false, touched: false, lastNudge: 0 },
         av: { stream: null, mic: false, cam: false, canvas: false, canvasPeers: new Set(), peers: new Set(), pcs: new Map(), ice: null, relayed: new Set() }
     };
@@ -139,20 +139,26 @@
             app.myId = frame.id;
             app.connected = true;
             enterRoom();
+            app.snapshotDone = false;
+            app.snapshotFrom = null;
             showPeers(frame.peers);
             await send({ type: 'hello', name: app.name, av: avFlags() });
-            win.setTimeout(() => { app.snapshotDone = true; }, 1500);
             return;
         }
         if (frame.slow) { say('Whoa, slow down a sec.'); return; }
-        if (Number.isFinite(frame.peers) && !frame.c) { showPeers(frame.peers); pruneNames(); return; }
+        if (Number.isFinite(frame.peers) && !frame.c) {
+            if (frame.left) {
+                app.names.delete(frame.left);
+                noteAv(frame.left, null);
+            }
+            showPeers(frame.peers);
+            return;
+        }
         if (!frame.c) return;
         let msg;
         try { msg = await H.open(app.key, frame); } catch (error) { return; }
         await handle(msg, { t: frame.t, from: frame.from });
     }
-
-    function pruneNames() { /* names are refreshed by hello/bye messages */ }
 
     function showPeers(n) {
         const names = Array.from(app.names.values());
@@ -179,9 +185,16 @@
             return;
         case 'snapshot':
             if (app.snapshotDone) return;
+            if (app.snapshotFrom && meta.from !== app.snapshotFrom) return;
+            if (!app.snapshotFrom) app.snapshotFrom = meta.from;
             if (msg.done || !msg.chunk) app.snapshotDone = true;
-            if (msg.lastHostSeq !== undefined) app.lastHostSeq = Math.max(app.lastHostSeq, msg.lastHostSeq);
-            H.apply(app.state, { type: 'snapshot', state: { strokes: msg.strokes, chat: msg.chat, append: msg.chunk } });
+            if (msg.lastHostSeqSigned && await verifyHost(msg.lastHostSeqSigned)) {
+                app.lastHostSeq = Math.max(app.lastHostSeq, msg.lastHostSeqSigned.body.seq || 0);
+            }
+            H.apply(app.state, {
+                type: 'snapshot',
+                state: { strokes: msg.strokes, chat: msg.chat, append: Boolean(msg.chunk && !msg.first) }
+            });
             if (msg.video && await verifyHost(msg.video.signed)) acceptVideo(msg.video.signed, msg.video.t);
             redraw();
             renderChat();
@@ -213,12 +226,13 @@
         }
     }
 
-    function sendSnapshot(to) {
+    async function sendSnapshot(to) {
         const video = app.lastVideoSigned;
         const strokes = app.state.strokes.slice(-400);
         const chunks = [];
         for (let i = 0; i < strokes.length; i += 100) chunks.push(strokes.slice(i, i + 100));
         if (!chunks.length) chunks.push([]);
+        const lastHostSeqSigned = app.isHost ? await signHost({ kind: 'seq', seq: app.lastHostSeq }) : null;
         chunks.forEach((chunk, i) => {
             const isLast = i === chunks.length - 1;
             send({
@@ -227,8 +241,9 @@
                 strokes: chunk,
                 chat: isLast ? app.state.chat.slice(-50) : undefined,
                 video: isLast ? video : undefined,
-                lastHostSeq: isLast ? app.lastHostSeq : undefined,
-                chunk: true,
+                lastHostSeqSigned: isLast ? lastHostSeqSigned : undefined,
+                chunk: chunks.length > 1,
+                first: i === 0,
                 done: isLast
             });
         });
@@ -520,8 +535,15 @@
     }
 
     function onLocalChange() {
-        if (!app.isHost || Date.now() < player.applying || !app.state.video) return;
-        hostPublish(app.state.video.source, localPlaying(), localTime());
+        if (!app.isHost || !app.state.video) return;
+        const v = app.state.video;
+        const playing = localPlaying();
+        const pos = localTime();
+        if (Date.now() < player.applying) {
+            const want = v.playing ? H.expectedPosition(v, app.clock.relayNow()) : v.pos;
+            if (playing === v.playing && Math.abs(pos - want) < 2) return;
+        }
+        hostPublish(v.source, playing, pos);
     }
     function onYtState(event) {
         if (event.data === 1 || event.data === 2) onLocalChange();

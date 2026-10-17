@@ -137,6 +137,58 @@ test('late joiner receives lastHostSeq and ignores replayed clear messages', asy
     expect(await late.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThan(0);
 });
 
+test('guest snapshot cannot poison lastHostSeq and block host clears', async ({ browser }) => {
+    const { host, guest, invite } = await hostAndGuest(browser);
+    await drawLine(host);
+    const late = await openBrowser(browser);
+    await late.goto(invite);
+    await late.fill('[data-name]', 'Pat');
+    await late.click('[data-enter]');
+    await expect.poll(() => late.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThan(0);
+
+    const lateId = await late.evaluate(() => window.__hangout.myId);
+    await guest.evaluate(async (to) => {
+        const app = window.__hangout;
+        const frame = await window.HangoutCore.seal(app.key, {
+            type: 'snapshot',
+            to,
+            strokes: [],
+            chunk: false,
+            first: true,
+            done: true,
+            lastHostSeq: Number.MAX_SAFE_INTEGER
+        });
+        app.ws.send(JSON.stringify(frame));
+    }, lateId);
+    expect(await late.evaluate(() => window.__hangout.lastHostSeq)).toBeLessThan(1e15);
+
+    await host.click('[data-clear]');
+    await expect.poll(() => late.evaluate(() => window.__hangout.state.strokes.length)).toBe(0);
+});
+
+test('abrupt peer disconnect clears peer count and AV tiles', async ({ browser }) => {
+    const { host, guest } = await hostAndGuest(browser);
+    await host.click('[data-cam]');
+    await host.click('[data-ask-yes]');
+    await guest.click('[data-cam]');
+    await guest.click('[data-ask-yes]');
+    await expect.poll(() => host.locator('[data-tiles] .tile:not([data-tile="me"])').count()).toBe(1);
+
+    await guest.evaluate(() => window.__hangout.ws.close());
+    await expect(host.locator('[data-peers]')).toHaveText('Just you');
+    await expect.poll(() => host.evaluate(() => window.__hangout.names.size)).toBe(0);
+    await expect.poll(() => host.locator('[data-tiles] .tile:not([data-tile="me"])').count()).toBe(0);
+});
+
+test('host pause right after load still reaches guests', async ({ browser }) => {
+    const { host, guest } = await hostAndGuest(browser);
+    await host.click('[data-pick-yt="oh5p5f5_-7A"]');
+    const gYt = guest.locator('[data-fake-yt]');
+    await expect(gYt).toHaveAttribute('data-state', 'playing');
+    await host.evaluate(() => { window.__ytLog[0].pauseVideo(); });
+    await expect(gYt).toHaveAttribute('data-state', 'paused');
+});
+
 test('host-driven YouTube stays in sync: load, play, pause, seek, late joiner', async ({ browser }) => {
     const { host, guest, invite } = await hostAndGuest(browser);
     await host.click('[data-pick-yt="oh5p5f5_-7A"]');
