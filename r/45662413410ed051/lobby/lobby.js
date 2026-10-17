@@ -11,6 +11,7 @@
     const previewKey = params.get('preview') || sessionStorage.getItem('hangout-preview') || '';
     if (params.get('preview')) sessionStorage.setItem('hangout-preview', params.get('preview'));
     const relayBase = ((isLocal && (params.get('relay') || sessionStorage.getItem('hangout-relay'))) || $('meta[name="hangout-relay"]').content || '').replace(/\/$/, '');
+    const turnUrl = ((isLocal && params.get('turn')) || $('meta[name="hangout-turn"]').content || '').trim();
     if (isLocal && params.get('relay')) sessionStorage.setItem('hangout-relay', params.get('relay'));
     if (location.search) history.replaceState(null, '', location.pathname + location.hash);
     const siteKey = $('meta[name="hangout-turnstile"]').content || '';
@@ -26,6 +27,13 @@
     const slug = () => `${pick(WORDS)}-${pick(THINGS)}`.replace(/[^a-z0-9-]/g, '');
 
     const app = window.__lobby = { ws: null, me: '', role: 'fan', band: false, chans: new Map(), pms: new Map(), active: '#stalemate', rooms: [], ignores: new Set(), pending: null };
+    let roomApi = null;
+    function room() {
+        if (!roomApi && window.LobbyRoom) {
+            roomApi = window.LobbyRoom.attach({ app, send, $, previewKey, turnUrl, isLocal, params });
+        }
+        return roomApi;
+    }
     const nickInput = $('[data-nick]');
     nickInput.value = localStorage.getItem('hangout-nick') || ''; // blank by default; remembered on this device
     $('[data-reroll]').addEventListener('click', (e) => {
@@ -107,10 +115,31 @@
             const c = { ...m.ch, lines: [] };
             app.chans.set(m.ch.name, c);
             (m.history || []).forEach((h) => pushLine(m.ch.name, h.t === 'event' ? { ...h, event: true } : h));
+            if (m.act) c.actSnap = m.act;
             switchTo(m.ch.name);
+            const r = room();
+            if (r) r.onJoin(c, m.act);
             break;
         }
-        case 'chan': { const c = app.chans.get(m.ch.name); if (c) { Object.assign(c, m.ch); if (app.active === c.name) drawChan(); } break; }
+        case 'chan': {
+            const c = app.chans.get(m.ch.name);
+            if (c) {
+                Object.assign(c, m.ch);
+                if (app.active === c.name) drawChan();
+                const r = room();
+                if (r) r.onChan(c);
+            }
+            break;
+        }
+        case 'act': {
+            const r = room();
+            if (r) r.onAct(m);
+            const ch = app.chans.get(m.ch);
+            if (ch && window.__lobbyRoom) {
+                ch.actSnap = { strokes: window.__lobbyRoom.state.room.strokes.slice(-400), video: window.__lobbyRoom.state.room.video };
+            }
+            break;
+        }
         case 'part': case 'closed': {
             app.chans.delete(m.ch);
             if (m.t === 'closed') toast(`${m.ch} was ${m.reason}.`);
@@ -131,7 +160,15 @@
         case 'pm-setting': $('[data-pm-off]').checked = m.off; toast(m.text); break;
         case 'invite': toast(`${m.by} invited you to ${m.ch}`, [['Join', () => cmd('join', [m.ch])]]); break;
         case 'kicked': app.kicked = m.ch === '#stalemate'; toast(`${m.banned ? 'Banned' : 'Kicked'} from ${m.ch} by ${m.by}: ${m.reason}`); if (app.kicked) { $('[data-gate]').hidden = false; $('[data-app]').hidden = true; gateStatus(`You got the boot (${m.reason}). Take a breather.`); } break;
-        case 'cam': { const c = app.chans.get(m.ch); if (c) c.myCam = m.on; if (app.active === m.ch) drawChan(); if (m.by && !m.on) toast(`Camera switched off by ${m.by}.`); break; }
+        case 'cam': {
+            const c = app.chans.get(m.ch);
+            if (c) c.myCam = m.on;
+            if (app.active === m.ch) drawChan();
+            const r = room();
+            if (r) r.onCam(m.ch, m.on);
+            if (m.by && !m.on) toast(`Camera switched off by ${m.by}.`);
+            break;
+        }
         case 'cam-gate': $('[data-cam-gate]').showModal(); break;
         case 'net': if (m.shield) toast('🛡️ Shield’s up: slow mode, cameras off for a bit.'); break;
         case 'modlog': m.entries.forEach((e) => line(app.active, { notice: true, from: 'log', text: `${new Date(e.at).toLocaleTimeString()} ${e.by} ${e.action} ${e.target} ${e.reason}` })); break;
@@ -180,6 +217,7 @@
     }
 
     function switchTo(key) {
+        const prev = app.active;
         app.active = key;
         const c = store(key);
         if (c) c.unread = 0;
@@ -188,6 +226,11 @@
         drawTabs(); drawChan();
         show('chat');
         const buf = $('[data-buffer]'); buf.scrollTop = buf.scrollHeight;
+        const r = room();
+        if (r) {
+            if (prev !== key && c && c.kind !== 'lobby' && c.kind !== 'jam') r.onJoin(c, c.actSnap);
+            else if (!c || c.kind === 'lobby' || c.kind === 'jam') r.onLeave();
+        }
     }
 
     function drawTabs() {
@@ -213,7 +256,9 @@
         const room = !isPm && c && c.kind !== 'lobby';
         $('[data-roombar]').hidden = !room;
         $('[data-jam]').hidden = !(room && c.kind === 'jam');
-        $('[data-activity]').hidden = !(room && c.kind !== 'jam');
+        const showAct = room && c.kind !== 'jam';
+        $('[data-activity]').hidden = !showAct;
+        $('[data-act-stage]').hidden = !showAct;
         document.body.classList.toggle('am-op', !!(c && amOp(c)));
         if (room) {
             const m = c.modes;
@@ -230,11 +275,6 @@
                 const web = $('[data-jam-web]');
                 web.disabled = !(c.jam && c.jam.webReady);
                 web.onclick = () => { if (c.jam && /^https:\/\//.test(c.jam.web)) window.open(c.jam.web, '_blank', 'noopener,noreferrer'); };
-            } else {
-                $('[data-activity-copy]').textContent = c.kind === 'bobross'
-                    ? 'Paint-along: the shared canvas + synced Bob for open rooms lands next. Today the host can open a private paint-along and drop the invite here… or just chat along.'
-                    : c.kind === 'watch' ? 'Watch together: the synced player for open rooms lands next. Paste YouTube links in chat in the meantime.'
-                        : 'Art on camera: turn your camera on (18+) and show what you’re making.';
             }
         }
         $('[data-people-title]').textContent = isPm ? 'PM' : c ? `${c.name} · ${c.count || c.names?.length || 0}` : 'People';

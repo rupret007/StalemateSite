@@ -8,6 +8,7 @@
     <meta name="referrer" content="no-referrer">
     <!-- Hidden preview. Not linked from anywhere on the public site. -->
     <meta name="hangout-relay" content="">
+    <meta name="hangout-turn" content="">
     <meta name="hangout-turnstile" content="">
     <title>#stalemate · Hang Out</title>
     <link rel="icon" href="../../../assets/favicon.svg" type="image/svg+xml">
@@ -67,8 +68,25 @@
                 </form>
             </div>
             <div class="activity" data-activity hidden>
-                <p data-activity-copy></p>
-                <a class="btn" data-activity-link href="../">Open the canvas &amp; player</a>
+                <div class="act-stage" data-act-stage hidden>
+                    <div class="act-video" data-act-video hidden>
+                        <div class="yt-wrap"><div data-act-yt id="lobby-yt-player"></div></div>
+                        <button class="btn btn--small" type="button" data-act-tap hidden>Tap to play</button>
+                        <form class="act-load op-only" data-act-load>
+                            <input data-act-url placeholder="Paste a YouTube link" aria-label="YouTube URL">
+                            <button class="btn btn--small" type="submit">Load</button>
+                        </form>
+                        <div class="bob-picks op-only" data-bob-picks></div>
+                    </div>
+                    <div class="act-paint" data-act-paint hidden>
+                        <canvas data-act-canvas width="600" height="360" aria-label="Shared paint canvas"></canvas>
+                        <div class="act-tools">
+                            <span class="swatches" data-act-swatches></span>
+                            <button class="btn btn--small op-only" type="button" data-act-clear>Clear canvas</button>
+                        </div>
+                    </div>
+                    <div class="act-cams" data-act-tiles aria-label="Room cameras"></div>
+                </div>
             </div>
             <ol class="buffer" data-buffer aria-live="polite" aria-relevant="additions"></ol>
             <div class="pmreq" data-pmreqs></div>
@@ -123,6 +141,10 @@
     <!-- Page-level counts only: fixed event names, no query string (the preview key is stripped first), no referrer. -->
     <script data-goatcounter="https://stalemate.goatcounter.com/count" data-goatcounter-settings='{"no_onload": true}' async src="../../../js/count.js"></script>
     <script src="../names.js"></script>
+    <script src="../sync-core.js"></script>
+    <script src="../video-core.js"></script>
+    <script src="../bob-ross.js"></script>
+    <script src="lobby-room.js"></script>
     <script src="lobby.js"></script>
 </body>
 </html>
