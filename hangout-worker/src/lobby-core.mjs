@@ -22,7 +22,7 @@ export const LOBBY_LIMITS = Object.freeze({
     maxChars: 300,
     perDeviceDay: 200,
     frameBytes: 2048,
-    actFrameBytes: 8192,
+    actFrameBytes: 16384,
     actBurst: 24,
     actPerSecond: 10,
     framesPerConnection: 4000,
@@ -293,11 +293,12 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (!c) return;
         c.frames += 1;
         spend(1 / 20);
+        if (typeof raw !== 'string' || raw.length > L.actFrameBytes) return kill(c, 4400, 'bad frame');
         let f;
         try { f = JSON.parse(raw); } catch (e) { return kill(c, 4400, 'bad frame'); }
         if (!f || typeof f !== 'object' || typeof f.t !== 'string') return kill(c, 4400, 'bad frame');
         const maxBytes = f.t === 'act' ? L.actFrameBytes : L.frameBytes;
-        if (typeof raw !== 'string' || raw.length > maxBytes) return kill(c, 4400, 'bad frame');
+        if (raw.length > maxBytes) return kill(c, 4400, 'bad frame');
         if (c.frames > L.framesPerConnection) return kill(c, 4429, 'frame cap');
         if (!c.nick && f.t !== 'hello') return bot(c, 'Pick a nickname first.', 'error');
         switch (f.t) {

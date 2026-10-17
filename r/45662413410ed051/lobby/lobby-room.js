@@ -118,7 +118,7 @@
             if (!m.ch || m.ch !== app.active) return;
             if (state.ch !== m.ch) state.ch = m.ch;
             if (Number.isFinite(m.ts)) state.clock.sample(m.ts);
-            if (m.kind === 'stroke' && H.apply(state.room, { type: 'stroke', stroke: m.stroke }) === 'draw') {
+            if (m.kind === 'stroke' && m.from !== state.myId && H.apply(state.room, { type: 'stroke', stroke: m.stroke }) === 'draw') {
                 const s = state.room.strokes.find((x) => x.id === m.stroke.id);
                 drawStroke(s);
             }
@@ -173,7 +173,7 @@
             const py = Math.max(0, Math.min(1, y));
             live.pts.push([px, py]);
             pendingPts.push([px, py]);
-            drawStroke(live, live.pts.length - 2);
+            drawStroke(live, Math.max(0, live.pts.length - 2));
             if (pendingPts.length >= 16) flushStroke();
             else if (!flushTimer) flushTimer = window.setTimeout(flushStroke, 80);
         }
@@ -363,6 +363,8 @@
             const pc = entry.pc;
             try {
                 if (msg.sdp) {
+                    const collision = msg.sdp.type === 'offer' && (entry.makingOffer || pc.signalingState !== 'stable');
+                    if (collision && !entry.polite) return;
                     await pc.setRemoteDescription(msg.sdp);
                     if (msg.sdp.type === 'offer') {
                         const answer = await pc.createAnswer();

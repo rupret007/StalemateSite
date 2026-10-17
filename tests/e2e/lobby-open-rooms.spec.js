@@ -44,10 +44,13 @@ async function drawOnCanvas(page) {
 
 test('art room: strokes sync between two browsers; clear is host-only', async ({ browser }) => {
     const host = await fan(browser, 'ArtHost');
+    const guest = await fan(browser, 'ArtGuest');
+    const guestErrors = [];
+    guest.on('pageerror', (e) => guestErrors.push(e));
+
     await host.click('[data-start="art"]');
     await expect(host.locator('[data-act-canvas]')).toBeVisible();
     const room = await host.evaluate(() => window.__lobby.active);
-    const guest = await fan(browser, 'ArtGuest');
     await guest.evaluate((r) => window.__lobby.cmd('join', [r]), room);
     await guest.click('[data-show="chat"]');
     await expect(guest.locator('[data-act-canvas]')).toBeVisible();
@@ -59,11 +62,31 @@ test('art room: strokes sync between two browsers; clear is host-only', async ({
         }));
     });
     await drawOnCanvas(guest);
-    await expect.poll(() => host.evaluate(() => window.__lobbyRoom?.state?.room?.strokes?.length || 0)).toBeGreaterThan(0);
+    await expect.poll(() => host.evaluate(() => window.__lobbyRoom?.state?.room?.strokes?.length || 0)).toBeGreaterThan(1);
+
+    const strokeId = await guest.evaluate(() => {
+        const strokes = window.__lobbyRoom.state.room.strokes;
+        const drawn = strokes.find((s) => s.id.startsWith('s'));
+        return (drawn || strokes.at(-1)).id;
+    });
+    const hostPts = await host.evaluate((id) => window.__lobbyRoom.state.room.strokes.find((s) => s.id === id).pts.length, strokeId);
+    const guestPts = await guest.evaluate((id) => window.__lobbyRoom.state.room.strokes.find((s) => s.id === id).pts.length, strokeId);
+    expect(guestPts).toBe(hostPts);
+    expect(guestErrors).toEqual([]);
+
+    const camOn = (ch) => window.__lobby.ws.send(JSON.stringify({ t: 'cam', ch, on: true, adult18: true }));
+    await Promise.all([host.evaluate(camOn, room), guest.evaluate(camOn, room)]);
+    await expect.poll(() => host.evaluate(() => window.__lobbyRoom.state.pcs.size)).toBe(1);
+    await expect.poll(() => guest.evaluate(() => window.__lobbyRoom.state.pcs.size)).toBe(1);
+    await expect.poll(() => host.evaluate(() => [...window.__lobbyRoom.state.pcs.values()][0]?.pc?.signalingState)).toBe('stable');
+    await expect.poll(() => guest.evaluate(() => [...window.__lobbyRoom.state.pcs.values()][0]?.pc?.signalingState)).toBe('stable');
+
     await expect(guest.locator('[data-act-clear]')).toBeHidden();
     await expect.poll(() => host.evaluate(() => window.__lobbyRoom.state.room.strokes.length)).toBeGreaterThan(0);
     await host.click('[data-act-clear]');
     await expect.poll(() => guest.evaluate(() => window.__lobbyRoom.state.room.strokes.length)).toBe(0);
+    await host.context().close();
+    await guest.context().close();
 });
 
 test('watch room: host loads YouTube and guest stays in sync', async ({ browser }) => {
@@ -83,6 +106,8 @@ test('watch room: host loads YouTube and guest stays in sync', async ({ browser 
         return Math.abs(h - g);
     };
     expect(await drift()).toBeLessThan(1.5);
+    await host.context().close();
+    await guest.context().close();
 });
 
 test('bob ross room: headline episode and paint canvas appear for host', async ({ browser }) => {
@@ -91,4 +116,5 @@ test('bob ross room: headline episode and paint canvas appear for host', async (
     await expect(host.locator('[data-act-canvas]')).toBeVisible();
     await expect(host.locator('[data-bob-picks]')).toBeVisible();
     await expect.poll(() => host.evaluate(() => window.__lobbyRoom.state.room.video?.source?.id)).toBeTruthy();
+    await host.context().close();
 });

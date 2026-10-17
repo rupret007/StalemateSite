@@ -323,6 +323,15 @@ describe('abuse caps', () => {
         const a = join('Alpha');
         L.message(a.id, 'x'.repeat(5000));
         expect(closed.at(-1)).toEqual([a.id, 4400]);
+
+        const b = join('Bravo');
+        const validAct = JSON.stringify({ t: 'act', ch: '#art-1', kind: 'rtc', sdp: { type: 'offer', sdp: 'v=0\r\n' + 'a=x'.repeat(4000) } });
+        L.message(b.id, validAct);
+        expect(closed.some(([id]) => id === b.id)).toBe(false);
+
+        const c = join('Charlie');
+        L.message(c.id, 'x'.repeat(20000));
+        expect(closed.at(-1)).toEqual([c.id, 4400]);
     });
     it('the lobby caps at 150 fans (fail closed)', () => {
         boot({ lobbyMax: 3 });
