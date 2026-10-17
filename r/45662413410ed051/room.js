@@ -184,13 +184,15 @@
             showPeers(app.names.size + 1);
             return;
         case 'snapshot': {
-            if (app.snapshotDone) return;
             const seqSigned = msg.lastHostSeqSigned;
             const hasSeqProof = Boolean(
                 seqSigned
                 && Number.isFinite(seqSigned.body?.seq)
                 && await verifyHost(seqSigned)
             );
+            if (app.snapshotDone) {
+                if (!(hasSeqProof && !app.snapshotHasSeqProof)) return;
+            }
             if (app.snapshotFrom && meta.from !== app.snapshotFrom) {
                 if (!app.snapshotHasSeqProof && hasSeqProof) app.snapshotFrom = meta.from;
                 else return;
@@ -200,12 +202,16 @@
                 app.lastHostSeq = Math.max(app.lastHostSeq, seqSigned.body.seq);
                 app.snapshotHasSeqProof = true;
             }
-            if ((msg.done || !msg.chunk) && app.snapshotHasSeqProof) app.snapshotDone = true;
+            if (msg.done || !msg.chunk) app.snapshotDone = true;
             H.apply(app.state, {
                 type: 'snapshot',
                 state: { strokes: msg.strokes, chat: msg.chat, append: Boolean(msg.chunk && !msg.first) }
             });
-            if (msg.video && await verifyHost(msg.video.signed)) acceptVideo(msg.video.signed, msg.video.t);
+            if (msg.video && await verifyHost(msg.video.signed)) {
+                const signedT = Number(msg.video.signed.body?.t);
+                if (!Number.isFinite(signedT)) return;
+                acceptVideo(msg.video.signed, signedT);
+            }
             redraw();
             renderChat();
             return;
@@ -490,6 +496,8 @@
                 });
             });
             ui.yt = doc.getElementById('yt-player') || ui.yt;
+        } else if (app.state.video?.playing) {
+            player.yt.loadVideoById({ videoId: source.id, startSeconds: 0 });
         } else {
             player.yt.cueVideoById(source.id);
         }
@@ -522,8 +530,9 @@
 
     async function acceptVideo(signed, t) {
         const b = signed.body;
-        if (H.apply(app.state, { type: 'video', source: b.source, playing: b.playing, pos: b.pos }, { t }) !== 'video') return;
-        app.lastVideoSigned = { signed, t };
+        const relayT = Number.isFinite(Number(b.t)) ? Number(b.t) : t;
+        if (H.apply(app.state, { type: 'video', source: b.source, playing: b.playing, pos: b.pos }, { t: relayT }) !== 'video') return;
+        app.lastVideoSigned = { signed, t: relayT };
         app.lastHostSeq = Math.max(app.lastHostSeq, b.seq || 0);
         showEpisode();
         await syncToState(true);
@@ -543,8 +552,8 @@
     async function hostPublish(source, playing, pos) {
         if (!app.isHost) return;
         app.lastHostSeq = Math.max(app.lastHostSeq + 1, Date.now());
-        const signed = await signHost({ kind: 'video', seq: app.lastHostSeq, source, playing, pos: Math.max(0, pos) });
         const t = app.clock.relayNow();
+        const signed = await signHost({ kind: 'video', seq: app.lastHostSeq, source, playing, pos: Math.max(0, pos), t });
         H.apply(app.state, { type: 'video', source, playing, pos }, { t });
         app.lastVideoSigned = { signed, t };
         showEpisode();
@@ -709,7 +718,8 @@
         renderTile('me', app.av.cam ? app.av.stream : null, app.av.canvas ? `${app.name}’s canvas (you)` : `${app.name} (you)`, true);
         await send({ type: 'av', av: avFlags() });
         if (!(app.av.mic || app.av.cam)) Array.from(app.av.pcs.keys()).filter((id) => !app.av.peers.has(id)).forEach(closePc);
-        for (const id of app.av.peers) if (!app.av.pcs.has(id)) openPc(id);
+        const mesh = (app.av.mic || app.av.cam) ? app.names.keys() : app.av.peers;
+        for (const id of mesh) if (!app.av.pcs.has(id)) openPc(id);
         for (const pc of app.av.pcs.values()) syncTracks(pc);
     }
 
@@ -789,8 +799,12 @@
     }
 
     async function onRtc(from, msg) {
+        if (!app.names.has(from)) return;
         if (!(app.av.mic || app.av.cam) && !app.av.peers.has(from)) return;
-        if (!app.av.pcs.has(from)) openPc(from);
+        if (!app.av.pcs.has(from)) {
+            if (!app.av.peers.has(from)) return;
+            openPc(from);
+        }
         const entry = app.av.pcs.get(from);
         const pc = entry.pc;
         try {

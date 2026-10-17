@@ -159,7 +159,7 @@ test('late joiner who receives snapshot from a guest still gets lastHostSeq and 
         });
         app.ws.send(JSON.stringify(frame));
     }, lateId);
-    expect(await late.evaluate(() => window.__hangout.snapshotDone)).toBe(false);
+    expect(await late.evaluate(() => window.__hangout.snapshotDone)).toBe(true);
 
     await host.evaluate(async ({ to, seq }) => {
         const app = window.__hangout;
@@ -268,16 +268,151 @@ test('guest snapshot cannot poison lastHostSeq and block host clears', async ({ 
 
 test('abrupt peer disconnect clears peer count and AV tiles', async ({ browser }) => {
     const { host, guest } = await hostAndGuest(browser);
-    await host.click('[data-cam]');
-    await host.click('[data-ask-yes]');
     await guest.click('[data-cam]');
     await guest.click('[data-ask-yes]');
-    await expect.poll(() => host.locator('[data-tiles] .tile:not([data-tile="me"])').count()).toBe(1);
+    await host.click('[data-cam]');
+    await host.click('[data-ask-yes]');
+    await expect.poll(() => host.evaluate(() => {
+        const v = document.querySelector('[data-tiles] .tile:not([data-tile="me"]) video');
+        return v && v.videoWidth > 0;
+    }), { timeout: 15000 }).toBe(true);
 
     await guest.evaluate(() => window.__hangout.ws.close());
     await expect(host.locator('[data-peers]')).toHaveText('Just you');
     await expect.poll(() => host.evaluate(() => window.__hangout.names.size)).toBe(0);
     await expect.poll(() => host.locator('[data-tiles] .tile:not([data-tile="me"])').count()).toBe(0);
+});
+
+test('switching from one playing YouTube video to another plays the second video on host and guest', async ({ browser }) => {
+    const { host, guest } = await hostAndGuest(browser);
+    await host.click('[data-pick-yt="oh5p5f5_-7A"]');
+    const hYt = host.locator('[data-fake-yt]');
+    const gYt = guest.locator('[data-fake-yt]');
+    await expect(hYt).toHaveAttribute('data-state', 'playing');
+    await expect(gYt).toHaveAttribute('data-video-id', 'oh5p5f5_-7A');
+    await host.click('[data-pick-yt="BtnyqIHTDMM"]');
+    await expect(hYt).toHaveAttribute('data-video-id', 'BtnyqIHTDMM');
+    await expect(hYt).toHaveAttribute('data-state', 'playing');
+    await expect(gYt).toHaveAttribute('data-video-id', 'BtnyqIHTDMM');
+    await expect(gYt).toHaveAttribute('data-state', 'playing');
+});
+
+test('guest snapshot without host seq proof still completes and blocks a later wipe', async ({ browser }) => {
+    const { host, guest, invite } = await hostAndGuest(browser);
+    await host.evaluate(() => window.__hangout.ws.close());
+    await expect.poll(async () => await guest.locator('[data-peers]').textContent()).toBe('Just you');
+
+    await drawLine(guest);
+    await guest.fill('[data-text]', 'still here');
+    await guest.press('[data-text]', 'Enter');
+
+    const late = await openBrowser(browser);
+    await late.goto(invite);
+    await late.fill('[data-name]', 'Pat');
+    await late.click('[data-enter]');
+    await expect.poll(() => late.evaluate(() => window.__hangout.snapshotDone)).toBe(true);
+    await expect.poll(() => late.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThan(0);
+    await expect(late.locator('[data-log]')).toContainText('still here');
+
+    const lateId = await late.evaluate(() => window.__hangout.myId);
+    const guestId = await guest.evaluate(() => window.__hangout.myId);
+    await guest.evaluate(async (to) => {
+        const app = window.__hangout;
+        const frame = await window.HangoutCore.seal(app.key, {
+            type: 'snapshot',
+            to,
+            strokes: [],
+            chat: [],
+            chunk: false,
+            first: true,
+            done: true
+        });
+        app.ws.send(JSON.stringify(frame));
+    }, lateId);
+    await late.waitForTimeout(400);
+    expect(await late.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThan(0);
+    expect(await late.evaluate(() => window.__hangout.snapshotFrom)).toBe(guestId);
+});
+
+test('guest snapshot cannot tamper with video timestamp to skew late joiner playback position', async ({ browser }) => {
+    const { host, guest, invite } = await hostAndGuest(browser);
+    await host.click('[data-pick-yt="oh5p5f5_-7A"]');
+    await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+    await host.evaluate(() => { window.__ytLog[window.__ytLog.length - 1].seekTo(45); });
+    await expect.poll(() => host.evaluate(() => window.__ytLog[window.__ytLog.length - 1].getCurrentTime())).toBeGreaterThan(44);
+    await expect.poll(() => guest.evaluate(() => Number.isFinite(Number(window.__hangout.lastVideoSigned?.signed?.body?.t)))).toBe(true);
+
+    const late = await openBrowser(browser);
+    await late.goto(invite);
+    await late.click('[data-enter]');
+    const lateId = await late.evaluate(() => window.__hangout.myId);
+    await late.evaluate(() => {
+        const app = window.__hangout;
+        app.snapshotDone = false;
+        app.snapshotFrom = null;
+        app.snapshotHasSeqProof = false;
+        app.state.video = null;
+    });
+    const forgedT = Date.now() - 3_600_000;
+    const signedT = await guest.evaluate(async ({ to, forged }) => {
+        const app = window.__hangout;
+        const video = app.lastVideoSigned;
+        if (!video) throw new Error('no video state');
+        const frame = await window.HangoutCore.seal(app.key, {
+            type: 'snapshot',
+            to,
+            strokes: app.state.strokes.slice(-400),
+            chat: app.state.chat.slice(-50),
+            video: { signed: video.signed, t: forged },
+            chunk: false,
+            first: true,
+            done: true
+        });
+        app.ws.send(JSON.stringify(frame));
+        return video.signed.body.t;
+    }, { to: lateId, forged: forgedT });
+
+    expect(forgedT).not.toBe(signedT);
+    await expect.poll(() => late.evaluate(() => window.__hangout.state.video && window.__hangout.state.video.t)).toBe(signedT);
+    const skew = await late.evaluate((forged) => {
+        const v = window.__hangout.state.video;
+        const now = window.__hangout.clock.relayNow();
+        const honest = window.HangoutCore.expectedPosition(v, now);
+        const evil = window.HangoutCore.expectedPosition({ ...v, t: forged }, now);
+        return Math.abs(honest - evil);
+    }, forgedT);
+    expect(skew).toBeGreaterThan(60);
+});
+
+test('remote peer cannot exceed AV_MAX or open peer connections without AV state', async ({ browser }) => {
+    const { host, guest } = await hostAndGuest(browser);
+    const before = await host.evaluate(() => window.__hangout.av.pcs.size);
+    await guest.evaluate(async () => {
+        const app = window.__hangout;
+        const victim = [...window.__hangout.names.keys()][0];
+        const frame = await window.HangoutCore.seal(app.key, {
+            type: 'rtc',
+            to: victim,
+            sdp: { type: 'offer', sdp: 'v=0\r\n' }
+        });
+        app.ws.send(JSON.stringify(frame));
+    });
+    await host.waitForTimeout(300);
+    expect(await host.evaluate(() => window.__hangout.av.pcs.size)).toBe(before);
+
+    await host.evaluate(() => ['x1', 'x2', 'x3', 'x4'].forEach((id) => window.__hangout.av.peers.add(id)));
+    await guest.evaluate(async () => {
+        const app = window.__hangout;
+        const victim = [...window.__hangout.names.keys()][0];
+        const frame = await window.HangoutCore.seal(app.key, {
+            type: 'rtc',
+            to: victim,
+            sdp: { type: 'offer', sdp: 'v=0\r\n' }
+        });
+        app.ws.send(JSON.stringify(frame));
+    });
+    await host.waitForTimeout(300);
+    expect(await host.evaluate(() => window.__hangout.av.pcs.size)).toBe(before);
 });
 
 test('host pause right after load still reaches guests', async ({ browser }) => {
@@ -479,20 +614,20 @@ test('TURN servers are fetched before peer connections are opened', async ({ bro
 test('hanging up local AV does not drop incoming video from peers', async ({ browser }) => {
     const { host, guest } = await hostAndGuest(browser);
 
-    await host.click('[data-cam]');
-    await host.click('[data-ask-yes]');
     await guest.click('[data-cam]');
     await guest.click('[data-ask-yes]');
+    await host.click('[data-cam]');
+    await host.click('[data-ask-yes]');
 
     await expect.poll(() => guest.evaluate(() => {
         const v = document.querySelector('[data-tile="me"] video');
         return v && v.videoWidth > 0;
-    })).toBe(true);
+    }), { timeout: 15000 }).toBe(true);
 
     await expect.poll(() => guest.evaluate(() => {
         const v = document.querySelector('[data-tiles] .tile:not([data-tile="me"]) video');
         return v && v.videoWidth > 0;
-    })).toBe(true);
+    }), { timeout: 15000 }).toBe(true);
 
     await guest.click('[data-hangup]');
 
