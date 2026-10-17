@@ -96,7 +96,7 @@ export function bumpShake(current, amount) {
 }
 
 /**
- * 0–1 urgency when a falling ball is in the lower playfield (TurdAnoid danger vignette).
+ * 0–1 urgency when a falling ball is in the lower playfield (Turdanoid danger vignette).
  * @param {Array<{vy?: number, y?: number, r?: number, stuck?: boolean}>} balls
  */
 export function ballDangerRatio(balls, canvasHeight, paddleY, startRatio = TURDANOID_FEEL.ballDangerStartRatio) {

@@ -48,6 +48,7 @@ function getMedia(options) {
     return fetch(`${origin}/play/stalemate/manic.m4a`, options);
 }
 
+// Loaded CI runners can take >5s to stream the 1.5 MB fixture; allow 30s, same assertions.
 describe('test server media responses', { timeout: 30000 }, () => {
     it('serves the full file with its byte length and range support', async () => {
         const response = await getMedia();
