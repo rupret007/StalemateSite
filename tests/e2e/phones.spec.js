@@ -51,8 +51,7 @@ test('phone homepage keeps the video-show hero usable without overflow', async (
         'https://www.youtube.com/@stalemate.punkband',
         'https://www.facebook.com/stalemate.band/'
     ]) {
-        // Deliberate: the hero socials row is hidden on phones (it duplicates the header) so Manic makes the first screen.
-        await expect(page.locator('#home a.social-link[href="' + href + '"]')).toBeHidden();
+        await expect(page.locator('#home a.social-link[href="' + href + '"]')).toHaveCount(0);
         await expect(page.locator('.site-header a.social-link[href="' + href + '"]')).toBeVisible();
         expect(tapHeight(await page.locator('.site-header a.social-link[href="' + href + '"]').boundingBox())).toBeGreaterThanOrEqual(44);
     }
@@ -69,18 +68,15 @@ test('phone first screen shows the countdown, Oct 24 show and Manic video before
     const games = await page.locator('#games').boundingBox();
     const home = await page.locator('#home').boundingBox();
     const card = await page.locator('.hero-show-card').boundingBox();
-    const cta = page.locator('[data-track="show-cta-hero"]');
+    const cta = page.locator('[data-track="show-cta-under-video"]');
     const ctaBox = await cta.boundingBox();
-    const repeat = page.locator('[data-track="show-cta-under-video"]');
-    await expect(repeat).toHaveText('See us Oct 24');
-    await expect(repeat).toHaveAttribute('href', 'https://rockinoctober.com');
+    await expect(cta).toHaveText('See us Oct 24');
     await expect(cta).toHaveAttribute('href', 'https://rockinoctober.com');
     expect(clock.y + clock.height, 'countdown fully on the first screen').toBeLessThan(vh);
     expect(clock.y).toBeLessThan(video.y);
     expect(card.y).toBeLessThan(video.y);
-    expect(ctaBox.y).toBeLessThan(video.y);
     expect(tapHeight(ctaBox)).toBeGreaterThanOrEqual(44);
-    expect((await repeat.boundingBox()).y).toBeGreaterThan(video.y + video.height);
+    expect(ctaBox.y).toBeGreaterThan(video.y + video.height);
     expect(games.y).toBeGreaterThanOrEqual(home.y + home.height - 1);
     expect(games.y).toBeGreaterThan(clock.y + clock.height);
     expect(games.y).toBeGreaterThan(video.y + video.height);
@@ -97,6 +93,6 @@ test.describe('390x844 first screen', () => {
         expect(844 - video.y, 'a real slice of the video shows').toBeGreaterThanOrEqual(40);
         const clock = await page.locator('[data-countdown-clock]').boundingBox();
         expect(clock.y + clock.height).toBeLessThan(video.y);
-        await expect(page.locator('.hero-show__cta a')).toBeVisible();
+        await expect(page.locator('#home [data-site-play="manic"]')).toBeVisible();
     });
 });

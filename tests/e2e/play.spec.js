@@ -12,7 +12,12 @@ test('/play/ hosts Turdanoid same-origin, hidden and noindex', async ({ page }) 
     await expect(page.locator('iframe')).toHaveCount(0);
     const strip = page.locator('nav.stalemate-strip');
     await expect(strip.locator('a.sm-home')).toHaveAttribute('href', '../');
-    await expect(strip.locator('a.sm-listen')).toContainText('Listen to Manic');
+    await expect(strip.locator('button.sm-listen')).toContainText('Listen to Manic');
+    await strip.locator('button.sm-listen').click();
+    await expect.poll(() => page.evaluate(() => {
+        const el = document.getElementById('stalemate-site-player');
+        return el && el.src.includes('/play/stalemate/manic.m4a');
+    })).toBe(true);
     const card = page.locator('a.game-card[href="TurdAnoid.html"]');
     await expect(card).toBeVisible();
     await card.click();

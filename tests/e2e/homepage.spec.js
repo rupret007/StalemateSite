@@ -8,8 +8,8 @@ test('homepage is a finished band page with originals, show and real links', asy
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.locator('#band-title')).toContainText('Stalemate');
     await expect(page.locator('#home a.button--listen')).toHaveAttribute('href', '#about');
-    await expect(page.locator('#home a.button--hot')).toHaveCount(2);
-    for (const cta of await page.locator('#home a.button--hot').all()) await expect(cta).toHaveAttribute('href', 'https://rockinoctober.com');
+    await expect(page.locator('#home a.button--hot')).toHaveCount(1);
+    await expect(page.locator('#home a.button--hot')).toHaveAttribute('href', 'https://rockinoctober.com');
     const video = page.locator('.hero-video__player');
     await expect(video).toBeVisible();
     await expect(video).not.toHaveAttribute('autoplay');
@@ -43,13 +43,11 @@ test('homepage is a finished band page with originals, show and real links', asy
     ];
     for (const [name, href] of socials) {
         const header = page.locator('.site-header a.social-link[href="' + href + '"]');
-        const hero = page.locator('#home a.social-link[href="' + href + '"]');
         const footer = page.locator('.site-footer a.social-link[href="' + href + '"]');
         await expect(header).toBeVisible();
-        await expect(hero).toBeVisible();
+        await expect(page.locator('#home a.social-link[href="' + href + '"]')).toHaveCount(0);
         await expect(footer).toBeVisible();
         expect(tapHeight(await header.boundingBox())).toBeGreaterThanOrEqual(44);
-        expect(tapHeight(await hero.boundingBox())).toBeGreaterThanOrEqual(44);
         expect(tapHeight(await footer.boundingBox())).toBeGreaterThanOrEqual(44);
         await expect(header).toHaveAttribute('rel', /noopener/);
         await expect(header).toContainText(name);
@@ -142,8 +140,7 @@ test.describe('homepage without JavaScript', () => {
     test('keeps about, the show facts and festival link usable', async ({ page }) => {
         await page.goto('/');
         await expect(page.locator('#home a[href="#about"]')).toBeVisible();
-        await expect(page.locator('#home a.button--hot[href="https://rockinoctober.com"]')).toHaveCount(2);
-        for (const cta of await page.locator('#home a.button--hot[href="https://rockinoctober.com"]').all()) await expect(cta).toBeVisible();
+        await expect(page.locator('#home a.button--hot[href="https://rockinoctober.com"]')).toHaveCount(1);
         await expect(page.locator('.hero-video__player source')).toHaveAttribute('src', 'assets/manic.mp4');
         await expect(page.locator('.hero-show__tie')).toContainText('Hear it loud Oct 24 at Los Amigo’s, Plano');
         await expect(page.locator('#about')).toContainText('Rockin’ October on Saturday, Oct 24, 4:45 PM');

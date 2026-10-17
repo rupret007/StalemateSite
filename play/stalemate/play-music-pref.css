@@ -1,0 +1,4 @@
+.stalemate-music-toggle{position:fixed;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));z-index:10000;min-width:44px;min-height:44px;padding:.45rem .75rem;border:3px solid #f4f0e6;background:#171410;color:#f4f0e6;font:700 13px/1 Impact,"Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;box-shadow:3px 3px 0 #ff4d84}
+.stalemate-music-toggle[aria-pressed="false"]{color:#b5dc08;border-color:#b5dc08;box-shadow:3px 3px 0 #f4f0e6}
+.stalemate-music-toggle:focus-visible{outline:3px solid #20baff;outline-offset:2px}
+nav.stalemate-strip .stalemate-music-toggle{position:static;flex:0 0 auto;min-height:44px;margin-left:auto}
