@@ -193,6 +193,9 @@
             if (app.snapshotDone) {
                 if (!(hasSeqProof && !app.snapshotHasSeqProof)) return;
             }
+            if (msg.first && hasSeqProof && app.snapshotDone && !app.snapshotHasSeqProof) {
+                app.snapshotDone = false;
+            }
             if (app.snapshotFrom && meta.from !== app.snapshotFrom) {
                 if (!app.snapshotHasSeqProof && hasSeqProof) app.snapshotFrom = meta.from;
                 else return;
@@ -207,10 +210,12 @@
                 type: 'snapshot',
                 state: { strokes: msg.strokes, chat: msg.chat, append: Boolean(msg.chunk && !msg.first) }
             });
-            if (msg.video && await verifyHost(msg.video.signed)) {
-                const signedT = Number(msg.video.signed.body?.t);
-                if (!Number.isFinite(signedT)) return;
-                acceptVideo(msg.video.signed, signedT);
+            if (
+                msg.video?.signed?.body?.kind === 'video'
+                && await verifyHost(msg.video.signed)
+            ) {
+                const signedT = Number(msg.video.signed.body.t);
+                if (Number.isFinite(signedT)) acceptVideo(msg.video.signed, signedT);
             }
             redraw();
             renderChat();
@@ -264,7 +269,7 @@
                 strokes: chunk,
                 chat: isLast ? app.state.chat.slice(-50) : undefined,
                 video: isLast ? video : undefined,
-                lastHostSeqSigned: isLast ? lastHostSeqSigned : undefined,
+                lastHostSeqSigned: lastHostSeqSigned || undefined,
                 chunk: chunks.length > 1,
                 first: i === 0,
                 done: isLast

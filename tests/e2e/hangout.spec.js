@@ -199,6 +199,115 @@ test('late joiner who receives snapshot from a guest still gets lastHostSeq and 
     expect(await late.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThan(0);
 });
 
+test('multi-chunk host snapshot (>100 strokes) with lastHostSeqSigned replaces an unverified guest snapshot without losing earlier chunks', async ({ browser }) => {
+    const { host, guest, invite } = await hostAndGuest(browser);
+    const strokeCount = 150;
+    await host.evaluate((n) => {
+        const app = window.__hangout;
+        for (let i = 0; i < n; i += 1) {
+            app.state.strokes.push({
+                id: `bulk-${i}`,
+                color: '#221b15',
+                size: 8,
+                pts: [[i % 50, i % 50], [(i % 50) + 1, (i % 50) + 1]]
+            });
+        }
+    }, strokeCount);
+
+    const late = await openBrowser(browser);
+    await late.goto(invite);
+    await late.fill('[data-name]', 'Pat');
+    await late.click('[data-enter]');
+    await expect.poll(() => late.evaluate(() => window.__hangout.snapshotDone)).toBe(true);
+    expect(await host.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThanOrEqual(strokeCount);
+
+    const guestId = await guest.evaluate(() => window.__hangout.myId);
+    await late.evaluate(({ gid, bogus }) => {
+        const app = window.__hangout;
+        window.HangoutCore.apply(app.state, {
+            type: 'snapshot',
+            state: { strokes: bogus, chat: [], append: false }
+        });
+        app.snapshotDone = true;
+        app.snapshotFrom = gid;
+        app.snapshotHasSeqProof = false;
+        app.lastHostSeq = 0;
+    }, {
+        gid: guestId,
+        bogus: [{ id: 'bogus-only', color: '#000000', size: 4, pts: [[0, 0]] }]
+    });
+    expect(await late.evaluate(() => window.__hangout.state.strokes[0].id)).toBe('bogus-only');
+
+    await guest.evaluate(() => window.__hangout.ws.close());
+    await late.evaluate(async () => {
+        const app = window.__hangout;
+        const frame = await window.HangoutCore.seal(app.key, {
+            type: 'hello',
+            name: app.name,
+            av: { mic: false, cam: false, canvas: false }
+        });
+        app.ws.send(JSON.stringify(frame));
+    });
+
+    await expect.poll(() => late.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThanOrEqual(strokeCount);
+    expect(await late.evaluate(() => window.__hangout.state.strokes.some((s) => s.id === 'bulk-0'))).toBe(true);
+    expect(await late.evaluate(() => window.__hangout.state.strokes.some((s) => s.id === 'bulk-120'))).toBe(true);
+    expect(await late.evaluate(() => window.__hangout.state.strokes.some((s) => s.id === 'bogus-only'))).toBe(false);
+});
+
+test('snapshot with a non-video host signature in msg.video still renders strokes and chat', async ({ browser }) => {
+    const { host, invite } = await hostAndGuest(browser);
+    await drawLine(host);
+    await host.fill('[data-text]', 'canvas ok');
+    await host.press('[data-text]', 'Enter');
+
+    const late = await openBrowser(browser);
+    await late.goto(invite);
+    await late.fill('[data-name]', 'Pat');
+    await late.click('[data-enter]');
+
+    const lateId = await late.evaluate(() => window.__hangout.myId);
+    await late.evaluate(() => {
+        const app = window.__hangout;
+        app.snapshotDone = false;
+        app.snapshotFrom = null;
+        app.snapshotHasSeqProof = false;
+        app.state.strokes = [];
+        app.state.chat = [];
+    });
+
+    await host.evaluate(async ({ to }) => {
+        const app = window.__hangout;
+        const body = { kind: 'clear', seq: app.lastHostSeq || Date.now() };
+        const canonical = new TextEncoder().encode(JSON.stringify(body));
+        const sig = new Uint8Array(await crypto.subtle.sign(
+            { name: 'ECDSA', hash: 'SHA-256' },
+            app.hostPriv,
+            canonical
+        ));
+        const b64u = (bytes) => {
+            let s = '';
+            bytes.forEach((b) => { s += String.fromCharCode(b); });
+            return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        };
+        const signed = { type: 'host', body, sig: b64u(sig) };
+        const frame = await window.HangoutCore.seal(app.key, {
+            type: 'snapshot',
+            to,
+            strokes: app.state.strokes.slice(-400),
+            chat: app.state.chat.slice(-50),
+            video: { signed },
+            chunk: false,
+            first: true,
+            done: true
+        });
+        app.ws.send(JSON.stringify(frame));
+    }, { to: lateId });
+
+    await expect.poll(() => late.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThan(0);
+    await expect(late.locator('[data-log]')).toContainText('canvas ok');
+});
+
 test('late joiner receives lastHostSeq and ignores replayed clear messages', async ({ browser }) => {
     const { host, guest, invite } = await hostAndGuest(browser);
 
