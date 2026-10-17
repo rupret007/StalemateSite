@@ -76,7 +76,7 @@ export function startRelay({ port = 0, previewKey = 'local-preview-key-0001', or
                 if (!frame) return ws.close(4400, 'bad frame');
                 cast({ t: Date.now(), from: ws.id, iv: frame.iv, c: frame.c }, ws);
             });
-            ws.on('close', () => { room.delete(ws); cast({ peers: room.size, t: Date.now() }); if (!room.size) rooms.delete(roomId); });
+            ws.on('close', () => { room.delete(ws); cast({ peers: room.size, left: ws.id, t: Date.now() }); if (!room.size) rooms.delete(roomId); });
         });
     });
     return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve({ port: server.address().port, lobby, close: () => new Promise((r) => { clearInterval(ticker); wss.clients.forEach((c) => c.terminate()); server.close(r); }) })));
