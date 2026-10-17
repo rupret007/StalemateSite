@@ -99,6 +99,44 @@ test('drawing, chat and the host wipe sync between two browsers', async ({ brows
     await expect.poll(() => guest.evaluate(() => window.__hangout.state.strokes.length)).toBe(0);
 });
 
+test('late joiner receives lastHostSeq and ignores replayed clear messages', async ({ browser }) => {
+    const { host, guest, invite } = await hostAndGuest(browser);
+
+    await guest.evaluate(() => {
+        window.__capturedClear = null;
+        const orig = window.__hangout.ws.onmessage;
+        window.__hangout.ws.onmessage = async (e) => {
+            const raw = e.data;
+            const frame = JSON.parse(raw);
+            if (frame.c) {
+                const msg = await window.HangoutCore.open(window.__hangout.key, frame);
+                if (msg.type === 'host' && msg.body.kind === 'clear') window.__capturedClear = msg;
+            }
+            return orig(e);
+        };
+    });
+
+    await drawLine(host);
+    await host.click('[data-clear]');
+    await expect.poll(() => guest.evaluate(() => !!window.__capturedClear)).toBe(true);
+
+    await drawLine(host);
+
+    const late = await openBrowser(browser);
+    await late.goto(invite);
+    await late.click('[data-enter]');
+    await expect.poll(() => late.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThan(0);
+
+    await guest.evaluate(async () => {
+        const app = window.__hangout;
+        const frame = await window.HangoutCore.seal(app.key, window.__capturedClear);
+        app.ws.send(JSON.stringify(frame));
+    });
+
+    await late.waitForTimeout(500);
+    expect(await late.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThan(0);
+});
+
 test('host-driven YouTube stays in sync: load, play, pause, seek, late joiner', async ({ browser }) => {
     const { host, guest, invite } = await hostAndGuest(browser);
     await host.click('[data-pick-yt="oh5p5f5_-7A"]');
@@ -173,6 +211,85 @@ test('camera and mic are opt-in with a plain explainer, then connect peer to pee
 
     await host.click('[data-hangup]');
     expect(await host.evaluate(() => window.__hangout.av.stream)).toBeNull();
+});
+
+test('TURN servers are fetched before peer connections are opened', async ({ browser }) => {
+    const host = await openBrowser(browser);
+    await host.addInitScript(() => {
+        const Orig = window.RTCPeerConnection;
+        window.__hangoutPcIce = [];
+        window.RTCPeerConnection = function (config, ...args) {
+            window.__hangoutPcIce.push(config);
+            return new Orig(config, ...args);
+        };
+    });
+    await host.route('**/room-turn', async (route) => {
+        if (route.request().method() === 'POST') {
+            await new Promise((r) => setTimeout(r, 200));
+            await route.fulfill({ json: { iceServers: [{ urls: 'turn:fake' }] } });
+        } else {
+            await route.continue();
+        }
+    });
+    await host.goto(roomUrl('&turn=/room-turn'));
+    await host.fill('[data-name]', 'Jeff');
+    await host.click('[data-enter]');
+    await expect(host.locator('[data-room]')).toBeVisible();
+
+    await expect.poll(() => host.evaluate(() => {
+        const ice = window.__hangout.av.ice;
+        return ice && ice.some((s) => {
+            const urls = Array.isArray(s.urls) ? s.urls : [s.urls];
+            return urls.some((u) => String(u).includes('turn:fake'));
+        });
+    })).toBe(true);
+
+    await host.click('[data-cam]');
+    await host.click('[data-ask-yes]');
+
+    const guest = await openBrowser(browser);
+    await guest.goto(host.url());
+    await guest.click('[data-enter]');
+    await guest.click('[data-cam]');
+    await guest.click('[data-ask-yes]');
+
+    await expect.poll(() => host.evaluate(() => {
+        const configs = window.__hangoutPcIce || [];
+        return configs.some((c) => (c.iceServers || []).some((s) => {
+            const urls = Array.isArray(s.urls) ? s.urls : [s.urls];
+            return urls.some((u) => String(u).includes('turn:fake'));
+        }));
+    }), { timeout: 15000 }).toBe(true);
+});
+
+test('hanging up local AV does not drop incoming video from peers', async ({ browser }) => {
+    const { host, guest } = await hostAndGuest(browser);
+
+    await host.click('[data-cam]');
+    await host.click('[data-ask-yes]');
+    await guest.click('[data-cam]');
+    await guest.click('[data-ask-yes]');
+
+    await expect.poll(() => guest.evaluate(() => {
+        const v = document.querySelector('[data-tile="me"] video');
+        return v && v.videoWidth > 0;
+    })).toBe(true);
+
+    await expect.poll(() => guest.evaluate(() => {
+        const v = document.querySelector('[data-tiles] .tile:not([data-tile="me"]) video');
+        return v && v.videoWidth > 0;
+    })).toBe(true);
+
+    await guest.click('[data-hangup]');
+
+    await expect(guest.locator('[data-tile="me"]')).toBeHidden();
+
+    await expect.poll(() => guest.evaluate(() => {
+        const v = document.querySelector('[data-tiles] .tile:not([data-tile="me"]) video');
+        return v && v.videoWidth > 0;
+    })).toBe(true);
+
+    await expect.poll(async () => await host.locator('[data-tiles] .tile:not([data-tile="me"])').count(), { timeout: 10000 }).toBe(0);
 });
 
 test('a fifth camera is refused politely', async ({ browser }) => {
