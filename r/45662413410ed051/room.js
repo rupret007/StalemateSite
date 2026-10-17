@@ -127,7 +127,7 @@
                 : app.myId ? 'Lost the room. Reload to get back in.'
                     : 'Couldn’t get in. The link may be wrong, the room may be full, or the room server is resting for today.';
             if (app.myId) say(why); else setGate(why);
-            stopAv();
+            stopAv(true);
         };
     }
 
@@ -179,8 +179,9 @@
             return;
         case 'snapshot':
             if (app.snapshotDone) return;
-            app.snapshotDone = true;
-            H.apply(app.state, { type: 'snapshot', state: { strokes: msg.strokes, chat: msg.chat } });
+            if (msg.done || !msg.chunk) app.snapshotDone = true;
+            if (msg.lastHostSeq !== undefined) app.lastHostSeq = Math.max(app.lastHostSeq, msg.lastHostSeq);
+            H.apply(app.state, { type: 'snapshot', state: { strokes: msg.strokes, chat: msg.chat, append: msg.chunk } });
             if (msg.video && await verifyHost(msg.video.signed)) acceptVideo(msg.video.signed, msg.video.t);
             redraw();
             renderChat();
@@ -214,7 +215,23 @@
 
     function sendSnapshot(to) {
         const video = app.lastVideoSigned;
-        send({ type: 'snapshot', to, strokes: app.state.strokes.slice(-400), chat: app.state.chat.slice(-50), video });
+        const strokes = app.state.strokes.slice(-400);
+        const chunks = [];
+        for (let i = 0; i < strokes.length; i += 100) chunks.push(strokes.slice(i, i + 100));
+        if (!chunks.length) chunks.push([]);
+        chunks.forEach((chunk, i) => {
+            const isLast = i === chunks.length - 1;
+            send({
+                type: 'snapshot',
+                to,
+                strokes: chunk,
+                chat: isLast ? app.state.chat.slice(-50) : undefined,
+                video: isLast ? video : undefined,
+                lastHostSeq: isLast ? app.lastHostSeq : undefined,
+                chunk: true,
+                done: isLast
+            });
+        });
     }
 
     /* ---------------- gate / enter ---------------- */
@@ -224,7 +241,6 @@
         doc.body.classList.toggle('is-host', app.isHost);
         ui.hostNote.textContent = app.isHost ? 'You started this room, so you drive the video and the wipe.' : 'The person who started the room drives the video.';
         say('You’re in. Say hi?');
-        iceServers();
         sizeCanvas();
     }
 
@@ -261,6 +277,7 @@
             try {
                 if (!invite) invite = await makeRoom();
                 await loadIdentity(invite);
+                await iceServers();
                 connect();
             } catch (error) {
                 setGate('That invite link looks broken. Ask for a fresh one.');
@@ -555,9 +572,13 @@
         if (av && av.canvas) app.av.canvasPeers.add(from); else app.av.canvasPeers.delete(from);
         const t = ui.tiles.querySelector(`[data-tile="${CSS.escape(from)}"]`);
         if (t) t.classList.toggle('tile--canvas', app.av.canvasPeers.has(from));
-        if (on) app.av.peers.add(from); else app.av.peers.delete(from);
-        if (!on && !(app.av.mic || app.av.cam)) closePc(from);
-        if (on && !app.av.pcs.has(from)) openPc(from);
+        if (on) {
+            app.av.peers.add(from);
+            if (!app.av.pcs.has(from)) openPc(from);
+        } else {
+            app.av.peers.delete(from);
+            closePc(from);
+        }
     }
 
     function ask(title, copy) {
@@ -573,18 +594,19 @@
 
     async function iceServers() {
         if (app.av.ice) return app.av.ice;
-        app.av.ice = STUN;
-        if (!turnUrl) return app.av.ice;
+        let servers = STUN;
+        if (!turnUrl) { app.av.ice = servers; return servers; }
         try {
             const res = await fetch(turnUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preview: previewKey, room: app.roomId }) });
             if (res.ok) {
                 const data = await res.json();
-                if (Array.isArray(data.iceServers)) app.av.ice = STUN.concat(data.iceServers);
+                if (Array.isArray(data.iceServers)) servers = STUN.concat(data.iceServers);
             } else {
                 say('The video relay is out of free juice for now. Faces only work when browsers can connect directly.');
             }
         } catch (error) { /* fail closed to direct-only */ }
-        return app.av.ice;
+        app.av.ice = servers;
+        return servers;
     }
 
     async function toggle(kind) {
@@ -700,7 +722,10 @@
         };
         pc.ontrack = (e) => {
             entry.stream.addTrack(e.track);
-            e.track.onended = () => entry.stream.removeTrack(e.track);
+            e.track.onended = () => {
+                entry.stream.removeTrack(e.track);
+                renderTile(id, entry.stream, app.names.get(id) || 'Friend');
+            };
             renderTile(id, entry.stream, app.names.get(id) || 'Friend');
         };
         pc.onconnectionstatechange = () => {
@@ -758,19 +783,28 @@
         if (tile) tile.remove();
     }
 
-    function stopAv() {
+    function stopAv(closeAll = false) {
         if (app.av.stream) app.av.stream.getTracks().forEach((t) => t.stop());
         app.av.stream = null;
         app.av.mic = false;
         app.av.cam = false;
         app.av.canvas = false;
-        Array.from(app.av.pcs.keys()).forEach(closePc);
+        if (closeAll) Array.from(app.av.pcs.keys()).forEach(closePc);
         renderTile('me', null);
+    }
+
+    function hasLiveVideo(stream) {
+        return Boolean(stream && stream.getVideoTracks().some((t) => t.readyState === 'live'));
     }
 
     function renderTile(id, stream, label, muted) {
         let tile = ui.tiles.querySelector(`[data-tile="${CSS.escape(id)}"]`);
-        if (!stream && id === 'me') { if (tile) tile.remove(); return; }
+        if (id === 'me') {
+            if (!stream) { if (tile) tile.remove(); return; }
+        } else if (!hasLiveVideo(stream)) {
+            if (tile) tile.remove();
+            return;
+        }
         if (!tile) {
             tile = doc.createElement('figure');
             tile.className = 'tile';
@@ -792,7 +826,7 @@
     ui.canvasCam.addEventListener('click', () => toggleCanvasCam());
     ui.mic.addEventListener('click', () => toggle('mic'));
     ui.cam.addEventListener('click', () => toggle('cam'));
-    ui.hangup.addEventListener('click', async () => { stopAv(); await refreshAv(); });
+    ui.hangup.addEventListener('click', async () => { stopAv(false); await refreshAv(); });
 
     /* ---------------- Bob Ross Paint-Along ---------------- */
     function setBob(on, byUser) {
