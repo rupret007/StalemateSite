@@ -125,6 +125,7 @@ test('late joiner receives lastHostSeq and ignores replayed clear messages', asy
 
     const late = await openBrowser(browser);
     await late.goto(invite);
+    await late.fill('[data-name]', 'Latecomer');
     await late.click('[data-enter]');
     await expect.poll(() => late.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThan(0);
 
@@ -251,6 +252,7 @@ test('TURN servers are fetched before peer connections are opened', async ({ bro
 
     const guest = await openBrowser(browser);
     await guest.goto(host.url());
+    await guest.fill('[data-name]', 'Karen');
     await guest.click('[data-enter]');
     await guest.click('[data-cam]');
     await guest.click('[data-ask-yes]');
