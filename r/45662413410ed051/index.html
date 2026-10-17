@@ -30,6 +30,13 @@
             <p data-gate-copy>Make a private room, copy the invite, text it to your people. No accounts, no app.</p>
             <label>Your name <span class="namebox"><input data-name maxlength="24" placeholder="Type a nickname… or roll one →" autocomplete="nickname"><button class="btn btn--ghost dice" type="button" data-dice aria-label="Make me a random fun nickname">🎲 Make me a name</button></span></label>
             <button class="btn btn--big" data-enter type="button">Start a room</button>
+            <button class="btn btn--ghost" data-check-btn type="button">Test my camera (optional)</button>
+            <div class="check" data-check hidden>
+                <video data-check-video autoplay playsinline muted></video>
+                <label>Mic level <meter data-check-meter min="0" max="1" low="0.1" high="0.8" optimum="0.5" value="0"></meter></label>
+                <p class="small" data-check-out role="status"></p>
+                <button class="btn btn--ghost" data-check-done type="button">Looks good</button>
+            </div>
             <p class="status" data-gate-status role="status"></p>
         </div>
     </section>
@@ -87,13 +94,26 @@
 
         <section class="panel call" aria-label="Camera and mic">
             <h2>Faces &amp; voices</h2>
-            <p class="small">Off until you turn it on. Up to 4 people on camera. Video goes straight between browsers when it can.</p>
-            <div class="tiles" data-tiles></div>
-            <div class="tools">
+            <p class="small">Off until you turn it on. Up to 8 people on camera. Video goes straight between browsers when it can.</p>
+            <p class="small jam-note" data-jam-note hidden>🎸 Jam room: your music goes through the WebJam app (plug in Ethernet). The browser mic is just for talking between songs, so it starts off and nobody hears you twice.</p>
+            <p class="hands" data-hands hidden></p>
+            <div class="tiles" data-tiles data-view="grid"></div>
+            <div class="react-float" data-react-float aria-live="polite"></div>
+            <div class="tools callbar" role="toolbar" aria-label="Call controls">
                 <button class="btn" type="button" data-mic>Turn on my mic</button>
                 <button class="btn" type="button" data-cam>Turn on my camera</button>
+                <button class="btn btn--ghost desk-only" type="button" data-share aria-pressed="false">Share screen</button>
+                <button class="btn btn--ghost" type="button" data-hand aria-pressed="false">Raise hand</button>
+                <span class="reacts" data-reacts role="group" aria-label="Reactions"></span>
+                <button class="btn btn--ghost" type="button" data-view-toggle hidden>Speaker view</button>
+                <button class="btn btn--ghost" type="button" data-pip hidden>Pop out</button>
+                <button class="btn btn--ghost" type="button" data-settings>⚙ Camera &amp; background</button>
                 <button class="btn btn--bob" type="button" data-canvas-cam aria-pressed="false">Show my real canvas</button>
                 <button class="btn btn--ghost" type="button" data-hangup hidden>Turn both off</button>
+            </div>
+            <div class="tools host-only host-call">
+                <button class="btn btn--ghost" type="button" data-lock aria-pressed="false">Lock faces</button>
+                <button class="btn btn--ghost" type="button" data-all-cams-off>Cameras off for everyone</button>
             </div>
         </section>
 
@@ -116,8 +136,32 @@
         </div>
     </dialog>
 
+    <dialog class="ask settings" data-settings-dlg>
+        <h2>Camera &amp; background</h2>
+        <label>Camera <select data-dev-cam></select></label>
+        <label>Mic <select data-dev-mic></select></label>
+        <label>Speaker <select data-dev-spk></select></label>
+        <label class="music"><input type="checkbox" data-music> Music mode (no echo cancelling; headphones on). For listening and singing along, not in time: play together in WebJam.</label>
+        <fieldset class="bg">
+            <legend>Background (only you run this; your video never leaves your device for it)</legend>
+            <div class="bg-picks" data-bg-picks>
+                <button type="button" data-bg="none" aria-pressed="true">None</button>
+                <button type="button" data-bg="blur" aria-pressed="false">Blur</button>
+                <button type="button" data-bg="checkerboard" aria-pressed="false" style="background-image:url(fx/bg/checkerboard.png)">Checkerboard</button>
+                <button type="button" data-bg="stripes" aria-pressed="false" style="background-image:url(fx/bg/stripes.png)">Stripes</button>
+                <button type="button" data-bg="stage" aria-pressed="false" style="background-image:url(fx/bg/stage.png)">Stage</button>
+                <button type="button" data-bg="blue" aria-pressed="false" style="background-image:url(fx/bg/blue.png)">Blue</button>
+            </div>
+            <p class="small" data-bg-status role="status"></p>
+            <p class="small" data-bg-support></p>
+        </fieldset>
+        <div class="tools"><button class="btn" type="button" data-settings-close>Done</button></div>
+    </dialog>
+    <dialog class="ask tile-menu" data-tile-menu></dialog>
+
     <script src="../../countdown.js" defer></script>
     <script src="sync-core.js"></script>
+    <script src="video-core.js"></script>
     <script src="bob-ross.js"></script>
     <script src="names.js"></script>
     <script src="room.js"></script>

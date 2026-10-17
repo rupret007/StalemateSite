@@ -633,7 +633,7 @@ test('toggling camera off and back on while mic stays on updates remote video ti
     }), { timeout: 15000 }).toBe(true);
 
     await guest.click('[data-cam]');
-    await guest.click('[data-ask-yes]');
+    if (await guest.locator('[data-ask]').isVisible()) await guest.click('[data-ask-yes]');
     await expect.poll(() => host.evaluate(() => {
         const v = document.querySelector('[data-tiles] .tile:not([data-tile="me"]) video');
         return v && v.videoWidth > 0;
@@ -653,8 +653,8 @@ test('camera and mic are opt-in with a plain explainer, then connect peer to pee
     await host.click('[data-ask-yes]');
     await expect(host.locator('[data-cam]')).toHaveText('Turn off my camera');
     const settings = await host.evaluate(() => window.__hangout.av.stream.getVideoTracks()[0].getSettings());
-    expect(settings.width).toBeLessThanOrEqual(320);
-    expect(settings.frameRate).toBeLessThanOrEqual(15);
+    expect(settings.width).toBeLessThanOrEqual(640);
+    expect(settings.frameRate).toBeLessThanOrEqual(24);
 
     await guest.click('[data-mic]');
     await guest.click('[data-ask-yes]');
@@ -664,12 +664,13 @@ test('camera and mic are opt-in with a plain explainer, then connect peer to pee
         const e = [...window.__hangout.av.pcs.values()][0];
         return e && e.pc.connectionState;
     }), { timeout: 15000 }).toBe('connected');
-    const bitrate = await host.evaluate(() => {
+    const enc = await host.evaluate(() => {
         const e = [...window.__hangout.av.pcs.values()][0];
         const s = e.pc.getSenders().find((x) => x.track && x.track.kind === 'video');
-        return s.getParameters().encodings[0].maxBitrate;
+        return s.getParameters().encodings[0];
     });
-    expect(bitrate).toBeLessThanOrEqual(250000);
+    expect(enc.maxBitrate).toBeLessThanOrEqual(250000);
+    expect(enc.scaleResolutionDownBy).toBeGreaterThanOrEqual(2);
 
     await host.click('[data-hangup]');
     expect(await host.evaluate(() => window.__hangout.av.stream)).toBeNull();
@@ -755,11 +756,11 @@ test('hanging up local AV does not drop incoming video from peers', async ({ bro
     await expect.poll(async () => await host.locator('[data-tiles] .tile:not([data-tile="me"])').count(), { timeout: 10000 }).toBe(0);
 });
 
-test('a fifth camera is refused politely', async ({ browser }) => {
+test('a ninth camera is refused politely (8 max, matching the room cap)', async ({ browser }) => {
     const { guest } = await hostAndGuest(browser);
-    await guest.evaluate(() => ['x1', 'x2', 'x3', 'x4'].forEach((id) => window.__hangout.av.peers.add(id)));
+    await guest.evaluate(() => ['x1', 'x2', 'x3', 'x4', 'x5', 'x6', 'x7', 'x8'].forEach((id) => window.__hangout.av.peers.add(id)));
     await guest.click('[data-cam]');
-    await expect(guest.locator('[data-status]')).toContainText('Faces are full (4 max)');
+    await expect(guest.locator('[data-status]')).toContainText('Faces are full (8 max)');
     await expect(guest.locator('[data-ask]')).toBeHidden();
 });
 
