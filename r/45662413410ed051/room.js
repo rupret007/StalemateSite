@@ -709,7 +709,10 @@
         };
         pc.ontrack = (e) => {
             entry.stream.addTrack(e.track);
-            e.track.onended = () => entry.stream.removeTrack(e.track);
+            e.track.onended = () => {
+                entry.stream.removeTrack(e.track);
+                renderTile(id, entry.stream, app.names.get(id) || 'Friend');
+            };
             renderTile(id, entry.stream, app.names.get(id) || 'Friend');
         };
         pc.onconnectionstatechange = () => {
@@ -777,9 +780,18 @@
         renderTile('me', null);
     }
 
+    function hasLiveVideo(stream) {
+        return Boolean(stream && stream.getVideoTracks().some((t) => t.readyState === 'live'));
+    }
+
     function renderTile(id, stream, label, muted) {
         let tile = ui.tiles.querySelector(`[data-tile="${CSS.escape(id)}"]`);
-        if (!stream && id === 'me') { if (tile) tile.remove(); return; }
+        if (id === 'me') {
+            if (!stream) { if (tile) tile.remove(); return; }
+        } else if (!hasLiveVideo(stream)) {
+            if (tile) tile.remove();
+            return;
+        }
         if (!tile) {
             tile = doc.createElement('figure');
             tile.className = 'tile';
