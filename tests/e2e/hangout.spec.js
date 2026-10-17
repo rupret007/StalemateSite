@@ -455,6 +455,7 @@ test('guest snapshot cannot tamper with video timestamp to skew late joiner play
 
     const late = await openBrowser(browser);
     await late.goto(invite);
+    await late.fill('[data-name]', 'Pat');
     await late.click('[data-enter]');
     const lateId = await late.evaluate(() => window.__hangout.myId);
     await late.evaluate(() => {
