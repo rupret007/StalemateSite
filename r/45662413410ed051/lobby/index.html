@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+    <meta name="googlebot" content="noindex, nofollow">
+    <meta name="referrer" content="no-referrer">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' wss://stalemate-hangout.jeffstory007.workers.dev https://stalemate.goatcounter.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <!-- Hidden preview. Not linked from anywhere on the public site. -->
+    <meta name="hangout-relay" content="">
+    <meta name="hangout-turnstile" content="">
+    <title>#stalemate · Hang Out</title>
+    <link rel="icon" href="../../../assets/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="lobby.css">
+</head>
+<body>
+    <div class="titlebar"><span>Hang Out — #stalemate</span><span class="dots" aria-hidden="true">▁ ▢ ✕</span></div>
+
+    <section class="gate" data-gate>
+        <div class="gate-card">
+            <h1>#stalemate</h1>
+            <p class="lede" data-gate-copy>The band’s hangout. Chat, paint along with Bob Ross, watch stuff, jam. No accounts.</p>
+            <label class="nickrow">Your nick
+                <span class="nickbox"><input data-nick maxlength="20" autocomplete="off" spellcheck="false" aria-label="Your nick" placeholder="Type a nickname… or roll one →"><button class="btn btn--ghost dice" type="button" data-reroll aria-label="Make me a random fun nickname">🎲 Make me a name</button></span>
+            </label>
+            <button class="btn btn--big" type="button" data-enter>I’m 13+ and I agree · Let me in 🤘</button>
+            <p class="rules"><b>One rule: Don’t be a dick.</b> Swear all you want. You own what you post; the band can remove anything. <a href="../terms/" data-terms>House rules &amp; privacy</a></p>
+            <p class="status" data-gate-status role="status"></p>
+            <div data-turnstile></div>
+        </div>
+    </section>
+
+    <main class="irc" data-app hidden>
+        <aside class="pane rooms" data-pane="rooms" aria-label="Rooms">
+            <h2>Start something</h2>
+            <div class="tiles" data-tiles>
+                <button class="tile" type="button" data-start="bobross"><b>🎨</b>Bob Ross paint-along</button>
+                <button class="tile" type="button" data-start="watch"><b>📺</b>Watch together</button>
+                <button class="tile" type="button" data-start="art"><b>🖌️</b>Art on camera</button>
+                <button class="tile" type="button" data-start="jam"><b>🎸</b>Jam (WebJam)</button>
+            </div>
+            <a class="private" data-private href="../">🔒 Private room instead (end-to-end encrypted) →</a>
+            <h2>Open rooms <span class="count" data-room-count>0</span></h2>
+            <ul class="roomlist" data-roomlist></ul>
+            <p class="empty" data-rooms-empty>No rooms yet. Tap a tile and you’re the host.</p>
+        </aside>
+
+        <section class="pane chat" data-pane="chat" aria-label="Chat">
+            <nav class="tabs" data-tabs role="tablist"></nav>
+            <div class="topic" data-topic></div>
+            <div class="roombar" data-roombar hidden>
+                <span class="modes" data-modes></span>
+                <button class="btn btn--small" type="button" data-cam aria-pressed="false">📷 Camera (18+)</button>
+                <button class="btn btn--small btn--ghost op-only" type="button" data-roomtools>@ Host tools</button>
+                <button class="btn btn--small btn--ghost" type="button" data-leave>Leave</button>
+            </div>
+            <div class="jam" data-jam hidden>
+                <p><b>Music runs in the WebJam desktop app</b> (Jamulus under the hood) so the timing is tight. <b>Plug in Ethernet</b> — Wi-Fi adds lag and dropouts.</p>
+                <div class="jam-actions">
+                    <a class="btn" data-jam-desktop href="#" hidden>Open in WebJam 🎸</a>
+                    <span class="small" data-jam-wait>Waiting for the host to paste their WebJam invite.</span>
+                    <button class="btn btn--ghost" type="button" data-jam-web disabled title="Arrives with WebJam Web Join">Join in browser (soon, higher delay)</button>
+                </div>
+                <form class="jam-paste op-only" data-jam-form>
+                    <input data-jam-link placeholder="Host: paste the webjam:// invite" aria-label="WebJam invite">
+                    <button class="btn btn--small" type="submit">Share</button>
+                </form>
+            </div>
+            <div class="activity" data-activity hidden>
+                <p data-activity-copy></p>
+                <a class="btn" data-activity-link href="../">Open the canvas &amp; player</a>
+            </div>
+            <ol class="buffer" data-buffer aria-live="polite" aria-relevant="additions"></ol>
+            <div class="pmreq" data-pmreqs></div>
+            <div class="quick" data-quick>
+                <button type="button" class="startroom" data-show="rooms">＋ Start a room</button>
+                <button type="button" data-quick-line="🤘 SHRED">🤘</button>
+                <button type="button" data-quick-line="happy little tree 🌲">🌲</button>
+                <button type="button" data-quick-me="moshes">/me mosh</button>
+                <button type="button" data-quick-cmd="slap">🐟 slap</button>
+                <button type="button" data-quick-cmd="away">💤 away</button>
+                <button type="button" data-quick-cmd="help">? help</button>
+            </div>
+            <form class="say" data-say>
+                <button class="slash" type="button" data-palette-open aria-label="Commands">/</button>
+                <input data-text maxlength="300" autocomplete="off" placeholder="Say something (or /help)" aria-label="Message">
+                <button class="btn" type="submit">Send</button>
+            </form>
+        </section>
+
+        <aside class="pane people" data-pane="people" aria-label="People">
+            <h2 data-people-title>People</h2>
+            <ul class="nicks" data-nicks></ul>
+            <label class="pmtoggle"><input type="checkbox" data-pm-off> Turn off PM requests</label>
+            <p class="small"><a href="../terms/">House rules</a> · Tap 🚩 on anything gross.</p>
+        </aside>
+
+        <nav class="phonetabs" aria-label="Sections">
+            <button type="button" data-show="rooms">🎨 Rooms</button>
+            <button type="button" data-show="chat" aria-current="true">💬 Chat</button>
+            <button type="button" data-show="people">🤘 People</button>
+        </nav>
+    </main>
+
+    <dialog class="sheet" data-sheet>
+        <h3 data-sheet-title></h3>
+        <div class="sheet-buttons" data-sheet-buttons></div>
+        <button class="btn btn--ghost" type="button" data-sheet-close>Close</button>
+    </dialog>
+    <dialog class="sheet" data-cam-gate>
+        <h3>Camera on?</h3>
+        <p>Cameras in open rooms are for grown-ups. Others in this room will see you.</p>
+        <label class="check"><input type="checkbox" data-adult> I’m 18 or older</label>
+        <div class="sheet-buttons"><button class="btn" type="button" data-cam-yes>Turn it on</button><button class="btn btn--ghost" type="button" data-cam-no>Never mind</button></div>
+    </dialog>
+    <dialog class="sheet" data-palette>
+        <h3>Commands</h3>
+        <p class="small">Tap one. Typing them works too.</p>
+        <div class="sheet-buttons" data-palette-buttons></div>
+        <button class="btn btn--ghost" type="button" data-palette-close>Close</button>
+    </dialog>
+    <div class="toast" data-toast role="status" hidden></div>
+    <!-- Page-level counts only: fixed event names, no query string (the preview key is stripped first), no referrer. -->
+    <script data-goatcounter="https://stalemate.goatcounter.com/count" data-goatcounter-settings='{"no_onload": true}' async src="../../../js/count.js"></script>
+    <script src="../names.js"></script>
+    <script src="lobby.js"></script>
+</body>
+</html>

@@ -26,3 +26,19 @@ Then put the `wss://stalemate-hangout.<account>.workers.dev` URL in the room pag
 - **TURN typical (about 15% of legs relayed):** 0.1–0.25 GB an hour.
 - **Free allowance:** Cloudflare's TURN and SFU share one free 1,000 GB a month. WebJam's TURN Worker caps the account at 800 GB, with 200 GB for web traffic.
 - **TURN is off by default.** `hangout-turn` is empty, so the room uses direct connections only (STUN) until a capped TURN credential endpoint is approved. If the endpoint says the budget is used up, faces fall back to direct-only, and chat, draw and watch keep working.
+
+## Lobby (#stalemate) — phase 1, hidden, NOT deployed
+- `/lobby` (fans) and `/lobby-admin` (band) WebSockets on the same Worker, one `HangoutLobby` Durable Object (Hibernation API).
+  Engine: `src/lobby-core.mjs` (pure, unit-tested, also driven by `scripts/hangout-relay-dev.mjs`). Filter: `src/filter.mjs`.
+  Auth + device ids: `src/auth.mjs`. Worker gate: `src/lobby-do.mjs`.
+- Fail closed: any missing secret/binding → 503. `HANGOUT_OPEN=0` → "back soon". Daily request share: read-only at 85 %, closed at 95 %.
+- Before any deploy (needs Jeff's OK):
+  1. Cloudflare Zero Trust (free) → Access app covering `<worker host>/lobby-admin*`, policy = band emails, login = One-time PIN.
+     Set the Access cookie to SameSite=None so the WebSocket from stalemate.band carries it. Put the team domain and AUD in
+     `[vars]` (public ids).
+  2. `wrangler secret put` HANGOUT_HMAC_KEY (32+ random chars), HANGOUT_TURNSTILE_SECRET, HANGOUT_OWNER_EMAIL,
+     HANGOUT_BAND_EMAILS, HANGOUT_ADMIN_RETURN (https://stalemate.band/r/<hidden>/admin/). Turnstile site key goes in the
+     lobby page meta.
+  3. Lawyer reviews `r/<hidden>/terms/` and the contact placeholder is filled before any public link (rollout R3).
+- WebJam: jam rooms only relay the host's `webjam://` invite; signaling, mailbox, TURN and Jamulus stay in WebJam.
+  `WEBJAM_WEB_ORIGINS` turns on the Web Join (#388) browser hook.

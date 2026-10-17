@@ -13,6 +13,22 @@ class_name = "HangoutRoom"
 name = "QUOTA"
 class_name = "HangoutQuota"
 
+[[durable_objects.bindings]]
+name = "LOBBY"
+class_name = "HangoutLobby"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["HangoutRoom", "HangoutQuota"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["HangoutLobby"]
+
+# Lobby (hidden, not deployed). Public ids only here; fill in after creating the Cloudflare Access app.
+# Secrets via `wrangler secret put`: HANGOUT_PREVIEW_KEY, HANGOUT_HMAC_KEY (32+ chars), HANGOUT_TURNSTILE_SECRET,
+# HANGOUT_OWNER_EMAIL, HANGOUT_BAND_EMAILS. Any missing => the lobby answers 503.
+[vars]
+HANGOUT_ACCESS_TEAM = ""
+HANGOUT_ACCESS_AUD = ""
+WEBJAM_WEB_ORIGINS = ""

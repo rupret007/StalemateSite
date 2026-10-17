@@ -1,0 +1,25 @@
+.terms {
+    max-width: 42rem;
+    margin: 0 auto;
+    padding: 18px 16px 60px;
+    line-height: 1.55;
+}
+
+.terms h1 {
+    font-size: 2.6rem;
+}
+
+.terms h2 {
+    margin-top: 22px;
+}
+
+.terms li {
+    margin: 6px 0;
+}
+
+.big-rule {
+    font: 800 2rem var(--display);
+    color: var(--pink);
+    text-transform: uppercase;
+    margin: 8px 0;
+}

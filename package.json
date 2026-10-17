@@ -16,5 +16,8 @@
     "jsdom": "^29.0.1",
     "vitest": "^4.1.2",
     "ws": "^8.18.3"
+  },
+  "dependencies": {
+    "obscenity": "^0.4.6"
   }
 }

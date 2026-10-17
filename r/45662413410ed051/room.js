@@ -301,9 +301,22 @@
             ui.gateCopy.textContent = 'Somebody wants to hang out. Pick a name (or don’t) and jump in.';
             ui.enter.textContent = 'Jump in';
         }
+        // Blank by default, remembered on this device; 🎲 fills in a fun name you can edit or reroll.
+        try { ui.name.value = localStorage.getItem('hangout-nick') || ''; } catch (error) { /* private mode */ }
+        const dice = $('[data-dice]');
+        if (dice) dice.addEventListener('click', () => {
+            const r = window.StaleNames.roll();
+            ui.name.value = r.name;
+            dice.textContent = '🎲 Roll again';
+            document.querySelector('[data-gate-status]').textContent = r.legendary ? '✨ LEGENDARY name! Keep it, it’s rare.' : '';
+            ui.name.focus();
+        });
         ui.enter.addEventListener('click', async () => {
+            const typed = (ui.name.value || '').replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, '').trim().slice(0, 24);
+            if (typed.length < 2) { document.querySelector('[data-gate-status]').textContent = 'Type a name (or tap 🎲 for a fun one).'; ui.name.focus(); return; }
+            try { localStorage.setItem('hangout-nick', typed); } catch (error) { /* private mode */ }
             ui.enter.disabled = true;
-            app.name = (ui.name.value || '').trim().slice(0, 24) || `Punk #${Math.floor(10 + Math.random() * 89)}`;
+            app.name = typed;
             try {
                 if (!invite) invite = await makeRoom();
                 await loadIdentity(invite);
