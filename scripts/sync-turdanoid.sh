@@ -50,7 +50,7 @@ for f in index.html TurdAnoid.html; do
   sed -i 's|</head>|<meta property="og:title" content="Turdanoid on stalemate.band">\n<meta property="og:description" content="Brick-breaker, but gross. Free, plays in the browser.">\n<meta property="og:image" content="https://stalemate.band/play/stalemate/og-play.png">\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">\n<meta name="twitter:card" content="summary_large_image">\n</head>|' "$f"
 done
 for f in *.html; do
-  sed -i 's|</body>|<script src="stalemate/play-music-pref.js" defer></script>\n<script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>\n<script src="../js/track.js" defer></script>\n<script src="stalemate/play-track.js" defer></script>\n</body>|' "$f"
+  sed -i 's|</body>|<script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>\n<script src="../js/track.js" defer></script>\n<script src="stalemate/play-track.js" defer></script>\n<script src="stalemate/play-music-pref.js" defer></script>\n</body>|' "$f"
 done
 printf 'Vendored from github.com/rupret007/Turdanoid@%s (%s). Same owner as this repo; no separate license file upstream.\nDo not edit by hand: run scripts/sync-turdanoid.sh\n' "$SHA" "$REF" > "$DEST/VENDORED.txt"
 echo "Synced Turdanoid $SHA into play/"

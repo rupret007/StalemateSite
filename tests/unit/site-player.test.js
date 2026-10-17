@@ -46,6 +46,23 @@ describe('site player', () => {
         win.StalemateMusicPref.write('off');
         await win.StalemateSitePlayer.play('manic');
         const el = win.document.getElementById('stalemate-site-player');
-        expect(el.paused).toBe(true);
+        expect(el).toBeNull();
+    });
+
+    it('pauses when another media element starts playing', async () => {
+        const win = loadPlayer(storage);
+        win.HTMLMediaElement.prototype.play = function playStub() {
+            return Promise.resolve();
+        };
+        await win.StalemateSitePlayer.play('manic');
+        const el = win.document.getElementById('stalemate-site-player');
+        let pausedCalled = false;
+        el.pause = () => { pausedCalled = true; };
+
+        const other = win.document.createElement('video');
+        win.document.body.appendChild(other);
+        other.dispatchEvent(new win.Event('play'));
+
+        expect(pausedCalled).toBe(true);
     });
 });

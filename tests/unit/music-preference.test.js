@@ -76,6 +76,7 @@ describe('music toggle markup', () => {
             const html = readFileSync(path.join(playDir, name), 'utf8');
             expect(html, name).toContain('music-preference.js');
             expect(html, name).toContain('play-music-pref.js');
+            expect(html, name).toMatch(/play-track\.js.*play-music-pref\.js.*<\/body>/s);
         }
     });
 });

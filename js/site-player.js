@@ -49,8 +49,8 @@
     }
 
     function playing() {
-        var el = getAudio();
-        return el && !el.paused && !el.ended;
+        if (!audio) return false;
+        return !audio.paused && !audio.ended;
     }
 
     function syncButtons() {
@@ -115,6 +115,11 @@
             }
             syncButtons();
         });
+        global.document.addEventListener('play', function (event) {
+            if (audio && event.target !== audio) {
+                try { audio.pause(); } catch (e) { /* */ }
+            }
+        }, true);
         syncButtons();
     }
 
