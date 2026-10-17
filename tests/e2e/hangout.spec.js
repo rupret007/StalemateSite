@@ -1,6 +1,7 @@
 // Two real browsers in one hidden room, synced over the local stand-in for the relay Worker.
 const path = require('node:path');
 const { test, expect } = require('@playwright/test');
+const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
 const SLUG = '45662413410ed051';
 const KEY = 'local-preview-key-0001';
@@ -12,12 +13,8 @@ test.use({
 });
 test.skip(({ browserName }) => browserName !== 'chromium', 'Chromium carries the two-browser sync suite');
 
-let relay;
-test.beforeAll(async ({ baseURL }) => {
-    const { startRelay } = await import('../../scripts/hangout-relay-dev.mjs');
-    relay = await startRelay({ previewKey: KEY, origins: new URL(baseURL).origin });
-});
-test.afterAll(async () => { if (relay) await relay.close(); });
+let testOrigin;
+test.beforeAll(async ({ baseURL }) => { testOrigin = baseURL; });
 
 async function openBrowser(browser) {
     const context = await browser.newContext({ permissions: ['camera', 'microphone'] });
@@ -25,7 +22,7 @@ async function openBrowser(browser) {
     await context.route('https://www.youtube.com/iframe_api', (route) => route.fulfill({ path: FAKE_YT, contentType: 'text/javascript' }));
     return context.newPage();
 }
-const roomUrl = (extra = '') => `/r/${SLUG}/?preview=${KEY}&relay=ws://127.0.0.1:${relay.port}${extra}`;
+const roomUrl = (extra = '') => `/r/${SLUG}/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}${extra}`;
 
 async function hostAndGuest(browser) {
     const host = await openBrowser(browser);
@@ -77,7 +74,7 @@ test('without the preview key the room stays shut and never dials the relay', as
 
 test('a wrong preview key is refused by the relay', async ({ browser }) => {
     const page = await openBrowser(browser);
-    await page.goto(`/r/${SLUG}/?preview=wrong-key-wrong-key&relay=ws://127.0.0.1:${relay.port}`);
+    await page.goto(`/r/${SLUG}/?preview=wrong-key-wrong-key&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`);
     await page.fill('[data-name]', 'Nope');
     await page.click('[data-enter]');
     await expect(page.locator('[data-gate-status]')).toContainText('Couldn’t get in');
@@ -496,6 +493,114 @@ test('guest snapshot cannot tamper with video timestamp to skew late joiner play
     expect(skew).toBeGreaterThan(60);
 });
 
+test('snapshot with a forged video host signature does not change playback state', async ({ browser }) => {
+    const { host, guest, invite } = await hostAndGuest(browser);
+    await host.click('[data-pick-yt="oh5p5f5_-7A"]');
+    await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+    const honestT = await guest.evaluate(() => window.__hangout.lastVideoSigned.signed.body.t);
+
+    const late = await openBrowser(browser);
+    await late.goto(invite);
+    await late.fill('[data-name]', 'Pat');
+    await late.click('[data-enter]');
+    const lateId = await late.evaluate(() => window.__hangout.myId);
+    await late.evaluate(() => {
+        const app = window.__hangout;
+        app.snapshotDone = false;
+        app.snapshotFrom = null;
+        app.snapshotHasSeqProof = false;
+        app.state.video = null;
+    });
+
+    await guest.evaluate(async ({ to, forgedT }) => {
+        const app = window.__hangout;
+        const video = app.lastVideoSigned;
+        const frame = await window.HangoutCore.seal(app.key, {
+            type: 'snapshot',
+            to,
+            strokes: app.state.strokes.slice(-400),
+            chat: app.state.chat.slice(-50),
+            video: {
+                signed: {
+                    type: 'host',
+                    body: { ...video.signed.body, t: forgedT, pos: 9999 },
+                    sig: 'AAAA'
+                }
+            },
+            chunk: false,
+            first: true,
+            done: true
+        });
+        app.ws.send(JSON.stringify(frame));
+    }, { to: lateId, forgedT: honestT - 3_600_000 });
+
+    await late.waitForTimeout(400);
+    expect(await late.evaluate(() => window.__hangout.state.video?.pos)).not.toBe(9999);
+    expect(await late.evaluate(() => window.__hangout.state.video?.t)).not.toBe(honestT - 3_600_000);
+});
+
+test('guest snapshot with an unsigned moderation mod cannot change lock state', async ({ browser }) => {
+    const { host, guest, invite } = await hostAndGuest(browser);
+    await host.click('[data-lock]');
+    await expect(host.locator('[data-lock]')).toHaveText('Unlock faces');
+
+    const late = await openBrowser(browser);
+    await late.goto(invite);
+    await late.fill('[data-name]', 'Pat');
+    await late.click('[data-enter]');
+    const lateId = await late.evaluate(() => window.__hangout.myId);
+    await late.evaluate(() => {
+        const app = window.__hangout;
+        app.snapshotDone = false;
+        app.snapshotFrom = null;
+        app.snapshotHasSeqProof = false;
+    });
+
+    await guest.evaluate(async ({ to }) => {
+        const app = window.__hangout;
+        const frame = await window.HangoutCore.seal(app.key, {
+            type: 'snapshot',
+            to,
+            strokes: app.state.strokes.slice(-400),
+            chat: app.state.chat.slice(-50),
+            mods: [{ type: 'host', body: { kind: 'lock', on: false, seq: Date.now() }, sig: 'AAAA' }],
+            chunk: false,
+            first: true,
+            done: true
+        });
+        app.ws.send(JSON.stringify(frame));
+    }, { to: lateId });
+
+    await expect.poll(() => late.evaluate(() => window.__hangout.av.locked)).toBe(true);
+});
+
+test('periodic resync corrects guest drift without a tap', async ({ browser }) => {
+    const { host, guest } = await hostAndGuest(browser);
+    await host.click('[data-pick-yt="oh5p5f5_-7A"]');
+    await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+    await host.evaluate(() => { window.__ytLog[0].seekTo(90); window.__ytLog[0].pauseVideo(); });
+    await expect.poll(() => guest.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeGreaterThan(89);
+    await guest.evaluate(() => { window.__ytLog[0].seekTo(5); });
+    expect(await guest.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeLessThan(20);
+    await guest.waitForTimeout(2500);
+    await expect.poll(() => guest.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeGreaterThan(80);
+});
+
+test('room page loads under its CSP without violations', async ({ browser }) => {
+    const page = await openBrowser(browser);
+    await page.addInitScript(() => {
+        document.addEventListener('securitypolicyviolation', (e) => {
+            window.__cspViolations = window.__cspViolations || [];
+            window.__cspViolations.push(e.violatedDirective);
+        });
+    });
+    await page.goto(roomUrl());
+    await page.fill('[data-name]', 'Csp');
+    await page.click('[data-enter]');
+    await expect(page.locator('[data-room]')).toBeVisible();
+    expect(await page.evaluate(() => window.__cspViolations || [])).toEqual([]);
+});
+
 test('remote peer cannot exceed AV_MAX or open peer connections without AV state', async ({ browser }) => {
     const { host, guest } = await hostAndGuest(browser);
     const before = await host.evaluate(() => window.__hangout.av.pcs.size);
@@ -643,11 +748,20 @@ test('toggling camera off and back on while mic stays on updates remote video ti
 test('camera and mic are opt-in with a plain explainer, then connect peer to peer at capped size', async ({ browser }) => {
     const { host, guest } = await hostAndGuest(browser);
     expect(await host.evaluate(() => window.__hangout.av.stream)).toBeNull();
+    await host.evaluate(() => {
+        window.__gumCalls = 0;
+        const gum = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+        navigator.mediaDevices.getUserMedia = (constraints) => {
+            window.__gumCalls += 1;
+            return gum(constraints);
+        };
+    });
     await host.click('[data-cam]');
     await expect(host.locator('[data-ask]')).toBeVisible();
     await expect(host.locator('[data-ask-copy]')).toContainText('Tap Allow');
     await host.click('[data-ask-no]');
     expect(await host.evaluate(() => window.__hangout.av.cam)).toBe(false);
+    expect(await host.evaluate(() => window.__gumCalls)).toBe(0);
 
     await host.click('[data-cam]');
     await host.click('[data-ask-yes]');

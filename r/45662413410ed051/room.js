@@ -281,6 +281,7 @@
             if (finishing) {
                 for (const mod of (Array.isArray(msg.mods) ? msg.mods.slice(0, 4) : [])) {
                     if (mod && V.cleanHostAction(mod.body) && await verifyHost(mod)) {
+                        if (mod.body.seq < app.lastHostSeq) continue; // snapshot replay guard
                         applyHostAction(mod.body, mod, false);
                         app.lastHostSeq = Math.max(app.lastHostSeq, mod.body.seq);
                     }
