@@ -18,13 +18,26 @@ async function turnstileOk(token, ip, secret, fetchImpl = fetch) {
     } catch (e) { return false; }
 }
 
-const jwksCache = { at: 0, body: null };
+const jwksCache = { url: '', at: 0, body: null };
 async function fetchJwks(url) {
-    if (jwksCache.body && Date.now() - jwksCache.at < 10 * 60 * 1000) return jwksCache.body;
+    if (jwksCache.url === url && jwksCache.body && Date.now() - jwksCache.at < 10 * 60 * 1000) return jwksCache.body;
     const r = await fetch(url, { redirect: 'error' });
     if (!r.ok) throw new Error('jwks');
-    jwksCache.body = await r.json(); jwksCache.at = Date.now();
+    jwksCache.body = await r.json(); jwksCache.url = url; jwksCache.at = Date.now();
     return jwksCache.body;
+}
+
+// Also guards the login redirect; a header merely being present is never authentication.
+export async function adminGate(request, env, deps = {}) {
+    if (!accessConfigured(env)) return { status: 503, reason: 'access-not-configured' };
+    try {
+        const { email } = await verifyAccessJwt(request.headers.get('Cf-Access-Jwt-Assertion'), {
+            team: env.HANGOUT_ACCESS_TEAM, aud: env.HANGOUT_ACCESS_AUD, fetchJwks: deps.fetchJwks || fetchJwks
+        });
+        const role = roleForEmail(email, env);
+        if (!role) return { status: 403, reason: 'not-band' };
+        return { ok: true, identity: { role, email, admin: true } };
+    } catch { return { status: 403, reason: 'access' }; }
 }
 
 // Exported for tests: returns {status, reason} when refused, or {ok, identity} when the upgrade may proceed.
@@ -37,13 +50,9 @@ export async function lobbyGate(request, env, url, deps = {}) {
     const ip = request.headers.get('CF-Connecting-IP') || '0.0.0.0';
     const identity = { role: 'fan', email: '', admin: false };
     if (url.pathname === '/lobby-admin') {
-        if (!accessConfigured(env)) return { status: 503, reason: 'access-not-configured' };
-        try {
-            const { email } = await verifyAccessJwt(request.headers.get('Cf-Access-Jwt-Assertion'), { team: env.HANGOUT_ACCESS_TEAM, aud: env.HANGOUT_ACCESS_AUD, fetchJwks: deps.fetchJwks || fetchJwks });
-            const role = roleForEmail(email, env);
-            if (!role) return { status: 403, reason: 'not-band' };
-            Object.assign(identity, { role, email, admin: true });
-        } catch (e) { return { status: 403, reason: 'access' }; }
+        const admin = await adminGate(request, env, deps);
+        if (!admin.ok) return admin;
+        Object.assign(identity, admin.identity);
     } else if (!(await (deps.turnstile || turnstileOk)(url.searchParams.get('ts'), ip, env.HANGOUT_TURNSTILE_SECRET))) {
         return { status: 403, reason: 'bot-check' };
     }
