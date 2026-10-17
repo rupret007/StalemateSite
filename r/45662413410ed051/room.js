@@ -744,10 +744,13 @@
         if (!on && !(app.av.mic || app.av.cam)) closePc(from);
         if (on && !app.av.pcs.has(from)) openPc(from);
         const entry = app.av.pcs.get(from);
-        if (entry && av && av.cam) {
-            entry.pc.getReceivers().forEach((r) => {
-                if (r.track && !entry.stream.getTracks().includes(r.track)) entry.stream.addTrack(r.track);
-            });
+        if (entry && av) {
+            if (!av.cam) entry.stream.getVideoTracks().forEach((t) => entry.stream.removeTrack(t));
+            else {
+                entry.pc.getReceivers().forEach((r) => {
+                    if (r.track && !entry.stream.getTracks().includes(r.track)) entry.stream.addTrack(r.track);
+                });
+            }
             pruneStreamTracks(entry.stream);
         }
         layout();
