@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
 const KEY = 'local-preview-key-0001';
 test.use({
@@ -6,12 +7,8 @@ test.use({
     launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--disable-features=WebRtcHideLocalIpsWithMdns'] }
 });
 
-let relay;
-test.beforeAll(async ({ baseURL }) => {
-    const { startRelay } = await import('../../scripts/hangout-relay-dev.mjs');
-    relay = await startRelay({ previewKey: KEY, origins: new URL(baseURL).origin });
-});
-test.afterAll(async () => { if (relay) await relay.close(); });
+let testOrigin;
+test.beforeAll(async ({ baseURL }) => { testOrigin = baseURL; });
 
 async function join(page, url, name) {
     // Supply a steady, audible mic signal so the actual Web Audio analyser and
@@ -49,7 +46,7 @@ async function turnOn(page, kind) {
     await expect(page.locator(`[data-${kind}]`)).toHaveAttribute('aria-pressed', 'true');
 }
 
-const roomUrl = () => `/r/45662413410ed051/?preview=${KEY}&relay=ws://127.0.0.1:${relay.port}`;
+const roomUrl = () => `/r/45662413410ed051/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`;
 
 test('camera first, then mic: speaker detection starts and follows a new mic track after muting', async ({ page }) => {
     await join(page, roomUrl(), 'Speaker');

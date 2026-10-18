@@ -60,6 +60,15 @@ describe('hangout sync core', () => {
         expect(s.chat.length).toBe(H.LIMITS.chatKept);
     });
 
+    it('appends strokes when snapshot chunking is used', () => {
+        const s = H.emptyState();
+        H.apply(s, { type: 'snapshot', state: { strokes: [{ id: 'a', color: '#000000', size: 10, pts: [[0, 0]] }] } });
+        expect(s.strokes.length).toBe(1);
+        H.apply(s, { type: 'snapshot', state: { strokes: [{ id: 'b', color: '#ffffff', size: 10, pts: [[1, 1]] }], append: true } });
+        expect(s.strokes.length).toBe(2);
+        expect(s.strokes[1].id).toBe('b');
+    });
+
     it('end-to-end encrypts frames; the relay cannot read or tamper', async () => {
         const secret = H.newSecret();
         expect(H.validSecret(secret)).toBe(true);

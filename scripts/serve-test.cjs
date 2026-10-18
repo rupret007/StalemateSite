@@ -8,6 +8,7 @@ const { resolveTestPort } = require('./lib/e2e-test-server.cjs');
 const ROOT = path.resolve(__dirname, '..');
 const PORT = resolveTestPort(process.env);
 const PROJECT_PREFIX = '/StalemateSite';
+const HANGOUT_RELAY_PREFIX = '/__hangout-relay';
 const MIME = {
     '.css': 'text/css; charset=utf-8',
     '.html': 'text/html; charset=utf-8',
@@ -89,41 +90,79 @@ function sendFile(request, response, filePath, status = 200) {
     send(response, status, request.method === 'HEAD' ? undefined : contents, headers);
 }
 
-const server = http.createServer((request, response) => {
-    if (request.method !== 'GET' && request.method !== 'HEAD') {
-        send(response, 405, 'Method Not Allowed', { Allow: 'GET, HEAD' });
-        return;
-    }
+async function main() {
+    const { createHangoutRelay } = await import('./hangout-relay-dev.mjs');
+    const origin = `http://127.0.0.1:${PORT}`;
+    const hangoutRelay = createHangoutRelay({
+        previewKey: 'local-preview-key-0001',
+        devAdminKey: process.env.HANGOUT_DEV_ADMIN_KEY || 'local-dev-admin-key-0001',
+        origins: origin,
+        lobbyLimits: { pmMinLobbyMs: 1500 }
+    });
 
-    const urlPath = new URL(request.url, `http://127.0.0.1:${PORT}`).pathname;
-    const filePath = safeJoin(urlPath);
-
-    if (!filePath) {
-        send(response, 400, 'Bad Request', { 'Content-Type': 'text/plain; charset=utf-8' });
-        return;
-    }
-
-    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-        sendFile(request, response, filePath);
-        return;
-    }
-
-    if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
-        const indexPath = path.join(filePath, 'index.html');
-        if (fs.existsSync(indexPath)) {
-            sendFile(request, response, indexPath);
+    const server = http.createServer((request, response) => {
+        if (request.method !== 'GET' && request.method !== 'HEAD') {
+            send(response, 405, 'Method Not Allowed', { Allow: 'GET, HEAD' });
             return;
         }
-    }
 
-    sendFile(request, response, path.join(ROOT, '404.html'), 404);
-});
+        const url = new URL(request.url, origin);
+        const urlPath = url.pathname;
 
-// Keep idle sockets open longer than any client pool so a reused keep-alive
-// socket is never closed mid-request (undici "other side closed" flake).
-server.keepAliveTimeout = 65000;
-server.headersTimeout = 66000;
+        if (urlPath === `${HANGOUT_RELAY_PREFIX}/__test/modlog.json`) {
+            const body = JSON.stringify(hangoutRelay.lobby.modlog);
+            send(response, 200, request.method === 'HEAD' ? undefined : body, {
+                'Content-Type': 'application/json; charset=utf-8',
+                'Content-Length': Buffer.byteLength(body)
+            });
+            return;
+        }
 
-server.listen(PORT, '127.0.0.1', () => {
-    process.stdout.write(`Stalemate test server on http://127.0.0.1:${PORT}\n`);
+        const filePath = safeJoin(urlPath);
+
+        if (!filePath) {
+            send(response, 400, 'Bad Request', { 'Content-Type': 'text/plain; charset=utf-8' });
+            return;
+        }
+
+        if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+            sendFile(request, response, filePath);
+            return;
+        }
+
+        if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
+            const indexPath = path.join(filePath, 'index.html');
+            if (fs.existsSync(indexPath)) {
+                sendFile(request, response, indexPath);
+                return;
+            }
+        }
+
+        sendFile(request, response, path.join(ROOT, '404.html'), 404);
+    });
+
+    // Keep idle sockets open longer than any client pool so a reused keep-alive
+    // socket is never closed mid-request (undici "other side closed" flake).
+    server.keepAliveTimeout = 65000;
+    server.headersTimeout = 66000;
+
+    server.on('upgrade', (req, socket, head) => {
+        const url = new URL(req.url, origin);
+        if (!url.pathname.startsWith(`${HANGOUT_RELAY_PREFIX}/`) && url.pathname !== HANGOUT_RELAY_PREFIX) {
+            socket.destroy();
+            return;
+        }
+        const subpath = url.pathname.slice(HANGOUT_RELAY_PREFIX.length) || '/';
+        url.pathname = subpath.startsWith('/') ? subpath : `/${subpath}`;
+        hangoutRelay.handleUpgrade(req, socket, head, url);
+    });
+
+    server.listen(PORT, '127.0.0.1', () => {
+        process.stdout.write(`Stalemate test server on ${origin}\n`);
+    });
+}
+
+main().catch((error) => {
+    process.stderr.write(`${error.stack || error}\n`);
+    process.exit(1);
 });

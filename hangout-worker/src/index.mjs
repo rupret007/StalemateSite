@@ -90,7 +90,7 @@ export class HangoutRoom {
     async webSocketClose(ws) {
         this.buckets.delete(this.tagOf(ws));
         const left = this.state.getWebSockets().filter((s) => s !== ws).length;
-        this.broadcast({ peers: left, t: Date.now() }, ws);
+        this.broadcast({ peers: left, left: this.tagOf(ws), t: Date.now() }, ws);
     }
 
     async webSocketError(ws) { return this.webSocketClose(ws); }

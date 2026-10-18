@@ -134,13 +134,18 @@
         }
         case 'snapshot': {
             const snap = msg.state || {};
-            state.strokes = (Array.isArray(snap.strokes) ? snap.strokes : []).map(cleanStroke).filter(Boolean).slice(-LIMITS.strokesKept);
-            state.chat = (Array.isArray(snap.chat) ? snap.chat : []).slice(-LIMITS.chatKept).map((c) => ({
-                name: cleanText(c && c.name, LIMITS.nameChars) || 'Someone', text: cleanText(c && c.text, LIMITS.chatChars), t: Number(c && c.t) || 0
-            })).filter((c) => c.text);
-            const v = snap.video;
-            const source = v && cleanSource(v.source);
-            state.video = source && Number.isFinite(Number(v.t)) ? { source, playing: Boolean(v.playing), pos: clampNumber(v.pos, 0, 86400) || 0, t: Number(v.t) } : null;
+            const newStrokes = (Array.isArray(snap.strokes) ? snap.strokes : []).map(cleanStroke).filter(Boolean);
+            state.strokes = snap.append ? state.strokes.concat(newStrokes).slice(-LIMITS.strokesKept) : newStrokes.slice(-LIMITS.strokesKept);
+            if (snap.chat || !snap.append) {
+                state.chat = (Array.isArray(snap.chat) ? snap.chat : []).slice(-LIMITS.chatKept).map((c) => ({
+                    name: cleanText(c && c.name, LIMITS.nameChars) || 'Someone', text: cleanText(c && c.text, LIMITS.chatChars), t: Number(c && c.t) || 0
+                })).filter((c) => c.text);
+            }
+            if (snap.video !== undefined || !snap.append) {
+                const v = snap.video;
+                const source = v && cleanSource(v.source);
+                state.video = source && Number.isFinite(Number(v.t)) ? { source, playing: Boolean(v.playing), pos: clampNumber(v.pos, 0, 86400) || 0, t: Number(v.t) } : null;
+            }
             return 'snapshot';
         }
         default:

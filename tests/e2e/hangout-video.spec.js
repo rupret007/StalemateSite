@@ -1,6 +1,7 @@
 // Room video: Webex-style basics on the peer-to-peer mesh, two real browsers over the local relay.
 const path = require('node:path');
 const { test, expect } = require('@playwright/test');
+const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
 const SLUG = '45662413410ed051';
 const KEY = 'local-preview-key-0001';
@@ -13,12 +14,8 @@ test.use({
 });
 test.skip(({ browserName }) => browserName !== 'chromium', 'Chromium carries the two-browser call suite');
 
-let relay;
-test.beforeAll(async ({ baseURL }) => {
-    const { startRelay } = await import('../../scripts/hangout-relay-dev.mjs');
-    relay = await startRelay({ previewKey: KEY, origins: new URL(baseURL).origin });
-});
-test.afterAll(async () => { if (relay) await relay.close(); });
+let testOrigin;
+test.beforeAll(async ({ baseURL }) => { testOrigin = baseURL; });
 
 async function openBrowser(browser, opts = {}) {
     const context = await browser.newContext(Object.assign({ permissions: ['camera', 'microphone'] }, opts));
@@ -29,7 +26,7 @@ async function openBrowser(browser, opts = {}) {
     page.on('pageerror', (e) => page.errors.push(e.message));
     return page;
 }
-const roomUrl = (extra = '') => `/r/${SLUG}/?preview=${KEY}&relay=ws://127.0.0.1:${relay.port}${extra}`;
+const roomUrl = (extra = '') => `/r/${SLUG}/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}${extra}`;
 
 async function join(page, url, name) {
     await page.goto(url);
@@ -141,6 +138,12 @@ test('host can mute, turn a camera off, spotlight, lock and take someone off fac
     await guestTile.locator('.more').click();
     await host.click('[data-tile-menu] button:has-text("Turn their camera off")');
     await expect(guest.locator('[data-cam]')).toHaveText('Turn on my camera');
+    await expect.poll(() => guest.evaluate(() => {
+        const a = window.__hangout.av;
+        if (a.cam) return 'cam-on';
+        const live = a.stream && a.stream.getVideoTracks().some((t) => t.readyState === 'live');
+        return live ? 'live' : 'off';
+    }), { timeout: 5000 }).toBe('off');
 
     await host.locator('[data-tile="me"] .more').click();
     await host.click('[data-tile-menu] button:has-text("Spotlight me for everyone")');
@@ -291,6 +294,54 @@ test('camera blocked: one tap joins with voice only and the others see an audio 
         return v ? v.videoWidth : 0;
     }), { timeout: 15000 }).toBeGreaterThan(0);
     await expect.poll(() => host.evaluate(() => [...window.__hangout.av.pcs.values()][0].pc.connectionState), { timeout: 15000 }).toBe('connected');
+});
+
+test('host camera-off targets only that peer; other cameras stay on', async ({ browser }) => {
+    const host = await openBrowser(browser);
+    await join(host, roomUrl(), 'Jeff');
+    const invite = host.url();
+    const pat = await openBrowser(browser);
+    await join(pat, invite, 'Pat');
+    const sam = await openBrowser(browser);
+    await join(sam, invite, 'Sam');
+    await camOn(pat);
+    await camOn(sam);
+    await expect.poll(() => host.locator('.tile:not([data-tile="me"]) video').count()).toBe(2, { timeout: 15000 });
+
+    const patTile = host.locator('.tile').filter({ hasText: 'Pat' });
+    await patTile.locator('.more').click();
+    await host.click('[data-tile-menu] button:has-text("Turn their camera off")');
+    await expect(pat.locator('[data-cam]')).toHaveText('Turn on my camera');
+    await expect(sam.locator('[data-cam]')).toHaveText('Turn off my camera');
+    await expect.poll(() => host.evaluate(() => {
+        const tiles = [...document.querySelectorAll('[data-tiles] .tile:not([data-tile="me"])')];
+        const samTile = tiles.find((t) => t.textContent.includes('Sam'));
+        const v = samTile && samTile.querySelector('video');
+        return v && v.videoWidth > 0;
+    }), { timeout: 15000 }).toBe(true);
+});
+
+test('no host or relay action can turn a guest camera on', async ({ browser }) => {
+    const { host, guest } = await call(browser);
+    const guestTile = host.locator('.tile:not([data-tile="me"])');
+    await guestTile.locator('.more').click();
+    await host.click('[data-tile-menu] button:has-text("Turn their camera off")');
+    const camOff = () => guest.evaluate(() => {
+        const a = window.__hangout.av;
+        if (a.cam) return 'cam-flag';
+        const live = a.stream && a.stream.getVideoTracks().some((t) => t.readyState === 'live');
+        return live ? 'live' : 'off';
+    });
+    await expect.poll(camOff, { timeout: 8000 }).toBe('off');
+
+    await guest.evaluate(() => window.__hangoutSend({
+        type: 'host',
+        body: { kind: 'camoff', seq: Date.now() + 1e9, target: '*' },
+        sig: 'AAAA'
+    }));
+    await guest.waitForTimeout(400);
+    await expect.poll(camOff, { timeout: 8000 }).toBe('off');
+    await expect(guest.locator('[data-cam]')).toHaveText('Turn on my camera');
 });
 
 test('send queue: a signaling burst never loses the offer or answer', async ({ browser }) => {
