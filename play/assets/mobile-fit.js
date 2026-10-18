@@ -47,7 +47,7 @@
     let start = 0;
     let size = 5;
     function update() {
-      const cards = [...hand.querySelectorAll('button')];
+      const cards = [...hand.querySelectorAll('button, .card')];
       const fitted = phone.matches && window.innerWidth >= 360;
       const paginate = game === 'crapeights';
       hand.classList.toggle('mobile-hand', fitted);
@@ -71,7 +71,7 @@
     next.addEventListener('click', () => { start += size; update(); });
     // Keyboard navigation in the game can move focus to another page.
     hand.addEventListener('focusin', event => {
-      const index = [...hand.querySelectorAll('button')].indexOf(event.target);
+      const index = [...hand.querySelectorAll('button, .card')].indexOf(event.target);
       if (index >= 0 && (index < start || index >= start + size)) { start = Math.floor(index / size) * size; update(); }
     });
     new MutationObserver(schedule).observe(hand, { childList:true, subtree:true });

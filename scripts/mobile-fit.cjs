@@ -12,7 +12,7 @@ const games = [
   ['TurdAnoid', '#game', '#btnPause', '#btnSound', '#mobileLaunch'],
   ['turdtris', '#game', '#mobileControls [data-action="left"]', '#mobileControls [data-action="right"]', '#mobileControls [data-action="rotate"]', '#mobileControls [data-action="drop"]', '#mobileControls [data-action="hold"]'],
   ['crapeights', '#drawPileBtn', '#playBtn', '#drawBtn', '#passBtn', '#smartBtn'],
-  ['turdrummy', '#playerHand', '#drawStockBtn', '#drawDiscardBtn', '#discardBtn', '#knockBtn', '#ginBtn', '#sortSuitBtn', '#sortRankBtn'],
+  ['turdrummy', '#playerHand', '#soundToggleBtn', '#quickGuideBtn', '#newRoundBtn', '#resetMatchBtn', '#drawStockBtn', '#drawDiscardBtn', '#discardBtn', '#knockBtn', '#ginBtn', '#sortSuitBtn', '#sortRankBtn'],
   ['turdspades', '#youCards', '#bidDown', '#bidUp', '#bidNil', '#lockBid'],
   ['turdomania', '#board', '#undoBtn', '#newBtn', '.tm-aim summary'],
   ['neon-arkanoid', '#gameCanvas', '[data-action="left"]', '[data-action="launch"]', '[data-action="right"]']
@@ -68,10 +68,10 @@ async function check(page, game, selectors, state) {
       if(await locator.isEnabled()) assert(await locator.evaluate(e => { const b=e.getBoundingClientRect(); const top=document.elementFromPoint(b.x+b.width/2,b.y+b.height/2); return top===e || e.contains(top); }), `${game} ${state} ${selector} is covered: ${await locator.evaluate(e => {const r=e.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.outerHTML.slice(0,200);})}`);
     }
   }
-  const cards = await page.locator('.mobile-hand button:not(.mobile-card-hidden)').evaluateAll(elements => elements.filter(e => e.checkVisibility() && e.getBoundingClientRect().width > 0).map(e => {
+  const cards = await page.locator('.mobile-hand button:not(.mobile-card-hidden), .mobile-hand .card:not(.mobile-card-hidden)').evaluateAll(elements => elements.filter(e => e.checkVisibility() && e.getBoundingClientRect().width > 0).map(e => {
     const b = e.getBoundingClientRect();
     const top = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
-    return { x:b.x, y:b.y, width:b.width, height:b.height, disabled:e.disabled, covered:top !== e && !e.contains(top) };
+    return { x:b.x, y:b.y, width:b.width, height:b.height, disabled:e.tagName !== 'BUTTON' || e.disabled, covered:top !== e && !e.contains(top) };
   }));
   for (const box of cards) {
     assert(box.width >= 44 && box.height >= 44 && box.y >= -1 && box.x >= -1 && box.y + box.height <= metrics.h+1 && box.x + box.width <= metrics.w+1, `${game} ${state} card target fits: ${JSON.stringify(box)}`);
