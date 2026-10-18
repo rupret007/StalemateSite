@@ -69,8 +69,6 @@ function sendFile(request, response, filePath, status = 200) {
         'Content-Length': contents.length,
         'Accept-Ranges': 'bytes'
     };
-    // WebKit probes media with bytes=0-1 before requesting the remaining file.
-    // Ignore Range on HEAD, error responses, and unsupported multi-range requests.
     const range = request.method === 'GET' && status === 200
         && /^bytes=(\d*)-(\d*)$/.exec(request.headers.range || '');
     if (range && (range[1] || range[2])) {

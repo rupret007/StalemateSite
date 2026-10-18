@@ -70,7 +70,7 @@ test('blank nick by default, dice fills a fun one, StaleBot says hi, rooms start
     await ctx.close();
 });
 
-test('three fans + a band op: chat, /me, slap button, filters, PM accept-first, forged commands', async ({ browser }) => {
+test('three fans + a band op: chat, /me, slap button, filters, PM accept-first, forged commands', async ({ browser, baseURL }) => {
     const a = await fan(browser, 'Sk8rKid');
     const b = await fan(browser, 'MoshPit');
     const c = await fan(browser, 'GoatLord');
