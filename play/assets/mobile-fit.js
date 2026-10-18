@@ -29,11 +29,14 @@ function setupMobileFit() {
   if (destination) {
     const originals = new Map();
     function placeUtilities() {
-      for (const setting of document.querySelectorAll('#suite-arcade-a11y-mount, body > .suite-arcade-a11y-toggle, body > .suite-difficulty--fallback, [data-mobile-game="neon-arkanoid"] > #suite-music-toggle, [data-mobile-game="turdomania"] > #suite-music-toggle, body[data-mobile-game] > #suite-music-toggle')) {
+      for (const setting of document.querySelectorAll('#suite-arcade-a11y-mount, body > .suite-arcade-a11y-toggle, body > .suite-difficulty--fallback, [data-mobile-game="neon-arkanoid"] > #suite-music-toggle, [data-mobile-game="turdomania"] > #suite-music-toggle, body[data-mobile-game] > #suite-music-toggle, .jack-difficulty-bar > .suite-difficulty, [data-mobile-game="crapeights"] .hud #suite-difficulty-mount > .suite-difficulty, [data-mobile-game="neon-arkanoid"] .play-area > .sidebar')) {
         if (!originals.has(setting)) originals.set(setting, setting.parentNode);
       }
       for (const [setting, original] of originals) {
-        const parent = phone.matches ? (setting.classList.contains('suite-difficulty--fallback') && menu ? menu : destination) : original;
+        const secondary = setting.matches('#newRoundBtn, #resetMatchBtn')
+          ? document.querySelector('#tableDrawer .tr-drawer-body')
+          : (setting.matches('.suite-difficulty, .sidebar') ? menu : null);
+        const parent = phone.matches ? (secondary || destination) : original;
         if (setting.parentNode !== parent) parent.append(setting);
       }
       positionTools();
