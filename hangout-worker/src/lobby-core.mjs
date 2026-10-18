@@ -6,7 +6,7 @@ import { actSnapshot, applyClear, applyStroke, applyVideo, cleanRtc, parseActFra
 
 export const BOT = 'StaleBot';
 export const LOBBY = '#stalemate';
-export const KINDS = Object.freeze({ bobross: '🎨 Bob Ross paint-along', watch: '📺 Watch together', art: '🖌️ Art on camera', jam: '🎸 Jam' });
+export const KINDS = Object.freeze({ bobross: '🎨 Bob Ross paint-along', watch: '📺 Watch together', art: '🖌️ Draw together', jam: '🎸 Jam' });
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
@@ -125,7 +125,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     const lines = new Map();          // msgId -> line (recent, for reports/purge)
 
     const mkChannel = (name, kind, title, founder) => ({
-        name, kind, title, founder, created: now(), topic: kind === 'lobby' ? 'Welcome to #stalemate. House rule: Don’t be a dick. Next show Sat Oct 24 @ Los Amigo’s, Plano' : '',
+        name, kind, title, founder, created: now(), topic: kind === 'lobby' ? 'Welcome to #stalemate. Pull up a nick, say hello, make something together. /help for commands.' : '',
         modes: { m: false, i: false, k: '', l: kind === 'lobby' ? L.lobbyMax : L.roomMax, t: true, S: kind === 'lobby' ? L.defaultSlow : 0, C: kind !== 'lobby', Q: false, locked: false },
         jam: kind === 'jam' ? { desktop: '', web: '' } : null, ops: new Set(founder ? [founder] : []), voice: new Set(), bans: [], invites: new Set(), kicks: {},
         members: new Set(), history: [], emptySince: null,

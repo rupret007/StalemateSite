@@ -56,8 +56,26 @@ async function assertStalemateTestOrigin(origin) {
     return assertStalemateHomepage(await response.text(), origin);
 }
 
-function hangoutRelayWsBase(origin) {
-    return new URL(HANGOUT_RELAY_PREFIX, origin).href.replace(/^http/, 'ws');
+function hangoutRelayPath(namespace = '') {
+    if (!namespace) return HANGOUT_RELAY_PREFIX;
+    if (typeof namespace !== 'string' || !/^[a-z0-9-]{1,80}$/.test(namespace)) {
+        throw new Error('Hangout test namespace must contain 1-80 lowercase letters, digits or hyphens.');
+    }
+    return `${HANGOUT_RELAY_PREFIX}/sessions/${namespace}`;
+}
+
+function parseHangoutRelayPath(pathname) {
+    if (pathname !== HANGOUT_RELAY_PREFIX && !pathname.startsWith(`${HANGOUT_RELAY_PREFIX}/`)) return null;
+    const suffix = pathname.slice(HANGOUT_RELAY_PREFIX.length) || '/';
+    if (suffix === '/sessions' || suffix.startsWith('/sessions/')) {
+        const match = /^\/sessions\/([a-z0-9-]{1,80})(\/.*)?$/.exec(suffix);
+        return match ? { namespace: match[1], pathname: match[2] || '/' } : null;
+    }
+    return { namespace: '', pathname: suffix };
+}
+
+function hangoutRelayWsBase(origin, namespace = '') {
+    return new URL(hangoutRelayPath(namespace), origin).href.replace(/^http/, 'ws');
 }
 
 module.exports = {
@@ -66,6 +84,8 @@ module.exports = {
     TITLE_NEEDLE,
     resolveTestPort,
     testBaseURL,
+    hangoutRelayPath,
+    parseHangoutRelayPath,
     hangoutRelayWsBase,
     homepageTitle,
     assertStalemateHomepage,

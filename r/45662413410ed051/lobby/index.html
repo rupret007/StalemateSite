@@ -16,40 +16,57 @@
     <link rel="stylesheet" href="lobby.css">
 </head>
 <body>
-    <div class="titlebar"><span>Hang Out — #stalemate</span><span class="dots" aria-hidden="true">▁ ▢ ✕</span></div>
+    <header class="titlebar"><span><b>STALEMATE IRC</b> <span class="title-extra">/ Hang Out</span></span><div class="connection-tools"><span class="connection" data-connection role="status" data-state="offline">Not connected</span><button type="button" data-reconnect hidden>Try again</button></div></header>
 
     <section class="gate" data-gate>
         <div class="gate-card">
+            <p class="eyebrow">A nick. A conversation. Something worth making.</p>
             <h1>#stalemate</h1>
-            <p class="lede" data-gate-copy>The band’s hangout. Chat, paint along with Bob Ross, watch stuff, jam. No accounts.</p>
+            <p class="lede" data-gate-copy>Pull up a chair. Talk about whatever, find your people, then draw, watch or jam together. Guest access. No account needed.</p>
             <label class="nickrow">Your nick
                 <span class="nickbox"><input data-nick maxlength="20" autocomplete="off" spellcheck="false" aria-label="Your nick" placeholder="Type a nickname… or roll one →"><button class="btn btn--ghost dice" type="button" data-reroll aria-label="Make me a random fun nickname">🎲 Make me a name</button></span>
             </label>
+            <p class="small gate-hint">Your guest nickname is remembered here, not reserved. Camera and mic stay off.</p>
             <button class="btn btn--big" type="button" data-enter>I’m 13+ and I agree · Let me in 🤘</button>
             <p class="rules"><b>One rule: Don’t be a dick.</b> Swear all you want. You own what you post; the band can remove anything. <a href="../terms/" data-terms>House rules &amp; privacy</a></p>
             <p class="status" data-gate-status role="status"></p>
-            <div data-turnstile></div>
         </div>
     </section>
 
     <main class="irc" data-app hidden>
         <aside class="pane rooms" data-pane="rooms" aria-label="Rooms">
-            <h2>Start something</h2>
-            <div class="tiles" data-tiles>
-                <button class="tile" type="button" data-start="bobross"><b>🎨</b>Bob Ross paint-along</button>
-                <button class="tile" type="button" data-start="watch"><b>📺</b>Watch together</button>
-                <button class="tile" type="button" data-start="art"><b>🖌️</b>Art on camera</button>
-                <button class="tile" type="button" data-start="jam"><b>🎸</b>Jam (WebJam)</button>
-            </div>
-            <a class="private" data-private href="../">🔒 Private room instead (end-to-end encrypted) →</a>
-            <h2>Open rooms <span class="count" data-room-count>0</span></h2>
+            <button class="channel-home" type="button" data-lobby-home><b>#stalemate</b><span data-lobby-count>The main conversation</span></button>
+            <section class="presence" aria-label="Lobby presence">
+                <h2 data-presence-title>Getting connected</h2>
+                <p data-presence-detail>Everyone starts in the same conversation.</p>
+            </section>
+            <h2>Rooms open now <span class="count" data-room-count>0</span></h2>
+            <p class="small directory-hint">Join something already going, or start a room below.</p>
             <ul class="roomlist" data-roomlist></ul>
-            <p class="empty" data-rooms-empty>No rooms yet. Tap a tile and you’re the host.</p>
+            <p class="empty" data-rooms-empty>No activity rooms yet. Stay for a chat, or be the first to start one.</p>
+            <h2 class="start-heading">Start something together</h2>
+            <div class="tiles" data-tiles>
+                <button class="tile" type="button" data-start="bobross"><b aria-hidden="true">🎨</b>Paint along<span>Bob Ross + a shared canvas</span></button>
+                <button class="tile" type="button" data-start="watch"><b aria-hidden="true">📺</b>Watch together<span>One video, same moment</span></button>
+                <button class="tile" type="button" data-start="art"><b aria-hidden="true">🖌️</b>Draw together<span>Make something from nothing</span></button>
+                <button class="tile" type="button" data-start="jam"><b aria-hidden="true">🎸</b>Jam (WebJam)<span>Invite people into a session</span></button>
+            </div>
+            <p class="small">You can stay in #stalemate while a room is open. Cameras are always optional.</p>
+            <a class="private" data-private href="../">🔒 Private room instead (end-to-end encrypted) →</a>
         </aside>
 
         <section class="pane chat" data-pane="chat" aria-label="Chat">
             <nav class="tabs" data-tabs role="tablist"></nav>
             <div class="topic" data-topic></div>
+            <p class="network-note" data-network-note role="status" hidden></p>
+            <section class="lobby-welcome" data-lobby-welcome aria-label="Conversation starters">
+                <div><b data-welcome-title>Make yourself at home.</b><p>Just reading is fine. When you’re ready, say hello or start with a question.</p></div>
+                <div class="conversation-starters">
+                    <button type="button" data-prompt="Hey everyone, I’m new here. ">Say hello</button>
+                    <button type="button" data-prompt="What’s everyone making or working on? ">What are you making?</button>
+                    <button type="button" data-prompt="Anyone up for drawing something together? ">Find a collaborator</button>
+                </div>
+            </section>
             <div class="roombar" data-roombar hidden>
                 <span class="modes" data-modes></span>
                 <button class="btn btn--small" type="button" data-cam aria-pressed="false">📷 Camera (18+)</button>
@@ -89,7 +106,8 @@
                     <div class="act-cams" data-act-tiles aria-label="Room cameras"></div>
                 </div>
             </div>
-            <ol class="buffer" data-buffer aria-live="polite" aria-relevant="additions"></ol>
+            <ol class="buffer" data-buffer role="log" aria-label="Conversation" aria-live="polite" aria-relevant="additions" aria-atomic="false"></ol>
+            <button class="jump-new" data-new-messages type="button" hidden>New messages ↓</button>
             <div class="pmreq" data-pmreqs></div>
             <div class="quick" data-quick>
                 <button type="button" class="startroom" data-show="rooms">＋ Start a room</button>
@@ -103,8 +121,9 @@
             <form class="say" data-say>
                 <button class="slash" type="button" data-palette-open aria-label="Commands">/</button>
                 <input data-text maxlength="300" autocomplete="off" placeholder="Say something (or /help)" aria-label="Message">
-                <button class="btn" type="submit">Send</button>
+                <button class="btn" data-send type="submit">Send</button>
             </form>
+            <div class="chat-status"><span data-chat-context>#stalemate</span><span>Enter to send · /help for commands</span></div>
         </section>
 
         <aside class="pane people" data-pane="people" aria-label="People">
@@ -138,6 +157,7 @@
         <div class="sheet-buttons" data-palette-buttons></div>
         <button class="btn btn--ghost" type="button" data-palette-close>Close</button>
     </dialog>
+    <aside class="guest-check" data-guest-check hidden><p role="status">Checking your guest connection…</p><div data-turnstile></div></aside>
     <div class="toast" data-toast role="status" hidden></div>
     <!-- Page-level counts only: fixed event names, no query string (the preview key is stripped first), no referrer. -->
     <script data-goatcounter="https://stalemate.goatcounter.com/count" data-goatcounter-settings='{"no_onload": true}' async src="../../../js/count.js"></script>
@@ -145,6 +165,7 @@
     <script src="../sync-core.js"></script>
     <script src="../video-core.js"></script>
     <script src="../bob-ross.js"></script>
+    <script src="discovery-core.js"></script>
     <script src="lobby-room.js"></script>
     <script src="lobby.js"></script>
 </body>

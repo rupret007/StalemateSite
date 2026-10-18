@@ -101,3 +101,98 @@ input{background:var(--ink);color:var(--cream);border:2px solid;border-color:var
 }
 .rules a,.people a{color:var(--blue);display:inline-block;min-height:24px}
 .quick .startroom{display:none;background:var(--lime);color:var(--ink)}@media (max-width:900px){.quick .startroom{display:inline-block}}
+
+/* IRC first: a shared conversation, with creative rooms one step away. */
+body{height:100vh;height:100dvh;min-height:0;overflow:hidden}
+button,input,a{-webkit-tap-highlight-color:transparent}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--lime);outline-offset:3px}
+button:disabled{cursor:not-allowed}
+.titlebar{flex:none;min-height:40px;padding:8px 12px;background:#341b2a;border-bottom:2px solid var(--pink);gap:12px;font-size:.85rem}
+.titlebar b{letter-spacing:.09em;color:var(--cream)}
+.title-extra{color:#e8b7cb;font-weight:400}
+.connection-tools{display:flex;align-items:center;gap:10px}
+.connection{font-size:.75rem;white-space:nowrap;color:var(--muted)}
+.connection::before{content:'●';margin-right:6px;color:var(--amber)}
+.connection[data-state=connected]::before{color:var(--lime)}
+.connection[data-state=offline]::before{color:var(--pink)}
+.connection-tools button{background:var(--ink);color:var(--cream);border:1px solid var(--muted);font:inherit;padding:4px 8px;min-height:32px;cursor:pointer}
+.guest-check{position:fixed;right:16px;bottom:76px;z-index:10;width:min(340px,calc(100vw - 32px));padding:14px;background:var(--surface);border:2px solid var(--amber);box-shadow:5px 5px 0 var(--ink)}
+.guest-check p{font-size:.85rem;margin:0 0 10px}
+.gate{overflow:auto;min-height:0}
+.gate-card{width:min(34rem,100%);gap:16px;padding:28px}
+.eyebrow{font:700 .72rem/1.6 var(--mono);color:var(--amber);text-transform:uppercase;letter-spacing:.08em;margin:0}
+.gate-hint{margin:0;font-size:.85rem}
+.irc{height:auto;grid-template-columns:280px minmax(0,1fr) 205px}
+.rooms{background:#201b18;padding:14px}
+.channel-home{display:flex;flex-direction:column;gap:6px;width:100%;text-align:left;background:#343c20;color:var(--cream);border:2px solid #6c812f;padding:12px;cursor:pointer}
+.channel-home b{font:700 1.15rem var(--mono);color:var(--lime)}
+.channel-home span{font:.8rem var(--mono);color:#d3dcbf}
+.presence{padding:12px 0;border-bottom:1px solid var(--bevel-hi);margin-bottom:18px}
+.presence h2{font:700 .9rem var(--body);text-transform:none;color:var(--cream);margin:0 0 5px}
+.presence p,.directory-hint{font-size:.8rem;line-height:1.45;color:var(--muted);margin:0}
+.directory-hint{margin:0 0 10px}
+.rooms h2{font-size:1.05rem}
+.room{border:1px solid var(--bevel-hi);border-left:3px solid var(--blue);padding:10px;gap:6px;overflow-wrap:anywhere}
+.room b{font-size:.9rem}
+.room span{font-size:.72rem;line-height:1.4}
+.room .room-action{color:var(--blue);font-family:var(--body);font-weight:700}
+.room[data-state=joined]{border-left-color:var(--lime)}
+.room[data-state=joined] .room-action{color:var(--lime)}
+.room[data-state=full],.room[data-state=invite],.room[data-state=key]{border-left-color:var(--amber)}
+.room:disabled{opacity:.65}
+.room:hover:enabled{background:#302820;border-color:var(--muted)}
+.start-heading{border-top:1px solid var(--bevel-hi);padding-top:18px;margin-top:18px}
+.tiles{gap:6px}
+.tile{min-height:116px;align-content:center;font-size:.85rem;gap:5px}
+.tile span{color:var(--muted);font-size:.72rem;line-height:1.35;font-weight:400}
+.tile b{font-size:1.4rem}
+.tile:disabled{opacity:.5}
+.empty{font-size:.85rem;line-height:1.5;padding:12px;border:1px dashed var(--bevel-hi)}
+.private{font-size:.8rem}
+.topic{font-size:.8rem;padding:10px 12px;overflow-wrap:anywhere;flex:none}
+.tabs{flex:none}
+.tabs button{min-height:44px}
+.tabs .has-mention{color:var(--amber);border-top-color:var(--amber)}
+.lobby-welcome{padding:12px 14px;background:#1c2117;border-bottom:1px solid #485334;flex:none}
+.lobby-welcome b{font-size:.9rem;color:#d7e3b7}
+.lobby-welcome p{font-size:.8rem;line-height:1.4;margin:4px 0 10px;color:var(--muted)}
+.conversation-starters{display:flex;gap:6px;flex-wrap:wrap}
+.conversation-starters button{font:.75rem var(--mono);padding:7px 9px;min-height:36px;background:transparent;color:#d7e3b7;border:1px solid #596641;cursor:pointer}
+.conversation-starters button:hover{background:#344026}
+.network-note{margin:0;padding:10px 14px;color:#f5cc7e;background:#352818;border-bottom:1px solid var(--amber);font-size:.85rem;flex:none}
+.buffer{min-height:70px;padding:12px;line-height:1.65;font-size:.85rem;scrollbar-color:var(--bevel-hi) var(--ink)}
+.buffer li{padding:3px 4px;border-left:2px solid transparent}
+.buffer .mention{background:#392e19;border-left-color:var(--amber)}
+.buffer .mention .who{color:#f5cc7e!important}
+.jump-new{flex:none;background:var(--blue);color:#061521;border:0;font:700 .85rem var(--mono);padding:8px;cursor:pointer;min-height:36px}
+.say{flex:none}
+.say input,.act-load input,.jam-paste input,.nickbox input{min-width:0}
+.chat-status{display:flex;justify-content:space-between;gap:12px;padding:4px 10px 7px;background:var(--surface);color:var(--muted);font:.65rem var(--mono);flex:none}
+.chat-status span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--lime)}
+.chat-status span:last-child{white-space:nowrap}
+.people{padding:14px 10px;background:#201b18}
+.nicks{gap:3px}
+.nick{font-size:.85rem;overflow-wrap:anywhere}
+.ts{color:#b2a28e}
+@media (max-width:1100px) and (min-width:901px){.irc{grid-template-columns:245px minmax(0,1fr) 170px}.title-extra{display:none}}
+@media (max-width:900px){
+    .irc{flex:1;height:auto;margin-bottom:60px;grid-template-columns:1fr;min-height:0}
+    .title-extra{display:none}
+    .titlebar{padding:8px 10px;font-size:.8rem}
+    .connection{font-size:.7rem}
+    .gate-card{padding:20px;box-shadow:5px 5px 0 var(--pink)}
+    .lobby-welcome{padding:10px}
+    .lobby-welcome p{margin-bottom:6px}
+    .conversation-starters{flex-wrap:nowrap;overflow-x:auto;padding-bottom:3px}
+    .conversation-starters button{flex:none;font-size:.7rem;min-height:40px}
+    .topic{padding:8px 10px;font-size:.75rem}
+    .buffer{font-size:.8rem;padding:8px}
+    .say{gap:5px;padding:6px}
+    .say input{font-size:16px;width:0}
+    .say .btn{font-size:1rem;padding:7px 10px}
+    .chat-status{font-size:.6rem}
+    .rooms{padding:14px}
+    .tile{min-height:105px}
+    .phonetabs button{min-height:44px}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}

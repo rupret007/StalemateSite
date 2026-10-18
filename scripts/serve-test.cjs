@@ -3,12 +3,11 @@
 const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
-const { resolveTestPort } = require('./lib/e2e-test-server.cjs');
+const { resolveTestPort, parseHangoutRelayPath } = require('./lib/e2e-test-server.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const PORT = resolveTestPort(process.env);
 const PROJECT_PREFIX = '/StalemateSite';
-const HANGOUT_RELAY_PREFIX = '/__hangout-relay';
 const MIME = {
     '.css': 'text/css; charset=utf-8',
     '.html': 'text/html; charset=utf-8',
@@ -91,12 +90,18 @@ function sendFile(request, response, filePath, status = 200) {
 async function main() {
     const { createHangoutRelay } = await import('./hangout-relay-dev.mjs');
     const origin = `http://127.0.0.1:${PORT}`;
-    const hangoutRelay = createHangoutRelay({
-        previewKey: 'local-preview-key-0001',
-        devAdminKey: process.env.HANGOUT_DEV_ADMIN_KEY || 'local-dev-admin-key-0001',
-        origins: origin,
-        lobbyLimits: { pmMinLobbyMs: 1500 }
-    });
+    // Each browser scenario can choose a namespace while retaining CSP's same-origin
+    // relay. Engines keep their real limits, moderation state and membership rules.
+    const hangoutRelays = new Map();
+    const relayFor = (namespace) => {
+        if (!hangoutRelays.has(namespace)) hangoutRelays.set(namespace, createHangoutRelay({
+            previewKey: 'local-preview-key-0001',
+            devAdminKey: process.env.HANGOUT_DEV_ADMIN_KEY || 'local-dev-admin-key-0001',
+            origins: origin,
+            lobbyLimits: { pmMinLobbyMs: 1500 }
+        }));
+        return hangoutRelays.get(namespace);
+    };
 
     const server = http.createServer((request, response) => {
         if (request.method !== 'GET' && request.method !== 'HEAD') {
@@ -107,8 +112,9 @@ async function main() {
         const url = new URL(request.url, origin);
         const urlPath = url.pathname;
 
-        if (urlPath === `${HANGOUT_RELAY_PREFIX}/__test/modlog.json`) {
-            const body = JSON.stringify(hangoutRelay.lobby.modlog);
+        const relayRoute = parseHangoutRelayPath(urlPath);
+        if (relayRoute?.pathname === '/__test/modlog.json') {
+            const body = JSON.stringify(relayFor(relayRoute.namespace).lobby.modlog);
             send(response, 200, request.method === 'HEAD' ? undefined : body, {
                 'Content-Type': 'application/json; charset=utf-8',
                 'Content-Length': Buffer.byteLength(body)
@@ -146,13 +152,13 @@ async function main() {
 
     server.on('upgrade', (req, socket, head) => {
         const url = new URL(req.url, origin);
-        if (!url.pathname.startsWith(`${HANGOUT_RELAY_PREFIX}/`) && url.pathname !== HANGOUT_RELAY_PREFIX) {
+        const relayRoute = parseHangoutRelayPath(url.pathname);
+        if (!relayRoute) {
             socket.destroy();
             return;
         }
-        const subpath = url.pathname.slice(HANGOUT_RELAY_PREFIX.length) || '/';
-        url.pathname = subpath.startsWith('/') ? subpath : `/${subpath}`;
-        hangoutRelay.handleUpgrade(req, socket, head, url);
+        url.pathname = relayRoute.pathname;
+        relayFor(relayRoute.namespace).handleUpgrade(req, socket, head, url);
     });
 
     server.listen(PORT, '127.0.0.1', () => {

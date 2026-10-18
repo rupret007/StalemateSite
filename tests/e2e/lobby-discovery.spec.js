@@ -1,0 +1,176 @@
+// Real guest conversations on the local relay; no fabricated production activity.
+const { test, expect } = require('@playwright/test');
+const { randomUUID } = require('node:crypto');
+const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+
+test.skip(({ browserName }) => browserName !== 'chromium', 'Desktop and phone layouts use Chromium here.');
+// A mocked external challenge callback connects to a loopback test relay. Chromium's
+// local-network provenance check otherwise blocks that fixture; production CSP stays enforced.
+test.use({ launchOptions: { args: ['--disable-features=LocalNetworkAccessChecks'] } });
+const ROOT = '/r/45662413410ed051/lobby/';
+const KEY = 'local-preview-key-0001';
+let origin;
+let relayNamespace;
+test.beforeEach(async ({ baseURL }) => { origin = baseURL; relayNamespace = `discovery-${randomUUID()}`; });
+const url = () => `${ROOT}?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(origin, relayNamespace))}`;
+
+async function guest(browser, nick, viewport) {
+    const context = await browser.newContext(viewport ? { viewport, isMobile: true, hasTouch: true } : {});
+    const page = await context.newPage();
+    await page.goto(url());
+    await page.fill('[data-nick]', nick);
+    await page.click('[data-enter]');
+    await expect(page.locator('[data-app]')).toBeVisible();
+    await expect(page.locator('[data-connection]')).toHaveText('Connected');
+    return page;
+}
+const lobbyTab = (page) => page.locator('[data-tabs] [data-channel-key="#stalemate"]');
+
+test('IRC conversation leads into an existing room; drafts and mentions survive channel switches', async ({ browser }) => {
+    const host = await guest(browser, 'DoodleHost');
+    const visitor = await guest(browser, 'RiffGuest');
+    try {
+        await expect(visitor.locator('[data-presence-title]')).toContainText('other visitor');
+        await visitor.click('[data-prompt="Hey everyone, I’m new here. "]');
+        await expect(visitor.locator('[data-text]')).toHaveValue('Hey everyone, I’m new here. ');
+        await expect(host.locator('[data-buffer]')).not.toContainText('Hey everyone, I’m new here.');
+        await host.click('[data-start="art"]');
+        await expect(host.locator('[data-act-canvas]')).toBeVisible();
+        const roomName = await host.evaluate(() => window.__lobby.active);
+        const card = visitor.locator('[data-roomlist] button').filter({ hasText: roomName });
+        await expect(card).toContainText('1/8 here');
+        await expect(card).toContainText('Join room');
+        await card.click();
+        await expect(visitor.locator('[data-act-canvas]')).toBeVisible();
+        await expect(visitor.locator('[data-text]')).toHaveValue('');
+        await visitor.fill('[data-text]', 'A drawing idea I haven’t sent yet');
+        await lobbyTab(visitor).click();
+        await expect(visitor.locator('[data-text]')).toHaveValue('Hey everyone, I’m new here. ');
+        await expect(visitor.locator('[data-lobby-welcome]')).toBeVisible();
+        await lobbyTab(visitor).focus();
+        await host.fill('[data-text]', 'RiffGuest, let’s draw a tiny monster');
+        await host.press('[data-text]', 'Enter');
+        const roomTab = visitor.locator('[data-tabs] button').filter({ hasText: roomName });
+        await expect(roomTab).toContainText('@you');
+        await expect(lobbyTab(visitor)).toBeFocused();
+        await expect(visitor).toHaveTitle(/^\(1\)/);
+        await roomTab.click();
+        await expect(visitor.locator('[data-text]')).toHaveValue('A drawing idea I haven’t sent yet');
+        await expect(visitor.locator('[data-buffer] .mention')).toContainText('tiny monster');
+        await expect(visitor).toHaveTitle('#stalemate · Hang Out');
+        await expect(visitor.locator('[data-cam]')).toHaveAttribute('aria-pressed', 'false');
+        await expect(visitor.locator('[data-lobby-welcome]')).toBeHidden();
+    } finally { await host.context().close(); await visitor.context().close(); }
+});
+
+test('offline sends keep the draft; reconnect clears stale membership and preserves PM preference', async ({ browser }) => {
+    const page = await guest(browser, 'ReturnGuest');
+    try {
+        await page.check('[data-pm-off]');
+        await expect(page.locator('[data-toast]')).toContainText('off');
+        await page.click('[data-start="art"]');
+        await expect(page.locator('[data-act-canvas]')).toBeVisible();
+        const oldRoom = await page.evaluate(() => window.__lobby.active);
+        await page.fill('[data-text]', 'This idea must not disappear');
+        await page.evaluate(() => window.__lobby.ws.close(1000));
+        await expect(page.locator('[data-connection]')).toHaveText('Offline');
+        await expect(page.locator('[data-send]')).toBeDisabled();
+        await page.locator('[data-say]').evaluate((form) => form.requestSubmit());
+        await expect(page.locator('[data-text]')).toHaveValue('This idea must not disappear');
+        await page.click('[data-reconnect]');
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        await expect(page.locator('[data-nicks]')).toContainText('ReturnGuest');
+        await expect(page.locator('[data-tabs] button')).toHaveCount(1);
+        await expect(page.locator('[data-pm-off]')).toBeChecked();
+        await expect(page.locator('[data-toast]')).toContainText('off');
+        const room = page.locator('[data-roomlist] button').filter({ hasText: oldRoom });
+        await expect(room).toContainText('No one here yet');
+        await room.click();
+        await expect(page.locator('[data-text]')).toHaveValue('This idea must not disappear');
+        await expect(page.locator('[data-cam]')).toHaveAttribute('aria-pressed', 'false');
+    } finally { await page.context().close(); }
+});
+
+test('phone chat, room discovery and composer fit without horizontal scrolling', async ({ browser }) => {
+    const page = await guest(browser, 'PocketGuest', { width: 375, height: 667 });
+    try {
+        await expect(page.locator('[data-text]')).toBeInViewport();
+        await expect(page.locator('[data-send]')).toBeInViewport();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+        await page.click('[data-show="rooms"]');
+        await expect(page.locator('[data-lobby-home]')).toBeVisible();
+        await expect(page.locator('[data-start="art"]')).toBeVisible();
+        await page.click('[data-lobby-home]');
+        await expect(page.locator('[data-text]')).toBeInViewport();
+        await page.click('[data-prompt="What’s everyone making or working on? "]');
+        await expect(page.locator('[data-text]')).toHaveValue('What’s everyone making or working on? ');
+    } finally { await page.context().close(); }
+});
+
+test('a fresh guest challenge is used on every socket admission and can be shown on reconnect', async ({ page }) => {
+    const tokens = [];
+    page.on('websocket', (ws) => tokens.push(new URL(ws.url()).searchParams.get('ts')));
+    await page.route(`**${ROOT}*`, async (route) => {
+        const response = await route.fetch();
+        await route.fulfill({ response, body: (await response.text()).replace('name="hangout-turnstile" content=""', 'name="hangout-turnstile" content="test-site-key"') });
+    });
+    await page.route('https://challenges.cloudflare.com/turnstile/v0/api.js*', (route) => route.fulfill({
+        contentType: 'application/javascript',
+        body: `let cb, n=0; window.turnstile={render(el,opts){cb=opts.callback;setTimeout(()=>cb('test-'+(++n)),30);return 1}, reset(){setTimeout(()=>cb('test-'+(++n)),100)}};window.__tsReady();`
+    }));
+    await page.goto(url());
+    await page.fill('[data-nick]', 'ChallengeGuest');
+    await page.click('[data-enter]');
+    await expect(page.locator('[data-connection]')).toHaveText('Connected');
+    await page.evaluate(() => window.__lobby.ws.close(1000));
+    await expect(page.locator('[data-connection]')).toHaveText('Offline');
+    await page.click('[data-reconnect]');
+    await expect(page.locator('[data-guest-check]')).toBeVisible();
+    await expect(page.locator('[data-connection]')).toHaveText('Connected');
+    expect(tokens).toEqual(['test-1', 'test-2']);
+    await expect(page.locator('[data-guest-check]')).toBeHidden();
+});
+
+test('a stalled guest-check script recovers to a retryable entry state', async ({ page }) => {
+    await page.route(`**${ROOT}*`, async (route) => {
+        const response = await route.fetch();
+        await route.fulfill({ response, body: (await response.text()).replace('name="hangout-turnstile" content=""', 'name="hangout-turnstile" content="test-site-key"') });
+    });
+    // The API loads but its onload callback never arrives: exercise the bounded load wait.
+    await page.route('https://challenges.cloudflare.com/turnstile/v0/api.js*', (route) => route.fulfill({ contentType: 'application/javascript', body: '/* deliberately no callback */' }));
+    await page.goto(url());
+    await page.clock.install();
+    await page.fill('[data-nick]', 'PatientGuest');
+    await page.click('[data-enter]');
+    await page.clock.fastForward(21000);
+    await expect(page.locator('[data-connection]')).toHaveText('Offline');
+    await expect(page.locator('[data-enter]')).toBeEnabled();
+    await expect(page.locator('[data-gate-status]')).toContainText('couldn’t finish');
+});
+
+test('reading older chat stays put until the guest chooses to jump to new messages', async ({ browser }) => {
+    const writer = await guest(browser, 'StoryWriter');
+    const reader = await guest(browser, 'StoryReader', { width: 375, height: 667 });
+    try {
+        const paragraphs = [
+            'The first drawing could be a crooked little house with a rooftop garden. A tiny bird keeps stealing all the seeds. We could each add one unexpected detail, a window, a plant, a strange door or a hand painted sign. Nobody needs to be good at drawing; a wobbly line can become part of the story.',
+            'The second drawing could take that same bird out for a nighttime adventure. It visits an empty train station and meets a friendly moth. One person could draw the sky while someone else works on the station. I would love to try telling a little story together without planning every part first.',
+            'For the last scene, the bird finally returns the missing seeds. There is a new tree next to the little house and a bench where the moth can rest. Someone could write a short caption or invent a name for the garden. We can leave a bit of blank canvas for the next person who wants to join in.'
+        ];
+        for (const text of paragraphs) {
+            await writer.fill('[data-text]', text);
+            await writer.press('[data-text]', 'Enter');
+            await expect(reader.locator('[data-buffer]')).toContainText(text);
+            await writer.waitForTimeout(3100); // Respect the unchanged three-second server slow mode.
+        }
+        const buffer = reader.locator('[data-buffer]');
+        await buffer.evaluate((el) => { el.scrollTop = 0; });
+        await writer.fill('[data-text]', 'Who wants to add a name for our little garden?');
+        await writer.press('[data-text]', 'Enter');
+        await expect(reader.locator('[data-new-messages]')).toBeVisible();
+        expect(await buffer.evaluate((el) => el.scrollTop)).toBe(0);
+        await reader.click('[data-new-messages]');
+        await expect(reader.locator('[data-new-messages]')).toBeHidden();
+        expect(await buffer.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThan(3);
+    } finally { await writer.context().close(); await reader.context().close(); }
+});
