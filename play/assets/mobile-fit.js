@@ -1,135 +1,149 @@
-/* Phone viewport fitting and secondary settings placement.
- * Eights pagination changes presentation only: every card stays in the engine hand. */
-function setupMobileFit() {
-  const phone = matchMedia('(max-width:980px)');
-  // Keep music and accessibility reachable without covering the playfield.
-  const topbar = document.querySelector('.topbar, .title-row');
-  const menu = document.querySelector('.mobile-menu-actions, #tsTableMenu .actions');
-  let destination = document.querySelector('.top-links, [data-mobile-game="turdomania"] .dock');
-  let positionTools = () => {};
-  if (!destination && topbar) {
-    destination = document.createElement('div');
-    destination.className = 'mobile-fit-tools';
-    const spacer = document.createElement('div');
-    spacer.className = 'mobile-fit-tools-space';
-    topbar.append(spacer);
-    document.body.append(destination);
-    const tools = destination;
-    positionTools = () => {
-      if (!phone.matches) return;
-      const count = tools.children.length;
-      spacer.style.width = (count * 44 + Math.max(0, count - 1) * 3) + 'px';
-      const rect = spacer.getBoundingClientRect();
-      tools.style.left = rect.left + 'px';
-      tools.style.top = rect.top + 'px';
-    };
-    new ResizeObserver(positionTools).observe(topbar);
-    window.addEventListener('resize', positionTools);
+/* Shared phone layout plumbing. Game rules, input handlers and audio stay game-owned. */
+(() => {
+  'use strict';
+  const root = document.documentElement;
+  const game = root.dataset.mobileGame;
+  const phone = matchMedia('(max-width: 980px)');
+  const pagers = [];
+  const placements = new Map();
+  function move(element, parent) {
+    if (!element || !parent || element.parentNode === parent || element.contains(parent)) return;
+    if (!placements.has(element)) placements.set(element, {parent:element.parentNode, next:element.nextSibling});
+    parent.append(element);
   }
-  if (destination) {
-    const originals = new Map();
-    function placeUtilities() {
-      for (const setting of document.querySelectorAll('#suite-arcade-a11y-mount, body > .suite-arcade-a11y-toggle, body > .suite-difficulty--fallback, [data-mobile-game="neon-arkanoid"] > #suite-music-toggle, [data-mobile-game="turdomania"] > #suite-music-toggle, body[data-mobile-game] > #suite-music-toggle, .jack-difficulty-bar > .suite-difficulty, [data-mobile-game="crapeights"] .hud #suite-difficulty-mount > .suite-difficulty, [data-mobile-game="neon-arkanoid"] .play-area > .sidebar')) {
-        if (!originals.has(setting)) originals.set(setting, setting.parentNode);
-      }
-      for (const [setting, original] of originals) {
-        const secondary = setting.matches('#newRoundBtn, #resetMatchBtn')
-          ? document.querySelector('#tableDrawer .tr-drawer-body')
-          : (setting.matches('.suite-difficulty, .sidebar') ? menu : null);
-        const parent = phone.matches ? (secondary || destination) : original;
-        if (setting.parentNode !== parent) parent.append(setting);
-      }
-      positionTools();
-    }
-    phone.addEventListener('change', placeUtilities);
-    const utilitySelector = '#suite-arcade-a11y-mount, .suite-arcade-a11y-toggle, .suite-difficulty--fallback, #suite-music-toggle';
-    new MutationObserver(records => {
-      if (records.some(record => [...record.addedNodes].some(node => node.nodeType === 1 &&
-        (node.matches(utilitySelector) || node.querySelector(utilitySelector))))) placeUtilities();
-    }).observe(document.body, { childList:true, subtree:true });
-    placeUtilities();
+  let frame;
+  const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(fit); };
+  function canvasFit(canvas, host, aspect, reserve = 0) {
+    if (!canvas || !host) return;
+    const height = Math.max(1, host.clientHeight - reserve);
+    const width = Math.max(1, Math.min(host.clientWidth - 12, height * aspect));
+    canvas.style.setProperty('width', `${width}px`, 'important');
+    canvas.style.setProperty('height', `${width / aspect}px`, 'important');
+    if (game === 'neon-arkanoid') canvas.parentElement.style.width = `${width}px`;
   }
-  const well = document.querySelector('[data-mobile-game="turdtris"] .board-column');
-  if (well) {
-    const layout = document.querySelector('[data-mobile-game="turdtris"] > .layout');
-    const wrap = well.querySelector('.board-wrap');
-    function fitWell() {
-      if (!phone.matches) { layout.style.removeProperty('--well-height'); return; }
-      const style = getComputedStyle(wrap);
-      const vertical = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom) + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
-      const caption = wrap.querySelector('.well-caption').getBoundingClientRect().height;
-      const stage = well.parentElement;
-      const rail = stage.querySelector('.cabinet-rail');
-      const railHeight = rail.getBoundingClientRect().height;
-      const gap = railHeight ? parseFloat(getComputedStyle(stage).gap) || 0 : 0;
-      const height = Math.max(0, Math.floor(Math.min(stage.clientHeight - railHeight - gap - vertical - caption - 4, (well.clientWidth - 16) * 2)));
-      layout.style.setProperty('--well-height', height + 'px');
-    }
-    new ResizeObserver(fitWell).observe(well.parentElement);
-    phone.addEventListener('change', fitWell);
-    fitWell();
-  }
-  const legacyArea = document.querySelector('[data-mobile-game="neon-arkanoid"] .play-area');
-  if (legacyArea) {
-    const wrap = legacyArea.querySelector('.canvas-wrap');
-    function fitLegacyCanvas() {
-      if (!phone.matches) { wrap.style.removeProperty('width'); return; }
-      wrap.style.width = Math.max(0, Math.min(legacyArea.clientWidth, (legacyArea.clientHeight - 4) * 1.5 + 4)) + 'px';
-    }
-    new ResizeObserver(fitLegacyCanvas).observe(legacyArea);
-    phone.addEventListener('change', fitLegacyCanvas);
-    fitLegacyCanvas();
-  }
-  const hand = document.querySelector('[data-mobile-game="crapeights"] #playerHand');
-  if (!hand) return;
-  let page = 0;
-  const pager = document.createElement('span');
-  pager.className = 'mobile-hand-pages';
-  const previous = document.createElement('button');
-  const next = document.createElement('button');
-  const count = document.createElement('span');
-  previous.type = next.type = 'button';
-  previous.textContent = '‹'; next.textContent = '›';
-  previous.setAttribute('aria-label', 'Previous cards');
-  next.setAttribute('aria-label', 'Next cards');
-  count.setAttribute('aria-live', 'polite');
-  pager.append(previous, count, next);
-  document.querySelector('.hand-head').append(pager);
   function fit() {
-    const cards = [...hand.querySelectorAll('[data-card-id]')];
+    placeSettings();
+    const strip = document.querySelector('.stalemate-strip');
+    root.style.setProperty('--mobile-footer', `${strip ? strip.getBoundingClientRect().height : 0}px`);
+    pagers.forEach(update => update());
+    if (!phone.matches) return;
+    if (game === 'turdtris') canvasFit(document.querySelector('#game'), document.querySelector('.game-grid'), 0.5, 14);
+    if (game === 'neon-arkanoid') canvasFit(document.querySelector('#gameCanvas'), document.querySelector('.play-area'), 1.5, 4);
+  }
+  function handPager(hand) {
+    if (!hand) return;
+    const nav = document.createElement('nav');
+    nav.className = 'mobile-hand-pager mobile-hand-pages';
+    nav.setAttribute('aria-label', 'Browse your hand');
+    const prev = document.createElement('button');
+    const next = document.createElement('button');
+    const label = document.createElement('span');
+    label.setAttribute('aria-live', 'polite');
+    prev.type = next.type = 'button';
+    prev.textContent = '‹'; next.textContent = '›';
+    prev.setAttribute('aria-label', 'Previous cards'); next.setAttribute('aria-label', 'Next cards');
+    nav.append(prev, label, next);
+    hand.before(nav);
+    let start = 0;
+    let size = 5;
+    function update() {
+      const cards = [...hand.querySelectorAll('button')];
+      const fitted = phone.matches && window.innerWidth >= 360;
+      const paginate = game === 'crapeights';
+      hand.classList.toggle('mobile-hand', fitted);
+      // Width comes from the hand, since landscape tables use side-by-side columns.
+      size = Math.max(1, Math.min(8, Math.floor((hand.clientWidth - 4) / 48)));
+      start = Math.min(start, Math.max(0, Math.ceil(cards.length / size) - 1) * size);
+      nav.hidden = !fitted || !paginate || cards.length <= size;
+      hand.style.setProperty('--mobile-hand-height', `${paginate ? 88 : Math.max(1, Math.ceil(cards.length / size)) * 68}px`);
+      hand.style.setProperty('--mobile-card-height', paginate ? '84px' : '64px');
+      hand.style.setProperty('--hand-columns', size);
+      const text = `${Math.min(start + 1, cards.length)}–${Math.min(start + size, cards.length)} / ${cards.length}`;
+      if (label.textContent !== text) label.textContent = text;
+      prev.disabled = start === 0; next.disabled = start + size >= cards.length;
+      cards.forEach((card, i) => {
+        const hidden = fitted && paginate && (i < start || i >= start + size);
+        card.classList.toggle('mobile-card-hidden', hidden);
+        card.hidden = hidden;
+      });
+    }
+    prev.addEventListener('click', () => { start = Math.max(0, start - size); update(); });
+    next.addEventListener('click', () => { start += size; update(); });
+    // Keyboard navigation in the game can move focus to another page.
+    hand.addEventListener('focusin', event => {
+      const index = [...hand.querySelectorAll('button')].indexOf(event.target);
+      if (index >= 0 && (index < start || index >= start + size)) { start = Math.floor(index / size) * size; update(); }
+    });
+    new MutationObserver(schedule).observe(hand, { childList:true, subtree:true });
+    pagers.push(update);
+  }
+  function placeSettings() {
     if (!phone.matches) {
-      pager.hidden = true;
-      cards.forEach(card => { card.hidden = false; });
+      [...placements.entries()].reverse().forEach(([element, place]) => place.parent.insertBefore(element, place.next?.parentNode === place.parent ? place.next : null));
+      placements.clear();
       return;
     }
-    const columns = Math.max(1, Math.floor((hand.clientWidth - 12) / 48));
-    const capacity = columns * 2;
-    const pages = Math.max(1, Math.ceil(cards.length / capacity));
-    page = Math.min(page, pages - 1);
-    pager.hidden = pages === 1;
-    previous.disabled = page === 0; next.disabled = page === pages - 1;
-    count.textContent = `${page + 1}/${pages}`;
-    hand.style.height = '144px';
-    hand.style.setProperty('--fan-w', '44px');
-    hand.style.setProperty('--fan-h', '64px');
-    cards.forEach((card, index) => {
-      const local = index - page * capacity;
-      card.hidden = local < 0 || local >= capacity;
-      if (card.hidden) return;
-      const row = Math.floor(local / columns);
-      const rowCount = Math.min(columns, cards.length - page * capacity - row * columns);
-      card.style.setProperty('--fan-x', `${(hand.clientWidth - rowCount * 48) / 2 + (local % columns) * 48}px`);
-      card.style.setProperty('--fan-y', `${10 + row * 68}px`);
-      card.style.setProperty('--fan-angle', '0deg');
+    document.querySelectorAll('.welcome-card, .guide-card, #welcomeGuide .overlay-card, #guideOverlay .overlay-card, #howToPlay .how-card').forEach(card => {
+      let details = card.querySelector(':scope > .mobile-guide-details');
+      if (!details) {
+        details = document.createElement('details');
+        details.className = 'mobile-guide-details';
+        const summary = document.createElement('summary');
+        summary.textContent = 'Rules & tips';
+        const body = document.createElement('div');
+        details.append(summary, body);
+        card.append(details);
+      }
+      const intro = card.querySelector(':scope > p');
+      [...card.children].forEach(child => {
+        if (child === details || child === intro || child.matches('h1, h2, .welcome-actions, .overlay-actions, .guide-actions')) return;
+        move(child, details.lastElementChild);
+      });
     });
+    let menu = document.querySelector('.mobile-menu-actions, .table-menu .actions');
+    if (game === 'turdrummy' && !document.querySelector('.mobile-settings')) {
+      const details = document.createElement('details');
+      details.className = 'mobile-settings';
+      const summary = document.createElement('summary');
+      summary.textContent = 'Table menu';
+      const panel = document.createElement('div');
+      panel.className = 'mobile-settings-panel';
+      details.append(summary, panel);
+      document.querySelector('.topbar').append(details);
+      ['.tr-difficulty-topbar'].forEach(selector => {
+        const element = document.querySelector(selector);
+        if (element) move(element, panel);
+      });
+    }
+    menu = document.querySelector('.mobile-settings-panel') || menu;
+    if (game === 'turdrummy') ['.tr-difficulty-topbar'].forEach(selector => move(document.querySelector(selector), menu));
+    if (menu) {
+      [...(game === 'turdtris' ? ['#suite-difficulty-mount', '.run-settings'] : [])].forEach(selector => {
+        const element = document.querySelector(selector);
+        move(element, menu);
+      });
+    }
+    move(document.querySelector('#suite-music-toggle'), document.body);
+    move(document.querySelector('#suite-arcade-a11y-mount'), document.body);
+
   }
-  previous.addEventListener('click', () => { page--; fit(); });
-  next.addEventListener('click', () => { page++; fit(); });
-  new MutationObserver(fit).observe(hand, { childList: true });
-  new ResizeObserver(fit).observe(hand);
-  window.addEventListener('orientationchange', fit);
-  phone.addEventListener('change', fit);
-  fit();
- }
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setupMobileFit, { once:true });
-else setupMobileFit();
+  function init() {
+    placeSettings();
+    new MutationObserver(() => { placeSettings(); }).observe(document.body, { childList:true, subtree:true });
+    if (['crapeights', 'turdrummy'].includes(game)) handPager(document.querySelector('#playerHand'));
+    if (game === 'turdspades') handPager(document.querySelector('#youCards'));
+    const host = document.querySelector(game === 'turdtris' ? '.game-grid' : '.play-area');
+    if (host) new ResizeObserver(schedule).observe(host);
+    const strip = document.querySelector('.stalemate-strip');
+    if (strip) new ResizeObserver(schedule).observe(strip);
+    fit();
+    // The suite can insert controls after dynamic imports; refit after its first layout.
+    setTimeout(schedule, 500);
+  }
+  window.addEventListener('resize', schedule);
+  window.addEventListener('orientationchange', schedule);
+  window.visualViewport?.addEventListener('resize', schedule);
+  phone.addEventListener('change', schedule);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();

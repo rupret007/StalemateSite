@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mobile-game="turdtris">
 <head>
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
@@ -1391,9 +1391,10 @@ body.desktop-cabinet .status {
   .control-btn:active, .control-btn.is-pressed { transform: none; }
 }
 </style>
-  <link rel="stylesheet" href="assets/mobile-fit.css">
+<link rel="stylesheet" href="assets/mobile-fit.css">
+<script src="assets/mobile-fit.js" defer></script>
 </head>
-<body data-mobile-game="turdtris" class="suite-ambient suite-no-zoom board-focus">
+<body class="suite-ambient suite-no-zoom board-focus">
 <div id="statusLive" class="sr-live" aria-live="polite" aria-atomic="true"></div>
 <div class="desktop-scene" id="desktopScene" aria-hidden="true"></div>
 <div class="welcome-guide" id="welcomeGuide">
@@ -4040,6 +4041,5 @@ window.addEventListener('storage', updateMusic);
 <script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>
 <script src="../js/track.js" defer></script>
 <script src="stalemate/play-track.js" defer></script>
-<script src="assets/mobile-fit.js"></script>
 </body>
 </html>

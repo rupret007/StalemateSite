@@ -1,2 +1,4 @@
 Vendored from github.com/rupret007/Turdanoid@d87b967 (main). Same owner as this repo; no separate license file upstream.
 Do not edit by hand: run scripts/sync-turdanoid.sh
+
+Local mobile-fit.css/mobile-fit.js and per-page includes mirror the mobile-no-scroll work in Turdanoid. Preserve these until the upstream branch is merged and synced. Run npm run test:mobile after syncing.

@@ -30,6 +30,9 @@ jobs:
       - name: Install Chromium and WebKit
         run: npx playwright install --with-deps chromium webkit
 
+      - name: Check mobile game fit
+        run: npm run test:mobile
+
       - name: Run automated tests
         run: npm test
 
