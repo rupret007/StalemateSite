@@ -73,9 +73,14 @@ export class HangoutLobby {
     constructor(state, env) {
         this.state = state;
         this.env = env;
+        this.pendingAdmission = new Map();
         this.ready = state.blockConcurrencyWhile(async () => {
             this.engine = createLobby({
-                send: (id, msg) => { const ws = this.byId(id); if (ws) ws.send(JSON.stringify(msg)); },
+                send: (id, msg) => {
+                    const ws = this.byId(id);
+                    if (ws) ws.send(JSON.stringify(msg));
+                    else this.pendingAdmission.get(id)?.push(msg);
+                },
                 close: (id, code, reason) => { const ws = this.byId(id); if (ws) try { ws.close(code, reason); } catch (e) { /* gone */ } },
                 persist: (kind, data) => {
                     if (kind === 'net') this.state.storage.put('net', data);
@@ -102,12 +107,22 @@ export class HangoutLobby {
         try { identity = JSON.parse(request.headers.get('X-Hangout-Identity')); } catch (e) { return new Response('no', { status: 400 }); }
         if (!identity || !identity.dev) return new Response('no', { status: 400 });
         const id = `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-        const verdict = this.engine.connect({ id, dev: identity.dev, iph: identity.iph, role: identity.role, email: identity.email, admin: identity.admin });
+        // Admission may refuse before upgrade, but successful connect also emits the
+        // hello the browser waits for. Hold those frames until the socket is accepted.
+        const initialFrames = [];
+        this.pendingAdmission.set(id, initialFrames);
+        let verdict;
+        try {
+            verdict = this.engine.connect({ id, dev: identity.dev, iph: identity.iph, role: identity.role, email: identity.email, admin: identity.admin });
+        } finally {
+            this.pendingAdmission.delete(id);
+        }
         if (!verdict.ok) return new Response(verdict.reason, { status: verdict.status });
         const pair = new WebSocketPair();
         this.state.acceptWebSocket(pair[1], [id]);
         pair[1].serializeAttachment({ id, dev: identity.dev, iph: identity.iph, role: identity.role, email: identity.email, admin: identity.admin });
         if (identity.devToken) pair[1].send(JSON.stringify({ t: 'device', token: identity.devToken }));
+        for (const frame of initialFrames) pair[1].send(JSON.stringify(frame));
         return new Response(null, { status: 101, webSocket: pair[0] });
     }
     async webSocketMessage(ws, raw) { await this.ready; this.engine.message(this.state.getTags(ws)[0], typeof raw === 'string' ? raw : ''); }
