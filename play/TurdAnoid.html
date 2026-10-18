@@ -238,8 +238,9 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="assets/mobile-fit.css">
 </head>
-<body data-suite-no-bg="1">
+<body data-mobile-game="turdanoid" data-suite-no-bg="1">
 <div id="app">
   <div id="announcer" role="status" aria-live="polite" aria-atomic="true"></div>
   <div id="stage">
@@ -826,7 +827,9 @@ function resize(){
   let canvasW = stageW;
   let canvasH = stageH;
   if(TLAYOUT){
-    const layout = TLAYOUT.computePlayfield(stageW, stageH);
+    const layout = matchMedia('(max-width:980px)').matches
+      ? { canvasW: stageW, canvasH: stageH, wide: false }
+      : TLAYOUT.computePlayfield(stageW, stageH);
     canvasW = layout.canvasW;
     canvasH = layout.canvasH;
     elStage.classList.toggle('layout-wide', layout.wide);
@@ -848,7 +851,8 @@ function resize(){
   DPR = Math.max(1, Math.min(window.devicePixelRatio||1, 2));
   cv.width = Math.floor(W*DPR);
   cv.height = Math.floor(H*DPR);
-  cv.style.width = W+'px'; cv.style.height = H+'px';
+  const displayScale = Math.min(1, stageW / W, stageH / H);
+  cv.style.width = (W * displayScale)+'px'; cv.style.height = (H * displayScale)+'px';
   ctx.setTransform(DPR,0,0,DPR,0,0);
   if(paddle){
     paddle.y = H - paddle.h - 36;
@@ -3615,5 +3619,6 @@ document.body.addEventListener('touchmove', e=>{ if(e.touches.length < 2) e.prev
 <script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>
 <script src="../js/track.js" defer></script>
 <script src="stalemate/play-track.js" defer></script>
+<script src="assets/mobile-fit.js"></script>
 </body>
 </html>

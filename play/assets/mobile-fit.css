@@ -1,0 +1,383 @@
+/* Phone play occupies the visual viewport. Drawers remain independently scrollable. */
+@media (max-width: 980px) {
+  html:has(body[data-mobile-game]) { height:100svh; height:100dvh; overflow:hidden; overscroll-behavior:none; }
+  body[data-mobile-game] {
+    --game-footer:0px;
+    --play-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--game-footer) - 12px);
+    box-sizing:border-box; height:100svh; height:100dvh; min-height:0;
+    padding:calc(env(safe-area-inset-top) + 6px) max(6px,env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + var(--game-footer) + 6px) max(6px,env(safe-area-inset-left)) !important;
+    overflow:hidden; overscroll-behavior:none; align-items:stretch;
+  }
+  body[data-mobile-game]:has(.stalemate-strip) { --game-footer:56px; }
+  body[data-mobile-game] :is(button,summary,select,.suite-music-btn) { min-height:44px; min-width:44px; touch-action:manipulation; }
+  body[data-mobile-game] :is(.shell,.app,.game-shell) { width:100%; max-width:100%; height:var(--play-height); min-height:0; margin:0; padding:6px; gap:4px; display:flex; flex-direction:column; }
+  body[data-mobile-game] .topbar { flex:none; min-height:44px; padding:0 0 0 48px; margin:0; gap:4px; }
+  body[data-mobile-game] .topbar h1 { font-size:18px; margin:0; }
+  body[data-mobile-game] .topbar :is(p,.brand-kicker,.club-label) { display:none; }
+  body[data-mobile-game] :is(.topbar > .actions,.top-actions) { display:none; }
+  body[data-mobile-game] .mobile-menu { display:block; }
+  body[data-mobile-game] :is(.mobile-menu-actions,.table-menu[open] > .actions) { position:fixed; top:calc(env(safe-area-inset-top) + 56px); right:8px; left:8px; max-height:calc(100dvh - 130px); overflow:auto; z-index:100; background:#10261f; padding:12px; border:1px solid #8effc2; display:flex; flex-wrap:wrap; gap:6px; }
+  body[data-mobile-game] :is(.welcome-guide,.how-to-play,.overlay):not(#overlay) { max-height:calc(100dvh - var(--game-footer)); }
+  body[data-mobile-game] :is(.welcome-card,.guide-card,.overlay-card,.how-to-card) { max-height:calc(100dvh - var(--game-footer) - 24px); overflow:auto; }
+  body[data-mobile-game] .suite-back-pill { top:max(6px,env(safe-area-inset-top)); bottom:auto; left:max(6px,env(safe-area-inset-left)); }
+  body[data-mobile-game] .table::after { display:none; }
+
+  /* Crapjack: two card lanes, live bank/bet, chips and the complete action dock. */
+  body[data-mobile-game="turdjack"] .shell > .hud { display:grid; grid-template-columns:1fr 1fr; margin:0; gap:4px; flex:none; }
+  body[data-mobile-game="turdjack"] .shell > .hud > [data-jack-stat-tier="session"] { display:none; }
+  body[data-mobile-game="turdjack"] .card-stat { padding:3px 8px; min-height:0; }
+  body[data-mobile-game="turdjack"] .card-stat :is(.k,.v) { display:inline; font-size:12px; margin-right:8px; }
+  body[data-mobile-game="turdjack"] .shell > .layout { flex:1; min-height:0; display:flex; margin:0; }
+  body[data-mobile-game="turdjack"] .table { flex:1; min-height:0; margin:0; padding:5px; display:flex; flex-direction:column; gap:3px; }
+  body[data-mobile-game="turdjack"] .status { min-height:0; padding:3px 6px; font-size:11px; line-height:1.2; margin:0; }
+  body[data-mobile-game="turdjack"] .table-stage { flex:1; min-height:0; margin:0; display:flex; flex-direction:column; gap:3px; }
+  body[data-mobile-game="turdjack"] :is(.discard-tray,.shoe-lane,.felt-inlay,.table-bet-zone,.desktop-controls,.hand-meter-host,.jack-difficulty-bar) { display:none !important; }
+  body[data-mobile-game="turdjack"] .hand { flex:1; min-height:0; padding:3px; margin:0; overflow:visible; }
+  body[data-mobile-game="turdjack"] .hand-title { min-height:20px; margin:0; font-size:12px; }
+  body[data-mobile-game="turdjack"] .cards { min-height:0; height:calc(100% - 24px); align-items:center; flex-wrap:nowrap; gap:3px; }
+  body[data-mobile-game="turdjack"] .playing-card { width:clamp(44px,13vw,62px); height:min(82px,100%); min-height:44px; flex-shrink:1; }
+  body[data-mobile-game="turdjack"] .mobile-felt-chip-rack { display:flex; flex:none; height:44px; margin:0; padding:0; justify-content:center; gap:8px; }
+  body[data-mobile-game="turdjack"] .mobile-felt-chip-rack .chip-btn { width:52px; height:44px; padding:0; font-size:12px; }
+  body[data-mobile-game="turdjack"] .mobile-pit { display:block; position:relative; inset:auto; flex:none; margin:0; padding:0; width:100%; }
+  body[data-mobile-game="turdjack"] .mobile-pit-row { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:3px; margin:3px 0 0; }
+  body[data-mobile-game="turdjack"] .mobile-pit .btn { padding:3px; font-size:11px; min-height:44px; }
+  body[data-mobile-game="turdjack"] .mobile-pit-extra { margin:0; padding:0; }
+  body[data-mobile-game="turdjack"] .mobile-pit-extra[open] > div { position:absolute; bottom:44px; width:100%; background:#10261f; padding:6px; z-index:20; }
+
+  /* Eights: compact opponent counts and piles leave the hand and actions visible. */
+  body[data-mobile-game="crapeights"] .shell > .hud { display:none; }
+  body[data-mobile-game="crapeights"] .layout { display:flex; flex:1; min-height:0; }
+  body[data-mobile-game="crapeights"] .table { display:flex; flex-direction:column; flex:1; min-height:0; padding:4px; gap:3px; }
+  body[data-mobile-game="crapeights"] .turn-banner { padding:2px 4px; margin:0; flex:none; }
+  body[data-mobile-game="crapeights"] .turn-banner span:not(.flow-badge) { font-size:10px; }
+  body[data-mobile-game="crapeights"] .status { font-size:11px; padding:2px 4px; min-height:0; margin:0; }
+  body[data-mobile-game="crapeights"] .arena { flex:1; min-height:0; padding:0; display:flex; flex-direction:column; gap:2px; }
+  body[data-mobile-game="crapeights"] .opponents { flex:none; gap:3px; }
+  body[data-mobile-game="crapeights"] .opp-card { min-height:0; padding:3px; }
+  body[data-mobile-game="crapeights"] :is(.opp-cards,.table-stamp,.suit-row,.selection-note,.pile-meta) { display:none; }
+  body[data-mobile-game="crapeights"] .pile-row { flex:1; min-height:0; margin:0; gap:24px; align-items:center; }
+  body[data-mobile-game="crapeights"] .pile-stack { height:70px; }
+  body[data-mobile-game="crapeights"] :is(.pile-card,.draw-back) { width:48px; height:68px; min-height:44px; }
+  body[data-mobile-game="crapeights"] .hand-wrap { flex:none; margin:0; padding:3px; }
+  body[data-mobile-game="crapeights"] .hand-head { margin:0; min-height:44px; font-size:11px; }
+  body[data-mobile-game="crapeights"] .hand-rail { height:86px; min-height:0; padding:3px; }
+  body[data-mobile-game="crapeights"] .action-dock { position:static; margin:0; padding:0; display:grid; grid-template-columns:repeat(4,1fr); gap:3px; flex:none; }
+  body[data-mobile-game="crapeights"] .action-dock .btn { padding:3px; font-size:11px; }
+
+  /* Gin: the three zones share the remaining height; controls are in normal flow. */
+  body[data-mobile-game="turdrummy"] .top-links { flex-wrap:nowrap; gap:3px; }
+  body[data-mobile-game="turdrummy"] .top-links > :is(a,#newRoundBtn,#resetMatchBtn) { display:none; }
+  body[data-mobile-game="turdrummy"] .top-links .btn { font-size:10px; padding:3px; }
+  body[data-mobile-game="turdrummy"] .title-group { display:none; }
+  body[data-mobile-game="turdrummy"] .status { flex:none; margin:0; gap:2px; }
+  body[data-mobile-game="turdrummy"] .stat { padding:3px; min-height:0; }
+  body[data-mobile-game="turdrummy"] .stat-value { font-size:14px; }
+  body[data-mobile-game="turdrummy"] .table-stage { flex:1; min-height:0; display:flex; flex-direction:column; gap:2px; }
+  body[data-mobile-game="turdrummy"] .table { flex:1; min-height:0; display:grid; grid-template-rows:1fr 1.2fr 1.2fr; gap:2px; padding:3px; }
+  body[data-mobile-game="turdrummy"] .zone { min-height:0; padding:2px; }
+  body[data-mobile-game="turdrummy"] .zone-header { margin:0; font-size:10px; }
+  body[data-mobile-game="turdrummy"] :is(.card-row,.pile-body) { min-height:0; height:calc(100% - 18px); }
+  body[data-mobile-game="turdrummy"] .card { max-height:100%; min-height:44px; }
+  body[data-mobile-game="turdrummy"] .piles { height:calc(100% - 18px); min-height:0; gap:16px; }
+  body[data-mobile-game="turdrummy"] .pile { min-height:0; padding:0; }
+  body[data-mobile-game="turdrummy"] .pile h3 { display:none; }
+  body[data-mobile-game="turdrummy"] .message { font-size:10px; padding:0; min-height:0; }
+  body[data-mobile-game="turdrummy"] .tr-drawer { flex:none; margin:0; }
+  body[data-mobile-game="turdrummy"] .tr-drawer[open] .tr-drawer-body { position:fixed; inset:100px 8px 170px; overflow:auto; background:#10261f; z-index:30; }
+  body[data-mobile-game="turdrummy"] .action-dock { flex:none; position:static; padding:0; margin:0; }
+  body[data-mobile-game="turdrummy"] .action-grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:3px; }
+  body[data-mobile-game="turdrummy"] .action-grid .btn { padding:3px; font-size:11px; }
+  body[data-mobile-game="turdrummy"] .footer-note { display:none; }
+
+  body[data-mobile-game="turdspades"] .ts-score-strip { margin:0; padding:3px; flex:none; }
+  body[data-mobile-game="turdspades"] .app > .message { padding:2px; margin:0; min-height:0; font-size:11px; }
+  body[data-mobile-game="turdspades"] .table-arena { flex:1; min-height:0; padding:3px; gap:2px; display:flex; flex-direction:column; }
+  body[data-mobile-game="turdspades"] .seat-north { flex:none; min-height:25px; padding:0; }
+  body[data-mobile-game="turdspades"] :is(.backs,.ts-seat-ring,.ts-trick-stack,.hand-guidance,.table-caption,.ts-avatar) { display:none; }
+  body[data-mobile-game="turdspades"] .mid { flex:1; min-height:0; gap:3px; }
+  body[data-mobile-game="turdspades"] .zone { min-height:0; padding:3px; }
+  body[data-mobile-game="turdspades"] .seat-you { flex:none; }
+  body[data-mobile-game="turdspades"] #youCards { min-height:90px; height:90px; }
+  body[data-mobile-game="turdspades"] .dock { position:static; padding:0; margin:0; flex:none; }
+  body[data-mobile-game="turdspades"] .bid-box { padding:0; margin:0; }
+  body[data-mobile-game="turdspades"] :is(.bid-chips,#bidExpectedHint,.bid-contract,.partner-bid-bubble,.bid-box > .name) { display:none; }
+  body[data-mobile-game="turdspades"] .bid-controls { margin:0; gap:4px; }
+  body[data-mobile-game="turdspades"] .dock-grid { gap:3px; margin:3px 0 0; }
+  body[data-mobile-game="turdspades"] .dock .btn { padding:3px; font-size:11px; }
+
+  /* The legacy canvas keeps its 3:2 aspect, with HUD and thumb buttons outside it. */
+  body[data-mobile-game="neon-arkanoid"] .hud-grid { display:flex; gap:3px; margin:0; }
+  body[data-mobile-game="neon-arkanoid"] .stat-card { flex:1; min-height:0; padding:2px; }
+  body[data-mobile-game="neon-arkanoid"] .stat-card .value { font-size:16px; }
+  body[data-mobile-game="neon-arkanoid"] :is(.status-bar,.sidebar) { display:none; }
+  body[data-mobile-game="neon-arkanoid"] .play-area { display:flex; flex:1; min-height:0; align-items:center; justify-content:center; }
+  body[data-mobile-game="neon-arkanoid"] .canvas-wrap { width:min(100%,calc((var(--play-height) - 145px) * 1.5)); flex:none; }
+  body[data-mobile-game="neon-arkanoid"] #gameCanvas { width:100%; height:auto; aspect-ratio:3/2; display:block; }
+  body[data-mobile-game="neon-arkanoid"] .mobile-controls { display:grid; position:static; grid-template-columns:repeat(3,1fr); padding:0; margin:0; gap:4px; flex:none; }
+
+  body[data-mobile-game="turdanoid"] #app { inset:env(safe-area-inset-top) env(safe-area-inset-right) calc(var(--game-footer) + env(safe-area-inset-bottom)) env(safe-area-inset-left); padding:6px; }
+  body[data-mobile-game="turdanoid"] .overlay { padding:12px; }
+
+  body[data-mobile-game="turdtris"] { --well-height:calc(var(--play-height) - 258px); }
+  body[data-mobile-game="turdtris"] > .layout { height:calc(var(--play-height) - 156px); min-height:0; padding:4px; margin:0; width:100%; }
+  body[data-mobile-game="turdtris"] #game { width:auto !important; height:var(--well-height) !important; max-width:100%; aspect-ratio:1/2; }
+  body[data-mobile-game="turdtris"] .game-grid.board-column { min-height:0; }
+  body[data-mobile-game="turdtris"] #mobileControls { height:152px; position:absolute; left:6px; right:6px; bottom:calc(var(--game-footer) + env(safe-area-inset-bottom) + 6px); padding:3px; gap:3px; }
+  body[data-mobile-game="turdtris"] #mobileControls .control-btn { min-height:44px; height:44px; padding:3px; }
+  body[data-mobile-game="turdtris"] .mobile-run-strip { height:50px; min-height:0; }
+  body[data-mobile-game="turdtris"] .mobile-preview-box { padding:0; }
+  body[data-mobile-game="turdtris"] .mobile-preview-box canvas { height:32px; width:48px; }
+
+  body[data-mobile-game="turdomania"] { display:flex; flex-direction:column; align-items:center; gap:4px; }
+  body[data-mobile-game="turdomania"] > .hud { flex:none; margin:0; padding:0 0 0 44px; }
+  body[data-mobile-game="turdomania"] .tagline, body[data-mobile-game="turdomania"] > .help { display:none; }
+  body[data-mobile-game="turdomania"] .tm { display:flex; flex:1; min-height:0; flex-direction:column; align-items:center; gap:4px; margin:0; }
+  body[data-mobile-game="turdomania"] .dock { position:static; margin:0; padding:0; gap:4px; flex:none; }
+}
+@media (max-width:980px) and (max-height:500px) {
+  body[data-mobile-game="turdjack"] .shell { display:grid; grid-template-columns:180px 1fr; grid-template-rows:44px 1fr; }
+  body[data-mobile-game="turdjack"] .shell > .layout { grid-column:2; grid-row:1/3; }
+  body[data-mobile-game="turdjack"] .shell > .hud { align-self:start; }
+  body[data-mobile-game="turdjack"] .table { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:30px 1fr; }
+  body[data-mobile-game="turdjack"] .status { grid-column:1/3; }
+  body[data-mobile-game="turdjack"] .table-stage { grid-row:2/4; }
+  body[data-mobile-game="turdjack"] .mobile-felt-chip-rack { grid-column:2; flex-wrap:wrap; height:auto; }
+  body[data-mobile-game="turdjack"] .mobile-pit { grid-column:2; }
+  body[data-mobile-game="turdjack"] .mobile-pit-row { grid-template-columns:repeat(2,1fr); }
+  body[data-mobile-game="turdjack"] .mobile-pit-extra { position:absolute; right:calc(100% + 8px); bottom:0; width:150px; }
+  body[data-mobile-game="crapeights"] .table { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:44px 26px 1fr 44px; }
+  body[data-mobile-game="crapeights"] .turn-banner { grid-column:1/3; }
+  body[data-mobile-game="crapeights"] .status { grid-column:1/3; }
+  body[data-mobile-game="crapeights"] .arena { grid-column:1; grid-row:3/5; }
+  body[data-mobile-game="crapeights"] .hand-wrap { grid-column:2; grid-row:3; }
+  body[data-mobile-game="crapeights"] .action-dock { grid-column:2; grid-row:4; }
+  body[data-mobile-game="turdrummy"] .table { grid-template-columns:1fr 1fr 1.3fr; grid-template-rows:1fr; }
+  body[data-mobile-game="turdrummy"] .table-stage { position:relative; }
+  body[data-mobile-game="turdrummy"] .tr-drawer { position:absolute; bottom:0; left:0; z-index:10; }
+  body[data-mobile-game="turdrummy"] .action-grid { grid-template-columns:repeat(7,1fr); }
+  body[data-mobile-game="turdspades"] .app { display:grid; grid-template-columns:180px 1fr; grid-template-rows:44px 30px 1fr; }
+  body[data-mobile-game="turdspades"] .table-arena { grid-column:2; grid-row:1/4; }
+  body[data-mobile-game="turdspades"] .dock { grid-column:1; grid-row:3; }
+  body[data-mobile-game="turdspades"] .bid-controls { flex-wrap:wrap; }
+  body[data-mobile-game="turdtris"] { --well-height:calc(var(--play-height) - 58px); }
+  body[data-mobile-game="turdtris"] > .layout { width:calc(100% - 260px); height:var(--play-height); }
+  body[data-mobile-game="turdtris"] #mobileControls { left:auto; width:248px; height:200px; top:70px; }
+}
+@media (max-width:980px) {
+ body[data-mobile-game="turdjack"] .table-stage { align-items:stretch; }
+ body[data-mobile-game="turdjack"] .table-stage .hand { width:100%; max-width:none; align-self:stretch; }
+ body[data-mobile-game="turdjack"] .topbar { flex-direction:row; align-items:center; justify-content:space-between; }
+ body[data-mobile-game="turdjack"] .mobile-menu { width:auto; }
+ body[data-mobile-game="turdjack"] .mobile-pit-extra summary { height:44px; padding:4px; }
+ body[data-mobile-game="turdjack"] .mobile-pit-extra:not([open]) > div { display:none; }
+ body[data-mobile-game="turdspades"] .mid { display:grid; grid-template-columns:70px 1fr 70px; }
+ body[data-mobile-game="turdspades"] .trick { min-height:80px; }
+ body[data-mobile-game="turdspades"] .seat-you { min-height:180px; }
+ body[data-mobile-game="turdspades"] #youCards { height:160px; }
+ body[data-mobile-game="turdspades"] .table-arena { overflow:visible; }
+ body[data-mobile-game="turdrummy"] .topbar { padding-top:0; padding-bottom:0; }
+ body[data-mobile-game="turdrummy"] .top-links { display:flex; width:auto; margin-left:auto; }
+ body[data-mobile-game="turdrummy"] .status { grid-template-columns:repeat(6,1fr); }
+ body[data-mobile-game="turdrummy"] .table { margin:0; width:100%; }
+ body[data-mobile-game="turdrummy"] .zone { max-height:none; overflow:visible; }
+ body[data-mobile-game="turdrummy"] .zone--center .piles { height:calc(100% - 18px); align-items:center; }
+ body[data-mobile-game="turdrummy"] .zone--center .pile { height:80px; flex:1; }
+ body[data-mobile-game="turdrummy"] .zone--center .pile-body { height:100%; min-height:0; }
+ body[data-mobile-game="turdrummy"] .card-row { min-height:0 !important; }
+ body[data-mobile-game="turdrummy"] #playerHand { padding-top:6px; padding-bottom:0; min-height:0; }
+ body[data-mobile-game="turdrummy"] #coachCard:not([hidden]) { position:fixed; top:100px; left:16px; right:16px; z-index:70; max-height:calc(100dvh - 240px); overflow:auto; background:#10261f; padding:12px; }
+ body[data-mobile-game="turdrummy"] .zone--center .message { position:absolute; left:4px; bottom:0; background:#10261f; }
+}
+@media (max-width:980px) and (max-height:500px) {
+ body[data-mobile-game="turdspades"] .table-arena { display:grid; grid-template-columns:1fr 1.5fr; grid-template-rows:28px 1fr; }
+ body[data-mobile-game="turdspades"] .seat-north { grid-column:1; }
+ body[data-mobile-game="turdspades"] .mid { grid-column:1; grid-row:2; grid-template-columns:1fr; grid-template-rows:24px 1fr 24px; }
+ body[data-mobile-game="turdspades"] .seat-you { grid-column:2; grid-row:1/3; min-height:0; }
+ body[data-mobile-game="turdspades"] .seat-you .head { font-size:10px; }
+ body[data-mobile-game="turdspades"] .trick { min-height:0; }
+ body[data-mobile-game="turdspades"] .dock-grid { grid-template-columns:1fr 1fr; }
+}
+.mobile-hand-pages { display:none; }
+@media (max-width:980px) {
+ body[data-mobile-game="crapeights"] .mobile-hand-pages:not([hidden]) { display:inline-flex; align-items:center; gap:2px; }
+ body[data-mobile-game="crapeights"] .mobile-hand-pages button { color:#ecfff5; background:#10261f; border:1px solid #809780; border-radius:8px; }
+ body[data-mobile-game="crapeights"] .card-btn { font-size:11px; }
+ body[data-mobile-game="crapeights"] .card-btn > div:first-child { font-size:13px; }
+ body[data-mobile-game="crapeights"] .card-btn :is(.small,.center),body[data-mobile-game="crapeights"] .card-btn::after { display:none; }
+ body[data-mobile-game="crapeights"] .card-btn[hidden] { display:none; }
+ body[data-mobile-game="crapeights"] .hand-rail { height:144px; }
+ body[data-mobile-game="crapeights"] .opponents { position:static; display:flex; justify-content:space-around; }
+ body[data-mobile-game="crapeights"] .opp-card { position:static; width:auto; }
+ body[data-mobile-game="crapeights"] .ce-avatar { width:24px; height:24px; }
+ body[data-mobile-game="crapeights"] .pile-row { position:static; }
+ body[data-mobile-game="turdrummy"] .tr-difficulty-topbar { display:none; }
+ body[data-mobile-game="turdrummy"] .table { grid-template-rows:minmax(44px,1fr) minmax(84px,1fr) minmax(110px,1.2fr); }
+ body[data-mobile-game="turdrummy"] .card-row { align-items:center; }
+ body[data-mobile-game="turdrummy"] .card-row .card { max-height:100%; }
+ body[data-mobile-game="turdrummy"] .zone::before { display:none; }
+}
+@media (max-width:980px) and (max-height:500px) {
+ body[data-mobile-game="turdrummy"] .table { grid-template-rows:1fr; }
+ body[data-mobile-game="crapeights"] .opponents { font-size:10px; }
+ body[data-mobile-game="crapeights"] .ce-avatar { display:none; }
+ body[data-mobile-game="crapeights"] .table { grid-template-rows:44px 18px 1fr 44px; }
+ body[data-mobile-game="crapeights"] .hand-head { display:none; }
+ body[data-mobile-game="crapeights"] .hand-head:has(.mobile-hand-pages:not([hidden])) { display:flex; position:absolute; top:-44px; right:0; }
+ body[data-mobile-game="crapeights"] .hand-head:has(.mobile-hand-pages:not([hidden])) > :not(.mobile-hand-pages) { display:none; }
+}
+@media (max-width:980px) {
+ body[data-mobile-game] .suite-back-pill { width:44px; max-width:44px; padding:0; justify-content:center; }
+ body[data-mobile-game] .suite-back-pill-label { display:none; }
+ body[data-mobile-game] #suite-music-toggle { position:fixed; top:max(6px,env(safe-area-inset-top)); right:54px; left:auto; bottom:auto; width:44px; padding:0; }
+ body[data-mobile-game="crapeights"] #suite-music-toggle { position:static; }
+ body[data-mobile-game="turdanoid"] #suite-music-toggle { top:110px; right:16px; }
+ body[data-mobile-game="turdjack"] #suite-music-toggle { top:56px; right:12px; }
+ body[data-mobile-game="turdjack"] .topbar { padding-right:0; }
+ body[data-mobile-game="turdtris"] #mobileControls { transform:none; width:auto; }
+ body[data-mobile-game="turdtris"] .main-stage { flex:1; min-height:0; }
+ body[data-mobile-game="turdtris"] .cabinet-rail { flex:none; }
+ body[data-mobile-game="turdtris"] .topbar { padding-right:100px; }
+ body[data-mobile-game="crapeights"] .pile-row { transform:none; left:auto; top:auto; width:100%; justify-content:center; }
+ body[data-mobile-game="crapeights"] .pile { flex:none; width:auto; }
+}
+@media (max-width:980px) and (max-height:500px) {
+ body[data-mobile-game="turdjack"] .topbar { flex-direction:column; padding-left:0; align-items:stretch; height:auto; min-height:100px; justify-content:start; }
+ body[data-mobile-game="turdjack"] .topbar > div:first-child { margin-left:44px; }
+ body[data-mobile-game="turdjack"] .mobile-menu { width:100%; }
+ body[data-mobile-game="turdjack"] .shell { grid-template-rows:110px 1fr; }
+ body[data-mobile-game="turdjack"] #suite-music-toggle { top:auto; bottom:12px; left:12px; right:auto; }
+ body[data-mobile-game="turdtris"] > .layout { display:flex; flex-direction:column; padding:0; }
+ body[data-mobile-game="turdtris"] .topbar { height:44px; padding-right:0; flex-direction:row; }
+ body[data-mobile-game="turdtris"] .topbar > div:first-child { display:none; }
+ body[data-mobile-game="turdtris"] .main-stage { display:flex; flex-direction:row; align-items:center; justify-content:center; }
+ body[data-mobile-game="turdtris"] .cabinet-rail { display:none; }
+ body[data-mobile-game="turdtris"] .well-caption { display:none; }
+ body[data-mobile-game="turdtris"] #mobileControls { width:248px; }
+ body[data-mobile-game="crapeights"] .table { min-height:0; margin:0; }
+ body[data-mobile-game="crapeights"] .arena { height:auto; max-height:none; }
+ body[data-mobile-game="crapeights"] .hand-wrap { margin:0; padding:0; }
+}
+@media (max-width:980px) {
+ body[data-mobile-game="turdrummy"] #playerHand { display:flex; flex-wrap:wrap; align-content:center; justify-content:center; align-items:center; gap:2px; }
+ body[data-mobile-game="turdrummy"] #playerHand .hand-group .card { position:relative; flex:0 0 44px; width:44px; height:54px; margin:0; transform:none; translate:none; }
+ body[data-mobile-game="turdrummy"] .tr-drawer { z-index:5; }
+ body[data-mobile-game="turdtris"] { justify-content:flex-start; align-items:flex-start; }
+ body[data-mobile-game="turdomania"] .tile { min-width:0; min-height:0; }
+}
+@media (max-width:980px) and (max-height:500px) {
+ body[data-mobile-game="turdspades"] .app { grid-template-rows:44px 30px 24px minmax(0,1fr); grid-template-columns:180px minmax(0,1fr); }
+ body[data-mobile-game="turdspades"] .table-arena { grid-row:1/5; min-width:0; }
+ body[data-mobile-game="turdspades"] .app > .message { grid-column:1; grid-row:3; font-size:9px; }
+ body[data-mobile-game="turdspades"] .dock { grid-column:1; grid-row:4; min-width:0; }
+ body[data-mobile-game="turdspades"] .bid-controls { display:grid; grid-template-columns:44px 1fr 44px; }
+ body[data-mobile-game="turdspades"] :is(#bidNil,#lockBid) { grid-column:1/4; }
+ body[data-mobile-game="turdspades"] .seat-you { min-width:0; }
+ body[data-mobile-game="turdspades"] .seat-you .cards { min-width:0; }
+ body[data-mobile-game="turdrummy"] .zone--opponent :is(.bot-persona,.back-card) { display:none; }
+ body[data-mobile-game="turdtris"] .layout { flex:none; }
+ body[data-mobile-game="turdomania"] .tm { flex-direction:row; gap:12px; width:100%; justify-content:center; }
+ body[data-mobile-game="turdomania"] .dock { width:160px; max-width:160px; }
+ body[data-mobile-game="turdomania"] > .hud { height:44px; padding:0 100px 0 44px; }
+ body[data-mobile-game="turdomania"] #boardWrap { margin:0; padding:2px; }
+}
+@media (max-width:980px) {
+ body[data-mobile-game] :is(.mobile-menu-actions,.table-menu .actions,.top-links,.dock) #suite-arcade-a11y-mount { position:static; display:inline-flex; width:44px; height:44px; flex:none; padding:0; margin:0; }
+ body[data-mobile-game="turdanoid"] #suite-arcade-a11y-mount { position:fixed; bottom:auto; top:160px; right:16px; width:44px; height:44px; }
+ body[data-mobile-game="turdrummy"] #suite-music-toggle { position:static; }
+}
+@media (max-width:980px) {
+ body[data-mobile-game="neon-arkanoid"] .title-row { height:44px; min-height:44px; flex:none; flex-direction:row; align-items:center; padding:0 0 0 48px; margin:0; gap:4px; }
+ body[data-mobile-game="neon-arkanoid"] .title-row h1 { font-size:16px; }
+ body[data-mobile-game="neon-arkanoid"] .title-row :is(p,.actions) { display:none; }
+ body[data-mobile-game="neon-arkanoid"] .mobile-menu { display:block; }
+ body[data-mobile-game="neon-arkanoid"] .mobile-controls { display:grid !important; }
+ body[data-mobile-game="neon-arkanoid"] .canvas-wrap { margin:0; }
+ body[data-mobile-game] .mobile-menu-actions :is(.suite-difficulty--fallback,.suite-arcade-a11y-toggle,#suite-music-toggle) { position:static; margin:0; height:auto; }
+ body[data-mobile-game="neon-arkanoid"] .play-area { overflow:hidden; }
+}
+@media (max-width:980px) {
+ body[data-mobile-game="turdrummy"] #difficultyBtn { display:inline-flex; align-items:center; justify-content:center; }
+ body[data-mobile-game="turdrummy"] .top-links { min-width:0; flex:1; }
+ body[data-mobile-game="turdrummy"] .top-links > .btn { flex:1; }
+ body[data-mobile-game] .mobile-menu details[open] { position:fixed; inset:56px 8px auto; width:auto; max-height:calc(100dvh - 120px); overflow:auto; z-index:200; padding:8px; background:#10261f; }
+ body[data-mobile-game] .mobile-menu details[open] > .mobile-menu-actions { position:static; max-height:none; }
+ body[data-mobile-game] .mobile-menu-stats { margin-top:8px; }
+}
+@media (max-width:980px) {
+ body[data-mobile-game="turdrummy"] #playerHand .hand-group { display:contents; }
+ body[data-mobile-game="turdrummy"] #playerHand :is(.hand-group-label,.hand-group::after) { display:none; }
+ body[data-mobile-game="turdrummy"] #playerHand .hand-group .card { rotate:none; margin:0 !important; translate:none !important; transform:none !important; }
+ body[data-mobile-game="turdomania"] .dock #suite-music-toggle { position:static; }
+}
+@media (max-width:980px) and (max-height:500px) {
+ body[data-mobile-game="turdrummy"] .table { grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(280px,1.6fr); }
+}
+@media (max-width:980px) {
+ body[data-mobile-game] .suite-back-pill .suite-back-pill-label { display:none !important; }
+ body[data-mobile-game="turdjack"] #suite-music-toggle { top:max(6px,env(safe-area-inset-top)); right:122px; }
+ body[data-mobile-game="turdjack"] .topbar h1 { font-size:15px; }
+ body[data-mobile-game="turdjack"] .topbar > div:first-child { max-width:130px; margin-right:48px; }
+ body[data-mobile-game="turdjack"] .mobile-menu { width:106px; }
+}
+@media (max-width:980px) and (max-height:500px) {
+ body[data-mobile-game="turdjack"] #suite-music-toggle { top:auto; bottom:12px; left:12px; right:auto; }
+ body[data-mobile-game="turdjack"] .topbar > div:first-child { margin-right:0; }
+ body[data-mobile-game="turdjack"] .mobile-menu { width:100%; }
+}
+@media (max-width:980px) {
+ body[data-mobile-game="turdrummy"] .app > .topbar { display:flex; padding:0 0 0 44px; }
+ body[data-mobile-game="turdrummy"] .top-links { width:100%; }
+}
+@media (max-width:980px) {
+ body[data-mobile-game="turdrummy"] .app > header.topbar { padding-left:44px !important; }
+ body[data-mobile-game="turdrummy"] .topbar .title-group { display:none; }
+}
+@media (max-width:980px) {
+ body[data-mobile-game="turdrummy"] .app #difficultyBtn { display:inline-flex !important; }
+}
+@media (max-width:980px) {
+ body[data-mobile-game] .mobile-menu details:not([open]) > .mobile-menu-actions { display:none; }
+}
+@media (max-width:980px) {
+ body[data-mobile-game="turdtris"] > .layout { display:flex; flex-direction:column; }
+ body[data-mobile-game="turdtris"] .main-stage { display:flex; flex-direction:column; flex:1; min-height:0; }
+ body[data-mobile-game="turdtris"] .board-column { display:flex; flex:1; min-height:0; align-items:center; justify-content:center; }
+ body[data-mobile-game="turdtris"] .board-wrap { margin:0; }
+}
+@media (max-width:980px) and (max-height:500px) {
+ body[data-mobile-game="turdtris"] .main-stage { flex-direction:row; }
+}
+@media (max-width:980px) {
+ body[data-mobile-game="turdrummy"] .table { grid-template-rows:minmax(44px,1fr) minmax(84px,1fr) minmax(148px,1.2fr); }
+ body[data-mobile-game="turdrummy"] .zone--hand { display:flex; flex-direction:column; }
+ body[data-mobile-game="turdrummy"] .zone--hand .zone-header { flex:none; }
+ body[data-mobile-game="turdrummy"] #playerHand { height:auto; flex:1; padding:0; }
+ body[data-mobile-game="turdrummy"] .table { padding-left:4px !important; }
+}
+@media (max-width:980px) and (max-height:500px) {
+ body[data-mobile-game="turdrummy"] .table { grid-template-rows:1fr; }
+}
+.mobile-fit-tools { display:none; }
+@media (max-width:980px) {
+ body[data-mobile-game] .mobile-fit-tools { display:flex; flex:none; align-items:center; gap:3px; }
+ body[data-mobile-game] .mobile-fit-tools :is(#suite-music-toggle,#suite-arcade-a11y-mount,.suite-arcade-a11y-toggle) { position:static !important; flex:none; width:44px; height:44px; min-width:44px; padding:0; margin:0; }
+ body[data-mobile-game] .topbar > div:first-child { min-width:0; }
+ body[data-mobile-game="turdjack"] .topbar > div:first-child { margin-right:0; flex:1; }
+ body[data-mobile-game="turdjack"] .topbar h1 { font-size:13px; }
+ body[data-mobile-game="crapeights"] .topbar h1 { font-size:13px; white-space:normal; }
+ body[data-mobile-game="crapeights"] .brand-eight { display:none; }
+ body[data-mobile-game="turdspades"] .topbar h1 { font-size:13px; }
+ body[data-mobile-game="turdtris"] .topbar { padding-right:0; }
+}
+@media (max-width:980px) and (max-height:500px) {
+ body[data-mobile-game="turdjack"] .topbar { min-height:144px; }
+ body[data-mobile-game="turdjack"] .shell { grid-template-rows:150px 1fr; }
+ body[data-mobile-game="turdjack"] .topbar > div:first-child { flex:none; }
+ body[data-mobile-game="turdjack"] .mobile-fit-tools { align-self:center; }
+}
+.mobile-fit-tools-space { display:none; }
+@media (max-width:980px) {
+ body[data-mobile-game] .mobile-fit-tools { position:fixed; z-index:10001; }
+ body[data-mobile-game] .mobile-fit-tools-space { display:block; flex:none; height:44px; }
+ body[data-mobile-game] .topbar > div:first-child { padding-left:0 !important; }
+}

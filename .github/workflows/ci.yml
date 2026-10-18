@@ -33,6 +33,9 @@ jobs:
       - name: Run automated tests
         run: npm test
 
+      - name: Mobile viewport regression matrix
+        run: npm run test:mobile
+
       - name: Upload Playwright artifacts on failure
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

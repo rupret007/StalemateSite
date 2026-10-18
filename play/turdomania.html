@@ -94,8 +94,9 @@ body.reduced .tile.popping { transform: var(--pos) !important; }
   .tile.popping { transform: var(--pos) !important; }
 }
 </style>
+  <link rel="stylesheet" href="assets/mobile-fit.css">
 </head>
-<body class="suite-ambient">
+<body data-mobile-game="turdomania" class="suite-ambient">
 <header class="hud">
   <h1>💩 Turdomania</h1>
   <div class="stat">Score<b id="score">0</b></div>
@@ -215,7 +216,12 @@ function start(levelKey, seed) {
 
 function layout() {
   const { availW, availH } = window.tmView();
-  cell = Math.max(22, Math.min(56, Math.floor(Math.min(availW / state.cols, availH / state.rows))));
+  const mobile = matchMedia('(max-width:980px)').matches;
+  const landscape = mobile && innerWidth > innerHeight;
+  const boardSpace = document.querySelector('.tm').getBoundingClientRect();
+  const fitW = mobile ? (landscape ? boardSpace.width - document.querySelector('.dock').getBoundingClientRect().width - 24 : innerWidth - 36) : availW;
+  const fitH = mobile ? boardSpace.height - (landscape ? 12 : document.querySelector('.dock').getBoundingClientRect().height + 16) : availH;
+  cell = Math.max(1, Math.min(56, Math.floor(Math.min(fitW / state.cols, fitH / state.rows))));
   const st = document.documentElement.style;
   st.setProperty('--cell', cell + 'px');
   st.setProperty('--board-w', cell * state.cols + 'px');
@@ -416,6 +422,7 @@ els.newBtn.addEventListener('click', () => start(state.level));
 els.again.addEventListener('click', () => { start(state.level); boardEl.focus({ preventScroll: true }); });
 els.level.addEventListener('change', () => { writePrefs({ level: els.level.value }); start(els.level.value); });
 let rz = 0;
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { if (state) { layout(); render(); } }).observe(document.querySelector('.tm'));
 window.addEventListener('resize', () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(() => { if (state) { layout(); render(); } }); });
 
 const startLevel = Core.LEVELS[qs.get('level')] ? qs.get('level') : (readPrefs().level || 'normal');
@@ -427,5 +434,6 @@ window.__turdomaniaUndo = doUndo;
 <script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>
 <script src="../js/track.js" defer></script>
 <script src="stalemate/play-track.js" defer></script>
+<script src="assets/mobile-fit.js"></script>
 </body>
 </html>
