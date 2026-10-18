@@ -30,6 +30,8 @@ async function tap(page, locator) {
   await page.waitForFunction(e => !e.disabled, element);
   const box = await locator.boundingBox();
   assert(box && box.width >= 44 && box.height >= 44, 'tap target is at least 44px');
+  const viewport = page.viewportSize();
+  assert(box.x >= -1 && box.y >= -1 && box.x+box.width <= viewport.width+1 && box.y+box.height <= viewport.height+1, 'tap target is fully on screen');
   assert(await locator.evaluate(e => {const r=e.getBoundingClientRect(); const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===e||e.contains(hit);}), 'tap target receives touch');
   await page.touchscreen.tap(box.x + box.width/2, box.y + box.height/2);
 }
@@ -46,7 +48,10 @@ async function enter(page, game) {
   if(game === 'turdspades') await clickVisible(page, '#quickStart');
   if(game === 'neon-arkanoid') await clickVisible(page, '#howToPlay .guide-actions button:last-child');
   await page.waitForTimeout(300);
-  if(game === 'turdrummy') await page.locator('#playerHand button').first().waitFor();
+  if(game === 'turdrummy') {
+    await page.locator('#playerHand button').first().waitFor();
+    await clickVisible(page, '#coachSkipBtn');
+  }
 }
 async function check(page, game, selectors, state) {
   const metrics = await page.evaluate(() => ({w:innerWidth,h:innerHeight,sw:document.scrollingElement.scrollWidth,sh:document.scrollingElement.scrollHeight}));
