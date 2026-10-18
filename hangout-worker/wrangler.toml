@@ -32,3 +32,6 @@ new_sqlite_classes = ["HangoutLobby"]
 HANGOUT_ACCESS_TEAM = ""
 HANGOUT_ACCESS_AUD = ""
 WEBJAM_WEB_ORIGINS = ""
+# Review-only AI is opt-in; no provider traffic until set to "review" and a Worker OPENAI_API_KEY secret exists.
+HANGOUT_AI_MODERATION = "off"
+HANGOUT_AI_DAILY_LIMIT = "1000"

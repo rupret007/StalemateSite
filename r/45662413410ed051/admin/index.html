@@ -58,7 +58,21 @@
             <button type="button" data-tab="log">Mod log</button>
             <a class="chatlink" data-chatlink href="../lobby/">Open chat →</a>
         </nav>
-        <section class="card" data-view="queue"><h2>Reports</h2><ul class="list" data-reports></ul><h2>Held by StaleBot</h2><ul class="list" data-held></ul><p class="small" data-queue-empty>All quiet. Nothing to review. 🤘</p></section>
+        <section class="card" data-view="queue">
+            <section class="ai-review" aria-labelledby="ai-review-title">
+                <h2 id="ai-review-title">AI-assisted review</h2>
+                <p class="ai-state" data-ai-state role="status" tabindex="-1">Waiting for AI review status.</p>
+                <p class="small" data-ai-counts></p>
+                <p class="state" data-moderation-storage role="status" hidden>Moderation state could not be saved. Current evidence may be lost on restart; check storage before relying on this queue.</p>
+                <p class="small">AI review happens after posting. Category signals are not rulings. A moderator decides whether to delete the message or dismiss the signal. Ordinary filters and visitor reports still apply.</p>
+                <p class="small">Only eligible public text is checked. Flagged, reported and held evidence stays in active review queues for up to 24 hours, separate from public chat scrollback. Configuration stays on the server.</p>
+                <ul class="list" data-ai-reviews></ul>
+                <p class="small" data-ai-empty>No AI signals awaiting review. This does not mean every message was checked.</p>
+            </section>
+            <h2>Reports</h2><ul class="list" data-reports></ul>
+            <h2>Held by StaleBot</h2><ul class="list" data-held></ul>
+            <p class="small" data-queue-empty>Nothing in the review queues.</p>
+        </section>
         <section class="card" data-view="people" hidden><h2>Online</h2><ul class="list" data-users></ul><h2>Bans</h2><ul class="list" data-bans></ul></section>
         <section class="card" data-view="rooms" hidden><h2>Open rooms</h2><ul class="list" data-rooms></ul><p class="small">Private rooms are end-to-end encrypted, so nobody (us included) can read them; they never show here.</p></section>
         <section class="card" data-view="stats" hidden>

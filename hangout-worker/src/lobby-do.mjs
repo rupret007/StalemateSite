@@ -3,6 +3,7 @@
 import { originAllowed, previewKeyOk } from './core.mjs';
 import { accessConfigured, hmacKeyOk, ipHash, newDeviceId, roleForEmail, signDevice, verifyAccessJwt, verifyDevice } from './auth.mjs';
 import { createLobby } from './lobby-core.mjs';
+import { createAiModerator } from './ai-moderation.mjs';
 
 export function lobbyConfigured(env = {}) {
     return !!(env.LOBBY && env.QUOTA && hmacKeyOk(env.HANGOUT_HMAC_KEY) && typeof env.HANGOUT_PREVIEW_KEY === 'string' && env.HANGOUT_TURNSTILE_SECRET);
@@ -68,14 +69,32 @@ export async function admitLobby(request, env, url) {
 }
 
 // One DO = one network. Uses the WebSocket Hibernation API; durable bits (bans, filters, lock, shield, mod log)
-// go to SQLite storage only when they change, never per chat line.
+// go to SQLite storage when they change. Optional AI quota reservations are stored before each check.
 export class HangoutLobby {
     constructor(state, env) {
         this.state = state;
         this.env = env;
         this.pendingAdmission = new Map();
+        this.evidenceStorage = 'ready';
         this.ready = state.blockConcurrencyWhile(async () => {
+            this.aiModerator = createAiModerator({
+                enabled: env.HANGOUT_AI_MODERATION === 'review',
+                apiKey: env.OPENAI_API_KEY,
+                dailyLimit: env.HANGOUT_AI_DAILY_LIMIT,
+                usage: await state.storage.get('ai-usage'),
+                saveUsage: async (usage) => {
+                    try { await state.storage.put('ai-usage', usage); }
+                    catch (error) { this.storageFailed(); throw error; }
+                },
+                onChange: () => this.engine?.notifyAiStatus()
+            });
             this.engine = createLobby({
+                aiModerationStatus: () => ({ ...this.aiModerator.status(), evidenceStorage: this.evidenceStorage }),
+                reviewPublicText: env.HANGOUT_AI_MODERATION === 'review' ? ({ id, text }) => {
+                    const task = this.aiModerator.review({ text }).then((result) => this.engine.applyAiReview(id, result));
+                    this.state.waitUntil?.(task);
+                    return task;
+                } : undefined,
                 send: (id, msg) => {
                     const ws = this.byId(id);
                     if (ws) ws.send(JSON.stringify(msg));
@@ -83,12 +102,14 @@ export class HangoutLobby {
                 },
                 close: (id, code, reason) => { const ws = this.byId(id); if (ws) try { ws.close(code, reason); } catch (e) { /* gone */ } },
                 persist: (kind, data) => {
-                    if (kind === 'net') this.state.storage.put('net', data);
-                    if (kind === 'modlog') { this.logSeq = (this.logSeq || 0) + 1; this.state.storage.put(`log:${String(Date.now()).padStart(15, '0')}:${this.logSeq}`, data); }
+                    if (['net', 'ai-reviews', 'moderation-queue'].includes(kind)) this.persistState(kind, data);
+                    if (kind === 'modlog') { this.logSeq = (this.logSeq || 0) + 1; this.persistState(`log:${String(Date.now()).padStart(15, '0')}:${this.logSeq}`, data); }
                 },
                 limits: { webJoinOrigins: String(env.WEBJAM_WEB_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean) }
             });
             this.engine.restore((await state.storage.get('net')) || {});
+            this.engine.restoreAiReviews((await state.storage.get('ai-reviews')) || []);
+            this.engine.restoreModerationQueue((await state.storage.get('moderation-queue')) || {});
             const logs = await state.storage.list({ prefix: 'log:', reverse: true, limit: 2000 });
             this.engine.restoreLog([...logs.values()].reverse());
             // After hibernation, sockets survive but memory doesn't: re-admit them (nick resets, they re-hello).
@@ -98,6 +119,16 @@ export class HangoutLobby {
             }
             if (!(await state.storage.getAlarm())) await state.storage.setAlarm(Date.now() + 60 * 1000);
         });
+    }
+    storageFailed() {
+        this.evidenceStorage = 'degraded';
+        this.engine?.notifyAiStatus();
+    }
+    persistState(key, value) {
+        // Track persistence separately from classifier work; failed writes are visible, never detached rejections.
+        const task = Promise.resolve().then(() => this.state.storage.put(key, value)).catch(() => this.storageFailed());
+        this.state.waitUntil?.(task);
+        return task;
     }
     byId(id) { return this.state.getWebSockets(id)[0]; }
     async alarm() { await this.ready; this.engine.tick(); await this.state.storage.setAlarm(Date.now() + 60 * 1000); }

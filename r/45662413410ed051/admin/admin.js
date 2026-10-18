@@ -51,17 +51,72 @@
     const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`; };
     const askReason = (what) => { const r = prompt(`${what}: reason? (required, goes in the mod log)`); return r && r.trim() ? r.trim().split(' ') : null; };
 
+    function drawAiReview(s) {
+        const ai = s.aiModeration || {};
+        $('[data-moderation-storage]').hidden = ai.evidenceStorage !== 'degraded';
+        const state = typeof ai.state === 'string'
+            ? ai.state === 'ready' && ai.enabled !== true ? 'unknown' : ai.state
+            : ai.enabled === true ? 'unknown' : 'disabled';
+        const labels = {
+            disabled: 'AI review is off',
+            ready: 'AI review is ready · review only',
+            degraded: 'AI review is interrupted · some messages may be unchecked',
+            capped: 'AI review reached its usage limit · further checks are paused',
+            misconfigured: 'AI review needs server configuration · checks are unavailable'
+        };
+        const statusLine = $('[data-ai-state]');
+        const knownState = typeof state === 'string' && Object.prototype.hasOwnProperty.call(labels, state);
+        statusLine.textContent = knownState ? labels[state] : 'AI review status is unavailable';
+        statusLine.dataset.aiHealth = knownState ? state : 'unknown';
+        const count = (key) => Number.isSafeInteger(ai[key]) && ai[key] >= 0 ? String(ai[key]) : '—';
+        $('[data-ai-counts]').textContent = ai.enabled === true
+            ? `Checked ${count('checked')} · Flagged ${count('flagged')} · Failed ${count('failed')} · Skipped ${count('skipped')} · Pending ${count('pending')} · Usage ${count('used')}/${count('limit')}`
+            : 'Ordinary filters and visitor reports remain available.';
+        const reviews = Array.isArray(s.aiReviews) ? s.aiReviews.filter((r) => r && typeof r.id === 'string' && typeof r.text === 'string') : [];
+        const list = $('[data-ai-reviews]');
+        const focused = list.contains(document.activeElement) ? document.activeElement : null;
+        const focusId = focused?.closest('[data-ai-review-id]')?.dataset.aiReviewId;
+        const focusAction = focused?.dataset.aiAction;
+        list.replaceChildren();
+        for (const review of reviews) {
+            const li = el('li');
+            li.dataset.aiReviewId = review.id;
+            li.append(el('b', `${review.from || 'Unknown nickname'} in ${review.ch || 'Unknown channel'}`));
+            const timestamp = Number.isFinite(review.at) ? new Date(review.at).toLocaleString() : 'Time unavailable';
+            li.append(el('span', `${timestamp} · Model: ${typeof review.model === 'string' && review.model ? review.model : 'Unspecified'}`, 'small'));
+            li.append(el('p', review.text, 'ai-evidence'));
+            const categories = Array.isArray(review.categories) ? review.categories.filter((c) => typeof c === 'string' && c) : [];
+            li.append(el('span', `Signals: ${categories.length ? categories.join(', ') : 'No category supplied'}`, 'small ai-signals'));
+            const acts = el('div', undefined, 'acts');
+            for (const [label, action] of [['Delete message', 'delete'], ['Dismiss signal', 'aidismiss']]) {
+                const button = btn(label, () => cmd(action, [review.id]), action === 'delete' ? 'btn btn--small' : 'btn btn--small btn--ghost');
+                button.dataset.aiAction = action;
+                acts.append(button);
+            }
+            li.append(acts); list.append(li);
+        }
+        // Incoming status snapshots must not strand a keyboard reviewer halfway through an action.
+        if (focusId && focusAction) {
+            const replacement = $$('[data-ai-review-id]', list).find((li) => li.dataset.aiReviewId === focusId);
+            const button = replacement && $$('[data-ai-action]', replacement).find((b) => b.dataset.aiAction === focusAction);
+            (button || statusLine).focus({ preventScroll: true });
+        }
+        $('[data-ai-empty]').hidden = reviews.length > 0;
+        return reviews.length;
+    }
+
     function draw() {
         const s = app.state;
-        $('[data-state]').textContent = `Lobby ${s.lock === 'off' ? 'OPEN' : s.lock === 'readonly' ? (s.lockAuto ? 'READ-ONLY (auto: no band op for 24h)' : 'READ-ONLY') : 'LOCKED'} · Shield ${s.shield ? (s.shieldAuto ? 'UP (auto: no band op for 24h)' : 'UP') : 'down'} · Slow ${s.slow}s · ${s.stats.online} online · Budget ${Math.round(100 * s.budget.requests / s.budget.cap)}% (${s.budget.level})`;
+        $('[data-state]').textContent = `Lobby ${s.lock === 'off' ? 'OPEN' : s.lock === 'readonly' ? (s.lockAuto ? 'READ-ONLY (automatic safety lock)' : 'READ-ONLY') : 'LOCKED'} · Shield ${s.shield ? (s.shieldAuto ? 'UP (legacy automatic shield)' : 'UP') : 'down'} · Slow ${s.slow}s · ${s.stats.online} online · Budget ${Math.round(100 * s.budget.requests / s.budget.cap)}% (${s.budget.level})`;
+        const aiReviewCount = drawAiReview(s);
         const reports = $('[data-reports]'); reports.replaceChildren();
         for (const r of s.reports) {
             const li = el('li');
             li.append(el('b', `${r.from} in ${r.ch} · ${r.count} report${r.count > 1 ? 's' : ''}${r.hidden ? ' · auto-hidden' : ''}`), el('span', r.text));
             li.append(el('pre', (r.context || []).join('\n'), 'ctx'));
             const acts = el('div', undefined, 'acts');
-            acts.append(btn('Delete', () => cmd('delete', [r.id]), 'btn btn--small'), btn('Mute 1h', () => cmd('mute', [r.from, '1h'])), btn('Kick', () => cmd('kick', [r.from, 'reported'])),
-                btn('Ban', () => { const why = askReason(`Ban ${r.from}`); if (why) cmd('gban', [r.from, ...why]); }, 'btn btn--small btn--danger'), btn('Dismiss', () => cmd('dismiss', [r.id]), 'btn btn--small btn--ghost'));
+            // Retained nicknames can belong to a different person later. Evidence actions target the message only.
+            acts.append(btn('Delete', () => cmd('delete', [r.id]), 'btn btn--small'), btn('Dismiss', () => cmd('dismiss', [r.id]), 'btn btn--small btn--ghost'));
             li.append(acts); reports.append(li);
         }
         const held = $('[data-held]'); held.replaceChildren();
@@ -70,8 +125,9 @@
             const acts = el('div', undefined, 'acts'); acts.append(btn('OK it', () => cmd('approve', [h.id])), btn('Reject', () => cmd('dismiss', [h.id]), 'btn btn--small btn--ghost'));
             li.append(acts); held.append(li);
         }
-        $('[data-qcount]').textContent = s.reports.length + s.held.length ? `(${s.reports.length + s.held.length})` : '';
-        $('[data-queue-empty]').hidden = !!(s.reports.length + s.held.length);
+        const queueCount = s.reports.length + s.held.length + aiReviewCount;
+        $('[data-qcount]').textContent = queueCount ? `(${queueCount})` : '';
+        $('[data-queue-empty]').hidden = !!queueCount;
 
         const users = $('[data-users]'); users.replaceChildren();
         for (const u of s.users) {

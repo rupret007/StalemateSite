@@ -38,6 +38,8 @@ These use temporary **local test visitors and example messages**, not live peopl
 - [Named channel creation](../pr-assets/irc-first/create-channel-desktop.png)
 - [Guest-hosted text channel](../pr-assets/irc-first/chat-channel-desktop.png)
 - [Text channel on a phone](../pr-assets/irc-first/chat-channel-phone.png)
+- [AI review queue — synthetic fixture](../pr-assets/irc-first/ai-review-desktop.png)
+- [Phone AI review and storage warning — synthetic fixture](../pr-assets/irc-first/ai-review-phone.png)
 
 ## Development baseline and changes
 
@@ -49,10 +51,12 @@ A production adapter bug was also fixed: the Worker previously emitted `hello` b
 
 Tests now use isolated same-origin relay namespaces so room creation and moderation state do not leak across cases. Production caps remain unchanged, with an actual WebSocket regression proving both the room cap and namespace isolation.
 
+The open-community follow-up removes band-absence shutdown while retaining emergency controls and safe stored-state validation. Optional AI moderation flags public text for humans; it has no automatic punishment authority. Actual-receipt report checks, immutable author matching, exact-message report resolution and bounded durable evidence queues address gaps found in the moderation audit. Provider failures and persistence failures have distinct visible handling. See [the safeguard design](HANGOUT_SAFEGUARDS_AI.md).
+
 ## Validation recorded
 
-- Full unit suite: **31 files / 244 tests passed** after the guest-host/classic-history changes.
-- Existing and new focused Chromium lobby browser scenarios: **17 distinct scenarios passed** (16-case combined run, followed by the updated 8-case discovery suite). Includes two-browser art/video behavior, guest admission, moderation, phone layout and rejected creation feedback, host handoff, no pre-join chat, draft/mention behavior, reconnect, fresh challenges and bounded challenge-load failure.
+- Full unit suite: **34 files / 276 tests passed** after the open-community/safeguard/AI changes.
+- Combined focused Chromium lobby and AI-admin browser suite: **21 scenarios passed**. Includes two-browser art/video behavior, guest admission, moderation, phone layout and rejected creation feedback, host handoff, no pre-join chat, draft/mention behavior, reconnect, fresh challenges, bounded challenge-load failure, and explicitly mocked AI review/status/permissions/disclosures.
 - Pages packaging succeeded; whitespace checks passed. Screenshots captured with no browser page errors.
 - A mocked external Turnstile callback requires disabling Chromium's local-network provenance check in the discovery test fixture. The app's CSP stays enforced; this is not a claim to have tested a live Turnstile service.
 
@@ -60,7 +64,7 @@ To repeat the focused checks:
 
 ```sh
 npm run test:unit -- --maxWorkers=2
-STALEMATE_TEST_PORT=4388 npx playwright test tests/e2e/lobby.spec.js tests/e2e/lobby-open-rooms.spec.js tests/e2e/lobby-discovery.spec.js --project=chromium --workers=1
+STALEMATE_TEST_PORT=4388 npx playwright test tests/e2e/lobby.spec.js tests/e2e/lobby-open-rooms.spec.js tests/e2e/lobby-discovery.spec.js tests/e2e/lobby-ai-admin.spec.js --project=chromium --workers=1
 npm run package:pages
 ```
 
@@ -68,4 +72,4 @@ npm run package:pages
 
 This is a working local collaboration slice, not a public launch. Guest hosting and classic IRC history are confirmed decisions: no chat backlog or replay is offered. Room activity and ordinary connection state are still in memory. The server's bounded moderation buffer supports reports; it is never sent as join history, and dismissing a report does not rebroadcast old text to newcomers. Unsent drafts survive channel switches and reconnection within the current tab; closing the tab loses them. Delivery acknowledgements are not implemented. Saved creations, schedules, reservations, notifications and a shared writing pad remain proposals.
 
-Real Cloudflare admission/Access/TURN, Safari/iPhone hardware, WAN music timing and the WebJam `/join/` hosting/release path still need their recorded integration work. See [product direction](HANGOUT_PRODUCT_DIRECTION.md) for priorities and the outstanding band-absence rule decision.
+Real Cloudflare admission/Access/TURN, Safari/iPhone hardware, WAN music timing and the WebJam `/join/` hosting/release path still need their recorded integration work. The band-absence rule is now resolved: community activity continues independently, with manual emergency controls retained. See [product direction](HANGOUT_PRODUCT_DIRECTION.md) and [AI moderation safeguards](HANGOUT_SAFEGUARDS_AI.md). The default local preview does not call an AI provider; automated AI UI/provider fixtures are explicitly mocked.

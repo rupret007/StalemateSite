@@ -10,6 +10,15 @@ export const KINDS = Object.freeze({ chat: '💬 Chat', bobross: '🎨 Bob Ross 
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
+export const AI_REVIEW_CATEGORIES = Object.freeze([
+    'harassment', 'harassment/threatening', 'hate', 'hate/threatening', 'illicit', 'illicit/violent',
+    'self-harm', 'self-harm/intent', 'self-harm/instructions', 'sexual', 'sexual/minors', 'violence', 'violence/graphic'
+]);
+const AI_CATEGORY_SET = new Set(AI_REVIEW_CATEGORIES);
+const AI_REVIEW_MAX = 100;
+const AI_REVIEW_TTL = DAY;
+const MODERATION_QUEUE_MAX = 100;
+const MODERATION_QUEUE_TTL = DAY;
 
 export const LOBBY_LIMITS = Object.freeze({
     lobbyMax: 150,
@@ -37,7 +46,6 @@ export const LOBBY_LIMITS = Object.freeze({
     reportsCamOff: 2,
     pmMinLobbyMs: 2 * MIN,
     pmPendingMax: 5,
-    noBandShield: DAY,
     moderationContext: 50, // in-memory report context; never replayed to visitors
     emptyRoomClose: 10 * MIN,
     requestBudget: 40000, // the lobby's share of the free 100k DO requests/day
@@ -53,7 +61,7 @@ export const HELP = [
     'Room @:   /topic text  /kick nick [why]  /ban nick [why]  /unban mask  /invite nick  /op /deop /voice /devoice nick',
     '          /mode +m|-m +i|-i +k key|-k +l N|-l +S secs|-S +C|-C +Q|-Q   /close',
     'Band @:   /mute nick 10m  /gban nick why  /purge nick  /shield  /shieldoff  /lobby lock|readonly|unlock',
-    '          /filter block|hold|allow|del word  /camoff all  /close #room  /approve id  /dismiss id  /log'
+    '          /filter block|hold|allow|del word  /camoff all  /close #room  /approve id  /dismiss id  /aidismiss id  /log'
 ];
 
 // Exact shape checks only: we never fetch, parse or rewrite WebJam's invite (WebJam's invitation_ingress owns that).
@@ -83,10 +91,10 @@ export const COMMANDS = Object.freeze({
     kick: 'chanop', ban: 'chanop', unban: 'chanop', invite: 'chanop', op: 'chanop', deop: 'chanop', voice: 'chanop',
     devoice: 'chanop', jamlink: 'chanop', mode: 'chanop', close: 'chanop', lock: 'chanop',
     mute: 'band', gban: 'band', purge: 'band', shield: 'band', shieldoff: 'band', lobby: 'band', filter: 'band',
-    camoff: 'band', approve: 'band', dismiss: 'band', log: 'band', delete: 'band', slow: 'band'
+    camoff: 'band', approve: 'band', dismiss: 'band', aidismiss: 'band', log: 'band', delete: 'band', slow: 'band'
 });
 
-export function createLobby({ now = () => Date.now(), send = () => {}, close = () => {}, persist = () => {}, limits = LOBBY_LIMITS } = {}) {
+export function createLobby({ now = () => Date.now(), send = () => {}, close = () => {}, persist = () => {}, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
     const L = { ...LOBBY_LIMITS, ...limits };
     const conns = new Map();          // connId -> conn
     const channels = new Map();       // lc(name) -> channel
@@ -101,7 +109,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         lock: 'off',                  // off | readonly | closed
         shield: false,
         shieldAuto: false,
-        lockAuto: false,              // auto-lockdown (no band op for 24h): read-only for fans until a band op unlocks
+        lockAuto: false,              // saved safety state (including legacy locks/corruption): explicit band recovery only
         lists: defaultLists(),
         modlog: [],
         lastBand: now(),
@@ -123,6 +131,10 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     const reports = new Map();        // msgId -> {devs:Set, iphs:Set, ch, from, text, hidden, at}
     const held = new Map();           // msgId -> pending line
     const lines = new Map();          // msgId -> line (recent, for reports/purge)
+    const lineMeta = new Map();       // immutable author device + actual recipient connections; never sent or persisted
+    const heldChannels = new Map();   // original channel object for live held-message approval; never restored
+    const aiPending = new Map();      // current message + channel object identities; never persisted
+    const aiReviews = new Map();      // bounded admin-only evidence, separate from chat and network snapshots
 
     const mkChannel = (name, kind, title, founder) => ({
         name, kind, title, founder, created: now(), topic: kind === 'lobby' ? 'Welcome to #stalemate. Pull up a nick, say hello, make something together. /help for commands.' : '',
@@ -150,7 +162,10 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (net.modlog.length > L.modlogKeep) net.modlog.splice(0, net.modlog.length - L.modlogKeep);
         persist('modlog', e);
         if (['kick', 'ban', 'mute', 'delete', 'purge'].includes(action)) {
-            for (const r of reports.values()) if (!r.done && (r.from === target || action === 'delete')) { r.done = true; net.stats.reports.actioned += 1; }
+            let changed = false;
+            const targetDev = action === 'delete' ? null : byNick(target)?.dev;
+            for (const [id, r] of reports) if (!r.done && (action === 'delete' ? id === target : targetDev && r.authorDev === targetDev)) { r.done = true; changed = true; net.stats.reports.actioned += 1; }
+            if (changed) saveModerationQueue();
         }
         pushAdmin();
         return e;
@@ -184,8 +199,10 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             budget: { ...net.budget, cap: L.requestBudget, level: budgetLevel() },
             users: [...conns.values()].filter((c) => c.nick).map((c) => ({ nick: c.nick, role: c.role, dev: c.dev.slice(0, 6), away: !!c.away, muted: (net.mutes[c.dev] || 0) > now(), channels: [...c.channels] })),
             rooms: [...channels.values()].map((c) => ({ name: c.name, kind: c.kind, title: c.title, count: c.members.size, modes: { ...c.modes, k: !!c.modes.k } })),
-            reports: [...reports.entries()].filter(([, r]) => !r.done).map(([id, r]) => ({ id, ch: r.ch, from: r.from, text: r.text, count: r.devs.size, hidden: r.hidden, context: r.context })),
-            held: [...held.values()].map((h) => ({ id: h.id, ch: h.ch, from: h.from, text: h.text, reason: h.reason })),
+            reports: [...reports.entries()].filter(([, r]) => !r.done && now() - r.at < MODERATION_QUEUE_TTL).map(([id, r]) => ({ id, ch: r.ch, from: r.from, text: r.text, count: r.devs.size, hidden: r.hidden, context: [...r.context] })),
+            held: [...held.values()].filter((h) => now() - h.ts < MODERATION_QUEUE_TTL).map((h) => ({ id: h.id, ch: h.ch, from: h.from, text: h.text, reason: h.reason })),
+            aiReviews: aiReviewList(),
+            aiModeration: aiStatus(),
             bans: net.bans.filter((b) => !b.until || b.until > now()),
             stats: statsView(),
             modlog: net.modlog.slice(-200)
@@ -200,6 +217,124 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             const state = adminState();
             for (const c of conns.values()) if (isBand(c) && c.admin) out(c, { t: 'admin', state });
         });
+    }
+
+    function aiStatus() {
+        try { return aiModerationStatus(); } catch (e) { return { enabled: false, mode: 'review-only', state: 'unavailable' }; }
+    }
+    function moderationQueue() {
+        return {
+            reports: [...reports].filter(([, r]) => !r.done && now() - r.at < MODERATION_QUEUE_TTL).map(([id, r]) => ({
+                id, ch: r.ch, from: r.from, text: r.text, at: r.at, hidden: r.hidden,
+                context: [...r.context], devs: [...r.devs], iphs: [...r.iphs], authorDev: r.authorDev
+            })),
+            held: [...held.values()].filter((h) => now() - h.ts < MODERATION_QUEUE_TTL).map((h) => ({
+                id: h.id, ch: h.ch, from: h.from, text: h.text, ts: h.ts, prefix: h.prefix,
+                band: h.band, me: h.me, reason: h.reason, dev: h.dev
+            }))
+        };
+    }
+    function saveModerationQueue() { persist('moderation-queue', moderationQueue()); pushAdmin(); }
+    function pruneModerationQueue() {
+        let changed = false;
+        for (const [id, r] of reports) if (now() - r.at >= MODERATION_QUEUE_TTL) { reports.delete(id); changed = true; }
+        for (const [id, h] of held) if (now() - h.ts >= MODERATION_QUEUE_TTL) { held.delete(id); heldChannels.delete(id); changed = true; }
+        if (changed) saveModerationQueue();
+    }
+    const moderationId = (id) => typeof id === 'string' && /^[mp][a-z0-9]{1,80}$/i.test(id);
+    const moderationNick = (nick) => typeof nick === 'string' && /^[A-Za-z][A-Za-z0-9_\-[\]{}^`|]{2,19}$/.test(nick);
+    const moderationIdentity = (id) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id);
+    const moderationText = (text, max = 300) => typeof text === 'string' && text.length > 0 && text.length <= max && !/[\u0000-\u001f\u007f]/.test(text);
+    const moderationTime = (at) => Number.isFinite(at) && at >= 0 && at <= now() && now() - at < MODERATION_QUEUE_TTL;
+    const moderationChannel = (name) => typeof name === 'string' && (/^#[a-z0-9-]{2,30}$/.test(name)
+        || (name.startsWith('pm:') && name.slice(3).split('>').length === 2 && name.slice(3).split('>').every(moderationNick)));
+    function restoreModerationQueue(stored = {}) {
+        reports.clear(); held.clear(); heldChannels.clear();
+        const entries = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+        const common = (item) => item && typeof item === 'object' && !Array.isArray(item)
+            && moderationId(item.id) && moderationNick(item.from) && moderationChannel(item.ch) && moderationText(item.text, L.maxChars);
+        const goodReports = (Array.isArray(entries.reports) ? entries.reports : []).filter((r) => common(r) && moderationTime(r.at)
+            && typeof r.hidden === 'boolean' && moderationIdentity(r.authorDev)
+            && Array.isArray(r.context) && r.context.length >= 1 && r.context.length <= 11 && r.context.every((line) => moderationText(line, 400))
+            && [r.devs, r.iphs].every((list) => Array.isArray(list) && list.length > 0 && list.length <= L.lobbyMax && list.every(moderationIdentity)))
+            .sort((a, b) => a.at - b.at).slice(-MODERATION_QUEUE_MAX);
+        for (const r of goodReports) reports.set(r.id, {
+            ch: r.ch, from: r.from, text: r.text, at: r.at, hidden: r.hidden, context: [...r.context],
+            devs: new Set(r.devs), iphs: new Set(r.iphs), authorDev: r.authorDev, done: false
+        });
+        const goodHeld = (Array.isArray(entries.held) ? entries.held : []).filter((h) => common(h) && h.id.startsWith('m') && h.ch.startsWith('#')
+            && moderationTime(h.ts) && moderationIdentity(h.dev) && moderationText(h.reason, 160)
+            && ['', '@', '+'].includes(h.prefix) && typeof h.band === 'boolean' && typeof h.me === 'boolean')
+            .sort((a, b) => a.ts - b.ts).slice(-MODERATION_QUEUE_MAX);
+        for (const h of goodHeld) held.set(h.id, { t: 'line', id: h.id, ch: h.ch, from: h.from, text: h.text, ts: h.ts,
+            prefix: h.prefix, band: h.band, me: h.me, reason: h.reason, dev: h.dev });
+        let changed = true;
+        try { changed = JSON.stringify(stored) !== JSON.stringify(moderationQueue()); } catch (e) { /* replace malformed storage */ }
+        if (changed) saveModerationQueue();
+    }
+    function aiReviewList() {
+        return [...aiReviews.values()].filter((entry) => now() - entry.at < AI_REVIEW_TTL)
+            .map((entry) => ({ ...entry, categories: [...entry.categories] }));
+    }
+    function saveAiReviews() {
+        persist('ai-reviews', aiReviewList());
+        pushAdmin();
+    }
+    function pruneAiReviews() {
+        let changed = false;
+        for (const [id, entry] of aiReviews) if (now() - entry.at >= AI_REVIEW_TTL) { aiReviews.delete(id); changed = true; }
+        for (const [id, pending] of aiPending) if (now() - pending.line.ts >= AI_REVIEW_TTL) aiPending.delete(id);
+        if (changed) saveAiReviews();
+    }
+    const publicChannel = (chan) => !!chan && (chan.kind === 'lobby' || (!chan.modes.i && !chan.modes.k && !chan.modes.locked));
+    const aiCategories = (categories) => Array.isArray(categories) && categories.length <= AI_REVIEW_CATEGORIES.length
+        && categories.every((category) => typeof category === 'string' && AI_CATEGORY_SET.has(category));
+    const aiModel = (model) => typeof model === 'string' && /^[A-Za-z0-9._:-]{1,100}$/.test(model);
+    function requestAiReview(chan, line) {
+        if (typeof reviewPublicText !== 'function' || !publicChannel(chan)) return;
+        aiPending.set(line.id, { line, chan });
+        if (aiPending.size > 1000) aiPending.delete(aiPending.keys().next().value);
+        try {
+            // Only the fresh public text and its opaque id leave this engine. No nicks,
+            // room names, device data, history, activity state or PM content are supplied.
+            const result = reviewPublicText({ id: line.id, text: line.text });
+            if (result && typeof result.catch === 'function') result.catch(() => aiPending.delete(line.id));
+        } catch (e) { aiPending.delete(line.id); } // Review availability never blocks chat.
+    }
+    function applyAiReview(id, result) {
+        pruneAiReviews();
+        const pending = aiPending.get(id);
+        aiPending.delete(id); // A review result is consumed at most once, including unavailable results.
+        if (!pending || lines.get(id) !== pending.line || ch(pending.line.ch) !== pending.chan || !publicChannel(pending.chan)) return false;
+        if (!result || result.status !== 'reviewed' || typeof result.flagged !== 'boolean'
+            || !aiModel(result.model) || !aiCategories(result.categories)
+            || (result.flagged && !result.categories.length)) return false;
+        if (result.scores !== undefined && (!result.scores || typeof result.scores !== 'object' || Array.isArray(result.scores)
+            || !Object.entries(result.scores).every(([category, score]) => AI_CATEGORY_SET.has(category) && Number.isFinite(score) && score >= 0 && score <= 1))) return false;
+        if (!result.flagged) return true;
+        const line = pending.line;
+        aiReviews.set(id, { id, from: line.from, ch: line.ch, text: line.text, at: now(), model: result.model, categories: [...new Set(result.categories)] });
+        while (aiReviews.size > AI_REVIEW_MAX) aiReviews.delete(aiReviews.keys().next().value);
+        saveAiReviews();
+        return true;
+    }
+    function restoreAiReviews(stored = []) {
+        const valid = (entry) => entry && typeof entry === 'object' && !Array.isArray(entry)
+            && typeof entry.id === 'string' && /^m[a-z0-9]{1,80}$/i.test(entry.id)
+            && typeof entry.from === 'string' && /^[A-Za-z][A-Za-z0-9_\-[\]{}^`|]{2,19}$/.test(entry.from)
+            && typeof entry.ch === 'string' && /^#[a-z0-9-]{2,30}$/.test(entry.ch)
+            && typeof entry.text === 'string' && entry.text.length > 0 && entry.text.length <= L.maxChars
+            && !/[\u0000-\u001f\u007f]/.test(entry.text)
+            && Number.isFinite(entry.at) && entry.at >= 0 && entry.at <= now() && now() - entry.at < AI_REVIEW_TTL
+            && aiModel(entry.model) && aiCategories(entry.categories) && entry.categories.length > 0;
+        aiReviews.clear();
+        for (const entry of (Array.isArray(stored) ? stored : []).filter(valid).sort((a, b) => a.at - b.at)) {
+            aiReviews.set(entry.id, { id: entry.id, from: entry.from, ch: entry.ch, text: entry.text, at: entry.at, model: entry.model, categories: [...new Set(entry.categories)] });
+        }
+        while (aiReviews.size > AI_REVIEW_MAX) aiReviews.delete(aiReviews.keys().next().value);
+        let changed = true;
+        try { changed = JSON.stringify(stored) !== JSON.stringify(aiReviewList()); } catch (e) { /* malformed storage is replaced */ }
+        if (changed) saveAiReviews();
     }
 
     function statsView() {
@@ -235,7 +370,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         const c = { id, dev, iph, role, email, admin: band && admin, nick: '', channels: new Set(), away: '', ignores: new Set(), blocks: new Set(), pmOff: false,
             cams: new Set(), since: now(), lastNick: 0, tokens: L.burst, last: now(), frames: 0, lastSaid: {}, actTokens: L.actBurst, actLast: now() };
         conns.set(id, c);
-        if (band) { net.lastBand = now(); if (net.shieldAuto || net.lockAuto) bot(c, 'Auto-lockdown is on because no band op was around for a day: fans can read but not talk. /lobby unlock and /shieldoff when you are ready.'); saveNet(); }
+        if (band) { net.lastBand = now(); if (net.shieldAuto || net.lockAuto) bot(c, 'A saved safety state needs review: fans can read but not talk while the lobby is read-only. Check the band panel; /lobby unlock and /shieldoff when you are ready.'); saveNet(); }
         out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true });
         return { ok: true };
     }
@@ -605,14 +740,19 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         purge(c, chan, [what]) {
             const t = byNick(what);
             const window = /^\d+[smh]$/.test(what || '') ? parseDuration(what, 5 * MIN) : 0;
-            const ids = [...lines.values()].filter((l) => (t ? l.from === t.nick : window ? l.ts >= now() - window : false)).map((l) => l.id);
+            const ids = [...lines.values()].filter((l) => (t ? lineMeta.get(l.id)?.authorDev === t.dev : window ? l.ts >= now() - window : false)).map((l) => l.id);
             if (!ids.length) return bot(c, 'Nothing to purge.', 'error');
             deleteIds(ids);
             return log(c.nick, 'purge', t ? t.nick : what, `${ids.length} lines`, chan.name);
         },
-        delete(c, chan, [id]) { if (!lines.has(id) && !held.has(id)) return bot(c, 'No such message.', 'error'); held.delete(id); deleteIds([id]); return log(c.nick, 'delete', id, '', chan.name); },
-        shield(c) { return shield(true, c.nick, false); },
-        shieldoff(c) { return shield(false, c.nick, false); },
+        delete(c, chan, [id]) {
+            if (!lines.has(id) && !held.has(id) && !aiReviews.has(id) && !reports.has(id)) return bot(c, 'No such message.', 'error');
+            if (held.delete(id)) { heldChannels.delete(id); saveModerationQueue(); }
+            deleteIds([id]);
+            return log(c.nick, 'delete', id, '', chan.name);
+        },
+        shield(c) { return shield(true, c.nick); },
+        shieldoff(c) { return shield(false, c.nick); },
         lobby(c, chan, [v]) {
             const mode = { lock: 'closed', closed: 'closed', readonly: 'readonly', unlock: 'off', off: 'off' }[lc(v)];
             if (!mode) return bot(c, '/lobby lock|readonly|unlock', 'error');
@@ -643,23 +783,31 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             return log(c.nick, 'camoff', all ? 'all' : chan.name);
         },
         approve(c, _chan, [id]) {
+            pruneModerationQueue();
             const h = held.get(id);
             if (!h) return bot(c, 'Nothing held with that id.', 'error');
-            held.delete(id);
             const room = ch(h.ch);
+            if (!room || heldChannels.get(id) !== room) return bot(c, 'The original room is no longer available. Dismiss or delete this held message.', 'error');
+            held.delete(id); heldChannels.delete(id); saveModerationQueue();
             const { reason: _r, dev, ...clean } = h;
             if (room) publish(room, clean, dev);
             return log(c.nick, 'approve', h.from, h.reason, h.ch);
         },
         dismiss(c, _chan, [id]) {
-            if (held.delete(id)) return log(c.nick, 'reject-held', id);
+            if (held.delete(id)) { heldChannels.delete(id); saveModerationQueue(); return log(c.nick, 'reject-held', id); }
             const r = reports.get(id);
             if (!r) return bot(c, 'No such report.', 'error');
             r.done = true;
             // Dismissing a report updates moderation state only. Rebroadcasting old text
             // would disclose pre-join messages to people who arrived afterward.
             r.hidden = false;
+            saveModerationQueue();
             return log(c.nick, 'dismiss-report', r.from, '', r.ch);
+        },
+        aidismiss(c, _chan, [id]) {
+            if (!aiReviews.delete(id)) return bot(c, 'No AI review with that message id.', 'error');
+            saveAiReviews();
+            return log(c.nick, 'ai-dismiss', id);
         },
         log(c) { return out(c, { t: 'modlog', entries: net.modlog.slice(-50) }); }
     };
@@ -712,6 +860,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     function closeRoom(chan, by, why) {
         for (const m of membersOf(chan)) { out(m, { t: 'closed', ch: chan.name, by, reason: why }); m.channels.delete(chan.name); m.cams.delete(lc(chan.name)); }
         channels.delete(lc(chan.name));
+        for (const [id, pending] of aiPending) if (pending.chan === chan) aiPending.delete(id);
         log(by, 'room-close', chan.name, why, chan.name);
         pushList();
     }
@@ -829,26 +978,37 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         }
         if (v.verdict === 'hold' && !isBand(c)) {
             held.set(line.id, { ...line, reason: v.reason, dev: c.dev });
+            heldChannels.set(line.id, chan);
+            while (held.size > MODERATION_QUEUE_MAX) { const oldest = held.keys().next().value; held.delete(oldest); heldChannels.delete(oldest); }
+            saveModerationQueue();
             bot(c, 'Your message is waiting for a band op to OK it.');
             log(BOT, 'filter-hold', c.nick, v.reason, chan.name);
             return undefined;
         }
-        return publish(chan, line, c.dev);
+        return publish(chan, line, c.dev, true);
     }
 
-    function publish(chan, line, dev) {
+    function publish(chan, line, dev, reviewNewPublicLine = false) {
         statHour().lines += 1;
-        lines.set(line.id, line);
-        if (lines.size > 1000) lines.delete(lines.keys().next().value);
+        const recipients = membersOf(chan).filter((m) => !m.ignores.has(lc(line.from)) && !(dev && m.blocks.has(dev)));
+        rememberLine(line, { authorDev: dev, recipients: new Set(recipients.map((m) => m.id)) });
         chan.moderationContext.push(line);
         if (chan.moderationContext.length > L.moderationContext) chan.moderationContext.shift();
-        cast(chan, line, (m) => !m.ignores.has(lc(line.from)) && !(dev && m.blocks.has(dev)));
+        for (const member of recipients) out(member, line);
+        if (reviewNewPublicLine) requestAiReview(chan, line);
+    }
+
+    function rememberLine(line, meta) {
+        lines.set(line.id, line); lineMeta.set(line.id, meta);
+        while (lines.size > 1000) { const oldest = lines.keys().next().value; lines.delete(oldest); lineMeta.delete(oldest); aiPending.delete(oldest); }
     }
 
     function deleteIds(ids) {
         const set = new Set(ids);
         for (const chan of channels.values()) chan.moderationContext = chan.moderationContext.filter((h) => !set.has(h.id));
-        for (const id of ids) lines.delete(id);
+        let aiChanged = false;
+        for (const id of ids) { lines.delete(id); lineMeta.delete(id); aiPending.delete(id); if (aiReviews.delete(id)) aiChanged = true; }
+        if (aiChanged) saveAiReviews();
         for (const x of conns.values()) if (x.nick) out(x, { t: 'delete', ids });
         pushAdmin();
     }
@@ -891,7 +1051,9 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         const v = checkText(rawText, net.lists);
         if (v.verdict !== 'ok') { log(BOT, 'pm-filter', from.nick, v.reason); return bot(from, v.reason.startsWith('personal-info') ? 'Not cool here: no phone numbers, emails, addresses or socials, even in PMs.' : 'Not cool here. Message not sent.', 'error'); }
         const msg = { t: 'pm', id: `p${now().toString(36)}${(seq += 1).toString(36)}`, from: from.nick, to: to.nick, text: v.text, band: isBand(from), ts: now() };
-        lines.set(msg.id, { ...msg, ch: `pm:${from.nick}>${to.nick}` });
+        const recipients = new Set([from.id]);
+        if (!to.ignores.has(lc(from.nick))) recipients.add(to.id);
+        rememberLine({ ...msg, ch: `pm:${from.nick}>${to.nick}` }, { authorDev: from.dev, recipients });
         out(from, msg);
         if (!to.ignores.has(lc(from.nick))) out(to, msg);
         return undefined;
@@ -900,49 +1062,54 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     function report(c, id) {
         const l = lines.get(id);
         if (!l) return bot(c, 'That message is gone already.', 'error');
-        if (l.from === c.nick) return bot(c, 'You can’t report yourself.', 'error');
-        if (String(l.ch).startsWith('pm:') && l.to !== c.nick) return bot(c, 'You can only report PMs sent to you.', 'error');
+        const meta = lineMeta.get(id);
+        if (!meta || !meta.recipients.has(c.id)) return bot(c, 'You can only report a message delivered to this connection.', 'error');
+        if (meta.authorDev === c.dev) return bot(c, 'You can’t report yourself.', 'error');
         let r = reports.get(id);
         if (!r) {
             const chan = ch(l.ch);
             const hist = chan ? chan.moderationContext : [];
             const at = hist.findIndex((h) => h.id === id);
             const context = at >= 0 ? hist.slice(Math.max(0, at - 5), at + 6).map((h) => `${h.from ? `<${h.from}> ` : '* '}${h.text}`) : [`<${l.from}> ${l.text}`];
-            r = { devs: new Set(), iphs: new Set(), ch: l.ch, from: l.from, text: l.text, hidden: false, context, at: now() };
+            r = { devs: new Set(), iphs: new Set(), ch: l.ch, from: l.from, text: l.text, hidden: false, context, at: now(), authorDev: meta.authorDev };
             reports.set(id, r);
+            while (reports.size > MODERATION_QUEUE_MAX) reports.delete(reports.keys().next().value);
         }
         // Spoof-proof: one vote per signed device AND per daily IP hash.
         if (r.devs.has(c.dev) || r.iphs.has(c.iph)) return bot(c, 'Already reported. Thanks.');
         r.devs.add(c.dev); r.iphs.add(c.iph);
         net.stats.reports.made += 1;
-        const offender = byNick(l.from);
+        const offenders = [...conns.values()].filter((person) => person.dev === r.authorDev);
         if (r.devs.size >= net.reportsToHide && !r.hidden) {
             r.hidden = true;
             deleteIds([id]);
             log(BOT, 'auto-hide', l.from, `${r.devs.size} reports`, l.ch);
         }
-        if (offender && r.devs.size >= L.reportsCamOff) {
-            offender.camReports = Math.max(offender.camReports || 0, r.devs.size);
-            for (const name of [...offender.cams]) { offender.cams.delete(name); out(offender, { t: 'cam', ch: name, on: false, by: BOT }); const room = ch(name); if (room) sendChan(room); }
+        if (r.devs.size >= L.reportsCamOff) {
+            for (const offender of offenders) {
+                offender.camReports = Math.max(offender.camReports || 0, r.devs.size);
+                for (const name of [...offender.cams]) { offender.cams.delete(name); out(offender, { t: 'cam', ch: name, on: false, by: BOT }); const room = ch(name); if (room) sendChan(room); }
+            }
         }
+        saveModerationQueue();
         pushAdmin();
         return bot(c, 'Reported to the band. Thanks for looking out.');
     }
 
-    function shield(on, by, auto) {
+    function shield(on, by) {
         net.shield = on;
-        net.shieldAuto = on && auto;
+        net.shieldAuto = false;
         if (on) for (const room of channels.values()) { if (room.kind !== 'lobby') { room.modes.C = false; camsOff(room, by); } }
         else for (const room of channels.values()) if (room.kind !== 'lobby' && room.kind !== 'chat') room.modes.C = true;
         event(ch(LOBBY), on ? `${by} raised the shield: slow mode 30s, cameras off, new rooms and PM requests paused` : `${by} lowered the shield`);
         for (const x of conns.values()) out(x, { t: 'net', lock: net.lock, shield: net.shield });
         for (const room of channels.values()) sendChan(room);
-        log(by, on ? (auto ? 'auto-shield' : 'shield') : 'shield-off', '', auto ? 'no band op online for 24h' : '');
+        log(by, on ? 'shield' : 'shield-off');
         saveNet();
         pushList();
     }
 
-    // Called by the DO alarm / dev relay timer. Expirations, empty-room cleanup, auto-shield.
+    // Called by the DO alarm / dev relay timer. Expirations and empty-room cleanup only.
     let lastStatSave = '';
     function tick() {
         const t = now();
@@ -953,16 +1120,10 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         for (const room of [...channels.values()]) if (room.kind !== 'lobby' && room.members.size === 0 && room.emptySince && t - room.emptySince >= L.emptyRoomClose) closeRoom(room, BOT, 'empty for 10 minutes');
         const bandOn = [...conns.values()].some(isBand);
         if (bandOn) net.lastBand = t;
-        if (!bandOn && !net.lockAuto && net.lock === 'off' && t - net.lastBand >= L.noBandShield) {
-            // True lockdown: fans go read-only everywhere (rooms and PMs too), not just slow mode.
-            net.lock = 'readonly';
-            net.lockAuto = true;
-            event(ch(LOBBY), `${BOT} locked the lobby: no band op for 24 hours, so it's read-only for fans until the band is back`);
-            for (const x of conns.values()) out(x, { t: 'net', lock: net.lock, shield: net.shield });
-            log(BOT, 'auto-lockdown', 'readonly', 'no band op online for 24h');
-            saveNet();
-        }
-        if (!bandOn && !net.shield && t - net.lastBand >= L.noBandShield) shield(true, BOT, true);
+        // Community conversations stay open without band presence. Only explicit
+        // moderation actions, budgets or invalid saved state change admission.
+        pruneAiReviews();
+        pruneModerationQueue();
     }
 
     function snapshot() {
@@ -994,7 +1155,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         }
         // Shield / auto flags must be booleans; anything else raises the shield.
         for (const k of ['shield', 'shieldAuto', 'lockAuto']) if (s[k] !== undefined && typeof s[k] !== 'boolean') { failClosed(); s.shield = true; if (k !== 'shield') s[k] = true; }
-        // lastBand: malformed = stale, so the 24h auto-lockdown fires on the next tick.
+        // lastBand is informational; malformed persisted fields still require explicit recovery.
         if (s.lastBand !== undefined && !(Number.isFinite(s.lastBand) && s.lastBand >= 0 && s.lastBand <= now() + MIN)) { s.lastBand = 0; failClosed(); }
         // reportsToHide: integer 1..20, else the default (and read-only for a band look).
         if (s.reportsToHide !== undefined && !(Number.isInteger(s.reportsToHide) && s.reportsToHide >= 1 && s.reportsToHide <= 20)) { s.reportsToHide = L.reportsToHide; failClosed(); }
@@ -1039,5 +1200,5 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     }
     function restoreLog(entries = []) { net.modlog = entries.slice(-L.modlogKeep); }
 
-    return { connect, disconnect, message, tick, snapshot, restore, restoreLog, adminState, budgetLevel, spend, get modlog() { return net.modlog.slice(); }, _debug: { conns, channels, net, pm, reports, held, lines } };
+    return { connect, disconnect, message, tick, snapshot, restore, restoreLog, restoreModerationQueue, restoreAiReviews, applyAiReview, notifyAiStatus: pushAdmin, adminState, budgetLevel, spend, get modlog() { return net.modlog.slice(); }, _debug: { conns, channels, net, pm, reports, held, lines } };
 }

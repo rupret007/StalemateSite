@@ -547,17 +547,19 @@ describe('band moderation', () => {
 describe('reports', () => {
     it('auto-hides at 3 distinct devices; same device or same IP hash counts once', () => {
         const bad = join('Bad');
-        say(bad, 'you all stink');
-        const id = got(bad).find((m) => m.t === 'line').id;
         const r1 = join('Rep1', { iph: 'a' });
         const r1b = join('Rep1b', { iph: 'a' });
+        const r2 = join('Rep2', { iph: 'b' });
+        const r3 = join('Rep3', { iph: 'c' });
+        say(bad, 'you all stink');
+        const id = got(bad).find((m) => m.t === 'line').id;
         L.message(r1.id, JSON.stringify({ t: 'report', id }));
         L.message(r1.id, JSON.stringify({ t: 'report', id }));
         L.message(r1b.id, JSON.stringify({ t: 'report', id }));
         expect(L._debug.reports.get(id).devs.size).toBe(1);
-        L.message(join('Rep2', { iph: 'b' }).id, JSON.stringify({ t: 'report', id }));
+        L.message(r2.id, JSON.stringify({ t: 'report', id }));
         expect(L._debug.reports.get(id).hidden).toBe(false);
-        L.message(join('Rep3', { iph: 'c' }).id, JSON.stringify({ t: 'report', id }));
+        L.message(r3.id, JSON.stringify({ t: 'report', id }));
         expect(L._debug.reports.get(id).hidden).toBe(true);
         expect(got(r1).some((m) => m.t === 'delete' && m.ids.includes(id))).toBe(true);
         L.message(r1.id, JSON.stringify({ t: 'report', id: 'm-made-up' }));
@@ -584,17 +586,22 @@ describe('cameras: allowed in open rooms, off by default, 18+ gate', () => {
     });
 });
 
-describe('auto-lockdown when no band op for 24h', () => {
-    it('raises the shield automatically and tells the next band op', () => {
-        join('Fan');
-        later(24 * 60 * 60 * 1000 + 1);
+describe('open community and explicit safety recovery', () => {
+    it('stays open for guest conversation and hosting after days without a band member', () => {
+        const fan = join('Fan');
+        const pal = join('Pal');
+        later(3 * 24 * 60 * 60 * 1000);
         L.tick();
-        expect(L._debug.net.shield).toBe(true);
-        expect(L._debug.net.shieldAuto).toBe(true);
-        const band = join('Drummer', { role: 'band' });
-        expect(notices(band)).toMatch(/Auto-lockdown is on/);
+        expect(L._debug.net.lock).toBe('off');
+        expect(L._debug.net.shield).toBe(false);
+        expect(L._debug.net.shieldAuto).toBe(false);
+        say(fan, 'still here together');
+        expect(lines(pal)).toContain('still here together');
+        cmd(fan, 'join', ['#still-open']);
+        expect(L._debug.channels.get('#still-open').ops.has('dev-Fan')).toBe(true);
+        expect(L.modlog.some((entry) => entry.action.startsWith('auto-'))).toBe(false);
     });
-    it('already-open PMs stop for fans after auto-lockdown; band PMs still go through', () => {
+    it('a manual read-only action still pauses guest PMs while band PMs remain available', () => {
         const a = join('Alpha');
         const b = join('Bravo');
         later(2 * 60 * 1000 + 1);
@@ -603,6 +610,7 @@ describe('auto-lockdown when no band op for 24h', () => {
         cmd(a, 'msg', ['Bravo', 'still', 'open']);
         expect(got(b).filter((m) => m.t === 'pm').map((m) => m.text)).toContain('still open');
         const band = join('Drummer', { role: 'band' });
+        cmd(band, 'lobby', ['readonly']);
         L.disconnect(band.id);
         later(25 * 60 * 60 * 1000);
         L.tick();
@@ -697,7 +705,7 @@ describe('auto-lockdown when no band op for 24h', () => {
             L.restore({ ...base, lastBand });
             expect(L._debug.net.lastBand, String(lastBand)).toBe(0); // treated as stale
             L.tick();
-            expect(L._debug.net.shield).toBe(true); // auto-lockdown fires
+            expect(L._debug.net.shield).toBe(false); // malformed storage locks safely, presence does not raise a shield
             expect(L._debug.net.lock).toBe('readonly');
         }
         boot(); L.restore({ ...base, lastBand: clock - 1000, shield: false, kicks: {}, reportsToHide: 5 });
@@ -774,7 +782,7 @@ describe('auto-lockdown when no band op for 24h', () => {
         L.restore({ lock: 'off' });
         expect(L._debug.net.lock).toBe('off'); // a real saved state is respected
     });
-    it('is a true lock: fans go read-only in the lobby, rooms and PMs; band can still talk and unlock', () => {
+    it('preserves legacy or corruption-triggered saved locks until a band member explicitly recovers', () => {
         const fan = join('Fan');
         const pal = join('Pal');
         cmd(fan, 'join', ['#hangs']);
@@ -783,11 +791,12 @@ describe('auto-lockdown when no band op for 24h', () => {
         L.tick();
         expect(L._debug.net.lock).toBe('off');
         later(60 * 60 * 1000 + 1);
+        L.restore({ lock: 'readonly', lockAuto: true, shield: true, shieldAuto: true });
         L.tick();
         expect(L._debug.net.lock).toBe('readonly');
         expect(L._debug.net.lockAuto).toBe(true);
         expect(L.adminState().lockAuto).toBe(true);
-        expect(got(fan).some((m) => m.t === 'net' && m.lock === 'readonly')).toBe(true);
+        expect(L.adminState().shieldAuto).toBe(true);
         inbox.clear();
         say(fan, 'anyone here?');
         say(fan, 'room chat', '#hangs');
@@ -795,7 +804,7 @@ describe('auto-lockdown when no band op for 24h', () => {
         expect(notices(fan)).toMatch(/read-only/);
         L.message(fan.id, JSON.stringify({ t: 'cmd', name: 'msg', args: ['Pal', 'psst'], ch: LOBBY }));
         expect(got(pal).some((m) => m.t === 'pm-request' || m.t === 'pm')).toBe(false);
-        expect(L.modlog.map((e) => e.action)).toContain('auto-lockdown');
+        expect(L.modlog.map((e) => e.action)).not.toContain('auto-lockdown');
         const snap = L.snapshot();
         expect(snap.lock).toBe('readonly');
         expect(snap.lockAuto).toBe(true);

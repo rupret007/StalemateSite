@@ -1,6 +1,6 @@
 # Hang Out relay (hidden preview)
 
-A tiny Cloudflare Worker with Durable Objects that forwards **encrypted data frames only** (strokes, chat, play/pause, WebRTC offers and answers) between people in one invite room. No video, audio or files go through it. Faces and voices connect browser to browser.
+The private invite-room relay forwards **encrypted data frames only** (strokes, chat, play/pause, WebRTC offers and answers). The separate public lobby engine below handles moderated text and activity state. Video/audio stay between browsers; they are not sent to the AI text classifier.
 
 ## Caps (free plan, no card, fail closed)
 - **Admission:** an exact-origin allowlist plus the `HANGOUT_PREVIEW_KEY` secret. A missing secret or binding returns 503, and a wrong key returns 403.
@@ -42,3 +42,11 @@ Then put the `wss://stalemate-hangout.<account>.workers.dev` URL in the room pag
   3. Lawyer reviews `r/<hidden>/terms/` and the contact placeholder is filled before any public link (rollout R3).
 - WebJam: jam rooms only relay the host's `webjam://` invite; signaling, mailbox, TURN and Jamulus stay in WebJam.
   `WEBJAM_WEB_ORIGINS` turns on the Web Join (#388) browser hook.
+
+## Open-community operation and optional AI review
+
+Guest rooms remain open when band members are away. Manual locks/shield, stored-state validation and infrastructure caps still apply. Legacy automatic locks are not silently cleared because their stored flag can also mean lost/corrupt moderation state.
+
+`HANGOUT_AI_MODERATION="off"` is the default. Setting it to `"review"` plus an `OPENAI_API_KEY` Worker secret enables review-only classification of new public text using `src/ai-moderation.mjs`. `HANGOUT_AI_DAILY_LIMIT` defaults to 1000; the persistent allowance, concurrency cap, timeout and failure backoff bound provider traffic. No browser receives credentials. The local relay does not enable external AI calls.
+
+AI flags, human reports and held-message evidence use separate bounded 24-hour storage queues; they never become visitor chat history. They are for authenticated human review. AI does not automatically punish users. See [the safeguard design and activation procedure](../docs/HANGOUT_SAFEGUARDS_AI.md) for data scope, failure behavior, validation and remaining launch work.

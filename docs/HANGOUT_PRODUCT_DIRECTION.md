@@ -1,6 +1,6 @@
 # Hang Out product direction
 
-Updated October 18, 2026. This records confirmed direction, the current development slice, and proposals for subsequent work. It does not authorize public deployment or change existing admission/moderation rules.
+Updated October 18, 2026. This records confirmed direction, the current development slice, and proposals for subsequent work. It does not authorize public deployment. The user's open-community decision supersedes the old band-absence shutdown rule.
 
 ## Confirmed direction
 
@@ -8,6 +8,8 @@ Updated October 18, 2026. This records confirmed direction, the current developm
 - Make the experience visibly retro IRC: nicknames, channels, topics, commands, conversation, and recognizable regulars.
 - Anyone visiting can create and host their own text or creative room; room hosts have channel-scoped controls, while authenticated band/site moderators retain site-wide authority.
 - Chat starts when someone joins. Keep scrollback for messages received while connected, with no pre-join backlog or replay of missed messages. Jeff's reference is classic EFnet.
+- Guest-hosted community activity continues when band members are away. Keep safeguards independent of band presence.
+- Build AI-assisted moderation first: flag possible abuse and help humans review it, before creative AI features.
 - Start in `#stalemate`; let conversation lead naturally into drawing, watching, music, and other collaboration.
 - Make participation useful to non-musicians and comfortable for people who prefer to read quietly.
 - Keep guest entry simple. Cameras and microphones remain optional and off initially; retain the recorded age/admission rules.
@@ -28,6 +30,7 @@ These changes are in the current local development branch; they are not a claim 
 - Connection status and retry behavior preserve drafts; a server session reset explains that rooms need to be rejoined.
 - The Worker WebSocket handshake queues initial frames until socket acceptance so the browser receives the greeting needed to proceed.
 - Local browser coverage exercises discovery, conversation starters, mentions/unreads, drafts, and reconnect behavior. Consult the current test run for results; this document is not a production acceptance record.
+- Community operation no longer depends on band attendance. Optional AI public-text review has a human queue, server-only credentials, durable usage limits and visible failure states. Reports require actual delivery; immutable author identity prevents nickname-reuse mistakes; bounded review evidence survives server restart.
 
 Existing creative-room, PM-consent, and moderation capabilities remain the foundation. Join frames no longer include chat history. The client keeps up to 300 received lines per joined channel in memory, clearing them on part/rejoin, reconnection or refresh. The server's bounded `moderationContext` supports abuse reports, remains separate from user-visible scrollback, and is never included in join payloads or persistence snapshots. Dismissing a report no longer rebroadcasts old text. Local drafts and nickname memory are not cross-device accounts or archives.
 
@@ -40,7 +43,7 @@ Guests can now create genuine named text rooms through `/join #name` and Start a
 - Keep one obvious main conversation; display active rooms honestly instead of fragmenting a small audience across empty destinations.
 - Show the next **confirmed** gathering hosted by any willing visitor, its host, local time, and what someone can do without equipment. No invented schedule or band-presence prerequisite.
 - When quiet, offer a small creative prompt and an approved past creation. When disconnected, explain the service state rather than displaying false emptiness.
-- The existing 24-hour band-absence global read-only rule conflicts with independent guest hosting. The exact replacement is pending a user answer; do not silently change it or equate a guest room host with a band moderator.
+- The old 24-hour band-absence global read-only/shield trigger is removed. Manual emergency controls, corruption locks and infrastructure caps remain. Guest hosts do not become site moderators merely by creating a room.
 - A recurring gathering is optional; anyone may host spontaneously. No weekly cadence or band hosting commitment has been promised.
 
 ### 2. Establish continuity and truthful guest identity
@@ -68,7 +71,7 @@ Guests can now create genuine named text rooms through `/join #name` and Start a
 
 ### 5. Make guest hosting dependable; keep global moderation separate
 
-- Room hosting is already open to guests as a product decision. A trusted site-wide moderator role would be a different capability; global reopening and the 24-hour rule remain unresolved.
+- Room hosting is already open to guests. A distinct trusted site-wide moderator role remains future work; the community no longer closes merely because a band member is absent.
 - Current lifecycle: creator gets room-op controls; `/op nick` grants a co-host; signed-device identity recovers authority while the room exists; the UI shows an unhosted state; rooms close after 10 minutes empty. There is no automatic transfer. A friend using the same nickname on a new device gets no authority. Remaining gaps include a more direct handoff flow, full-room return and room-state loss on Worker hibernation.
 - The existing one-room-per-device/10-minute creation cap can interrupt chat → creative collaboration. Revisit the allowance or add an explicit way to turn a chat into an activity before launching; do not silently remove abuse limits.
 - Never restore host controls based on nickname alone, silently hand global power to a guest entering `#stalemate`, or imply that a room-op marker identifies a band member.
@@ -76,6 +79,7 @@ Guests can now create genuine named text rooms through `/join #name` and Start a
 - Start event reminders with a calendar download. Email/push require a clear opt-in, an off switch, and truthful delivery behavior.
 - A local saved event is not a server RSVP. A connected tab is not proof of an attentive person. Never use either to imply fake attendance or concurrency.
 - Keep Ignore, Report, and Leave discoverable; define who receives reports and when a human is available.
+- See [open-community safeguards and AI review](HANGOUT_SAFEGUARDS_AI.md): review-only public-text classification, bounded evidence queues, visible degraded/off/capped status, and explicit human decisions. AI is configured off until a server-side credential and enable setting are supplied.
 
 ## Lean pilot
 

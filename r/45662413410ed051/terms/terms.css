@@ -1,3 +1,9 @@
+body {
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
+}
+
 .terms {
     max-width: 42rem;
     margin: 0 auto;
