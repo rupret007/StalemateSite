@@ -23,6 +23,8 @@ The printed `local-preview-key-0001` value is the development fixture, not a pro
 4. Use the keyboard to move between channel tabs. While reading older chat, incoming messages leave your position alone and offer a jump control.
 5. Disconnect/reconnect during a local test. Offline submission preserves the draft. Reconnection returns to the lobby, removes stale room memberships and keeps room drafts available when rejoining. Cameras stay off and PM-off preference is reapplied.
 6. Try the phone layout: Chat, Rooms and People remain separate views, with the composer visible at a 375 × 667 viewport.
+7. Choose Start a chat channel and name it `#night-owls`, or type `/join #night-owls`. A guest who creates it gets `@` controls. Use `/topic` and `/op nick` to share hosting. No canvas, player or camera is opened for ordinary chat channels.
+8. Send a message, then join from another browser. The newcomer sees the topic and people, but no earlier chat. Messages received while joined remain in that tab (up to 300 lines per channel). Leaving/rejoining, reconnecting or refreshing begins fresh. Shared drawing/video state is separate and still synchronizes on entry.
 
 ## Screenshots
 
@@ -33,6 +35,9 @@ These use temporary **local test visitors and example messages**, not live peopl
 - [Desktop conversation and room discovery](../pr-assets/irc-first/lobby-desktop.png)
 - [Phone conversation](../pr-assets/irc-first/lobby-phone.png)
 - [Phone room directory](../pr-assets/irc-first/rooms-phone.png)
+- [Named channel creation](../pr-assets/irc-first/create-channel-desktop.png)
+- [Guest-hosted text channel](../pr-assets/irc-first/chat-channel-desktop.png)
+- [Text channel on a phone](../pr-assets/irc-first/chat-channel-phone.png)
 
 ## Development baseline and changes
 
@@ -46,8 +51,8 @@ Tests now use isolated same-origin relay namespaces so room creation and moderat
 
 ## Validation recorded
 
-- Full unit suite: **31 files / 232 tests passed**.
-- Existing and new focused Chromium lobby browser scenarios: **15 passed** across the main run and added scroll-position case. Includes two-browser art/video behavior, guest admission, moderation, phone layout, draft/mention behavior, reconnect, fresh challenges and bounded challenge-load failure.
+- Full unit suite: **31 files / 244 tests passed** after the guest-host/classic-history changes.
+- Existing and new focused Chromium lobby browser scenarios: **17 distinct scenarios passed** (16-case combined run, followed by the updated 8-case discovery suite). Includes two-browser art/video behavior, guest admission, moderation, phone layout and rejected creation feedback, host handoff, no pre-join chat, draft/mention behavior, reconnect, fresh challenges and bounded challenge-load failure.
 - Pages packaging succeeded; whitespace checks passed. Screenshots captured with no browser page errors.
 - A mocked external Turnstile callback requires disabling Chromium's local-network provenance check in the discovery test fixture. The app's CSP stays enforced; this is not a claim to have tested a live Turnstile service.
 
@@ -61,6 +66,6 @@ npm run package:pages
 
 ## Boundaries and next work
 
-This is a working local collaboration slice, not a public launch. Current history, room activity and ordinary connection state are still in memory. Unsent drafts survive channel switches and reconnection within the current tab; closing the tab loses them. Delivery acknowledgements and durable chat replay are not implemented. Saved creations, schedules, reservations, notifications and a shared writing pad remain proposals.
+This is a working local collaboration slice, not a public launch. Guest hosting and classic IRC history are confirmed decisions: no chat backlog or replay is offered. Room activity and ordinary connection state are still in memory. The server's bounded moderation buffer supports reports; it is never sent as join history, and dismissing a report does not rebroadcast old text to newcomers. Unsent drafts survive channel switches and reconnection within the current tab; closing the tab loses them. Delivery acknowledgements are not implemented. Saved creations, schedules, reservations, notifications and a shared writing pad remain proposals.
 
-Real Cloudflare admission/Access/TURN, Safari/iPhone hardware, WAN music timing and the WebJam `/join/` hosting/release path still need their recorded integration work. See [product direction](HANGOUT_PRODUCT_DIRECTION.md) for priorities and the outstanding hosting/history decisions.
+Real Cloudflare admission/Access/TURN, Safari/iPhone hardware, WAN music timing and the WebJam `/join/` hosting/release path still need their recorded integration work. See [product direction](HANGOUT_PRODUCT_DIRECTION.md) for priorities and the outstanding band-absence rule decision.

@@ -26,6 +26,76 @@ async function guest(browser, nick, viewport) {
 }
 const lobbyTab = (page) => page.locator('[data-tabs] [data-channel-key="#stalemate"]');
 
+test('guests host named chat channels with live-only history and can hand off room controls', async ({ browser }) => {
+    const host = await guest(browser, 'NightHost');
+    let visitor;
+    try {
+        await host.fill('[data-text]', 'This lobby message predates the next visitor');
+        await host.press('[data-text]', 'Enter');
+        await expect(host.locator('[data-buffer]')).toContainText('predates the next visitor');
+        visitor = await guest(browser, 'NightGuest');
+        await expect(visitor.locator('[data-buffer]')).not.toContainText('predates the next visitor');
+
+        await host.click('[data-start="chat"]');
+        await host.fill('[data-channel-name]', '#art-night-owls');
+        await host.locator('[data-channel-form] button[type="submit"]').click();
+        await expect(host.locator('[data-channel-error]')).toContainText('starts an activity room');
+        await host.fill('[data-channel-name]', '#night-owls');
+        await host.locator('[data-channel-form] button[type="submit"]').click();
+        await expect(host.locator('[data-chat-context]')).toHaveText('#night-owls');
+        await expect(host.locator('[data-nicks]')).toContainText('@NightHost');
+        await expect(host.locator('[data-roomtools]')).toBeVisible();
+        await host.click('[data-roomtools]');
+        await expect(host.locator('[data-palette-buttons]')).not.toContainText('Cams allowed');
+        await host.click('[data-palette-close]');
+        await expect(host.locator('[data-activity]')).toBeHidden();
+        await expect(host.locator('[data-cam]')).toBeHidden();
+        await host.fill('[data-text]', 'This room message was sent before you joined');
+        await host.press('[data-text]', 'Enter');
+        await expect(host.locator('[data-buffer]')).toContainText('before you joined');
+
+        await visitor.locator('[data-roomlist] [data-room="#night-owls"]').click();
+        await expect(visitor.locator('[data-chat-context]')).toHaveText('#night-owls');
+        await expect(visitor.locator('[data-buffer]')).not.toContainText('before you joined');
+        await expect(visitor.locator('[data-roomtools]')).toBeHidden();
+        await host.fill('[data-text]', 'This message arrives while we are both here');
+        await host.press('[data-text]', 'Enter');
+        await expect(visitor.locator('[data-buffer]')).toContainText('while we are both here');
+        await lobbyTab(visitor).click();
+        await visitor.locator('[data-tabs] [data-channel-key="#night-owls"]').click();
+        await expect(visitor.locator('[data-buffer]')).toContainText('while we are both here');
+
+        await visitor.click('[data-leave]');
+        await expect(visitor.locator('[data-chat-context]')).toHaveText('#stalemate');
+        await host.fill('[data-text]', 'This message arrives while you are away');
+        await host.press('[data-text]', 'Enter');
+        await expect(host.locator('[data-buffer]')).toContainText('while you are away');
+        await visitor.locator('[data-roomlist] [data-room="#night-owls"]').click();
+        await expect(visitor.locator('[data-chat-context]')).toHaveText('#night-owls');
+        await expect(visitor.locator('[data-buffer]')).not.toContainText('while we are both here');
+        await expect(visitor.locator('[data-buffer]')).not.toContainText('while you are away');
+
+        await host.fill('[data-text]', '/op NightGuest');
+        await host.press('[data-text]', 'Enter');
+        await expect(visitor.locator('[data-roomtools]')).toBeVisible();
+        await host.click('[data-leave]');
+        await expect(visitor.locator('[data-host-status]')).toContainText('You have @ host controls');
+        await visitor.fill('[data-text]', '/topic A hangout for night owls');
+        await visitor.press('[data-text]', 'Enter');
+        await expect(visitor.locator('[data-topic]')).toHaveText('A hangout for night owls');
+
+        // A refreshed client receives current topic/membership, but no previous conversation.
+        await visitor.reload();
+        await visitor.click('[data-enter]');
+        await expect(visitor.locator('[data-connection]')).toHaveText('Connected');
+        await visitor.locator('[data-roomlist] [data-room="#night-owls"]').click();
+        await expect(visitor.locator('[data-topic]')).toHaveText('A hangout for night owls');
+        await expect(visitor.locator('[data-roomtools]')).toBeVisible();
+        await expect(visitor.locator('[data-buffer]')).not.toContainText('while you are away');
+        await expect(visitor.locator('[data-buffer]')).not.toContainText('sets mode +o');
+    } finally { await host.context().close(); if (visitor) await visitor.context().close(); }
+});
+
 test('IRC conversation leads into an existing room; drafts and mentions survive channel switches', async ({ browser }) => {
     const host = await guest(browser, 'DoodleHost');
     const visitor = await guest(browser, 'RiffGuest');
@@ -104,6 +174,35 @@ test('phone chat, room discovery and composer fit without horizontal scrolling',
         await expect(page.locator('[data-text]')).toBeInViewport();
         await page.click('[data-prompt="What’s everyone making or working on? "]');
         await expect(page.locator('[data-text]')).toHaveValue('What’s everyone making or working on? ');
+    } finally { await page.context().close(); }
+});
+
+test('phone room creation keeps the name and shows a server rejection inside the dialog', async ({ browser }) => {
+    const page = await guest(browser, 'PhoneHost', { width: 375, height: 667 });
+    try {
+        await page.click('[data-show="rooms"]');
+        await page.click('[data-start="chat"]');
+        await page.fill('[data-channel-name]', '#first-chat');
+        await page.locator('[data-channel-form] button[type="submit"]').click();
+        await expect(page.locator('[data-chat-context]')).toHaveText('#first-chat');
+        await expect(page.locator('[data-channel-dialog]')).toBeHidden();
+        await page.click('[data-show="rooms"]');
+        await page.click('[data-start="chat"]');
+        await page.fill('[data-channel-name]', '#another-chat');
+        await page.locator('[data-channel-form] button[type="submit"]').click();
+        await expect(page.locator('[data-channel-dialog]')).toBeVisible();
+        await expect(page.locator('[data-channel-error]')).toContainText('One new room per 10 minutes');
+        await expect(page.locator('[data-channel-name]')).toHaveValue('#another-chat');
+        await expect(page.locator('[data-channel-error]')).toBeInViewport();
+        await expect(page.locator('[data-channel-cancel]')).toBeInViewport();
+        await page.click('[data-channel-cancel]');
+        await expect(page.locator('[data-start="chat"]')).toBeFocused();
+        await page.click('[data-start="chat"]');
+        await page.fill('[data-channel-name]', '#first-chat');
+        await page.locator('[data-channel-form] button[type="submit"]').click();
+        await expect(page.locator('[data-channel-dialog]')).toBeHidden();
+        await expect(page.locator('[data-chat-context]')).toHaveText('#first-chat');
+        await expect(page.locator('[data-text]')).toBeInViewport();
     } finally { await page.context().close(); }
 });
 

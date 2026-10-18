@@ -159,6 +159,108 @@ describe('classic IRC commands', () => {
     });
 });
 
+describe('chat starts when a visitor joins', () => {
+    it('does not replay lobby messages or events to late or reconnected guests', () => {
+        const host = join('EarlyGuest');
+        say(host, 'words before anyone else arrived');
+        const late = join('LateGuest');
+        const admission = got(late).find((frame) => frame.t === 'join');
+        expect(admission).not.toHaveProperty('history');
+        expect(JSON.stringify(got(late))).not.toContain('words before anyone else arrived');
+        expect(got(late).filter((frame) => frame.t === 'event').map((frame) => frame.text)).not.toContain('EarlyGuest has joined #stalemate');
+        later(4000);
+        say(host, 'words arriving live');
+        expect(lines(late)).toContain('words arriving live');
+        L.disconnect(late.id);
+        const back = join('LateGuest');
+        expect(got(back).find((frame) => frame.t === 'join')).not.toHaveProperty('history');
+        expect(lines(back)).toEqual([]);
+    });
+
+    it('does not replay room messages after a part and rejoin', () => {
+        const host = join('RoomHost');
+        const guest = join('RoomGuest');
+        const name = '#gardenclub';
+        cmd(host, 'join', [name]);
+        say(host, 'before the room guest arrived', name);
+        cmd(guest, 'join', [name]);
+        expect(got(guest).find((frame) => frame.t === 'join' && frame.ch.name === name)).not.toHaveProperty('history');
+        expect(lines(guest)).not.toContain('before the room guest arrived');
+        later(1000);
+        say(host, 'we are here together', name);
+        expect(lines(guest)).toContain('we are here together');
+        cmd(guest, 'part', [name]);
+        later(1000);
+        say(host, 'while the room guest was away', name);
+        inbox.set(guest.id, []);
+        cmd(guest, 'join', [name]);
+        expect(lines(guest)).toEqual([]);
+        expect(got(guest).find((frame) => frame.t === 'join')).not.toHaveProperty('history');
+    });
+
+    it('keeps bounded report context separate from visitor join payloads and durable snapshots', () => {
+        boot({ moderationContext: 3 });
+        const speaker = join('Speaker');
+        const witness = join('Witness', { iph: 'witness-home' });
+        for (const text of ['oldest words', 'a little context', 'the reported words', 'a final response']) {
+            later(4000); say(speaker, text);
+        }
+        const room = L._debug.channels.get(LOBBY);
+        expect(room.moderationContext.map((line) => line.text)).toEqual(['a little context', 'the reported words', 'a final response']);
+        expect(JSON.stringify(L.snapshot())).not.toContain('the reported words');
+        const reported = got(witness).find((frame) => frame.t === 'line' && frame.text === 'the reported words');
+        L.message(witness.id, JSON.stringify({ t: 'report', id: reported.id }));
+        expect(L.adminState().reports[0].context).toContain('<Speaker> a little context');
+        const late = join('AfterReport');
+        expect(JSON.stringify(got(late))).not.toContain('the reported words');
+        const band = join('Drummer', { role: 'band' });
+        inbox.set(late.id, []);
+        cmd(band, 'dismiss', [reported.id]);
+        expect(lines(late)).toEqual([]);
+        expect(L._debug.reports.get(reported.id).done).toBe(true);
+    });
+});
+
+describe('guest-hosted chat channels', () => {
+    it.each([
+        ['#hangs', 'chat'], ['#watchmakers', 'chat'], ['#artistclub', 'chat'],
+        ['#watch', 'watch'], ['#watch-together', 'watch'], ['#art-sketch', 'art'],
+        ['#bobross', 'bobross'], ['#jam-garage', 'jam']
+    ])('%s chooses %s without treating arbitrary name prefixes as activities', (name, kind) => {
+        const host = join('GuestHost');
+        cmd(host, 'join', [name]);
+        const room = L._debug.channels.get(name);
+        expect(room.kind).toBe(kind);
+        expect(room.ops.has('dev-GuestHost')).toBe(true);
+        if (kind === 'chat') {
+            expect(room.modes.C).toBe(false);
+            expect(got(host).find((frame) => frame.t === 'join' && frame.ch.name === name).act).toBeNull();
+            expect(notices(host)).toContain('room host runs this conversation');
+        }
+    });
+
+    it('keeps chat text-only through host mode commands and a shield cycle', () => {
+        const host = join('GuestHost');
+        const guest = join('GuestPal');
+        const band = join('Drummer', { role: 'band' });
+        const name = '#gardenclub';
+        cmd(host, 'join', [name]); cmd(guest, 'join', [name]);
+        cmd(host, 'topic', ['Garden', 'chat'], name);
+        expect(L._debug.channels.get(name).topic).toBe('Garden chat');
+        cmd(host, 'mode', ['+C'], name);
+        L.message(host.id, JSON.stringify({ t: 'cam', ch: name, on: true, adult18: true }));
+        expect(L._debug.conns.get(host.id).cams.size).toBe(0);
+        expect(notices(host)).toContain('Cameras belong in activity rooms');
+        cmd(band, 'shield'); cmd(band, 'shieldoff');
+        expect(L._debug.channels.get(name).modes.C).toBe(false);
+        inbox.set(guest.id, []);
+        L.message(host.id, JSON.stringify({ t: 'act', ch: name, kind: 'rtc', to: guest.id, sdp: { type: 'offer', sdp: 'test' } }));
+        expect(got(guest).some((frame) => frame.t === 'act')).toBe(false);
+        say(host, 'chat still works', name);
+        expect(lines(guest)).toContain('chat still works');
+    });
+});
+
 describe('permissions are enforced on the server (forged commands)', () => {
     const chanop = Object.entries(COMMANDS).filter(([, s]) => s === 'chanop').map(([k]) => k);
     const band = Object.entries(COMMANDS).filter(([, s]) => s === 'band').map(([k]) => k);

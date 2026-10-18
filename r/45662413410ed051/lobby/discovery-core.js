@@ -4,6 +4,7 @@
     'use strict';
 
     const ACTIVITY = Object.freeze({
+        chat: Object.freeze({ label: 'Chat channel', description: 'A named conversation hosted by the person who starts it.' }),
         bobross: Object.freeze({ label: 'Bob Ross paint-along', description: 'Watch and paint on a shared canvas. Camera optional.' }),
         watch: Object.freeze({ label: 'Watch together', description: 'Share a YouTube video and chat. Camera optional.' }),
         art: Object.freeze({ label: 'Draw together', description: 'Make something on a shared canvas. Camera optional.' }),

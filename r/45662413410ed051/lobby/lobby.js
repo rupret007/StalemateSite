@@ -20,8 +20,8 @@
     // GoatCounter: fixed, privacy-safe event names only (no nicks, no room names, no query string).
     const count = (event) => { try { if (window.goatcounter && window.goatcounter.count) window.goatcounter.count({ path: `hangout-${event}`, title: 'Hang Out', event: true, referrer: '' }); } catch (e) { /* analytics never breaks chat */ } };
     count('lobby-view');
-    const KIND_ICON = { lobby: '#', bobross: '🎨', watch: '📺', art: '🖌️', jam: '🎸' };
-    const KIND_NAME = { bobross: 'Bob Ross paint-along', watch: 'Watch together', art: 'Draw together', jam: 'Jam' };
+    const KIND_ICON = { lobby: '#', chat: '#', bobross: '🎨', watch: '📺', art: '🖌️', jam: '🎸' };
+    const KIND_NAME = { chat: 'Chat channel', bobross: 'Bob Ross paint-along', watch: 'Watch together', art: 'Draw together', jam: 'Jam' };
     const WORDS = ['happy', 'little', 'gross', 'loud', 'feral', 'fuzzy', 'mighty', 'snotty', 'rad', 'grumpy', 'soggy', 'mosh'];
     const THINGS = ['tree', 'cloud', 'possum', 'riff', 'taco', 'goat', 'ghost', 'drip', 'squirrel', 'pickle', 'van', 'amp'];
     const pick = (a) => a[Math.floor(Math.random() * a.length)];
@@ -117,6 +117,10 @@
         $('[data-enter]').disabled = state === 'connecting' || state === 'reconnecting';
         $('[data-reconnect]').hidden = state !== 'offline' || !app.me;
         $$('[data-start]').forEach((b) => { b.disabled = state !== 'connected'; });
+        if (state === 'offline' && app.pendingChannel) {
+            app.pendingChannel = '';
+            $('[data-channel-error]').textContent = 'Connection lost. Reconnect and try this channel again.';
+        }
         drawCommunity(); drawRooms();
     }
     async function connect(nick) {
@@ -194,8 +198,12 @@
         }
         case 'join': {
             const c = { ...m.ch, lines: [] };
+            if (app.pendingChannel === m.ch.name) {
+                app.pendingChannel = '';
+                $('[data-channel-dialog]').close();
+            }
             app.chans.set(m.ch.name, c);
-            (m.history || []).forEach((h) => pushLine(m.ch.name, h.t === 'event' ? { ...h, event: true } : h));
+            // Classic IRC: joining begins a fresh buffer; never render pre-join backlog.
             if (m.act) c.actSnap = m.act;
             switchTo(m.ch.name);
             const r = room();
@@ -231,7 +239,15 @@
         }
         case 'line': pushLine(m.ch, m); break;
         case 'event': pushLine(m.ch, { ...m, event: true }); break;
-        case 'notice': line(app.active, { notice: true, from: m.from, text: m.text, kind: m.kind }); break;
+        case 'notice':
+            line(app.active, { notice: true, from: m.from, text: m.text, kind: m.kind });
+            if (m.kind === 'error') {
+                if (app.pendingChannel && $('[data-channel-dialog]').open) {
+                    $('[data-channel-error]').textContent = m.text;
+                    app.pendingChannel = '';
+                } else toast(m.text);
+            }
+            break;
         case 'denied': line(app.active, { notice: true, from: 'StaleBot', text: m.text, kind: 'error' }); break;
         case 'list': app.rooms = m.rooms; drawRooms(); if (m.show) show('rooms'); break;
         case 'delete': for (const c of [...app.chans.values(), ...app.pms.values()]) c.lines = c.lines.filter((l) => !m.ids.includes(l.id)); $$('[data-id]').forEach((li) => { if (m.ids.includes(li.dataset.id)) li.remove(); }); break;
@@ -380,14 +396,17 @@
         const room = !isPm && c && c.kind !== 'lobby';
         $('[data-roombar]').hidden = !room;
         $('[data-jam]').hidden = !(room && c.kind === 'jam');
-        const showAct = room && c.kind !== 'jam';
+        const showAct = room && ['bobross', 'watch', 'art'].includes(c.kind);
         $('[data-activity]').hidden = !showAct;
         $('[data-act-stage]').hidden = !showAct;
         document.body.classList.toggle('am-op', !!(c && amOp(c)));
         if (room) {
             const m = c.modes;
+            const hosts = c.names.filter((n) => n.prefix === '@').map((n) => n.nick);
+            $('[data-host-status]').textContent = amOp(c) ? 'You have @ host controls · /op nick adds a co-host' : hosts.length ? `Hosts: ${hosts.map((nick) => `@${nick}`).join(', ')}` : 'No room host online. An existing host can return, or a site moderator can help.';
             $('[data-modes]').textContent = `${KIND_NAME[c.kind]} · +t${m.m ? 'm' : ''}${m.i ? 'i' : ''}${m.k ? 'k' : ''}${m.C ? 'C' : ''}${m.Q ? 'Q' : ''}${m.S ? ` slow ${m.S}s` : ''}${m.locked ? ' 🔒' : ''} · ${c.count}/${m.l}`;
             const cam = $('[data-cam]');
+            cam.hidden = c.kind === 'chat';
             cam.setAttribute('aria-pressed', String(!!c.myCam));
             cam.textContent = c.myCam ? '📷 Camera on' : m.C ? '📷 Camera (18+)' : '📷 Cameras off here';
             cam.disabled = !m.C && !c.myCam;
@@ -451,7 +470,7 @@
         const paused = !app.band && (app.netLock === 'readonly' || app.budget === 'readonly');
         const note = $('[data-network-note]');
         note.hidden = !paused && connected;
-        note.textContent = !connected ? 'You’re offline. Your draft stays here until you reconnect.' : 'The lobby is read-only for now. You can catch up; the band needs to reopen the conversation.';
+        note.textContent = !connected ? 'You’re offline. Your draft stays here until you reconnect.' : 'Chat is read-only for now. Your unsent draft stays here.';
     }
     $('[data-lobby-home]').addEventListener('click', () => { if (app.chans.has('#stalemate')) switchTo('#stalemate'); });
     $('[data-reconnect]').addEventListener('click', () => connect(app.me || nickInput.value.trim()));
@@ -461,8 +480,44 @@
         input.value = b.dataset.prompt; input.focus();
     }));
 
-    // One tap = a room. Name and title are picked for you; the host can /topic later.
-    $$('[data-start]').forEach((b) => b.addEventListener('click', () => { count(`room-start-${b.dataset.start}`); cmd('join', [`#${b.dataset.start}-${slug()}`]); }));
+    // Activity tiles pick a name; plain chat lets guests name their own channel.
+    $$('[data-start]').forEach((b) => b.addEventListener('click', () => {
+        if (b.dataset.start === 'chat') {
+            $('[data-channel-error]').textContent = '';
+            $('[data-channel-dialog]').showModal();
+            $('[data-channel-name]').focus();
+            return;
+        }
+        count(`room-start-${b.dataset.start}`); cmd('join', [`#${b.dataset.start}-${slug()}`]);
+    }));
+    $('[data-channel-cancel]').addEventListener('click', () => $('[data-channel-dialog]').close());
+    $('[data-channel-dialog]').addEventListener('close', () => { app.pendingChannel = ''; });
+    $('[data-channel-form]').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = `#${$('[data-channel-name]').value.trim().replace(/^#/, '').toLowerCase()}`;
+        if (!/^#[a-z0-9-]{2,30}$/.test(name)) {
+            $('[data-channel-error]').textContent = 'Use 2–30 letters, numbers or dashes.';
+            $('[data-channel-name]').focus();
+            return;
+        }
+        if (app.chans.has(name)) {
+            $('[data-channel-dialog]').close();
+            switchTo(name);
+            return;
+        }
+        if (/^#(?:art|watch|bobross|jam)(?:-|$)/.test(name) && !app.rooms.some((r) => r.name === name)) {
+            $('[data-channel-error]').textContent = 'That name starts an activity room. Choose another name for chat, or use the activity buttons.';
+            $('[data-channel-name]').focus();
+            return;
+        }
+        if (!cmd('join', [name])) {
+            $('[data-channel-error]').textContent = 'Reconnect before joining a channel. Your name stays here.';
+            return;
+        }
+        app.pendingChannel = name;
+        $('[data-channel-error]').textContent = 'Joining…';
+        count('room-start-chat');
+    });
     $('[data-private]').addEventListener('click', () => count('room-start-private'));
 
     function openPm(nick, focus) {
@@ -520,6 +575,7 @@
         const box = $('[data-palette-buttons]');
         box.replaceChildren();
         for (const [label, name, ask, fixed] of (ops ? OP_PALETTE : PALETTE)) {
+            if (store(app.active)?.kind === 'chat' && name === 'mode' && ['+C', '-C'].includes(fixed?.[0])) continue;
             const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--small'; b.textContent = label;
             b.addEventListener('click', () => {
                 $('[data-palette]').close();

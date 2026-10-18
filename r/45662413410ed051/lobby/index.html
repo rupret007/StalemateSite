@@ -27,6 +27,7 @@
                 <span class="nickbox"><input data-nick maxlength="20" autocomplete="off" spellcheck="false" aria-label="Your nick" placeholder="Type a nickname… or roll one →"><button class="btn btn--ghost dice" type="button" data-reroll aria-label="Make me a random fun nickname">🎲 Make me a name</button></span>
             </label>
             <p class="small gate-hint">Your guest nickname is remembered here, not reserved. Camera and mic stay off.</p>
+            <p class="small">Chat starts when you join. Scrollback stays in this tab for your connected session.</p>
             <button class="btn btn--big" type="button" data-enter>I’m 13+ and I agree · Let me in 🤘</button>
             <p class="rules"><b>One rule: Don’t be a dick.</b> Swear all you want. You own what you post; the band can remove anything. <a href="../terms/" data-terms>House rules &amp; privacy</a></p>
             <p class="status" data-gate-status role="status"></p>
@@ -43,9 +44,11 @@
             <h2>Rooms open now <span class="count" data-room-count>0</span></h2>
             <p class="small directory-hint">Join something already going, or start a room below.</p>
             <ul class="roomlist" data-roomlist></ul>
-            <p class="empty" data-rooms-empty>No activity rooms yet. Stay for a chat, or be the first to start one.</p>
+            <p class="empty" data-rooms-empty>No rooms yet. Stay for a chat, or be the first to start one.</p>
             <h2 class="start-heading">Start something together</h2>
+            <p class="small">Anyone can host. Create a room and you get @ host controls.</p>
             <div class="tiles" data-tiles>
+                <button class="tile tile-chat" type="button" data-start="chat"><b aria-hidden="true">#</b>Start a chat channel<span>Pick a name. Make it your hangout.</span></button>
                 <button class="tile" type="button" data-start="bobross"><b aria-hidden="true">🎨</b>Paint along<span>Bob Ross + a shared canvas</span></button>
                 <button class="tile" type="button" data-start="watch"><b aria-hidden="true">📺</b>Watch together<span>One video, same moment</span></button>
                 <button class="tile" type="button" data-start="art"><b aria-hidden="true">🖌️</b>Draw together<span>Make something from nothing</span></button>
@@ -60,7 +63,7 @@
             <div class="topic" data-topic></div>
             <p class="network-note" data-network-note role="status" hidden></p>
             <section class="lobby-welcome" data-lobby-welcome aria-label="Conversation starters">
-                <div><b data-welcome-title>Make yourself at home.</b><p>Just reading is fine. When you’re ready, say hello or start with a question.</p></div>
+                <div><b data-welcome-title>Make yourself at home.</b><p>Chat starts when you join. Say hello, read along, or host your own channel.</p></div>
                 <div class="conversation-starters">
                     <button type="button" data-prompt="Hey everyone, I’m new here. ">Say hello</button>
                     <button type="button" data-prompt="What’s everyone making or working on? ">What are you making?</button>
@@ -72,6 +75,7 @@
                 <button class="btn btn--small" type="button" data-cam aria-pressed="false">📷 Camera (18+)</button>
                 <button class="btn btn--small btn--ghost op-only" type="button" data-roomtools>@ Host tools</button>
                 <button class="btn btn--small btn--ghost" type="button" data-leave>Leave</button>
+                <span class="small host-status" data-host-status></span>
             </div>
             <div class="jam" data-jam hidden>
                 <p><b>Music runs in the WebJam desktop app</b> (Jamulus under the hood) so the timing is tight. <b>Plug in Ethernet</b> — Wi-Fi adds lag and dropouts.</p>
@@ -123,7 +127,7 @@
                 <input data-text maxlength="300" autocomplete="off" placeholder="Say something (or /help)" aria-label="Message">
                 <button class="btn" data-send type="submit">Send</button>
             </form>
-            <div class="chat-status"><span data-chat-context>#stalemate</span><span>Enter to send · /help for commands</span></div>
+            <div class="chat-status"><span data-chat-context>#stalemate</span><span title="The last 300 lines received in this channel during this session. No earlier messages are replayed.">Session scrollback · /help</span></div>
         </section>
 
         <aside class="pane people" data-pane="people" aria-label="People">
@@ -140,6 +144,18 @@
         </nav>
     </main>
 
+    <dialog class="sheet" data-channel-dialog aria-labelledby="channel-dialog-title">
+        <h3 id="channel-dialog-title">Your own #channel</h3>
+        <p>Anyone can host. Join an existing channel, or create one and become its @ host.</p>
+        <form data-channel-form>
+            <label class="channel-label" for="channel-name">Channel name</label>
+            <input id="channel-name" data-channel-name maxlength="31" autocomplete="off" spellcheck="false" placeholder="#night-owls" aria-describedby="channel-name-hint channel-name-error" required>
+            <p class="small" id="channel-name-hint">2–30 letters, numbers or dashes. You can also type /join #night-owls in chat.</p>
+            <p class="status" id="channel-name-error" data-channel-error role="status"></p>
+            <div class="sheet-buttons"><button class="btn" type="submit">Join / create</button><button class="btn btn--ghost" type="button" data-channel-cancel>Cancel</button></div>
+        </form>
+        <p class="small">Give another member @ with /op nick before you leave. Rooms close after 10 minutes empty.</p>
+    </dialog>
     <dialog class="sheet" data-sheet>
         <h3 data-sheet-title></h3>
         <div class="sheet-buttons" data-sheet-buttons></div>

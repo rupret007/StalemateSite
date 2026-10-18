@@ -6,7 +6,7 @@ import { actSnapshot, applyClear, applyStroke, applyVideo, cleanRtc, parseActFra
 
 export const BOT = 'StaleBot';
 export const LOBBY = '#stalemate';
-export const KINDS = Object.freeze({ bobross: '🎨 Bob Ross paint-along', watch: '📺 Watch together', art: '🖌️ Draw together', jam: '🎸 Jam' });
+export const KINDS = Object.freeze({ chat: '💬 Chat', bobross: '🎨 Bob Ross paint-along', watch: '📺 Watch together', art: '🖌️ Draw together', jam: '🎸 Jam' });
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
@@ -38,7 +38,7 @@ export const LOBBY_LIMITS = Object.freeze({
     pmMinLobbyMs: 2 * MIN,
     pmPendingMax: 5,
     noBandShield: DAY,
-    history: 50,
+    moderationContext: 50, // in-memory report context; never replayed to visitors
     emptyRoomClose: 10 * MIN,
     requestBudget: 40000, // the lobby's share of the free 100k DO requests/day
     modlogKeep: 2000,
@@ -126,9 +126,9 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
 
     const mkChannel = (name, kind, title, founder) => ({
         name, kind, title, founder, created: now(), topic: kind === 'lobby' ? 'Welcome to #stalemate. Pull up a nick, say hello, make something together. /help for commands.' : '',
-        modes: { m: false, i: false, k: '', l: kind === 'lobby' ? L.lobbyMax : L.roomMax, t: true, S: kind === 'lobby' ? L.defaultSlow : 0, C: kind !== 'lobby', Q: false, locked: false },
+        modes: { m: false, i: false, k: '', l: kind === 'lobby' ? L.lobbyMax : L.roomMax, t: true, S: kind === 'lobby' ? L.defaultSlow : 0, C: kind !== 'lobby' && kind !== 'chat', Q: false, locked: false },
         jam: kind === 'jam' ? { desktop: '', web: '' } : null, ops: new Set(founder ? [founder] : []), voice: new Set(), bans: [], invites: new Set(), kicks: {},
-        members: new Set(), history: [], emptySince: null,
+        members: new Set(), moderationContext: [], emptySince: null,
         act: { strokes: [], video: null }
     });
     channels.set(LOBBY, mkChannel(LOBBY, 'lobby', 'The lobby', null));
@@ -163,8 +163,8 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     };
     const event = (chan, text) => {
         const msg = { t: 'event', ch: chan.name, text, ts: now() };
-        chan.history.push(msg);
-        if (chan.history.length > L.history) chan.history.shift();
+        chan.moderationContext.push(msg);
+        if (chan.moderationContext.length > L.moderationContext) chan.moderationContext.shift();
         cast(chan, msg);
     };
     const names = (chan) => membersOf(chan).filter((m) => m.nick).map((m) => ({ id: m.id, nick: m.nick, prefix: prefix(m, chan), band: isBand(m), away: !!m.away, cam: !!(m.cams && m.cams.has(lc(chan.name))) }))
@@ -277,11 +277,14 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (chan.kind !== 'lobby') bump(net.stats.rooms, (KINDS[chan.kind].endsWith(chan.title) ? KINDS[chan.kind] : `${KINDS[chan.kind]} · ${chan.title}`).slice(0, 60));
         c.channels.add(chan.name);
         const act = actSnapshot(chan);
-        out(c, { t: 'join', ch: chanView(chan), history: chan.history.filter((h) => !(h.from && c.ignores.has(lc(h.from)))), act });
+        // Classic IRC: channel metadata/current activity may synchronize, but chat begins now.
+        // The bounded moderation context above is not a visitor backlog.
+        out(c, { t: 'join', ch: chanView(chan), act });
         event(chan, `${nickOf(c)} has joined ${chan.name}`);
         if (chan.kind === 'lobby') bot(c, `welcome to #stalemate, ${c.nick}. One rule: Don’t be a dick. Swear all you want; no hate, threats, creepy stuff or personal info. 🚩 anything gross. /help for commands.`);
         else if (chan.kind === 'jam') bot(c, `welcome to ${chan.name}. Music runs in the WebJam desktop app (Jamulus) for tight timing. Plug in Ethernet: Wi-Fi adds lag and dropouts.`);
-        else bot(c, `welcome to ${chan.name}. Open rooms are moderated by the band. Cameras stay off unless you turn yours on (18+).`);
+        else if (chan.kind === 'chat') bot(c, `welcome to ${chan.name}. The room host runs this conversation; the band moderates sitewide. Chat starts when you join. Start an activity room to draw, watch or use optional cameras.`);
+        else bot(c, `welcome to ${chan.name}. The room host runs this activity; the band moderates sitewide. Cameras stay off unless you turn yours on (18+).`);
         sendChan(chan);
         pushList();
         return true;
@@ -543,7 +546,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             if (k === 'k') { if (on && !/^[A-Za-z0-9]{3,20}$/.test(arg || '')) return bot(c, '+k needs a 3-20 letter key.', 'error'); chan.modes.k = on ? arg : ''; }
             else if (k === 'l') { const n = Number(arg); const cap = chan.kind === 'lobby' ? L.lobbyMax : L.roomMax; chan.modes.l = on && Number.isInteger(n) && n > 0 ? Math.min(n, cap) : cap; }
             else if (k === 'S') { const n = Number(arg); chan.modes.S = on ? (Number.isInteger(n) && n >= 0 ? Math.min(n, 300) : 5) : 0; }
-            else if (k === 'C') { if (on && net.shield) return bot(c, 'Shield is on: cameras stay off.', 'error'); chan.modes.C = on; if (!on) camsOff(chan, c.nick); }
+            else if (k === 'C') { if (on && (chan.kind === 'chat' || chan.kind === 'lobby')) return bot(c, 'Cameras belong in activity rooms.', 'error'); if (on && net.shield) return bot(c, 'Shield is on: cameras stay off.', 'error'); chan.modes.C = on; if (!on) camsOff(chan, c.nick); }
             else chan.modes[k] = on;
             event(chan, `${c.nick} sets mode ${flag}${k === 'k' && on ? ' ****' : arg && k !== 'k' ? ` ${arg}` : ''}`);
             log(c.nick, 'mode', `${chan.name} ${flag}${arg && k !== 'k' ? ` ${arg}` : ''}`, '', chan.name);
@@ -653,7 +656,9 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             const r = reports.get(id);
             if (!r) return bot(c, 'No such report.', 'error');
             r.done = true;
-            if (r.hidden && lines.has(id)) { r.hidden = false; const l = lines.get(id); const room = ch(l.ch); if (room) cast(room, { ...l, restored: true }); }
+            // Dismissing a report updates moderation state only. Rebroadcasting old text
+            // would disclose pre-join messages to people who arrived afterward.
+            r.hidden = false;
             return log(c.nick, 'dismiss-report', r.from, '', r.ch);
         },
         log(c) { return out(c, { t: 'modlog', entries: net.modlog.slice(-50) }); }
@@ -675,7 +680,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     }
 
     function create(c, name, key, titleText) {
-        const kind = Object.keys(KINDS).find((k) => name.startsWith(`#${k}`)) || 'watch';
+        const kind = Object.keys(KINDS).find((k) => name === `#${k}` || name.startsWith(`#${k}-`)) || 'chat';
         if (net.shield && !isBand(c)) return bot(c, 'Shield is on, so new rooms are paused. Try again later.', 'error');
         const listed = [...channels.values()].filter((x) => x.kind !== 'lobby').length;
         if (listed >= L.roomsListed) return bot(c, 'All 30 room slots are busy. Join one from the list.', 'error');
@@ -721,7 +726,8 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         const chan = ch(where);
         if (!chan || !chan.members.has(c.id)) return bot(c, 'Join the room first.', 'error');
         if (!on) { c.cams.delete(lc(chan.name)); out(c, { t: 'cam', ch: chan.name, on: false }); return sendChan(chan); }
-        if (chan.kind === 'lobby') return bot(c, 'No cameras in #stalemate. Start or join a room.', 'error');
+        if (chan.kind === 'lobby') return bot(c, 'No cameras in #stalemate. Start or join an activity room.', 'error');
+        if (chan.kind === 'chat') return bot(c, 'Cameras belong in activity rooms. Start or join one to turn yours on.', 'error');
         if (net.shield) return bot(c, 'Shield is on: cameras are off everywhere for now.', 'error');
         if (!chan.modes.C) return bot(c, `Cameras are off in ${chan.name} (-C).`, 'error');
         if (!adult18) return out(c, { t: 'cam-gate', ch: chan.name, text: 'Cameras in open rooms are 18+. Tick the box to turn yours on.' });
@@ -755,7 +761,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (!f) return kill(c, 4400, 'bad frame');
         const chan = ch(f.ch);
         if (!chan || !chan.members.has(c.id)) return bot(c, 'Join the room first.', 'error');
-        if (chan.kind === 'lobby' || chan.kind === 'jam') return bot(c, 'Not in that kind of room.', 'error');
+        if (chan.kind === 'lobby' || chan.kind === 'chat' || chan.kind === 'jam') return bot(c, 'Not in that kind of room.', 'error');
         if (!actAllowed(c)) return bot(c, 'The lobby is read-only right now.', 'error');
         if (!takeActToken(c)) return bot(c, 'Easy on the paint brush.', 'error');
         const relayT = now();
@@ -834,14 +840,14 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         statHour().lines += 1;
         lines.set(line.id, line);
         if (lines.size > 1000) lines.delete(lines.keys().next().value);
-        chan.history.push(line);
-        if (chan.history.length > L.history) chan.history.shift();
+        chan.moderationContext.push(line);
+        if (chan.moderationContext.length > L.moderationContext) chan.moderationContext.shift();
         cast(chan, line, (m) => !m.ignores.has(lc(line.from)) && !(dev && m.blocks.has(dev)));
     }
 
     function deleteIds(ids) {
         const set = new Set(ids);
-        for (const chan of channels.values()) chan.history = chan.history.filter((h) => !set.has(h.id));
+        for (const chan of channels.values()) chan.moderationContext = chan.moderationContext.filter((h) => !set.has(h.id));
         for (const id of ids) lines.delete(id);
         for (const x of conns.values()) if (x.nick) out(x, { t: 'delete', ids });
         pushAdmin();
@@ -899,7 +905,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         let r = reports.get(id);
         if (!r) {
             const chan = ch(l.ch);
-            const hist = chan ? chan.history : [];
+            const hist = chan ? chan.moderationContext : [];
             const at = hist.findIndex((h) => h.id === id);
             const context = at >= 0 ? hist.slice(Math.max(0, at - 5), at + 6).map((h) => `${h.from ? `<${h.from}> ` : '* '}${h.text}`) : [`<${l.from}> ${l.text}`];
             r = { devs: new Set(), iphs: new Set(), ch: l.ch, from: l.from, text: l.text, hidden: false, context, at: now() };
@@ -927,7 +933,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         net.shield = on;
         net.shieldAuto = on && auto;
         if (on) for (const room of channels.values()) { if (room.kind !== 'lobby') { room.modes.C = false; camsOff(room, by); } }
-        else for (const room of channels.values()) if (room.kind !== 'lobby') room.modes.C = true;
+        else for (const room of channels.values()) if (room.kind !== 'lobby' && room.kind !== 'chat') room.modes.C = true;
         event(ch(LOBBY), on ? `${by} raised the shield: slow mode 30s, cameras off, new rooms and PM requests paused` : `${by} lowered the shield`);
         for (const x of conns.values()) out(x, { t: 'net', lock: net.lock, shield: net.shield });
         for (const room of channels.values()) sendChan(room);

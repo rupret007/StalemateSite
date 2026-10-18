@@ -6,6 +6,8 @@ Updated October 18, 2026. This records confirmed direction, the current developm
 
 - Welcome anyone visiting Stalemate, with guest access from day one.
 - Make the experience visibly retro IRC: nicknames, channels, topics, commands, conversation, and recognizable regulars.
+- Anyone visiting can create and host their own text or creative room; room hosts have channel-scoped controls, while authenticated band/site moderators retain site-wide authority.
+- Chat starts when someone joins. Keep scrollback for messages received while connected, with no pre-join backlog or replay of missed messages. Jeff's reference is classic EFnet.
 - Start in `#stalemate`; let conversation lead naturally into drawing, watching, music, and other collaboration.
 - Make participation useful to non-musicians and comfortable for people who prefer to read quietly.
 - Keep guest entry simple. Cameras and microphones remain optional and off initially; retain the recorded age/admission rules.
@@ -27,22 +29,24 @@ These changes are in the current local development branch; they are not a claim 
 - The Worker WebSocket handshake queues initial frames until socket acceptance so the browser receives the greeting needed to proceed.
 - Local browser coverage exercises discovery, conversation starters, mentions/unreads, drafts, and reconnect behavior. Consult the current test run for results; this document is not a production acceptance record.
 
-Existing creative-room, PM-consent, and moderation capabilities remain the foundation. Current recent chat history is bounded in memory (`LOBBY_LIMITS.history` is 50); persistent moderation/network state does not make conversation history durable. Local drafts and local nickname memory are not cross-device accounts or archives.
+Existing creative-room, PM-consent, and moderation capabilities remain the foundation. Join frames no longer include chat history. The client keeps up to 300 received lines per joined channel in memory, clearing them on part/rejoin, reconnection or refresh. The server's bounded `moderationContext` supports abuse reports, remains separate from user-visible scrollback, and is never included in join payloads or persistence snapshots. Dismissing a report no longer rebroadcasts old text. Local drafts and nickname memory are not cross-device accounts or archives.
+
+Guests can now create genuine named text rooms through `/join #name` and Start a chat channel, receiving `@` controls for their room. Text rooms open no media. A host-status line shows current hosts or explains when none are online; `/op nick` shares control. Phone creation failures keep the name and show the server's explanation in the dialog. Browser coverage verifies host handoff, same-device return, and no backlog on lobby entry, room entry, rejoin and refresh.
 
 ## Ranked roadmap
 
 ### 1. Make quiet visits and hosted visits worthwhile
 
 - Keep one obvious main conversation; display active rooms honestly instead of fragmenting a small audience across empty destinations.
-- Show the next **confirmed** hosted gathering, its host, local time, and what someone can do without equipment. No invented schedule or implied live host.
+- Show the next **confirmed** gathering hosted by any willing visitor, its host, local time, and what someone can do without equipment. No invented schedule or band-presence prerequisite.
 - When quiet, offer a small creative prompt and an approved past creation. When disconnected, explain the service state rather than displaying false emptiness.
-- Preserve the existing 24-hour band-absence lockdown. A closed lobby can still explain the situation and display approved information.
-- Hosting cadence remains unanswered: ask what Jeff or another named host can sustain before promising a weekly event.
+- The existing 24-hour band-absence global read-only rule conflicts with independent guest hosting. The exact replacement is pending a user answer; do not silently change it or equate a guest room host with a band moderator.
+- A recurring gathering is optional; anyone may host spontaneously. No weekly cadence or band hosting commitment has been promised.
 
 ### 2. Establish continuity and truthful guest identity
 
-- Decide whether public chat should persist, for how long, and what deletion/removal means before adding durable replay. Persistence preferences are still unanswered.
-- Explain who can read history before posting; keep private-room and PM audiences separate from public channels.
+- Enforce live chat from join onward. Channel switching may retain already-received scrollback while membership continues; no new visitor gets earlier messages and no fresh visit restores a transcript.
+- Reconnection begins a fresh chat buffer; unsent drafts remain separate and can survive within the tab. Keep private-room and PM audiences distinct.
 - Remembering a nickname on one device improves convenience but does not reserve a name or establish identity. Clearing storage can lose that continuity.
 - Consider optional claimed/reserved identity only when cross-device recognition is wanted; never make it the default guest-entry requirement.
 - Authenticate host/band roles independently of nicknames. A display name must not confer authority.
@@ -62,9 +66,12 @@ Existing creative-room, PM-consent, and moderation capabilities remain the found
 - Try an asynchronous co-writing pad later: a small text document with explicit sharing, version recovery, attribution, and moderation. Validate demand before adding a document platform.
 - Keep the lobby accessible while making things; returning from a room should preserve the visitor's conversation context.
 
-### 5. Expand hosting and reminders only with an operating model
+### 5. Make guest hosting dependable; keep global moderation separate
 
-- A future trusted community host role could make gatherings less dependent on the band. Who may reopen/moderate the lobby under the 24-hour rule remains unresolved.
+- Room hosting is already open to guests as a product decision. A trusted site-wide moderator role would be a different capability; global reopening and the 24-hour rule remain unresolved.
+- Current lifecycle: creator gets room-op controls; `/op nick` grants a co-host; signed-device identity recovers authority while the room exists; the UI shows an unhosted state; rooms close after 10 minutes empty. There is no automatic transfer. A friend using the same nickname on a new device gets no authority. Remaining gaps include a more direct handoff flow, full-room return and room-state loss on Worker hibernation.
+- The existing one-room-per-device/10-minute creation cap can interrupt chat → creative collaboration. Revisit the allowance or add an explicit way to turn a chat into an activity before launching; do not silently remove abuse limits.
+- Never restore host controls based on nickname alone, silently hand global power to a guest entering `#stalemate`, or imply that a room-op marker identifies a band member.
 - StaleBot can explain commands and enforce understandable rules; humans should welcome and respond to people. Never simulate visitors or activity.
 - Start event reminders with a calendar download. Email/push require a clear opt-in, an off switch, and truthful delivery behavior.
 - A local saved event is not a server RSVP. A connected tab is not proof of an attentive person. Never use either to imply fake attendance or concurrency.
@@ -72,7 +79,7 @@ Existing creative-room, PM-consent, and moderation capabilities remain the found
 
 ## Lean pilot
 
-Use four hosted sessions with roughly 12–20 recruited visitors spanning friends, non-musicians, and phones. This is a usability/demand pilot for an eventual public guest product, not a statistically reliable retention experiment. The following thresholds are provisional decision rules, not industry benchmarks:
+Propose four sessions hosted by willing visitors with roughly 12–20 recruited participants spanning friends, non-musicians, and phones. No band presence or weekly cadence is required. This is a usability/demand pilot for an eventual public guest product, not a statistically reliable retention experiment. The following thresholds are provisional decision rules, not industry benchmarks:
 
 | Question | Useful measure |
 | --- | --- |
@@ -98,6 +105,7 @@ Track host workload, reconnect failures, and whether guests can find contact con
 - [Libera helper guidance](https://libera.chat/guides/helpers): personal responses and a welcoming channel culture; bots should not substitute for people.
 - [Arguello et al., CHI 2006](https://www.cs.cmu.edu/~jaime/ArguelloCHI06.pdf): replies associated with subsequent participation in historical Usenet data. Observational evidence, not a causal Stalemate retention estimate.
 - [Discord onboarding](https://support.discord.com/hc/en-us/articles/11074987197975-Community-Onboarding-FAQ) and [events](https://support.discord.com/hc/en-us/articles/4409494125719-Scheduled-Events): focused entry and voluntary event reminders are existing design patterns, not measured proof of our hypotheses.
-- [IRCv3 history](https://ircv3.net/specs/extensions/chathistory): reconnect/catch-up reference; the specification is a draft and does not require changing this application's transport.
+- [RFC 1459 §1.3](https://www.rfc-editor.org/rfc/rfc1459.html#section-1.3): first join creates a channel and gives channel-op status; it ends when empty. [RFC 2812 JOIN](https://www.rfc-editor.org/rfc/rfc2812.html#section-3.2.1) supplies current topic/members and subsequent messages, not prior chat.
+- [EFnet](https://efnet.org/) describes registration-free entry; [OpenChanfix](https://chanfix.org/introduction.html) documents recovery from operator history, not perpetual registered ownership. [mIRC](https://ftp.mirc.com/help/html/other.html) documents local scrollback separately from [optional file logging](https://ftp.mirc.com/help/html/logging.html). Do not claim no backlog prevents copying/logging by recipients.
 - [Excalidraw](https://github.com/excalidraw/excalidraw) and [BandLab fork controls](https://help.bandlab.com/hc/en-us/articles/115002945753-What-is-Forking): live creation, saved work, and opt-in continuation can be separate capabilities.
 - [W3C chat log technique](https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA23.html): semantic, polite message updates; retro styling still needs keyboard, touch, screen-reader, zoom, and contrast testing.
