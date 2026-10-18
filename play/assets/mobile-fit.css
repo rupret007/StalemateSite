@@ -1,0 +1,345 @@
+/* Phone play is a viewport-sized layout. Desktop cabinet styling stays intact. */
+@media (max-width: 980px) {
+  html[data-mobile-game] { height:100%; height:100svh; height:100dvh; overflow:hidden; overscroll-behavior:none; }
+  html[data-mobile-game] body { box-sizing:border-box; width:100%; height:100%; min-height:0!important; margin:0!important; overflow:hidden; overscroll-behavior:none; padding: max(4px,env(safe-area-inset-top)) max(4px,env(safe-area-inset-right)) calc(max(4px,env(safe-area-inset-bottom)) + var(--mobile-footer,0px)) max(4px,env(safe-area-inset-left))!important; }
+  html[data-mobile-game] button:not(.tile), html[data-mobile-game] summary, html[data-mobile-game] select { min-width:44px; min-height:44px; touch-action:manipulation; }
+  html[data-mobile-game] .topbar { flex:none!important; min-height:44px; padding:0 4px 0 52px!important; margin:0!important; gap:4px!important; flex-direction:row!important; flex-wrap:nowrap!important; }
+  html[data-mobile-game] .topbar h1 { font-size:16px!important; line-height:1.1; margin:0; }
+  html[data-mobile-game] .topbar p, html[data-mobile-game] .brand-kicker { display:none!important; }
+  html[data-mobile-game] .mobile-menu { display:block!important; width:auto!important; margin:0!important; }
+  html[data-mobile-game] .mobile-menu details { position:relative; padding:0 4px!important; }
+  html[data-mobile-game] .mobile-menu-actions { position:absolute!important; top:100%; right:0; width:270px; max-width:80vw; background:#10291f; z-index:100; padding:8px; }
+  html[data-mobile-game] .top-actions, html[data-mobile-game="turdjack"] .topbar>.actions, html[data-mobile-game="crapeights"] .topbar>.actions { display:none!important; }
+  html[data-mobile-game] .suite-music-toggle { bottom:calc(max(4px,env(safe-area-inset-bottom)) + var(--mobile-footer,0px))!important; }
+  html[data-mobile-game] .welcome-card, html[data-mobile-game] .guide-card, html[data-mobile-game] .overlay-card { max-height:calc(100dvh - 20px - var(--mobile-footer,0px)); }
+  html[data-mobile-game] .mobile-hand { display:grid!important; grid-template-columns:repeat(var(--hand-columns,5),minmax(0,1fr))!important; gap:4px!important; height:88px!important; min-height:88px!important; padding:2px!important; overflow:visible!important; }
+  html[data-mobile-game] .mobile-hand > button { position:relative!important; inset:auto!important; width:100%!important; height:84px!important; min-width:44px!important; margin:0!important; transform:none!important; translate:none!important; rotate:none!important; animation:none!important; }
+  html[data-mobile-game] .mobile-hand > button.mobile-card-hidden { display:none!important; }
+  html[data-mobile-game] .mobile-hand > button.selected { outline:3px solid #ffe199; outline-offset:-3px; }
+  .mobile-hand-pager { display:flex; align-items:center; justify-content:flex-end; gap:6px; height:44px; font:12px sans-serif; flex:none; }
+  .mobile-hand-pager button { padding:0 10px; color:#fff0cc; border:1px solid #8ee8c7; border-radius:8px; background:#10291f; font-size:18px; }
+  .mobile-hand-pager[hidden] { display:none; }
+  /* Crapjack: live money stays above the felt; session stats remain in Table Menu. */
+  html[data-mobile-game="turdjack"] .shell { display:flex; flex-direction:column; width:100%; height:100%; min-height:0; padding:4px!important; }
+  html[data-mobile-game="turdjack"] .shell>.hud { display:flex!important; flex:none; gap:6px; padding:2px 0!important; margin:2px 0!important; }
+  html[data-mobile-game="turdjack"] .shell>.hud>[data-jack-stat-tier="session"], html[data-mobile-game="turdjack"] .jack-difficulty-bar { display:none!important; }
+  html[data-mobile-game="turdjack"] .shell>.hud>.card-stat { flex:1; min-height:0!important; padding:3px!important; }
+  html[data-mobile-game="turdjack"] .shell>.hud .k { font-size:9px!important; }
+  html[data-mobile-game="turdjack"] .shell>.hud .v { font-size:15px!important; }
+  html[data-mobile-game="turdjack"] .layout { flex:1; display:flex; min-height:0; }
+  html[data-mobile-game="turdjack"] .table { display:flex; flex-direction:column; flex:1; min-height:0!important; width:100%; margin:0!important; padding:8px!important; gap:4px; }
+  html[data-mobile-game="turdjack"] #statusText { flex:none; min-height:30px; padding:4px 8px!important; font-size:11px!important; line-height:1.2; }
+  html[data-mobile-game="turdjack"] .table-stage { flex:1; min-height:0!important; display:flex!important; flex-direction:column; gap:4px!important; margin:0!important; }
+  html[data-mobile-game="turdjack"] .table-stage>.hand { flex:1; min-height:0!important; padding:4px!important; width:100%; }
+  html[data-mobile-game="turdjack"] .table-stage>.hand[hidden] { display:none!important; }
+  html[data-mobile-game="turdjack"] .hand-title { min-height:24px; margin:0!important; font-size:12px; }
+  html[data-mobile-game="turdjack"] .cards { min-height:0!important; height:calc(100% - 28px); flex-wrap:nowrap; padding:2px!important; }
+  html[data-mobile-game="turdjack"] .playing-card { width:54px!important; height:75px!important; min-width:0!important; flex-shrink:1; }
+  html[data-mobile-game="turdjack"] .hand-meter-host, html[data-mobile-game="turdjack"] .table-bet-zone, html[data-mobile-game="turdjack"] .felt-inlay, html[data-mobile-game="turdjack"] .discard-tray, html[data-mobile-game="turdjack"] .shoe-lane, html[data-mobile-game="turdjack"] .desktop-controls, html[data-mobile-game="turdjack"] .toilet-boss, html[data-mobile-game="turdjack"] .boss-bubble { display:none!important; }
+  html[data-mobile-game="turdjack"] .mobile-felt-chip-rack { display:flex!important; position:static; flex:none; justify-content:center; gap:12px; margin:0!important; padding:0!important; }
+  html[data-mobile-game="turdjack"] .mobile-felt-chip-rack .chip-btn { width:44px!important; height:44px!important; min-height:44px!important; padding:0!important; }
+  html[data-mobile-game="turdjack"] .mobile-pit { display:flex!important; flex-direction:column; flex:none; position:relative!important; inset:auto!important; padding:0!important; margin:0!important; gap:4px; border:0; }
+  html[data-mobile-game="turdjack"] .mobile-pit-row { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; }
+  html[data-mobile-game="turdjack"] .mobile-pit .btn { padding:2px!important; font-size:11px!important; min-height:44px!important; }
+  html[data-mobile-game="turdjack"] .mobile-pit-extra { margin:0; padding:0; }
+  html[data-mobile-game="turdjack"] .mobile-pit-extra summary { min-height:44px; padding:10px; }
+  html[data-mobile-game="turdjack"] .mobile-pit-extra[open] .mobile-pit-bets { position:absolute; bottom:46px; left:0; right:0; padding:8px; background:#10291f; z-index:30; }
+  /* Eights: compact arena and a paged hand with non-overlapping card targets. */
+  html[data-mobile-game="crapeights"] .shell { display:flex; flex-direction:column; height:100%; min-height:0!important; }
+  html[data-mobile-game="crapeights"] .shell>.hud { flex:none; padding:2px!important; margin:0!important; display:flex; height:36px; }
+  html[data-mobile-game="crapeights"] .hud-card { flex:1; padding:0!important; }
+  html[data-mobile-game="crapeights"] .hud-card .v { font-size:12px; }
+  html[data-mobile-game="crapeights"] .layout { display:flex; flex:1; min-height:0; gap:0; }
+  html[data-mobile-game="crapeights"] .table { display:flex; flex-direction:column; min-height:0!important; padding:6px!important; margin:0!important; gap:3px; }
+  html[data-mobile-game="crapeights"] .turn-banner { min-height:44px; padding:0; flex:none; }
+  html[data-mobile-game="crapeights"] .turn-banner strong { font-size:13px; }
+  html[data-mobile-game="crapeights"] #statusText, html[data-mobile-game="crapeights"] .selection-note { display:none; }
+  html[data-mobile-game="crapeights"] .arena { flex:1; height:auto; min-height:175px!important; margin:0!important; max-height:none!important; }
+  html[data-mobile-game="crapeights"] .opp-card { width:90px; top:0!important; padding:0; }
+  html[data-mobile-game="crapeights"] .ce-avatar { width:30px; height:30px; }
+  html[data-mobile-game="crapeights"] .opp-cards, html[data-mobile-game="crapeights"] .table-stamp { display:none; }
+  html[data-mobile-game="crapeights"] .pile-row { top:65px!important; gap:30px; }
+  html[data-mobile-game="crapeights"] .pile-stack { --pile-w:56px; --pile-h:78px; }
+  html[data-mobile-game="crapeights"] .suit-row { bottom:0; }
+  html[data-mobile-game="crapeights"] .hand-wrap { margin:0!important; padding:0; flex:none; }
+  html[data-mobile-game="crapeights"] .hand-head { min-height:44px; }
+  html[data-mobile-game="crapeights"] .action-dock { position:static; margin:0; padding:0; flex:none; }
+  html[data-mobile-game="crapeights"] .action-dock .btn { min-height:44px; padding:2px; }
+  html[data-mobile-game="crapeights"] .mobile-hand .center { font-size:26px!important; }
+  /* Rummy keeps its scores, draw piles, hand, and all seven actions in flow. */
+  html[data-mobile-game="turdrummy"] .app { display:flex; flex-direction:column; height:100%; min-height:0; padding:0; width:100%; }
+  html[data-mobile-game="turdrummy"] .topbar { flex-wrap:wrap!important; padding-left:4px!important; }
+  html[data-mobile-game="turdrummy"] .title-group { min-height:44px; padding-left:50px; }
+  html[data-mobile-game="turdrummy"] .top-links { display:flex; width:auto; gap:4px; margin-left:auto; }
+  html[data-mobile-game="turdrummy"] .top-links>* { min-width:44px; min-height:44px; font-size:10px; padding:2px; }
+  html[data-mobile-game="turdrummy"] .status { flex:none; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); padding:2px!important; gap:2px; }
+  html[data-mobile-game="turdrummy"] .stat { padding:2px; }
+  html[data-mobile-game="turdrummy"] .stat-label { font-size:8px; }
+  html[data-mobile-game="turdrummy"] .stat-value { font-size:12px; }
+  html[data-mobile-game="turdrummy"] .table-stage { display:flex; flex-direction:column; flex:1; min-height:0; overflow:visible; }
+  html[data-mobile-game="turdrummy"] .table { display:flex; flex-direction:column; flex:1; min-height:0; margin:2px; padding:2px; gap:2px; overflow:visible; }
+  html[data-mobile-game="turdrummy"] .zone--opponent { flex:none; height:24px; min-height:0; overflow:hidden; }
+  html[data-mobile-game="turdrummy"] .zone--center { flex:1; min-height:0; padding:2px; display:flex; align-items:center; justify-content:center; }
+  html[data-mobile-game="turdrummy"] .zone--center .zone-header, html[data-mobile-game="turdrummy"] .zone--center .message { display:none; }
+  html[data-mobile-game="turdrummy"] .piles { padding:0; gap:12px; }
+  html[data-mobile-game="turdrummy"] .pile-body { min-height:80px; }
+  html[data-mobile-game="turdrummy"] .piles .card, html[data-mobile-game="turdrummy"] .piles .back-card { width:56px; height:78px; }
+  html[data-mobile-game="turdrummy"] .zone--hand { flex:none; padding:0; }
+  html[data-mobile-game="turdrummy"] .zone--hand .zone-header { margin:0; }
+  html[data-mobile-game="turdrummy"] .tr-drawer { position:relative; flex:none; margin:0; }
+  html[data-mobile-game="turdrummy"] .tr-drawer summary { padding:8px; }
+  html[data-mobile-game="turdrummy"] .tr-drawer[open] .tr-drawer-body { position:absolute; bottom:44px; left:0; right:0; max-height:45dvh; overflow:auto; background:#10291f; z-index:40; }
+  html[data-mobile-game="turdrummy"] .action-dock { flex:none; position:static; padding:2px; margin:0; }
+  html[data-mobile-game="turdrummy"] .action-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; }
+  html[data-mobile-game="turdrummy"] .action-grid .btn { padding:2px; font-size:11px; }
+  html[data-mobile-game="turdrummy"] .footer-note { display:none; }
+  /* Spades already uses a flexible trick well; reserve a single hand row. */
+  html[data-mobile-game="turdspades"] .app { width:100%; height:100%; max-height:100%; min-height:0; padding:0; }
+  html[data-mobile-game="turdspades"] .table.table-arena { grid-template-rows:45px minmax(0,1fr) auto; margin:2px; padding:4px; }
+  html[data-mobile-game="turdspades"] .message { height:22px; line-height:18px; padding:2px 8px; }
+  html[data-mobile-game="turdspades"] .hand-guidance { display:none; }
+  html[data-mobile-game="turdspades"] .seat-you { padding:2px; }
+  html[data-mobile-game="turdspades"] .seat-you .head { height:20px; }
+  html[data-mobile-game="turdspades"] .bid-chips, html[data-mobile-game="turdspades"] .bid-contract, html[data-mobile-game="turdspades"] #bidExpectedHint { display:none; }
+  html[data-mobile-game="turdspades"] .bid-box { padding:0; }
+  html[data-mobile-game="turdspades"] .dock { padding:2px!important; }
+  html[data-mobile-game="turdspades"] .bid-controls { gap:4px; }
+  /* Turdtris: the well takes the space between chrome and a real in-flow dock. */
+  html[data-mobile-game="turdtris"] body { display:flex; flex-direction:column; }
+  html[data-mobile-game="turdtris"] body.board-focus .layout { display:flex; flex-direction:column; flex:1; min-height:0; padding:4px; margin:0; }
+  html[data-mobile-game="turdtris"] .run-settings { display:none; }
+  html[data-mobile-game="turdtris"] .main-stage { flex:1; min-height:0; display:flex; justify-content:center; }
+  html[data-mobile-game="turdtris"] .game-grid { min-height:0; display:flex; justify-content:center; align-items:center; }
+  html[data-mobile-game="turdtris"] .board-wrap { position:relative!important; min-height:0; padding:2px!important; margin:2px!important; }
+  html[data-mobile-game="turdtris"] .well-caption { display:none; }
+  html[data-mobile-game="turdtris"] #game { display:block; width:auto!important; height:auto; max-width:100%; }
+  html[data-mobile-game="turdtris"] .cabinet-rail { flex:none; }
+  html[data-mobile-game="turdtris"] .hud { margin:2px 0!important; }
+  html[data-mobile-game="turdtris"] .mobile-controls { display:flex; flex-direction:column; flex:none; position:static; width:100%; max-width:none; padding:4px; margin:0; transform:none; gap:4px; }
+  html[data-mobile-game="turdtris"] .mobile-controls .control-btn { min-height:44px; height:44px; }
+  html[data-mobile-game="turdtris"] .mobile-run-strip { height:36px; }
+  html[data-mobile-game="turdtris"] .mobile-preview-box canvas { height:24px; }
+  /* Neon: fit the 3:2 canvas between a one-row HUD and touch controls. */
+  html[data-mobile-game="neon-arkanoid"] .game-shell { display:flex; flex-direction:column; width:100%; height:100%; min-height:0; padding:4px; }
+  html[data-mobile-game="neon-arkanoid"] .title-row { flex:none; padding:0 4px 0 52px; min-height:44px; margin:0; }
+  html[data-mobile-game="neon-arkanoid"] h1 { font-size:18px; }
+  html[data-mobile-game="neon-arkanoid"] .subtitle, html[data-mobile-game="neon-arkanoid"] .actions, html[data-mobile-game="neon-arkanoid"] .sidebar, html[data-mobile-game="neon-arkanoid"] .status-bar { display:none; }
+  html[data-mobile-game="neon-arkanoid"] .hud-grid { flex:none; display:flex; gap:4px; margin:4px 0; }
+  html[data-mobile-game="neon-arkanoid"] .stat-card { flex:1; padding:4px; min-width:0; }
+  html[data-mobile-game="neon-arkanoid"] .stat-card .label { font-size:8px; }
+  html[data-mobile-game="neon-arkanoid"] .stat-card .value { font-size:14px; }
+  html[data-mobile-game="neon-arkanoid"] .play-area { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; }
+  html[data-mobile-game="neon-arkanoid"] .canvas-wrap { flex:none; max-width:100%; }
+  html[data-mobile-game="neon-arkanoid"] #gameCanvas { display:block; max-width:100%; }
+  html[data-mobile-game="neon-arkanoid"] .mobile-controls { display:flex; flex:none; position:static; margin:4px 0 0; gap:6px; }
+  html[data-mobile-game="neon-arkanoid"] .mobile-controls button { flex:1; min-height:44px; }
+  html[data-mobile-game="neon-arkanoid"] body>.suite-difficulty { position:absolute; bottom:54px; right:6px; }
+  html[data-mobile-game="neon-arkanoid"] .suite-arcade-a11y-toggle--floating { bottom:4px; }
+  /* Turdanoid sizes its logical canvas from this safe, footer-aware stage. */
+  html[data-mobile-game="turdanoid"] #app { position:relative; inset:auto; height:100%; padding:0; }
+  html[data-mobile-game="turdanoid"] #playShell { min-width:0; min-height:0; }
+  html[data-mobile-game="turdanoid"] .side-art { display:none; }
+  /* SameGame: resize the board from measured chrome, never shrink buttons. */
+  html[data-mobile-game="turdomania"] .help, html[data-mobile-game="turdomania"] .tagline { display:none; }
+  html[data-mobile-game="turdomania"] header.hud { flex:none; padding:2px 48px; height:64px; gap:2px; }
+  html[data-mobile-game="turdomania"] header.hud h1 { display:none; }
+  html[data-mobile-game="turdomania"] #boardWrap { flex:none; margin:auto; }
+  html[data-mobile-game="turdomania"] .dock { flex:none; margin:4px 0 0; padding:0; }
+}
+@media (max-width:980px) and (orientation:landscape) {
+  html[data-mobile-game="turdjack"] .table { display:grid; grid-template-columns:minmax(0,1fr) 250px; grid-template-rows:auto minmax(0,1fr); }
+  html[data-mobile-game="turdjack"] #statusText { grid-column:1/-1; }
+  html[data-mobile-game="turdjack"] .table-stage { grid-column:1; grid-row:2; flex-direction:row; height:100%; }
+  html[data-mobile-game="turdjack"] .mobile-felt-chip-rack { grid-column:2; grid-row:2; align-self:start; }
+  html[data-mobile-game="turdjack"] .mobile-pit { grid-column:2; grid-row:2; align-self:end; }
+  html[data-mobile-game="turdjack"] .cards { flex-wrap:wrap; align-content:start; }
+  html[data-mobile-game="crapeights"] .table { display:grid; grid-template-columns:minmax(220px,1fr) minmax(290px,1fr); grid-template-rows:44px 1fr 44px; }
+  html[data-mobile-game="crapeights"] .turn-banner { grid-column:1/-1; }
+  html[data-mobile-game="crapeights"] .arena { grid-row:2/4; grid-column:1; height:100%; min-height:0!important; }
+  html[data-mobile-game="crapeights"] .hand-wrap { grid-column:2; grid-row:2; }
+  html[data-mobile-game="crapeights"] .action-dock { grid-column:2; grid-row:3; }
+  html[data-mobile-game="crapeights"] .pile-row { top:50px!important; }
+  html[data-mobile-game="crapeights"] .suit-row { display:none; }
+  html[data-mobile-game="turdrummy"] .topbar { flex-wrap:nowrap!important; }
+  html[data-mobile-game="turdrummy"] .table { display:grid; grid-template-columns:180px minmax(0,1fr); grid-template-rows:24px 1fr; }
+  html[data-mobile-game="turdrummy"] .zone--opponent { grid-column:1/-1; }
+  html[data-mobile-game="turdrummy"] .zone--center { grid-column:1; grid-row:2; }
+  html[data-mobile-game="turdrummy"] .zone--hand { grid-column:2; grid-row:2; }
+  html[data-mobile-game="turdrummy"] .action-grid { grid-template-columns:repeat(7,minmax(0,1fr)); }
+  html[data-mobile-game="turdspades"] .app { display:grid; grid-template-columns:minmax(300px,1fr) 300px; grid-template-rows:44px 26px 1fr; }
+  html[data-mobile-game="turdspades"] .topbar { grid-column:1/-1; }
+  html[data-mobile-game="turdspades"] .ts-score-strip { grid-column:1/-1; padding:2px; }
+  html[data-mobile-game="turdspades"] #msg { display:none; }
+  html[data-mobile-game="turdspades"] .table.table-arena { grid-column:1/-1; grid-row:3; grid-template-columns:40px minmax(0,1fr) 40px 292px; grid-template-rows:24px 1fr; margin-right:4px; }
+  html[data-mobile-game="turdspades"] .table>.seat-north { grid-row:1; }
+  html[data-mobile-game="turdspades"] .seat-north .backs, html[data-mobile-game="turdspades"] .seat-north .seat-count { display:none; }
+  html[data-mobile-game="turdspades"] .seat-you { grid-column:4; grid-row:1/3; }
+  html[data-mobile-game="turdspades"] .dock { grid-column:2; grid-row:3; align-self:end; z-index:5; }
+  html[data-mobile-game="turdspades"] .trick-pile.layout-seat .entry[data-seat] { width:44px; height:60px; }
+  html[data-mobile-game="turdspades"] .trick-pile.layout-seat .entry[data-seat="North"] { top:calc(50% - 62px); }
+  html[data-mobile-game="turdspades"] .trick-pile.layout-seat .entry[data-seat="You"] { top:50%; }
+  html[data-mobile-game="turdtris"] body { display:grid; grid-template-columns:1fr 220px; }
+  html[data-mobile-game="turdtris"] .layout { height:100%; }
+  html[data-mobile-game="turdtris"] .mobile-controls { justify-content:center; height:100%; }
+  html[data-mobile-game="turdtris"] .mobile-controls-main { grid-template-columns:repeat(2,1fr); }
+  html[data-mobile-game="turdtris"] .mobile-controls-meta { grid-template-columns:repeat(2,1fr); }
+  html[data-mobile-game="turdomania"] body { flex-direction:row; flex-wrap:wrap; justify-content:center; }
+  html[data-mobile-game="turdomania"] header.hud { position:absolute; top:4px; left:48px; width:190px; padding:0; height:44px; }
+  html[data-mobile-game="turdomania"] .dock { width:180px; flex-direction:column; margin:48px 0 0; }
+}
+@media(min-width:981px) { .mobile-hand-pager { display:none; } }
+@media(max-width:980px) {
+  html[data-mobile-game] .mobile-settings { position:relative; margin-left:auto; z-index:50; }
+  html[data-mobile-game] .mobile-settings summary { padding:10px; border:1px solid #8ee8c7; border-radius:8px; font-size:11px; }
+  html[data-mobile-game] .mobile-settings-panel { position:absolute; right:0; top:100%; width:290px; max-width:85vw; padding:8px; background:#10291f; border:1px solid #8ee8c7; border-radius:8px; }
+  html[data-mobile-game] .mobile-settings-panel .top-links { flex-wrap:wrap; }
+  html[data-mobile-game] .mobile-settings-panel .tr-difficulty-topbar { display:block!important; }
+  html[data-mobile-game] .mobile-menu-actions .run-settings { display:flex!important; flex-wrap:wrap; }
+  html[data-mobile-game] .mobile-menu-actions .suite-music-toggle, html[data-mobile-game] .table-menu .suite-music-toggle, html[data-mobile-game] .mobile-settings-panel .suite-music-toggle, html[data-mobile-game] .topbtns-icons .suite-music-toggle, html[data-mobile-game] .title-row .suite-music-toggle { position:static!important; height:44px!important; width:44px; padding:4px!important; margin:0!important; }
+  html[data-mobile-game] .topbtns-icons { display:flex; gap:2px; }
+  html[data-mobile-game] .suite-back-pill { position:fixed; top:max(8px,env(safe-area-inset-top)); left:max(8px,env(safe-area-inset-left)); bottom:auto; width:44px; height:44px; min-width:44px; padding:0; overflow:hidden; font-size:0; }
+  html[data-mobile-game] .suite-back-pill::before { font-size:18px; }
+  html[data-mobile-game="turdjack"] .topbar>div:first-child { min-width:0; }
+  html[data-mobile-game="turdjack"] .topbar h1 { font-size:14px!important; white-space:nowrap; letter-spacing:0; }
+  html[data-mobile-game="turdtris"] .board-wrap { box-sizing:content-box; }
+}
+@media(max-width:980px) {
+  html[data-mobile-game] .mobile-hand .hand-group { display:contents!important; }
+  html[data-mobile-game] .mobile-hand .hand-group-label { display:none!important; }
+  html[data-mobile-game] .mobile-hand button { position:relative!important; inset:auto!important; width:100%!important; height:84px!important; min-width:44px!important; margin:0!important; transform:none!important; translate:none!important; rotate:none!important; animation:none!important; }
+  html[data-mobile-game] .mobile-hand button.mobile-card-hidden { display:none!important; }
+  html[data-mobile-game="neon-arkanoid"] .canvas-wrap { padding:0; border:0; }
+  html[data-mobile-game="neon-arkanoid"] #gameCanvas { max-width:none; }
+}
+@media(max-width:980px) {
+  html[data-mobile-game="turdtris"] .game-grid { flex:1!important; width:100%; }
+  html[data-mobile-game="turdspades"] #youCards.mobile-hand .card { transform:none!important; translate:none!important; }
+}
+@media(min-width:981px) { .mobile-settings { display:none; } }
+@media(max-width:980px) {
+  html[data-mobile-game] .mobile-hand { height:var(--mobile-hand-height,88px)!important; min-height:var(--mobile-hand-height,88px)!important; }
+  html[data-mobile-game] .mobile-hand button { height:var(--mobile-card-height,84px)!important; }
+  html[data-mobile-game="turdspades"] .mobile-hand .s { font-size:18px; }
+  html[data-mobile-game="turdrummy"] .mobile-hand .card-suit { display:none; }
+}
+/* Keep the shared music and colour controls directly available, with their own chrome space. */
+@media(max-width:980px) {
+  html[data-mobile-game] #suite-music-toggle { position:fixed!important; top:max(8px,env(safe-area-inset-top))!important; right:max(8px,env(safe-area-inset-right))!important; bottom:auto!important; left:auto!important; width:44px!important; height:44px!important; padding:4px!important; }
+  html[data-mobile-game] #suite-arcade-a11y-mount, html[data-mobile-game] #suite-arcade-a11y-toggle { position:fixed; top:max(8px,env(safe-area-inset-top)); right:calc(56px + env(safe-area-inset-right)); bottom:auto; left:auto; width:44px; height:44px; margin:0; padding:0; z-index:10001; }
+  html[data-mobile-game] #suite-arcade-a11y-mount #suite-arcade-a11y-toggle { position:static; }
+  html[data-mobile-game]:has(#suite-music-toggle) .topbar, html[data-mobile-game]:has(#suite-music-toggle) .title-row { padding-right:54px!important; }
+  html[data-mobile-game]:has(#suite-arcade-a11y-toggle) .topbar, html[data-mobile-game]:has(#suite-arcade-a11y-toggle) .title-row { padding-right:102px!important; }
+  html[data-mobile-game="turdanoid"] #suite-music-toggle { right:104px!important; }
+  html[data-mobile-game="turdanoid"] #suite-arcade-a11y-mount, html[data-mobile-game="turdanoid"] #suite-arcade-a11y-toggle { right:152px; }
+  html[data-mobile-game="turdanoid"] .hud { top:58px!important; left:8px!important; right:8px!important; padding-left:0!important; }
+  html[data-mobile-game="turdomania"] header.hud { padding-right:104px; }
+}
+@media(max-width:430px) {
+  html[data-mobile-game]:has(#suite-arcade-a11y-toggle) .topbar>div:first-child { display:none!important; }
+}
+@media(max-width:980px) {
+  html[data-mobile-game] .topbar { min-height:48px; }
+  html[data-mobile-game="turdjack"] body:has(#jackConfirmOverlay.is-open) #suite-arcade-a11y-mount { visibility:hidden; }
+}
+@media(max-width:980px) {
+  html[data-mobile-game] .mobile-hand { grid-template-rows:none!important; grid-auto-rows:var(--mobile-card-height,84px)!important; align-content:start!important; }
+}
+@media(max-width:980px) {
+  html[data-mobile-game="turdspades"] #youCards.mobile-hand .card.selected { translate:0 -6px!important; }
+}
+@media(max-width:980px) and (orientation:landscape) {
+  html[data-mobile-game="turdspades"] .app { grid-template-rows:52px 26px minmax(0,1fr); }
+}
+@media(max-width:980px) {
+  html[data-mobile-game] #welcomeGuide .welcome-card { padding:12px; }
+  html[data-mobile-game] #welcomeGuide h2 { font-size:22px; margin:4px 0; }
+  html[data-mobile-game] #welcomeGuide p, html[data-mobile-game] #welcomeGuide li { font-size:12px; line-height:1.25; margin:4px 0; }
+  html[data-mobile-game] #welcomeGuide .welcome-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); padding:4px 0; margin:4px 0 0; position:static; gap:6px; }
+  html[data-mobile-game="turdjack"] .moment-banner { top:30%; max-width:calc(100% - 24px); font-size:14px!important; padding:6px; min-height:44px; }
+  html[data-mobile-game] .suite-hype { font-size:18px; max-width:calc(100% - 20px); }
+}
+@media(max-width:980px) and (orientation:landscape) {
+  html[data-mobile-game="turdspades"] .app { grid-template-columns:minmax(0,1fr) 356px; }
+  html[data-mobile-game="turdspades"] .table.table-arena { grid-template-columns:40px minmax(0,1fr) 40px 348px; }
+  html[data-mobile-game="turdjack"] .moment-banner { left:calc((100% - 270px)/2); max-width:calc(100% - 270px); top:50%; }
+  html[data-mobile-game] #welcomeGuide .guide-legend, html[data-mobile-game] #welcomeGuide .attract-logo { display:none; }
+}
+@media(max-width:980px) {
+  html[data-mobile-game="turdtris"] #welcomeGuide .welcome-actions { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+@media(max-width:980px) and (orientation:landscape) {
+  html[data-mobile-game] #welcomeGuide .overlay-card, html[data-mobile-game] #guideOverlay .overlay-card { padding:12px; }
+  html[data-mobile-game] #welcomeGuide .guide-brand, html[data-mobile-game] #welcomeGuide .guide-cards { display:none; }
+  html[data-mobile-game] #welcomeGuide .overlay-card h2, html[data-mobile-game] #guideOverlay h2 { font-size:20px; margin:4px 0; }
+  html[data-mobile-game] #welcomeGuide .overlay-card p, html[data-mobile-game] #guideOverlay p, html[data-mobile-game] #guideOverlay li { font-size:12px; line-height:1.25; margin:4px 0; }
+  html[data-mobile-game] #guideOverlay ul { margin:6px 0; }
+}
+.tm-aim { position:relative; }
+.tm-aim summary { min-height:44px; min-width:44px; padding:10px; border:1px solid var(--panel-border); border-radius:12px; cursor:pointer; }
+.tm-aim nav { position:absolute; right:0; bottom:calc(100% + 6px); z-index:50; display:flex; gap:4px; padding:6px; background:#10291f; border:1px solid #8ee8c7; border-radius:10px; }
+.tm-aim:not([open]) nav { display:none; }
+.tm-aim nav button { width:44px; min-width:44px; min-height:44px; padding:0; }
+@media(max-width:980px) {
+  html[data-mobile-game] .mobile-guide-details { margin-top:6px; text-align:left; }
+  html[data-mobile-game] .mobile-guide-details summary { display:flex; align-items:center; padding:6px; cursor:pointer; font-size:12px; }
+  html[data-mobile-game] .mobile-guide-details>div { max-height:35dvh; overflow:auto; }
+}
+@media(min-width:981px) { .mobile-guide-details { display:none; } }
+@media(max-width:980px) and (prefers-reduced-motion:reduce) {
+  /* Reduced motion disables the toss animation, so its visual class must not disable betting. */
+  html[data-mobile-game="turdjack"] .chip-btn.tossed { pointer-events:auto; transform:none; }
+}
+@media(max-width:980px) and (orientation:landscape) {
+  .tm-aim nav { right:calc(100% + 8px); bottom:0; }
+}
+@media(max-width:980px) {
+  html[data-mobile-game="turdrummy"] .topbar { display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-rows:48px 44px; padding:0 4px!important; }
+  html[data-mobile-game="turdrummy"] .title-group { display:none!important; }
+  html[data-mobile-game="turdrummy"] .mobile-settings { grid-row:1; grid-column:1; margin:0 0 0 48px; justify-self:start; }
+  html[data-mobile-game="turdrummy"] .top-links { grid-row:2; grid-column:1/-1; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); width:100%; margin:0; }
+  html[data-mobile-game="turdtris"] body { padding-bottom:calc(148px + env(safe-area-inset-bottom) + var(--mobile-footer,0px))!important; }
+  html[data-mobile-game="turdtris"] .mobile-controls { position:fixed; left:4px; width:calc(100% - 8px); bottom:calc(4px + env(safe-area-inset-bottom) + var(--mobile-footer,0px)); }
+}
+@media(max-width:980px) and (orientation:landscape) {
+  html[data-mobile-game="turdrummy"] .topbar { display:flex; padding:0 102px 0 48px!important; }
+  html[data-mobile-game="turdrummy"] .mobile-settings { margin:0; }
+  html[data-mobile-game="turdrummy"] .top-links { grid-template-columns:repeat(5,minmax(44px,1fr)); }
+  html[data-mobile-game="turdtris"] body { padding-bottom:calc(4px + env(safe-area-inset-bottom))!important; }
+  html[data-mobile-game="turdtris"] .mobile-controls { left:auto; right:4px; top:4px; bottom:calc(4px + env(safe-area-inset-bottom)); width:220px; height:auto; }
+}
+@media(max-width:980px) {
+  html[data-mobile-game="turdomania"] header.hud { height:60px; }
+  html[data-mobile-game="turdomania"] .dock { margin-top:2px; }
+  html[data-mobile-game] .mobile-menu-actions, html[data-mobile-game] .mobile-settings-panel, html[data-mobile-game] .table-menu .actions { position:fixed!important; right:8px!important; top:calc(56px + env(safe-area-inset-top))!important; width:270px; max-width:calc(100vw - 24px); max-height:calc(100dvh - 72px); overflow:auto; }
+}
+@media(max-width:980px) and (orientation:portrait) {
+  html[data-mobile-game="turdtris"] .mobile-controls { left:max(4px,env(safe-area-inset-left)); width:calc(100% - max(4px,env(safe-area-inset-left)) - max(4px,env(safe-area-inset-right))); }
+}
+@media(max-width:980px) and (orientation:landscape) {
+  html[data-mobile-game="turdtris"] .mobile-controls { right:max(4px,env(safe-area-inset-right)); }
+}
+@media(max-width:980px) and (orientation:landscape) {
+  /* Suit chips carry the live HUD beside the piles; scores remain in Table details. */
+  html[data-mobile-game="crapeights"] .shell>.hud { display:none!important; }
+  html[data-mobile-game="crapeights"] .suit-row { display:flex!important; bottom:0; }
+  html[data-mobile-game="turdomania"] header.hud { left:auto; right:max(8px,env(safe-area-inset-right)); top:60px; width:180px; height:44px; padding:0; }
+}
+@media(max-width:980px) {
+  html[data-mobile-game="neon-arkanoid"] .title-row { flex-direction:row; flex-wrap:nowrap; align-items:center; gap:4px; }
+  html[data-mobile-game="neon-arkanoid"] .title-wrap { min-width:0; flex:1; }
+  html[data-mobile-game="neon-arkanoid"] .title-wrap p { display:none; }
+  html[data-mobile-game="neon-arkanoid"] .title-wrap h1 { font-size:12px; margin:0; }
+  html[data-mobile-game="neon-arkanoid"] .mobile-menu { flex:none; }
+}
+@media(max-width:980px) and (orientation:portrait) {
+  html[data-mobile-game="turdrummy"] .top-links { grid-template-columns:repeat(5,minmax(44px,1fr)); }
+  html[data-mobile-game="turdrummy"] .top-links a[href="./"] { display:none!important; }
+}
+@media(max-width:980px) and (orientation:landscape) {
+  html[data-mobile-game="turdrummy"] .top-links { grid-template-columns:repeat(6,minmax(44px,1fr)); }
+}
+@media(max-width:980px) {
+  /* Rummy renders read-only cards as divs on the bot's turn; keep the same hand geometry. */
+  html[data-mobile-game] .mobile-hand .card { position:relative!important; inset:auto!important; width:100%!important; height:var(--mobile-card-height,84px)!important; min-width:44px!important; min-height:44px; margin:0!important; transform:none!important; translate:none!important; rotate:none!important; animation:none!important; }
+  html[data-mobile-game="turdspades"] #youCards.mobile-hand .card.selected { translate:0 -6px!important; }
+}

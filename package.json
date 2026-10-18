@@ -9,7 +9,8 @@
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
-    "test:install-browsers": "playwright install chromium webkit"
+    "test:install-browsers": "playwright install chromium webkit",
+    "test:mobile": "node scripts/test-mobile-fit.cjs && node scripts/mobile-fit.cjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
