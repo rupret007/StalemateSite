@@ -307,3 +307,27 @@
   html[data-mobile-game="turdtris"] body { padding-bottom:calc(4px + env(safe-area-inset-bottom))!important; }
   html[data-mobile-game="turdtris"] .mobile-controls { left:auto; right:4px; top:4px; bottom:calc(4px + env(safe-area-inset-bottom)); width:220px; height:auto; }
 }
+@media(max-width:980px) {
+  html[data-mobile-game="turdomania"] header.hud { height:60px; }
+  html[data-mobile-game="turdomania"] .dock { margin-top:2px; }
+  html[data-mobile-game] .mobile-menu-actions, html[data-mobile-game] .mobile-settings-panel, html[data-mobile-game] .table-menu .actions { position:fixed!important; right:8px!important; top:calc(56px + env(safe-area-inset-top))!important; width:270px; max-width:calc(100vw - 24px); max-height:calc(100dvh - 72px); overflow:auto; }
+}
+@media(max-width:980px) and (orientation:portrait) {
+  html[data-mobile-game="turdtris"] .mobile-controls { left:max(4px,env(safe-area-inset-left)); width:calc(100% - max(4px,env(safe-area-inset-left)) - max(4px,env(safe-area-inset-right))); }
+}
+@media(max-width:980px) and (orientation:landscape) {
+  html[data-mobile-game="turdtris"] .mobile-controls { right:max(4px,env(safe-area-inset-right)); }
+}
+@media(max-width:980px) and (orientation:landscape) {
+  /* Suit chips carry the live HUD beside the piles; scores remain in Table details. */
+  html[data-mobile-game="crapeights"] .shell>.hud { display:none!important; }
+  html[data-mobile-game="crapeights"] .suit-row { display:flex!important; bottom:0; }
+  html[data-mobile-game="turdomania"] header.hud { left:auto; right:max(8px,env(safe-area-inset-right)); top:60px; width:180px; height:44px; padding:0; }
+}
+@media(max-width:980px) {
+  html[data-mobile-game="neon-arkanoid"] .title-row { flex-direction:row; flex-wrap:nowrap; align-items:center; gap:4px; }
+  html[data-mobile-game="neon-arkanoid"] .title-wrap { min-width:0; flex:1; }
+  html[data-mobile-game="neon-arkanoid"] .title-wrap p { display:none; }
+  html[data-mobile-game="neon-arkanoid"] .title-wrap h1 { font-size:12px; margin:0; }
+  html[data-mobile-game="neon-arkanoid"] .mobile-menu { flex:none; }
+}

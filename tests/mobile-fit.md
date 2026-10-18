@@ -18,7 +18,7 @@ rotation. Its Aim menu supplies 44px arrow/Pop controls for precise selection
 when the game cells are smaller than a button; rotation never restarts the board.
 
 Run `npm ci`, `npx playwright install chromium`, then `npm run test:mobile`.
-The standalone Playwright test starts an ephemeral local server and checks all
+Both preserved Playwright matrices start ephemeral local servers and check all
 eight games at 360x640, 375x667, 390x844, 430x932, 667x375 and 844x390. It checks
 document bounds, scroll locking, key controls, touch targets, card hit testing,
 canvas aspect ratios, betting/dealing/resolution, draw/discard, bidding and live
