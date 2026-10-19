@@ -157,7 +157,7 @@ test('open rooms: camera off by default with an 18+ gate; jam hands off to WebJa
     await expect(jammer.locator('[data-jam]')).toContainText('Plug in Ethernet');
     await expect(jammer.locator('[data-jam-web]')).toBeDisabled();
     await jammer.fill('[data-jam-link]', 'webjam://join?v=1#k=abcdef0123');
-    await jammer.press('[data-jam-link]', 'Enter');
+    await jammer.locator('[data-jam-form] button[type="submit"]').click();
     await expect(jammer.locator('[data-jam-desktop]')).toHaveAttribute('href', 'webjam://join?v=1#k=abcdef0123');
 });
 

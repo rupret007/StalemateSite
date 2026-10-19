@@ -28,7 +28,8 @@
             myId: null, names: new Map(), camOn: false, ice: null,
             pcs: new Map(), stream: null, peers: new Set()
         };
-        const player = { yt: null, ytReady: null, kind: null, key: '', applying: 0 };
+        const player = { yt: null, ytReady: null, kind: null, key: '', readyKey: '', applying: 0 };
+        let videoPublishTimer;
         let live = null;
         let pendingPts = [];
         let flushTimer = 0;
@@ -47,6 +48,7 @@
 
         function teardown() {
             roomGeneration += 1; captureVersion += 1;
+            clearTimeout(videoPublishTimer);
             turnClient?.stop(); turnClient = null; turnInit = null; state.ice = null;
             ui.relayStatus.textContent = '';
             state.ch = null;
@@ -264,8 +266,10 @@
             const key = `${source.kind}:${source.id}`;
             if (player.key === key) return;
             player.key = key;
+            player.readyKey = '';
             player.kind = 'yt';
             const YT = await loadYouTubeApi();
+            if (!state.ch || player.key !== key) return;
             if (!player.yt) {
                 await new Promise((resolve) => {
                     player.yt = new YT.Player(ui.yt, {
@@ -275,6 +279,7 @@
                     });
                 });
             } else player.yt.cueVideoById(source.id);
+            player.readyKey = key;
         }
 
         function localTime() { return player.yt && player.yt.getCurrentTime ? player.yt.getCurrentTime() || 0 : 0; }
@@ -287,7 +292,9 @@
         async function syncToState(force) {
             const v = state.room.video;
             if (!v) return;
+            const generation = roomGeneration;
             await ensureSource(v.source);
+            if (generation !== roomGeneration || state.room.video !== v) return;
             const want = H.expectedPosition(v, state.clock.relayNow());
             if (force || H.needsCorrection(localTime(), want)) seekTo(want);
             if (v.playing && !localPlaying()) playLocal();
@@ -303,9 +310,28 @@
 
         function onYtState(ev) {
             if (!isOp() || Date.now() < player.applying || !state.room.video) return;
-            if (ev.data === 1 || ev.data === 2) actSend({ kind: 'video', source: state.room.video.source, playing: localPlaying(), pos: localTime() });
+            if (ev.data !== 1 && ev.data !== 2) return;
+            clearTimeout(videoPublishTimer);
+            const channel = state.ch;
+            videoPublishTimer = setTimeout(() => {
+                if (state.ch === channel && isOp() && state.room.video && Date.now() >= player.applying) {
+                    actSend({ kind: 'video', source: state.room.video.source, playing: localPlaying(), pos: localTime() });
+                }
+            }, 100);
         }
-        setInterval(() => { if (!isOp() || !localPlaying()) syncToState(false); }, 2000);
+        setInterval(() => {
+            if (!isOp()) return syncToState(false);
+            const v = state.room.video;
+            if (!v || !player.yt || player.readyKey !== `${v.source.kind}:${v.source.id}` || Date.now() < player.applying) return;
+            // YouTube does not reliably emit a state change when a paused
+            // player is scrubbed. Publish the host's changed position instead
+            // of correcting the host back to the previous shared position.
+            const pos = localTime(), playing = localPlaying();
+            if (playing !== v.playing || H.needsCorrection(pos, H.expectedPosition(v, state.clock.relayNow()))) {
+                actSend({ kind: 'video', source: v.source, playing, pos });
+                H.apply(state.room, { type: 'video', source: v.source, playing, pos }, { t: state.clock.relayNow() });
+            }
+        }, 2000);
 
         /* ---- P2P video (cameras only) ---- */
         async function iceServers() {

@@ -431,10 +431,16 @@
             if (c.kind === 'jam') {
                 const a = $('[data-jam-desktop]');
                 const link = c.jam && c.jam.desktop;
-                a.hidden = !link; $('[data-jam-wait]').hidden = !!link;
+                const invitation = c.jam && (c.jam.invitation || link);
+                a.hidden = !link; $('[data-jam-wait]').hidden = !!invitation;
+                $('[data-jam-copy]').hidden = !invitation;
+                $('[data-jam-copy-fallback]').hidden = true;
+                $('[data-jam-copy-value]').value = '';
                 if (link && /^webjam:\/\//.test(link)) a.setAttribute('href', link);
+                else a.removeAttribute('href');
                 const web = $('[data-jam-web]');
                 web.disabled = !(c.jam && c.jam.webReady);
+                web.textContent = web.disabled ? 'Browser join unavailable' : 'Join in browser (higher delay)';
                 web.onclick = () => { if (c.jam && /^https:\/\//.test(c.jam.web)) window.open(c.jam.web, '_blank', 'noopener,noreferrer'); };
             }
         }
@@ -663,7 +669,23 @@
     });
     $('[data-cam-yes]').addEventListener('click', () => { if (!$('[data-adult]').checked) return toast('Tick the 18+ box first.'); send({ t: 'cam', ch: app.active, on: true, adult18: true }); return $('[data-cam-gate]').close(); });
     $('[data-cam-no]').addEventListener('click', () => $('[data-cam-gate]').close());
-    $('[data-jam-form]').addEventListener('submit', (e) => { e.preventDefault(); const v = $('[data-jam-link]').value.trim(); $('[data-jam-link]').value = ''; if (v) cmd('jamlink', [v]); });
+    $('[data-jam-form]').addEventListener('submit', (e) => { e.preventDefault(); const v = $('[data-jam-link]').value; if (v && cmd('jamlink', ['invitation', v])) $('[data-jam-link]').value = ''; });
+    $('[data-jam-copy]').addEventListener('click', async () => {
+        const c = store(app.active);
+        const link = c?.kind === 'jam' && (c.jam?.invitation || c.jam?.desktop);
+        if (!link) return;
+        try {
+            await navigator.clipboard.writeText(link);
+            toast('Invite copied. Open WebJam, choose Join, and paste it there.');
+        } catch (_) {
+            // Clipboard access is unavailable in some embedded browsers. Keep the
+            // invitation in this room only; never place its bearer in storage.
+            if (app.active !== c.name || (store(app.active)?.jam?.invitation || store(app.active)?.jam?.desktop) !== link) return;
+            $('[data-jam-copy-fallback]').hidden = false;
+            const input = $('[data-jam-copy-value]');
+            input.value = link; input.focus(); input.select();
+        }
+    });
 
     function show(pane) {
         document.body.dataset.show = pane;
