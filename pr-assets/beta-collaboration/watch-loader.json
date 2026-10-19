@@ -66,8 +66,28 @@
     },
     "independentProductionReview": "One concrete retired-player access issue identified and fixed; final read-only verification found no additional blocker.",
     "ci": {
-      "correctedSourceCommit": "11acab0b27594da3a85957502ec97bb5dbd44ee1",
-      "status": "pending"
+      "sourceCommit": "a1ecb473841c63f0099d32e59fd4d3cc15b11858",
+      "productSourceCommit": "11acab0b27594da3a85957502ec97bb5dbd44ee1",
+      "status": "success",
+      "push": {
+        "run": 39230423122,
+        "unitPassed": 575,
+        "unitFiles": 55,
+        "browserDirect": 225,
+        "retryPasses": 0
+      },
+      "pullRequest": {
+        "run": 39230428352,
+        "unitPassed": 575,
+        "unitFiles": 55,
+        "browserDirect": 224,
+        "retryPasses": 1,
+        "retry": "Existing WebKit iPhoneSE game share height43.999969482421875 versus44; retry1passed3.4s"
+      },
+      "skips": 0,
+      "finalFailures": 0,
+      "allElevenLoaderCasesDirectPerRun": true,
+      "rerunsRequested": false
     },
     "reviewFindingRegressions": {
       "passed": 2,
@@ -235,7 +255,7 @@
         "existingDriftBudgetUnchanged": true
       },
       "distinctCurrentLoaderCasesPassed": 11,
-      "fullCorrectedMatrixCi": "pending",
+      "fullCorrectedMatrixCi": "All eleven loader cases passed directly in both original corrected CI runs; full counts recorded in validation.ci.",
       "independentFinalReview": "Clean: API lifetime/callback ownership, completed-join observer fence, exact authoritative seek plus bounded native clock comparison, and host readiness barriers reviewed."
     }
   },

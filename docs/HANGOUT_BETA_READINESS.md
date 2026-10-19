@@ -134,7 +134,11 @@ acceptance.
   loader cases and ten relevant desktop/phone checks now pass in targeted
   runs. Three existing private checks explicitly wait for the host player
   before calling its API; their timeouts and drift limits stay unchanged.
-  The corrected full CI gate remains pending; the original failures are retained.
+  The corrected [push CI](https://github.com/rupret007/StalemateSite/actions/runs/39230423122)
+  passed all 575 unit and 225 browser checks directly. [PR CI](https://github.com/rupret007/StalemateSite/actions/runs/39230428352)
+  passed 575 units and 224 browser checks directly; one existing iPhone SE game
+  share-height assertion passed on retry. All eleven loader cases passed directly
+  in both runs, with no skips or final failures. The original failures are retained.
   Independent review also caught Bob controls accessing a retired player; they
   now use current shared intent while a replacement loads. The existing iframe
   privacy, autoplay and synchronization checks pass. The first diagnostic remains
