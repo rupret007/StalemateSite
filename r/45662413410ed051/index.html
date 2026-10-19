@@ -13,6 +13,20 @@
     <title>Hang Out · Stalemate</title>
     <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="room.css">
+    <style>
+        .private-report{width:calc(100% - 24px);max-width:32rem;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow:auto;overflow-wrap:anywhere}
+        .private-report form,.private-report label{display:grid;gap:6px;min-width:0}
+        .private-report label{margin:8px 0}
+        .private-report input,.private-report textarea,.private-report select{box-sizing:border-box;width:100%;max-width:100%;min-width:0;font:16px/1.4 var(--body);background:var(--ink);color:var(--cream);border:1px solid var(--line);border-radius:4px;padding:9px}
+        .private-report textarea{resize:vertical;overflow-wrap:anywhere}
+        .private-report .report-consent{display:flex;align-items:flex-start;gap:8px}
+        .private-report .report-consent input{width:auto;flex:0 0 auto;margin-top:4px}
+        .private-report .tools{flex-wrap:wrap;min-width:0}
+        .private-report .btn{max-width:100%;min-height:44px;white-space:normal;overflow-wrap:anywhere}
+        .private-report :focus-visible{outline:2px solid var(--lime);outline-offset:3px}
+        [data-log] li{overflow-wrap:anywhere}
+        [data-message-report]{margin-left:8px;max-width:100%;min-height:44px;font-size:.8rem;white-space:normal}
+    </style>
 </head>
 <body>
     <header class="hang-head">
@@ -47,6 +61,7 @@
             <span class="peers" data-peers>Just you</span>
             <button class="btn" data-copy type="button">Copy invite link</button>
             <button class="btn btn--bob" data-bob-toggle type="button" aria-pressed="false">Paint along with Bob</button>
+            <button class="btn btn--ghost" data-private-report type="button" hidden>Report a problem to staff</button>
             <span class="status" data-status role="status"></span>
         </div>
 
@@ -131,6 +146,37 @@
             </form>
         </section>
     </main>
+
+    <dialog class="ask private-report" data-report-dialog aria-labelledby="private-report-title" aria-describedby="private-report-privacy">
+        <h2 id="private-report-title">Report to community staff</h2>
+        <p class="small" id="private-report-privacy">The details you choose below, limited room and connection references, and submission time are shared with community staff when you submit. Regular encrypted chat is not monitored or sent to AI. No invitation, room key, full history or automatic chat context is attached. Review the quote and do not include invitation links, passwords or access codes.</p>
+        <form data-report-form>
+            <label>What are you reporting?
+                <select data-report-kind><option value="member">A member or room problem</option><option value="message">A message</option></select>
+            </label>
+            <label>Member, if known
+                <select data-report-target><option value="">Someone who left, the host, or another problem</option></select>
+            </label>
+            <label>Nickname you saw (not a verified identity)
+                <input data-report-name maxlength="24" autocomplete="off">
+            </label>
+            <label>Selected quote (optional for a member report)
+                <textarea data-report-excerpt maxlength="400" rows="3" spellcheck="false"></textarea>
+            </label>
+            <label>Why are you reporting this?
+                <textarea data-report-reason maxlength="400" rows="3" required></textarea>
+            </label>
+            <label class="report-consent"><input data-report-consent type="checkbox" required><span>I agree to share this selected quote, nickname and reason, with limited room and connection references, with community staff for review.</span></label>
+            <p class="small" data-report-availability hidden></p>
+            <p class="small" data-report-status role="status" aria-live="polite">Draft only. Nothing has been sent.</p>
+            <div class="tools">
+                <button class="btn" data-report-send type="submit" disabled>Send selected details to staff</button>
+                <button class="btn btn--ghost" data-report-retry type="button" hidden>Retry the same report</button>
+                <button class="btn btn--ghost" data-report-new type="button">Clear / new report</button>
+                <button class="btn btn--ghost" data-report-close type="button">Close</button>
+            </div>
+        </form>
+    </dialog>
 
     <dialog class="ask" data-ask>
         <h2 data-ask-title>Use your camera?</h2>
