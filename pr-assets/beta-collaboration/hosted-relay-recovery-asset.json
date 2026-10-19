@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "checkedAt": "2026-10-19T05:33:47.356Z",
+  "origin": "https://stalemate-hangout-beta.jeffstory007.workers.dev",
+  "runtimeVersion": "207a4b5a-c416-44c7-a751-24f88af5beb4",
+  "sourceCommit": "ea012fc06f3eab2ff78410eaf28bfe9b96611007",
+  "asset": "/r/45662413410ed051/room.js",
+  "scope": "Protected deployed client identity and read-only operational health; no hosted WebRTC, camera or forced-relay acceptance claim.",
+  "credentialsRecorded": false,
+  "uninvitedStatus": 401,
+  "invitedStatus": 200,
+  "cacheControl": "no-store",
+  "sha256": "5725c9fd0dfc3e11e25b79424e62c6f179cfc76bd55aa8d93b799a616d6bb5cf",
+  "health": {
+    "version": 1,
+    "checkedAt": "2026-10-19T05:33:47.780Z",
+    "service": {
+      "state": "ready",
+      "reasons": []
+    },
+    "admission": {
+      "state": "open",
+      "lock": "off",
+      "shield": false,
+      "lockAuto": false
+    },
+    "storage": {
+      "lobby": "ok",
+      "quota": "ok",
+      "registry": "ok"
+    },
+    "storageCheck": "read-only",
+    "providerChecks": "not-performed",
+    "features": {
+      "email": {
+        "configured": true,
+        "provider": "not-probed"
+      },
+      "staffAuth": {
+        "configured": true
+      },
+      "moderationContact": {
+        "configured": true
+      },
+      "ai": {
+        "enabled": false,
+        "configured": true,
+        "state": "disabled",
+        "currentInstance": {
+          "checked": 0,
+          "flagged": 0,
+          "failed": 0,
+          "skipped": 0,
+          "pending": 0
+        }
+      },
+      "turn": {
+        "enabled": false,
+        "configured": false,
+        "providerUsage": "unknown"
+      }
+    },
+    "usage": [
+      {
+        "name": "connections",
+        "used": 24,
+        "limit": 200,
+        "unit": "connections",
+        "scope": "application",
+        "period": "day"
+      },
+      {
+        "name": "lobbyRequests",
+        "used": 1,
+        "limit": 40000,
+        "unit": "requests",
+        "scope": "application",
+        "period": "day"
+      },
+      {
+        "name": "aiReviews",
+        "used": 1,
+        "limit": 100,
+        "unit": "reviews",
+        "scope": "application",
+        "period": "day"
+      },
+      {
+        "name": "betaSessions",
+        "used": 26,
+        "limit": 1000,
+        "unit": "sessions",
+        "scope": "application",
+        "period": "active"
+      }
+    ]
+  },
+  "status": "passed",
+  "logoutStatus": 200,
+  "afterLogoutAssetStatus": 401
+}

@@ -26,9 +26,12 @@ part of this deployment.
    was deployed as `33e6a92f`; its HTTP 200 health check confirmed configuration
    only. Real email-code owner login and separate staff SSO/WebSocket admission
    passed after the JWKS fix. Current runtime is
-   `f4438515-7338-4287-b2e4-8485e88bbc90`, committed source `15767d9`.
+   `207a4b5a-c416-44c7-a751-24f88af5beb4`, committed source `ea012fc`.
    The sign-in acceptance was recorded on earlier `e3177c6d`/`832f7e1`;
-   the current deployment adds private AI observation and co-host grant revocation.
+   the current deployment also includes private AI observation, co-host grant
+   revocation and media reconnect guards. The protected client hash, invitation
+   denial and proof-session logout are [verified](../pr-assets/beta-collaboration/hosted-relay-recovery-asset.json);
+   hosted camera/TURN acceptance remains separate.
    Complete denied-identity and
    ownership-recovery acceptance. Use hostname/path applications: Cloudflare's
    Worker-level Access integration does not support WebSocket upgrades.

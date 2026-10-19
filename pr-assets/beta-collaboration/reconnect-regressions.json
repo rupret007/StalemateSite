@@ -20,17 +20,89 @@
     }
   ],
   "validation": {
-    "originalReconnectBaseline": { "passed": 10, "retries": 0 },
-    "finalFocusedMatrix": { "scenarios": 3, "repetitions": 3, "passed": 9, "retries": 0 },
-    "fullVideoSuite": { "passed": 15, "retries": 0 },
-    "fullUnitSuite": { "passed": 560, "files": 54 },
+    "originalReconnectBaseline": {
+      "passed": 10,
+      "retries": 0
+    },
+    "finalFocusedMatrix": {
+      "scenarios": 3,
+      "repetitions": 3,
+      "passed": 9,
+      "retries": 0
+    },
+    "fullVideoSuite": {
+      "passed": 15,
+      "retries": 0
+    },
+    "fullUnitSuite": {
+      "passed": 560,
+      "files": 54
+    },
+    "initialFullBrowserRun": {
+      "passed": 189,
+      "failed": 1,
+      "retries": 0,
+      "failure": "Host-control fixture locked faces before the host received the guest's resumed mic advertisement."
+    },
+    "hostControlFixtureFollowUp": {
+      "traceEvidence": "Host received all-off publication, then sent lock 46ms later; resumed mic publication arrived 259ms after lock. No relay departure or peer-token retirement occurred.",
+      "change": "Observe the host's all-off state, then its received active-mic membership before locking faces.",
+      "scenarios": 4,
+      "repetitions": 3,
+      "passed": 12,
+      "retries": 0,
+      "productModerationChanged": false
+    },
     "delayedPreDepartureChatPreserved": true,
-    "existingReconnectAssertionsAndTimeoutsWeakened": false
+    "existingReconnectAssertionsAndTimeoutsWeakened": false,
+    "sourceCi": {
+      "runId": 39204794574,
+      "head": "4526a47148d243879b5656e67645946e9ee1f56b",
+      "unitPassed": 560,
+      "unitFiles": 54,
+      "browserPassed": 190,
+      "browserRetries": 0
+    },
+    "deployedHeadCi": {
+      "runId": 39205093407,
+      "head": "ea012fc06f3eab2ff78410eaf28bfe9b96611007",
+      "unitPassed": 560,
+      "unitFiles": 54,
+      "browserPassedDirectly": 189,
+      "browserPassedOnConfiguredRetry": 1,
+      "retryTest": "tests/e2e/hangout.spec.js:380 abrupt peer disconnect clears peer count and AV tiles",
+      "retryStage": "Initial camera decoding, before the tested disconnect occurred.",
+      "retryCause": "Unproven. Ten bounded local repetitions passed without retries; initial CI trace was unavailable. No cause attributed and no timeout or assertion weakened."
+    },
+    "deployedHeadCiWithoutRetries": {
+      "runId": 39205096878,
+      "head": "ea012fc06f3eab2ff78410eaf28bfe9b96611007",
+      "unitPassed": 560,
+      "unitFiles": 54,
+      "browserPassed": 190,
+      "browserRetries": 0
+    },
+    "initialMediaFollowUp": {
+      "scenarios": 1,
+      "repetitions": 10,
+      "passed": 10,
+      "retries": 0,
+      "initialCiEvidence": "Both local cameras captured while both remote videos remained black, before any disconnect. Initial screenshot and error context retained; only the passing retry has a trace.",
+      "cause": "Unproven; no source change made."
+    }
   },
   "diagnostics": {
     "videoSuiteTrace": "retain-on-failure",
     "ciUpload": "Preserve generated playwright-report and test-results directories even when a configured retry passes; seven-day retention.",
-    "newAutomaticVideoRecordingClaim": false
+    "newAutomaticVideoRecordingClaim": false,
+    "observedUploadAfterPassingRetries": {
+      "runId": 39204810370,
+      "artifactId": 12165098825,
+      "artifactSha256": "1490730e13adaa9c0a515689f079a84865a2fbb23ec6090070819966876e14ed",
+      "browserPassedDirectly": 188,
+      "browserPassedOnConfiguredRetry": 2,
+      "retryScope": "Existing public game and homepage geometry scenarios; media scenarios passed directly."
+    }
   },
   "credentialsOrRoomKeysRecorded": false
 }

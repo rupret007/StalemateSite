@@ -65,6 +65,22 @@ acceptance.
   scenarios passing without retries. Pre-departure chat remains deliverable;
   no recovery timeout or assertion was weakened. Initial failure traces and
   generated CI diagnostics are now retained even after a passing retry.
+  A subsequent full local run passed 189/190 scenarios; its host-control fixture
+  locked before a resumed microphone advertisement arrived. The fixture now
+  observes the host's received media state before locking. Host controls and
+  all three reconnect scenarios then passed 12 repeated checks without retries;
+  the product's moderation rules remain unchanged.
+  The reconnect source [passed CI](https://github.com/rupret007/StalemateSite/actions/runs/39204794574)
+  with 560 unit tests and all 190 browser scenarios directly. The exact deployed
+  head [passed CI](https://github.com/rupret007/StalemateSite/actions/runs/39205093407)
+  with 560 unit tests, 189 browser scenarios directly and one existing camera
+  startup check on retry, before that test's intended disconnect. Its cause is
+  not established; a successful retry does not prove physical camera readiness.
+  The same deployed head's [PR run](https://github.com/rupret007/StalemateSite/actions/runs/39205096878)
+  passed all 560 unit tests and all 190 browser scenarios without retries.
+  Ten bounded local repetitions of the camera-startup/disconnect case also
+  passed without retries; they did not reproduce or explain the other CI run's
+  initial failure. Its initial trace was unavailable, so the uncertainty remains.
 
 - [Actual hosted AI pipeline](../pr-assets/beta-collaboration/hosted-ai-pipeline.json):
   one benign guest message completed a real Worker/provider review, a second
@@ -131,10 +147,16 @@ The guest/native checks used beta version
 `ee8fb29f-aaa5-4e55-8ee3-06c760fd3778`; the later version provisioned secrets.
 Worker versions and Git commits are different identifiers.
 
-**Current active runtime:** `f4438515-7338-4287-b2e4-8485e88bbc90`, source commit
-`15767d9` (co-host revocation with persisted account/device grant associations).
-The private health response is ready with AI off and its spent daily reservation
-retained. [Deployment evidence](../pr-assets/beta-collaboration/hosted-cohost-deployment.json)
+**Current active runtime:** `207a4b5a-c416-44c7-a751-24f88af5beb4`, source commit
+`ea012fc` (private-room media reconnect guards and stronger test preconditions).
+The [protected asset receipt](../pr-assets/beta-collaboration/hosted-relay-recovery-asset.json)
+verifies the deployed client byte-for-byte, uninvited denial, no-store caching,
+successful proof-session logout and denial afterward. Private health is ready;
+AI and TURN remain off, with the spent AI reservation retained. This is asset
+and read-only health evidence, not hosted WebRTC or forced-relay acceptance.
+The previous runtime was `f4438515-7338-4287-b2e4-8485e88bbc90`, source `15767d9`
+(co-host revocation with persisted account/device grant associations).
+[Its deployment evidence](../pr-assets/beta-collaboration/hosted-cohost-deployment.json)
 verifies the uploaded fix and observed health; real-account hosted revocation
 acceptance remains separate. The previous AI observation runtime was
 `210c1fee`, source `51c5fc5` (AI outcome counters and observed failure alerts).
@@ -233,9 +255,14 @@ earlier website/game work into these diffs:
 - [#34: durable moderation and exact-connection PM consent](https://github.com/rupret007/StalemateSite/pull/34)
 - [#35: real beta identity and lifecycle](https://github.com/rupret007/StalemateSite/pull/35)
 - [#37: protected operational health and confirmed contact](https://github.com/rupret007/StalemateSite/pull/37)
+- [#39: real Cloudflare email verification](https://github.com/rupret007/StalemateSite/pull/39)
+- [#41: bounded private AI observation](https://github.com/rupret007/StalemateSite/pull/41)
+- [#42: durable co-host device-grant revocation](https://github.com/rupret007/StalemateSite/pull/42)
+- [#44: private-room media reconnect recovery](https://github.com/rupret007/StalemateSite/pull/44)
 
-Hosted receipts and the final assessment are supplied in a separate documentation
-PR stacked on #35, keeping test artifacts out of the implementation diffs.
+Initial hosted receipts and the assessment are supplied in documentation PR #36
+stacked on #35. Subsequent evidence and installer progress are recorded in
+documentation PRs #40 and #43, with the reconnect receipt in #44.
 
 These are draft PRs. The repository's CI is the configured automated gate; no
 automated Karen review or protected-branch rule was found. Human approval is not
