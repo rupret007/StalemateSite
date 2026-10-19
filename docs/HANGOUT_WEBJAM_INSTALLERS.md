@@ -1,9 +1,10 @@
 # WebJam packages for the community beta
 
 Checked October 19, 2026 UTC. **Mac, Windows and Linux are all required for this
-beta. None currently has a completed candidate installation-and-audio receipt.**
-The protected website's native handoff passed against source; that does not
-establish that the installers visitors download contain the same implementation.
+beta. Exact-source packages for all four architecture targets are now verified;
+attended installation-and-audio receipts remain pending.** The protected
+website's native handoff, candidate package checks and native CI runs provide
+separate evidence from physical cross-computer audio acceptance.
 Windows native remote Join additionally needs a signed transport executable;
 the ordinary unsigned candidate cannot satisfy its existing runtime policy.
 
@@ -70,13 +71,13 @@ commit `5effbc58db706254f8ca8b52de4a0520c482294a`:
 - Branch dispatch cannot enter the tag-only GitHub Release publisher. No tag,
   release, source change or default application/protocol association was made.
 
-**Build status: running.** Apple Silicon Mac, Windows and Linux packages passed
-their native CI jobs and downloaded-artifact verification. Intel Mac is still
-building. Windows remote v3 Join remains blocked as described below. The sanitized
+**Build status: completed successfully.** Apple Silicon Mac, Intel Mac, Windows
+and Linux packages passed their native CI jobs and downloaded-artifact
+verification. Windows remote v3 Join remains blocked as described below. The
+sanitized
 [installer receipt](../pr-assets/beta-collaboration/webjam-installers.json)
-records the observed run status and public-release provenance. A dispatched or
-green source-test run is not a successful packaging run. If a prerequisite or
-target fails, record that failure and its cause; do not substitute older bytes.
+binds the successful packaging run, exact source and downloaded bytes. Signing
+and physical session acceptance remain separate gates below.
 
 | Computer | Expected CI artifact | Candidate files inside it | Required package trust description |
 | --- | --- | --- | --- |
@@ -108,15 +109,15 @@ the full `5eff` source hash above before testing the invitation flow.
 
 ## Candidate package hashes
 
-Snapshot frozen 2026-10-19T04:54:06.478726Z. These are inner package hashes from run
-`39197407138`, source `5effbc58db706254f8ca8b52de4a0520c482294a`. Intel remains
-pending; the live run can advance after this record. ZIP fallback hashes and
-outer Actions artifact identities are in the JSON receipt.
+Snapshot refreshed after all four targets completed. These are inner package
+hashes from run `39197407138`, source
+`5effbc58db706254f8ca8b52de4a0520c482294a`. The JSON receipt records the snapshot
+time, ZIP fallback hashes and outer Actions artifact identities.
 
 | Computer | Preferred candidate package | SHA-256 |
 | --- | --- | --- |
 | Apple Silicon Mac | `WebJam-v0.29.0-macos-arm64-ADHOC-TEST-ONLY.dmg` | `a2c2188e9afa2f804cdfa8cb7382f4be94189877c9574b43aababa7b5a4054cb` |
-| Intel Mac | Pending upstream packaging | Pending |
+| Intel Mac | `WebJam-v0.29.0-macos-x64-ADHOC-TEST-ONLY.dmg` | `dc7d5f7d389df8d4ed99bdf2c239d7013f97ea72c0e84e2b9b27e121d5c49189` |
 | Windows x64 | `WebJam-v0.29.0-windows-x64-UNSIGNED-TEST-ONLY-setup.exe` | `e72fde40f4a70466d21fe57c96404b2b3f686d700435f173d5cb7eea5321ed1c` |
 | Ubuntu 22.04 x64 | `WebJam-linux-x64.zip` | `c0ff84e9ebf1660380a0ccef03987f00c93c85eb7fde00fd4a882dc1bece57da` |
 
@@ -128,8 +129,17 @@ outer Actions artifact identities are in the JSON receipt.
   verified. The actual frozen executable passed its upstream isolated
   Reference Studio runtime smoke. The package's own native fabric passed
   mandatory hash/signature/architecture and ready/hello/stop checks.
-- **Native handoff from that Mac package:** its unmodified bundled Python code
-  was loaded in an isolated Python 3.11 interpreter, including the actual Qt
+- **Intel Mac:** downloaded Actions ZIP digest, DMG/ZIP hashes, embedded source
+  ID and x64 fabric manifest passed. Native Intel macOS CI verified the mounted
+  DMG, launched the frozen app and passed Reference Studio and packaged transport
+  gates. On this Apple Silicon Mac, the isolated Intel DMG copy also passed
+  deep/strict ad-hoc signature checks before and after execution, the actual
+  frozen Reference Studio process under Rosetta, and mandatory x64 fabric
+  integrity/signature/ready/hello/stop checks. Its bundled Qt Join dialogs
+  accepted full v2/v3 messages through the isolated interpreter. Rosetta
+  execution does not complete physical Intel Mac installation/audio acceptance.
+- **Native handoff from the Apple Silicon Mac package:** its unmodified bundled
+  Python code was loaded in an isolated Python 3.11 interpreter, including the actual Qt
   Join dialog and frozen transport integrity policy. Its own fabric and
   Jamulus server authenticated a native guest and returned a real Jamulus
   packet using the explicit sealed-reply fallback. The frozen application
@@ -152,8 +162,10 @@ outer Actions artifact identities are in the JSON receipt.
 
 No installation helper was run on the user's Mac; the installed app stayed at
 0.27.2, no owned native test process remained, and the default `webjam:` handler
-still resolved to `/Applications/WebJam.app` after the candidate checks. All
-physical three-computer installation/audio rows remain pending.
+still resolved to `/Applications/WebJam.app` after the candidate checks. Attended
+physical installation/audio acceptance remains pending for Mac (including
+Intel), Windows and Linux. The build monitor exited and both Mac disk images
+were detached after verification.
 
 ## A genuine v2 invitation uses the separate LAN route
 
@@ -199,7 +211,9 @@ This conclusion is from the exact source policy; physical Windows execution is
 still pending.
 
 The existing `windows-release-trust` workflow can produce a signed test
-candidate without a public release, but its `windows-release` environment
+candidate without a public release. It signs both `WebJam.exe` and
+`webjam-fabric.exe`, then regenerates the fabric hash manifest and final
+ZIP/Setup containers. Its `windows-release` environment
 and this personal repository currently expose no secret or variable names. It requires
 `WINDOWS_CODESIGN_PFX`, `WINDOWS_CODESIGN_PASSWORD` and
 `WINDOWS_CODESIGN_SUBJECT`. Provision a real approved signing identity through

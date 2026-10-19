@@ -31,7 +31,7 @@ protected Cloudflare beta, with separate actual visitor browser contexts.
 | Bounded AI assistance | Actual hosted guest text completed one provider review under a one-request daily cap. A second message reached the other guest while quota stayed at one and review was skipped. Both guests logged out; AI was restored off with the configured 100/day allowance. Automated queue/privacy/outage checks pass. | Benign input only. Complete real flagged-evidence and human review acceptance before permanent enablement. |
 | Shared drawing | Actual browser pointer drawing reached a separate hosted guest. WebKit/Android touch drawing and reconnect checks pass. | Physical touch-device acceptance. |
 | Watch synchronization | Desktop/private room and phone fixtures verify host play/pause/seek and guest restrictions, including paused seeks. A provider-readiness race exposed in CI is fixed; pending source/leave cancellation is covered. | Actual YouTube/provider playback and mobile autoplay/permission behavior remain to be accepted on devices. |
-| WebJam invitation/join | Actual native host invitation crossed two Cloudflare guests unchanged into actual Qt Join; a native guest authenticated and received a real Jamulus response. | Same Mac with explicit sealed-reply fallback. Mac, Windows and Linux are all beta requirements; Windows native v3 is blocked by its unsigned bundled fabric; do not weaken the signature check. Intel packaging is still pending. Compatible packaged installation, cross-network audio and timing remain to be accepted on all required platforms. Browser Web Join is disabled; its deployed site returned 404. |
+| WebJam invitation/join | Actual native host invitation crossed two Cloudflare guests unchanged into actual Qt Join; a native guest authenticated and received a real Jamulus response. | Same Mac with explicit sealed-reply fallback. Mac, Windows and Linux are all beta requirements; Windows native v3 is blocked by its unsigned bundled fabric; do not weaken the signature check. Compatible packaged installation, cross-network audio and timing remain to be accepted on all required platforms. Browser Web Join is disabled; its deployed site returned 404. |
 | Camera/TURN and cost controls | Consent, credential expiry/refresh, failure fallback and serialized usage/rate accounting pass provider fixtures. A separate read-only account-wide analytics query succeeded and returned zero October TURN egress bytes. | TURN is off. Beta issuer/analytics credentials, shared allocation and forced-relay media remain unverified. The zero sample does not establish remaining free allowance or billing; admission estimates are not a billing cap. |
 | Mobile usability | All repository browser checks passed, including WebKit phone projects. Hosted 375/390px captures have no page overflow, wrapping text, 16px input and visible Send. | Real iPhone Safari keyboard, Access redirects, camera/audio and background/resume are unverified. |
 | IRC history/reconnect | Hosted newcomers saw no earlier messages; original live connections retained scrollback during idle. Exact-connection PM consent cannot transfer to a reconnect or another same-device tab. | Real device/network interruption acceptance. No transcript archive or pre-join history is introduced. |
@@ -42,17 +42,26 @@ protected Cloudflare beta, with separate actual visitor browser contexts.
 
 The [installer assessment](HANGOUT_WEBJAM_INSTALLERS.md) records the exact candidate
 artifacts. Windows native v3 currently fails its required signature policy;
-Intel packaging remains pending. All three desktop platforms remain requirements.
+All four exact-source artifacts are now verified, including Intel native CI and
+an isolated Rosetta check. All three desktop platforms remain requirements.
 A successful package build is not physical installation or cross-network audio
 acceptance.
 
 ## Verification receipts
 
+- Co-host revocation passes **560 unit tests in 54 files and 188 browser scenarios**
+  in [CI](https://github.com/rupret007/StalemateSite/actions/runs/39202779472).
+  The deployed source differs from that CI head only in documentation and
+  sanitized evidence. Sixteen new permission regressions cover offline restart,
+  anonymous reconnect, multiple devices, nickname reuse and grant cleanup.
+  The runbook records unknown legacy grants and older-serializer rollback limits.
+
 - [Actual hosted AI pipeline](../pr-assets/beta-collaboration/hosted-ai-pipeline.json):
   one benign guest message completed a real Worker/provider review, a second
   message continued through chat at the one-request cap, two guests logged out,
   and AI was verified off after restoration. No human review or flagged-content
-  pass is implied. The observer source passed **544 unit tests in 53 files**.
+  pass is implied. The observer source passed **544 unit tests in 53 files and 188 browser scenarios**
+  in [CI](https://github.com/rupret007/StalemateSite/actions/runs/39202426418).
 
 
 - The watch-correction head passed CI with **470 unit tests in 50 files** and
@@ -112,8 +121,13 @@ The guest/native checks used beta version
 `ee8fb29f-aaa5-4e55-8ee3-06c760fd3778`; the later version provisioned secrets.
 Worker versions and Git commits are different identifiers.
 
-**Current active runtime:** `210c1fee-6344-4376-a4f8-3d44c20d142a`, source commit
-`51c5fc5` (private AI outcome counters and observed failure alerts; AI restored off).
+**Current active runtime:** `f4438515-7338-4287-b2e4-8485e88bbc90`, source commit
+`15767d9` (co-host revocation with persisted account/device grant associations).
+The private health response is ready with AI off and its spent daily reservation
+retained. [Deployment evidence](../pr-assets/beta-collaboration/hosted-cohost-deployment.json)
+verifies the uploaded fix and observed health; real-account hosted revocation
+acceptance remains separate. The previous AI observation runtime was
+`210c1fee`, source `51c5fc5` (AI outcome counters and observed failure alerts).
 The one-request hosted AI pipeline check passed, then restored the configured
 100/day allowance without resetting its spent reservation. The previous sign-in
 fix runtime was `e3177c6d`, source `832f7e1` (Workers-compatible provider requests

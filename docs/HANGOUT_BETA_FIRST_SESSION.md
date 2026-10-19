@@ -42,8 +42,8 @@ round-the-clock report responses without people assigned to provide them.
   only Jeff; named future cohort owners belong
   only in the owner app. Confirm Jeff's review coverage and recheck the contact
   link after any deployment.
-- Resolve the Windows native v3 signing blocker and finish Intel packaging
-  in the [installer assessment](HANGOUT_WEBJAM_INSTALLERS.md); all three desktop
+- Resolve the Windows native v3 signing blocker. All four candidate artifacts
+  are verified in the [installer assessment](HANGOUT_WEBJAM_INSTALLERS.md); all three desktop
   platforms remain required. Test the actual candidate installer on Mac, Windows
   and Linux in a disposable OS profile. Record OS,
   architecture, artifact version/hash, microphone permission and complete
