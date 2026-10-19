@@ -357,6 +357,148 @@ test('a reconnect does not wait for obsolete peer ICE setup', async ({ browser }
     expect(host.errors.concat(guest.errors)).toEqual([]);
 });
 
+test('initial camera publication stays current when an earlier hello decrypts late', async ({ browser }) => {
+    const host = await openBrowser(browser);
+    await join(host, roomUrl(), 'Jeff');
+    await camOn(host);
+    await host.evaluate(() => {
+        const open = window.HangoutCore.open;
+        window.HangoutCore.open = async (key, frame) => {
+            const msg = await open(key, frame);
+            if (msg.type === 'hello' && !msg.reply) {
+                window.HangoutCore.open = open;
+                window.__heldInitialHello = true;
+                await new Promise((resolve) => { window.__releaseInitialHello = resolve; });
+            }
+            return msg;
+        };
+    });
+    const guest = await openBrowser(browser);
+    await join(guest, host.url(), 'Karen');
+    await expect.poll(() => host.evaluate(() => window.__heldInitialHello)).toBe(true);
+    await camOn(guest);
+    const guestId = await guest.evaluate(() => window.__hangout.myId);
+    // The newer camera advertisement finishes decrypting before the older
+    // hello; releasing hello must not replace that current camera state.
+    await expect.poll(() => host.evaluate((id) => window.__hangout.av.camPeers.has(id), guestId)).toBe(true);
+    await host.evaluate(() => window.__releaseInitialHello());
+    await expect.poll(() => guest.evaluate(() => {
+        const v = document.querySelector('.tile:not([data-tile="me"]) video');
+        return v ? v.videoWidth : 0;
+    }), { timeout: 15000 }).toBeGreaterThan(0);
+    await expect.poll(() => host.evaluate(() => {
+        const v = document.querySelector('.tile:not([data-tile="me"]) video');
+        return v ? v.videoWidth : 0;
+    }), { timeout: 15000 }).toBeGreaterThan(0);
+    expect(await host.evaluate((id) => ({ name: window.__hangout.names.get(id), camera: window.__hangout.av.camPeers.has(id) }), guestId)).toEqual({ name: 'Karen', camera: true });
+    expect(host.errors.concat(guest.errors)).toEqual([]);
+});
+
+test('an older camera-on publication cannot restore a newer camera-off tile', async ({ browser }) => {
+    const host = await openBrowser(browser);
+    await join(host, roomUrl(), 'Jeff');
+    await camOn(host);
+    const guest = await openBrowser(browser);
+    await join(guest, host.url(), 'Karen');
+    await expect(host.locator('[data-peers]')).toContainText('Karen');
+    const guestId = await guest.evaluate(() => window.__hangout.myId);
+    await host.evaluate((id) => {
+        const open = window.HangoutCore.open;
+        window.HangoutCore.open = async (key, frame) => {
+            const msg = await open(key, frame);
+            if (frame.from === id && msg.type === 'av') {
+                if (msg.av.cam) {
+                    window.__heldCameraOn = true;
+                    await new Promise((resolve) => { window.__releaseCameraOn = resolve; });
+                } else window.__receivedCameraOff = true;
+            }
+            return msg;
+        };
+        window.__restoreCameraDecrypt = () => { window.HangoutCore.open = open; };
+    }, guestId);
+    await camOn(guest);
+    await expect.poll(() => host.evaluate(() => window.__heldCameraOn)).toBe(true);
+    await guest.click('[data-cam]');
+    await expect(guest.locator('[data-cam]')).toHaveText('Turn on my camera');
+    await expect.poll(() => host.evaluate(() => window.__receivedCameraOff)).toBe(true);
+    await host.evaluate(async () => {
+        window.__restoreCameraDecrypt();
+        window.__releaseCameraOn();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await expect(host.locator(`[data-tile="${guestId}"]`)).toHaveCount(0);
+    expect(await host.evaluate((id) => window.__hangout.av.camPeers.has(id), guestId)).toBe(false);
+    expect(await guest.evaluate(() => Boolean(window.__hangout.av.rawCam) || window.__hangout.av.stream?.getVideoTracks().some((track) => track.readyState === 'live'))).toBe(false);
+    expect(host.errors.concat(guest.errors)).toEqual([]);
+});
+
+test('a valid follow-up offer is answered while the previous remote answer is pending', async ({ browser }) => {
+    const { host, guest } = await call(browser);
+    await expect.poll(() => host.evaluate(() => [...window.__hangout.av.pcs.values()][0]?.pc.signalingState)).toBe('stable');
+    await expect.poll(() => guest.evaluate(() => [...window.__hangout.av.pcs.values()][0]?.pc.signalingState)).toBe('stable');
+    const hostPolite = await host.evaluate(() => [...window.__hangout.av.pcs.values()][0].polite);
+    const impolite = hostPolite ? guest : host;
+    const polite = hostPolite ? host : guest;
+    await impolite.evaluate(() => {
+        const open = window.HangoutCore.open;
+        const gates = {};
+        window.__heldSdp = [];
+        window.__remoteSdpCalls = [];
+        window.HangoutCore.open = async (key, frame) => {
+            const msg = await open(key, frame);
+            if (msg.type === 'rtc' && msg.sdp && !gates[msg.sdp.type]) {
+                window.__heldSdp.push(msg.sdp.type);
+                await new Promise((resolve) => { gates[msg.sdp.type] = resolve; });
+            }
+            return msg;
+        };
+        window.__releaseSdp = () => {
+            window.HangoutCore.open = open;
+            gates.answer();
+            gates.offer();
+        };
+        const pc = [...window.__hangout.av.pcs.values()][0].pc;
+        const setRemote = pc.setRemoteDescription.bind(pc);
+        let answerPending = false;
+        pc.setRemoteDescription = (description) => {
+            window.__remoteSdpCalls.push({ type: description.type, state: pc.signalingState, answerPending });
+            if (description.type === 'answer') answerPending = true;
+            const result = setRemote(description);
+            if (description.type === 'answer') result.then(() => { answerPending = false; }, () => { answerPending = false; });
+            return result;
+        };
+        pc.restartIce();
+    });
+    await expect.poll(() => impolite.evaluate(() => window.__heldSdp.includes('answer'))).toBe(true);
+    await expect.poll(() => polite.evaluate(() => [...window.__hangout.av.pcs.values()][0].pc.signalingState)).toBe('stable');
+    await polite.evaluate(() => [...window.__hangout.av.pcs.values()][0].pc.restartIce());
+    await expect.poll(() => impolite.evaluate(() => window.__heldSdp.includes('offer'))).toBe(true);
+    // Resolve both decryptions in the same task: the valid next offer reaches
+    // the browser's native operations chain while SRD(answer) is still pending.
+    await impolite.evaluate(() => window.__releaseSdp());
+    try {
+        await expect.poll(() => impolite.evaluate(() => window.__remoteSdpCalls.some((entry) => entry.type === 'offer'))).toBe(true);
+        expect(await impolite.evaluate(() => window.__remoteSdpCalls.some((entry) => entry.type === 'offer' && entry.answerPending && entry.state === 'have-local-offer'))).toBe(true);
+        await expect.poll(() => polite.evaluate(() => [...window.__hangout.av.pcs.values()][0].pc.signalingState)).toBe('stable');
+        await expect.poll(() => impolite.evaluate(() => [...window.__hangout.av.pcs.values()][0].pc.signalingState)).toBe('stable');
+        expect(await impolite.evaluate(() => [...window.__hangout.av.pcs.values()][0].settingRemoteAnswer)).toBe(false);
+        for (const page of [host, guest]) {
+            await expect.poll(() => page.evaluate(() => [...window.__hangout.av.pcs.values()][0].pc.connectionState)).toBe('connected');
+            await expect.poll(() => page.evaluate(() => document.querySelector('.tile:not([data-tile="me"]) video')?.videoWidth || 0)).toBeGreaterThan(0);
+        }
+    } finally {
+        const diagnostic = {
+            impolite: await impolite.evaluate(() => {
+                const entry = [...window.__hangout.av.pcs.values()][0];
+                return { state: entry.pc.signalingState, ignoreOffer: entry.ignoreOffer, held: window.__heldSdp, nativeCalls: window.__remoteSdpCalls };
+            }),
+            polite: await polite.evaluate(() => ({ state: [...window.__hangout.av.pcs.values()][0].pc.signalingState }))
+        };
+        await test.info().attach('sdp-overlap-state', { body: JSON.stringify(diagnostic), contentType: 'application/json' });
+    }
+    expect(host.errors.concat(guest.errors)).toEqual([]);
+});
+
 test('phones: portrait tiles, call bar sticks to the bottom in thumb reach, 44px targets', async ({ browser }) => {
     const opts = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' };
     const { host, guest } = await call(browser, opts);

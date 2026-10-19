@@ -49,6 +49,14 @@ acceptance.
 
 ## Verification receipts
 
+- [Initial media ordering regressions](../pr-assets/beta-collaboration/initial-media-regressions.json):
+  delayed hello/AV decryption could replace newer camera state, and a valid
+  follow-up WebRTC offer could be discarded while a remote answer was still
+  applying. Receive ordinals and per-PC answer state fix three failing negative
+  controls; all **18 video scenarios** pass without retries. Capture consent,
+  admission limits, recovery assertions and timeouts remain unchanged. These
+  reproduced bugs do not establish the earlier intermittent CI failure's cause.
+
 - [Ownership-offer recovery](../pr-assets/beta-collaboration/ownership-offer-recovery.json):
   a reproduced ten-minute offer loss across wake is fixed with bounded,
   account-bound metadata and the original deadline. Fifteen new regressions

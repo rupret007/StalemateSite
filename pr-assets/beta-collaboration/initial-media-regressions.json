@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "checkedOn": "2026-10-19",
+  "scope": "Local Chromium, real browser WebRTC operations with fake capture and local relay; no physical camera, hosted WebRTC or forced-relay acceptance claim.",
+  "priorSourceCommit": "42ebc4114ea78930ef616a50a3815d8d57a424e1",
+  "correctedRoomJsSha256": "dabc083bf6b0f2ee5e85127375d7239eb7a4b0bb905f154b73c4b18530924dac",
+  "negativeControls": [
+    {
+      "operation": "Hold initial hello decryption until a newer camera-on advertisement has been applied.",
+      "observed": "Late hello overwrote current AV state; guest decoded host video while host video stayed zero for fifteen seconds."
+    },
+    {
+      "operation": "Hold older camera-on decryption until a newer camera-off advertisement has been applied.",
+      "observed": "Releasing the older publication restored one stale peer tile despite the guest having stopped capture."
+    },
+    {
+      "operation": "Release a real remote answer and valid subsequent offer together while native answer application is pending.",
+      "observed": "The impolite endpoint ignored the valid offer before native setRemoteDescription and left the other endpoint waiting for an answer."
+    }
+  ],
+  "fix": {
+    "stateOrdering": "Independent name and AV receive ordinals per live relay peer preserve newer wire-order state across delayed decryption.",
+    "negotiation": "Per-PC pending-answer state recognizes a valid subsequent offer and resets on success or failure.",
+    "standardReference": "https://www.w3.org/TR/webrtc/#perfect-negotiation-example",
+    "inboundMessageQueueAdded": false,
+    "consentOrMediaAdmissionExpanded": false,
+    "recoveryAssertionsOrTimeoutsWeakened": false
+  },
+  "validation": {
+    "focusedScenariosPassed": 7,
+    "fullVideoScenariosPassed": 18,
+    "retries": 0,
+    "currentNameAndCameraStateVerified": true,
+    "cameraOffCaptureRemainsStopped": true,
+    "pendingAnswerFlagResetAndBilateralDecodedVideoVerified": true,
+    "independentSourceReview": "No blocker found."
+  },
+  "earlierCiStartupFailureCause": "Unproven. These separately reproduced product races do not establish that CI failure's cause.",
+  "credentialsOrRoomKeysRecorded": false
+}

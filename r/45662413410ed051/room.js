@@ -252,14 +252,15 @@
         }
         if (!frame.c) return;
         let peer = relayPeers.get(frame.from);
-        if (!peer) { peer = { live: true }; relayPeers.set(frame.from, peer); }
+        if (!peer) { peer = { live: true, received: 0, avReceived: 0, nameReceived: 0 }; relayPeers.set(frame.from, peer); }
+        const received = ++peer.received;
         let msg;
         try { msg = await H.open(app.key, frame); } catch (error) { return; }
         if (app.ended || app.ws !== ws) return;
         // Crypto may finish after the relay has already announced departure.
         // Keep prior chat/drawing, but never restore that person's name or media.
         if (!peer.live && ['hello', 'av', 'rtc'].includes(msg.type)) return;
-        await handle(msg, { t: frame.t, from: frame.from, peer });
+        await handle(msg, { t: frame.t, from: frame.from, peer, received });
     }
 
     function pruneNames() { /* names are refreshed by hello/bye messages */ }
@@ -274,9 +275,18 @@
         if (msg.to && msg.to !== app.myId) return;
         switch (msg.type) {
         case 'hello':
-            app.names.set(meta.from, String(msg.name || 'Someone').slice(0, 24));
+            if (meta.received > meta.peer.nameReceived) {
+                meta.peer.nameReceived = meta.received;
+                app.names.set(meta.from, String(msg.name || 'Someone').slice(0, 24));
+            }
             showPeers(app.names.size + 1);
-            noteAv(meta.from, msg.av);
+            if (meta.received > meta.peer.avReceived) {
+                meta.peer.avReceived = meta.received;
+                noteAv(meta.from, msg.av);
+            } else if (app.av.peers.has(meta.from) && !app.av.pcs.has(meta.from)) {
+                // A newer AV update may arrive before this hello supplies a name.
+                openPc(meta.from);
+            }
             if (!msg.reply) {
                 await send({ type: 'hello', reply: true, to: meta.from, name: app.name, av: avFlags() });
                 win.setTimeout(() => sendSnapshot(meta.from), app.isHost ? 0 : 150 + Math.random() * 400);
@@ -354,7 +364,10 @@
             if (V.HOST_KINDS.includes(msg.body.kind)) applyHostAction(msg.body, msg, false);
             return;
         case 'av':
-            noteAv(meta.from, msg.av);
+            if (meta.received > meta.peer.avReceived) {
+                meta.peer.avReceived = meta.received;
+                noteAv(meta.from, msg.av);
+            }
             return;
         case 'nudge':
             if (app.isHost) say(`${app.names.get(meta.from) || 'Someone'} needs a sec. Hit “Hold up!” to pause for everyone.`);
@@ -1125,7 +1138,7 @@
             const pc = new RTCPeerConnection({ iceServers: app.av.ice || STUN });
             const conn = navigator.connection || {};
             const thrifty = Boolean(conn.saveData) || conn.type === 'cellular' || /(^|-)2g|3g/.test(conn.effectiveType || '');
-            const entry = { pc, polite: app.myId > id, makingOffer: false, ignoreOffer: false, pendingIce: [], relayed: false, stream: new MediaStream(), senders: {}, wantHi: false, tier: thrifty ? 'weak' : 'ok', hist: [], restarts: 0, last: null };
+            const entry = { pc, polite: app.myId > id, makingOffer: false, ignoreOffer: false, settingRemoteAnswer: false, pendingIce: [], relayed: false, stream: new MediaStream(), senders: {}, wantHi: false, tier: thrifty ? 'weak' : 'ok', hist: [], restarts: 0, last: null };
             app.av.pcs.set(id, entry);
             const current = () => peer.live && app.av.pcs.get(id) === entry;
             pc.onicecandidate = (e) => { if (current() && e.candidate) send({ type: 'rtc', to: id, ice: e.candidate.toJSON() }); };
@@ -1243,10 +1256,14 @@
         const current = () => peer.live && app.av.pcs.get(from) === entry;
         try {
             if (msg.sdp) {
-                const collision = msg.sdp.type === 'offer' && (entry.makingOffer || pc.signalingState !== 'stable');
+                const readyForOffer = !entry.makingOffer && (pc.signalingState === 'stable' || entry.settingRemoteAnswer);
+                const collision = msg.sdp.type === 'offer' && !readyForOffer;
                 entry.ignoreOffer = !entry.polite && collision;
                 if (entry.ignoreOffer) return;
-                await pc.setRemoteDescription(msg.sdp);
+                const answer = msg.sdp.type === 'answer';
+                if (answer) entry.settingRemoteAnswer = true;
+                try { await pc.setRemoteDescription(msg.sdp); }
+                finally { if (answer) entry.settingRemoteAnswer = false; }
                 if (!current()) return;
                 for (const ice of entry.pendingIce.splice(0)) {
                     try { await pc.addIceCandidate(ice); } catch (_) { /* stale candidate from a prior negotiation */ }
