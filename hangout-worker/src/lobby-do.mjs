@@ -7,6 +7,12 @@ import { LOG_TTL } from './community-state.mjs';
 import { createAiModerator } from './ai-moderation.mjs';
 import { activeBetaSession, validBetaSession } from './beta-session-client.mjs';
 import { INTERNAL_HEALTH_PATH, aiHealth, dailyUsage, healthJson } from './beta-ops.mjs';
+import { createPrivateReportQueue, privateReportRef, validatePrivateReportControl, LIMITS as PRIVATE_REPORT_LIMITS } from './private-reports.mjs';
+
+const privateReportResponse = (value) => new Response(JSON.stringify(value), {
+    status: value.ok ? 200 : Number.isInteger(value.status) ? value.status : 503,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+});
 
 export function lobbyConfigured(env = {}) {
     return !!(env.LOBBY && env.QUOTA && hmacKeyOk(env.HANGOUT_HMAC_KEY) && typeof env.HANGOUT_PREVIEW_KEY === 'string' && env.HANGOUT_TURNSTILE_SECRET);
@@ -120,6 +126,8 @@ export class HangoutLobby {
         this.env = env;
         this.pendingAdmission = new Map();
         this.evidenceStorage = 'ready';
+        this.privateReportState = { storage: 'disabled', reports: [] };
+        this.privateAdminDispatch = new WeakMap();
         this.ready = state.blockConcurrencyWhile(async () => {
             // Only the separate authenticated pilot can initialize its first empty network.
             // A later missing/corrupt record still restores fail-closed after this sentinel exists.
@@ -129,6 +137,10 @@ export class HangoutLobby {
                     if ((await txn.get('net')) === undefined && (await txn.get('room-index')) === undefined) await txn.put('net', { lock: 'off' });
                     await txn.put(bootstrapKey, true);
                 });
+            }
+            if (env.HANGOUT_BETA_MODE === 'protected') {
+                this.privateReportQueue = createPrivateReportQueue({ storage: state.storage });
+                await this.refreshPrivateReports(false);
             }
             this.aiModerator = createAiModerator({
                 enabled: env.HANGOUT_AI_MODERATION === 'review',
@@ -159,6 +171,10 @@ export class HangoutLobby {
                                 const ended = Promise.resolve().then(() => this.webSocketClose(ws)).catch(() => this.storageFailed());
                                 this.state.waitUntil?.(ended);
                             }
+                            return;
+                        }
+                        if (msg.t === 'admin' && env.HANGOUT_BETA_MODE === 'protected') {
+                            this.sendPrivateAdmin(ws, id, msg);
                             return;
                         }
                         ws.send(JSON.stringify(msg));
@@ -220,6 +236,86 @@ export class HangoutLobby {
             if (!(await state.storage.getAlarm())) await state.storage.setAlarm(Date.now() + 60 * 1000);
         });
     }
+    sendPrivateAdmin(ws, id, msg) {
+        const original = ws.deserializeAttachment() || {};
+        if (!original.admin || !['owner', 'band', 'moderator'].includes(original.role)
+            || socketIdentityInvalid(original, this.env)) return;
+        const generation = (this.privateAdminDispatch.get(ws) || 0) + 1;
+        this.privateAdminDispatch.set(ws, generation);
+        const task = (async () => {
+            // A registry revocation can commit while its disconnect RPC waits
+            // behind this Lobby event. Local socket metadata alone is not proof
+            // that private evidence may still be delivered.
+            const active = await activeBetaSession(this.env, original);
+            if (this.privateAdminDispatch.get(ws) !== generation || this.byId(id) !== ws) return;
+            const current = ws.deserializeAttachment() || {};
+            if (socketIdentityInvalid(current, this.env) || !current.admin
+                || !['owner', 'band', 'moderator'].includes(current.role)
+                || ['id', 'betaSid', 'betaInviteVersion', 'expiresAt', 'role', 'email', 'admin']
+                    .some(key => current[key] !== original[key])
+                || ws.readyState !== undefined && ws.readyState !== 1) return;
+            if (!active) {
+                ws.serializeAttachment({ ...current, sessionEnded: true });
+                ws.close(4401, 'sign in again');
+                const ended = Promise.resolve().then(() => this.webSocketClose(ws)).catch(() => this.storageFailed());
+                this.state.waitUntil?.(ended);
+                return;
+            }
+            const now = Date.now();
+            const privateReports = { ...this.privateReportState, reports: this.privateReportState.reports.filter(report =>
+                Number.isFinite(report.at) && report.at <= now && now - report.at < PRIVATE_REPORT_LIMITS.ttlMs) };
+            // Read the current queue only after authentication, and supersede
+            // older checks so an old frame cannot restore dismissed evidence.
+            ws.send(JSON.stringify({ ...msg, state: { ...msg.state, privateReports } }));
+        })().catch(() => { /* No private evidence is sent on delivery failure. */ });
+        this.state.waitUntil?.(task);
+        return task;
+    }
+    async refreshPrivateReports(notify = true) {
+        if (!this.privateReportQueue) return;
+        const cleanup = await this.privateReportQueue.prune();
+        const result = await this.privateReportQueue.snapshot();
+        this.privateReportState = result.ok
+            ? { storage: cleanup.ok ? result.storage : 'unavailable', reports: result.reports }
+            : { storage: 'unavailable', reports: [] };
+        if (notify) this.engine?.notifyAiStatus();
+    }
+    async resolvePrivateReport({ connection, action, id }) {
+        const ws = this.byId(connection);
+        const a = ws?.deserializeAttachment() || {};
+        if (!this.privateReportQueue || !a.admin || !['owner', 'band', 'moderator'].includes(a.role)
+            || socketIdentityInvalid(a, this.env) || !await activeBetaSession(this.env, a)) return { ok: false };
+        const current = ws.deserializeAttachment() || {};
+        if (socketIdentityInvalid(current, this.env) || current.betaSid !== a.betaSid
+            || ws.readyState !== undefined && ws.readyState !== 1) return { ok: false };
+        const result = await this.privateReportQueue.resolve(id, action);
+        await this.refreshPrivateReports();
+        return result;
+    }
+    async receivePrivateReport(request) {
+        if (this.env.HANGOUT_BETA_MODE !== 'protected' || request.method !== 'POST' || !this.privateReportQueue) {
+            return privateReportResponse({ ok: false, error: 'unavailable', status: 503 });
+        }
+        let beta, body;
+        const room = request.headers.get('X-Hangout-Private-Room');
+        try {
+            beta = JSON.parse(request.headers.get('X-Hangout-Beta-Session'));
+            const text = await request.text();
+            if (new TextEncoder().encode(text).byteLength > 8192) throw new Error('request');
+            body = JSON.parse(text);
+        } catch { return privateReportResponse({ ok: false, error: 'invalid-report', status: 400 }); }
+        if (!validBetaSession(beta, this.env) || !/^[0-9a-f]{64}$/.test(room || '')
+            || !await activeBetaSession(this.env, beta)) return privateReportResponse({ ok: false, error: 'unavailable', status: 503 });
+        const checked = validatePrivateReportControl(body?.report);
+        if (!checked.ok) return privateReportResponse({ ok: false, error: 'invalid-report', status: 400 });
+        const reporterRef = await privateReportRef('reporter', beta.betaSid, this.env.HANGOUT_HMAC_KEY);
+        const roomRef = await privateReportRef('room', room, this.env.HANGOUT_HMAC_KEY);
+        if (body?.provenance?.reporterRef !== reporterRef || body.provenance.roomRef !== roomRef
+            || !validBetaSession(beta, this.env)) return privateReportResponse({ ok: false, error: 'invalid-report', status: 400 });
+        const result = await this.privateReportQueue.submit(checked.report, body.provenance);
+        await this.refreshPrivateReports();
+        return privateReportResponse(result);
+    }
     storageFailed() {
         this.evidenceStorage = 'degraded';
         this.engine?.notifyAiStatus();
@@ -276,11 +372,15 @@ export class HangoutLobby {
                 if (ended) { ws.close(4401, 'sign in again'); await this.engine.disconnect(a.id); }
             }
             await this.engine.tick(); await this.pruneLogs();
+            await this.refreshPrivateReports();
             await this.state.storage.setAlarm(Date.now() + 60000);
         });
     }
     async fetch(request) {
         await this.ready;
+        if (new URL(request.url).pathname === '/__beta/private-report') {
+            return this.state.blockConcurrencyWhile(() => this.receivePrivateReport(request));
+        }
         if (new URL(request.url).pathname === INTERNAL_HEALTH_PATH) {
             if (this.env.HANGOUT_BETA_MODE !== 'protected' || request.method !== 'GET') return new Response('not found', { status: 404 });
             return this.state.blockConcurrencyWhile(async () => {
@@ -338,7 +438,10 @@ export class HangoutLobby {
             betaInviteVersion: this.env.HANGOUT_BETA_MODE === 'protected' ? identity.betaInviteVersion : undefined,
             dev: identity.dev, iph: identity.iph, role: identity.role, email: identity.email, account: identity.account, expiresAt: identity.expiresAt, admin: identity.admin });
         if (identity.devToken) pair[1].send(JSON.stringify({ t: 'device', token: identity.devToken }));
-        for (const frame of initialFrames) pair[1].send(JSON.stringify(frame));
+        for (const frame of initialFrames) {
+            if (frame.t === 'admin' && this.env.HANGOUT_BETA_MODE === 'protected') this.sendPrivateAdmin(pair[1], id, frame);
+            else pair[1].send(JSON.stringify(frame));
+        }
         return new Response(null, { status: 101, webSocket: pair[0] });
         });
     }
@@ -347,7 +450,14 @@ export class HangoutLobby {
         return this.state.blockConcurrencyWhile(async () => {
             const a = ws.deserializeAttachment() || {};
             if (socketIdentityInvalid(a, this.env)) { ws.close(4401, 'sign in again'); return this.engine.disconnect(a.id); }
-            return this.engine.message(this.state.getTags(ws)[0], typeof raw === 'string' ? raw : '');
+            const result = await this.engine.message(this.state.getTags(ws)[0], typeof raw === 'string' ? raw : '');
+            if (result?.privateReportAction) {
+                let resolved;
+                try { resolved = await this.resolvePrivateReport(result.privateReportAction); }
+                catch { resolved = { ok: false }; }
+                return this.engine.completePrivateReportAction(a.id, resolved);
+            }
+            return result;
         });
     }
     async webSocketClose(ws) { await this.ready; return this.state.blockConcurrencyWhile(() => Promise.resolve(this.engine.disconnect(this.state.getTags(ws)[0]))); }

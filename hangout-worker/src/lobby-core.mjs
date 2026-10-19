@@ -116,7 +116,7 @@ export const COMMANDS = Object.freeze({
     kick: 'chanop', ban: 'chanop', unban: 'chanop', invite: 'chanop', op: 'chanop', deop: 'chanop', voice: 'chanop',
     devoice: 'chanop', jamlink: 'chanop', mode: 'chanop', close: 'chanop', lock: 'chanop',
     mute: 'moderator', gban: 'moderator', purge: 'moderator', shield: 'band', shieldoff: 'band', lobby: 'band', filter: 'band',
-    camoff: 'moderator', approve: 'moderator', dismiss: 'moderator', aidismiss: 'moderator', log: 'moderator', delete: 'moderator', slow: 'band'
+    camoff: 'moderator', approve: 'moderator', dismiss: 'moderator', aidismiss: 'moderator', privatereport: 'moderator', log: 'moderator', delete: 'moderator', slow: 'band'
 });
 
 export function createLobby({ now = () => Date.now(), send = () => {}, close = () => {}, persist: persistImpl = () => {}, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
@@ -1219,8 +1219,29 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             saveAiReviews();
             return log(c.nick, 'ai-dismiss', id);
         },
+        privatereport(c, _chan, [action, id, ...extra]) {
+            if (!c.admin) return bot(c, 'Private report review requires a staff sign-in.', 'error');
+            if (extra.length || !['resolve', 'dismiss'].includes(action) || !/^[A-Za-z0-9_-]{1,64}$/.test(id || '')) {
+                return bot(c, 'Use /privatereport resolve|dismiss report-id.', 'error');
+            }
+            // Return an intent only. The DO executes it after this synchronous
+            // command's required accounting writes have committed.
+            return { privateReportAction: { connection: c.id, action, id } };
+        },
         log(c) { return out(c, { t: 'modlog', entries: net.modlog.slice(-50) }); }
     };
+
+    function completePrivateReportAction(connection, result) {
+        const c = conns.get(connection);
+        if (!c || !isStaff(c) || !c.admin) return;
+        if (!result?.ok || !['resolved', 'dismissed'].includes(result.status)
+            || !/^[A-Za-z0-9_-]{1,64}$/.test(result.id || '')) {
+            return bot(c, 'Private report changes are not confirmed. Check staff sign-in and storage, then retry.', 'error');
+        }
+        if (result.duplicate) return bot(c, `Private report was already ${result.status}. No new action was taken.`);
+        log(c.nick, `private-report-${result.status === 'resolved' ? 'resolve' : 'dismiss'}`, result.id);
+        return bot(c, `Private report ${result.status}. No chat was deleted or participant punished.`);
+    }
 
     function setRank(c, chan, n, set, on, flag) {
         if (chan.kind === 'lobby') return bot(c, 'In #stalemate authenticated site staff are the ops. Use this inside a room.', 'error');
@@ -1748,5 +1769,5 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     }
     function restoreLog(entries = []) { net.modlog = entries.filter((e) => Number.isFinite(e.at) && now() - e.at < LOG_TTL).slice(-L.modlogKeep); }
 
-    return { connect, disconnect: (...args) => durable(disconnect, args), message: (...args) => durable(message, args), tick: (...args) => durable(tick, args), roomSnapshot, restoreRooms, sessionSnapshot, restoreSessions, abuseSnapshot, restoreAbuse, snapshot, restore, restoreLog, restoreModerationQueue, restoreAiReviews, applyAiReview, notifyAiStatus: pushAdmin, adminState, budgetLevel, spend, get modlog() { return net.modlog.slice(); }, _debug: { conns, channels, net, pm, reports, held, lines } };
+    return { connect, disconnect: (...args) => durable(disconnect, args), message: (...args) => durable(message, args), completePrivateReportAction: (...args) => durable(completePrivateReportAction, args), tick: (...args) => durable(tick, args), roomSnapshot, restoreRooms, sessionSnapshot, restoreSessions, abuseSnapshot, restoreAbuse, snapshot, restore, restoreLog, restoreModerationQueue, restoreAiReviews, applyAiReview, notifyAiStatus: pushAdmin, adminState, budgetLevel, spend, get modlog() { return net.modlog.slice(); }, _debug: { conns, channels, net, pm, reports, held, lines } };
 }
