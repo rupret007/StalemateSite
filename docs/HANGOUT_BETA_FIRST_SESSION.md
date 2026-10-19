@@ -21,7 +21,7 @@ not promises that coverage already exists.
 | Assignment | Person / value | Verified |
 | --- | --- | --- |
 | Session host and release decision | Jeff | Sole initial owner confirmed; actual OTP owner callback verified |
-| Report reviewer during the session | Jeff | Confirmed; separate actual staff callback and panel connection verified; human disposition pending |
+| Report reviewer during the session | Jeff | Confirmed; separate actual staff callback and panel connection verified; Jeff confirmed test-report dismissal/removal; independent reload pending |
 | Session helper and incident handoff | Unassigned | Pending; no staff privilege implied |
 | Monitored moderation contact | jeffstory007@gmail.com | Confirmed by Jeff; hosted mail link verified at 04:10 UTC in the [ops receipt](../pr-assets/beta-collaboration/hosted-ops.json) |
 | Report review hours and expected response | Unagreed | Pending |
@@ -112,7 +112,7 @@ in public issue attachments.
 | Separate-household audio session | Pending | |
 | Real owner login and second-device room recovery | Partial | Actual owner callback verified; second-device room recovery pending |
 | Separately verified co-host handoff and revocation | Pending | Requires a second approved owner-policy identity; staff remains Jeff-only |
-| Real restricted staff login, denied guest/owner, report review | Partial | Actual restricted panel and synthetic queue evidence verified; human disposition and denied-identity acceptance pending |
+| Real restricted staff login, denied guest/owner, report review | Partial | Actual restricted panel and synthetic queue evidence verified; Jeff confirmed test-report dismissal/removal; independent reload and denied-identity acceptance pending |
 | Confirmed moderation contact displayed | Verified | [Hosted mail-link check](../pr-assets/beta-collaboration/hosted-ops.json); recheck after changes |
 | Reviewer coverage and incident handoff | Pending | Jeff is the sole initial reviewer; agree hours and helper |
 | Actual provider watch playback | Pending | |

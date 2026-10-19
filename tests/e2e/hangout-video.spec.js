@@ -10,6 +10,7 @@ const SHOTS = process.env.HANGOUT_VIDEO_SHOTS || '';
 
 test.use({
     permissions: ['camera', 'microphone'],
+    trace: 'retain-on-failure',
     launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--disable-features=WebRtcHideLocalIpsWithMdns'] }
 });
 test.skip(({ browserName }) => browserName !== 'chromium', 'Chromium carries the two-browser call suite');
@@ -125,6 +126,7 @@ test('raise hand and reactions reach everyone; junk reactions are dropped', asyn
 
 test('host can mute, turn a camera off, spotlight, lock and take someone off faces; guests cannot forge it', async ({ browser }) => {
     const { host, guest } = await call(browser);
+    const guestId = await guest.evaluate(() => window.__hangout.myId);
     await micOn(guest);
     const guestTile = host.locator('.tile:not([data-tile="me"])');
 
@@ -147,6 +149,12 @@ test('host can mute, turn a camera off, spotlight, lock and take someone off fac
         const live = a.stream && a.stream.getVideoTracks().some((t) => t.readyState === 'live');
         return live ? 'live' : 'off';
     }), { timeout: 5000 }).toBe('off');
+    // Observe the all-off publication before resuming, so an earlier mic-on
+    // advertisement cannot satisfy the admission check before locking faces.
+    await expect.poll(() => host.evaluate((id) => {
+        const av = window.__hangout.av;
+        return !av.micPeers.has(id) && !av.camPeers.has(id) && !av.peers.has(id);
+    }, guestId)).toBe(true);
 
     await host.locator('[data-tile="me"] .more').click();
     await host.click('[data-tile-menu] button:has-text("Spotlight me for everyone")');
@@ -155,6 +163,10 @@ test('host can mute, turn a camera off, spotlight, lock and take someone off fac
     // Muted by the host, back on by choice (no second explainer).
     await guest.click('[data-mic]');
     await expect(guest.locator('[data-mic]')).toHaveText('Mute my mic');
+    await expect.poll(() => host.evaluate((id) => {
+        const av = window.__hangout.av;
+        return av.micPeers.has(id) && av.peers.has(id);
+    }, guestId)).toBe(true);
     await expect(host.locator('.tile:not([data-tile="me"])')).toHaveCount(1);
 
     await host.click('[data-lock]');
@@ -231,6 +243,10 @@ test('jam rooms: browser mic starts off and is labelled for talking only', async
 
 test('a dropped relay connection reconnects and faces come back', async ({ browser }) => {
     const { host, guest } = await call(browser);
+    await expect.poll(() => host.evaluate(() => {
+        const v = document.querySelector('.tile:not([data-tile="me"]) video');
+        return v ? v.videoWidth : 0;
+    }), { timeout: 15000 }).toBeGreaterThan(0);
     const before = await guest.evaluate(() => window.__hangout.myId);
     await guest.evaluate(() => window.__hangout.ws.close(3000));
     await expect(guest.locator('[data-status]')).toContainText(/Reconnecting|Back in/);
@@ -240,6 +256,105 @@ test('a dropped relay connection reconnects and faces come back', async ({ brows
         return v && v.videoWidth;
     }), { timeout: 20000 }).toBeGreaterThan(0);
     await expect(host.locator('.tile:not([data-tile="me"])')).toHaveCount(1, { timeout: 20000 });
+});
+
+test('a reconnect during camera publication cannot restore a departed peer after decryption', async ({ browser }) => {
+    const host = await openBrowser(browser);
+    await join(host, roomUrl(), 'Jeff');
+    const guest = await openBrowser(browser);
+    await join(guest, host.url(), 'Karen');
+    await expect(guest.locator('[data-peers]')).toContainText('2 here');
+    await camOn(host);
+    await micOn(host);
+    const oldId = await guest.evaluate(() => window.__hangout.myId);
+
+    // Reproduce a real event ordering: encrypted camera publication is still
+    // decrypting when the relay's unencrypted leave notification arrives.
+    await host.evaluate((id) => {
+        const originalOpen = window.HangoutCore.open;
+        const releases = [];
+        window.__heldCameraPublication = false;
+        window.__heldDepartingChat = false;
+        window.__departedWhileDecrypting = false;
+        window.__releaseCameraPublication = () => {
+            window.HangoutCore.open = originalOpen;
+            releases.forEach((release) => release());
+        };
+        window.HangoutCore.open = async (key, frame) => {
+            const msg = await originalOpen(key, frame);
+            if (frame.from === id && ((msg.type === 'av' && msg.av?.cam) || msg.text === 'Sent before disconnect')) {
+                if (msg.type === 'av') window.__heldCameraPublication = true;
+                else window.__heldDepartingChat = true;
+                await new Promise((resolve) => { releases.push(resolve); });
+            }
+            return msg;
+        };
+        window.__hangout.ws.addEventListener('message', (event) => {
+            if (JSON.parse(event.data).left === id) window.__departedWhileDecrypting = true;
+        });
+    }, oldId);
+    await camOn(guest);
+    await expect.poll(() => host.evaluate(() => window.__heldCameraPublication)).toBe(true);
+    await guest.fill('[data-text]', 'Sent before disconnect');
+    await guest.press('[data-text]', 'Enter');
+    await expect.poll(() => host.evaluate(() => window.__heldDepartingChat)).toBe(true);
+    await guest.evaluate(() => window.__hangout.ws.close(3000));
+    await expect.poll(() => host.evaluate(() => window.__departedWhileDecrypting)).toBe(true);
+    await host.evaluate(() => window.__releaseCameraPublication());
+    await expect.poll(() => guest.evaluate(() => window.__hangout.myId), { timeout: 15000 }).not.toBe(oldId);
+    const newId = await guest.evaluate(() => window.__hangout.myId);
+    await expect.poll(() => host.evaluate((id) => {
+        const v = document.querySelector(`[data-tile="${id}"] video`);
+        return v ? v.videoWidth : 0;
+    }, newId), { timeout: 20000 }).toBeGreaterThan(0);
+    await expect(host.locator(`[data-tile="${oldId}"]`)).toHaveCount(0);
+    await expect(host.locator('.tile:not([data-tile="me"])')).toHaveCount(1);
+    await expect(host.locator('[data-log]')).toContainText('Sent before disconnect');
+    expect(host.errors.concat(guest.errors)).toEqual([]);
+});
+
+test('a reconnect does not wait for obsolete peer ICE setup', async ({ browser }) => {
+    const host = await openBrowser(browser);
+    await join(host, roomUrl(), 'Jeff');
+    const guest = await openBrowser(browser);
+    await guest.addInitScript(() => {
+        document.addEventListener('DOMContentLoaded', () => {
+            const create = window.HangoutTurn.createTurnClient;
+            window.HangoutTurn.createTurnClient = (options) => {
+                const client = create(options);
+                const get = client.get;
+                let calls = 0;
+                client.get = () => {
+                    const result = get();
+                    // The first call preloads ICE when entering the room.
+                    if (++calls !== 2) return result;
+                    window.__heldOldIce = true;
+                    return new Promise((resolve) => { window.__releaseOldIce = () => result.then(resolve); });
+                };
+                return client;
+            };
+        });
+    });
+    await join(guest, host.url(), 'Karen');
+    await expect(guest.locator('[data-peers]')).toContainText('2 here');
+    await camOn(guest);
+    await expect.poll(() => guest.evaluate(() => window.__heldOldIce)).toBe(true);
+    const oldId = await guest.evaluate(() => window.__hangout.myId);
+    await guest.evaluate(() => window.__hangout.ws.close(3000));
+    await expect.poll(() => guest.evaluate(() => window.__hangout.myId), { timeout: 15000 }).not.toBe(oldId);
+    const newId = await guest.evaluate(() => window.__hangout.myId);
+    try {
+        // Fresh peer negotiation must progress even while the old TURN request
+        // remains unresolved. Releasing it later must not replace the fresh PC.
+        await expect.poll(() => host.evaluate((id) => {
+            const v = document.querySelector(`[data-tile="${id}"] video`);
+            return v ? v.videoWidth : 0;
+        }, newId), { timeout: 20000 }).toBeGreaterThan(0);
+    } finally {
+        await guest.evaluate(() => window.__releaseOldIce());
+    }
+    await expect.poll(() => guest.evaluate(() => window.__hangout.av.pcs.size)).toBe(1);
+    expect(host.errors.concat(guest.errors)).toEqual([]);
 });
 
 test('phones: portrait tiles, call bar sticks to the bottom in thumb reach, 44px targets', async ({ browser }) => {

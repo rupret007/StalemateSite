@@ -26,9 +26,12 @@ part of this deployment.
    was deployed as `33e6a92f`; its HTTP 200 health check confirmed configuration
    only. Real email-code owner login and separate staff SSO/WebSocket admission
    passed after the JWKS fix. Current runtime is
-   `f4438515-7338-4287-b2e4-8485e88bbc90`, committed source `15767d9`.
+   `207a4b5a-c416-44c7-a751-24f88af5beb4`, committed source `ea012fc`.
    The sign-in acceptance was recorded on earlier `e3177c6d`/`832f7e1`;
-   the current deployment adds private AI observation and co-host grant revocation.
+   the current deployment also includes private AI observation, co-host grant
+   revocation and media reconnect guards. The protected client hash, invitation
+   denial and proof-session logout are [verified](../pr-assets/beta-collaboration/hosted-relay-recovery-asset.json);
+   hosted camera/TURN acceptance remains separate.
    Complete denied-identity and
    ownership-recovery acceptance. Use hostname/path applications: Cloudflare's
    Worker-level Access integration does not support WebSocket upgrades.
@@ -63,9 +66,10 @@ account/path guards and distinct public audiences. OAuth lists still omit
 these same-account resources; the filtering mechanism is unknown and empty
 results do not establish absence. The team and distinct audiences are deployed.
 Actual OTP owner login and separate staff SSO succeeded; the moderation socket
-shows the exact synthetic report. Jeff has been asked to dismiss it, but human
-review has not yet passed. Restore the temporary Chrome Apple Events scripting permission to
-off when setup is finished and record verification.
+showed the exact synthetic report. Jeff confirmed dismissing it and seeing it
+disappear; an independent post-action queue reload has not been performed.
+Temporary Chrome Apple Events scripting is restored off, confirmed by Jeff
+and a blocked no-op probe (Chrome error 12).
 The earlier accessible Turnstile list was empty. Current OAuth still cannot
 list TURN keys, but a read-only account-wide TURN query succeeded at 04:13:55
 UTC and returned zero October egress bytes. That sample does not establish

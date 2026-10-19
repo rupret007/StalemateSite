@@ -150,6 +150,19 @@
 
     if (isLocal) { win.__hangoutSend = send; win.__hangoutPace = pace; } // local test hooks only (localhost)
 
+    // Tokens belong to the relay's current peer identities, not display names.
+    // A leave invalidates in-flight media work without retaining departed IDs.
+    const relayPeers = new Map();
+    function retireRelayPeer(id) {
+        const peer = relayPeers.get(id);
+        if (peer) peer.live = false;
+        relayPeers.delete(id);
+    }
+    function retireRelayPeers() {
+        for (const peer of relayPeers.values()) peer.live = false;
+        relayPeers.clear();
+    }
+
     let reconnectTimer;
     function connect() {
         if (app.ended) return;
@@ -161,9 +174,10 @@
         setGate('Connecting…');
         const ws = new WebSocket(url);
         app.ws = ws;
-        ws.onmessage = (event) => onRelay(event.data);
+        ws.onmessage = (event) => onRelay(event.data, ws);
         ws.onclose = (event) => {
             if (app.ws !== ws) return;
+            retireRelayPeers();
             app.connected = false;
             app.lastClose = event.code;
             // Dropped mid-hang (Wi-Fi blip, phone switching networks): retry a few times with backoff.
@@ -185,6 +199,7 @@
 
     function endSession(reason) {
         app.ended = true; app.connected = false;
+        retireRelayPeers();
         app.ws.onmessage = null;
         clearTimeout(reconnectTimer); clearTimeout(pace.timer); clearTimeout(flushTimer);
         clearTimeout(videoPublishTimer); clearInterval(videoSyncTimer);
@@ -201,8 +216,8 @@
         setGate(reason); say(reason);
     }
 
-    async function onRelay(raw) {
-        if (app.ended) return;
+    async function onRelay(raw, ws) {
+        if (app.ended || app.ws !== ws) return;
         let frame;
         try { frame = JSON.parse(raw); } catch (error) { return; }
         if (Number.isFinite(frame.t)) app.clock.sample(frame.t);
@@ -227,6 +242,7 @@
         if (frame.slow) { say('Whoa, slow down a sec.'); return; }
         if (Number.isFinite(frame.peers) && !frame.c) {
             if (frame.left) {
+                retireRelayPeer(frame.left);
                 app.names.delete(frame.left);
                 noteAv(frame.left, null);
                 closePc(frame.left);
@@ -235,10 +251,15 @@
             return;
         }
         if (!frame.c) return;
+        let peer = relayPeers.get(frame.from);
+        if (!peer) { peer = { live: true }; relayPeers.set(frame.from, peer); }
         let msg;
         try { msg = await H.open(app.key, frame); } catch (error) { return; }
-        if (app.ended) return;
-        await handle(msg, { t: frame.t, from: frame.from });
+        if (app.ended || app.ws !== ws) return;
+        // Crypto may finish after the relay has already announced departure.
+        // Keep prior chat/drawing, but never restore that person's name or media.
+        if (!peer.live && ['hello', 'av', 'rtc'].includes(msg.type)) return;
+        await handle(msg, { t: frame.t, from: frame.from, peer });
     }
 
     function pruneNames() { /* names are refreshed by hello/bye messages */ }
@@ -339,7 +360,7 @@
             if (app.isHost) say(`${app.names.get(meta.from) || 'Someone'} needs a sec. Hit “Hold up!” to pause for everyone.`);
             return;
         case 'rtc':
-            await onRtc(meta.from, msg);
+            await onRtc(meta.from, msg, meta.peer);
             return;
         case 'gone': {
             // A friend reconnected with a new id: drop their stale face.
@@ -1090,31 +1111,38 @@
     }
 
     async function openPc(id) {
-        if (app.av.pcs.has(id) || app.av.removed.has(id)) return;
-        if (app.av.opening.has(id)) return app.av.opening.get(id);
+        const peer = relayPeers.get(id);
+        if (!peer?.live || app.av.pcs.has(id) || app.av.removed.has(id)) return;
+        const pending = app.av.opening.get(id);
+        if (pending?.peer === peer) return pending.ready;
         let finish;
         const ready = new Promise((resolve) => { finish = resolve; });
-        app.av.opening.set(id, ready);
+        const opening = { peer, ready };
+        app.av.opening.set(id, opening);
         try {
             await iceServers();
-            if (app.av.pcs.has(id) || app.av.removed.has(id) || !app.names.has(id) || !(app.av.mic || app.av.cam || app.av.peers.has(id))) return;
+            if (!peer.live || app.av.pcs.has(id) || app.av.removed.has(id) || !app.names.has(id) || !(app.av.mic || app.av.cam || app.av.peers.has(id))) return;
             const pc = new RTCPeerConnection({ iceServers: app.av.ice || STUN });
             const conn = navigator.connection || {};
             const thrifty = Boolean(conn.saveData) || conn.type === 'cellular' || /(^|-)2g|3g/.test(conn.effectiveType || '');
             const entry = { pc, polite: app.myId > id, makingOffer: false, ignoreOffer: false, pendingIce: [], relayed: false, stream: new MediaStream(), senders: {}, wantHi: false, tier: thrifty ? 'weak' : 'ok', hist: [], restarts: 0, last: null };
             app.av.pcs.set(id, entry);
-            pc.onicecandidate = (e) => { if (e.candidate) send({ type: 'rtc', to: id, ice: e.candidate.toJSON() }); };
+            const current = () => peer.live && app.av.pcs.get(id) === entry;
+            pc.onicecandidate = (e) => { if (current() && e.candidate) send({ type: 'rtc', to: id, ice: e.candidate.toJSON() }); };
             pc.onnegotiationneeded = async () => {
                 try {
+                    if (!current()) return;
                     entry.makingOffer = true;
                     const offer = await pc.createOffer();
-                    if (pc.signalingState !== 'stable') return;
+                    if (!current() || pc.signalingState !== 'stable') return;
                     if (app.av.music) offer.sdp = V.musicSdp(offer.sdp);
                     await pc.setLocalDescription(offer);
+                    if (!current()) return;
                     await send({ type: 'rtc', to: id, sdp: pc.localDescription.toJSON() });
                 } catch (error) { /* retried by next negotiation */ } finally { entry.makingOffer = false; }
             };
             pc.ontrack = (e) => {
+                if (!current()) return;
                 entry.stream.addTrack(e.track);
                 e.track.onended = () => {
                     entry.stream.removeTrack(e.track);
@@ -1126,6 +1154,7 @@
                 layout();
             };
             pc.onconnectionstatechange = () => {
+                if (!current()) return;
                 const s = pc.connectionState;
                 if (s === 'connected') { entry.restarts = 0; checkRelay(id, entry); layout(); }
                 if (s === 'disconnected') win.setTimeout(() => { if (pc.connectionState === 'disconnected') restartIce(id, entry); }, 3000);
@@ -1138,7 +1167,10 @@
             }
             layout();
         } catch (_) { say('Couldn’t start this video connection. Chat and drawing remain available.'); }
-        finally { app.av.opening.delete(id); finish(); }
+        finally {
+            if (app.av.opening.get(id) === opening) app.av.opening.delete(id);
+            finish();
+        }
     }
 
     /* Reconnect: ICE restart a few times, then give up on that one face politely. */
@@ -1201,26 +1233,31 @@
     }
     win.setInterval(sampleQuality, 2000);
 
-    async function onRtc(from, msg) {
-        if (app.av.removed.has(from)) return;
+    async function onRtc(from, msg, peer) {
+        if (!peer.live || app.av.removed.has(from)) return;
         if (!(app.av.mic || app.av.cam) && !app.av.peers.has(from)) return;
         if (!app.av.pcs.has(from)) await openPc(from);
         const entry = app.av.pcs.get(from);
-        if (!entry) return;
+        if (!entry || !peer.live) return;
         const pc = entry.pc;
+        const current = () => peer.live && app.av.pcs.get(from) === entry;
         try {
             if (msg.sdp) {
                 const collision = msg.sdp.type === 'offer' && (entry.makingOffer || pc.signalingState !== 'stable');
                 entry.ignoreOffer = !entry.polite && collision;
                 if (entry.ignoreOffer) return;
                 await pc.setRemoteDescription(msg.sdp);
+                if (!current()) return;
                 for (const ice of entry.pendingIce.splice(0)) {
                     try { await pc.addIceCandidate(ice); } catch (_) { /* stale candidate from a prior negotiation */ }
+                    if (!current()) return;
                 }
                 if (msg.sdp.type === 'offer') {
                     const answer = await pc.createAnswer();
+                    if (!current()) return;
                     if (app.av.music) answer.sdp = V.musicSdp(answer.sdp);
                     await pc.setLocalDescription(answer);
+                    if (!current()) return;
                     await send({ type: 'rtc', to: from, sdp: pc.localDescription.toJSON() });
                 }
             } else if (msg.ice) {
