@@ -115,7 +115,7 @@ in public issue attachments.
 | Real restricted staff login, denied guest/owner, report review | Partial | Actual restricted panel and synthetic queue evidence verified; Jeff confirmed test-report dismissal/removal; independent reload and denied-identity acceptance pending |
 | Confirmed moderation contact displayed | Verified | [Hosted mail-link check](../pr-assets/beta-collaboration/hosted-ops.json); recheck after changes |
 | Reviewer coverage and incident handoff | Pending | Jeff is the sole initial reviewer; agree hours and helper |
-| Actual provider watch playback | Partial | [Hosted private-room YouTube play/pause/paused seek/resume](../pr-assets/beta-collaboration/hosted-watch-provider.json) passed with two Chromium guests on one Mac; physical/mobile, separate-network and guest-hosted channel provider checks remain |
+| Actual provider watch playback | Partial | [Private-room](../pr-assets/beta-collaboration/hosted-watch-provider.json) and [guest-hosted channel](../pr-assets/beta-collaboration/hosted-channel-watch-provider.json) YouTube play/pause/paused seek/resume passed with two Chromium guests on one Mac; physical/mobile and separate-network checks remain |
 | Forced-relay camera, consent, provider failure and usage visibility | Pending | |
 | Registered-room compatible deployment/recovery | Pending | |
 | Operator alert, recovery notification and documented coverage | Partial | Actual installed Mac probes and controlled local notification submissions verified; attended visibility and independent coverage pending |

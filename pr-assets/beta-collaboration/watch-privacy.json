@@ -2,7 +2,7 @@
   "version": 1,
   "checkedOn": "2026-10-19",
   "status": "verified-private-deployment-and-actual-provider",
-  "scope": "Actual provider privacy comparison with public dummy markers on loopback, browser construction/synchronization regressions for both watch surfaces, and a separate two-guest real-provider private-room hosted receipt. Physical-device, mobile-autoplay, separate-network, guest-hosted channel provider and TURN acceptance remain separate.",
+  "scope": "Actual provider privacy comparison with public dummy markers on loopback, browser construction/synchronization regressions for both watch surfaces, and separate two-guest real-provider private-room and naturally guest-hosted channel receipts. Physical-device, mobile-autoplay, separate-network and TURN acceptance remain separate.",
   "providerLibrary": {
     "sha256": "316a92f17a6607590c3675c075dbea110f7ab5bf8dd3e24a6eaf3bd767122038",
     "source": "https://www.youtube.com/iframe_api"
@@ -102,6 +102,24 @@
   "runtimeVersion": "0ee7705e-e381-4cb4-a70a-1f26daa10e78",
   "deploymentEvidence": "hosted-watch-privacy-asset.json",
   "hostedProviderEvidence": "hosted-watch-provider.json",
-  "hostedScope": "Two separate guest/fan contexts, actual YouTube and signed private-room synchronization on one Mac. No physical-device, mobile autoplay, separate-network, guest-hosted channel provider or TURN acceptance.",
-  "localProviderComparisonScope": "Actual current YouTube IFrame API on an owned loopback page with public dummy query/fragment markers, plus repository browser regressions. No Stalemate admission, deployed invitation or user secret was used in the provider comparison. This is not hosted synchronization or physical-device acceptance."
+  "localProviderComparisonScope": "Actual current YouTube IFrame API on an owned loopback page with public dummy query/fragment markers, plus repository browser regressions. No Stalemate admission, deployed invitation or user secret was used in the provider comparison. This is not hosted synchronization or physical-device acceptance.",
+  "privateRoomHostedScope": "Two separate guest/fan contexts, actual YouTube and signed private-room synchronization on one Mac; this original receipt does not cover the separately tested channel path.",
+  "channelHostedEvidence": "hosted-channel-watch-provider.json",
+  "channelHostedScope": "One naturally guest-hosted temporary channel, two normal unverified guests, real YouTube and server-authorized host controls, one ordinary guest denial, no prejoin chat replay, exact founder close and both logouts. One Mac, no physical/mobile/separate-network/TURN acceptance.",
+  "documentationFollowUpCi": {
+    "sourceCommit": "99ff97e73e5a4de0dba826fb6bcf56ec9096cd3a",
+    "push": {
+      "run": 39216572974,
+      "unitPassed": 575,
+      "browserDirectPasses": 207,
+      "retries": 0
+    },
+    "pullRequest": {
+      "run": 39216578587,
+      "unitPassed": 575,
+      "browserDirectPasses": 206,
+      "browserRetryPasses": 1,
+      "retry": "Unrelated iPhone SE /play share-button height43.999969px against44px; retry passed. All Hang Out checks passed directly."
+    }
+  }
 }

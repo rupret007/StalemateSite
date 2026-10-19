@@ -35,8 +35,13 @@ part of this deployment.
    [verified](../pr-assets/beta-collaboration/hosted-watch-privacy-asset.json).
    [Actual YouTube playback](../pr-assets/beta-collaboration/hosted-watch-provider.json)
    passed with two guests in a private room on one Mac: signed pause, paused
-   seek, resume, less than 0.2 seconds drift and both logouts. No invitation-data
+   seek, resume, sampled drift below 0.2 seconds and both logouts. No invitation-data
    match was found in 85 checked third-party HTTP requests.
+   A separate [guest-hosted channel check](../pr-assets/beta-collaboration/hosted-channel-watch-provider.json)
+   passed real play/pause/paused seek/resume, server denial of an ordinary
+   guest's control request and no pre-join chat replay. The founder closed the
+   exact temporary room and both guests logged out; 82 checked third-party HTTP
+   requests had no invitation-data matches. Both hosted watch checks used one Mac.
    [Two hosted synthetic-camera guests](../pr-assets/beta-collaboration/hosted-camera-startup.json)
    also passed delayed-hello startup, capture-off, passive reconnect and both
    logout checks on one Mac on the preceding `348c747`/`08dd365d` deployment.
@@ -227,6 +232,26 @@ sockets are checked on frames, wakes and alarms. Keep `HANGOUT_HMAC_KEY` stable
 because registered account IDs derive from it.
 
 Before a release, retain the previous source/config and deployment version.
+Retain the pre-created YouTube iframe construction introduced in `b111bb2` on
+both watch surfaces. The [real-provider comparison](../pr-assets/beta-collaboration/watch-privacy.json)
+showed that the older constructor sends the full parent URL in embed metadata;
+an unmodified earlier release reintroduces that invitation-data exposure.
+Prefer a compatible recovery build retaining this fix over an earlier raw
+version. If an emergency requires older code, keep invitations and watch use on
+hold until the fix is restored and both watch-client bytes are rechecked.
+
+A private pinned recovery package is prepared locally at
+`.local/recovery-b111bb2/stalemate-beta-b111bb2.tar.gz`; its
+[sanitized manifest](../pr-assets/beta-collaboration/recovery-b111bb2.json)
+records the archive hash, exact `b111bb2` source/config/lockfile and both fixed
+watch clients. The adjacent recovery tool and bundled README describe fresh
+extraction and verification. All 68 committed source files and 46 built assets
+matched the pinned Git objects; an extracted offline asset rebuild also passed.
+This is source/assets recovery preparation, not an executed rollback or backup
+of durable data, Access policies, credentials or live configuration overrides.
+Compare the active schema/config before any future deployment and preserve
+existing remote secrets, account identity and DO bindings.
+
 For compatible code-only changes:
 
 ```sh

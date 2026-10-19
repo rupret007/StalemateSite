@@ -1,0 +1,350 @@
+{
+  "version": 1,
+  "startedAt": "2026-10-19T07:53:08.209Z",
+  "sourceCommit": "b111bb2aa070cd791834f40f26665996ad406421",
+  "runtimeVersion": "0ee7705e-e381-4cb4-a70a-1f26daa10e78",
+  "runId": "e9ecd038",
+  "publicVideoId": "BtnyqIHTDMM",
+  "scope": "One naturally guest-hosted temporary watch channel and two owned normal guest Chromium contexts on one Mac, using actual YouTube. No registered-owner, staff, physical-device, mobile, separate-network, WAN-audio or TURN acceptance claim.",
+  "authority": "Server-authenticated channel @ authorization, not E2EE host signatures",
+  "status": "passed",
+  "pageErrors": 0,
+  "creationAttempts": 1,
+  "checks": {
+    "normalUnprivilegedGuests": true,
+    "freshTemporaryNaturalFounder": true,
+    "classicIrcHistory": {
+      "prejoinLineAcknowledged": true,
+      "guestReceivedEarlierLine": false,
+      "liveLineDeliveredOnce": true,
+      "currentActivitySnapshotReceived": true
+    },
+    "actualInitialPlayback": {
+      "samples": [
+        {
+          "role": "host",
+          "providerState": 1,
+          "providerTime": 0.69002195803833,
+          "expectedVideo": true,
+          "shared": {
+            "expectedVideo": true,
+            "playing": true,
+            "pos": 0,
+            "t": 1792396390566
+          },
+          "native": {
+            "available": true,
+            "ad": false,
+            "errorVisible": false,
+            "paused": false,
+            "readyState": 4,
+            "width": 854,
+            "time": 0.697835,
+            "frames": 26,
+            "frameCounterType": "decoded"
+          },
+          "autoplayBlockedEvents": 0
+        },
+        {
+          "role": "guest",
+          "providerState": 1,
+          "providerTime": 0.8064219885559082,
+          "expectedVideo": true,
+          "shared": {
+            "expectedVideo": true,
+            "playing": true,
+            "pos": 0,
+            "t": 1792396390566
+          },
+          "native": {
+            "available": true,
+            "ad": false,
+            "errorVisible": false,
+            "paused": false,
+            "readyState": 4,
+            "width": 854,
+            "time": 0.813632,
+            "frames": 31,
+            "frameCounterType": "decoded"
+          },
+          "autoplayBlockedEvents": 0
+        }
+      ],
+      "normalizedDriftSeconds": 0.11720000686645515
+    },
+    "actualPause": [
+      {
+        "role": "host",
+        "providerState": 2,
+        "providerTime": 0.709177,
+        "expectedVideo": true,
+        "shared": {
+          "expectedVideo": true,
+          "playing": false,
+          "pos": 0.709177,
+          "t": 1792396393464
+        },
+        "native": {
+          "available": true,
+          "ad": false,
+          "errorVisible": false,
+          "paused": true,
+          "readyState": 4,
+          "width": 854,
+          "time": 0.709177,
+          "frames": 27,
+          "frameCounterType": "decoded"
+        },
+        "autoplayBlockedEvents": 0
+      },
+      {
+        "role": "guest",
+        "providerState": 2,
+        "providerTime": 0.709177,
+        "expectedVideo": true,
+        "shared": {
+          "expectedVideo": true,
+          "playing": false,
+          "pos": 0.709177,
+          "t": 1792396393464
+        },
+        "native": {
+          "available": true,
+          "ad": false,
+          "errorVisible": false,
+          "paused": true,
+          "readyState": 1,
+          "width": 854,
+          "time": 0.709177,
+          "frames": 103,
+          "frameCounterType": "decoded"
+        },
+        "autoplayBlockedEvents": 0
+      }
+    ],
+    "actualPausedSeek": {
+      "requestedSeconds": 21,
+      "samples": [
+        {
+          "role": "host",
+          "providerState": 2,
+          "providerTime": 21,
+          "expectedVideo": true,
+          "shared": {
+            "expectedVideo": true,
+            "playing": false,
+            "pos": 21,
+            "t": 1792396395465
+          },
+          "native": {
+            "available": true,
+            "ad": false,
+            "errorVisible": false,
+            "paused": true,
+            "readyState": 4,
+            "width": 854,
+            "time": 21,
+            "frames": 180,
+            "frameCounterType": "decoded"
+          },
+          "autoplayBlockedEvents": 0
+        },
+        {
+          "role": "guest",
+          "providerState": 2,
+          "providerTime": 21,
+          "expectedVideo": true,
+          "shared": {
+            "expectedVideo": true,
+            "playing": false,
+            "pos": 21,
+            "t": 1792396395465
+          },
+          "native": {
+            "available": true,
+            "ad": false,
+            "errorVisible": false,
+            "paused": true,
+            "readyState": 4,
+            "width": 854,
+            "time": 21,
+            "frames": 259,
+            "frameCounterType": "decoded"
+          },
+          "autoplayBlockedEvents": 0
+        }
+      ]
+    },
+    "actualResume": {
+      "samples": [
+        {
+          "role": "host",
+          "providerState": 1,
+          "providerTime": 23.069579038146973,
+          "expectedVideo": true,
+          "shared": {
+            "expectedVideo": true,
+            "playing": true,
+            "pos": 22.788768020980836,
+            "t": 1792396397465
+          },
+          "native": {
+            "available": true,
+            "ad": false,
+            "errorVisible": false,
+            "paused": false,
+            "readyState": 4,
+            "width": 854,
+            "time": 23.073054,
+            "frames": 291,
+            "frameCounterType": "decoded"
+          },
+          "autoplayBlockedEvents": 0
+        },
+        {
+          "role": "guest",
+          "providerState": 1,
+          "providerTime": 23.07088202670288,
+          "expectedVideo": true,
+          "shared": {
+            "expectedVideo": true,
+            "playing": true,
+            "pos": 22.788768020980836,
+            "t": 1792396397465
+          },
+          "native": {
+            "available": true,
+            "ad": false,
+            "errorVisible": false,
+            "paused": false,
+            "readyState": 4,
+            "width": 854,
+            "time": 23.07316,
+            "frames": 315,
+            "frameCounterType": "decoded"
+          },
+          "autoplayBlockedEvents": 0
+        }
+      ],
+      "normalizedDriftSeconds": 0.0000030122070278082447
+    },
+    "normalGuestCannotDrive": {
+      "attemptedRequests": 1,
+      "expectedServerDenialAcknowledged": true,
+      "hostSharedStateUnchanged": true,
+      "hostDecodedFrameGrowth": 10,
+      "guestLoadControlsHidden": true,
+      "nonHostVideoBroadcasts": 0
+    }
+  },
+  "requestGuard": {
+    "enabled": true,
+    "checkedThirdPartyRequests": 82,
+    "blockedRequests": 0,
+    "checks": [
+      "URL",
+      "request-body",
+      "Referer"
+    ],
+    "secretRepresentations": [
+      "raw",
+      "percent-encoded/decoded",
+      "base64-token"
+    ]
+  },
+  "publishedSourceResponseModified": false,
+  "providerResponsesStubbed": false,
+  "providerApiReplaced": false,
+  "autoplayPolicyBypassed": false,
+  "browserAudioOutputMuted": true,
+  "captureRequested": false,
+  "credentialsRecorded": false,
+  "roomNamesRecorded": false,
+  "nicknamesRecorded": false,
+  "chatOrNoticesRecorded": false,
+  "rawProviderPayloadsRecorded": false,
+  "tracesScreenshotsOrHarRecorded": false,
+  "roleOrAdmissionConfigurationChanged": false,
+  "aiOrTurnConfigurationChanged": false,
+  "rateAllowanceReset": false,
+  "deploymentPerformed": false,
+  "assets": [
+    {
+      "asset": "/r/45662413410ed051/lobby/lobby.js",
+      "sha256": "b11c1a268478ccaf5af1cd4daaf780a5bc6a190f2ee789cd56991eb5de3df7d1"
+    },
+    {
+      "asset": "/r/45662413410ed051/lobby/lobby-room.js",
+      "sha256": "114170b76b44436e8571346dba0d95554c701c77ac5814f78d3a98a4e8c50516"
+    }
+  ],
+  "runtimeEvidence": "Prior protected-asset receipt identifies runtime; both guests recheck committed lobby.js and lobby-room.js bytes.",
+  "creationFlow": "watch-tile",
+  "roomCleanup": {
+    "attempted": true,
+    "confirmed": true,
+    "created": true,
+    "exactFounderClose": true
+  },
+  "cleanup": [
+    {
+      "role": "host",
+      "admissionConfirmed": true,
+      "logoutStatus": 200,
+      "deniedAfterLogout": true,
+      "socketEgressVerified": true,
+      "contextClosed": true,
+      "nativePlayClicks": 0,
+      "closedOfflineStableMilliseconds": 1500,
+      "confirmed": true
+    },
+    {
+      "role": "guest",
+      "admissionConfirmed": true,
+      "logoutStatus": 200,
+      "deniedAfterLogout": true,
+      "socketEgressVerified": true,
+      "contextClosed": true,
+      "nativePlayClicks": 0,
+      "closedOfflineStableMilliseconds": 1500,
+      "confirmed": true
+    }
+  ],
+  "browserClosed": true,
+  "completedAt": "2026-10-19T07:53:21.334Z",
+  "visitorsCreated": 2,
+  "admittedVisitors": 2,
+  "successfulLogouts": 2,
+  "authorityReceipts": [
+    {
+      "role": "host",
+      "creationJoinFrames": 1,
+      "creationCapped": false,
+      "beforeLines": 1,
+      "afterLines": 1,
+      "videoFrames": 4,
+      "hostVideoFrames": 4,
+      "nonHostVideoFrames": 0,
+      "authorityDenials": 0,
+      "guestVideoAttempts": 0,
+      "closedFrames": 1,
+      "founderClosedFrames": 1,
+      "unexpectedVideo": false
+    },
+    {
+      "role": "guest",
+      "creationJoinFrames": 0,
+      "creationCapped": false,
+      "beforeLines": 0,
+      "afterLines": 1,
+      "videoFrames": 3,
+      "hostVideoFrames": 3,
+      "nonHostVideoFrames": 0,
+      "authorityDenials": 1,
+      "guestVideoAttempts": 1,
+      "closedFrames": 1,
+      "founderClosedFrames": 1,
+      "unexpectedVideo": false
+    }
+  ]
+}
