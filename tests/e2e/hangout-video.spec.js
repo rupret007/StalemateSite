@@ -865,6 +865,9 @@ test('outbound generation: reconnect drops paced camera state while preserving o
     const guest = await openBrowser(browser);
     await join(guest, host.url(), 'Karen');
     await expect(host.locator('[data-peers]')).toContainText('Karen');
+    await host.fill('[data-text]', 'Delivered before the relay reconnect');
+    await host.press('[data-text]', 'Enter');
+    await expect(guest.locator('[data-log]')).toContainText('Delivered before the relay reconnect');
     await camOn(guest);
     const oldId = await guest.evaluate(() => window.__hangout.myId);
     await expect.poll(() => host.evaluate((id) => window.__hangout.av.camPeers.has(id), oldId)).toBe(true);
@@ -881,12 +884,24 @@ test('outbound generation: reconnect drops paced camera state while preserving o
     await guest.fill('[data-text]', 'Queued before the relay reconnect');
     await guest.press('[data-text]', 'Enter');
     await expect.poll(() => guest.evaluate(() => window.__hangoutPace.queue.length)).toBeGreaterThanOrEqual(2);
+    await expect(guest.locator('[data-log]')).toContainText('Queued before the relay reconnect');
+    await guest.fill('[data-text]', 'Unsent draft stays in this tab');
     await guest.click('[data-cam]');
     await expect(guest.locator('[data-cam]')).toHaveText('Turn on my camera');
     expect(await captureIsOff(guest)).toBe(true);
     const queuedBeforeReconnect = await guest.evaluate(() => window.__hangoutPace.queue.length);
 
-    await guest.evaluate(() => window.__hangout.ws.close(3000));
+    const disconnected = await guest.evaluate(async () => {
+        const app = window.__hangout;
+        await new Promise((resolve) => {
+            app.ws.addEventListener('close', resolve, { once: true });
+            app.ws.close(3000);
+        });
+        return { connected: app.connected, chat: app.state.chat,
+            log: document.querySelector('[data-log]').textContent,
+            draft: document.querySelector('[data-text]').value };
+    });
+    expect(disconnected).toEqual({ connected: false, chat: [], log: '', draft: 'Unsent draft stays in this tab' });
     await expect.poll(() => guest.evaluate(() => window.__hangout.myId), { timeout: 15000 }).not.toBe(oldId);
     const replacement = await guest.evaluate(() => window.__hangout.myId);
     await guest.evaluate(async () => {
@@ -910,5 +925,8 @@ test('outbound generation: reconnect drops paced camera state while preserving o
     expect(diagnostic.queuedChatCount).toBe(1);
     expect(diagnostic.barrierChatCount).toBe(1);
     expect(diagnostic.cameraOnFromReplacement).toBe(0);
+    await expect(guest.locator('[data-log]')).not.toContainText('Delivered before the relay reconnect');
+    await expect(guest.locator('[data-text]')).toHaveValue('Unsent draft stays in this tab');
+    await expect(host.locator('[data-log]')).toContainText('Delivered before the relay reconnect');
     expect(host.errors.concat(guest.errors)).toEqual([]);
 });

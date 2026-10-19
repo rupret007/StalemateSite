@@ -34,7 +34,7 @@ protected Cloudflare beta, with separate actual visitor browser contexts.
 | WebJam invitation/join | Actual native host invitation crossed two Cloudflare guests unchanged into actual Qt Join; a native guest authenticated and received a real Jamulus response. | Same Mac with explicit sealed-reply fallback. Mac, Windows and Linux are all beta requirements; Windows native v3 is blocked by its unsigned bundled fabric; do not weaken the signature check. Compatible packaged installation, cross-network audio and timing remain to be accepted on all required platforms. Browser Web Join is disabled; its deployed site returned 404. |
 | Camera/TURN and cost controls | Two invited guests on one Mac exchanged decoded synthetic-camera video through the deployed beta, then passed capture-off, passive reconnect and logout cleanup. Consent, credential expiry/refresh, failure fallback and serialized usage/rate accounting pass provider fixtures. A separate read-only account-wide analytics query returned zero October TURN egress bytes. | Physical cameras, separate networks and forced relay remain unverified. TURN is off; beta issuer/analytics credentials and shared allocation are missing. The zero sample does not establish remaining free allowance or billing; admission estimates are not a billing cap. |
 | Mobile usability | All repository browser checks passed, including WebKit phone projects. Hosted 375/390px captures have no page overflow, wrapping text, 16px input and visible Send. | Real iPhone Safari keyboard, Access redirects, camera/audio and background/resume are unverified. |
-| IRC history/reconnect | Hosted newcomers saw no earlier messages; original live connections retained scrollback during idle. Exact-connection PM consent cannot transfer to a reconnect or another same-device tab. | Real device/network interruption acceptance. No transcript archive or pre-join history is introduced. |
+| IRC history/reconnect | Hosted IRC-channel newcomers saw no earlier messages; original live connections retained scrollback during idle. Exact-connection PM consent cannot transfer to a reconnect or another same-device tab. A subsequent source audit found private creative-room snapshots still carried old chat and private reconnect retained delivered scrollback. A [narrow private-room correction](../pr-assets/beta-collaboration/private-chat-history.json) passes local regressions. | The correction has not been deployed. Verify it on the hosted beta after the eight-hour expiry observation, then complete real device/network interruption acceptance. Earlier channel receipts do not establish private-room history behavior. |
 | Compatible rollback/recovery | Historical Cloudflare rollback/restoration retained two real lobby sockets, scrollback and drafts; newcomers received no backlog. A private [pinned recovery package](../pr-assets/beta-collaboration/recovery-b111bb2.json) now retains both watch privacy fixes and current backend/config, with all 114 source/asset payloads and an offline rebuild verified. | The package was not deployed and contains no live data or credentials. A separate temporary-room deployment rehearsal preserved guest-op permissions, settings and drawing. Registered-room acceptance, forced restart, schema-changing rollback and health continuity remain unverified. Raw versions before `b111bb2` reintroduce the demonstrated watch URL exposure; pre-operations versions can also return health 401. |
 | Provider failures/full rooms | Automated failed quota/storage/JWKS/classifier/relay responses, room/session limits and retry behavior pass. Missing Access fails closed on the hosted beta. A [prepared YouTube recovery fix](../pr-assets/beta-collaboration/watch-loader.json) handles failed API downloads, player readiness deadlines and provider errors with local explicit retry; controlled loopback checks pass. | The YouTube candidate is not deployed during the natural expiry observation. Complete hosted controlled-failure recovery and the shared TURN budget drill; fixtures do not establish external provider availability. |
 | Operational checks | Actual bearer-only hosted health reads preserve admission counters and exclude visitor content. This Mac's five-minute LaunchAgent completed live probes; actual local failure/recovery notification submissions and deduplication passed a controlled fixture. | Mac must be awake, online and logged in. Provider billing, availability, storage writes and independent external alert coverage are not established by these checks. |
@@ -48,6 +48,23 @@ A successful package build is not physical installation or cross-network audio
 acceptance.
 
 ## Verification receipts
+
+- [Private creative-room chat from join onward](../pr-assets/beta-collaboration/private-chat-history.json):
+  source `ecc5dee` omits chat from host/guest activity snapshots, ignores legacy
+  snapshot chat without erasing live lines, and clears delivered scrollback on
+  actual disconnect. Drafts and bounded unsent envelopes remain separate; the
+  queued-message check proves one delivery to the peer after reconnect. Closed
+  socket chat decryptions cannot refill the buffer. Drawing, watch, host proof
+  and replay protections remain covered. Five distinct old-code browser cases
+  and two new unit cases reproduce the problem. The candidate passes 577 units
+  and 42 distinct browser checks across two commands without retries or skips.
+  The first browser matrix retained one fixture failure: raw local drawing
+  samples were compared with quantized wire coordinates. Only that corrected
+  case was repeated alongside four reconnect checks; all original results are
+  retained. Independent source and fixture reviews are clean after narrowing
+  disconnect suppression to chat and adding receiver-completion barriers.
+  Hosted deployment and physical/network acceptance remain pending. The older
+  two-house checklist now explicitly requires no earlier chat for late joiners.
 
 - [Watch-player privacy](../pr-assets/beta-collaboration/watch-privacy.json):
   an actual-provider comparison using only public dummy markers found the API's

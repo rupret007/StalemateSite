@@ -136,11 +136,8 @@
             const snap = msg.state || {};
             const newStrokes = (Array.isArray(snap.strokes) ? snap.strokes : []).map(cleanStroke).filter(Boolean);
             state.strokes = snap.append ? state.strokes.concat(newStrokes).slice(-LIMITS.strokesKept) : newStrokes.slice(-LIMITS.strokesKept);
-            if (snap.chat || !snap.append) {
-                state.chat = (Array.isArray(snap.chat) ? snap.chat : []).slice(-LIMITS.chatKept).map((c) => ({
-                    name: cleanText(c && c.name, LIMITS.nameChars) || 'Someone', text: cleanText(c && c.text, LIMITS.chatChars), t: Number(c && c.t) || 0
-                })).filter((c) => c.text);
-            }
+            // Activity snapshots never import or reset chat, including legacy
+            // snapshots. Only live chat frames add to this connection's buffer.
             if (snap.video !== undefined || !snap.append) {
                 const v = snap.video;
                 const source = v && cleanSource(v.source);
