@@ -220,7 +220,8 @@
         app.names.clear(); app.state = H.emptyState(); app.lastVideoSigned = null;
         if (player.yt) { try { player.yt.stopVideo(); } catch (_) { /* provider already gone */ } }
         ui.file.pause(); ui.file.removeAttribute('src'); ui.file.load();
-        player.kind = null; player.readyKey = '';
+        player.kind = null; player.readyKey = ''; player.autoplayBlocked = false;
+        ui.tap.hidden = true;
         ui.log.replaceChildren(); ui.tiles.replaceChildren(); ui.text.value = ''; ui.url.value = '';
         ui.peers.textContent = ''; ui.turnStatus.textContent = ''; redraw();
         ui.room.hidden = true; ui.gate.hidden = false; ui.enter.disabled = true;
@@ -645,7 +646,7 @@
     });
 
     /* ---------------- synced video (host drives) ---------------- */
-    const player = { kind: null, yt: null, ytReady: null, applying: 0, currentKey: '', readyKey: '' };
+    const player = { kind: null, yt: null, ytReady: null, applying: 0, currentKey: '', readyKey: '', autoplayBlocked: false };
     let videoPublishTimer;
 
     function loadYouTubeApi() {
@@ -666,6 +667,8 @@
         if (player.currentKey === key) return;
         player.currentKey = key;
         player.readyKey = '';
+        player.autoplayBlocked = false;
+        ui.tap.hidden = true;
         if (source.kind === 'file') {
             if (player.yt) player.yt.stopVideo();
             ui.yt.hidden = true;
@@ -698,7 +701,7 @@
                 ui.yt.replaceWith(frame);
                 ui.yt = frame;
                 player.yt = new YT.Player(ui.yt, {
-                    events: { onReady: resolve, onStateChange: onYtState }
+                    events: { onReady: resolve, onStateChange: onYtState, onAutoplayBlocked: onYtAutoplayBlocked }
                 });
             });
             ui.yt = doc.getElementById('yt-player') || ui.yt;
@@ -749,6 +752,8 @@
         if (!v) return;
         await ensureSource(v.source);
         if (app.ended || app.state.video !== v) return;
+        if (!v.playing) { player.autoplayBlocked = false; ui.tap.hidden = true; }
+        else if (player.autoplayBlocked && !force) return;
         const want = H.expectedPosition(v, app.clock.relayNow());
         if (force || H.needsCorrection(localTime(), want)) seekTo(want);
         if (v.playing && !localPlaying()) playLocal();
@@ -758,7 +763,7 @@
         if (!app.connected) return;
         if (!app.isHost) return syncToState(false);
         const v = app.state.video;
-        if (!v || !player.kind || player.readyKey !== `${v.source.kind}:${v.source.id}` || Date.now() < player.applying) return;
+        if (!v || !player.kind || player.autoplayBlocked || player.readyKey !== `${v.source.kind}:${v.source.id}` || Date.now() < player.applying) return;
         // Paused YouTube scrubs can omit onStateChange. Host authority still
         // travels through hostPublish's signed, sequenced video message.
         if (localPlaying() !== v.playing || H.needsCorrection(localTime(), H.expectedPosition(v, app.clock.relayNow()))) {
@@ -779,7 +784,7 @@
     }
 
     function onLocalChange() {
-        if (!app.connected || !app.isHost || !app.state.video) return;
+        if (!app.connected || !app.isHost || !app.state.video || player.autoplayBlocked) return;
         const v = app.state.video;
         const playing = localPlaying();
         const pos = localTime();
@@ -789,13 +794,24 @@
         }
         hostPublish(v.source, playing, pos);
     }
+    function onYtAutoplayBlocked() {
+        const v = app.state.video;
+        if (app.ended || player.kind !== 'yt' || localPlaying() || !v?.playing || v.source.kind !== 'yt'
+            || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
+        // YouTube playVideo() returns void; policy denial is a separate event.
+        // Keep the shared play request until a real user gesture starts playback.
+        player.autoplayBlocked = true;
+        ui.tap.hidden = false;
+    }
     function onYtState(event) {
+        if (app.ended) return;
+        if (event.data === 1 && player.kind === 'yt') { player.autoplayBlocked = false; ui.tap.hidden = true; }
         if (event.data !== 1 && event.data !== 2) return;
         clearTimeout(videoPublishTimer);
         videoPublishTimer = win.setTimeout(onLocalChange, 100);
     }
     ['play', 'pause', 'seeked'].forEach((e) => ui.file.addEventListener(e, onLocalChange));
-    ui.tap.addEventListener('click', () => { ui.tap.hidden = true; syncToState(true); });
+    ui.tap.addEventListener('click', () => { if (player.kind !== 'yt') ui.tap.hidden = true; syncToState(true); });
 
     async function hostLoad(source) {
         if (!app.isHost) { say('Only the person who started the room changes the video.'); return; }
