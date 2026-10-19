@@ -125,6 +125,49 @@ describe('durable delivery receipts without a saved chat backlog', () => {
         expect(state.receipts.at(-1).recipients).toHaveLength(200);
     });
 
+    it('reclaims witness bytes on disconnect without unnecessarily evicting still-reportable lines', () => {
+        const crowded = createLobby({ now: () => now, limits: { defaultSlow: 0 } });
+        const ids = Array.from({ length: 200 }, (_, i) => `crowd${i}-${'x'.repeat(100)}`);
+        ids.forEach((id, i) => {
+            crowded.connect({ id, dev: `dev-${i}`, iph: `ip-${i}`, role: 'owner' });
+            crowded.message(id, JSON.stringify({ t: 'hello', nick: `Crowd${i}`, age13: true }));
+        });
+        const publish = (text) => { now += 4000; crowded.message(ids[0], JSON.stringify({ t: 'say', ch: '#stalemate', text })); };
+        for (let i = 0; i < 100; i++) publish(`Crowded line ${i}`);
+        const initial = crowded.sessionSnapshot().receipts;
+        for (const id of ids.slice(2)) crowded.disconnect(id);
+        for (let i = 0; i < 100; i++) publish(`Two remaining witnesses ${i}`);
+        const current = crowded.sessionSnapshot().receipts;
+        expect(current).toHaveLength(initial.length + 100);
+        expect(current[0].id).toBe(initial[0].id);
+        expect(current.every((r) => r.recipients.length === 2)).toBe(true);
+        expect(new TextEncoder().encode(JSON.stringify(current)).byteLength).toBeLessThanOrEqual(1024 * 1024);
+    });
+
+    it('keeps an outstanding durable snapshot immutable when later witnesses leave or evidence is deleted', () => {
+        const captured = [];
+        boot((kind, value) => { if (kind === 'sessions') captured.push(value); });
+        const sender = guest('Sender', 'owner'), witness = guest('Witness');
+        const line = say(sender, 'A digest-only immutable delivery snapshot');
+        const original = captured.at(-1), expected = JSON.stringify(original);
+        engine.disconnect(witness);
+        expect(captured.at(-1).receipts[0].recipients).toEqual([sender]);
+        cmd(sender, 'delete', [line.id]);
+        expect(captured.at(-1).receipts).toEqual([]);
+        expect(JSON.stringify(original)).toBe(expected);
+        expect(expected).not.toContain(line.text);
+    });
+
+    it('retains no delivery receipt for a line received by nobody', () => {
+        const sender = guest('Sender', 'owner');
+        cmd(sender, 'ignore', ['Sender']);
+        say(sender, 'No one receives this line');
+        expect(engine.sessionSnapshot().receipts).toEqual([]);
+        cmd(sender, 'unignore', ['Sender']);
+        say(sender, 'This line has an actual recipient');
+        expect(engine.sessionSnapshot().receipts).toHaveLength(1);
+    });
+
     it('drops malformed or oversized receipts without granting reports or resetting valid live sessions', () => {
         const sender = guest('Sender'); const witness = guest('Witness'); const line = say(sender, 'An authentic sentence');
         const saved = snapshot(); saved.sessions.receipts[0].digest = 'invalid';
