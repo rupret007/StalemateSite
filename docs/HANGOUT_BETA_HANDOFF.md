@@ -114,12 +114,20 @@ provider connectivity by disabling signature or route-specific audience checks.
 
 ## Build and deploy privately
 
-The original natural eight-hour expiry observation started October 19 at 08:00
-UTC, with expiry at 16:00 UTC. Keep the hosted source, runtime, configuration,
-invitation and identity keys unchanged until that original job has a recorded
-terminal result; reaching 16:00 alone is not confirmation. New fixes are
-prepared for review, not deployed. Complete the required exact-head Karen review and
-release acceptance before deploying them.
+The [original natural expiry observation](../pr-assets/beta-collaboration/hosted-natural-expiry.json)
+ended at 15:56:30.679 UTC on October 19, 230.100 seconds before its issued expiry.
+Its seventh observed private WebSocket attempt exceeded the six-attempt
+observation budget. No late-lobby, expired HTTP, token replay or server-expiry
+close acceptance ran. Owned logout and browser cleanup succeeded. The
+[diagnostic notes](../pr-assets/beta-collaboration/hosted-natural-expiry-notes.md)
+explain why the final counts do not prove successful handshakes or reveal close
+causes. Preserve this failed result.
+
+A separate passive diagnostic variant is prepared, not started. New fixes are
+prepared for review, not deployed; complete exact-head Karen review and release
+acceptance. During any new observation, keep its hosted source, runtime,
+configuration, invitation and identity keys unchanged until that exact job has
+a recorded terminal result. A scheduled expiry time alone is not confirmation.
 
 The code-review gate is StoryPool's local Karen poller, not a GitHub workflow
 or a separate human approval. A non-draft, CI-green PR enters through
@@ -130,6 +138,13 @@ Karen itself never merges. During the Stalemate automatic-merge hold, review
 with an isolated private verdict directory; do not send those artifacts to the
 active verdict publisher/conductor. Preserve the existing private-beta scope
 and complete hosted acceptance before distributing visitor invitations.
+
+The selected `c41896b` package has [passed Worker compilation](../pr-assets/beta-collaboration/candidate-worker-build.json)
+using Wrangler 4.151.1 in a private build directory with network access denied.
+Its 72 selected source files and 49 assets retained their hashes. This dry-run
+used tracked defaults and did not reconcile or deploy effective live controls.
+Complete review coverage for the earlier watch, private-history, recovery and
+report changes as well as PR #62's health guard before deploying the candidate.
 
 Use a clean, isolated checkout of the reviewed release commit. Before building,
 record the effective active configuration privately and reconcile it with the
@@ -216,9 +231,10 @@ and never grants a staff role.
    restart across two workerd generations preserved the pending report, with
    the same cookie and a fresh socket receiving the same report ID. Both
    logouts and copied-cookie asset denials passed. This does not prove real
-   Access, human review or hosted behavior. Complete exact-head Karen review and
-   hosted guest-to-staff acceptance after the original eight-hour expiry job
-   has a recorded terminal result. See the
+   Access, human review or hosted behavior. Complete exact-head Karen review,
+   private candidate deployment and hosted guest-to-staff acceptance. The
+   original expiry job is terminal but failed; check for any new active observer
+   before deployment. See the
    [readiness assessment](HANGOUT_BETA_READINESS.md) and
    [moderator guide](HANGOUT_MODERATOR_GUIDE.md).
 6. Leaving the beta revokes the session across its live chat and private-room
@@ -322,6 +338,15 @@ existing remote secrets, account identity and DO bindings. The package's
 historical configuration includes admission open and invitation version `1`;
 do not deploy those defaults over a later pause or version increment. Carry the
 effective safety settings described above into a compatible recovery release.
+
+The `b111bb2` recovery source predates the
+[private chat-history correction](../pr-assets/beta-collaboration/private-chat-history.json).
+Keep new guest/private-room admission paused during emergency recovery using
+this source, carrying `HANGOUT_OPEN=0` and the effective invitation version into
+the recovery deployment. Restore the reviewed history correction and verify
+fresh joins and reconnects before reopening private visitor admission. The
+archive's offline checks do not establish compatibility with the candidate's
+new private-report queue or staff intake; accept those separately before use.
 
 Use a version rollback only after checking that the target's effective bindings,
 invitation version, admission state, staff policies and provider settings retain

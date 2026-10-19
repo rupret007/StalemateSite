@@ -39,9 +39,12 @@ A later paid decision can select Azure identity onboarding or a specific CA/prov
 ## TURN: unlock the existing Vaultwarden profile
 
 **Jeff-only action:** the existing `bw-bots` profile belongs to
-`jeffstory007@gmail.com` on Jeff's self-hosted Vaultwarden. It is currently
-locked; it is not a separate bot account. Jeff must enter his master password
-himself in his own terminal, for example:
+`jeffstory007@gmail.com` on Jeff's self-hosted Vaultwarden. A status-only check
+at 17:07 UTC on October 19 still reported this CLI profile locked in the agent's
+process. Jeff has reported successful sign-in and a resolved database issue;
+an unlocked session in another terminal needs the approved local handoff.
+If unlocking is needed, only Jeff enters his master password in his own
+terminal, for example:
 
 ```sh
 BITWARDENCLI_APPDATA_DIR="$HOME/vaultwarden/bw-bots" bw unlock
@@ -53,7 +56,13 @@ share its environment with this process; use the existing approved local
 handoff if needed. Confirm when the approved helper can read **Hangout TURN Key
 ID**, **Hangout TURN API Token** and **Hangout TURN Analytics Token**. Do not
 guess the password, read master-password files, bypass the lock, rotate the
-shared TURN key or print/commit recovered credentials. Continue independent
-beta work while this prerequisite is pending. Unlocking alone does not enable
-TURN; preserve the running expiry observation and the separate usage/trial
-acceptance requirements.
+shared TURN key or print/commit recovered credentials. The destination is the
+existing `stalemate-hangout-beta` Worker, using `HANGOUT_TURN_KEY_ID`,
+`HANGOUT_TURN_API_TOKEN` and `HANGOUT_TURN_ANALYTICS_TOKEN` as described in the
+[deployment handoff](docs/HANGOUT_BETA_HANDOFF.md). Continue independent beta
+work while this prerequisite is pending.
+
+Unlocking alone does not enable TURN. The original expiry run is terminal and
+failed. If a new observation is active, preserve its source, runtime,
+configuration and invitation/identity keys until its recorded terminal result.
+TURN usage and relay acceptance remain separate requirements.
