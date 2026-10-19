@@ -26,18 +26,27 @@ part of this deployment.
    was deployed as `33e6a92f`; its HTTP 200 health check confirmed configuration
    only. Real email-code owner login and separate staff SSO/WebSocket admission
    passed after the JWKS fix. Current runtime is
-   `e3177c6d-6bea-4c80-90dc-491d29a33da1`, committed source `832f7e1`.
+   `f4438515-7338-4287-b2e4-8485e88bbc90`, committed source `15767d9`.
+   The sign-in acceptance was recorded on earlier `e3177c6d`/`832f7e1`;
+   the current deployment adds private AI observation and co-host grant revocation.
    Complete denied-identity and
    ownership-recovery acceptance. Use hostname/path applications: Cloudflare's
    Worker-level Access integration does not support WebSocket upgrades.
-3. Restore the approved Vaultwarden bot CLI session before retrieving provider
-   credentials. Keep secrets outside source, PR bodies, screenshots and logs.
+3. Recover the actual provider credentials through the approved vault/account.
+   The approved account was signed in and its OpenAI key worked; needed TURN
+   credentials were not visible there. Another successful login alone does
+   not establish availability. Keep secrets outside source, PR bodies,
+   screenshots and logs.
+   The older `hangout-secrets-from-vault.sh --apply` targets the main Worker;
+   do not use it for this beta. Any beta secret upload must explicitly select
+   `hangout-worker/wrangler.beta.toml`.
    Reuse the existing shared TURN key; do not rotate it. The beta HMAC and invite
    keys are separate from the old demonstration. Keep the HMAC stable; rotate
    the invitation key with its version when revoking invitations.
 4. Configure and verify Turnstile on the beta hostname. A real classifier request
-   succeeded, but keep AI moderation off until the hosted review flow, daily
-   limit, outage behavior and real staff handling are checked. Keep TURN off until credential issuance,
+   succeeded. A one-request hosted benign review and cap check also passed,
+   with two guests logged out and AI restored off. Keep AI moderation off
+   until flagged-evidence and real staff handling are accepted. Keep TURN off until credential issuance,
    account-wide analytics and a forced-relay connection succeed.
 5. Choose a conservative TURN allowance within the shared account's allocation.
    Its admission estimate is not a provider spending cap. Existing WebJam

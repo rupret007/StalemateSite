@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-10-19T04:54:06.478726Z",
+  "checkedAt": "2026-10-19T05:10:46.712932Z",
   "scope": "all three desktop operating systems required; four architecture targets",
   "publishedRelease": {
     "id": 399744065,
@@ -151,8 +151,8 @@
     "ref": "refs/heads/master",
     "sourceCommit": "5effbc58db706254f8ca8b52de4a0520c482294a",
     "createdAt": "2026-10-19T04:01:11Z",
-    "status": "in_progress",
-    "conclusion": null,
+    "status": "completed",
+    "conclusion": "success",
     "inputs": {
       "final_build": true,
       "windows_diagnostic_source_run": "",
@@ -277,11 +277,9 @@
       {
         "id": 117887577115,
         "name": "Build Desktop (macos-x64)",
-        "status": "in_progress",
-        "conclusion": null,
-        "activeSteps": [
-          "Build verified Jamulus HEADLESS Reference Track client (macOS)"
-        ]
+        "status": "completed",
+        "conclusion": "success",
+        "activeSteps": []
       },
       {
         "id": 117887577128,
@@ -295,6 +293,27 @@
         "name": "Build Desktop (linux-x64)",
         "status": "completed",
         "conclusion": "success",
+        "activeSteps": []
+      },
+      {
+        "id": 117899458542,
+        "name": "Publish GitHub Release",
+        "status": "completed",
+        "conclusion": "skipped",
+        "activeSteps": []
+      },
+      {
+        "id": 117899458785,
+        "name": "Windows Release Trust (windows-x64)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "activeSteps": []
+      },
+      {
+        "id": 117899458966,
+        "name": "macOS Release Trust (${{ matrix.target }})",
+        "status": "completed",
+        "conclusion": "skipped",
         "activeSteps": []
       }
     ],
@@ -310,12 +329,11 @@
         "target": "macos-x64",
         "runner": "macos-15-intel",
         "artifactName": "webjam-macos-x64",
-        "packageAcceptance": "pending; actual upstream Intel packaging job remains in progress",
-        "observedJobStatus": "in_progress",
-        "observedActiveSteps": [
-          "Build verified Jamulus HEADLESS Reference Track client (macOS)"
-        ],
-        "packageProvenanceVerified": false
+        "packageAcceptance": "artifact provenance, native Intel CI launch and isolated Rosetta frozen app/transport checks passed; physical Intel installation/audio pending",
+        "observedJobStatus": "completed",
+        "observedActiveSteps": [],
+        "packageProvenanceVerified": true,
+        "observedJobConclusion": "success"
       },
       {
         "target": "windows-x64",
@@ -797,12 +815,179 @@
           "signaturePolicyUnchanged": true,
           "actualWindowsV3JoinExecution": false
         }
+      },
+      "macos-x64": {
+        "checkedAt": "2026-10-19T05:08:20.824779+00:00",
+        "target": "macos-x64",
+        "sourceCommit": "5effbc58db706254f8ca8b52de4a0520c482294a",
+        "runId": 39197407138,
+        "runAttempt": 1,
+        "job": {
+          "id": 117887577115,
+          "url": "https://github.com/rupret007/webjam/actions/runs/39197407138/job/117887577115",
+          "conclusion": "success",
+          "successfulSteps": [
+            "Set up job",
+            "Checkout",
+            "Set up service test Python",
+            "Install service test dependencies",
+            "Verify service connection ownership on this desktop",
+            "Verify workspace backup publication on this desktop",
+            "Set up Python",
+            "Set up Go",
+            "Verify TLS service control on this desktop",
+            "Prepare Pocket Stage owner-device setup kit for the Mac package",
+            "Verify Pocket Stage owner-device setup kit",
+            "Install hash-locked pip bootstrap",
+            "Install verified Intel macOS source-build dependencies",
+            "Verify installed native dependencies",
+            "Verify Art host and guest runtime on this desktop",
+            "Install native portability test runner",
+            "Verify portable workspace media and restart on this desktop",
+            "Verify complete Reference Studio workflow on this desktop",
+            "Verify macOS PyInstaller pkg_resources compatibility",
+            "Build bundled secure transport",
+            "Stage bundled Jamulus.app (macOS)",
+            "Build verified Jamulus HEADLESS Reference Track client (macOS)",
+            "Build desktop artifact",
+            "Verify frozen lesson player",
+            "Reverify Intel cryptography after final ZIP packaging",
+            "Build macOS disk image",
+            "Verify mounted macOS disk image",
+            "Verify expected release deliverables",
+            "Mark unsigned platform source artifacts as test-only",
+            "Upload non-Windows build artifact",
+            "Post Set up Go",
+            "Post Set up Python",
+            "Post Set up service test Python",
+            "Post Checkout",
+            "Complete job"
+          ]
+        },
+        "actionsArtifact": {
+          "id": 12164094393,
+          "name": "webjam-macos-x64",
+          "digest": "sha256:558ec3ce3d07de8dce57b1acaa1b223762e3d2480d07f761a9b47b86a169b0b8",
+          "size_in_bytes": 471832032,
+          "created_at": "2026-10-19T05:06:23Z",
+          "expires_at": "2026-11-02T05:05:33Z"
+        },
+        "actionsArtifactDownloadedSha256": "558ec3ce3d07de8dce57b1acaa1b223762e3d2480d07f761a9b47b86a169b0b8",
+        "actionsArtifactDigestVerified": true,
+        "packages": [
+          {
+            "name": "WebJam-macos-x64-ADHOC-TEST-ONLY.zip",
+            "bytes": 236695549,
+            "sha256": "93e95a50488e1a26a87b222f40f1c9d85367fc3d6309959c8665f65e3a0fc471",
+            "embeddedBuildId": "5effbc58db706254f8ca8b52de4a0520c482294a",
+            "transportSha256": "af69b0e022d01b2431fb143641bcc408c24cc6bab9f1ccf0f0f06576e4a8b428",
+            "transportManifestVerified": true,
+            "frozenBinarySha256": "e3abe1a496e5cc99e58ed17e0da5a800dfaf6a489a457d0a52599fce198890e7"
+          },
+          {
+            "name": "WebJam-v0.29.0-macos-x64-ADHOC-TEST-ONLY.dmg",
+            "bytes": 237714509,
+            "sha256": "dc7d5f7d389df8d4ed99bdf2c239d7013f97ea72c0e84e2b9b27e121d5c49189"
+          }
+        ],
+        "physicalDeviceAcceptance": false,
+        "installedAppReplaced": false,
+        "isolatedDmgCopyInspection": {
+          "dmgVerified": true,
+          "mountedReadOnly": true,
+          "detached": true,
+          "candidateMetadata": {
+            "format": "1",
+            "version": "0.29.0",
+            "build_id": "5effbc58db706254f8ca8b52de4a0520c482294a",
+            "target": "macos-x64",
+            "architecture": "x86_64",
+            "trust": "ad-hoc-unnotarized"
+          },
+          "copiedAppVersion": "0.29.0",
+          "copiedMainBinaryMatchesVerifiedZip": true,
+          "deepStrictCodeSignatureVerified": true,
+          "signature": "ad-hoc",
+          "notarized": false,
+          "installationHelpersRun": false,
+          "installedApplicationReplaced": false
+        },
+        "actualFrozenIngress": {
+          "method": "actual unmodified package PYZ bytecode loaded in isolated Python3.11 interpreter",
+          "compiledProfiles": [
+            "direct-stun",
+            "reference-local"
+          ],
+          "results": [
+            {
+              "platformPolicy": "darwin",
+              "version": 2,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "darwin",
+              "version": 3,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "win32",
+              "version": 2,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "win32",
+              "version": 3,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "linux",
+              "version": 2,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "linux",
+              "version": 3,
+              "fullPasteAccepted": true
+            }
+          ],
+          "incompleteBareV3Rejected": true,
+          "actualBundledQtJoinDialogsAccepted": 2,
+          "applicationProcessLaunched": false,
+          "syntheticInvitationAdmissionOnly": true,
+          "invitationValuesLogged": false,
+          "crossNetworkOrPhysicalAudioClaim": false
+        },
+        "localExecutionEvidence": {
+          "verifiedAt": "2026-10-19T05:09:27.559349+00:00",
+          "hostOs": "macOS15.8.2 arm64",
+          "executionMode": "Intel candidate under Rosetta2",
+          "actualFrozenReferenceStudioSmoke": true,
+          "packagedFabricIntegrityArchitectureSignatureReadyHelloStop": true,
+          "noRemainingCandidateProcesses": true,
+          "defaultProtocolHandlerAfter": "/Applications/WebJam.app",
+          "defaultProtocolHandlerUnchanged": true,
+          "installedApplicationVersionUnchanged": "0.27.2",
+          "physicalIntelDeviceAcceptance": false,
+          "physicalAudioOrWanAcceptance": false,
+          "frozenApplicationProcessJoin": false,
+          "deepStrictCodeSignatureVerifiedAfterTests": true
+        },
+        "ciExecutionEvidence": {
+          "executionPlatform": "macOS15.7.9 x86_64 GitHub runner",
+          "mountedDmgCopyInspected": true,
+          "normalFrozenLaunchSurface": true,
+          "actualFrozenReferenceStudioSmoke": true,
+          "packagedFabricIntegrityArchitectureSignatureReadyHelloStop": true,
+          "downloadedJobLogSha256": "3d4438aaf58eba3c3ef82483ce586f3ae7f4fd41a27f67f420e39054640fc37f",
+          "rawLogCommitted": false,
+          "physicalAudioOrWanAcceptance": false
+        }
       }
     },
-    "lastObservedAt": "2026-10-19T04:53:13.204774+00:00",
-    "snapshotFrozenAt": "2026-10-19T04:54:06.478726Z",
-    "allFourPackagingArtifactsVerified": false,
-    "snapshotScope": "three completed target artifacts verified; Intel Mac packaging still in progress",
+    "lastObservedAt": "2026-10-19T05:07:35.501107+00:00",
+    "snapshotFrozenAt": "2026-10-19T05:10:46.712932Z",
+    "allFourPackagingArtifactsVerified": true,
+    "snapshotScope": "four completed architecture-target artifacts downloaded and verified; Intel candidate additionally executed under Rosetta; physical installation/audio and Windows v3 signing acceptance remain pending",
     "unrelatedSigningOrReleaseGatesAwaited": false
   },
   "capabilityBoundary": {
@@ -824,7 +1009,8 @@
   "physicalPlatformAcceptance": {
     "mac": "not run",
     "windows": "not run",
-    "linux": "not run"
+    "linux": "not run",
+    "intelMac": "not run; Intel candidate package checks under Rosetta on Apple Silicon only"
   },
   "installedWebJamVersion": "0.27.2",
   "installedAppReplaced": false,
@@ -862,7 +1048,10 @@
     "actualCandidateArtifactId": 12163331968,
     "githubEnvironmentProtectionRules": [],
     "githubEnvironmentDeploymentBranchPolicy": null,
-    "githubEnvironmentIsApprovalBoundary": false
+    "githubEnvironmentIsApprovalBoundary": false,
+    "existingSigningJobSignsAppAndFabric": true,
+    "existingSigningJobRegeneratesFabricManifestAfterSigning": true,
+    "existingSigningJobVerifiesFinalZipAndInstalledSignatures": true
   },
   "defaultProtocolHandlerBeforeCandidateLaunch": "/Applications/WebJam.app",
   "privateLanV2Route": {
@@ -890,5 +1079,6 @@
       "remove unverified signing protection claim; actual environment rules are empty"
     ],
     "sourceOrRuntimeModified": false
-  }
+  },
+  "defaultProtocolHandlerAfterMacIntelCandidateLaunch": "/Applications/WebJam.app"
 }
