@@ -152,6 +152,8 @@ for (const surface of ['private', 'channel']) {
         const room = await pair(browser, baseURL, surface);
         await room.load();
         await expectBlocked(room.guest.page, room.tap);
+        // Guest policy denial does not establish that the host player is ready.
+        await expect(room.host.page.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
         await room.host.page.evaluate(() => window.__ytLog[0].pauseVideo());
         await expect.poll(async () => (await room.shared(room.guest.page))?.playing).toBe(false);
         expect(await room.guest.page.locator(room.tap).evaluate(node => node.hidden)).toBe(true);
