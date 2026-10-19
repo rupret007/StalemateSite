@@ -27,7 +27,6 @@
                 const ready = () => {
                     if (window.YT?.Player) done();
                 };
-                attempt.cancel = () => done(new Error('YouTube loading cancelled'));
                 window.onYouTubeIframeAPIReady = ready;
                 script.onerror = () => done(new Error('YouTube script unavailable'));
                 timer = setTimeout(() => done(new Error('YouTube script timed out')), DEADLINE);
@@ -120,7 +119,9 @@
 
         function cancel() {
             retire(current); current = null;
-            apiAttempt?.cancel();
+            // The API belongs to this page, not a room selection. Removing its
+            // script cannot stop late execution; keep one bounded attempt when
+            // a room is initialized again or left while the download is pending.
         }
 
         return { select, cancel };

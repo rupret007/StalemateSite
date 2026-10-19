@@ -153,6 +153,60 @@ for (const surface of ['private', 'channel']) {
     });
 }
 
+test('channel a late visitor reuses one pending API download across normal join initialization', async ({ browser, baseURL }) => {
+    const room = await pair(browser, baseURL, 'channel');
+    await room.load(VIDEO);
+    await expectPlaying(room, VIDEO);
+    const control = heldApi();
+    const late = await visitor(browser, baseURL, control.handler);
+    try {
+        const relay = await room.host.page.evaluate(() => sessionStorage.getItem('hangout-relay'));
+        await late.page.goto(ROOT + 'lobby/?preview=' + KEY + '&relay=' + encodeURIComponent(relay));
+        await late.page.fill('[data-nick]', 'LoaderLate');
+        await late.page.click('[data-enter]');
+        await expect(late.page.locator('[data-app]')).toBeVisible();
+        await late.page.evaluate(api => {
+            window.__loaderApiScriptCount = 0;
+            new MutationObserver(records => {
+                for (const record of records) for (const node of record.addedNodes) {
+                    if (node.tagName === 'SCRIPT' && node.src === api) window.__loaderApiScriptCount += 1;
+                }
+            }).observe(document.head, { childList: true });
+        }, API);
+        await late.page.fill('[data-text]', '/join #watch-loader');
+        await late.page.press('[data-text]', 'Enter');
+        await expect.poll(() => late.page.evaluate(() => window.__lobbyRoom.state.ch)).toBe('#watch-loader');
+        // The next task follows the complete join handler and both normal
+        // activity initializations. Count insertions too: a removed first
+        // script may not reach routing, hiding a duplicate load attempt.
+        const inserted = await late.page.evaluate(() => new Promise(resolve => {
+            setTimeout(() => resolve(window.__loaderApiScriptCount), 0);
+        }));
+        expect(inserted).toBe(1);
+        await expect.poll(late.attempts).toBe(1);
+        await releaseApi(control, late.page);
+        const player = late.page.locator('[data-fake-yt]');
+        await expect(player).toHaveCount(1);
+        await expect(player).toHaveAttribute('data-video-id', VIDEO);
+        await expect(player).toHaveAttribute('data-state', 'playing');
+        await expect(late.page.locator(room.status)).toHaveText('');
+        await room.host.page.evaluate(() => { window.__ytLog[0].pauseVideo(); window.__ytLog[0].seekTo(42); });
+        await expect(player).toHaveAttribute('data-state', 'paused');
+        await expect.poll(() => late.page.evaluate(() => window.__lobbyRoom.state.room.video.pos)).toBe(42);
+        // The local clock can advance between seek and pause (observed 0.1ms).
+        // Keep the authoritative seek exact; allow that sub-frame media time.
+        await expect.poll(() => late.page.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeCloseTo(42, 1);
+        await room.host.page.evaluate(() => window.__ytLog[0].playVideo());
+        await expect(player).toHaveAttribute('data-state', 'playing');
+        expect(await room.shared(late.page)).toEqual({ source: { kind: 'yt', id: VIDEO }, playing: true });
+        expect(await late.page.evaluate(() => window.__ytLog.length)).toBe(1);
+        expect(late.attempts()).toBe(1);
+        expect(late.errors).toEqual([]);
+    } finally {
+        control.release();
+    }
+});
+
 test('private an older signature completing after the newer selection cannot publish over it', async ({ browser, baseURL }) => {
     const room = await pair(browser, baseURL, 'private');
     await room.host.page.evaluate(oldId => {
