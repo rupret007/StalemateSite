@@ -1,0 +1,104 @@
+{
+  "time": "2026-10-19T04:10:11.542Z",
+  "version": "4aa8ab36-02c6-4f3e-938a-5d22a7455680",
+  "source": "3d469ba",
+  "checks": [
+    "Missing ops header denied",
+    "Wrong ops header denied",
+    "Ops credential cannot fetch product assets",
+    "Internal binding route cannot be forwarded publicly",
+    "Mutation method denied even with ops credential",
+    "Protected ops reads succeed without guest admission",
+    "Read-only probes preserve measured admission counters",
+    "Configured contact is reported without exposing its address",
+    "Provider and storage verification limits are explicit",
+    "No credential, message or room name appears in ops response",
+    "Normal guest invitation accepted for separate contact check",
+    "Guest cookie alone cannot read ops health",
+    "Confirmed moderation address appears as guest-visible mail link"
+  ],
+  "scope": "Actual protected Cloudflare read-only ops boundaries and confirmed guest contact display. Provider delivery, write availability, staff login and billing not proven.",
+  "health": {
+    "version": 1,
+    "checkedAt": "2026-10-19T04:10:11.861Z",
+    "service": {
+      "state": "degraded",
+      "reasons": [
+        "identity-unconfigured",
+        "staff-unconfigured"
+      ]
+    },
+    "admission": {
+      "state": "open",
+      "lock": "off",
+      "shield": false,
+      "lockAuto": false
+    },
+    "storage": {
+      "lobby": "ok",
+      "quota": "ok",
+      "registry": "ok"
+    },
+    "storageCheck": "read-only",
+    "providerChecks": "not-performed",
+    "features": {
+      "email": {
+        "configured": false,
+        "provider": "not-probed"
+      },
+      "staffAuth": {
+        "configured": false
+      },
+      "moderationContact": {
+        "configured": true
+      },
+      "ai": {
+        "enabled": false,
+        "configured": true,
+        "state": "disabled"
+      },
+      "turn": {
+        "enabled": false,
+        "configured": false,
+        "providerUsage": "unknown"
+      }
+    },
+    "usage": [
+      {
+        "name": "connections",
+        "used": 19,
+        "limit": 200,
+        "unit": "connections",
+        "scope": "application",
+        "period": "day"
+      },
+      {
+        "name": "lobbyRequests",
+        "used": 0,
+        "limit": 40000,
+        "unit": "requests",
+        "scope": "application",
+        "period": "day"
+      },
+      {
+        "name": "aiReviews",
+        "used": 0,
+        "limit": 100,
+        "unit": "reviews",
+        "scope": "application",
+        "period": "day"
+      },
+      {
+        "name": "betaSessions",
+        "used": 17,
+        "limit": 1000,
+        "unit": "sessions",
+        "scope": "application",
+        "period": "active"
+      }
+    ]
+  },
+  "contactDisplay": "Verified",
+  "status": "passed",
+  "proofSessionLogoutStatus": 200
+}

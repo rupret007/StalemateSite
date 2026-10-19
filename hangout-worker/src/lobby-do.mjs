@@ -6,6 +6,7 @@ import { createLobby, LOBBY_LIMITS } from './lobby-core.mjs';
 import { LOG_TTL } from './community-state.mjs';
 import { createAiModerator } from './ai-moderation.mjs';
 import { activeBetaSession, validBetaSession } from './beta-session-client.mjs';
+import { INTERNAL_HEALTH_PATH, aiHealth, dailyUsage, healthJson } from './beta-ops.mjs';
 
 export function lobbyConfigured(env = {}) {
     return !!(env.LOBBY && env.QUOTA && hmacKeyOk(env.HANGOUT_HMAC_KEY) && typeof env.HANGOUT_PREVIEW_KEY === 'string' && env.HANGOUT_TURNSTILE_SECRET);
@@ -269,6 +270,19 @@ export class HangoutLobby {
     }
     async fetch(request) {
         await this.ready;
+        if (new URL(request.url).pathname === INTERNAL_HEALTH_PATH) {
+            if (this.env.HANGOUT_BETA_MODE !== 'protected' || request.method !== 'GET') return new Response('not found', { status: 404 });
+            return this.state.blockConcurrencyWhile(async () => {
+                try {
+                    // Ordinary wake/restore already ran. This read neither spends
+                    // allowance nor applies any administrative/moderation action.
+                    const net = this.engine.snapshot();
+                    return healthJson({ storage: 'ok', lock: net.lock, shield: net.shield, lockAuto: net.lockAuto, evidenceStorage: this.evidenceStorage,
+                        quota: (() => { const daily = dailyUsage(net.budget, 'requests'); return daily && { ...daily, limit: LOBBY_LIMITS.requestBudget }; })(),
+                        ai: aiHealth(this.env, await this.state.storage.get('ai-usage')) });
+                } catch { return healthJson({ storage: 'unavailable' }, 503); }
+            });
+        }
         let identity;
         try { identity = JSON.parse(request.headers.get('X-Hangout-Identity')); } catch (e) { return new Response('no', { status: 400 }); }
         if (this.env.PILOT_MODE === 'protected' && new URL(request.url).pathname === '/__pilot/disconnect' && request.method === 'POST' && /^[a-z0-9-]{16,64}$/.test(identity?.pilotSid || '')) {

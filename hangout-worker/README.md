@@ -1,4 +1,17 @@
-# Hang Out relay and protected private pilot
+# Hang Out relay and private environments
+
+The real visitor beta uses **`stalemate-hangout-beta`** and
+`wrangler.beta.toml`. Start with [the beta handoff](../docs/HANGOUT_BETA_HANDOFF.md)
+and [current assessment](../docs/HANGOUT_BETA_READINESS.md). It has real guest
+sessions and no synthetic role selector; real email/staff acceptance remains a
+separate requirement. The older pilot below is a demonstration environment.
+
+The beta's optional `GET /beta/health` requires a separate
+`HANGOUT_BETA_OPS_KEY` bearer credential. It returns read-only storage status,
+configuration flags and aggregate application allowances without admitting a
+guest or granting staff access. It performs no provider or billing checks and
+does not verify storage writes. Normal Object wake housekeeping can still run.
+See the [hosted boundary checks](../pr-assets/beta-collaboration/hosted-ops.json).
 
 The new **`stalemate-hangout-pilot`** Worker is deployed at
 [the protected pilot entrance](https://stalemate-hangout-pilot.jeffstory007.workers.dev/pilot/).

@@ -1,6 +1,7 @@
 // Metadata-only beta revocation registry. No messages, PMs, ICE, media or plaintext room names.
 import { validRoomId } from './core.mjs';
 import { BETA_TTL, betaVersion } from './beta-session-client.mjs';
+import { INTERNAL_HEALTH_PATH, healthJson } from './beta-ops.mjs';
 
 export const BETA_SESSION_LIMIT = 1000;
 export const BETA_SESSION_ROOM_LIMIT = 16;
@@ -69,6 +70,15 @@ export class BetaSessions {
         return true;
     }
     async fetch(request) {
+        if (new URL(request.url).pathname === INTERNAL_HEALTH_PATH) {
+            if (this.env.HANGOUT_BETA_MODE !== 'protected' || request.method !== 'GET') return new Response('not found', { status: 404 });
+            return this.state.blockConcurrencyWhile(async () => {
+                try {
+                    const rows = await this.records(); await this.mintRates();
+                    return healthJson({ storage: 'ok', quota: { used: [...rows.values()].filter((record) => record.exp > Date.now()).length, limit: BETA_SESSION_LIMIT } });
+                } catch { return healthJson({ storage: 'unavailable' }, 503); }
+            });
+        }
         if (this.env.HANGOUT_BETA_MODE !== 'protected' || request.method !== 'POST') return reply(404, 'not found');
         let body;
         try {
