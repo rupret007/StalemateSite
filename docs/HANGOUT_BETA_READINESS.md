@@ -59,8 +59,9 @@ acceptance.
   tests/docs.
 - The provider compatibility fix `832f7e1` passed the full local unit suite:
   **540 tests in 53 files**, including the 28 new Access diagnostics checks.
-  The 509-unit/188-browser CI result above predates this fix; a passing new
-  browser/CI run is not implied by the local unit result.
+  The exact source head also passed [GitHub CI](https://github.com/rupret007/StalemateSite/actions/runs/39201407037)
+  with **540 unit tests and all 188 browser scenarios**; no browser retry was
+  reported in that run. The 509-unit result above is earlier evidence.
 - [Hosted guest receipt](../pr-assets/beta-collaboration/hosted-guest.json):
   admission denial, separate chat, restricted guest art room, drawing, 75-second
   idle continuity, durable report acknowledgement, copied-session logout and
