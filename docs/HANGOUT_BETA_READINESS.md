@@ -30,6 +30,7 @@ protected Cloudflare beta, with separate actual visitor browser contexts.
 | Host controls and abuse limits | Hosted guests verified restricted-room admission and device-op handoff. A granted guest kept managing a temporary room across deployment and after its creator logged out. Automated room/PM consent, account/device limits, caps and emergency controls pass. | Run Jeff's authenticated incident/recovery drill; any additional staff need an explicit appointment and separate allowlists. |
 | Bounded AI assistance | Actual hosted guest text completed one provider review under a one-request daily cap. A second message reached the other guest while quota stayed at one and review was skipped. Both guests logged out; AI was restored off with the configured 100/day allowance. Automated queue/privacy/outage checks pass. | A separate owned synthetic-fiction test produced one real provider flagged counter with one additional reserved attempt. Exact saved AI queue visibility and human disposition remain unverified; keep AI off. |
 | Shared drawing | Actual browser drawing reached a separate guest; a fresh post-deployment visitor received the saved drawing. WebKit/Android touch drawing and reconnect checks pass. | Physical touch-device acceptance. |
+| Private activity recovery | A [prepared reconnect correction](../pr-assets/beta-collaboration/private-activity-recovery.json) passes 125 private-room browser checks, including 18 new native relay/crypto cases. Fresh nonce-bound snapshots recover missed drawing, watch state and locks; atomic offset/epoch reconciliation preserves drawing during recovery. Obsolete socket/identity work is fenced, and meaningful host actions stay ordered. | Not deployed during the eight-hour expiry observation. Older drawing clients require refresh for continuous recovery; incomplete, conflicting or over-cap activity has explicit retry/failure. Hosted and physical device/network interruption acceptance remain separate. |
 | Watch synchronization | Two invited Chromium guests passed real YouTube play/pause/paused seek/resume in both a private room and a naturally guest-hosted temporary channel. Channel host controls worked; the server rejected one ordinary guest control request. The late joiner received current activity without earlier chat. The founder closed the test channel and both guests logged out. Phone fixtures cover source changes and cancellation. | The deployed source misses YouTube's blocked-autoplay event; a [tested recovery fix](../pr-assets/beta-collaboration/watch-autoplay.json) passes real-provider denial recovery on both loopback surfaces but is not deployed. Hosted denial recovery, physical/mobile autoplay and separate networks remain to be accepted. Hosted checks used separate contexts on one Mac. |
 | WebJam invitation/join | Actual native host invitation crossed two Cloudflare guests unchanged into actual Qt Join; a native guest authenticated and received a real Jamulus response. | Same Mac with explicit sealed-reply fallback. Mac, Windows and Linux are all beta requirements; Windows native v3 is blocked by its unsigned bundled fabric; do not weaken the signature check. Compatible packaged installation, cross-network audio and timing remain to be accepted on all required platforms. Browser Web Join is disabled; its deployed site returned 404. |
 | Camera/TURN and cost controls | Two invited guests on one Mac exchanged decoded synthetic-camera video through the deployed beta, then passed capture-off, passive reconnect and logout cleanup. Consent, credential expiry/refresh, failure fallback and serialized usage/rate accounting pass provider fixtures. A separate read-only account-wide analytics query returned zero October TURN egress bytes. | Physical cameras, separate networks and forced relay remain unverified. TURN is off; beta issuer/analytics credentials and shared allocation are missing. The zero sample does not establish remaining free allowance or billing; admission estimates are not a billing cap. |
@@ -48,6 +49,33 @@ A successful package build is not physical installation or cross-network audio
 acceptance.
 
 ## Verification receipts
+
+- [Private creative-room activity recovery](../pr-assets/beta-collaboration/private-activity-recovery.json):
+  source `208f898` replaces stale reconnect snapshot flags with a new request
+  nonce on each welcome. Complete host attestations bind drawing and persistent
+  controls; peer snapshots grant no host authority. A bounded journal reconciles
+  absolute stroke ranges and verified clear epochs without importing chat or
+  exposing a partial canvas. A returning creator keeps compatible known art
+  when an uninitialized newcomer answers first. Native encryption spanning a
+  disconnect and unfinished local strokes remain represented during recovery.
+  Sender transactions and received host frames retain authority order across
+  asynchronous cryptography; obsolete pending video signing can be cancelled
+  without cancelling a committed send. Departed identity verification cannot
+  restore an old host or hold a snapshot barrier indefinitely.
+  Eight old-source browser cases fail at their intended assertions. The final
+  controlled loopback matrix passes all 125 private-room Chromium checks,
+  including 18 new cases, with no retries or skips; all 653 unit tests pass.
+  The [separate pure foundations](../pr-assets/beta-collaboration/private-recovery-core.json)
+  add 76 unit cases and bounded atomic state/proof handling.
+  Original failed candidate runs remain recorded: a real retired-host barrier
+  deadlock, an introduced latest-video regression, two fixture assumptions and
+  four shared-test-relay admission failures. Those scenarios were corrected
+  without relaxing replay, camera, autoplay, chat or provider assertions. New
+  scenarios use separate relay namespaces with unchanged limits. The 105-stroke
+  multipart fixture seeds canonical state before join, then uses actual source
+  capture/sign/encrypt/relay and real pointer strokes across the held cut.
+  No hosted deployment, physical Safari, separate-network or provider acceptance
+  is claimed. Human/Karen review and the wider readiness gates remain pending.
 
 - [Private creative-room chat from join onward](../pr-assets/beta-collaboration/private-chat-history.json):
   source `ecc5dee` omits chat from host/guest activity snapshots, ignores legacy

@@ -1,0 +1,124 @@
+{
+  "status": "verified-controlled-loopback-not-deployed",
+  "checkedAt": "2026-10-19T10:49:48.402408+00:00",
+  "sourceCommit": "208f8981aadd6c8e5291a066b577b73b463e6c2d",
+  "foundationCommit": "2f870337a1bb961e8a986c625245bf057d32a997",
+  "foundationPr": 55,
+  "baseBeforeRecovery": "df9cc55da76c289bb0e9f49583e8eeb3ae29d5ac",
+  "deployedSourceCommit": "b111bb2aa070cd791834f40f26665996ad406421",
+  "deployedRuntimeVersion": "0ee7705e-e381-4cb4-a70a-1f26daa10e78",
+  "deploymentPerformed": false,
+  "scope": "Private creative-room recovery over actual native browser WebSockets, encryption and signatures using the owned loopback relay. Existing fake YouTube and synthetic camera fixtures remain controlled provider substitutes. Not hosted, physical-device, separate-network, real Access or real-provider acceptance.",
+  "sourceHashes": {
+    "r/45662413410ed051/index.html": "5f0d2280ae09efb7ae15965b20ed2142255d4ffb9644932ef6fee00eef4d4fd5",
+    "r/45662413410ed051/room.js": "af56ee5fdd7d29b8889868f0e7ba21f287d8346118033c5a87c8e91a0a3bfc66",
+    "tests/e2e/hangout.spec.js": "836b27d9087eff3651e49fda9c48225b289de42427d9b42461847a6d271aca61",
+    "tests/e2e/hangout-authority-order.spec.js": "9c5e2ac3e8827133f2e5135ffb8783e826956011a74b1262299b5e936bf90fd2",
+    "tests/e2e/hangout-authority-receive-order.spec.js": "4bcd96890c9397be8b9de654b7dc71964266a3f93e2900c206fc22ad9a2fab95",
+    "tests/e2e/hangout-host-presence.spec.js": "f51723eba3aef308e9493f5194d595bc9f84971f62c25c88e481d6c35771e016",
+    "tests/e2e/hangout-reconnect-inflight.spec.js": "7f76e99957bf781a3b0fd58e49db8c7e3757302c59660dc38644cbe0d4dab9ff",
+    "tests/e2e/hangout-reconnect-races.spec.js": "c9feaf18fd3840d5b772d51c3dd35631608c9bf85113faf14e47a462370dde64",
+    "tests/e2e/hangout-reconnect-state.spec.js": "b9f2b137a52ccb199ea83343f4f3282d32aa1ed0d4955dae5b195eea45a39a38",
+    "tests/e2e/hangout-reconnect-stream.spec.js": "6922ef949edf07c1783360613935e259e06150920ea06434eef514daf78b9175",
+    "tests/e2e/hangout-snapshot-retirement.spec.js": "1e34b71587cecabff61fec23ff24223313a085ff3de4cb286dc149772be0b9c0"
+  },
+  "finding": "Replacement relay welcomes retained completed snapshot flags, so fresh host snapshots were discarded; missed drawing clears, watch selections and room locks stayed stale. Signature verification continuations could also mutate a replacement membership after the original socket closed.",
+  "behavior": [
+    "Every welcome requests a fresh nonce-bound multipart snapshot; only a complete verified host cut can attest older persistent controls as current. No partial canvas replacement or earlier chat is imported.",
+    "Continuous drawing is reconciled with signed clear epochs, absolute point offsets and a bounded atomic journal. Unfinished local strokes, queued envelopes and native encryption spanning a disconnect retain their operations.",
+    "A peer may supply drawing but not fresh host control authority or an unsigned sequence floor. A returning creator retains compatible same-epoch art even if an uninitialized newcomer answers first.",
+    "Old-socket host clear/video/lock verification cannot mutate a replacement connection. Retired host identity verification cannot replace the returned host or block its snapshot barrier.",
+    "Whole meaningful host transactions preserve reservation, signature, local commit and encrypted egress order. Receiving live host frames reserve order before decryption and verification, while chat/drawing/media remain independent.",
+    "A newer video choice can cancel obsolete pending signing; a committed action still completes egress in order. Existing watch-loader, autoplay, replay, chat, camera and reconnect contracts remain covered.",
+    "Recovery has a 15-second deadline with visible Retry room sync. Known retired presence work wakes an already waiting snapshot barrier; unknown drawing/control decryption remains awaited."
+  ],
+  "validation": {
+    "finalFullUnit": {
+      "passed": 653,
+      "files": 58,
+      "elapsedSeconds": 10.7
+    },
+    "finalPrivateBrowserMatrix": {
+      "passedDirect": 125,
+      "newCases": 18,
+      "workers": 2,
+      "retries": 0,
+      "skips": 0,
+      "elapsedReported": "1.9 minutes"
+    },
+    "oldSourceNegatives": {
+      "source": "df9cc55da76c289bb0e9f49583e8eeb3ae29d5ac",
+      "drawingWatchLockReconnect": 2,
+      "oldSocketHostAndNestedSnapshotContinuations": 3,
+      "senderAuthorityOrder": 1,
+      "receiverAuthorityOrderAcrossVerifyAndDecrypt": 2,
+      "allEightFailedAtIntendedAssertions": true
+    },
+    "newIntegrationNegative": {
+      "retiredPresenceAlreadyInsideSnapshotBarrier": {
+        "failedAsExpected": 1,
+        "sourceRoomSha256": "fc76198d77cf9d4c31db4969d4a58a8cabef1713a9a929203d8dbba852199301"
+      }
+    },
+    "retainedEarlierRuns": [
+      {
+        "label": "first baseline drawing setup",
+        "failed": 2,
+        "note": "One case reached missed-clear failure before replacement pointer stroke had actually been created; fixture then scrolls canvas into view and waits for a real new stroke. Corrected baseline has two intended failures."
+      },
+      {
+        "label": "old-socket baseline setup",
+        "collected": 0,
+        "note": "Initial filename-prefixed title did not match an anchored grep; corrected collection then ran only the three intended cases."
+      },
+      {
+        "label": "first eight candidate cases",
+        "passed": 8,
+        "retries": 0
+      },
+      {
+        "label": "first broader candidate matrix",
+        "passed": 108,
+        "failed": 1,
+        "note": "Peer-only fallback fixture left the host tab alive; normal reconnect correctly supplied a new host snapshot. The fixture now closes the host page, preserving the intended absent-host precondition."
+      },
+      {
+        "label": "extended race matrix",
+        "passed": 9,
+        "failed": 2,
+        "note": "One real departed-host verification deadlock was corrected. One multipart fixture started with an unknown newer clear epoch; withholding that drawing was correct. The continuous-drawing fixture now begins at known epoch zero; the separate clear-during-intake case still tests a real newer signed clear."
+      },
+      {
+        "label": "first complete private matrix",
+        "passed": 119,
+        "failed": 5,
+        "note": "One introduced video latest-selection regression was corrected by cancelling obsolete pending signing. Four late cases failed admission after the shared fixture relay reached its 200-connection limit. New scenarios now use separate namespaces with unchanged real relay limits."
+      }
+    ],
+    "fixtureDetails": [
+      "Multipart capture seeds 105 canonical strokes through H.apply before a visitor exists; production code captures, chunks, signs, encrypts and relays them. Real pointer strokes span the cut, continue during assembly, and remain unfinished across atomic replacement.",
+      "Crypto race gates hold genuine native results; tests observe exact original handler completion after release. No fake successful verification or weakened replay assertion is used.",
+      "Each new scenario has a separate local relay namespace; per-relay admission, room capacity, rate and message limits stay intact.",
+      "All original failures, setup attempts, screenshots and logs are retained privately; no CI reruns requested."
+    ],
+    "independentReview": "Concrete authority-order, creator-preservation, in-flight encryption, retired-identity and barrier-wake findings were fixed and regression covered. Final source review found no additional concrete issue.",
+    "ci": {
+      "status": "pending-normal-first-runs",
+      "rerunsRequested": false
+    },
+    "initialFullUnit": {
+      "passed": 653,
+      "files": 58,
+      "elapsedSeconds": 13.57
+    },
+    "ownedLoopbackTestServersStopped": true,
+    "existingUserPreviewPreserved": true
+  },
+  "limits": [
+    "The hosted beta stays at b111bb2/runtime0ee7705e during the original normal eight-hour expiry observation. Neither this recovery correction nor its preceding private-history fix is deployed there.",
+    "Already loaded older clients require refresh for offset/epoch drawing during recovery. Unsupported legacy drawing, conflicts, missing ranges and capacity exhaustion show explicit retry/failure instead of claiming lossless recovery.",
+    "No new message delivery acknowledgment or uninterrupted eight-hour socket guarantee is claimed.",
+    "Physical Safari/backgrounding, Windows/Linux installation and audio, second verified owner/co-host identity, TURN and human/Karen acceptance remain outstanding.",
+    "No main merge, public navigation change, visitor invitations or public launch."
+  ]
+}
