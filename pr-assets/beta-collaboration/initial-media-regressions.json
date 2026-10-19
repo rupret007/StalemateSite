@@ -151,5 +151,12 @@
     "rootCauseEstablished": false,
     "trackedProductOrSpecEdited": false,
     "scope": "A bounded scheduling comparison narrows the investigation; it is not yet a production fix, physical device or hosted camera acceptance."
+  },
+  "supersedingFollowUp": {
+    "sourceCommit": "348c747e8bc7d2d5c229bed546644b2fba49daea",
+    "runtimeVersion": "08dd365d-3ce9-435c-9552-21465cf008fe",
+    "receipt": "initial-offer-arbitration.json",
+    "assetEvidence": "hosted-initial-offer-asset.json",
+    "scope": "Historical failed/undeployed snapshots above remain unchanged; the combined follow-up passed local and exact Linux checks and is now deployed privately. Root cause and physical/forced-relay media acceptance remain separate."
   }
 }

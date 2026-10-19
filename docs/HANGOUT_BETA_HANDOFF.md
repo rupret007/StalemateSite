@@ -26,13 +26,16 @@ part of this deployment.
    was deployed as `33e6a92f`; its HTTP 200 health check confirmed configuration
    only. Real email-code owner login and separate staff SSO/WebSocket admission
    passed after the JWKS fix. Current runtime is
-   `df75bdc6-4e7c-45c1-9575-4d6dda4d6d68`, committed source `b95c7cd`.
+   `08dd365d-3ce9-435c-9552-21465cf008fe`, committed source `348c747`.
    The sign-in acceptance was recorded on earlier `e3177c6d`/`832f7e1`;
    the current deployment also includes private AI observation, co-host grant
-   revocation, media reconnect guards and durable ownership offers. The earlier
-   protected client hash, invitation
-   denial and proof-session logout are [verified](../pr-assets/beta-collaboration/hosted-relay-recovery-asset.json);
-   hosted camera/TURN acceptance remains separate.
+   revocation, media reconnect guards, durable ownership offers and initial-offer
+   arbitration. The current protected client hash, invitation
+   denial and proof-session logout are [verified](../pr-assets/beta-collaboration/hosted-initial-offer-asset.json);
+   [Two hosted synthetic-camera guests](../pr-assets/beta-collaboration/hosted-camera-startup.json)
+   also passed delayed-hello startup, capture-off, passive reconnect and both
+   logout checks on one Mac. Physical-device, separate-network and TURN
+   acceptance remain outstanding.
    Complete denied-identity and
    ownership-recovery acceptance. Use hostname/path applications: Cloudflare's
    Worker-level Access integration does not support WebSocket upgrades.
@@ -93,8 +96,9 @@ The first real login exposed a Workers-specific JWKS fetch failure:
 `redirect: 'error'` throws before sending the request. The fix uses `manual`
 and rejects non-success responses, preserving redirect refusal and all JWT
 checks. The live callback works and the staff socket survived final deployment
-`e3177c6d` with its synthetic report still visible. Complete Jeff's queue action
-and second-device room recovery. Never fix
+`e3177c6d` with its synthetic report still visible. Jeff subsequently confirmed
+dismissing that report and seeing it disappear. Complete independent post-action
+queue reload/persistence and second-device room recovery. Never fix
 provider connectivity by disabling signature or route-specific audience checks.
 
 ## Build and deploy privately

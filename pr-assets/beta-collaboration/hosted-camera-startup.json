@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "startedAt": "2026-10-19T07:05:18.784Z",
+  "sourceCommit": "348c747e8bc7d2d5c229bed546644b2fba49daea",
+  "runtimeVersion": "08dd365d-3ce9-435c-9552-21465cf008fe",
+  "runId": "3352150e",
+  "scope": "Two owned invited Chromium guests using synthetic cameras on one Mac, through the actual protected beta relay. No physical-device, separate-network, WAN-audio, TURN or forced-relay acceptance claim.",
+  "status": "passed",
+  "pageErrors": 0,
+  "checks": {
+    "ownedNamesOnly": true,
+    "initialDelayedHello": {
+      "host": {
+        "pcCount": 1,
+        "connected": true,
+        "inboundBytes": 2020,
+        "decodedFrames": 1,
+        "outboundBytes": 2020,
+        "remoteVideoCount": 1,
+        "decodedVideoCount": 1,
+        "playingVideoCount": 1
+      },
+      "guest": {
+        "pcCount": 1,
+        "connected": true,
+        "inboundBytes": 5640,
+        "decodedFrames": 3,
+        "outboundBytes": 5640,
+        "remoteVideoCount": 1,
+        "decodedVideoCount": 1,
+        "playingVideoCount": 1
+      }
+    },
+    "guestFanRoles": true,
+    "cameraOff": {
+      "captureStopped": true,
+      "hostGuestTileRemoved": true,
+      "passiveDecodedFrameGrowth": 1,
+      "passiveInboundByteGrowth": 890
+    },
+    "passiveReconnect": {
+      "identityChanged": true,
+      "captureStayedOff": true,
+      "media": {
+        "pcCount": 1,
+        "connected": true,
+        "inboundBytes": 3618,
+        "decodedFrames": 1,
+        "outboundBytes": 0,
+        "remoteVideoCount": 1,
+        "decodedVideoCount": 1,
+        "playingVideoCount": 1
+      },
+      "decodedFrameGrowth": 2,
+      "negotiationQuiescent": true
+    }
+  },
+  "runtimeEvidence": "Prior protected-asset receipt identifies the runtime; this runner rechecks both contexts receive the exact committed room.js bytes.",
+  "syntheticCameras": true,
+  "maximumControlledReconnects": 1,
+  "controlledReconnects": 1,
+  "credentialsRecorded": false,
+  "invitationUrlsRecorded": false,
+  "rawRtcRecorded": false,
+  "tracesScreenshotsOrHarRecorded": false,
+  "publishedSourceResponseModified": false,
+  "initialHelloDecryptionDeliberatelyHeld": true,
+  "aiOrTurnConfigurationChanged": false,
+  "deploymentPerformed": false,
+  "publicLobbyJoined": false,
+  "namedPublicRoomCreated": false,
+  "priorAssetRuntimeVerified": true,
+  "cleanup": [
+    {
+      "role": "host",
+      "admissionConfirmed": true,
+      "logoutStatus": 200,
+      "deniedAfterLogout": true,
+      "endedStateVerified": true,
+      "contextClosed": true,
+      "confirmed": true
+    },
+    {
+      "role": "guest",
+      "admissionConfirmed": true,
+      "logoutStatus": 200,
+      "deniedAfterLogout": true,
+      "endedStateVerified": true,
+      "contextClosed": true,
+      "confirmed": true
+    }
+  ],
+  "browserClosed": true,
+  "completedAt": "2026-10-19T07:05:34.078Z",
+  "visitorsCreated": 2,
+  "successfulLogouts": 2,
+  "admittedVisitors": 2
+}

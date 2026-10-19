@@ -32,7 +32,7 @@ protected Cloudflare beta, with separate actual visitor browser contexts.
 | Shared drawing | Actual browser drawing reached a separate guest; a fresh post-deployment visitor received the saved drawing. WebKit/Android touch drawing and reconnect checks pass. | Physical touch-device acceptance. |
 | Watch synchronization | Desktop/private room and phone fixtures verify host play/pause/seek and guest restrictions, including paused seeks. A provider-readiness race exposed in CI is fixed; pending source/leave cancellation is covered. | Actual YouTube/provider playback and mobile autoplay/permission behavior remain to be accepted on devices. |
 | WebJam invitation/join | Actual native host invitation crossed two Cloudflare guests unchanged into actual Qt Join; a native guest authenticated and received a real Jamulus response. | Same Mac with explicit sealed-reply fallback. Mac, Windows and Linux are all beta requirements; Windows native v3 is blocked by its unsigned bundled fabric; do not weaken the signature check. Compatible packaged installation, cross-network audio and timing remain to be accepted on all required platforms. Browser Web Join is disabled; its deployed site returned 404. |
-| Camera/TURN and cost controls | Consent, credential expiry/refresh, failure fallback and serialized usage/rate accounting pass provider fixtures. A separate read-only account-wide analytics query succeeded and returned zero October TURN egress bytes. | TURN is off. Beta issuer/analytics credentials, shared allocation and forced-relay media remain unverified. The zero sample does not establish remaining free allowance or billing; admission estimates are not a billing cap. |
+| Camera/TURN and cost controls | Two invited guests on one Mac exchanged decoded synthetic-camera video through the deployed beta, then passed capture-off, passive reconnect and logout cleanup. Consent, credential expiry/refresh, failure fallback and serialized usage/rate accounting pass provider fixtures. A separate read-only account-wide analytics query returned zero October TURN egress bytes. | Physical cameras, separate networks and forced relay remain unverified. TURN is off; beta issuer/analytics credentials and shared allocation are missing. The zero sample does not establish remaining free allowance or billing; admission estimates are not a billing cap. |
 | Mobile usability | All repository browser checks passed, including WebKit phone projects. Hosted 375/390px captures have no page overflow, wrapping text, 16px input and visible Send. | Real iPhone Safari keyboard, Access redirects, camera/audio and background/resume are unverified. |
 | IRC history/reconnect | Hosted newcomers saw no earlier messages; original live connections retained scrollback during idle. Exact-connection PM consent cannot transfer to a reconnect or another same-device tab. | Real device/network interruption acceptance. No transcript archive or pre-join history is introduced. |
 | Compatible rollback/recovery | Actual Cloudflare rollback and restoration retained two real lobby sockets, scrollback and drafts; new guests received no backlog after either change. | A separate temporary-room deployment rehearsal also preserved guest-op permissions, settings and drawing for fresh visitors. Registered-room provider acceptance, a forced restart, schema-changing rollback and health-endpoint continuity remain unverified. Pre-operations versions can return health 401 with the correct key. |
@@ -59,7 +59,19 @@ acceptance.
   **30 camera/startup scenarios**, without retries. Two strengthened proofs also
   passed. Independent review found no actionable issue. This mitigates the
   reproduced initial scheduling pattern; the underlying zero-candidate cause
-  and later/passive glare remain separate. This candidate is not deployed.
+  and later/passive glare remain separate. The exact source passed **575 unit
+  tests and 205 browser scenarios** in [push CI](https://github.com/rupret007/StalemateSite/actions/runs/39212270471)
+  without retries. [PR CI](https://github.com/rupret007/StalemateSite/actions/runs/39212275941)
+  passed 575 unit tests and 204 browser scenarios directly; one unrelated iPhone
+  game button-height check passed on retry. All Hang Out checks passed directly.
+  The [deployed asset proof](../pr-assets/beta-collaboration/hosted-initial-offer-asset.json)
+  confirms exact bytes, the active private runtime, invitation protection and
+  logout revocation. A separate [hosted synthetic-camera check](../pr-assets/beta-collaboration/hosted-camera-startup.json)
+  passed on the same source: delayed hello, bilateral decoded video, capture-off,
+  a passive viewer's relay reconnect and both logouts, with no page errors.
+  Both contexts received exact committed client bytes; the deployed response
+  was not modified. These were simulated cameras on one Mac through the actual
+  protected relay, not physical-device, separate-network or TURN acceptance.
 
 - [Initial media ordering regressions](../pr-assets/beta-collaboration/initial-media-regressions.json):
   delayed hello/AV decryption could replace newer camera state, and a valid
@@ -72,7 +84,8 @@ acceptance.
   endpoints reach stable signaling, but the polite endpoint gathers no local
   network candidates and neither endpoint sends video. Five local repetitions
   with final-state-only diagnostics produced three passes and two failures;
-  no native API wrappers ran in that check. The patch remains undeployed.
+  no native API wrappers ran in that check. That snapshot was undeployed; the
+  superseding arbitration deployment and hosted check are recorded above.
 
 - [Outbound reconnect review](../pr-assets/beta-collaboration/outbound-generation-regressions.json)
   reproduced stale camera state crossing a replacement
@@ -104,11 +117,11 @@ acceptance.
 
 - Co-host revocation passes **560 unit tests in 54 files and 188 browser scenarios**
   in [CI](https://github.com/rupret007/StalemateSite/actions/runs/39202779472).
-  The deployed source differs from that CI head only in documentation and
+  At that deployment, source `15767d9` differed from that CI head only in documentation and
   sanitized evidence. Sixteen new permission regressions cover offline restart,
   anonymous reconnect, multiple devices, nickname reuse and grant cleanup.
   The runbook records unknown legacy grants and older-serializer rollback limits.
-  The exact deployed head also [passed CI](https://github.com/rupret007/StalemateSite/actions/runs/39203122936)
+  That then-deployed head also [passed CI](https://github.com/rupret007/StalemateSite/actions/runs/39203122936)
   with 560 unit tests, 187 browser scenarios directly and one video-relay
   reconnect scenario on its configured retry. Investigation reproduced two
   media races: delayed decryption could restore a departed tile, and obsolete
@@ -124,12 +137,12 @@ acceptance.
   all three reconnect scenarios then passed 12 repeated checks without retries;
   the product's moderation rules remain unchanged.
   The reconnect source [passed CI](https://github.com/rupret007/StalemateSite/actions/runs/39204794574)
-  with 560 unit tests and all 190 browser scenarios directly. The exact deployed
-  head [passed CI](https://github.com/rupret007/StalemateSite/actions/runs/39205093407)
+  with 560 unit tests and all 190 browser scenarios directly. The then-deployed
+  head `ea012fc` [passed CI](https://github.com/rupret007/StalemateSite/actions/runs/39205093407)
   with 560 unit tests, 189 browser scenarios directly and one existing camera
   startup check on retry, before that test's intended disconnect. Its cause is
   not established; a successful retry does not prove physical camera readiness.
-  The same deployed head's [PR run](https://github.com/rupret007/StalemateSite/actions/runs/39205096878)
+  That historical head's [PR run](https://github.com/rupret007/StalemateSite/actions/runs/39205096878)
   passed all 560 unit tests and all 190 browser scenarios without retries.
   Ten bounded local repetitions of the camera-startup/disconnect case also
   passed without retries; they did not reproduce or explain the other CI run's
@@ -197,11 +210,11 @@ acceptance.
   actual dashboard rows and saved settings verify One-time PIN, separate
   Jeff-only owner/staff policies, exact hostname/paths, eight-hour sessions,
   distinct public audiences, hidden launcher entries and HttpOnly cookies.
-  Configuration `a449541` is deployed as `33e6a92f`; the protected health read
-  returns HTTP 200 with healthy configuration and no issues. The endpoint
+  Configuration `a449541` was deployed as `33e6a92f`; its protected health read
+  returned HTTP 200 with healthy configuration and no issues. The endpoint
   performs no provider checks. Subsequent real OTP owner login and separate
   staff SSO/WebSocket admission passed after correcting the Workers JWKS fetch
-  mode. Committed fix `832f7e1` is deployed as `e3177c6d`; the live staff socket
+  mode. Committed fix `832f7e1` was deployed as `e3177c6d`; the live staff socket
   survived deployment with the exact report still visible. Jeff subsequently
   confirmed dismissing that report and seeing it disappear. An independent
   post-action queue reload is not claimed. New diagnostics regressions pass **28/28**.
@@ -216,10 +229,16 @@ The guest/native checks used beta version
 `ee8fb29f-aaa5-4e55-8ee3-06c760fd3778`; the later version provisioned secrets.
 Worker versions and Git commits are different identifiers.
 
-**Current active runtime:** `df75bdc6-4e7c-45c1-9575-4d6dda4d6d68`, source commit
-`b95c7cd` (AI restored off after the bounded flagged-outcome test; ownership
-offers survive room-server wake). Protected health is ready with AI and TURN
-off and spent AI usage retained at two. The [temporary-room rehearsal](../pr-assets/beta-collaboration/hosted-temporary-room-recovery.json)
+**Current active runtime:** `08dd365d-3ce9-435c-9552-21465cf008fe`, source commit
+`348c747` (initial media ordering, socket-scoped outbound work and initial-offer
+arbitration). The [protected asset proof](../pr-assets/beta-collaboration/hosted-initial-offer-asset.json)
+verifies exact committed client bytes, the active deployment, invitation denial,
+no-store caching, proof-session logout and denial afterward. Protected health
+is ready with AI and TURN off and spent AI usage retained at two.
+
+The preceding runtime was `df75bdc6-4e7c-45c1-9575-4d6dda4d6d68`, source `b95c7cd`
+(AI restored off after the bounded flagged-outcome test; ownership offers survive
+room-server wake). The [temporary-room rehearsal](../pr-assets/beta-collaboration/hosted-temporary-room-recovery.json)
 records guest-op permissions, settings and drawing across the preceding
 `a5d15d34` deployment of the same source;
 real verified-account offer acceptance remains outstanding.
@@ -230,9 +249,15 @@ Its [protected asset receipt](../pr-assets/beta-collaboration/hosted-relay-recov
 verifies the client byte-for-byte, uninvited denial, no-store caching,
 successful proof-session logout and denial afterward. This is asset and
 read-only health evidence, not hosted WebRTC or forced-relay acceptance.
-The newer initial-camera and offer-arbitration patches are not deployed. The
-latest mitigation passed 30 local camera/startup scenarios and ten repetitions
-of the original delayed-hello case; exact Linux CI remains pending.
+The current initial-camera and offer-arbitration source passed 30 local
+camera/startup scenarios, ten repetitions of the original delayed-hello case
+and the exact Linux checks above. These are narrower than physical-device,
+cross-network and forced-relay acceptance.
+The [current hosted camera receipt](../pr-assets/beta-collaboration/hosted-camera-startup.json)
+adds actual protected-relay startup and passive reconnect with two separate
+invited contexts and synthetic cameras on one Mac. Both decoded video, capture
+stopped when requested, and both sessions logged out with asset access revoked.
+It does not establish physical-device, separate-network or forced-relay behavior.
 The previous runtime was `f4438515-7338-4287-b2e4-8485e88bbc90`, source `15767d9`
 (co-host revocation with persisted account/device grant associations).
 [Its deployment evidence](../pr-assets/beta-collaboration/hosted-cohost-deployment.json)
@@ -340,6 +365,7 @@ earlier website/game work into these diffs:
 - [#44: private-room media reconnect recovery](https://github.com/rupret007/StalemateSite/pull/44)
 - [#45: ownership offers across room-server wake](https://github.com/rupret007/StalemateSite/pull/45)
 - [#46: initial camera state and WebRTC negotiation](https://github.com/rupret007/StalemateSite/pull/46)
+- [#47: initial-offer arbitration and passive-viewer recovery](https://github.com/rupret007/StalemateSite/pull/47)
 
 Initial hosted receipts and the assessment are supplied in documentation PR #36
 stacked on #35. Subsequent evidence and installer progress are recorded in
