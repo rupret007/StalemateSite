@@ -475,6 +475,7 @@ test('guest snapshot cannot tamper with video timestamp to skew late joiner play
     const { host, guest, invite } = await hostAndGuest(browser);
     await host.click('[data-pick-yt="oh5p5f5_-7A"]');
     await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+    await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
     await host.evaluate(() => { window.__ytLog[window.__ytLog.length - 1].seekTo(45); });
     await expect.poll(() => host.evaluate(() => window.__ytLog[window.__ytLog.length - 1].getCurrentTime())).toBeGreaterThan(44);
     await expect.poll(() => guest.evaluate(() => Number.isFinite(Number(window.__hangout.lastVideoSigned?.signed?.body?.t)))).toBe(true);
