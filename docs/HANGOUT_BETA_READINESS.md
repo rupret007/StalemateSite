@@ -30,7 +30,7 @@ protected Cloudflare beta, with separate actual visitor browser contexts.
 | Host controls and abuse limits | Hosted guests verified restricted-room admission and device-op handoff. A granted guest kept managing a temporary room across deployment and after its creator logged out. Automated room/PM consent, account/device limits, caps and emergency controls pass. | Run Jeff's authenticated incident/recovery drill; any additional staff need an explicit appointment and separate allowlists. |
 | Bounded AI assistance | Actual hosted guest text completed one provider review under a one-request daily cap. A second message reached the other guest while quota stayed at one and review was skipped. Both guests logged out; AI was restored off with the configured 100/day allowance. Automated queue/privacy/outage checks pass. | A separate owned synthetic-fiction test produced one real provider flagged counter with one additional reserved attempt. Exact saved AI queue visibility and human disposition remain unverified; keep AI off. |
 | Shared drawing | Actual browser drawing reached a separate guest; a fresh post-deployment visitor received the saved drawing. WebKit/Android touch drawing and reconnect checks pass. | Physical touch-device acceptance. |
-| Watch synchronization | Desktop/private room and phone fixtures verify host play/pause/seek and guest restrictions, including paused seeks. A provider-readiness race exposed in CI is fixed; pending source/leave cancellation is covered. | Actual YouTube/provider playback and mobile autoplay/permission behavior remain to be accepted on devices. |
+| Watch synchronization | Two invited Chromium guests in a hosted private room played real YouTube, paused, sought to 21 seconds while paused and resumed with less than 0.2 seconds measured drift. Both logged out. Guest-hosted channel and phone fixtures cover host authority, source changes and cancellation. The real-player privacy comparison and both watch surfaces' safe construction regressions pass. | Physical-device/mobile autoplay and guest-hosted channel playback against the real provider remain to be accepted. The hosted provider check used two contexts on one Mac; it does not verify separate household networks. |
 | WebJam invitation/join | Actual native host invitation crossed two Cloudflare guests unchanged into actual Qt Join; a native guest authenticated and received a real Jamulus response. | Same Mac with explicit sealed-reply fallback. Mac, Windows and Linux are all beta requirements; Windows native v3 is blocked by its unsigned bundled fabric; do not weaken the signature check. Compatible packaged installation, cross-network audio and timing remain to be accepted on all required platforms. Browser Web Join is disabled; its deployed site returned 404. |
 | Camera/TURN and cost controls | Two invited guests on one Mac exchanged decoded synthetic-camera video through the deployed beta, then passed capture-off, passive reconnect and logout cleanup. Consent, credential expiry/refresh, failure fallback and serialized usage/rate accounting pass provider fixtures. A separate read-only account-wide analytics query returned zero October TURN egress bytes. | Physical cameras, separate networks and forced relay remain unverified. TURN is off; beta issuer/analytics credentials and shared allocation are missing. The zero sample does not establish remaining free allowance or billing; admission estimates are not a billing cap. |
 | Mobile usability | All repository browser checks passed, including WebKit phone projects. Hosted 375/390px captures have no page overflow, wrapping text, 16px input and visible Send. | Real iPhone Safari keyboard, Access redirects, camera/audio and background/resume are unverified. |
@@ -57,8 +57,22 @@ acceptance.
   zero dummy markers in outbound requests after the change. Two new browser
   regressions fail on the preceding product source and pass with the fix; all
   nine targeted watch scenarios pass without retries. The page's no-referrer
-  policy and invitation URL remain intact. This candidate is not yet deployed;
-  actual hosted-provider synchronization remains a separate acceptance check.
+  policy and invitation URL remain intact. Exact source `b111bb2` passed
+  **575 unit tests and 207 browser scenarios directly**, without retries, in
+  both [push CI](https://github.com/rupret007/StalemateSite/actions/runs/39215495193)
+  and [PR CI](https://github.com/rupret007/StalemateSite/actions/runs/39215533300).
+  The [deployed asset proof](../pr-assets/beta-collaboration/hosted-watch-privacy-asset.json)
+  verifies both committed watch clients, no-store caching, the privacy notice,
+  invitation denial, logout revocation and healthy AI/TURN-off state.
+  The [actual hosted provider check](../pr-assets/beta-collaboration/hosted-watch-provider.json)
+  passed with two invited guest/fan contexts in a private room: real decoded
+  YouTube video, signed pause, paused seek to 21 seconds and resume. Measured
+  normalized drift was 0.193 seconds initially and 0.110 seconds after resume.
+  No autoplay bypass or player fixture was used, no permission/capture was
+  requested, and both logouts and ended states were verified. The HTTP request
+  guard checked 85 third-party requests and found no invitation-data matches.
+  This is one-Mac Chromium evidence, not physical-device, mobile-autoplay,
+  separate-network, guest-hosted channel provider or TURN acceptance.
 
 - [Initial-offer arbitration](../pr-assets/beta-collaboration/initial-offer-arbitration.json):
   when both peers already publish media, one defers its first offer while
@@ -240,12 +254,19 @@ The guest/native checks used beta version
 `ee8fb29f-aaa5-4e55-8ee3-06c760fd3778`; the later version provisioned secrets.
 Worker versions and Git commits are different identifiers.
 
-**Current active runtime:** `08dd365d-3ce9-435c-9552-21465cf008fe`, source commit
-`348c747` (initial media ordering, socket-scoped outbound work and initial-offer
-arbitration). The [protected asset proof](../pr-assets/beta-collaboration/hosted-initial-offer-asset.json)
-verifies exact committed client bytes, the active deployment, invitation denial,
-no-store caching, proof-session logout and denial afterward. Protected health
-is ready with AI and TURN off and spent AI usage retained at two.
+**Current active runtime:** `0ee7705e-e381-4cb4-a70a-1f26daa10e78`, source commit
+`b111bb2` (safe YouTube embed metadata on both watch surfaces, retaining earlier
+media reliability fixes). The [protected asset proof](../pr-assets/beta-collaboration/hosted-watch-privacy-asset.json)
+verifies both exact committed watch clients, the active deployment, invitation
+denial, no-store caching, privacy notice, proof-session logout and denial
+afterward. The [actual provider check](../pr-assets/beta-collaboration/hosted-watch-provider.json)
+adds two separate guests' real playback and signed pause/seek/resume. Protected
+health is ready with AI and TURN off and spent AI usage retained at two.
+
+The preceding runtime was `08dd365d-3ce9-435c-9552-21465cf008fe`, source `348c747`
+(initial media ordering, socket-scoped outbound work and initial-offer
+arbitration). Its [protected asset proof](../pr-assets/beta-collaboration/hosted-initial-offer-asset.json)
+and synthetic-camera proof below remain historical evidence for that deployment.
 
 The preceding runtime was `df75bdc6-4e7c-45c1-9575-4d6dda4d6d68`, source `b95c7cd`
 (AI restored off after the bounded flagged-outcome test; ownership offers survive
@@ -260,11 +281,11 @@ Its [protected asset receipt](../pr-assets/beta-collaboration/hosted-relay-recov
 verifies the client byte-for-byte, uninvited denial, no-store caching,
 successful proof-session logout and denial afterward. This is asset and
 read-only health evidence, not hosted WebRTC or forced-relay acceptance.
-The current initial-camera and offer-arbitration source passed 30 local
+The initial-camera and offer-arbitration changes on `348c747` passed 30 local
 camera/startup scenarios, ten repetitions of the original delayed-hello case
 and the exact Linux checks above. These are narrower than physical-device,
 cross-network and forced-relay acceptance.
-The [current hosted camera receipt](../pr-assets/beta-collaboration/hosted-camera-startup.json)
+The [hosted camera receipt](../pr-assets/beta-collaboration/hosted-camera-startup.json)
 adds actual protected-relay startup and passive reconnect with two separate
 invited contexts and synthetic cameras on one Mac. Both decoded video, capture
 stopped when requested, and both sessions logged out with asset access revoked.
@@ -377,6 +398,7 @@ earlier website/game work into these diffs:
 - [#45: ownership offers across room-server wake](https://github.com/rupret007/StalemateSite/pull/45)
 - [#46: initial camera state and WebRTC negotiation](https://github.com/rupret007/StalemateSite/pull/46)
 - [#47: initial-offer arbitration and passive-viewer recovery](https://github.com/rupret007/StalemateSite/pull/47)
+- [#48: watch-player invitation privacy and real-provider acceptance](https://github.com/rupret007/StalemateSite/pull/48)
 
 Initial hosted receipts and the assessment are supplied in documentation PR #36
 stacked on #35. Subsequent evidence and installer progress are recorded in

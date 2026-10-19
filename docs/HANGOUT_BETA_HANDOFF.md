@@ -26,15 +26,21 @@ part of this deployment.
    was deployed as `33e6a92f`; its HTTP 200 health check confirmed configuration
    only. Real email-code owner login and separate staff SSO/WebSocket admission
    passed after the JWKS fix. Current runtime is
-   `08dd365d-3ce9-435c-9552-21465cf008fe`, committed source `348c747`.
+   `0ee7705e-e381-4cb4-a70a-1f26daa10e78`, committed source `b111bb2`.
    The sign-in acceptance was recorded on earlier `e3177c6d`/`832f7e1`;
    the current deployment also includes private AI observation, co-host grant
    revocation, media reconnect guards, durable ownership offers and initial-offer
-   arbitration. The current protected client hash, invitation
-   denial and proof-session logout are [verified](../pr-assets/beta-collaboration/hosted-initial-offer-asset.json);
+   arbitration and safe YouTube embed metadata. Both current watch-client
+   hashes, invitation denial and proof-session logout are
+   [verified](../pr-assets/beta-collaboration/hosted-watch-privacy-asset.json).
+   [Actual YouTube playback](../pr-assets/beta-collaboration/hosted-watch-provider.json)
+   passed with two guests in a private room on one Mac: signed pause, paused
+   seek, resume, less than 0.2 seconds drift and both logouts. No invitation-data
+   match was found in 85 checked third-party HTTP requests.
    [Two hosted synthetic-camera guests](../pr-assets/beta-collaboration/hosted-camera-startup.json)
    also passed delayed-hello startup, capture-off, passive reconnect and both
-   logout checks on one Mac. Physical-device, separate-network and TURN
+   logout checks on one Mac on the preceding `348c747`/`08dd365d` deployment.
+   Physical-device, mobile-autoplay, separate-network and TURN
    acceptance remain outstanding.
    Complete denied-identity and
    ownership-recovery acceptance. Use hostname/path applications: Cloudflare's

@@ -1,8 +1,8 @@
 {
   "version": 1,
   "checkedOn": "2026-10-19",
-  "status": "local-provider-verified-pending-ci-and-hosted",
-  "scope": "Actual current YouTube IFrame API on an owned loopback page with public dummy query/fragment markers, plus repository browser regressions. No Stalemate admission, deployed invitation or user secret was used in the provider comparison. This is not hosted synchronization or physical-device acceptance.",
+  "status": "verified-private-deployment-and-actual-provider",
+  "scope": "Actual provider privacy comparison with public dummy markers on loopback, browser construction/synchronization regressions for both watch surfaces, and a separate two-guest real-provider private-room hosted receipt. Physical-device, mobile-autoplay, separate-network, guest-hosted channel provider and TURN acceptance remain separate.",
   "providerLibrary": {
     "sha256": "316a92f17a6607590c3675c075dbea110f7ab5bf8dd3e24a6eaf3bd767122038",
     "source": "https://www.youtube.com/iframe_api"
@@ -55,7 +55,7 @@
     "targetedUnitTestsPassed": 14,
     "targetedUnitFilesPassed": 3
   },
-  "deployed": false,
+  "deployed": true,
   "humanKarenReviewComplete": false,
   "references": [
     "https://developers.google.com/youtube/iframe_api_reference#Loading_a_Video_Player",
@@ -81,5 +81,27 @@
       "failure": "Unrelated iPhone SE /play share button measured 43.999969px against >=44px on both attempts.",
       "retry": "Existing late-joiner snapshot fixture immediately asserted receiver snapshotDone after cross-page socket send; retry passed. Product cause not established."
     }
-  }
+  },
+  "sourceCommit": "b111bb2aa070cd791834f40f26665996ad406421",
+  "ci": {
+    "push": {
+      "run": 39215495193,
+      "unitTestsPassed": 575,
+      "unitFilesPassed": 55,
+      "browserDirectPasses": 207,
+      "retries": 0
+    },
+    "pullRequest": {
+      "run": 39215533300,
+      "unitTestsPassed": 575,
+      "unitFilesPassed": 55,
+      "browserDirectPasses": 207,
+      "retries": 0
+    }
+  },
+  "runtimeVersion": "0ee7705e-e381-4cb4-a70a-1f26daa10e78",
+  "deploymentEvidence": "hosted-watch-privacy-asset.json",
+  "hostedProviderEvidence": "hosted-watch-provider.json",
+  "hostedScope": "Two separate guest/fan contexts, actual YouTube and signed private-room synchronization on one Mac. No physical-device, mobile autoplay, separate-network, guest-hosted channel provider or TURN acceptance.",
+  "localProviderComparisonScope": "Actual current YouTube IFrame API on an owned loopback page with public dummy query/fragment markers, plus repository browser regressions. No Stalemate admission, deployed invitation or user secret was used in the provider comparison. This is not hosted synchronization or physical-device acceptance."
 }

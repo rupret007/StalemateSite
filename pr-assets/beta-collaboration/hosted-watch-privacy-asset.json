@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "checkedAt": "2026-10-19T07:28:34.827Z",
+  "origin": "https://stalemate-hangout-beta.jeffstory007.workers.dev",
+  "sourceCommit": "b111bb2aa070cd791834f40f26665996ad406421",
+  "runtimeVersion": "0ee7705e-e381-4cb4-a70a-1f26daa10e78",
+  "scope": "Protected deployed watch-client identity, no-store caching, invitation boundary, privacy notice and read-only operational health. Provider playback is a separate receipt.",
+  "credentialsRecorded": false,
+  "assets": [
+    {
+      "asset": "/r/45662413410ed051/room.js",
+      "status": 200,
+      "cacheControl": "no-store",
+      "sha256": "b5593e7c9d7933bdfe595e5e57ef64d474fb678265dd82e9ea0cd9b720a17158"
+    },
+    {
+      "asset": "/r/45662413410ed051/lobby/lobby-room.js",
+      "status": 200,
+      "cacheControl": "no-store",
+      "sha256": "114170b76b44436e8571346dba0d95554c701c77ac5814f78d3a98a4e8c50516"
+    }
+  ],
+  "activeRuntimeVerified": true,
+  "uninvitedStatus": 401,
+  "youtubePrivacyNoticePresent": true,
+  "health": {
+    "version": 1,
+    "checkedAt": "2026-10-19T07:28:36.352Z",
+    "service": {
+      "state": "ready",
+      "reasons": []
+    },
+    "admission": {
+      "state": "open",
+      "lock": "off",
+      "shield": false,
+      "lockAuto": false
+    },
+    "storage": {
+      "lobby": "ok",
+      "quota": "ok",
+      "registry": "ok"
+    },
+    "storageCheck": "read-only",
+    "providerChecks": "not-performed",
+    "features": {
+      "email": {
+        "configured": true,
+        "provider": "not-probed"
+      },
+      "staffAuth": {
+        "configured": true
+      },
+      "moderationContact": {
+        "configured": true
+      },
+      "ai": {
+        "enabled": false,
+        "configured": true,
+        "state": "disabled",
+        "currentInstance": {
+          "checked": 0,
+          "flagged": 0,
+          "failed": 0,
+          "skipped": 0,
+          "pending": 0
+        }
+      },
+      "turn": {
+        "enabled": false,
+        "configured": false,
+        "providerUsage": "unknown"
+      }
+    },
+    "usage": [
+      {
+        "name": "connections",
+        "used": 32,
+        "limit": 200,
+        "unit": "connections",
+        "scope": "application",
+        "period": "day"
+      },
+      {
+        "name": "lobbyRequests",
+        "used": 1,
+        "limit": 40000,
+        "unit": "requests",
+        "scope": "application",
+        "period": "day"
+      },
+      {
+        "name": "aiReviews",
+        "used": 2,
+        "limit": 100,
+        "unit": "reviews",
+        "scope": "application",
+        "period": "day"
+      },
+      {
+        "name": "betaSessions",
+        "used": 35,
+        "limit": 1000,
+        "unit": "sessions",
+        "scope": "application",
+        "period": "active"
+      }
+    ]
+  },
+  "status": "passed",
+  "logoutStatus": 200,
+  "afterLogoutAssetStatus": 401
+}
