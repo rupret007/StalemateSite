@@ -844,6 +844,7 @@
             }
             pruneStreamTracks(entry.stream);
         }
+        entry?.pumpOffer();
         layout();
     }
 
@@ -1076,6 +1077,7 @@
         if (!(app.av.mic || app.av.cam)) Array.from(app.av.pcs.keys()).filter((id) => !app.av.peers.has(id)).forEach(closePc);
         for (const id of app.av.peers) if (!app.av.pcs.has(id)) openPc(id);
         for (const entry of app.av.pcs.values()) syncTracks(entry);
+        for (const entry of app.av.pcs.values()) entry.pumpOffer();
         layout();
     }
 
@@ -1149,21 +1151,55 @@
             const pc = new RTCPeerConnection({ iceServers: app.av.ice || STUN });
             const conn = navigator.connection || {};
             const thrifty = Boolean(conn.saveData) || conn.type === 'cellular' || /(^|-)2g|3g/.test(conn.effectiveType || '');
-            const entry = { pc, polite: app.myId > id, makingOffer: false, ignoreOffer: false, settingRemoteAnswer: false, remoteOfferPending: false, pendingIce: [], relayed: false, stream: new MediaStream(), senders: {}, wantHi: false, tier: thrifty ? 'weak' : 'ok', hist: [], restarts: 0, last: null };
+            const entry = { pc, polite: app.myId > id, makingOffer: false, offerNeeded: false, waitingInitialOffer: false, ignoreOffer: false, settingRemoteAnswer: false, remoteOfferPending: false, remoteOfferJobs: 0, pendingIce: [], relayed: false, stream: new MediaStream(), senders: {}, wantHi: false, tier: thrifty ? 'weak' : 'ok', hist: [], restarts: 0, last: null };
             app.av.pcs.set(id, entry);
             const current = () => peer.live && app.av.pcs.get(id) === entry;
             pc.onicecandidate = (e) => { if (current() && e.candidate) send({ type: 'rtc', to: id, ice: e.candidate.toJSON() }); };
-            pc.onnegotiationneeded = async () => {
+            const initial = () => !pc.localDescription && !pc.remoteDescription;
+            const waitForInitialOffer = () => initial() && entry.polite && (app.av.mic || app.av.cam) && app.av.peers.has(id);
+            entry.pumpOffer = async () => {
+                if (!current() || app.av.removed.has(id) || !(entry.offerNeeded || entry.waitingInitialOffer)
+                    || entry.makingOffer || entry.remoteOfferPending || pc.signalingState !== 'stable') return;
+                if (waitForInitialOffer()) {
+                    entry.waitingInitialOffer = true;
+                    entry.offerNeeded = false;
+                    return;
+                }
+                const initialAttempt = initial();
+                // This attempt owns existing native work. A later browser event
+                // latches separate work even while createOffer/send is pending.
+                entry.offerNeeded = false;
+                entry.makingOffer = true;
+                let failed = false;
                 try {
-                    if (!current()) return;
-                    entry.makingOffer = true;
                     const offer = await pc.createOffer();
-                    if (!current() || entry.remoteOfferPending || pc.signalingState !== 'stable') return;
+                    if (!current()) return;
+                    if (entry.remoteOfferPending || pc.signalingState !== 'stable') {
+                        if (initialAttempt && !pc.remoteDescription) entry.waitingInitialOffer = true;
+                        else if (!initialAttempt) entry.offerNeeded = true;
+                        return;
+                    }
+                    if (waitForInitialOffer()) { entry.waitingInitialOffer = true; return; }
                     if (app.av.music) offer.sdp = V.musicSdp(offer.sdp);
                     await pc.setLocalDescription(offer);
                     if (!current()) return;
+                    entry.waitingInitialOffer = false;
                     await send({ type: 'rtc', to: id, sdp: pc.localDescription.toJSON() });
-                } catch (error) { /* retried by next negotiation */ } finally { entry.makingOffer = false; }
+                } catch (error) {
+                    failed = true;
+                    if (initialAttempt && !pc.remoteDescription) entry.waitingInitialOffer = true;
+                    else entry.offerNeeded = true;
+                    // Retain debt for a later native/AV/signaling event. Retrying
+                    // this same exception from finally would create a busy loop.
+                } finally {
+                    entry.makingOffer = false;
+                    if (!failed) entry.pumpOffer();
+                }
+            };
+            pc.onnegotiationneeded = () => {
+                if (!current()) return;
+                entry.offerNeeded = true;
+                entry.pumpOffer();
             };
             pc.ontrack = (e) => {
                 if (!current()) return;
@@ -1274,24 +1310,32 @@
                 const answer = msg.sdp.type === 'answer';
                 const offer = msg.sdp.type === 'offer';
                 if (answer) entry.settingRemoteAnswer = true;
-                if (offer) entry.remoteOfferPending = true;
-                try { await pc.setRemoteDescription(msg.sdp); }
-                finally {
-                    if (answer) entry.settingRemoteAnswer = false;
-                    if (offer) entry.remoteOfferPending = false;
-                }
-                if (!current()) return;
-                for (const ice of entry.pendingIce.splice(0)) {
-                    try { await pc.addIceCandidate(ice); } catch (_) { /* stale candidate from a prior negotiation */ }
+                // An older offer callback must not clear a newer callback's
+                // guard while its native answer/encrypted publication is pending.
+                if (offer) { entry.remoteOfferJobs += 1; entry.remoteOfferPending = true; }
+                try {
+                    try { await pc.setRemoteDescription(msg.sdp); }
+                    finally { if (answer) entry.settingRemoteAnswer = false; }
                     if (!current()) return;
-                }
-                if (msg.sdp.type === 'offer') {
-                    const answer = await pc.createAnswer();
-                    if (!current()) return;
-                    if (app.av.music) answer.sdp = V.musicSdp(answer.sdp);
-                    await pc.setLocalDescription(answer);
-                    if (!current()) return;
-                    await send({ type: 'rtc', to: from, sdp: pc.localDescription.toJSON() });
+                    if (offer) entry.waitingInitialOffer = false;
+                    for (const ice of entry.pendingIce.splice(0)) {
+                        try { await pc.addIceCandidate(ice); } catch (_) { /* stale candidate from a prior negotiation */ }
+                        if (!current()) return;
+                    }
+                    if (offer) {
+                        const answer = await pc.createAnswer();
+                        if (!current()) return;
+                        if (app.av.music) answer.sdp = V.musicSdp(answer.sdp);
+                        await pc.setLocalDescription(answer);
+                        if (!current()) return;
+                        await send({ type: 'rtc', to: from, sdp: pc.localDescription.toJSON() });
+                    }
+                } finally {
+                    if (offer) {
+                        entry.remoteOfferJobs -= 1;
+                        entry.remoteOfferPending = entry.remoteOfferJobs > 0;
+                    }
+                    if (current()) entry.pumpOffer();
                 }
             } else if (msg.ice) {
                 if (!pc.remoteDescription) {
@@ -1305,7 +1349,7 @@
 
     function closePc(id) {
         const entry = app.av.pcs.get(id);
-        if (entry) { entry.pc.close(); app.av.pcs.delete(id); }
+        if (entry) { entry.offerNeeded = false; entry.waitingInitialOffer = false; entry.pc.close(); app.av.pcs.delete(id); }
         app.av.relayed.delete(id);
         delete app.av.levels[id];
         const meter = app.av.meters.get(id);

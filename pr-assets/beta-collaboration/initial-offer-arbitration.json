@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "checkedOn": "2026-10-19",
+  "status": "verified-private-asset-and-synthetic-camera",
+  "scope": "Local Chromium, fake capture, genuine native WebRTC and local encrypted relay for the regression suite. A separate hosted receipt covers two invited synthetic-camera contexts on one Mac using actual protected beta signaling. No physical-device, separate-network, WAN-audio or TURN acceptance.",
+  "priorSourceCommit": "8b24072",
+  "roomJsSha256": "275a1514dad1d778b146cf01804562f5172072db75c32b1a13448c3ee4ef6bb8",
+  "startupSpecSha256": "010f20400666bf0fbc7cc6f5b838adbbce7b18a0f5db00f0fa9797db37a24814",
+  "negativeControl": {
+    "sourceCommit": "8b24072",
+    "operation": "Hold the genuine initial impolite createOffer result while both peers publish media.",
+    "observed": "The polite endpoint transmitted one real encrypted SDP offer before the leader was released.",
+    "primaryAssertion": "Expected zero transmitted polite offers; received one.",
+    "failureWasMissingNewFlag": false
+  },
+  "fix": {
+    "initialArbitration": "Only a description-free polite connection with both accepted local and remote media active defers its initial offer.",
+    "pendingWork": "Separate per-PC booleans preserve a deliberately deferred initial offer and later native negotiation events while busy.",
+    "wakeups": "Accepted AV changes, local media refresh and completed signaling reconsider existing pending work; passive viewers can still initiate.",
+    "answerPublication": "Keep the remote-offer guard through native answer creation/application and encrypted answer enqueue; a balanced scalar count owns overlapping callbacks.",
+    "nativeFailure": "Retain pending work for a later external/native event without an immediate finally-driven retry.",
+    "retiredPeers": "Current-PC and relay-token guards remain; closing clears both pending-work flags.",
+    "captureConsentOrAdmissionChanged": false,
+    "newPeerOpeningPath": false,
+    "payloadQueueOrTimerAdded": false,
+    "assertionsOrTimeoutsWeakened": false
+  },
+  "validation": {
+    "initialFocusedChecksPassed": 3,
+    "newStartupScenariosPassed": 9,
+    "originalLateHelloRepetitionsPassed": 10,
+    "combinedVideoAndStartupScenariosPassed": 30,
+    "finalStrengthenedProofsPassed": 2,
+    "retries": 0,
+    "passiveViewerBothRolesWithoutCapture": true,
+    "mixedMicrophoneAndCameraBothRoles": true,
+    "localOffBeforeRemoteSeesPriorOn": true,
+    "remoteOffResumesActiveWaiter": true,
+    "releasedOlderAvCompletionObservedBeforeAbsenceAssertions": true,
+    "syntheticNativeFailureHasOneCallBeforeLaterMediaChange": true,
+    "restoredVideoRequiresNewDecodedFrames": true,
+    "heldEncryptedAnswerPrecedesQueuedNativeOfferOnWire": true,
+    "existingMusicHostControlsReconnectAndOverlapChecksPassed": true,
+    "independentFrozenSourceReview": "No actionable issue found.",
+    "syntaxAndDiffChecksPassed": true
+  },
+  "underlyingZeroCandidateCauseEstablished": false,
+  "laterOrPassiveGlareEliminated": false,
+  "deployed": true,
+  "humanKarenReviewComplete": false,
+  "credentialsOrRoomKeysRecorded": false,
+  "sourceCommit": "348c747e8bc7d2d5c229bed546644b2fba49daea",
+  "ci": {
+    "push": {
+      "run": 39212270471,
+      "unitTestsPassed": 575,
+      "unitFilesPassed": 55,
+      "browserDirectPasses": 205,
+      "browserRetryPasses": 0
+    },
+    "pullRequest": {
+      "run": 39212275941,
+      "unitTestsPassed": 575,
+      "unitFilesPassed": 55,
+      "browserDirectPasses": 204,
+      "browserRetryPasses": 1,
+      "retryCase": "Unrelated iPhone SE /play share button height 43.999969px versus 44px; retry passed."
+    },
+    "hangoutOrStartupRetries": 0
+  },
+  "runtimeVersion": "08dd365d-3ce9-435c-9552-21465cf008fe",
+  "deploymentEvidence": "hosted-initial-offer-asset.json",
+  "deploymentScope": "Protected client bytes, active runtime, invitation gate, no-store, healthy AI/TURN-off state and own-session logout/revocation. The separate hosted-media receipt adds synthetic-camera startup, capture-off, passive reconnect and both logouts on one Mac; no physical-device, WAN or TURN claim.",
+  "hostedMediaEvidence": "hosted-camera-startup.json"
+}
