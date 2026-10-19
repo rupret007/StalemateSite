@@ -32,8 +32,11 @@ part of this deployment.
    Complete denied-identity and
    ownership-recovery acceptance. Use hostname/path applications: Cloudflare's
    Worker-level Access integration does not support WebSocket upgrades.
-3. Restore the approved Vaultwarden bot CLI session before retrieving provider
-   credentials. Keep secrets outside source, PR bodies, screenshots and logs.
+3. Recover the actual provider credentials through the approved vault/account.
+   The approved account was signed in and its OpenAI key worked; needed TURN
+   credentials were not visible there. Another successful login alone does
+   not establish availability. Keep secrets outside source, PR bodies,
+   screenshots and logs.
    The older `hangout-secrets-from-vault.sh --apply` targets the main Worker;
    do not use it for this beta. Any beta secret upload must explicitly select
    `hangout-worker/wrangler.beta.toml`.

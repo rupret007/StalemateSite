@@ -106,5 +106,16 @@
     "Older serializers may drop optional grant associations; see runbook.",
     "Health reads do not probe providers; the separate AI receipt records the actual provider test."
   ],
-  "credentialsRecorded": false
+  "credentialsRecorded": false,
+  "latestExactHeadCi": {
+    "runId": 39203122936,
+    "head": "15767d9f8e90f0bda748651f77f5a84b5e4d7de7",
+    "status": "passed-with-one-browser-retry",
+    "unitPassed": 560,
+    "unitFiles": 54,
+    "browserPassedDirectly": 187,
+    "browserPassedOnConfiguredRetry": 1,
+    "retryTest": "tests/e2e/hangout-video.spec.js:232 dropped relay connection reconnects and faces come back",
+    "retryFollowUp": "Root requested source-based investigation; no assertion or timeout was weakened."
+  }
 }

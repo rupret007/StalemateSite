@@ -55,6 +55,10 @@ acceptance.
   sanitized evidence. Sixteen new permission regressions cover offline restart,
   anonymous reconnect, multiple devices, nickname reuse and grant cleanup.
   The runbook records unknown legacy grants and older-serializer rollback limits.
+  The exact deployed head also [passed CI](https://github.com/rupret007/StalemateSite/actions/runs/39203122936)
+  with 560 unit tests, 187 browser scenarios directly and one video-relay
+  reconnect scenario on its configured retry. That retry is under investigation;
+  no timeout or assertion was weakened.
 
 - [Actual hosted AI pipeline](../pr-assets/beta-collaboration/hosted-ai-pipeline.json):
   one benign guest message completed a real Worker/provider review, a second
