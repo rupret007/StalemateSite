@@ -49,6 +49,18 @@ acceptance.
 
 ## Verification receipts
 
+- [Initial-offer arbitration](../pr-assets/beta-collaboration/initial-offer-arbitration.json):
+  when both peers already publish media, one defers its first offer while
+  preserving later native negotiation work. Passive viewers still initiate;
+  local/remote camera-off resumes pending setup, and an encrypted answer is
+  queued before any follow-up offer. A controlled old-source check transmitted
+  one unwanted competing offer. The fix passed **nine new startup scenarios**,
+  **ten repetitions of the previously failing late-hello case**, and all
+  **30 camera/startup scenarios**, without retries. Two strengthened proofs also
+  passed. Independent review found no actionable issue. This mitigates the
+  reproduced initial scheduling pattern; the underlying zero-candidate cause
+  and later/passive glare remain separate. This candidate is not deployed.
+
 - [Initial media ordering regressions](../pr-assets/beta-collaboration/initial-media-regressions.json):
   delayed hello/AV decryption could replace newer camera state, and a valid
   follow-up WebRTC offer could be discarded while a remote answer was still
@@ -74,7 +86,7 @@ acceptance.
   The combined source `aebec95` passed **575 unit tests and all 196 browser
   scenarios without retries** in both [PR CI](https://github.com/rupret007/StalemateSite/actions/runs/39209749176)
   and [push CI](https://github.com/rupret007/StalemateSite/actions/runs/39209743297).
-  Local startup failures remain unresolved despite those passes. A separate
+  Local startup failures were still observed on that source despite those passes. A separate
   diagnostic stopped at its first real stall, invoked one guest ICE restart,
   and observed no recovery in another 15 seconds. A restart-only watchdog has
   not been implemented. Bounded native controls, including separate browser
@@ -218,8 +230,9 @@ Its [protected asset receipt](../pr-assets/beta-collaboration/hosted-relay-recov
 verifies the client byte-for-byte, uninvited denial, no-store caching,
 successful proof-session logout and denial afterward. This is asset and
 read-only health evidence, not hosted WebRTC or forced-relay acceptance.
-The newer initial-camera patch is not deployed: its Linux delayed-hello
-regression remains under investigation despite passing the local video suite.
+The newer initial-camera and offer-arbitration patches are not deployed. The
+latest mitigation passed 30 local camera/startup scenarios and ten repetitions
+of the original delayed-hello case; exact Linux CI remains pending.
 The previous runtime was `f4438515-7338-4287-b2e4-8485e88bbc90`, source `15767d9`
 (co-host revocation with persisted account/device grant associations).
 [Its deployment evidence](../pr-assets/beta-collaboration/hosted-cohost-deployment.json)
