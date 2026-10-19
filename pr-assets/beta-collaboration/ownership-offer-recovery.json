@@ -23,7 +23,22 @@
     "fullUnitFiles": 55,
     "activeOfferAcceptedAfterNineMinutesAndWake": true,
     "expiredReplayedRevokedReboundAndMalformedOffersRejected": true,
-    "independentSourceReview": "No blocker found; no duplicate test run."
+    "independentSourceReview": "No blocker found; no duplicate test run.",
+    "gitHubCi": {
+      "runId": 39206451586,
+      "head": "b95c7cd9f63ff249f4d29e0a87a62b9de69dba4c",
+      "unitPassed": 575,
+      "unitFiles": 55,
+      "browserPassed": 190,
+      "browserRetries": 0
+    }
   },
-  "credentialsRecorded": false
+  "credentialsRecorded": false,
+  "deployment": {
+    "runtimeVersion": "a5d15d34-5d9e-4f57-97a6-ec07bdf94f75",
+    "sourceCommit": "b95c7cd9f63ff249f4d29e0a87a62b9de69dba4c",
+    "health": "Read-only protected health returned HTTP200 and no issues. AI and TURN remain off.",
+    "hostedTemporaryRoomRehearsal": "hosted-temporary-room-recovery.json",
+    "hostedVerifiedAccountOfferAcceptance": "Not performed; separate approved second identity still required."
+  }
 }

@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "startedAt": "2026-10-19T05:46:00.671Z",
+  "origin": "https://stalemate-hangout-beta.jeffstory007.workers.dev",
+  "runId": "etzn1b",
+  "initialRuntime": "207a4b5a-c416-44c7-a751-24f88af5beb4",
+  "checks": [
+    {
+      "name": "Separate guest receives device-op grant and can manage the temporary room; ordinary guest was denied"
+    },
+    {
+      "name": "Guest device-op grant authorizes a fresh server mutation after deployment",
+      "clients": [
+        {
+          "role": "creator",
+          "sameSocket": true,
+          "draftPreserved": true
+        },
+        {
+          "role": "guest-op",
+          "sameSocket": true,
+          "draftPreserved": true
+        }
+      ]
+    },
+    {
+      "name": "Fresh post-deployment visitor receives room settings and drawing, with no earlier chat or op privilege"
+    },
+    {
+      "name": "Granted guest op continues managing the temporary room after its creator logs out"
+    }
+  ],
+  "scope": "Actual invited nickname guests, temporary art room, guest device-op handoff and one controlled beta deployment. No verified-account ownership/cohost, physical-device, media or forced-relay claim.",
+  "credentialsRecorded": false,
+  "updatedRuntime": "a5d15d34-5d9e-4f57-97a6-ec07bdf94f75",
+  "updatedSource": "b95c7cd9f63ff249f4d29e0a87a62b9de69dba4c",
+  "status": "passed",
+  "syntheticRoomCleanup": "confirmed",
+  "successfulLogouts": 3,
+  "visitorsCreated": 3,
+  "pageErrors": 0,
+  "finishedAt": "2026-10-19T05:54:03.141Z"
+}

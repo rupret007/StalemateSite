@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "checkedOn": "2026-10-19",
+  "scope": "Local Chromium, real browser WebRTC operations with fake capture and local relay; no physical camera, hosted WebRTC or forced-relay acceptance claim.",
+  "priorSourceCommit": "42ebc4114ea78930ef616a50a3815d8d57a424e1",
+  "correctedRoomJsSha256": "dabc083bf6b0f2ee5e85127375d7239eb7a4b0bb905f154b73c4b18530924dac",
+  "negativeControls": [
+    {
+      "operation": "Hold initial hello decryption until a newer camera-on advertisement has been applied.",
+      "observed": "Late hello overwrote current AV state; guest decoded host video while host video stayed zero for fifteen seconds."
+    },
+    {
+      "operation": "Hold older camera-on decryption until a newer camera-off advertisement has been applied.",
+      "observed": "Releasing the older publication restored one stale peer tile despite the guest having stopped capture."
+    },
+    {
+      "operation": "Release a real remote answer and valid subsequent offer together while native answer application is pending.",
+      "observed": "The impolite endpoint ignored the valid offer before native setRemoteDescription and left the other endpoint waiting for an answer."
+    }
+  ],
+  "fix": {
+    "stateOrdering": "Independent name and AV receive ordinals per live relay peer preserve newer wire-order state across delayed decryption.",
+    "negotiation": "Per-PC pending-answer state recognizes a valid subsequent offer and resets on success or failure.",
+    "standardReference": "https://www.w3.org/TR/webrtc/#perfect-negotiation-example",
+    "inboundMessageQueueAdded": false,
+    "consentOrMediaAdmissionExpanded": false,
+    "recoveryAssertionsOrTimeoutsWeakened": false
+  },
+  "validation": {
+    "focusedScenariosPassed": 7,
+    "fullVideoScenariosPassed": 18,
+    "retries": 0,
+    "currentNameAndCameraStateVerified": true,
+    "cameraOffCaptureRemainsStopped": true,
+    "pendingAnswerFlagResetAndBilateralDecodedVideoVerified": true,
+    "independentSourceReview": "No blocker found."
+  },
+  "earlierCiStartupFailureCause": "Unproven. These separately reproduced product races do not establish that CI failure's cause.",
+  "credentialsOrRoomKeysRecorded": false,
+  "linuxFollowUp": {
+    "sourceCommit": "ffee51975016573a1216f5f030cd791055314482",
+    "pullRequestRun": 39206666587,
+    "status": "failed delayed-hello regression on both attempts; 192 other browser cases passed",
+    "pushRun": 39206647237,
+    "pushResult": "192 direct passes plus delayed-hello pass on configured retry",
+    "cause": "Unproven. Complete SDP exchange does not imply transport success. Local final-state-only diagnostics reproduced stable signaling with no local candidates on the polite endpoint and zero video traffic on either endpoint.",
+    "deployed": false,
+    "diagnosticFollowUp": "Final read-only RTP, track, DOM, gathering and candidate-count state without native API wrappers, SDP, candidate addresses, URLs or keys.",
+    "diagnosticLocalPassed": 1,
+    "diagnosticCi": {
+      "sourceCommit": "ed00c1ab45814984064437141c3b802c291e8797",
+      "runs": [
+        39207747197,
+        39207741798
+      ],
+      "unitTestsPassed": 575,
+      "unitFilesPassed": 55,
+      "browserDirectPassesPerRun": 192,
+      "browserRetryPassesPerRun": 1,
+      "retryCase": "Existing iPhone Manic video fold check; initial-camera test passed directly in both runs.",
+      "cameraFailureResolved": false
+    },
+    "finalStateOnlyLocal": {
+      "repetitions": 5,
+      "passed": 3,
+      "failed": 2,
+      "nativeApiWrappersInstalled": false,
+      "failedEndpointState": "Both stable signaling and gathering ICE; host 19 local/0 remote candidates, polite guest 0 local/0 remote candidates; zero RTP and decoded remote video.",
+      "nativeOfferGuardFlagsReset": true,
+      "timeoutsOrAssertionsWeakened": false
+    },
+    "transportFinalOnlyLocal": {
+      "repetitions": 3,
+      "passed": 1,
+      "failed": 2,
+      "nativeApiWrappersInstalled": false,
+      "nativeLocalCandidateCountsConfirmStats": true,
+      "credentialComparison": "Unavailable in this Chromium, including in the successful case; no native transport/SDP mismatch is established.",
+      "remoteCandidateMethodLimitation": "Returned zero even in the successful case; not evidence of remote-candidate loss.",
+      "standaloneComparison": "Five native-only empty-ICE-server trials did not reproduce the failure. They do not match the app STUN/network configuration.",
+      "causeEstablished": false,
+      "deployed": false
+    }
+  },
+  "pendingRemoteOfferFollowUp": {
+    "operation": "Hold a real createOffer result, start native application of the other peer's valid offer, then release the local offer before native signaling state changes.",
+    "negativeControl": "Old code called setLocalDescription(offer) from visible stable state into the pending remote-offer operation and received InvalidStateError; both peers later recovered before the no-rejection assertion failed.",
+    "fix": "A per-PC remoteOfferPending flag blocks the obsolete local offer after createOffer and resets in setRemoteDescription finally.",
+    "focusedScenariosPassed": 3,
+    "retries": 0,
+    "musicSdpAndSettingsScenarioPassed": true,
+    "bilateralStableConnectedDecodedMediaVerified": true,
+    "independentSourceReview": "No actionable issue found.",
+    "zeroCandidateStartupFailureResolved": false,
+    "deployed": false
+  },
+  "followUpRoomJsSha256": "320d9ebf3a12e2b3f7a159f31e656017b55964ef895c8e16eab36f5ad5ce7df5",
+  "currentFollowUpCi": {
+    "sourceCommit": "aebec95f2b2b3340cbad2271e991284f2cbf000b",
+    "runs": [
+      39209749176,
+      39209743297
+    ],
+    "unitTestsPassed": 575,
+    "unitFilesPassed": 55,
+    "browserScenariosPassed": 196,
+    "retries": 0,
+    "localStartupFailureResolved": false,
+    "deployed": false
+  },
+  "nativeRecoveryExperiment": {
+    "diagnosticOnly": true,
+    "sourceCommit": "aebec95f2b2b3340cbad2271e991284f2cbf000b",
+    "maximumCases": 3,
+    "actualCases": 2,
+    "stoppedAtFirstStall": true,
+    "initialObservationMs": 14979,
+    "explicitGuestRestartCalls": 1,
+    "recoveryObservationMs": 14946,
+    "before": "Stable SDP and sendrecv tracks on both peers; guest zero local candidates, host 19; no remote video or RTP.",
+    "after": "Renegotiation completed and roles flipped, but guest local candidates stayed zero; host local candidates rose to 38; ICE/DTLS remained new and no video flowed.",
+    "senderAndReceiverShareOneTransport": true,
+    "singleIceRestartRecoveredMedia": false,
+    "startupRestartWatchdogImplemented": false,
+    "committedRegressionOrProductSourceModified": false
+  },
+  "standaloneNativeControls": {
+    "emptyIceServersTrials": 5,
+    "defaultStunMatchingBrowserFlagsTrials": 3,
+    "separateContextsFakeCameraTrials": 3,
+    "allConnectionsEstablished": true,
+    "separateContextCameraTrialsDecodedBilaterally": true,
+    "nativeErrorsObserved": 0,
+    "sameStartupFailureReproduced": false,
+    "scope": "Bounded controls did not reproduce the app startup failure; they do not establish an app-independent browser defect or disprove an ordering/timing problem."
+  },
+  "initialOfferBarrierComparison": {
+    "diagnosticOnly": true,
+    "cases": 3,
+    "bilateralConnectedDecodedPasses": 3,
+    "politeRealCreateOfferResultHeldUntilRemoteOfferAccepted": true,
+    "firstPoliteLocalDescriptionWasAnswer": true,
+    "initialPoliteSetLocalOfferCalls": 0,
+    "mediaObservationMs": [
+      109,
+      113,
+      118
+    ],
+    "nativeApiOutcomeMocked": false,
+    "timeoutsOrAssertionsWeakened": false,
+    "rootCauseEstablished": false,
+    "trackedProductOrSpecEdited": false,
+    "scope": "A bounded scheduling comparison narrows the investigation; it is not yet a production fix, physical device or hosted camera acceptance."
+  }
+}
