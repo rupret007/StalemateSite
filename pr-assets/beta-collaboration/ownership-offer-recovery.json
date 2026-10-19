@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "checkedOn": "2026-10-19",
+  "scope": "Local authoritative lobby engine and simulated Durable Object wake with exact admitted identities; no hosted verified-account or second-device acceptance claim.",
+  "priorSourceCommit": "3e996ce",
+  "negativeControl": {
+    "operation": "Create a ten-minute ownership offer, snapshot, advance sixty seconds, and restore the exact live identities.",
+    "observed": "The still-valid offer was absent after restoration, so the verified co-host could not accept ownership."
+  },
+  "fix": {
+    "metadata": "One optional bounded tuple containing current owner account, current co-host account and original deadline per room.",
+    "preservesOriginalDeadline": true,
+    "requiresCurrentVerifiedAccountAndRoomMembership": true,
+    "expiresAndRemovesConsumedOrRevokedOffers": true,
+    "requiresDurableCommitBeforeSuccessNotification": true,
+    "chatOrMediaStored": false,
+    "schemaMigration": "Optional metadata; older records without offers remain valid. Older serializers can discard pending offers on write."
+  },
+  "validation": {
+    "newRegressionTests": 15,
+    "focusedPassed": 51,
+    "fullUnitPassed": 575,
+    "fullUnitFiles": 55,
+    "activeOfferAcceptedAfterNineMinutesAndWake": true,
+    "expiredReplayedRevokedReboundAndMalformedOffersRejected": true,
+    "independentSourceReview": "No blocker found; no duplicate test run."
+  },
+  "credentialsRecorded": false
+}
