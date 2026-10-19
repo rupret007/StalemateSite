@@ -4,6 +4,7 @@
 import { ROOM_TTL, LOG_TTL, roomRecord, validRoom, createRateLimits } from './community-state.mjs';
 import { checkNick, checkText, defaultLists, normalize } from './filter.mjs';
 import { actSnapshot, applyClear, applyStroke, applyVideo, cleanRtc, parseActFrame, PAINT_KINDS, VIDEO_KINDS } from './lobby-act.mjs';
+import { messageReceipt, receiptDigest } from './message-receipts.mjs';
 
 export const BOT = 'StaleBot';
 export const LOBBY = '#stalemate';
@@ -26,6 +27,10 @@ const SESSION_STATE_BYTES = 2 * 1024 * 1024;
 const SESSION_CONNECTIONS = 200;
 const SESSION_PREFERENCES = 50;
 const SESSION_PM_PAIRS = 2000;
+const SESSION_PM_PENDING = 1000;
+const PM_PENDING_TTL = 10 * MIN;
+const RECEIPT_MAX = 1000;
+const RECEIPT_STATE_BYTES = 1024 * 1024;
 const encoder = new TextEncoder();
 
 export const LOBBY_LIMITS = Object.freeze({
@@ -114,12 +119,12 @@ export const COMMANDS = Object.freeze({
     camoff: 'moderator', approve: 'moderator', dismiss: 'moderator', aidismiss: 'moderator', log: 'moderator', delete: 'moderator', slow: 'band'
 });
 
-export function createLobby({ now = () => Date.now(), send = () => {}, close = () => {}, persist = () => {}, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
+export function createLobby({ now = () => Date.now(), send = () => {}, close = () => {}, persist: persistImpl = () => {}, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
     const L = { ...LOBBY_LIMITS, ...limits };
     const roomStateLimit = Math.max(32768, Math.min(ROOM_STATE_MAX_BYTES, Number(L.roomStateBytes) || ROOM_STATE_MAX_BYTES));
     const conns = new Map();          // connId -> conn
     const channels = new Map();       // lc(name) -> channel
-    const pm = new Map();             // "devA|devB" (sorted) -> {state:'pending'|'open', from}
+    const pm = new Map();             // exact connection pair -> consent; device IDs are rate limits, never consent grants
     const devStats = new Map();       // dev -> {day, msgs, lastRoom}
     const ipRooms = new Map();        // iph -> [timestamps]
     let seq = 0;
@@ -127,6 +132,20 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     let roomsBroken = false;
     let outputBatch = null;
     let closeBatch = null;
+    let evidenceWrites = null;
+    let pendingCommits = 0;
+    let deferredAdmin = false;
+    const persist = (kind, value) => {
+        const required = kind === 'moderation-queue' || kind === 'net';
+        let task;
+        try { task = persistImpl(kind, value); }
+        catch (error) { if (!required) throw error; task = Promise.reject(error); }
+        if (required && evidenceWrites) evidenceWrites.push(task);
+        // Outside a durable command, keep the original promise available to an
+        // awaiting caller while handling a connection/heartbeat write rejection.
+        else if (required && task && typeof task.catch === 'function') task.catch(storageUnavailable);
+        return task;
+    };
     const net = {
         bans: [],                     // {mask, reason, by, at, until}
         kicks: {},                    // dev -> until
@@ -156,7 +175,8 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     const reports = new Map();        // msgId -> {devs:Set, iphs:Set, ch, from, text, hidden, at}
     const held = new Map();           // msgId -> pending line
     const lines = new Map();          // msgId -> line (recent, for reports/purge)
-    const lineMeta = new Map();       // immutable author device + actual recipient connections; never sent or persisted
+    const lineMeta = new Map();       // immutable author device + actual recipient connections; never sent to visitors
+    const receipts = new Map();       // bounded text digests + delivery metadata; no ordinary chat or PM bodies
     const heldChannels = new Map();   // original channel object for live held-message approval; never restored
     const aiPending = new Map();      // current message + channel object identities; never persisted
     const aiReviews = new Map();      // bounded admin-only evidence, separate from chat and network snapshots
@@ -248,6 +268,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         adminDirty = true;
         queueMicrotask(() => {
             adminDirty = false;
+            if (pendingCommits) { deferredAdmin = true; return; }
             const state = adminState();
             for (const c of conns.values()) if (isStaff(c) && c.admin) out(c, { t: 'admin', state: { ...state, capabilities: capabilities(c) } });
         });
@@ -268,12 +289,12 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             }))
         };
     }
-    function saveModerationQueue() { persist('moderation-queue', moderationQueue()); pushAdmin(); }
+    function saveModerationQueue() { const task = persist('moderation-queue', moderationQueue()); pushAdmin(); return task; }
     function pruneModerationQueue() {
         let changed = false;
         for (const [id, r] of reports) if (now() - r.at >= MODERATION_QUEUE_TTL) { reports.delete(id); changed = true; }
         for (const [id, h] of held) if (now() - h.ts >= MODERATION_QUEUE_TTL) { held.delete(id); heldChannels.delete(id); changed = true; }
-        if (changed) saveModerationQueue();
+        if (changed) return saveModerationQueue();
     }
     const moderationId = (id) => typeof id === 'string' && /^[mp][a-z0-9]{1,80}$/i.test(id);
     const moderationNick = (nick) => typeof nick === 'string' && /^[A-Za-z][A-Za-z0-9_\-[\]{}^`|]{2,19}$/.test(nick);
@@ -304,7 +325,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             prefix: h.prefix, band: h.band, me: h.me, reason: h.reason, dev: h.dev });
         let changed = true;
         try { changed = JSON.stringify(stored) !== JSON.stringify(moderationQueue()); } catch (e) { /* replace malformed storage */ }
-        if (changed) saveModerationQueue();
+        if (changed) return saveModerationQueue();
     }
     function aiReviewList() {
         return [...aiReviews.values()].filter((entry) => now() - entry.at < AI_REVIEW_TTL)
@@ -414,8 +435,11 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         const c = conns.get(id);
         if (!c) return;
         for (const name of [...c.channels]) leave(c, ch(name), why, true);
+        for (const [k, v] of pm) if (v.fromId === id || v.toId === id) {
+            if (v.state === 'pending') endPendingPm(k, v, 'The other visitor disconnected.');
+            else pm.delete(k);
+        }
         conns.delete(id);
-        for (const [k, v] of pm) if (k.split('|').includes(c.dev) && v.state === 'pending') pm.delete(k);
         if (isBand(c)) { net.lastBand = now(); saveNet(); }
         pushAdmin();
     }
@@ -491,7 +515,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
                 : Array.isArray(f.args) ? f.args.slice(0, 8).map((a) => String(a).slice(0, 300)) : [];
             return command(c, f.ch, name, args);
         }
-        case 'report': return report(c, String(f.id || ''));
+        case 'report': return report(c, String(f.id || ''), f.text);
         case 'cam': return cam(c, f.ch, !!f.on, f.adult18 === true);
         case 'act': return roomAct(c, f);
         case 'admin-refresh': if (isStaff(c) && c.admin) out(c, { t: 'admin', state: { ...adminState(), capabilities: capabilities(c) } }); return undefined;
@@ -599,15 +623,17 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     // The adapter supplies the exact live socket identities again after hibernation.
     function sessionSnapshot() {
         const live = [...conns.values()].filter((c) => c.nick);
-        const devs = new Set(live.map((c) => c.dev));
         return { version: 1, connections: live.map((c) => ({
             id: c.id, dev: c.dev, iph: c.iph, account: c.account || '', role: c.role, admin: c.admin,
             nick: c.nick, channels: [...c.channels], away: c.away, ignores: [...c.ignores], blocks: [...c.blocks], pmOff: c.pmOff,
             cams: [...c.cams], since: c.since, lastNick: c.lastNick, tokens: c.tokens, last: c.last, frames: c.frames,
             lastSaid: Object.fromEntries(Object.entries(c.lastSaid).filter(([name]) => c.channels.has(name))),
             actTokens: c.actTokens, actLast: c.actLast, camReports: c.camReports || 0
-        })), pm: [...pm].filter(([key, p]) => p.state === 'open' && key.split('|').every((dev) => devs.has(dev)))
-            .map(([key, p]) => ({ key, from: p.from, state: 'open' })) };
+        })), receipts: [...receipts.values()].map((r) => ({ ...r, recipients: r.recipients.filter((id) => conns.get(id)?.nick) }))
+            .filter((r) => r.recipients.length), pm: [...pm].filter(([, p]) => p.state === 'open' && conns.has(p.fromId) && conns.has(p.toId))
+            .map(([key, p]) => ({ key, from: p.from, fromId: p.fromId, toId: p.toId, state: 'open' })),
+        pendingPm: [...pm].filter(([, p]) => p.state === 'pending' && conns.has(p.fromId) && conns.has(p.toId))
+            .map(([key, p]) => ({ key, from: p.from, fromId: p.fromId, toId: p.toId, at: p.at, hadFirst: !!p.first || !!p.lostFirst })) };
     }
     function restoreSessions(saved, liveIdentities = []) {
         const rejected = [], resumed = [];
@@ -637,7 +663,8 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
                 || new Set(saved.connections.map((s) => lc(s.nick))).size !== saved.connections.length
                 || !Array.isArray(saved.pm) || saved.pm.length > SESSION_PM_PAIRS || saved.pm.some((p) => !obj(p) || p.state !== 'open' || typeof p.key !== 'string'
                     || p.key.split('|').length !== 2 || !p.key.split('|').every(moderationIdentity) || pairKey(...p.key.split('|')) !== p.key
-                    || !moderationIdentity(p.from) || !p.key.split('|').includes(p.from))) return rejectAll('session-invalid');
+                    || !moderationIdentity(p.from) || (p.fromId === undefined && p.toId === undefined ? !p.key.split('|').includes(p.from)
+                        : !moderationIdentity(p.fromId) || !moderationIdentity(p.toId) || p.fromId === p.toId || pairKey(p.fromId, p.toId) !== p.key))) return rejectAll('session-invalid');
         } catch { return rejectAll('session-invalid'); }
         const records = new Map(saved.connections.map((s) => [s.id, s]));
         for (const identity of liveIdentities) {
@@ -661,8 +688,12 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             for (const name of c.channels) { const room = ch(name); room.members.add(c.id); room.emptySince = null; }
             resumed.push(c.id);
         }
-        const liveDevs = new Set([...conns.values()].map((c) => c.dev));
-        for (const p of saved.pm) if (p.key.split('|').every((dev) => liveDevs.has(dev))) pm.set(p.key, { state: 'open', from: p.from });
+        for (const p of saved.pm) {
+            const from = conns.get(p.fromId), to = conns.get(p.toId);
+            if (from && to && from.dev === p.from && !from.blocks.has(to.dev) && !to.blocks.has(from.dev)) pm.set(p.key, { state: 'open', from: p.from, fromId: p.fromId, toId: p.toId });
+        }
+        restorePendingPm(saved.pendingPm, records);
+        restoreReceipts(saved.receipts);
         for (const id of resumed) {
             const c = conns.get(id), s = records.get(id);
             for (const name of s.cams) if (!c.cams.has(name)) out(c, { t: 'cam', ch: name, on: false, by: BOT });
@@ -712,11 +743,11 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         const before = JSON.stringify(roomSnapshot());
         const rateBefore = JSON.stringify(abuseSnapshot());
         const sessionsBefore = JSON.stringify(sessionSnapshot());
-        outputBatch = []; closeBatch = [];
+        outputBatch = []; closeBatch = []; evidenceWrites = [];
         let result;
-        try { result = fn(...args); } catch (error) { outputBatch = null; closeBatch = null; throw error; }
-        const frames = outputBatch; const closing = closeBatch; outputBatch = null; closeBatch = null;
-        const writes = [];
+        try { result = fn(...args); } catch (error) { outputBatch = null; closeBatch = null; evidenceWrites = null; throw error; }
+        const frames = outputBatch; const closing = closeBatch; const writes = evidenceWrites;
+        outputBatch = null; closeBatch = null; evidenceWrites = null;
         const after = roomSnapshot();
         if (!roomsBroken && JSON.stringify(after) !== before) writes.push(persist('rooms', after));
         const abuse = abuseSnapshot();
@@ -732,12 +763,37 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             for (const args of closing) try { close(...args); } catch { /* already gone */ }
             return result;
         };
-        if (writes.some((w) => w && typeof w.then === 'function')) return Promise.all(writes).then(flush).catch(() => {
-            net.lock = 'readonly'; net.lockAuto = true; roomsBroken = true;
-            for (const c of conns.values()) out(c, { t: 'net', lock: 'readonly', shield: net.shield });
-            for (const c of conns.values()) bot(c, 'Storage is unavailable. Changes are not confirmed; reconnect after administrator recovery.', 'error');
-        });
+        if (writes.some((w) => w && typeof w.then === 'function')) {
+            pendingCommits += 1;
+            const finished = () => { pendingCommits -= 1; if (!pendingCommits && deferredAdmin) { deferredAdmin = false; pushAdmin(); } };
+            return Promise.all(writes).then(() => { finished(); return flush(); }).catch(() => {
+                finished(); storageUnavailable();
+                // A failed ban/kick commit may already have removed an endpoint
+                // from engine memory. End its actual socket with a service error
+                // rather than leaving an admitted connection that can never act.
+                for (const [id] of closing) {
+                    try { send(id, { t: 'notice', from: BOT, kind: 'error', text: 'Storage is unavailable. Changes are not confirmed; reconnect after administrator recovery.', ts: now() }); } catch { /* gone */ }
+                    try { close(id, 1011, 'storage unavailable'); } catch { /* gone */ }
+                }
+            });
+        }
         return flush();
+    }
+
+    function storageUnavailable() {
+        net.lock = 'readonly'; net.lockAuto = true; roomsBroken = true;
+        for (const c of conns.values()) {
+            out(c, { t: 'net', lock: 'readonly', shield: net.shield });
+            // A failed write discards buffered success frames, including camera
+            // revocation frames. Stop captures explicitly even if state changed.
+            for (const name of c.channels) {
+                const room = ch(name);
+                if (room && room.kind !== 'chat' && room.kind !== 'lobby') out(c, { t: 'cam', ch: name, on: false, by: BOT });
+            }
+            c.cams.clear();
+            bot(c, 'Storage is unavailable. Changes are not confirmed; reconnect after administrator recovery.', 'error');
+        }
+        pushAdmin();
     }
 
     const handlers = {
@@ -810,6 +866,13 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             const old = c.nick;
             c.nick = v.nick;
             c.lastNick = now();
+            for (const p of pm.values()) if (p.state === 'pending' && p.fromId === c.id) {
+                const recipient = conns.get(p.toId);
+                if (recipient) {
+                    out(recipient, { t: 'pm-request-ended', from: old });
+                    out(recipient, { t: 'pm-request', from: c.nick, band: isBand(c) });
+                }
+            }
             out(c, { t: 'welcome', nick: c.nick, role: c.role, band: isBand(c), moderator: c.role === 'moderator', verified: !!c.account, capabilities: capabilities(c) });
             for (const name of c.channels) { const chn = ch(name); event(chn, `${old} is now known as ${c.nick}`); sendChan(chn); }
             return pushAdmin();
@@ -828,19 +891,31 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         query(c, _chan, [to]) { return privmsg(c, to, ''); },
         accept(c, _chan, [n]) {
             const t = target(c, n); if (!t) return undefined;
-            const k = pairKey(c.dev, t.dev);
+            const k = pairKey(c.id, t.id);
             const p = pm.get(k);
-            if (!p || p.state !== 'pending' || p.from !== t.dev) return bot(c, `No PM request from ${t.nick}.`, 'error');
+            if (!p || p.state !== 'pending' || p.from !== t.dev || p.fromId !== t.id || p.toId !== c.id) return bot(c, `No PM request from ${t.nick}.`, 'error');
+            if (now() - p.at >= PM_PENDING_TTL || !pendingPmAllowed(t, c)) {
+                endPendingPm(k, p, 'The PM request expired or is no longer allowed.');
+                return bot(c, 'This PM request expired or is no longer allowed. Ask for a new request if you want to chat.', 'error');
+            }
             if ([...pm.values()].filter((item) => item.state === 'open').length >= SESSION_PM_PAIRS) return bot(c, 'Private conversation allowance is full. Try again later.', 'error');
             p.state = 'open';
             out(c, { t: 'pm-open', with: t.nick });
             out(t, { t: 'pm-open', with: c.nick });
             if (p.first) deliverPm(t, c, p.first);
+            if (p.lostFirst) {
+                bot(t, `Your PM with ${c.nick} is open. Your undelivered first message was not retained during a server restart. Please send it again.`);
+                bot(c, `Your PM with ${t.nick} is open. Their undelivered first message was not retained during a server restart; ask them to resend it.`);
+                p.lostFirst = false;
+            }
+            p.first = '';
             return undefined;
         },
         decline(c, _chan, [n]) {
             const t = byNick(n); if (!t) return bot(c, 'Request cleared.');
-            pm.delete(pairKey(c.dev, t.dev));
+            const p = pm.get(pairKey(c.id, t.id));
+            if (p?.state === 'pending' && (p.toId !== c.id || p.fromId !== t.id)) return bot(c, 'That PM request belongs to a different connection.', 'error');
+            pm.delete(pairKey(c.id, t.id));
             out(t, { t: 'notice', from: BOT, text: `${c.nick} said no thanks to a PM.`, kind: 'info', ts: now() });
             return bot(c, `Declined ${t.nick}.`);
         },
@@ -848,13 +923,17 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             const t = target(c, n); if (!t) return undefined;
             if ((!c.blocks.has(t.dev) && c.blocks.size >= SESSION_PREFERENCES) || (!c.ignores.has(lc(t.nick)) && c.ignores.size >= SESSION_PREFERENCES)) return bot(c, 'Your block or ignore list is full (50 each). Remove an entry before adding another.', 'error');
             c.blocks.add(t.dev); c.ignores.add(lc(t.nick));
-            pm.delete(pairKey(c.dev, t.dev));
+            for (const [key, pending] of pm) if ((pending.fromId === c.id && conns.get(pending.toId)?.dev === t.dev)
+                || (pending.toId === c.id && conns.get(pending.fromId)?.dev === t.dev)) {
+                if (pending.state === 'pending') endPendingPm(key, pending, 'The conversation was blocked.');
+                else pm.delete(key);
+            }
             out(t, { t: 'pm-closed', with: c.nick });
             out(c, { t: 'pm-closed', with: t.nick });
             return bot(c, `Blocked ${t.nick}. They can't PM you and you won't see them.`);
         },
         unblock(c, _chan, [n]) { const t = byNick(n); if (t) { c.blocks.delete(t.dev); c.ignores.delete(lc(t.nick)); } return bot(c, `Unblocked ${String(n || '').slice(0, 20)}.`); },
-        pm(c, _chan, [v]) { c.pmOff = lc(v) === 'off'; if (c.pmOff) for (const [k, p] of pm) if (k.split('|').includes(c.dev) && p.state === 'pending') pm.delete(k); return out(c, { t: 'pm-setting', off: c.pmOff, text: c.pmOff ? 'PMs are off. Nobody can send you requests.' : 'PMs are on (accept-first).' }); },
+        pm(c, _chan, [v]) { c.pmOff = lc(v) === 'off'; if (c.pmOff) for (const [k, p] of pm) if ((p.fromId === c.id || p.toId === c.id) && p.state === 'pending') endPendingPm(k, p, 'PM requests were turned off.'); return out(c, { t: 'pm-setting', off: c.pmOff, text: c.pmOff ? 'PMs are off. Nobody can send you requests.' : 'PMs are on (accept-first).' }); },
         whois(c, _chan, [n]) {
             const t = target(c, n); if (!t) return undefined;
             const mins = Math.round((now() - t.since) / MIN);
@@ -1033,13 +1112,17 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             const t = byNick(what);
             if (t && isStaff(t) && !isBand(c)) return bot(c, 'Staff actions require a band administrator.', 'error');
             const window = /^\d+[smh]$/.test(what || '') ? parseDuration(what, 5 * MIN) : 0;
-            const ids = [...lines.values()].filter((l) => (t ? lineMeta.get(l.id)?.authorDev === t.dev : window ? l.ts >= now() - window : false)).map((l) => l.id);
+            const ids = [...new Set([...lines.keys(), ...receipts.keys()])].filter((id) => {
+                const line = lines.get(id) || receipts.get(id);
+                const author = lineMeta.get(id)?.authorDev || receipts.get(id)?.authorDev;
+                return t ? author === t.dev : window ? line.ts >= now() - window : false;
+            });
             if (!ids.length) return bot(c, 'Nothing to purge.', 'error');
             deleteIds(ids);
             return log(c.nick, 'purge', t ? t.nick : what, `${ids.length} lines`, chan.name);
         },
         delete(c, chan, [id]) {
-            if (!lines.has(id) && !held.has(id) && !aiReviews.has(id) && !reports.has(id)) return bot(c, 'No such message.', 'error');
+            if (!lines.has(id) && !receipts.has(id) && !held.has(id) && !aiReviews.has(id) && !reports.has(id)) return bot(c, 'No such message.', 'error');
             if (held.delete(id)) { heldChannels.delete(id); saveModerationQueue(); }
             deleteIds([id]);
             return log(c.nick, 'delete', id, '', chan.name);
@@ -1303,36 +1386,115 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     function rememberLine(line, meta) {
         lines.set(line.id, line); lineMeta.set(line.id, meta);
         while (lines.size > 1000) { const oldest = lines.keys().next().value; lines.delete(oldest); lineMeta.delete(oldest); aiPending.delete(oldest); }
+        receipts.set(line.id, messageReceipt(line, meta));
+        pruneReceipts();
+    }
+
+    function pruneReceipts() {
+        for (const [id, r] of receipts) {
+            r.recipients = r.recipients.filter((recipient) => conns.get(recipient)?.nick);
+            if (!r.recipients.length || now() - r.ts >= DAY) receipts.delete(id);
+        }
+        while (receipts.size > RECEIPT_MAX) receipts.delete(receipts.keys().next().value);
+        // A popular lobby can have many delivery witnesses per line. Cap serialized
+        // metadata as well as record count so it cannot exhaust the session record.
+        let size = encoder.encode(JSON.stringify([...receipts.values()])).byteLength;
+        while (size > RECEIPT_STATE_BYTES && receipts.size) {
+            const id = receipts.keys().next().value;
+            size -= encoder.encode(JSON.stringify(receipts.get(id))).byteLength + 1;
+            receipts.delete(id);
+        }
+    }
+
+    function restoreReceipts(stored) {
+        receipts.clear();
+        // Old session records have no receipts. Invalid evidence never grants a
+        // report, and need not destroy otherwise valid live chat sessions.
+        if (!Array.isArray(stored) || stored.length > RECEIPT_MAX
+            || encoder.encode(JSON.stringify(stored)).byteLength > RECEIPT_STATE_BYTES) return;
+        for (const r of stored) {
+            if (!r || typeof r !== 'object' || Array.isArray(r) || !moderationId(r.id)
+                || !['line', 'pm'].includes(r.t) || !moderationChannel(r.ch) || !moderationNick(r.from)
+                || !moderationIdentity(r.authorDev) || !/^[a-f0-9]{64}$/.test(r.digest)
+                || !moderationTime(r.ts) || typeof r.prefix !== 'string' || !['', '@', '+'].includes(r.prefix)
+                || ['band', 'moderator', 'me'].some((key) => typeof r[key] !== 'boolean')
+                || typeof r.to !== 'string' || (r.t === 'pm' ? !moderationNick(r.to) || r.ch !== `pm:${r.from}>${r.to}` || !r.id.startsWith('p') : !!r.to || !r.ch.startsWith('#') || !r.id.startsWith('m'))
+                || !Array.isArray(r.recipients) || !r.recipients.length || r.recipients.length > SESSION_CONNECTIONS
+                || r.recipients.some((id) => !moderationIdentity(id)) || new Set(r.recipients).size !== r.recipients.length) continue;
+            const eligible = r.recipients.filter((id) => conns.has(id));
+            if (eligible.length) receipts.set(r.id, { t: r.t, id: r.id, ch: r.ch, from: r.from, to: r.to,
+                prefix: r.prefix, band: r.band, moderator: r.moderator, me: r.me, ts: r.ts,
+                authorDev: r.authorDev, digest: r.digest, recipients: eligible });
+        }
     }
 
     function deleteIds(ids) {
         const set = new Set(ids);
         for (const chan of channels.values()) chan.moderationContext = chan.moderationContext.filter((h) => !set.has(h.id));
         let aiChanged = false;
-        for (const id of ids) { lines.delete(id); lineMeta.delete(id); aiPending.delete(id); if (aiReviews.delete(id)) aiChanged = true; }
+        for (const id of ids) { lines.delete(id); lineMeta.delete(id); receipts.delete(id); aiPending.delete(id); if (aiReviews.delete(id)) aiChanged = true; }
         if (aiChanged) saveAiReviews();
         for (const x of conns.values()) if (x.nick) out(x, { t: 'delete', ids });
         pushAdmin();
     }
 
+    function pendingPmAllowed(from, to) {
+        return !!from && !!to && !!from.nick && !!to.nick && !to.pmOff
+            && !from.blocks.has(to.dev) && !to.blocks.has(from.dev)
+            && !from.ignores.has(lc(to.nick)) && !to.ignores.has(lc(from.nick));
+    }
+    function endPendingPm(key, pending, reason) {
+        pm.delete(key);
+        const from = conns.get(pending.fromId), to = conns.get(pending.toId);
+        if (to && from) out(to, { t: 'pm-request-ended', from: from.nick, reason });
+        if (from) bot(from, `PM request${to ? ` to ${to.nick}` : ''} cleared. ${reason}`);
+    }
+    function prunePendingPm() {
+        for (const [key, p] of pm) if (p.state === 'pending' && (now() - p.at >= PM_PENDING_TTL
+            || !pendingPmAllowed(conns.get(p.fromId), conns.get(p.toId)))) endPendingPm(key, p, 'The request expired or is no longer allowed.');
+    }
+    function restorePendingPm(stored, records) {
+        if (!Array.isArray(stored) || stored.length > SESSION_PM_PENDING) return;
+        const perSender = new Map();
+        for (const p of stored) {
+            if (!p || typeof p !== 'object' || Array.isArray(p) || !moderationIdentity(p.from)
+                || !moderationIdentity(p.fromId) || !moderationIdentity(p.toId) || p.fromId === p.toId
+                || typeof p.key !== 'string' || !Number.isFinite(p.at) || p.at < 0 || p.at > now() || typeof p.hadFirst !== 'boolean') continue;
+            const from = conns.get(p.fromId), to = conns.get(p.toId);
+            if (!from || !to) {
+                const original = records.get(p.fromId);
+                if (to && original?.dev === p.from && pairKey(p.fromId, p.toId) === p.key) out(to, { t: 'pm-request-ended', from: original.nick, reason: 'The other visitor disconnected.' });
+                continue;
+            }
+            if (from.dev !== p.from || pairKey(from.id, to.id) !== p.key || pm.has(p.key)) continue;
+            const entry = { state: 'pending', from: p.from, fromId: p.fromId, toId: p.toId, at: p.at, first: '', lostFirst: p.hadFirst };
+            if (now() - p.at >= PM_PENDING_TTL || !pendingPmAllowed(from, to) || (perSender.get(p.from) || 0) >= L.pmPendingMax) {
+                endPendingPm(p.key, entry, 'The request expired or is no longer allowed.'); continue;
+            }
+            pm.set(p.key, entry); perSender.set(p.from, (perSender.get(p.from) || 0) + 1);
+        }
+    }
+
     function privmsg(c, to, rawText) {
+        prunePendingPm();
         const t = byNick(to);
         if (!t || t === c) return bot(c, `No such nick: ${String(to || '').slice(0, 20)}`, 'error');
         if (lc(to) === lc(BOT)) return handlers.help(c);
-        const k = pairKey(c.dev, t.dev);
+        const k = pairKey(c.id, t.id);
         const p = pm.get(k);
         if (!isBand(c) && (net.lock === 'readonly' || budgetLevel() !== 'ok')) return bot(c, 'The lobby is read-only right now, PMs too.', 'error');
         if (p && p.state === 'open') {
             if (!rawText) return out(c, { t: 'pm-open', with: t.nick });
             return deliverPm(c, t, rawText);
         }
-        if (t.pmOff || t.blocks.has(c.dev) || c.blocks.has(t.dev)) return bot(c, `${t.nick} isn't taking PMs.`, 'error');
+        if (!pendingPmAllowed(c, t)) return bot(c, `${t.nick} isn't taking PMs.`, 'error');
+        if ([...pm.values()].filter((x) => x.state === 'pending').length >= SESSION_PM_PENDING) return bot(c, 'Private request allowance is full. Try again later.', 'error');
+        const pending = [...pm.values()].filter((x) => x.from === c.dev && x.state === 'pending').length;
+        if (pending >= L.pmPendingMax) return bot(c, 'Too many PM requests waiting. Give people a minute.', 'error');
         if (!isBand(c)) {
             if (net.shield) return bot(c, 'Shield is on: new PM requests are paused.', 'error');
             if (Math.max(net.mutes[c.dev] || 0, net.mutes[c.account] || 0) > now()) return bot(c, 'You’re muted for now.', 'error');
             if (now() - c.since < L.pmMinLobbyMs) return bot(c, `Hang in the lobby for ${Math.ceil(L.pmMinLobbyMs / MIN)} minutes before sending PM requests.`, 'error');
-            const pending = [...pm.values()].filter((x) => x.from === c.dev && x.state === 'pending').length;
-            if (pending >= L.pmPendingMax) return bot(c, 'Too many PM requests waiting. Give people a minute.', 'error');
         }
         if (!limited(c, 'pm-request', 3, 3 / 60)) return;
         let first = '';
@@ -1342,7 +1504,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             first = v.text;
         }
         if (p && p.state === 'pending') return bot(c, `Still waiting for ${t.nick} to accept.`);
-        pm.set(k, { state: 'pending', from: c.dev, first, at: now() });
+        pm.set(k, { state: 'pending', from: c.dev, fromId: c.id, toId: t.id, first, at: now() });
         out(t, { t: 'pm-request', from: c.nick, band: isBand(c) });
         return bot(c, `PM request sent to ${t.nick}. It opens if they accept.`);
     }
@@ -1364,11 +1526,19 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         return undefined;
     }
 
-    function report(c, id) {
+    function report(c, id, text) {
         if (!limited(c, 'report', 5, 5 / 60)) return;
-        const l = lines.get(id);
+        let l = lines.get(id);
+        let meta = lineMeta.get(id);
+        if (!l) {
+            const receipt = receipts.get(id);
+            if (receipt && now() - receipt.ts < DAY && typeof text === 'string' && moderationText(text, L.maxChars)
+                && receipt.digest === receiptDigest(receipt, receipt.authorDev, text)) {
+                l = { ...receipt, text };
+                meta = { authorDev: receipt.authorDev, recipients: new Set(receipt.recipients) };
+            }
+        }
         if (!l) return bot(c, 'That message is gone already.', 'error');
-        const meta = lineMeta.get(id);
         if (!meta || !meta.recipients.has(c.id)) return bot(c, 'You can only report a message delivered to this connection.', 'error');
         if (meta.authorDev === c.dev) return bot(c, 'You can’t report yourself.', 'error');
         let r = reports.get(id);
@@ -1382,7 +1552,13 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             while (reports.size > MODERATION_QUEUE_MAX) reports.delete(reports.keys().next().value);
         }
         // Spoof-proof: one vote per signed device AND per daily IP hash.
-        if (r.devs.has(c.dev) || r.iphs.has(c.iph)) return bot(c, 'Already reported. Thanks.');
+        if (r.devs.has(c.dev) || r.iphs.has(c.iph)) {
+            // A previous write may have failed after updating memory. A retry is
+            // acknowledged only after storing the evidence again, without a vote.
+            saveModerationQueue();
+            out(c, { t: 'report-status', id, submitted: true });
+            return bot(c, 'Already reported. Thanks.');
+        }
         r.devs.add(c.dev); r.iphs.add(c.iph);
         net.stats.reports.made += 1;
         const offenders = [...conns.values()].filter((person) => person.dev === r.authorDev);
@@ -1399,6 +1575,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         }
         saveModerationQueue();
         pushAdmin();
+        out(c, { t: 'report-status', id, submitted: true });
         return bot(c, 'Reported to the moderators. Thanks for looking out.');
     }
 
@@ -1443,6 +1620,8 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         // moderation actions, budgets or invalid saved state change admission.
         pruneAiReviews();
         pruneModerationQueue();
+        pruneReceipts();
+        prunePendingPm();
     }
 
     function snapshot() {

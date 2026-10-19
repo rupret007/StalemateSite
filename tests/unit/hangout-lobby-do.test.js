@@ -63,7 +63,7 @@ describe('HangoutLobby AI review integration', () => {
         const state = stateWith();
         const originalPut = state.storage.put;
         state.storage.put = async (key, value) => {
-            if (key === 'ai-reviews' || key === 'moderation-queue') throw new Error('fixture write failed');
+            if (key === 'ai-reviews') throw new Error('fixture write failed');
             return originalPut(key, value);
         };
         const lobby = new HangoutLobby(state, {});
