@@ -56,12 +56,8 @@ Configuration is prepared but has not been activated or deployed:
 
 Automated tests mock the provider and prove transport, permissions, routing, persistence, limits and failure behavior. They do not establish live model accuracy. Evaluate real classification separately with consented/synthetic cases, including ordinary profanity, quoted lyrics, reclaimed language, jokes, obfuscated harassment and false reports. Record false positives and misses before considering automatic AI interventions.
 
-## Next safeguards before a public launch
+## Community follow-up
 
-1. Give trusted non-band volunteers a distinct authenticated site-moderator role, without owner/configuration power or a BAND badge. Guest room hosts keep their room-only role.
-2. Set a realistic human response process, appeal/contact route and evidence-retention policy. AI flags cannot substitute for people reviewing the queue.
-3. Add rate limits for commands, reports and PM delivery in addition to ordinary message limits; test coordinated report abuse. Distinct device/IP reports help but do not prove independent humans.
-4. Prune durable action-log records explicitly. The old engine's in-memory/readback cap does not bound all stored `log:*` rows.
-5. Preserve room/host state across hibernation and make co-host handoff easier. Revisit the ten-minute creation allowance so a chat host can move a willing group into a creative activity.
+The moderator-role, rate-limit, action-log-pruning and room-continuity work is now implemented locally. See [Community improvements](HANGOUT_COMMUNITY_IMPROVEMENTS.md) for exact permissions, persistent email-backed rooms, limits, migration and staging requirements. Guest room creation remains immediate; permanent registration is optional.
 
-Creative AI remains later work: an explicitly invoked idea helper, collaborative writing prompts or help developing a shared artifact. It should never fabricate community members or quietly turn ephemeral conversations into training material or public summaries.
+Remaining public-launch work includes a real human response/appeal contact, live Access and email configuration, staging load/restart validation, and backup retention review. Creative AI remains later work: an explicitly invoked idea helper, collaborative writing prompts or help developing a shared artifact. It should never fabricate community members or quietly turn ephemeral conversations into public summaries.

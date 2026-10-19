@@ -6,6 +6,8 @@
     const $$ = (s, el = document) => [...el.querySelectorAll(s)];
     const Discovery = window.HangoutDiscovery;
     const params = new URLSearchParams(location.search);
+    let ownerSession = params.get('owner') === '1' || sessionStorage.getItem('hangout-owner') === '1';
+    if (ownerSession) sessionStorage.setItem('hangout-owner', '1');
     const isLocal = /^(127\.0\.0\.1|localhost)$/.test(location.hostname);
     // Read the preview key once, then drop the query from the address bar (keeps it out of history,
     // screenshots and page analytics).
@@ -127,15 +129,15 @@
         const attempt = ++connectionAttempt;
         clearTimeout(retryTimer);
         setConnection(app.me ? 'reconnecting' : 'connecting');
-        const tsToken = await loadTurnstile();
+        const tsToken = ownerSession ? '' : await loadTurnstile();
         if (attempt !== connectionAttempt) return;
-        if (siteKey && !tsToken) { setConnection('offline'); return gateStatus('The guest check couldn’t finish. Please try again.'); }
+        if (!ownerSession && siteKey && !tsToken) { setConnection('offline'); return gateStatus('The guest check couldn’t finish. Please try again.'); }
         const q = new URLSearchParams({ preview: previewKey });
         const dev = localStorage.getItem('hangout-dev');
         if (dev) q.set('dev', dev);
         if (tsToken) q.set('ts', tsToken);
         if (app.ws) { app.ws.onclose = null; app.ws.onmessage = null; app.ws.close(1000); }
-        const ws = new WebSocket(`${relayBase}/lobby?${q}`);
+        const ws = new WebSocket(`${relayBase}/${ownerSession ? 'lobby-owner' : 'lobby'}?${q}`);
         app.ws = ws;
         let opened = false;
         let sessionNick = nick;
@@ -151,6 +153,7 @@
             if (attempt !== connectionAttempt) return;
             setConnection('offline');
             if (roomApi) roomApi.onLeave();
+            if (ownerSession && (!opened || e.code === 4401)) { $('[data-gate-guest]').hidden = false; return gateStatus('Email sign-in is unavailable or expired. Sign in again to manage your rooms, or continue as a guest.'); }
             if (!opened) return gateStatus('Couldn’t get in. Maybe it’s full, locked, or you got the boot. Try again in a bit.');
             if ([4001, 4003, 4503, 4403].includes(e.code) || app.kicked || e.code === 1000) return;
             line(app.active, { event: true, text: '* Disconnected. Reconnecting…' });
@@ -168,9 +171,15 @@
 
     function handle(m, nick) {
         switch (m.t) {
+        case 'rate-limit':
+            if (connectionState !== 'connected') { setConnection('offline'); gateStatus(m.text); app.ws?.close(1000); }
+            else toast(m.text);
+            break;
+        case 'ownership': { const c = store(m.ch); if (c) c.cohosts = m.cohosts; break; }
+        case 'owner-offer': toast(`${m.by} offered you ownership of ${m.ch}`, [['Accept ownership', () => { if (confirm(`Accept ownership of ${m.ch}?`)) cmd('acceptowner', [], m.ch); }]]); break;
         case 'device': localStorage.setItem('hangout-dev', m.token); break;
         case 'hello':
-            app.role = m.role; app.netLock = m.lock; app.budget = m.budget;
+            app.role = m.role; app.verified = m.verified === true; app.capabilities = m.capabilities || {}; $('[data-owner-signout]').hidden = !ownerSession; app.netLock = m.lock; app.budget = m.budget;
             if (app.me) {
                 app.resetSession = true; setConnection('reconnecting');
                 drafts.set(app.active, $('[data-text]').value);
@@ -186,11 +195,15 @@
         case 'welcome': {
             const wasIn = !!app.me;
             if (!wasIn) count('lobby-join');
+            app.verified = m.verified === true; app.capabilities = m.capabilities || app.capabilities;
+            $('[data-room-filter] option[value=mine]').disabled = !app.verified;
             app.me = m.nick; app.band = m.band; localStorage.setItem('hangout-nick', m.nick);
             app.kicked = false; retry = 0; setConnection('connected');
+            const returnRoom = sessionStorage.getItem('hangout-return-room');
+            if (returnRoom && app.verified) { sessionStorage.removeItem('hangout-return-room'); cmd('join', [returnRoom]); }
             if (app.restorePmOff) { cmd('pm', ['off']); app.restorePmOff = false; }
             $('[data-gate]').hidden = true; $('[data-app]').hidden = false;
-            if (wasIn && app.resetSession) toast('Connected. Your drafts are kept in this tab; choose a room to rejoin.');
+            if (wasIn && app.resetSession) toast('Connected. Room ownership and settings are kept; chat starts fresh. Choose a room to rejoin. Cameras stay off.');
             else if (wasIn) line(app.active, { event: true, text: `* You are now ${m.nick}` });
             app.resetSession = false;
             document.body.classList.toggle('is-band', !!m.band);
@@ -306,6 +319,7 @@
             who.textContent = l.me ? `* ${l.prefix || ''}${l.from}` : `<${l.prefix || ''}${l.from}>`;
             who.addEventListener('click', () => nickSheet(l.from));
             li.append(who);
+            if (l.moderator) { const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = 'MOD'; li.append(' ', badge); }
             if (l.band) { const s = document.createElement('span'); s.className = 'badge'; s.textContent = '⭐ BAND'; li.append(' ', s); }
             li.append(' ', l.text);
             if (l.from !== app.me && l.id) {
@@ -403,7 +417,7 @@
         if (room) {
             const m = c.modes;
             const hosts = c.names.filter((n) => n.prefix === '@').map((n) => n.nick);
-            $('[data-host-status]').textContent = amOp(c) ? 'You have @ host controls · /op nick adds a co-host' : hosts.length ? `Hosts: ${hosts.map((nick) => `@${nick}`).join(', ')}` : 'No room host online. An existing host can return, or a site moderator can help.';
+            $('[data-host-status]').textContent = (c.persistent ? `Registered · expires ${new Date(c.expiresAt).toLocaleDateString()} · ` : 'Temporary · ') + (amOp(c) ? 'You have @ host controls · /op nick adds a co-host' : hosts.length ? `Hosts: ${hosts.map((nick) => `@${nick}`).join(', ')}` : 'No room host online. An existing host can return, or a site moderator can help.');
             $('[data-modes]').textContent = `${KIND_NAME[c.kind]} · +t${m.m ? 'm' : ''}${m.i ? 'i' : ''}${m.k ? 'k' : ''}${m.C ? 'C' : ''}${m.Q ? 'Q' : ''}${m.S ? ` slow ${m.S}s` : ''}${m.locked ? ' 🔒' : ''} · ${c.count}/${m.l}`;
             const cam = $('[data-cam]');
             cam.hidden = c.kind === 'chat';
@@ -427,7 +441,7 @@
             const li = document.createElement('li');
             const b = document.createElement('button');
             b.type = 'button'; b.className = 'nick'; b.style.color = colorOf(n.nick);
-            b.textContent = `${n.prefix}${n.nick}${n.band ? ' ⭐' : ''}${n.cam ? ' 📷' : ''}${n.away ? ' 💤' : ''}`;
+            b.textContent = `${n.prefix}${n.nick}${n.band ? ' ⭐' : n.moderator ? ' MOD' : ''}${n.cam ? ' 📷' : ''}${n.away ? ' 💤' : ''}`;
             b.addEventListener('click', () => nickSheet(n.nick));
             li.append(b); ul.append(li);
         });
@@ -436,7 +450,11 @@
     function drawRooms() {
         const ul = $('[data-roomlist]');
         ul.replaceChildren();
-        const rooms = Discovery.describeRooms(app.rooms, [...app.chans.keys()]);
+        const query = $('[data-room-search]').value.trim().toLowerCase();
+        const filter = $('[data-room-filter]').value;
+        const rooms = Discovery.describeRooms(app.rooms.filter((r) =>
+            (filter === 'mine' ? r.mine : filter === 'registered' ? r.persistent : r.count > 0 || !r.persistent)
+            && (!query || `${r.name} ${r.title}`.toLowerCase().includes(query))), [...app.chans.keys()]);
         $('[data-room-count]').textContent = String(rooms.length);
         $('[data-rooms-empty]').hidden = rooms.length > 0;
         for (const r of rooms) {
@@ -447,7 +465,7 @@
             b.dataset.state = r.state;
             b.disabled = !r.canJoin || connectionState !== 'connected';
             const t = document.createElement('b'); t.textContent = `${KIND_ICON[r.kind]} ${r.title}`;
-            const s = document.createElement('span'); s.textContent = `${r.name} · ${r.count}/${r.max} here`;
+            const s = document.createElement('span'); s.textContent = `${r.name} · ${r.count}/${r.max} here · ${r.persistent ? 'Registered' : 'Temporary'} · ${r.hostPresent ? 'Host here' : 'Host away'}`;
             const action = document.createElement('span'); action.className = 'room-action'; action.textContent = `${r.statusLabel} · ${r.actionLabel}`;
             b.append(t, s, action);
             b.addEventListener('click', () => {
@@ -459,6 +477,14 @@
         }
     }
 
+    $('[data-room-filter]').addEventListener('change', drawRooms);
+    $('[data-room-search]').addEventListener('input', drawRooms);
+    $('[data-owner-signin]').href = relayBase ? `${relayBase.replace(/^ws/, 'http')}/lobby-owner/login` : '#';
+    $('[data-gate-guest]').hidden = !ownerSession;
+    $('[data-gate-guest]').addEventListener('click', () => { ownerSession = false; sessionStorage.removeItem('hangout-owner'); $('[data-gate-guest]').hidden = true; connect(app.me || nickInput.value); });
+    $('[data-owner-signout]').addEventListener('click', () => {
+        ownerSession = false; sessionStorage.removeItem('hangout-owner'); connect(app.me || nickInput.value);
+    });
     function drawCommunity() {
         const lobby = app.chans.get('#stalemate');
         const summary = Discovery.summarizeLobby(lobby, app.me);
@@ -570,20 +596,32 @@
         ['/slap', 'slap', 'nick'], ['/help', 'help'], ['/quit', 'quit']
     ];
     const OP_PALETTE = [['/mode +m', 'mode', null, ['+m']], ['/mode -m', 'mode', null, ['-m']], ['/mode +i', 'mode', null, ['+i']], ['/mode -i', 'mode', null, ['-i']], ['Slow 10s', 'mode', null, ['+S', '10']], ['Slow off', 'mode', null, ['-S']],
-        ['Cams off', 'mode', null, ['-C']], ['Cams allowed', 'mode', null, ['+C']], ['/topic …', 'topic', 'new topic'], ['🔒 Lock', 'lock'], ['🔓 Unlock', 'lock', null, ['off']], ['Close room', 'close']];
+        ['Cams off', 'mode', null, ['-C']], ['Cams allowed', 'mode', null, ['+C']], ['/topic …', 'topic', 'new topic'], ['🔒 Lock', 'lock'], ['🔓 Unlock', 'lock', null, ['off']], ['Add guest co-host', 'op', 'nickname'], ['Remove guest co-host', 'deop', 'nickname'], ['Keep this room', 'register'], ['Add verified co-host', 'cohost', 'add nickname'], ['Remove verified co-host', 'cohost', 'remove nickname'], ['Transfer ownership', 'transfer', 'verified co-host nickname'], ['Delete registration', 'unregister'], ['Close room', 'close']];
     function openPalette(ops) {
         const box = $('[data-palette-buttons]');
+        const current = store(app.active);
+        const owner = current?.names?.find((n) => n.nick === app.me)?.owner;
         box.replaceChildren();
         for (const [label, name, ask, fixed] of (ops ? OP_PALETTE : PALETTE)) {
+            if (name === 'register' && current?.persistent) continue;
+            if (['cohost', 'transfer', 'unregister'].includes(name) && !owner) continue;
+            if (current?.persistent && ['op', 'deop', 'close'].includes(name) && !owner && !app.capabilities?.configure) continue;
             if (store(app.active)?.kind === 'chat' && name === 'mode' && ['+C', '-C'].includes(fixed?.[0])) continue;
             const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--small'; b.textContent = label;
             b.addEventListener('click', () => {
                 $('[data-palette]').close();
+                if (['deop', 'unregister', 'transfer', 'close'].includes(name) && !confirm(current?.persistent && ['close', 'unregister'].includes(name) ? `Permanently delete ${app.active} and release its registered name?` : `${label} in ${app.active}?`)) return;
+                if (name === 'register' && !app.verified) { sessionStorage.setItem('hangout-return-room', app.active); location.assign($('[data-owner-signin]').href); return; }
+                if (name === 'cohost') { const who = prompt(`${label}: nickname`); if (!who) return; if (label.startsWith('Remove') && !confirm(`Remove ${who} as co-host?`)) return; return cmd(name, [label.startsWith('Remove') ? 'remove' : 'add', who.trim()]); }
                 if (fixed) return cmd(name, fixed);
                 if (ask) { const v = prompt(`${label}: ${ask}`); if (v === null) return undefined; return cmd(name, v.trim() ? v.trim().split(' ') : []); }
                 return cmd(name, []);
             });
             box.append(b);
+        }
+        if (ops && owner) for (const host of current.cohosts || []) {
+            const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--small'; b.textContent = `Remove verified co-host: ${host.label}`;
+            b.addEventListener('click', () => { if (confirm(`Remove ${host.label} as a verified co-host?`)) { cmd('cohost', ['remove', host.id]); $('[data-palette]').close(); } }); box.append(b);
         }
         $('[data-palette]').showModal();
     }

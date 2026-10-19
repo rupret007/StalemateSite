@@ -115,7 +115,7 @@ describe('human moderation evidence and recipient authorization', () => {
 
     it('bounds both queues and expires evidence after 24 hours with a persisted deletion', () => {
         const sender = guest('Drummer', 'band'); const witness = guest('Witness'); const heldSender = guest('HeldGuest');
-        for (let i = 0; i < 105; i += 1) report(witness, say(sender, `report queue words ${i}`));
+        for (let i = 0; i < 105; i += 1) { clock += 12000; report(witness, say(sender, `report queue words ${i}`)); }
         for (let i = 0; i < 105; i += 1) say(heldSender, `you are such a loser ${i}`);
         expect(engine.adminState().reports).toHaveLength(100); expect(engine.adminState().held).toHaveLength(100);
         expect(saved().reports[0].text).toBe('report queue words 5');

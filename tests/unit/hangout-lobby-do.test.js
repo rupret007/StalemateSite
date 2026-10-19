@@ -7,6 +7,7 @@ import { AI_CATEGORIES } from '../../hangout-worker/src/ai-moderation.mjs';
 
 class Socket {
     frames = [];
+    close(code, reason) { this.closed = { code, reason }; }
     send(raw) { this.frames.push(JSON.parse(raw)); }
     serializeAttachment(value) { this.attachment = value; }
     deserializeAttachment() { return this.attachment; }
@@ -22,7 +23,9 @@ function stateWith(net = { lock: 'off' }) {
         storage: {
             get: async (key) => values.get(key),
             put: async (key, value) => values.set(key, value),
-            list: async () => new Map(),
+            list: async (options = {}) => new Map([...values].filter(([k]) => k.startsWith(options.prefix || '') && (!options.end || k < options.end)).sort(([a], [b]) => options.reverse ? b.localeCompare(a) : a.localeCompare(b)).slice(0, options.limit || Infinity)),
+            delete: async (keys) => { for (const k of Array.isArray(keys) ? keys : [keys]) values.delete(k); },
+            transaction: async (fn) => fn({ get: async (k) => values.get(k), put: async (k, v) => values.set(k, structuredClone(v)), delete: async (k) => values.delete(k) }),
             getAlarm: async () => 1,
             setAlarm: async () => {}
         },
@@ -132,7 +135,7 @@ describe('HangoutLobby WebSocket admission', () => {
         const server = pairs[0][1];
         expect(state.getWebSockets()).toEqual([server]);
         expect(server.frames.filter((frame) => frame.t === 'hello')).toEqual([
-            { t: 'hello', role: 'fan', lock: 'off', shield: false, budget: 'ok', needNick: true }
+            { t: 'hello', role: 'fan', lock: 'off', shield: false, budget: 'ok', needNick: true, verified: false, capabilities: { moderate: false, configure: false, register: false } }
         ]);
         expect(server.frames.map((frame) => frame.t)).toEqual(devToken ? ['device', 'hello'] : ['hello']);
         expect(lobby.pendingAdmission.size).toBe(0);
@@ -164,9 +167,42 @@ describe('HangoutLobby WebSocket admission', () => {
         const lobby = new HangoutLobby(state, {});
         await lobby.ready;
         expect(server.frames.filter((frame) => frame.t === 'hello')).toHaveLength(1);
-        expect(server.frames[0]).toMatchObject({ t: 'hello', needNick: true });
+        expect(server.frames[0]).toMatchObject({ t: 'hello', needNick: true, verified: false, capabilities: { moderate: false, configure: false, register: false } });
         await lobby.webSocketMessage(server, JSON.stringify({ t: 'hello', nick: 'GuestBack', age13: true }));
         expect(server.frames).toContainEqual(expect.objectContaining({ t: 'welcome', nick: 'GuestBack' }));
         expect(lobby.pendingAdmission.size).toBe(0);
+    });
+});
+
+describe('durable community storage', () => {
+    it('prunes preexisting logs by age and count across storage pages', async () => {
+        const state = stateWith(); const now = Date.now();
+        for (let i = 0; i < 2200; i++) state.values.set(`log:${String(i).padStart(15, '0')}:test`, { at: now - i, action: 'fixture' });
+        state.values.set('log:000000000000000:old', { at: now - 31 * 86400000 });
+        const lobby = new HangoutLobby(state, {}); await lobby.ready;
+        expect([...state.values.keys()].filter((k) => k.startsWith('log:'))).toHaveLength(2000);
+        expect(state.values.has('log:000000000000000:old')).toBe(false);
+    });
+    it('restores per-room records and fails closed if an indexed record is missing', async () => {
+        const state = stateWith(); const lobby = new HangoutLobby(state, {}); await lobby.ready;
+        lobby.engine.connect({ id: 'one', dev: 'dev-one', iph: 'ip-one', account: 'account-one' });
+        const msg = (f) => lobby.engine.message('one', JSON.stringify(f));
+        await msg({ t: 'hello', nick: 'Alice', age13: true });
+        await msg({ t: 'cmd', name: 'join', args: ['#friends'], ch: '#stalemate' });
+        await msg({ t: 'cmd', name: 'register', args: [], ch: '#friends' });
+        expect(state.values.get('room-index')).toEqual({ version: 1, names: ['#friends'] });
+        const restored = new HangoutLobby(state, {}); await restored.ready;
+        expect(restored.engine._debug.channels.get('#friends').owner).toBe('account-one');
+        state.values.delete('community-room:#friends');
+        const damaged = new HangoutLobby(state, {}); await damaged.ready;
+        expect(damaged.engine.adminState().lock).toBe('readonly');
+    });
+    it('revokes staff access on hibernation when the email is removed from the allowlist', async () => {
+        const state = stateWith(); const ws = new Socket();
+        ws.serializeAttachment({ id: 'old-mod', dev: 'old-device', iph: 'old-ip', role: 'moderator', admin: true, email: 'removed@example.test', expiresAt: Date.now() + 60000 });
+        state.acceptWebSocket(ws, ['old-mod']);
+        const lobby = new HangoutLobby(state, {}); await lobby.ready;
+        expect(ws.closed.code).toBe(4401);
+        expect(lobby.engine._debug.conns.has('old-mod')).toBe(false);
     });
 });

@@ -7,21 +7,21 @@
     <meta name="googlebot" content="noindex, nofollow">
     <meta name="referrer" content="no-referrer">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' wss://stalemate-hangout.jeffstory007.workers.dev https://stalemate.goatcounter.com; object-src 'none'; base-uri 'none'; form-action 'none'">
-    <!-- Hidden band admin panel. The server only answers band emails signed in through Cloudflare Access. -->
+    <!-- Hidden moderation panel. The server checks the staff allowlist and Cloudflare Access assertion. -->
     <meta name="hangout-relay" content="">
-    <title>Band panel · Hang Out</title>
+    <title>Moderation panel · Hang Out</title>
     <link rel="icon" href="../../../assets/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../lobby/lobby.css">
     <link rel="stylesheet" href="admin.css">
 </head>
 <body class="admin">
-    <div class="titlebar"><span>Band panel — #stalemate ops</span><span class="dots" aria-hidden="true">▁ ▢ ✕</span></div>
+    <div class="titlebar"><span>Moderation panel — #stalemate ops</span><span class="dots" aria-hidden="true">▁ ▢ ✕</span></div>
     <section class="gate" data-gate>
         <div class="gate-card">
-            <h1>Band panel</h1>
-            <p class="lede">For the band only. Sign in with the email code from Cloudflare (nothing to install).</p>
+            <h1>Moderation panel</h1>
+            <p class="lede">For appointed site moderators and band administrators. Sign in with the email code from Cloudflare (nothing to install).</p>
             <a class="btn btn--big" data-signin href="#">Sign in with email code</a>
-            <label class="nickrow">Nick in chat <span class="nickbox"><input data-nick maxlength="16" value="Jeff"></span></label>
+            <label class="nickrow">Nick in chat <span class="nickbox"><input data-nick maxlength="16" value="Helper"></span></label>
             <button class="btn btn--big" type="button" data-enter>Open the panel</button>
             <p class="status" data-status role="status"></p>
         </div>

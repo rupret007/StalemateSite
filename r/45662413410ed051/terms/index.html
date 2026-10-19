@@ -23,22 +23,25 @@
         <ul>
             <li><b>13+ only.</b> If you’re under 13, this isn’t for you. Cameras in open rooms are 18+.</li>
             <li><b>Your words, your responsibility.</b> What you post is on you, not on Stalemate.</li>
-            <li><b>The band can remove anything</b>, and mute, kick or ban anyone, for any reason.</li>
+            <li><b>Site moderators handle abuse</b> and can remove messages, restrict cameras, mute, kick or ban visitors, and close abusive rooms. Hosts manage their own rooms.</li>
             <li><b>No hate, threats, sexual stuff aimed at people, or sharing anyone’s personal info</b> (yours included: no phone numbers, addresses, emails or socials in public chat).</li>
-            <li><b>See something gross? Tap 🚩.</b> Reports go to the band. Every report and every action is logged.</li>
+            <li><b>See something gross? Tap 🚩.</b> Reports go to site moderators. Review evidence and action records have the retention limits below.</li>
             <li><b>Private rooms</b> are end-to-end encrypted. Nobody, including us, can read them. Open rooms and the lobby are moderated.</li>
         </ul>
+        <h2>Hosting and returning to rooms</h2>
+        <p>Anyone can host a temporary room without an account. To keep a room name across visits, sign in with an email code. Email verification does not reserve your nickname or give you site-moderator powers. We store an opaque identifier for ownership, room settings and co-host grants; your email is not displayed to visitors. Registered rooms expire after 90 days without an owner or verified co-host visit. Temporary rooms close after 10 empty minutes. Drawing and video state clears after 10 empty minutes even in registered rooms; chat has no saved backlog.</p>
         <h2>How AI review works</h2>
         <p>When AI review is enabled, public text from #stalemate and open rooms may be sent to OpenAI after posting to identify messages for our moderators to review. Category signals are not rulings: a moderator decides whether to delete the message or dismiss the signal. Ordinary filters and visitor reports still apply.</p>
+
         <p>PMs, invitation links, invite-only rooms, key-protected rooms, locked rooms, camera video and encrypted private rooms are excluded from AI review. Checks can be unavailable or reach a usage limit; an empty review queue does not mean every message was checked.</p>
         <h2>What we keep (not much)</h2>
         <ul>
-            <li>No accounts, no real names, no emails from fans, no birthdays.</li>
+            <li>Guest chat requires no account or email. Optional room ownership uses Cloudflare email-code sign-in; Cloudflare processes your email and the room service stores an opaque ownership identifier. We do not ask for real names or birthdays.</li>
             <li>No raw IP addresses. To make bans work we keep a scrambled, daily-changing code instead.</li>
             <li>Chat starts when you join a channel. This site keeps your last 300 received lines in that tab while you remain joined; leaving, reconnecting or refreshing starts fresh. Earlier messages aren’t replayed.</li>
             <li>A limited buffer of recent messages is held in server memory for moderation. It is separate from your scrollback and isn’t a public chat archive.</li>
             <li>Messages reported by visitors, held by filters or flagged by AI can be kept in bounded active review queues for up to 24 hours. This can include message text, nickname, channel, nearby context and AI model/category signals. This evidence is separate from public chat scrollback and is not a public chat archive. Infrastructure backup retention is separate from the active review queue.</li>
-            <li>The moderation log records actions and nicknames separately from chat so we can review how reports were handled.</li>
+            <li>The active moderation log records actions and nicknames separately from chat, for up to 30 days or 2,000 records, whichever limit is reached first. Scheduled cleanup runs approximately once per minute; infrastructure backups have separate retention.</li>
             <li>Visitor stats are counts only (how many, when, which room types). Camera video goes straight between browsers and never touches our server.</li>
         </ul>
         <h2>Copyright and contact</h2>

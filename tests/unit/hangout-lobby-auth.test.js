@@ -25,7 +25,7 @@ describe('Cloudflare Access JWT', async () => {
     const other = await keys();
     const opts = { team: TEAM, aud: AUD, now, fetchJwks: async () => jwks };
     it('accepts a valid token and lowercases the email', async () => {
-        expect(await verifyAccessJwt(await token(pair, good), opts)).toEqual({ email: 'jeff@example.com' });
+        expect(await verifyAccessJwt(await token(pair, good), opts)).toEqual({ email: 'jeff@example.com', expiresAt: good.exp * 1000 });
     });
     it.each([
         ['missing', async () => ''],
@@ -81,6 +81,20 @@ describe('Worker lobby gate fails closed', async () => {
         return [new Request(url, { headers: { Upgrade: 'websocket', Origin: 'https://stalemate.band', ...headers } }), url];
     };
     const deps = { turnstile: async (t) => t === 'tok', fetchJwks: async () => jwks };
+    it('separates public owner authentication from moderator authorization', async () => {
+        const ownerAud = 'b'.repeat(64);
+        const config = { ...env, HANGOUT_OWNER_ACCESS_AUD: ownerAud, HANGOUT_MODERATOR_EMAILS: 'helper@example.com' };
+        const jwt = await token(pair, { ...good, email: 'helper@example.com', aud: [ownerAud] });
+        const [ownerReq, ownerUrl] = req('/lobby-owner', { 'Cf-Access-Jwt-Assertion': jwt });
+        const result = await lobbyGate(ownerReq, config, ownerUrl, deps);
+        expect(result.identity).toMatchObject({ role: 'fan', admin: false, email: '' });
+        expect(result.identity.account).toMatch(/^a_/);
+        const [staffReq, staffUrl] = req('/lobby-admin', { 'Cf-Access-Jwt-Assertion': jwt });
+        expect((await lobbyGate(staffReq, config, staffUrl, deps)).status).toBe(403);
+        const staffJwt = await token(pair, { ...good, email: 'helper@example.com' });
+        const [verified, verifiedUrl] = req('/lobby-admin', { 'Cf-Access-Jwt-Assertion': staffJwt });
+        expect((await lobbyGate(verified, config, verifiedUrl, deps)).identity.role).toBe('moderator');
+    });
     it('503 when any secret or binding is missing, or the kill switch is set', async () => {
         for (const drop of ['LOBBY', 'QUOTA', 'HANGOUT_HMAC_KEY', 'HANGOUT_PREVIEW_KEY', 'HANGOUT_TURNSTILE_SECRET']) {
             const e = { ...env }; delete e[drop];

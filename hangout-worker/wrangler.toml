@@ -35,3 +35,9 @@ WEBJAM_WEB_ORIGINS = ""
 # Review-only AI is opt-in; no provider traffic until set to "review" and a Worker OPENAI_API_KEY secret exists.
 HANGOUT_AI_MODERATION = "off"
 HANGOUT_AI_DAILY_LIMIT = "1000"
+
+# Optional community roles/ownership: configure through deployment variables/secrets.
+# HANGOUT_MODERATOR_EMAILS: owner-maintained staff allowlist; no UI can modify it.
+# HANGOUT_OWNER_ACCESS_AUD: a DIFFERENT Access application's audience for public email OTP.
+# HANGOUT_OWNER_RETURN: https://stalemate.band/r/45662413410ed051/lobby/
+# Protect /lobby-owner* separately; never broaden the /lobby-admin* staff policy.

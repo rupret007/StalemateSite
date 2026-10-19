@@ -139,7 +139,7 @@ test('three fans + a band op: chat, /me, slap button, filters, PM accept-first, 
 test('a wrong dev-admin key is refused; fans cannot reach the admin socket', async ({ page }) => {
     await page.goto(adminUrl('wrong-wrong-wrong-key'));
     await page.click('[data-enter]');
-    await expect(page.locator('[data-status]')).toContainText('Not signed in as band');
+    await expect(page.locator('[data-status]')).toContainText('Not signed in as a site moderator');
 });
 
 test('open rooms: camera off by default with an 18+ gate; jam hands off to WebJam', async ({ browser }) => {

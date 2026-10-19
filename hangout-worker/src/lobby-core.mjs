@@ -1,6 +1,7 @@
 // Hang Out lobby engine: an old-school IRC network in one authoritative place (one Durable Object, one writer,
 // so no netsplits and no "first in gets @"). Pure logic, no I/O: the Worker DO and the local dev relay both
 // drive it, and unit tests drive it directly. Every permission is checked here, never in the browser.
+import { ROOM_TTL, LOG_TTL, roomRecord, validRoom, createRateLimits } from './community-state.mjs';
 import { checkNick, checkText, defaultLists, normalize } from './filter.mjs';
 import { actSnapshot, applyClear, applyStroke, applyVideo, cleanRtc, parseActFrame, PAINT_KINDS, VIDEO_KINDS } from './lobby-act.mjs';
 
@@ -60,8 +61,10 @@ export const HELP = [
     'Jam @:    /jamlink webjam://…  (from the WebJam desktop app)  /jamlink clear',
     'Room @:   /topic text  /kick nick [why]  /ban nick [why]  /unban mask  /invite nick  /op /deop /voice /devoice nick',
     '          /mode +m|-m +i|-i +k key|-k +l N|-l +S secs|-S +C|-C +Q|-Q   /close',
-    'Band @:   /mute nick 10m  /gban nick why  /purge nick  /shield  /shieldoff  /lobby lock|readonly|unlock',
-    '          /filter block|hold|allow|del word  /camoff all  /close #room  /approve id  /dismiss id  /aidismiss id  /log'
+    'Owners: /register  /cohost add|remove nick  /transfer nick  /acceptowner  /unregister',
+    'Site MOD: /mute nick 10m  /gban nick why  /purge nick  /camoff all  /close #room',
+    '          /approve id  /dismiss id  /aidismiss id  /delete id  /log',
+    'Band @:   /shield  /shieldoff  /lobby lock|readonly|unlock  /filter block|hold|allow|del word'
 ];
 
 // Exact shape checks only: we never fetch, parse or rewrite WebJam's invite (WebJam's invitation_ingress owns that).
@@ -85,13 +88,13 @@ const parseDuration = (s, fallback) => {
 // Role x command matrix (exported for the permission tests). scope: who may run it.
 //   any = everyone, chanop = @ in that channel (founder/op/band), band = band or owner only.
 export const COMMANDS = Object.freeze({
-    join: 'any', part: 'any', quit: 'any', nick: 'any', me: 'any', msg: 'any', query: 'any', whois: 'any', away: 'any',
+    register: 'any', cohost: 'any', transfer: 'any', acceptowner: 'any', unregister: 'any', join: 'any', part: 'any', quit: 'any', nick: 'any', me: 'any', msg: 'any', query: 'any', whois: 'any', away: 'any',
     ignore: 'any', unignore: 'any', list: 'any', names: 'any', topic: 'any', slap: 'any', help: 'any', report: 'any',
     accept: 'any', decline: 'any', block: 'any', unblock: 'any', pm: 'any', cam: 'any',
     kick: 'chanop', ban: 'chanop', unban: 'chanop', invite: 'chanop', op: 'chanop', deop: 'chanop', voice: 'chanop',
     devoice: 'chanop', jamlink: 'chanop', mode: 'chanop', close: 'chanop', lock: 'chanop',
-    mute: 'band', gban: 'band', purge: 'band', shield: 'band', shieldoff: 'band', lobby: 'band', filter: 'band',
-    camoff: 'band', approve: 'band', dismiss: 'band', aidismiss: 'band', log: 'band', delete: 'band', slow: 'band'
+    mute: 'moderator', gban: 'moderator', purge: 'moderator', shield: 'band', shieldoff: 'band', lobby: 'band', filter: 'band',
+    camoff: 'moderator', approve: 'moderator', dismiss: 'moderator', aidismiss: 'moderator', log: 'moderator', delete: 'moderator', slow: 'band'
 });
 
 export function createLobby({ now = () => Date.now(), send = () => {}, close = () => {}, persist = () => {}, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
@@ -102,6 +105,10 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     const devStats = new Map();       // dev -> {day, msgs, lastRoom}
     const ipRooms = new Map();        // iph -> [timestamps]
     let seq = 0;
+    const rates = createRateLimits(now);
+    let roomsBroken = false;
+    let outputBatch = null;
+    let closeBatch = null;
     const net = {
         bans: [],                     // {mask, reason, by, at, until}
         kicks: {},                    // dev -> until
@@ -140,17 +147,21 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         name, kind, title, founder, created: now(), topic: kind === 'lobby' ? 'Welcome to #stalemate. Pull up a nick, say hello, make something together. /help for commands.' : '',
         modes: { m: false, i: false, k: '', l: kind === 'lobby' ? L.lobbyMax : L.roomMax, t: true, S: kind === 'lobby' ? L.defaultSlow : 0, C: kind !== 'lobby' && kind !== 'chat', Q: false, locked: false },
         jam: kind === 'jam' ? { desktop: '', web: '' } : null, ops: new Set(founder ? [founder] : []), voice: new Set(), bans: [], invites: new Set(), kicks: {},
-        members: new Set(), moderationContext: [], emptySince: null,
+        owner: '', cohostLabels: {}, cohosts: new Set(), renewed: now(), transfer: null, members: new Set(), moderationContext: [], emptySince: null,
         act: { strokes: [], video: null }
     });
     channels.set(LOBBY, mkChannel(LOBBY, 'lobby', 'The lobby', null));
 
     // ---------- helpers ----------
-    const out = (c, msg) => { try { send(c.id, msg); } catch (e) { /* gone */ } };
+    const out = (c, msg) => { try { if (outputBatch) outputBatch.push([c.id, msg]); else send(c.id, msg); } catch (e) { /* gone */ } };
     const isBand = (c) => c && (c.role === 'band' || c.role === 'owner');
+    const isStaff = (c) => isBand(c) || c?.role === 'moderator';
+    const owns = (c, room) => !!c?.account && room?.owner === c.account;
+    const hosts = (c, room) => !!room && (owns(c, room) || room.ops.has(c.dev) || !!c.account && room.cohosts.has(c.account));
+    const capabilities = (c) => ({ moderate: isStaff(c), configure: isBand(c), register: !!c.account });
     const ch = (name) => channels.get(lc(name));
     const byNick = (nick) => [...conns.values()].find((c) => c.nick && lc(c.nick) === lc(String(nick || '').replace(/^[@+]/, '')));
-    const isOp = (c, chan) => isBand(c) || (chan && chan.ops.has(c.dev));
+    const isOp = (c, chan) => isStaff(c) || hosts(c, chan);
     const prefix = (c, chan) => (isOp(c, chan) ? '@' : chan && chan.voice.has(c.dev) ? '+' : '');
     const bot = (c, text, kind = 'info') => out(c, { t: 'notice', from: BOT, text, kind, ts: now() });
     const log = (by, action, target = '', reason = '', where = '') => {
@@ -182,14 +193,18 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (chan.moderationContext.length > L.moderationContext) chan.moderationContext.shift();
         cast(chan, msg);
     };
-    const names = (chan) => membersOf(chan).filter((m) => m.nick).map((m) => ({ id: m.id, nick: m.nick, prefix: prefix(m, chan), band: isBand(m), away: !!m.away, cam: !!(m.cams && m.cams.has(lc(chan.name))) }))
+    const names = (chan) => membersOf(chan).filter((m) => m.nick).map((m) => ({ id: m.id, nick: m.nick, prefix: prefix(m, chan), band: isBand(m), moderator: m.role === 'moderator', verified: !!m.account, owner: owns(m, chan), away: !!m.away, cam: !!(m.cams && m.cams.has(lc(chan.name))) }))
         .sort((a, b) => (a.prefix === b.prefix ? lc(a.nick).localeCompare(lc(b.nick)) : a.prefix === '@' ? -1 : b.prefix === '@' ? 1 : a.prefix === '+' ? -1 : 1));
-    const chanView = (chan) => ({ name: chan.name, kind: chan.kind, title: chan.title, topic: chan.topic, modes: { ...chan.modes, k: chan.modes.k ? true : false }, count: chan.members.size, names: names(chan), jam: chan.jam ? { desktop: chan.jam.desktop, web: chan.jam.web, webReady: !!chan.jam.web } : null });
-    const sendChan = (chan) => cast(chan, { t: 'chan', ch: chanView(chan) });
-    const directory = () => [...channels.values()].filter((c) => c.kind !== 'lobby').slice(0, L.roomsListed)
-        .map((c) => ({ name: c.name, kind: c.kind, title: c.title, count: c.members.size, max: c.modes.l, locked: c.modes.locked || c.modes.i, key: !!c.modes.k, cams: c.modes.C }));
-    const pushList = () => { const rooms = directory(); for (const c of conns.values()) if (c.nick) out(c, { t: 'list', rooms }); pushAdmin(); };
-    const banned = (list, c) => list.some((b) => (!b.until || b.until > now()) && (b.mask === `dev:${c.dev}` || b.mask === `iph:${c.iph}` || (c.nick && b.mask === `nick:${lc(c.nick)}`)));
+    const chanView = (chan) => ({ name: chan.name, kind: chan.kind, title: chan.title, topic: chan.topic, modes: { ...chan.modes, k: chan.modes.k ? true : false }, count: chan.members.size, persistent: !!chan.owner, expiresAt: chan.owner ? chan.renewed + ROOM_TTL : null, names: names(chan), jam: chan.jam ? { desktop: chan.jam.desktop, web: chan.jam.web, webReady: !!chan.jam.web } : null });
+    const sendChan = (chan) => {
+        cast(chan, { t: 'chan', ch: chanView(chan) });
+        for (const c of membersOf(chan)) if (owns(c, chan)) out(c, { t: 'ownership', ch: chan.name,
+            cohosts: [...chan.cohosts].map((id) => ({ id, label: chan.cohostLabels[id] || 'Verified co-host' })) });
+    };
+    const directory = (viewer) => [...channels.values()].filter((r) => r.kind !== 'lobby' && (publicChannel(r) || isStaff(viewer) || viewer && (hosts(viewer, r) || r.members.has(viewer.id))))
+        .map((r) => ({ name: r.name, kind: r.kind, title: r.title, count: r.members.size, max: r.modes.l, locked: r.modes.locked || r.modes.i, key: !!r.modes.k, cams: r.modes.C, persistent: !!r.owner, mine: !!viewer && owns(viewer, r), hostPresent: membersOf(r).some((m) => hosts(m, r)) }));
+    const pushList = () => { for (const c of conns.values()) if (c.nick) out(c, { t: 'list', rooms: directory(c) }); pushAdmin(); };
+    const banned = (list, c) => list.some((b) => (!b.until || b.until > now()) && (b.mask === `dev:${c.dev}` || c.account && b.mask === `account:${c.account}` || b.mask === `iph:${c.iph}` || (c.nick && b.mask === `nick:${lc(c.nick)}`)));
     const pairKey = (a, b) => [a, b].sort().join('|');
 
     function adminState() {
@@ -197,7 +212,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             lock: net.lock, shield: net.shield, shieldAuto: net.shieldAuto, lockAuto: net.lockAuto, lastBand: net.lastBand,
             slow: ch(LOBBY).modes.S, lists: net.lists, reportsToHide: net.reportsToHide,
             budget: { ...net.budget, cap: L.requestBudget, level: budgetLevel() },
-            users: [...conns.values()].filter((c) => c.nick).map((c) => ({ nick: c.nick, role: c.role, dev: c.dev.slice(0, 6), away: !!c.away, muted: (net.mutes[c.dev] || 0) > now(), channels: [...c.channels] })),
+            users: [...conns.values()].filter((c) => c.nick).map((c) => ({ nick: c.nick, role: c.role, dev: c.dev.slice(0, 6), away: !!c.away, muted: Math.max(net.mutes[c.dev] || 0, net.mutes[c.account] || 0) > now(), channels: [...c.channels] })),
             rooms: [...channels.values()].map((c) => ({ name: c.name, kind: c.kind, title: c.title, count: c.members.size, modes: { ...c.modes, k: !!c.modes.k } })),
             reports: [...reports.entries()].filter(([, r]) => !r.done && now() - r.at < MODERATION_QUEUE_TTL).map(([id, r]) => ({ id, ch: r.ch, from: r.from, text: r.text, count: r.devs.size, hidden: r.hidden, context: [...r.context] })),
             held: [...held.values()].filter((h) => now() - h.ts < MODERATION_QUEUE_TTL).map((h) => ({ id: h.id, ch: h.ch, from: h.from, text: h.text, reason: h.reason })),
@@ -215,7 +230,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         queueMicrotask(() => {
             adminDirty = false;
             const state = adminState();
-            for (const c of conns.values()) if (isBand(c) && c.admin) out(c, { t: 'admin', state });
+            for (const c of conns.values()) if (isStaff(c) && c.admin) out(c, { t: 'admin', state: { ...state, capabilities: capabilities(c) } });
         });
     }
 
@@ -355,23 +370,23 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     function spend(n) { budgetLevel(); net.budget.requests += n; }
 
     // ---------- connection lifecycle ----------
-    function connect({ id, dev, iph, role = 'fan', email = '', admin = false }) {
+    function connect({ id, dev, iph, role = 'fan', email = '', account = '', admin = false }) {
         spend(1);
         const lvl = budgetLevel();
-        const band = role === 'band' || role === 'owner';
+        const band = role === 'band' || role === 'owner' || role === 'moderator';
         if (lvl === 'closed' && !band) return { ok: false, status: 503, reason: 'budget' };
         if (!band) {
             if (net.lock === 'closed') return { ok: false, status: 503, reason: 'locked' };
-            if (banned(net.bans, { dev, iph })) return { ok: false, status: 403, reason: 'banned' };
+            if (banned(net.bans, { dev, iph, account })) return { ok: false, status: 403, reason: 'banned' };
             if ((net.kicks[dev] || 0) > now()) return { ok: false, status: 403, reason: 'kicked' };
             const inLobby = [...conns.values()].filter((c) => !isBand(c)).length;
             if (inLobby >= L.lobbyMax) return { ok: false, status: 429, reason: 'full' };
         }
-        const c = { id, dev, iph, role, email, admin: band && admin, nick: '', channels: new Set(), away: '', ignores: new Set(), blocks: new Set(), pmOff: false,
+        const c = { id, dev, iph, role, email, account, admin: band && admin, nick: '', channels: new Set(), away: '', ignores: new Set(), blocks: new Set(), pmOff: false,
             cams: new Set(), since: now(), lastNick: 0, tokens: L.burst, last: now(), frames: 0, lastSaid: {}, actTokens: L.actBurst, actLast: now() };
         conns.set(id, c);
         if (band) { net.lastBand = now(); if (net.shieldAuto || net.lockAuto) bot(c, 'A saved safety state needs review: fans can read but not talk while the lobby is read-only. Check the band panel; /lobby unlock and /shieldoff when you are ready.'); saveNet(); }
-        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true });
+        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c) });
         return { ok: true };
     }
 
@@ -399,14 +414,16 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
 
     function enter(c, chan, { key = '' } = {}) {
         if (chan.members.has(c.id)) return true;
+        if (chan.kind !== 'lobby' && !chan.members.size && [...channels.values()].filter((r) => r.kind !== 'lobby' && r.members.size).length >= L.roomsListed) return bot(c, 'All 30 active room slots are busy. Try again shortly.', 'error');
         if (!isBand(c)) {
             if (banned(chan.bans, c)) return bot(c, `You're banned from ${chan.name}.`, 'error'), false;
             if ((chan.kicks[c.dev] || 0) > now()) return bot(c, `Kicked from ${chan.name} recently. Give it a few minutes.`, 'error'), false;
-            if (chan.modes.locked && !chan.ops.has(c.dev)) return bot(c, `${chan.name} is locked right now.`, 'error'), false;
-            if (chan.modes.i && !chan.invites.has(c.dev) && !chan.ops.has(c.dev)) return bot(c, `${chan.name} is invite-only (+i). Ask an @ to /invite you.`, 'error'), false;
-            if (chan.modes.k && key !== chan.modes.k && !chan.ops.has(c.dev)) return bot(c, `${chan.name} needs a key (+k): /join ${chan.name} key`, 'error'), false;
-            if (chan.members.size >= chan.modes.l) return bot(c, `${chan.name} is full (+l ${chan.modes.l}).`, 'error'), false;
+            if (chan.modes.locked && !hosts(c, chan)) return bot(c, `${chan.name} is locked right now.`, 'error'), false;
+            if (chan.modes.i && !chan.invites.has(c.dev) && !hosts(c, chan)) return bot(c, `${chan.name} is invite-only (+i). Ask an @ to /invite you.`, 'error'), false;
+            if (chan.modes.k && key !== chan.modes.k && !hosts(c, chan)) return bot(c, `${chan.name} needs a key (+k): /join ${chan.name} key`, 'error'), false;
+            if (chan.members.size >= chan.modes.l - (chan.owner && !owns(c, chan) && !membersOf(chan).some((m) => owns(m, chan)) ? 1 : 0)) return bot(c, `${chan.name} is full (+l ${chan.modes.l}).`, 'error'), false;
         }
+        if (owns(c, chan) || c.account && chan.cohosts.has(c.account)) chan.renewed = now();
         chan.members.add(c.id);
         chan.emptySince = null;
         if (chan.kind !== 'lobby') bump(net.stats.rooms, (KINDS[chan.kind].endsWith(chan.title) ? KINDS[chan.kind] : `${KINDS[chan.kind]} · ${chan.title}`).slice(0, 60));
@@ -418,8 +435,8 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         event(chan, `${nickOf(c)} has joined ${chan.name}`);
         if (chan.kind === 'lobby') bot(c, `welcome to #stalemate, ${c.nick}. One rule: Don’t be a dick. Swear all you want; no hate, threats, creepy stuff or personal info. 🚩 anything gross. /help for commands.`);
         else if (chan.kind === 'jam') bot(c, `welcome to ${chan.name}. Music runs in the WebJam desktop app (Jamulus) for tight timing. Plug in Ethernet: Wi-Fi adds lag and dropouts.`);
-        else if (chan.kind === 'chat') bot(c, `welcome to ${chan.name}. The room host runs this conversation; the band moderates sitewide. Chat starts when you join. Start an activity room to draw, watch or use optional cameras.`);
-        else bot(c, `welcome to ${chan.name}. The room host runs this activity; the band moderates sitewide. Cameras stay off unless you turn yours on (18+).`);
+        else if (chan.kind === 'chat') bot(c, `welcome to ${chan.name}. The room host runs this conversation; site moderators handle abuse. Chat starts when you join. Start an activity room to draw, watch or use optional cameras.`);
+        else bot(c, `welcome to ${chan.name}. The room host runs this activity; site moderators handle abuse. Cameras stay off unless you turn yours on (18+).`);
         sendChan(chan);
         pushList();
         return true;
@@ -439,6 +456,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (raw.length > maxBytes) return kill(c, 4400, 'bad frame');
         if (c.frames > L.framesPerConnection) return kill(c, 4429, 'frame cap');
         if (!c.nick && f.t !== 'hello') return bot(c, 'Pick a nickname first.', 'error');
+        if (f.t !== 'act' && f.t !== 'say' && f.t !== 'cmd' && !limited(c, 'command', 10, 1, true)) return;
         switch (f.t) {
         case 'hello': return hello(c, f);
         case 'say': {
@@ -454,16 +472,16 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         case 'report': return report(c, String(f.id || ''));
         case 'cam': return cam(c, f.ch, !!f.on, f.adult18 === true);
         case 'act': return roomAct(c, f);
-        case 'admin-refresh': if (isBand(c) && c.admin) out(c, { t: 'admin', state: adminState() }); return undefined;
+        case 'admin-refresh': if (isStaff(c) && c.admin) out(c, { t: 'admin', state: { ...adminState(), capabilities: capabilities(c) } }); return undefined;
         default: return kill(c, 4400, 'bad frame');
         }
     }
 
-    function kill(c, code, reason) { close(c.id, code, reason); disconnect(c.id, reason); }
+    function kill(c, code, reason) { if (closeBatch) closeBatch.push([c.id, code, reason]); else close(c.id, code, reason); disconnect(c.id, reason); }
 
     function hello(c, f) {
         if (c.nick) return bot(c, 'Already here. Use /nick to change.', 'error');
-        if (!isBand(c) && f.age13 !== true) return bot(c, 'Tick "I\'m 13+ and will be cool" to chat.', 'error');
+        if (!isStaff(c) && f.age13 !== true) return bot(c, 'Tick "I\'m 13+ and will be cool" to chat.', 'error');
         const v = checkNick(f.nick, net.lists, { band: isBand(c) });
         if (!v.ok) return out(c, { t: 'nick-error', text: v.reason });
         if (byNick(v.nick)) return out(c, { t: 'nick-error', text: 'That nick is taken right now.' });
@@ -471,10 +489,10 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         c.nick = v.nick;
         c.lastNick = now();
         statHour().joins += 1; statPeak();
-        out(c, { t: 'welcome', nick: c.nick, role: c.role, band: isBand(c) });
-        out(c, { t: 'list', rooms: directory() });
+        out(c, { t: 'welcome', nick: c.nick, role: c.role, band: isBand(c), moderator: c.role === 'moderator', verified: !!c.account, capabilities: capabilities(c) });
+        out(c, { t: 'list', rooms: directory(c) });
         enter(c, ch(LOBBY));
-        if (c.admin) out(c, { t: 'admin', state: adminState() });
+        if (c.admin) out(c, { t: 'admin', state: { ...adminState(), capabilities: capabilities(c) } });
         return undefined;
     }
 
@@ -487,12 +505,15 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
 
     function allowed(c, scope, chan) {
         if (scope === 'any') return true;
+        if (scope === 'moderator') return isStaff(c);
         if (scope === 'band') return isBand(c);
-        if (scope === 'chanop') return !!chan && chan.kind !== 'lobby' ? isOp(c, chan) : isBand(c); // lobby ops = band only
+        if (scope === 'chanop') return !!chan && chan.kind !== 'lobby' ? isOp(c, chan) : isStaff(c); // lobby ops = band only
         return false;
     }
 
     function command(c, where, name, args) {
+        if (!limited(c, 'command', 10, 1, true)) return;
+        if (roomsBroken && !['help', 'list', 'names', 'whois', 'part', 'quit', 'lobby', 'log'].includes(name)) return bot(c, 'Storage needs administrator recovery before changes can continue.', 'error');
         const alias = { j: 'join', leave: 'part', m: 'msg', q: 'query', w: 'whois', who: 'names', exit: 'quit', bye: 'quit', h: 'help', '?': 'help', deny: 'decline', approveheld: 'approve' };
         name = alias[name] || name;
         const scope = COMMANDS[name];
@@ -505,8 +526,9 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (name === 'invite' && args[1] && ch(args[1])) chan = ch(args[1]);
         if (!allowed(c, scope, chan)) {
             log(nickOf(c), 'denied', `/${name}`, 'not permitted', chan ? chan.name : '');
-            return out(c, { t: 'denied', cmd: name, text: `* /${name}: permission denied. ${scope === 'band' ? 'Band ops only.' : `You need @ in ${chan ? chan.name : 'that room'}.`}` });
+            return out(c, { t: 'denied', cmd: name, text: `* /${name}: permission denied. ${scope === 'band' ? 'Band administrators only.' : scope === 'moderator' ? 'Site moderators only.' : `You need @ in ${chan ? chan.name : 'that room'}.`}` });
         }
+        if (c.role === 'moderator' && chan.kind === 'lobby' && ['mode', 'lock', 'op', 'deop', 'voice', 'devoice', 'topic'].includes(name)) return bot(c, 'Site configuration is restricted to band administrators.', 'error');
         const fn = handlers[name];
         return fn(c, chan, args);
     }
@@ -517,7 +539,130 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         return t;
     };
 
+    function consumeDaily(c) {
+        const day = new Date(now()).toISOString().slice(0, 10);
+        const keys = [c.dev, ...(c.account ? [c.account] : [])];
+        if (devStats.size + keys.filter((key) => !devStats.has(key)).length > 5000) { bot(c, 'Daily allowance storage is busy. Try again later.', 'error'); return false; }
+        const rows = keys.map((key) => { const old = devStats.get(key) || {}; return [key, old.day === day ? old : { ...old, day, msgs: 0 }]; });
+        if (rows.some(([, st]) => st.msgs >= L.perDeviceDay)) { bot(c, 'That’s 200 lines today. Come back tomorrow.', 'error'); return false; }
+        for (const [key, st] of rows) devStats.set(key, { ...st, msgs: (st.msgs || 0) + 1 });
+        return true;
+    }
+    function limited(c, kind, cap, refill, ip = false) {
+        if (isBand(c)) return true;
+        const keys = [`dev:${c.dev}`, ...(c.account ? [`account:${c.account}`] : [])];
+        let retry = rates.take(keys, kind, cap, refill);
+        if (ip) retry = Math.max(retry, rates.take([c.iph], 'ip-command', 120, 2));
+        if (!retry) return true;
+        if (!c.rateNotice || now() - c.rateNotice >= 5000) {
+            c.rateNotice = now(); out(c, { t: 'rate-limit', scope: kind, retryAfter: retry, text: `Please wait ${retry}s before trying again.` });
+        }
+        return false;
+    }
+    function ownerOnly(c, room) {
+        if (room.kind === 'lobby' || !owns(c, room)) { bot(c, 'Only the registered room owner can do that.', 'error'); return false; }
+        return true;
+    }
+    function roomSnapshot() { return { version: 1, rooms: [...channels.values()].filter((r) => r.kind !== 'lobby').map(roomRecord) }; }
+    function restoreRooms(saved) {
+        if (saved === undefined) return;
+        if (!saved || saved.version !== 1 || !Array.isArray(saved.rooms) || saved.rooms.length > 1030 || saved.rooms.some((r) => !validRoom(r, now())) || new Set(saved.rooms.map((r) => r.name)).size !== saved.rooms.length) {
+            roomsBroken = true; net.lock = 'readonly'; net.lockAuto = true; return;
+        }
+        for (const r of saved.rooms) {
+            const room = mkChannel(r.name, r.kind, r.title, r.founder);
+            Object.assign(room, r, { ops: new Set(r.ops), voice: new Set(r.voice), invites: new Set(r.invites), cohosts: new Set(r.cohosts), emptySince: r.emptySince ?? now() });
+            // Decode through the activity validators; malformed media state cannot become a frame.
+            room.act = { strokes: [], video: null };
+            for (const stroke of r.act.strokes) applyStroke(room, stroke);
+            if (r.act.video) applyVideo(room, { kind: 'video', ...r.act.video }, now());
+            channels.set(room.name, room);
+        }
+        // Record the first observed empty instant so repeated hibernation cannot reset cleanup.
+        if (JSON.stringify(saved) !== JSON.stringify(roomSnapshot())) return persist('rooms', roomSnapshot());
+    }
+    function abuseSnapshot() { return { version: 1, buckets: rates.snapshot(), devices: [...devStats], ips: [...ipRooms] }; }
+    function restoreAbuse(saved) {
+        if (saved === undefined) return;
+        try {
+            if (saved?.version !== 1 || !Array.isArray(saved.devices) || saved.devices.length > 5000 || !Array.isArray(saved.ips) || saved.ips.length > 5000) throw new Error('invalid abuse state');
+            rates.restore(saved.buckets);
+            for (const [k, v] of saved.devices) {
+                if (!moderationIdentity(k) || !v || !Number.isFinite(v.msgs ?? 0) || !Number.isFinite(v.lastRoom ?? 0) || typeof (v.day ?? '') !== 'string') throw new Error('invalid device allowance');
+                devStats.set(k, v);
+            }
+            for (const [k, v] of saved.ips) {
+                if (!moderationIdentity(k) || !Array.isArray(v) || v.length > L.roomsPerIpHour || !v.every(Number.isFinite)) throw new Error('invalid IP allowance');
+                ipRooms.set(k, v);
+            }
+        } catch { net.lock = 'readonly'; net.lockAuto = true; roomsBroken = true; }
+    }
+    // Buffer success frames until durable writes finish. The DO serializes these operations.
+    function durable(fn, args) {
+        const before = JSON.stringify(roomSnapshot());
+        const rateBefore = JSON.stringify(abuseSnapshot());
+        outputBatch = []; closeBatch = [];
+        let result;
+        try { result = fn(...args); } catch (error) { outputBatch = null; closeBatch = null; throw error; }
+        const frames = outputBatch; const closing = closeBatch; outputBatch = null; closeBatch = null;
+        const writes = [];
+        const after = roomSnapshot();
+        if (!roomsBroken && JSON.stringify(after) !== before) writes.push(persist('rooms', after));
+        const abuse = abuseSnapshot();
+        if (JSON.stringify(abuse) !== rateBefore) writes.push(persist('abuse', abuse));
+        const flush = () => { for (const [id, frame] of frames) send(id, frame); for (const args of closing) close(...args); return result; };
+        if (writes.some((w) => w && typeof w.then === 'function')) return Promise.all(writes).then(flush).catch(() => {
+            net.lock = 'readonly'; net.lockAuto = true; roomsBroken = true;
+            for (const c of conns.values()) out(c, { t: 'net', lock: 'readonly', shield: net.shield });
+            for (const c of conns.values()) bot(c, 'Storage is unavailable. Changes are not confirmed; reconnect after administrator recovery.', 'error');
+        });
+        return flush();
+    }
+
     const handlers = {
+        register(c, room) {
+            if (roomsBroken || net.lock !== 'off' || net.shield) return bot(c, 'Registration is paused while the community is restricted.', 'error');
+            if (!c.account) return bot(c, 'Sign in with email to keep a room across visits.', 'error');
+            if (room.kind === 'lobby' || room.owner || room.founder !== c.dev || !room.members.has(c.id)) return bot(c, 'Only this temporary room’s founder can register it.', 'error');
+            if ([...channels.values()].filter((r) => r.owner === c.account).length >= 3 || [...channels.values()].filter((r) => r.owner).length >= 1000) return bot(c, 'Registered room allowance reached (3 per account; 1,000 sitewide).', 'error');
+            room.owner = c.account; room.ops.delete(c.dev); room.renewed = now();
+            log(c.nick, 'room-register', room.name); sendChan(room); pushList();
+            bot(c, 'Room registered. Ownership expires after 90 days without an owner or verified co-host visit.');
+        },
+        cohost(c, room, [action, nick]) {
+            if (!ownerOnly(c, room)) return;
+            if (!['add', 'remove'].includes(action)) return bot(c, '/cohost add|remove nick', 'error');
+            if (action === 'remove' && room.cohosts.has(nick)) {
+                room.cohosts.delete(nick); delete room.cohostLabels[nick]; if (room.transfer?.to === nick) room.transfer = null;
+                log(c.nick, 'cohost-remove', 'verified co-host', '', room.name); sendChan(room); pushList(); return;
+            }
+            const t = target(c, nick); if (!t || !t.account || !room.members.has(t.id)) return bot(c, 'Choose an email-verified member of this room.', 'error');
+            if (owns(t, room)) return bot(c, 'The owner already has host access.', 'error');
+            if (action === 'add' && room.cohosts.size >= 20) return bot(c, 'This room already has 20 verified co-hosts.', 'error');
+            if (action === 'add') { room.cohosts.add(t.account); room.cohostLabels[t.account] = t.nick; } else { room.cohosts.delete(t.account); delete room.cohostLabels[t.account]; room.ops.delete(t.dev); }
+            if (room.transfer?.to === t.account) room.transfer = null;
+            log(c.nick, `cohost-${action}`, t.nick, '', room.name); sendChan(room); pushList();
+        },
+        transfer(c, room, [nick]) {
+            if (!ownerOnly(c, room)) return;
+            const t = target(c, nick); if (!t?.account || !room.cohosts.has(t.account) || !room.members.has(t.id)) return bot(c, 'Choose a verified co-host in this room.', 'error');
+            room.transfer = { from: c.account, to: t.account, until: now() + 10 * MIN };
+            out(t, { t: 'owner-offer', ch: room.name, by: c.nick });
+            bot(c, 'Ownership offered for 10 minutes. The co-host must accept.');
+        },
+        acceptowner(c, room) {
+            const offer = room.transfer;
+            if (!c.account || !offer || offer.to !== c.account || offer.from !== room.owner || offer.until <= now() || !room.cohosts.has(c.account) || !room.members.has(c.id)) return bot(c, 'No valid ownership offer.', 'error');
+            if ([...channels.values()].filter((r) => r.owner === c.account).length >= 3) return bot(c, 'You already own three rooms.', 'error');
+            room.cohosts.add(room.owner); room.cohostLabels[room.owner] = membersOf(room).find((m) => owns(m, room))?.nick || 'Previous owner'; room.cohosts.delete(c.account); delete room.cohostLabels[c.account]; room.owner = c.account; room.renewed = now(); room.transfer = null;
+            // The original guest identity must not retain ownership privileges after transfer.
+            room.ops.delete(room.founder); room.founder = c.dev;
+            log(c.nick, 'room-transfer', room.name); sendChan(room); pushList();
+        },
+        unregister(c, room) {
+            if (!ownerOnly(c, room)) return;
+            return closeRoom(room, c.nick, 'registration removed by owner');
+        },
         help(c) { HELP.forEach((h) => bot(c, h)); },
         join(c, _chan, [rawName, key = '', ...titleWords]) {
             let name = String(rawName || '');
@@ -544,7 +689,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             const old = c.nick;
             c.nick = v.nick;
             c.lastNick = now();
-            out(c, { t: 'welcome', nick: c.nick, role: c.role, band: isBand(c) });
+            out(c, { t: 'welcome', nick: c.nick, role: c.role, band: isBand(c), moderator: c.role === 'moderator', verified: !!c.account, capabilities: capabilities(c) });
             for (const name of c.channels) { const chn = ch(name); event(chn, `${old} is now known as ${c.nick}`); sendChan(chn); }
             return pushAdmin();
         },
@@ -600,7 +745,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         },
         ignore(c, _chan, [n]) { if (!n) return bot(c, `Ignoring: ${[...c.ignores].join(', ') || 'nobody'}`); c.ignores.add(lc(n)); return bot(c, `Ignoring ${String(n).slice(0, 20)}.`); },
         unignore(c, _chan, [n]) { c.ignores.delete(lc(n)); return bot(c, `Unignored ${String(n || '').slice(0, 20)}.`); },
-        list(c) { return out(c, { t: 'list', rooms: directory(), show: true }); },
+        list(c) { return out(c, { t: 'list', rooms: directory(c), show: true }); },
         names(c, chan, [maybe]) { const room = maybe && ch(maybe) ? ch(maybe) : chan; return bot(c, `${room.name}: ${names(room).map((n) => `${n.prefix}${n.nick}`).join(' ')}`); },
         topic(c, chan, args) {
             if (!args.length) return bot(c, `${chan.name} topic: ${chan.topic || '(none)'}`);
@@ -621,7 +766,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         // ---- room @ ----
         kick(c, chan, [n, ...why]) {
             const t = target(c, n); if (!t) return undefined;
-            if (isBand(t) && !isBand(c)) return bot(c, 'You can’t kick a band op.', 'error');
+            if (isStaff(t) && !isBand(c)) return bot(c, 'Only band administrators can act on site staff.', 'error');
             if (!chan.members.has(t.id)) return bot(c, `${t.nick} isn't in ${chan.name}.`, 'error');
             const reason = normalize(why.join(' '), 80) || 'kicked';
             if (chan.kind === 'lobby') {
@@ -631,6 +776,8 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
                 out(t, { t: 'kicked', ch: chan.name, by: c.nick, reason });
                 return kill(t, 4001, 'kicked');
             }
+            for (const [dev, until] of Object.entries(chan.kicks)) if (until <= now()) delete chan.kicks[dev];
+            if (Object.keys(chan.kicks).length >= 150 && !chan.kicks[t.dev]) return bot(c, 'Room cooldown list is full; ask a site moderator for help.', 'error');
             chan.kicks[t.dev] = now() + L.kickCooldown;
             event(chan, `${t.nick} was kicked by ${c.nick} (${reason})`);
             out(t, { t: 'kicked', ch: chan.name, by: c.nick, reason });
@@ -640,10 +787,11 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         ban(c, chan, [n, ...why]) {
             if (chan.kind === 'lobby') return handlers.gban(c, chan, [n, ...why]);
             const t = target(c, n); if (!t) return undefined;
-            if (isBand(t)) return bot(c, 'You can’t ban a band op.', 'error');
+            if (isStaff(t)) return bot(c, 'Site staff access is managed by the owner.', 'error');
             const reason = normalize(why.join(' '), 80) || 'banned';
             chan.bans.push({ mask: `dev:${t.dev}`, reason, by: c.nick, at: now() }, { mask: `nick:${lc(t.nick)}`, reason, by: c.nick, at: now() },
                 { mask: `iph:${t.iph}`, nick: t.nick, reason, by: c.nick, at: now(), until: now() + L.ipBan }); // a private window can't dodge it
+            if (t.account) chan.bans.push({ mask: `account:${t.account}`, reason, by: c.nick, at: now() });
             if (chan.bans.length > L.roomBanMax) chan.bans = chan.bans.slice(-L.roomBanMax); // keep the newest
             event(chan, `${c.nick} sets mode +b ${t.nick}`);
             log(c.nick, 'ban', t.nick, reason, chan.name);
@@ -664,6 +812,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         invite(c, chan, [n]) {
             const t = target(c, n); if (!t) return undefined;
             if (chan.kind === 'lobby') return bot(c, '/invite nick #room', 'error');
+            if (chan.invites.size >= 150 && !chan.invites.has(t.dev)) return bot(c, 'Room invitation list is full.', 'error');
             chan.invites.add(t.dev);
             out(t, { t: 'invite', ch: chan.name, by: c.nick });
             return bot(c, `Invited ${t.nick} to ${chan.name}.`);
@@ -711,17 +860,19 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         },
         close(c, chan) {
             if (chan.kind === 'lobby') return bot(c, '#stalemate can’t be closed. Use /lobby lock.', 'error');
+            if (chan.owner && !owns(c, chan) && !isStaff(c)) return bot(c, 'Only the owner or site moderators can close a registered room.', 'error');
             return closeRoom(chan, c.nick, isBand(c) ? 'closed by the band' : 'closed by the host');
         },
         // ---- band @ ----
         gban(c, chan, [n, ...why]) {
             const t = target(c, n); if (!t) return undefined;
-            if (isBand(t)) return bot(c, 'Band ops can’t be banned here; remove them in Cloudflare Access.', 'error');
+            if (isStaff(t)) return bot(c, 'Site staff access must be removed through the staff allowlist and Cloudflare Access.', 'error');
             const reason = normalize(why.join(' '), 80);
             if (!reason) return bot(c, 'A ban needs a reason: /ban nick why', 'error');
             net.bans.push({ mask: `dev:${t.dev}`, nick: t.nick, reason, by: c.nick, at: now() },
                 { mask: `iph:${t.iph}`, nick: t.nick, reason, by: c.nick, at: now(), until: now() + L.ipBan },
                 { mask: `nick:${lc(t.nick)}`, nick: t.nick, reason, by: c.nick, at: now() });
+            if (t.account) net.bans.push({ mask: `account:${t.account}`, reason, by: c.nick, at: now() });
             if (net.bans.length > L.banMax) net.bans = net.bans.slice(-L.banMax); // keep the newest
             for (const name of t.channels) event(ch(name), `${t.nick} was banned by ${c.nick} (${reason})`);
             log(c.nick, 'ban', t.nick, reason, 'network');
@@ -731,14 +882,17 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         },
         mute(c, chan, [n, dur]) {
             const t = target(c, n); if (!t) return undefined;
+            if (isStaff(t) && !isBand(c)) return bot(c, 'Staff privileges are managed by the owner.', 'error');
             const ms = Math.min(parseDuration(dur, 10 * MIN), DAY);
             net.mutes[t.dev] = now() + ms;
+            if (t.account) net.mutes[t.account] = now() + ms;
             bot(t, `You're muted for ${Math.round(ms / MIN)} min. You can still read.`, 'error');
             log(c.nick, 'mute', t.nick, `${Math.round(ms / MIN)}m`, chan.name);
             return saveNet();
         },
         purge(c, chan, [what]) {
             const t = byNick(what);
+            if (t && isStaff(t) && !isBand(c)) return bot(c, 'Staff actions require a band administrator.', 'error');
             const window = /^\d+[smh]$/.test(what || '') ? parseDuration(what, 5 * MIN) : 0;
             const ids = [...lines.values()].filter((l) => (t ? lineMeta.get(l.id)?.authorDev === t.dev : window ? l.ts >= now() - window : false)).map((l) => l.id);
             if (!ids.length) return bot(c, 'Nothing to purge.', 'error');
@@ -813,9 +967,12 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     };
 
     function setRank(c, chan, n, set, on, flag) {
-        if (chan.kind === 'lobby') return bot(c, 'In #stalemate the band are the ops. Use this inside a room.', 'error');
+        if (chan.kind === 'lobby') return bot(c, 'In #stalemate authenticated site staff are the ops. Use this inside a room.', 'error');
         const t = target(c, n); if (!t) return undefined;
         if (!chan.members.has(t.id)) return bot(c, `${t.nick} isn't in ${chan.name}.`, 'error');
+        if (chan.owner && set === 'ops' && !owns(c, chan) && !isBand(c)) return bot(c, 'Only the owner manages co-hosts.', 'error');
+        if (!on && owns(t, chan)) return bot(c, 'The room owner keeps host access.', 'error');
+        if (on && chan[set].size >= 150) return bot(c, 'Room grants are full; remove an existing grant first.', 'error');
         if (on) chan[set].add(t.dev); else chan[set].delete(t.dev);
         event(chan, `${c.nick} sets mode ${flag} ${t.nick}`);
         log(c.nick, `mode ${flag}`, t.nick, '', chan.name);
@@ -830,9 +987,11 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     function create(c, name, key, titleText) {
         const kind = Object.keys(KINDS).find((k) => name === `#${k}` || name.startsWith(`#${k}-`)) || 'chat';
         if (net.shield && !isBand(c)) return bot(c, 'Shield is on, so new rooms are paused. Try again later.', 'error');
-        const listed = [...channels.values()].filter((x) => x.kind !== 'lobby').length;
+        if (roomsBroken) return bot(c, 'Room storage needs administrator recovery.', 'error');
+        const listed = [...channels.values()].filter((x) => x.kind !== 'lobby' && !x.owner).length;
         if (listed >= L.roomsListed) return bot(c, 'All 30 room slots are busy. Join one from the list.', 'error');
         if (!isBand(c)) {
+            if (devStats.size >= 5000 && !devStats.has(c.dev) || ipRooms.size >= 5000 && !ipRooms.has(c.iph)) return bot(c, 'Room creation is temporarily busy.', 'error');
             const st = devStats.get(c.dev) || {};
             if (st.lastRoom && now() - st.lastRoom < L.roomPerDevice) return bot(c, 'One new room per 10 minutes.', 'error');
             const hits = (ipRooms.get(c.iph) || []).filter((t) => t > now() - HOUR);
@@ -880,7 +1039,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (net.shield) return bot(c, 'Shield is on: cameras are off everywhere for now.', 'error');
         if (!chan.modes.C) return bot(c, `Cameras are off in ${chan.name} (-C).`, 'error');
         if (!adult18) return out(c, { t: 'cam-gate', ch: chan.name, text: 'Cameras in open rooms are 18+. Tick the box to turn yours on.' });
-        if ((c.camReports || 0) >= L.reportsCamOff) return bot(c, 'Your camera is off pending band review.', 'error');
+        if ((c.camReports || 0) >= L.reportsCamOff) return bot(c, 'Your camera is off pending moderator review.', 'error');
         c.cams.add(lc(chan.name));
         out(c, { t: 'cam', ch: chan.name, on: true });
         return sendChan(chan);
@@ -918,6 +1077,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             if (!PAINT_KINDS.has(chan.kind)) return undefined;
             const stroke = applyStroke(chan, f.stroke);
             if (!stroke) return undefined;
+            while (JSON.stringify(chan.act.strokes).length > 250000) chan.act.strokes.shift();
             return castAct(chan, { t: 'act', ch: chan.name, kind: 'stroke', stroke, from: c.id, ts: relayT });
         }
         if (f.kind === 'clear') {
@@ -945,12 +1105,13 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     }
 
     function say(c, where, rawText, action) {
+        if (!limited(c, 'chat', L.burst, L.perSecond)) return;
         const chan = ch(where);
         if (!chan || !chan.members.has(c.id)) return bot(c, 'You are not in that room.', 'error');
         if (!isBand(c)) {
-            if ((net.mutes[c.dev] || 0) > now()) return bot(c, 'You’re muted for now. You can still read.', 'error');
+            if (Math.max(net.mutes[c.dev] || 0, net.mutes[c.account] || 0) > now()) return bot(c, 'You’re muted for now. You can still read.', 'error');
             if (net.lock === 'readonly' || budgetLevel() !== 'ok') return bot(c, 'The lobby is read-only right now.', 'error');
-            if (chan.modes.m && !chan.voice.has(c.dev) && !chan.ops.has(c.dev)) return bot(c, `${chan.name} is +m: only @ and + can talk.`, 'error');
+            if (chan.modes.m && !chan.voice.has(c.dev) && !hosts(c, chan)) return bot(c, `${chan.name} is +m: only @ and + can talk.`, 'error');
             if (chan.modes.Q) return bot(c, 'Quick lines only right now (+Q). Tap a quick line.', 'error');
             const t = now();
             c.tokens = Math.min(L.burst, c.tokens + ((t - c.last) / 1000) * L.perSecond);
@@ -958,11 +1119,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             if (c.tokens < 1) return bot(c, 'Easy, speed racer.', 'error');
             const slow = net.shield && chan.kind === 'lobby' ? Math.max(30, chan.modes.S) : chan.modes.S;
             if (slow && c.lastSaid[chan.name] && t - c.lastSaid[chan.name] < slow * 1000) return bot(c, `Slow mode: one line every ${slow}s.`, 'error');
-            const day = new Date(t).toISOString().slice(0, 10);
-            const st = devStats.get(c.dev) || {};
-            if (st.day !== day) { st.day = day; st.msgs = 0; }
-            if (st.msgs >= L.perDeviceDay) return bot(c, 'That’s 200 lines today. Come back tomorrow.', 'error');
-            st.msgs += 1; devStats.set(c.dev, st);
+            if (!consumeDaily(c)) return;
             c.tokens -= 1;
             c.lastSaid[chan.name] = t;
         }
@@ -971,7 +1128,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (!isBand(c) && c.lastText === norm && now() - (c.lastTextAt || 0) < 30000) { log(BOT, 'filter-block', c.nick, 'spam:repeat', chan.name); return bot(c, 'Heard you the first time. 🦜', 'error'); }
         c.lastText = norm; c.lastTextAt = now();
         const v = checkText(rawText, net.lists);
-        const line = { t: 'line', id: `m${now().toString(36)}${(seq += 1).toString(36)}`, ch: chan.name, from: c.nick, prefix: prefix(c, chan), band: isBand(c), me: !!action, text: v.text, ts: now() };
+        const line = { t: 'line', id: `m${now().toString(36)}${(seq += 1).toString(36)}`, ch: chan.name, from: c.nick, prefix: prefix(c, chan), band: isBand(c), moderator: c.role === 'moderator', me: !!action, text: v.text, ts: now() };
         if (v.verdict === 'block' && !(isBand(c) && v.reason.startsWith('link'))) {
             if (v.reason !== 'empty') { bot(c, v.reason.startsWith('personal-info') ? 'Not cool here: no phone numbers, emails, addresses or socials in public chat.' : v.reason === 'link' ? 'Only YouTube links are allowed.' : v.reason === 'threat' ? 'Nope. No threats. Don’t be a dick.' : v.reason === 'spam' ? 'Easy on the keyboard mash.' : 'Don’t be a dick. Message not sent.', 'error'); log(BOT, 'filter-block', c.nick, v.reason, chan.name); }
             return undefined;
@@ -981,7 +1138,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             heldChannels.set(line.id, chan);
             while (held.size > MODERATION_QUEUE_MAX) { const oldest = held.keys().next().value; held.delete(oldest); heldChannels.delete(oldest); }
             saveModerationQueue();
-            bot(c, 'Your message is waiting for a band op to OK it.');
+            bot(c, 'Your message is waiting for a moderator to OK it.');
             log(BOT, 'filter-hold', c.nick, v.reason, chan.name);
             return undefined;
         }
@@ -1027,11 +1184,12 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (t.pmOff || t.blocks.has(c.dev) || c.blocks.has(t.dev)) return bot(c, `${t.nick} isn't taking PMs.`, 'error');
         if (!isBand(c)) {
             if (net.shield) return bot(c, 'Shield is on: new PM requests are paused.', 'error');
-            if ((net.mutes[c.dev] || 0) > now()) return bot(c, 'You’re muted for now.', 'error');
+            if (Math.max(net.mutes[c.dev] || 0, net.mutes[c.account] || 0) > now()) return bot(c, 'You’re muted for now.', 'error');
             if (now() - c.since < L.pmMinLobbyMs) return bot(c, `Hang in the lobby for ${Math.ceil(L.pmMinLobbyMs / MIN)} minutes before sending PM requests.`, 'error');
             const pending = [...pm.values()].filter((x) => x.from === c.dev && x.state === 'pending').length;
             if (pending >= L.pmPendingMax) return bot(c, 'Too many PM requests waiting. Give people a minute.', 'error');
         }
+        if (!limited(c, 'pm-request', 3, 3 / 60)) return;
         let first = '';
         if (rawText) {
             const v = checkText(rawText, net.lists);
@@ -1045,8 +1203,10 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     }
 
     function deliverPm(from, to, rawText) {
+        if (!limited(from, 'chat', L.burst, L.perSecond)) return;
+        if (!isBand(from) && !consumeDaily(from)) return;
         if (!isBand(from) && (net.lock === 'readonly' || budgetLevel() !== 'ok')) return bot(from, 'The lobby is read-only right now, PMs too.', 'error');
-        if (!isBand(from) && (net.mutes[from.dev] || 0) > now()) return bot(from, 'You’re muted for now.', 'error');
+        if (!isBand(from) && Math.max(net.mutes[from.dev] || 0, net.mutes[from.account] || 0) > now()) return bot(from, 'You’re muted for now.', 'error');
         if (to.blocks.has(from.dev)) return bot(from, `${to.nick} isn't taking PMs.`, 'error');
         const v = checkText(rawText, net.lists);
         if (v.verdict !== 'ok') { log(BOT, 'pm-filter', from.nick, v.reason); return bot(from, v.reason.startsWith('personal-info') ? 'Not cool here: no phone numbers, emails, addresses or socials, even in PMs.' : 'Not cool here. Message not sent.', 'error'); }
@@ -1060,6 +1220,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     }
 
     function report(c, id) {
+        if (!limited(c, 'report', 5, 5 / 60)) return;
         const l = lines.get(id);
         if (!l) return bot(c, 'That message is gone already.', 'error');
         const meta = lineMeta.get(id);
@@ -1093,7 +1254,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         }
         saveModerationQueue();
         pushAdmin();
-        return bot(c, 'Reported to the band. Thanks for looking out.');
+        return bot(c, 'Reported to the moderators. Thanks for looking out.');
     }
 
     function shield(on, by) {
@@ -1113,11 +1274,24 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     let lastStatSave = '';
     function tick() {
         const t = now();
+        rates.prune();
         if (hourKey() !== lastStatSave) { lastStatSave = hourKey(); saveNet(); } // stats: ~24 row writes/day
+        for (const [key, v] of devStats) if ((!v.lastRoom || now() - v.lastRoom > HOUR) && v.day !== new Date(now()).toISOString().slice(0, 10)) devStats.delete(key);
+        for (const [key, v] of ipRooms) { const fresh = v.filter((at) => now() - at < HOUR); if (fresh.length) ipRooms.set(key, fresh); else ipRooms.delete(key); }
         for (const [d, until] of Object.entries(net.kicks)) if (until <= t) delete net.kicks[d];
         for (const [d, until] of Object.entries(net.mutes)) if (until <= t) delete net.mutes[d];
         net.bans = net.bans.filter((b) => !b.until || b.until > t);
-        for (const room of [...channels.values()]) if (room.kind !== 'lobby' && room.members.size === 0 && room.emptySince && t - room.emptySince >= L.emptyRoomClose) closeRoom(room, BOT, 'empty for 10 minutes');
+        for (const room of [...channels.values()]) {
+            for (const [key, until] of Object.entries(room.kicks)) if (until <= t) delete room.kicks[key];
+            if (room.kind === 'lobby') continue;
+            if (room.owner && membersOf(room).some((m) => owns(m, room) || m.account && room.cohosts.has(m.account))) room.renewed = t;
+            if (room.owner && t - room.renewed >= ROOM_TTL) { closeRoom(room, BOT, 'registration expired after 90 inactive days'); continue; }
+            if (!room.members.size && room.emptySince !== null && t - room.emptySince >= L.emptyRoomClose) {
+                if (!room.owner) closeRoom(room, BOT, 'empty for 10 minutes');
+                else { room.act = { strokes: [], video: null }; if (room.jam) room.jam = { desktop: '', web: '' }; }
+            }
+        }
+        net.modlog = net.modlog.filter((e) => now() - e.at < LOG_TTL).slice(-L.modlogKeep);
         const bandOn = [...conns.values()].some(isBand);
         if (bandOn) net.lastBand = t;
         // Community conversations stay open without band presence. Only explicit
@@ -1135,7 +1309,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         s = { ...s };
         // Bans: keep only well-formed entries. If any were malformed a ban may be lost, so lock read-only too.
         if (s.bans !== undefined) {
-            const okBan = (b) => b && typeof b === 'object' && typeof b.mask === 'string' && /^(?:dev|iph|nick):.+/.test(b.mask)
+            const okBan = (b) => b && typeof b === 'object' && typeof b.mask === 'string' && /^(?:dev|iph|nick|account):.+/.test(b.mask)
                 && (b.until === undefined || b.until === null || Number.isFinite(b.until));
             const list = Array.isArray(s.bans) ? s.bans : [];
             const good = list.filter(okBan);
@@ -1198,7 +1372,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         }
         for (const k of ['bans', 'kicks', 'mutes', 'lock', 'shield', 'shieldAuto', 'lockAuto', 'lists', 'lastBand', 'budget', 'reportsToHide', 'stats']) if (s[k] !== undefined) net[k] = s[k];
     }
-    function restoreLog(entries = []) { net.modlog = entries.slice(-L.modlogKeep); }
+    function restoreLog(entries = []) { net.modlog = entries.filter((e) => Number.isFinite(e.at) && now() - e.at < LOG_TTL).slice(-L.modlogKeep); }
 
-    return { connect, disconnect, message, tick, snapshot, restore, restoreLog, restoreModerationQueue, restoreAiReviews, applyAiReview, notifyAiStatus: pushAdmin, adminState, budgetLevel, spend, get modlog() { return net.modlog.slice(); }, _debug: { conns, channels, net, pm, reports, held, lines } };
+    return { connect, disconnect: (...args) => durable(disconnect, args), message: (...args) => durable(message, args), tick: (...args) => durable(tick, args), roomSnapshot, restoreRooms, abuseSnapshot, restoreAbuse, snapshot, restore, restoreLog, restoreModerationQueue, restoreAiReviews, applyAiReview, notifyAiStatus: pushAdmin, adminState, budgetLevel, spend, get modlog() { return net.modlog.slice(); }, _debug: { conns, channels, net, pm, reports, held, lines } };
 }

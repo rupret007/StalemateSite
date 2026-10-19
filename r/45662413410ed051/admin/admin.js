@@ -32,15 +32,16 @@
         app.ws = ws;
         let opened = false;
         ws.onopen = () => { opened = true; };
-        ws.onclose = () => { if (!opened) status('Not signed in as band. Tap “Sign in with email code” first.'); else toast('Disconnected. Reload to reconnect.'); };
+        ws.onclose = () => { if (!opened) status('Not signed in as a site moderator. Tap “Sign in with email code” first.'); else toast('Disconnected. Reload to reconnect.'); };
         ws.onmessage = (e) => {
             let m; try { m = JSON.parse(e.data); } catch (err) { return; }
             if (m.t === 'device') localStorage.setItem('hangout-dev', m.token);
-            if (m.t === 'hello') send({ t: 'hello', nick: $('[data-nick]').value.trim() || 'Band' });
+            if (m.t === 'hello') send({ t: 'hello', nick: $('[data-nick]').value.trim() || 'Helper', age13: true });
             if (m.t === 'nick-error') status(m.text);
             if (m.t === 'welcome') { $('[data-gate]').hidden = true; $('[data-panel]').hidden = false; }
             if (m.t === 'admin') { app.state = m.state; draw(); }
             if (m.t === 'notice' && m.kind === 'error') toast(m.text);
+            if (m.t === 'rate-limit') toast(m.text);
             if (m.t === 'denied') toast(m.text);
         };
         return undefined;
@@ -106,6 +107,8 @@
     }
 
     function draw() {
+        const configure = app.state?.capabilities?.configure === true;
+        $$('[data-panic], [data-shieldoff], [data-lobby], [data-slow], [data-tab=filter], [data-filter-form]').forEach((e) => { e.hidden = !configure; });
         const s = app.state;
         $('[data-state]').textContent = `Lobby ${s.lock === 'off' ? 'OPEN' : s.lock === 'readonly' ? (s.lockAuto ? 'READ-ONLY (automatic safety lock)' : 'READ-ONLY') : 'LOCKED'} · Shield ${s.shield ? (s.shieldAuto ? 'UP (legacy automatic shield)' : 'UP') : 'down'} · Slow ${s.slow}s · ${s.stats.online} online · Budget ${Math.round(100 * s.budget.requests / s.budget.cap)}% (${s.budget.level})`;
         const aiReviewCount = drawAiReview(s);
@@ -131,7 +134,7 @@
 
         const users = $('[data-users]'); users.replaceChildren();
         for (const u of s.users) {
-            const li = el('li'); li.append(el('b', `${u.role !== 'fan' ? '⭐ ' : ''}${u.nick}${u.muted ? ' (muted)' : ''}${u.away ? ' 💤' : ''}`), el('span', u.channels.join(' '), 'small'));
+            const li = el('li'); li.append(el('b', `${u.role === 'moderator' ? 'MOD ' : u.role !== 'fan' ? '⭐ ' : ''}${u.nick}${u.muted ? ' (muted)' : ''}${u.away ? ' 💤' : ''}`), el('span', u.channels.join(' '), 'small'));
             if (u.role === 'fan') {
                 const acts = el('div', undefined, 'acts');
                 acts.append(btn('Mute 10m', () => cmd('mute', [u.nick, '10m'])), btn('Mute 24h', () => cmd('mute', [u.nick, '24h'])), btn('Kick', () => cmd('kick', [u.nick, 'take a breather'])),

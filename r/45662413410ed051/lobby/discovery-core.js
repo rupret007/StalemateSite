@@ -42,7 +42,7 @@
                 max: source.max,
                 locked: source.locked,
                 key: source.key,
-                cams: source.cams === true,
+                cams: source.cams === true, persistent: source.persistent === true, mine: source.mine === true, hostPresent: source.hostPresent === true,
                 joined: joined.has(nameKey)
             };
             room.state = room.joined ? 'joined' : room.count >= room.max ? 'full' : room.locked ? 'invite' : room.key ? 'key' : room.count > 0 ? 'open' : 'empty';

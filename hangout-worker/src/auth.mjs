@@ -36,7 +36,7 @@ export async function verifyAccessJwt(token, { team, aud, now = Date.now(), fetc
     if (typeof claims.exp !== 'number' || claims.exp <= t) throw new Error('expired');
     if (typeof claims.nbf === 'number' && claims.nbf > t + 30) throw new Error('not-yet');
     if (typeof claims.email !== 'string' || !claims.email.includes('@')) throw new Error('email');
-    return { email: claims.email.toLowerCase() };
+    return { email: claims.email.toLowerCase(), expiresAt: claims.exp * 1000 };
 }
 
 // Owner (Jeff) vs band op. Emails come from `wrangler secret`/vars, never the repo. Unknown Access email => band
@@ -45,6 +45,7 @@ export function roleForEmail(email, env = {}) {
     const list = (v) => String(v || '').toLowerCase().split(',').map((s) => s.trim()).filter(Boolean);
     if (list(env.HANGOUT_OWNER_EMAIL).includes(email)) return 'owner';
     if (list(env.HANGOUT_BAND_EMAILS).includes(email)) return 'band';
+    if (list(env.HANGOUT_MODERATOR_EMAILS).includes(email)) return 'moderator';
     return null;
 }
 
@@ -77,3 +78,5 @@ export async function verifyDevice(token, key) {
 export async function ipHash(ip, key, now = Date.now()) {
     return (await hmac(key, `ip:${ip}:${new Date(now).toISOString().slice(0, 10)}`)).slice(0, 22);
 }
+
+export async function accountId(email, key) { return `a_${await hmac(key, `account:${email.toLowerCase()}`)}`; }

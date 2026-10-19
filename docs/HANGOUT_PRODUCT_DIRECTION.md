@@ -71,8 +71,8 @@ Guests can now create genuine named text rooms through `/join #name` and Start a
 
 ### 5. Make guest hosting dependable; keep global moderation separate
 
-- Room hosting is already open to guests. A distinct trusted site-wide moderator role remains future work; the community no longer closes merely because a band member is absent.
-- Current lifecycle: creator gets room-op controls; `/op nick` grants a co-host; signed-device identity recovers authority while the room exists; the UI shows an unhosted state; rooms close after 10 minutes empty. There is no automatic transfer. A friend using the same nickname on a new device gets no authority. Remaining gaps include a more direct handoff flow, full-room return and room-state loss on Worker hibernation.
+- Room hosting is already open to guests. An owner-appointed trusted site-wide moderator role is implemented locally; the community no longer closes merely because a band member is absent.
+- Current lifecycle: guest temporary rooms remain immediate. Optional email-backed registration preserves names and owner/co-host roles across devices and restarts; names expire after 90 days without an owner/co-host visit. Visible handoff, offline co-host removal, reserved owner capacity and room restoration are implemented. See [community improvements](HANGOUT_COMMUNITY_IMPROVEMENTS.md).
 - The existing one-room-per-device/10-minute creation cap can interrupt chat → creative collaboration. Revisit the allowance or add an explicit way to turn a chat into an activity before launching; do not silently remove abuse limits.
 - Never restore host controls based on nickname alone, silently hand global power to a guest entering `#stalemate`, or imply that a room-op marker identifies a band member.
 - StaleBot can explain commands and enforce understandable rules; humans should welcome and respond to people. Never simulate visitors or activity.

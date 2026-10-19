@@ -30,7 +30,8 @@
             <p class="small">Chat starts when you join. Scrollback stays in this tab for your connected session.</p>
             <p class="small" data-ai-disclosure>When AI review is enabled, public text may go to OpenAI after posting to flag messages for our moderators. PMs, invite links, invite-only/key-protected/locked rooms, cameras and encrypted private rooms are excluded. Flagged, reported or held evidence stays up to 24 hours, separate from chat scrollback.</p>
             <button class="btn btn--big" type="button" data-enter>I’m 13+ and I agree · Let me in 🤘</button>
-            <p class="rules"><b>One rule: Don’t be a dick.</b> Swear all you want. You own what you post; the band can remove anything. <a href="../terms/" data-terms>House rules &amp; privacy</a></p>
+            <p class="rules"><b>One rule: Don’t be a dick.</b> Swear all you want. You own what you post; site moderators can remove abusive content. <a href="../terms/" data-terms>House rules &amp; privacy</a></p>
+            <button class="btn btn--ghost" data-gate-guest hidden>Continue as guest</button>
             <p class="status" data-gate-status role="status"></p>
         </div>
     </section>
@@ -42,12 +43,16 @@
                 <h2 data-presence-title>Getting connected</h2>
                 <p data-presence-detail>Everyone starts in the same conversation.</p>
             </section>
-            <h2>Rooms open now <span class="count" data-room-count>0</span></h2>
+            <h2>Rooms <span class="count" data-room-count>0</span></h2>
             <p class="small directory-hint">Join something already going, or start a room below.</p>
+            <label class="small">Show <select data-room-filter aria-label="Room directory"><option value="active">Active now</option><option value="registered">Registered rooms</option><option value="mine">My rooms</option></select></label>
+            <label class="small">Find a room <input data-room-search type="search" maxlength="40" aria-label="Find a room"></label>
+            <a class="private" data-owner-signin href="#">Sign in with email to keep a room</a>
+            <button class="btn btn--small btn--ghost" data-owner-signout hidden>Continue as guest</button>
             <ul class="roomlist" data-roomlist></ul>
             <p class="empty" data-rooms-empty>No rooms yet. Stay for a chat, or be the first to start one.</p>
             <h2 class="start-heading">Start something together</h2>
-            <p class="small">Anyone can host. Create a room and you get @ host controls.</p>
+            <p class="small">Anyone can host a temporary room. Sign in with email to keep its name across visits. Registered rooms expire after 90 days without an owner or verified co-host visit.</p>
             <div class="tiles" data-tiles>
                 <button class="tile tile-chat" type="button" data-start="chat"><b aria-hidden="true">#</b>Start a chat channel<span>Pick a name. Make it your hangout.</span></button>
                 <button class="tile" type="button" data-start="bobross"><b aria-hidden="true">🎨</b>Paint along<span>Bob Ross + a shared canvas</span></button>

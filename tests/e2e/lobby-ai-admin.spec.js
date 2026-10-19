@@ -137,3 +137,15 @@ test('guests see the conditional AI disclosure and its exclusions before enterin
     await page.mouse.wheel(0, 10000);
     await expect(page.getByRole('link', { name: 'Back to #stalemate', exact: true })).toBeInViewport();
 });
+
+test('community moderators see review actions without band configuration controls', async ({ page, baseURL }) => {
+    await openFixture(page, baseURL, snapshot({ capabilities: { moderate: true, configure: false }, users: [{ nick: 'Helper', role: 'moderator', channels: ['#stalemate'] }] }));
+    await expect(page.locator('[data-panic]')).toBeHidden();
+    await expect(page.locator('[data-tab="filter"]')).toBeHidden();
+    await expect(page.locator('[data-lobby="unlock"]')).toBeHidden();
+    await page.click('[data-tab="people"]');
+    await expect(page.locator('[data-users]')).toContainText('MOD Helper');
+    await expect(page.locator('[data-users]')).not.toContainText('⭐ Helper');
+    await page.click('[data-tab="queue"]');
+    await expect(page.locator('[data-ai-state]')).toBeVisible();
+});

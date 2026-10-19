@@ -50,3 +50,7 @@ Guest rooms remain open when band members are away. Manual locks/shield, stored-
 `HANGOUT_AI_MODERATION="off"` is the default. Setting it to `"review"` plus an `OPENAI_API_KEY` Worker secret enables review-only classification of new public text using `src/ai-moderation.mjs`. `HANGOUT_AI_DAILY_LIMIT` defaults to 1000; the persistent allowance, concurrency cap, timeout and failure backoff bound provider traffic. No browser receives credentials. The local relay does not enable external AI calls.
 
 AI flags, human reports and held-message evidence use separate bounded 24-hour storage queues; they never become visitor chat history. They are for authenticated human review. AI does not automatically punish users. See [the safeguard design and activation procedure](../docs/HANGOUT_SAFEGUARDS_AI.md) for data scope, failure behavior, validation and remaining launch work.
+
+## Community roles and room registration
+
+Optional public email ownership uses a separate Access application (`HANGOUT_OWNER_ACCESS_AUD`, `HANGOUT_OWNER_RETURN`); staff remain behind the existing restricted application. `HANGOUT_MODERATOR_EMAILS` is owner-managed deployment configuration. See [community configuration, limits and migration](../docs/HANGOUT_COMMUNITY_IMPROVEMENTS.md). Nothing in this change configures Cloudflare, sends email, deploys pages, or enables AI.

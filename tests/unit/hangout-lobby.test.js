@@ -267,7 +267,7 @@ describe('permissions are enforced on the server (forged commands)', () => {
     it('a plain fan is denied every op and band command, and each attempt is logged', () => {
         const fan = join('Fan');
         join('Victim');
-        for (const name of [...chanop, ...band]) cmd(fan, name, ['Victim', 'x']);
+        for (const name of [...chanop, ...band]) { later(1000); cmd(fan, name, ['Victim', 'x']); }
         const denied = got(fan).filter((m) => m.t === 'denied').map((m) => m.cmd);
         expect(denied.sort()).toEqual([...chanop, ...band].sort());
         expect(L.modlog.filter((e) => e.action === 'denied').length).toBe(chanop.length + band.length);
@@ -401,7 +401,7 @@ describe('PMs are accept-first, filtered, blockable, switchable and need lobby t
         const a = join('Alpha');
         for (const x of ['Bb1', 'Bb2', 'Bb3', 'Bb4', 'Bb5', 'Bb6']) join(x);
         later(3 * 60 * 1000);
-        for (const x of ['Bb1', 'Bb2', 'Bb3', 'Bb4', 'Bb5', 'Bb6']) cmd(a, 'query', [x]);
+        for (const x of ['Bb1', 'Bb2', 'Bb3', 'Bb4', 'Bb5', 'Bb6']) { later(21000); cmd(a, 'query', [x]); }
         expect(notices(a)).toMatch(/Too many PM requests/);
     });
 });

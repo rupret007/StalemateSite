@@ -4,7 +4,7 @@ import http from 'node:http';
 import { WebSocketServer } from 'ws';
 import { admit, createBucket, limitsFrom, validFrame, originAllowed, previewKeyOk } from '../hangout-worker/src/core.mjs';
 import { createLobby } from '../hangout-worker/src/lobby-core.mjs';
-import { ipHash, newDeviceId, signDevice, verifyDevice } from '../hangout-worker/src/auth.mjs';
+import { accountId, ipHash, newDeviceId, signDevice, verifyDevice } from '../hangout-worker/src/auth.mjs';
 
 const DEV_HMAC = 'local-dev-only-hmac-key-not-a-secret-000';
 
@@ -28,24 +28,28 @@ export function createHangoutRelay({ previewKey = 'local-preview-key-0001', orig
 
     const handleUpgrade = async (req, socket, head, url) => {
         const reject = (status, reason) => { socket.end(`HTTP/1.1 ${status} ${reason}\r\n\r\n`); };
-        if (url.pathname === '/lobby' || url.pathname === '/lobby-admin') {
+        if (url.pathname === '/lobby' || url.pathname === '/lobby-admin' || url.pathname === '/lobby-owner') {
             if (!originAllowed(req.headers.origin, origins)) return reject(403, 'origin');
             if (!previewKeyOk(url.searchParams.get('preview'), previewKey)) return reject(403, 'preview');
-            let role = 'fan';
+            let role = 'fan'; let account = '';
+            if (url.pathname === '/lobby-owner') {
+                if (!devAdminKey || !previewKeyOk(url.searchParams.get('devowner'), devAdminKey)) return reject(403, 'owner-access');
+                account = await accountId(url.searchParams.get('account') || 'owner-fixture@example.test', DEV_HMAC);
+            }
             if (url.pathname === '/lobby-admin') {
                 if (!devAdminKey || !previewKeyOk(url.searchParams.get('devadmin'), devAdminKey)) return reject(403, 'access');
-                role = url.searchParams.get('as') === 'owner' ? 'owner' : 'band';
+                role = ['owner', 'moderator'].includes(url.searchParams.get('as')) ? url.searchParams.get('as') : 'band';
             }
             let dev = await verifyDevice(url.searchParams.get('dev'), DEV_HMAC);
             const token = dev ? null : await signDevice((dev = newDeviceId()), DEV_HMAC);
             const iph = await ipHash(req.headers['x-test-ip'] || url.searchParams.get('testip') || req.socket.remoteAddress, DEV_HMAC);
             const id = `c${(lobbySeq += 1)}`;
-            const verdict = lobby.connect({ id, dev, iph, role, admin: role !== 'fan' });
+            const verdict = lobby.connect({ id, dev, iph, role, account, admin: role !== 'fan' });
             if (!verdict.ok) return reject(verdict.status, verdict.reason);
             return wss.handleUpgrade(req, socket, head, (ws) => {
                 lobbySockets.set(id, ws);
                 if (token) ws.send(JSON.stringify({ t: 'device', token }));
-                ws.send(JSON.stringify({ t: 'hello', role, needNick: true }));
+                ws.send(JSON.stringify({ t: 'hello', role, verified: !!account, needNick: true }));
                 ws.on('message', (data) => lobby.message(id, String(data)));
                 ws.on('close', () => { lobbySockets.delete(id); lobby.disconnect(id); });
             });
