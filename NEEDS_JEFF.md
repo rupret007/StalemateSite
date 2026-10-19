@@ -1,8 +1,8 @@
-# Needs Jeff: Windows native music readiness
+# Needs Jeff: beta prerequisites
 
 Updated October 19, 2026. **Jeff confirmed there is no Windows signing certificate or service on record. Treat current Windows builds as unsigned. Do not purchase, sign up, submit identity/billing information, or start signing without a later explicit decision.** Mac, Windows and Linux remain required for the beta.
 
-## Current blocker
+## Current Windows blocker
 
 The verified candidate is WebJam source `5effbc58db706254f8ca8b52de4a0520c482294a`, build [39197407138](https://github.com/rupret007/webjam/actions/runs/39197407138). Its unsigned Windows installer can pass installation/launch checks while native remote v3 Join still fails: the bundled `webjam-fabric.exe` must have an Authenticode status of **Valid** before WebJam starts it. That [runtime requirement](https://github.com/rupret007/webjam/blob/5effbc58db706254f8ca8b52de4a0520c482294a/services/transport_runtime.py#L693) stays intact. No v2 substitution or policy bypass.
 
@@ -35,3 +35,25 @@ These have **no certificate fee**, but differ in what they can establish. None i
 **Current decision: unsigned only; no purchase or signup.** If Jeff wants the next no-cost feasibility experiment, prefer WSLg before adding Podman. Record it separately as Linux-on-Windows and preserve the unmet native Windows requirement. WinGet/Scoop or Run Anyway can improve installation instructions, but cannot unblock native remote music.
 
 A later paid decision can select Azure identity onboarding or a specific CA/provider budget. Until then, signing and native Windows v3 remain blocked. No signing workflow, credential configuration, installation experiment, publication or purchase is authorized by this document. Mac and Linux physical installation/Join/audio receipts also remain required.
+
+## TURN: unlock the existing Vaultwarden profile
+
+**Jeff-only action:** the existing `bw-bots` profile belongs to
+`jeffstory007@gmail.com` on Jeff's self-hosted Vaultwarden. It is currently
+locked; it is not a separate bot account. Jeff must enter his master password
+himself in his own terminal, for example:
+
+```sh
+BITWARDENCLI_APPDATA_DIR="$HOME/vaultwarden/bw-bots" bw unlock
+```
+
+Keep the resulting session key private. Do not paste it or any vault values
+into chat, source, PRs or logs. An unlock in another terminal does not by itself
+share its environment with this process; use the existing approved local
+handoff if needed. Confirm when the approved helper can read **Hangout TURN Key
+ID**, **Hangout TURN API Token** and **Hangout TURN Analytics Token**. Do not
+guess the password, read master-password files, bypass the lock, rotate the
+shared TURN key or print/commit recovered credentials. Continue independent
+beta work while this prerequisite is pending. Unlocking alone does not enable
+TURN; preserve the running expiry observation and the separate usage/trial
+acceptance requirements.
