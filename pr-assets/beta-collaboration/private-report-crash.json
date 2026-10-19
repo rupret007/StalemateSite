@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "status": "passed",
+  "sourceCommit": "c41896b12ba7743d4f362869d5ea3bc9709038b1",
+  "sourceTree": "fbde5e70d5bd5145799dc9859add1cc2580caa6e",
+  "startedAt": "2026-10-19T19:22:11.752Z",
+  "finishedAt": "2026-10-19T19:22:15.144Z",
+  "scope": "One synthetic, explicitly consented private report survives abrupt death of the first owned local c418 Worker process group and same-source SQLite restart.",
+  "candidate": {
+    "archiveSha256": "15d37af478480833cd5502ba7820607d98c44eb7435dc3358f2266d7db878c47",
+    "manifestSha256": "2989c363d66c82f7ed9331a23fa0b102a3be0ecbfc0424725f3418cf5b4b3d5d",
+    "sourceAndAssetFilesVerifiedBeforeAndAfter": 121,
+    "lockedDependency": "obscenity@0.4.6",
+    "dependencyFilesVerified": 62
+  },
+  "checks": {
+    "normalGuestReportAcknowledgedBeforeCrash": true,
+    "sameSourceConfigBindingsKeysInviteVersionAndSQLite": true,
+    "sameCookieFreshConnectionRetryReturnsOriginalPendingId": true,
+    "changedContentSameRequestRejected409": true,
+    "originalReportStillPendingAfterConflict": true,
+    "allOwnedProcessesTerminal": true,
+    "existingPreviewPreserved": true,
+    "testPortReleased": true
+  },
+  "actualCrash": {
+    "signal": "SIGKILL",
+    "onlyFirstOwnedGeneration": true,
+    "ownedProcessesAbruptlyTerminated": 5,
+    "actualWorkerdProcessesAbruptlyTerminated": 2,
+    "terminalBeforeRestart": true,
+    "generations": 2,
+    "secondGenerationStoppedGracefully": true,
+    "forcedCleanupKills": 0
+  },
+  "storage": {
+    "sqliteFiles": 15,
+    "actual16ByteHeadersVerified": true,
+    "sameOriginalFileIdentitiesAssertedAcrossCrashAndRestart": true,
+    "historicalIdentityEvidence": "Reviewed runtime assertions and receipt; historical inode values were not separately retained.",
+    "verifierReadOrChangedStoredRecords": false
+  },
+  "cleanup": {
+    "normalLogouts": 2,
+    "copiedCookieAssetDenials401": 2
+  },
+  "boundaries": {
+    "hostedDeployment": false,
+    "hostedOrUserCredentialsSupplied": false,
+    "providersEnabled": false,
+    "physicalDeviceOrHumanAcceptance": false,
+    "powerLossOrFsyncAcceptance": false,
+    "network": "Kernel sandbox restricted the child runtime to localhost and local IPC; no external-network negative probe was performed."
+  },
+  "limitations": [
+    "An actual SIGKILL process crash does not simulate filesystem, machine or power loss and does not prove fsync durability.",
+    "Only ACKed private-report persistence, unchanged guest-cookie retry/idempotency and conflict preservation are covered; no claim about other rooms, activities or all session behavior.",
+    "No hosted deployment/recovery, real staff review, uninterrupted 24-hour retention, physical device, native package or provider acceptance."
+  ],
+  "preservedSetupFailure": {
+    "stage": "first-c418-start",
+    "failureCode": "owned-worker-start-failed",
+    "cause": "Sandbox denied ancestor package metadata; corrected by permitting only the exact file after verifying sealed bytes.",
+    "guestReportOrIntentionalCrashReached": false,
+    "privateReceiptSha256": "10fbcaf96307c38c6a5e1150fcff651f8b6e75169c28a89c5497bf34d8cc1c49"
+  },
+  "evidence": {
+    "runnerSha256": "8cb91d1f2b725baf5f86d9588be7bd58b64f9b98ebb5b47a3d0c3b448d0f8e89",
+    "sandboxSha256": "06bc6d67a8e04a15ce011973d9893d9df4d144893d5cc0accc0ca2ba03634bff",
+    "privateReceiptSha256": "876b9b9bf7d562872957c6a44c2f27c03909a2526825f846848dd3a84c0eee23",
+    "independentAuditSha256": "d6d13484a60fbf4929e546ed2c6fb734774fb911fd0dfbb14c248496dae17b49",
+    "independentChecksPassed": 24,
+    "credentialCookieQuoteNameRequestRoomIdFrameOrUrlRecorded": false
+  }
+}
