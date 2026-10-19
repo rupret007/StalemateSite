@@ -48,9 +48,27 @@ describe('TURN public endpoint', () => {
         const [url, init] = upstream.mock.calls[1];
         expect(url).toBe('https://rtc.live.cloudflare.com/v1/turn/keys/test-key/credentials/generate-ice-servers');
         expect(init.headers.Authorization).toBe('Bearer test-token');
+        expect(init.redirect).toBe('manual');
+        expect(upstream.mock.calls[0][1].redirect).toBe('manual');
         expect(JSON.parse(init.body)).toEqual({ ttl: 600 });
         expect(JSON.parse(upstream.mock.calls[0][1].body).variables).toEqual({ account: env.HANGOUT_CF_ACCOUNT_ID, from: '2026-10-01', to: '2026-10-16' });
         expect(JSON.stringify([...store.values()])).not.toContain('test-credential');
+    });
+    it.each(['analytics', 'credentials'])('refuses a %s redirect without following it or returning credentials', async (stage) => {
+        upstream.mockImplementation(async (url, options) => {
+            if (options.redirect === 'error') throw new TypeError('Unsupported redirect mode');
+            if (url.includes('/graphql') && stage !== 'analytics') return usage();
+            return new Response('private provider diagnostic', { status: 307, headers: { Location: 'https://untrusted.example/collect' } });
+        });
+        const result = await request();
+        expect(result.status).toBe(503);
+        expect(await result.json()).toEqual({ iceServers: [], reason: 'TURN unavailable' });
+        expect(upstream).toHaveBeenCalledTimes(stage === 'analytics' ? 1 : 2);
+        for (const [url, options] of upstream.mock.calls) {
+            expect(url).not.toContain('untrusted.example');
+            expect(options.redirect).toBe('manual');
+        }
+        expect(store.get('ledger').reserved).toBe(stage === 'analytics' ? 0 : 0.1 * 1e9);
     });
     it.each([
         ['preview', { preview: 'wrong' }, 403], ['room', { room: 'invalid' }, 400],

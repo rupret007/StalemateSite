@@ -62,7 +62,7 @@ async function monthlyUsage(env, now, fetchImpl) {
         } }
     }`;
     const res = await fetchImpl('https://api.cloudflare.com/client/v4/graphql', {
-        method: 'POST', redirect: 'error', signal: AbortSignal.timeout(8000),
+        method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(8000),
         headers: { Authorization: `Bearer ${env.HANGOUT_TURN_ANALYTICS_TOKEN}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ query, variables: { account: env.HANGOUT_CF_ACCOUNT_ID, from: `${date.slice(0, 7)}-01`, to: date } })
     });
@@ -128,7 +128,7 @@ export class HangoutTurnBudget {
         ledger.reserved += RESERVE_BYTES;
         await store.put('ledger', ledger);
         const res = await fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(env.HANGOUT_TURN_KEY_ID)}/credentials/generate-ice-servers`, {
-            method: 'POST', redirect: 'error', signal: AbortSignal.timeout(8000),
+            method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(8000),
             headers: { Authorization: `Bearer ${env.HANGOUT_TURN_API_TOKEN}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ ttl: TURN_TTL })
         });
