@@ -10,7 +10,7 @@
   "files": {
     "r/45662413410ed051/room.js": "fdd1b47464e3b7185927d4fad7e3be10c5ab6aea68c46fb990bf91794958d2b0",
     "r/45662413410ed051/index.html": "64fad0d7e7f978e654963b58113c00785e514d974ae409a778de47ef36f9a86e",
-    "r/45662413410ed051/admin/admin.js": "fab00353d9d3cee1ef9257a2a402b783a03bb02aa0d294bcd32e5081593edebb",
+    "r/45662413410ed051/admin/admin.js": "61aac14dc17552bd5cadfa27e71181255d924f7e1c1aa4fc3c6436ee75cd2d8b",
     "r/45662413410ed051/admin/index.html": "27310339fba626a6cefa8ab41c69d45d31c4cd1deb359d8b32ee1d3b372aeaf5",
     "r/45662413410ed051/terms/index.html": "1bf766e7cb9c1f87d76e189e47a6af3eb55ae47a0d6836162e8f7b167505c529",
     "tests/e2e/hangout-private-reports.spec.js": "0b5213c4306dbd485824a4e352a54761d6b1c1329af2334ca7bc0fa4b1f1df47",
@@ -56,6 +56,27 @@
     "finalStaffBrowser": {
       "privateReportCases": 7,
       "existingAiAdminCases": 5,
+      "passed": 13,
+      "retries": 0,
+      "skips": 0,
+      "elapsedSeconds": 4.3,
+      "logSha256": "2e07f975167d5753ed4ba9b4a3af2053b4e41b55381983250068cfb06f4ded84",
+      "coverage": [
+        "Safe unverified evidence rendering and queue counts.",
+        "Exact Resolve/Dismiss commands; server-confirmed removal.",
+        "Ready redraw, removal and storage-failure keyboard focus.",
+        "Legacy backend without capability.",
+        "Actual routed4401close clears cached state and rendered private text/actions.",
+        "Retired message/close callback cannot overwrite or clear new staff connection.",
+        "Initial rejected staff sign-in retains the correct Not signed in message; connected4401stillclears evidence."
+      ],
+      "existingInitialDenialCases": 1
+    },
+    "newBrowserCases": 13,
+    "noRealAccessClaimFromUiFixtures": true,
+    "previousStaffBrowser": {
+      "privateReportCases": 7,
+      "existingAiAdminCases": 5,
       "passed": 12,
       "retries": 0,
       "skips": 0,
@@ -67,11 +88,11 @@
         "Ready redraw, removal and storage-failure keyboard focus.",
         "Legacy backend without capability.",
         "Actual routed4401close clears cached state and rendered private text/actions.",
-        "Retired message/close callback cannot overwrite or clear new staff connection."
-      ]
-    },
-    "newBrowserCases": 13,
-    "noRealAccessClaimFromUiFixtures": true
+        "Retired message/close callback cannot overwrite or clear new staff connection.",
+        "Initial rejected staff sign-in retains the correct Not signed in message; connected4401stillclears evidence."
+      ],
+      "testedAdminSha256": "fab00353d9d3cee1ef9257a2a402b783a03bb02aa0d294bcd32e5081593edebb"
+    }
   },
   "retainedMeaningfulNegatives": [
     {
@@ -113,5 +134,25 @@
     "Hosted beta remains old source during original8-hour expiry observation. Deploy only after recorded terminal result and reviewed effective configuration.",
     "Actual hosted guest-to-real-staff submission, human disposition and independent reload persistence.",
     "Physical iPhone Safari and required Mac/Windows/Linux device acceptance remain separate."
-  ]
+  ],
+  "retainedCiFailures": {
+    "sourceCommit": "44ccf5e8a04a48aa5df3832ffabd98dd32786666",
+    "push": 39245907421,
+    "pullRequest": 39245951116,
+    "attempt": 1,
+    "actualPrCheckout": "08111b32a958a30d5e8b5463ba442918c65ae6e6",
+    "eachRun": {
+      "unitPassed": 715,
+      "unitFiles": 61,
+      "browserDirect": 259,
+      "browserFinalFailures": 1,
+      "successfulRetries": 0,
+      "testSkips": 0,
+      "all13NewBrowserCasesPassedDirectly": true,
+      "failedConfiguredRetry": true,
+      "PagesDeploySkipped": true
+    },
+    "failure": "Existing wrong dev-admin key denial test expected Not signed in as a site moderator; new generic close copy incorrectly said Staff session ended for an initial rejection. No admission bypass.",
+    "correction": "Preserve the original initial-denial message when the socket never opened; connected expiry4401 keeps the new evidence cleanup and session-ended message. All13 focused staff/AI/denial checks pass. New source CI pending; original failures retained, no rerun requested."
+  }
 }

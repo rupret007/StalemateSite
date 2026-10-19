@@ -51,9 +51,10 @@
             if (app.ws !== ws) return;
             app.ws = null;
             clearPanel();
-            const message = !opened || event.code === 4401
-                ? 'Staff session ended. Tap “Sign in with email code”, then reconnect.'
-                : 'Disconnected. Reconnect to load the current review queue.';
+            const message = !opened
+                ? 'Not signed in as a site moderator. Tap “Sign in with email code” first.'
+                : event.code === 4401 ? 'Staff session ended. Tap “Sign in with email code”, then reconnect.'
+                    : 'Disconnected. Reconnect to load the current review queue.';
             status(message); toast(message);
             $('[data-signin]').focus({ preventScroll: true });
         };
