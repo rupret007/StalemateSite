@@ -1,7 +1,7 @@
 // Hang Out lobby engine: an old-school IRC network in one authoritative place (one Durable Object, one writer,
 // so no netsplits and no "first in gets @"). Pure logic, no I/O: the Worker DO and the local dev relay both
 // drive it, and unit tests drive it directly. Every permission is checked here, never in the browser.
-import { ROOM_TTL, LOG_TTL, roomRecord, validRoom, createRateLimits } from './community-state.mjs';
+import { ROOM_TTL, LOG_TTL, OWNER_TRANSFER_TTL, roomRecord, validRoom, createRateLimits } from './community-state.mjs';
 import { checkNick, checkText, defaultLists, normalize } from './filter.mjs';
 import { actSnapshot, applyClear, applyStroke, applyVideo, cleanRtc, parseActFrame, PAINT_KINDS, VIDEO_KINDS } from './lobby-act.mjs';
 import { messageReceipt, receiptDigest } from './message-receipts.mjs';
@@ -582,7 +582,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         // Leave room for bounded metadata changes and disconnect bookkeeping. Cleanup
         // remains available when storage is full; refuse growth before side effects.
         const growsRoom = chan.kind !== 'lobby' && (
-            ['register', 'acceptowner', 'invite', 'op', 'voice', 'ban'].includes(name)
+            ['register', 'transfer', 'acceptowner', 'invite', 'op', 'voice', 'ban'].includes(name)
             || name === 'topic' && args.length > 0
             || name === 'lock' && lc(args[0]) !== 'off'
             || name === 'cohost' && args[0] === 'add'
@@ -737,7 +737,8 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         }
         for (const r of saved.rooms) {
             const room = mkChannel(r.name, r.kind, r.title, r.founder);
-            Object.assign(room, r, { ops: new Set(r.ops), opAccounts: new Map(r.opAccounts || []), voice: new Set(r.voice), invites: new Set(r.invites), cohosts: new Set(r.cohosts), emptySince: r.emptySince ?? now() });
+            Object.assign(room, r, { ops: new Set(r.ops), opAccounts: new Map(r.opAccounts || []), voice: new Set(r.voice), invites: new Set(r.invites), cohosts: new Set(r.cohosts), emptySince: r.emptySince ?? now(),
+                transfer: r.transfer?.until > now() ? { ...r.transfer } : null });
             // Decode through the activity validators; malformed media state cannot become a frame.
             room.act = { strokes: [], video: null };
             for (const stroke of r.act.strokes) applyStroke(room, stroke);
@@ -856,7 +857,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         transfer(c, room, [nick]) {
             if (!ownerOnly(c, room)) return;
             const t = target(c, nick); if (!t?.account || !room.cohosts.has(t.account) || !room.members.has(t.id)) return bot(c, 'Choose a verified co-host in this room.', 'error');
-            room.transfer = { from: c.account, to: t.account, until: now() + 10 * MIN };
+            room.transfer = { from: c.account, to: t.account, until: now() + OWNER_TRANSFER_TTL };
             out(t, { t: 'owner-offer', ch: room.name, by: c.nick });
             bot(c, 'Ownership offered for 10 minutes. The co-host must accept.');
         },
@@ -1654,6 +1655,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         for (const room of [...channels.values()]) {
             for (const [key, until] of Object.entries(room.kicks)) if (until <= t) delete room.kicks[key];
             if (room.kind === 'lobby') continue;
+            if (room.transfer?.until <= t) room.transfer = null;
             if (room.owner && membersOf(room).some((m) => owns(m, room) || m.account && room.cohosts.has(m.account))) room.renewed = t;
             if (room.owner && t - room.renewed >= ROOM_TTL) { closeRoom(room, BOT, 'registration expired after 90 inactive days'); continue; }
             if (!room.members.size && room.emptySince !== null && t - room.emptySince >= L.emptyRoomClose) {

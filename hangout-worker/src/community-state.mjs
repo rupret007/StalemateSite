@@ -1,5 +1,6 @@
 // Bounded durable community state. Never includes chat, PM bodies, media or jam invites.
 export const ROOM_TTL = 90 * 86400000;
+export const OWNER_TRANSFER_TTL = 10 * 60000;
 export const LOG_TTL = 30 * 86400000;
 const obj = (v) => v && typeof v === 'object' && !Array.isArray(v);
 const id = (v) => typeof v === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(v);
@@ -11,6 +12,7 @@ export function roomRecord(r) {
         created: r.created, modes: { ...r.modes }, ops: [...r.ops], voice: [...r.voice], bans: r.bans,
         invites: [...r.invites], kicks: r.kicks, emptySince: r.emptySince,
         owner: r.owner || '', cohostLabels: { ...(r.cohostLabels || {}) }, cohosts: [...(r.cohosts || [])], renewed: r.renewed || r.created,
+        ...(r.transfer ? { transfer: { from: r.transfer.from, to: r.transfer.to, until: r.transfer.until } } : {}),
         act: { strokes, video: r.act.video } };
 }
 export function validRoom(r, now) {
@@ -21,6 +23,10 @@ export function validRoom(r, now) {
         && id(r.founder) && (r.owner === '' || id(r.owner)) && ids(r.cohosts)
         && Number.isFinite(r.created) && r.created >= 0 && r.created <= now
         && Number.isFinite(r.renewed) && r.renewed >= r.created && r.renewed <= now
+        && (r.transfer == null || obj(r.transfer) && Object.keys(r.transfer).length === 3
+            && id(r.transfer.from) && r.transfer.from === r.owner
+            && id(r.transfer.to) && r.transfer.to !== r.owner && r.cohosts.includes(r.transfer.to)
+            && Number.isFinite(r.transfer.until) && r.transfer.until >= r.created && r.transfer.until <= now + OWNER_TRANSFER_TTL)
         && (r.emptySince === null || Number.isFinite(r.emptySince) && r.emptySince >= 0 && r.emptySince <= now)
         && obj(r.modes) && ['m', 'i', 't', 'C', 'Q', 'locked'].every((k) => typeof r.modes[k] === 'boolean')
         && typeof r.modes.k === 'string' && (r.modes.k === '' || /^[A-Za-z0-9]{3,20}$/.test(r.modes.k))

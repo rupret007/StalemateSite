@@ -134,6 +134,11 @@ and never grants a staff role.
    email verification and then **Host tools → Keep this room**. This option is
    available after the successful real login; second-device registered-room
    recovery acceptance remains pending.
+   Ownership offers keep their original ten-minute deadline across room-server
+   wake/restart and remain bound to the current owner and verified co-host.
+   Acceptance still requires that account to be in the room. Older code that
+   omits the optional offer metadata can discard a pending offer on its next
+   write; reissue it after recovery rather than treating it as completed.
 4. For WebJam music, share the complete **Copy Invite** message and paste the
    complete message into desktop WebJam's **Join** dialog. A phone can use room
    chat; no browser audio client is promised. See the

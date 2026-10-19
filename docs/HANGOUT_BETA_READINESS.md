@@ -49,6 +49,13 @@ acceptance.
 
 ## Verification receipts
 
+- [Ownership-offer recovery](../pr-assets/beta-collaboration/ownership-offer-recovery.json):
+  a reproduced ten-minute offer loss across wake is fixed with bounded,
+  account-bound metadata and the original deadline. Fifteen new regressions
+  cover wake, expiry, replay, identity changes, revocation and durable commit;
+  all **575 unit tests in 55 files** pass. This is engine evidence; real-account
+  co-host and second-device acceptance remain outstanding.
+
 - Co-host revocation passes **560 unit tests in 54 files and 188 browser scenarios**
   in [CI](https://github.com/rupret007/StalemateSite/actions/runs/39202779472).
   The deployed source differs from that CI head only in documentation and
