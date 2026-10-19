@@ -94,6 +94,56 @@ state and logs for review or reinstall. Revoke the dedicated Worker secret
 separately if retiring the monitor; guest invitation and identity keys do not
 need to change with it.
 
+## Prepared independent GitHub check
+
+The draft `.github/workflows/beta-health.yml` prepares a GitHub-hosted check
+that does not depend on this Mac. It is **not active**. In this workflow, only
+`main` with repository variable `STALEMATE_BETA_MONITOR_ENABLED` exactly `true`
+can run the job; dispatching another branch skips it. Repository writers can
+edit workflows and variables, so this condition is not a separate secret-access
+boundary. Repository secret permissions still apply.
+
+The schedule requests four checks per hour, at minutes 7, 22, 37 and 52, with a
+two-minute job deadline. No dependency installation, guest login, AI/TURN call,
+deployment, artifact upload or local monitor state is involved. The
+adapter `scripts/beta-health-ci.cjs` uses the same fixed-origin, bounded,
+read-only probe as the Mac monitor. A degraded response or an application
+allowance warning at 80% or above fails the job, as do authentication, storage,
+network and response-contract failures. Optional disabled AI/TURN remains
+normal. Output contains one fixed status label and the provider/billing
+limitation; it excludes response bodies, counters, selected evidence and
+credentials. This repository's Actions run status and those fixed labels are
+public. A setup failure or job timeout is a monitor failure, not proof of a
+beta outage. The check never changes a saved safety restriction.
+
+After required review and the original expiry observation's recorded terminal
+result, activation still requires all of the following:
+
+1. Publish the reviewed workflow on `main` through the repository's release
+   process; this preparation does not authorize a merge or public launch.
+2. Store the existing dedicated read-only health key as Actions repository
+   secret `HANGOUT_BETA_OPS_KEY` through a private secret entry. Do not use an
+   invitation, Access token, Cloudflare deployment token or session HMAC, and
+   never put the key in an argument, workflow file, output or artifact. No
+   Worker key rotation is needed to add this reader.
+3. Configure the intended operator's GitHub Actions notification preferences,
+   then set repository variable `STALEMATE_BETA_MONITOR_ENABLED=true`. Perform
+   an attended manual dispatch on `main` and record actual probe results and
+   failure/recovery notification delivery before relying on it.
+4. To stop these checks, set the variable to `false` or disable this workflow.
+   This leaves the beta, its invitation and local Mac monitor unchanged.
+
+[GitHub's schedule documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
+says scheduled runs use the default branch, can be delayed or dropped during
+high load, and are disabled in public repositories after 60 days without
+activity. Scheduled notifications depend on the schedule actor and their
+notification settings. A completed job does not prove an operator received an
+alert. This prepared check has no durable alert deduplication, retrying delivery
+or independent missed-heartbeat detector; it is best-effort coverage, not a
+continuous uptime service. Activation, actual scheduled execution and attended
+notification acceptance remain unverified. Provider availability, billing and
+the separate external alerting/coverage gate remain outstanding.
+
 ## Responding to an alert
 
 First check this Mac's network, the last successful local probe and the active
@@ -112,9 +162,9 @@ Do not unlock a saved safety state just to turn the monitor green.
 The separate read-only provider audit successfully queried account-wide TURN
 analytics using local OAuth; no runtime analytics credential is configured and
 this monitor does not query those metrics. Billing, SFU usage, remaining shared
-allocation and provider availability remain unknown. Independent external
-alerts still need a provider and an agreed notification destination. A healthy
-local probe cannot fill those gaps.
+allocation and provider availability remain unknown. The prepared GitHub check
+is inactive and does not yet establish independent alert coverage or an agreed,
+tested notification destination. A healthy local probe cannot fill those gaps.
 Record actual deployment and monitor evidence in the
 [readiness assessment](HANGOUT_BETA_READINESS.md). Session coverage and human
 device checks are in the [first-session plan](HANGOUT_BETA_FIRST_SESSION.md).
