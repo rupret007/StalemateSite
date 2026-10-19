@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "sourceCommit": "6c1432869123fa9aa58a1f4e643353a2f338f3d8",
+  "startedAt": "2026-10-19T08:46:33.404Z",
+  "scope": "Controlled aborted API-script requests on isolated owned loopback clients only. No real provider outage, hosted, remote synchronization or physical-device acceptance claim.",
+  "captureRequested": false,
+  "recordingsProduced": false,
+  "status": "failed",
+  "externalRequestsForwarded": 0,
+  "abortedExternalRequests": 3,
+  "pageErrors": 0,
+  "private": {
+    "apiRequestsAfterThreeSelections": 1,
+    "ytUnavailable": true,
+    "chatWorks": true,
+    "drawingWorks": false,
+    "nativeFilePlays": true,
+    "feedbackOnFailedApi": false,
+    "apiRequestsAfterReloadSelection": 2
+  },
+  "channel": {
+    "apiRequestsAfterSelectionsAndReentry": 1,
+    "loaderStillPending": true,
+    "chatWorks": true,
+    "drawingWorks": true,
+    "feedbackOnFailedApi": false,
+    "ownChannelClosed": true
+  },
+  "cleanup": {
+    "contextsClosed": true,
+    "browserClosed": true,
+    "browserProcessClosed": true,
+    "relayClosed": true,
+    "serverClosed": true,
+    "confirmed": true
+  },
+  "failedStage": "channel-independent-tools",
+  "failureCode": "expected-controlled-fault-not-observed",
+  "completedAt": "2026-10-19T08:46:37.315Z"
+}
