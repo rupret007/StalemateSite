@@ -53,9 +53,24 @@ acceptance.
   delayed hello/AV decryption could replace newer camera state, and a valid
   follow-up WebRTC offer could be discarded while a remote answer was still
   applying. Receive ordinals and per-PC answer state fix three failing negative
-  controls; all **18 video scenarios** pass without retries. Capture consent,
+  controls; the first local run passed all **18 video scenarios** without retries. Capture consent,
   admission limits, recovery assertions and timeouts remain unchanged. These
   reproduced bugs do not establish the earlier intermittent CI failure's cause.
+  Later Linux and local runs reproduced a separate startup failure. Both
+  endpoints reach stable signaling, but the polite endpoint gathers no local
+  network candidates and neither endpoint sends video. Five local repetitions
+  with final-state-only diagnostics produced three passes and two failures;
+  no native API wrappers ran in that check. The patch remains undeployed.
+
+- [Outbound reconnect review](../pr-assets/beta-collaboration/outbound-generation-regressions.json)
+  reproduced stale camera state crossing a replacement
+  relay identity, both during encryption and in the paced send queue. Socket
+  scoping fixes both negative controls while retaining the bounded original
+  unsent chat/drawing/signed-host envelopes. Two browser regressions pass;
+  queued chat is verified to arrive once. A separate native-operation overlap
+  regression reproduces and fixes an obsolete local offer entering a pending
+  remote-offer operation. These narrow fixes passed independent source review;
+  they do not explain or fix the zero-candidate startup failure above.
 
 - [Ownership-offer recovery](../pr-assets/beta-collaboration/ownership-offer-recovery.json):
   a reproduced ten-minute offer loss across wake is fixed with bounded,

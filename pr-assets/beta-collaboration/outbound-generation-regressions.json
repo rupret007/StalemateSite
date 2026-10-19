@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "checkedOn": "2026-10-19",
+  "scope": "Local Chromium fake capture over the local relay. No physical device, hosted WebRTC, TURN or guaranteed offline delivery claim.",
+  "priorSourceCommit": "ed00c1ab45814984064437141c3b802c291e8797",
+  "negativeControls": [
+    {
+      "operation": "Hold real camera-on encryption across capture-off and relay reconnection, then release it after the replacement identity advertises camera-off.",
+      "observedBeforeFix": "One obsolete camera-on message arrived from the replacement identity."
+    },
+    {
+      "operation": "Pause the bounded real send queue, enqueue camera-on and one real chat, turn capture off, then reconnect and drain.",
+      "observedBeforeFix": "The queued chat arrived once, but obsolete camera-on also arrived from the replacement identity."
+    }
+  ],
+  "fix": {
+    "identityScopedWork": "Capture the relay socket before encryption; media, presence and signaling may enqueue and flush only on that socket.",
+    "roomScopedWork": "Retain original unsent encrypted chat, stroke and signed-host envelopes within the existing 200-item queue; preserve host priority and signatures.",
+    "reconnect": "Cancel the pacing timer and discard identity-scoped queued items; the next welcome restarts retained room content.",
+    "sessionEnd": "Existing terminal cleanup clears all queued content and blocks late encryption completion.",
+    "captureConsentChanged": false,
+    "newPersistenceOrUnboundedQueue": false,
+    "assertionsOrTimeoutsWeakened": false
+  },
+  "validation": {
+    "negativeControlsFailedBeforeFix": 2,
+    "focusedRegressionsPassed": 2,
+    "focusedRetries": 0,
+    "fullVideoFile": {
+      "passed": 19,
+      "failed": 1,
+      "failure": "Separate existing initial-camera delayed-hello case: no decoded guest video; outbound regressions both passed again."
+    },
+    "captureRemainsOff": true,
+    "queuedChatDeliveredOnce": true,
+    "strokeAndSignedHostSeparateBrowserReplayTested": false,
+    "independentSourceReview": "No actionable issue found."
+  },
+  "knownSeparateStartupFailureResolved": false,
+  "deployed": false,
+  "credentialsOrRoomKeysRecorded": false,
+  "roomJsSha256": "320d9ebf3a12e2b3f7a159f31e656017b55964ef895c8e16eab36f5ad5ce7df5"
+}

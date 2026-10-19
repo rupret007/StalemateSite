@@ -49,39 +49,6 @@ async function micOn(page) {
     await page.click('[data-ask-yes]');
     await expect(page.locator('[data-mic]')).toHaveText('Mute my mic');
 }
-async function installRtcDiagnostics(page) {
-    await page.addInitScript(() => {
-        const operations = [];
-        const ids = new WeakMap();
-        let sequence = 0;
-        const state = (pc) => ({ signaling: pc.signalingState, connection: pc.connectionState, ice: pc.iceConnectionState });
-        const record = (entry) => { if (operations.length < 200) operations.push({ at: Math.round(performance.now()), ...entry }); };
-        const idFor = (pc) => {
-            if (!ids.has(pc)) {
-                ids.set(pc, ++sequence);
-                for (const event of ['signalingstatechange', 'connectionstatechange', 'iceconnectionstatechange']) {
-                    pc.addEventListener(event, () => record({ pc: ids.get(pc), event, ...state(pc) }));
-                }
-            }
-            return ids.get(pc);
-        };
-        for (const method of ['createOffer', 'createAnswer', 'setLocalDescription', 'setRemoteDescription', 'addIceCandidate']) {
-            const original = RTCPeerConnection.prototype[method];
-            RTCPeerConnection.prototype[method] = function (...args) {
-                const pc = idFor(this);
-                const description = ['offer', 'answer', 'pranswer', 'rollback'].includes(args[0]?.type) ? args[0].type : undefined;
-                record({ pc, method, description, result: 'called', ...state(this) });
-                const failure = (error) => record({ pc, method, result: 'rejected', error: ['InvalidStateError', 'OperationError', 'TypeError', 'InvalidAccessError', 'NotSupportedError'].includes(error?.name) ? error.name : 'Other', ...state(this) });
-                try {
-                    const result = original.apply(this, args);
-                    result.then(() => record({ pc, method, result: 'fulfilled', ...state(this) }), failure);
-                    return result;
-                } catch (error) { failure(error); throw error; }
-            };
-        }
-        window.__rtcDiagnostics = { operations, idFor };
-    });
-}
 async function captureRtcDiagnostics(page) {
     if (!page) return { available: false };
     return page.evaluate(async () => {
@@ -91,8 +58,11 @@ async function captureRtcDiagnostics(page) {
         const pcs = await Promise.all([...app.av.pcs].slice(0, 8).map(async ([peer, entry]) => {
             const pc = entry.pc;
             const stats = [];
+            const candidates = { local: 0, remote: 0 };
             try {
                 (await pc.getStats()).forEach((row) => {
+                    if (row.type === 'local-candidate') candidates.local += 1;
+                    if (row.type === 'remote-candidate') candidates.remote += 1;
                     if (!['inbound-rtp', 'outbound-rtp'].includes(row.type) || stats.length >= 16) return;
                     const safe = { type: row.type, kind: row.kind || row.mediaType };
                     for (const key of ['bytesSent', 'bytesReceived', 'framesSent', 'framesEncoded', 'framesDecoded', 'framesReceived', 'framesDropped', 'packetsSent', 'packetsReceived']) {
@@ -101,19 +71,49 @@ async function captureRtcDiagnostics(page) {
                     stats.push(safe);
                 });
             } catch (_) { /* closed connections retain their safe state fields */ }
+            const transports = [];
+            const seen = new Set();
+            const matchesDescription = (description, parameters, mid) => {
+                if (!description?.sdp || !parameters) return null;
+                const sections = description.sdp.split(/(?=^m=)/m);
+                const session = sections[0]?.startsWith('m=') ? '' : sections[0] || '';
+                const media = sections.find((section) => section.startsWith('m=') && section.split(/\r?\n/).includes(`a=mid:${mid}`)) || '';
+                const read = (name) => media.match(new RegExp(`^a=${name}:([^\\r\\n]+)`, 'm'))?.[1] || session.match(new RegExp(`^a=${name}:([^\\r\\n]+)`, 'm'))?.[1];
+                // Values are compared only inside this page. Neither credentials
+                // nor hashes of them are included in the diagnostic result.
+                return read('ice-ufrag') === parameters.usernameFragment && read('ice-pwd') === parameters.password;
+            };
+            for (const transceiver of pc.getTransceivers().slice(0, 4)) {
+                const dtls = transceiver.sender.transport || transceiver.receiver.transport;
+                const ice = dtls?.iceTransport;
+                if (!ice || seen.has(ice)) continue;
+                seen.add(ice);
+                try {
+                    const local = ice.getLocalParameters?.() || null;
+                    const remote = ice.getRemoteParameters?.() || null;
+                    transports.push({
+                        dtls: dtls.state, ice: ice.state, gathering: ice.gatheringState,
+                        localCandidateCount: ice.getLocalCandidates?.().length ?? null,
+                        remoteCandidateCount: ice.getRemoteCandidates?.().length ?? null,
+                        localParametersPresent: Boolean(local), remoteParametersPresent: Boolean(remote),
+                        localParametersMatchDescription: matchesDescription(pc.localDescription, local, transceiver.mid),
+                        remoteParametersMatchDescription: matchesDescription(pc.remoteDescription, remote, transceiver.mid)
+                    });
+                } catch (_) { transports.push({ available: false }); }
+            }
             return {
-                peer, diagnosticId: window.__rtcDiagnostics.idFor(pc),
-                signaling: pc.signalingState, connection: pc.connectionState, ice: pc.iceConnectionState,
-                polite: entry.polite, makingOffer: entry.makingOffer, ignoreOffer: entry.ignoreOffer, settingRemoteAnswer: entry.settingRemoteAnswer,
+                peer, signaling: pc.signalingState, connection: pc.connectionState, ice: pc.iceConnectionState, gathering: pc.iceGatheringState,
+                descriptions: { local: pc.localDescription?.type || null, remote: pc.remoteDescription?.type || null }, candidates,
+                polite: entry.polite, makingOffer: entry.makingOffer, ignoreOffer: entry.ignoreOffer, settingRemoteAnswer: entry.settingRemoteAnswer, remoteOfferPending: entry.remoteOfferPending,
                 pendingIce: entry.pendingIce.length,
                 transceivers: pc.getTransceivers().slice(0, 4).map((value) => ({
                     mid: value.mid, direction: value.direction, currentDirection: value.currentDirection,
                     sender: track(value.sender.track), receiver: track(value.receiver.track)
-                })), stats
+                })), stats, transports
             };
         }));
         return {
-            available: true, connected: app.connected, ended: app.ended,
+            available: true, mode: 'final-state-only', connected: app.connected, ended: app.ended,
             names: [...app.names].slice(0, 8),
             av: { mic: app.av.mic, cam: app.av.cam, peers: [...app.av.peers].slice(0, 8), micPeers: [...app.av.micPeers].slice(0, 8), camPeers: [...app.av.camPeers].slice(0, 8) },
             pcs,
@@ -121,8 +121,7 @@ async function captureRtcDiagnostics(page) {
                 peer: video.closest('[data-tile]').dataset.tile,
                 paused: video.paused, readyState: video.readyState, width: video.videoWidth,
                 tracks: video.srcObject?.getTracks().map(track) || []
-            })),
-            operations: window.__rtcDiagnostics.operations
+            }))
         };
     }).catch(() => ({ available: false }));
 }
@@ -437,7 +436,6 @@ test('a reconnect does not wait for obsolete peer ICE setup', async ({ browser }
 
 test('initial camera publication stays current when an earlier hello decrypts late', async ({ browser }) => {
     const host = await openBrowser(browser);
-    await installRtcDiagnostics(host);
     let guest;
     try {
         await join(host, roomUrl(), 'Jeff');
@@ -455,7 +453,6 @@ test('initial camera publication stays current when an earlier hello decrypts la
             };
         });
         guest = await openBrowser(browser);
-        await installRtcDiagnostics(guest);
         await join(guest, host.url(), 'Karen');
         await expect.poll(() => host.evaluate(() => window.__heldInitialHello)).toBe(true);
         await camOn(guest);
@@ -587,6 +584,70 @@ test('a valid follow-up offer is answered while the previous remote answer is pe
     expect(host.errors.concat(guest.errors)).toEqual([]);
 });
 
+test('a pending remote offer prevents an obsolete local offer from entering the native chain', async ({ browser }) => {
+    const { host, guest } = await call(browser);
+    for (const page of [host, guest]) {
+        await expect.poll(() => page.evaluate(() => [...window.__hangout.av.pcs.values()][0].pc.signalingState)).toBe('stable');
+    }
+    const target = await host.evaluate(() => [...window.__hangout.av.pcs.values()][0].polite) ? host : guest;
+    const other = target === host ? guest : host;
+    await target.evaluate(() => {
+        const pc = [...window.__hangout.av.pcs.values()][0].pc;
+        const createOffer = pc.createOffer.bind(pc);
+        const setRemote = pc.setRemoteDescription.bind(pc);
+        const setLocal = pc.setLocalDescription.bind(pc);
+        window.__localOfferProof = { overlap: false, localDescriptions: [] };
+        pc.createOffer = async (...args) => {
+            pc.createOffer = createOffer;
+            const offer = await createOffer(...args);
+            window.__localOfferReady = true;
+            return new Promise((resolve) => { window.__releaseLocalOffer = () => resolve(offer); });
+        };
+        pc.setRemoteDescription = (description) => {
+            const result = setRemote(description);
+            if (description.type === 'offer' && window.__releaseLocalOffer) {
+                window.__localOfferProof.overlap = pc.signalingState === 'stable';
+                const release = window.__releaseLocalOffer;
+                window.__releaseLocalOffer = null;
+                release();
+            }
+            return result;
+        };
+        pc.setLocalDescription = (description) => {
+            const record = { type: description.type, before: pc.signalingState, result: 'pending' };
+            if (window.__localOfferProof.localDescriptions.length < 20) window.__localOfferProof.localDescriptions.push(record);
+            const result = setLocal(description);
+            result.then(() => { record.result = 'fulfilled'; record.after = pc.signalingState; }, (error) => {
+                record.result = 'rejected'; record.after = pc.signalingState;
+                record.error = ['InvalidStateError', 'OperationError', 'TypeError'].includes(error.name) ? error.name : 'Other';
+            });
+            return result;
+        };
+        pc.restartIce();
+    });
+    await expect.poll(() => target.evaluate(() => window.__localOfferReady)).toBe(true);
+    await other.evaluate(() => [...window.__hangout.av.pcs.values()][0].pc.restartIce());
+    try {
+        await expect.poll(() => target.evaluate(() => window.__localOfferProof.overlap)).toBe(true);
+        for (const page of [host, guest]) {
+            await expect.poll(() => page.evaluate(() => [...window.__hangout.av.pcs.values()][0].pc.signalingState)).toBe('stable');
+            await expect.poll(() => page.evaluate(() => [...window.__hangout.av.pcs.values()][0].pc.connectionState)).toBe('connected');
+            await expect.poll(() => page.evaluate(() => document.querySelector('.tile:not([data-tile="me"]) video')?.videoWidth || 0)).toBeGreaterThan(0);
+        }
+        expect(await target.evaluate(() => window.__localOfferProof.localDescriptions.filter((entry) => entry.result === 'rejected'))).toEqual([]);
+        expect(await target.evaluate(() => [...window.__hangout.av.pcs.values()][0].remoteOfferPending)).toBe(false);
+    } finally {
+        const diagnostic = {
+            overlap: await target.evaluate(() => window.__localOfferProof),
+            host: await captureRtcDiagnostics(host), guest: await captureRtcDiagnostics(guest)
+        };
+        const diagnosticPath = test.info().outputPath('pending-remote-offer.json');
+        await fs.writeFile(diagnosticPath, `${JSON.stringify(diagnostic, null, 2)}\n`);
+        await test.info().attach('pending-remote-offer', { path: diagnosticPath, contentType: 'application/json' });
+    }
+    expect(host.errors.concat(guest.errors)).toEqual([]);
+});
+
 test('phones: portrait tiles, call bar sticks to the bottom in thumb reach, 44px targets', async ({ browser }) => {
     const opts = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' };
     const { host, guest } = await call(browser, opts);
@@ -706,4 +767,148 @@ test('send queue: a signaling burst never loses the offer or answer', async ({ b
     });
     expect(kept.len).toBeLessThanOrEqual(200);
     expect(kept.len - kept.ice).toBeGreaterThanOrEqual(2); // offer + answer survived
+});
+
+async function observeOutboundAv(page) {
+    await page.evaluate(() => {
+        const open = window.HangoutCore.open;
+        window.__outboundAvProof = { received: [], decryptions: [] };
+        window.HangoutCore.open = async (key, frame) => {
+            const decoding = open(key, frame);
+            if (window.__outboundAvProof.decryptions.length < 100) window.__outboundAvProof.decryptions.push(decoding);
+            const msg = await decoding;
+            if (['hello', 'av'].includes(msg.type) && window.__outboundAvProof.received.length < 40) {
+                window.__outboundAvProof.received.push({ type: msg.type, from: frame.from, camera: Boolean(msg.av?.cam) });
+            }
+            return msg;
+        };
+    });
+}
+
+async function settleOutboundAv(page) {
+    await page.evaluate(async () => {
+        await Promise.allSettled(window.__outboundAvProof.decryptions);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+}
+
+const captureIsOff = (page) => page.evaluate(() => {
+    const av = window.__hangout.av;
+    return !av.cam && !av.rawCam && !av.stream?.getVideoTracks().some((track) => track.readyState === 'live');
+});
+
+test('outbound generation: delayed camera encryption cannot publish through a replacement relay identity', async ({ browser }) => {
+    const host = await openBrowser(browser);
+    await join(host, roomUrl(), 'Jeff');
+    await observeOutboundAv(host);
+    const guest = await openBrowser(browser);
+    await join(guest, host.url(), 'Karen');
+    await expect(host.locator('[data-peers]')).toContainText('Karen');
+    await camOn(guest);
+    const oldId = await guest.evaluate(() => window.__hangout.myId);
+    await expect.poll(() => host.evaluate((id) => window.__hangout.av.camPeers.has(id), oldId)).toBe(true);
+
+    await guest.evaluate(() => {
+        const seal = window.HangoutCore.seal;
+        window.HangoutCore.seal = async (key, msg) => {
+            const frame = await seal(key, msg);
+            if (msg.type === 'av' && msg.av?.cam) {
+                window.HangoutCore.seal = seal;
+                window.__heldOldOutboundAv = true;
+                await new Promise((resolve) => { window.__releaseOldOutboundAv = resolve; });
+            }
+            return frame;
+        };
+        const av = window.__hangout.av;
+        window.__heldOutboundSend = window.__hangoutSend({ type: 'av', av: { cam: av.cam, mic: av.mic } });
+    });
+    await expect.poll(() => guest.evaluate(() => window.__heldOldOutboundAv)).toBe(true);
+    await guest.click('[data-cam]');
+    await expect(guest.locator('[data-cam]')).toHaveText('Turn on my camera');
+    expect(await captureIsOff(guest)).toBe(true);
+    await expect.poll(() => host.evaluate((id) => window.__hangout.av.camPeers.has(id), oldId)).toBe(false);
+
+    await guest.evaluate(() => window.__hangout.ws.close(3000));
+    await expect.poll(() => guest.evaluate(() => window.__hangout.myId), { timeout: 15000 }).not.toBe(oldId);
+    const replacement = await guest.evaluate(() => window.__hangout.myId);
+    await expect.poll(() => host.evaluate((id) => window.__outboundAvProof.received.some((entry) => entry.type === 'hello' && entry.from === id && !entry.camera), replacement)).toBe(true);
+
+    // The real send began on the old socket. Its encryption completes only
+    // after the replacement identity has advertised the actual camera-off state.
+    await guest.evaluate(async () => {
+        window.__releaseOldOutboundAv();
+        await window.__heldOutboundSend;
+        await window.__hangoutSend({ type: 'chat', name: window.__hangout.name, text: 'After held camera encryption' });
+    });
+    await expect(host.locator('[data-log]')).toContainText('After held camera encryption');
+    await settleOutboundAv(host);
+    const diagnostic = await host.evaluate((id) => ({
+        cameraOnFromReplacement: window.__outboundAvProof.received.filter((entry) => entry.type === 'av' && entry.from === id && entry.camera).length,
+        currentCamera: window.__hangout.av.camPeers.has(id),
+        barrierChatCount: window.__hangout.state.chat.filter((line) => line.text === 'After held camera encryption').length
+    }), replacement);
+    diagnostic.identityChanged = replacement !== oldId;
+    diagnostic.captureOff = await captureIsOff(guest);
+    await test.info().attach('outbound-encryption-generation', { body: JSON.stringify(diagnostic), contentType: 'application/json' });
+    expect(diagnostic.captureOff).toBe(true);
+    expect(diagnostic.barrierChatCount).toBe(1);
+    expect(diagnostic.cameraOnFromReplacement).toBe(0);
+    expect(diagnostic.currentCamera).toBe(false);
+    await expect(host.locator(`[data-tile="${replacement}"]`)).toHaveCount(0);
+    expect(host.errors.concat(guest.errors)).toEqual([]);
+});
+
+test('outbound generation: reconnect drops paced camera state while preserving one queued chat', async ({ browser }) => {
+    const host = await openBrowser(browser);
+    await join(host, roomUrl(), 'Jeff');
+    await observeOutboundAv(host);
+    const guest = await openBrowser(browser);
+    await join(guest, host.url(), 'Karen');
+    await expect(host.locator('[data-peers]')).toContainText('Karen');
+    await camOn(guest);
+    const oldId = await guest.evaluate(() => window.__hangout.myId);
+    await expect.poll(() => host.evaluate((id) => window.__hangout.av.camPeers.has(id), oldId)).toBe(true);
+
+    await guest.evaluate(async () => {
+        const pace = window.__hangoutPace;
+        clearTimeout(pace.timer);
+        // Keep the bounded real send queue paused across the reconnect without
+        // modifying its contents or constructing encrypted relay frames by hand.
+        pace.timer = setTimeout(() => {}, 30000);
+        const av = window.__hangout.av;
+        await window.__hangoutSend({ type: 'av', av: { cam: av.cam, mic: av.mic } });
+    });
+    await guest.fill('[data-text]', 'Queued before the relay reconnect');
+    await guest.press('[data-text]', 'Enter');
+    await expect.poll(() => guest.evaluate(() => window.__hangoutPace.queue.length)).toBeGreaterThanOrEqual(2);
+    await guest.click('[data-cam]');
+    await expect(guest.locator('[data-cam]')).toHaveText('Turn on my camera');
+    expect(await captureIsOff(guest)).toBe(true);
+    const queuedBeforeReconnect = await guest.evaluate(() => window.__hangoutPace.queue.length);
+
+    await guest.evaluate(() => window.__hangout.ws.close(3000));
+    await expect.poll(() => guest.evaluate(() => window.__hangout.myId), { timeout: 15000 }).not.toBe(oldId);
+    const replacement = await guest.evaluate(() => window.__hangout.myId);
+    await guest.evaluate(async () => {
+        const pace = window.__hangoutPace;
+        clearTimeout(pace.timer); pace.timer = 0;
+        pace.tokens = 24; pace.last = Date.now();
+        await window.__hangoutSend({ type: 'chat', name: window.__hangout.name, text: 'After paced queue drain' });
+    });
+    await expect(host.locator('[data-log]')).toContainText('After paced queue drain');
+    await settleOutboundAv(host);
+    const diagnostic = await host.evaluate((id) => ({
+        cameraOnFromReplacement: window.__outboundAvProof.received.filter((entry) => entry.type === 'av' && entry.from === id && entry.camera).length,
+        queuedChatCount: window.__hangout.state.chat.filter((line) => line.text === 'Queued before the relay reconnect').length,
+        barrierChatCount: window.__hangout.state.chat.filter((line) => line.text === 'After paced queue drain').length
+    }), replacement);
+    diagnostic.queuedBeforeReconnect = queuedBeforeReconnect;
+    diagnostic.identityChanged = replacement !== oldId;
+    diagnostic.captureOff = await captureIsOff(guest);
+    await test.info().attach('outbound-paced-generation', { body: JSON.stringify(diagnostic), contentType: 'application/json' });
+    expect(diagnostic.captureOff).toBe(true);
+    expect(diagnostic.queuedChatCount).toBe(1);
+    expect(diagnostic.barrierChatCount).toBe(1);
+    expect(diagnostic.cameraOnFromReplacement).toBe(0);
+    expect(host.errors.concat(guest.errors)).toEqual([]);
 });

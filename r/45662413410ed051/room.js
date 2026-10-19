@@ -137,14 +137,23 @@
     const QUEUE_MAX = 200;
     function paceFlush() {
         pace.timer = 0;
-        while (pace.queue.length && app.ws && app.ws.readyState === 1 && paceTake()) app.ws.send(pace.queue.shift().frame);
-        if (pace.queue.length) pace.timer = win.setTimeout(paceFlush, 150);
+        while (pace.queue.length) {
+            const item = pace.queue[0];
+            if (item.socket && (item.socket !== app.ws || item.socket.readyState !== 1)) { pace.queue.shift(); continue; }
+            if (!app.ws || app.ws.readyState !== 1 || !paceTake()) break;
+            app.ws.send(pace.queue.shift().frame);
+        }
+        if (pace.queue.length && app.ws?.readyState === 1) pace.timer = win.setTimeout(paceFlush, 150);
     }
     async function send(obj) {
-        if (app.ended || !app.ws || app.ws.readyState !== 1) return;
+        const socket = app.ws;
+        if (app.ended || !socket || socket.readyState !== 1) return;
+        const roomScoped = ['chat', 'stroke', 'host'].includes(obj.type);
         const frame = JSON.stringify(await H.seal(app.key, obj));
-        if (app.ended || app.ws.readyState !== 1) return;
-        pace.queue = V.enqueue(pace.queue, { frame, ice: obj.type === 'rtc' && Boolean(obj.ice), priority: obj.type === 'host' }, QUEUE_MAX);
+        if (app.ended || !roomScoped && (app.ws !== socket || socket.readyState !== 1)) return;
+        // Room content keeps its original envelope; media and presence belong
+        // only to the relay identity that existed before encryption began.
+        pace.queue = V.enqueue(pace.queue, { frame, socket: roomScoped ? null : socket, ice: obj.type === 'rtc' && Boolean(obj.ice), priority: obj.type === 'host' }, QUEUE_MAX);
         if (!pace.timer) paceFlush();
     }
 
@@ -178,6 +187,8 @@
         ws.onclose = (event) => {
             if (app.ws !== ws) return;
             retireRelayPeers();
+            clearTimeout(pace.timer); pace.timer = 0;
+            pace.queue = pace.queue.filter((item) => !item.socket);
             app.connected = false;
             app.lastClose = event.code;
             // Dropped mid-hang (Wi-Fi blip, phone switching networks): retry a few times with backoff.
@@ -1138,7 +1149,7 @@
             const pc = new RTCPeerConnection({ iceServers: app.av.ice || STUN });
             const conn = navigator.connection || {};
             const thrifty = Boolean(conn.saveData) || conn.type === 'cellular' || /(^|-)2g|3g/.test(conn.effectiveType || '');
-            const entry = { pc, polite: app.myId > id, makingOffer: false, ignoreOffer: false, settingRemoteAnswer: false, pendingIce: [], relayed: false, stream: new MediaStream(), senders: {}, wantHi: false, tier: thrifty ? 'weak' : 'ok', hist: [], restarts: 0, last: null };
+            const entry = { pc, polite: app.myId > id, makingOffer: false, ignoreOffer: false, settingRemoteAnswer: false, remoteOfferPending: false, pendingIce: [], relayed: false, stream: new MediaStream(), senders: {}, wantHi: false, tier: thrifty ? 'weak' : 'ok', hist: [], restarts: 0, last: null };
             app.av.pcs.set(id, entry);
             const current = () => peer.live && app.av.pcs.get(id) === entry;
             pc.onicecandidate = (e) => { if (current() && e.candidate) send({ type: 'rtc', to: id, ice: e.candidate.toJSON() }); };
@@ -1147,7 +1158,7 @@
                     if (!current()) return;
                     entry.makingOffer = true;
                     const offer = await pc.createOffer();
-                    if (!current() || pc.signalingState !== 'stable') return;
+                    if (!current() || entry.remoteOfferPending || pc.signalingState !== 'stable') return;
                     if (app.av.music) offer.sdp = V.musicSdp(offer.sdp);
                     await pc.setLocalDescription(offer);
                     if (!current()) return;
@@ -1261,9 +1272,14 @@
                 entry.ignoreOffer = !entry.polite && collision;
                 if (entry.ignoreOffer) return;
                 const answer = msg.sdp.type === 'answer';
+                const offer = msg.sdp.type === 'offer';
                 if (answer) entry.settingRemoteAnswer = true;
+                if (offer) entry.remoteOfferPending = true;
                 try { await pc.setRemoteDescription(msg.sdp); }
-                finally { if (answer) entry.settingRemoteAnswer = false; }
+                finally {
+                    if (answer) entry.settingRemoteAnswer = false;
+                    if (offer) entry.remoteOfferPending = false;
+                }
                 if (!current()) return;
                 for (const ice of entry.pendingIce.splice(0)) {
                     try { await pc.addIceCandidate(ice); } catch (_) { /* stale candidate from a prior negotiation */ }
