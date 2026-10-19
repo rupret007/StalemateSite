@@ -1,15 +1,24 @@
 // Stand-in for https://www.youtube.com/iframe_api so sync tests are deterministic and offline.
 window.__ytLog = [];
+window.__ytEmbeds = [];
 window.YT = {
     PlayerState: { UNSTARTED: -1, ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3, CUED: 5 },
     Player: function FakePlayer(el, opts) {
         const node = typeof el === 'string' ? document.getElementById(el) : el;
+        window.__ytEmbeds.push({ tagName: node.tagName, id: node.id,
+            src: node.getAttribute('src'), referrerPolicy: node.referrerPolicy || '',
+            allow: node.getAttribute('allow'), allowFullscreen: node.hasAttribute('allowfullscreen'),
+            attributes: Object.fromEntries([...node.attributes].map(({ name, value }) => [name, value])) });
+        let videoId = opts.videoId;
+        if (node.tagName === 'IFRAME') {
+            const embed = new URL(node.src, location.href);
+            videoId = /^\/embed\/([A-Za-z0-9_-]{11})$/.exec(embed.pathname)?.[1] || '';
+        }
         const box = document.createElement('div');
-        box.id = node.id;
+        for (const attr of node.attributes) box.setAttribute(attr.name, attr.value);
         box.dataset.fakeYt = '';
         box.style.background = '#333';
         node.replaceWith(box);
-        let videoId = opts.videoId;
         let base = 0;
         let started = null;
         let playerState = 2;

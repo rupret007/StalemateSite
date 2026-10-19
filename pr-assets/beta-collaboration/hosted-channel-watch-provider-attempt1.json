@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "startedAt": "2026-10-19T07:48:47.857Z",
+  "sourceCommit": "b111bb2aa070cd791834f40f26665996ad406421",
+  "runtimeVersion": "0ee7705e-e381-4cb4-a70a-1f26daa10e78",
+  "runId": "f7fd2c03",
+  "publicVideoId": "BtnyqIHTDMM",
+  "scope": "One naturally guest-hosted temporary watch channel and two owned normal guest Chromium contexts on one Mac, using actual YouTube. No registered-owner, staff, physical-device, mobile, separate-network, WAN-audio or TURN acceptance claim.",
+  "authority": "Server-authenticated channel @ authorization, not E2EE host signatures",
+  "status": "failed",
+  "pageErrors": 0,
+  "creationAttempts": 1,
+  "checks": {
+    "normalUnprivilegedGuests": true
+  },
+  "requestGuard": {
+    "enabled": true,
+    "checkedThirdPartyRequests": 0,
+    "blockedRequests": 0,
+    "checks": [
+      "URL",
+      "request-body",
+      "Referer"
+    ],
+    "secretRepresentations": [
+      "raw",
+      "percent-encoded/decoded",
+      "base64-token"
+    ]
+  },
+  "publishedSourceResponseModified": false,
+  "providerResponsesStubbed": false,
+  "providerApiReplaced": false,
+  "autoplayPolicyBypassed": false,
+  "browserAudioOutputMuted": true,
+  "captureRequested": false,
+  "credentialsRecorded": false,
+  "roomNamesRecorded": false,
+  "nicknamesRecorded": false,
+  "chatOrNoticesRecorded": false,
+  "rawProviderPayloadsRecorded": false,
+  "tracesScreenshotsOrHarRecorded": false,
+  "roleOrAdmissionConfigurationChanged": false,
+  "aiOrTurnConfigurationChanged": false,
+  "rateAllowanceReset": false,
+  "deploymentPerformed": false,
+  "assets": [
+    {
+      "asset": "/r/45662413410ed051/lobby/lobby.js",
+      "sha256": "b11c1a268478ccaf5af1cd4daaf780a5bc6a190f2ee789cd56991eb5de3df7d1"
+    },
+    {
+      "asset": "/r/45662413410ed051/lobby/lobby-room.js",
+      "sha256": "114170b76b44436e8571346dba0d95554c701c77ac5814f78d3a98a4e8c50516"
+    }
+  ],
+  "runtimeEvidence": "Prior protected-asset receipt identifies runtime; both guests recheck committed lobby.js and lobby-room.js bytes.",
+  "creationFlow": "watch-tile",
+  "failedStage": "one-watch-creation-attempt",
+  "failureCode": "bounded-check-failed",
+  "roomCleanup": {
+    "attempted": false,
+    "confirmed": false,
+    "created": false,
+    "ownershipUnconfirmed": true
+  },
+  "cleanup": [
+    {
+      "role": "host",
+      "admissionConfirmed": true,
+      "logoutStatus": 200,
+      "deniedAfterLogout": true,
+      "socketEgressVerified": true,
+      "contextClosed": true,
+      "nativePlayClicks": 0,
+      "closedOfflineStableMilliseconds": 1500,
+      "confirmed": true
+    },
+    {
+      "role": "guest",
+      "admissionConfirmed": true,
+      "logoutStatus": 200,
+      "deniedAfterLogout": true,
+      "socketEgressVerified": true,
+      "contextClosed": true,
+      "nativePlayClicks": 0,
+      "closedOfflineStableMilliseconds": 1500,
+      "confirmed": true
+    }
+  ],
+  "browserClosed": true,
+  "completedAt": "2026-10-19T07:48:59.277Z",
+  "visitorsCreated": 2,
+  "admittedVisitors": 2,
+  "successfulLogouts": 2,
+  "authorityReceipts": [
+    {
+      "role": "host",
+      "creationJoinFrames": 0,
+      "creationCapped": false,
+      "beforeLines": 0,
+      "afterLines": 0,
+      "videoFrames": 0,
+      "hostVideoFrames": 0,
+      "nonHostVideoFrames": 0,
+      "authorityDenials": 0,
+      "guestVideoAttempts": 0,
+      "closedFrames": 0,
+      "founderClosedFrames": 0,
+      "unexpectedVideo": false
+    },
+    {
+      "role": "guest",
+      "creationJoinFrames": 0,
+      "creationCapped": false,
+      "beforeLines": 0,
+      "afterLines": 0,
+      "videoFrames": 0,
+      "hostVideoFrames": 0,
+      "nonHostVideoFrames": 0,
+      "authorityDenials": 0,
+      "guestVideoAttempts": 0,
+      "closedFrames": 0,
+      "founderClosedFrames": 0,
+      "unexpectedVideo": false
+    }
+  ],
+  "subsequentHarnessDiagnosis": {
+    "cause": "The runner tried clicking hidden desktop navigation before its visible Watch control. Local reproduction confirmed TimeoutError; both Rooms and Chat panes were already visible.",
+    "observedRoomJoinRequests": 0,
+    "initialCreationAttemptsFieldCountedUiIntention": true,
+    "serverRoomCreationCapEncountered": false,
+    "localCorrectedPaneNavigationAndChatAcknowledgementVerified": true,
+    "rateAllowanceReset": false,
+    "supersedingReceipt": "hosted-channel-watch-provider.json"
+  }
+}
