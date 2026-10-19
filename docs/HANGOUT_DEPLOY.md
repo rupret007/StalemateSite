@@ -10,7 +10,7 @@ defaults, not proof that dashboard settings or secrets are missing.
 
 The new, separate **`stalemate-hangout-pilot`** Worker is deployed at
 [the protected pilot entrance](https://stalemate-hangout-pilot.jeffstory007.workers.dev/pilot/).
-October 18 deployment: `c7a855b0-55db-4c31-9a05-c7a05925470a`.
+October 18 visual-refresh deployment: `d22c2228-f490-4473-8faa-c42837ffeba4`.
 An invitation unlocks a signed, eight-hour, HttpOnly/Secure/SameSite=Strict cookie. The Worker
 checks this session before serving collaboration assets or relay routes; a hidden path is not
 its access control. Operator invitations can select clearly labeled synthetic test roles;
@@ -176,7 +176,7 @@ separate public-owner audience, StaleBot, continued operation without band atten
 lobby camera consent. All upstream calls and credentials in these tests are fixtures.
 The dry run lists names only: it does not read the vault or upload secrets.
 
-The combined local validation passed **382 unit tests and 93 community Chromium tests**.
+The combined local validation passed **382 unit tests and 94 community Chromium tests**.
 Live two-browser pilot checks passed for shared chat, drawing and report review. The pilot's
 signed-cookie asset/relay gateway provides private invitation access independently of Access.
 The final live check retained the same socket, nickname, room membership and scrollback across

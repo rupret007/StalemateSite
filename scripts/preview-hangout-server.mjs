@@ -117,7 +117,7 @@ export async function startPreview({ port = 4387, statePath = defaultPreviewStat
                 .replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/g, '')
                 .replace(/(<meta name="hangout-(?:relay|turn|turnstile)" content=")[^"]*(">)/g, '$1$2')
                 .replace(/<script[^>]*data-goatcounter[^>]*><\/script>/g, '')
-                .replace('</head>', `<link rel="stylesheet" href="${PREFIX}/assets/preview.css"><script src="${PREFIX}/assets/session.js" data-session="${session.token}" data-profile="${session.profile}" data-label="${profile.label}" data-nick="${profile.nick}"></script></head>`);
+                .replace('</head>', `<link rel="stylesheet" href="${PREFIX}/assets/preview.css"><script src="${PREFIX}/assets/session.js" data-session="${session.token}" data-profile="${session.profile}" data-label="${profile.label}" data-preview-nick="${profile.nick}"></script></head>`);
         }
         return send(res, 200, body, { 'Content-Type': MIME[path.extname(filePath)] }, head);
     });

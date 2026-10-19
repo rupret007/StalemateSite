@@ -23,6 +23,20 @@ async function enter(page) {
     await expect(page.locator('[data-app], [data-panel]')).toBeVisible();
 }
 
+test('local visitors can replace the suggested nickname and keep their chosen nickname after reloading', async ({ page }) => {
+    await page.goto(preview.url);
+    const guest = await openProfile(page, 'Open a guest');
+    const nickname = guest.getByRole('textbox', { name: 'Your nick', exact: true });
+    await expect(nickname).toHaveValue(/^Guest[a-f0-9]{5}$/);
+    await nickname.fill('MyChosenNickname');
+    await enter(guest);
+    await expect.poll(() => guest.evaluate(() => __lobby.me)).toBe('MyChosenNickname');
+    await guest.reload();
+    await expect(nickname).toHaveValue('MyChosenNickname');
+    await enter(guest);
+    await expect.poll(() => guest.evaluate(() => __lobby.me)).toBe('MyChosenNickname');
+});
+
 test('local tabs represent distinct visitors, with working room registration and limited moderator role', async ({ page, context }) => {
     const errors = []; const external = [];
     context.on('page', (tab) => tab.on('pageerror', (error) => errors.push(error.message)));

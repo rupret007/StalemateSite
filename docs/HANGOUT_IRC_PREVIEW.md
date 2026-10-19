@@ -58,7 +58,7 @@ The open-community follow-up removes band-absence shutdown while retaining emerg
 ## Validation recorded
 
 - Full unit suite: **43 files / 382 tests passed**.
-- Combined Chromium community suite: **93 scenarios passed**. Covers IRC chat, guest hosting, persistent ownership, report review, art/watch synchronization, consent, camera signaling, TURN fallback, reconnection and phone layouts.
+- Combined Chromium community suite: **94 scenarios passed**. Covers IRC chat, guest hosting, persistent ownership, report review, art/watch synchronization, consent, camera signaling, TURN fallback, reconnection and phone layouts.
 - Real protected Cloudflare pilot: two independent browsers verified chat, shared drawing, room registration, cross-device ownership recovery, no pre-join chat, visitor reports, moderator permissions and phone layout. The final idle/restart result is recorded in the [pilot notes](HANGOUT_PRIVATE_PILOT.md).
 - Public pages and JavaScript in the pilot both deny unauthenticated access. Provider-response tests for AI, TURN and Turnstile use explicit fixtures; these do not establish live provider integration.
 

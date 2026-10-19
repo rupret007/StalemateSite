@@ -39,11 +39,18 @@ leave/rejoin starts fresh. Server hibernation preserves the same live socket's
 membership without replaying chat. Registered room settings and ownership are
 durable; ordinary conversation and private messages are not stored as a backlog.
 
+## Visual refresh
+
+The same invitation now opens a redesigned portal, entry, room directory and IRC
+workspace. Phone activities collapse to give chat more room, drawing keeps its
+correct proportions, and private rooms/moderation share the new styling. See the
+[visual assessment, screenshots and verification](HANGOUT_VISUAL_REFRESH.md).
+
 ## What is verified
 
 - **382 unit tests in 43 files**, including pilot authentication, permission
   boundaries, storage failures, moderation, durable ownership and session recovery.
-- **93 Chromium browser scenarios**, including two-browser art/watch activity,
+- **94 Chromium browser scenarios**, including two-browser art/watch activity,
   private room signaling, consent, reconnect, guest hosting and phone layouts.
 - Real Cloudflare browsers verified operator and guest invitations, WebSocket
   chat, shared drawing, durable registration, cross-device ownership recovery,
@@ -56,7 +63,7 @@ durable; ordinary conversation and private messages are not stored as a backlog.
 - Unauthenticated requests to the pilot's product HTML **and JavaScript** return
   401. Static assets run through the Worker gate. Missing pilot secrets fail
   closed; invalid invitations and guest attempts to select staff roles are refused.
-- Deployment version: `c7a855b0-55db-4c31-9a05-c7a05925470a`.
+- Deployment version: `d22c2228-f490-4473-8faa-c42837ffeba4`.
 
 The invitation is removed from the browser URL before the unlock POST. Access
 uses signed HttpOnly, Secure, SameSite cookies. Operator capabilities, guest

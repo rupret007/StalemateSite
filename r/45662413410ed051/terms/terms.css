@@ -26,6 +26,12 @@ body {
 .big-rule {
     font: 800 2rem var(--display);
     color: var(--pink);
-    text-transform: uppercase;
     margin: 8px 0;
 }
+
+.terms p, .terms li { color: var(--muted); }
+.terms b, .terms strong { color: var(--cream); }
+.terms h1 { letter-spacing: -.04em; }
+.terms h2 { color: var(--blue); }
+.terms li::marker { color: var(--pink); }
+.terms .big-rule { color: var(--pink); letter-spacing: -.035em; }

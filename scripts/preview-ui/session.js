@@ -33,7 +33,7 @@
         const back = document.createElement('a'); back.href = '/__preview/'; back.target = '_blank'; back.rel = 'noopener'; back.textContent = 'Open another identity';
         banner.append(strong, copy, back); document.body.prepend(banner);
         const nick = document.querySelector('[data-nick]');
-        if (nick && !window.localStorage.getItem('hangout-nick')) nick.value = `${script.dataset.nick}${id.slice(0, 5)}`.slice(0, 20);
+        if (nick && !window.localStorage.getItem('hangout-nick')) nick.value = `${script.dataset.previewNick}${id.slice(0, 5)}`.slice(0, 20);
         for (const link of document.querySelectorAll('[data-signin], [data-owner-signin]')) {
             link.href = '/__preview/'; link.target = '_blank'; link.rel = 'noopener'; link.textContent = 'Choose a local test identity';
         }

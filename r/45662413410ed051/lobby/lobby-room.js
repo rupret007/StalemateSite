@@ -141,16 +141,30 @@
         function setupCanvas() {
             if (!ui.swatches.dataset.ready) {
                 ui.swatches.dataset.ready = '1';
+                ui.swatches.dataset.color = H.COLORS[2];
+                const colorNames = {
+                    '#f4f0e6': 'Ivory', '#171410': 'Charcoal', '#009ee8': 'Sky blue',
+                    '#b5dc08': 'Lime', '#ed2765': 'Pink', '#c98a24': 'Ochre',
+                    '#7a4a2a': 'Brown', '#2f7d3a': 'Forest green', '#ffffff': 'White',
+                    '#0c0040': 'Indigo', '#021e44': 'Navy', '#000000': 'Black'
+                };
                 H.COLORS.slice(0, 12).forEach((color) => {
                     const b = document.createElement('button');
                     b.type = 'button';
                     b.className = 'swatch';
                     b.style.background = color;
                     b.dataset.color = color;
-                    b.addEventListener('click', () => { ui.swatches.dataset.color = color; });
+                    b.setAttribute('aria-label', `${colorNames[color] || color} brush`);
+                    b.setAttribute('aria-pressed', String(color === ui.swatches.dataset.color));
+                    b.title = `${colorNames[color] || color} (${color})`;
+                    b.addEventListener('click', () => {
+                        ui.swatches.dataset.color = color;
+                        ui.swatches.querySelectorAll('.swatch').forEach((swatch) => {
+                            swatch.setAttribute('aria-pressed', String(swatch === b));
+                        });
+                    });
                     ui.swatches.append(b);
                 });
-                ui.swatches.dataset.color = H.COLORS[2];
                 ui.clear.addEventListener('click', () => { if (isOp()) actSend({ kind: 'clear' }); });
                 const ctx = ui.canvas.getContext('2d');
                 const pos = (e) => {

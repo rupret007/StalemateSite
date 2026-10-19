@@ -199,6 +199,8 @@
             app.verified = m.verified === true; app.capabilities = m.capabilities || app.capabilities;
             $('[data-room-filter] option[value=mine]').disabled = !app.verified;
             app.me = m.nick; app.band = m.band; localStorage.setItem('hangout-nick', m.nick);
+            $('[data-self-nick]').textContent = m.nick;
+            $('[data-self-role]').textContent = app.capabilities.configure ? 'Site administrator' : app.capabilities.moderate ? 'Community moderator' : app.verified ? 'Room owner account' : 'Guest access';
             app.kicked = false; retry = 0; setConnection('connected');
             const returnRoom = sessionStorage.getItem('hangout-return-room');
             if (returnRoom && app.verified) { sessionStorage.removeItem('hangout-return-room'); cmd('join', [returnRoom]); }
@@ -413,6 +415,7 @@
         $('[data-jam]').hidden = !(room && c.kind === 'jam');
         const showAct = room && ['bobross', 'watch', 'art'].includes(c.kind);
         $('[data-activity]').hidden = !showAct;
+        $('[data-activity-title]').textContent = showAct ? c.kind === 'art' ? 'A canvas for everyone' : c.kind === 'bobross' ? 'A little paint. A little Bob Ross.' : 'Watching together' : 'Shared activity';
         $('[data-act-stage]').hidden = !showAct;
         document.body.classList.toggle('am-op', !!(c && amOp(c)));
         if (room) {
@@ -442,6 +445,7 @@
             const li = document.createElement('li');
             const b = document.createElement('button');
             b.type = 'button'; b.className = 'nick'; b.style.color = colorOf(n.nick);
+            b.dataset.self = String(n.nick === app.me);
             b.textContent = `${n.prefix}${n.nick}${n.band ? ' ⭐' : n.moderator ? ' MOD' : ''}${n.cam ? ' 📷' : ''}${n.away ? ' 💤' : ''}`;
             b.addEventListener('click', () => nickSheet(n.nick));
             li.append(b); ul.append(li);
