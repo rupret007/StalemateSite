@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "startedAt": "2026-10-19T04:10:07.293Z",
+  "completedAt": "2026-10-19T04:10:07.575Z",
+  "platform": "darwin",
+  "fixtureOnly": true,
+  "liveNetworkRequests": 0,
+  "hostedDeploymentChanged": false,
+  "productionMonitorStateChanged": false,
+  "notificationDelivery": "submitted-to-os; human visibility not confirmed",
+  "actualOsNotificationsSubmitted": 2,
+  "probes": [
+    {
+      "phase": "healthy-baseline",
+      "kind": "healthy",
+      "notification": "not-needed"
+    },
+    {
+      "phase": "simulated-failure",
+      "kind": "service-error",
+      "notification": "submitted-to-os"
+    },
+    {
+      "phase": "duplicate-failure",
+      "kind": "service-error",
+      "notification": "not-needed"
+    },
+    {
+      "phase": "simulated-recovery",
+      "kind": "healthy",
+      "notification": "submitted-to-os"
+    }
+  ],
+  "privateFixtureFilesRemoved": true
+}

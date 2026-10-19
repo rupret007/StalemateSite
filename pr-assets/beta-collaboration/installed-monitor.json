@@ -1,0 +1,26 @@
+{
+  "time": "2026-10-19T04:24:20.684860+00:00",
+  "status": "passed",
+  "kind": "Actual current-user macOS LaunchAgent and hosted health read",
+  "label": "com.stalemate.beta-monitor",
+  "intervalSeconds": 300,
+  "loaded": true,
+  "lastExitCode": 0,
+  "runtimeOutsideDocuments": true,
+  "installedRuntimeMatchesSource": true,
+  "runtimeSha256": "aef4f78db25bc6a49dbcd05934eddfa5276d4173c3ea1274831e49a1b13ad5ab",
+  "privateFileModes": [
+    "0o600"
+  ],
+  "keyAbsentFromRuntimePlistStateAndLogs": true,
+  "firstScheduledNotification": "submitted-to-os",
+  "secondScheduledNotification": "not-needed",
+  "latestHealth": "degraded",
+  "limits": [
+    "Mac must be awake, online and logged in.",
+    "Notification submission does not prove human display.",
+    "Local application read-only health and allowance checks; no provider availability or billing proof.",
+    "Current degraded status reflects missing Access configuration; no hosted outage was created."
+  ],
+  "sourceIncludesCriticalRestrictionTransitions": true
+}
