@@ -4,6 +4,31 @@
     'use strict';
     const $ = (s, el = document) => el.querySelector(s);
     const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+    // Keep the composer inside the visible area when a mobile keyboard opens.
+    // Pinch zoom remains browser-controlled; never turn it into a layout resize.
+    function fitChatViewport() {
+        const viewport = window.visualViewport;
+        const style = document.body.style;
+        if (!viewport || !matchMedia('(max-width: 900px)').matches) {
+            style.removeProperty('--chat-viewport-height');
+            style.removeProperty('--chat-viewport-top');
+            document.body.classList.remove('keyboard-open');
+            return;
+        }
+        if (Math.abs(viewport.scale - 1) > 0.01) return;
+        style.setProperty('--chat-viewport-height', `${viewport.height}px`);
+        style.setProperty('--chat-viewport-top', `${viewport.offsetTop}px`);
+        document.body.classList.toggle('keyboard-open', viewport.height < innerHeight - 100);
+    }
+    let viewportFrame;
+    const scheduleViewport = () => {
+        cancelAnimationFrame(viewportFrame);
+        viewportFrame = requestAnimationFrame(fitChatViewport);
+    };
+    window.addEventListener('resize', scheduleViewport);
+    window.visualViewport?.addEventListener('resize', scheduleViewport);
+    window.visualViewport?.addEventListener('scroll', scheduleViewport);
+    fitChatViewport();
     const Discovery = window.HangoutDiscovery;
     const params = new URLSearchParams(location.search);
     let ownerSession = params.get('owner') === '1' || sessionStorage.getItem('hangout-owner') === '1';
