@@ -5,6 +5,7 @@ import { accountId, accessConfigured, hmacKeyOk, ipHash, newDeviceId, roleForEma
 import { createLobby, LOBBY_LIMITS } from './lobby-core.mjs';
 import { LOG_TTL } from './community-state.mjs';
 import { createAiModerator } from './ai-moderation.mjs';
+import { activeBetaSession, validBetaSession } from './beta-session-client.mjs';
 
 export function lobbyConfigured(env = {}) {
     return !!(env.LOBBY && env.QUOTA && hmacKeyOk(env.HANGOUT_HMAC_KEY) && typeof env.HANGOUT_PREVIEW_KEY === 'string' && env.HANGOUT_TURNSTILE_SECRET);
@@ -21,9 +22,16 @@ async function turnstileOk(token, ip, secret, fetchImpl = fetch) {
 }
 
 const jwksCache = { url: '', at: 0, body: null };
+function betaSessionInvalid(attachment, env) {
+    return env.HANGOUT_BETA_MODE === 'protected' && (attachment.betaEnded || !validBetaSession(attachment, env));
+}
+function socketIdentityInvalid(attachment, env) {
+    return attachment.sessionEnded || betaSessionInvalid(attachment, env) || attachment.expiresAt && attachment.expiresAt <= Date.now() ||
+        attachment.admin && roleForEmail(attachment.email, env) !== attachment.role;
+}
 async function fetchJwks(url) {
     if (jwksCache.url === url && jwksCache.body && Date.now() - jwksCache.at < 10 * 60 * 1000) return jwksCache.body;
-    const r = await fetch(url, { redirect: 'error' });
+    const r = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(8000) });
     if (!r.ok) throw new Error('jwks');
     jwksCache.body = await r.json(); jwksCache.url = url; jwksCache.at = Date.now();
     return jwksCache.body;
@@ -103,10 +111,11 @@ export class HangoutLobby {
         this.ready = state.blockConcurrencyWhile(async () => {
             // Only the separate authenticated pilot can initialize its first empty network.
             // A later missing/corrupt record still restores fail-closed after this sentinel exists.
-            if (env.PILOT_MODE === 'protected' && !(await state.storage.get('pilot-initialized'))) {
+            const bootstrapKey = env.HANGOUT_BETA_MODE === 'protected' ? 'beta-initialized' : 'pilot-initialized';
+            if ((env.PILOT_MODE === 'protected' || env.HANGOUT_BETA_MODE === 'protected') && !(await state.storage.get(bootstrapKey))) {
                 await state.storage.transaction(async (txn) => {
                     if ((await txn.get('net')) === undefined && (await txn.get('room-index')) === undefined) await txn.put('net', { lock: 'off' });
-                    await txn.put('pilot-initialized', true);
+                    await txn.put(bootstrapKey, true);
                 });
             }
             this.aiModerator = createAiModerator({
@@ -129,7 +138,19 @@ export class HangoutLobby {
                 } : undefined,
                 send: (id, msg) => {
                     const ws = this.byId(id);
-                    if (ws) ws.send(JSON.stringify(msg));
+                    if (ws) {
+                        const a = ws.deserializeAttachment() || {};
+                        if (socketIdentityInvalid(a, env)) {
+                            if (!a.sessionEnded) {
+                                ws.serializeAttachment({ ...a, sessionEnded: true });
+                                ws.close(4401, 'sign in again');
+                                const ended = Promise.resolve().then(() => this.webSocketClose(ws)).catch(() => this.storageFailed());
+                                this.state.waitUntil?.(ended);
+                            }
+                            return;
+                        }
+                        ws.send(JSON.stringify(msg));
+                    }
                     else this.pendingAdmission.get(id)?.push(msg);
                 },
                 close: (id, code, reason) => { const ws = this.byId(id); if (ws) try { ws.close(code, reason); } catch (e) { /* gone */ } },
@@ -161,11 +182,15 @@ export class HangoutLobby {
             this.engine.restoreAbuse(await state.storage.get('abuse'));
             // Hibernation preserves the browser's actual connection. Restore metadata only:
             // never send hello/join or erase its connected-session scrollback on an idle wake.
-            const live = [], sockets = new Map();
+            const live = [], sockets = new Map(), betaChecks = new Map();
             for (const ws of state.getWebSockets()) {
                 const a = ws.deserializeAttachment() || {};
                 if (!a.id) { ws.close(4401, 'session unavailable'); continue; }
-                if (a.expiresAt && a.expiresAt <= Date.now() || a.admin && roleForEmail(a.email, env) !== a.role) { ws.close(4401, 'sign in again'); continue; }
+                if (socketIdentityInvalid(a, env)) { ws.close(4401, 'sign in again'); continue; }
+                if (env.HANGOUT_BETA_MODE === 'protected') {
+                    if (!betaChecks.has(a.betaSid)) betaChecks.set(a.betaSid, activeBetaSession(env, a));
+                    if (!await betaChecks.get(a.betaSid)) { ws.close(4401, 'beta session ended'); continue; }
+                }
                 live.push(a); sockets.set(a.id, ws);
             }
             const roomsBeforeResume = JSON.stringify(this.engine.roomSnapshot());
@@ -228,11 +253,17 @@ export class HangoutLobby {
     async alarm() {
         await this.ready;
         return this.state.blockConcurrencyWhile(async () => {
-            await this.engine.tick(); await this.pruneLogs();
+            const betaChecks = new Map();
             for (const ws of this.state.getWebSockets()) {
                 const a = ws.deserializeAttachment() || {};
-                if (a.expiresAt && a.expiresAt <= Date.now() || a.admin && roleForEmail(a.email, this.env) !== a.role) { ws.close(4401, 'sign in again'); await this.engine.disconnect(a.id); }
+                let ended = socketIdentityInvalid(a, this.env);
+                if (!ended && this.env.HANGOUT_BETA_MODE === 'protected') {
+                    if (!betaChecks.has(a.betaSid)) betaChecks.set(a.betaSid, activeBetaSession(this.env, a));
+                    ended = !await betaChecks.get(a.betaSid);
+                }
+                if (ended) { ws.close(4401, 'sign in again'); await this.engine.disconnect(a.id); }
             }
+            await this.engine.tick(); await this.pruneLogs();
             await this.state.storage.setAlarm(Date.now() + 60000);
         });
     }
@@ -249,7 +280,20 @@ export class HangoutLobby {
                 return new Response('ok');
             });
         }
+        if (this.env.HANGOUT_BETA_MODE === 'protected' && new URL(request.url).pathname === '/__beta/disconnect' && request.method === 'POST' && /^[a-z0-9-]{16,64}$/.test(identity?.betaSid || '')) {
+            return this.state.blockConcurrencyWhile(async () => {
+                for (const ws of this.state.getWebSockets()) {
+                    const a = ws.deserializeAttachment() || {};
+                    if (a.betaSid === identity.betaSid) { ws.serializeAttachment({ ...a, betaEnded: true }); ws.close(4401, 'beta session ended'); await this.engine.disconnect(a.id); }
+                }
+                return new Response('ok');
+            });
+        }
+        return this.state.blockConcurrencyWhile(async () => {
         if (!identity || !identity.dev) return new Response('no', { status: 400 });
+        if (socketIdentityInvalid(identity, this.env)) return new Response('session required', { status: 403 });
+        if (this.env.HANGOUT_BETA_MODE === 'protected' && !await activeBetaSession(this.env, identity)) return new Response('beta session required', { status: 403 });
+        if (socketIdentityInvalid(identity, this.env)) return new Response('session required', { status: 403 });
         const id = `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
         // Admission may refuse before upgrade, but successful connect also emits the
         // hello the browser waits for. Hold those frames until the socket is accepted.
@@ -264,16 +308,20 @@ export class HangoutLobby {
         if (!verdict.ok) return new Response(verdict.reason, { status: verdict.status });
         const pair = new WebSocketPair();
         this.state.acceptWebSocket(pair[1], [id]);
-        pair[1].serializeAttachment({ id, pilotSid: this.env.PILOT_MODE === 'protected' ? identity.pilotSid : undefined, dev: identity.dev, iph: identity.iph, role: identity.role, email: identity.email, account: identity.account, expiresAt: identity.expiresAt, admin: identity.admin });
+        pair[1].serializeAttachment({ id, pilotSid: this.env.PILOT_MODE === 'protected' ? identity.pilotSid : undefined,
+            betaSid: this.env.HANGOUT_BETA_MODE === 'protected' ? identity.betaSid : undefined,
+            betaInviteVersion: this.env.HANGOUT_BETA_MODE === 'protected' ? identity.betaInviteVersion : undefined,
+            dev: identity.dev, iph: identity.iph, role: identity.role, email: identity.email, account: identity.account, expiresAt: identity.expiresAt, admin: identity.admin });
         if (identity.devToken) pair[1].send(JSON.stringify({ t: 'device', token: identity.devToken }));
         for (const frame of initialFrames) pair[1].send(JSON.stringify(frame));
         return new Response(null, { status: 101, webSocket: pair[0] });
+        });
     }
     async webSocketMessage(ws, raw) {
         await this.ready;
         return this.state.blockConcurrencyWhile(async () => {
             const a = ws.deserializeAttachment() || {};
-            if (a.expiresAt && a.expiresAt <= Date.now() || a.admin && roleForEmail(a.email, this.env) !== a.role) { ws.close(4401, 'sign in again'); return this.engine.disconnect(a.id); }
+            if (socketIdentityInvalid(a, this.env)) { ws.close(4401, 'sign in again'); return this.engine.disconnect(a.id); }
             return this.engine.message(this.state.getTags(ws)[0], typeof raw === 'string' ? raw : '');
         });
     }

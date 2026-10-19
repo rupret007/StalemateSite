@@ -32,6 +32,7 @@ secrets*
 *.zip
 
 .pilot-assets/
+.beta-assets/
 .local/
 .wrangler/
 .dev.vars*

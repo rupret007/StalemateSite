@@ -177,6 +177,9 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     const lines = new Map();          // msgId -> line (recent, for reports/purge)
     const lineMeta = new Map();       // immutable author device + actual recipient connections; never sent to visitors
     const receipts = new Map();       // bounded text digests + delivery metadata; no ordinary chat or PM bodies
+    const receiptSizes = new Map();   // exact UTF-8 record sizes; avoid re-encoding the whole queue per line
+    let receiptBytes = 2;             // serialized [] plus records and commas
+    let receiptRevision = 0;
     const heldChannels = new Map();   // original channel object for live held-message approval; never restored
     const aiPending = new Map();      // current message + channel object identities; never persisted
     const aiReviews = new Map();      // bounded admin-only evidence, separate from chat and network snapshots
@@ -440,6 +443,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             else pm.delete(k);
         }
         conns.delete(id);
+        pruneReceipts(); // A later connection must never inherit a departed socket's delivery witness.
         if (isBand(c)) { net.lastBand = now(); saveNet(); }
         pushAdmin();
     }
@@ -621,7 +625,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     function roomSnapshot() { return { version: 1, rooms: [...channels.values()].filter((r) => r.kind !== 'lobby').map(roomRecord) }; }
     // Metadata belongs to an already admitted WebSocket, never to a returning nickname.
     // The adapter supplies the exact live socket identities again after hibernation.
-    function sessionSnapshot() {
+    function sessionMetadata() {
         const live = [...conns.values()].filter((c) => c.nick);
         return { version: 1, connections: live.map((c) => ({
             id: c.id, dev: c.dev, iph: c.iph, account: c.account || '', role: c.role, admin: c.admin,
@@ -629,11 +633,13 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             cams: [...c.cams], since: c.since, lastNick: c.lastNick, tokens: c.tokens, last: c.last, frames: c.frames,
             lastSaid: Object.fromEntries(Object.entries(c.lastSaid).filter(([name]) => c.channels.has(name))),
             actTokens: c.actTokens, actLast: c.actLast, camReports: c.camReports || 0
-        })), receipts: [...receipts.values()].map((r) => ({ ...r, recipients: r.recipients.filter((id) => conns.get(id)?.nick) }))
-            .filter((r) => r.recipients.length), pm: [...pm].filter(([, p]) => p.state === 'open' && conns.has(p.fromId) && conns.has(p.toId))
+        })), pm: [...pm].filter(([, p]) => p.state === 'open' && conns.has(p.fromId) && conns.has(p.toId))
             .map(([key, p]) => ({ key, from: p.from, fromId: p.fromId, toId: p.toId, state: 'open' })),
         pendingPm: [...pm].filter(([, p]) => p.state === 'pending' && conns.has(p.fromId) && conns.has(p.toId))
             .map(([key, p]) => ({ key, from: p.from, fromId: p.fromId, toId: p.toId, at: p.at, hadFirst: !!p.first || !!p.lostFirst })) };
+    }
+    function sessionSnapshot() {
+        return { ...sessionMetadata(), receipts: [...receipts.values()].map((r) => ({ ...r, recipients: [...r.recipients] })) };
     }
     function restoreSessions(saved, liveIdentities = []) {
         const rejected = [], resumed = [];
@@ -742,7 +748,8 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     function durable(fn, args) {
         const before = JSON.stringify(roomSnapshot());
         const rateBefore = JSON.stringify(abuseSnapshot());
-        const sessionsBefore = JSON.stringify(sessionSnapshot());
+        const sessionsBefore = JSON.stringify(sessionMetadata());
+        const receiptsBefore = receiptRevision;
         outputBatch = []; closeBatch = []; evidenceWrites = [];
         let result;
         try { result = fn(...args); } catch (error) { outputBatch = null; closeBatch = null; evidenceWrites = null; throw error; }
@@ -752,11 +759,18 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (!roomsBroken && JSON.stringify(after) !== before) writes.push(persist('rooms', after));
         const abuse = abuseSnapshot();
         if (JSON.stringify(abuse) !== rateBefore) writes.push(persist('abuse', abuse));
-        const sessions = sessionSnapshot();
-        const sessionJson = JSON.stringify(sessions);
-        if (sessionJson !== sessionsBefore) {
-            if (encoder.encode(sessionJson).byteLength > SESSION_STATE_BYTES) writes.push(Promise.reject(new Error('session allowance exceeded')));
-            else writes.push(persist('sessions', sessions));
+        const metadata = sessionMetadata();
+        const metadataJson = JSON.stringify(metadata);
+        if (receiptRevision !== receiptsBefore || metadataJson !== sessionsBefore) {
+            // Receipt mutations are tracked separately. Serialize their full bounded
+            // state only for the required commit, not for both change comparisons.
+            // Replacing metadata's closing brace with ,"receipts":<array>} adds
+            // exactly this ASCII property and the incrementally measured array.
+            const bytes = encoder.encode(metadataJson).byteLength + ',"receipts":'.length + receiptBytes;
+            if (bytes > SESSION_STATE_BYTES) writes.push(Promise.reject(new Error('session allowance exceeded')));
+            // Stored receipt records are immutable; replacement/pruning creates
+            // new records, so an outstanding storage write keeps its exact snapshot.
+            else writes.push(persist('sessions', { ...metadata, receipts: [...receipts.values()] }));
         }
         const flush = () => {
             for (const [id, frame] of frames) try { send(id, frame); } catch { /* one gone socket must not stop delivery to everyone else */ }
@@ -1386,28 +1400,38 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     function rememberLine(line, meta) {
         lines.set(line.id, line); lineMeta.set(line.id, meta);
         while (lines.size > 1000) { const oldest = lines.keys().next().value; lines.delete(oldest); lineMeta.delete(oldest); aiPending.delete(oldest); }
-        receipts.set(line.id, messageReceipt(line, meta));
-        pruneReceipts();
+        setReceipt(line.id, messageReceipt(line, meta));
+        pruneReceipts(false);
     }
 
-    function pruneReceipts() {
+    function setReceipt(id, value) {
+        const size = encoder.encode(JSON.stringify(value)).byteLength;
+        if (receipts.has(id)) receiptBytes += size - receiptSizes.get(id);
+        else receiptBytes += size + (receipts.size ? 1 : 0);
+        receipts.set(id, value); receiptSizes.set(id, size); receiptRevision += 1;
+    }
+    function deleteReceipt(id) {
+        if (!receipts.has(id)) return;
+        receiptBytes -= receiptSizes.get(id) + (receipts.size > 1 ? 1 : 0);
+        receipts.delete(id); receiptSizes.delete(id); receiptRevision += 1;
+    }
+    function pruneReceipts(pruneWitnesses = true) {
+        const time = now();
         for (const [id, r] of receipts) {
-            r.recipients = r.recipients.filter((recipient) => conns.get(recipient)?.nick);
-            if (!r.recipients.length || now() - r.ts >= DAY) receipts.delete(id);
+            if (!r.recipients.length || time - r.ts >= DAY) { deleteReceipt(id); continue; }
+            if (pruneWitnesses) {
+                const recipients = r.recipients.filter((recipient) => conns.get(recipient)?.nick);
+                if (!recipients.length) deleteReceipt(id);
+                else if (recipients.length !== r.recipients.length) setReceipt(id, { ...r, recipients });
+            }
         }
-        while (receipts.size > RECEIPT_MAX) receipts.delete(receipts.keys().next().value);
         // A popular lobby can have many delivery witnesses per line. Cap serialized
         // metadata as well as record count so it cannot exhaust the session record.
-        let size = encoder.encode(JSON.stringify([...receipts.values()])).byteLength;
-        while (size > RECEIPT_STATE_BYTES && receipts.size) {
-            const id = receipts.keys().next().value;
-            size -= encoder.encode(JSON.stringify(receipts.get(id))).byteLength + 1;
-            receipts.delete(id);
-        }
+        while (receipts.size > RECEIPT_MAX || receiptBytes > RECEIPT_STATE_BYTES) deleteReceipt(receipts.keys().next().value);
     }
 
     function restoreReceipts(stored) {
-        receipts.clear();
+        receipts.clear(); receiptSizes.clear(); receiptBytes = 2; receiptRevision += 1;
         // Old session records have no receipts. Invalid evidence never grants a
         // report, and need not destroy otherwise valid live chat sessions.
         if (!Array.isArray(stored) || stored.length > RECEIPT_MAX
@@ -1422,7 +1446,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
                 || !Array.isArray(r.recipients) || !r.recipients.length || r.recipients.length > SESSION_CONNECTIONS
                 || r.recipients.some((id) => !moderationIdentity(id)) || new Set(r.recipients).size !== r.recipients.length) continue;
             const eligible = r.recipients.filter((id) => conns.has(id));
-            if (eligible.length) receipts.set(r.id, { t: r.t, id: r.id, ch: r.ch, from: r.from, to: r.to,
+            if (eligible.length) setReceipt(r.id, { t: r.t, id: r.id, ch: r.ch, from: r.from, to: r.to,
                 prefix: r.prefix, band: r.band, moderator: r.moderator, me: r.me, ts: r.ts,
                 authorDev: r.authorDev, digest: r.digest, recipients: eligible });
         }
@@ -1432,7 +1456,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         const set = new Set(ids);
         for (const chan of channels.values()) chan.moderationContext = chan.moderationContext.filter((h) => !set.has(h.id));
         let aiChanged = false;
-        for (const id of ids) { lines.delete(id); lineMeta.delete(id); receipts.delete(id); aiPending.delete(id); if (aiReviews.delete(id)) aiChanged = true; }
+        for (const id of ids) { lines.delete(id); lineMeta.delete(id); deleteReceipt(id); aiPending.delete(id); if (aiReviews.delete(id)) aiChanged = true; }
         if (aiChanged) saveAiReviews();
         for (const x of conns.values()) if (x.nick) out(x, { t: 'delete', ids });
         pushAdmin();

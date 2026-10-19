@@ -1,0 +1,60 @@
+# Separate invitation-only real visitor beta. No pilot identities and no public site routes.
+# Build protected assets with npm run package:beta; all requests run through beta-entry first.
+# Configure hostname/path Cloudflare Access apps for /lobby-owner* and /lobby-admin*.
+# Do not enable worker-level Access: that breaks WebSocket upgrades.
+name = "stalemate-hangout-beta"
+main = "src/beta-entry.mjs"
+compatibility_date = "2026-10-01"
+workers_dev = true
+preview_urls = false
+
+[assets]
+directory = "../.beta-assets"
+binding = "ASSETS"
+run_worker_first = true
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "HangoutRoom"
+[[durable_objects.bindings]]
+name = "QUOTA"
+class_name = "HangoutQuota"
+[[durable_objects.bindings]]
+name = "LOBBY"
+class_name = "HangoutLobby"
+[[durable_objects.bindings]]
+name = "TURN_BUDGET"
+class_name = "HangoutTurnBudget"
+[[durable_objects.bindings]]
+name = "BETA_SESSIONS"
+class_name = "BetaSessions"
+
+[[migrations]]
+tag = "beta-v1"
+new_sqlite_classes = ["HangoutRoom", "HangoutQuota", "HangoutLobby", "HangoutTurnBudget", "BetaSessions"]
+
+[vars]
+HANGOUT_BETA_MODE = "protected"
+HANGOUT_BETA_INVITE_VERSION = "1"
+HANGOUT_OPEN = "1"
+HANGOUT_ACCESS_TEAM = ""
+HANGOUT_OWNER_ACCESS_AUD = ""
+HANGOUT_ACCESS_AUD = ""
+HANGOUT_OWNER_EMAIL = ""
+HANGOUT_BAND_EMAILS = ""
+HANGOUT_MODERATOR_EMAILS = ""
+HANGOUT_MODERATION_CONTACT = ""
+HANGOUT_TURNSTILE_SITEKEY = ""
+HANGOUT_TURN_ENABLED = "0"
+HANGOUT_TURN_MONTHLY_GB = "800"
+HANGOUT_CF_ACCOUNT_ID = ""
+HANGOUT_AI_MODERATION = "off"
+HANGOUT_AI_DAILY_LIMIT = "100"
+WEBJAM_WEB_ORIGINS = ""
+
+# Required secrets: HANGOUT_BETA_INVITE_KEY (32+ chars), HANGOUT_HMAC_KEY, HANGOUT_PREVIEW_KEY.
+# Optional provider secrets only after readiness verification:
+# HANGOUT_TURNSTILE_SECRET, OPENAI_API_KEY,
+# HANGOUT_TURN_KEY_ID, HANGOUT_TURN_API_TOKEN, HANGOUT_TURN_ANALYTICS_TOKEN.
+# Increment HANGOUT_BETA_INVITE_VERSION to invalidate current beta invitations/sessions,
+# then distribute a new private invite key. Existing sockets close on their next frame/wake.
