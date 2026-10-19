@@ -122,6 +122,8 @@
 
         <section class="panel chat" aria-label="Chat">
             <h2>Chat</h2>
+            <p class="small" data-sync-status role="status" hidden></p>
+            <button class="btn btn--ghost" type="button" data-sync-retry hidden>Retry room sync</button>
             <ol class="log" data-log aria-live="polite"></ol>
             <form class="say" data-say>
                 <input data-text maxlength="400" placeholder="Say something dumb" aria-label="Message">
@@ -164,6 +166,8 @@
 
     <script src="../../countdown.js" defer></script>
     <script src="sync-core.js"></script>
+    <script src="private-snapshot.js"></script>
+    <script src="private-recovery.js"></script>
     <script src="video-core.js"></script>
     <script src="youtube-player.js"></script>
     <script src="turn-client.js"></script>

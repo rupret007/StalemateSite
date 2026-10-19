@@ -6,6 +6,8 @@
 
     const H = win.HangoutCore;
     const V = win.HangoutVideo;
+    const S = win.HangoutPrivateSnapshot;
+    const R = win.HangoutPrivateRecovery;
     const $ = (sel) => doc.querySelector(sel);
     // Capture once; each receiver gets it scaled for how big they show us. Most people are on
     // phones, so phones and low-power devices default lighter (battery + cell data).
@@ -33,6 +35,7 @@
         copy: $('[data-copy]'), load: $('[data-load]'), url: $('[data-url]'), picks: $('[data-picks]'), hostNote: $('[data-host-note]'),
         canvas: $('[data-canvas]'), swatches: $('[data-swatches]'), size: $('[data-size]'), clear: $('[data-clear]'), save: $('[data-save]'),
         log: $('[data-log]'), say: $('[data-say]'), text: $('[data-text]'), tiles: $('[data-tiles]'),
+        syncStatus: $('[data-sync-status]'), syncRetry: $('[data-sync-retry]'),
         mic: $('[data-mic]'), cam: $('[data-cam]'), hangup: $('[data-hangup]'), ask: $('[data-ask]'), turnStatus: $('[data-turn-status]'),
         askTitle: $('[data-ask-title]'), askCopy: $('[data-ask-copy]'), askYes: $('[data-ask-yes]'), askNo: $('[data-ask-no]'),
         yt: $('[data-yt]'), file: $('[data-file]'), tap: $('[data-tap]'), videoStatus: $('[data-video-status]'),
@@ -51,6 +54,7 @@
     const app = {
         state: H.emptyState(), clock: H.createClock(), ws: null, myId: null, key: null, roomId: null,
         hostPub: null, hostPriv: null, isHost: false, lastHostSeq: 0, lastHostSigned: null, lastVideoSigned: null,
+        lastClearSigned: null, drawingEpoch: 0, snapshotRequest: null, snapshotFresh: false, knownHostId: null,
         names: new Map(), name: '', snapshotDone: false, snapshotFrom: null, snapshotHasSeqProof: false, connected: false, ended: false, retries: 0,
         bob: { on: false, touched: false, lastNudge: 0 },
         av: {
@@ -112,6 +116,33 @@
     }
 
     const SIGN = { name: 'ECDSA', hash: 'SHA-256' };
+    const authorityWork = new Set();
+    const inboundWork = new WeakMap();
+    const inboundAuthority = new WeakMap();
+    const snapshotJobs = new Map();
+    const futureStrokes = new Map();
+    const sealingStrokes = new Set();
+    const retirementWaiters = new Set();
+    let futureStrokePoints = 0;
+    let recovery = null;
+    let authorityTail = null;
+    function hostWork(work) {
+        // Reserve, sign, commit and encrypt each action in the same order.
+        // Receivers retain one global replay floor for all host actions.
+        const run = () => !app.ended && app.connected && app.isHost ? work() : false;
+        const task = authorityTail ? authorityTail.then(run, run) : Promise.resolve(run());
+        authorityTail = task;
+        authorityWork.add(task);
+        const settled = () => {
+            authorityWork.delete(task);
+            if (authorityTail === task) authorityTail = null;
+        };
+        void task.then(settled, settled);
+        return task;
+    }
+    function relayCurrent(meta) {
+        return !app.ended && app.connected && app.ws === meta.socket && meta.socket.readyState === 1;
+    }
     function canonical(body) { return new TextEncoder().encode(JSON.stringify(body)); }
     async function signHost(body) {
         const sig = new Uint8Array(await crypto.subtle.sign(SIGN, app.hostPriv, canonical(body)));
@@ -141,20 +172,31 @@
             const item = pace.queue[0];
             if (item.socket && (item.socket !== app.ws || item.socket.readyState !== 1)) { pace.queue.shift(); continue; }
             if (!app.ws || app.ws.readyState !== 1 || !paceTake()) break;
-            app.ws.send(pace.queue.shift().frame);
+            const next = pace.queue.shift();
+            if (next.activity) recordStroke(next.activity);
+            app.ws.send(next.frame);
         }
         if (pace.queue.length && app.ws?.readyState === 1) pace.timer = win.setTimeout(paceFlush, 150);
     }
     async function send(obj) {
         const socket = app.ws;
-        if (app.ended || !socket || socket.readyState !== 1) return;
         const roomScoped = ['chat', 'stroke', 'host'].includes(obj.type);
-        const frame = JSON.stringify(await H.seal(app.key, obj));
-        if (app.ended || !roomScoped && (app.ws !== socket || socket.readyState !== 1)) return;
-        // Room content keeps its original envelope; media and presence belong
-        // only to the relay identity that existed before encryption began.
-        pace.queue = V.enqueue(pace.queue, { frame, socket: roomScoped ? null : socket, ice: obj.type === 'rtc' && Boolean(obj.ice), priority: obj.type === 'host' }, QUEUE_MAX);
-        if (!pace.timer) paceFlush();
+        if (app.ended || !socket || socket.readyState !== 1 && !roomScoped) return;
+        // Keep the drawing operation before native encryption yields. A fresh
+        // connection can finish recovering while that encryption is pending.
+        const activity = obj.type === 'stroke' ? JSON.parse(JSON.stringify(obj)) : null;
+        if (activity) sealingStrokes.add(activity);
+        try {
+            const frame = JSON.stringify(await H.seal(app.key, obj));
+            if (app.ended || !roomScoped && (app.ws !== socket || socket.readyState !== 1)) return;
+            // Room content keeps its original envelope; media and presence belong
+            // only to the relay identity that existed before encryption began.
+            pace.queue = V.enqueue(pace.queue, { frame, socket: roomScoped ? null : socket,
+                activity, ice: obj.type === 'rtc' && Boolean(obj.ice), priority: obj.type === 'host' }, QUEUE_MAX);
+            if (!pace.timer) paceFlush();
+        } finally {
+            if (activity) sealingStrokes.delete(activity);
+        }
     }
 
     if (isLocal) { win.__hangoutSend = send; win.__hangoutPace = pace; } // local test hooks only (localhost)
@@ -162,17 +204,255 @@
     // Tokens belong to the relay's current peer identities, not display names.
     // A leave invalidates in-flight media work without retaining departed IDs.
     const relayPeers = new Map();
+    function notifyRetirement() {
+        for (const resolve of retirementWaiters) resolve();
+        retirementWaiters.clear();
+    }
     function retireRelayPeer(id) {
         const peer = relayPeers.get(id);
         if (peer) peer.live = false;
         relayPeers.delete(id);
+        notifyRetirement();
+        const job = snapshotJobs.get(id);
+        if (job) { clearTimeout(job.timer); snapshotJobs.delete(id); }
     }
     function retireRelayPeers() {
         for (const peer of relayPeers.values()) peer.live = false;
         relayPeers.clear();
+        notifyRetirement();
     }
 
     let reconnectTimer;
+    function syncNotice(text, retry = false) {
+        ui.syncStatus.textContent = text;
+        ui.syncStatus.hidden = !text;
+        ui.syncRetry.hidden = !retry;
+    }
+    function cancelRecovery() {
+        if (recovery) {
+            clearTimeout(recovery.timer);
+            recovery.cancelled = true;
+            recovery.resolve(false);
+        }
+        recovery = null;
+        syncNotice('');
+    }
+    function recoveryCurrent(context, meta) {
+        return context && recovery === context && !context.cancelled && !context.failed
+            && !context.complete && relayCurrent(meta) && context.socket === meta.socket;
+    }
+    function beginRecovery(socket) {
+        cancelRecovery();
+        const context = { socket, to: app.myId, request: H.newSecret(), seqFloor: app.lastHostSeq,
+            epochFloor: app.drawingEpoch, journal: R.createJournal({ H }), peers: new Map(),
+            fresh: null, complete: false, failed: false, cancelled: false, peerApplied: false };
+        context.ready = new Promise(resolve => { context.resolve = resolve; });
+        recovery = context;
+        for (const activity of sealingStrokes) context.journal.recordStroke(activity);
+        for (const item of pace.queue) if (item.activity) context.journal.recordStroke(item.activity);
+        app.snapshotRequest = context.request;
+        app.snapshotDone = false; app.snapshotFrom = null; app.snapshotHasSeqProof = false; app.snapshotFresh = false;
+        context.timer = win.setTimeout(() => {
+            if (recovery !== context || context.complete || context.cancelled) return;
+            failRecovery(context, context.peerApplied
+                ? 'The drawing is shared. The host has not confirmed the current room controls. Retry when they return.'
+                : 'Room activity has not caught up. Chat is still live. Retry room sync.');
+        }, 15000);
+        syncNotice('Getting the room’s drawing and watch state…');
+        return context;
+    }
+    function finishRecovery(context, fresh, from, proof) {
+        if (recovery !== context) return;
+        context.complete = true;
+        clearTimeout(context.timer);
+        app.snapshotDone = true; app.snapshotFresh = fresh;
+        app.snapshotFrom = from || null; app.snapshotHasSeqProof = Boolean(proof);
+        context.resolve(true);
+        syncNotice('');
+    }
+    function finishOwnRecovery() {
+        if (recovery && app.isHost) finishRecovery(recovery, true, app.myId, true);
+    }
+    function failRecovery(context, text) {
+        if (recovery !== context || context.complete || context.cancelled) return;
+        context.failed = true;
+        clearTimeout(context.timer);
+        context.resolve(false);
+        syncNotice(text || 'The drawing could not catch up safely. Retry room sync.', true);
+    }
+    function recordStroke(message) {
+        if (recovery && !recovery.complete && !recovery.failed) recovery.journal.recordStroke(message);
+    }
+    function recordHost(message, t) {
+        if (['clear', 'video', 'lock', 'spot'].includes(message.body?.kind)
+            && recovery && !recovery.complete && !recovery.failed) recovery.journal.recordHost(message, t);
+        tryPendingRecovery();
+    }
+    function tryPendingRecovery() {
+        const pending = recovery?.pendingSnapshot;
+        if (pending) commitRecovered(pending.snapshot, recovery, pending.meta, pending.provenSeq);
+    }
+    function applyDrawingMessage(message) {
+        if (H.apply(app.state, message) === 'draw') drawStroke(app.state.strokes.find(stroke => stroke.id === message.stroke.id));
+    }
+    function applyDeferredStrokes(state = app.state, epoch = app.drawingEpoch, consume = true) {
+        for (const [key, message] of futureStrokes) {
+            if (message.epoch > epoch) continue;
+            if (consume) { futureStrokes.delete(key); futureStrokePoints -= message.stroke.pts.length; }
+            if (message.epoch === epoch) H.apply(state, message);
+        }
+        return H.strokeRangeStatus(state);
+    }
+    function acceptStroke(message) {
+        recordStroke(message);
+        if (Object.hasOwn(message, 'epoch') && message.epoch !== app.drawingEpoch) {
+            if (!Number.isSafeInteger(message.epoch) || message.epoch < app.drawingEpoch
+                || !Number.isInteger(message.offset) || message.offset < 0) return;
+            const stroke = H.cleanStroke(message.stroke);
+            if (!stroke || message.offset + stroke.pts.length > H.LIMITS.strokeTotalPoints) return;
+            const key = `${message.epoch}:${stroke.id}:${message.offset}`;
+            const item = { type: 'stroke', epoch: message.epoch, offset: message.offset, stroke };
+            const previous = futureStrokes.get(key);
+            if (previous) {
+                if (JSON.stringify(previous) !== JSON.stringify(item)) syncNotice('The drawing has conflicting updates. Retry room sync.', true);
+                return;
+            }
+            if (futureStrokes.size >= 128 || futureStrokePoints + stroke.pts.length > H.LIMITS.strokeRangePoints) {
+                syncNotice('The drawing is waiting for a missing update. Retry room sync.', true);
+                return;
+            }
+            futureStrokes.set(key, item); futureStrokePoints += stroke.pts.length;
+            return;
+        }
+        applyDrawingMessage(message);
+        tryPendingRecovery();
+    }
+    async function sendHello(to, reply = false) {
+        const socket = app.ws, id = app.myId, request = app.snapshotRequest;
+        const hostHello = app.isHost
+            ? await signHost({ kind: 'hello', from: id, request }) : undefined;
+        if (app.ended || app.ws !== socket || !app.connected || app.myId !== id || app.snapshotRequest !== request) return;
+        await send({ type: 'hello', ...(to ? { to } : {}), ...(reply ? { reply: true } : {}),
+            name: app.name, av: avFlags(), protocol: 2, snapshotRequest: request, hostHello });
+    }
+    async function confirmedHostHello(msg, meta) {
+        const signed = msg.hostHello;
+        if (app.isHost || signed?.body?.kind !== 'hello' || signed.body.from !== meta.from
+            || !S.validNonce(signed.body.request) || !await verifyHost(signed)
+            || !relayCurrent(meta) || !meta.peer.live) return false;
+        const changed = app.knownHostId !== meta.from;
+        app.knownHostId = meta.from;
+        if (changed && (!recovery || recovery.complete || recovery.failed)) beginRecovery(meta.socket);
+        if (recovery && !recovery.complete && !recovery.failed && recovery.askedHost !== meta.from) {
+            recovery.askedHost = meta.from;
+            return true;
+        }
+        return false;
+    }
+    ui.syncRetry.addEventListener('click', () => {
+        if (!app.connected || app.ended) return;
+        beginRecovery(app.ws);
+        void sendHello();
+    });
+    function commitRecovered(snapshot, context, meta, provenSeq = 0) {
+        if (!recoveryCurrent(context, meta)) return;
+        const pending = { snapshot, meta, provenSeq };
+        if (context.pendingSnapshot?.snapshot.trusted && !snapshot.trusted) return;
+        if (authorityWork.size) {
+            context.pendingSnapshot = pending;
+            if (!context.authorityWait) {
+                context.authorityWait = true;
+                void Promise.allSettled([...authorityWork]).then(() => {
+                    context.authorityWait = false;
+                    if (recovery === context) tryPendingRecovery();
+                });
+            }
+            return;
+        }
+        // Include an unfinished local stroke before replacing the canvas. Its
+        // absolute offsets make a later paced delivery idempotent at peers.
+        flush();
+        let incoming = snapshot;
+        if (!snapshot.trusted) {
+            // A peer may share drawing, but cannot assert fresh host controls.
+            incoming = { ...snapshot, seq: Math.max(context.seqFloor, app.lastHostSeq, provenSeq, snapshot.epoch),
+                video: app.lastVideoSigned,
+                mods: [app.av.mods.lock, app.av.mods.spot].filter(Boolean) };
+        }
+        const result = context.journal.merge(incoming, {
+            state: app.state, lastVideoSigned: app.lastVideoSigned, lastClearSigned: app.lastClearSigned,
+            mods: app.av.mods, lastHostSeq: app.lastHostSeq, drawingEpoch: app.drawingEpoch,
+            preserveDrawing: app.isHost && !snapshot.trusted
+        });
+        if (!result.ok) {
+            if (['unproved-epoch', 'unresolved-stroke-gap'].includes(result.error)) {
+                context.pendingSnapshot = pending;
+                return;
+            }
+            failRecovery(context, result.error === 'legacy-stroke'
+                ? 'An older room tab is drawing. Refresh those tabs, then retry room sync.' : undefined);
+            return;
+        }
+        const next = result.candidate;
+        const ranges = applyDeferredStrokes(next.state, next.drawingEpoch, false);
+        if (ranges.pendingPoints) { context.pendingSnapshot = pending; return; }
+        if (ranges.conflicted || ranges.exhausted) { failRecovery(context); return; }
+        context.pendingSnapshot = null;
+        app.state = next.state;
+        app.lastHostSeq = next.lastHostSeq;
+        app.lastVideoSigned = next.lastVideoSigned;
+        app.lastClearSigned = next.lastClearSigned;
+        app.drawingEpoch = next.drawingEpoch;
+        applyDeferredStrokes();
+        for (const signed of [next.mods.lock, next.mods.spot].filter(Boolean)) applyHostAction(signed.body, signed, false);
+        redraw(); renderChat(); showEpisode();
+        void syncToState(true);
+        app.snapshotDone = true; app.snapshotFrom = meta.from;
+        app.snapshotHasSeqProof = snapshot.trusted || provenSeq > 0;
+        if (snapshot.trusted || app.isHost) {
+            finishRecovery(context, true, meta.from, true);
+        } else {
+            context.peerApplied = true;
+            syncNotice('The drawing is shared. Waiting for the host to confirm room controls…');
+        }
+    }
+    async function receiveSnapshot(message, meta) {
+        const context = recovery;
+        if (!recoveryCurrent(context, meta) || message.request !== context.request) return;
+        const options = { to: context.to, request: context.request,
+            seqFloor: context.seqFloor, epochFloor: context.epochFloor };
+        try {
+            if (Object.hasOwn(message, 'lastHostSeqSigned')) {
+                const part = await S.verifyPart(message, options, verifyHost);
+                if (!recoveryCurrent(context, meta)) return;
+                if (!context.fresh) context.fresh = S.createAssembly(options);
+                const snapshot = context.fresh.add(part);
+                if (snapshot) {
+                    commitRecovered(snapshot, context, meta);
+                    if (context.complete) app.lastSnapshotProof = part.lastHostSeqSigned;
+                }
+                return;
+            }
+            const part = S.parsePeerPart(message, options);
+            if (part.epoch && !(await verifyHost(part.clear))) return;
+            if (!recoveryCurrent(context, meta)) return;
+            let provenSeq = 0;
+            const proof = message.peerHostSeqProof;
+            if (proof && Number.isSafeInteger(proof.body?.seq) && proof.body.seq >= 0 && await verifyHost(proof)) provenSeq = proof.body.seq;
+            if (!recoveryCurrent(context, meta) || context.peerApplied) return;
+            if (!context.peers.has(meta.from)) {
+                if (context.peers.size >= 12) return;
+                context.peers.set(meta.from, { assembly: S.createAssembly({ ...options, peer: true }), provenSeq });
+            }
+            const peer = context.peers.get(meta.from);
+            peer.provenSeq = Math.max(peer.provenSeq, provenSeq);
+            const snapshot = peer.assembly.add(part);
+            if (snapshot) commitRecovered(snapshot, context, meta, peer.provenSeq);
+        } catch (_) {
+            // Untrusted, stale and malformed packets never downgrade into the
+            // old snapshot path or replace any currently displayed activity.
+        }
+    }
     function connect() {
         if (app.ended) return;
         if (!relayBase) {
@@ -183,7 +463,15 @@
         setGate('Connecting…');
         const ws = new WebSocket(url);
         app.ws = ws;
-        ws.onmessage = (event) => onRelay(event.data, ws);
+        const incoming = new Set();
+        inboundWork.set(ws, incoming);
+        ws.onmessage = (event) => {
+            const work = { peer: null, type: null, task: null };
+            const task = work.task = onRelay(event.data, ws, work);
+            incoming.add(work);
+            void task.then(() => incoming.delete(work), () => incoming.delete(work));
+            return task;
+        };
         ws.onclose = (event) => {
             if (app.ws !== ws) return;
             retireRelayPeers();
@@ -194,6 +482,7 @@
             // envelopes and the unsent composer draft remain separate.
             app.state.chat = [];
             ui.log.replaceChildren();
+            cancelRecovery();
             app.lastClose = event.code;
             // Dropped mid-hang (Wi-Fi blip, phone switching networks): retry a few times with backoff.
             if (app.myId && event.code !== 4429 && event.code < 4400 && app.retries < 5) {
@@ -214,6 +503,11 @@
 
     function endSession(reason) {
         app.ended = true; app.connected = false;
+        cancelRecovery();
+        for (const job of snapshotJobs.values()) clearTimeout(job.timer);
+        snapshotJobs.clear();
+        futureStrokes.clear(); futureStrokePoints = 0;
+        sealingStrokes.clear();
         retireRelayPeers();
         app.ws.onmessage = null;
         clearTimeout(reconnectTimer); clearTimeout(pace.timer); clearTimeout(flushTimer);
@@ -233,7 +527,7 @@
         setGate(reason); say(reason);
     }
 
-    async function onRelay(raw, ws) {
+    async function onRelay(raw, ws, work) {
         if (app.ended || app.ws !== ws) return;
         let frame;
         try { frame = JSON.parse(raw); } catch (error) { return; }
@@ -244,16 +538,16 @@
             app.myId = frame.id;
             app.connected = true;
             app.retries = 0;
-            if (again) { say('Back in.'); app.av.wantSent.clear(); } else {
-                enterRoom();
-                app.snapshotDone = false;
-                app.snapshotFrom = null;
-                app.snapshotHasSeqProof = false;
-            }
+            if (again) { say('Back in.'); app.av.wantSent.clear(); } else enterRoom();
+            beginRecovery(ws);
             showPeers(frame.peers);
-            await send({ type: 'hello', name: app.name, av: avFlags() });
+            await sendHello();
             if (again && oldId !== frame.id) await send({ type: 'gone', id: oldId });
-            if (!again) win.setTimeout(() => { app.snapshotDone = true; }, 1500);
+            if (app.isHost && frame.peers <= 1) finishOwnRecovery();
+            const context = recovery;
+            win.setTimeout(() => {
+                if (context && recovery === context && app.ws === ws && app.connected) app.snapshotDone = true;
+            }, 1500);
             return;
         }
         if (frame.slow) { say('Whoa, slow down a sec.'); return; }
@@ -270,15 +564,32 @@
         if (!frame.c) return;
         let peer = relayPeers.get(frame.from);
         if (!peer) { peer = { live: true, received: 0, avReceived: 0, nameReceived: 0 }; relayPeers.set(frame.from, peer); }
+        work.peer = peer;
         const received = ++peer.received;
+        // Reserve order before decrypting an opaque frame. Native decryption
+        // and signature checks can finish out of order; persistent host actions
+        // still have to reach their shared replay floor in relay order. Chat,
+        // drawing and media continue independently of authority verification.
+        const before = inboundAuthority.get(ws) || Promise.resolve();
+        let decoded, applied;
+        const ready = new Promise(resolve => { decoded = resolve; });
+        const done = new Promise(resolve => { applied = resolve; });
+        inboundAuthority.set(ws, before.then(() => ready).then(isHost => isHost ? done : undefined));
         let msg;
-        try { msg = await H.open(app.key, frame); } catch (error) { return; }
-        if (app.ended || app.ws !== ws) return;
-        if (msg.type === 'chat' && (!app.connected || ws.readyState !== 1)) return;
-        // Crypto may finish after the relay has already announced departure.
-        // Keep prior chat/drawing, but never restore that person's name or media.
-        if (!peer.live && ['hello', 'av', 'rtc'].includes(msg.type)) return;
-        await handle(msg, { t: frame.t, from: frame.from, peer, received });
+        try {
+            try { msg = await H.open(app.key, frame); } catch (error) { decoded(false); return; }
+            work.type = msg?.type;
+            decoded(msg?.type === 'host');
+            if (msg?.type === 'host') await before;
+            if (app.ended || app.ws !== ws) return;
+            if (msg.type === 'chat' && (!app.connected || ws.readyState !== 1)) return;
+            // Crypto may finish after the relay has already announced departure.
+            // Keep prior chat/drawing, but never restore that person's name or media.
+            if (!peer.live && ['hello', 'av', 'rtc'].includes(msg.type)) return;
+            await handle(msg, { t: frame.t, from: frame.from, peer, received, socket: ws });
+        } finally {
+            decoded(false); applied();
+        }
     }
 
     function pruneNames() { /* names are refreshed by hello/bye messages */ }
@@ -292,7 +603,7 @@
     async function handle(msg, meta) {
         if (msg.to && msg.to !== app.myId) return;
         switch (msg.type) {
-        case 'hello':
+        case 'hello': {
             if (meta.received > meta.peer.nameReceived) {
                 meta.peer.nameReceived = meta.received;
                 app.names.set(meta.from, String(msg.name || 'Someone').slice(0, 24));
@@ -305,11 +616,13 @@
                 // A newer AV update may arrive before this hello supplies a name.
                 openPc(meta.from);
             }
-            if (!msg.reply) {
-                await send({ type: 'hello', reply: true, to: meta.from, name: app.name, av: avFlags() });
-                win.setTimeout(() => sendSnapshot(meta.from), app.isHost ? 0 : 150 + Math.random() * 400);
-            }
+            const askHost = await confirmedHostHello(msg, meta);
+            if (!relayCurrent(meta) || !meta.peer.live) return;
+            if (!msg.reply || askHost) await sendHello(meta.from, true);
+            if (!relayCurrent(meta) || !meta.peer.live) return;
+            if (!msg.reply || app.isHost && S.validNonce(msg.snapshotRequest)) scheduleSnapshot(meta.from, msg.snapshotRequest);
             return;
+        }
         case 'bye':
             app.names.delete(meta.from);
             noteAv(meta.from, null);
@@ -317,13 +630,17 @@
             showPeers(app.names.size + 1);
             return;
         case 'snapshot': {
+            if (Object.hasOwn(msg, 'request') || msg.lastHostSeqSigned?.body?.kind === 'snapshot') {
+                await receiveSnapshot(msg, meta);
+                return;
+            }
             const seqSigned = msg.lastHostSeqSigned;
             const hasSeqProof = Boolean(
                 seqSigned
                 && Number.isFinite(seqSigned.body?.seq)
                 && await verifyHost(seqSigned)
             );
-            if (app.ended) return;
+            if (!relayCurrent(meta)) return;
             if (app.snapshotDone) {
                 if (!(hasSeqProof && !app.snapshotHasSeqProof)) return;
             }
@@ -343,18 +660,18 @@
             if (finishing) app.snapshotDone = true;
             H.apply(app.state, {
                 type: 'snapshot',
-                state: { strokes: msg.strokes, append: Boolean(msg.chunk && !msg.first) }
+                state: { strokes: msg.strokes, video: app.state.video, append: Boolean(msg.chunk && !msg.first) }
             });
             if (
                 msg.video?.signed?.body?.kind === 'video'
-                && await verifyHost(msg.video.signed) && !app.ended
+                && await verifyHost(msg.video.signed) && relayCurrent(meta)
             ) {
                 const signedT = Number(msg.video.signed.body.t);
                 if (Number.isFinite(signedT)) acceptVideo(msg.video.signed, signedT);
             }
             if (finishing) {
                 for (const mod of (Array.isArray(msg.mods) ? msg.mods.slice(0, 4) : [])) {
-                    if (mod && V.cleanHostAction(mod.body) && await verifyHost(mod) && !app.ended) {
+                    if (mod && V.cleanHostAction(mod.body) && await verifyHost(mod) && relayCurrent(meta)) {
                         if (mod.body.seq < app.lastHostSeq) continue; // snapshot replay guard
                         applyHostAction(mod.body, mod, false);
                         app.lastHostSeq = Math.max(app.lastHostSeq, mod.body.seq);
@@ -366,20 +683,25 @@
             return;
         }
         case 'stroke':
-            if (H.apply(app.state, msg) === 'draw') drawStroke(app.state.strokes.find((s) => s.id === msg.stroke.id));
+            acceptStroke(msg);
             return;
         case 'chat':
             H.apply(app.state, msg, meta);
             renderChat();
             return;
         case 'host':
-            if (!(await verifyHost(msg)) || app.ended) return;
+            if (!['clear', 'video', ...V.HOST_KINDS].includes(msg.body?.kind)) return;
+            if (!(await verifyHost(msg)) || !relayCurrent(meta)) return;
             if (!(msg.body.seq > app.lastHostSeq)) return; // replay guard
             app.lastHostSeq = msg.body.seq;
             app.lastHostSigned = msg;
-            if (msg.body.kind === 'clear') { H.apply(app.state, { type: 'clear' }); redraw(); say('The host wiped the canvas.'); }
+            if (msg.body.kind === 'clear') {
+                app.lastClearSigned = msg; app.drawingEpoch = msg.body.seq;
+                H.apply(app.state, { type: 'clear' }); applyDeferredStrokes(); redraw(); say('The host wiped the canvas.');
+            }
             if (msg.body.kind === 'video') acceptVideo(msg, meta.t);
             if (V.HOST_KINDS.includes(msg.body.kind)) applyHostAction(msg.body, msg, false);
+            recordHost(msg, meta.t);
             return;
         case 'av':
             if (meta.received > meta.peer.avReceived) {
@@ -423,7 +745,80 @@
         }
     }
 
-    async function sendSnapshot(to) {
+    function scheduleSnapshot(to, request) {
+        const previous = snapshotJobs.get(to);
+        if (previous && previous.socket === app.ws && previous.request === request) return;
+        if (previous) clearTimeout(previous.timer);
+        const job = { to, request, socket: app.ws, timer: 0 };
+        snapshotJobs.set(to, job);
+        job.timer = win.setTimeout(() => { void sendSnapshot(job); }, app.isHost ? 0 : 150 + Math.random() * 400);
+    }
+    function snapshotJobCurrent(job) {
+        return !app.ended && app.connected && app.ws === job.socket && job.socket.readyState === 1
+            && snapshotJobs.get(job.to) === job;
+    }
+    async function settleState(job) {
+        if (app.isHost && recovery && !recovery.complete && !await recovery.ready) return false;
+        while (snapshotJobCurrent(job)) {
+            const pending = [...(inboundWork.get(job.socket) || [])]
+                // A departed identity's presence/media verification cannot
+                // change a captured canvas and must not block its replacement.
+                .filter(work => !work.peer || work.peer.live || !['hello', 'av', 'rtc'].includes(work.type))
+                .map(work => work.task);
+            pending.push(...authorityWork);
+            if (!pending.length) return true;
+            let wake;
+            const retired = new Promise(resolve => { wake = resolve; retirementWaiters.add(resolve); });
+            try {
+                // Recheck known presence work when its identity leaves, even
+                // if its native verification has not finished yet.
+                await Promise.race([Promise.allSettled(pending), retired]);
+            } finally { retirementWaiters.delete(wake); }
+        }
+        return false;
+    }
+    function bestHostProof() {
+        return [app.lastHostSigned, app.lastClearSigned, app.lastVideoSigned?.signed,
+            app.av.mods.lock, app.av.mods.spot, app.lastSnapshotProof]
+            .filter(proof => Number.isSafeInteger(proof?.body?.seq))
+            .sort((a, b) => b.body.seq - a.body.seq)[0] || null;
+    }
+    async function sendSnapshot(job) {
+        if (!await settleState(job) || !snapshotJobCurrent(job)) return;
+        const status = H.strokeRangeStatus(app.state);
+        if (status.pendingPoints || status.exhausted || status.conflicted) {
+            syncNotice('The drawing is missing a piece. Retry room sync.', true);
+            return;
+        }
+        if (!S.validNonce(job.request)) {
+            await sendLegacySnapshot(job);
+            return;
+        }
+        try {
+            // makeChunks clones synchronously after inbound and local authority
+            // transactions settle. Later input cannot change the signed cut.
+            const seq = app.lastHostSeq;
+            const proof = bestHostProof();
+            const parts = S.makeChunks({ to: job.to, request: job.request, seq,
+                epoch: app.drawingEpoch, clear: app.lastClearSigned,
+                strokes: app.state.strokes.map(H.cleanSnapshotStroke),
+                video: app.lastVideoSigned, mods: [app.av.mods.lock, app.av.mods.spot].filter(Boolean) });
+            for (const part of parts) {
+                let packet;
+                if (app.isHost) {
+                    const body = await S.proofBody(part, seq);
+                    const signed = await signHost(body);
+                    packet = { ...part, lastHostSeqSigned: signed };
+                } else packet = { ...part, peerHostSeqProof: proof };
+                if (!snapshotJobCurrent(job)) return;
+                await send(packet);
+            }
+        } catch (_) {
+            if (snapshotJobCurrent(job)) syncNotice('The drawing could not be shared safely. Save it or retry room sync.', true);
+        }
+    }
+    async function sendLegacySnapshot(job) {
+        const to = job.to;
         const video = app.lastVideoSigned;
         const mods = [app.av.mods.lock, app.av.mods.spot].filter(Boolean);
         const strokes = app.state.strokes.slice(-400);
@@ -436,9 +831,11 @@
         } else if (app.lastHostSigned && Number.isFinite(app.lastHostSigned.body?.seq)) {
             lastHostSeqSigned = app.lastHostSigned;
         }
-        chunks.forEach((chunk, i) => {
+        for (let i = 0; i < chunks.length; i += 1) {
+            if (!snapshotJobCurrent(job)) return;
+            const chunk = chunks[i];
             const isLast = i === chunks.length - 1;
-            send({
+            await send({
                 type: 'snapshot',
                 to,
                 strokes: chunk,
@@ -449,7 +846,7 @@
                 first: i === 0,
                 done: isLast
             });
-        });
+        }
     }
 
     /* ---------------- gate / enter ---------------- */
@@ -519,6 +916,7 @@
     /* ---------------- chat ---------------- */
     ui.say.addEventListener('submit', async (event) => {
         event.preventDefault();
+        if (!app.connected) { say('Reconnecting. Your draft stays here until you can send it.'); return; }
         const text = ui.text.value.trim();
         if (!text) return;
         ui.text.value = '';
@@ -606,23 +1004,30 @@
     let flushTimer = null;
     function point(event) {
         const r = ui.canvas.getBoundingClientRect();
-        return [Math.min(1, Math.max(0, (event.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (event.clientY - r.top) / r.height))];
+        return [Math.min(1, Math.max(0, (event.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (event.clientY - r.top) / r.height))]
+            .map(value => Math.round(value * 10000) / 10000);
     }
     function flush() {
         flushTimer = null;
         if (!live || !pending.length) return;
-        send({ type: 'stroke', stroke: { id: live.id, color: live.color, size: live.size, pts: pending } });
+        if (live.epoch !== app.drawingEpoch) { pending = []; return; }
+        const message = { type: 'stroke', offset: live.sent, epoch: live.epoch,
+            stroke: { id: live.id, color: live.color, size: live.size, pts: pending } };
+        live.sent += pending.length;
+        recordStroke(message);
+        void send(message);
         pending = [];
     }
     ui.canvas.addEventListener('pointerdown', (event) => {
+        if (!app.connected) { say('Reconnecting. Drawing resumes when you are back in.'); return; }
         ui.canvas.setPointerCapture(event.pointerId);
-        live = { id: `${app.myId}-${Date.now().toString(36)}`, color, size: Number(ui.size.value), pts: [point(event)] };
+        live = { id: H.newSecret(), color, size: Number(ui.size.value), pts: [point(event)], sent: 0, epoch: app.drawingEpoch };
         pending = [live.pts[0]];
         H.apply(app.state, { type: 'stroke', stroke: { ...live } });
         drawStroke(app.state.strokes[app.state.strokes.length - 1]);
     });
     ui.canvas.addEventListener('pointermove', (event) => {
-        if (!live) return;
+        if (!live || !app.connected) return;
         const p = point(event);
         const mine = app.state.strokes.find((s) => s.id === live.id);
         if (!mine || mine.pts.length > H.LIMITS.strokePoints * 8 - 1) return;
@@ -637,11 +1042,19 @@
     ui.canvas.addEventListener('pointercancel', endStroke);
 
     ui.clear.addEventListener('click', async () => {
-        if (!app.isHost) return;
-        H.apply(app.state, { type: 'clear' });
-        redraw();
-        app.lastHostSeq = Math.max(app.lastHostSeq + 1, Date.now());
-        await send(await signHost({ kind: 'clear', seq: app.lastHostSeq }));
+        if (!app.isHost || !app.connected) return;
+        await hostWork(async () => {
+            const seq = app.lastHostSeq = Math.max(app.lastHostSeq + 1, Date.now());
+            app.drawingEpoch = seq;
+            H.apply(app.state, { type: 'clear' });
+            redraw();
+            const signed = await signHost({ kind: 'clear', seq });
+            if (app.ended || seq !== app.drawingEpoch) return;
+            app.lastClearSigned = signed;
+            applyDeferredStrokes();
+            recordHost(signed, app.clock.relayNow());
+            await send(signed);
+        });
     });
     ui.save.addEventListener('click', () => {
         const a = doc.createElement('a');
@@ -770,17 +1183,34 @@
         }
     }, 2000);
 
+    let videoPublication = null;
     async function hostPublish(source, playing, pos) {
         if (!app.connected || !app.isHost) return;
-        const seq = app.lastHostSeq = Math.max(app.lastHostSeq + 1, Date.now());
-        const t = app.clock.relayNow();
-        const signed = await signHost({ kind: 'video', seq, source, playing, pos: Math.max(0, pos), t });
-        if (!app.connected || app.ended || app.lastHostSeq !== seq) return false;
-        H.apply(app.state, { type: 'video', source, playing, pos }, { t });
-        app.lastVideoSigned = { signed, t };
-        showEpisode();
-        await send(signed);
-        return true;
+        // A newer video choice can retire an obsolete pending signature. Clear
+        // and moderation transactions still run to completion in their order.
+        if (videoPublication && !videoPublication.committed) videoPublication.cancel();
+        const publication = { cancelled: false, committed: false, cancel: null };
+        const cancelled = new Promise(resolve => {
+            publication.cancel = () => { publication.cancelled = true; resolve(null); };
+        });
+        videoPublication = publication;
+        return hostWork(async () => {
+            if (publication.cancelled || videoPublication !== publication) return false;
+            const seq = app.lastHostSeq = Math.max(app.lastHostSeq + 1, Date.now());
+            const t = app.clock.relayNow();
+            const signed = await Promise.race([
+                signHost({ kind: 'video', seq, source, playing, pos: Math.max(0, pos), t }), cancelled
+            ]);
+            if (!signed || publication.cancelled || videoPublication !== publication
+                || !app.connected || app.ended || app.lastHostSeq !== seq) return false;
+            publication.committed = true;
+            H.apply(app.state, { type: 'video', source, playing, pos }, { t });
+            app.lastVideoSigned = { signed, t };
+            recordHost(signed, t);
+            showEpisode();
+            await send(signed);
+            return true;
+        });
     }
 
     function onLocalChange() {
@@ -1611,13 +2041,17 @@
 
     /* ---------------- host moderation (signed by the room creator) ---------------- */
     async function hostAct(action) {
-        if (!app.isHost) return;
-        app.lastHostSeq = Math.max(app.lastHostSeq + 1, Date.now());
-        const body = V.cleanHostAction(Object.assign({}, action, { seq: app.lastHostSeq }));
-        if (!body) return;
-        const signed = await signHost(body);
-        applyHostAction(body, signed, true);
-        await send(signed);
+        if (!app.isHost || !app.connected) return;
+        return hostWork(async () => {
+            app.lastHostSeq = Math.max(app.lastHostSeq + 1, Date.now());
+            const body = V.cleanHostAction(Object.assign({}, action, { seq: app.lastHostSeq }));
+            if (!body) return;
+            const signed = await signHost(body);
+            if (app.ended) return;
+            applyHostAction(body, signed, true);
+            recordHost(signed, app.clock.relayNow());
+            await send(signed);
+        });
     }
     function applyHostAction(body, signed, mine) {
         const a = V.cleanHostAction(body);
