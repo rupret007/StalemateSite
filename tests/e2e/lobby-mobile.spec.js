@@ -55,6 +55,7 @@ for (const width of [375, 390]) {
         await page.fill('[data-text]', message);
         await page.click('[data-send]');
         await expect(page.locator('[data-buffer]')).toContainText(message);
+        await expect(page.locator('[data-text]')).toBeFocused();
         await fits();
         await page.locator('[data-quick-cmd="help"]').click();
         await fits();

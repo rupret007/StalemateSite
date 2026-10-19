@@ -667,7 +667,7 @@
         if (connectionState !== 'connected') return toast('Not connected yet. Your draft is still here.');
         if (!app.band && (app.netLock === 'readonly' || app.budget === 'readonly') && !text.startsWith('/')) return toast('Chat is paused. Your draft is still here.');
         const sent = app.active.startsWith('pm:') && !text.startsWith('/') ? cmd('msg', [app.active.slice(3), ...text.split(' ')]) : send({ t: 'say', ch: app.active.startsWith('pm:') ? '#stalemate' : app.active, text });
-        if (sent) { input.value = ''; drafts.delete(app.active); }
+        if (sent) { input.value = ''; drafts.delete(app.active); input.focus({ preventScroll: true }); }
     });
     $$('[data-quick-line]').forEach((b) => b.addEventListener('click', () => send({ t: 'say', ch: app.active, text: b.dataset.quickLine })));
     $$('[data-quick-me]').forEach((b) => b.addEventListener('click', () => cmd('me', [b.dataset.quickMe])));
