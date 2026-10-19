@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "startedAt": "2026-10-19T05:06:51.400Z",
+  "origin": "https://stalemate-hangout-beta.jeffstory007.workers.dev",
+  "runId": "0ae03f",
+  "status": "passed",
+  "sourceCommit": "51c5fc5",
+  "scope": "Actual hosted benign public-text review and one-request daily cap. No flagged-content or human-action claim.",
+  "input": "Clearly labelled benign synthetic public text only",
+  "dailyLimitDuringCheck": 1,
+  "roomsCreated": 0,
+  "permanentAiEnablement": false,
+  "humanReview": "Pending separate human queue acceptance.",
+  "credentialsRecorded": false,
+  "before": {
+    "ai": {
+      "enabled": false,
+      "configured": true,
+      "state": "disabled",
+      "currentInstance": {
+        "checked": 0,
+        "flagged": 0,
+        "failed": 0,
+        "skipped": 0,
+        "pending": 0
+      }
+    },
+    "quota": {
+      "name": "aiReviews",
+      "used": 0,
+      "limit": 100,
+      "unit": "reviews",
+      "scope": "application",
+      "period": "day"
+    },
+    "reasons": [],
+    "providerChecks": "not-performed"
+  },
+  "priorAttempt": {
+    "failure": "bounded-config-not-confirmed",
+    "chatSubmitted": false,
+    "aiRestoredOff": true,
+    "note": "Earlier reads saw preceding lobby settings. This attempt allows idle intervals and still requires active lobby settings before any text submission."
+  },
+  "reviewRuntime": "77316e2d-25cd-4819-83b4-7100e1290739",
+  "bounded": {
+    "ai": {
+      "enabled": true,
+      "configured": true,
+      "state": "ready",
+      "currentInstance": {
+        "checked": 0,
+        "flagged": 0,
+        "failed": 0,
+        "skipped": 0,
+        "pending": 0
+      }
+    },
+    "quota": {
+      "name": "aiReviews",
+      "used": 0,
+      "limit": 1,
+      "unit": "reviews",
+      "scope": "application",
+      "period": "day"
+    },
+    "reasons": [],
+    "providerChecks": "not-performed"
+  },
+  "boundedConfigurationVerified": true,
+  "outcome": {
+    "ai": {
+      "enabled": true,
+      "configured": true,
+      "state": "capped",
+      "currentInstance": {
+        "checked": 1,
+        "flagged": 0,
+        "failed": 0,
+        "skipped": 0,
+        "pending": 0
+      }
+    },
+    "quota": {
+      "name": "aiReviews",
+      "used": 1,
+      "limit": 1,
+      "unit": "reviews",
+      "scope": "application",
+      "period": "day"
+    },
+    "reasons": [
+      "ai-capped"
+    ],
+    "providerChecks": "not-performed"
+  },
+  "realWorkerProviderReviewCompleted": true,
+  "capped": {
+    "ai": {
+      "enabled": true,
+      "configured": true,
+      "state": "capped",
+      "currentInstance": {
+        "checked": 1,
+        "flagged": 0,
+        "failed": 0,
+        "skipped": 1,
+        "pending": 0
+      }
+    },
+    "quota": {
+      "name": "aiReviews",
+      "used": 1,
+      "limit": 1,
+      "unit": "reviews",
+      "scope": "application",
+      "period": "day"
+    },
+    "reasons": [
+      "ai-capped"
+    ],
+    "providerChecks": "not-performed"
+  },
+  "chatContinuedAtDailyCap": true,
+  "cleanup": {
+    "contexts": 2,
+    "successfulLogouts": 2,
+    "allContextsClosed": true
+  },
+  "restoredRuntime": "210c1fee-6344-4376-a4f8-3d44c20d142a",
+  "restored": {
+    "ai": {
+      "enabled": false,
+      "configured": true,
+      "state": "disabled",
+      "currentInstance": {
+        "checked": 0,
+        "flagged": 0,
+        "failed": 0,
+        "skipped": 0,
+        "pending": 0
+      }
+    },
+    "quota": {
+      "name": "aiReviews",
+      "used": 1,
+      "limit": 100,
+      "unit": "reviews",
+      "scope": "application",
+      "period": "day"
+    },
+    "reasons": [],
+    "providerChecks": "not-performed"
+  },
+  "aiRestoredOff": true,
+  "completedAt": "2026-10-19T05:07:40.988Z",
+  "limitations": [
+    "Benign public text only; no real flagged-content or human moderation action acceptance.",
+    "Current-instance counters reset on hibernation/restart; daily quota reservations remain durable.",
+    "Effective lobby settings were checked after propagation with 15-second polling; the exact cause of earlier stale settings was not established."
+  ]
+}

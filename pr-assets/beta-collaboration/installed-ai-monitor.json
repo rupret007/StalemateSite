@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "scope": "Updated installed Mac monitor includes observed AI failure classification; no notification visibility claim.",
+  "sourceCommit": "51c5fc5",
+  "sourceSha256": "36a35eb524a970dce6950f85f1b1f7b6185c1b261e586abc8612a696de010b97",
+  "installedSha256": "36a35eb524a970dce6950f85f1b1f7b6185c1b261e586abc8612a696de010b97",
+  "runtimeMatchesSource": true,
+  "opsKeyRecorded": false,
+  "installedByActualInstaller": true
+}

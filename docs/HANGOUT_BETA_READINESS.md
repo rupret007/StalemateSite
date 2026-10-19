@@ -28,7 +28,7 @@ protected Cloudflare beta, with separate actual visitor browser contexts.
 | Session lifecycle | Actual hosted logout closed lobby and private relay sockets in two profiles sharing a session; copied pre-logout cookies could not fetch assets or reconnect. Automated expiry, version revocation, multi-room retries and admission races pass. | Real Access callback/expiry acceptance on devices. |
 | Reports and human review | A pre-idle message was durably acknowledged after 75 seconds with the same live sockets. The real staff queue displays the exact synthetic report. Durable evidence and review controls pass automated checks. Jeff is the confirmed sole initial reviewer; the hosted contact link is verified. | Jeff's requested dismissal is pending. Agree review coverage/handoff and verify the action persists before marking human review passed. |
 | Host controls and abuse limits | Hosted guest created a restricted art room, denied an uninvited guest and admitted an invited one. Automated room/PM consent, account/device limits, caps and emergency controls pass. | Run Jeff's authenticated incident/recovery drill; any additional staff need an explicit appointment and separate allowlists. |
-| Bounded AI assistance | A real `omni-moderation-latest` request returned HTTP 200 using the approved vault key. Beta secret provisioned. Automated queue, exclusions, 100/day limit and outage checks pass. | AI remains off. Verify hosted text-to-review flow and real staff handling before enabling it. |
+| Bounded AI assistance | Actual hosted guest text completed one provider review under a one-request daily cap. A second message reached the other guest while quota stayed at one and review was skipped. Both guests logged out; AI was restored off with the configured 100/day allowance. Automated queue/privacy/outage checks pass. | Benign input only. Complete real flagged-evidence and human review acceptance before permanent enablement. |
 | Shared drawing | Actual browser pointer drawing reached a separate hosted guest. WebKit/Android touch drawing and reconnect checks pass. | Physical touch-device acceptance. |
 | Watch synchronization | Desktop/private room and phone fixtures verify host play/pause/seek and guest restrictions, including paused seeks. A provider-readiness race exposed in CI is fixed; pending source/leave cancellation is covered. | Actual YouTube/provider playback and mobile autoplay/permission behavior remain to be accepted on devices. |
 | WebJam invitation/join | Actual native host invitation crossed two Cloudflare guests unchanged into actual Qt Join; a native guest authenticated and received a real Jamulus response. | Same Mac with explicit sealed-reply fallback. Mac, Windows and Linux are all beta requirements; Windows native v3 is blocked by its unsigned bundled fabric; do not weaken the signature check. Intel packaging is still pending. Compatible packaged installation, cross-network audio and timing remain to be accepted on all required platforms. Browser Web Join is disabled; its deployed site returned 404. |
@@ -47,6 +47,13 @@ A successful package build is not physical installation or cross-network audio
 acceptance.
 
 ## Verification receipts
+
+- [Actual hosted AI pipeline](../pr-assets/beta-collaboration/hosted-ai-pipeline.json):
+  one benign guest message completed a real Worker/provider review, a second
+  message continued through chat at the one-request cap, two guests logged out,
+  and AI was verified off after restoration. No human review or flagged-content
+  pass is implied. The observer source passed **544 unit tests in 53 files**.
+
 
 - The watch-correction head passed CI with **470 unit tests in 50 files** and
   **188 browser scenarios** (187 passed directly; one existing iPhone game test
@@ -105,9 +112,13 @@ The guest/native checks used beta version
 `ee8fb29f-aaa5-4e55-8ee3-06c760fd3778`; the later version provisioned secrets.
 Worker versions and Git commits are different identifiers.
 
-**Current active runtime:** `e3177c6d-6bea-4c80-90dc-491d29a33da1`, source commit
-`832f7e1` (Workers-compatible provider requests and bounded Access diagnostics).
-The real staff moderation socket survived this deployment and retained the
+**Current active runtime:** `210c1fee-6344-4376-a4f8-3d44c20d142a`, source commit
+`51c5fc5` (private AI outcome counters and observed failure alerts; AI restored off).
+The one-request hosted AI pipeline check passed, then restored the configured
+100/day allowance without resetting its spent reservation. The previous sign-in
+fix runtime was `e3177c6d`, source `832f7e1` (Workers-compatible provider requests
+and bounded Access diagnostics).
+The real staff moderation socket survived that earlier sign-in deployment and retained the
 exact synthetic report. Initial Access configuration runtime was
 `33e6a92f-57a8-4d89-b79f-23039af1044d`, source `a449541`; its health check
 reported healthy configuration with HTTP 200 and no issues, with provider
