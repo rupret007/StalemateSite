@@ -36,5 +36,16 @@
     "independentSourceReview": "No blocker found."
   },
   "earlierCiStartupFailureCause": "Unproven. These separately reproduced product races do not establish that CI failure's cause.",
-  "credentialsOrRoomKeysRecorded": false
+  "credentialsOrRoomKeysRecorded": false,
+  "linuxFollowUp": {
+    "sourceCommit": "ffee51975016573a1216f5f030cd791055314482",
+    "pullRequestRun": 39206666587,
+    "status": "failed delayed-hello regression on both attempts; 192 other browser cases passed",
+    "pushRun": 39206647237,
+    "pushResult": "192 direct passes plus delayed-hello pass on configured retry",
+    "cause": "Unproven; wire SDP exchange is complete but native operation and transport success require diagnostics.",
+    "deployed": false,
+    "diagnosticFollowUp": "Capture bounded native-operation, RTP, track and DOM video state without SDP, candidate addresses, URLs or keys.",
+    "diagnosticLocalPassed": 1
+  }
 }

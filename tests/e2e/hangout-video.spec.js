@@ -1,5 +1,6 @@
 // Room video: Webex-style basics on the peer-to-peer mesh, two real browsers over the local relay.
 const path = require('node:path');
+const fs = require('node:fs/promises');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
@@ -47,6 +48,83 @@ async function micOn(page) {
     await page.click('[data-mic]');
     await page.click('[data-ask-yes]');
     await expect(page.locator('[data-mic]')).toHaveText('Mute my mic');
+}
+async function installRtcDiagnostics(page) {
+    await page.addInitScript(() => {
+        const operations = [];
+        const ids = new WeakMap();
+        let sequence = 0;
+        const state = (pc) => ({ signaling: pc.signalingState, connection: pc.connectionState, ice: pc.iceConnectionState });
+        const record = (entry) => { if (operations.length < 200) operations.push({ at: Math.round(performance.now()), ...entry }); };
+        const idFor = (pc) => {
+            if (!ids.has(pc)) {
+                ids.set(pc, ++sequence);
+                for (const event of ['signalingstatechange', 'connectionstatechange', 'iceconnectionstatechange']) {
+                    pc.addEventListener(event, () => record({ pc: ids.get(pc), event, ...state(pc) }));
+                }
+            }
+            return ids.get(pc);
+        };
+        for (const method of ['createOffer', 'createAnswer', 'setLocalDescription', 'setRemoteDescription', 'addIceCandidate']) {
+            const original = RTCPeerConnection.prototype[method];
+            RTCPeerConnection.prototype[method] = function (...args) {
+                const pc = idFor(this);
+                const description = ['offer', 'answer', 'pranswer', 'rollback'].includes(args[0]?.type) ? args[0].type : undefined;
+                record({ pc, method, description, result: 'called', ...state(this) });
+                const failure = (error) => record({ pc, method, result: 'rejected', error: ['InvalidStateError', 'OperationError', 'TypeError', 'InvalidAccessError', 'NotSupportedError'].includes(error?.name) ? error.name : 'Other', ...state(this) });
+                try {
+                    const result = original.apply(this, args);
+                    result.then(() => record({ pc, method, result: 'fulfilled', ...state(this) }), failure);
+                    return result;
+                } catch (error) { failure(error); throw error; }
+            };
+        }
+        window.__rtcDiagnostics = { operations, idFor };
+    });
+}
+async function captureRtcDiagnostics(page) {
+    if (!page) return { available: false };
+    return page.evaluate(async () => {
+        const app = window.__hangout;
+        if (!app) return { available: false };
+        const track = (value) => value ? { kind: value.kind, readyState: value.readyState, muted: value.muted, enabled: value.enabled } : null;
+        const pcs = await Promise.all([...app.av.pcs].slice(0, 8).map(async ([peer, entry]) => {
+            const pc = entry.pc;
+            const stats = [];
+            try {
+                (await pc.getStats()).forEach((row) => {
+                    if (!['inbound-rtp', 'outbound-rtp'].includes(row.type) || stats.length >= 16) return;
+                    const safe = { type: row.type, kind: row.kind || row.mediaType };
+                    for (const key of ['bytesSent', 'bytesReceived', 'framesSent', 'framesEncoded', 'framesDecoded', 'framesReceived', 'framesDropped', 'packetsSent', 'packetsReceived']) {
+                        if (Number.isFinite(row[key])) safe[key] = row[key];
+                    }
+                    stats.push(safe);
+                });
+            } catch (_) { /* closed connections retain their safe state fields */ }
+            return {
+                peer, diagnosticId: window.__rtcDiagnostics.idFor(pc),
+                signaling: pc.signalingState, connection: pc.connectionState, ice: pc.iceConnectionState,
+                polite: entry.polite, makingOffer: entry.makingOffer, ignoreOffer: entry.ignoreOffer, settingRemoteAnswer: entry.settingRemoteAnswer,
+                pendingIce: entry.pendingIce.length,
+                transceivers: pc.getTransceivers().slice(0, 4).map((value) => ({
+                    mid: value.mid, direction: value.direction, currentDirection: value.currentDirection,
+                    sender: track(value.sender.track), receiver: track(value.receiver.track)
+                })), stats
+            };
+        }));
+        return {
+            available: true, connected: app.connected, ended: app.ended,
+            names: [...app.names].slice(0, 8),
+            av: { mic: app.av.mic, cam: app.av.cam, peers: [...app.av.peers].slice(0, 8), micPeers: [...app.av.micPeers].slice(0, 8), camPeers: [...app.av.camPeers].slice(0, 8) },
+            pcs,
+            videos: [...document.querySelectorAll('[data-tiles] video')].slice(0, 9).map((video) => ({
+                peer: video.closest('[data-tile]').dataset.tile,
+                paused: video.paused, readyState: video.readyState, width: video.videoWidth,
+                tracks: video.srcObject?.getTracks().map(track) || []
+            })),
+            operations: window.__rtcDiagnostics.operations
+        };
+    }).catch(() => ({ available: false }));
 }
 async function call(browser, opts) {
     const host = await openBrowser(browser, opts);
@@ -359,39 +437,49 @@ test('a reconnect does not wait for obsolete peer ICE setup', async ({ browser }
 
 test('initial camera publication stays current when an earlier hello decrypts late', async ({ browser }) => {
     const host = await openBrowser(browser);
-    await join(host, roomUrl(), 'Jeff');
-    await camOn(host);
-    await host.evaluate(() => {
-        const open = window.HangoutCore.open;
-        window.HangoutCore.open = async (key, frame) => {
-            const msg = await open(key, frame);
-            if (msg.type === 'hello' && !msg.reply) {
-                window.HangoutCore.open = open;
-                window.__heldInitialHello = true;
-                await new Promise((resolve) => { window.__releaseInitialHello = resolve; });
-            }
-            return msg;
-        };
-    });
-    const guest = await openBrowser(browser);
-    await join(guest, host.url(), 'Karen');
-    await expect.poll(() => host.evaluate(() => window.__heldInitialHello)).toBe(true);
-    await camOn(guest);
-    const guestId = await guest.evaluate(() => window.__hangout.myId);
-    // The newer camera advertisement finishes decrypting before the older
-    // hello; releasing hello must not replace that current camera state.
-    await expect.poll(() => host.evaluate((id) => window.__hangout.av.camPeers.has(id), guestId)).toBe(true);
-    await host.evaluate(() => window.__releaseInitialHello());
-    await expect.poll(() => guest.evaluate(() => {
-        const v = document.querySelector('.tile:not([data-tile="me"]) video');
-        return v ? v.videoWidth : 0;
-    }), { timeout: 15000 }).toBeGreaterThan(0);
-    await expect.poll(() => host.evaluate(() => {
-        const v = document.querySelector('.tile:not([data-tile="me"]) video');
-        return v ? v.videoWidth : 0;
-    }), { timeout: 15000 }).toBeGreaterThan(0);
-    expect(await host.evaluate((id) => ({ name: window.__hangout.names.get(id), camera: window.__hangout.av.camPeers.has(id) }), guestId)).toEqual({ name: 'Karen', camera: true });
-    expect(host.errors.concat(guest.errors)).toEqual([]);
+    await installRtcDiagnostics(host);
+    let guest;
+    try {
+        await join(host, roomUrl(), 'Jeff');
+        await camOn(host);
+        await host.evaluate(() => {
+            const open = window.HangoutCore.open;
+            window.HangoutCore.open = async (key, frame) => {
+                const msg = await open(key, frame);
+                if (msg.type === 'hello' && !msg.reply) {
+                    window.HangoutCore.open = open;
+                    window.__heldInitialHello = true;
+                    await new Promise((resolve) => { window.__releaseInitialHello = resolve; });
+                }
+                return msg;
+            };
+        });
+        guest = await openBrowser(browser);
+        await installRtcDiagnostics(guest);
+        await join(guest, host.url(), 'Karen');
+        await expect.poll(() => host.evaluate(() => window.__heldInitialHello)).toBe(true);
+        await camOn(guest);
+        const guestId = await guest.evaluate(() => window.__hangout.myId);
+        // The newer camera advertisement finishes decrypting before the older
+        // hello; releasing hello must not replace that current camera state.
+        await expect.poll(() => host.evaluate((id) => window.__hangout.av.camPeers.has(id), guestId)).toBe(true);
+        await host.evaluate(() => window.__releaseInitialHello());
+        await expect.poll(() => guest.evaluate(() => {
+            const v = document.querySelector('.tile:not([data-tile="me"]) video');
+            return v ? v.videoWidth : 0;
+        }), { timeout: 15000 }).toBeGreaterThan(0);
+        await expect.poll(() => host.evaluate(() => {
+            const v = document.querySelector('.tile:not([data-tile="me"]) video');
+            return v ? v.videoWidth : 0;
+        }), { timeout: 15000 }).toBeGreaterThan(0);
+        expect(await host.evaluate((id) => ({ name: window.__hangout.names.get(id), camera: window.__hangout.av.camPeers.has(id) }), guestId)).toEqual({ name: 'Karen', camera: true });
+        expect(host.errors.concat(guest.errors)).toEqual([]);
+    } finally {
+        const diagnostic = { host: await captureRtcDiagnostics(host), guest: await captureRtcDiagnostics(guest) };
+        const diagnosticPath = test.info().outputPath('initial-camera-diagnostics.json');
+        await fs.writeFile(diagnosticPath, `${JSON.stringify(diagnostic, null, 2)}\n`);
+        await test.info().attach('initial-camera-diagnostics', { path: diagnosticPath, contentType: 'application/json' });
+    }
 });
 
 test('an older camera-on publication cannot restore a newer camera-off tile', async ({ browser }) => {

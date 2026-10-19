@@ -26,10 +26,11 @@ part of this deployment.
    was deployed as `33e6a92f`; its HTTP 200 health check confirmed configuration
    only. Real email-code owner login and separate staff SSO/WebSocket admission
    passed after the JWKS fix. Current runtime is
-   `207a4b5a-c416-44c7-a751-24f88af5beb4`, committed source `ea012fc`.
+   `a5d15d34-5d9e-4f57-97a6-ec07bdf94f75`, committed source `b95c7cd`.
    The sign-in acceptance was recorded on earlier `e3177c6d`/`832f7e1`;
    the current deployment also includes private AI observation, co-host grant
-   revocation and media reconnect guards. The protected client hash, invitation
+   revocation, media reconnect guards and durable ownership offers. The earlier
+   protected client hash, invitation
    denial and proof-session logout are [verified](../pr-assets/beta-collaboration/hosted-relay-recovery-asset.json);
    hosted camera/TURN acceptance remains separate.
    Complete denied-identity and
