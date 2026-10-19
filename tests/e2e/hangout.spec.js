@@ -412,7 +412,9 @@ test('switching from one playing YouTube video to another plays the second video
 
 test('guest snapshot without host seq proof still completes and blocks a later wipe', async ({ browser }) => {
     const { host, guest, invite } = await hostAndGuest(browser);
-    await host.evaluate(() => window.__hangout.ws.close());
+    // Keep the creator absent throughout this peer-only fallback. Closing just
+    // its socket starts the normal reconnect and a fresh creator attestation.
+    await host.close();
     await expect.poll(async () => await guest.locator('[data-peers]').textContent()).toBe('Just you');
 
     await drawLine(guest);
