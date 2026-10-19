@@ -1,38 +1,264 @@
 {
-  "checkedAt": "2026-10-19T03:25:05.300090+00:00",
-  "mode": "read-only existing Wrangler OAuth",
+  "checkedAt": "2026-10-19T04:14:56.006957+00:00",
+  "mode": "read-only existing Wrangler OAuth metadata, source inspection and analytics; prior authorized Access write attempts recorded separately",
   "checks": [
     {
       "service": "Access apps",
-      "status": 403,
-      "success": false,
-      "count": null,
-      "errors": [
-        {
-          "code": 9999,
-          "message": "access.api.error.not_enabled: Access is not enabled. Visit the Access dashboard at https://dash.cloudflare.com/ and click the 'Enable Access' button."
-        }
-      ]
-    },
-    {
-      "service": "Turnstile widgets",
       "status": 200,
       "success": true,
+      "errors": [],
       "count": 0,
-      "errors": []
+      "betaAppPaths": []
+    },
+    {
+      "service": "Access identity providers",
+      "status": 200,
+      "success": true,
+      "errors": [],
+      "count": 0,
+      "providerTypes": []
     },
     {
       "service": "TURN keys",
       "status": 403,
       "success": false,
-      "count": null,
       "errors": [
         {
           "code": 10000,
           "message": "Authentication error"
         }
       ]
+    },
+    {
+      "service": "Shared TURN Worker settings",
+      "status": 200,
+      "success": true,
+      "errors": [],
+      "secretNames": [
+        "CLOUDFLARE_ACCOUNT_ID",
+        "CLOUDFLARE_ANALYTICS_API_TOKEN",
+        "TURN_KEY_API_TOKEN",
+        "TURN_KEY_ID"
+      ],
+      "publicVars": {
+        "TURN_CREDENTIAL_TTL_SECONDS": "600",
+        "TURN_MONTHLY_CAP_GB": "800",
+        "TURN_RATE_LIMIT_PER_MINUTE": "10"
+      },
+      "browserKeyConfigured": false,
+      "originVarConfigured": false
+    },
+    {
+      "service": "Beta TURN settings",
+      "status": 200,
+      "success": true,
+      "errors": [],
+      "turnEnabled": false,
+      "turnKeyIdConfigured": false,
+      "turnIssuerSecretConfigured": false,
+      "turnAnalyticsSecretConfigured": false,
+      "accountIdConfigured": false
+    },
+    {
+      "service": "Access team certificates",
+      "status": 200,
+      "success": true,
+      "team": "throbbing-hill-6ed4.cloudflareaccess.com",
+      "publicJwkCount": 2
+    },
+    {
+      "service": "Account-wide TURN analytics using existing Wrangler OAuth",
+      "status": 200,
+      "success": true,
+      "checkedAt": "2026-10-19T04:13:55.348011+00:00",
+      "month": "2026-10",
+      "egressBytes": 0,
+      "rowShapeVerified": true,
+      "runtimeTokenVerified": false,
+      "billingVerified": false
     }
   ],
-  "changesMade": false
+  "historicalAudits": [
+    {
+      "checkedAt": "2026-10-19T03:25:05.300090+00:00",
+      "mode": "read-only existing Wrangler OAuth",
+      "checks": [
+        {
+          "service": "Access apps",
+          "status": 403,
+          "success": false,
+          "count": null,
+          "errors": [
+            {
+              "code": 9999,
+              "message": "access.api.error.not_enabled: Access is not enabled. Visit the Access dashboard at https://dash.cloudflare.com/ and click the 'Enable Access' button."
+            }
+          ]
+        },
+        {
+          "service": "Turnstile widgets",
+          "status": 200,
+          "success": true,
+          "count": 0,
+          "errors": []
+        },
+        {
+          "service": "TURN keys",
+          "status": 403,
+          "success": false,
+          "count": null,
+          "errors": [
+            {
+              "code": 10000,
+              "message": "Authentication error"
+            }
+          ]
+        }
+      ],
+      "changesMade": false
+    }
+  ],
+  "priorAccessCreationAttempts": {
+    "otpProvider": {
+      "status": 403,
+      "errorCode": 1010,
+      "created": false
+    },
+    "narrowOwnerApplication": {
+      "status": 403,
+      "errorCode": 1010,
+      "error": "auth.forbidden",
+      "created": false
+    }
+  },
+  "sharedIssuer": {
+    "worker": "webjam-turn-credentials",
+    "deployedVersion": "e7cda1bb-be95-4824-a363-924ff6f2948b",
+    "deployedAt": "2026-10-16T02:14:45.48952Z",
+    "sourceModuleSha256": "e80a60a87a1db16cecea75835142eee18e156eb4d389e5111e1f6851b33f8fa2",
+    "browserOriginPolicyPresent": false,
+    "browserKeySeparationPresent": false,
+    "invitationValidation": "shape only; no cryptographic beta invitation verification",
+    "usageScope": "existing desktop key; ingress plus egress; 60-second cache",
+    "currentRepoCommit": "5effbc58db706254f8ca8b52de4a0520c482294a",
+    "repoBrowserCodeDeployed": false,
+    "configurationChanged": false
+  },
+  "billing": {
+    "subscription": "unknown",
+    "invoice": "unknown",
+    "sfuUsage": "unknown",
+    "remainingSharedFreeAllowance": "unknown",
+    "turnUsageSampleDoesNotProveFreeBudget": true
+  },
+  "changesMade": false,
+  "credentialsIssued": false,
+  "keysCreatedOrRotated": false,
+  "providerSecretValuesRead": false,
+  "wranglerOAuthUploaded": false,
+  "limitations": [
+    "An empty or zero TURN analytics sample is not an invoice, a remaining free allowance, or an account spending cap.",
+    "A read-only GraphQL success with local OAuth does not configure the beta runtime analytics credential.",
+    "Shared Worker secret names prove bindings exist, not that upstream credentials work.",
+    "No live TURN credential generation, forced-relay media, email delivery, or real owner/staff login was exercised."
+  ],
+  "followupObservations": [
+    {
+      "checkedAt": "2026-10-19T04:34:00.190200+00:00",
+      "source": "operator verified dashboard DOM; independent OAuth list discrepancy",
+      "accountIdMatchVerified": true,
+      "oneTimePinProviderVisibleInDashboard": true,
+      "ownershipAppSavedInDashboard": true,
+      "ownershipPath": "stalemate-hangout-beta.jeffstory007.workers.dev/lobby-owner*",
+      "publicAudiences": "pending",
+      "oauthInventory": "insufficient authority; empty API lists do not establish resource absence",
+      "setupReceipt": "hosted-access-setup.json",
+      "changesMadeByAuditAgent": false
+    },
+    {
+      "checkedAt": "2026-10-19T04:38:14.930673+00:00",
+      "source": "operator verified saved Cloudflare dashboard resources and public IDs",
+      "accountIdMatchVerified": true,
+      "oneTimePinProviderVisibleInDashboard": true,
+      "bothApplicationsSaved": true,
+      "applications": {
+        "owner": {
+          "id": "070c634a-367e-4bc3-877d-ae7f9109be20",
+          "aud": "5b3896041740f5ca1dd62300e3523119bacca308fa1415bd964bece03c4030b4",
+          "host": "stalemate-hangout-beta.jeffstory007.workers.dev",
+          "path": "/lobby-owner*",
+          "sessionDuration": "8h",
+          "allowedIdPs": [
+            "One-time PIN"
+          ],
+          "useAllIdPs": false,
+          "appLauncherVisible": false,
+          "httpOnlyAccessCookie": true,
+          "policy": {
+            "id": "909795df-e9c8-4e33-a73e-bb07c0fe8d9f",
+            "decision": "allow",
+            "includeConfirmedSoleOwnerEmailOnly": true,
+            "requireOneTimePin": true,
+            "ruleCount": 2
+          },
+          "savedListRowVerified": true,
+          "publicAudienceReadFromSavedAdditionalSettings": true
+        },
+        "staff": {
+          "id": "d7132132-55f6-4af1-a28a-c592163938b2",
+          "aud": "16af993efee6923eb6d0718b28fc0d90e8f5662a21df2ed6acbca143e663fb0e",
+          "host": "stalemate-hangout-beta.jeffstory007.workers.dev",
+          "path": "/lobby-admin*",
+          "sessionDuration": "8h",
+          "allowedIdPs": [
+            "One-time PIN"
+          ],
+          "useAllIdPs": false,
+          "appLauncherVisible": false,
+          "httpOnlyAccessCookie": true,
+          "policy": {
+            "id": "738c2a6b-f1ec-4c39-bacb-5880213b5c86",
+            "decision": "allow",
+            "includeConfirmedSoleOwnerEmailOnly": true,
+            "requireOneTimePin": true,
+            "ruleCount": 2
+          },
+          "savedListRowVerified": true,
+          "publicAudienceReadFromSavedAdditionalSettings": true
+        }
+      },
+      "distinctAudiencesVerified": true,
+      "configurationSourceCommit": "a449541",
+      "runtimeDeployment": "pending",
+      "realEmailAndStaffLogin": "pending",
+      "oauthInventory": "incomplete/filtered or otherwise insufficient; exact mechanism unknown; empty lists do not establish absence",
+      "setupReceipt": "hosted-access-setup.json",
+      "changesMadeByAuditAgent": false,
+      "providerConfigurationPerformedByAuthorizedOperator": true
+    },
+    {
+      "checkedAt": "2026-10-19T04:38:57.533918+00:00",
+      "source": "operator deployment and protected health check",
+      "runtimeDeployment": {
+        "status": "deployed",
+        "version": "33e6a92f-57a8-4d89-b79f-23039af1044d",
+        "sourceCommit": "a449541",
+        "durableObjectBindingCount": 5,
+        "durableObjectBindingsChanged": false,
+        "staticAssetsChanged": false
+      },
+      "health": {
+        "httpStatus": 200,
+        "configuration": "healthy",
+        "issues": [],
+        "providerChecks": "not-performed",
+        "source": "operator actual protected health request",
+        "provesEmailOrStaffLogin": false
+      },
+      "accessSetupReceipt": "hosted-access-setup.json",
+      "emailDelivery": "pending",
+      "realStaffLogin": "pending",
+      "auditAgentCloudMutations": false
+    }
+  ]
 }
