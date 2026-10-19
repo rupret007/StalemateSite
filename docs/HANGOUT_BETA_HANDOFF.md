@@ -118,8 +118,18 @@ The original natural eight-hour expiry observation started October 19 at 08:00
 UTC, with expiry at 16:00 UTC. Keep the hosted source, runtime, configuration,
 invitation and identity keys unchanged until that original job has a recorded
 terminal result; reaching 16:00 alone is not confirmation. New fixes are
-prepared for review, not deployed. Complete the required human/Karen review and
+prepared for review, not deployed. Complete the required exact-head Karen review and
 release acceptance before deploying them.
+
+The code-review gate is StoryPool's local Karen poller, not a GitHub workflow
+or a separate human approval. A non-draft, CI-green PR enters through
+`needs-karen`. Karen runs checks and independent reviewers at the exact head;
+the conductor requires a trusted PASS for the current head, green CI and two
+agreeing reviewers before merging. A new push invalidates the previous PASS.
+Karen itself never merges. During the Stalemate automatic-merge hold, review
+with an isolated private verdict directory; do not send those artifacts to the
+active verdict publisher/conductor. Preserve the existing private-beta scope
+and complete hosted acceptance before distributing visitor invitations.
 
 Use a clean, isolated checkout of the reviewed release commit. Before building,
 record the effective active configuration privately and reconcile it with the
@@ -206,7 +216,7 @@ and never grants a staff role.
    restart across two workerd generations preserved the pending report, with
    the same cookie and a fresh socket receiving the same report ID. Both
    logouts and copied-cookie asset denials passed. This does not prove real
-   Access, human review or hosted behavior. Complete human/Karen review and
+   Access, human review or hosted behavior. Complete exact-head Karen review and
    hosted guest-to-staff acceptance after the original eight-hour expiry job
    has a recorded terminal result. See the
    [readiness assessment](HANGOUT_BETA_READINESS.md) and

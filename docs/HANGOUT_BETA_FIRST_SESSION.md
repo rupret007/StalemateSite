@@ -128,4 +128,4 @@ in the moderation flow, not in a public GitHub issue.
 Afterward, remove only synthetic test rooms/content, triage blockers, record
 device outcomes and choose one concrete return activity. Invite the next small
 cohort after the blocking failures are fixed and reviewed. This document does
-not authorize a public launch or substitute for the required human PR review.
+not authorize a public launch or substitute for the required exact-head Karen gate.
