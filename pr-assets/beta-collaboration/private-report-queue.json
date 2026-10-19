@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "status": "prepared-foundation-not-deployed",
+  "scope": "Pure bounded durable queue and validation only. This commit does not expose report intake or staff review to visitors. Integrated browser/Room/Lobby delivery is a separate change.",
+  "baseCommit": "e43d14205976846c4ff9d1e75ce923e60d4eedac",
+  "files": {
+    "hangout-worker/src/private-reports.mjs": "90f0af6de56a3a8fc796a63e2f49bee1726644899130b6cf0599f3b6130cf17d",
+    "hangout-worker/tests/private-reports.test.js": "3b7ae22df1b2574ce67ee6db2f7620696c915b5f52e187771a55a1520a4e42c1"
+  },
+  "validation": {
+    "focusedUnitTests": 26,
+    "directPasses": 26,
+    "retries": 0,
+    "coverage": [
+      "Explicit consent and exact permitted fields; multiline quotes/reasons and single-line claimed names.",
+      "Purpose-separated opaque reporter/room/target references; no room key or raw beta SID stored.",
+      "Required atomic storage write before acknowledgement; serialized copy-on-write; uncertain-write reload.",
+      "Idempotent immutable report payload and room binding across connection changes; conflicting nonce rejected.",
+      "Durable per-session and global limits; queue capacity; corruption fail-closed.",
+      "Resolve/dismiss removes saved quote/name/reason and preserves actual disposition on duplicate.",
+      "Expiration and persisted cleanup; no AI call, independently verified quote or automatic sanction."
+    ]
+  },
+  "limits": {
+    "pendingReports": 100,
+    "textFreeReceipts": 200,
+    "retentionHours": 24,
+    "perSessionMinute": 5,
+    "perSessionUtcDay": 20,
+    "globalUtcDay": 100,
+    "excerptCharacters": 400,
+    "reasonCharacters": 400,
+    "claimedNameCharacters": 24,
+    "storedStateBytes": 524288
+  },
+  "privacy": {
+    "quoteVerified": false,
+    "automaticPunishment": false,
+    "ordinaryChatInspection": false,
+    "aiReviewOfPrivateReports": false,
+    "receiptContainsSecretsOrUserData": false
+  },
+  "remaining": [
+    "Integrate protected relay intake and fresh authenticated staff delivery.",
+    "Verify candidate UI and real local Worker persistence.",
+    "Required human/Karen review and later hosted acceptance; no deployment or public launch."
+  ]
+}
