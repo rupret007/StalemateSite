@@ -114,12 +114,20 @@ provider connectivity by disabling signature or route-specific audience checks.
 
 ## Build and deploy privately
 
-The original natural eight-hour expiry observation started October 19 at 08:00
-UTC, with expiry at 16:00 UTC. Keep the hosted source, runtime, configuration,
-invitation and identity keys unchanged until that original job has a recorded
-terminal result; reaching 16:00 alone is not confirmation. New fixes are
-prepared for review, not deployed. Complete the required exact-head Karen review and
-release acceptance before deploying them.
+The [original natural expiry observation](../pr-assets/beta-collaboration/hosted-natural-expiry.json)
+ended at 15:56:30.679 UTC on October 19, 230.100 seconds before its issued expiry.
+Its seventh observed private WebSocket attempt exceeded the six-attempt
+observation budget. No late-lobby, expired HTTP, token replay or server-expiry
+close acceptance ran. Owned logout and browser cleanup succeeded. The
+[diagnostic notes](../pr-assets/beta-collaboration/hosted-natural-expiry-notes.md)
+explain why the final counts do not prove successful handshakes or reveal close
+causes. Preserve this failed result.
+
+A separate passive diagnostic variant is prepared, not started. New fixes are
+prepared for review, not deployed; complete exact-head Karen review and release
+acceptance. During any new observation, keep its hosted source, runtime,
+configuration, invitation and identity keys unchanged until that exact job has
+a recorded terminal result. A scheduled expiry time alone is not confirmation.
 
 The code-review gate is StoryPool's local Karen poller, not a GitHub workflow
 or a separate human approval. A non-draft, CI-green PR enters through
@@ -216,9 +224,10 @@ and never grants a staff role.
    restart across two workerd generations preserved the pending report, with
    the same cookie and a fresh socket receiving the same report ID. Both
    logouts and copied-cookie asset denials passed. This does not prove real
-   Access, human review or hosted behavior. Complete exact-head Karen review and
-   hosted guest-to-staff acceptance after the original eight-hour expiry job
-   has a recorded terminal result. See the
+   Access, human review or hosted behavior. Complete exact-head Karen review,
+   private candidate deployment and hosted guest-to-staff acceptance. The
+   original expiry job is terminal but failed; check for any new active observer
+   before deployment. See the
    [readiness assessment](HANGOUT_BETA_READINESS.md) and
    [moderator guide](HANGOUT_MODERATOR_GUIDE.md).
 6. Leaving the beta revokes the session across its live chat and private-room
