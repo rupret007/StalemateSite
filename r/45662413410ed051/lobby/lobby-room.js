@@ -18,6 +18,7 @@
             video: $('[data-act-video]'),
             yt: $('[data-act-yt]'),
             tap: $('[data-act-tap]'),
+            videoStatus: $('[data-act-video-status]'),
             load: $('[data-act-load]'),
             url: $('[data-act-url]'),
             bobPicks: $('[data-bob-picks]'),
@@ -28,7 +29,12 @@
             myId: null, names: new Map(), camOn: false, ice: null,
             pcs: new Map(), stream: null, peers: new Set()
         };
-        const player = { yt: null, ytReady: null, kind: null, key: '', readyKey: '', loading: null, applying: 0, autoplayBlocked: false };
+        const player = { yt: null, kind: null, key: '', readyKey: '', failedKey: '', loading: null, applying: 0, autoplayBlocked: false };
+        const youtube = window.HangoutYouTube.create({
+            getElement: () => ui.yt, setElement: (element) => { ui.yt = element; },
+            onStateChange: onYtState, onAutoplayBlocked: onYtAutoplayBlocked,
+            onError: () => videoFailure(player.key)
+        });
         let videoPublishTimer;
         let live = null;
         let pendingPts = [];
@@ -64,8 +70,9 @@
             ui.paint.hidden = true;
             ui.video.hidden = true;
             ui.tiles.replaceChildren();
-            if (player.yt && player.yt.stopVideo) try { player.yt.stopVideo(); } catch (e) { /* */ }
-            player.key = ''; player.readyKey = ''; player.autoplayBlocked = false;
+            youtube.cancel(); player.yt = null;
+            player.key = ''; player.readyKey = ''; player.failedKey = ''; player.loading = null; player.autoplayBlocked = false;
+            ui.videoStatus.hidden = true; ui.videoStatus.textContent = '';
             ui.tap.hidden = true;
         }
 
@@ -249,60 +256,48 @@
                 ui.url.value = '';
                 hostVideo({ kind: 'yt', id }, true, 0);
             });
-            ui.tap.addEventListener('click', () => syncToState(true));
+            ui.tap.addEventListener('click', () => syncToState(true, true));
         }
 
-        function loadYouTubeApi() {
-            if (player.ytReady) return player.ytReady;
-            player.ytReady = new Promise((resolve) => {
-                window.onYouTubeIframeAPIReady = () => resolve(window.YT);
-                const s = document.createElement('script');
-                s.src = 'https://www.youtube.com/iframe_api';
-                document.head.append(s);
-            });
-            return player.ytReady;
+        function videoFailure(key) {
+            if (!state.ch || player.key !== key) return;
+            player.yt = null; player.readyKey = ''; player.failedKey = key; player.autoplayBlocked = false;
+            ui.videoStatus.textContent = 'YouTube couldn’t load. Retry video when you’re ready.';
+            ui.videoStatus.hidden = false;
+            ui.tap.textContent = 'Retry video'; ui.tap.hidden = false;
         }
 
-        async function ensureSource(source) {
-            if (source.kind !== 'yt' || !/^[A-Za-z0-9_-]{11}$/.test(source.id || '')) return;
+        async function ensureSource(source, retry = false) {
+            if (!state.ch || source.kind !== 'yt' || !/^[A-Za-z0-9_-]{11}$/.test(source.id || '')) return false;
             const key = `${source.kind}:${source.id}`;
-            if (player.key === key) return player.loading;
-            const previous = player.loading;
+            if (player.key === key) {
+                if (player.failedKey === key && !retry) return false;
+                if (player.loading) return player.loading;
+                if (player.readyKey === key) return true;
+            }
             player.key = key;
-            player.readyKey = '';
+            player.readyKey = ''; player.failedKey = '';
             player.autoplayBlocked = false;
-            ui.tap.hidden = true;
+            ui.tap.hidden = true; ui.tap.textContent = 'Tap to play';
+            ui.videoStatus.hidden = true; ui.videoStatus.textContent = '';
             player.kind = 'yt';
+            player.yt = null;
+            ui.videoStatus.textContent = 'Loading YouTube…'; ui.videoStatus.hidden = false;
             const generation = roomGeneration;
             const loading = (async () => {
-                if (previous) await previous;
-                const YT = await loadYouTubeApi();
-                if (generation !== roomGeneration || !state.ch || player.key !== key) return;
-                if (!player.yt) {
-                    await new Promise((resolve) => {
-                        // Avoid the API's div constructor deriving embed metadata
-                        // from this page's full URL, including any invitation.
-                        const frame = document.createElement('iframe');
-                        for (const attr of ui.yt.attributes) frame.setAttribute(attr.name, attr.value);
-                        frame.setAttribute('frameborder', '0');
-                        frame.setAttribute('allowfullscreen', '');
-                        frame.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share');
-                        frame.setAttribute('title', frame.getAttribute('title') || 'YouTube video player');
-                        frame.referrerPolicy = 'strict-origin-when-cross-origin';
-                        const query = new URLSearchParams({ enablejsapi: '1', origin: location.origin,
-                            playsinline: '1', rel: '0', widget_referrer: location.origin });
-                        frame.src = `https://www.youtube.com/embed/${encodeURIComponent(source.id)}?${query}`;
-                        ui.yt.replaceWith(frame);
-                        ui.yt = frame;
-                        player.yt = new YT.Player(ui.yt, {
-                            events: { onReady: resolve, onStateChange: onYtState, onAutoplayBlocked: onYtAutoplayBlocked }
-                        });
-                    });
-                } else player.yt.cueVideoById(source.id);
-                if (generation === roomGeneration && player.key === key) player.readyKey = key;
+                try {
+                    const instance = await youtube.select(source.id);
+                    if (!instance || generation !== roomGeneration || !state.ch || player.key !== key) return false;
+                    player.yt = instance; player.readyKey = key;
+                    ui.videoStatus.hidden = true; ui.videoStatus.textContent = '';
+                    return true;
+                } catch (_) {
+                    if (generation === roomGeneration) videoFailure(key);
+                    return false;
+                }
             })();
             player.loading = loading;
-            try { await loading; }
+            try { return await loading; }
             finally { if (player.loading === loading) player.loading = null; }
         }
 
@@ -313,13 +308,13 @@
         function playLocal() { hold(() => { if (player.yt) player.yt.playVideo(); }); }
         function pauseLocal() { hold(() => { if (player.yt) player.yt.pauseVideo(); }); }
 
-        async function syncToState(force) {
+        async function syncToState(force, retry = false) {
             const requested = state.room.video;
             if (!requested) return;
             const generation = roomGeneration;
-            await ensureSource(requested.source);
+            if (!await ensureSource(requested.source, retry)) return;
             const v = state.room.video;
-            if (generation !== roomGeneration || !v || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
+            if (generation !== roomGeneration || v !== requested || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
             if (!v.playing) { player.autoplayBlocked = false; ui.tap.hidden = true; }
             else if (player.autoplayBlocked && !force) return;
             const want = H.expectedPosition(v, state.clock.relayNow());
@@ -332,7 +327,7 @@
             if (!isOp()) return;
             actSend({ kind: 'video', source, playing, pos });
             H.apply(state.room, { type: 'video', source, playing, pos }, { t: state.clock.relayNow() });
-            syncToState(true);
+            syncToState(true, true);
         }
 
         function onYtAutoplayBlocked() {
@@ -345,12 +340,14 @@
         function onYtState(ev) {
             if (!state.ch) return;
             if (ev.data === 1) { player.autoplayBlocked = false; ui.tap.hidden = true; }
-            if (!isOp() || player.autoplayBlocked || Date.now() < player.applying || !state.room.video) return;
+            if (!isOp() || player.autoplayBlocked || Date.now() < player.applying || !state.room.video
+                || player.readyKey !== `${state.room.video.source.kind}:${state.room.video.source.id}`) return;
             if (ev.data !== 1 && ev.data !== 2) return;
             clearTimeout(videoPublishTimer);
             const channel = state.ch;
             videoPublishTimer = setTimeout(() => {
-                if (state.ch === channel && isOp() && !player.autoplayBlocked && state.room.video && Date.now() >= player.applying) {
+                if (state.ch === channel && isOp() && !player.autoplayBlocked && state.room.video
+                    && player.readyKey === `${state.room.video.source.kind}:${state.room.video.source.id}` && Date.now() >= player.applying) {
                     actSend({ kind: 'video', source: state.room.video.source, playing: localPlaying(), pos: localTime() });
                 }
             }, 100);

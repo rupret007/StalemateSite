@@ -36,7 +36,7 @@ protected Cloudflare beta, with separate actual visitor browser contexts.
 | Mobile usability | All repository browser checks passed, including WebKit phone projects. Hosted 375/390px captures have no page overflow, wrapping text, 16px input and visible Send. | Real iPhone Safari keyboard, Access redirects, camera/audio and background/resume are unverified. |
 | IRC history/reconnect | Hosted newcomers saw no earlier messages; original live connections retained scrollback during idle. Exact-connection PM consent cannot transfer to a reconnect or another same-device tab. | Real device/network interruption acceptance. No transcript archive or pre-join history is introduced. |
 | Compatible rollback/recovery | Historical Cloudflare rollback/restoration retained two real lobby sockets, scrollback and drafts; newcomers received no backlog. A private [pinned recovery package](../pr-assets/beta-collaboration/recovery-b111bb2.json) now retains both watch privacy fixes and current backend/config, with all 114 source/asset payloads and an offline rebuild verified. | The package was not deployed and contains no live data or credentials. A separate temporary-room deployment rehearsal preserved guest-op permissions, settings and drawing. Registered-room acceptance, forced restart, schema-changing rollback and health continuity remain unverified. Raw versions before `b111bb2` reintroduce the demonstrated watch URL exposure; pre-operations versions can also return health 401. |
-| Provider failures/full rooms | Automated failed quota/storage/JWKS/classifier/relay responses, room/session limits and retry behavior pass. Missing Access fails closed on the hosted beta. | Live provider outage and shared TURN budget drill; avoid confusing fixtures with provider availability. |
+| Provider failures/full rooms | Automated failed quota/storage/JWKS/classifier/relay responses, room/session limits and retry behavior pass. Missing Access fails closed on the hosted beta. A [prepared YouTube recovery fix](../pr-assets/beta-collaboration/watch-loader.json) handles failed API downloads, player readiness deadlines and provider errors with local explicit retry; controlled loopback checks pass. | The YouTube candidate is not deployed during the natural expiry observation. Complete hosted controlled-failure recovery and the shared TURN budget drill; fixtures do not establish external provider availability. |
 | Operational checks | Actual bearer-only hosted health reads preserve admission counters and exclude visitor content. This Mac's five-minute LaunchAgent completed live probes; actual local failure/recovery notification submissions and deduplication passed a controlled fixture. | Mac must be awake, online and logged in. Provider billing, availability, storage writes and independent external alert coverage are not established by these checks. |
 | Handoff | Private access file, onboarding, moderator guide, deployment/rollback guidance and sanitized hosted receipts exist. | Complete the remaining provider/device checks and record reviewer acceptance before visitor invitations. |
 
@@ -117,6 +117,36 @@ acceptance.
   tap and decoded playback checks; its exact owned temporary channel was closed.
   These are separate single-host Chromium checks on one Mac, not hosted,
   multi-visitor synchronization, physical/mobile or separate-network acceptance.
+
+- [Watch-loader failure recovery](../pr-assets/beta-collaboration/watch-loader.json):
+  failed API downloads previously left both surfaces waiting indefinitely;
+  repeated selections and channel reentry could not recover. The prepared
+  shared helper bounds API and player readiness to 15 seconds, handles provider
+  errors, retires obsolete callbacks and offers explicit local retry without
+  reload or repeated automatic requests. Shared intent survives a local failure.
+  Private host signing cannot publish an obsolete selection after a newer one.
+  Initial source `af37814` passed ten focused regressions, eighteen related
+  checks and all 575 unit tests, but its first full CI gate failed on late
+  channel visitors and phone watch initialization. Corrected source `11acab0`
+  retains the page-wide API attempt across room reinitialization; a new negative
+  case proves two old script insertions versus one expected. Eleven distinct
+  loader cases and ten relevant desktop/phone checks now pass in targeted
+  runs. Three existing private checks explicitly wait for the host player
+  before calling its API; their timeouts and drift limits stay unchanged.
+  The corrected full CI gate remains pending; the original failures are retained.
+  Independent review also caught Bob controls accessing a retired player; they
+  now use current shared intent while a replacement loads. The existing iframe
+  privacy, autoplay and synchronization checks pass. The first diagnostic remains
+  [overall failed](../pr-assets/beta-collaboration/watch-loader-diagnostic-attempt1.json)
+  because its private drawing stroke was not observed; no drawing defect or
+  cause was established. Two later baseline cases fail at the intended missing
+  recovery feedback. An initial candidate matrix exposed two isolated fixture
+  cleanup errors, retained and corrected before the passing matrix. An unrelated
+  encryption test changed only unused base64 bits; [its separate correction](https://github.com/rupret007/StalemateSite/pull/51)
+  now changes a decoded ciphertext byte, with production crypto unchanged.
+  These are controlled loopback faults, not a real provider outage or hosted,
+  physical-device, mobile or separate-network candidate acceptance. The hosted
+  source remains unchanged during the natural eight-hour expiry observation.
 
 - [Initial-offer arbitration](../pr-assets/beta-collaboration/initial-offer-arbitration.json):
   when both peers already publish media, one defers its first offer while
@@ -447,6 +477,7 @@ earlier website/game work into these diffs:
 - [#48: watch-player invitation privacy and real-provider acceptance](https://github.com/rupret007/StalemateSite/pull/48)
 - [#49: wait for snapshot delivery in the replay fixture](https://github.com/rupret007/StalemateSite/pull/49)
 - [#50: recover watch playback after browser autoplay denial](https://github.com/rupret007/StalemateSite/pull/50)
+- [#51: make the ciphertext tamper test change decoded bytes](https://github.com/rupret007/StalemateSite/pull/51)
 
 Initial hosted receipts and the assessment are supplied in documentation PR #36
 stacked on #35. Subsequent evidence and installer progress are recorded in

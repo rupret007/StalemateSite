@@ -581,6 +581,7 @@ test('periodic resync corrects guest drift without a tap', async ({ browser }) =
     const { host, guest } = await hostAndGuest(browser);
     await host.click('[data-pick-yt="oh5p5f5_-7A"]');
     await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+    await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
     await host.evaluate(() => { window.__ytLog[0].seekTo(90); window.__ytLog[0].pauseVideo(); });
     await expect.poll(() => guest.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeGreaterThan(89);
     await guest.evaluate(() => { window.__ytLog[0].seekTo(5); });
@@ -640,6 +641,9 @@ test('host pause right after load still reaches guests', async ({ browser }) => 
     await host.click('[data-pick-yt="oh5p5f5_-7A"]');
     const gYt = guest.locator('[data-fake-yt]');
     await expect(gYt).toHaveAttribute('data-state', 'playing');
+    // Shared intent can reach the guest before the host API is ready. Exercise
+    // a supported host-player control immediately after its own readiness.
+    await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
     await host.evaluate(() => { window.__ytLog[0].pauseVideo(); });
     await expect(gYt).toHaveAttribute('data-state', 'paused');
 });
@@ -648,6 +652,7 @@ test('a paused YouTube seek without a player state event reaches the guest', asy
     const { host, guest } = await hostAndGuest(browser);
     await host.click('[data-pick-yt="oh5p5f5_-7A"]');
     await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+    await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
     await host.evaluate(() => window.__ytLog[0].pauseVideo());
     await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'paused');
     // The fixture, like YouTube, omits a state-change event for this scrub.

@@ -35,7 +35,7 @@
         log: $('[data-log]'), say: $('[data-say]'), text: $('[data-text]'), tiles: $('[data-tiles]'),
         mic: $('[data-mic]'), cam: $('[data-cam]'), hangup: $('[data-hangup]'), ask: $('[data-ask]'), turnStatus: $('[data-turn-status]'),
         askTitle: $('[data-ask-title]'), askCopy: $('[data-ask-copy]'), askYes: $('[data-ask-yes]'), askNo: $('[data-ask-no]'),
-        yt: $('[data-yt]'), file: $('[data-file]'), tap: $('[data-tap]'),
+        yt: $('[data-yt]'), file: $('[data-file]'), tap: $('[data-tap]'), videoStatus: $('[data-video-status]'),
         bobToggle: $('[data-bob-toggle]'), bob: $('[data-bob]'), bobNow: $('[data-bob-now]'), bobHold: $('[data-bob-hold]'),
         bobRewind: $('[data-bob-rewind]'), bobCatchup: $('[data-bob-catchup]'), bobNudge: $('[data-bob-nudge]'),
         bobEpisodes: $('[data-bob-episodes]'), bobPalette: $('[data-bob-palette]'), bobBrushes: $('[data-bob-brushes]'),
@@ -218,9 +218,10 @@
         stopPreCheck(); stopAv(true); turnClient?.stop();
         app.av.peers.clear(); app.av.opening.clear(); app.av.ice = null;
         app.names.clear(); app.state = H.emptyState(); app.lastVideoSigned = null;
-        if (player.yt) { try { player.yt.stopVideo(); } catch (_) { /* provider already gone */ } }
+        youtube.cancel(); player.yt = null;
         ui.file.pause(); ui.file.removeAttribute('src'); ui.file.load();
-        player.kind = null; player.readyKey = ''; player.autoplayBlocked = false;
+        player.kind = null; player.currentKey = ''; player.readyKey = ''; player.failedKey = ''; player.autoplayBlocked = false;
+        ui.videoStatus.hidden = true; ui.videoStatus.textContent = '';
         ui.tap.hidden = true;
         ui.log.replaceChildren(); ui.tiles.replaceChildren(); ui.text.value = ''; ui.url.value = '';
         ui.peers.textContent = ''; ui.turnStatus.textContent = ''; redraw();
@@ -646,69 +647,63 @@
     });
 
     /* ---------------- synced video (host drives) ---------------- */
-    const player = { kind: null, yt: null, ytReady: null, applying: 0, currentKey: '', readyKey: '', autoplayBlocked: false };
+    const player = { kind: null, yt: null, loading: null, applying: 0, currentKey: '', readyKey: '', failedKey: '', autoplayBlocked: false };
     let videoPublishTimer;
+    const youtube = win.HangoutYouTube.create({
+        getElement: () => ui.yt, setElement: (element) => { ui.yt = element; },
+        onStateChange: onYtState, onAutoplayBlocked: onYtAutoplayBlocked,
+        onError: () => videoFailure(player.currentKey)
+    });
 
-    function loadYouTubeApi() {
-        if (player.ytReady) return player.ytReady;
-        player.ytReady = new Promise((resolve) => {
-            win.onYouTubeIframeAPIReady = () => resolve(win.YT);
-            const s = doc.createElement('script');
-            s.src = 'https://www.youtube.com/iframe_api';
-            doc.head.append(s);
-        });
-        return player.ytReady;
+    function videoFailure(key) {
+        if (app.ended || player.currentKey !== key || player.kind !== 'yt') return;
+        player.yt = null; player.readyKey = ''; player.failedKey = key; player.autoplayBlocked = false;
+        ui.videoStatus.textContent = 'YouTube couldn’t load. Retry video when you’re ready.';
+        ui.videoStatus.hidden = false;
+        ui.tap.textContent = 'Retry video'; ui.tap.hidden = false;
     }
 
-    async function ensureSource(source) {
-        if (source.kind !== 'file' && source.kind !== 'yt') return;
-        if (source.kind === 'yt' && !/^[A-Za-z0-9_-]{11}$/.test(source.id || '')) return;
+    async function ensureSource(source, retry = false) {
+        if (app.ended || (source.kind !== 'file' && source.kind !== 'yt')) return false;
+        if (source.kind === 'yt' && !/^[A-Za-z0-9_-]{11}$/.test(source.id || '')) return false;
+        if (source.kind === 'file' && !H.FILE_SOURCES[source.id]) return false;
         const key = `${source.kind}:${source.id}`;
-        if (player.currentKey === key) return;
+        if (player.currentKey === key) {
+            if (player.failedKey === key && !retry) return false;
+            if (player.loading) return player.loading;
+            if (player.readyKey === key) return true;
+        }
         player.currentKey = key;
-        player.readyKey = '';
+        player.readyKey = ''; player.failedKey = ''; player.loading = null;
         player.autoplayBlocked = false;
-        ui.tap.hidden = true;
+        ui.tap.hidden = true; ui.tap.textContent = 'Tap to sync in';
+        ui.videoStatus.hidden = true; ui.videoStatus.textContent = '';
+        player.kind = source.kind;
         if (source.kind === 'file') {
-            if (player.yt) player.yt.stopVideo();
+            youtube.cancel(); player.yt = null;
             ui.yt.hidden = true;
             ui.file.hidden = false;
             ui.file.src = H.FILE_SOURCES[source.id].src;
-            player.kind = 'file';
             player.readyKey = key;
-            return;
+            return true;
         }
         ui.file.pause();
         ui.file.hidden = true;
         ui.yt.hidden = false;
-        player.kind = 'yt';
-        const YT = await loadYouTubeApi();
-        if (app.ended || player.currentKey !== key) return;
-        if (!player.yt) {
-            await new Promise((resolve) => {
-                // The API's div constructor adds the complete room URL to its
-                // embed request. Attach to our safe iframe so invitations stay here.
-                const frame = doc.createElement('iframe');
-                for (const attr of ui.yt.attributes) frame.setAttribute(attr.name, attr.value);
-                frame.setAttribute('frameborder', '0');
-                frame.setAttribute('allowfullscreen', '');
-                frame.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share');
-                frame.setAttribute('title', frame.getAttribute('title') || 'YouTube video player');
-                frame.referrerPolicy = 'strict-origin-when-cross-origin';
-                const query = new URLSearchParams({ enablejsapi: '1', origin: win.location.origin,
-                    playsinline: '1', rel: '0', widget_referrer: win.location.origin });
-                frame.src = `https://www.youtube.com/embed/${encodeURIComponent(source.id)}?${query}`;
-                ui.yt.replaceWith(frame);
-                ui.yt = frame;
-                player.yt = new YT.Player(ui.yt, {
-                    events: { onReady: resolve, onStateChange: onYtState, onAutoplayBlocked: onYtAutoplayBlocked }
-                });
-            });
-            ui.yt = doc.getElementById('yt-player') || ui.yt;
-        } else {
-            player.yt.cueVideoById(source.id);
-        }
-        player.readyKey = key;
+        player.yt = null;
+        ui.videoStatus.textContent = 'Loading YouTube…'; ui.videoStatus.hidden = false;
+        const loading = (async () => {
+            try {
+                const instance = await youtube.select(source.id);
+                if (!instance || app.ended || player.currentKey !== key) return false;
+                player.yt = instance; player.readyKey = key;
+                ui.videoStatus.hidden = true; ui.videoStatus.textContent = '';
+                return true;
+            } catch (_) { videoFailure(key); return false; }
+        })();
+        player.loading = loading;
+        try { return await loading; }
+        finally { if (player.loading === loading) player.loading = null; }
     }
 
     function localTime() {
@@ -747,10 +742,10 @@
         await syncToState(true);
     }
 
-    async function syncToState(force) {
+    async function syncToState(force, retry = false) {
         const v = app.state.video;
         if (!v) return;
-        await ensureSource(v.source);
+        if (!await ensureSource(v.source, retry)) return;
         if (app.ended || app.state.video !== v) return;
         if (!v.playing) { player.autoplayBlocked = false; ui.tap.hidden = true; }
         else if (player.autoplayBlocked && !force) return;
@@ -773,19 +768,21 @@
 
     async function hostPublish(source, playing, pos) {
         if (!app.connected || !app.isHost) return;
-        app.lastHostSeq = Math.max(app.lastHostSeq + 1, Date.now());
+        const seq = app.lastHostSeq = Math.max(app.lastHostSeq + 1, Date.now());
         const t = app.clock.relayNow();
-        const signed = await signHost({ kind: 'video', seq: app.lastHostSeq, source, playing, pos: Math.max(0, pos), t });
-        if (!app.connected || app.ended) return;
+        const signed = await signHost({ kind: 'video', seq, source, playing, pos: Math.max(0, pos), t });
+        if (!app.connected || app.ended || app.lastHostSeq !== seq) return false;
         H.apply(app.state, { type: 'video', source, playing, pos }, { t });
         app.lastVideoSigned = { signed, t };
         showEpisode();
         await send(signed);
+        return true;
     }
 
     function onLocalChange() {
         if (!app.connected || !app.isHost || !app.state.video || player.autoplayBlocked) return;
         const v = app.state.video;
+        if (player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
         const playing = localPlaying();
         const pos = localTime();
         if (Date.now() < player.applying) {
@@ -811,14 +808,14 @@
         videoPublishTimer = win.setTimeout(onLocalChange, 100);
     }
     ['play', 'pause', 'seeked'].forEach((e) => ui.file.addEventListener(e, onLocalChange));
-    ui.tap.addEventListener('click', () => { if (player.kind !== 'yt') ui.tap.hidden = true; syncToState(true); });
+    ui.tap.addEventListener('click', () => { if (player.kind !== 'yt') ui.tap.hidden = true; syncToState(true, true); });
 
     async function hostLoad(source) {
         if (!app.isHost) { say('Only the person who started the room changes the video.'); return; }
-        await ensureSource(source);
-        await hostPublish(source, true, 0);
-        seekTo(0);
-        playLocal();
+        player.readyKey = ''; // Stop old player events while the new intent is signed.
+        // Choosing a video is an explicit host action. Loading failures remain
+        // local and cannot later replace a newer shared selection.
+        if (await hostPublish(source, true, 0)) await syncToState(true, true);
     }
     ui.load.addEventListener('submit', (event) => {
         event.preventDefault();
@@ -1995,19 +1992,25 @@
     ui.bobHold.addEventListener('click', async () => {
         const v = app.state.video;
         if (!app.isHost || !v) return;
-        const pos = localTime();
-        if (v.playing) { pauseLocal(); await hostPublish(v.source, false, pos); say('Paused for everyone. Beat the devil out of that brush.'); }
-        else { await hostPublish(v.source, true, pos); playLocal(); say('Back to painting.'); }
+        const pos = player.readyKey === `${v.source.kind}:${v.source.id}` ? localTime() : H.expectedPosition(v, app.clock.relayNow());
+        if (await hostPublish(v.source, !v.playing, pos)) {
+            await syncToState(true);
+            say(v.playing ? 'Paused for everyone. Beat the devil out of that brush.' : 'Back to painting.');
+        }
     });
     ui.bobRewind.addEventListener('click', async () => {
         const v = app.state.video;
         if (!app.isHost || !v) return;
-        const pos = Math.max(0, localTime() - 15);
-        seekTo(pos);
-        await hostPublish(v.source, v.playing, pos);
-        say('Rewound 15 seconds for everyone.');
+        const current = player.readyKey === `${v.source.kind}:${v.source.id}` ? localTime() : H.expectedPosition(v, app.clock.relayNow());
+        if (await hostPublish(v.source, v.playing, Math.max(0, current - 15))) {
+            await syncToState(true);
+            say('Rewound 15 seconds for everyone.');
+        }
     });
-    ui.bobCatchup.addEventListener('click', async () => { ui.tap.hidden = true; await syncToState(true); say('Caught up with the host.'); });
+    ui.bobCatchup.addEventListener('click', async () => {
+        await syncToState(true, true);
+        if (!app.ended && !player.failedKey) say('Caught up with the host.');
+    });
     ui.bobNudge.addEventListener('click', async () => {
         if (Date.now() - app.bob.lastNudge < 10000) { say('Hang tight, the host already got your nudge.'); return; }
         app.bob.lastNudge = Date.now();
