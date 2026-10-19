@@ -363,6 +363,20 @@ treating recovery as compatible. The short local preservation check does not
 establish uninterrupted retention, hosted recovery, staff intake/review, crash
 durability or safe extended operation on the older source.
 
+A separate [same-source report crash rehearsal](../pr-assets/beta-collaboration/private-report-crash.json)
+abruptly terminated only the first owned c418 process group after a synthetic,
+consented private report was acknowledged. Its replacement c418 process reused
+the same SQLite files, configuration, keys and invitation version. The original
+guest cookie and request returned the same pending report ID; changed content
+returned 409, and the original report remained pending. Both guests logged out,
+all owned processes became terminal and the existing preview was preserved.
+Fifteen actual SQLite file headers were checked without reading stored records.
+The first attempt stopped during compiler setup before guest admission, report
+submission or crash; its failure and the narrowly corrected sandbox are retained.
+This proves only that acknowledged report's local process-crash recovery. It
+does not qualify the older fallback, power-loss/fsync durability, all room or
+session state, hosted recovery, human review or uninterrupted retention.
+
 Use a version rollback only after checking that the target's effective bindings,
 invitation version, admission state, staff policies and provider settings retain
 the current controls. Otherwise prepare a reviewed compatible recovery release
