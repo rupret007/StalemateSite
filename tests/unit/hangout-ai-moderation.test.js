@@ -28,11 +28,25 @@ describe('server-only AI moderation adapter', () => {
         expect(events).toEqual([1, 'fetch']);
         const [url, options] = fetchImpl.mock.calls[0];
         expect(url).toBe('https://api.openai.com/v1/moderations');
-        expect(options.redirect).toBe('error');
+        expect(options.redirect).toBe('manual');
         expect(JSON.parse(options.body)).toEqual({ model: 'omni-moderation-latest', input: 'Some public text' });
         expect(result).toMatchObject({ status: 'reviewed', flagged: true, categories: ['harassment'] });
         expect(moderator.status()).toMatchObject({ checked: 1, flagged: 1, used: 1, pending: 0 });
         expect(JSON.stringify(moderator.status())).not.toContain('test-only-secret');
+    });
+
+    it('refuses provider redirects without forwarding the API key or treating them as reviewed', async () => {
+        const fetchImpl = vi.fn(async (_url, options) => {
+            // Match Workers, where redirect:error throws before a network call.
+            if (options.redirect === 'error') throw new TypeError('Unsupported redirect mode');
+            return new Response('private provider diagnostic', { status: 307, headers: { Location: 'https://untrusted.example/collect' } });
+        });
+        const moderator = createAiModerator({ enabled: true, apiKey: 'test-only-secret', fetchImpl });
+        expect(await moderator.review({ text: 'Synthetic public text' })).toEqual({ status: 'unavailable', reason: 'review-failed' });
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
+        expect(fetchImpl.mock.calls[0][1].redirect).toBe('manual');
+        expect(moderator.status()).toMatchObject({ used: 1, checked: 0, failed: 1 });
+        expect(JSON.stringify(moderator.status())).not.toContain('private provider diagnostic');
     });
 
     it('rejects malformed classifier results instead of treating them as safe', () => {

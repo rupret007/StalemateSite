@@ -23,11 +23,16 @@ export async function verifyAccessJwt(token, { team, aud, now = Date.now(), fetc
     let claims;
     try { header = jsonPart(parts[0]); claims = jsonPart(parts[1]); } catch (error) { throw new Error('malformed'); }
     if (header.alg !== 'RS256') throw new Error('alg');
-    const jwks = await fetchJwks(`https://${team}/cdn-cgi/access/certs`);
+    let jwks;
+    try { jwks = await fetchJwks(`https://${team}/cdn-cgi/access/certs`); }
+    catch { throw new Error('jwks'); }
     const jwk = (jwks.keys || []).find((k) => k.kid === header.kid);
     if (!jwk) throw new Error('kid');
-    const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
-    const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64urlToBytes(parts[2]), enc.encode(`${parts[0]}.${parts[1]}`));
+    let ok;
+    try {
+        const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+        ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64urlToBytes(parts[2]), enc.encode(`${parts[0]}.${parts[1]}`));
+    } catch { throw new Error('crypto'); }
     if (!ok) throw new Error('signature');
     const t = Math.floor(now / 1000);
     if (claims.iss !== `https://${team}`) throw new Error('issuer');

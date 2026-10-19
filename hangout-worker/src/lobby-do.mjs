@@ -23,6 +23,8 @@ async function turnstileOk(token, ip, secret, fetchImpl = fetch) {
 }
 
 const jwksCache = { url: '', at: 0, body: null };
+// Fixed categories only: provider errors can contain credentials or arbitrary text.
+const accessFailure = (error) => ['missing', 'malformed', 'alg', 'kid', 'signature', 'issuer', 'audience', 'expired', 'not-yet', 'email', 'jwks', 'crypto'].includes(error?.message) ? error.message : 'verification';
 function betaSessionInvalid(attachment, env) {
     return env.HANGOUT_BETA_MODE === 'protected' && (attachment.betaEnded || !validBetaSession(attachment, env));
 }
@@ -32,9 +34,18 @@ function socketIdentityInvalid(attachment, env) {
 }
 async function fetchJwks(url) {
     if (jwksCache.url === url && jwksCache.body && Date.now() - jwksCache.at < 10 * 60 * 1000) return jwksCache.body;
-    const r = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(8000) });
-    if (!r.ok) throw new Error('jwks');
-    jwksCache.body = await r.json(); jwksCache.url = url; jwksCache.at = Date.now();
+    let r;
+    // Workers rejects redirect:'error' before sending the request. Manual mode
+    // plus the !ok check below refuses redirects without following them.
+    try { r = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(8000) }); }
+    catch (error) {
+        console.warn('hangout.access-jwks', 'request', ['TypeError', 'AbortError', 'TimeoutError'].includes(error?.name) ? error.name : 'Error');
+        throw new Error('jwks');
+    }
+    if (!r.ok) { console.warn('hangout.access-jwks', 'status', r.status); throw new Error('jwks'); }
+    try { jwksCache.body = await r.json(); }
+    catch { console.warn('hangout.access-jwks', 'body', 'invalid-json'); throw new Error('jwks'); }
+    jwksCache.url = url; jwksCache.at = Date.now();
     return jwksCache.body;
 }
 
@@ -48,7 +59,7 @@ export async function adminGate(request, env, deps = {}) {
         const role = roleForEmail(email, env);
         if (!role) return { status: 403, reason: 'not-band' };
         return { ok: true, identity: { role, email, expiresAt, admin: true } };
-    } catch { return { status: 403, reason: 'access' }; }
+    } catch (error) { return { status: 403, reason: 'access', check: accessFailure(error) }; }
 }
 
 export async function ownerGate(request, env, deps = {}) {
@@ -58,7 +69,7 @@ export async function ownerGate(request, env, deps = {}) {
             team: env.HANGOUT_ACCESS_TEAM, aud: env.HANGOUT_OWNER_ACCESS_AUD, fetchJwks: deps.fetchJwks || fetchJwks
         });
         return { ok: true, identity: { email, expiresAt } };
-    } catch { return { status: 403, reason: 'owner-signin' }; }
+    } catch (error) { return { status: 403, reason: 'owner-signin', check: accessFailure(error) }; }
 }
 
 // Exported for tests: returns {status, reason} when refused, or {ok, identity} when the upgrade may proceed.

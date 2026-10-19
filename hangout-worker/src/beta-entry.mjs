@@ -96,7 +96,10 @@ async function betaRequest(request, env, deps = {}) {
         if (!betaAccessConfigured(env)) return reply('Email verification is not configured. Guest chat is still available from your invitation.', 503);
         const owner = url.pathname === '/lobby-owner/login';
         const gate = await (owner ? ownerGate : adminGate)(request, env, deps);
-        if (!gate.ok) return reply(owner ? 'Verified email sign-in required.' : 'Restricted moderator sign-in required.', gate.status);
+        if (!gate.ok) {
+            console.warn('hangout.access-denied', owner ? 'owner' : 'staff', gate.check || gate.reason);
+            return reply(owner ? 'Verified email sign-in required.' : 'Restricted moderator sign-in required.', gate.status);
+        }
         await disconnect(env, session);
         const next = await newAccess(env, { exp: session.access.exp, ip: request.headers.get('CF-Connecting-IP') || '0.0.0.0' });
         const identity = { v: 1, sid: next.access.sid, exp: Math.min(next.access.exp, gate.identity.expiresAt), kind: owner ? 'owner' : 'staff', email: gate.identity.email, role: owner ? 'fan' : gate.identity.role };

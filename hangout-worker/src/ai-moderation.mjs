@@ -99,7 +99,7 @@ export function createAiModerator({ enabled = false, apiKey = '', fetchImpl = gl
                 await saveUsage(reservation);
                 if (controller.signal.aborted) throw new Error('timeout');
                 const response = await fetchImpl(ENDPOINT, {
-                    method: 'POST', redirect: 'error', signal: controller.signal,
+                    method: 'POST', redirect: 'manual', signal: controller.signal,
                     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
                     body: JSON.stringify({ model: AI_MODERATION_MODEL, input: text })
                 });
