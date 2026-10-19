@@ -79,7 +79,9 @@ describe('hangout sync core', () => {
         const frame = await H.seal(a.key, { type: 'chat', text: 'paint a happy tree' });
         expect(frame.c).not.toContain('happy');
         expect(await H.open(b.key, frame)).toEqual({ type: 'chat', text: 'paint a happy tree' });
-        const bad = { ...frame, c: frame.c.slice(0, -2) + (frame.c.endsWith('A') ? 'BB' : 'AA') };
+        const ciphertext = Buffer.from(frame.c, 'base64url');
+        ciphertext[0] ^= 1; // Change an authenticated byte, rather than unused base64 trailing bits.
+        const bad = { ...frame, c: ciphertext.toString('base64url') };
         await expect(H.open(b.key, bad)).rejects.toBeTruthy();
         const other = await H.deriveRoom(H.newSecret());
         await expect(H.open(other.key, frame)).rejects.toBeTruthy();
