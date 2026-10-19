@@ -17,8 +17,12 @@ Validation: 382 unit tests and 104 chat/room browser scenarios passed, including
 both widths in Chromium, Android emulation and three WebKit iPhone profiles.
 The keyboard cases simulate a 300px visual viewport and 25px offset; they do
 not show an actual iOS keyboard. Physical iPhone Safari remains a manual check.
+Page-hide and repeated page-show checks also verify that viewport listeners
+suspend and resume without losing the draft or hiding Send.
 Both public and private packaging commands passed. This change is a PR;
 these screenshots do not claim that the hosted pilot has been updated.
 
 Reproduce: `npm run test:unit -- --maxWorkers=2`, then
-`STALEMATE_TEST_PORT=4396 npx playwright test tests/e2e/hangout*.spec.js tests/e2e/lobby*.spec.js --workers=1`.
+`STALEMATE_TEST_PORT=4402 npx playwright test tests/e2e/hangout*.spec.js tests/e2e/lobby*.spec.js --workers=1`.
+Use a fresh local relay for a complete run so previous room tests do not exhaust
+the relay's daily creation allowance.

@@ -389,6 +389,7 @@ input::placeholder { color: #8b958f; opacity: 1; }
 }
 @media (max-width: 900px) {
   /* The keyboard changes the visual viewport, not Safari's height media queries. */
+  /* Keep these state overrides after every height breakpoint. */
   body.keyboard-open .lobby-welcome, body.keyboard-open .quick, body.keyboard-open .chat-status, body.keyboard-open .topic { display: none; }
   body.keyboard-open .titlebar { min-height: 44px; padding-block: 4px; }
   body.keyboard-open .brand-caption { display: none; }

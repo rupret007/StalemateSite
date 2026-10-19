@@ -78,6 +78,25 @@ for (const width of [375, 390]) {
         await expect(page.locator('[data-text]')).toHaveValue('Draft survives the keyboard');
         await page.screenshot({ path: testInfo.outputPath(`keyboard-${width}.png`) });
         await page.evaluate(() => {
+            window.dispatchEvent(new Event('pagehide'));
+            Object.assign(window.visualViewport, { height: 280 });
+            window.dispatchEvent(new Event('resize'));
+        });
+        await page.waitForTimeout(50);
+        await expect.poll(() => page.evaluate(() => document.body.getBoundingClientRect().height)).toBe(300);
+        await page.evaluate(() => {
+            window.dispatchEvent(new Event('pageshow'));
+            window.dispatchEvent(new Event('pageshow'));
+        });
+        await expect.poll(() => page.evaluate(() => document.body.getBoundingClientRect().height)).toBe(280);
+        await expect(page.locator('[data-text]')).toHaveValue('Draft survives the keyboard');
+        await expect(page.locator('[data-send]')).toBeInViewport({ ratio: 1 });
+        await page.evaluate(() => {
+            Object.assign(window.visualViewport, { height: 300 });
+            window.dispatchEvent(new Event('resize'));
+        });
+        await expect.poll(() => page.evaluate(() => document.body.getBoundingClientRect().height)).toBe(300);
+        await page.evaluate(() => {
             Object.assign(window.visualViewport, { height: 150, scale: 2 });
             window.dispatchEvent(new Event('resize'));
         });

@@ -4,6 +4,8 @@
     'use strict';
     const $ = (s, el = document) => el.querySelector(s);
     const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+    const KEYBOARD_MIN_REDUCTION_PX = 100;
+    window.__lobbyViewportCleanup?.();
     // Keep the composer inside the visible area when a mobile keyboard opens.
     // Pinch zoom remains browser-controlled; never turn it into a layout resize.
     function fitChatViewport() {
@@ -18,17 +20,40 @@
         if (Math.abs(viewport.scale - 1) > 0.01) return;
         style.setProperty('--chat-viewport-height', `${viewport.height}px`);
         style.setProperty('--chat-viewport-top', `${viewport.offsetTop}px`);
-        document.body.classList.toggle('keyboard-open', viewport.height < innerHeight - 100);
+        document.body.classList.toggle('keyboard-open', viewport.height < innerHeight - KEYBOARD_MIN_REDUCTION_PX);
     }
     let viewportFrame;
+    let viewportTarget;
     const scheduleViewport = () => {
         cancelAnimationFrame(viewportFrame);
         viewportFrame = requestAnimationFrame(fitChatViewport);
     };
-    window.addEventListener('resize', scheduleViewport);
-    window.visualViewport?.addEventListener('resize', scheduleViewport);
-    window.visualViewport?.addEventListener('scroll', scheduleViewport);
-    fitChatViewport();
+    const unbindViewport = () => {
+        cancelAnimationFrame(viewportFrame);
+        window.removeEventListener('resize', scheduleViewport);
+        viewportTarget?.removeEventListener('resize', scheduleViewport);
+        viewportTarget?.removeEventListener('scroll', scheduleViewport);
+    };
+    const bindViewport = () => {
+        unbindViewport();
+        viewportTarget = window.visualViewport;
+        window.addEventListener('resize', scheduleViewport);
+        viewportTarget?.addEventListener('resize', scheduleViewport);
+        viewportTarget?.addEventListener('scroll', scheduleViewport);
+        fitChatViewport();
+    };
+    const disposeViewport = () => {
+        unbindViewport();
+        window.removeEventListener('pagehide', unbindViewport);
+        window.removeEventListener('pageshow', bindViewport);
+        if (window.__lobbyViewportCleanup === disposeViewport) delete window.__lobbyViewportCleanup;
+    };
+    // Safari can restore this document from its page cache. Suspend while hidden,
+    // then rebind once on return; a new client initialization disposes this one.
+    window.addEventListener('pagehide', unbindViewport);
+    window.addEventListener('pageshow', bindViewport);
+    window.__lobbyViewportCleanup = disposeViewport;
+    bindViewport();
     const Discovery = window.HangoutDiscovery;
     const params = new URLSearchParams(location.search);
     let ownerSession = params.get('owner') === '1' || sessionStorage.getItem('hangout-owner') === '1';
