@@ -125,9 +125,15 @@ acceptance.
   errors, retires obsolete callbacks and offers explicit local retry without
   reload or repeated automatic requests. Shared intent survives a local failure.
   Private host signing cannot publish an obsolete selection after a newer one.
-  Exact source `af37814` passes ten new controlled-fault regressions and
-  eighteen related watch checks directly, with no retries; all 575 unit checks
-  pass after the separate deterministic ciphertext-test correction.
+  Initial source `af37814` passed ten focused regressions, eighteen related
+  checks and all 575 unit tests, but its first full CI gate failed on late
+  channel visitors and phone watch initialization. Corrected source `11acab0`
+  retains the page-wide API attempt across room reinitialization; a new negative
+  case proves two old script insertions versus one expected. Eleven distinct
+  loader cases and ten relevant desktop/phone checks now pass in targeted
+  runs. Three existing private checks explicitly wait for the host player
+  before calling its API; their timeouts and drift limits stay unchanged.
+  The corrected full CI gate remains pending; the original failures are retained.
   Independent review also caught Bob controls accessing a retired player; they
   now use current shared intent while a replacement loads. The existing iframe
   privacy, autoplay and synchronization checks pass. The first diagnostic remains

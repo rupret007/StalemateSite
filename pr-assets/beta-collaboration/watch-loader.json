@@ -1,19 +1,20 @@
 {
   "status": "verified-controlled-loopback-not-deployed",
-  "sourceCommit": "af3781431fbaf2402e39d1e89353b453808c0769",
+  "sourceCommit": "11acab0b27594da3a85957502ec97bb5dbd44ee1",
   "baseCommit": "4223d5364b362f6d3b76e5bd7559c35be6827040",
   "deployedSourceCommit": "b111bb2aa070cd791834f40f26665996ad406421",
   "deployedRuntimeVersion": "0ee7705e-e381-4cb4-a70a-1f26daa10e78",
   "deploymentPerformed": false,
   "scope": "Controlled aborted API requests, delayed offline fixtures, provider error callback and real 15-second player-ready deadline on isolated loopback contexts. No real provider outage, hosted candidate, mobile, physical-device or separate-network acceptance claim.",
   "sourceHashes": {
-    "r/45662413410ed051/youtube-player.js": "3ba53f4989963e2fec19f171f8d87ef9b5cc7d3c205806c00757a7f01d3e9eac",
+    "r/45662413410ed051/youtube-player.js": "04626211942b8a925f8d0817d4e1e5c07d05febfccb81b9d018b0857eced5379",
     "r/45662413410ed051/room.js": "230fc1626af4a8c39251e9ebe8d117149f896c5c4f0a3e754824b3edbc51a33d",
     "r/45662413410ed051/lobby/lobby-room.js": "ae14127c36c8361bc0bcb6ad742f5963d99c3d8f3978071c23fb4ed1921094f7",
     "r/45662413410ed051/index.html": "e47988fbb03a94ad3c595777b6ee6c32a5a41cd328c654d8d7e45be4a0609f37",
     "r/45662413410ed051/lobby/index.html": "124287437c58e0fbe253c5e5a2ecc9c91f1a2659ad74d36fd4fb672e5bf527cf",
-    "tests/e2e/hangout-watch-loader.spec.js": "3efa53ee3a46c011c30f44d73cc0be8b814635ac8e8d47273502a1b618cacaa6",
-    "tests/e2e/support/fake-youtube-loader.js": "695e4664e58a1d467d1b285ce0cb7be1b8548e4052559c925c8396ea577b1e7c"
+    "tests/e2e/hangout-watch-loader.spec.js": "5c89d0376b80e91036b1ff36b4f3678098db7b2d389d6c7f79dd06907f5bf2ef",
+    "tests/e2e/support/fake-youtube-loader.js": "695e4664e58a1d467d1b285ce0cb7be1b8548e4052559c925c8396ea577b1e7c",
+    "tests/e2e/hangout.spec.js": "685c939cf0e7afa075984b9c48bf18d9e6c6812a2bb8e09bf91db0fbd8ff0559"
   },
   "behavior": [
     "Resettable single-flight API load with script error and 15-second deadline",
@@ -23,7 +24,8 @@
     "New source and room teardown retire old callbacks and pending waits",
     "Guard private host publication after asynchronous signing",
     "Keep precreated iframe with origin-only metadata and strict-origin-when-cross-origin referrer policy",
-    "Bob controls use current shared position while a replacement loads; catch-up is an explicit local retry"
+    "Bob controls use current shared position while a replacement loads; catch-up is an explicit local retry",
+    "Room teardown cancels selection work while retaining the single page-scoped API attempt and its original deadline"
   ],
   "validation": {
     "oldCodeNetworkErrorRegressions": {
@@ -39,24 +41,6 @@
     "correctedTargetedCases": {
       "passed": 3,
       "retries": 0
-    },
-    "finalLoaderMatrix": {
-      "passed": 10,
-      "retries": 0,
-      "elapsedSeconds": 25.7,
-      "browser": "Chromium",
-      "cases": [
-        "Private script error and explicit retry without reload",
-        "Channel script error and explicit retry without reload",
-        "Channel delayed API retains newest video",
-        "Private older completed signature cannot overwrite newer selection",
-        "Private late API cannot replace paused site video across genuine two-second reconciliation timer",
-        "Channel leave retires late API callbacks; rejoin receives current activity",
-        "Private real 15-second never-ready deadline and fresh-player retry",
-        "Channel provider error and fresh-player retry",
-        "Private Bob pause/rewind while replacement unready never access retired instance, preserve new-source pause/rewind, and complete after real ready callback fence",
-        "Ordinary private guest Bob Catchup retry failure keeps Retry visible; third attempt succeeds with unchanged host sequence and shared play"
-      ]
     },
     "relatedExistingChecks": {
       "policy": 7,
@@ -81,7 +65,10 @@
       "files": 55
     },
     "independentProductionReview": "One concrete retired-player access issue identified and fixed; final read-only verification found no additional blocker.",
-    "ci": "pending",
+    "ci": {
+      "correctedSourceCommit": "11acab0b27594da3a85957502ec97bb5dbd44ee1",
+      "status": "pending"
+    },
     "reviewFindingRegressions": {
       "passed": 2,
       "retries": 0,
@@ -137,7 +124,119 @@
       "watch-loader-final10.log": "f01f28cc11767ce14482780fc118743caddb829d5c95ccb8597e51496023e9c4",
       "watch-loader-reviewed-related.log": "b16b353f68be77e2698aa8408aa0519ad2b2a837ce234918e56d406f267c99a3",
       "watch-loader-unit.log": "be89dbdaf9ead79c46bddf69161fd7ce7088b726a5a4bcd2ab366a73db63ef84",
-      "watch-loader-unit-after-fixture-fix.log": "9c3ad3b9e4c761c28e6d09a6666307329a3f5b5a7fb94a41e16e7be887f23e05"
+      "watch-loader-unit-after-fixture-fix.log": "9c3ad3b9e4c761c28e6d09a6666307329a3f5b5a7fb94a41e16e7be887f23e05",
+      "watch-loader-ci-repro.log": "fcda518361d580e2fd7ede69b36057cf76d7a766e4bd554f0486ed4e03c52b95",
+      "watch-loader-late-join-before-fix.log": "c65e7af8050fc3c023b06d5b10f3645122e12fcf33d22d065c7544023413e132",
+      "watch-loader-late-join-duplicate-before-fix.log": "86ee0ff50bc03535c05fb33dbfbbc285813a4624ef73a4f1ae65e70e6f5e17e6",
+      "watch-loader-ci-correction.log": "4c79af6905bc551fab5bac21a085f3f3860689c723b444bf6e010d17bc4d528a",
+      "watch-loader-final11.log": "3201ce40c13976f1153475ddacfe89767a1f207bf863548776a97c58c0c68fdc",
+      "watch-loader-late-clock.log": "4c8f7e91807095119be25937b0c9673d2dc6ebe90edb4a2446f3c6d833ab6c72",
+      "ci39228114628.log": "66bc9ace7d93df2c9e47b4e6c2b416e73697bc8510a233b8f09bbcd64d973b4a",
+      "ci39228156806.log": "6202ccec13d54b3345eda57b71d16fc16ca9c90ef57bbef5cd526be95b669236"
+    },
+    "initialTenCaseMatrix": {
+      "passed": 10,
+      "retries": 0,
+      "elapsedSeconds": 25.7,
+      "browser": "Chromium",
+      "cases": [
+        "Private script error and explicit retry without reload",
+        "Channel script error and explicit retry without reload",
+        "Channel delayed API retains newest video",
+        "Private older completed signature cannot overwrite newer selection",
+        "Private late API cannot replace paused site video across genuine two-second reconciliation timer",
+        "Channel leave retires late API callbacks; rejoin receives current activity",
+        "Private real 15-second never-ready deadline and fresh-player retry",
+        "Channel provider error and fresh-player retry",
+        "Private Bob pause/rewind while replacement unready never access retired instance, preserve new-source pause/rewind, and complete after real ready callback fence",
+        "Ordinary private guest Bob Catchup retry failure keeps Retry visible; third attempt succeeds with unchanged host sequence and shared play"
+      ]
+    },
+    "initialFullCi": {
+      "sourceCommit": "f32d9d55f1038bd7bec22194df7abc87fda52d8a",
+      "push": {
+        "run": 39228114628,
+        "status": "failure",
+        "unitsPassed": 575,
+        "browserDirect": 218,
+        "browserRetryPasses": 3,
+        "finalFailures": 1,
+        "serialNotRun": 2
+      },
+      "pullRequest": {
+        "run": 39228156806,
+        "status": "failure",
+        "unitsPassed": 575,
+        "browserDirect": 216,
+        "browserRetryPasses": 3,
+        "finalFailures": 3,
+        "serialNotRun": 2
+      },
+      "declaredSkips": 0,
+      "allTenNewCasesDirectPass": true,
+      "failures": [
+        "Both runs: late channel visitor had undefined fixture player during drift check",
+        "PR run: iPhone15 and Android watch initialization ended with zero fixture players"
+      ],
+      "retryPasses": [
+        "Push: existing snapshotDone fixture49 race, private host pause, iPhone15 watch initialization",
+        "PR: private periodic resync and host pause, iPhoneSE watch initialization"
+      ],
+      "rerunsRequested": false
+    },
+    "pageApiLifetimeCorrection": {
+      "localOriginalWatchReproduction": {
+        "failed": 1,
+        "causeObserved": "Undefined fixture player in the existing watch drift check"
+      },
+      "newCaseAttempts": [
+        {
+          "status": "failed-setup-not-regression-proof",
+          "reason": "Clean lobby URL omitted local preview/relay entry parameters"
+        },
+        {
+          "status": "failed-harness-barrier-not-regression-proof",
+          "reason": "Two script insertions but only one routed request while held; removed scripts need not reach routing"
+        },
+        {
+          "status": "intended-negative",
+          "sourceCommit": "f32d9d55f1038bd7bec22194df7abc87fda52d8a",
+          "expectedScriptInsertions": 1,
+          "observedScriptInsertions": 2,
+          "retries": 0
+        }
+      ],
+      "sourceFinding": "Normal join initializes the activity twice; selection cancellation removed the API script and appended another even though removed scripts may still execute",
+      "correction": "Retain one page-scoped in-flight API attempt across room teardown, preserving its original 15-second deadline and error reset. Retire only selection/player work.",
+      "hostReadiness": "Three existing private tests now wait for the host player to play before directly invoking its API. Shared intent can reach a guest first; no existing timeout or drift tolerance changed.",
+      "broaderExistingChecksAfterCorrection": {
+        "passed": 10,
+        "retries": 0,
+        "includes": [
+          "Desktop channel watch synchronization",
+          "Delayed source/leave/rejoin",
+          "Bob Ross initial activity",
+          "Private resync/pause/paused seek",
+          "All four configured emulated phone watch projects"
+        ]
+      },
+      "firstElevenCaseMatrix": {
+        "passed": 10,
+        "failed": 1,
+        "retries": 0,
+        "failure": "New late visitor local media time was42.0001 versus exact42; one script/player and playback recovery checks passed"
+      },
+      "targetedNewCaseAfterAssertionCorrection": {
+        "passed": 1,
+        "retries": 0,
+        "elapsedSeconds": 5.5,
+        "authoritativePausedPositionExact": 42,
+        "nativePausedTimeToleranceSeconds": 0.05,
+        "existingDriftBudgetUnchanged": true
+      },
+      "distinctCurrentLoaderCasesPassed": 11,
+      "fullCorrectedMatrixCi": "pending",
+      "independentFinalReview": "Clean: API lifetime/callback ownership, completed-join observer fence, exact authoritative seek plus bounded native clock comparison, and host readiness barriers reviewed."
     }
   },
   "preservedInitialDiagnostic": {
@@ -159,5 +258,6 @@
     "Hosted candidate recovery after natural expiry observation finishes",
     "Physical iPhone/mobile and separate networks",
     "Human/Karen review before merge or invitations"
-  ]
+  ],
+  "initialProductSourceCommit": "af3781431fbaf2402e39d1e89353b453808c0769"
 }
