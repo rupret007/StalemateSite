@@ -1,0 +1,295 @@
+{
+  "version": 1,
+  "status": "real-owner-and-staff-login-verified-human-action-pending",
+  "scope": "Actual separate private-beta hostname/path Access configuration, real emailed-code owner callback and separate restricted staff connection; human disposition and second-device recovery remain separate.",
+  "betaHost": "stalemate-hangout-beta.jeffstory007.workers.dev",
+  "team": "throbbing-hill-6ed4.cloudflareaccess.com",
+  "observations": [
+    {
+      "checkedAt": "2026-10-19T04:33:40.712862+00:00",
+      "source": "operator dashboard DOM report plus independent read-only Wrangler OAuth API",
+      "dashboardReportedByOperator": {
+        "identityProviderOptions": [
+          "Cloudflare",
+          "One-time PIN"
+        ],
+        "ownershipPolicy": {
+          "id": "909795df-e9c8-4e33-a73e-bb07c0fe8d9f",
+          "includeConfirmedSoleOwnerEmailOnly": true,
+          "requireOneTimePin": true,
+          "ruleCount": 2
+        },
+        "ownershipAppCreateClicked": true,
+        "ownershipAppForm": {
+          "host": "stalemate-hangout-beta.jeffstory007.workers.dev",
+          "path": "lobby-owner*",
+          "sessionDuration": "8h",
+          "allowedIdPs": "One-time PIN only",
+          "useAllIdPs": false,
+          "appLauncherVisible": false,
+          "httpOnlyAccessCookie": true
+        },
+        "savedAppConfirmationIndependentlyVerified": false
+      },
+      "independentApiChecks": [
+        {
+          "kind": "applications",
+          "status": 200,
+          "success": true,
+          "resultType": "list",
+          "resultInfo": {
+            "page": 1,
+            "per_page": 100,
+            "count": 0,
+            "total_count": 0,
+            "total_pages": 0
+          },
+          "errors": [],
+          "applications": []
+        },
+        {
+          "kind": "providers",
+          "status": 200,
+          "success": true,
+          "resultType": "list",
+          "resultInfo": {
+            "page": 1,
+            "per_page": 100,
+            "count": 0,
+            "total_count": 0,
+            "total_pages": 0
+          },
+          "errors": [],
+          "providers": []
+        },
+        {
+          "kind": "ownership policy",
+          "status": 403,
+          "success": false,
+          "resultType": "NoneType",
+          "resultInfo": null,
+          "errors": [
+            {
+              "code": 1010,
+              "message": null
+            }
+          ]
+        }
+      ],
+      "audiencesVerified": false
+    },
+    {
+      "checkedAt": "2026-10-19T04:34:00.190200+00:00",
+      "source": "root operator verified actual signed-in Cloudflare dashboard DOM",
+      "accountIdConfirmed": "a5e21cdca940b11f19f050e1c840060f",
+      "accountPathGuardAppliedToEveryAction": true,
+      "identityProviderOptions": [
+        "Cloudflare",
+        "One-time PIN"
+      ],
+      "savedApplications": {
+        "ownership": {
+          "savedListRowVerified": true,
+          "host": "stalemate-hangout-beta.jeffstory007.workers.dev",
+          "path": "lobby-owner*",
+          "audience": "pending operator read from Additional Settings"
+        },
+        "moderation": {
+          "status": "operator creating separate Jeff-only OTP policy/application",
+          "audience": "pending"
+        }
+      },
+      "oauthAccessInventoryAuthority": "insufficient: same-account OAuth lists omit dashboard-verified resources",
+      "apiWriteRetriesMade": false
+    },
+    {
+      "checkedAt": "2026-10-19T04:38:14.930673+00:00",
+      "source": "root operator verified saved Apps list and each Additional Settings DOM; public IDs read from ignored access-apps.json",
+      "sameAccountGuardVerified": true,
+      "bothApplicationsSaved": true,
+      "separatePoliciesSaved": true,
+      "distinctPublicAudiencesVerified": true,
+      "oneTimePinOnlyVerifiedOnBothForms": true,
+      "configurationCommittedByOperator": "a449541",
+      "browserCookiesAuthHeadersOrTokensReadByAuditAgent": false
+    },
+    {
+      "checkedAt": "2026-10-19T04:38:57.533918+00:00",
+      "source": "root operator deployment and actual protected health request",
+      "runtimeDeployment": {
+        "status": "deployed",
+        "version": "33e6a92f-57a8-4d89-b79f-23039af1044d",
+        "sourceCommit": "a449541",
+        "durableObjectBindingCount": 5,
+        "durableObjectBindingsChanged": false,
+        "staticAssetsChanged": false
+      },
+      "health": {
+        "httpStatus": 200,
+        "configuration": "healthy",
+        "issues": [],
+        "providerChecks": "not-performed",
+        "source": "operator actual protected health request",
+        "provesEmailOrStaffLogin": false
+      },
+      "emailDelivery": "pending",
+      "realStaffLogin": "pending"
+    },
+    {
+      "checkedAt": "2026-10-19T04:49:11.586570+00:00",
+      "source": "root operator actual Chrome session and user-completed real OTP; no auth values inspected by audit agent",
+      "realOtpCompleted": true,
+      "ownerCallbackState": {
+        "httpStatus": 200,
+        "kind": "owner",
+        "role": "fan"
+      },
+      "separateStaffSsoCallbackSucceeded": true,
+      "moderationWebSocketConnected": true,
+      "exactSyntheticReportVisible": "mmverkvuy1",
+      "requestedHumanDismissal": "pending user response",
+      "humanReviewPassed": false,
+      "finalCommittedFixRuntimeReceipt": "pending"
+    },
+    {
+      "checkedAt": "2026-10-19T04:50:06.922420+00:00",
+      "source": "root operator final committed deployment and existing real moderation session",
+      "runtimeDeployment": {
+        "status": "deployed",
+        "version": "e3177c6d-6bea-4c80-90dc-491d29a33da1",
+        "sourceCommit": "832f7e1",
+        "liveModerationSocketSurvivedDeployment": true,
+        "exactSyntheticReportStillVisible": "mmverkvuy1"
+      },
+      "humanQueueAction": "pending user reply",
+      "humanReviewPassed": false,
+      "temporaryChromeScriptingRestoration": "pending operator verification"
+    }
+  ],
+  "limitations": [
+    "Existing OAuth list results are insufficient to inventory the dashboard-verified same-account resources; exact filtering mechanism is unknown.",
+    "A visible moderation queue is not a completed human action; dismissal remains pending.",
+    "Registered-room recovery from a second device, denied-identity acceptance and physical device/expiry checks remain outstanding.",
+    "The operator must restore temporary Chrome Apple Events scripting to off after setup and record verification."
+  ],
+  "credentialsOrBrowserAuthRecorded": false,
+  "checkedAt": "2026-10-19T04:50:06.922420+00:00",
+  "configurationSourceCommit": "a449541",
+  "applications": {
+    "owner": {
+      "id": "070c634a-367e-4bc3-877d-ae7f9109be20",
+      "aud": "5b3896041740f5ca1dd62300e3523119bacca308fa1415bd964bece03c4030b4",
+      "host": "stalemate-hangout-beta.jeffstory007.workers.dev",
+      "path": "/lobby-owner*",
+      "sessionDuration": "8h",
+      "allowedIdPs": [
+        "One-time PIN"
+      ],
+      "useAllIdPs": false,
+      "appLauncherVisible": false,
+      "httpOnlyAccessCookie": true,
+      "policy": {
+        "id": "909795df-e9c8-4e33-a73e-bb07c0fe8d9f",
+        "decision": "allow",
+        "includeConfirmedSoleOwnerEmailOnly": true,
+        "requireOneTimePin": true,
+        "ruleCount": 2
+      },
+      "savedListRowVerified": true,
+      "publicAudienceReadFromSavedAdditionalSettings": true
+    },
+    "staff": {
+      "id": "d7132132-55f6-4af1-a28a-c592163938b2",
+      "aud": "16af993efee6923eb6d0718b28fc0d90e8f5662a21df2ed6acbca143e663fb0e",
+      "host": "stalemate-hangout-beta.jeffstory007.workers.dev",
+      "path": "/lobby-admin*",
+      "sessionDuration": "8h",
+      "allowedIdPs": [
+        "One-time PIN"
+      ],
+      "useAllIdPs": false,
+      "appLauncherVisible": false,
+      "httpOnlyAccessCookie": true,
+      "policy": {
+        "id": "738c2a6b-f1ec-4c39-bacb-5880213b5c86",
+        "decision": "allow",
+        "includeConfirmedSoleOwnerEmailOnly": true,
+        "requireOneTimePin": true,
+        "ruleCount": 2
+      },
+      "savedListRowVerified": true,
+      "publicAudienceReadFromSavedAdditionalSettings": true
+    }
+  },
+  "distinctAudiencesVerified": true,
+  "runtimeDeployment": {
+    "status": "deployed",
+    "version": "e3177c6d-6bea-4c80-90dc-491d29a33da1",
+    "sourceCommit": "832f7e1",
+    "liveModerationSocketSurvivedDeployment": true,
+    "exactSyntheticReportStillVisible": "mmverkvuy1"
+  },
+  "emailDelivery": "verified: user completed real One-time PIN",
+  "realStaffLogin": {
+    "status": "verified",
+    "method": "separate staff callback through Access SSO after real OTP",
+    "moderationWebSocketConnected": true,
+    "syntheticReportVisible": true,
+    "syntheticReportId": "mmverkvuy1"
+  },
+  "temporaryChromeAutomation": {
+    "requiredFinalAppleEventsScriptingState": "off",
+    "restorationVerified": false
+  },
+  "health": {
+    "httpStatus": 200,
+    "configuration": "healthy",
+    "issues": [],
+    "providerChecks": "not-performed",
+    "source": "operator installed monitor actual protected health read",
+    "checkedAt": "2026-10-19T04:49:39.559Z",
+    "runtimeVersion": "e3177c6d-6bea-4c80-90dc-491d29a33da1",
+    "provesEmailOrStaffLogin": false
+  },
+  "tests": {
+    "focusedIdentityDeploymentEndpointMonitor": 85,
+    "sourceCiUnit": 509,
+    "sourceCiBrowser": 188,
+    "newAccessDiagnostics": 28,
+    "finalFixLocalUnit": {
+      "passed": 540,
+      "files": 53,
+      "sourceCommit": "832f7e1",
+      "newAccessDiagnosticsIncluded": 28
+    }
+  },
+  "previousConfigurationDeployment": {
+    "status": "deployed",
+    "version": "33e6a92f-57a8-4d89-b79f-23039af1044d",
+    "sourceCommit": "a449541",
+    "durableObjectBindingCount": 5,
+    "durableObjectBindingsChanged": false,
+    "staticAssetsChanged": false
+  },
+  "ownerLogin": {
+    "status": "verified",
+    "actualBetaState": {
+      "httpStatus": 200,
+      "kind": "owner",
+      "role": "fan"
+    }
+  },
+  "humanQueueAction": {
+    "status": "pending",
+    "actionRequested": "dismiss the identified synthetic report",
+    "humanReviewPassed": false
+  },
+  "ownerRoomRecovery": "pending second-device registered-room acceptance",
+  "workersCompatibilityFix": {
+    "cause": "Workers throws TypeError for redirect:error before sending a JWKS request",
+    "fix": "manual redirect handling plus reject non-success response; no Location follow",
+    "signatureIssuerAudienceExpiryChecksPreserved": true,
+    "officialReference": "https://developers.cloudflare.com/workers/runtime-apis/request/"
+  },
+  "reviewPullRequest": "https://github.com/rupret007/StalemateSite/pull/39"
+}

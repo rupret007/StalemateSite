@@ -1,0 +1,894 @@
+{
+  "checkedAt": "2026-10-19T04:54:06.478726Z",
+  "scope": "all three desktop operating systems required; four architecture targets",
+  "publishedRelease": {
+    "id": 399744065,
+    "tag": "v0.29.0",
+    "url": "https://github.com/rupret007/webjam/releases/tag/v0.29.0",
+    "publishedAt": "2026-09-30T05:36:56Z",
+    "immutable": true,
+    "sourceCommit": "7aa74be14446e907f1116b0da9a264667ae22937",
+    "assets": [
+      {
+        "id": 600122092,
+        "name": "WebJam-linux-x64.zip",
+        "size": 459532425,
+        "digest": "sha256:fba6f8199c3475f73e36e958a0a61b5fde0e18fca7a8408470ea4ca25a47ca53",
+        "browser_download_url": "https://github.com/rupret007/webjam/releases/download/v0.29.0/WebJam-linux-x64.zip",
+        "downloadedAndHashVerified": false
+      },
+      {
+        "id": 600122086,
+        "name": "WebJam-macos-arm64-ADHOC-TEST-ONLY.zip",
+        "size": 226875146,
+        "digest": "sha256:810b5c705f13e30acab0d121de5a42bbd9270082d6445bd874c7e72bdd8ce56f",
+        "browser_download_url": "https://github.com/rupret007/webjam/releases/download/v0.29.0/WebJam-macos-arm64-ADHOC-TEST-ONLY.zip",
+        "downloadedAndHashVerified": false
+      },
+      {
+        "id": 600122087,
+        "name": "WebJam-macos-x64-ADHOC-TEST-ONLY.zip",
+        "size": 234175743,
+        "digest": "sha256:74f97a5ef6224052bd4d7f643ba2edd2a8da79a8af273530f5c50f93edf8c5d9",
+        "browser_download_url": "https://github.com/rupret007/webjam/releases/download/v0.29.0/WebJam-macos-x64-ADHOC-TEST-ONLY.zip",
+        "downloadedAndHashVerified": false
+      },
+      {
+        "id": 600122088,
+        "name": "WebJam-v0.29.0-macos-arm64-ADHOC-TEST-ONLY.dmg",
+        "size": 228012741,
+        "digest": "sha256:885e002f91d03845b88386d25b35874596de6089fc754b676fa5f67f663c6141",
+        "browser_download_url": "https://github.com/rupret007/webjam/releases/download/v0.29.0/WebJam-v0.29.0-macos-arm64-ADHOC-TEST-ONLY.dmg",
+        "downloadedAndHashVerified": true,
+        "actualDownloadedSha256": "885e002f91d03845b88386d25b35874596de6089fc754b676fa5f67f663c6141"
+      },
+      {
+        "id": 600122093,
+        "name": "WebJam-v0.29.0-macos-x64-ADHOC-TEST-ONLY.dmg",
+        "size": 235087208,
+        "digest": "sha256:31b1aca4e165ed42baee577c156d7e43afb0ccb9c4c05b8d82a4883bdc29f481",
+        "browser_download_url": "https://github.com/rupret007/webjam/releases/download/v0.29.0/WebJam-v0.29.0-macos-x64-ADHOC-TEST-ONLY.dmg",
+        "downloadedAndHashVerified": false
+      },
+      {
+        "id": 600122085,
+        "name": "WebJam-v0.29.0-SHA256SUMS.txt",
+        "size": 749,
+        "digest": "sha256:677ba2c0aa81e33da25449f726170b6ff2c4b73cffb20c593a5d32aeb7b12c24",
+        "browser_download_url": "https://github.com/rupret007/webjam/releases/download/v0.29.0/WebJam-v0.29.0-SHA256SUMS.txt",
+        "downloadedAndHashVerified": true,
+        "actualDownloadedSha256": "677ba2c0aa81e33da25449f726170b6ff2c4b73cffb20c593a5d32aeb7b12c24"
+      },
+      {
+        "id": 600122089,
+        "name": "WebJam-v0.29.0-windows-x64-UNSIGNED-TEST-ONLY-setup.exe",
+        "size": 266603139,
+        "digest": "sha256:23873fcb55c85db3e7d08916b82d5e4faee9291735588274d592c44fd26630a6",
+        "browser_download_url": "https://github.com/rupret007/webjam/releases/download/v0.29.0/WebJam-v0.29.0-windows-x64-UNSIGNED-TEST-ONLY-setup.exe",
+        "downloadedAndHashVerified": false
+      },
+      {
+        "id": 600122091,
+        "name": "WebJam-windows-x64-UNSIGNED-TEST-ONLY.zip",
+        "size": 342362622,
+        "digest": "sha256:0208ea1f4ac0ebcef31d34baf4086bc12214e315e413b5ef65b1655696630d36",
+        "browser_download_url": "https://github.com/rupret007/webjam/releases/download/v0.29.0/WebJam-windows-x64-UNSIGNED-TEST-ONLY.zip",
+        "downloadedAndHashVerified": false
+      }
+    ]
+  },
+  "officialMacArm64Inspection": {
+    "mountedReadOnly": true,
+    "candidateMetadata": [
+      "format=1",
+      "version=0.29.0",
+      "build_id=7aa74be14446e907f1116b0da9a264667ae22937",
+      "target=macos-arm64",
+      "architecture=arm64",
+      "trust=ad-hoc-unnotarized"
+    ],
+    "codeSignatureVerifiedDeepStrict": true,
+    "signature": "ad-hoc",
+    "developerTeamId": null,
+    "notarizationPassed": false,
+    "actualFrozenIngress": {
+      "method": "actual published arm64 DMG PyInstaller ingress bytecode loaded in isolated interpreter",
+      "sourceCommit": "7aa74be14446e907f1116b0da9a264667ae22937",
+      "packagedDirectStunInviteModule": false,
+      "packagedProfileIds": [
+        "reference-local"
+      ],
+      "results": [
+        {
+          "platformPolicy": "darwin",
+          "invitationKind": "private_lan_v2",
+          "accepted": true,
+          "version": 2
+        },
+        {
+          "platformPolicy": "darwin",
+          "invitationKind": "current_direct_stun_v3_full_message",
+          "accepted": false,
+          "errorCode": "unsupported"
+        },
+        {
+          "platformPolicy": "win32",
+          "invitationKind": "private_lan_v2",
+          "accepted": true,
+          "version": 2
+        },
+        {
+          "platformPolicy": "win32",
+          "invitationKind": "current_direct_stun_v3_full_message",
+          "accepted": false,
+          "errorCode": "unsupported"
+        },
+        {
+          "platformPolicy": "linux",
+          "invitationKind": "private_lan_v2",
+          "accepted": true,
+          "version": 2
+        },
+        {
+          "platformPolicy": "linux",
+          "invitationKind": "current_direct_stun_v3_full_message",
+          "accepted": false,
+          "errorCode": "unsupported"
+        }
+      ],
+      "invitationValuesLogged": false,
+      "appLaunchedOrInstalled": false,
+      "nativeOsOrAudioAcceptance": false
+    }
+  },
+  "candidateBuild": {
+    "repository": "rupret007/webjam",
+    "workflow": ".github/workflows/ci.yml",
+    "runId": 39197407138,
+    "runAttempt": 1,
+    "url": "https://github.com/rupret007/webjam/actions/runs/39197407138",
+    "event": "workflow_dispatch",
+    "ref": "refs/heads/master",
+    "sourceCommit": "5effbc58db706254f8ca8b52de4a0520c482294a",
+    "createdAt": "2026-10-19T04:01:11Z",
+    "status": "in_progress",
+    "conclusion": null,
+    "inputs": {
+      "final_build": true,
+      "windows_diagnostic_source_run": "",
+      "macos_signing_rehearsal": false,
+      "windows_signing_rehearsal": false,
+      "run_one_hour_certification": false,
+      "build_unapproved_jamulus_3123_headless_evidence": false
+    },
+    "jobs": [
+      {
+        "id": 117883041942,
+        "name": "Transport (Go security and cross-build)",
+        "status": "completed",
+        "conclusion": "success",
+        "activeSteps": []
+      },
+      {
+        "id": 117883042169,
+        "name": "test",
+        "status": "completed",
+        "conclusion": "success",
+        "activeSteps": []
+      },
+      {
+        "id": 117883042195,
+        "name": "Windows native diagnostic control",
+        "status": "completed",
+        "conclusion": "success",
+        "activeSteps": []
+      },
+      {
+        "id": 117883042196,
+        "name": "Reference service (protocol and container)",
+        "status": "completed",
+        "conclusion": "success",
+        "activeSteps": []
+      },
+      {
+        "id": 117883042284,
+        "name": "Test integrity guards",
+        "status": "completed",
+        "conclusion": "success",
+        "activeSteps": []
+      },
+      {
+        "id": 117883042342,
+        "name": "iOS change gate",
+        "status": "completed",
+        "conclusion": "success",
+        "activeSteps": []
+      },
+      {
+        "id": 117883043038,
+        "name": "Changelog fragment",
+        "status": "completed",
+        "conclusion": "skipped",
+        "activeSteps": []
+      },
+      {
+        "id": 117883043363,
+        "name": "Certify Jamulus/JACK (one hour, manual)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "activeSteps": []
+      },
+      {
+        "id": 117883043532,
+        "name": "Jamulus 3.12.3 HEADLESS evidence (${{ matrix.target }})",
+        "status": "completed",
+        "conclusion": "skipped",
+        "activeSteps": []
+      },
+      {
+        "id": 117883065106,
+        "name": "Art companion (iPhone and iPad)",
+        "status": "completed",
+        "conclusion": "success",
+        "activeSteps": []
+      },
+      {
+        "id": 117883065168,
+        "name": "Pocket Stage (iOS app)",
+        "status": "completed",
+        "conclusion": "success",
+        "activeSteps": []
+      },
+      {
+        "id": 117886959163,
+        "name": "Jamulus 3.12.3 update input (macos-universal)",
+        "status": "completed",
+        "conclusion": "success",
+        "activeSteps": []
+      },
+      {
+        "id": 117886959189,
+        "name": "Integration (real Jamulus 3.12.2)",
+        "status": "completed",
+        "conclusion": "success",
+        "activeSteps": []
+      },
+      {
+        "id": 117886959212,
+        "name": "Integration (real Jamulus 3.12.3)",
+        "status": "completed",
+        "conclusion": "success",
+        "activeSteps": []
+      },
+      {
+        "id": 117886959281,
+        "name": "Jamulus 3.12.3 update input (windows-x64)",
+        "status": "completed",
+        "conclusion": "success",
+        "activeSteps": []
+      },
+      {
+        "id": 117887577045,
+        "name": "Build Desktop (macos-arm64)",
+        "status": "completed",
+        "conclusion": "success",
+        "activeSteps": []
+      },
+      {
+        "id": 117887577115,
+        "name": "Build Desktop (macos-x64)",
+        "status": "in_progress",
+        "conclusion": null,
+        "activeSteps": [
+          "Build verified Jamulus HEADLESS Reference Track client (macOS)"
+        ]
+      },
+      {
+        "id": 117887577128,
+        "name": "Build Desktop (windows-x64)",
+        "status": "completed",
+        "conclusion": "success",
+        "activeSteps": []
+      },
+      {
+        "id": 117887577129,
+        "name": "Build Desktop (linux-x64)",
+        "status": "completed",
+        "conclusion": "success",
+        "activeSteps": []
+      }
+    ],
+    "targets": [
+      {
+        "target": "macos-arm64",
+        "runner": "macos-14",
+        "artifactName": "webjam-macos-arm64",
+        "packageAcceptance": "artifact and isolated Mac package/native transport checks passed; physical audio and attended installation pending",
+        "packageProvenanceVerified": true
+      },
+      {
+        "target": "macos-x64",
+        "runner": "macos-15-intel",
+        "artifactName": "webjam-macos-x64",
+        "packageAcceptance": "pending; actual upstream Intel packaging job remains in progress",
+        "observedJobStatus": "in_progress",
+        "observedActiveSteps": [
+          "Build verified Jamulus HEADLESS Reference Track client (macOS)"
+        ],
+        "packageProvenanceVerified": false
+      },
+      {
+        "target": "windows-x64",
+        "runner": "windows-2025",
+        "artifactName": "webjam-windows-x64",
+        "packageAcceptance": "artifact provenance, native CI install/launch/uninstall and packaged ingress passed; remote v3 blocked by unsigned fabric; physical LAN/audio pending",
+        "packageProvenanceVerified": true,
+        "nativeRemoteJoinBlocked": true
+      },
+      {
+        "target": "linux-x64",
+        "runner": "ubuntu-22.04",
+        "artifactName": "webjam-linux-x64",
+        "packageAcceptance": "artifact provenance, actual bundled ingress and native CI package gates passed; physical installation/audio pending",
+        "packageProvenanceVerified": true
+      }
+    ],
+    "tagOrReleaseCreated": false,
+    "releaseJobRequiresTag": true,
+    "signingTrustJobsEnabled": false,
+    "sourceModified": false,
+    "targetVerifications": {
+      "linux-x64": {
+        "checkedAt": "2026-10-19T04:26:55.542287+00:00",
+        "target": "linux-x64",
+        "sourceCommit": "5effbc58db706254f8ca8b52de4a0520c482294a",
+        "runId": 39197407138,
+        "runAttempt": 1,
+        "job": {
+          "id": 117887577129,
+          "url": "https://github.com/rupret007/webjam/actions/runs/39197407138/job/117887577129",
+          "conclusion": "success",
+          "successfulSteps": [
+            "Set up job",
+            "Checkout",
+            "Set up service test Python",
+            "Install service test dependencies",
+            "Verify service connection ownership on this desktop",
+            "Verify workspace backup publication on this desktop",
+            "Set up Python",
+            "Set up Go",
+            "Verify TLS service control on this desktop",
+            "Install Linux desktop system libraries",
+            "Install hash-locked pip bootstrap",
+            "Install binary-only native dependencies",
+            "Verify installed native dependencies",
+            "Verify Art host and guest runtime on this desktop",
+            "Install native portability test runner",
+            "Verify portable workspace media and restart on this desktop",
+            "Verify complete Reference Studio workflow on this desktop",
+            "Build bundled secure transport",
+            "Stage bundled Jamulus package (Linux)",
+            "Build desktop artifact",
+            "Verify frozen lesson player",
+            "Verify expected release deliverables",
+            "Upload non-Windows build artifact",
+            "Post Set up Go",
+            "Post Set up Python",
+            "Post Set up service test Python",
+            "Post Checkout",
+            "Complete job"
+          ]
+        },
+        "actionsArtifact": {
+          "id": 12163306254,
+          "name": "webjam-linux-x64",
+          "digest": "sha256:7f7e5816a548976a04cf3c09dbdb359ce120180cce402136717197a49a857fd2",
+          "size_in_bytes": 457775942,
+          "created_at": "2026-10-19T04:25:44Z",
+          "expires_at": "2026-11-02T04:25:29Z"
+        },
+        "actionsArtifactDownloadedSha256": "7f7e5816a548976a04cf3c09dbdb359ce120180cce402136717197a49a857fd2",
+        "actionsArtifactDigestVerified": true,
+        "packages": [
+          {
+            "name": "WebJam-linux-x64.zip",
+            "bytes": 461992966,
+            "sha256": "c0ff84e9ebf1660380a0ccef03987f00c93c85eb7fde00fd4a882dc1bece57da",
+            "embeddedBuildId": "5effbc58db706254f8ca8b52de4a0520c482294a",
+            "transportSha256": "bde058a6c7c80170c77f16a7b4f7e40af52adf2eeb6ec4aacc35b07530414208",
+            "transportManifestVerified": true,
+            "actualTransportElfArchitecture": "x86_64",
+            "frozenBinarySha256": "35c9fd8316aac18ab9c70013dbb94accd7d128e50f5c9ab54f0a561e51a5f0f2"
+          }
+        ],
+        "physicalDeviceAcceptance": false,
+        "installedAppReplaced": false,
+        "actualFrozenIngress": {
+          "method": "actual unmodified package PYZ bytecode loaded in isolated Python3.11 interpreter",
+          "compiledProfiles": [
+            "direct-stun",
+            "reference-local"
+          ],
+          "results": [
+            {
+              "platformPolicy": "darwin",
+              "version": 2,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "darwin",
+              "version": 3,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "win32",
+              "version": 2,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "win32",
+              "version": 3,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "linux",
+              "version": 2,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "linux",
+              "version": 3,
+              "fullPasteAccepted": true
+            }
+          ],
+          "incompleteBareV3Rejected": true,
+          "actualBundledQtJoinDialogsAccepted": 0,
+          "applicationProcessLaunched": false,
+          "syntheticInvitationAdmissionOnly": true,
+          "invitationValuesLogged": false,
+          "crossNetworkOrPhysicalAudioClaim": false
+        },
+        "ciExecutionEvidence": {
+          "executionPlatform": "Ubuntu 22.04 x64 GitHub runner",
+          "frozenApplicationLaunch": true,
+          "frozenReferenceStudioSmoke": true,
+          "packagedFabricIntegrityArchitectureAndReadyHelloStop": true,
+          "jamulusClientOnPrivateDummyJackGraph": true,
+          "authenticatedLoopbackJsonRpcChecked": true,
+          "normalExitAndClientPortCleanupChecked": true,
+          "evidenceMethod": "completed successful native packaging gate and its exact checked-in assertions",
+          "physicalAudioOrWanAcceptance": false,
+          "downloadedJobLogSha256": "eb5588b4715333b19571331c13db9d0724df1791761c396da12f08212822f1d0",
+          "rawLogCommitted": false
+        }
+      },
+      "macos-arm64": {
+        "checkedAt": "2026-10-19T04:30:28.347202+00:00",
+        "target": "macos-arm64",
+        "sourceCommit": "5effbc58db706254f8ca8b52de4a0520c482294a",
+        "runId": 39197407138,
+        "runAttempt": 1,
+        "job": {
+          "id": 117887577045,
+          "url": "https://github.com/rupret007/webjam/actions/runs/39197407138/job/117887577045",
+          "conclusion": "success",
+          "successfulSteps": [
+            "Set up job",
+            "Checkout",
+            "Set up service test Python",
+            "Install service test dependencies",
+            "Verify service connection ownership on this desktop",
+            "Verify workspace backup publication on this desktop",
+            "Set up Python",
+            "Set up Go",
+            "Verify TLS service control on this desktop",
+            "Prepare Pocket Stage owner-device setup kit for the Mac package",
+            "Verify Pocket Stage owner-device setup kit",
+            "Install hash-locked pip bootstrap",
+            "Install binary-only native dependencies",
+            "Verify installed native dependencies",
+            "Verify Art host and guest runtime on this desktop",
+            "Install native portability test runner",
+            "Verify portable workspace media and restart on this desktop",
+            "Verify complete Reference Studio workflow on this desktop",
+            "Verify macOS PyInstaller pkg_resources compatibility",
+            "Build bundled secure transport",
+            "Stage bundled Jamulus.app (macOS)",
+            "Build verified Jamulus HEADLESS Reference Track client (macOS)",
+            "Build desktop artifact",
+            "Verify frozen lesson player",
+            "Build macOS disk image",
+            "Verify mounted macOS disk image",
+            "Verify expected release deliverables",
+            "Mark unsigned platform source artifacts as test-only",
+            "Upload non-Windows build artifact",
+            "Post Set up Go",
+            "Post Set up Python",
+            "Post Set up service test Python",
+            "Post Checkout",
+            "Complete job"
+          ]
+        },
+        "actionsArtifact": {
+          "id": 12162553476,
+          "name": "webjam-macos-arm64",
+          "digest": "sha256:da971d414414920b1e048b9d6435b9eee9e2e82b7d584b9fa7b01c953d8db643",
+          "size_in_bytes": 456854306,
+          "created_at": "2026-10-19T04:28:25Z",
+          "expires_at": "2026-11-02T04:28:09Z"
+        },
+        "actionsArtifactDownloadedSha256": "da971d414414920b1e048b9d6435b9eee9e2e82b7d584b9fa7b01c953d8db643",
+        "actionsArtifactDigestVerified": true,
+        "packages": [
+          {
+            "name": "WebJam-macos-arm64-ADHOC-TEST-ONLY.zip",
+            "bytes": 229182085,
+            "sha256": "2a6c2013fc845214e03282e62e2f53d74e76f544e1a90af3798b64425e3f87ae",
+            "embeddedBuildId": "5effbc58db706254f8ca8b52de4a0520c482294a",
+            "transportSha256": "bd3b6402571b9fb5ab094e9f232dbdb7c17588f9a063851ca63f3bc4bf9bd4c6",
+            "transportManifestVerified": true,
+            "frozenBinarySha256": "15bfc73ae2273e250c85fd6f018ae532ef0c8f0d3b3e515a56758cecf5eb4ae2"
+          },
+          {
+            "name": "WebJam-v0.29.0-macos-arm64-ADHOC-TEST-ONLY.dmg",
+            "bytes": 230238114,
+            "sha256": "a2c2188e9afa2f804cdfa8cb7382f4be94189877c9574b43aababa7b5a4054cb"
+          }
+        ],
+        "physicalDeviceAcceptance": false,
+        "installedAppReplaced": false,
+        "isolatedDmgCopyInspection": {
+          "dmgVerified": true,
+          "mountedReadOnly": true,
+          "detached": true,
+          "candidateMetadata": {
+            "format": "1",
+            "version": "0.29.0",
+            "build_id": "5effbc58db706254f8ca8b52de4a0520c482294a",
+            "target": "macos-arm64",
+            "architecture": "arm64",
+            "trust": "ad-hoc-unnotarized"
+          },
+          "copiedAppVersion": "0.29.0",
+          "copiedMainBinaryMatchesVerifiedZip": true,
+          "deepStrictCodeSignatureVerified": true,
+          "signature": "ad-hoc",
+          "notarized": false,
+          "installationHelpersRun": false,
+          "installedApplicationReplaced": false
+        },
+        "actualFrozenIngress": {
+          "method": "actual unmodified package PYZ bytecode loaded in isolated Python3.11 interpreter",
+          "compiledProfiles": [
+            "direct-stun",
+            "reference-local"
+          ],
+          "results": [
+            {
+              "platformPolicy": "darwin",
+              "version": 2,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "darwin",
+              "version": 3,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "win32",
+              "version": 2,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "win32",
+              "version": 3,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "linux",
+              "version": 2,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "linux",
+              "version": 3,
+              "fullPasteAccepted": true
+            }
+          ],
+          "incompleteBareV3Rejected": true,
+          "actualBundledQtJoinDialogsAccepted": 2,
+          "applicationProcessLaunched": false,
+          "syntheticInvitationAdmissionOnly": true,
+          "invitationValuesLogged": false,
+          "crossNetworkOrPhysicalAudioClaim": false
+        },
+        "localCandidateNativeTransport": {
+          "sourceCommit": "5effbc58db706254f8ca8b52de4a0520c482294a",
+          "nativeBuild": "5effbc58db706254f8ca8b52de4a0520c482294a",
+          "productPythonCode": "unmodified candidate PYZ loaded in isolated Python3.11 interpreter",
+          "fabricAndJamulusFromCandidate": true,
+          "packagedIntegrityPolicyEnabled": true,
+          "frozenApplicationProcessJoin": false,
+          "audioOrWANClaim": false,
+          "signaling": "explicit sealed-reply paste fallback",
+          "actualQtJoin": true,
+          "actualNativeGuestConnected": true,
+          "realJamulusResponseThroughNativeTransport": true,
+          "hostAndGuestSameMac": true,
+          "invitationBytesUnchanged": true,
+          "endedAt": "2026-10-19T04:32:21Z",
+          "hangoutRelayRetested": false,
+          "historicalCloudflareReceipt": "hosted-native-handoff.json",
+          "actualFrozenProcessSeparatelyVerified": true
+        },
+        "localExecutionEvidence": {
+          "hostOs": "macOS 15.8.2 arm64",
+          "actualFrozenReferenceStudioSmoke": true,
+          "packagedFabricIntegrityArchitectureSignatureReadyHelloStop": true,
+          "noRemainingCandidateProcesses": true,
+          "defaultProtocolHandlerAfter": "/Applications/WebJam.app",
+          "defaultProtocolHandlerUnchanged": true,
+          "installedApplicationVersionUnchanged": "0.27.2",
+          "physicalAudioOrWanAcceptance": false,
+          "frozenApplicationProcessJoin": false,
+          "deepStrictCodeSignatureVerifiedAfterTests": true
+        },
+        "ciExecutionEvidence": {
+          "executionPlatform": "macOS14 arm64 GitHub runner",
+          "mountedDmgCopyInspected": true,
+          "normalFrozenLaunchSurface": true,
+          "actualFrozenReferenceStudioSmoke": true,
+          "packagedFabricIntegrityArchitectureSignatureReadyHelloStop": true,
+          "downloadedJobLogSha256": "f92a994890d562145045de9b084ac6bf08c802c20d90ec4c8419332d29ac7740",
+          "rawLogCommitted": false,
+          "physicalAudioOrWanAcceptance": false
+        }
+      },
+      "windows-x64": {
+        "checkedAt": "2026-10-19T04:33:18.837972+00:00",
+        "target": "windows-x64",
+        "sourceCommit": "5effbc58db706254f8ca8b52de4a0520c482294a",
+        "runId": 39197407138,
+        "runAttempt": 1,
+        "job": {
+          "id": 117887577128,
+          "url": "https://github.com/rupret007/webjam/actions/runs/39197407138/job/117887577128",
+          "conclusion": "success",
+          "successfulSteps": [
+            "Set up job",
+            "Checkout",
+            "Set up service test Python",
+            "Install service test dependencies",
+            "Verify service connection ownership on this desktop",
+            "Verify workspace backup publication on this desktop",
+            "Set up Python",
+            "Set up Go",
+            "Verify TLS service control on this desktop",
+            "Verify Windows release helper fails closed without credentials",
+            "Exercise disposable Windows certificate lifecycle",
+            "Install hash-locked pip bootstrap",
+            "Install binary-only native dependencies",
+            "Verify installed native dependencies",
+            "Verify Art host and guest runtime on this desktop",
+            "Install native portability test runner",
+            "Verify portable workspace media and restart on this desktop",
+            "Verify complete Reference Studio workflow on this desktop",
+            "Build bundled secure transport",
+            "Stage bundled Jamulus installer (Windows)",
+            "Build desktop artifact",
+            "Verify frozen lesson player",
+            "Verify Windows version metadata",
+            "Verify frozen Windows package",
+            "Build, install, launch, and uninstall Windows setup",
+            "Verify expected release deliverables",
+            "Mark unsigned platform source artifacts as test-only",
+            "Generate and verify Windows candidate checksum manifest",
+            "Upload Windows candidate artifact",
+            "Post Set up Go",
+            "Post Set up Python",
+            "Post Set up service test Python",
+            "Post Checkout",
+            "Complete job"
+          ]
+        },
+        "actionsArtifact": {
+          "id": 12163331968,
+          "name": "webjam-windows-x64",
+          "digest": "sha256:20e4fc5cb79d040db4ce0f2fa5c09a024598b162e263c57fed45b6ccdf7327df",
+          "size_in_bytes": 610889034,
+          "created_at": "2026-10-19T04:32:38Z",
+          "expires_at": "2027-01-17T04:01:12Z"
+        },
+        "actionsArtifactDownloadedSha256": "20e4fc5cb79d040db4ce0f2fa5c09a024598b162e263c57fed45b6ccdf7327df",
+        "actionsArtifactDigestVerified": true,
+        "packages": [
+          {
+            "name": "WebJam-v0.29.0-windows-x64-SHA256SUMS.txt",
+            "bytes": 230,
+            "sha256": "fbabf53011884e558ff6868adeaa0bf94bf5cb8084df750e8171770bee371adc"
+          },
+          {
+            "name": "WebJam-v0.29.0-windows-x64-UNSIGNED-TEST-ONLY-setup.exe",
+            "bytes": 268323486,
+            "sha256": "e72fde40f4a70466d21fe57c96404b2b3f686d700435f173d5cb7eea5321ed1c"
+          },
+          {
+            "name": "WebJam-windows-x64-UNSIGNED-TEST-ONLY.zip",
+            "bytes": 344591035,
+            "sha256": "2e267fe26802658bcdaa6e7f12b394fb5b71e27cb9e6ae7f8dca38606939678b",
+            "embeddedBuildId": "5effbc58db706254f8ca8b52de4a0520c482294a",
+            "transportSha256": "e9632aff9abeef2c4cfb8248167444fe13e5c8f3705081f5d2795434a0d40166",
+            "transportManifestVerified": true,
+            "actualTransportPeArchitecture": "x86_64",
+            "actualTransportAuthenticodeCertificateTableBytes": 0,
+            "actualTransportAuthenticodeCertificateTableOffset": 0,
+            "frozenBinarySha256": "14599ee92da917dd40d68f9c3b19ac80eb9a7bad3e40d14f5d8f1fc7ecba5ae4"
+          }
+        ],
+        "physicalDeviceAcceptance": false,
+        "installedAppReplaced": false,
+        "actualFrozenIngress": {
+          "method": "actual unmodified package PYZ bytecode loaded in isolated Python3.11 interpreter",
+          "compiledProfiles": [
+            "direct-stun",
+            "reference-local"
+          ],
+          "results": [
+            {
+              "platformPolicy": "darwin",
+              "version": 2,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "darwin",
+              "version": 3,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "win32",
+              "version": 2,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "win32",
+              "version": 3,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "linux",
+              "version": 2,
+              "fullPasteAccepted": true
+            },
+            {
+              "platformPolicy": "linux",
+              "version": 3,
+              "fullPasteAccepted": true
+            }
+          ],
+          "incompleteBareV3Rejected": true,
+          "actualBundledQtJoinDialogsAccepted": 0,
+          "applicationProcessLaunched": false,
+          "syntheticInvitationAdmissionOnly": true,
+          "invitationValuesLogged": false,
+          "crossNetworkOrPhysicalAudioClaim": false
+        },
+        "ciExecutionEvidence": {
+          "executionPlatform": "Windows2025 x64 GitHub runner",
+          "perUserSetupInstallLaunchUninstallChecked": true,
+          "installedVersionBuildArchitectureChecked": true,
+          "ownedShortcutsAndUninstallCleanupChecked": true,
+          "unownedFilePreserved": true,
+          "frozenPortableLaunch": true,
+          "frozenReferenceStudioSmoke": true,
+          "actualAuthenticodeNotSignedAssertionsPassed": true,
+          "realAuthenticatedArtLanLoopback": true,
+          "nativeV2MusicAudioChecked": false,
+          "frozenContinuityJoinVersion": 1,
+          "frozenContinuityExternalAudioStartupIntercepted": true,
+          "nativeV3GuestTransportStarted": false,
+          "physicalAudioOrWanAcceptance": false,
+          "downloadedJobLogSha256": "6d69dfb7e7787cf9bbee033276f6f6834aff515201309e199e86b33d27d47be9",
+          "rawLogCommitted": false
+        },
+        "nativeV3Readiness": {
+          "blocked": true,
+          "actualPeCertificateTableBytes": 0,
+          "requiredPlatformSignatureStatus": "Valid",
+          "signaturePolicyUnchanged": true,
+          "actualWindowsV3JoinExecution": false
+        }
+      }
+    },
+    "lastObservedAt": "2026-10-19T04:53:13.204774+00:00",
+    "snapshotFrozenAt": "2026-10-19T04:54:06.478726Z",
+    "allFourPackagingArtifactsVerified": false,
+    "snapshotScope": "three completed target artifacts verified; Intel Mac packaging still in progress",
+    "unrelatedSigningOrReleaseGatesAwaited": false
+  },
+  "capabilityBoundary": {
+    "websiteRoomHosting": [
+      "Mac",
+      "Windows",
+      "Linux"
+    ],
+    "nativeMusicHost": [
+      "Mac"
+    ],
+    "nativeMusicJoin": [
+      "Mac",
+      "Windows x64",
+      "Ubuntu 22.04 x64"
+    ],
+    "windowsLinuxNativeMusicHostingGap": true
+  },
+  "physicalPlatformAcceptance": {
+    "mac": "not run",
+    "windows": "not run",
+    "linux": "not run"
+  },
+  "installedWebJamVersion": "0.27.2",
+  "installedAppReplaced": false,
+  "defaultProtocolHandlerChanged": false,
+  "crossNetworkAudioClaim": false,
+  "audibleLatencyClaim": false,
+  "nativeSourceProof": "hosted-native-handoff.json",
+  "invitationOrCredentialValuesIncluded": false,
+  "windowsNativeRemoteJoinBlocker": {
+    "sourceCommit": "5effbc58db706254f8ca8b52de4a0520c482294a",
+    "frozenNativeGuestRequiresPlatformSignature": true,
+    "windowsRequiredAuthenticodeStatus": "Valid",
+    "ordinaryWindowsCandidateExpectedStatus": "NotSigned",
+    "unsignedFrozenV3JoinExpectedToFail": true,
+    "physicalWindowsExecution": false,
+    "sourcePolicy": "services/native_remote_transport.py:_integrity_options; services/transport_runtime.py:_verify_platform_signature",
+    "existingSigningJob": "windows-release-trust",
+    "githubEnvironment": "windows-release",
+    "environmentSecretNames": [],
+    "environmentVariableNames": [],
+    "requiredSecretNames": [
+      "WINDOWS_CODESIGN_PFX",
+      "WINDOWS_CODESIGN_PASSWORD"
+    ],
+    "requiredVariableNames": [
+      "WINDOWS_CODESIGN_SUBJECT"
+    ],
+    "secretValuesRead": false,
+    "signaturePolicyModified": false,
+    "repositorySecretNames": [],
+    "repositoryVariableNames": [],
+    "repositoryOwnerType": "User",
+    "actualDownloadedFabricPeCertificateTableBytes": 0,
+    "actualWindowsCiNotSignedAssertionsPassed": true,
+    "actualCandidateArtifactId": 12163331968,
+    "githubEnvironmentProtectionRules": [],
+    "githubEnvironmentDeploymentBranchPolicy": null,
+    "githubEnvironmentIsApprovalBoundary": false
+  },
+  "defaultProtocolHandlerBeforeCandidateLaunch": "/Applications/WebJam.app",
+  "privateLanV2Route": {
+    "sourcePolicySupported": [
+      "Mac",
+      "Windows x64",
+      "Ubuntu 22.04 x64"
+    ],
+    "usesNativeFabric": false,
+    "fabricAuthenticodeRequirementApplies": false,
+    "requiresGenuinePrivateLanInvitation": true,
+    "publicV029MacNormalHostPolicy": "v2 LAN unless explicit lab opt-in",
+    "current5effMacNormalHostPolicy": "v3 direct-stun when packaged sidecar is available",
+    "current5effMacUserFacingLanMusicSelectorFound": false,
+    "windowsCiEvidence": "real authenticated Art LAN loopback; frozen v1 Join with startup intercepted",
+    "sourceV2MusicJourneyEvidence": "authenticated discovery to ordinary Jamulus startup, audio intercepted",
+    "physicalThreeDeviceLanAcceptance": false,
+    "wanOrAudioReadinessClaim": false
+  },
+  "defaultProtocolHandlerAfterMacArm64CandidateLaunch": "/Applications/WebJam.app",
+  "independentReadOnlyReview": {
+    "materialEvidenceOverclaimsFound": false,
+    "docCorrectionsApplied": [
+      "require disposable OS profile for attended GUI/install/audio; separate folder alone does not isolate settings/Windows installation ownership",
+      "remove unverified signing protection claim; actual environment rules are empty"
+    ],
+    "sourceOrRuntimeModified": false
+  }
+}

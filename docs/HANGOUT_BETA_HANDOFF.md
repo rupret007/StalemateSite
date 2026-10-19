@@ -11,34 +11,72 @@ part of this deployment.
 
 ## Operator setup
 
-1. Confirm the owner and moderator email addresses and a monitored moderation
-   inbox. Set `HANGOUT_OWNER_EMAIL`, any additional role allowlists, and
-   `HANGOUT_MODERATION_CONTACT`. Do not infer staffing from an account login or
-   an address mentioned in an unmerged PR.
-2. Follow [the identity setup](HANGOUT_BETA_IDENTITY.md) for two distinct Access
-   applications on `/lobby-owner*` and `/lobby-admin*`. Verify actual email
-   delivery and denied identities. Use hostname/path applications: Cloudflare's
+1. Jeff confirmed `jeffstory007@gmail.com` as the moderation contact and sole
+   initial owner/reviewer. Both beta configuration fields are set; the hosted
+   contact link is verified. Agree review coverage and backup before invitations.
+   Additional role allowlists remain empty.
+2. The two distinct Access applications on `/lobby-owner*` and `/lobby-admin*`
+   are saved and dashboard-verified; [the setup receipt](../pr-assets/beta-collaboration/hosted-access-setup.json)
+   records their public IDs/audiences. Both initial Allow
+   policies include only `jeffstory007@gmail.com` and require One-time PIN;
+   their audiences remain different. Future named cohort owners go only into
+   the owner app and gain no staff role. Zero Trust Free has a shared 50-user
+   limit; check seat use before expanding verified identities. Guest nickname
+   chat and temporary hosting do not require Access. Configuration `a449541`
+   was deployed as `33e6a92f`; its HTTP 200 health check confirmed configuration
+   only. Real email-code owner login and separate staff SSO/WebSocket admission
+   passed after the JWKS fix. Current runtime is
+   `e3177c6d-6bea-4c80-90dc-491d29a33da1`, committed source `832f7e1`.
+   Complete denied-identity and
+   ownership-recovery acceptance. Use hostname/path applications: Cloudflare's
    Worker-level Access integration does not support WebSocket upgrades.
 3. Restore the approved Vaultwarden bot CLI session before retrieving provider
    credentials. Keep secrets outside source, PR bodies, screenshots and logs.
    Reuse the existing shared TURN key; do not rotate it. The beta HMAC and invite
    keys are separate from the old demonstration. Keep the HMAC stable; rotate
    the invitation key with its version when revoking invitations.
-4. Configure and verify Turnstile on the beta hostname. Keep AI moderation off
-   until a real classifier request succeeds and its status, daily limit and
-   outage behavior are checked. Keep TURN off until credential issuance,
+4. Configure and verify Turnstile on the beta hostname. A real classifier request
+   succeeded, but keep AI moderation off until the hosted review flow, daily
+   limit, outage behavior and real staff handling are checked. Keep TURN off until credential issuance,
    account-wide analytics and a forced-relay connection succeed.
 5. Choose a conservative TURN allowance within the shared account's allocation.
    Its admission estimate is not a provider spending cap. Existing WebJam
    issuance and already minted credentials can continue independently.
 
-The provider audit on October 19 UTC found the main, pilot and shared TURN
-Workers. Access's API reported `access.api.error.not_enabled` for this account;
-the accessible Turnstile widget list was empty. Current Wrangler OAuth could not
-read TURN keys or account analytics. Vaultwarden's bot CLI initially reported
-`unauthenticated`; interactive access was subsequently restored and the OpenAI
-key passed a live moderation request. Access/TURN setup remains unresolved; see
-[the current assessment](HANGOUT_BETA_READINESS.md) for the latest evidence.
+The [provider audit](../pr-assets/beta-collaboration/provider-audit.json) preserves
+October 19's earlier observations and the later dashboard setup. Zero
+Trust Free onboarding is complete and
+`throbbing-hill-6ed4.cloudflareaccess.com` serves public signing keys. At that
+snapshot Access app/provider GETs returned empty lists; authorized creation
+attempts returned 403/code 1010 `auth.forbidden`. The operator subsequently
+saved One-time PIN and both apps through the signed-in dashboard, with exact
+account/path guards and distinct public audiences. OAuth lists still omit
+these same-account resources; the filtering mechanism is unknown and empty
+results do not establish absence. The team and distinct audiences are deployed.
+Actual OTP owner login and separate staff SSO succeeded; the moderation socket
+shows the exact synthetic report. Jeff has been asked to dismiss it, but human
+review has not yet passed. Restore the temporary Chrome Apple Events scripting permission to
+off when setup is finished and record verification.
+The earlier accessible Turnstile list was empty. Current OAuth still cannot
+list TURN keys, but a read-only account-wide TURN query succeeded at 04:13:55
+UTC and returned zero October egress bytes. That sample does not establish
+billing, SFU usage or remaining free allocation; no OAuth token was uploaded.
+The beta's TURN issuer/analytics settings remain absent and TURN stays off.
+The shared issuer's deployed source is desktop-only and was not changed.
+
+Vaultwarden's bot CLI initially reported `unauthenticated`; interactive access
+was subsequently restored and the approved OpenAI key passed a real moderation
+request. Existing TURN credentials still need recovery through the approved
+private process. See [the current assessment](HANGOUT_BETA_READINESS.md) and
+[provider setup details](HANGOUT_BETA_IDENTITY.md) for exact remaining checks.
+
+The first real login exposed a Workers-specific JWKS fetch failure:
+`redirect: 'error'` throws before sending the request. The fix uses `manual`
+and rejects non-success responses, preserving redirect refusal and all JWT
+checks. The live callback works and the staff socket survived final deployment
+`e3177c6d` with its synthetic report still visible. Complete Jeff's queue action
+and second-device room recovery. Never fix
+provider connectivity by disabling signature or route-specific audience checks.
 
 ## Build and deploy privately
 
@@ -81,7 +119,8 @@ and never grants a staff role.
    invitations to bring another person into a restricted room.
 3. To keep a room and recover it from another device, use the beta portal's
    email verification and then **Host tools → Keep this room**. This option is
-   unavailable until real Access configuration is complete.
+   available after the successful real login; second-device registered-room
+   recovery acceptance remains pending.
 4. For WebJam music, share the complete **Copy Invite** message and paste the
    complete message into desktop WebJam's **Join** dialog. A phone can use room
    chat; no browser audio client is promised. See the
@@ -92,6 +131,17 @@ and never grants a staff role.
 6. Leaving the beta revokes the session across its live chat and private-room
    connections. If closure cannot be confirmed, the portal reports failure and
    retries closure rather than claiming a successful logout.
+
+Use the [first-session plan and invitation draft](HANGOUT_BETA_FIRST_SESSION.md)
+for the initial 8–10-person cohort. Nothing has been scheduled or sent. Mac,
+Windows and Linux all require actual WebJam package acceptance; native music
+currently uses a Mac host. Keep browser participation available for people who
+do not install the music app.
+
+The [operations guide](HANGOUT_BETA_OPERATIONS.md) describes the separate
+read-only health endpoint and installed local Mac monitor. Its five-minute
+checks require an awake, online, logged-in Mac. They do not establish storage
+write durability, provider availability/billing or continuous external coverage.
 
 ## Hosted acceptance before visitor invitations
 
@@ -140,7 +190,15 @@ npx --yes wrangler@4.151.1 rollback <previous-version-id> --config hangout-worke
 ```
 
 Check the deployment list afterward and repeat invitation denial, guest chat,
-staff sign-in and persistent-room recovery. Rollback does not reverse Durable
+staff sign-in and persistent-room recovery. A rollback to a version from before
+the operations endpoint can make `/beta/health` return 401 even with a valid
+monitor key. That is a monitoring compatibility gap, not proof that the site
+is down or its key changed. Use the independent acceptance checks and restore
+a compatible health-enabled release before relying on scheduled alerts again;
+see [operations](HANGOUT_BETA_OPERATIONS.md). The recorded lobby rollback drill
+predates the endpoint and did not prove health continuity across rollback.
+
+Rollback does not reverse Durable
 Object schema migrations or erase incident evidence. Do not roll back past the
 initial `beta-v1` migration or restore an older permissive identity gateway over
 newer state. Keep admission paused while resolving incompatible storage.
@@ -152,4 +210,4 @@ Operational references: [Cloudflare Access for Workers](https://developers.cloud
 The [current assessment](HANGOUT_BETA_READINESS.md) records the actual deployment,
 separate-browser checks, rollback/restore receipt and remaining blockers. Its
 successful lobby drill does not establish persistent-room recovery or authorize
-inviting visitors before real staff access and contact are configured.
+inviting visitors before real staff access and review coverage are verified.

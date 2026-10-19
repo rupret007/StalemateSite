@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "startedAt": "2026-10-19T04:38:31.050Z",
+  "origin": "https://stalemate-hangout-beta.jeffstory007.workers.dev",
+  "runId": "55c728",
+  "scope": "One actual hosted synthetic lobby report by separate invited guest browsers; no staff identity or queue action.",
+  "channel": "#stalemate",
+  "caption": "Beta acceptance report test only 55c728 - synthetic evidence for Jeff to dismiss after review.",
+  "status": "passed",
+  "reportId": "mmverkvuy1",
+  "guestRolesVerified": true,
+  "durableAcknowledgement": true,
+  "roomsCreated": 0,
+  "syntheticStaffUsed": false,
+  "aiEnabled": false,
+  "humanReview": "Actual restricted staff panel displayed this exact report; user dismissal confirmation remains pending.",
+  "cleanup": {
+    "releaseRequested": true,
+    "ownedRunnerStillPresent": false,
+    "successfulLogouts": "unverified: runner ended without final receipt",
+    "roomsCreated": 0,
+    "retainedEvidence": "Separate durable queue entry; leave other reports untouched"
+  },
+  "authorNick": "BetaRptA55c728",
+  "witnessNick": "BetaRptW55c728",
+  "acknowledgedAt": "2026-10-19T04:38:33.215Z"
+}
