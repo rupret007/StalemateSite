@@ -20,7 +20,19 @@
 
     const app = window.__admin = { ws: null, state: null };
     const send = (o) => { if (app.ws && app.ws.readyState === 1) app.ws.send(JSON.stringify(o)); };
-    const cmd = (name, args = []) => send({ t: 'cmd', name, args, ch: '#stalemate' });
+    const cmd = (name, args = []) => { if (app.state) send({ t: 'cmd', name, args, ch: '#stalemate' }); };
+
+    function clearPanel() {
+        app.state = null;
+        // Hide and erase received evidence when its authenticated connection
+        // ends. A hidden panel must not retain private report text or actions.
+        for (const selector of ['[data-reports]', '[data-held]', '[data-ai-reviews]', '[data-private-reports]',
+            '[data-users]', '[data-bans]', '[data-rooms]', '[data-modlog]']) $(selector).replaceChildren();
+        for (const selector of ['[data-state]', '[data-qcount]', '[data-ai-counts]', '[data-private-report-storage]']) $(selector).textContent = '';
+        $('[data-private-report-review]').hidden = true;
+        $('[data-panel]').hidden = true;
+        $('[data-gate]').hidden = false;
+    }
 
     $('[data-enter]').addEventListener('click', () => {
         if (!relayBase) return status('The chat server isn’t switched on yet.');
@@ -28,12 +40,25 @@
         if (devAdmin) q.set('devadmin', devAdmin);
         const dev = localStorage.getItem('hangout-dev');
         if (dev) q.set('dev', dev);
+        const previous = app.ws;
         const ws = new WebSocket(`${relayBase}/lobby-admin?${q}`);
         app.ws = ws;
+        clearPanel();
+        if (previous && previous.readyState < 2) previous.close(1000, 'staff connection replaced');
         let opened = false;
-        ws.onopen = () => { opened = true; };
-        ws.onclose = () => { if (!opened) status('Not signed in as a site moderator. Tap “Sign in with email code” first.'); else toast('Disconnected. Reload to reconnect.'); };
+        ws.onopen = () => { if (app.ws === ws) opened = true; };
+        ws.onclose = (event) => {
+            if (app.ws !== ws) return;
+            app.ws = null;
+            clearPanel();
+            const message = !opened || event.code === 4401
+                ? 'Staff session ended. Tap “Sign in with email code”, then reconnect.'
+                : 'Disconnected. Reconnect to load the current review queue.';
+            status(message); toast(message);
+            $('[data-signin]').focus({ preventScroll: true });
+        };
         ws.onmessage = (e) => {
+            if (app.ws !== ws || ws.readyState !== 1) return;
             let m; try { m = JSON.parse(e.data); } catch (err) { return; }
             if (m.t === 'device') localStorage.setItem('hangout-dev', m.token);
             if (m.t === 'hello') send({ t: 'hello', nick: $('[data-nick]').value.trim() || 'Helper', age13: true });
@@ -106,12 +131,55 @@
         return reviews.length;
     }
 
+    function drawPrivateReports(s) {
+        const review = $('[data-private-report-review]');
+        const queue = s.privateReports;
+        review.hidden = !queue;
+        if (!queue) return 0;
+        const ready = queue.storage === 'ready';
+        const line = $('[data-private-report-storage]');
+        line.textContent = ready ? 'Private report storage is ready. Review each claim before taking any separate action.'
+            : 'Private report storage is unavailable. Evidence and review actions are not confirmed; check storage before relying on this queue.';
+        const list = $('[data-private-reports]');
+        const focused = list.contains(document.activeElement) ? document.activeElement : null;
+        const focusId = focused?.closest('[data-private-report-id]')?.dataset.privateReportId;
+        const focusAction = focused?.dataset.privateReportAction;
+        list.replaceChildren();
+        const reports = Array.isArray(queue.reports) ? queue.reports.filter(r => r && typeof r.id === 'string') : [];
+        for (const report of reports) {
+            const li = el('li'); li.dataset.privateReportId = report.id;
+            li.append(el('b', `Reported nickname: ${report.claimedName || 'Not supplied'} · ${report.kind === 'message' ? 'Shared quote' : 'Member concern'}`));
+            const at = Number.isFinite(report.at) ? new Date(report.at).toLocaleString() : 'Time unavailable';
+            li.append(el('span', `${at} · Room reference ${String(report.roomRef || '').slice(0, 10)}`, 'small'));
+            li.append(el('p', 'Reporter-supplied evidence · quote not independently verified', 'small'));
+            li.append(el('p', report.targetMembership === 'live'
+                ? 'The server confirmed the reported relay connection was in this room at submission. This does not verify the quote or nickname.'
+                : 'The reported connection was absent or unverified at submission. Do not identify or punish someone by the retained nickname.', 'small'));
+            if (typeof report.excerpt === 'string' && report.excerpt) li.append(el('pre', report.excerpt, 'ctx'));
+            if (typeof report.reason === 'string' && report.reason) li.append(el('p', report.reason));
+            const acts = el('div', undefined, 'acts');
+            for (const [label, action] of [['Resolve report', 'resolve'], ['Dismiss report', 'dismiss']]) {
+                const button = btn(label, () => cmd('privatereport', [action, report.id]), action === 'dismiss' ? 'btn btn--small btn--ghost' : 'btn btn--small');
+                button.dataset.privateReportAction = action; button.disabled = !ready;
+                acts.append(button);
+            }
+            li.append(acts); list.append(li);
+        }
+        if (focusId && focusAction) {
+            const row = $$('[data-private-report-id]', list).find(li => li.dataset.privateReportId === focusId);
+            const replacement = row && $$('[data-private-report-action]', row).find(button => button.dataset.privateReportAction === focusAction);
+            (replacement && !replacement.disabled ? replacement : line).focus({ preventScroll: true });
+        }
+        return reports.length;
+    }
+
     function draw() {
         const configure = app.state?.capabilities?.configure === true;
         $$('[data-panic], [data-shieldoff], [data-lobby], [data-slow], [data-tab=filter], [data-filter-form]').forEach((e) => { e.hidden = !configure; });
         const s = app.state;
         $('[data-state]').textContent = `Lobby ${s.lock === 'off' ? 'OPEN' : s.lock === 'readonly' ? (s.lockAuto ? 'READ-ONLY (automatic safety lock)' : 'READ-ONLY') : 'LOCKED'} · Shield ${s.shield ? (s.shieldAuto ? 'UP (legacy automatic shield)' : 'UP') : 'down'} · Slow ${s.slow}s · ${s.stats.online} online · Budget ${Math.round(100 * s.budget.requests / s.budget.cap)}% (${s.budget.level})`;
         const aiReviewCount = drawAiReview(s);
+        const privateReportCount = drawPrivateReports(s);
         const reports = $('[data-reports]'); reports.replaceChildren();
         for (const r of s.reports) {
             const li = el('li');
@@ -128,7 +196,7 @@
             const acts = el('div', undefined, 'acts'); acts.append(btn('OK it', () => cmd('approve', [h.id])), btn('Reject', () => cmd('dismiss', [h.id]), 'btn btn--small btn--ghost'));
             li.append(acts); held.append(li);
         }
-        const queueCount = s.reports.length + s.held.length + aiReviewCount;
+        const queueCount = s.reports.length + s.held.length + aiReviewCount + privateReportCount;
         $('[data-qcount]').textContent = queueCount ? `(${queueCount})` : '';
         $('[data-queue-empty]').hidden = !!queueCount;
 

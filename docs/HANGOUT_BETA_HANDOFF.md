@@ -184,11 +184,32 @@ and never grants a staff role.
    [native handoff evidence and remaining limits](HANGOUT_COLLABORATION_BETA.md).
 5. In the lobby and its channels, use a message's report button for abuse. A
    check mark means the server confirmed durable submission to community staff.
-   The separate encrypted private-room page has no message report action; its
-   camera-tile **Report to the host** is an encrypted host notice, not a durable
-   staff report or delivery acknowledgement. Use `jeffstory007@gmail.com` as an
-   interim contact for private-room abuse, without sending invitation secrets.
-   On-site private-room staff intake remains required before readiness; see the
+   The currently hosted encrypted private-room page still has the older
+   camera-tile **Report to the host** notice and no per-message staff action.
+   That encrypted notice is not saved for community staff and does not confirm
+   delivery to the host.
+   A [prepared, not deployed staff-intake candidate](../pr-assets/beta-collaboration/private-staff-reports.json)
+   adds message/member reports independent of the host. The reporter reviews
+   the selected quote, claimed name and reason and explicitly consents to share
+   that text with staff. Message reports require a quote; member reports require
+   a reason. Ordinary private chat remains encrypted and excluded from AI;
+   selected evidence is an unverified claim, with no automatic punishment.
+   Do not include invitation or credential details. A saved acknowledgement
+   requires a confirmed durable write, not an encrypted host notice.
+   The separate staff queue retains at most 100 pending reports for 24 hours
+   and permits 100 new reports per day globally. Up to 200 text-free request
+   receipts remain for 24 hours. Resolve/Dismiss removes saved quote/name/reason
+   after the write succeeds; it neither deletes private chat nor punishes a
+   participant. Staff delivery and actions recheck the current staff session
+   and permissions.
+   Actual local protected guests reached the SQLite-backed queue; a graceful
+   restart across two workerd generations preserved the pending report, with
+   the same cookie and a fresh socket receiving the same report ID. Both
+   logouts and copied-cookie asset denials passed. This does not prove real
+   Access, human review or hosted behavior. Complete human/Karen review and
+   hosted guest-to-staff acceptance after the original eight-hour expiry job
+   has a recorded terminal result. See the
+   [readiness assessment](HANGOUT_BETA_READINESS.md) and
    [moderator guide](HANGOUT_MODERATOR_GUIDE.md).
 6. Leaving the beta revokes the session across its live chat and private-room
    connections. If closure cannot be confirmed, the portal reports failure and

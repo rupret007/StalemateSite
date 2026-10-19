@@ -70,11 +70,17 @@
                 <p class="small" data-ai-empty>No AI signals awaiting review. This does not mean every message was checked.</p>
             </section>
             <h2>Reports</h2><ul class="list" data-reports></ul>
+            <section data-private-report-review hidden>
+                <h2>Private-room reports</h2>
+                <p class="small">Visitors explicitly shared these quotes or descriptions. They are not independently verified transcripts. Private chat is not monitored or sent to AI. Resolving a report removes its saved text; it does not delete private chat or punish a participant.</p>
+                <p class="state" data-private-report-storage role="status" tabindex="-1"></p>
+                <ul class="list" data-private-reports></ul>
+            </section>
             <h2>Held by StaleBot</h2><ul class="list" data-held></ul>
             <p class="small" data-queue-empty>Nothing in the review queues.</p>
         </section>
         <section class="card" data-view="people" hidden><h2>Online</h2><ul class="list" data-users></ul><h2>Bans</h2><ul class="list" data-bans></ul></section>
-        <section class="card" data-view="rooms" hidden><h2>Open rooms</h2><ul class="list" data-rooms></ul><p class="small">Private rooms are end-to-end encrypted, so nobody (us included) can read them; they never show here.</p></section>
+        <section class="card" data-view="rooms" hidden><h2>Open rooms</h2><ul class="list" data-rooms></ul><p class="small">Ordinary private chat stays encrypted, and private rooms are not listed here. Visitors may explicitly share selected details in Private-room reports.</p></section>
         <section class="card" data-view="stats" hidden>
             <p class="small">Counts only: no names, devices or IPs. Times in your timezone. Page views live in GoatCounter.</p>
             <div class="kpis" data-kpis></div>

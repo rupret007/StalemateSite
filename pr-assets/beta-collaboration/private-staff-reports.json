@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "status": "prepared-interface-not-deployed",
+  "foundationPr": 58,
+  "foundationCommit": "1203974cd2f730802116644e8662104be4647e39",
+  "backendPr": 59,
+  "backendCommit": "a13c6de79f8838613acb72518dd474ee44845d73",
+  "backendEvidence": "private-report-delivery.json",
+  "scope": "Consented private-room reporter and restricted staff interfaces. Frontend ACKs/staff snapshots are controlled protocol fixtures; actual protected Room/Lobby/SQLite persistence is proved separately by the linked backend receipt.",
+  "files": {
+    "r/45662413410ed051/room.js": "fdd1b47464e3b7185927d4fad7e3be10c5ab6aea68c46fb990bf91794958d2b0",
+    "r/45662413410ed051/index.html": "64fad0d7e7f978e654963b58113c00785e514d974ae409a778de47ef36f9a86e",
+    "r/45662413410ed051/admin/admin.js": "fab00353d9d3cee1ef9257a2a402b783a03bb02aa0d294bcd32e5081593edebb",
+    "r/45662413410ed051/admin/index.html": "27310339fba626a6cefa8ab41c69d45d31c4cd1deb359d8b32ee1d3b372aeaf5",
+    "r/45662413410ed051/terms/index.html": "1bf766e7cb9c1f87d76e189e47a6af3eb55ae47a0d6836162e8f7b167505c529",
+    "tests/e2e/hangout-private-reports.spec.js": "0b5213c4306dbd485824a4e352a54761d6b1c1329af2334ca7bc0fa4b1f1df47",
+    "tests/e2e/lobby-private-reports.spec.js": "a14dd53f3bd87184815d5affe9dad84bd56f3d1c3128010b30f31db61035199e",
+    "docs/HANGOUT_BETA_HANDOFF.md": "157e828af26ed46a4b2f2b03a9850488536fa6e4d3148ec64abcd2634c37ad57",
+    "docs/HANGOUT_BETA_READINESS.md": "6d5045d0d52371749c669ce07b54c061fa3ee58fcc850c642bc8f5128826abaa",
+    "docs/HANGOUT_MODERATOR_GUIDE.md": "4ea008e89a5e3a65e240b0c49ebd5d3864371ead8e45d972e68b49d116c8adbb"
+  },
+  "behavior": [
+    "Backend capability-gated received-message and member reports work without cameras or host cooperation.",
+    "Explicit consent sends only chosen quote/claimed nickname/reason plus limited room/connection references and submission time. No room key, prior history or automatic chat context is appended.",
+    "Normal private chat stays encrypted. Selected allegations remain unverified, outside AI and automatic sanctions.",
+    "Saved status requires a matching current-socket/current-request acknowledgement. Offline/timeout/storage failures remain unconfirmed; retry is explicit and reuses immutable payload/request.",
+    "Editing an uncertain submission creates a new request and preserves the may-already-be-saved warning across continued typing. Reconnect retains the draft without automatically submitting; ended session clears it.",
+    "Staff renders selected evidence with textContent and clear provenance limits. Resolve/Dismiss waits for server state and removes saved evidence, with no private-chat deletion or punitive shortcut.",
+    "Storage failure disables actions and preserves keyboard focus on explanation. Staff session close erases cached evidence/actions; retired socket callbacks cannot repopulate or erase a newer queue.",
+    "Consent fields use16px text and report controls fit375px and390px browser viewports. This is not physical iPhone Safari acceptance."
+  ],
+  "validation": {
+    "backendFullUnitTests": 715,
+    "backendUnitFiles": 61,
+    "broadBrowser": {
+      "passed": 141,
+      "retries": 0,
+      "skips": 0,
+      "elapsedMinutes": 3.7,
+      "logSha256": "29dbffd503028384e11bb699d0f29c90824dfbe1524024a9517c7f7324322a2e",
+      "qualification": "Broad candidate regression before final uncertain-typing and staff-session cleanup fixes; changed paths verified by the final focused runs below."
+    },
+    "finalRoomBrowser": {
+      "passed": 6,
+      "retries": 0,
+      "skips": 0,
+      "elapsedSeconds": 7.2,
+      "logSha256": "5612fea46e22ba7539b81da32b0855e6c325abda08044508c93a5d711305a636",
+      "coverage": [
+        "Actual loopback encrypted chat/host snapshot and selected-message attribution; explicit consent and no context/secret append.",
+        "Matching simulated ACK only; fixed failures, manual identical retry and new request after edits.",
+        "UI deadline and late ACK; actual reconnect and stale callback rejection.",
+        "Ended session clears draft/dialog; no AV/departed target; multiline concern;375/390px controls and16px inputs."
+      ]
+    },
+    "finalStaffBrowser": {
+      "privateReportCases": 7,
+      "existingAiAdminCases": 5,
+      "passed": 12,
+      "retries": 0,
+      "skips": 0,
+      "elapsedSeconds": 4.5,
+      "logSha256": "af065c6b62920acfde73ac1ea65ed43e98f9b53a7ee7d662f0051424704a331b",
+      "coverage": [
+        "Safe unverified evidence rendering and queue counts.",
+        "Exact Resolve/Dismiss commands; server-confirmed removal.",
+        "Ready redraw, removal and storage-failure keyboard focus.",
+        "Legacy backend without capability.",
+        "Actual routed4401close clears cached state and rendered private text/actions.",
+        "Retired message/close callback cannot overwrite or clear new staff connection."
+      ]
+    },
+    "newBrowserCases": 13,
+    "noRealAccessClaimFromUiFixtures": true
+  },
+  "retainedMeaningfulNegatives": [
+    {
+      "scope": "Staff storage failure focus",
+      "passed": 4,
+      "failed": 1,
+      "classification": "Disabled replacement action lost keyboard focus; fixed, final12/12 pass."
+    },
+    {
+      "scope": "Uncertain report edit typing",
+      "failed": 1,
+      "classification": "Second real keystroke hid may-already-be-saved warning; persistent latch fixed, final6/6 pass."
+    },
+    {
+      "scope": "Staff session cleanup and stale callbacks",
+      "failed": 2,
+      "classification": "Closed staff retained evidence/actions, and old message callback replaced newer queue; fixed, final12/12 pass."
+    }
+  ],
+  "retainedFixtureDevelopmentFailures": {
+    "originalBrowserSetupFailures": 6,
+    "snapshotDiagnostics": 2,
+    "correctedBarrierRun": {
+      "passed": 1,
+      "failed": 5
+    },
+    "ackDiagnostics": 2,
+    "inheritedDescriptorSetupFailures": 6,
+    "classification": "Observer was installed on Playwright backing socket before route injection. Final harness observes current application socket after navigation and delegates inherited onmessage setter. These failed before relevant target behavior or inside fixture observation; not product-regression evidence. Logs/artifacts retained privately.",
+    "initialTypingSelectionError": "One anchored grep selected no tests; not regression evidence."
+  },
+  "privacyLimits": [
+    "Reporter-supplied quotes and nicknames cannot be independently authenticated using the shared encrypted-room key. Live target provenance confirms the relay connection only.",
+    "Credential guards reject known/local invitation material and recognizable credential patterns; they are not a general personal-data scanner. Reporters review selected fields before consent.",
+    "Pending report text retains up to24hours; confirmed disposition removes saved text. Up to200 text-free immutable retry receipts retain the original24-hour window. Backup/PITR remains separate."
+  ],
+  "remaining": [
+    "Required human/Karen review; no merge or public launch.",
+    "Hosted beta remains old source during original8-hour expiry observation. Deploy only after recorded terminal result and reviewed effective configuration.",
+    "Actual hosted guest-to-real-staff submission, human disposition and independent reload persistence.",
+    "Physical iPhone Safari and required Mac/Windows/Linux device acceptance remain separate."
+  ]
+}

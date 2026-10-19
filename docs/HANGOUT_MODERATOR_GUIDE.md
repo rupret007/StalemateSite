@@ -42,19 +42,47 @@ must show an error rather than a successful report acknowledgement.
 
 ## Encrypted private rooms
 
-The separate encrypted private-room page has no per-message staff report action.
-Its camera-tile **Report to the host** sends an encrypted notice to that room's
-creator and hides the participant locally. It does not create durable staff
-evidence, and the displayed notice is not confirmation that a host received it.
-Staff cannot inspect the encrypted conversation or use the channel queue's
-message-deletion controls there.
+The **current hosted beta** has only the older camera-tile **Report to the host**
+notice. It sends an encrypted notice to that room's creator and hides the
+participant locally; it is not durable staff evidence or confirmed host delivery.
+Use `jeffstory007@gmail.com` as the interim contact for private-room abuse,
+including an abusive or absent host. Do not send invitation links, room keys,
+access codes or passwords.
 
-For private-room abuse, including an abusive or absent host, use
-`jeffstory007@gmail.com` as an interim contact. Include the approximate time and
-a brief description; do not send private invitation links, access codes or
-passwords. A usable on-site path to submit private-room abuse to staff with an
-honest acknowledgement remains a beta requirement. Email contact alone does not
-complete that requirement.
+A [prepared staff-report candidate](../pr-assets/beta-collaboration/private-staff-reports.json)
+adds consented intake; it is **not deployed**. Human/Karen review and hosted
+guest-to-real-staff acceptance remain pending after the original eight-hour
+expiry observation has a recorded terminal result. Email contact alone does
+not complete that requirement. After an accepted release:
+
+1. A visitor can choose **Report to staff** beside a received private message,
+   or **Report a problem to staff** without using cameras or relying on the host.
+   They review the selected quote, claimed nickname and reason, then explicitly
+   agree to share those details. Ordinary encrypted chat stays unmonitored; no
+   history, automatic context, invitation or room key is attached. Private reports
+   are excluded from AI review.
+2. Use the restricted staff sign-in, then **Queue → Private-room reports**.
+   Review actions recheck session expiry/revocation and staff permission. Check
+   **Private report storage is ready** before relying on the queue. The reported
+   nickname and quote are unverified claims. A membership note proves only that
+   the selected relay connection was present in that room at submission; an
+   absent/unverified target establishes no current identity.
+   If the staff connection ends, the panel clears its saved display. Sign in
+   again if needed, then reconnect to load the current queue.
+3. Use **Resolve report** after review or **Dismiss report** when unwarranted.
+   These rows have no **Delete**, mute, kick or ban actions. Neither disposition
+   deletes private chat or automatically punishes anyone. A successful required
+   write removes the saved report text from the active queue; confirm the server
+   update rather than treating a button click as success. Do not target someone
+   in **People** using a retained private-report nickname.
+4. If storage is unavailable, treat the disposition as unconfirmed and ask the
+   operator to restore it; an empty-looking queue does not establish deletion.
+   For reporters, **Not confirmed** means the submission may have been saved.
+   Keep the same details and use **Retry the same report** manually. Reconnect
+   never submits automatically; editing details creates a new request and may
+   create a separate report. Within the original 24-hour receipt window, retrying
+   a resolved/dismissed submission returns its final status without recreating
+   the removed text.
 
 ## Room-host controls
 
@@ -112,6 +140,14 @@ rooms, camera media or invitation links. Moderation action logs retain at most
 2,000 records for 30 days. Cleanup runs periodically; backup/PITR retention is a
 separate operational setting. Avoid collecting extra evidence outside those
 queues unless an incident requires it and the operator agrees on handling.
+
+The prepared private-report candidate adds a separate queue of at most 100
+reports for 24 hours. It stores consented text/claimed names, submission time,
+relay connection metadata and opaque keyed room/target-session references,
+not invitations or decryption keys. Resolve/Dismiss removes that active record
+after a successful write. Up to 200 text-free retry receipts retain report ID,
+time, request code, digest, reporter reference and final/pending status for the
+original 24-hour window. Backup/PITR retention remains separate.
 
 Pending PM requests keep only sender/recipient connection metadata for ten
 minutes, bounded to 1,000 requests globally and five per sender. After a server

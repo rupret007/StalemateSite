@@ -36,6 +36,11 @@
         canvas: $('[data-canvas]'), swatches: $('[data-swatches]'), size: $('[data-size]'), clear: $('[data-clear]'), save: $('[data-save]'),
         log: $('[data-log]'), say: $('[data-say]'), text: $('[data-text]'), tiles: $('[data-tiles]'),
         syncStatus: $('[data-sync-status]'), syncRetry: $('[data-sync-retry]'),
+        privateReport: $('[data-private-report]'), reportDialog: $('[data-report-dialog]'), reportForm: $('[data-report-form]'),
+        reportKind: $('[data-report-kind]'), reportTarget: $('[data-report-target]'), reportName: $('[data-report-name]'),
+        reportExcerpt: $('[data-report-excerpt]'), reportReason: $('[data-report-reason]'), reportConsent: $('[data-report-consent]'),
+        reportStatus: $('[data-report-status]'), reportAvailability: $('[data-report-availability]'), reportSend: $('[data-report-send]'),
+        reportRetry: $('[data-report-retry]'), reportNew: $('[data-report-new]'), reportClose: $('[data-report-close]'),
         mic: $('[data-mic]'), cam: $('[data-cam]'), hangup: $('[data-hangup]'), ask: $('[data-ask]'), turnStatus: $('[data-turn-status]'),
         askTitle: $('[data-ask-title]'), askCopy: $('[data-ask-copy]'), askYes: $('[data-ask-yes]'), askNo: $('[data-ask-no]'),
         yt: $('[data-yt]'), file: $('[data-file]'), tap: $('[data-tap]'), videoStatus: $('[data-video-status]'),
@@ -55,7 +60,7 @@
         state: H.emptyState(), clock: H.createClock(), ws: null, myId: null, key: null, roomId: null,
         hostPub: null, hostPriv: null, isHost: false, lastHostSeq: 0, lastHostSigned: null, lastVideoSigned: null,
         lastClearSigned: null, drawingEpoch: 0, snapshotRequest: null, snapshotFresh: false, knownHostId: null,
-        names: new Map(), name: '', snapshotDone: false, snapshotFrom: null, snapshotHasSeqProof: false, connected: false, ended: false, retries: 0,
+        names: new Map(), name: '', snapshotDone: false, snapshotFrom: null, snapshotHasSeqProof: false, connected: false, ended: false, retries: 0, privateReports: false,
         bob: { on: false, touched: false, lastNudge: 0 },
         av: {
             stream: null, rawCam: null, mic: false, cam: false, canvas: false, screen: null, hand: null, away: false, music: false,
@@ -70,6 +75,162 @@
 
     function say(text) { ui.status.textContent = text; }
     function setGate(text) { ui.gateStatus.textContent = text; }
+
+    /* Private reports are deliberately outside chat state, encrypted snapshots,
+     * and the outbound content queue. Only an explicit consent click sends the
+     * selected fields to the protected relay's staff-intake control. */
+    let receivedChatOrigins = new WeakMap();
+    const staffReport = { attempt: null, phase: 'draft', timer: 0, opener: null, uncertainEdit: false };
+    const reportFields = [ui.reportKind, ui.reportTarget, ui.reportName, ui.reportExcerpt, ui.reportReason];
+    function reportOnline() { return !app.ended && app.connected && app.privateReports && app.ws?.readyState === 1; }
+    function updateReportControls() {
+        const waiting = staffReport.phase === 'waiting';
+        const ready = reportOnline();
+        ui.privateReport.hidden = !app.privateReports;
+        for (const field of [...reportFields, ui.reportConsent]) field.disabled = waiting;
+        ui.reportSend.disabled = !ready || waiting || staffReport.phase === 'saved' || !ui.reportConsent.checked;
+        ui.reportRetry.hidden = !staffReport.attempt || !['unconfirmed', 'error'].includes(staffReport.phase);
+        ui.reportRetry.disabled = !ready || waiting || !ui.reportConsent.checked;
+        ui.reportNew.disabled = waiting;
+        ui.reportAvailability.textContent = app.ended ? 'This room session has ended.'
+            : !app.privateReports ? 'Staff reporting is unavailable on this room server. No new report can be sent.'
+                : !ready ? 'Offline. Your report draft stays here; reconnect before sending or retrying.' : '';
+        ui.reportAvailability.hidden = !ui.reportAvailability.textContent;
+    }
+    function stopReportWait() { clearTimeout(staffReport.timer); staffReport.timer = 0; }
+    function reportDraftChanged() {
+        stopReportWait();
+        staffReport.uncertainEdit ||= Boolean(staffReport.attempt && staffReport.phase !== 'saved');
+        staffReport.attempt = null;
+        staffReport.phase = 'draft';
+        ui.reportConsent.checked = false;
+        ui.reportStatus.textContent = staffReport.uncertainEdit
+            ? 'Details changed. The earlier report was not confirmed; it may have been saved. Sending these details creates a new report.'
+            : 'Draft only. Review the selected details and agree before sending.';
+        updateReportControls();
+    }
+    function reportMembers(selected = '', selectedName = '') {
+        const option = doc.createElement('option');
+        option.value = ''; option.textContent = 'Someone who left, the host, or another problem';
+        ui.reportTarget.replaceChildren(option);
+        const members = new Map(app.names);
+        if (selected && !members.has(selected)) members.set(selected, selectedName || 'Someone who left');
+        for (const [peer, name] of members) {
+            if (peer === app.myId) continue;
+            const entry = doc.createElement('option'); entry.value = peer;
+            entry.textContent = String(name || 'Someone').slice(0, 24);
+            ui.reportTarget.append(entry);
+        }
+        ui.reportTarget.value = selected;
+    }
+    function clearStaffReport() {
+        stopReportWait(); staffReport.attempt = null; staffReport.phase = 'draft'; staffReport.uncertainEdit = false;
+        ui.reportForm.reset(); reportMembers();
+        ui.reportStatus.textContent = 'New draft. Nothing from this draft has been sent.';
+        updateReportControls();
+    }
+    function openStaffReport({ line = null, peer = null, name = '' } = {}, opener = null) {
+        if (!app.privateReports || app.ended) return;
+        if (staffReport.phase !== 'waiting' && (line || peer)) {
+            clearStaffReport();
+            const origin = line ? receivedChatOrigins.get(line) : null;
+            const target = origin?.peer || peer || '';
+            const claimedName = String(line?.name || name || app.names.get(target) || '').slice(0, 24);
+            ui.reportKind.value = line ? 'message' : 'member';
+            reportMembers(target, claimedName);
+            ui.reportName.value = claimedName;
+            ui.reportExcerpt.value = line ? String(line.text || '').slice(0, 400) : '';
+        } else {
+            reportMembers(ui.reportTarget.value, ui.reportName.value);
+        }
+        staffReport.opener = opener || doc.activeElement;
+        updateReportControls();
+        if (!ui.reportDialog.open) ui.reportDialog.showModal();
+        (ui.reportReason.disabled ? ui.reportClose : ui.reportReason).focus();
+    }
+    function reportContainsCredentials(fields) {
+        const content = [fields.claimedName, fields.excerpt, fields.reason].join('\n');
+        const invite = readInvite();
+        if ([invite?.secret, invite?.host, previewKey].some(value => value && value.length >= 16 && content.includes(value))) return true;
+        return /(?:[#?&](?:invite|preview|r|h)=|webjam(?:-signal)?:|\b(?:BW_SESSION|Authorization|Cookie)\s*[:=])/i.test(content);
+    }
+    function submitStaffReport() {
+        if (!reportOnline() || staffReport.phase === 'waiting' || !ui.reportConsent.checked || !ui.reportForm.reportValidity()) return;
+        const fields = { kind: ui.reportKind.value, target: ui.reportTarget.value || null,
+            claimedName: ui.reportName.value.trim().slice(0, 24), excerpt: ui.reportExcerpt.value.trim().slice(0, 400),
+            reason: ui.reportReason.value.trim().slice(0, 400) };
+        if (!['message', 'member'].includes(fields.kind) || !fields.reason || fields.kind === 'message' && !fields.excerpt) {
+            ui.reportStatus.textContent = 'Add a reason and, for a message report, the selected quote. Nothing was sent.';
+            return;
+        }
+        if (reportContainsCredentials(fields)) {
+            ui.reportStatus.textContent = 'Remove invitation links, room keys and access credentials before sending. Nothing was sent.';
+            return;
+        }
+        const signature = JSON.stringify(fields);
+        if (!staffReport.attempt || staffReport.attempt.signature !== signature) {
+            staffReport.attempt = { signature, payload: { type: 'private-report', v: 1, request: H.newSecret(), ...fields, consent: true }, socket: null };
+        }
+        const attempt = staffReport.attempt, socket = app.ws;
+        attempt.socket = socket; staffReport.phase = 'waiting'; staffReport.uncertainEdit = false;
+        ui.reportStatus.textContent = 'Sending the selected details. Waiting for confirmation…';
+        stopReportWait(); updateReportControls();
+        staffReport.timer = win.setTimeout(() => {
+            if (staffReport.attempt !== attempt || attempt.socket !== socket || app.ws !== socket || staffReport.phase !== 'waiting') return;
+            staffReport.timer = 0; attempt.socket = null; staffReport.phase = 'unconfirmed';
+            ui.reportStatus.textContent = 'Not confirmed. The report may have been saved. Retry the same report to check safely; it will not send automatically.';
+            updateReportControls();
+        }, 15000);
+        try {
+            // This opt-in control intentionally stays plaintext to staff over
+            // the current protected WSS connection. Never seal or pace it.
+            socket.send(JSON.stringify(attempt.payload));
+        } catch (_) {
+            stopReportWait(); attempt.socket = null; staffReport.phase = 'unconfirmed';
+            ui.reportStatus.textContent = 'Not confirmed. Reconnect if needed, then retry the same report manually.';
+            updateReportControls();
+        }
+    }
+    function receiveStaffReportAck(value, socket) {
+        const attempt = staffReport.attempt;
+        if (!reportOnline() || socket !== app.ws || !attempt || attempt.socket !== socket ||
+            staffReport.phase !== 'waiting' || !value || typeof value !== 'object' || value.request !== attempt.payload.request) return;
+        if (value.ok === true && typeof value.id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value.id) &&
+            ['pending', 'resolved', 'dismissed'].includes(value.status)) {
+            stopReportWait(); attempt.socket = null; staffReport.phase = 'saved';
+            ui.reportStatus.textContent = value.status === 'pending' ? 'Saved for community staff review. This is not a promise of immediate response.'
+                : value.status === 'resolved' ? 'Saved report confirmed. Community staff have resolved it.' : 'Saved report confirmed. Community staff have dismissed it.';
+            updateReportControls();
+        } else if (value.ok === false && [400, 409, 429, 503].includes(value.status)) {
+            stopReportWait(); attempt.socket = null; staffReport.phase = 'error';
+            ui.reportStatus.textContent = value.status === 429 ? 'Not saved: the report allowance is full. Wait before retrying the same report.'
+                : value.status === 409 ? 'Not saved: this request conflicts with an earlier report. Review the details before starting a new report.'
+                    : value.status === 400 ? value.error === 'unsafe-content'
+                        ? 'Not saved: remove invitation or credential details. You can clear the quote and report the member with a brief reason instead.'
+                        : 'Not saved: review the report fields before trying again.'
+                        : 'Not confirmed: staff report storage is unavailable. Retry the same report manually later.';
+            updateReportControls();
+        }
+    }
+    function staffReportDisconnected(socket) {
+        if (staffReport.attempt?.socket === socket) {
+            stopReportWait(); staffReport.attempt.socket = null; staffReport.phase = 'unconfirmed';
+            ui.reportStatus.textContent = 'Not confirmed: the connection closed. Your report draft remains here. Reconnect, then retry the same report manually.';
+        }
+        updateReportControls();
+    }
+    ui.privateReport.addEventListener('click', () => openStaffReport({}, ui.privateReport));
+    ui.reportForm.addEventListener('submit', event => { event.preventDefault(); submitStaffReport(); });
+    ui.reportRetry.addEventListener('click', submitStaffReport);
+    ui.reportNew.addEventListener('click', () => { clearStaffReport(); ui.reportReason.focus(); });
+    ui.reportClose.addEventListener('click', () => ui.reportDialog.close());
+    ui.reportDialog.addEventListener('close', () => { if (staffReport.opener?.isConnected) staffReport.opener.focus(); staffReport.opener = null; });
+    for (const field of reportFields.filter(field => field !== ui.reportTarget)) field.addEventListener('input', reportDraftChanged);
+    ui.reportTarget.addEventListener('change', () => {
+        if (ui.reportTarget.value) ui.reportName.value = String(app.names.get(ui.reportTarget.value) || '').slice(0, 24);
+        reportDraftChanged();
+    });
+    ui.reportConsent.addEventListener('change', updateReportControls);
 
     /* ---------------- invite + host identity ---------------- */
     function readInvite() {
@@ -478,6 +639,7 @@
             clearTimeout(pace.timer); pace.timer = 0;
             pace.queue = pace.queue.filter((item) => !item.socket);
             app.connected = false;
+            staffReportDisconnected(ws);
             // Scrollback belongs to this live connection. Retained outbound
             // envelopes and the unsent composer draft remain separate.
             app.state.chat = [];
@@ -516,6 +678,11 @@
         stopPreCheck(); stopAv(true); turnClient?.stop();
         app.av.peers.clear(); app.av.opening.clear(); app.av.ice = null;
         app.names.clear(); app.state = H.emptyState(); app.lastVideoSigned = null;
+        app.privateReports = false;
+        receivedChatOrigins = new WeakMap();
+        clearStaffReport();
+        if (ui.reportDialog.open) ui.reportDialog.close();
+        staffReport.opener = null;
         youtube.cancel(); player.yt = null;
         ui.file.pause(); ui.file.removeAttribute('src'); ui.file.load();
         player.kind = null; player.currentKey = ''; player.readyKey = ''; player.failedKey = ''; player.autoplayBlocked = false;
@@ -531,12 +698,16 @@
         if (app.ended || app.ws !== ws) return;
         let frame;
         try { frame = JSON.parse(raw); } catch (error) { return; }
+        if (!frame || typeof frame !== 'object' || Array.isArray(frame)) return;
+        if (Object.hasOwn(frame, 'privateReport')) { receiveStaffReportAck(frame.privateReport, ws); return; }
         if (Number.isFinite(frame.t)) app.clock.sample(frame.t);
         if (frame.welcome) {
             const again = Boolean(app.myId);
             const oldId = app.myId;
             app.myId = frame.id;
             app.connected = true;
+            app.privateReports = frame.privateReports === true;
+            updateReportControls();
             app.retries = 0;
             if (again) { say('Back in.'); app.av.wantSent.clear(); } else enterRoom();
             beginRecovery(ws);
@@ -686,7 +857,7 @@
             acceptStroke(msg);
             return;
         case 'chat':
-            H.apply(app.state, msg, meta);
+            if (H.apply(app.state, msg, meta) === 'chat') receivedChatOrigins.set(app.state.chat[app.state.chat.length - 1], { peer: meta.from });
             renderChat();
             return;
         case 'host':
@@ -933,6 +1104,14 @@
             const b = doc.createElement('b');
             b.textContent = `${line.name}: `;
             li.append(b, doc.createTextNode(line.text));
+            if (app.privateReports && receivedChatOrigins.has(line)) {
+                const report = doc.createElement('button');
+                report.type = 'button'; report.className = 'btn btn--ghost'; report.dataset.messageReport = '';
+                report.textContent = 'Report to staff';
+                report.setAttribute('aria-label', `Report this message from ${line.name} to community staff`);
+                report.addEventListener('click', () => openStaffReport({ line }, report));
+                li.append(report);
+            }
             ui.log.append(li);
         }
         ui.log.scrollTop = ui.log.scrollHeight;
@@ -2007,6 +2186,10 @@
         if (id !== 'me') {
             item('Hide for me', () => { app.av.hidden.add(id); layout(); say(`Hid ${peerName(id)} for you. Reload to bring them back.`); });
             item('Report to the host', () => reportPeer(id), 'warn');
+            const notice = doc.createElement('p'); notice.className = 'small';
+            notice.textContent = 'Host notices are best effort and are not saved for community staff.';
+            m.append(notice);
+            if (app.privateReports) item('Report to community staff', () => openStaffReport({ peer: id, name: peerName(id) }, anchor), 'warn');
             if (app.isHost) {
                 const hs = doc.createElement('h3');
                 hs.textContent = 'Host';
@@ -2033,10 +2216,14 @@
     }
 
     async function reportPeer(id) {
-        await send({ type: 'report', about: id, name: peerName(id) });
         app.av.hidden.add(id);
         layout();
-        say(`Reported ${peerName(id)} to the host and hid them for you.`);
+        if (!app.connected || app.ws?.readyState !== 1) {
+            say(`Hid ${peerName(id)} for you. You are offline, so no host notice was sent.`);
+            return;
+        }
+        try { await send({ type: 'report', about: id, name: peerName(id) }); } catch (_) { /* no delivery acknowledgement exists */ }
+        if (!app.ended) say(`Hid ${peerName(id)} for you. Tried to notify the host; delivery is not confirmed.`);
     }
 
     /* ---------------- host moderation (signed by the room creator) ---------------- */
