@@ -43,7 +43,7 @@ These use temporary **local test visitors and example messages**, not live peopl
 
 ## Development baseline and changes
 
-The fresh checkout starts with PR #26's open-room implementation, then incorporates the current #23 video and #21 lobby branches. Their test conflicts and the lobby's YouTube CSP integration were resolved locally. This does not merge any GitHub PR. The separate #25 deployment branch has not been folded into this work.
+The fresh checkout starts with PR #26's open-room implementation, then incorporates the current #23 video and #21 lobby branches. Their test conflicts and the lobby's YouTube CSP integration were resolved locally. This does not merge any GitHub PR. The separate [#25 deployment branch](https://github.com/rupret007/StalemateSite/pull/25) already contains Cloudflare setup preparation and regression checks, but has not been folded into this work. Reuse and reconcile that baseline; its absence here does not establish missing cloud resources.
 
 The new slice adds conversation-first discovery, truthful presence/quiet/offline states, guest identity copy, draft prompts, unread mentions, accessible keyboard tabs, tab-local drafts, connection feedback, fresh bounded Turnstile checks per socket admission and safe session-reset behavior. A dated show announcement was replaced with a timeless default topic, and Art no longer implies a camera requirement.
 
