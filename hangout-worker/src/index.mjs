@@ -1,10 +1,13 @@
-// Stalemate hangout relay: a dumb, capped, encrypted-frame broadcaster.
+// Stalemate hangout relay: capped, opaque room frames and separate consented
+// report controls sent only to the staff queue. Ordinary chat stays encrypted.
 // One Durable Object per invite room. No video, audio, or files ever pass through here.
-import { admit, createBucket, dayKey, limitsFrom, validFrame } from './core.mjs';
+import { admit, createBucket, dayKey, limitsFrom, validFrame, validRoomId } from './core.mjs';
 import { admitTurn, HangoutTurnBudget } from './turn.mjs';
 import { adminGate, ownerGate, admitLobby, HangoutLobby } from './lobby-do.mjs';
 import { activeBetaSession, registryRequest, validBetaSession } from './beta-session-client.mjs';
 import { INTERNAL_HEALTH_PATH, healthJson } from './beta-ops.mjs';
+import { hmacKeyOk } from './auth.mjs';
+import { privateReportRef, validatePrivateReportControl } from './private-reports.mjs';
 
 export { HangoutLobby, HangoutTurnBudget };
 
@@ -112,10 +115,13 @@ export class HangoutRoom {
             const pair = new WebSocketPair();
             const id = `p${crypto.randomUUID().replace(/-/g, '')}`;
             const bucket = createBucket(this.limits);
+            const roomId = new URL(request.url).searchParams.get('room');
             this.state.acceptWebSocket(pair[1], [id]);
-            pair[1].serializeAttachment({ v: 1, id, bucket: bucket.snapshot(), ...(beta || {}) });
+            pair[1].serializeAttachment({ v: 1, id, bucket: bucket.snapshot(), ...(beta || {}),
+                ...(beta && validRoomId(roomId) ? { roomId } : {}) });
             this.buckets.set(id, bucket);
-            pair[1].send(JSON.stringify({ welcome: true, id, t: Date.now(), peers: sockets.length + 1, max: this.limits.maxPeers }));
+            pair[1].send(JSON.stringify({ welcome: true, id, t: Date.now(), peers: sockets.length + 1, max: this.limits.maxPeers,
+                ...(this.privateReportsConfigured() && validRoomId(roomId) ? { privateReports: true } : {}) }));
             this.broadcast({ peers: sockets.length + 1, t: Date.now() }, pair[1]);
             await this.schedule();
             return new Response(null, { status: 101, webSocket: pair[0] });
@@ -157,6 +163,102 @@ export class HangoutRoom {
         }
     }
 
+    privateReportsConfigured() {
+        return this.env.HANGOUT_BETA_MODE === 'protected' && typeof this.env.LOBBY?.get === 'function'
+            && typeof this.env.LOBBY?.idFromName === 'function' && hmacKeyOk(this.env.HANGOUT_HMAC_KEY)
+            && this.env.HANGOUT_HMAC_KEY.length <= 4096;
+    }
+    sameReportSocket(ws, original) {
+        const current = this.attachment(ws);
+        return (ws.readyState === undefined || ws.readyState === 1) && this.state.getWebSockets().includes(ws)
+            && this.validAttachment(current) && this.tagOf(ws) === original.id
+            && ['id', 'betaSid', 'betaInviteVersion', 'expiresAt', 'roomId'].every(key => current[key] === original[key]);
+    }
+    reportReply(ws, original, request, result) {
+        if (!this.sameReportSocket(ws, original)) return;
+        try { ws.send(JSON.stringify({ privateReport: { request, ...result } })); } catch { /* closed */ }
+    }
+    async privateReport(ws, original, raw, request) {
+        const unavailable = { ok: false, error: 'unavailable', status: 503 };
+        const unconfirmed = { ok: false, error: 'unconfirmed', status: 503 };
+        if (!this.privateReportsConfigured() || !validRoomId(original.roomId)) {
+            this.reportReply(ws, original, request, unavailable); return;
+        }
+        const parsed = validatePrivateReportControl(raw);
+        if (!parsed.ok) { this.reportReply(ws, original, request, { ok: false, error: 'invalid-report', status: 400 }); return; }
+        const report = parsed.report;
+        const secrets = ['HANGOUT_BETA_INVITE_KEY', 'HANGOUT_PREVIEW_KEY', 'HANGOUT_HMAC_KEY']
+            .map(key => this.env[key]).filter(value => typeof value === 'string' && value.length >= 16);
+        if (Object.values(report).some(value => typeof value === 'string' && secrets.some(secret => value.includes(secret)))) {
+            this.reportReply(ws, original, request, { ok: false, error: 'invalid-report', status: 400 }); return;
+        }
+        let timer;
+        const controller = new AbortController();
+        const current = () => !controller.signal.aborted && this.sameReportSocket(ws, original);
+        const work = (async () => {
+            if (!current()) return null;
+            const active = await activeBetaSession(this.env, original);
+            if (!current()) return null;
+            if (!active) { this.end(ws, 4401, 'beta session ended'); return null; }
+            const [reporterRef, roomRef] = await Promise.all([
+                privateReportRef('reporter', original.betaSid, this.env.HANGOUT_HMAC_KEY),
+                privateReportRef('room', original.roomId, this.env.HANGOUT_HMAC_KEY)
+            ]);
+            if (!current()) return null;
+            const target = report.target && this.liveSockets().find(peer => {
+                const a = this.attachment(peer);
+                return a.id === report.target && a.roomId === original.roomId;
+            });
+            const targetIdentity = target ? this.attachment(target) : null;
+            let targetSessionRef = targetIdentity
+                ? await privateReportRef('target', targetIdentity.betaSid, this.env.HANGOUT_HMAC_KEY) : null;
+            if (!current()) return null;
+            const targetLive = Boolean(target && this.sameReportSocket(target, targetIdentity));
+            if (!targetLive) targetSessionRef = null;
+            const provenance = { reporterRef, roomRef, reporterConnection: original.id,
+                targetConnection: report.target, targetSessionRef, targetMembership: targetLive ? 'live' : 'unverified' };
+            const response = await this.env.LOBBY.get(this.env.LOBBY.idFromName('stalemate')).fetch(new Request('https://lobby/__beta/private-report', {
+                method: 'POST', signal: controller.signal, redirect: 'manual',
+                headers: { 'Content-Type': 'application/json', 'X-Hangout-Private-Room': original.roomId,
+                    'X-Hangout-Beta-Session': JSON.stringify({ betaSid: original.betaSid,
+                        betaInviteVersion: original.betaInviteVersion, expiresAt: original.expiresAt }) },
+                body: JSON.stringify({ report, provenance })
+            }));
+            if (!current()) return null;
+            const result = await this.privateReportResult(response);
+            if (!current()) return null;
+            const stillActive = await activeBetaSession(this.env, original);
+            if (!current()) return null;
+            if (!stillActive) { this.end(ws, 4401, 'beta session ended'); return null; }
+            return result;
+        })().catch(() => unconfirmed);
+        const deadline = new Promise(resolve => {
+            timer = setTimeout(() => { controller.abort(); resolve(unconfirmed); }, 8000);
+        });
+        try {
+            const result = await Promise.race([work, deadline]);
+            if (result) this.reportReply(ws, original, report.request, result);
+        } finally { clearTimeout(timer); }
+    }
+    async privateReportResult(response) {
+        const fallback = { ok: false, error: 'unconfirmed', status: 503 };
+        const errors = new Map([[400, 'invalid-report'], [409, 'conflict'], [429, 'rate-limit'], [503, 'unavailable']]);
+        try {
+            const text = await response.text();
+            if (new TextEncoder().encode(text).byteLength > 4096) return fallback;
+            const result = JSON.parse(text);
+            if (response.status === 200 && result?.ok === true && /^pr[A-Za-z0-9_-]{43}$/.test(result.id)
+                && ['pending', 'resolved', 'dismissed'].includes(result.status) && typeof result.duplicate === 'boolean') {
+                return { ok: true, id: result.id, duplicate: result.duplicate, status: result.status };
+            }
+            if (result?.ok === false && errors.has(response.status) && result.status === response.status) {
+                return { ok: false, error: errors.get(response.status), status: response.status,
+                    ...(Number.isSafeInteger(result.retryAfter) && result.retryAfter > 0 && result.retryAfter <= 86400 ? { retryAfter: result.retryAfter } : {}) };
+            }
+            return fallback;
+        } catch { return fallback; }
+    }
+
     async webSocketMessage(ws, raw) {
         await this.ready;
         const a = this.attachment(ws);
@@ -168,6 +270,15 @@ export class HangoutRoom {
         ws.serializeAttachment({ ...a, bucket: bucket.snapshot() });
         if (verdict === 'spent') { this.end(ws, 4429, 'message cap'); return; }
         if (verdict === 'slow') { ws.send(JSON.stringify({ slow: true })); return; }
+        let control;
+        if (typeof raw === 'string' && raw.length <= this.limits.maxFrameBytes) {
+            try { control = JSON.parse(raw); } catch { /* ordinary frame validation below */ }
+        }
+        if (control?.type === 'private-report') {
+            const request = typeof control.request === 'string' && /^[A-Za-z0-9_-]{24}$/.test(control.request) ? control.request : null;
+            await this.privateReport(ws, this.attachment(ws), raw, request);
+            return;
+        }
         const frame = validFrame(raw, this.limits);
         if (!frame) { this.end(ws, 4400, 'bad frame'); return; }
         this.broadcast({ t: Date.now(), from: this.tagOf(ws), iv: frame.iv, c: frame.c }, ws);

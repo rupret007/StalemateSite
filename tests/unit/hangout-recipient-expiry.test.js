@@ -11,7 +11,7 @@ class Socket {
     deserializeAttachment() { return structuredClone(this.attachment); }
 }
 function storageState() {
-    const values = new Map(), sockets = new Map();
+    const values = new Map(), sockets = new Map(), background = [];
     const storage = {
         get: async (key) => structuredClone(values.get(key)),
         put: async (key, value) => values.set(key, structuredClone(value)),
@@ -20,7 +20,18 @@ function storageState() {
         getAlarm: async () => 1, setAlarm: async () => {}, deleteAlarm: async () => {}
     };
     storage.transaction = (fn) => fn(storage);
-    return { values, sockets, storage, blockConcurrencyWhile: (fn) => fn(), waitUntil: () => {},
+    return { values, sockets, storage, blockConcurrencyWhile: (fn) => fn(), waitUntil: (task) => background.push(task),
+        async settle() {
+            for (let round = 0; round < 20; round += 1) {
+                // pushAdmin coalesces notifications in a microtask before the
+                // DO registers its fresh-auth dispatch with waitUntil. Cross
+                // that producer boundary before treating an empty batch as idle.
+                await new Promise(resolve => queueMicrotask(resolve));
+                if (!background.length) return;
+                await Promise.all(background.splice(0));
+            }
+            throw Error('Recipient fixture background work did not settle');
+        },
         getWebSockets: (tag) => [...sockets].filter(([ws, tags]) => ws.readyState === 1 && (!tag || tags.includes(tag))).map(([ws]) => ws),
         getTags: (ws) => sockets.get(ws) || [], acceptWebSocket: (ws, tags) => sockets.set(ws, tags) };
 }
@@ -87,6 +98,7 @@ describe('authorization applies to recipients before the next alarm', () => {
             expect((await lobby.fetch(new Request('https://internal/lobby-admin', { headers: { 'X-Hangout-Identity': JSON.stringify(who) } }))).status).toBe(101);
             const socket = pairs.at(-1)[1];
             await lobby.webSocketMessage(socket, JSON.stringify({ t: 'hello', nick: label, age13: true }));
+            await state.settle();
             expect(socket.frames.some((frame) => frame.t === 'admin')).toBe(true);
             return socket;
         };
@@ -94,7 +106,7 @@ describe('authorization applies to recipients before the next alarm', () => {
         removed.frames = []; kept.frames = [];
         config.HANGOUT_MODERATOR_EMAILS = 'second@example.test';
         lobby.engine.notifyAiStatus();
-        await Promise.resolve();
+        await state.settle();
         expect(kept.frames.some((frame) => frame.t === 'admin')).toBe(true);
         expect(removed.frames).toEqual([]);
         expect(removed.closed?.code).toBe(4401);
