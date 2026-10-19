@@ -21,6 +21,14 @@ Storage checks are read-only. A successful response does not establish that a
 future report can be written. Email and AI providers are not called, TURN
 traffic is not measured, and provider billing/availability are explicitly
 unknown. Disabled AI/TURN is expected until their acceptance gates pass.
+
+AI includes content-free `currentInstance` counters for completed, flagged,
+failed, skipped and pending reviews. They come from the running adapter and
+reset when the lobby instance restarts; they are not durable lifetime totals.
+The separate daily `aiReviews` usage is durable and counts reserved attempts,
+including failures. Observed review failures make enabled AI degraded and
+produce an `ai-unavailable` monitor issue. A health read sends no text to the
+provider, and a ready status does not establish future provider availability.
 The monitor's own Worker/Object reads still count as provider operations.
 
 The Mac LaunchAgent probes immediately and every five minutes. It notifies on

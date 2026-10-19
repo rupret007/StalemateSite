@@ -290,7 +290,7 @@ export class HangoutLobby {
                     const net = this.engine.snapshot();
                     return healthJson({ storage: 'ok', lock: net.lock, shield: net.shield, lockAuto: net.lockAuto, evidenceStorage: this.evidenceStorage,
                         quota: (() => { const daily = dailyUsage(net.budget, 'requests'); return daily && { ...daily, limit: LOBBY_LIMITS.requestBudget }; })(),
-                        ai: aiHealth(this.env, await this.state.storage.get('ai-usage')) });
+                        ai: aiHealth(this.env, await this.state.storage.get('ai-usage'), this.aiModerator.status()) });
                 } catch { return healthJson({ storage: 'unavailable' }, 503); }
             });
         }

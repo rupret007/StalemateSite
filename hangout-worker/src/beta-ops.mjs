@@ -15,14 +15,21 @@ export function dailyUsage(stored, field, now = Date.now()) {
         stored.day !== '' && !DAY.test(stored.day) || stored.day > today || stored.day === '' && stored[field] !== 0) return null;
     return { day: today, used: stored.day === today ? stored[field] : 0 };
 }
-export function aiHealth(env, stored) {
+export function aiObservation(value) {
+    const fields = ['checked', 'flagged', 'failed', 'skipped', 'pending'];
+    if (!value || !fields.every((field) => Number.isSafeInteger(value[field]) && value[field] >= 0)) return null;
+    return Object.fromEntries(fields.map((field) => [field, value[field]]));
+}
+export function aiHealth(env, stored, runtime) {
     const enabled = env.HANGOUT_AI_MODERATION === 'review';
     const configured = typeof env.OPENAI_API_KEY === 'string' && !!env.OPENAI_API_KEY.trim();
     const rawLimit = Number(env.HANGOUT_AI_DAILY_LIMIT);
     const limit = Number.isSafeInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 10000) : 1000;
     const daily = stored !== undefined && !Number.isSafeInteger(stored?.used) ? null : dailyUsage(stored, 'used');
-    return { enabled, configured, state: !enabled ? 'disabled' : !configured ? 'misconfigured' : !daily ? 'unknown' : daily.used >= limit ? 'capped' : 'unknown',
-        quota: daily && { ...daily, limit } };
+    const observed = aiObservation(runtime);
+    return { enabled, configured, state: !enabled ? 'disabled' : !configured ? 'misconfigured' : !daily ? 'unknown' : daily.used >= limit ? 'capped'
+        : observed && ['ready', 'degraded', 'capped'].includes(runtime.state) ? runtime.state : 'unknown',
+        quota: daily && { ...daily, limit }, currentInstance: observed };
 }
 
 async function internalRead(binding, name) {
@@ -84,9 +91,11 @@ export async function betaHealth(request, env, { betaConfigured = false, accessC
     const contactConfigured = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,63}$/i.test(String(env.HANGOUT_MODERATION_CONTACT || '').trim());
     if (!contactConfigured) reasons.push('contact-unconfigured');
     const ai = { enabled: env.HANGOUT_AI_MODERATION === 'review', configured: typeof env.OPENAI_API_KEY === 'string' && !!env.OPENAI_API_KEY.trim(),
-        state: inSet(lobby?.ai?.state, ['disabled', 'misconfigured', 'ready', 'capped', 'unknown']) };
+        state: inSet(lobby?.ai?.state, ['disabled', 'misconfigured', 'ready', 'degraded', 'capped', 'unknown']),
+        currentInstance: aiObservation(lobby?.ai?.currentInstance) };
     if (ai.enabled && !ai.configured) reasons.push('ai-misconfigured');
     if (ai.state === 'capped') reasons.push('ai-capped');
+    if (ai.enabled && ai.state === 'degraded') reasons.push('ai-unavailable');
     const turnBudget = Number(env.HANGOUT_TURN_MONTHLY_GB);
     const turnConfigured = !!(env.TURN_BUDGET && env.HANGOUT_TURN_KEY_ID && env.HANGOUT_TURN_API_TOKEN && env.HANGOUT_TURN_ANALYTICS_TOKEN &&
         /^[a-f0-9]{32}$/.test(env.HANGOUT_CF_ACCOUNT_ID || '') && Number.isFinite(turnBudget) && turnBudget > 0 && turnBudget <= 800);

@@ -157,6 +157,21 @@ describe('transition alerts, quota warning thresholds and private state', () => 
         expect((await monitor.runOnce(options)).issues).toContain('usage-unknown'); expect(notify).toHaveBeenCalledTimes(3);
         expect(JSON.stringify(notify.mock.calls)).not.toContain('private-room-name');
     });
+    it('alerts on observed AI review failure, deduplicates it and reports recovery during another restriction', async () => {
+        const file = config(), body = fixture(), notify = vi.fn(async () => ({ delivery: 'submitted-to-os' }));
+        body.service = { state: 'degraded', reasons: ['identity-unconfigured'] };
+        body.features.email.configured = false;
+        body.features.ai = { enabled: true, configured: true, state: 'ready' };
+        const options = { configPath: file, notify, fetchImpl: async () => response(body) };
+        await monitor.runOnce(options);
+        body.features.ai.state = 'degraded'; body.service.reasons.push('ai-unavailable');
+        expect((await monitor.runOnce(options)).issues).toContain('ai-unavailable');
+        expect(notify).toHaveBeenCalledTimes(2);
+        await monitor.runOnce(options); expect(notify).toHaveBeenCalledTimes(2);
+        body.features.ai.state = 'ready'; body.service.reasons.pop();
+        expect((await monitor.runOnce(options)).issues).not.toContain('ai-unavailable');
+        expect(notify).toHaveBeenCalledTimes(3);
+    });
     it('retries failed notification delivery without claiming it succeeded', async () => {
         const file = config(), notify = vi.fn().mockRejectedValueOnce(new Error(KEY)).mockResolvedValue({ delivery: 'submitted-to-os' });
         const options = { configPath: file, notify, fetchImpl: async () => new Response('', { status: 401 }) };

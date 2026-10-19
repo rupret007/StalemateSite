@@ -127,7 +127,7 @@ function validateHealth(body) {
         || !object(body.storage) || ['lobby', 'registry', 'quota'].some(key => !['ok', 'unavailable'].includes(body.storage[key]))
         || !object(body.features) || !object(body.features.email) || typeof body.features.email.configured !== 'boolean' || body.features.email.provider !== 'not-probed'
         || !object(body.features.ai) || typeof body.features.ai.enabled !== 'boolean' || typeof body.features.ai.configured !== 'boolean'
-        || !['disabled', 'misconfigured', 'ready', 'capped', 'unknown'].includes(body.features.ai.state)
+        || !['disabled', 'misconfigured', 'ready', 'degraded', 'capped', 'unknown'].includes(body.features.ai.state)
         || !object(body.features.turn) || typeof body.features.turn.enabled !== 'boolean' || typeof body.features.turn.configured !== 'boolean' || body.features.turn.providerUsage !== 'unknown'
         || !Array.isArray(body.usage) || body.usage.length > 4 || new Set(body.usage.map(row => row?.name)).size !== body.usage.length
         || body.usage.some(row => !object(row) || !Object.hasOwn(USAGE_NAMES, row.name) || row.unit !== USAGE_UNITS[row.name]
@@ -150,6 +150,7 @@ function classifyHealth(body, at, httpStatus) {
     if (body.features.staffAuth?.configured === false) issues.push('staff-auth-unconfigured');
     if (body.features.ai.enabled && !body.features.ai.configured) issues.push('ai-unconfigured');
     if (body.features.ai.state === 'capped') issues.push('ai-capped');
+    if (body.features.ai.enabled && body.features.ai.state === 'degraded') issues.push('ai-unavailable');
     if (body.features.turn.enabled && !body.features.turn.configured) issues.push('turn-unconfigured');
     const usage = body.usage.map(row => ({ name: row.name, used: row.used, limit: row.limit, unit: row.unit, period: row.period, scope: 'application' }));
     const warnings = usage.filter(row => row.used / row.limit >= .8).map(row => ({ name: row.name, percent: Math.floor(100 * row.used / row.limit), level: row.used >= row.limit ? 'capped' : 'warning' }));
