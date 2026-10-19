@@ -139,6 +139,13 @@ with an isolated private verdict directory; do not send those artifacts to the
 active verdict publisher/conductor. Preserve the existing private-beta scope
 and complete hosted acceptance before distributing visitor invitations.
 
+The selected `c41896b` package has [passed Worker compilation](../pr-assets/beta-collaboration/candidate-worker-build.json)
+using Wrangler 4.151.1 in a private build directory with network access denied.
+Its 72 selected source files and 49 assets retained their hashes. This dry-run
+used tracked defaults and did not reconcile or deploy effective live controls.
+Complete review coverage for the earlier watch, private-history, recovery and
+report changes as well as PR #62's health guard before deploying the candidate.
+
 Use a clean, isolated checkout of the reviewed release commit. Before building,
 record the effective active configuration privately and reconcile it with the
 candidate beta config. Tracked defaults are not a backup of live settings.
@@ -331,6 +338,15 @@ existing remote secrets, account identity and DO bindings. The package's
 historical configuration includes admission open and invitation version `1`;
 do not deploy those defaults over a later pause or version increment. Carry the
 effective safety settings described above into a compatible recovery release.
+
+The `b111bb2` recovery source predates the
+[private chat-history correction](../pr-assets/beta-collaboration/private-chat-history.json).
+Keep new guest/private-room admission paused during emergency recovery using
+this source, carrying `HANGOUT_OPEN=0` and the effective invitation version into
+the recovery deployment. Restore the reviewed history correction and verify
+fresh joins and reconnects before reopening private visitor admission. The
+archive's offline checks do not establish compatibility with the candidate's
+new private-report queue or staff intake; accept those separately before use.
 
 Use a version rollback only after checking that the target's effective bindings,
 invitation version, admission state, staff policies and provider settings retain
