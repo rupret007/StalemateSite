@@ -30,6 +30,7 @@
         </ul>
         <h2>Hosting and returning to rooms</h2>
         <p>Anyone can host a temporary room without an account. To keep a room name across visits, sign in with an email code. Email verification does not reserve your nickname or give you site-moderator powers. We store an opaque identifier for ownership, room settings and co-host grants; your email is not displayed to visitors. Registered rooms expire after 90 days without an owner or verified co-host visit. Temporary rooms close after 10 empty minutes. Drawing and video state clears after 10 empty minutes even in registered rooms; chat has no saved backlog.</p>
+        <p>PMs open only after the recipient accepts. Unaccepted requests expire after 10 minutes. A server restart preserves the request for the same still-connected people, but never saves its undelivered first message. If that text is lost, both people are told to resend it after acceptance. A real disconnect ends that connection’s pending requests and PM consent; a reconnect must ask again.</p>
         <h2>How AI review works</h2>
         <p>When AI review is enabled, public text from #stalemate and open rooms may be sent to OpenAI after posting to identify messages for our moderators to review. Category signals are not rulings: a moderator decides whether to delete the message or dismiss the signal. Ordinary filters and visitor reports still apply.</p>
 
@@ -39,13 +40,13 @@
             <li>Guest chat requires no account or email. Optional room ownership uses Cloudflare email-code sign-in; Cloudflare processes your email and the room service stores an opaque ownership identifier. We do not ask for real names or birthdays.</li>
             <li>No raw IP addresses. To make bans work we keep a scrambled, daily-changing code instead.</li>
             <li>Chat starts when you join a channel. This site keeps your last 300 received lines in that tab while you remain joined; leaving, reconnecting or refreshing starts fresh. Earlier messages aren’t replayed.</li>
-            <li>A limited buffer of recent messages is held in server memory for moderation. It is separate from your scrollback and isn’t a public chat archive.</li>
+            <li>A limited buffer of recent messages is held in server memory for moderation. It is separate from your scrollback and isn’t a public chat archive. To let you report a line still visible after a server restart, we also keep bounded content digests and delivery metadata for up to 24 hours, only for connections that remain open. Digests do not contain the message text. Tapping 🚩 submits the exact text you received so the server can verify it before retaining report evidence.</li>
             <li>Messages reported by visitors, held by filters or flagged by AI can be kept in bounded active review queues for up to 24 hours. This can include message text, nickname, channel, nearby context and AI model/category signals. This evidence is separate from public chat scrollback and is not a public chat archive. Infrastructure backup retention is separate from the active review queue.</li>
             <li>The active moderation log records actions and nicknames separately from chat, for up to 30 days or 2,000 records, whichever limit is reached first. Scheduled cleanup runs approximately once per minute; infrastructure backups have separate retention.</li>
-            <li>Visitor stats are counts only (how many, when, which room types). Camera video goes straight between browsers and never touches our server.</li>
+            <li>Visitor stats are counts only (how many, when, which room types). Camera media is encrypted between participating browsers. When a direct connection is unavailable and a relay is enabled, encrypted media can pass through the relay. This service does not record camera media.</li>
         </ul>
-        <h2>Copyright and contact</h2>
-        <p>Copyright complaints (DMCA) or anything else: <b data-contact>[CONTACT EMAIL — set before public launch]</b>.</p>
+        <h2>Reports, appeals and contact</h2>
+        <p>Tap 🚩 beside a received message to submit a report. Moderators review reports when available; this service does not promise immediate or round-the-clock review. For a moderation appeal, copyright complaint or a report you cannot submit in chat, use <b data-contact>[A monitored contact must be configured before visitor invitations]</b>. Include the channel, approximate time and message ID if available. Do not send private invitation links, access codes or passwords.</p>
         <p class="small">Draft v0.1, October 2026. These rules get a lawyer’s review before Hang Out is linked publicly.</p>
         <p><a class="btn" href="../lobby/">Back to #stalemate</a></p>
     </main>
