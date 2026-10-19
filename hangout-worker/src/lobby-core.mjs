@@ -187,7 +187,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     const mkChannel = (name, kind, title, founder) => ({
         name, kind, title, founder, created: now(), topic: kind === 'lobby' ? 'Welcome to #stalemate. Pull up a nick, say hello, make something together. /help for commands.' : '',
         modes: { m: false, i: false, k: '', l: kind === 'lobby' ? L.lobbyMax : L.roomMax, t: true, S: kind === 'lobby' ? L.defaultSlow : 0, C: kind !== 'lobby' && kind !== 'chat', Q: false, locked: false },
-        jam: kind === 'jam' ? { desktop: '', web: '' } : null, ops: new Set(founder ? [founder] : []), voice: new Set(), bans: [], invites: new Set(), kicks: {},
+        jam: kind === 'jam' ? { desktop: '', web: '' } : null, ops: new Set(founder ? [founder] : []), opAccounts: new Map(), voice: new Set(), bans: [], invites: new Set(), kicks: {},
         owner: '', cohostLabels: {}, cohosts: new Set(), renewed: now(), transfer: null, members: new Set(), moderationContext: [], emptySince: null,
         act: { strokes: [], video: null }
     });
@@ -622,7 +622,26 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (room.kind === 'lobby' || !owns(c, room)) { bot(c, 'Only the registered room owner can do that.', 'error'); return false; }
         return true;
     }
-    function roomSnapshot() { return { version: 1, rooms: [...channels.values()].filter((r) => r.kind !== 'lobby').map(roomRecord) }; }
+    function removeDeviceOp(room, dev) { room.ops.delete(dev); room.opAccounts.delete(dev); }
+    function removeCohost(room, account) {
+        room.cohosts.delete(account); delete room.cohostLabels[account];
+        if (room.transfer?.to === account) room.transfer = null;
+        // Grant-time bindings survive disconnect/restart. Legacy unmapped grants
+        // can also be identified by an exact admitted account/device binding,
+        // but never by a retained label or a subsequently reused nickname.
+        for (const [dev, grantedAccount] of room.opAccounts) if (grantedAccount === account) removeDeviceOp(room, dev);
+        for (const person of conns.values()) if (person.account === account && !room.opAccounts.has(person.dev)) removeDeviceOp(room, person.dev);
+    }
+    const roomMetadata = (room) => ({ ...roomRecord(room), opAccounts: [...room.opAccounts] });
+    function roomSnapshot() { return { version: 1, rooms: [...channels.values()].filter((r) => r.kind !== 'lobby').map(roomMetadata) }; }
+    function validOpAccounts(room) {
+        // The optional field keeps existing ops arrays readable without inventing
+        // historical identity associations. Each current grant adds at most one.
+        const rows = room.opAccounts;
+        return rows === undefined || Array.isArray(rows) && rows.length <= room.ops.length
+            && rows.every((row) => Array.isArray(row) && row.length === 2 && row.every(moderationIdentity) && room.ops.includes(row[0]))
+            && new Set(rows.map(([dev]) => dev)).size === rows.length;
+    }
     // Metadata belongs to an already admitted WebSocket, never to a returning nickname.
     // The adapter supplies the exact live socket identities again after hibernation.
     function sessionMetadata() {
@@ -708,17 +727,17 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     }
     function roomCapacity(extraRoom) {
         const snapshot = roomSnapshot();
-        if (extraRoom) snapshot.rooms.push(roomRecord(extraRoom));
+        if (extraRoom) snapshot.rooms.push(roomMetadata(extraRoom));
         return encoder.encode(JSON.stringify(snapshot)).byteLength <= roomStateLimit - ROOM_GROWTH_RESERVE;
     }
     function restoreRooms(saved) {
         if (saved === undefined) return;
-        if (!saved || saved.version !== 1 || !Array.isArray(saved.rooms) || saved.rooms.length > 1030 || encoder.encode(JSON.stringify(saved)).byteLength > roomStateLimit || saved.rooms.some((r) => !validRoom(r, now())) || new Set(saved.rooms.map((r) => r.name)).size !== saved.rooms.length) {
+        if (!saved || saved.version !== 1 || !Array.isArray(saved.rooms) || saved.rooms.length > 1030 || encoder.encode(JSON.stringify(saved)).byteLength > roomStateLimit || saved.rooms.some((r) => !validRoom(r, now()) || !validOpAccounts(r)) || new Set(saved.rooms.map((r) => r.name)).size !== saved.rooms.length) {
             roomsBroken = true; net.lock = 'readonly'; net.lockAuto = true; return;
         }
         for (const r of saved.rooms) {
             const room = mkChannel(r.name, r.kind, r.title, r.founder);
-            Object.assign(room, r, { ops: new Set(r.ops), voice: new Set(r.voice), invites: new Set(r.invites), cohosts: new Set(r.cohosts), emptySince: r.emptySince ?? now() });
+            Object.assign(room, r, { ops: new Set(r.ops), opAccounts: new Map(r.opAccounts || []), voice: new Set(r.voice), invites: new Set(r.invites), cohosts: new Set(r.cohosts), emptySince: r.emptySince ?? now() });
             // Decode through the activity validators; malformed media state cannot become a frame.
             room.act = { strokes: [], video: null };
             for (const stroke of r.act.strokes) applyStroke(room, stroke);
@@ -816,7 +835,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             if (!c.account) return bot(c, 'Sign in with email to keep a room across visits.', 'error');
             if (room.kind === 'lobby' || room.owner || room.founder !== c.dev || !room.members.has(c.id)) return bot(c, 'Only this temporary room’s founder can register it.', 'error');
             if ([...channels.values()].filter((r) => r.owner === c.account).length >= 3 || [...channels.values()].filter((r) => r.owner).length >= 1000) return bot(c, 'Registered room allowance reached (3 per account; 1,000 sitewide).', 'error');
-            room.owner = c.account; room.ops.delete(c.dev); room.renewed = now();
+            room.owner = c.account; removeDeviceOp(room, c.dev); room.renewed = now();
             log(c.nick, 'room-register', room.name); sendChan(room); pushList();
             bot(c, 'Room registered. Ownership expires after 90 days without an owner or verified co-host visit.');
         },
@@ -824,13 +843,13 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             if (!ownerOnly(c, room)) return;
             if (!['add', 'remove'].includes(action)) return bot(c, '/cohost add|remove nick', 'error');
             if (action === 'remove' && room.cohosts.has(nick)) {
-                room.cohosts.delete(nick); delete room.cohostLabels[nick]; if (room.transfer?.to === nick) room.transfer = null;
+                removeCohost(room, nick);
                 log(c.nick, 'cohost-remove', 'verified co-host', '', room.name); sendChan(room); pushList(); return;
             }
             const t = target(c, nick); if (!t || !t.account || !room.members.has(t.id)) return bot(c, 'Choose an email-verified member of this room.', 'error');
             if (owns(t, room)) return bot(c, 'The owner already has host access.', 'error');
             if (action === 'add' && room.cohosts.size >= 20) return bot(c, 'This room already has 20 verified co-hosts.', 'error');
-            if (action === 'add') { room.cohosts.add(t.account); room.cohostLabels[t.account] = t.nick; } else { room.cohosts.delete(t.account); delete room.cohostLabels[t.account]; room.ops.delete(t.dev); }
+            if (action === 'add') { room.cohosts.add(t.account); room.cohostLabels[t.account] = t.nick; } else removeCohost(room, t.account);
             if (room.transfer?.to === t.account) room.transfer = null;
             log(c.nick, `cohost-${action}`, t.nick, '', room.name); sendChan(room); pushList();
         },
@@ -847,7 +866,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             if ([...channels.values()].filter((r) => r.owner === c.account).length >= 3) return bot(c, 'You already own three rooms.', 'error');
             room.cohosts.add(room.owner); room.cohostLabels[room.owner] = membersOf(room).find((m) => owns(m, room))?.nick || 'Previous owner'; room.cohosts.delete(c.account); delete room.cohostLabels[c.account]; room.owner = c.account; room.renewed = now(); room.transfer = null;
             // The original guest identity must not retain ownership privileges after transfer.
-            room.ops.delete(room.founder); room.founder = c.dev;
+            removeDeviceOp(room, room.founder); room.founder = c.dev;
             log(c.nick, 'room-transfer', room.name); sendChan(room); pushList();
         },
         unregister(c, room) {
@@ -1210,6 +1229,10 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (!on && owns(t, chan)) return bot(c, 'The room owner keeps host access.', 'error');
         if (on && chan[set].size >= 150) return bot(c, 'Room grants are full; remove an existing grant first.', 'error');
         if (on) chan[set].add(t.dev); else chan[set].delete(t.dev);
+        if (set === 'ops') {
+            if (on && t.account) chan.opAccounts.set(t.dev, t.account);
+            else chan.opAccounts.delete(t.dev);
+        }
         event(chan, `${c.nick} sets mode ${flag} ${t.nick}`);
         log(c.nick, `mode ${flag}`, t.nick, '', chan.name);
         return sendChan(chan);
@@ -1240,6 +1263,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         const nameCheck = checkText(name.slice(1).replace(/-/g, ' '), net.lists, { handles: false });
         if (nameCheck.verdict !== 'ok') return bot(c, 'Not cool here. Pick another room name.', 'error');
         const room = mkChannel(name, kind, title.text.slice(0, 40), c.dev);
+        if (c.account) room.opAccounts.set(c.dev, c.account);
         if (key && /^[A-Za-z0-9]{3,20}$/.test(key)) room.modes.k = key;
         if (net.shield) room.modes.C = false;
         if (kind === 'jam') room.modes.i = true; // a WebJam invite carries the host's address: members only, founder invites
