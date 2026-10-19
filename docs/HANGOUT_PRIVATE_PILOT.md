@@ -1,5 +1,10 @@
 # Private Stalemate community pilot
 
+This records the earlier synthetic-role demonstration. For the separate real
+visitor beta, use the [current readiness assessment](HANGOUT_BETA_READINESS.md)
+and [beta handoff](HANGOUT_BETA_HANDOFF.md). Do not use this pilot's role selector
+as real owner or moderator authentication.
+
 Updated October 18, 2026 (deployment receipts use October 19 UTC).
 
 The community is implemented in **StalemateSite**, on `codex/hangout-irc-first`.

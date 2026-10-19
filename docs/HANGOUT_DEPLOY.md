@@ -1,5 +1,11 @@
 # Hang Out deployment reconciliation — private testing only
 
+For the current real visitor beta, use the [beta handoff](HANGOUT_BETA_HANDOFF.md)
+and [readiness assessment](HANGOUT_BETA_READINESS.md). They target
+`wrangler.beta.toml`. This document preserves the older synthetic pilot and main
+Worker integration guidance; its main-Worker vault helper is not a beta deploy
+command.
+
 This branch incorporates the relevant TURN, Access and vault preparation from
 [PR #25](https://github.com/rupret007/StalemateSite/pull/25), preserving the newer community
 moderators, persistent rooms and open community decisions. The existing Cloudflare setup is

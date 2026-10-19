@@ -1,0 +1,92 @@
+{
+  "time": "2026-10-19T03:32:46.487Z",
+  "origin": "https://stalemate-hangout-beta.jeffstory007.workers.dev",
+  "runId": "ep8aon",
+  "initialVersion": "da842199-79fc-4cfd-b51e-2c66fa01fb9e",
+  "checkoutAtStart": "851fa959836d5e352f7d298027f740a03e067f2e",
+  "kind": "actual compatible Cloudflare rollback and restore with invited lobby guests",
+  "phases": [
+    {
+      "kind": "rollback",
+      "version": "2f752cff-8aae-43fe-b1a6-4855057ae7a1",
+      "sourceCommit": "b3178e5c2f53a0cf48a94557004d845bf7672e98",
+      "checkedAt": "2026-10-19T03:33:48.930Z",
+      "clients": [
+        {
+          "nickname": "RestartHostep8aon",
+          "transportSurvived": true,
+          "connectedSessionHistoryPreserved": true,
+          "freshHistoryAfterReconnect": false,
+          "draftRecovered": true
+        },
+        {
+          "nickname": "RestartGuestep8aon",
+          "transportSurvived": true,
+          "connectedSessionHistoryPreserved": true,
+          "freshHistoryAfterReconnect": false,
+          "draftRecovered": true
+        }
+      ],
+      "checks": [
+        "actual compatible version change observed",
+        "lobby connection recovers",
+        "history follows real transport continuity",
+        "unsent drafts recover",
+        "late visitor gets no pre-join messages",
+        "new cross-browser chat works"
+      ]
+    },
+    {
+      "kind": "restore",
+      "version": "da842199-79fc-4cfd-b51e-2c66fa01fb9e",
+      "sourceCommit": "851fa959836d5e352f7d298027f740a03e067f2e",
+      "checkedAt": "2026-10-19T03:34:48.681Z",
+      "clients": [
+        {
+          "nickname": "RestartHostep8aon",
+          "transportSurvived": true,
+          "connectedSessionHistoryPreserved": true,
+          "freshHistoryAfterReconnect": false,
+          "draftRecovered": true
+        },
+        {
+          "nickname": "RestartGuestep8aon",
+          "transportSurvived": true,
+          "connectedSessionHistoryPreserved": true,
+          "freshHistoryAfterReconnect": false,
+          "draftRecovered": true
+        }
+      ],
+      "checks": [
+        "actual compatible version change observed",
+        "lobby connection recovers",
+        "history follows real transport continuity",
+        "unsent drafts recover",
+        "late visitor gets no pre-join messages",
+        "new cross-browser chat works"
+      ]
+    }
+  ],
+  "scope": [
+    "two real invited guest lobby connections",
+    "connected-session history or honest fresh history after transport reconnect",
+    "unsent draft recovery",
+    "late-join no-backlog",
+    "cross-browser chat after each version change"
+  ],
+  "observedAbuseLimit": {
+    "at": "2026-10-19T03:30:56.996Z",
+    "outcome": "expected denial",
+    "message": "Too many new rooms from your connection this hour.",
+    "policy": "Persisted shared-egress-IP room-creation cap of 3 per hour. No reset or bypass performed."
+  },
+  "limitations": [
+    "Lobby-only version-boundary proof. No temporary or registered room persistence claim.",
+    "Owner/staff email, live AI, TURN/media and native WebJam are not verified by this run.",
+    "Actual rollback and restore are performed by the root operator and identified by Worker version."
+  ],
+  "status": "passed",
+  "pageErrors": 0,
+  "sessionCleanup": "all four guest sessions explicitly logged out and contexts closed",
+  "finishedAt": "2026-10-19T03:34:49.030Z"
+}

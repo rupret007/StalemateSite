@@ -35,8 +35,10 @@ part of this deployment.
 The provider audit on October 19 UTC found the main, pilot and shared TURN
 Workers. Access's API reported `access.api.error.not_enabled` for this account;
 the accessible Turnstile widget list was empty. Current Wrangler OAuth could not
-read TURN keys or account analytics. Vaultwarden's bot CLI reported
-`unauthenticated`. These are unresolved setup requirements, not passing tests.
+read TURN keys or account analytics. Vaultwarden's bot CLI initially reported
+`unauthenticated`; interactive access was subsequently restored and the OpenAI
+key passed a live moderation request. Access/TURN setup remains unresolved; see
+[the current assessment](HANGOUT_BETA_READINESS.md) for the latest evidence.
 
 ## Build and deploy privately
 
@@ -146,3 +148,8 @@ newer state. Keep admission paused while resolving incompatible storage.
 Operational references: [Cloudflare Access for Workers](https://developers.cloudflare.com/workers/configuration/cloudflare-access/),
 [TURN analytics](https://developers.cloudflare.com/realtime/turn/analytics/),
 [OpenAI moderation](https://developers.openai.com/api/docs/guides/moderation).
+
+The [current assessment](HANGOUT_BETA_READINESS.md) records the actual deployment,
+separate-browser checks, rollback/restore receipt and remaining blockers. Its
+successful lobby drill does not establish persistent-room recovery or authorize
+inviting visitors before real staff access and contact are configured.

@@ -1,0 +1,82 @@
+{
+  "time": "2026-10-19T03:19:46.289Z",
+  "origin": "https://stalemate-hangout-beta.jeffstory007.workers.dev",
+  "kind": "real hosted invited-guest technical checks",
+  "status": "passed",
+  "runId": "eorkoh",
+  "checks": [
+    {
+      "name": "Uninvited profiles denied product assets and all relay endpoints; portal exposes no synthetic role selector",
+      "denialCount": 10
+    },
+    {
+      "name": "Separate invited guests exchange chat without receiving pre-join history"
+    },
+    {
+      "name": "Guest identity cannot acquire owner/staff roles; unconfigured Access fails closed",
+      "ownerLoginStatus": 503,
+      "staffLoginStatus": 503,
+      "accessConfigured": false
+    },
+    {
+      "name": "A guest hosts an invite-only art room, enforces admission, shares actual canvas drawing and cannot register without verified email"
+    },
+    {
+      "name": "Same live sockets retain membership and scrollback through 75 seconds idle; reporting pre-idle text receives durable acknowledgement",
+      "idleSeconds": 75
+    },
+    {
+      "name": "Synthetic guest-hosted proof room removed by its host"
+    },
+    {
+      "name": "Automated hosted WebKit layouts fit 375 and 390px with 16px message input and visible Send"
+    },
+    {
+      "name": "Logout closes two profiles sharing a session across lobby and private relay; copied pre-logout cookies cannot replay assets or reconnect"
+    }
+  ],
+  "phones": [
+    {
+      "engine": "webkit",
+      "width": 375,
+      "status": "passed",
+      "screenshot": "hosted-webkit-375.png",
+      "layout": {
+        "viewport": 375,
+        "htmlWidth": 375,
+        "bodyWidth": 375,
+        "inputFont": 16,
+        "inputLeft": 46,
+        "inputRight": 294,
+        "inputWidth": 248,
+        "sendLeft": 299,
+        "sendRight": 357
+      }
+    },
+    {
+      "engine": "webkit",
+      "width": 390,
+      "status": "passed",
+      "screenshot": "hosted-webkit-390.png",
+      "layout": {
+        "viewport": 390,
+        "htmlWidth": 390,
+        "bodyWidth": 390,
+        "inputFont": 16,
+        "inputLeft": 46,
+        "inputRight": 309,
+        "inputWidth": 263,
+        "sendLeft": 314,
+        "sendRight": 372
+      }
+    }
+  ],
+  "limitations": [
+    "No real email, owner or staff identity was used; Access delivery remains separate evidence.",
+    "No live AI classifier, forced TURN/media, or native WebJam session was exercised.",
+    "WebKit viewports are automated engine checks, not physical iPhone Safari."
+  ],
+  "pageErrors": 0,
+  "syntheticRoomCleanup": "confirmed",
+  "finishedAt": "2026-10-19T03:21:11.413Z"
+}
