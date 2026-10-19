@@ -71,6 +71,15 @@ acceptance.
   regression reproduces and fixes an obsolete local offer entering a pending
   remote-offer operation. These narrow fixes passed independent source review;
   they do not explain or fix the zero-candidate startup failure above.
+  The combined source `aebec95` passed **575 unit tests and all 196 browser
+  scenarios without retries** in both [PR CI](https://github.com/rupret007/StalemateSite/actions/runs/39209749176)
+  and [push CI](https://github.com/rupret007/StalemateSite/actions/runs/39209743297).
+  Local startup failures remain unresolved despite those passes. A separate
+  diagnostic stopped at its first real stall, invoked one guest ICE restart,
+  and observed no recovery in another 15 seconds. A restart-only watchdog has
+  not been implemented. Bounded native controls, including separate browser
+  contexts with fake camera capture, connected successfully but did not
+  reproduce or explain the app failure.
 
 - [Ownership-offer recovery](../pr-assets/beta-collaboration/ownership-offer-recovery.json):
   a reproduced ten-minute offer loss across wake is fixed with bounded,

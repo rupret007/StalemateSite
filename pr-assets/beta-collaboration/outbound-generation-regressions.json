@@ -34,7 +34,17 @@
     "captureRemainsOff": true,
     "queuedChatDeliveredOnce": true,
     "strokeAndSignedHostSeparateBrowserReplayTested": false,
-    "independentSourceReview": "No actionable issue found."
+    "independentSourceReview": "No actionable issue found.",
+    "currentCi": {
+      "sourceCommit": "aebec95f2b2b3340cbad2271e991284f2cbf000b",
+      "runs": [
+        39209749176,
+        39209743297
+      ],
+      "unitTestsPassed": 575,
+      "browserScenariosPassed": 196,
+      "retries": 0
+    }
   },
   "knownSeparateStartupFailureResolved": false,
   "deployed": false,
