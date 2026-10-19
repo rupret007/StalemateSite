@@ -30,7 +30,7 @@ protected Cloudflare beta, with separate actual visitor browser contexts.
 | Host controls and abuse limits | Hosted guests verified restricted-room admission and device-op handoff. A granted guest kept managing a temporary room across deployment and after its creator logged out. Automated room/PM consent, account/device limits, caps and emergency controls pass. | Run Jeff's authenticated incident/recovery drill; any additional staff need an explicit appointment and separate allowlists. |
 | Bounded AI assistance | Actual hosted guest text completed one provider review under a one-request daily cap. A second message reached the other guest while quota stayed at one and review was skipped. Both guests logged out; AI was restored off with the configured 100/day allowance. Automated queue/privacy/outage checks pass. | A separate owned synthetic-fiction test produced one real provider flagged counter with one additional reserved attempt. Exact saved AI queue visibility and human disposition remain unverified; keep AI off. |
 | Shared drawing | Actual browser drawing reached a separate guest; a fresh post-deployment visitor received the saved drawing. WebKit/Android touch drawing and reconnect checks pass. | Physical touch-device acceptance. |
-| Watch synchronization | Two invited Chromium guests passed real YouTube play/pause/paused seek/resume in both a private room and a naturally guest-hosted temporary channel. Channel host controls worked; the server rejected one ordinary guest control request. The late joiner received current activity without earlier chat. The founder closed the test channel and both guests logged out. Phone fixtures cover source changes and cancellation. | Physical-device/mobile autoplay and separate household networks remain to be accepted. The hosted checks used separate contexts on one Mac. |
+| Watch synchronization | Two invited Chromium guests passed real YouTube play/pause/paused seek/resume in both a private room and a naturally guest-hosted temporary channel. Channel host controls worked; the server rejected one ordinary guest control request. The late joiner received current activity without earlier chat. The founder closed the test channel and both guests logged out. Phone fixtures cover source changes and cancellation. | The deployed source misses YouTube's blocked-autoplay event; a [tested recovery fix](../pr-assets/beta-collaboration/watch-autoplay.json) passes real-provider denial recovery on both loopback surfaces but is not deployed. Hosted denial recovery, physical/mobile autoplay and separate networks remain to be accepted. Hosted checks used separate contexts on one Mac. |
 | WebJam invitation/join | Actual native host invitation crossed two Cloudflare guests unchanged into actual Qt Join; a native guest authenticated and received a real Jamulus response. | Same Mac with explicit sealed-reply fallback. Mac, Windows and Linux are all beta requirements; Windows native v3 is blocked by its unsigned bundled fabric; do not weaken the signature check. Compatible packaged installation, cross-network audio and timing remain to be accepted on all required platforms. Browser Web Join is disabled; its deployed site returned 404. |
 | Camera/TURN and cost controls | Two invited guests on one Mac exchanged decoded synthetic-camera video through the deployed beta, then passed capture-off, passive reconnect and logout cleanup. Consent, credential expiry/refresh, failure fallback and serialized usage/rate accounting pass provider fixtures. A separate read-only account-wide analytics query returned zero October TURN egress bytes. | Physical cameras, separate networks and forced relay remain unverified. TURN is off; beta issuer/analytics credentials and shared allocation are missing. The zero sample does not establish remaining free allowance or billing; admission estimates are not a billing cap. |
 | Mobile usability | All repository browser checks passed, including WebKit phone projects. Hosted 375/390px captures have no page overflow, wrapping text, 16px input and visible Send. | Real iPhone Safari keyboard, Access redirects, camera/audio and background/resume are unverified. |
@@ -92,6 +92,31 @@ acceptance.
   stopped at a hidden desktop navigation button before any room-join request;
   both sessions logged out. Local reproduction identified that selector error;
   the corrected runner checks actual pane visibility before navigation.
+
+- [Blocked-autoplay recovery](../pr-assets/beta-collaboration/watch-autoplay.json):
+  YouTube returns no play promise, so the previous players could leave the tap
+  prompt hidden after policy denial and publish a blocked host's local pause.
+  Prepared source `baf96de` handles the provider event, preserves shared play
+  intent and keeps the gesture prompt until actual playback. Both old-code
+  regressions failed at the intended hidden-button assertion; seven new policy
+  fixtures and twelve related watch checks pass directly. Independent review
+  identified a delayed-callback edge, now fixed and covered on both surfaces.
+  This candidate is not deployed while the natural expiry observation runs.
+  A [real-provider private-host probe](../pr-assets/beta-collaboration/watch-autoplay-provider-private.json)
+  now passes on loopback: genuine denial with no activation in either document,
+  more than 2.3 seconds paused with shared play preserved, one trusted site tap,
+  then decoded frames and time growth with the prompt cleared. No native-player
+  click or simulated provider event was used. The [old-source baseline](../pr-assets/beta-collaboration/watch-autoplay-provider-baseline.json)
+  reproduced a hidden prompt and unwanted shared pause; its overall recovery
+  attempt failed because no native recovery control was visible, and remains
+  recorded as failed. The [first local probe](../pr-assets/beta-collaboration/watch-autoplay-provider-attempt1.json)
+  stopped earlier at browser inspection; a [neutral frame-routing control](../pr-assets/beta-collaboration/watch-autoplay-frame-routing.json)
+  validates the corrected reader without granting activation. Every probe closed
+  its owned resources. A separate [natural guest-channel founder probe](../pr-assets/beta-collaboration/watch-autoplay-provider-channel.json)
+  also passes the genuine denial, 2.3-second shared-intent hold, single product
+  tap and decoded playback checks; its exact owned temporary channel was closed.
+  These are separate single-host Chromium checks on one Mac, not hosted,
+  multi-visitor synchronization, physical/mobile or separate-network acceptance.
 
 - [Initial-offer arbitration](../pr-assets/beta-collaboration/initial-offer-arbitration.json):
   when both peers already publish media, one defers its first offer while
@@ -420,6 +445,8 @@ earlier website/game work into these diffs:
 - [#46: initial camera state and WebRTC negotiation](https://github.com/rupret007/StalemateSite/pull/46)
 - [#47: initial-offer arbitration and passive-viewer recovery](https://github.com/rupret007/StalemateSite/pull/47)
 - [#48: watch-player invitation privacy and real-provider acceptance](https://github.com/rupret007/StalemateSite/pull/48)
+- [#49: wait for snapshot delivery in the replay fixture](https://github.com/rupret007/StalemateSite/pull/49)
+- [#50: recover watch playback after browser autoplay denial](https://github.com/rupret007/StalemateSite/pull/50)
 
 Initial hosted receipts and the assessment are supplied in documentation PR #36
 stacked on #35. Subsequent evidence and installer progress are recorded in

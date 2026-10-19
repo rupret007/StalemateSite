@@ -28,7 +28,7 @@
             myId: null, names: new Map(), camOn: false, ice: null,
             pcs: new Map(), stream: null, peers: new Set()
         };
-        const player = { yt: null, ytReady: null, kind: null, key: '', readyKey: '', loading: null, applying: 0 };
+        const player = { yt: null, ytReady: null, kind: null, key: '', readyKey: '', loading: null, applying: 0, autoplayBlocked: false };
         let videoPublishTimer;
         let live = null;
         let pendingPts = [];
@@ -65,7 +65,8 @@
             ui.video.hidden = true;
             ui.tiles.replaceChildren();
             if (player.yt && player.yt.stopVideo) try { player.yt.stopVideo(); } catch (e) { /* */ }
-            player.key = ''; player.readyKey = '';
+            player.key = ''; player.readyKey = ''; player.autoplayBlocked = false;
+            ui.tap.hidden = true;
         }
 
         function onJoin(chan, act) {
@@ -248,7 +249,7 @@
                 ui.url.value = '';
                 hostVideo({ kind: 'yt', id }, true, 0);
             });
-            ui.tap.addEventListener('click', () => { ui.tap.hidden = true; syncToState(true); });
+            ui.tap.addEventListener('click', () => syncToState(true));
         }
 
         function loadYouTubeApi() {
@@ -269,6 +270,8 @@
             const previous = player.loading;
             player.key = key;
             player.readyKey = '';
+            player.autoplayBlocked = false;
+            ui.tap.hidden = true;
             player.kind = 'yt';
             const generation = roomGeneration;
             const loading = (async () => {
@@ -292,7 +295,7 @@
                         ui.yt.replaceWith(frame);
                         ui.yt = frame;
                         player.yt = new YT.Player(ui.yt, {
-                            events: { onReady: resolve, onStateChange: onYtState }
+                            events: { onReady: resolve, onStateChange: onYtState, onAutoplayBlocked: onYtAutoplayBlocked }
                         });
                     });
                 } else player.yt.cueVideoById(source.id);
@@ -307,7 +310,7 @@
         function localPlaying() { return player.yt && player.yt.getPlayerState ? player.yt.getPlayerState() === 1 : false; }
         function hold(fn) { player.applying = Date.now() + 900; fn(); }
         function seekTo(s) { hold(() => { if (player.yt) player.yt.seekTo(s, true); }); }
-        function playLocal() { hold(() => { const p = player.yt && player.yt.playVideo(); if (p && p.catch) ui.tap.hidden = false; }); }
+        function playLocal() { hold(() => { if (player.yt) player.yt.playVideo(); }); }
         function pauseLocal() { hold(() => { if (player.yt) player.yt.pauseVideo(); }); }
 
         async function syncToState(force) {
@@ -317,6 +320,8 @@
             await ensureSource(requested.source);
             const v = state.room.video;
             if (generation !== roomGeneration || !v || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
+            if (!v.playing) { player.autoplayBlocked = false; ui.tap.hidden = true; }
+            else if (player.autoplayBlocked && !force) return;
             const want = H.expectedPosition(v, state.clock.relayNow());
             if (force || H.needsCorrection(localTime(), want)) seekTo(want);
             if (v.playing && !localPlaying()) playLocal();
@@ -330,13 +335,22 @@
             syncToState(true);
         }
 
+        function onYtAutoplayBlocked() {
+            const v = state.room.video;
+            if (!state.ch || localPlaying() || !v?.playing || v.source.kind !== 'yt' || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
+            // Policy denial is local, not a request to pause everyone else.
+            player.autoplayBlocked = true;
+            ui.tap.hidden = false;
+        }
         function onYtState(ev) {
-            if (!isOp() || Date.now() < player.applying || !state.room.video) return;
+            if (!state.ch) return;
+            if (ev.data === 1) { player.autoplayBlocked = false; ui.tap.hidden = true; }
+            if (!isOp() || player.autoplayBlocked || Date.now() < player.applying || !state.room.video) return;
             if (ev.data !== 1 && ev.data !== 2) return;
             clearTimeout(videoPublishTimer);
             const channel = state.ch;
             videoPublishTimer = setTimeout(() => {
-                if (state.ch === channel && isOp() && state.room.video && Date.now() >= player.applying) {
+                if (state.ch === channel && isOp() && !player.autoplayBlocked && state.room.video && Date.now() >= player.applying) {
                     actSend({ kind: 'video', source: state.room.video.source, playing: localPlaying(), pos: localTime() });
                 }
             }, 100);
@@ -344,7 +358,7 @@
         setInterval(() => {
             if (!isOp()) return syncToState(false);
             const v = state.room.video;
-            if (!v || !player.yt || player.readyKey !== `${v.source.kind}:${v.source.id}` || Date.now() < player.applying) return;
+            if (!v || !player.yt || player.autoplayBlocked || player.readyKey !== `${v.source.kind}:${v.source.id}` || Date.now() < player.applying) return;
             // YouTube does not reliably emit a state change when a paused
             // player is scrubbed. Publish the host's changed position instead
             // of correcting the host back to the previous shared position.

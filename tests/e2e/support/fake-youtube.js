@@ -22,12 +22,16 @@ window.YT = {
         let base = 0;
         let started = null;
         let playerState = 2;
+        // Opt-in policy fixture only. Real playVideo() returns void, including
+        // when browser policy blocks playback; the API reports that separately.
+        // Existing suites keep their original immediate-play behavior.
+        const policy = window.__ytAutoplayControl || null;
         const now = () => performance.now() / 1000;
         const time = () => (started === null ? base : base + (now() - started));
         const syncState = () => { playerState = started === null ? 2 : 1; };
         const emit = (state) => {
             playerState = state;
-            opts.events && opts.events.onStateChange && opts.events.onStateChange({ data: state });
+            opts.events && opts.events.onStateChange && opts.events.onStateChange({ target: this, data: state });
         };
         const render = () => {
             syncState();
@@ -37,10 +41,31 @@ window.YT = {
         };
         this.getCurrentTime = () => time();
         this.getPlayerState = () => playerState;
-        this.playVideo = () => {
+        const startPlaying = () => {
             if (started === null) started = now();
             emit(1);
             render();
+        };
+        const autoplayBlocked = () => {
+            policy.blockedEvents = (policy.blockedEvents || 0) + 1;
+            opts.events && opts.events.onAutoplayBlocked && opts.events.onAutoplayBlocked({ target: this });
+        };
+        if (policy) {
+            policy.players = policy.players || [];
+            // Stored callbacks let focused tests deliver a provider event after
+            // a source change or room teardown without changing application state.
+            policy.players.push({ emitAutoplayBlocked: autoplayBlocked, finishPlayback: startPlaying });
+        }
+        this.playVideo = () => {
+            if (policy) {
+                policy.playCalls = (policy.playCalls || 0) + 1;
+                if (policy.blocked) {
+                    setTimeout(autoplayBlocked, 0);
+                    return;
+                }
+                if (policy.deferPlaying) return;
+            }
+            startPlaying();
         };
         this.pauseVideo = () => {
             if (started !== null) {
@@ -64,8 +89,8 @@ window.YT = {
             render();
             setTimeout(() => {
                 if (autoplay || wasPlaying) {
-                    started = now();
-                    emit(1);
+                    if (policy) this.playVideo();
+                    else { started = now(); emit(1); }
                 } else {
                     emit(2);
                 }
