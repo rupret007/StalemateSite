@@ -15,9 +15,12 @@ test.skip(({ browserName }) => browserName !== 'chromium', 'Chromium carries the
 
 let testOrigin;
 test.beforeAll(async ({ baseURL }) => { testOrigin = baseURL; });
+const roomContexts = new Set();
+test.afterEach(async () => { await Promise.all([...roomContexts].map((context) => context.close())); roomContexts.clear(); });
 
 async function openBrowser(browser) {
     const context = await browser.newContext({ permissions: ['camera', 'microphone'] });
+    roomContexts.add(context);
     await context.route(/youtube\.com|ytimg|googlevideo/, (route) => route.abort());
     await context.route('https://www.youtube.com/iframe_api', (route) => route.fulfill({ path: FAKE_YT, contentType: 'text/javascript' }));
     return context.newPage();
@@ -794,6 +797,7 @@ test('TURN servers are fetched before peer connections are opened', async ({ bro
     const host = await openBrowser(browser);
     await host.addInitScript(() => {
         const Orig = window.RTCPeerConnection;
+        localStorage.setItem('hangout-dev', `${'a'.repeat(22)}.${'b'.repeat(32)}`);
         window.__hangoutPcIce = [];
         window.RTCPeerConnection = function (config, ...args) {
             window.__hangoutPcIce.push(config);
@@ -803,7 +807,8 @@ test('TURN servers are fetched before peer connections are opened', async ({ bro
     await host.route('**/room-turn', async (route) => {
         if (route.request().method() === 'POST') {
             await new Promise((r) => setTimeout(r, 200));
-            await route.fulfill({ json: { iceServers: [{ urls: 'turn:fake' }] } });
+            expect(route.request().postDataJSON().device).toBe(`${'a'.repeat(22)}.${'b'.repeat(32)}`);
+            await route.fulfill({ json: { iceServers: [{ urls: 'turn:fake', username: 'fixture-user', credential: 'fixture-password' }], ttl: 600, expiresAt: Date.now() + 600000 } });
         } else {
             await route.continue();
         }

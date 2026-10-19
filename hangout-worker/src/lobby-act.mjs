@@ -1,8 +1,5 @@
 // Open-room paint + synced video: pure validation shared by lobby-core and unit tests.
-import { createRequire } from 'node:module';
-
-const require = createRequire(import.meta.url);
-const H = require('../../r/45662413410ed051/sync-core.js');
+import H from '../../r/45662413410ed051/sync-core.js';
 
 export const PAINT_KINDS = new Set(['art', 'bobross']);
 export const VIDEO_KINDS = new Set(['bobross', 'watch']);

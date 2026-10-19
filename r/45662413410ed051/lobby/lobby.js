@@ -43,7 +43,7 @@
         return roomApi;
     }
     const nickInput = $('[data-nick]');
-    nickInput.value = localStorage.getItem('hangout-nick') || ''; // blank by default; remembered on this device
+    nickInput.value = nickInput.value || localStorage.getItem('hangout-nick') || ''; // blank by default; remembered on this device
     $('[data-reroll]').addEventListener('click', (e) => {
         const r = window.StaleNames.roll();
         nickInput.value = r.name;
@@ -105,6 +105,7 @@
         gateStatus('Getting you in…');
         connect(nickInput.value.trim());
     });
+    $('[data-enter]').disabled = !previewKey || !relayBase;
     nickInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('[data-enter]').click(); });
 
     let retry = 0;

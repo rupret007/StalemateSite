@@ -30,3 +30,8 @@ secrets*
 !secrets.example*
 *.tar.gz
 *.zip
+
+.pilot-assets/
+.local/
+.wrangler/
+.dev.vars*

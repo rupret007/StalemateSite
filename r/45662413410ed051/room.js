@@ -33,7 +33,7 @@
         copy: $('[data-copy]'), load: $('[data-load]'), url: $('[data-url]'), picks: $('[data-picks]'), hostNote: $('[data-host-note]'),
         canvas: $('[data-canvas]'), swatches: $('[data-swatches]'), size: $('[data-size]'), clear: $('[data-clear]'), save: $('[data-save]'),
         log: $('[data-log]'), say: $('[data-say]'), text: $('[data-text]'), tiles: $('[data-tiles]'),
-        mic: $('[data-mic]'), cam: $('[data-cam]'), hangup: $('[data-hangup]'), ask: $('[data-ask]'),
+        mic: $('[data-mic]'), cam: $('[data-cam]'), hangup: $('[data-hangup]'), ask: $('[data-ask]'), turnStatus: $('[data-turn-status]'),
         askTitle: $('[data-ask-title]'), askCopy: $('[data-ask-copy]'), askYes: $('[data-ask-yes]'), askNo: $('[data-ask-no]'),
         yt: $('[data-yt]'), file: $('[data-file]'), tap: $('[data-tap]'),
         bobToggle: $('[data-bob-toggle]'), bob: $('[data-bob]'), bobNow: $('[data-bob-now]'), bobHold: $('[data-bob-hold]'),
@@ -57,7 +57,7 @@
             stream: null, rawCam: null, mic: false, cam: false, canvas: false, screen: null, hand: null, away: false, music: false,
             jam: params.get('kind') === 'jam', asked: {}, view: 'grid', pin: null, spot: null, locked: false, kicked: false,
             canvasPeers: new Set(), camPeers: new Set(), micPeers: new Set(), screenPeers: new Set(), awayPeers: new Set(), hands: {},
-            peers: new Set(), pcs: new Map(), ice: null, relayed: new Set(), removed: new Set(), lockedOut: new Set(), hidden: new Set(),
+            peers: new Set(), pcs: new Map(), opening: new Map(), ice: null, adult18: false, relayed: new Set(), removed: new Set(), lockedOut: new Set(), hidden: new Set(),
             levels: {}, meters: new Map(), ac: null, speaker: { id: null, since: 0 }, wantSent: new Map(), reactTimes: [], peerReacts: new Map(),
             mods: {}, bg: { choice: 'none', proc: null, el: null, frames: [], loading: false, light: false }, sink: null, lock: null
         }
@@ -143,7 +143,7 @@
     async function send(obj) {
         if (!app.ws || app.ws.readyState !== 1) return;
         const frame = JSON.stringify(await H.seal(app.key, obj));
-        pace.queue = V.enqueue(pace.queue, { frame, ice: obj.type === 'rtc' && Boolean(obj.ice) }, QUEUE_MAX);
+        pace.queue = V.enqueue(pace.queue, { frame, ice: obj.type === 'rtc' && Boolean(obj.ice), priority: obj.type === 'host' }, QUEUE_MAX);
         if (!pace.timer) paceFlush();
     }
 
@@ -207,6 +207,7 @@
             if (frame.left) {
                 app.names.delete(frame.left);
                 noteAv(frame.left, null);
+                closePc(frame.left);
             }
             showPeers(frame.peers);
             return;
@@ -757,32 +758,50 @@
         layout();
     }
 
-    function ask(title, copy) {
+    function ask(title, copy, { adult18 = false } = {}) {
+        if (ui.ask.open) return Promise.resolve(false);
         return new Promise((resolve) => {
             ui.askTitle.textContent = title;
-            ui.askCopy.textContent = copy;
-            const done = (v) => { ui.ask.close(); ui.askYes.onclick = null; ui.askNo.onclick = null; resolve(v); };
+            const confirmAge = adult18 && !app.av.adult18;
+            ui.askCopy.textContent = `${confirmAge ? 'Cameras are for adults 18+. Confirm you are 18 or older to continue. ' : ''}${copy}`;
+            ui.askYes.textContent = confirmAge ? 'I’m 18+ — ask my browser' : 'OK, ask my browser';
+            const cancel = (event) => { event.preventDefault(); done(false); };
+            const done = (v) => {
+                ui.ask.close(); ui.askYes.onclick = null; ui.askNo.onclick = null; ui.ask.removeEventListener('cancel', cancel);
+                if (v && confirmAge) app.av.adult18 = true;
+                resolve(v);
+            };
             ui.askYes.onclick = () => done(true);
             ui.askNo.onclick = () => done(false);
-            if (ui.ask.showModal) ui.ask.showModal(); else resolve(win.confirm(`${title}\n\n${copy}`));
+            ui.ask.addEventListener('cancel', cancel);
+            if (ui.ask.showModal) ui.ask.showModal(); else done(win.confirm(`${title}\n\n${ui.askCopy.textContent}`));
         });
     }
 
+    let turnClient;
     async function iceServers() {
-        if (app.av.ice) return app.av.ice;
-        app.av.ice = STUN;
-        if (!turnUrl) return app.av.ice;
-        try {
-            const res = await fetch(turnUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preview: previewKey, room: app.roomId }) });
-            if (res.ok) {
-                const data = await res.json();
-                if (Array.isArray(data.iceServers)) app.av.ice = STUN.concat(data.iceServers);
-            } else {
-                say('The video relay is out of free juice for now. Faces only work when browsers can connect directly.');
+        if (!turnClient) turnClient = win.HangoutTurn.createTurnClient({
+            url: turnUrl, preview: previewKey, room: app.roomId,
+            getDevice: () => { try { return localStorage.getItem('hangout-dev'); } catch (_) { return ''; } },
+            onStatus: (status) => {
+                ui.turnStatus.textContent = status === 'ready' ? 'Video relay available for connections that need it.'
+                    : status === 'device-required' ? 'Direct connections only. Join the lobby once on this browser to enable relay access.'
+                        : 'Video relay unavailable for now. Direct connections, chat and drawing remain available.';
+            },
+            onChange: (ice) => {
+                app.av.ice = ice;
+                for (const { pc } of app.av.pcs.values()) {
+                    try { pc.setConfiguration({ ...pc.getConfiguration(), iceServers: ice }); pc.restartIce(); } catch (_) { /* closed peer */ }
+                }
             }
-        } catch (error) { /* fail closed to direct-only */ }
+        });
+        app.av.ice = await turnClient.get();
         return app.av.ice;
     }
+    win.addEventListener('pagehide', () => turnClient?.stop());
+    win.addEventListener('pageshow', (event) => {
+        if (event.persisted && app.roomId) { turnClient = null; iceServers(); }
+    });
 
     function prefs() {
         try { return JSON.parse(localStorage.getItem('hangout-av') || '{}') || {}; } catch (error) { return {}; }
@@ -835,7 +854,7 @@
                         ? 'Tap Allow on the next pop-up. Only this room sees you.'
                         : app.av.jam
                             ? 'This is for talking between songs. Your playing goes through WebJam, so keep this off while you play or people hear you twice. Your browser will ask: tap Allow.'
-                            : 'Tap Allow on the next pop-up. Only this room hears you.');
+                            : 'Tap Allow on the next pop-up. Only this room hears you.', { adult18: kind === 'cam' });
                 if (!ok) return;
             }
             if (version !== captureVersion[mediaKind]) return;
@@ -891,7 +910,7 @@
         if (!restore && !(app.av.mic || app.av.cam) && avCount() >= V.MAX_CAMS) { say(`Faces are full (${V.MAX_CAMS} max). Chat and draw still work.`); return; }
         const version = ++captureVersion.video;
         const ok = restore || await ask('Show your real canvas?',
-            'Point your camera at your easel, sketchbook or lump of clay. Your browser will ask to use the camera. Tap Allow. On phones we try the back camera. Only people in this room see it.');
+            'Point your camera at your easel, sketchbook or lump of clay. Your browser will ask to use the camera. Tap Allow. On phones we try the back camera. Only people in this room see it.', { adult18: true });
         if (!ok || version !== captureVersion.video) return;
         try {
             const got = await navigator.mediaDevices.getUserMedia({ video: CANVAS_CAM });
@@ -1025,47 +1044,56 @@
         }
     }
 
-    function openPc(id) {
+    async function openPc(id) {
         if (app.av.pcs.has(id) || app.av.removed.has(id)) return;
-        const pc = new RTCPeerConnection({ iceServers: app.av.ice || STUN });
-        const conn = navigator.connection || {};
-        const thrifty = Boolean(conn.saveData) || conn.type === 'cellular' || /(^|-)2g|3g/.test(conn.effectiveType || '');
-        const entry = { pc, polite: app.myId > id, makingOffer: false, ignoreOffer: false, relayed: false, stream: new MediaStream(), senders: {}, wantHi: false, tier: thrifty ? 'weak' : 'ok', hist: [], restarts: 0, last: null };
-        app.av.pcs.set(id, entry);
-        pc.onicecandidate = (e) => { if (e.candidate) send({ type: 'rtc', to: id, ice: e.candidate.toJSON() }); };
-        pc.onnegotiationneeded = async () => {
-            try {
-                entry.makingOffer = true;
-                const offer = await pc.createOffer();
-                if (pc.signalingState !== 'stable') return;
-                if (app.av.music) offer.sdp = V.musicSdp(offer.sdp);
-                await pc.setLocalDescription(offer);
-                await send({ type: 'rtc', to: id, sdp: pc.localDescription.toJSON() });
-            } catch (error) { /* retried by next negotiation */ } finally { entry.makingOffer = false; }
-        };
-        pc.ontrack = (e) => {
-            entry.stream.addTrack(e.track);
-            e.track.onended = () => {
-                entry.stream.removeTrack(e.track);
+        if (app.av.opening.has(id)) return app.av.opening.get(id);
+        let finish;
+        const ready = new Promise((resolve) => { finish = resolve; });
+        app.av.opening.set(id, ready);
+        try {
+            await iceServers();
+            if (app.av.pcs.has(id) || app.av.removed.has(id) || !app.names.has(id) || !(app.av.mic || app.av.cam || app.av.peers.has(id))) return;
+            const pc = new RTCPeerConnection({ iceServers: app.av.ice || STUN });
+            const conn = navigator.connection || {};
+            const thrifty = Boolean(conn.saveData) || conn.type === 'cellular' || /(^|-)2g|3g/.test(conn.effectiveType || '');
+            const entry = { pc, polite: app.myId > id, makingOffer: false, ignoreOffer: false, pendingIce: [], relayed: false, stream: new MediaStream(), senders: {}, wantHi: false, tier: thrifty ? 'weak' : 'ok', hist: [], restarts: 0, last: null };
+            app.av.pcs.set(id, entry);
+            pc.onicecandidate = (e) => { if (e.candidate) send({ type: 'rtc', to: id, ice: e.candidate.toJSON() }); };
+            pc.onnegotiationneeded = async () => {
+                try {
+                    entry.makingOffer = true;
+                    const offer = await pc.createOffer();
+                    if (pc.signalingState !== 'stable') return;
+                    if (app.av.music) offer.sdp = V.musicSdp(offer.sdp);
+                    await pc.setLocalDescription(offer);
+                    await send({ type: 'rtc', to: id, sdp: pc.localDescription.toJSON() });
+                } catch (error) { /* retried by next negotiation */ } finally { entry.makingOffer = false; }
+            };
+            pc.ontrack = (e) => {
+                entry.stream.addTrack(e.track);
+                e.track.onended = () => {
+                    entry.stream.removeTrack(e.track);
+                    pruneStreamTracks(entry.stream);
+                    layout();
+                };
                 pruneStreamTracks(entry.stream);
+                if (e.track.kind === 'audio') watchLevel(id, entry.stream);
                 layout();
             };
-            pruneStreamTracks(entry.stream);
-            if (e.track.kind === 'audio') watchLevel(id, entry.stream);
+            pc.onconnectionstatechange = () => {
+                const s = pc.connectionState;
+                if (s === 'connected') { entry.restarts = 0; checkRelay(id, entry); layout(); }
+                if (s === 'disconnected') win.setTimeout(() => { if (pc.connectionState === 'disconnected') restartIce(id, entry); }, 3000);
+                if (s === 'failed') restartIce(id, entry);
+            };
+            syncTracks(entry);
+            if (!Object.keys(entry.senders).length) {
+                pc.addTransceiver('audio', { direction: 'recvonly' });
+                pc.addTransceiver('video', { direction: 'recvonly' });
+            }
             layout();
-        };
-        pc.onconnectionstatechange = () => {
-            const s = pc.connectionState;
-            if (s === 'connected') { entry.restarts = 0; checkRelay(id, entry); layout(); }
-            if (s === 'disconnected') win.setTimeout(() => { if (pc.connectionState === 'disconnected') restartIce(id, entry); }, 3000);
-            if (s === 'failed') restartIce(id, entry);
-        };
-        syncTracks(entry);
-        if (!Object.keys(entry.senders).length) {
-            pc.addTransceiver('audio', { direction: 'recvonly' });
-            pc.addTransceiver('video', { direction: 'recvonly' });
-        }
-        layout();
+        } catch (_) { say('Couldn’t start this video connection. Chat and drawing remain available.'); }
+        finally { app.av.opening.delete(id); finish(); }
     }
 
     /* Reconnect: ICE restart a few times, then give up on that one face politely. */
@@ -1131,7 +1159,7 @@
     async function onRtc(from, msg) {
         if (app.av.removed.has(from)) return;
         if (!(app.av.mic || app.av.cam) && !app.av.peers.has(from)) return;
-        if (!app.av.pcs.has(from)) openPc(from);
+        if (!app.av.pcs.has(from)) await openPc(from);
         const entry = app.av.pcs.get(from);
         if (!entry) return;
         const pc = entry.pc;
@@ -1141,6 +1169,9 @@
                 entry.ignoreOffer = !entry.polite && collision;
                 if (entry.ignoreOffer) return;
                 await pc.setRemoteDescription(msg.sdp);
+                for (const ice of entry.pendingIce.splice(0)) {
+                    try { await pc.addIceCandidate(ice); } catch (_) { /* stale candidate from a prior negotiation */ }
+                }
                 if (msg.sdp.type === 'offer') {
                     const answer = await pc.createAnswer();
                     if (app.av.music) answer.sdp = V.musicSdp(answer.sdp);
@@ -1148,6 +1179,10 @@
                     await send({ type: 'rtc', to: from, sdp: pc.localDescription.toJSON() });
                 }
             } else if (msg.ice) {
+                if (!pc.remoteDescription) {
+                    if (entry.pendingIce.length < 64) entry.pendingIce.push(msg.ice);
+                    return;
+                }
                 try { await pc.addIceCandidate(msg.ice); } catch (error) { if (!entry.ignoreOffer) throw error; }
             }
         } catch (error) { /* bad signaling from a peer; ignore */ }
@@ -1628,6 +1663,7 @@
         ui.check.hidden = true;
     }
     async function preCheck() {
+        if (!app.av.adult18 && !await ask('Test your camera and mic?', 'This preview stays on your device and is stopped when you close it. Tap Allow on the next pop-up.', { adult18: true })) return;
         stopPreCheck();
         const check = { stream: null, ac: null, pc: null, timer: 0, frame: 0, networkDone: null };
         activeCheck = check;

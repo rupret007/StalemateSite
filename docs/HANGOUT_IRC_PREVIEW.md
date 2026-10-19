@@ -1,6 +1,8 @@
 # IRC-first Hang Out development preview
 
-October 18, 2026. Local research and development on `codex/hangout-irc-first`.
+October 18, 2026. Private development and testing on `codex/hangout-irc-first`.
+
+A protected hosted pilot is now available alongside the local preview. See [private pilot access, verified behavior and limits](HANGOUT_PRIVATE_PILOT.md). The existing public site and production Worker were not deployed or linked to this pilot.
 
 ## Try it
 
@@ -11,9 +13,9 @@ npm ci
 npm run dev:hangout
 ```
 
-The command prints the complete local lobby link and runs the site plus a loopback-only relay on port 4387. Choose a guest nickname. Use another browser profile or private window for a separate visitor. Stop with Ctrl+C. To choose a different port, set `STALEMATE_TEST_PORT` before the command.
+Open **http://127.0.0.1:4387/__preview/**. The launcher offers Guest, Room owner A/B, Community moderator, and Site owner identities. Each opened tab has isolated device storage, so separate browser profiles are optional. Room/email and staff identities are clearly labeled local stand-ins. Local room and moderation state survive a restart; chat does not. Stop with Ctrl+C. Set `HANGOUT_PREVIEW_PORT` to choose another port. See [local testing instructions](HANGOUT_LOCAL_TESTING.md) for a complete test sequence and state-file details.
 
-The printed `local-preview-key-0001` value is the development fixture, not a production credential. The preview does not configure Cloudflare, send mail, or publish the feature. Existing public pages remain unlinked from Hang Out.
+The preview uses a development fixture internally, never a production credential. It does not configure Cloudflare, send mail, call an AI provider, or publish the feature. Existing public pages remain unlinked from Hang Out.
 
 ## What to try
 
@@ -43,11 +45,11 @@ These use temporary **local test visitors and example messages**, not live peopl
 
 ## Development baseline and changes
 
-The fresh checkout starts with PR #26's open-room implementation, then incorporates the current #23 video and #21 lobby branches. Their test conflicts and the lobby's YouTube CSP integration were resolved locally. This does not merge any GitHub PR. The separate [#25 deployment branch](https://github.com/rupret007/StalemateSite/pull/25) already contains Cloudflare setup preparation and regression checks, but has not been folded into this work. Reuse and reconcile that baseline; its absence here does not establish missing cloud resources.
+The fresh checkout starts with PR #26's open-room implementation, then incorporates the current #23 video and #21 lobby branches. Their test conflicts and the lobby's YouTube CSP integration were resolved locally. This does not merge any GitHub PR. The relevant TURN, Access and vault preparation from the separate [#25 deployment branch](https://github.com/rupret007/StalemateSite/pull/25) is now reconciled into this work. Existing cloud resources were inspected before creating the separate guarded pilot; see [deployment notes](HANGOUT_DEPLOY.md).
 
 The new slice adds conversation-first discovery, truthful presence/quiet/offline states, guest identity copy, draft prompts, unread mentions, accessible keyboard tabs, tab-local drafts, connection feedback, fresh bounded Turnstile checks per socket admission and safe session-reset behavior. A dated show announcement was replaced with a timeless default topic, and Art no longer implies a camera requirement.
 
-A production adapter bug was also fixed: the Worker previously emitted `hello` before its socket was available. Initial admission frames now wait until the socket is accepted; refused clients still fail before upgrade. Four adapter tests cover new/returning guests, refusal and hibernation admission. The locked `ws` dependency was patched within its existing version range.
+A production adapter bug was also fixed: the Worker previously emitted `hello` before its socket was available. Initial admission frames now wait until the socket is accepted; refused clients still fail before upgrade. Adapter tests cover new/returning guests, refusal and hibernation. Connected sessions now restore bounded membership and consent metadata after a Worker wake, without replaying chat or resetting the browser buffer. A reconnect still starts fresh. The locked `ws` dependency was patched within its existing version range.
 
 Tests now use isolated same-origin relay namespaces so room creation and moderation state do not leak across cases. Production caps remain unchanged, with an actual WebSocket regression proving both the room cap and namespace isolation.
 
@@ -55,21 +57,22 @@ The open-community follow-up removes band-absence shutdown while retaining emerg
 
 ## Validation recorded
 
-- Full unit suite: **35 files / 300 tests passed** after the community roles, persistent ownership and safeguard changes.
-- Combined focused Chromium lobby and AI-admin browser suite: **25 scenarios passed**. Includes two-browser art/video behavior, guest admission, moderation, phone layout and rejected creation feedback, host handoff, no pre-join chat, draft/mention behavior, reconnect, fresh challenges, bounded challenge-load failure, and explicitly mocked AI review/status/permissions/disclosures.
-- Pages packaging succeeded; whitespace checks passed. Screenshots captured with no browser page errors.
-- A mocked external Turnstile callback requires disabling Chromium's local-network provenance check in the discovery test fixture. The app's CSP stays enforced; this is not a claim to have tested a live Turnstile service.
+- Full unit suite: **43 files / 382 tests passed**.
+- Combined Chromium community suite: **93 scenarios passed**. Covers IRC chat, guest hosting, persistent ownership, report review, art/watch synchronization, consent, camera signaling, TURN fallback, reconnection and phone layouts.
+- Real protected Cloudflare pilot: two independent browsers verified chat, shared drawing, room registration, cross-device ownership recovery, no pre-join chat, visitor reports, moderator permissions and phone layout. The final idle/restart result is recorded in the [pilot notes](HANGOUT_PRIVATE_PILOT.md).
+- Public pages and JavaScript in the pilot both deny unauthenticated access. Provider-response tests for AI, TURN and Turnstile use explicit fixtures; these do not establish live provider integration.
 
-To repeat the focused checks:
+To repeat the checks:
 
 ```sh
 npm run test:unit -- --maxWorkers=2
-STALEMATE_TEST_PORT=4388 npx playwright test tests/e2e/lobby.spec.js tests/e2e/lobby-open-rooms.spec.js tests/e2e/lobby-discovery.spec.js tests/e2e/lobby-ai-admin.spec.js tests/e2e/lobby-community.spec.js --project=chromium --workers=1
+STALEMATE_TEST_PORT=4390 npx playwright test tests/e2e/hangout*.spec.js tests/e2e/lobby*.spec.js --project=chromium --workers=1
 npm run package:pages
+npm run package:pilot
 ```
 
 ## Boundaries and next work
 
-This is a working local collaboration slice, not a public launch. Guest hosting and classic IRC history are confirmed decisions: no chat backlog or replay is offered. Room settings, host grants and bounded activity snapshots now survive server restart. Connection membership and chat stay ephemeral. Optional verified-email ownership preserves named rooms across visits; see [community improvements](HANGOUT_COMMUNITY_IMPROVEMENTS.md). The server's bounded moderation buffer supports reports; it is never sent as join history, and dismissing a report does not rebroadcast old text to newcomers. Unsent drafts survive channel switches and reconnection within the current tab; closing the tab loses them. Delivery acknowledgements are not implemented. Long-term saved creations, schedules, notifications and a shared writing pad remain proposals; named room registration is implemented locally.
+This is a working private collaboration pilot. Public navigation remains unchanged. Guest hosting and classic IRC history are confirmed decisions: no chat backlog or replay is offered. Room settings, host grants and bounded activity snapshots now survive server restart. Chat stays ephemeral. Bounded connection metadata survives a server wake only for the same still-connected socket; an actual disconnect starts fresh. Optional verified-email ownership preserves named rooms across visits; see [community improvements](HANGOUT_COMMUNITY_IMPROVEMENTS.md). The server's bounded moderation buffer supports reports; it is never sent as join history, and dismissing a report does not rebroadcast old text to newcomers. Unsent drafts survive channel switches and reconnection within the current tab; closing the tab loses them. Delivery acknowledgements are not implemented. Long-term saved creations, schedules, notifications and a shared writing pad remain proposals; named room registration is implemented and tested in both the local preview and protected cloud pilot.
 
-Real Cloudflare admission/Access/TURN, Safari/iPhone hardware, WAN music timing and the WebJam `/join/` hosting/release path still need their recorded integration work. The band-absence rule is now resolved: community activity continues independently, with manual emergency controls retained. See [product direction](HANGOUT_PRODUCT_DIRECTION.md) and [AI moderation safeguards](HANGOUT_SAFEGUARDS_AI.md). The default local preview does not call an AI provider; automated AI UI/provider fixtures are explicitly mocked.
+The protected pilot verifies real Cloudflare WebSockets and private invitation admission. Production Access/email codes, Turnstile and TURN, Safari/iPhone hardware, WAN music timing and the WebJam `/join/` hosting/release path still need their recorded integration work. The band-absence rule is now resolved: community activity continues independently, with manual emergency controls retained. See [product direction](HANGOUT_PRODUCT_DIRECTION.md) and [AI moderation safeguards](HANGOUT_SAFEGUARDS_AI.md). The default local preview does not call an AI provider; automated AI UI/provider fixtures are explicitly mocked.

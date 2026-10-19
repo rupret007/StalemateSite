@@ -16,9 +16,12 @@ test.skip(({ browserName }) => browserName !== 'chromium', 'Chromium carries the
 
 let testOrigin;
 test.beforeAll(async ({ baseURL }) => { testOrigin = baseURL; });
+const roomContexts = new Set();
+test.afterEach(async () => { await Promise.all([...roomContexts].map((context) => context.close())); roomContexts.clear(); });
 
 async function openBrowser(browser, opts = {}) {
     const context = await browser.newContext(Object.assign({ permissions: ['camera', 'microphone'] }, opts));
+    roomContexts.add(context);
     await context.route(/youtube\.com|ytimg|googlevideo/, (route) => route.abort());
     await context.route('https://www.youtube.com/iframe_api', (route) => route.fulfill({ path: FAKE_YT, contentType: 'text/javascript' }));
     const page = await context.newPage();

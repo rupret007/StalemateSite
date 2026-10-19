@@ -1,0 +1,40 @@
+# Private invite-only pilot: separate service and state; no production site routes.
+name = "stalemate-hangout-pilot"
+main = "src/pilot-entry.mjs"
+compatibility_date = "2026-10-01"
+workers_dev = true
+preview_urls = false
+
+[assets]
+directory = "../.pilot-assets"
+binding = "ASSETS"
+run_worker_first = true
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "HangoutRoom"
+[[durable_objects.bindings]]
+name = "QUOTA"
+class_name = "HangoutQuota"
+[[durable_objects.bindings]]
+name = "LOBBY"
+class_name = "HangoutLobby"
+[[durable_objects.bindings]]
+name = "TURN_BUDGET"
+class_name = "HangoutTurnBudget"
+
+[[migrations]]
+tag = "pilot-v1"
+new_sqlite_classes = ["HangoutRoom", "HangoutQuota", "HangoutLobby", "HangoutTurnBudget"]
+
+[vars]
+PILOT_MODE = "protected"
+HANGOUT_OPEN = "1"
+HANGOUT_TURN_ENABLED = "0"
+HANGOUT_TURN_MONTHLY_GB = "800"
+HANGOUT_CF_ACCOUNT_ID = ""
+HANGOUT_AI_MODERATION = "off"
+HANGOUT_AI_DAILY_LIMIT = "100"
+HANGOUT_OWNER_EMAIL = "pilot-admin@pilot.invalid"
+HANGOUT_MODERATOR_EMAILS = "pilot-mod@pilot.invalid"
+WEBJAM_WEB_ORIGINS = ""

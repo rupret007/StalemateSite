@@ -32,6 +32,8 @@ async function openCheck(page, { delayMedia = false } = {}) {
     }, { delayMedia });
     await page.goto(`/r/45662413410ed051/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`);
     await page.click('[data-check-btn]');
+    await expect(page.locator('[data-ask-copy]')).toContainText('18 or older');
+    await page.click('[data-ask-yes]');
     await expect.poll(() => page.evaluate(() => window.checkStreams.length)).toBe(1);
 }
 

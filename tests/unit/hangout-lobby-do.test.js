@@ -159,18 +159,29 @@ describe('HangoutLobby WebSocket admission', () => {
         expect(lobby.pendingAdmission.size).toBe(0);
     });
 
-    it('re-admits a surviving socket with one hello after hibernation', async () => {
-        const state = stateWith();
-        const server = new Socket();
-        server.serializeAttachment({ id: 'survivor', ...identity });
-        state.acceptWebSocket(server, ['survivor']);
-        const lobby = new HangoutLobby(state, {});
-        await lobby.ready;
-        expect(server.frames.filter((frame) => frame.t === 'hello')).toHaveLength(1);
-        expect(server.frames[0]).toMatchObject({ t: 'hello', needNick: true, verified: false, capabilities: { moderate: false, configure: false, register: false } });
-        await lobby.webSocketMessage(server, JSON.stringify({ t: 'hello', nick: 'GuestBack', age13: true }));
-        expect(server.frames).toContainEqual(expect.objectContaining({ t: 'welcome', nick: 'GuestBack' }));
-        expect(lobby.pendingAdmission.size).toBe(0);
+    it('preserves a surviving connection and room membership without a new hello after hibernation', async () => {
+        const pairs = installUpgradeRuntime(); const state = stateWith();
+        const first = new HangoutLobby(state, {}); await first.fetch(request());
+        const server = pairs[0][1];
+        const message = (lobby, frame) => lobby.webSocketMessage(server, JSON.stringify(frame));
+        await message(first, { t: 'hello', nick: 'GuestBack', age13: true });
+        await message(first, { t: 'cmd', name: 'join', args: ['#connected-room'], ch: '#stalemate' });
+        await message(first, { t: 'say', ch: '#connected-room', text: 'Connected session marker' });
+        expect(JSON.stringify(state.values.get('sessions'))).not.toContain('Connected session marker');
+        const before = server.frames.length;
+        const restored = new HangoutLobby(state, {}); await restored.ready;
+        expect(server.frames.slice(before).some((f) => f.t === 'hello' || f.t === 'join')).toBe(false);
+        expect(restored.engine._debug.conns.get(server.attachment.id).nick).toBe('GuestBack');
+        expect(restored.engine._debug.channels.get('#connected-room').members.has(server.attachment.id)).toBe(true);
+        await message(restored, { t: 'say', ch: '#connected-room', text: 'Still connected after wake' });
+        expect(server.frames).toContainEqual(expect.objectContaining({ t: 'line', text: 'Still connected after wake' }));
+    });
+    it('closes a surviving socket if its saved session metadata is missing', async () => {
+        const state = stateWith(); const server = new Socket();
+        server.serializeAttachment({ id: 'survivor', ...identity }); state.acceptWebSocket(server, ['survivor']);
+        const lobby = new HangoutLobby(state, {}); await lobby.ready;
+        expect(server.closed).toMatchObject({ code: 4401, reason: 'session-missing' });
+        expect(server.frames.some((f) => f.t === 'hello')).toBe(false);
     });
 });
 
@@ -205,4 +216,15 @@ describe('durable community storage', () => {
         expect(ws.closed.code).toBe(4401);
         expect(lobby.engine._debug.conns.has('old-mod')).toBe(false);
     });
+});
+
+it('ends only the matching private-pilot sockets when its operator changes role or logs out', async () => {
+    const pairs = installUpgradeRuntime(); const state = stateWith();
+    const lobby = new HangoutLobby(state, { PILOT_MODE: 'protected' });
+    const sid = 'private-pilot-session-123';
+    await lobby.fetch(request({ ...identity, pilotSid: sid }));
+    await lobby.fetch(request({ ...identity, dev: 'other-device', pilotSid: 'different-pilot-session-456' }));
+    const response = await lobby.fetch(new Request('https://internal/__pilot/disconnect', { method: 'POST', headers: { 'X-Hangout-Identity': JSON.stringify({ pilotSid: sid }) } }));
+    expect(response.status).toBe(200); expect(pairs[0][1].closed.code).toBe(4401);
+    expect(pairs[1][1].closed).toBeUndefined();
 });

@@ -29,7 +29,7 @@
             <p class="small gate-hint">Your guest nickname is remembered here, not reserved. Camera and mic stay off.</p>
             <p class="small">Chat starts when you join. Scrollback stays in this tab for your connected session.</p>
             <p class="small" data-ai-disclosure>When AI review is enabled, public text may go to OpenAI after posting to flag messages for our moderators. PMs, invite links, invite-only/key-protected/locked rooms, cameras and encrypted private rooms are excluded. Flagged, reported or held evidence stays up to 24 hours, separate from chat scrollback.</p>
-            <button class="btn btn--big" type="button" data-enter>I’m 13+ and I agree · Let me in 🤘</button>
+            <button class="btn btn--big" type="button" data-enter disabled>I’m 13+ and I agree · Let me in 🤘</button>
             <p class="rules"><b>One rule: Don’t be a dick.</b> Swear all you want. You own what you post; site moderators can remove abusive content. <a href="../terms/" data-terms>House rules &amp; privacy</a></p>
             <button class="btn btn--ghost" data-gate-guest hidden>Continue as guest</button>
             <p class="status" data-gate-status role="status"></p>
@@ -114,6 +114,7 @@
                         </div>
                     </div>
                     <div class="act-cams" data-act-tiles aria-label="Room cameras"></div>
+                    <p class="small" data-act-relay-status role="status"></p>
                 </div>
             </div>
             <ol class="buffer" data-buffer role="log" aria-label="Conversation" aria-live="polite" aria-relevant="additions" aria-atomic="false"></ol>
@@ -186,6 +187,7 @@
     <script src="../names.js"></script>
     <script src="../sync-core.js"></script>
     <script src="../video-core.js"></script>
+    <script src="../turn-client.js"></script>
     <script src="../bob-ross.js"></script>
     <script src="discovery-core.js"></script>
     <script src="lobby-room.js"></script>

@@ -5,6 +5,7 @@
   "description": "Static site for Stalemate punk rock originals.",
   "scripts": {
     "dev:hangout": "node scripts/preview-hangout.cjs",
+    "package:pilot": "node scripts/package-pilot.cjs",
     "package:pages": "node scripts/package-pages.cjs",
     "serve:test": "node scripts/serve-test.cjs",
     "test": "npm run test:unit && npm run test:e2e",

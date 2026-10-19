@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="referrer" content="no-referrer">
+    <meta name="preview-csrf" content="__PREVIEW_NONCE__">
+    <title>Stalemate · private local testing</title>
+    <link rel="stylesheet" href="/__preview/assets/preview.css">
+    <script src="/__preview/assets/control.js" defer></script>
+</head>
+<body class="preview-control">
+    <main>
+        <p class="preview-eyebrow">STALEMATE · LOCAL TESTING</p>
+        <h1>Your community, ready to try.</h1>
+        <p class="preview-lede">Open two identities in separate tabs to talk, create rooms, draw together, and review reports. These are real connections you control. Nobody else has been added.</p>
+        <p class="preview-callout"><strong>Private on this computer.</strong> This server listens only on 127.0.0.1. Email and staff identities below are explicit local stand-ins; no email is sent, no Cloudflare login is tested, and AI review stays off.</p>
+        <section class="preview-profiles" aria-label="Choose a test identity">
+            <article><h2>Guest</h2><p>Enter with a nickname. Start a temporary room and test reporting. Each opening has a separate device identity.</p><button data-profile="guest">Open a guest</button></article>
+            <article><h2>Room owner A</h2><p>Try “Keep this room.” Reopen this identity to recover ownership on a different local device.</p><button data-profile="room-owner-a">Open room owner A</button></article>
+            <article><h2>Room owner B</h2><p>A second email stand-in for persistent co-host grants and ownership transfers.</p><button data-profile="room-owner-b">Open room owner B</button></article>
+            <article><h2>Community moderator</h2><p>Review real visitor reports and moderate abuse. Site configuration and staff appointment remain restricted.</p><button data-profile="moderator">Open moderator panel</button></article>
+            <article><h2>Site owner administrator</h2><p>Try the full admin controls, review safety locks, and manage the community.</p><button data-profile="administrator">Open owner panel</button></article>
+        </section>
+        <p id="preview-status" role="status"></p>
+        <p id="preview-runtime" class="preview-muted"></p>
+        <section class="preview-steps"><h2>A useful first test</h2><ol><li>Open a guest and room owner A. Pick different nicknames and exchange messages.</li><li>Use owner A to start a chat channel and choose “Keep this room.”</li><li>Open owner B, join that channel, and try co-host access and ownership transfer.</li><li>Report a message from the other identity. Open the moderator panel to review it.</li><li>Try Draw together, then stop and restart the preview. Registered rooms return; old chat does not.</li></ol><p>Watch together loads YouTube only when used. Cameras require your explicit permission. Live WebJam audio and Cloudflare TURN still require the real service configuration.</p></section>
+    </main>
+</body>
+</html>

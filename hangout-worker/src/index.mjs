@@ -1,26 +1,23 @@
 // Stalemate hangout relay: a dumb, capped, encrypted-frame broadcaster.
 // One Durable Object per invite room. No video, audio, or files ever pass through here.
 import { admit, createBucket, dayKey, limitsFrom, validFrame } from './core.mjs';
-import { verifyAccessJwt } from './auth.mjs';
-import { admitLobby, HangoutLobby } from './lobby-do.mjs';
+import { admitTurn, HangoutTurnBudget } from './turn.mjs';
+import { adminGate, ownerGate, admitLobby, HangoutLobby } from './lobby-do.mjs';
 
-export { HangoutLobby };
+export { HangoutLobby, HangoutTurnBudget };
 
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
-        // Cloudflare Access protects /lobby-admin*; reaching this means the band member signed in. Send them back.
-        if (url.pathname === '/lobby-owner/login') {
-            const back = String(env.HANGOUT_OWNER_RETURN || '');
-            if (!/^https:\/\/(www\.)?stalemate\.band\/r\/[0-9a-f]{16}\/lobby\/$/.test(back)) return new Response('not configured', { status: 503 });
-            try {
-                await verifyAccessJwt(request.headers.get('Cf-Access-Jwt-Assertion'), { team: env.HANGOUT_ACCESS_TEAM, aud: env.HANGOUT_OWNER_ACCESS_AUD, fetchJwks: async (u) => { const r = await fetch(u); return r.json(); } });
-                return Response.redirect(`${back}?owner=1`, 302);
-            } catch { return new Response('sign in required', { status: 403 }); }
-        }
-        if (url.pathname === '/lobby-admin/login') {
-            const back = String(env.HANGOUT_ADMIN_RETURN || '');
-            return /^https:\/\/(www\.)?stalemate\.band\/r\/[0-9a-f]{16}\/admin\/$/.test(back) && request.headers.get('Cf-Access-Jwt-Assertion') ? Response.redirect(back, 302) : new Response('nope', { status: 404 });
+        if (url.pathname === '/turn') return admitTurn(request, env, url);
+        if (url.pathname === '/lobby-owner/login' || url.pathname === '/lobby-admin/login') {
+            const owner = url.pathname === '/lobby-owner/login';
+            const result = await (owner ? ownerGate : adminGate)(request, env);
+            if (!result.ok) return new Response(result.reason, { status: result.status, headers: { 'Cache-Control': 'no-store' } });
+            const back = String(owner ? env.HANGOUT_OWNER_RETURN || '' : env.HANGOUT_ADMIN_RETURN || '');
+            const target = /^https:\/\/(www\.)?stalemate\.band\/r\/[0-9a-f]{16}\/(admin|lobby)\/$/.exec(back);
+            if (!target || target[2] !== (owner ? 'lobby' : 'admin')) return new Response('not configured', { status: 503 });
+            return new Response(null, { status: 302, headers: { Location: owner ? `${back}?owner=1` : back, 'Cache-Control': 'no-store' } });
         }
         if (url.pathname === '/lobby' || url.pathname === '/lobby-admin' || url.pathname === '/lobby-owner') return admitLobby(request, env, url);
         if (url.pathname !== '/room') return new Response('nope', { status: 404 });

@@ -2,7 +2,7 @@
 // before a DO request is spent. Missing config/secrets => 503 (fail closed).
 import { originAllowed, previewKeyOk } from './core.mjs';
 import { accountId, accessConfigured, hmacKeyOk, ipHash, newDeviceId, roleForEmail, signDevice, verifyAccessJwt, verifyDevice } from './auth.mjs';
-import { createLobby } from './lobby-core.mjs';
+import { createLobby, LOBBY_LIMITS } from './lobby-core.mjs';
 import { LOG_TTL } from './community-state.mjs';
 import { createAiModerator } from './ai-moderation.mjs';
 
@@ -20,13 +20,36 @@ async function turnstileOk(token, ip, secret, fetchImpl = fetch) {
     } catch (e) { return false; }
 }
 
-const jwksCache = { at: 0, body: null };
+const jwksCache = { url: '', at: 0, body: null };
 async function fetchJwks(url) {
-    if (jwksCache.body && Date.now() - jwksCache.at < 10 * 60 * 1000) return jwksCache.body;
+    if (jwksCache.url === url && jwksCache.body && Date.now() - jwksCache.at < 10 * 60 * 1000) return jwksCache.body;
     const r = await fetch(url, { redirect: 'error' });
     if (!r.ok) throw new Error('jwks');
-    jwksCache.body = await r.json(); jwksCache.at = Date.now();
+    jwksCache.body = await r.json(); jwksCache.url = url; jwksCache.at = Date.now();
     return jwksCache.body;
+}
+
+// Reuse cryptographic staff authorization for redirects and WebSocket admission.
+export async function adminGate(request, env, deps = {}) {
+    if (!accessConfigured(env)) return { status: 503, reason: 'access-not-configured' };
+    try {
+        const { email, expiresAt } = await verifyAccessJwt(request.headers.get('Cf-Access-Jwt-Assertion'), {
+            team: env.HANGOUT_ACCESS_TEAM, aud: env.HANGOUT_ACCESS_AUD, fetchJwks: deps.fetchJwks || fetchJwks
+        });
+        const role = roleForEmail(email, env);
+        if (!role) return { status: 403, reason: 'not-band' };
+        return { ok: true, identity: { role, email, expiresAt, admin: true } };
+    } catch { return { status: 403, reason: 'access' }; }
+}
+
+export async function ownerGate(request, env, deps = {}) {
+    if (!accessConfigured({ ...env, HANGOUT_ACCESS_AUD: env.HANGOUT_OWNER_ACCESS_AUD })) return { status: 503, reason: 'owner-signin-not-configured' };
+    try {
+        const { email, expiresAt } = await verifyAccessJwt(request.headers.get('Cf-Access-Jwt-Assertion'), {
+            team: env.HANGOUT_ACCESS_TEAM, aud: env.HANGOUT_OWNER_ACCESS_AUD, fetchJwks: deps.fetchJwks || fetchJwks
+        });
+        return { ok: true, identity: { email, expiresAt } };
+    } catch { return { status: 403, reason: 'owner-signin' }; }
 }
 
 // Exported for tests: returns {status, reason} when refused, or {ok, identity} when the upgrade may proceed.
@@ -39,19 +62,13 @@ export async function lobbyGate(request, env, url, deps = {}) {
     const ip = request.headers.get('CF-Connecting-IP') || '0.0.0.0';
     const identity = { role: 'fan', email: '', admin: false };
     if (url.pathname === '/lobby-admin') {
-        if (!accessConfigured(env)) return { status: 503, reason: 'access-not-configured' };
-        try {
-            const { email, expiresAt } = await verifyAccessJwt(request.headers.get('Cf-Access-Jwt-Assertion'), { team: env.HANGOUT_ACCESS_TEAM, aud: env.HANGOUT_ACCESS_AUD, fetchJwks: deps.fetchJwks || fetchJwks });
-            const role = roleForEmail(email, env);
-            if (!role) return { status: 403, reason: 'not-band' };
-            Object.assign(identity, { role, email, expiresAt, account: await accountId(email, env.HANGOUT_HMAC_KEY), admin: true });
-        } catch (e) { return { status: 403, reason: 'access' }; }
+        const admin = await adminGate(request, env, deps);
+        if (!admin.ok) return admin;
+        Object.assign(identity, admin.identity, { account: await accountId(admin.identity.email, env.HANGOUT_HMAC_KEY) });
     } else if (url.pathname === '/lobby-owner') {
-        try {
-            if (!env.HANGOUT_OWNER_ACCESS_AUD) return { status: 503, reason: 'owner-signin-not-configured' };
-            const { email, expiresAt } = await verifyAccessJwt(request.headers.get('Cf-Access-Jwt-Assertion'), { team: env.HANGOUT_ACCESS_TEAM, aud: env.HANGOUT_OWNER_ACCESS_AUD, fetchJwks: deps.fetchJwks || fetchJwks });
-            Object.assign(identity, { account: await accountId(email, env.HANGOUT_HMAC_KEY), expiresAt });
-        } catch { return { status: 403, reason: 'owner-signin' }; }
+        const owner = await ownerGate(request, env, deps);
+        if (!owner.ok) return owner;
+        Object.assign(identity, { account: await accountId(owner.identity.email, env.HANGOUT_HMAC_KEY), expiresAt: owner.identity.expiresAt });
     } else if (!(await (deps.turnstile || turnstileOk)(url.searchParams.get('ts'), ip, env.HANGOUT_TURNSTILE_SECRET))) {
         return { status: 403, reason: 'bot-check' };
     }
@@ -84,6 +101,14 @@ export class HangoutLobby {
         this.pendingAdmission = new Map();
         this.evidenceStorage = 'ready';
         this.ready = state.blockConcurrencyWhile(async () => {
+            // Only the separate authenticated pilot can initialize its first empty network.
+            // A later missing/corrupt record still restores fail-closed after this sentinel exists.
+            if (env.PILOT_MODE === 'protected' && !(await state.storage.get('pilot-initialized'))) {
+                await state.storage.transaction(async (txn) => {
+                    if ((await txn.get('net')) === undefined && (await txn.get('room-index')) === undefined) await txn.put('net', { lock: 'off' });
+                    await txn.put('pilot-initialized', true);
+                });
+            }
             this.aiModerator = createAiModerator({
                 enabled: env.HANGOUT_AI_MODERATION === 'review',
                 apiKey: env.OPENAI_API_KEY,
@@ -109,7 +134,7 @@ export class HangoutLobby {
                 },
                 close: (id, code, reason) => { const ws = this.byId(id); if (ws) try { ws.close(code, reason); } catch (e) { /* gone */ } },
                 persist: (kind, data) => {
-                    if (['rooms', 'abuse'].includes(kind)) return this.persistRequired(kind, data);
+                    if (['rooms', 'abuse', 'sessions'].includes(kind)) return this.persistRequired(kind, data);
                     if (['net', 'ai-reviews', 'moderation-queue'].includes(kind)) return this.persistState(kind, data);
                     if (kind === 'modlog') { this.logSeq = (this.logSeq || 0) + 1; this.persistState(`log:${String(Date.now()).padStart(15, '0')}:${crypto.randomUUID()}`, data); }
                 },
@@ -120,22 +145,41 @@ export class HangoutLobby {
             this.engine.restoreModerationQueue((await state.storage.get('moderation-queue')) || {});
             const roomIndex = await state.storage.get('room-index');
             if (roomIndex !== undefined) {
-                const records = roomIndex?.version === 1 && Array.isArray(roomIndex.names) && roomIndex.names.length <= 1030 ? await Promise.all(roomIndex.names.map((name) => state.storage.get(`community-room:${name}`))) : null;
+                let records = roomIndex?.version === 1 && Array.isArray(roomIndex.names) && roomIndex.names.length <= 1030
+                    && roomIndex.names.every((name) => /^#[a-z0-9-]{2,30}$/.test(name))
+                    && new Set(roomIndex.names).size === roomIndex.names.length ? [] : null;
+                let bytes = 32;
+                if (records) for (const name of roomIndex.names) {
+                    const record = await state.storage.get(`community-room:${name}`);
+                    try { bytes += new TextEncoder().encode(JSON.stringify(record)).byteLength + 1; }
+                    catch { records = null; break; }
+                    if (bytes > LOBBY_LIMITS.roomStateBytes) { records = null; break; }
+                    records.push(record);
+                }
                 await this.engine.restoreRooms(records ? { version: 1, rooms: records } : null);
             } else await this.engine.restoreRooms(await state.storage.get('rooms'));
             this.engine.restoreAbuse(await state.storage.get('abuse'));
+            // Hibernation preserves the browser's actual connection. Restore metadata only:
+            // never send hello/join or erase its connected-session scrollback on an idle wake.
+            const live = [], sockets = new Map();
+            for (const ws of state.getWebSockets()) {
+                const a = ws.deserializeAttachment() || {};
+                if (!a.id) { ws.close(4401, 'session unavailable'); continue; }
+                if (a.expiresAt && a.expiresAt <= Date.now() || a.admin && roleForEmail(a.email, env) !== a.role) { ws.close(4401, 'sign in again'); continue; }
+                live.push(a); sockets.set(a.id, ws);
+            }
+            const roomsBeforeResume = JSON.stringify(this.engine.roomSnapshot());
+            const savedSessions = await state.storage.get('sessions');
+            const restored = this.engine.restoreSessions(savedSessions, live);
+            for (const rejected of restored.rejected) sockets.get(rejected.id)?.close(4401, rejected.reason);
+            const currentRooms = this.engine.roomSnapshot();
+            if (JSON.stringify(currentRooms) !== roomsBeforeResume) await this.persistRequired('rooms', currentRooms);
+            const currentSessions = this.engine.sessionSnapshot();
+            if (JSON.stringify(savedSessions) !== JSON.stringify(currentSessions)) await this.persistRequired('sessions', currentSessions);
             await this.engine.tick();
             await this.pruneLogs();
             const logs = await state.storage.list({ prefix: 'log:', reverse: true, limit: 2000 });
             this.engine.restoreLog([...logs.values()].reverse());
-            // After hibernation, sockets survive but memory doesn't: re-admit them (nick resets, they re-hello).
-            for (const ws of state.getWebSockets()) {
-                const a = ws.deserializeAttachment() || {};
-                if (a.id) {
-                    if (a.expiresAt && a.expiresAt <= Date.now() || a.admin && roleForEmail(a.email, env) !== a.role) { ws.close(4401, 'sign in again'); continue; }
-                    this.engine.connect(a);
-                }
-            }
             if (!(await state.storage.getAlarm())) await state.storage.setAlarm(Date.now() + 60 * 1000);
         });
     }
@@ -196,6 +240,15 @@ export class HangoutLobby {
         await this.ready;
         let identity;
         try { identity = JSON.parse(request.headers.get('X-Hangout-Identity')); } catch (e) { return new Response('no', { status: 400 }); }
+        if (this.env.PILOT_MODE === 'protected' && new URL(request.url).pathname === '/__pilot/disconnect' && request.method === 'POST' && /^[a-z0-9-]{16,64}$/.test(identity?.pilotSid || '')) {
+            return this.state.blockConcurrencyWhile(async () => {
+                for (const ws of this.state.getWebSockets()) {
+                    const a = ws.deserializeAttachment() || {};
+                    if (a.pilotSid === identity.pilotSid) { ws.close(4401, 'pilot identity changed'); await this.engine.disconnect(a.id); }
+                }
+                return new Response('ok');
+            });
+        }
         if (!identity || !identity.dev) return new Response('no', { status: 400 });
         const id = `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
         // Admission may refuse before upgrade, but successful connect also emits the
@@ -211,7 +264,7 @@ export class HangoutLobby {
         if (!verdict.ok) return new Response(verdict.reason, { status: verdict.status });
         const pair = new WebSocketPair();
         this.state.acceptWebSocket(pair[1], [id]);
-        pair[1].serializeAttachment({ id, dev: identity.dev, iph: identity.iph, role: identity.role, email: identity.email, account: identity.account, expiresAt: identity.expiresAt, admin: identity.admin });
+        pair[1].serializeAttachment({ id, pilotSid: this.env.PILOT_MODE === 'protected' ? identity.pilotSid : undefined, dev: identity.dev, iph: identity.iph, role: identity.role, email: identity.email, account: identity.account, expiresAt: identity.expiresAt, admin: identity.admin });
         if (identity.devToken) pair[1].send(JSON.stringify({ t: 'device', token: identity.devToken }));
         for (const frame of initialFrames) pair[1].send(JSON.stringify(frame));
         return new Response(null, { status: 101, webSocket: pair[0] });

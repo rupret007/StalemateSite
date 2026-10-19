@@ -21,7 +21,7 @@
             load: $('[data-act-load]'),
             url: $('[data-act-url]'),
             bobPicks: $('[data-bob-picks]'),
-            tiles: $('[data-act-tiles]')
+            tiles: $('[data-act-tiles]'), relayStatus: $('[data-act-relay-status]')
         };
         const state = {
             ch: null, kind: null, clock: H.createClock(), room: H.emptyState(),
@@ -32,6 +32,7 @@
         let live = null;
         let pendingPts = [];
         let flushTimer = 0;
+        let roomGeneration = 0, captureVersion = 0, turnClient = null, turnInit = null;
 
         window.__lobbyRoom = { state, player }; // test hook
 
@@ -45,6 +46,9 @@
         const phone = V.isPhoneDevice({ ua: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints, coarse: mq('(pointer: coarse)'), fine: mq('(any-pointer: fine)'), cores: navigator.hardwareConcurrency });
 
         function teardown() {
+            roomGeneration += 1; captureVersion += 1;
+            turnClient?.stop(); turnClient = null; turnInit = null; state.ice = null;
+            ui.relayStatus.textContent = '';
             state.ch = null;
             state.kind = null;
             state.room = H.emptyState();
@@ -291,25 +295,45 @@
 
         /* ---- P2P video (cameras only) ---- */
         async function iceServers() {
-            if (state.ice) return state.ice;
-            state.ice = STUN;
-            const url = turnUrl;
-            if (!url) return state.ice;
-            try {
-                const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preview: previewKey, room: state.ch }) });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (Array.isArray(data.iceServers)) state.ice = STUN.concat(data.iceServers);
-                }
-            } catch (e) { /* STUN only */ }
-            return state.ice;
+            if (!turnUrl || !state.ch) return state.ice = STUN;
+            const generation = roomGeneration;
+            if (!turnInit) turnInit = (async () => {
+                const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`hangout-channel:${state.ch.toLowerCase()}`));
+                if (generation !== roomGeneration) return null;
+                const room = [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
+                turnClient = window.HangoutTurn.createTurnClient({
+                    url: turnUrl, preview: previewKey, room,
+                    getDevice: () => { try { return localStorage.getItem('hangout-dev'); } catch (_) { return ''; } },
+                    onChange: (ice) => {
+                        if (generation !== roomGeneration) return;
+                        state.ice = ice;
+                        for (const { pc } of state.pcs.values()) {
+                            try { pc.setConfiguration({ ...pc.getConfiguration(), iceServers: ice }); pc.restartIce(); } catch (_) { /* closed peer */ }
+                        }
+                    },
+                    onStatus: (status) => {
+                        if (generation !== roomGeneration) return;
+                        ui.relayStatus.textContent = status === 'ready' ? 'Camera relay available for connections that need it.'
+                            : 'Camera relay unavailable for now. Direct connections, chat and drawing remain available.';
+                    }
+                });
+                return turnClient;
+            })();
+            const client = await turnInit;
+            const ice = client ? await client.get() : STUN;
+            if (generation === roomGeneration) state.ice = ice;
+            return ice;
         }
 
         async function startCam() {
+            const generation = roomGeneration, version = ++captureVersion;
             await iceServers();
-            if (state.stream) return;
+            if (state.stream || !state.camOn || generation !== roomGeneration || version !== captureVersion) return;
             try {
                 const got = await navigator.mediaDevices.getUserMedia({ video: CAM, audio: false });
+                if (!state.camOn || generation !== roomGeneration || version !== captureVersion) {
+                    got.getTracks().forEach((track) => track.stop()); return;
+                }
                 state.stream = got;
                 for (const id of state.peers) if (!state.pcs.has(id)) openPc(id);
                 layoutTiles();
@@ -317,6 +341,7 @@
         }
 
         function stopCam() {
+            captureVersion += 1;
             if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
             state.stream = null;
             for (const id of [...state.pcs.keys()]) closePc(id);
@@ -338,7 +363,7 @@
             if (state.pcs.has(id) || id === state.myId) return;
             const pc = new RTCPeerConnection({ iceServers: state.ice || STUN });
             const polite = (state.myId || '') > id;
-            const entry = { pc, polite, makingOffer: false, stream: new MediaStream() };
+            const entry = { pc, polite, makingOffer: false, ignoreOffer: false, pendingIce: [], stream: new MediaStream() };
             state.pcs.set(id, entry);
             pc.onicecandidate = (e) => { if (e.candidate) actSend({ kind: 'rtc', to: id, ice: e.candidate.toJSON() }); };
             pc.ontrack = (e) => { entry.stream.addTrack(e.track); layoutTiles(); };
@@ -364,14 +389,21 @@
             try {
                 if (msg.sdp) {
                     const collision = msg.sdp.type === 'offer' && (entry.makingOffer || pc.signalingState !== 'stable');
-                    if (collision && !entry.polite) return;
+                    entry.ignoreOffer = collision && !entry.polite;
+                    if (entry.ignoreOffer) return;
                     await pc.setRemoteDescription(msg.sdp);
+                    for (const ice of entry.pendingIce.splice(0)) {
+                        try { await pc.addIceCandidate(ice); } catch (_) { /* stale negotiation */ }
+                    }
                     if (msg.sdp.type === 'offer') {
                         const answer = await pc.createAnswer();
                         await pc.setLocalDescription(answer);
                         actSend({ kind: 'rtc', to: from, sdp: pc.localDescription.toJSON() });
                     }
-                } else if (msg.ice) await pc.addIceCandidate(msg.ice);
+                } else if (msg.ice) {
+                    if (!pc.remoteDescription) { if (entry.pendingIce.length < 64) entry.pendingIce.push(msg.ice); }
+                    else await pc.addIceCandidate(msg.ice);
+                }
             } catch (e) { /* */ }
         }
 

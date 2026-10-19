@@ -1,5 +1,6 @@
 // Local stand-in for the hangout Cloudflare Worker, used by tests and local previews.
-// Same admission rules and caps (from hangout-worker/src/core.mjs); in-memory only.
+// Same admission rules and caps (from hangout-worker/src/core.mjs). Persistence and
+// identity adapters are used only by the explicit loopback preview launcher.
 import http from 'node:http';
 import { WebSocketServer } from 'ws';
 import { admit, createBucket, limitsFrom, validFrame, originAllowed, previewKeyOk } from '../hangout-worker/src/core.mjs';
@@ -9,7 +10,7 @@ import { accountId, ipHash, newDeviceId, signDevice, verifyDevice } from '../han
 const DEV_HMAC = 'local-dev-only-hmac-key-not-a-secret-000';
 
 // devAdminKey: TEST-ONLY stand-in for Cloudflare Access. The real Worker has no such path (see lobby-do.mjs).
-export function createHangoutRelay({ previewKey = 'local-preview-key-0001', origins = '', connectionsPerDay, devAdminKey = '', lobbyLimits = {}, now } = {}) {
+export function createHangoutRelay({ previewKey = 'local-preview-key-0001', origins = '', connectionsPerDay, devAdminKey = '', lobbyLimits = {}, now, resolveIdentity = null, initialState = {}, persist = () => {} } = {}) {
     const env = { HANGOUT_PREVIEW_KEY: previewKey, ROOMS: {}, QUOTA: {}, HANGOUT_CONNECTIONS_PER_DAY: connectionsPerDay };
     const limits = limitsFrom(env);
     const rooms = new Map();
@@ -17,41 +18,63 @@ export function createHangoutRelay({ previewKey = 'local-preview-key-0001', orig
     let seq = 0;
     const wss = new WebSocketServer({ noServer: true, maxPayload: limits.maxFrameBytes });
     const lobbySockets = new Map();
+    const pendingAdmission = new Map();
+    let work = Promise.resolve();
+    let stopping = false;
+    // Match the DO's serial processing when a persistence adapter returns promises.
+    const enqueue = (fn) => { const task = work.then(fn); work = task.catch(() => {}); return task; };
     const lobby = createLobby({
         now,
         limits: lobbyLimits,
-        send: (id, msg) => { const ws = lobbySockets.get(id); if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); },
+        persist,
+        send: (id, msg) => { const ws = lobbySockets.get(id); if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); else pendingAdmission.get(id)?.push(msg); },
         close: (id, code, reason) => { const ws = lobbySockets.get(id); if (ws) ws.close(code, reason); }
     });
-    const ticker = setInterval(() => lobby.tick(), 1000);
+    if (initialState.net !== undefined) lobby.restore(initialState.net);
+    lobby.restoreAiReviews(initialState['ai-reviews'] || []);
+    lobby.restoreModerationQueue(initialState['moderation-queue'] || {});
+    lobby.restoreLog(initialState.modlog || []);
+    enqueue(async () => { await lobby.restoreRooms(initialState.rooms); lobby.restoreAbuse(initialState.abuse); await lobby.tick(); });
+    const ticker = setInterval(() => { enqueue(() => lobby.tick()).catch(() => {}); }, 1000);
     let lobbySeq = 0;
 
     const handleUpgrade = async (req, socket, head, url) => {
         const reject = (status, reason) => { socket.end(`HTTP/1.1 ${status} ${reason}\r\n\r\n`); };
+        if (stopping) return reject(503, 'stopping');
         if (url.pathname === '/lobby' || url.pathname === '/lobby-admin' || url.pathname === '/lobby-owner') {
             if (!originAllowed(req.headers.origin, origins)) return reject(403, 'origin');
             if (!previewKeyOk(url.searchParams.get('preview'), previewKey)) return reject(403, 'preview');
             let role = 'fan'; let account = '';
-            if (url.pathname === '/lobby-owner') {
+            if (resolveIdentity) {
+                const identity = await resolveIdentity(req, url);
+                if (!identity) return reject(403, 'local-preview-identity');
+                role = identity.role || 'fan'; account = identity.account || '';
+                if (url.pathname === '/lobby-owner' && !account || url.pathname === '/lobby-admin' && role === 'fan') return reject(403, 'local-preview-role');
+            } else if (url.pathname === '/lobby-owner') {
                 if (!devAdminKey || !previewKeyOk(url.searchParams.get('devowner'), devAdminKey)) return reject(403, 'owner-access');
                 account = await accountId(url.searchParams.get('account') || 'owner-fixture@example.test', DEV_HMAC);
             }
-            if (url.pathname === '/lobby-admin') {
+            if (!resolveIdentity && url.pathname === '/lobby-admin') {
                 if (!devAdminKey || !previewKeyOk(url.searchParams.get('devadmin'), devAdminKey)) return reject(403, 'access');
                 role = ['owner', 'moderator'].includes(url.searchParams.get('as')) ? url.searchParams.get('as') : 'band';
             }
             let dev = await verifyDevice(url.searchParams.get('dev'), DEV_HMAC);
             const token = dev ? null : await signDevice((dev = newDeviceId()), DEV_HMAC);
-            const iph = await ipHash(req.headers['x-test-ip'] || url.searchParams.get('testip') || req.socket.remoteAddress, DEV_HMAC);
+            const iph = await ipHash(resolveIdentity ? req.socket.remoteAddress : req.headers['x-test-ip'] || url.searchParams.get('testip') || req.socket.remoteAddress, DEV_HMAC);
             const id = `c${(lobbySeq += 1)}`;
-            const verdict = lobby.connect({ id, dev, iph, role, account, admin: role !== 'fan' });
-            if (!verdict.ok) return reject(verdict.status, verdict.reason);
+            pendingAdmission.set(id, []);
+            let verdict;
+            try { verdict = await enqueue(() => lobby.connect({ id, dev, iph, role, account, admin: url.pathname === '/lobby-admin' })); }
+            catch { pendingAdmission.delete(id); return reject(503, 'storage'); }
+            if (!verdict.ok) { pendingAdmission.delete(id); return reject(verdict.status, verdict.reason); }
+            if (socket.destroyed) { pendingAdmission.delete(id); enqueue(() => lobby.disconnect(id)).catch(() => {}); return; }
             return wss.handleUpgrade(req, socket, head, (ws) => {
                 lobbySockets.set(id, ws);
                 if (token) ws.send(JSON.stringify({ t: 'device', token }));
-                ws.send(JSON.stringify({ t: 'hello', role, verified: !!account, needNick: true }));
-                ws.on('message', (data) => lobby.message(id, String(data)));
-                ws.on('close', () => { lobbySockets.delete(id); lobby.disconnect(id); });
+                for (const frame of pendingAdmission.get(id) || []) ws.send(JSON.stringify(frame));
+                pendingAdmission.delete(id);
+                ws.on('message', (data) => { enqueue(() => lobby.message(id, String(data))).catch(() => ws.close(4503, 'local storage')); });
+                ws.on('close', () => { lobbySockets.delete(id); enqueue(() => lobby.disconnect(id)).catch(() => {}); });
             });
         }
         if (url.pathname !== '/room') return reject(404, 'nope');
@@ -82,13 +105,15 @@ export function createHangoutRelay({ previewKey = 'local-preview-key-0001', orig
         });
     };
 
-    const close = () => new Promise((resolve) => {
+    const close = async () => {
+        stopping = true;
         clearInterval(ticker);
         wss.clients.forEach((c) => c.terminate());
-        resolve();
-    });
+        await new Promise((resolve) => wss.close(resolve));
+        await work;
+    };
 
-    return { handleUpgrade, lobby, close };
+    return { handleUpgrade, lobby, close, settled: () => work };
 }
 
 export function startRelay(options = {}) {

@@ -206,10 +206,18 @@
     /* Bounded send queue: when full, shed ICE candidates first (oldest first); offers,
      * answers and everything else only go once no candidates are left to drop. */
     function enqueue(queue, item, max) {
-        const q = (queue || []).concat([item]);
+        const q = (queue || []).slice();
+        // Signed host actions must reach recipients promptly during ICE bursts.
+        // Preserve their own sequence order while moving them ahead of ordinary traffic.
+        if (item && item.priority) {
+            let after = 0;
+            q.forEach((entry, index) => { if (entry && entry.priority) after = index + 1; });
+            q.splice(after, 0, item);
+        } else q.push(item);
         while (q.length > max) {
             const i = q.findIndex((x) => x && x.ice);
-            q.splice(i >= 0 ? i : 0, 1);
+            const ordinary = q.findIndex((x) => !x || !x.priority);
+            q.splice(i >= 0 ? i : ordinary >= 0 ? ordinary : 0, 1);
         }
         return q;
     }
