@@ -1,0 +1,16 @@
+{
+  "checkedAt": "2026-10-19T03:23:01.579644+00:00",
+  "provider": "OpenAI moderation",
+  "endpoint": "/v1/moderations",
+  "model": "omni-moderation-latest",
+  "httpStatus": 200,
+  "input": "Synthetic benign beta greeting; no visitor content",
+  "flagged": false,
+  "categoryCount": 13,
+  "keySource": "Approved Vaultwarden OpenAI API Key item; value not recorded",
+  "betaSecretProvisioned": true,
+  "workerAiEnabled": false,
+  "limitations": [
+    "Direct live classifier request only; hosted text-to-review-queue and real human staff acceptance remain unverified."
+  ]
+}

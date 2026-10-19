@@ -55,6 +55,16 @@ The regression fixtures contain no working shared invitation. Actual ephemeral
 invitations were kept in process pipes and browser memory, never committed.
 The sanitized receipt is [native-handoff.json](../pr-assets/beta-collaboration/native-handoff.json).
 
+The same native check subsequently passed through the real protected
+`stalemate-hangout-beta` Cloudflare deployment, version
+`2f752cff-8aae-43fe-b1a6-4855057ae7a1`. Two independently admitted guest browsers
+shared the complete invitation unchanged; the actual Qt/native guest connected
+and received the real Jamulus response. Both beta sessions logged out, the
+synthetic room closed, and native processes stopped. See the separate
+[hosted native receipt](../pr-assets/beta-collaboration/hosted-native-handoff.json).
+This remains a same-Mac native transport check with explicit sealed-reply paste,
+not WAN or physical-audio acceptance.
+
 This proves native invitation handoff, authentication and UDP forwarding. It
 does not prove cross-network NAT traversal, physical audio, audible latency,
 automatic mailbox signaling or a released desktop package. The installed
@@ -94,6 +104,6 @@ npx playwright test tests/e2e/hangout-turn.spec.js tests/e2e/hangout.spec.js --p
 - Browser Web Join remains disabled. Its source is merged, but
   `https://stalemate.band/join/` still returned 404 on this check and no release
   or static-host configuration was inferred from source availability.
-- Verify the final protected Cloudflare deployment's invitation handoff after
-  deployment. Local relay tests alone do not establish its configured origins,
-  provider credentials or budget accounting.
+- Live forced-TURN media and shared-account budget accounting still require
+  separate provider checks. The hosted native handoff above does not establish
+  those website camera-provider settings.

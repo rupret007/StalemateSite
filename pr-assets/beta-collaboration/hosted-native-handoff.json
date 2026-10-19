@@ -1,0 +1,20 @@
+{
+  "sourceCommit": "5effbc58db706254f8ca8b52de4a0520c482294a",
+  "nativeBuild": "stalemate-beta-check",
+  "audioOrWANClaim": false,
+  "signaling": "explicit sealed-reply paste fallback",
+  "actualQtJoin": true,
+  "actualNativeGuestConnected": true,
+  "realJamulusResponseThroughNativeTransport": true,
+  "hostAndGuestSameMac": true,
+  "invitationBytesUnchanged": true,
+  "endedAt": "2026-10-19T03:19:26Z",
+  "realIndependentBrowserContexts": 2,
+  "hangoutRelay": "protected Cloudflare beta WebSockets",
+  "betaOrigin": "https://stalemate-hangout-beta.jeffstory007.workers.dev",
+  "cloudflareDeploymentTested": true,
+  "guestRolesOnly": true,
+  "physicalDeviceTested": false,
+  "installedWebJamReplaced": false,
+  "browserErrors": 0
+}

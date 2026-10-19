@@ -1,0 +1,38 @@
+{
+  "checkedAt": "2026-10-19T03:25:05.300090+00:00",
+  "mode": "read-only existing Wrangler OAuth",
+  "checks": [
+    {
+      "service": "Access apps",
+      "status": 403,
+      "success": false,
+      "count": null,
+      "errors": [
+        {
+          "code": 9999,
+          "message": "access.api.error.not_enabled: Access is not enabled. Visit the Access dashboard at https://dash.cloudflare.com/ and click the 'Enable Access' button."
+        }
+      ]
+    },
+    {
+      "service": "Turnstile widgets",
+      "status": 200,
+      "success": true,
+      "count": 0,
+      "errors": []
+    },
+    {
+      "service": "TURN keys",
+      "status": 403,
+      "success": false,
+      "count": null,
+      "errors": [
+        {
+          "code": 10000,
+          "message": "Authentication error"
+        }
+      ]
+    }
+  ],
+  "changesMade": false
+}
