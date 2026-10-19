@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = join(fileURLToPath(new URL('../..', import.meta.url)));
 const SLUG = '45662413410ed051';
 const ROOM = join(repoRoot, 'r', SLUG);
-const SKIP = new Set(['node_modules', '.git', 'tests', 'r', 'dist', 'playwright-report', 'test-results', 'hangout-worker', 'pr-assets', '.pilot-assets', '.local', '.wrangler']);
+const SKIP = new Set(['node_modules', '.git', 'tests', 'r', 'dist', 'playwright-report', 'test-results', 'hangout-worker', 'pr-assets', '.pilot-assets', '.beta-assets', '.local', '.wrangler']);
 
 function walk(dir, out = []) {
     for (const name of readdirSync(dir)) {

@@ -65,22 +65,25 @@ export function validFrame(raw, limits = DEFAULTS) {
     return { iv: frame.iv, c: frame.c };
 }
 
-export function createBucket(limits = DEFAULTS, now = () => Date.now()) {
-    let tokens = limits.burst;
-    let last = now();
-    let total = 0;
+export function createBucket(limits = DEFAULTS, now = () => Date.now(), saved) {
+    if (saved !== undefined && (saved?.v !== 1 || !Number.isFinite(saved.tokens) || saved.tokens < 0 || saved.tokens > limits.burst ||
+        !Number.isFinite(saved.last) || saved.last < 0 || !Number.isSafeInteger(saved.total) || saved.total < 0 || saved.total > limits.messagesPerConnection + 1)) throw new Error('invalid bucket metadata');
+    let tokens = saved?.tokens ?? limits.burst;
+    let last = saved?.last ?? now();
+    let total = saved?.total ?? 0;
     return {
         take() {
             const t = now();
-            tokens = Math.min(limits.burst, tokens + ((t - last) / 1000) * limits.refillPerSecond);
-            last = t;
+            tokens = Math.min(limits.burst, tokens + (Math.max(0, t - last) / 1000) * limits.refillPerSecond);
+            last = Math.max(last, t);
             total += 1;
             if (total > limits.messagesPerConnection) return 'spent';
             if (tokens < 1) return 'slow';
             tokens -= 1;
             return 'ok';
         },
-        get total() { return total; }
+        get total() { return total; },
+        snapshot() { return { v: 1, tokens, last, total }; }
     };
 }
 

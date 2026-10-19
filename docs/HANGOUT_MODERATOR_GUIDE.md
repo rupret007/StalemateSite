@@ -64,7 +64,13 @@ rooms without acquiring their ownership.
 - **Recovery:** review the cause, confirm the queue is writable, and then use
   **Open** (`/lobby unlock`) and **Lower shield** (`/shieldoff`) as appropriate.
   A storage fault deliberately leaves service read-only until administrator
-  recovery. Do not bypass a corruption lock to make an error disappear.
+  recovery. The operator must validate the restored durable state and reload
+  the Durable Object before reopening normal room operations: **Open** alone
+  does not clear the engine's storage-fault flag. Do not bypass a corruption
+  lock to make an error disappear.
+- **Scope:** these lobby controls do not end independent desktop WebJam sessions
+  or already established encrypted private peer-to-peer media. A lobby lock
+  closes visitor lobby connections; it is not a universal media kill switch.
 - **Classifier outage or cap:** an empty AI queue does not prove messages were
   checked. Deterministic filters, visitor reports, human review and manual
   controls remain available. The owner should check provider configuration,
