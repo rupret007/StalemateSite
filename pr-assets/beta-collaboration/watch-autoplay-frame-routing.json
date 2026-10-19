@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "startedAt": "2026-10-19T08:27:28.846Z",
+  "status": "passed",
+  "scope": "Neutral owned loopback iframe/CDP routing only; no product, YouTube, media, hosted service or user browser.",
+  "providerRequests": 0,
+  "credentialsRead": false,
+  "productContentUsed": false,
+  "trustedInputs": 0,
+  "requestedCapture": false,
+  "rawUserGesture": false,
+  "browserIsolation": "site-per-process",
+  "requestGuard": {
+    "allowed": 3,
+    "blocked": 0,
+    "inspectionFailures": 0
+  },
+  "pageErrors": 0,
+  "checks": {
+    "sameFrameSeparateSessionRejected": true,
+    "sameFrameExceptionName": "Error",
+    "sameFrame": {
+      "path": "parent-session",
+      "markerMatches": true,
+      "isChild": true,
+      "active": false,
+      "ever": false
+    },
+    "crossFrameMetadata": {
+      "directChildren": 1,
+      "expectedOriginPathChildren": 0,
+      "expectedParentChildren": 0,
+      "expectedOwnerIdChildren": 0,
+      "ownerInspectionFailures": 0,
+      "separateSessionAttached": true,
+      "separateTreeRootExpectedOriginPath": true,
+      "separateRootMatchesTopChild": 0,
+      "contexts": {
+        "total": 2,
+        "defaultBoolean": 1,
+        "defaultTruthyNonBoolean": 0,
+        "expectedOrigin": 2,
+        "normalizedExpectedOrigin": 2,
+        "expectedRootFrameId": 2,
+        "stringFrameId": 2,
+        "defaultExpectedOriginAndRoot": 1,
+        "uniqueIdPresent": 2
+      }
+    },
+    "crossFrame": {
+      "path": "separate-session",
+      "markerMatches": true,
+      "isChild": true,
+      "active": false,
+      "ever": false
+    }
+  },
+  "cleanup": {
+    "contextClosed": true,
+    "browserClosed": true,
+    "browserProcessClosed": true,
+    "firstServerClosed": true,
+    "secondServerClosed": true,
+    "confirmed": true
+  },
+  "helperSha256": "16855acbb372c3320e457ede186c4128b86677b05bcc433dcf72955884b0f373",
+  "ownedLoopbackServersBound": 2,
+  "browserVersion": "156.0.8078.4",
+  "completedAt": "2026-10-19T08:27:29.132Z"
+}

@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "checkedAt": "2026-10-19T08:38:16.039Z",
+  "status": "verified-code-fixtures-and-loopback-provider-not-deployed",
+  "sourceCommit": "baf96de8ca10f40cdc02d98ac83b85d3652b7e33",
+  "deployedSourceCommit": "b111bb2aa070cd791834f40f26665996ad406421",
+  "deploymentPerformed": false,
+  "apiReference": "https://developers.google.com/youtube/iframe_api_reference#onAutoplayBlocked",
+  "problem": "YouTube playVideo returns void and reports policy denial via onAutoplayBlocked. Both previous watch surfaces relied on a promise rejection to expose their gesture recovery buttons, while a blocked host could publish its local non-playing state as a shared pause.",
+  "changes": [
+    "Handle the provider policy event on both watch surfaces without changing iframe privacy construction.",
+    "Preserve requested shared playback and suspend periodic retries while locally blocked.",
+    "Keep the gesture prompt until actual PLAYING; a local guest tap does not publish host controls.",
+    "Clear on shared pause, source change and teardown; ignore delayed denial once playback is already running."
+  ],
+  "negativeFixture": {
+    "productSourceCommit": "13dbe391bbeacf9cc3c5a6e63c3523d068923eef",
+    "cases": 2,
+    "result": "Both fail at intended Tap-visible assertion after a void-play blocked event; no setup failures.",
+    "retries": 0
+  },
+  "positiveFixture": {
+    "policyEventCases": 7,
+    "passedDirectly": 7,
+    "retries": 0,
+    "relatedWatchPrivacySourceFileAndBobRossCases": 12,
+    "relatedPassedDirectly": 12,
+    "strengthenedPostPlayingStaleCallbackCases": 2,
+    "strengthenedPassedDirectly": 2
+  },
+  "independentProductionReview": {
+    "initialFinding": "A delayed denial after actual PLAYING could re-latch the local block flag.",
+    "resolution": "Both handlers now ignore callbacks when localPlaying is true; both guest recovery cases exercise the delayed callback after observed PLAYING.",
+    "finalResult": "No further actionable issue in reviewed production scope."
+  },
+  "actualProvider": {
+    "status": "private-and-channel-loopback-candidate-recovery-passed",
+    "initialAttemptEvidence": "watch-autoplay-provider-attempt1.json",
+    "initialAttemptScope": "Stopped during browser inspection before any blocked-playback proof or trusted recovery click. Zero page errors, zero known invitation matches and owned cleanup confirmed. No provider acceptance claimed for this attempt.",
+    "frameRoutingEvidence": "watch-autoplay-frame-routing.json",
+    "frameRoutingScope": "Provider-free loopback control reproduced the known same-process-frame CDP rejection and verified both exact parent/separate frame readers with raw userGesture:false. The original first failure did not record its exact call, so retrospective attribution remains limited.",
+    "baselineEvidence": "watch-autoplay-provider-baseline.json",
+    "baselineScope": "Overall FAILED: genuine provider denial, no user activation in parent/iframe, paused stationary2365ms, site Tap hidden and shared play changed to pause. No visible native recovery control; zero recovery clicks, no successful baseline recovery claimed. Owned cleanup confirmed.",
+    "candidateEvidence": "watch-autoplay-provider-private.json",
+    "candidateScope": "Exact committed baf96de private-host bytes on loopback with actual YouTube and controlled document-user-activation-required policy. Real event with no activation, unmuted media remained paused with shared play preserved across2357ms. Exactly one trusted site Tap; native decoded frames4→91→101 and advancing time, Tap cleared, no native Play click.",
+    "candidateThirdPartyHttpChecks": 34,
+    "candidateKnownInvitationMatches": 0,
+    "pageErrors": 0,
+    "cleanupConfirmed": true,
+    "hostedAdmissions": 0,
+    "providerCredentialsRead": false,
+    "physicalOrMobileAcceptance": false,
+    "channelCandidateEvidence": "watch-autoplay-provider-channel.json",
+    "channelCandidateScope": "One ordinary local guest used the visible Watch tile to become the natural temporary-room founder. Exact baf96de channel bytes, genuine blocked event and no prior parent/iframe activation; remained paused with shared play preserved across2303ms. One trusted product Tap, zero native clicks, decoded frames15→118→125 and time growth, prompt cleared. Exact owned channel closed, then owned browser/relay/server cleanup confirmed.",
+    "channelCandidateThirdPartyHttpChecks": 37,
+    "channelCandidateKnownInvitationMatches": 0
+  },
+  "ci": {
+    "sourceCommit": "baf96de8ca10f40cdc02d98ac83b85d3652b7e33",
+    "push": {
+      "run": 39221920774,
+      "unitPassed": 575,
+      "browserDirectPasses": 221,
+      "skipped": 21,
+      "retries": 0
+    },
+    "pullRequest": {
+      "run": 39221963355,
+      "unitPassed": 575,
+      "browserDirectPasses": 221,
+      "skipped": 21,
+      "retries": 0
+    },
+    "discoveryScope": "The old filename autoplay.spec.js also matched the phone-project play.spec.js suffix regex. Seven cases ran in both Chromium projects with desktop-default explicit contexts; three WebKit projects skipped those seven cases. No mobile acceptance inferred. The file is renamed hangout-watch-policy.spec.js to keep these deterministic fixtures in their intended desktop project.",
+    "renamedTestDiscovery": {
+      "command": "STALEMATE_TEST_PORT=4372 npx playwright test tests/e2e/hangout-watch-policy.spec.js --list",
+      "cases": 7,
+      "projects": [
+        "chromium"
+      ],
+      "browserExecutionPerformed": false
+    }
+  },
+  "scope": "Deterministic policy-event regressions for both surfaces, independent production review, and actual-provider denied-autoplay recovery in separate loopback private-host and natural guest-channel founder browsers on one Mac. No hosted candidate, physical-device, mobile Safari, separate-network, multi-visitor synchronization or TURN acceptance claim.",
+  "deployedRuntimeVersion": "0ee7705e-e381-4cb4-a70a-1f26daa10e78",
+  "runnerSha256": {
+    "private": "71c337b44613de310674c7852354eb5cb663dc7c3da09440781c2c92a432c24a",
+    "channel": "3db7cbba22d4291ffea773874bc4d4a738dfa7c2f3e9fda6ac71377b5479f44a",
+    "nativeReader": "16855acbb372c3320e457ede186c4128b86677b05bcc433dcf72955884b0f373"
+  }
+}

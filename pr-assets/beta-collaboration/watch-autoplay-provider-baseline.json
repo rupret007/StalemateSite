@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "startedAt": "2026-10-19T08:28:31.476Z",
+  "sourceCommit": "b111bb2aa070cd791834f40f26665996ad406421",
+  "scope": "One owned loopback private-host room with exact committed client bytes and actual YouTube on one Mac Chromium. Controlled browser-policy diagnosis only; no hosted, physical iPhone/mobile, separate-network or synchronization acceptance claim.",
+  "videoId": "BtnyqIHTDMM",
+  "status": "failed",
+  "sourceResponseModified": false,
+  "providerResponsesStubbed": false,
+  "providerApiReplaced": false,
+  "playerOrNativeEventsFabricated": false,
+  "browserPolicy": "document-user-activation-required",
+  "browserAudioOutputMuted": true,
+  "productGateAndLoadActions": "DOM element.click via raw CDP userGesture:false; no trusted input before blocking observation",
+  "preBlockObservation": "raw CDP Runtime.evaluate with userGesture:false only",
+  "publicDummyPreviewOnly": true,
+  "localInvitationValuesRecorded": false,
+  "hostedAdmissions": 0,
+  "providerCredentialsRead": false,
+  "captureRequested": false,
+  "recoveryMode": "native",
+  "nativePlayClicks": 0,
+  "nativePlayClickAttempts": 0,
+  "productTapClicks": 0,
+  "productTapClickAttempts": 0,
+  "pageErrors": 0,
+  "requestGuard": {
+    "checkedThirdPartyRequests": 29,
+    "blockedMatches": 0,
+    "otherFailures": 0
+  },
+  "cleanup": {
+    "contextClosed": true,
+    "browserClosed": true,
+    "browserProcessClosed": true,
+    "localRelayClosed": true,
+    "ownedServerClosed": true,
+    "confirmed": true
+  },
+  "clientSha256": "b5593e7c9d7933bdfe595e5e57ef64d474fb678265dd82e9ea0cd9b720a17158",
+  "indexSha256": "e4f54b7ac671d1a4e8ceacad5fae381b3bc2599002633ee6fe29d28254183776",
+  "exactCommittedProductFiles": 46,
+  "nativeReaderSha256": "16855acbb372c3320e457ede186c4128b86677b05bcc433dcf72955884b0f373",
+  "ownedLoopbackBound": true,
+  "browserVersion": "156.0.8078.4",
+  "initialActivation": {
+    "active": false,
+    "ever": false
+  },
+  "nativeObservationRoute": "parent-session",
+  "blocked": {
+    "first": {
+      "top": {
+        "activation": {
+          "active": false,
+          "ever": false
+        },
+        "joined": true,
+        "tapVisible": false,
+        "captureOff": true,
+        "providerState": -1,
+        "time": 0,
+        "sharedPlaying": true,
+        "expectedVideo": true,
+        "playerMuted": false,
+        "volume": 100,
+        "blockedEvents": 1,
+        "errorCount": 0,
+        "knownErrorCodes": [],
+        "observerAttached": true
+      },
+      "native": {
+        "activation": {
+          "active": false,
+          "ever": false
+        },
+        "available": true,
+        "paused": true,
+        "muted": false,
+        "time": 0,
+        "width": 0,
+        "readyState": 0,
+        "frames": 0,
+        "frameCounterType": "decoded",
+        "ad": false,
+        "errorVisible": false,
+        "nativePlayVisible": false
+      }
+    },
+    "stationary": {
+      "top": {
+        "activation": {
+          "active": false,
+          "ever": false
+        },
+        "joined": true,
+        "tapVisible": false,
+        "captureOff": true,
+        "providerState": -1,
+        "time": 0,
+        "sharedPlaying": false,
+        "expectedVideo": true,
+        "playerMuted": false,
+        "volume": 100,
+        "blockedEvents": 1,
+        "errorCount": 0,
+        "knownErrorCodes": [],
+        "observerAttached": true
+      },
+      "native": {
+        "activation": {
+          "active": false,
+          "ever": false
+        },
+        "available": true,
+        "paused": true,
+        "muted": false,
+        "time": 0,
+        "width": 854,
+        "readyState": 4,
+        "frames": 4,
+        "frameCounterType": "decoded",
+        "ad": false,
+        "errorVisible": false,
+        "nativePlayVisible": false
+      }
+    },
+    "stationaryObservationMs": 2365,
+    "productTapVisible": false,
+    "nativePlayVisible": false
+  },
+  "failedStage": "prove-native-autoplay-denial",
+  "failedSubstage": "observe-stationary-native-video",
+  "exceptionName": "Error",
+  "failureCode": "no-visible-native-recovery-control",
+  "completedAt": "2026-10-19T08:28:35.643Z"
+}
