@@ -49,6 +49,17 @@ acceptance.
 
 ## Verification receipts
 
+- [Watch-player privacy](../pr-assets/beta-collaboration/watch-privacy.json):
+  an actual-provider comparison using only public dummy markers found the API's
+  default constructor copied the full parent URL into embed metadata. Both
+  watch surfaces now attach to a pre-created iframe with a video ID and
+  origin-only identification. The same real provider played successfully with
+  zero dummy markers in outbound requests after the change. Two new browser
+  regressions fail on the preceding product source and pass with the fix; all
+  nine targeted watch scenarios pass without retries. The page's no-referrer
+  policy and invitation URL remain intact. This candidate is not yet deployed;
+  actual hosted-provider synchronization remains a separate acceptance check.
+
 - [Initial-offer arbitration](../pr-assets/beta-collaboration/initial-offer-arbitration.json):
   when both peers already publish media, one defers its first offer while
   preserving later native negotiation work. Passive viewers still initiate;

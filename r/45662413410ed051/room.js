@@ -660,6 +660,8 @@
     }
 
     async function ensureSource(source) {
+        if (source.kind !== 'file' && source.kind !== 'yt') return;
+        if (source.kind === 'yt' && !/^[A-Za-z0-9_-]{11}$/.test(source.id || '')) return;
         const key = `${source.kind}:${source.id}`;
         if (player.currentKey === key) return;
         player.currentKey = key;
@@ -681,9 +683,21 @@
         if (app.ended || player.currentKey !== key) return;
         if (!player.yt) {
             await new Promise((resolve) => {
+                // The API's div constructor adds the complete room URL to its
+                // embed request. Attach to our safe iframe so invitations stay here.
+                const frame = doc.createElement('iframe');
+                for (const attr of ui.yt.attributes) frame.setAttribute(attr.name, attr.value);
+                frame.setAttribute('frameborder', '0');
+                frame.setAttribute('allowfullscreen', '');
+                frame.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share');
+                frame.setAttribute('title', frame.getAttribute('title') || 'YouTube video player');
+                frame.referrerPolicy = 'strict-origin-when-cross-origin';
+                const query = new URLSearchParams({ enablejsapi: '1', origin: win.location.origin,
+                    playsinline: '1', rel: '0', widget_referrer: win.location.origin });
+                frame.src = `https://www.youtube.com/embed/${encodeURIComponent(source.id)}?${query}`;
+                ui.yt.replaceWith(frame);
+                ui.yt = frame;
                 player.yt = new YT.Player(ui.yt, {
-                    videoId: source.id,
-                    playerVars: { playsinline: 1, rel: 0, origin: win.location.origin },
                     events: { onReady: resolve, onStateChange: onYtState }
                 });
             });
