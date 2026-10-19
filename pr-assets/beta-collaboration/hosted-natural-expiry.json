@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "startedAt": "2026-10-19T08:00:20.381Z",
+  "sourceCommit": "b111bb2aa070cd791834f40f26665996ad406421",
+  "runtimeVersion": "0ee7705e-e381-4cb4-a70a-1f26daa10e78",
+  "status": "failed",
+  "scope": "One normally admitted owned guest on one isolated Chromium context, one unlisted encrypted room and a late same-session lobby connection. Actual eight-hour expiry; no owner/staff, real-media, provider, physical-device or separate-network acceptance claim.",
+  "runtimeEvidence": "The existing protected-asset receipt identifies this runtime. This run checks deployed client bytes against that exact committed source; it does not independently query Cloudflare deployment state.",
+  "credentialsRecorded": false,
+  "invitationUrlsRecorded": false,
+  "rawFramesRecorded": false,
+  "tracesScreenshotsHarOrConsoleRecorded": false,
+  "applicationOrNativeHooksModified": false,
+  "clockOrSessionTtlModified": false,
+  "globalInviteRotationPerformed": false,
+  "reAdmissionPerformed": false,
+  "manualReconnectPerformed": false,
+  "captureAndYoutubeIntentionallyOff": true,
+  "thirdPartyHttpBlocked": true,
+  "publicNamedRoomsCreated": 0,
+  "chatOrReportsSent": 0,
+  "checks": {
+    "priorRuntimeProof": true,
+    "normalEightHourTtl": {
+      "expectedMs": 28800000,
+      "observedMs": 28800081,
+      "toleranceMs": 30000
+    },
+    "guestFanIdentity": true,
+    "initialSourceBytes": true,
+    "singleUnlistedPrivateRoom": true
+  },
+  "cleanup": {
+    "logoutStatus": 200,
+    "logoutAcceptable": true,
+    "contextClosed": true,
+    "browserClosed": true,
+    "ownedIdleSleepHelperStopped": true
+  },
+  "sourceSha256": {
+    "room": "b5593e7c9d7933bdfe595e5e57ef64d474fb678265dd82e9ea0cd9b720a17158",
+    "lobby": "b11c1a268478ccaf5af1cd4daaf780a5bc6a190f2ee789cd56991eb5de3df7d1",
+    "lobbyRoom": "114170b76b44436e8571346dba0d95554c701c77ac5814f78d3a98a4e8c50516"
+  },
+  "ownedIdleSleepPreventionRequested": true,
+  "expiryAt": "2026-10-19T16:00:20.779Z",
+  "failedStage": "holding-normal-session-until-late-lobby-join",
+  "failureCode": "private-product-reconnect-budget-exceeded",
+  "completedAt": "2026-10-19T15:56:30.679Z",
+  "counts": {
+    "unlockPosts": 1,
+    "admittedGuests": 1,
+    "privateRoomStarts": 1,
+    "lobbyJoins": 0,
+    "privateSockets": 7,
+    "privateSocketCloses": 7,
+    "lobbySockets": 0,
+    "lobbySocketCloses": 0,
+    "blockedThirdPartyHttp": 0,
+    "blockedBrowserMutations": 0,
+    "pageErrors": 0,
+    "expiryHttpChecks": 0,
+    "expiredTokenReplays": 0,
+    "logoutAttempts": 1
+  },
+  "totalElapsedMs": 28570326
+}
