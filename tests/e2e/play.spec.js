@@ -162,6 +162,7 @@ test('game over offers Listen to Manic, the Oct 24 show and Share score next to 
     await expect(extra.getByRole('link', { name: 'Come see us live, Oct 24' })).toHaveAttribute('href', 'https://rockinoctober.com');
     const share = extra.getByRole('button', { name: 'Share score' });
     await expect(share).toBeVisible();
+    await extra.evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)).then(() => {}));
     const h = await share.boundingBox();
     expect(h.height).toBeGreaterThanOrEqual(44);
     await page.evaluate(() => {
