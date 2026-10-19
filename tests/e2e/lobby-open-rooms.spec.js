@@ -99,15 +99,71 @@ test('watch room: host loads YouTube and guest stays in sync', async ({ browser 
     await guest.evaluate((r) => window.__lobby.cmd('join', [r]), room);
     await guest.click('[data-show="chat"]');
     await expect.poll(() => guest.evaluate(() => window.__lobbyRoom.state.room.video?.source?.id)).toBe('oh5p5f5_-7A');
-    await host.waitForTimeout(1200);
+    await Promise.all([host, guest].map(async (page) => {
+        await expect(page.locator('[data-fake-yt]')).toHaveAttribute('data-video-id', 'oh5p5f5_-7A');
+        await expect(page.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+    }));
     const drift = async () => {
-        const h = await host.evaluate(() => window.__ytLog[0].getCurrentTime());
-        const g = await guest.evaluate(() => window.__ytLog[0].getCurrentTime());
+        const samples = await Promise.all([host, guest].map((page) => page.evaluate(() => ({
+            position: window.__ytLog[0].getCurrentTime(),
+            playing: window.__ytLog[0].getPlayerState() === 1,
+            at: performance.timeOrigin + performance.now()
+        }))));
+        if (samples.some((sample) => !sample.playing)) return Infinity;
+        // Page evaluations can complete at different times under CI load.
+        // Compare both playing positions at one instant, not two wall times.
+        const at = Math.max(...samples.map((sample) => sample.at));
+        const [h, g] = samples.map((sample) => sample.position + (at - sample.at) / 1000);
         return Math.abs(h - g);
     };
-    expect(await drift()).toBeLessThan(1.5);
+    // The production player corrects drift every two seconds. Keep the same
+    // 1.5s requirement and the existing 5s expectation budget for convergence.
+    await expect.poll(drift).toBeLessThan(1.5);
     await host.context().close();
     await guest.context().close();
+});
+
+test('watch source changes wait for one player and a canceled room cannot start late playback', async ({ browser }) => {
+    const host = await fan(browser, 'DelayedWatchHost');
+    let guest, releaseApi;
+    const blocked = new Promise((resolve) => { releaseApi = resolve; });
+    let apiRequested = false;
+    await host.route('https://www.youtube.com/iframe_api', async (route) => {
+        apiRequested = true;
+        await blocked;
+        await route.fulfill({ path: FAKE_YT, contentType: 'text/javascript' });
+    });
+    try {
+        await host.click('[data-start="watch"]');
+        await host.fill('[data-act-url]', 'https://youtu.be/oh5p5f5_-7A');
+        await host.press('[data-act-url]', 'Enter');
+        await expect.poll(() => apiRequested).toBe(true);
+        await host.fill('[data-act-url]', 'https://youtu.be/uj5FE70BcB0');
+        await host.press('[data-act-url]', 'Enter');
+        await expect.poll(() => host.evaluate(() => __lobbyRoom.state.room.video?.source?.id)).toBe('uj5FE70BcB0');
+        const channel = await host.evaluate(() => __lobby.active);
+        guest = await fan(browser, 'DelayedWatchGuest');
+        await guest.evaluate((channel) => __lobby.cmd('join', [channel]), channel);
+        await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-video-id', 'uj5FE70BcB0');
+        await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+        // Leave while both source requests share the pending API load. Neither
+        // old request may construct or play a hidden room after it resolves.
+        await host.click('[data-leave]');
+        await expect(host.locator('[data-chat-context]')).toHaveText('#stalemate');
+        releaseApi();
+        await expect.poll(() => host.evaluate(() => !!window.YT)).toBe(true);
+        expect(await host.evaluate(() => window.__ytLog.length)).toBe(0);
+        await expect(host.locator('[data-activity]')).toBeHidden();
+        await host.evaluate((channel) => __lobby.cmd('join', [channel]), channel);
+        await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-video-id', 'uj5FE70BcB0');
+        await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+        expect(await host.evaluate(() => window.__ytLog.length)).toBe(1);
+        expect(await host.evaluate(() => __lobbyRoom.player.readyKey)).toBe('yt:uj5FE70BcB0');
+    } finally {
+        releaseApi();
+        await host.context().close();
+        if (guest) await guest.context().close();
+    }
 });
 
 test('bob ross room: headline episode and paint canvas appear for host', async ({ browser }) => {

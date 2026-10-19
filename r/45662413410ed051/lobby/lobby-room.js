@@ -28,7 +28,7 @@
             myId: null, names: new Map(), camOn: false, ice: null,
             pcs: new Map(), stream: null, peers: new Set()
         };
-        const player = { yt: null, ytReady: null, kind: null, key: '', readyKey: '', applying: 0 };
+        const player = { yt: null, ytReady: null, kind: null, key: '', readyKey: '', loading: null, applying: 0 };
         let videoPublishTimer;
         let live = null;
         let pendingPts = [];
@@ -65,7 +65,7 @@
             ui.video.hidden = true;
             ui.tiles.replaceChildren();
             if (player.yt && player.yt.stopVideo) try { player.yt.stopVideo(); } catch (e) { /* */ }
-            player.key = '';
+            player.key = ''; player.readyKey = '';
         }
 
         function onJoin(chan, act) {
@@ -264,22 +264,30 @@
 
         async function ensureSource(source) {
             const key = `${source.kind}:${source.id}`;
-            if (player.key === key) return;
+            if (player.key === key) return player.loading;
+            const previous = player.loading;
             player.key = key;
             player.readyKey = '';
             player.kind = 'yt';
-            const YT = await loadYouTubeApi();
-            if (!state.ch || player.key !== key) return;
-            if (!player.yt) {
-                await new Promise((resolve) => {
-                    player.yt = new YT.Player(ui.yt, {
-                        videoId: source.id,
-                        playerVars: { playsinline: 1, rel: 0, origin: location.origin },
-                        events: { onReady: resolve, onStateChange: onYtState }
+            const generation = roomGeneration;
+            const loading = (async () => {
+                if (previous) await previous;
+                const YT = await loadYouTubeApi();
+                if (generation !== roomGeneration || !state.ch || player.key !== key) return;
+                if (!player.yt) {
+                    await new Promise((resolve) => {
+                        player.yt = new YT.Player(ui.yt, {
+                            videoId: source.id,
+                            playerVars: { playsinline: 1, rel: 0, origin: location.origin },
+                            events: { onReady: resolve, onStateChange: onYtState }
+                        });
                     });
-                });
-            } else player.yt.cueVideoById(source.id);
-            player.readyKey = key;
+                } else player.yt.cueVideoById(source.id);
+                if (generation === roomGeneration && player.key === key) player.readyKey = key;
+            })();
+            player.loading = loading;
+            try { await loading; }
+            finally { if (player.loading === loading) player.loading = null; }
         }
 
         function localTime() { return player.yt && player.yt.getCurrentTime ? player.yt.getCurrentTime() || 0 : 0; }
@@ -290,11 +298,12 @@
         function pauseLocal() { hold(() => { if (player.yt) player.yt.pauseVideo(); }); }
 
         async function syncToState(force) {
-            const v = state.room.video;
-            if (!v) return;
+            const requested = state.room.video;
+            if (!requested) return;
             const generation = roomGeneration;
-            await ensureSource(v.source);
-            if (generation !== roomGeneration || state.room.video !== v) return;
+            await ensureSource(requested.source);
+            const v = state.room.video;
+            if (generation !== roomGeneration || !v || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
             const want = H.expectedPosition(v, state.clock.relayNow());
             if (force || H.needsCorrection(localTime(), want)) seekTo(want);
             if (v.playing && !localPlaying()) playLocal();
