@@ -5,6 +5,7 @@ import { adminGate, ownerGate } from './lobby-do.mjs';
 import { previewKeyOk } from './core.mjs';
 import { BETA_TTL, BETA_COOKIE, BETA_IDENTITY_COOKIE, BetaSessionUnavailable, equalInvite, signBeta, betaCookie, betaSession, readBetaBody } from './beta-auth.mjs';
 import { registryRequest } from './beta-session-client.mjs';
+import { betaHealth } from './beta-ops.mjs';
 export { BetaSessions } from './beta-sessions.mjs';
 export { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget };
 
@@ -60,6 +61,7 @@ async function betaRequest(request, env, deps = {}) {
     try { assetPath = new URL(url.origin + decodeURIComponent(url.pathname)).pathname; }
     catch { return reply('Invalid path.', 400); }
     if (url.pathname === '/robots.txt') return reply('User-agent: *\nDisallow: /\n');
+    if (url.pathname === '/beta/health') return betaHealth(request, env, { betaConfigured: !!betaConfigured(env), accessConfigured: betaAccessConfigured(env) });
     if (!betaConfigured(env)) return reply('Private community beta is not configured.', 503);
     if (['/', '/beta', '/beta/'].includes(url.pathname)) return reply(SHELL, 200, 'text/html; charset=utf-8');
     if (url.pathname === '/beta/style.css') return reply(STYLE, 200, 'text/css');

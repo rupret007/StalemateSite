@@ -4,6 +4,7 @@ import { admit, createBucket, dayKey, limitsFrom, validFrame } from './core.mjs'
 import { admitTurn, HangoutTurnBudget } from './turn.mjs';
 import { adminGate, ownerGate, admitLobby, HangoutLobby } from './lobby-do.mjs';
 import { activeBetaSession, registryRequest, validBetaSession } from './beta-session-client.mjs';
+import { INTERNAL_HEALTH_PATH, healthJson } from './beta-ops.mjs';
 
 export { HangoutLobby, HangoutTurnBudget };
 
@@ -48,9 +49,17 @@ export default {
 };
 
 export class HangoutQuota {
-    constructor(state, env) { this.state = state; this.limits = limitsFrom(env); }
-    async fetch() {
+    constructor(state, env) { this.state = state; this.env = env; this.limits = limitsFrom(env); }
+    async fetch(request) {
         const key = `c:${dayKey(Date.now())}`;
+        if (request && new URL(request.url).pathname === INTERNAL_HEALTH_PATH) {
+            if (this.env.HANGOUT_BETA_MODE !== 'protected' || request.method !== 'GET') return new Response('not found', { status: 404 });
+            try {
+                const stored = await this.state.storage.get(key), used = stored === undefined ? 0 : stored;
+                if (!Number.isSafeInteger(used) || used < 0) throw new Error('quota');
+                return healthJson({ storage: 'ok', quota: { day: dayKey(Date.now()), used, limit: this.limits.connectionsPerDay } });
+            } catch { return healthJson({ storage: 'unavailable' }, 503); }
+        }
         const used = (await this.state.storage.get(key)) || 0;
         if (used >= this.limits.connectionsPerDay) return new Response('cap', { status: 429 });
         await this.state.storage.put(key, used + 1);
