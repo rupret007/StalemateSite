@@ -5,6 +5,7 @@ import main, { HangoutQuota } from '../src/index.mjs';
 import { HangoutLobby } from '../src/lobby-do.mjs';
 import { BetaSessions } from '../src/beta-sessions.mjs';
 import { aiHealth, dailyUsage, INTERNAL_HEALTH_PATH } from '../src/beta-ops.mjs';
+import { AI_CATEGORIES } from '../src/ai-moderation.mjs';
 
 const origin = 'https://beta.example';
 const OPS = 'ops-health-test-key-'.repeat(3), INVITE = 'invitation-test-key-'.repeat(3), SECRET = 'signing-test-key-'.repeat(3);
@@ -145,6 +146,38 @@ describe('sanitized truthful operational status', () => {
 });
 
 describe('actual DO health reads do not spend or reset application state', () => {
+    it.each([true, false])('reports actual instance review outcomes (provider success: %s) without health probes sending text', async (success) => {
+        const { env } = config();
+        Object.assign(env, { HANGOUT_AI_MODERATION: 'review', OPENAI_API_KEY: 'synthetic-provider-key' });
+        const fixture = { model: 'test-moderation', results: [{ flagged: false,
+            categories: Object.fromEntries(AI_CATEGORIES.map((c) => [c, false])),
+            category_scores: Object.fromEntries(AI_CATEGORIES.map((c) => [c, 0.01])) }] };
+        const provider = vi.fn(async () => success ? Response.json(fixture) : new Response('private provider error', { status: 503 }));
+        vi.stubGlobal('fetch', provider);
+        const lobbyState = state([['beta-initialized', true], ['net', { lock: 'off' }]]);
+        const lobby = new HangoutLobby(lobbyState, env); await lobby.ready;
+        env.LOBBY = { idFromName: name => name, get: () => lobby };
+        await lobby.aiModerator.review({ text: 'Synthetic public test only' });
+        const before = structuredClone(lobbyState.values); lobbyState.storage.put.mockClear();
+        for (let i = 0; i < 2; i++) {
+            const body = await (await betaFetch(request(), env)).json();
+            expect(body.features.ai).toMatchObject({ enabled: true, configured: true, state: success ? 'ready' : 'degraded',
+                currentInstance: { checked: success ? 1 : 0, flagged: 0, failed: success ? 0 : 1, skipped: 0, pending: 0 } });
+            expect(body.service.reasons.includes('ai-unavailable')).toBe(!success);
+            expect(body.providerChecks).toBe('not-performed');
+            expect(JSON.stringify(body)).not.toMatch(/Synthetic public test|synthetic-provider-key|private provider error/);
+        }
+        expect(provider).toHaveBeenCalledTimes(1);
+        expect(lobbyState.values).toEqual(before); expect(lobbyState.storage.put).not.toHaveBeenCalled();
+    });
+    it('allows only bounded numeric runtime outcomes and makes no durable-success claim', async () => {
+        const { env, binding } = config();
+        env.LOBBY = binding({ storage: 'ok', lock: 'off', shield: false, lockAuto: false, evidenceStorage: 'ready',
+            quota: { day: today(), used: 1, limit: 40000 }, ai: { ...aiHealth(env), currentInstance: { checked: 'private message', failed: -1, pending: 0, secret: OPS } } });
+        const body = await (await betaFetch(request(), env)).json();
+        expect(body.features.ai.currentInstance).toBeNull();
+        expect(JSON.stringify(body)).not.toMatch(/private message|ops-health-test-key/);
+    });
     it('leaves admitted-session records, connection allowances, reports and abuse unchanged after normal wake', async () => {
         const { env } = config();
         const lobbyState = state([['beta-initialized', true], ['net', { lock: 'off', budget: { day: today(), requests: 17 } }], ['ai-usage', { day: today(), used: 4 }]]);
