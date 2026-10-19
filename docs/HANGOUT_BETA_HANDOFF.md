@@ -345,8 +345,23 @@ Keep new guest/private-room admission paused during emergency recovery using
 this source, carrying `HANGOUT_OPEN=0` and the effective invitation version into
 the recovery deployment. Restore the reviewed history correction and verify
 fresh joins and reconnects before reopening private visitor admission. The
-archive's offline checks do not establish compatibility with the candidate's
-new private-report queue or staff intake; accept those separately before use.
+archive's offline checks alone do not establish data compatibility. A
+[three-generation local rehearsal](../pr-assets/beta-collaboration/private-report-recovery.json)
+now verifies one synthetic, consented report across actual `c41896b` → paused
+`b111bb2` → `c41896b` processes sharing SQLite and unchanged local identities.
+The older Lobby woke through its operator health endpoint with guest admission
+paused. After restoration, the original guest cookie and unchanged request
+returned the same pending report ID; changed content with that request returned
+409. All three generations stopped gracefully, both guests logged out and the
+test port was released. The first attempt's sandbox setup failure is retained.
+
+The older source also has no private-report intake, review controls or pruning
+for the new queue's 24-hour retention period. Pausing admission does not keep
+that pruning running, and its health response cannot attest report readiness.
+Use a reviewed recovery build that retains report handling and expiry before
+treating recovery as compatible. The short local preservation check does not
+establish uninterrupted retention, hosted recovery, staff intake/review, crash
+durability or safe extended operation on the older source.
 
 Use a version rollback only after checking that the target's effective bindings,
 invitation version, admission state, staff policies and provider settings retain

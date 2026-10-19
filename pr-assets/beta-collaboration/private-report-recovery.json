@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "status": "passed-local-only-not-deployed",
+  "startedAt": "2026-10-19T18:10:14.646Z",
+  "finishedAt": "2026-10-19T18:10:19.217Z",
+  "scope": "Short graceful local c418 candidate → admission-paused b111 fallback → exact c418 restoration using one owned SQLite directory and unchanged local identity settings. Synthetic explicitly consented evidence only.",
+  "runnerSha256": "89886e07ec351636243e27375b1507fb8136bfbaf5482f11b9f8d76a3ac7f732",
+  "privateReceiptSha256": "a3326d3fcc4adac882e4f5f2b704176181ab8cb9822d0fd6d40b9efbfc15b42e",
+  "sandboxPolicySha256": "dc42ef5e473d8e1534ed1699d6a71aeaee263c4af4cd6af61fc166afce3fdbb9",
+  "sourceValidation": {
+    "c418": {
+      "sourceCommit": "c41896b12ba7743d4f362869d5ea3bc9709038b1",
+      "sourceTree": "fbde5e70d5bd5145799dc9859add1cc2580caa6e",
+      "archiveSha256": "15d37af478480833cd5502ba7820607d98c44eb7435dc3358f2266d7db878c47",
+      "manifestSha256": "2989c363d66c82f7ed9331a23fa0b102a3be0ecbfc0424725f3418cf5b4b3d5d",
+      "verifiedSourceAndAssetFileCount": 121,
+      "exactFilesCopied": true
+    },
+    "b111": {
+      "sourceCommit": "b111bb2aa070cd791834f40f26665996ad406421",
+      "sourceTree": "56bcdf0dd5d0919472b49954da5a6d14bd720b51",
+      "archiveSha256": "58ec6699e647980dc31a520e207324cea38c7466f1ce4f7f9819ee5c8dc69822",
+      "manifestSha256": "061eb0ec18920108b6f06c979e035c2e7cb82c5e62041ac3f420437a25890f68",
+      "verifiedSourceAndAssetFileCount": 114,
+      "exactFilesCopied": true
+    }
+  },
+  "tools": {
+    "wrangler": "4.151.1",
+    "miniflare": "5.20261012.1-beta",
+    "workerd": "1.20261012.1",
+    "ws": "8.21.0"
+  },
+  "checks": {
+    "sameConfigPathWorkerNameDoClassesMigrationsPersistAndInviteVersion": true,
+    "sandboxPolicyCompilePreflightPassed": true,
+    "normalConsentingGuestReportDurableAck": true,
+    "oldLobbyActualWakeViaLocalOpsHealth": true,
+    "oldAdmissionPausedProvidersOff": true,
+    "noOldGuestUnlockAdmissionChatOrStaffRequests": true,
+    "sameCookieFreshSocketExactRequestDuplicateOriginalIdPending": true,
+    "changedContentSameNonce409": true,
+    "originalRecordStillPendingAfterConflict": true
+  },
+  "nativeRuntime": {
+    "processGenerations": 3,
+    "sourceSequence": [
+      "c41896b12ba7743d4f362869d5ea3bc9709038b1",
+      "b111bb2aa070cd791834f40f26665996ad406421",
+      "c41896b12ba7743d4f362869d5ea3bc9709038b1"
+    ],
+    "actualWorkerdProcessesPerGeneration": [
+      2,
+      2,
+      2
+    ],
+    "sqliteFilesWithVerifiedHeader": 15,
+    "admissionPausedInFallback": true,
+    "sameRestoredConfigHash": true,
+    "allGracefullyStopped": true
+  },
+  "cleanup": {
+    "guestLogouts": 2,
+    "copiedCookieAssetDenials": 2,
+    "allOwnedProcessesGone": true,
+    "ownedPortReleased": true,
+    "existingPreviewPreserved": true
+  },
+  "isolation": {
+    "hostedDeployment": false,
+    "userBrowserUsed": false,
+    "externalProvidersEnabled": false,
+    "credentialSource": "New generated local-only values; minimal child environment; real HOME unchanged; legacy Wrangler profile content reads and writes denied.",
+    "network": "Wrangler descendants ran under a sandbox allowing localhost endpoint filters and local IPC; runner requests used only its owned loopback port.",
+    "sandboxCompilePreflightPassed": true,
+    "externalNetworkNegativeProbePerformed": false
+  },
+  "retainedFailures": [
+    {
+      "runnerSha256": "8fd43fefc0c59da0536bf485e2d34509c42947dc2be27a585ea9a39cd2886cae",
+      "privateReceiptSha256": "0ea23ccaca3fa916332b28ab8a0e656f4fe24c3061efe315ff168f723952dab6",
+      "stage": "first-c418-start",
+      "result": "Unsupported sandbox endpoint syntax stopped the first attempt before any workerd, guest or report. Owned cleanup passed. Corrected supported localhost filters and added a bounded compile preflight before the successful attempt."
+    }
+  ],
+  "limitations": [
+    "The fallback cannot receive or review the new private reports and does not run their 24-hour pruning. Paused admission alone does not preserve retention.",
+    "This short graceful local check proves report and receipt preservation, not uninterrupted retention, long downtime, crash durability or hosted recovery.",
+    "No real Access identity, human moderator disposition, browser UI, physical-device or external-provider acceptance.",
+    "The fallback predates the private-history correction. Real recovery requires a reviewed compatible build retaining history, report handling and expiry; this rehearsal is not permission to deploy the older source.",
+    "Public evidence excludes selected text, names, cookies, keys, report/request/room identifiers, frames and request URLs."
+  ],
+  "rootEvidenceVerificationSha256": "e8fafe276176a62269f1b9cefef6d0c78f334416052f7d2f01d6c5da7768237d"
+}
