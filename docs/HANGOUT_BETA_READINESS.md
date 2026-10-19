@@ -27,8 +27,8 @@ protected Cloudflare beta, with separate actual visitor browser contexts.
 | Host controls and abuse limits | Hosted guest created a restricted art room, denied an uninvited guest and admitted an invited one. Automated room/PM consent, account/device limits, caps and emergency controls pass. | Appoint actual moderators and run their incident/recovery drill. |
 | Bounded AI assistance | A real `omni-moderation-latest` request returned HTTP 200 using the approved vault key. Beta secret provisioned. Automated queue, exclusions, 100/day limit and outage checks pass. | AI remains off. Verify hosted text-to-review flow and real staff handling before enabling it. |
 | Shared drawing | Actual browser pointer drawing reached a separate hosted guest. WebKit/Android touch drawing and reconnect checks pass. | Physical touch-device acceptance. |
-| Watch synchronization | Desktop/private room and phone fixtures verify host play/pause/seek and guest restrictions, including paused seeks. | Actual YouTube/provider playback and mobile autoplay/permission behavior remain to be accepted on devices. |
-| WebJam invitation/join | Actual native host invitation crossed two Cloudflare guests unchanged into actual Qt Join; a native guest authenticated and received a real Jamulus response. | Same Mac with explicit sealed-reply fallback. Cross-network audio, timing and released desktop package acceptance remain. Browser Web Join is disabled; its deployed site returned 404. |
+| Watch synchronization | Desktop/private room and phone fixtures verify host play/pause/seek and guest restrictions, including paused seeks. A provider-readiness race exposed in CI is fixed; pending source/leave cancellation is covered. | Actual YouTube/provider playback and mobile autoplay/permission behavior remain to be accepted on devices. |
+| WebJam invitation/join | Actual native host invitation crossed two Cloudflare guests unchanged into actual Qt Join; a native guest authenticated and received a real Jamulus response. | Same Mac with explicit sealed-reply fallback. Mac, Windows and Linux are all beta requirements; compatible packaged installation, cross-network audio and timing remain to be accepted. Browser Web Join is disabled; its deployed site returned 404. |
 | Camera/TURN and cost controls | Consent, credential expiry/refresh, failure fallback and serialized usage/rate accounting pass provider fixtures. | TURN is off. Shared key, issuance/analytics permissions, usage allocation and forced-relay connection need live verification. Admission estimates are not a billing cap. |
 | Mobile usability | All repository browser checks passed, including WebKit phone projects. Hosted 375/390px captures have no page overflow, wrapping text, 16px input and visible Send. | Real iPhone Safari keyboard, Access redirects, camera/audio and background/resume are unverified. |
 | IRC history/reconnect | Hosted newcomers saw no earlier messages; original live connections retained scrollback during idle. Exact-connection PM consent cannot transfer to a reconnect or another same-device tab. | Real device/network interruption acceptance. No transcript archive or pre-join history is introduced. |
@@ -41,7 +41,10 @@ protected Cloudflare beta, with separate actual visitor browser contexts.
 - Final local unit run: **470 tests in 50 files passed**. Full browser run:
   **187 scenarios passed**, covering the entire repository rather than only the
   community pages. The final receipt optimization also passed 11 affected
-  browser scenarios. Provider fixtures are identified in their tests/docs.
+  browser scenarios. The later watch correction passed 10 watch checks under
+  CPU load and 39 related private/session/moderation scenarios; the additional
+  readiness regression brings the browser suite to 188 scenarios. Provider
+  fixtures are identified in their tests/docs.
 - [Hosted guest receipt](../pr-assets/beta-collaboration/hosted-guest.json):
   admission denial, separate chat, restricted guest art room, drawing, 75-second
   idle continuity, durable report acknowledgement, copied-session logout and
@@ -66,9 +69,13 @@ The guest/native checks used beta version
 `ee8fb29f-aaa5-4e55-8ee3-06c760fd3778`; the later version provisioned secrets.
 Worker versions and Git commits are different identifiers.
 
-**Final active runtime:** `da842199-79fc-4cfd-b51e-2c66fa01fb9e`, source commit
-`851fa959836d5e352f7d298027f740a03e067f2e`. The rollback drill changed to the
-compatible `2f752cff` version, then restored this release. AI and TURN remain
+**Current active runtime:** `d906ab1d-fb64-4f15-9887-4d485c24f5a7`, source commit
+`31d2b7c68fb243ad64f2341b5e09194cc5de4530`. The earlier rollback drill changed
+from `da842199` to compatible `2f752cff`, then restored `da842199`; that drill
+does not prove a rollback of this later watch correction. A separate
+[protected asset check](../pr-assets/beta-collaboration/hosted-watch-asset.json)
+verified this deployed watch file byte-for-byte against source, with invitation
+denial and proof-session logout. AI and TURN remain
 off; Access and the moderation contact remain unconfigured. These deployment
 facts are narrower than full beta readiness.
 
@@ -77,6 +84,13 @@ without increasing timeouts or weakening bounds. Existing CI exposed an intermit
 5-second retention-test timeout; the same workload improved locally from 1,399 ms
 to 811 ms. New checks preserve byte reclamation, immutable pending snapshots and
 zero-recipient cleanup.
+
+The subsequent watch correction shares source-readiness work and applies the
+latest room state after loading. Previously a source echo could let the guest
+play while leaving the host paused. Both fixture players must now actually be
+playing before concurrent, timestamp-aligned synchronization measurements. The
+1.5-second tolerance and five-second expectation remain unchanged; leaving or
+changing source while a provider is loading cannot start an obsolete player.
 
 ## External setup still needed
 
@@ -93,9 +107,9 @@ zero-recipient cleanup.
    Cloudflare/Hangout/shared TURN credential searches did not expose those keys.
    Verify the existing issuer and analytics credentials through the approved
    vault process. Do not rotate shared WebJam keys or invent replacement ones.
-4. **Devices/networks:** physical iPhone Safari and a second household's desktop
-   need real email, media and audio acceptance. WebKit emulation and same-Mac
-   encrypted forwarding are narrower evidence.
+4. **Devices/networks:** Mac, Windows and Linux desktop installations, physical
+   iPhone Safari and a second household's connection need actual acceptance.
+   WebKit emulation and same-Mac encrypted forwarding are narrower evidence.
 
 Vault access was restored for this session. The legacy helper's saved bot-master
 unlock does not match the account used for that sign-in, so unattended future

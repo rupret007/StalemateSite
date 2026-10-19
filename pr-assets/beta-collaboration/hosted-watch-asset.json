@@ -1,0 +1,11 @@
+{
+  "time": "2026-10-19T03:58:50.214Z",
+  "version": "d906ab1d-fb64-4f15-9887-4d485c24f5a7",
+  "source": "31d2b7c68fb243ad64f2341b5e09194cc5de4530",
+  "status": "passed",
+  "uninvitedStatus": 401,
+  "invitedStatus": 200,
+  "asset": "/r/45662413410ed051/lobby/lobby-room.js",
+  "sha256": "b3f118abc4cf7da69ef09eb7e0b250cd6fea68faa6f8ab77a8f1b2e67c374c3d",
+  "scope": "Protected deployed watch asset identity only; no provider playback claim."
+}
