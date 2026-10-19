@@ -160,7 +160,7 @@ test('late joiner who receives snapshot from a guest still gets lastHostSeq and 
         });
         app.ws.send(JSON.stringify(frame));
     }, lateId);
-    expect(await late.evaluate(() => window.__hangout.snapshotDone)).toBe(true);
+    await expect.poll(() => late.evaluate(() => window.__hangout.snapshotDone)).toBe(true);
 
     await host.evaluate(async ({ to, seq }) => {
         const app = window.__hangout;
