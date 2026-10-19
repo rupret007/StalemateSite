@@ -145,6 +145,16 @@ write durability, provider availability/billing or continuous external coverage.
 
 ## Hosted acceptance before visitor invitations
 
+Co-host removal now also revokes operator grants whose account/device association
+was proved when granted, including disconnected devices restored from storage.
+The optional `opAccounts` room metadata is bounded by the existing operator list.
+Legacy grants with no proved association remain separate guest grants; retained
+nicknames cannot establish ownership. An older engine can read the unchanged
+operator list but drops these associations when it next saves the room. Prefer
+rollback targets that preserve this field. After an emergency rollback to an
+older serializer, audit and revoke affected guest operator grants explicitly;
+restoring newer code cannot reconstruct associations that were discarded.
+
 Use separate browser profiles for two guests, a verified owner and a restricted
 moderator. Test real email delivery, ownership recovery on the second device,
 co-host and transfer boundaries, report review, room capacity and restrictions,
