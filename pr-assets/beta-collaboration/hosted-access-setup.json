@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "status": "real-owner-and-staff-login-verified-human-action-pending",
-  "scope": "Actual separate private-beta hostname/path Access configuration, real emailed-code owner callback and separate restricted staff connection; human disposition and second-device recovery remain separate.",
+  "status": "real-owner-and-staff-login-verified-human-dismissal-confirmed",
+  "scope": "Actual private-beta Access setup, real owner and restricted staff login, user-confirmed report dismissal and verified restoration of temporary Chrome automation; second-device recovery remains separate.",
   "betaHost": "stalemate-hangout-beta.jeffstory007.workers.dev",
   "team": "throbbing-hill-6ed4.cloudflareaccess.com",
   "observations": [
@@ -167,10 +167,9 @@
     }
   ],
   "limitations": [
-    "Existing OAuth list results are insufficient to inventory the dashboard-verified same-account resources; exact filtering mechanism is unknown.",
-    "A visible moderation queue is not a completed human action; dismissal remains pending.",
-    "Registered-room recovery from a second device, denied-identity acceptance and physical device/expiry checks remain outstanding.",
-    "The operator must restore temporary Chrome Apple Events scripting to off after setup and record verification."
+    "Existing OAuth lists do not inventory the dashboard-verified resources; exact filtering mechanism is unknown.",
+    "Human dismissal/removal is user-confirmed; an independent queue reload was not performed.",
+    "Registered-room recovery from a second device, denied-identity acceptance and physical device/expiry checks remain outstanding."
   ],
   "credentialsOrBrowserAuthRecorded": false,
   "checkedAt": "2026-10-19T04:50:06.922420+00:00",
@@ -239,7 +238,10 @@
   },
   "temporaryChromeAutomation": {
     "requiredFinalAppleEventsScriptingState": "off",
-    "restorationVerified": false
+    "restorationVerified": true,
+    "verification": "User confirmed unchecked; no-op Apple Events JavaScript probe was blocked with Chrome error 12.",
+    "verifiedAt": "2026-10-19T05:43:44.697267+00:00",
+    "browserAuthValuesRead": false
   },
   "health": {
     "httpStatus": 200,
@@ -290,9 +292,13 @@
     }
   },
   "humanQueueAction": {
-    "status": "pending",
-    "actionRequested": "dismiss the identified synthetic report",
-    "humanReviewPassed": false
+    "status": "user-confirmed",
+    "action": "dismiss identified synthetic report",
+    "reportId": "mmverkvuy1",
+    "humanObservedRemoval": true,
+    "humanReviewPassed": true,
+    "recordedAt": "2026-10-19T05:43:44.697267+00:00",
+    "independentReloadPersistenceCheck": "not performed"
   },
   "ownerRoomRecovery": "pending second-device registered-room acceptance",
   "workersCompatibilityFix": {
@@ -301,5 +307,15 @@
     "signatureIssuerAudienceExpiryChecksPreserved": true,
     "officialReference": "https://developers.cloudflare.com/workers/runtime-apis/request/"
   },
-  "reviewPullRequest": "https://github.com/rupret007/StalemateSite/pull/39"
+  "reviewPullRequest": "https://github.com/rupret007/StalemateSite/pull/39",
+  "followupObservations": [
+    {
+      "recordedAt": "2026-10-19T05:43:44.697267+00:00",
+      "source": "User confirmation and no-op Chrome setting probe",
+      "humanDismissedExactSyntheticReport": true,
+      "chromeAppleEventsScriptingRestoredOff": true,
+      "probeBlockedError": 12,
+      "noBrowserAuthValuesRead": true
+    }
+  ]
 }

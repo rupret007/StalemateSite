@@ -2,7 +2,7 @@
 
 Updated October 19, 2026 UTC. **The guest technical beta works; it is not yet
 ready for general visitor invitations.** Real email owner login and separate
-staff access now work; human report review, second-device ownership recovery
+staff access now work; Jeff confirmed the test-report dismissal. Second-device ownership recovery
 and live TURN acceptance remain outstanding. Jeff confirmed `jeffstory007@gmail.com` as the
 moderation contact and sole initial owner/reviewer; the contact is now visible
 inside the hosted beta.
@@ -24,9 +24,9 @@ protected Cloudflare beta, with separate actual visitor browser contexts.
 | --- | --- | --- |
 | Nickname-only guests | Hosted separate guests exchanged real chat. Ten uninvited product/relay probes returned application 401. | Complete human device acceptance before inviting visitors. |
 | Verified persistent ownership | A real email OTP was completed and the corrected hosted callback returned owner/fan state. Generated-RSA/JWT tests verify distinct audience, account continuity and recovery/co-host/transfer boundaries. The narrow owner app/policy and deployed AUD are dashboard-verified. | Recover a registered room from a second device and exercise handoff with a separately verified co-host. |
-| Restricted real staff | The separate real staff callback succeeded through Access SSO, connected its moderation WebSocket and showed the exact synthetic report. Automated allowlist/signature/audience/expiry checks pass; no synthetic staff role exists in beta. | Complete the human queue action and real denied-identity/device acceptance. |
+| Restricted real staff | The separate real staff callback succeeded through Access SSO, connected its moderation WebSocket and showed the exact synthetic report. Automated allowlist/signature/audience/expiry checks pass; no synthetic staff role exists in beta. | Jeff confirmed dismissing the identified report. Complete real denied-identity/device acceptance. |
 | Session lifecycle | Actual hosted logout closed lobby and private relay sockets in two profiles sharing a session; copied pre-logout cookies could not fetch assets or reconnect. Automated expiry, version revocation, multi-room retries and admission races pass. | Real Access callback/expiry acceptance on devices. |
-| Reports and human review | A pre-idle message was durably acknowledged after 75 seconds with the same live sockets. The real staff queue displays the exact synthetic report. Durable evidence and review controls pass automated checks. Jeff is the confirmed sole initial reviewer; the hosted contact link is verified. | Jeff's requested dismissal is pending. Agree review coverage/handoff and verify the action persists before marking human review passed. |
+| Reports and human review | A pre-idle message was durably acknowledged after 75 seconds with the same live sockets. The real staff queue displayed the exact synthetic report, and Jeff confirmed dismissing it. Durable evidence and review controls pass automated checks. Jeff is the confirmed sole initial reviewer; the hosted contact link is verified. | Jeff confirmed dismissal and observed removal. Independent reload persistence and review coverage/handoff remain to be accepted. |
 | Host controls and abuse limits | Hosted guest created a restricted art room, denied an uninvited guest and admitted an invited one. Automated room/PM consent, account/device limits, caps and emergency controls pass. | Run Jeff's authenticated incident/recovery drill; any additional staff need an explicit appointment and separate allowlists. |
 | Bounded AI assistance | Actual hosted guest text completed one provider review under a one-request daily cap. A second message reached the other guest while quota stayed at one and review was skipped. Both guests logged out; AI was restored off with the configured 100/day allowance. Automated queue/privacy/outage checks pass. | Benign input only. Complete real flagged-evidence and human review acceptance before permanent enablement. |
 | Shared drawing | Actual browser pointer drawing reached a separate hosted guest. WebKit/Android touch drawing and reconnect checks pass. | Physical touch-device acceptance. |
@@ -134,8 +134,9 @@ acceptance.
   performs no provider checks. Subsequent real OTP owner login and separate
   staff SSO/WebSocket admission passed after correcting the Workers JWKS fetch
   mode. Committed fix `832f7e1` is deployed as `e3177c6d`; the live staff socket
-  survived deployment with the exact report still visible. A human dismissal
-  is requested but not yet accepted. New diagnostics regressions pass **28/28**.
+  survived deployment with the exact report still visible. Jeff subsequently
+  confirmed dismissing that report and seeing it disappear. An independent
+  post-action queue reload is not claimed. New diagnostics regressions pass **28/28**.
 - [Installed Mac monitor](../pr-assets/beta-collaboration/installed-monitor.json)
   and [controlled local failure/recovery](../pr-assets/beta-collaboration/local-monitor-alerts.json):
   actual LaunchAgent exit 0, copied runtime/source match, private file modes,
@@ -214,15 +215,15 @@ changing source while a provider is loading cannot start an obsolete player.
    include only Jeff's confirmed email and require OTP; add future named cohort
    owners only to the owner app. Actual OTP owner login and separate staff
    admission now pass. Complete denied-identity acceptance and second-device
-   recovery. The operator must restore temporary Chrome
-   Apple Events scripting to off after setup and record verification.
+   recovery. Temporary Chrome Apple Events scripting is restored off: Jeff
+   confirmed unchecking it and the no-op probe was blocked with error 12.
    Access Free has a shared 50-user limit; guest nickname chat/temporary
    hosting does not require Access. Do not enable Worker-level Access:
    Cloudflare documents that its WebSocket upgrades fail.
 2. **Staffing:** Jeff confirmed `jeffstory007@gmail.com` for contact and as the
    sole initial owner/reviewer. Its hosted display and real staff sign-in are
-   verified. Review coverage/handoff and Jeff's human queue action still need
-   completion; a visible report is not a completed review.
+   verified. Jeff confirmed dismissing the exact synthetic report and observing
+   removal. Review coverage/handoff and independent reload persistence remain.
 3. **TURN:** the shared desktop credential Worker and its secret-binding names
    are verified, but it lacks the newer browser Origin/key policy in WebJam
    master. It remains unchanged. Use the beta's same-origin `/turn` gateway;
