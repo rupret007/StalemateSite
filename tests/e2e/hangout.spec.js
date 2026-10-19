@@ -138,15 +138,33 @@ test('late joiner who receives snapshot from a guest still gets lastHostSeq and 
     await late.click('[data-enter]');
     await expect.poll(() => late.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThan(0);
 
+    await expect.poll(() => late.evaluate(() => window.__hangout.snapshotFresh && window.__hangout.snapshotHasSeqProof)).toBe(true);
     const guestId = await guest.evaluate(() => window.__hangout.myId);
+    const hostId = await host.evaluate(() => window.__hangout.myId);
     const lateId = await late.evaluate(() => window.__hangout.myId);
-    await late.evaluate((gid) => {
+    await late.evaluate(({ gid, hid, seq }) => {
         const app = window.__hangout;
         app.snapshotDone = false;
         app.snapshotFrom = gid;
         app.snapshotHasSeqProof = false;
         app.lastHostSeq = 0;
-    }, guestId);
+        const original = app.ws.onmessage;
+        window.__legacyGuestSnapshotHandled = false;
+        window.__legacyHostSnapshotHandled = false;
+        window.__replayedClearHandled = false;
+        app.ws.onmessage = async (event) => {
+            const frame = JSON.parse(event.data);
+            const message = frame.c ? await window.HangoutCore.open(app.key, frame) : null;
+            await original(event);
+            if (message?.type === 'snapshot' && !Object.hasOwn(message, 'request') && message.to === app.myId && message.done) {
+                if (frame.from === gid && !message.lastHostSeqSigned) window.__legacyGuestSnapshotHandled = true;
+                if (frame.from === hid && message.lastHostSeqSigned?.body?.kind === 'seq'
+                    && message.lastHostSeqSigned.body.seq === seq) window.__legacyHostSnapshotHandled = true;
+            }
+            if (frame.from === gid && message?.type === 'host' && message.body?.kind === 'clear' && message.body.seq === seq)
+                window.__replayedClearHandled = true;
+        };
+    }, { gid: guestId, hid: hostId, seq: clearSeq });
 
     await guest.evaluate(async (to) => {
         const app = window.__hangout;
@@ -160,7 +178,9 @@ test('late joiner who receives snapshot from a guest still gets lastHostSeq and 
         });
         app.ws.send(JSON.stringify(frame));
     }, lateId);
-    expect(await late.evaluate(() => window.__hangout.snapshotDone)).toBe(true);
+    await expect.poll(() => late.evaluate(() => window.__legacyGuestSnapshotHandled && window.__hangout.snapshotDone)).toBe(true);
+    expect(await late.evaluate(() => window.__hangout.snapshotHasSeqProof)).toBe(false);
+    expect(await late.evaluate(() => window.__hangout.lastHostSeq)).toBe(0);
 
     await host.evaluate(async ({ to, seq }) => {
         const app = window.__hangout;
@@ -188,15 +208,15 @@ test('late joiner who receives snapshot from a guest still gets lastHostSeq and 
         app.ws.send(JSON.stringify(frame));
     }, { to: lateId, seq: clearSeq });
 
-    await expect.poll(() => late.evaluate(() => window.__hangout.snapshotDone)).toBe(true);
-    expect(await late.evaluate(() => window.__hangout.lastHostSeq)).toBeGreaterThanOrEqual(clearSeq);
+    await expect.poll(() => late.evaluate((seq) => window.__legacyHostSnapshotHandled && window.__hangout.snapshotDone
+        && window.__hangout.snapshotHasSeqProof && window.__hangout.lastHostSeq >= seq, clearSeq)).toBe(true);
 
     await guest.evaluate(async () => {
         const app = window.__hangout;
         const frame = await window.HangoutCore.seal(app.key, window.__capturedClear);
         app.ws.send(JSON.stringify(frame));
     });
-    await late.waitForTimeout(500);
+    await expect.poll(() => late.evaluate(() => window.__replayedClearHandled)).toBe(true);
     expect(await late.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThan(0);
 });
 
