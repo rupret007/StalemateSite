@@ -111,6 +111,7 @@ in public issue attachments.
 | Linux package install and actual invitation join | Pending | |
 | Separate-household audio session | Pending | |
 | Real owner login and second-device room recovery | Partial | Actual owner callback verified; second-device room recovery pending |
+| Separately verified co-host handoff and revocation | Pending | Requires a second approved owner-policy identity; staff remains Jeff-only |
 | Real restricted staff login, denied guest/owner, report review | Partial | Actual restricted panel and synthetic queue evidence verified; human disposition and denied-identity acceptance pending |
 | Confirmed moderation contact displayed | Verified | [Hosted mail-link check](../pr-assets/beta-collaboration/hosted-ops.json); recheck after changes |
 | Reviewer coverage and incident handoff | Pending | Jeff is the sole initial reviewer; agree hours and helper |
