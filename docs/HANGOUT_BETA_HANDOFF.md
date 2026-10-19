@@ -26,7 +26,7 @@ part of this deployment.
    was deployed as `33e6a92f`; its HTTP 200 health check confirmed configuration
    only. Real email-code owner login and separate staff SSO/WebSocket admission
    passed after the JWKS fix. Current runtime is
-   `a5d15d34-5d9e-4f57-97a6-ec07bdf94f75`, committed source `b95c7cd`.
+   `df75bdc6-4e7c-45c1-9575-4d6dda4d6d68`, committed source `b95c7cd`.
    The sign-in acceptance was recorded on earlier `e3177c6d`/`832f7e1`;
    the current deployment also includes private AI observation, co-host grant
    revocation, media reconnect guards and durable ownership offers. The earlier
@@ -49,7 +49,12 @@ part of this deployment.
    the invitation key with its version when revoking invitations.
 4. Configure and verify Turnstile on the beta hostname. A real classifier request
    succeeded. A one-request hosted benign review and cap check also passed,
-   with two guests logged out and AI restored off. Keep AI moderation off
+   with two guests logged out and AI restored off. A later owned synthetic
+   public-room test produced one flagged provider outcome using one additional
+   attempt under a two-attempt total cap; both guests logged out, its room was
+   removed and AI was restored off on the same source with usage retained at two.
+   Exact saved AI queue visibility and human disposition remain unverified.
+   Keep AI moderation off
    until flagged-evidence and real staff handling are accepted. Keep TURN off until credential issuance,
    account-wide analytics and a forced-relay connection succeed.
 5. Choose a conservative TURN allowance within the shared account's allocation.
