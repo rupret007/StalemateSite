@@ -256,11 +256,12 @@ test('multi-chunk host snapshot (>100 strokes) with lastHostSeqSigned replaces a
     expect(await late.evaluate(() => window.__hangout.state.strokes.some((s) => s.id === 'bogus-only'))).toBe(false);
 });
 
-test('snapshot with a non-video host signature in msg.video still renders strokes and chat', async ({ browser }) => {
+test('snapshot with a non-video host signature still renders strokes without importing chat', async ({ browser }) => {
     const { host, invite } = await hostAndGuest(browser);
     await drawLine(host);
     await host.fill('[data-text]', 'canvas ok');
     await host.press('[data-text]', 'Enter');
+    await expect(host.locator('[data-log]')).toContainText('canvas ok');
 
     const late = await openBrowser(browser);
     await late.goto(invite);
@@ -306,7 +307,8 @@ test('snapshot with a non-video host signature in msg.video still renders stroke
     }, { to: lateId });
 
     await expect.poll(() => late.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThan(0);
-    await expect(late.locator('[data-log]')).toContainText('canvas ok');
+    await expect(late.locator('[data-log]')).not.toContainText('canvas ok');
+    expect(await late.evaluate(() => window.__hangout.state.chat)).toEqual([]);
 });
 
 test('late joiner receives lastHostSeq and ignores replayed clear messages', async ({ browser }) => {
@@ -416,6 +418,7 @@ test('guest snapshot without host seq proof still completes and blocks a later w
     await drawLine(guest);
     await guest.fill('[data-text]', 'still here');
     await guest.press('[data-text]', 'Enter');
+    await expect(guest.locator('[data-log]')).toContainText('still here');
 
     const late = await openBrowser(browser);
     await late.goto(invite);
@@ -423,7 +426,8 @@ test('guest snapshot without host seq proof still completes and blocks a later w
     await late.click('[data-enter]');
     await expect.poll(() => late.evaluate(() => window.__hangout.snapshotDone)).toBe(true);
     await expect.poll(() => late.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThan(0);
-    await expect(late.locator('[data-log]')).toContainText('still here');
+    await expect(late.locator('[data-log]')).not.toContainText('still here');
+    expect(await late.evaluate(() => window.__hangout.state.chat)).toEqual([]);
 
     const lateId = await late.evaluate(() => window.__hangout.myId);
     const guestId = await guest.evaluate(() => window.__hangout.myId);

@@ -190,6 +190,10 @@
             clearTimeout(pace.timer); pace.timer = 0;
             pace.queue = pace.queue.filter((item) => !item.socket);
             app.connected = false;
+            // Scrollback belongs to this live connection. Retained outbound
+            // envelopes and the unsent composer draft remain separate.
+            app.state.chat = [];
+            ui.log.replaceChildren();
             app.lastClose = event.code;
             // Dropped mid-hang (Wi-Fi blip, phone switching networks): retry a few times with backoff.
             if (app.myId && event.code !== 4429 && event.code < 4400 && app.retries < 5) {
@@ -270,6 +274,7 @@
         let msg;
         try { msg = await H.open(app.key, frame); } catch (error) { return; }
         if (app.ended || app.ws !== ws) return;
+        if (msg.type === 'chat' && (!app.connected || ws.readyState !== 1)) return;
         // Crypto may finish after the relay has already announced departure.
         // Keep prior chat/drawing, but never restore that person's name or media.
         if (!peer.live && ['hello', 'av', 'rtc'].includes(msg.type)) return;
@@ -338,7 +343,7 @@
             if (finishing) app.snapshotDone = true;
             H.apply(app.state, {
                 type: 'snapshot',
-                state: { strokes: msg.strokes, chat: msg.chat, append: Boolean(msg.chunk && !msg.first) }
+                state: { strokes: msg.strokes, append: Boolean(msg.chunk && !msg.first) }
             });
             if (
                 msg.video?.signed?.body?.kind === 'video'
@@ -437,7 +442,6 @@
                 type: 'snapshot',
                 to,
                 strokes: chunk,
-                chat: isLast ? app.state.chat.slice(-50) : undefined,
                 video: isLast ? video : undefined,
                 mods: isLast ? mods : undefined,
                 lastHostSeqSigned: lastHostSeqSigned || undefined,

@@ -69,6 +69,42 @@ describe('hangout sync core', () => {
         expect(s.strokes[1].id).toBe('b');
     });
 
+    it('gives a new visitor current activity without importing legacy snapshot chat', () => {
+        const s = H.emptyState();
+        const stroke = { id: 'already-drawn', color: '#000000', size: 10, pts: [[0, 0], [1, 1]] };
+        const video = { source: { kind: 'file', id: 'manic' }, playing: false, pos: 21, t: 100 };
+        H.apply(s, { type: 'snapshot', state: { strokes: [stroke], video,
+            chat: [{ name: 'Earlier visitor', text: 'Sent before you joined', t: 90 }] } });
+        expect(s.strokes).toEqual([stroke]);
+        expect(s.video).toEqual(video);
+        expect(s.chat).toEqual([]);
+    });
+
+    it('preserves live chat across first, appended and replacement activity snapshots', () => {
+        const s = H.emptyState();
+        const first = { id: 'first', color: '#000000', size: 10, pts: [[0, 0]] };
+        const second = { id: 'second', color: '#ffffff', size: 10, pts: [[1, 1]] };
+        const replacement = { id: 'verified', color: '#000000', size: 8, pts: [[0.5, 0.5]] };
+        H.apply(s, { type: 'chat', name: 'Present visitor', text: 'Received while the snapshot loads' }, { t: 110 });
+        const liveChat = s.chat;
+        // A first chunk without a chat field must not erase an already received line.
+        H.apply(s, { type: 'snapshot', state: { strokes: [first] } });
+        expect(s.chat).toBe(liveChat);
+        H.apply(s, { type: 'chat', name: 'Present visitor', text: 'Received between chunks' }, { t: 120 });
+        H.apply(s, { type: 'snapshot', state: { strokes: [second], append: true,
+            chat: [{ name: 'Earlier visitor', text: 'Legacy backlog', t: 90 }] } });
+        expect(s.strokes).toEqual([first, second]);
+        // A later authenticated host snapshot can replace unverified drawing,
+        // but an explicit legacy chat field still cannot replace live scrollback.
+        H.apply(s, { type: 'snapshot', state: { strokes: [replacement], chat: [] } });
+        expect(s.strokes).toEqual([replacement]);
+        expect(s.chat).toBe(liveChat);
+        expect(s.chat).toEqual([
+            { name: 'Present visitor', text: 'Received while the snapshot loads', t: 110 },
+            { name: 'Present visitor', text: 'Received between chunks', t: 120 }
+        ]);
+    });
+
     it('end-to-end encrypts frames; the relay cannot read or tamper', async () => {
         const secret = H.newSecret();
         expect(H.validSecret(secret)).toBe(true);
