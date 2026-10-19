@@ -126,6 +126,7 @@ test('raise hand and reactions reach everyone; junk reactions are dropped', asyn
 
 test('host can mute, turn a camera off, spotlight, lock and take someone off faces; guests cannot forge it', async ({ browser }) => {
     const { host, guest } = await call(browser);
+    const guestId = await guest.evaluate(() => window.__hangout.myId);
     await micOn(guest);
     const guestTile = host.locator('.tile:not([data-tile="me"])');
 
@@ -148,6 +149,12 @@ test('host can mute, turn a camera off, spotlight, lock and take someone off fac
         const live = a.stream && a.stream.getVideoTracks().some((t) => t.readyState === 'live');
         return live ? 'live' : 'off';
     }), { timeout: 5000 }).toBe('off');
+    // Observe the all-off publication before resuming, so an earlier mic-on
+    // advertisement cannot satisfy the admission check before locking faces.
+    await expect.poll(() => host.evaluate((id) => {
+        const av = window.__hangout.av;
+        return !av.micPeers.has(id) && !av.camPeers.has(id) && !av.peers.has(id);
+    }, guestId)).toBe(true);
 
     await host.locator('[data-tile="me"] .more').click();
     await host.click('[data-tile-menu] button:has-text("Spotlight me for everyone")');
@@ -156,6 +163,10 @@ test('host can mute, turn a camera off, spotlight, lock and take someone off fac
     // Muted by the host, back on by choice (no second explainer).
     await guest.click('[data-mic]');
     await expect(guest.locator('[data-mic]')).toHaveText('Mute my mic');
+    await expect.poll(() => host.evaluate((id) => {
+        const av = window.__hangout.av;
+        return av.micPeers.has(id) && av.peers.has(id);
+    }, guestId)).toBe(true);
     await expect(host.locator('.tile:not([data-tile="me"])')).toHaveCount(1);
 
     await host.click('[data-lock]');
