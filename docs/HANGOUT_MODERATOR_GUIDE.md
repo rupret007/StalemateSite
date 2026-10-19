@@ -4,11 +4,11 @@ Use a real staff sign-in assigned by the site owner. A room owner or co-host has
 authority in their own room; creating a room or verifying an email never grants
 site-wide staff powers. Synthetic pilot identities are for testing only.
 
-Before inviting visitors, the operator must configure a monitored moderation
-contact, confirm who will review the queue, and agree when they will check it.
-The existing site-contact PR proposes the band inbox; its presence in a PR does
-not establish that anyone monitors it. The beta house rules must display the
-configured address. Do not advertise immediate response or 24-hour coverage.
+Jeff confirmed `jeffstory007@gmail.com` as the moderation contact and himself as
+the sole initial reviewer; the hosted house-rules contact link is verified.
+Before inviting visitors, agree review hours and an incident handoff, then
+recheck the displayed contact after deployment. Do not advertise immediate
+response or 24-hour coverage.
 
 ## Review a report
 
@@ -31,7 +31,8 @@ configured address. Do not advertise immediate response or 24-hour coverage.
    configured moderation inbox; do not copy sensitive evidence into public
    GitHub issues or external chat rooms.
 
-Reports are authorized against actual delivery to that still-open connection.
+These message reports cover the lobby and its channels. They are authorized
+against actual delivery to that still-open connection.
 They remain possible after a server wake because the client can resubmit the
 exact received text against a bounded server digest. A refresh or real reconnect
 starts a new IRC session and grants no access to previous messages. Digests do
@@ -39,10 +40,26 @@ not create a chat backlog. Reports outside the 24-hour/receipt-cap window may be
 unavailable; the displayed moderation contact is the fallback. Storage failures
 must show an error rather than a successful report acknowledgement.
 
+## Encrypted private rooms
+
+The separate encrypted private-room page has no per-message staff report action.
+Its camera-tile **Report to the host** sends an encrypted notice to that room's
+creator and hides the participant locally. It does not create durable staff
+evidence, and the displayed notice is not confirmation that a host received it.
+Staff cannot inspect the encrypted conversation or use the channel queue's
+message-deletion controls there.
+
+For private-room abuse, including an abusive or absent host, use
+`jeffstory007@gmail.com` as an interim contact. Include the approximate time and
+a brief description; do not send private invitation links, access codes or
+passwords. A usable on-site path to submit private-room abuse to staff with an
+honest acknowledgement remains a beta requirement. Email contact alone does not
+complete that requirement.
+
 ## Room-host controls
 
-Hosts can invite, kick or ban people in their own room, apply slow mode, disable
-cameras and close the room. `/mode +m` restricts speech to hosts and voiced
+Lobby-channel hosts can invite, kick or ban people in their own room, apply slow
+mode, disable cameras and close the room. `/mode +m` restricts speech to hosts and voiced
 visitors; `/mode +i` requires an invitation; `/mode +k key` requires a room key;
 `/mode +S 10` adds a ten-second slow mode; `/mode -C` disables room cameras.
 Registered owners can manage verified co-hosts and transfer ownership. Co-hosts

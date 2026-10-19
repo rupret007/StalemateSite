@@ -114,9 +114,25 @@ provider connectivity by disabling signature or route-specific audience checks.
 
 ## Build and deploy privately
 
-Run from the repository root. Use the beta config explicitly for every Wrangler
-command; the existing vault-upload script targets the main Worker and is not a
-beta deploy command.
+The original natural eight-hour expiry observation started October 19 at 08:00
+UTC, with expiry at 16:00 UTC. Keep the hosted source, runtime, configuration,
+invitation and identity keys unchanged until that original job has a recorded
+terminal result; reaching 16:00 alone is not confirmation. New fixes are
+prepared for review, not deployed. Complete the required human/Karen review and
+release acceptance before deploying them.
+
+Use a clean, isolated checkout of the reviewed release commit. Before building,
+record the effective active configuration privately and reconcile it with the
+candidate beta config. Tracked defaults are not a backup of live settings.
+Preserve the effective `HANGOUT_OPEN` admission state, `HANGOUT_BETA_INVITE_VERSION`, staff
+allowlists, Access audiences, provider enable flags and usage caps. Never reduce
+or reuse an invitation version; keep AI/TURN disabled until accepted. Preserve
+remote secrets, especially the stable `HANGOUT_HMAC_KEY`, and DO bindings.
+
+Run from that checkout's repository root. Use the beta config explicitly for
+every Wrangler command; the existing vault-upload script targets the main
+Worker and is not a beta deploy command. The following commands do not grant
+release approval or lift an incident pause.
 
 ```sh
 npm ci
@@ -127,7 +143,9 @@ npm run package:beta
 npx --yes wrangler@4.151.1 deploy --config hangout-worker/wrangler.beta.toml --dry-run
 ```
 
-Before the first working deployment, provision `HANGOUT_BETA_INVITE_KEY`,
+The existing beta secrets are already provisioned; do not replace them as part
+of a code release. For a separate first-time setup only, provision
+`HANGOUT_BETA_INVITE_KEY`,
 `HANGOUT_HMAC_KEY` and `HANGOUT_PREVIEW_KEY` through stdin or a permission-restricted
 ignored secret file with `wrangler secret bulk --config
 hangout-worker/wrangler.beta.toml`. Do not put values in command arguments. A
@@ -164,9 +182,14 @@ and never grants a staff role.
    complete message into desktop WebJam's **Join** dialog. A phone can use room
    chat; no browser audio client is promised. See the
    [native handoff evidence and remaining limits](HANGOUT_COLLABORATION_BETA.md).
-5. Use a message's report button for abuse. A check mark means the server
-   confirmed durable submission. Hosts manage their own rooms; community staff
-   review reports under the [moderator guide](HANGOUT_MODERATOR_GUIDE.md).
+5. In the lobby and its channels, use a message's report button for abuse. A
+   check mark means the server confirmed durable submission to community staff.
+   The separate encrypted private-room page has no message report action; its
+   camera-tile **Report to the host** is an encrypted host notice, not a durable
+   staff report or delivery acknowledgement. Use `jeffstory007@gmail.com` as an
+   interim contact for private-room abuse, without sending invitation secrets.
+   On-site private-room staff intake remains required before readiness; see the
+   [moderator guide](HANGOUT_MODERATOR_GUIDE.md).
 6. Leaving the beta revokes the session across its live chat and private-room
    connections. If closure cannot be confirmed, the portal reports failure and
    retries closure rather than claiming a successful logout.
@@ -212,6 +235,14 @@ invitation-version revocation, provider outages and full quotas. Redeploy the
 same compatible schema while a registered proof room exists, confirm recovery,
 and remove only the synthetic proof data. Do not delete other visitors' rooms.
 
+An [actual local workerd/SQLite restart receipt](https://github.com/rupret007/StalemateSite/blob/77359d0cd7700bc647df40eef652af534c4e95fd/pr-assets/beta-collaboration/local-worker-restart.json)
+in [sibling PR #53](https://github.com/rupret007/StalemateSite/pull/53) records one
+short graceful process-restart check: normal guest sessions, temporary-room
+settings, exact drawing and a granted device op recovered; a late guest saw no
+earlier chat. Old sockets disconnected and guests explicitly rejoined. This is
+not hosted restart, registered-account recovery, crash/power-loss or long-downtime
+acceptance; those checks remain separate.
+
 Automated WebKit phone viewports provide engine/layout coverage. They do not
 replace physical iPhone Safari checks for email redirects, keyboard, permissions,
 background/resume and real media. Record both types of evidence separately.
@@ -230,6 +261,12 @@ revocation of every existing connection. To revoke beta sessions, change the
 invitation key and increment `HANGOUT_BETA_INVITE_VERSION`, then deploy; existing
 sockets are checked on frames, wakes and alarms. Keep `HANGOUT_HMAC_KEY` stable
 because registered account IDs derive from it.
+
+Keep the effective invitation version at its current value or increase it,
+including during rollback. A version mismatch rejects a cookie without marking
+its saved session permanently revoked; restoring an older version can make its
+still-unexpired cookies valid again. Rotating the invitation key alone does not
+prevent this because existing cookies use the stable HMAC key.
 
 Before a release, retain the previous source/config and deployment version.
 Retain the pre-created YouTube iframe construction introduced in `b111bb2` on
@@ -250,13 +287,26 @@ matched the pinned Git objects; an extracted offline asset rebuild also passed.
 This is source/assets recovery preparation, not an executed rollback or backup
 of durable data, Access policies, credentials or live configuration overrides.
 Compare the active schema/config before any future deployment and preserve
-existing remote secrets, account identity and DO bindings.
+existing remote secrets, account identity and DO bindings. The package's
+historical configuration includes admission open and invitation version `1`;
+do not deploy those defaults over a later pause or version increment. Carry the
+effective safety settings described above into a compatible recovery release.
 
-For compatible code-only changes:
+Use a version rollback only after checking that the target's effective bindings,
+invitation version, admission state, staff policies and provider settings retain
+the current controls. Otherwise prepare a reviewed compatible recovery release
+with those controls preserved. Do not use the command below to restore older
+configuration blindly:
 
 ```sh
 npx --yes wrangler@4.151.1 rollback <previous-version-id> --config hangout-worker/wrangler.beta.toml
 ```
+
+Cloudflare's [rollback guidance](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/)
+states that rollback activates the selected version immediately and leaves
+connected resources unchanged. It does not restore their earlier data; Durable
+Object lifecycle changes can also prevent rollback. Treat data compatibility and
+the current safety settings as separate release checks.
 
 Check the deployment list afterward and repeat invitation denial, guest chat,
 staff sign-in and persistent-room recovery. A rollback to a version from before
