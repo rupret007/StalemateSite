@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "checkedOn": "2026-10-19",
+  "scope": "Local Chromium with fake capture devices and the local development relay; no physical camera, hosted WebRTC or forced-TURN acceptance claim.",
+  "priorSourceCommit": "9fa6e2f61cc9634f9a991ee4d9f7eb8c1043047f",
+  "priorRoomJsSha256": "c7386ac65b291ea78397c83c9d4ab4faa6ce156df9bfcfec9dd6d80e4220e8b0",
+  "correctedRoomJsSha256": "5725c9fd0dfc3e11e25b79424e62c6f179cfc76bd55aa8d93b799a616d6bb5cf",
+  "negativeControls": [
+    {
+      "source": "Unmodified prior room.js",
+      "heldOperation": "Decrypting camera publication until after authoritative relay departure",
+      "observed": "Replacement peer video decoded, but the departed peer tile remained present for the full five-second assertion.",
+      "expectedFailure": "Departed tile count was 1 instead of 0."
+    },
+    {
+      "source": "Peer liveness fix before the pending-ICE generation guard",
+      "heldOperation": "Old peer ICE lookup across the local relay reconnect",
+      "observed": "Replacement peer video width remained zero for the full existing twenty-second assertion.",
+      "expectedFailure": "Replacement peer did not decode video while the obsolete lookup remained unresolved."
+    }
+  ],
+  "validation": {
+    "originalReconnectBaseline": { "passed": 10, "retries": 0 },
+    "finalFocusedMatrix": { "scenarios": 3, "repetitions": 3, "passed": 9, "retries": 0 },
+    "fullVideoSuite": { "passed": 15, "retries": 0 },
+    "fullUnitSuite": { "passed": 560, "files": 54 },
+    "delayedPreDepartureChatPreserved": true,
+    "existingReconnectAssertionsAndTimeoutsWeakened": false
+  },
+  "diagnostics": {
+    "videoSuiteTrace": "retain-on-failure",
+    "ciUpload": "Preserve generated playwright-report and test-results directories even when a configured retry passes; seven-day retention.",
+    "newAutomaticVideoRecordingClaim": false
+  },
+  "credentialsOrRoomKeysRecorded": false
+}

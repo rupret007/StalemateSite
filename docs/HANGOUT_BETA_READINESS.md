@@ -57,8 +57,14 @@ acceptance.
   The runbook records unknown legacy grants and older-serializer rollback limits.
   The exact deployed head also [passed CI](https://github.com/rupret007/StalemateSite/actions/runs/39203122936)
   with 560 unit tests, 187 browser scenarios directly and one video-relay
-  reconnect scenario on its configured retry. That retry is under investigation;
-  no timeout or assertion was weakened.
+  reconnect scenario on its configured retry. Investigation reproduced two
+  media races: delayed decryption could restore a departed tile, and obsolete
+  ICE setup could block a fresh connection. Per-peer liveness and generation
+  checks fix both. The [regression receipt](../pr-assets/beta-collaboration/reconnect-regressions.json)
+  records failing negative controls, nine focused repetitions and all 15 video
+  scenarios passing without retries. Pre-departure chat remains deliverable;
+  no recovery timeout or assertion was weakened. Initial failure traces and
+  generated CI diagnostics are now retained even after a passing retry.
 
 - [Actual hosted AI pipeline](../pr-assets/beta-collaboration/hosted-ai-pipeline.json):
   one benign guest message completed a real Worker/provider review, a second
