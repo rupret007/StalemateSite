@@ -52,6 +52,17 @@ acceptance.
 
 ## Verification receipts
 
+- [Required private-report storage health](../pr-assets/beta-collaboration/private-report-health.json):
+  this prepared correction makes the existing protected health endpoint return
+  503 when required private-report storage or its cleanup state is unavailable.
+  Three actual Durable Object regressions first reproduced false healthy 200
+  responses for corrupt restore, a failed required write and failed expiration
+  cleanup; all now pass, including confirmed recovery. All 718 unit checks pass.
+  The guard reads existing memory status and exposes no evidence; it adds no
+  storage write, cleanup, allowance spend or provider call. This is a read-only
+  readiness signal after normal initialization, not an active write/provider
+  probe. It is not deployed; hosted acceptance and human/Karen review remain.
+
 - [Consented private-room staff reports](../pr-assets/beta-collaboration/private-staff-reports.json):
   this candidate is prepared for review and has not been deployed. A connected
   guest can report a selected message or member, including an abusive or absent

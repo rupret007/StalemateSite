@@ -387,6 +387,9 @@ export class HangoutLobby {
                 try {
                     // Ordinary wake/restore already ran. This read neither spends
                     // allowance nor applies any administrative/moderation action.
+                    if (this.privateReportQueue?.status().storage !== 'ready' || this.privateReportState.storage !== 'ready') {
+                        return healthJson({ storage: 'unavailable' }, 503);
+                    }
                     const net = this.engine.snapshot();
                     return healthJson({ storage: 'ok', lock: net.lock, shield: net.shield, lockAuto: net.lockAuto, evidenceStorage: this.evidenceStorage,
                         quota: (() => { const daily = dailyUsage(net.budget, 'requests'); return daily && { ...daily, limit: LOBBY_LIMITS.requestBudget }; })(),
