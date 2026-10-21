@@ -1,3 +1,5 @@
+import { formatRunTime } from '../games/turdtris-modes.js';
+
 /**
  * Read-only hub stat chips from existing localStorage keys (no new save formats).
  */
@@ -45,7 +47,13 @@ export function readHubStatBadge(getItem, href) {
     }
     case 'turdtris.html': {
       const best = parseSafeInt(getItem('turdtrisHighScore'));
-      return best > 0 ? { text: `Best ${best.toLocaleString('en-US')}` } : null;
+      const sprint = parseSafeInt(getItem('turdtrisSprint40BestMs_v1'));
+      const ultra = parseSafeInt(getItem('turdtrisUltra120Best_v1'));
+      const parts = [];
+      if (best > 0) parts.push(`Classic best ${best.toLocaleString('en-US')}`);
+      if (sprint > 0) parts.push(`Sprint best ${formatRunTime(sprint, true)}`);
+      if (ultra > 0) parts.push(`Ultra best ${ultra.toLocaleString('en-US')}`);
+      return parts.length ? { text: parts.join(' · ') } : null;
     }
     case 'turdjack.html': {
       const bankroll = parseSafeInt(getItem('turdjackBankroll'));
@@ -85,8 +93,11 @@ export function readHubStatBadge(getItem, href) {
       const wrap = readJsonObject(getItem, 'turdomania_best_v1');
       const best = wrap && wrap.best && typeof wrap.best === 'object' ? wrap.best : null;
       if (!best) return null;
-      const top = Math.max(parseSafeInt(best.easy), parseSafeInt(best.normal), parseSafeInt(best.hard));
-      return top > 0 ? { text: `Best ${top}` } : null;
+      const parts = ['easy', 'normal', 'hard'].flatMap((level) => {
+        const value = parseSafeInt(best[level]);
+        return value > 0 ? [`${level[0].toUpperCase() + level.slice(1)} best ${value.toLocaleString('en-US')}`] : [];
+      });
+      return parts.length ? { text: parts.join(' · ') } : null;
     }
     default:
       return null;
@@ -117,7 +128,6 @@ export function decorateHubStatBadges(doc, storage) {
     el.className = 'suite-hub-stat';
     el.textContent = badge.text;
     if (badge.title) el.setAttribute('title', badge.title);
-    el.setAttribute('aria-hidden', 'true');
     const info = card.querySelector('.game-info');
     if (info) info.appendChild(el);
   }

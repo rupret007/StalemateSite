@@ -41,14 +41,14 @@
   var end = document.getElementById('endScreen');
   var restart = document.getElementById('btnRestart');
   if (!end || !restart) return;
-  var SHOW_END = Date.parse('2026-10-25T00:00:00-05:00');
   var box = document.createElement('div');
   box.className = 'stalemate-end';
   box.innerHTML =
     '<a class="stalemate-end__listen" href="../#home">Listen to Manic</a>' +
     '<button type="button" class="stalemate-end__share" id="stalemateShare">Share score</button>' +
-    (Date.now() < SHOW_END ? '<p class="stalemate-end__show">See Stalemate live: Sat, Oct 24, 4:45 PM, Los Amigo’s, Plano · <a class="stalemate-end__showlink" href="https://rockinoctober.com" target="_blank" rel="noopener noreferrer">Come see us live, Oct 24</a></p>' : '');
+    '<p class="stalemate-end__show" data-next-show hidden data-starts-at="2026-10-24T16:45:00-05:00">See Stalemate live: Sat, Oct 24, 4:45 PM, Los Amigo’s, Plano · <a class="stalemate-end__showlink" href="https://rockinoctober.com" target="_blank" rel="noopener noreferrer">Come see us live, Oct 24</a></p>';
   restart.insertAdjacentElement('afterend', box);
+  if (window.StalemateCountdown) window.StalemateCountdown.start(document);
   var showLink = box.querySelector('.stalemate-end__showlink');
   if (showLink) showLink.addEventListener('click', function () {
     if (typeof window.smTrack === 'function') window.smTrack('gameover-turdanoid-show');

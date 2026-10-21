@@ -3,6 +3,7 @@ const { test, expect } = require('@playwright/test');
 // Every link on every public page: internal targets load, external targets are ours.
 const PAGES = ['/', '/qr/', '/tap/', '/play/', '/404.html'];
 const OURS = [
+    /^mailto:stalemate\.punk@gmail\.com$/,
     /^https:\/\/www\.instagram\.com\/stalemate\.punk\/$/,
     /^https:\/\/www\.youtube\.com\/@stalemate\.punkband$/,
     /^https:\/\/www\.facebook\.com\/stalemate\.band\/$/,

@@ -94,6 +94,19 @@ body.reduced .tile.popping { transform: var(--pos) !important; }
   .dock .suite-difficulty-btn { min-width: 0; padding: 0 8px; font-size: 0.62rem; }
 }
 .dock:has(.suite-difficulty) #levelSel { display: none; }
+.tm-start-hint { flex:1 0 100%; max-width:100%; text-align:center; font-size:12px; line-height:14px; color:#f6e4c5; }
+.tm-start-hint[hidden] { display:none; }
+@media(max-width:980px) and (orientation:portrait) {
+  .dock { gap:4px; }
+  .dock button { padding:0 4px; }
+  .dock .tm-control-label { display:none; }
+  .dock #suite-difficulty-mount { min-width:0; }
+  .dock .suite-difficulty-btn { padding:0 4px; }
+}
+@media(max-width:360px) and (orientation:portrait) {
+  html[data-mobile-game="turdomania"] header.hud .stat { font-size:11px; line-height:1.1; padding:2px; }
+  html[data-mobile-game="turdomania"] header.hud .stat b { font-size:16px; }
+}
 @media (prefers-reduced-motion: reduce) {
   .tile, .float { transition: none !important; animation: none !important; }
   .tile.popping { transform: var(--pos) !important; }
@@ -107,6 +120,20 @@ body.reduced .tile.popping { transform: var(--pos) !important; }
   html[data-mobile-game="turdomania"] header.hud .stat { min-width:0; flex:1 1 0; }
   html[data-mobile-game="turdomania"] .dock .suite-difficulty-seg { padding:0; }
   html[data-mobile-game="turdomania"] .tm-aim nav { position:fixed; left:50%; right:auto; bottom:calc(100dvh - var(--tm-dock-top, 100dvh) + 8px); transform:translateX(-50%); width:max-content; max-width:calc(100vw - 12px); flex-wrap:wrap; justify-content:center; z-index:60; }
+}
+@media(max-width:360px) and (orientation:portrait) {
+  html[data-mobile-game="turdomania"] header.hud { height:44px; }
+}
+@media(max-width:980px) and (orientation:landscape) {
+  html[data-mobile-game="turdomania"] header.hud { height:44px; }
+  html[data-mobile-game="turdomania"] header.hud .stat { font-size:11px; line-height:1.1; padding:2px; }
+  html[data-mobile-game="turdomania"] header.hud .stat b { font-size:16px; }
+  html[data-mobile-game="turdomania"] .dock { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; align-self:flex-start; margin-top:108px; }
+  html[data-mobile-game="turdomania"] .dock #suite-difficulty-mount,
+  html[data-mobile-game="turdomania"] .dock .tm-aim { grid-column:1/-1; }
+  html[data-mobile-game="turdomania"] .dock .tm-control-label { display:none; }
+  html[data-mobile-game="turdomania"] .dock:has(.tm-start-hint:not([hidden])) { align-self:flex-start; margin-top:136px; }
+  html[data-mobile-game="turdomania"] .tm-start-hint { position:fixed; top:108px; right:max(8px,env(safe-area-inset-right)); width:180px; }
 }
 </style>
 </head>
@@ -133,9 +160,10 @@ body.reduced .tile.popping { transform: var(--pos) !important; }
   </div>
 </div>
 <div class="dock" role="toolbar" aria-label="Game controls">
+  <p class="tm-start-hint" id="startHint" role="status" hidden>Tap 2+ matching tiles. Bigger groups score more.</p>
   <div class="suite-hud-settings" id="suite-difficulty-mount"></div>
-  <button type="button" id="undoBtn" aria-keyshortcuts="U">↶ Undo</button>
-  <button type="button" id="newBtn" aria-keyshortcuts="N">🚽 New board</button>
+  <button type="button" id="undoBtn" aria-label="Undo" aria-keyshortcuts="U">↶<span class="tm-control-label"> Undo</span></button>
+  <button type="button" id="newBtn" aria-label="New board" aria-keyshortcuts="N">🚽<span class="tm-control-label"> New board</span></button>
   <details class="tm-aim"><summary>Aim</summary><nav aria-label="Precise board controls">
     <button type="button" data-board-key="ArrowLeft" aria-label="Aim left">←</button>
     <button type="button" data-board-key="ArrowUp" aria-label="Aim up">↑</button>
@@ -164,7 +192,7 @@ window.tmView = function () {
   var mobile = w <= 980;
   var landscape = w > h;
   var strip = document.querySelector('.stalemate-strip');
-  var footer = strip ? strip.getBoundingClientRect().height : 0;
+  var footer = (strip ? strip.getBoundingClientRect().height : 0) + (document.getElementById('suite-music-status')?.getBoundingClientRect().height || 0);
   var hud = document.querySelector('header.hud');
   var dock = document.querySelector('.dock');
   var chrome = mobile ? (landscape ? 24 : (hud ? hud.offsetHeight : 64) + (dock ? dock.offsetHeight : 100) + 20) : (compact ? 182 : 230);
@@ -217,6 +245,9 @@ const reduced = () => qs.get('reducedMotion') === '1' || matchMedia('(prefers-re
 if (reduced()) document.body.classList.add('reduced');
 // Accessing the storage property itself can throw in private/embedded browsers.
 const safeStorage = (() => { try { return window.localStorage; } catch { return null; } })();
+const hintEl = document.getElementById('startHint');
+const HINT_KEY = 'turdomania_first_pop_v1';
+try { hintEl.hidden = safeStorage?.getItem(HINT_KEY) === '1'; } catch { hintEl.hidden = false; }
 
 function readPrefs() {
   try { const p = JSON.parse(safeStorage.getItem(Core.PREFS_KEY) || 'null'); return p && p.v === 1 ? p : { v: 1 }; } catch { return { v: 1 }; }
@@ -268,14 +299,16 @@ function layout() {
   let { availW, availH } = window.tmView();
   const viewH = Math.min(window.innerHeight, document.documentElement.clientHeight);
   const viewW = Math.min(window.innerWidth, document.documentElement.clientWidth);
-  const footer = document.querySelector('.stalemate-strip')?.getBoundingClientRect().height || 0;
+  const footer = (document.querySelector('.stalemate-strip')?.getBoundingClientRect().height || 0) + (document.getElementById('suite-music-status')?.getBoundingClientRect().height || 0);
   const landscape = viewW <= 980 && viewW > viewH;
   const bodyStyle = getComputedStyle(document.body);
   const padding = (parseFloat(bodyStyle.paddingTop) || 0) + (parseFloat(bodyStyle.paddingBottom) || 0);
   const help = document.querySelector('.help');
   const helpHeight = help && getComputedStyle(help).display !== 'none' ? help.getBoundingClientRect().height + 8 : 0;
   // Measure the actual kit and footer; fonts and settings can change their height.
-  availH = landscape ? viewH - footer - 24 : viewH - document.querySelector('header.hud').offsetHeight - document.querySelector('.dock').offsetHeight - helpHeight - Math.max(footer, padding) - 24;
+  const frameHeight = wrap.offsetHeight - boardEl.offsetHeight;
+  const reserve = viewW <= 980 && frameHeight > 0 ? frameHeight + (parseFloat(getComputedStyle(document.querySelector('.dock')).marginTop) || 0) : 24;
+  availH = landscape ? viewH - footer - 24 : viewH - document.querySelector('header.hud').offsetHeight - document.querySelector('.dock').offsetHeight - helpHeight - Math.max(footer, padding) - reserve;
   if (landscape) availW = viewW - 224;
   cell = Math.max(22, Math.min(56, Math.floor(Math.min(availW / state.cols, availH / state.rows))));
   const st = document.documentElement.style;
@@ -414,6 +447,11 @@ function popAt(c, r) {
     return;
   }
   clearHot();
+  if (!hintEl.hidden) {
+    hintEl.hidden = true;
+    try { safeStorage?.setItem(HINT_KEY, '1'); } catch { /* session-only when denied */ }
+    layout();
+  }
   const removedEls = res.removed.map((t) => tileEls.get(t.id)).filter(Boolean);
   removedEls.forEach((el) => el.classList.add('popping'));
   floatText(res.points ? `+${res.points}` : 'plop', c, r);
@@ -523,6 +561,12 @@ if (window.Suite && Suite.difficulty) {
 }
 let rz = 0;
 window.addEventListener('resize', () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(() => { if (state) { layout(); render(); } }); });
+// Fonts and the first-play hint change the toolbar independently of viewport size.
+if (window.ResizeObserver) {
+  const chromeObserver = new ResizeObserver(() => window.dispatchEvent(new Event('resize')));
+  chromeObserver.observe(document.querySelector('header.hud'));
+  chromeObserver.observe(document.querySelector('.dock'));
+}
 
 function armSuiteMusic() {
   try {

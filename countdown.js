@@ -43,6 +43,21 @@
     function apply(root, now = Date.now()) {
         const timestamp = assertFiniteTime(now);
         const blocks = Array.from(root.querySelectorAll('[data-next-show]'));
+        const activeShow = blocks.find((block) => remainingParts(block.getAttribute('data-starts-at'), timestamp));
+        root.querySelectorAll('[data-show-before]').forEach((element) => { element.hidden = !activeShow; });
+        root.querySelectorAll('[data-show-copy]').forEach((element) => {
+            if (!element.hasAttribute('data-evergreen')) element.setAttribute('data-evergreen', element.textContent);
+            element.textContent = element.getAttribute(activeShow ? 'data-before' : 'data-evergreen');
+        });
+        root.querySelectorAll('[data-show-action]').forEach((element) => {
+            if (!element.hasAttribute('data-evergreen-label')) {
+                element.setAttribute('data-evergreen-label', element.textContent);
+                element.setAttribute('data-evergreen-href', element.getAttribute('href'));
+            }
+            element.textContent = element.getAttribute(activeShow ? 'data-before-label' : 'data-evergreen-label');
+            element.setAttribute('href', activeShow ? activeShow.getAttribute('data-show-href') : element.getAttribute('data-evergreen-href'));
+            element.setAttribute('data-track', activeShow ? element.getAttribute('data-before-track') : 'show-cta-next-fallback');
+        });
         let visibleCount = 0;
 
         blocks.forEach((block) => {
@@ -101,6 +116,10 @@
             start(global.document);
         }
         global.addEventListener('pagehide', stop);
+        global.addEventListener('focus', () => start(global.document));
+        global.document.addEventListener('visibilitychange', () => {
+            if (!global.document.hidden) start(global.document);
+        });
         global.addEventListener('pageshow', (event) => {
             if (event.persisted) start(global.document);
         });

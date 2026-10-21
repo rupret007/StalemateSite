@@ -40,6 +40,7 @@
     try { localStorage.setItem(STALEMATE_MUSIC_KEY, on ? 'on' : 'off'); } catch (e) {}
   }
   let musicEnabled = readMusicEnabled();
+  let musicState = { paused: true, title: '' };
 
   function ctx() {
     if (!actx) {
@@ -244,6 +245,7 @@
               var d = document.documentElement.dataset;
               d.stalemateMusic = state.paused ? 'paused' : 'playing';
               d.stalemateTrack = state.title || '';
+              syncMusicStatus(state);
             } catch (e) {}
           }
         });
@@ -648,6 +650,7 @@
       const btn = document.getElementById('suite-music-toggle');
       if (!btn) return;
       const on = musicEnabled;
+      syncMusicStatus(musicState);
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
       btn.setAttribute('aria-label', on ? 'Stalemate music on, tap to turn music off' : 'Stalemate music off, tap to turn music on');
         btn.textContent = on ? '🎵' : '🔇';
@@ -663,6 +666,16 @@
       btn.className = 'suite-music-toggle';
       const slot = document.querySelector('[data-suite-music-slot]');
       (slot || document.body).appendChild(btn);
+      const status = document.createElement('div');
+      status.id = 'suite-music-status';
+      status.className = 'suite-music-status';
+      status.setAttribute('role', 'status');
+      status.setAttribute('aria-live', 'polite');
+      status.addEventListener('keydown', function (event) { event.stopPropagation(); });
+      const statusHost = isSuiteHubPage(currentPageName()) ? document.querySelector('.shell') : document.body;
+      (statusHost || document.body).appendChild(status);
+      window.dispatchEvent(new Event('resize'));
+      syncMusicStatus({ paused: true, title: '' });
       syncMusicToggleUi();
       btn.addEventListener('click', function () {
         Suite.setMusicEnabled(!musicEnabled);
@@ -674,6 +687,30 @@
         }
       });
     } catch (e) {}
+  }
+
+  function syncMusicStatus(state) {
+    musicState = state;
+    const status = document.getElementById('suite-music-status');
+    if (!status) return;
+    const label = !musicEnabled ? 'Music off' : state.title ? `${state.paused ? 'Paused' : 'Now playing'}: ${state.title}` : 'Stalemate music · play to listen';
+    const href = state.listenUrl || '';
+    if (status.dataset.label === label && status.dataset.href === href) return;
+    status.dataset.label = label;
+    status.dataset.href = href;
+    status.replaceChildren();
+    const title = document.createElement('span');
+    title.textContent = label;
+    status.appendChild(title);
+    if (href) {
+      const link = document.createElement('a');
+      link.href = href;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = 'Listen ↗';
+      link.setAttribute('aria-label', `${state.title} by Stalemate on Apple Music`);
+      status.appendChild(link);
+    }
   }
 
   function injectListenManic() {

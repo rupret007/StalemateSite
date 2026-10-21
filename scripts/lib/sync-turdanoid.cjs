@@ -76,11 +76,11 @@ function transform(stage) {
                 .replace(/\n[ \t]*\.changelog \{[^}]*\}/gi, '');
             if (/changelog/i.test(html)) throw new Error('Hub changelog strip failed');
             html = insert(html, '</head>', '<link rel="stylesheet" href="stalemate-strip.css">', filename);
-            html = html.replace(/<body\b[^>]*>/i, '$&\n<nav class="stalemate-strip" aria-label="Stalemate"><a href="../" class="sm-home"><img src="../assets/mark.svg" alt="" width="22" height="22">Stalemate Arcade</a><a href="https://www.youtube.com/@stalemate.punkband" class="sm-listen" rel="noopener">Listen to Manic</a></nav>');
+            html = html.replace(/<body\b[^>]*>/i, '$&\n<nav class="stalemate-strip" aria-label="Stalemate"><a href="../" class="sm-home"><img src="../assets/mark.svg" alt="" width="22" height="22">Stalemate Arcade</a><a href="https://www.youtube.com/@stalemate.punkband" class="sm-listen" rel="noopener">Listen to Stalemate</a></nav>');
         }
         if (filename === 'TurdAnoid.html') {
             html = insert(html, '</head>', '<link rel="stylesheet" href="stalemate/stalemate-overlay.css">', filename);
-            html = insert(html, '</body>', '<script src="stalemate/stalemate-overlay.js"></script>', filename);
+            html = insert(html, '</body>', '<script src="../countdown.js"></script>\n<script src="stalemate/stalemate-overlay.js"></script>', filename);
         }
         if (filename === 'index.html' || filename === 'TurdAnoid.html') {
             html = insert(html, '</head>', [
