@@ -1,0 +1,20 @@
+PASS 320 new
+PASS 320 returning
+AssertionError [ERR_ASSERTION]: 320 no-script
++ actual - expected
+
++ [
++   'Turdomania below 600.1875'
++ ]
+- []
+
+    at /private/tmp/stalemate-arcade-evidence/hub-strict.cjs:2:1624
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at process.processImmediate (node:internal/timers:541:9) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: [Array],
+  expected: [],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}

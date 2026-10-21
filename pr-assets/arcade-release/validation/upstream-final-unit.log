@@ -1,0 +1,119 @@
+Command: npm test
+Runtime: v22.22.3
+07327fc3b0c4ed5344b7517af671bc941785e03c
+
+> turdanoid@1.0.0 test
+> vitest run
+
+
+ RUN  v4.1.11 /Users/jeffstory/Documents/ChatGPT/Stalemate Website/Turdanoid
+
+stderr | tests/suite-difficulty-page-behavior.test.js > suite difficulty page behavior > Turdomania boots at the saved suite difficulty level
+http://localhost/turdomania.html:3
+import * as Daily from './games/turdomania-daily.js';
+^^^^^^
+
+SyntaxError: Cannot use import statement outside a module
+    at new Script (node:vm:117:7)
+    at createScript (node:vm:269:10)
+    at Object.runInContext (node:vm:300:10)
+    at processJavaScript (/Users/jeffstory/Documents/ChatGPT/Stalemate Website/Turdanoid/node_modules/jsdom/lib/jsdom/living/nodes/HTMLScriptElement-impl.js:231:10)
+    at HTMLScriptElementImpl._innerEval (/Users/jeffstory/Documents/ChatGPT/Stalemate Website/Turdanoid/node_modules/jsdom/lib/jsdom/living/nodes/HTMLScriptElement-impl.js:166:5)
+    at /Users/jeffstory/Documents/ChatGPT/Stalemate Website/Turdanoid/node_modules/jsdom/lib/jsdom/living/nodes/HTMLScriptElement-impl.js:107:12
+    at ResourceQueue.push (/Users/jeffstory/Documents/ChatGPT/Stalemate Website/Turdanoid/node_modules/jsdom/lib/jsdom/browser/resources/resource-queue.js:53:16)
+    at HTMLScriptElementImpl._fetchInternalScript (/Users/jeffstory/Documents/ChatGPT/Stalemate Website/Turdanoid/node_modules/jsdom/lib/jsdom/living/nodes/HTMLScriptElement-impl.js:106:21)
+    at HTMLScriptElementImpl._eval (/Users/jeffstory/Documents/ChatGPT/Stalemate Website/Turdanoid/node_modules/jsdom/lib/jsdom/living/nodes/HTMLScriptElement-impl.js:160:12)
+    at HTMLScriptElementImpl._poppedOffStackOfOpenElements (/Users/jeffstory/Documents/ChatGPT/Stalemate Website/Turdanoid/node_modules/jsdom/lib/jsdom/living/nodes/HTMLScriptElement-impl.js:123:10)
+
+ ❯ tests/suite-difficulty-page-behavior.test.js (8 tests | 1 failed) 2719ms
+     × Turdomania boots at the saved suite difficulty level 49ms
+ ❯ tests/turdomania-layout.test.js (4 tests | 4 failed) 630ms
+     × keeps cells at least 22px before paint and at startup in a 120x120 viewport 396ms
+     × keeps cells at least 22px before paint and at startup in a 240x200 viewport 73ms
+     × keeps cells at least 22px before paint and at startup in a 320x180 viewport 116ms
+     × preserves the board and the 22–56px range through resizing and rotation 42ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/suite-difficulty-page-behavior.test.js > suite difficulty page behavior > Turdomania boots at the saved suite difficulty level
+TypeError: Cannot read properties of undefined (reading 'state')
+ ❯ tests/suite-difficulty-page-behavior.test.js:283:27
+    281|   it('Turdomania boots at the saved suite difficulty level', () => {
+    282|     const w = bootTurdomania('hard');
+    283|     expect(w.__turdomania.state.level).toBe('hard');
+       |                           ^
+    284|     expect(w.__turdomania.Core.LEVELS.hard.kinds).toBeGreaterThan(w.__…
+    285|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  tests/turdomania-layout.test.js > Turdomania playable cell sizes > keeps cells at least 22px before paint and at startup in a 120x120 viewport
+ FAIL  tests/turdomania-layout.test.js > Turdomania playable cell sizes > keeps cells at least 22px before paint and at startup in a 240x200 viewport
+ FAIL  tests/turdomania-layout.test.js > Turdomania playable cell sizes > keeps cells at least 22px before paint and at startup in a 320x180 viewport
+SyntaxError: Cannot use import statement outside a module
+ ❯ Object.start tests/turdomania-layout.test.js:42:25
+     40|     document,
+     41|     cell: () => Number.parseInt(document.documentElement.style.getProp…
+     42|     start: () => window.eval(scripts[1].textContent.replace("import * …
+       |                         ^
+     43|     resize(w, h) {
+     44|       window.innerWidth = w;
+ ❯ tests/turdomania-layout.test.js:59:12
+
+Module SyntaxError: Cannot use import statement outside a module seems to be an ES Module but shipped in a CommonJS package. You might want to create an issue to the package "SyntaxError: Cannot use import statement outside a module" asking them to ship the file in .mjs extension or add "type": "module" in their package.json.
+
+As a temporary workaround you can try to inline the package by updating your config:
+
+// vitest.config.js
+export default {
+  test: {
+    server: {
+      deps: {
+        inline: [
+          "SyntaxError: Cannot use import statement outside a module"
+        ]
+      }
+    }
+  }
+}
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  tests/turdomania-layout.test.js > Turdomania playable cell sizes > preserves the board and the 22–56px range through resizing and rotation
+SyntaxError: Cannot use import statement outside a module
+ ❯ Object.start tests/turdomania-layout.test.js:42:25
+     40|     document,
+     41|     cell: () => Number.parseInt(document.documentElement.style.getProp…
+     42|     start: () => window.eval(scripts[1].textContent.replace("import * …
+       |                         ^
+     43|     resize(w, h) {
+     44|       window.innerWidth = w;
+ ❯ tests/turdomania-layout.test.js:68:10
+
+Module SyntaxError: Cannot use import statement outside a module seems to be an ES Module but shipped in a CommonJS package. You might want to create an issue to the package "SyntaxError: Cannot use import statement outside a module" asking them to ship the file in .mjs extension or add "type": "module" in their package.json.
+
+As a temporary workaround you can try to inline the package by updating your config:
+
+// vitest.config.js
+export default {
+  test: {
+    server: {
+      deps: {
+        inline: [
+          "SyntaxError: Cannot use import statement outside a module"
+        ]
+      }
+    }
+  }
+}
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+
+ Test Files  2 failed | 135 passed (137)
+      Tests  5 failed | 1875 passed (1880)
+   Start at  08:20:24
+   Duration  140.71s (transform 7.10s, setup 0ms, import 48.38s, tests 740.65s, environment 135.86s)
+
+
+Exit: 1; seconds: 141.5
