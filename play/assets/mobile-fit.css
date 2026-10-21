@@ -352,6 +352,9 @@ body[data-arcade-game="turdtris"] .welcome-card .mobile-guide-details { display:
 }
 
 /* Landscape leaves the music player its full 44px controls without covering hands. */
+@media(max-width:980px) and (orientation:landscape) and (max-height:340px) {
+  html[data-mobile-game="turdomania"] #boardWrap { padding:0; border-width:1px; margin:0 auto; }
+}
 @media(max-width:980px) and (orientation:landscape) {
   html[data-mobile-game="crapeights"] .hand-wrap { position:relative; }
   html[data-mobile-game="crapeights"] .hand-head { padding-right:149px; gap:4px; align-items:center; }

@@ -139,6 +139,12 @@ body.tm-hint-space .tm-start-hint[hidden] { display:block!important; visibility:
   html[data-mobile-game="turdomania"] body.tm-hint-space .dock { margin-top:136px; }
   html[data-mobile-game="turdomania"] .tm-start-hint { position:fixed; top:108px; right:max(8px,env(safe-area-inset-right)); width:180px; }
 }
+@media(max-width:980px) and (orientation:landscape) and (max-height:340px) {
+  html[data-mobile-game="turdomania"] header.hud { top:56px; }
+  html[data-mobile-game="turdomania"] .tm-start-hint { top:100px; line-height:12px; }
+  html[data-mobile-game="turdomania"] .dock:has(.tm-start-hint:not([hidden])),
+  html[data-mobile-game="turdomania"] body.tm-hint-space .dock { margin-top:124px; }
+}
 </style>
 </head>
 <body class="suite-ambient turdomania arcade" data-arcade-game="turdomania">
@@ -317,7 +323,7 @@ function layout() {
   const reserve = viewW <= 980 && frameHeight > 0 ? frameHeight + (parseFloat(getComputedStyle(document.querySelector('.dock')).marginTop) || 0) : 24;
   availH = landscape ? viewH - footer - 24 : viewH - document.querySelector('header.hud').offsetHeight - document.querySelector('.dock').offsetHeight - helpHeight - Math.max(footer, padding) - reserve;
   if (landscape) availW = viewW - 224;
-  cell = Math.max(landscape ? 20 : 22, Math.min(56, Math.floor(Math.min(availW / state.cols, availH / state.rows))));
+  cell = Math.max(22, Math.min(56, Math.floor(Math.min(availW / state.cols, availH / state.rows))));
   const st = document.documentElement.style;
   st.setProperty('--cell', cell + 'px');
   st.setProperty('--board-w', cell * state.cols + 'px');
