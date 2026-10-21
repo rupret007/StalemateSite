@@ -244,14 +244,15 @@ test.describe('repeat show button', () => {
                 await page.goto(path);
                 await expect(page.locator('.header-cta')).toHaveText('Show details');
                 await expect(page.locator('#listen-title')).toHaveText('Homework before the show');
-                await expect(page.locator('[data-show-before]')).toBeVisible();
+                await expect(page.locator('[data-show-before]')).toHaveCount(3);
+                for (const promotion of await page.locator('[data-show-before]').all()) await expect(promotion).toBeVisible();
                 await page.clock.runFor(1000);
                 for (const refresh of [false, true]) {
                     if (refresh) await page.reload();
                     await expect(page.locator('.header-cta')).toHaveText('Follow the band');
                     await expect(page.locator('#listen-title')).toHaveText('Learn the words');
                     await expect(page.locator('[data-next-show]')).toBeHidden();
-                    await expect(page.locator('[data-show-before]')).toBeHidden();
+                    for (const promotion of await page.locator('[data-show-before]').all()) await expect(promotion).toBeHidden();
                     expect(await page.locator('body').innerText()).not.toMatch(/Oct 24|Rockin’ October|Homework before/);
                     for (const name of ['meta[name="description"]', 'meta[property="og:description"]', 'meta[name="twitter:description"]']) {
                         expect(await page.locator(name).getAttribute('content')).not.toMatch(/Oct 24|Rockin/);
