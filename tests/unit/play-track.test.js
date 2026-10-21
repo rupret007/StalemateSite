@@ -101,18 +101,16 @@ describe('shared arcade music analytics', () => {
   });
 });
 
-describe('fixed Daily Dump analytics', () => {
-  it.each(['/play/', '/StalemateSite/play/index.html'])('tracks hub daily links separately from ordinary cards at %s', (path) => {
-    const { win, paths } = boot(path, '<a id="daily-hub-play" href="turdomania.html?daily=2026-10-21&v=1"><span>Daily</span></a><a id="daily-hub-previous" href="turdomania.html?daily=2026-10-20&v=1">Continue</a><a class="game-card" href="TurdAnoid.html"><span>Game</span></a>');
-    click(win, '#daily-hub-play span');
-    click(win, '#daily-hub-previous');
+describe('ordinary arcade analytics', () => {
+  it.each(['/play/', '/StalemateSite/play/index.html'])('tracks game cards on the hub at %s', (path) => {
+    const { win, paths } = boot(path, '<a class="game-card" href="TurdAnoid.html"><span>Turdanoid</span></a><a class="game-card" href="turdomania.html">Turdomania</a>');
     click(win, '.game-card span');
-    expect(paths()).toEqual(['hub-open', 'hub-daily-open', 'hub-daily-open', 'hub-card-turdanoid']);
+    click(win, '.game-card[href="turdomania.html"]');
+    expect(paths()).toEqual(['hub-open', 'hub-card-turdanoid', 'hub-card-turdomania']);
   });
 
-  it('emits first-run start/completion once and uses only fixed event payloads', async () => {
-    const { win, paths } = boot('/play/turdomania.html?daily=2026-10-21&v=1', '<div id="board"></div><div id="overlay"><button id="dailyShare">Share 999999 points</button><button id="dailyCopy">Copy</button></div>');
-    win.document.body.classList.add('daily-dump');
+  it.each(['/play/turdomania.html', '/StalemateSite/play/turdomania.html?daily=2026-10-21&v=1'])('keeps free-play start and completion events fixed at %s', async (path) => {
+    const { win, paths } = boot(path, '<div id="board"></div><div id="overlay"></div>');
     const board = win.document.getElementById('board');
     board.dispatchEvent(new win.Event('pointerdown', { bubbles: true }));
     board.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
@@ -123,39 +121,17 @@ describe('fixed Daily Dump analytics', () => {
     await settle(win);
     overlay.classList.add('show');
     await settle(win);
-    click(win, '#dailyShare');
-    click(win, '#dailyCopy');
-    expect(paths().filter((path) => path === 'play-daily-dump-start')).toHaveLength(1);
-    expect(paths().filter((path) => path === 'play-daily-dump-completed')).toHaveLength(1);
-    expect(paths().filter((path) => path === 'gameover-daily-dump-share')).toHaveLength(2);
-    expect(paths()).toContain('play-turdomania-start');
-    expect(paths()).toContain('play-turdomania-over');
+    expect(paths()).toEqual(['play-turdomania-start', 'play-turdomania-over', 'play-turdomania-dur-lt30s']);
     for (const [payload] of win.goatcounter.count.mock.calls) {
       expect(Object.keys(payload).sort()).toEqual(['event', 'path', 'title']);
       expect(payload.title).toBe(payload.path);
       expect(payload.event).toBe(true);
-      expect(payload.path).not.toMatch(/2026|999999/);
     }
   });
 
-  it.each(['daily-dump daily-practice', ''])('excludes practice/free play from daily events: %s', async (classes) => {
-    const { win, paths } = boot('/play/turdomania.html', '<div id="board"></div><div id="overlay"><button id="dailyShare">Share</button></div>');
-    win.document.body.className = classes;
-    win.document.getElementById('board').dispatchEvent(new win.Event('pointerdown'));
-    win.document.getElementById('overlay').classList.add('show');
+  it('does not count an already-visible end screen as a new game or completion', async () => {
+    const { win, paths } = boot('/play/turdomania.html', '<div id="board"></div><div id="overlay" class="show"></div>');
     await settle(win);
-    click(win, '#dailyShare');
-    expect(paths()).toContain('play-turdomania-start');
-    expect(paths().some((path) => path.includes('daily-dump'))).toBe(false);
-  });
-
-  it('does not count opening a saved result as a fresh completion or hidden buttons as sharing', async () => {
-    const { win, paths } = boot('/play/turdomania.html?daily=2026-10-21', '<div id="board"></div><div id="overlay" class="show"><button id="dailyShare">Share</button></div>');
-    win.document.body.classList.add('daily-dump');
-    await settle(win);
-    expect(paths()).toEqual([]);
-    win.document.getElementById('overlay').classList.remove('show');
-    click(win, '#dailyShare');
     expect(paths()).toEqual([]);
   });
 });

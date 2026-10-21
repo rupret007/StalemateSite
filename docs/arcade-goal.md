@@ -2,6 +2,47 @@
 
 New record created October 21, 2026. Full authorized scope: [arcade-scope.md](arcade-scope.md).
 
+## Current scope change: remove The Daily Dump
+
+On October 21, 2026, the user requested removing The Daily Dump and publishing that
+removal under the existing deployment authorization. This replaces the daily-challenge
+requirements in the historical scope; `arcade-scope.md` remains unchanged as that history.
+The first release was published from site merge `983644c560c8a4f4d48a7c14d3ea2d678d0c8665`
+and source merge `1c612ff746e9827db6c00313753854aaf17db627`, and was verified on Pages
+and `https://stalemate.band/` before this request.
+
+Removal work uses `codex/remove-daily-dump` in the same isolated checkouts. The site
+starts at `983644c`; upstream starts at `1c612ff`. Preserve all seven games, ordinary
+Turdomania, the visual/mobile improvements, shared optional music, and Turdanoid result
+sharing. Former daily links must open ordinary Turdomania. Existing free-play preferences
+and records remain supported; removing a feature does not require deleting device-local data.
+
+- Site source: replace the homepage challenge promotion with an arcade primary action,
+  retain the seven direct game links, and remove daily-specific analytics.
+- Upstream source: remove challenge rules/UI/assets and hub promotion while retaining
+  ordinary Turdomania controls, artwork, records, and the shared arcade presentation.
+  Removal revision: `f75f41b882bb8293a3cd13e4212d728c8b83e845` (committed, not yet imported here).
+- Browser regressions now cover root/project paths, former daily URLs, playable free play
+  and undo, completed-game record compatibility, and denied storage across all five projects.
+- Integration is pending the committed upstream removal revision. The root agent owns the
+  exact SHA import, final gates, new screenshots, review/publication, and live verification.
+
+Site source checks with Node 24.22.0: four targeted unit files / 22 tests passed; all three
+changed browser files passed syntax checks. New browser regressions await the upstream import.
+The first source check rejected new copy containing a word prohibited by the existing content
+boundary test; the copy was corrected and the assertion retained. Successful raw output is
+`/private/tmp/stalemate-arcade-evidence/remove-daily-source-unit.log`.
+
+Next executable step: import that committed upstream revision with `scripts/sync-turdanoid.sh`,
+run the required site/upstream gates, and verify the published removal on both Pages and
+the band domain. The domain served the first release after a later host refresh; verify its
+actual content rather than assuming both hosts update together.
+
+## Historical first-release investigation
+
+The sections below retain the initial candidate investigation and its pre-publication
+checkpoint. The scope change above is the current instruction.
+
 ## Outcome and release boundary
 First-release candidate implements Stalemate Arcade presentation, mobile/onboarding improvements,
 Daily Dump, result sharing, returning-player hub and shared optional music. No retention gains
