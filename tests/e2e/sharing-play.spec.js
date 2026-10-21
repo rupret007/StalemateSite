@@ -14,6 +14,7 @@ test.afterEach(async ({ page }, info) => {
                 return { id: el.id, className: el.className, rect: r.toJSON(), scrollTop: el.scrollTop,
                     scrollHeight: el.scrollHeight, clientHeight: el.clientHeight, display: s.display,
                     opacity: s.opacity, transform: s.transform, overflow: s.overflow, position: s.position,
+                    gridRows: s.gridTemplateRows, centerHit: document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.outerHTML.slice(0, 500),
                     animations: el.getAnimations().map(a => ({ playState: a.playState, currentTime: a.currentTime })) };
             };
             return { viewport: [innerWidth, innerHeight], scroll: [scrollX, scrollY],
@@ -179,4 +180,29 @@ test('Turdomania shares a real completed board, allows Undo, clears stale output
     await activate(page, page.getByRole('button', { name: 'New board', exact: true }));
     expect(await page.evaluate(() => window.__turdomania.state.moves)).toBe(0);
     await expect(share).toBeHidden();
+});
+
+test('phone results are immediately readable and offer full-size native share targets in every Turdtris mode', async ({ page }) => {
+    await page.setViewportSize({ width: 430, height: 932 });
+    await nativeStub(page, 'cancel');
+    for (const mode of ['classic', 'sprint', 'ultra']) {
+        await page.goto('/play/turdtris.html?mode=' + mode);
+        await expect(page.locator('#attractPlay')).toBeEnabled();
+        if (await page.locator('#attractPlay').isVisible()) await activate(page, page.locator('#attractPlay'));
+        await page.evaluate(() => document.fonts.ready);
+        const first = await page.evaluate(mode => {
+            score = 12345; linesCleared = 40; runStats.elapsedMs = mode === 'ultra' ? 120000 : 61234;
+            showGameOver(mode !== 'classic');
+            const card = document.getElementById('endOverlayCard');
+            const button = card.querySelector('.suite-result-share button');
+            const b = button.getBoundingClientRect(), bounds = card.getBoundingClientRect();
+            const hit = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
+            return { opacity: Number(getComputedStyle(card).opacity), height: b.height,
+                hit: hit === button || button.contains(hit), onScreen: bounds.top >= 56 && bounds.bottom <= innerHeight - 50 };
+        }, mode);
+        expect(first, mode).toMatchObject({ opacity: 1, hit: true, onScreen: true });
+        expect(first.height, mode).toBeGreaterThanOrEqual(44);
+        await activate(page, page.locator('#gameOverOverlay').getByRole('button', { name: 'Share score' }));
+        await expect(page.locator('#gameOverOverlay').getByRole('status')).toHaveText('Sharing cancelled.');
+    }
 });

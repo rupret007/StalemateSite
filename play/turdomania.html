@@ -317,7 +317,7 @@ function layout() {
   const reserve = viewW <= 980 && frameHeight > 0 ? frameHeight + (parseFloat(getComputedStyle(document.querySelector('.dock')).marginTop) || 0) : 24;
   availH = landscape ? viewH - footer - 24 : viewH - document.querySelector('header.hud').offsetHeight - document.querySelector('.dock').offsetHeight - helpHeight - Math.max(footer, padding) - reserve;
   if (landscape) availW = viewW - 224;
-  cell = Math.max(22, Math.min(56, Math.floor(Math.min(availW / state.cols, availH / state.rows))));
+  cell = Math.max(landscape ? 20 : 22, Math.min(56, Math.floor(Math.min(availW / state.cols, availH / state.rows))));
   const st = document.documentElement.style;
   st.setProperty('--cell', cell + 'px');
   st.setProperty('--board-w', cell * state.cols + 'px');

@@ -1,0 +1,33 @@
+const { test, expect } = require('@playwright/test');
+
+test('music selection, next, saved position and mute work across game navigation', async ({ page }) => {
+    const errors = []; page.on('pageerror', e => errors.push(e.message));
+    await page.goto('/play/turdomania.html?seed=42');
+    await page.locator('#newBtn').click();
+    const label = page.locator('.suite-music-title');
+    await expect(label).toHaveText('Now playing: Manic');
+    await page.getByRole('button', { name: 'Next song', exact: true }).click();
+    await expect(label).toHaveText('Now playing: Andrea');
+    await page.getByRole('button', { name: 'Songs', exact: true }).click();
+    const picker = page.getByRole('dialog', { name: 'Choose a Stalemate song' });
+    await expect(picker).toBeVisible();
+    const select = picker.getByLabel('Choose a song');
+    await expect(select.locator('option')).toHaveCount(5);
+    await select.selectOption('3');
+    await expect(label).toHaveText('Now playing: Wham Bam');
+    await select.press('Escape'); await expect(picker).toBeHidden();
+    await expect.poll(() => page.evaluate(async () => Number.isFinite((await Suite.music()).audioElement.duration))).toBe(true);
+    await page.evaluate(async () => { const p = await Suite.music(); p.audioElement.currentTime = 20; p.savePosition(); });
+    await page.goto('/StalemateSite/play/turdtris.html');
+    expect(await page.evaluate(async () => (await Suite.music()).trackTitle)).toBe('Wham Bam');
+    expect(await page.evaluate(async () => (await Suite.music()).armed)).toBe(false);
+    await expect(page.locator('#attractPlay')).toBeEnabled();
+    if (await page.locator('#attractPlay').isVisible()) await page.locator('#attractPlay').click();
+    await expect.poll(() => page.evaluate(async () => (await Suite.music()).audioElement.currentTime)).toBeGreaterThanOrEqual(19.5);
+    await page.locator('#suite-music-toggle').click();
+    await expect(label).toHaveText('Music off');
+    await page.getByRole('button', { name: 'Next song', exact: true }).click();
+    expect(await page.evaluate(async () => ({ title: (await Suite.music()).trackTitle, paused: (await Suite.music()).audioElement.paused }))).toEqual({ title: 'Planet of the Flakes', paused: true });
+    await page.reload(); await expect(label).toHaveText('Music off');
+    expect(errors).toEqual([]);
+});

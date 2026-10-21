@@ -22,7 +22,8 @@ const MIME = {
     '.svg': 'image/svg+xml',
     '.txt': 'text/plain; charset=utf-8',
     '.webp': 'image/webp',
-    '.xml': 'application/xml; charset=utf-8'
+    '.xml': 'application/xml; charset=utf-8',
+    '.ics': 'text/calendar; charset=utf-8'
 };
 
 function stripPrefix(urlPath) {

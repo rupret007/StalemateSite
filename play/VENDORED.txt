@@ -1,2 +1,2 @@
-Vendored from github.com/rupret007/Turdanoid@cd79b2125d122fbce6184e94e834e1e76734ed95. Same owner as this repo; no separate license file upstream.
-Do not edit by hand: run scripts/sync-turdanoid.sh cd79b2125d122fbce6184e94e834e1e76734ed95
+Vendored from github.com/rupret007/Turdanoid@f782a84d8dca132c54d96e614e3ff8ad3b512873. Same owner as this repo; no separate license file upstream.
+Do not edit by hand: run scripts/sync-turdanoid.sh f782a84d8dca132c54d96e614e3ff8ad3b512873

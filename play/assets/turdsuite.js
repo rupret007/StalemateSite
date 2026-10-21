@@ -249,6 +249,7 @@
             } catch (e) {}
           }
         });
+        window.addEventListener('pagehide', function () { if (musicEngine) musicEngine.savePosition(); });
         document.addEventListener('visibilitychange', function () {
           if (musicEngine) musicEngine.sync();
         });
@@ -669,9 +670,54 @@
       const status = document.createElement('div');
       status.id = 'suite-music-status';
       status.className = 'suite-music-status';
-      status.setAttribute('role', 'status');
-      status.setAttribute('aria-live', 'polite');
       status.addEventListener('keydown', function (event) { event.stopPropagation(); });
+      const title = document.createElement('span');
+      title.className = 'suite-music-title';
+      title.setAttribute('role', 'status'); title.setAttribute('aria-live', 'polite');
+      const listen = document.createElement('a');
+      listen.className = 'suite-music-listen'; listen.hidden = true;
+      listen.target = '_blank'; listen.rel = 'noopener noreferrer'; listen.textContent = 'Listen ↗';
+      const songs = document.createElement('button');
+      songs.type = 'button'; songs.id = 'suite-music-songs'; songs.textContent = 'Songs';
+      songs.setAttribute('aria-expanded', 'false'); songs.setAttribute('aria-controls', 'suite-music-picker');
+      const next = document.createElement('button');
+      next.type = 'button'; next.id = 'suite-music-next'; next.textContent = 'Next';
+      next.setAttribute('aria-label', 'Next song'); next.disabled = true;
+      status.append(title, listen, songs, next);
+      const picker = document.createElement('section');
+      picker.id = 'suite-music-picker'; picker.hidden = true;
+      picker.setAttribute('role', 'dialog'); picker.setAttribute('aria-label', 'Choose a Stalemate song');
+      const label = document.createElement('label');
+      label.htmlFor = 'suite-song-select'; label.textContent = 'Choose a song';
+      const select = document.createElement('select');
+      select.id = 'suite-song-select'; select.disabled = true;
+      picker.append(label, select); document.body.append(picker);
+      function closePicker() { picker.hidden = true; songs.setAttribute('aria-expanded', 'false'); }
+      songs.addEventListener('click', function () {
+        picker.hidden = !picker.hidden; songs.setAttribute('aria-expanded', String(!picker.hidden));
+        if (!picker.hidden) select.focus();
+      });
+      picker.addEventListener('keydown', function (event) {
+        event.stopPropagation();
+        if (event.key === 'Escape') { closePicker(); songs.focus(); }
+      });
+      document.addEventListener('pointerdown', function (event) {
+        if (!picker.hidden && !picker.contains(event.target) && !songs.contains(event.target)) closePicker();
+      });
+      select.addEventListener('change', function () {
+        Suite.music().then(function (player) { if (player) player.playTrackAt(Number(select.value)); });
+      });
+      next.addEventListener('click', function () {
+        Suite.music().then(function (player) { if (player) player.nextTrack(); });
+      });
+      Suite.music().then(function (player) {
+        if (!player) return;
+        player.tracks.forEach(function (track) {
+          const option = document.createElement('option'); option.value = String(track.index);
+          option.textContent = track.title; select.append(option);
+        });
+        select.value = String(player.trackIndex); select.disabled = false; next.disabled = false;
+      }).catch(function () {});
       const statusHost = isSuiteHubPage(currentPageName()) ? document.querySelector('.shell') : document.body;
       (statusHost || document.body).appendChild(status);
       window.dispatchEvent(new Event('resize'));
@@ -694,22 +740,17 @@
     const status = document.getElementById('suite-music-status');
     if (!status) return;
     const label = !musicEnabled ? 'Music off' : state.title ? `${state.paused ? 'Paused' : 'Now playing'}: ${state.title}` : 'Stalemate music · play to listen';
-    const href = state.listenUrl || '';
-    if (status.dataset.label === label && status.dataset.href === href) return;
-    status.dataset.label = label;
-    status.dataset.href = href;
-    status.replaceChildren();
-    const title = document.createElement('span');
-    title.textContent = label;
-    status.appendChild(title);
-    if (href) {
-      const link = document.createElement('a');
-      link.href = href;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.textContent = 'Listen ↗';
-      link.setAttribute('aria-label', `${state.title} by Stalemate on Apple Music`);
-      status.appendChild(link);
+    const title = status.querySelector('.suite-music-title');
+    if (title) { title.textContent = label; title.title = label; }
+    const select = document.getElementById('suite-song-select');
+    if (select && Number.isInteger(state.index)) select.value = String(state.index);
+    const link = status.querySelector('.suite-music-listen');
+    if (link) {
+      link.hidden = !state.listenUrl;
+      if (state.listenUrl) {
+        link.href = state.listenUrl;
+        link.setAttribute('aria-label', `${state.title} by Stalemate on Apple Music`);
+      } else link.removeAttribute('href');
     }
   }
 

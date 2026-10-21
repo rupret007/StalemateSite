@@ -1,0 +1,19 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Stalemate//Confirmed Shows//EN
+CALSCALE:GREGORIAN
+BEGIN:VEVENT
+UID:stalemate-rockin-october-20261024@stalemate.band
+DTSTAMP:20261021T230000Z
+DTSTART:20261024T214500Z
+SUMMARY:Stalemate at Rockin' October
+LOCATION:Los Amigo's Sports Bar + Bites\, 8604 Preston Rd Suite 100\,
+ Plano TX 75024
+DESCRIPTION:Stalemate starts at 4:45 PM Central. End time unconfirmed.\n
+ Doors at noon. Under 18 with a parent or guardian.\n
+ Details and schedule updates: https://rockinoctober.com/
+URL:https://rockinoctober.com/
+TRANSP:TRANSPARENT
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR
