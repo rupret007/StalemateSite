@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="assets/arcade-hub.css">
   <script src="games/table-continue-core.js"></script>
   <script src="assets/turdsuite.js"></script>
-  <title>Stalemate Arcade — The Daily Dump & Seven Free Games</title>
+  <title>Stalemate Arcade — Seven Free Games</title>
   <style>
     :root {
       --bg-a: #10192d;
@@ -714,17 +714,6 @@
       </div>
     </header>
 
-    <section class="daily-feature" aria-labelledby="daily-heading">
-      <div class="daily-feature-copy">
-        <p class="daily-eyebrow">A fresh puzzle every day</p>
-        <h2 id="daily-heading">The Daily Dump<span aria-hidden="true">.</span></h2>
-        <p>One board. Make every pop count.</p>
-        <p id="daily-hub-status" class="daily-status" aria-live="polite">Turdomania · 8×10 · four kinds · no undo</p>
-        <a id="daily-hub-play" class="daily-play" href="turdomania.html?daily=today">Play today’s Dump <span aria-hidden="true">↗</span></a>
-        <p id="daily-hub-next" class="daily-reset">New puzzle at midnight America/Chicago.</p>
-      </div>
-      <img class="daily-feature-art" src="assets/daily-dump.svg" width="270" height="240" alt="A grinning swirl, corn and toilet paper in a checkerboard puzzle" fetchpriority="high">
-    </section>
     <div class="arcade-grid-heading"><h2>Seven games. Zero dignity.</h2><p>Your records stay on this device.</p></div>
     <main class="games" id="hub-games" aria-label="Choose a game">
       <a href="TurdAnoid.html" class="game-card" data-vibe="Bricks. Busted. Flushed." style="--c:#9effc8;--c2:#7ae6ff">
@@ -1015,7 +1004,6 @@
   <script type="module">
     import { injectSkipLink, createAnnouncer } from './assets/suite-a11y.js';
     import { decorateHubStatBadges } from './assets/suite-hub-stats.js';
-    import { bootDailyHub } from './assets/arcade-hub.js';
     import { wireHubCoverIdleMotion, wireHubAttractHeader } from './assets/suite-hub-attract.js';
 
     function bootHubModules() {
@@ -1023,7 +1011,6 @@
       let storage = null;
       try { storage = window.localStorage; } catch { /* device storage unavailable */ }
       decorateHubStatBadges(document, storage || { getItem: () => null });
-      bootDailyHub(document, storage);
       wireHubCoverIdleMotion(document);
       wireHubAttractHeader(document);
       if (window.Suite) {

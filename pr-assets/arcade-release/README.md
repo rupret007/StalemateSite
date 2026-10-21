@@ -1,3 +1,8 @@
+> Historical evidence for the first October 21 release, before the user requested removal
+> of Daily Dump. The screenshots and `capture-candidate.cjs` below reproduce that earlier
+> candidate; they do not represent the current arcade. See `docs/arcade-goal.md` for the
+> subsequent removal and its validation.
+
 # Actual arcade candidate evidence
 
 Captured October21,2026 from StalemateSite with upstream5160ba6. All named root PNGs are actual integrated candidate renders, inspected at gameplay size. capture.json records zero page errors. daily-share.png is the actual exported1200×630 result image.

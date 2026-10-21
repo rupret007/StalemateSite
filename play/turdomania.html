@@ -102,52 +102,11 @@ body.reduced .tile.popping { transform: var(--pos) !important; }
 <link rel="stylesheet" href="assets/mobile-fit.css">
 <script src="assets/mobile-fit.js" defer></script>
 <style>
-.daily-info { width:100%; font-size:.8rem; text-align:center; display:grid; grid-template-columns:1fr auto; align-items:center; gap:2px 12px; }
-.daily-info a { color:#a9f4d5; display:inline-flex; align-items:center; min-height:44px; padding:0 8px; }
-.daily-cta { grid-template-columns:1fr; }
-.daily-cta > p { line-height:1.35; color:#ffe398; }
-.daily-identity, .daily-storage-note { grid-column:1/-1; }
-.daily-identity { font-weight:bold; color:#ffe398; line-height:1.35; }
-.daily-storage-note { color:#ffe398; }
-.daily-storage-note:empty { display:none; }
-.daily-rules { text-align:left; }
-.daily-rules summary { cursor:pointer; display:flex; align-items:center; justify-content:center; min-height:44px; padding:0 8px; text-decoration:underline; }
-.daily-rules summary::before { content:'▸ '; margin-right:5px; }
-.daily-rules[open] summary::before { content:'▾ '; }
-.daily-rules-body { position:fixed; z-index:80; top:130px; left:50%; transform:translateX(-50%); width:min(430px,calc(100vw - 24px)); max-height:calc(100dvh - 150px); overflow:auto; padding:16px; border:2px solid #ffe398; border-radius:12px; background:#211a25; box-shadow:0 8px 35px #000a; font-size:.85rem; line-height:1.5; }
-.daily-rules-body p + p { margin-top:10px; }
-.daily-links { display:flex; justify-content:center; align-items:center; }
-.daily-info [hidden], .daily-dump [hidden] { display:none!important; }
-.daily-dump #overlay { overflow:auto; align-items:safe center; }
-.daily-dump #overlay > div { max-width:100%; }
-.daily-share { margin-top:10px; }
-.daily-share-status, #dailyResultNote { font-size:.78rem; margin-top:8px; }
-#dailyShareFallback { width:100%; min-height:135px; color:#fff; background:#211a25; padding:8px; font:13px sans-serif; }
-.daily-result-free { display:inline-flex; min-height:44px; align-items:center; color:#a9f4d5; padding:4px; }
-.daily-info a:focus-visible, .daily-rules summary:focus-visible { outline:3px solid #a9f4d5; }
 @media(max-width:980px) {
-  html[data-mobile-game="turdomania"] body:not(.daily-entry) header.hud { height:56px; }
+  html[data-mobile-game="turdomania"] header.hud { height:56px; flex-wrap:nowrap; }
+  html[data-mobile-game="turdomania"] header.hud .stat { min-width:0; flex:1 1 0; }
   html[data-mobile-game="turdomania"] .dock .suite-difficulty-seg { padding:0; }
-  html[data-mobile-game="turdomania"] body.daily-entry header.hud { height:auto; padding:2px 4px; flex-wrap:wrap; }
-  .daily-entry header.hud .stat { flex:1; min-width:0; }
-  .daily-entry header.hud .stat:first-of-type { margin-left:48px; }
-  .daily-entry header.hud .stat:nth-of-type(3) { margin-right:100px; }
-  .daily-info { font-size:.72rem; gap:0 4px; }
-  .daily-dump .daily-identity { margin-top:3px; }
-  .daily-dump .dock { max-width:100%; }
-  .daily-dump .dock button { font-size:.75rem; padding:0 8px; }
-  .daily-dump #boardWrap { margin:4px auto!important; }
   html[data-mobile-game="turdomania"] .tm-aim nav { position:fixed; left:50%; right:auto; bottom:calc(100dvh - var(--tm-dock-top, 100dvh) + 8px); transform:translateX(-50%); width:max-content; max-width:calc(100vw - 12px); flex-wrap:wrap; justify-content:center; z-index:60; }
-}
-@media(max-width:980px) and (orientation:landscape) {
-  html[data-mobile-game="turdomania"] body.daily-entry header.hud { top:56px; width:188px; right:8px; }
-  .daily-entry header.hud .stat:first-of-type, .daily-entry header.hud .stat:nth-of-type(3) { margin:0; }
-  .daily-dump .daily-info { display:block; }
-  .daily-dump .daily-identity { font-size:.68rem; }
-  html[data-mobile-game="turdomania"] body.daily-dump .dock { position:absolute; right:8px; bottom:calc(8px + var(--mobile-footer,0px)); margin:0; width:188px; gap:2px; }
-  .daily-dump .daily-links { margin-top:-4px; }
-  html[data-mobile-game="turdomania"] body.daily-dump #boardWrap { position:absolute; margin:0!important; left:max(4px,calc((100vw - 220px - var(--board-w) - 16px) / 2)); top:max(4px,calc((100dvh - var(--mobile-footer,0px) - var(--board-h) - 16px) / 2)); }
-  .daily-rules-body { top:56px; max-height:calc(100dvh - 72px); }
 }
 </style>
 </head>
@@ -242,8 +201,6 @@ window.tmFit = function (levelKey) {
 
 <script type="module">
 import * as Core from './games/turdomania-core.js';
-import * as Daily from './games/turdomania-daily.js';
-import { createDailyUI } from './games/turdomania-daily-ui.js';
 
 const qs = new URLSearchParams(location.search);
 const boardEl = document.getElementById('board');
@@ -280,7 +237,6 @@ let cursor = { c: 0, r: 0 };
 let cell = 32;
 const tileEls = new Map();
 const fixedSeed = qs.has('seed') ? Number(qs.get('seed')) >>> 0 : null;
-const daily = createDailyUI({ params: qs, storage: safeStorage, gameURL: location.href, announce });
 let busy = false;
 let popTimer = 0;
 let generation = 0;
@@ -300,12 +256,6 @@ function resetView() {
 }
 
 function start(levelKey, seed) {
-  if (daily.enabled) {
-    if (!daily.startPractice()) return;
-    state = daily.run.state;
-    resetView();
-    return;
-  }
   // First board reuses the size reserved before paint; later boards re-measure.
   const init = window.TM_INIT && window.TM_INIT.level === levelKey ? window.TM_INIT : null;
   window.TM_INIT = null;
@@ -324,10 +274,10 @@ function layout() {
   const padding = (parseFloat(bodyStyle.paddingTop) || 0) + (parseFloat(bodyStyle.paddingBottom) || 0);
   const help = document.querySelector('.help');
   const helpHeight = help && getComputedStyle(help).display !== 'none' ? help.getBoundingClientRect().height + 8 : 0;
-  // Measure the actual kit, daily banner and footer; fonts and settings can change their height.
+  // Measure the actual kit and footer; fonts and settings can change their height.
   availH = landscape ? viewH - footer - 24 : viewH - document.querySelector('header.hud').offsetHeight - document.querySelector('.dock').offsetHeight - helpHeight - Math.max(footer, padding) - 24;
   if (landscape) availW = viewW - 224;
-  cell = Math.max(daily.enabled ? 18 : 22, Math.min(56, Math.floor(Math.min(availW / state.cols, availH / state.rows))));
+  cell = Math.max(22, Math.min(56, Math.floor(Math.min(availW / state.cols, availH / state.rows))));
   const st = document.documentElement.style;
   st.setProperty('--cell', cell + 'px');
   st.setProperty('--board-w', cell * state.cols + 'px');
@@ -401,16 +351,15 @@ function render() {
   }));
   for (const [id, el] of tileEls) if (!live.has(id)) { el.remove(); tileEls.delete(id); }
   els.score.textContent = state.score;
-  const best = daily.enabled ? (daily.firstResult?.score || 0) : Core.readBest(safeStorage)[state.level];
+  const best = Core.readBest(safeStorage)[state.level];
   els.best.textContent = Math.max(best, state.score);
   els.left.textContent = Core.tileCount(state.board);
   els.undo.disabled = state.history.length === 0;
   els.level.value = state.level;
-  if (daily.enabled) daily.update();
   clampCursor();
   paintCursor();
   if (state.over) showOver();
-  window.__turdomania = { state, Core, daily: daily.enabled ? daily.run : null };
+  window.__turdomania = { state, Core };
 }
 
 function clampCursor() {
@@ -456,7 +405,7 @@ function floatText(text, c, r) {
 
 function popAt(c, r) {
   if (busy || !state) return;
-  const res = daily.enabled ? Daily.playMove(daily.run, c, r) : Core.play(state, c, r);
+  const res = Core.play(state, c, r);
   if (!res) {
     const t = Core.cellAt(state.board, c, r);
     const el = t && tileEls.get(t.id);
@@ -470,8 +419,7 @@ function popAt(c, r) {
   floatText(res.points ? `+${res.points}` : 'plop', c, r);
   sfx(res.removed.length >= 6 ? 'ding' : 'blip');
   state = res.state;
-  if (daily.enabled) { daily.run = res.run; daily.persist(); }
-  else if (state.over) Core.recordBest(safeStorage, state.level, state.score);
+  if (state.over) Core.recordBest(safeStorage, state.level, state.score);
   const startedGeneration = generation;
   const finish = () => {
     if (startedGeneration !== generation) return;
@@ -486,11 +434,9 @@ function popAt(c, r) {
 
 function doUndo() {
   if (busy) return;
-  const previousRun = daily.enabled ? Daily.undoPractice(daily.run) : null;
-  const prev = daily.enabled ? previousRun?.state : state && Core.undo(state);
+  const prev = state && Core.undo(state);
   if (!prev) return;
   state = prev;
-  if (daily.enabled) { daily.run = previousRun; daily.persist(); }
   overlay.classList.remove('show');
   // Rebuild tiles: undone tiles come back with their old ids.
   render();
@@ -505,11 +451,6 @@ function showOver() {
   els.overText.textContent = state.cleared
     ? `Board flushed. +${Core.CLEAR_BONUS} bonus. Final ${state.score}.${state.score >= best ? ' New best!' : ''}`
     : `No more matches. ${left} turd${left === 1 ? '' : 's'} left behind. Final ${state.score}.${state.score >= best && state.score > 0 ? ' New best!' : ''}`;
-  if (daily.enabled) {
-    const result = daily.run.practice ? Daily.summarize(daily.run) : daily.firstResult || Daily.summarize(daily.run);
-    els.overTitle.textContent = daily.run.practice ? 'Practice complete!' : 'Daily Dump complete!';
-    els.overText.textContent = `${result.challenge.date} · ${result.score} points · ${result.moves} pops · ${result.cleared ? 'Board flushed!' : result.left + ' tiles left.'}`;
-  }
   overlay.classList.add('show');
   sfx(state.cleared ? 'win' : 'lose');
   announce(els.overTitle.textContent + ' ' + els.overText.textContent);
@@ -561,7 +502,6 @@ function suiteBoardLevel() {
   } catch { return null; }
 }
 els.level.addEventListener('change', () => {
-  if (daily.enabled) return;
   const lvl = els.level.value;
   writePrefs({ level: lvl });
   try {
@@ -574,7 +514,7 @@ const pinnedLevel = Core.LEVELS[qs.get('level')] ? qs.get('level') : null;
 
 if (window.Suite && Suite.difficulty) {
   Suite.difficulty.onChange((lvl) => {
-    if (pinnedLevel || daily.enabled) { return; }
+    if (pinnedLevel) { return; }
     if (!Core.LEVELS[lvl] || (state && state.level === lvl)) { return; }
     if (els.level.value !== lvl) { els.level.value = lvl; }
     writePrefs({ level: lvl });
@@ -611,10 +551,9 @@ const startLevel = pinnedLevel
   || suiteBoardLevel()
   || readPrefs().level
   || 'normal';
-if (daily.enabled) { state = daily.run.state; resetView(); }
-else start(startLevel);
+start(startLevel);
 try {
-  if (!daily.enabled && pinnedLevel && window.Suite && Suite.difficulty && Suite.difficulty.get() !== pinnedLevel) {
+  if (pinnedLevel && window.Suite && Suite.difficulty && Suite.difficulty.get() !== pinnedLevel) {
     Suite.difficulty.set(pinnedLevel);
   }
 } catch { /* ignore */ }

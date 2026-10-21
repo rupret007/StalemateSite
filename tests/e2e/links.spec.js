@@ -50,11 +50,11 @@ test('every link on every page resolves and every external link is our Stalemate
     }
 });
 
-test('homepage Daily Dump action and every game link open their own game', async ({ page }) => {
+test('homepage arcade action and every game link open their destination', async ({ page }) => {
     await page.goto('/');
     const games = page.locator('#games');
-    await expect(games.getByRole('link', { name: 'Play The Daily Dump' })).toHaveAttribute('href', 'play/turdomania.html?daily=today');
-    await expect(games.getByRole('link', { name: 'All seven games' })).toHaveAttribute('href', 'play/');
+    await expect(games.getByRole('link', { name: 'Open Stalemate Arcade' })).toHaveAttribute('href', 'play/');
+    await expect(games.getByRole('link', { name: 'Play Turdanoid' })).toHaveAttribute('href', 'play/TurdAnoid.html');
     const list = games.locator('.games-card__list');
     await expect(list.locator('a')).toHaveCount(7);
     const hrefs = await list.locator('a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
@@ -71,9 +71,9 @@ test('homepage Daily Dump action and every game link open their own game', async
         const b = await a.boundingBox();
         expect(b.height, `${await a.textContent()} tap target`).toBeGreaterThanOrEqual(44);
     }
-    await games.getByRole('link', { name: 'Play The Daily Dump' }).click();
-    await expect(page).toHaveURL(/\/play\/turdomania\.html\?daily=20/);
-    await expect(page).toHaveTitle(/^The Daily Dump/);
+    await games.getByRole('link', { name: 'Open Stalemate Arcade' }).click();
+    await expect(page).toHaveURL(/\/play\/$/);
+    await expect(page).toHaveTitle(/^Stalemate Arcade/);
 });
 
 test('the /play/ hub cards each open a different game', async ({ page }) => {
