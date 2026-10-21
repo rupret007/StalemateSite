@@ -21,10 +21,18 @@
     canvas.style.setProperty('height', `${width / aspect}px`, 'important');
     if (game === 'neon-arkanoid') canvas.parentElement.style.width = `${width}px`;
   }
+  function updateFooter() {
+    const strip = document.querySelector('.stalemate-strip');
+    const musicStatus = document.getElementById('suite-music-status');
+    const footer = `${(strip ? strip.getBoundingClientRect().height : 0) + (musicStatus ? musicStatus.getBoundingClientRect().height : 0)}px`;
+    if (root.style.getPropertyValue('--mobile-footer') !== footer) {
+      root.style.setProperty('--mobile-footer', footer);
+      window.dispatchEvent(new Event('resize'));
+    }
+  }
   function fit() {
     placeSettings();
-    const strip = document.querySelector('.stalemate-strip');
-    root.style.setProperty('--mobile-footer', `${strip ? strip.getBoundingClientRect().height : 0}px`);
+    updateFooter();
     pagers.forEach(update => update());
     if (!phone.matches) return;
     if (game === 'turdtris') canvasFit(document.querySelector('#game'), document.querySelector('.game-grid'), 0.5, 14);
@@ -96,7 +104,7 @@
       }
       const intro = card.querySelector(':scope > p');
       [...card.children].forEach(child => {
-        if (child === details || child === intro || child.matches('h1, h2, .welcome-actions, .overlay-actions, .guide-actions')) return;
+        if (child === details || child === intro || child.matches('h1, h2, .welcome-actions, .overlay-actions, .guide-actions, .attract-modes')) return;
         move(child, details.lastElementChild);
       });
     });
@@ -119,7 +127,9 @@
     if (game === 'turdrummy') ['.tr-difficulty-topbar'].forEach(selector => move(document.querySelector(selector), menu));
     if (menu) {
       const settings = game === 'turdtris' ? ['#suite-difficulty-mount', '.run-settings']
-        : game === 'crapeights' ? ['#suite-difficulty-mount'] : [];
+        : game === 'crapeights' ? ['#suite-difficulty-mount']
+        : game === 'turdjack' ? ['.mobile-pit-extra']
+        : game === 'neon-arkanoid' ? ['.suite-difficulty'] : [];
       settings.forEach(selector => {
         const element = document.querySelector(selector);
         move(element, menu);
@@ -131,13 +141,24 @@
   }
   function init() {
     placeSettings();
-    new MutationObserver(() => { placeSettings(); }).observe(document.body, { childList:true, subtree:true });
+    const observedFooters = new WeakSet();
+    const footerObserver = new ResizeObserver(schedule);
+    function watchFooters() {
+      document.querySelectorAll('.stalemate-strip, #suite-music-status').forEach(footer => {
+        if (observedFooters.has(footer)) return;
+        observedFooters.add(footer);
+        footerObserver.observe(footer);
+      });
+      // The shared player can arrive after the initial frame and fallback timer.
+      // Reserve its space before a subsequent touch, even without a window resize.
+      updateFooter();
+    }
+    new MutationObserver(() => { placeSettings(); watchFooters(); }).observe(document.body, { childList:true, subtree:true });
     if (['crapeights', 'turdrummy'].includes(game)) handPager(document.querySelector('#playerHand'));
     if (game === 'turdspades') handPager(document.querySelector('#youCards'));
     const host = document.querySelector(game === 'turdtris' ? '.game-grid' : '.play-area');
     if (host) new ResizeObserver(schedule).observe(host);
-    const strip = document.querySelector('.stalemate-strip');
-    if (strip) new ResizeObserver(schedule).observe(strip);
+    watchFooters();
     fit();
     // The suite can insert controls after dynamic imports; refit after its first layout.
     setTimeout(schedule, 500);

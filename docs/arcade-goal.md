@@ -2,7 +2,16 @@
 
 New record created October 21, 2026. Full authorized scope: [arcade-scope.md](arcade-scope.md).
 
-## Current scope change: remove The Daily Dump
+## Current goal: website and game polish
+
+The user activated a new goal to implement, test, merge, publish and verify homepage
+rollover, clearer Turdtris modes, complete phone records/first-pop guidance, actual
+music-track display, and verified band contact/bio. Daily Dump stays removed.
+Current implementation, validation, missing photo input and next steps are recorded
+in [site-game-polish.md](site-game-polish.md). Earlier release/removal sections below
+are historical. The root ARCADE-RELEASE-HANDOFF.md tracks publication receipts.
+
+## Historical scope change: remove The Daily Dump
 
 On October 21, 2026, the user requested removing The Daily Dump and publishing that
 removal under the existing deployment authorization. This replaces the daily-challenge

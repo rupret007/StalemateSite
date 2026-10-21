@@ -12,7 +12,7 @@ test('/play/ hosts Turdanoid same-origin, hidden and noindex', async ({ page }) 
     await expect(page.locator('iframe')).toHaveCount(0);
     const strip = page.locator('nav.stalemate-strip');
     await expect(strip.locator('a.sm-home')).toHaveAttribute('href', '../');
-    await expect(strip.locator('a.sm-listen')).toContainText('Listen to Manic');
+    await expect(strip.locator('a.sm-listen')).toContainText('Listen to Stalemate');
     const card = page.locator('a.game-card[href="TurdAnoid.html"]');
     await expect(card).toBeVisible();
     await card.click();
@@ -162,5 +162,124 @@ test('game over offers Listen to Manic, the Oct 24 show and Share score next to 
     await share.click();
     const shared = await page.evaluate(() => window.__shared);
     expect(shared.text).toMatch(/^I scored \d+ in Turdanoid/);
+    await page.clock.setFixedTime(new Date('2026-10-24T16:45:00-05:00'));
+    await expect(extra.locator('[data-next-show]')).toBeHidden();
+    await page.reload();
+    await page.locator('#btnStart').click();
+    await page.evaluate(() => window.gameOver(false));
+    await expect(page.locator('#endScreen #btnRestart')).toBeVisible();
+    await expect(page.locator('.stalemate-end [data-next-show]')).toBeHidden();
     expect(errors).toEqual([]);
+});
+test('Turdtris Ultra shortcut opens the actual mode and Play honors a changed selection', async ({ page }) => {
+    await page.goto('/play/');
+    const shortcut = page.getByRole('link', { name: 'Turdtris · 2-minute Ultra →', exact: true });
+    await expect(shortcut).toHaveAttribute('href', 'turdtris.html?mode=ultra');
+    expect(await shortcut.evaluate((a) => a.closest('.game-card'))).toBeNull();
+    await shortcut.click();
+    await expect(page.locator('#attractModeSetting')).toHaveValue('ultra');
+    await expect(page.locator('.hud[data-mode="ultra"]')).toHaveCount(1);
+    await page.locator('#attractModeSetting').selectOption('sprint');
+    await page.getByRole('button', { name: 'Play', exact: true }).click();
+    await expect(page.locator('.hud[data-mode="sprint"]')).toHaveCount(1);
+    await expect(page.locator('#welcomeGuide')).toBeHidden();
+    await expect(page.locator('#highLabel')).toHaveText('Best time');
+    await page.evaluate(() => { score = 123; showWelcomeGuide(); });
+    await page.getByRole('button', { name: 'Resume run', exact: true }).click();
+    expect(await page.evaluate(() => ({ mode: runMode, score }))).toEqual({ mode: 'sprint', score: 123 });
+    await page.goto('/play/turdtris.html?mode=invalid');
+    await expect(page.locator('#attractModeSetting')).toHaveValue('classic');
+});
+
+test('hub records remain complete and accessible with mode and difficulty context', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.addInitScript(() => {
+        localStorage.setItem('turdtrisHighScore', '1234567');
+        localStorage.setItem('turdtrisSprint40BestMs_v1', '61234');
+        localStorage.setItem('turdtrisUltra120Best_v1', '98765');
+        localStorage.setItem('turdomania_best_v1', JSON.stringify({ v: 1, best: { easy: 7777, normal: 123456, hard: 99 } }));
+    });
+    await page.goto('/play/');
+    for (const [href, text] of [
+        ['turdtris.html', 'Classic best 1,234,567 · Sprint best 1:01.2 · Ultra best 98,765'],
+        ['turdomania.html', 'Easy best 7,777 · Normal best 123,456 · Hard best 99']
+    ]) {
+        const card = page.locator(`.game-card[href="${href}"]`);
+        await card.evaluate(el => el.scrollIntoView({ block: 'center' }));
+        await expect(card.locator('.suite-hub-stat')).toHaveText(text);
+        await expect(card).toHaveAccessibleName(new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+        const fits = await card.locator('.suite-hub-stat').evaluate((el) => ({ width: el.scrollWidth <= el.clientWidth + 1, height: el.scrollHeight <= el.clientHeight + 1, overflow: getComputedStyle(el).textOverflow }));
+        expect(fits).toEqual({ width: true, height: true, overflow: 'clip' });
+        const badge = await card.locator('.suite-hub-stat').boundingBox();
+        const footer = await page.locator('.stalemate-strip').boundingBox();
+        expect(badge.y).toBeGreaterThanOrEqual(0);
+        expect(badge.y + badge.height).toBeLessThanOrEqual(footer.y);
+    }
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('turdomania_best_v1')).best.normal)).toBe(123456);
+});
+
+test('shared music displays the actual track, confirmed links, mute and visibility state', async ({ page }) => {
+    await page.goto('/play/turdomania.html?seed=42');
+    const toggle = page.locator('#suite-music-toggle');
+    await toggle.click();
+    await expect(page.locator('#suite-music-status')).toHaveText('Music off');
+    await toggle.click();
+    await page.evaluate(async () => { const player = await Suite.music(); player.playTrackAt(1); });
+    const status = page.locator('#suite-music-status');
+    await expect(status).toContainText('Now playing: Andrea');
+    await expect(status.getByRole('link')).toHaveAttribute('href', 'https://music.apple.com/us/album/andrea/1718463871?i=1718463872');
+    await page.evaluate(async () => { (await Suite.music()).advanceForTest(); });
+    await expect(status).toContainText('Now playing: It’s Only Been 18');
+    await expect(status.getByRole('link')).toHaveAttribute('href', 'https://music.apple.com/us/album/its-been-only-18/1718464113?i=1718464114');
+    // Controlled visibility transition exercises the real shared player callback.
+    await page.evaluate(() => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+        document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect(status).toContainText('Paused: It’s Only Been 18');
+    await page.evaluate(() => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+        document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect(status).toContainText('Now playing: It’s Only Been 18');
+    await page.evaluate(async () => { (await Suite.music()).advanceForTest(); });
+    await expect(status).toHaveText('Now playing: Wham Bam');
+    await expect(status.getByRole('link')).toHaveCount(0);
+    await toggle.click();
+    await expect(status).toHaveText('Music off');
+    await page.reload();
+    await expect(status).toHaveText('Music off');
+    expect(await page.evaluate(() => localStorage.getItem('stalemate.music'))).toBe('off');
+});
+
+test('Turdomania first-play hint clears landscape controls and persists after a real pop', async ({ page, isMobile }) => {
+    await page.goto('/play/turdomania.html?seed=42&reducedMotion=1');
+    await expect(page.locator('#startHint')).toBeVisible();
+    await page.setViewportSize({ width: 568, height: 320 });
+    await page.evaluate(() => document.fonts.ready);
+    await expect.poll(() => page.evaluate(() => {
+        const hint = document.getElementById('startHint').getBoundingClientRect();
+        return [...document.querySelectorAll('#board, header.hud .stat, .dock button, .dock summary')].filter(el => {
+            if (!el.getClientRects().length) return false;
+            const b = el.getBoundingClientRect();
+            return hint.left < b.right && hint.right > b.left && hint.top < b.bottom && hint.bottom > b.top;
+        }).map(el => el.id || el.textContent);
+    })).toEqual([]);
+    await page.setViewportSize({ width: 320, height: 568 });
+    const move = await page.evaluate(() => {
+        const { state, Core } = window.__turdomania;
+        for (let c = 0; c < state.board.length; c++) for (let r = 0; r < state.board[c].length; r++) {
+            if (Core.findGroup(state.board, c, r).length >= 2) return [c, r];
+        }
+    });
+    const tile = page.locator(`.tile[data-col="${move[0]}"][data-row="${move[1]}"]`);
+    if (isMobile) {
+        const box = await tile.boundingBox();
+        await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+    } else await tile.click();
+    await expect.poll(() => page.evaluate(() => window.__turdomania.state.moves)).toBe(1);
+    await expect(page.locator('#startHint')).toBeHidden();
+    await page.locator('#undoBtn').click();
+    await page.reload();
+    await expect(page.locator('#startHint')).toBeHidden();
 });

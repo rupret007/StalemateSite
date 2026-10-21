@@ -19,11 +19,13 @@ Do not publish guesses for any of these:
 - Stream / store URLs for Better Than Now and Manic
 - A public YouTube watch URL for the Manic lyric video (the band channel lists Andrea and It’s Only Been 18)
 - ICS for Rockin’ October
-- Booking email
+- A genuine approved band photo
 - TikTok handle
 - Press kit / EPK / QR landing (do not publish until the band has them)
 
-The homepage countdown and next-show block hide after `2026-10-24T16:45:00-05:00` and leave no empty slot. The Manic lyric video stays.
+The homepage uses evergreen metadata and no-JavaScript content. The existing `2026-10-24T16:45:00-05:00` cutoff controls all dated promotions and show actions together; after it, the band/social links remain. This is a promotion cutoff, not a confirmed set end time. The Manic lyric video stays.
+
+Booking/contact: **stalemate.punk@gmail.com**, supplied by the owner and corroborated October 21, 2026. Mail delivery has not been tested.
 
 ## Visual identity
 

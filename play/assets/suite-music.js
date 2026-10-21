@@ -59,8 +59,8 @@ export const STALEMATE_TRACK_ONLY_BEEN_18_TITLE = 'It\u2019s Only Been 18';
 
 export const STALEMATE_PLAYLIST = [
   { path: 'stalemate/manic.m4a', title: 'Manic' },
-  { path: 'stalemate/andrea.m4a', title: 'Andrea' },
-  { path: 'stalemate/only-been-18.m4a', title: STALEMATE_TRACK_ONLY_BEEN_18_TITLE },
+  { path: 'stalemate/andrea.m4a', title: 'Andrea', listenUrl: 'https://music.apple.com/us/album/andrea/1718463871?i=1718463872' },
+  { path: 'stalemate/only-been-18.m4a', title: STALEMATE_TRACK_ONLY_BEEN_18_TITLE, listenUrl: 'https://music.apple.com/us/album/its-been-only-18/1718464113?i=1718464114' },
   { path: 'stalemate/wham-bam.m4a', title: 'Wham Bam' },
   { path: 'stalemate/planet-of-the-flakes.m4a', title: 'Planet of the Flakes' }
 ];
@@ -96,7 +96,7 @@ export function readTrackIndex(storage, length) {
  * @param {(path: string) => string} opts.resolveSrc
  * @param {Storage|null} [opts.storage]
  * @param {typeof Audio} [opts.AudioCtor]
- * @param {(state: { paused: boolean, title: string }) => void} [opts.onStateChange]
+ * @param {(state: { paused: boolean, title: string, listenUrl: string }) => void} [opts.onStateChange]
  */
 export function createSuiteMusic(opts) {
   const playlist = opts.playlist || STALEMATE_PLAYLIST;
@@ -129,7 +129,8 @@ export function createSuiteMusic(opts) {
     const track = currentTrack();
     onStateChange({
       paused: blocked() || audio.paused,
-      title: track ? track.title : ''
+      title: track ? track.title : '',
+      listenUrl: track ? track.listenUrl || '' : ''
     });
   }
 

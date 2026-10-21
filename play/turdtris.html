@@ -1437,6 +1437,7 @@ body.desktop-cabinet .status {
     </div>
     <h2 class="sr-live" style="position:absolute;width:1px;height:1px;overflow:hidden">Turdtris</h2>
     <p>Stack clean, survive level modifiers, and score big with combos and back-to-back clears.</p>
+    <details class="mobile-guide-details"><summary>Rules &amp; tips</summary><div>
     <ul tabindex="0" aria-label="Keyboard and touch controls">
       <li><strong>Move:</strong> Left/Right arrows</li>
       <li><strong>Rotate:</strong> Up or <strong>X</strong> (clockwise), <strong>Z</strong> (counterclockwise)</li>
@@ -1448,10 +1449,10 @@ body.desktop-cabinet .status {
     </ul>
     <div class="guide-legend"><span><strong>Ghost outline</strong><br>Your landing spot.</span><span><strong>Landing meter</strong><br>Time left to slide or spin.</span><span><strong>4 rows</strong><br>A mighty TURDTRIS!</span></div>
     <p>Hold saves a piece for later. Clear rows to travel from bathroom to orbit. Run Menu also has Sprint 40L, Ultra 2-minute, movement tuning and music.</p>
+    </div></details>
     <div class="welcome-actions">
-      <button class="btn" type="button" onclick="startAttractMode()">Play</button>
-      <button class="btn subtle" type="button" onclick="quickStartRun()">Quick Start</button>
-      <button class="btn subtle" type="button" onclick="hideWelcomeGuide()">Close Guide</button>
+      <button class="btn" id="attractPlay" type="button" onclick="startAttractMode()" disabled>Play</button>
+      <button class="btn subtle" id="guideResume" type="button" onclick="hideWelcomeGuide()" hidden>Resume run</button>
     </div>
   </div>
 </div>
@@ -1887,6 +1888,7 @@ let lockResets = 0;
 let lastFrameTime = 0;
 let rAF = null;
 let onboardingOpen = false;
+let hasStartedRun = false;
 let guidePausedGame = false;
 let clearHoldIntervalRef = () => {};
 let cancelBoardGesture = () => {};
@@ -1937,6 +1939,7 @@ function showWelcomeGuide() {
   syncChallengeClock();
   clearHeldInput();
   refreshAttractBest();
+  document.getElementById("guideResume").hidden = !hasStartedRun || gameOver;
   const guide = document.getElementById('welcomeGuide');
   if (guide) {
     guide.style.display = 'flex';
@@ -1969,24 +1972,14 @@ function hideWelcomeGuide() {
   ensureLoopRunning();
 }
 
-function quickStartRun() {
-  hideWelcomeGuide();
-  unlockAudio();
-  statusText = 'Quick start live. Stack clean and trust your ghost piece.';
-  setHype('Quick start active. Build filthy combos.', 90);
-  playSfx('level');
-  ensureLoopRunning();
-  updateScore();
-}
-
 function startAttractMode() {
+  if (!window.TurdtrisModes) return;
   const attractMode = document.getElementById('attractModeSetting');
   const modeSetting = document.getElementById('modeSetting');
   if (attractMode && modeSetting) modeSetting.value = attractMode.value;
   hideWelcomeGuide();
   unlockAudio();
-  if (typeof startSelectedMode === 'function') startSelectedMode();
-  else quickStartRun();
+  startSelectedMode();
 }
 
 function handleWindowBlur() {
@@ -3479,6 +3472,7 @@ function startSelectedMode() {
   if (!window.TurdtrisModes) return;
   const definition = window.TurdtrisModes.modeDefinition(document.getElementById('modeSetting').value);
   runMode = definition.id;
+  hasStartedRun = true;
   modeBest = 0;
   try { modeBest = window.TurdtrisModes.readModeBest(localStorage, runMode); } catch (e) {}
   document.querySelector('.hud').dataset.mode = runMode;
@@ -3588,9 +3582,13 @@ document.addEventListener('keydown', (e) => {
   if (e.target?.matches?.('select, input, textarea, summary')) return;
   if (!gameOver && e.target?.matches?.('button') && (e.code === 'Space' || e.code === 'Enter')) return;
   if (onboardingOpen) {
-    if (e.code === 'Escape' || e.code === 'Enter' || e.code === 'Space') {
+    if (e.code === 'Enter' || e.code === 'Space') {
       e.preventDefault();
-      hideWelcomeGuide();
+      startAttractMode();
+    } else if (e.code === 'Escape') {
+      e.preventDefault();
+      if (hasStartedRun) hideWelcomeGuide();
+      else document.querySelector('#welcomeGuide details').open = false;
     }
     return;
   }
@@ -3844,9 +3842,11 @@ gesturesEnabled = loadGesturesPref();
 updateSoundButtons();
 updateGesturesButton();
 restartGame();
+document.getElementById('attractPlay').disabled = !window.TurdtrisModes;
 if (!(window.Suite && Suite.guide && Suite.guide.hasSeen('turdtris.html'))) {
   showWelcomeGuide();
 } else {
+  hasStartedRun = true;
   refreshAttractBest();
 }
 
@@ -4010,6 +4010,19 @@ import { createAttractField } from './games/turdtris-attract.js';
 window.TurdtrisFx = TurdtrisFx;
 window.TurdtrisQueue = TurdtrisQueue;
 window.TurdtrisModes = TurdtrisModes;
+document.getElementById('attractPlay').disabled = false;
+// Allow only existing modes; a hub shortcut selects the real mode and its records.
+const linkedMode = new URLSearchParams(location.search).get('mode');
+if (Object.hasOwn(TurdtrisModes.MODES, linkedMode)) {
+  const guideWasOpen = document.getElementById('welcomeGuide').classList.contains('is-open');
+  document.getElementById('modeSetting').value = linkedMode;
+  startSelectedMode();
+  refreshAttractBest();
+  if (guideWasOpen) {
+    hasStartedRun = false;
+    showWelcomeGuide();
+  }
+}
 window.TurdtrisArt = createTurdtrisArt();
 window.TurdtrisAudio = { playTurdtrisSfx };
 

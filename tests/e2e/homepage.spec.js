@@ -139,21 +139,18 @@ for (const width of [320, 390, 768, 1440]) {
 
 test.describe('homepage without JavaScript', () => {
     test.use({ javaScriptEnabled: false });
-    test('keeps about, the show facts and festival link usable', async ({ page }) => {
+    test('keeps evergreen band information and links usable', async ({ page }) => {
         await page.goto('/');
         await expect(page.locator('#home a[href="#about"]')).toBeVisible();
-        await expect(page.locator('#home a.button--hot[href="https://rockinoctober.com"]')).toHaveCount(2);
-        for (const cta of await page.locator('#home a.button--hot[href="https://rockinoctober.com"]').all()) await expect(cta).toBeVisible();
+        await expect(page.locator('[data-next-show]')).toBeHidden();
+        await expect(page.locator('.header-cta')).toHaveText('Follow the band');
+        await expect(page.locator('#listen-title')).toHaveText('Learn the words');
         await expect(page.locator('.hero-video__player source')).toHaveAttribute('src', 'assets/manic.mp4');
-        await expect(page.locator('.hero-show__tie')).toContainText('Hear it loud Oct 24 at Los Amigo’s, Plano');
-        await expect(page.locator('#about')).toContainText('Rockin’ October on Saturday, Oct 24, 4:45 PM');
+        await expect(page.locator('#about')).toContainText(/punk rock/i);
+        expect(await page.locator('body').innerText()).not.toMatch(/Oct 24|Rockin’ October|Homework before/);
+        await expect(page.locator('a[href="mailto:stalemate.punk@gmail.com"]')).toBeVisible();
         await expect(page.locator('[data-load-preview]')).toHaveCount(0);
         await expect(page.locator('[data-share-band]:not([hidden])')).toHaveCount(0);
-        await expect(page.locator('#about')).toContainText(/punk rock/i);
-        await expect(page.locator('#about dt')).toHaveCount(0);
-        await expect(page.locator('[data-next-show-block]')).toContainText('Rockin’ October');
-        await expect(page.locator('[data-countdown-clock]')).toBeHidden();
-        await expect(page.locator('body')).not.toContainText(/ticket/i);
         await expect(page.locator('body')).not.toContainText(PLACEHOLDER_COPY);
     });
 });
@@ -196,7 +193,7 @@ test.describe('hero countdown after the set', () => {
         await expect(page.locator('#home a[href="#about"]')).toBeVisible();
         const repeat = page.locator('#home .button-row [data-show-cta]');
         await expect(repeat).toBeVisible();
-        await expect(repeat).toHaveText('Catch the next show');
+        await expect(repeat).toHaveText('Follow the band');
         await expect(repeat).toHaveAttribute('href', 'https://www.instagram.com/stalemate.punk/');
         await expect(repeat).toHaveAttribute('data-track', 'show-cta-next-fallback');
         await expect(page.locator('#home')).not.toContainText('See us Oct 24');
@@ -204,7 +201,7 @@ test.describe('hero countdown after the set', () => {
         await expect(page.locator('#home')).not.toContainText('Shows coming soon');
         expect(await page.locator('[data-next-show]').boundingBox()).toBeNull();
         await expect(page.locator('[data-upcoming-empty]')).toHaveCount(0);
-        await expect(page.locator('#about')).toContainText('Rockin’ October');
+        expect(await page.locator('#about').innerText()).not.toContain('Rockin’ October');
         await expect(page.locator('body')).not.toContainText(/ticket/i);
         await expect(page.locator('body')).not.toContainText(PLACEHOLDER_COPY);
     });
@@ -232,24 +229,35 @@ test.describe('repeat show button', () => {
         await expect(repeat).toHaveText('See us Oct 24');
         await page.clock.setFixedTime(new Date('2026-10-24T16:45:01-05:00'));
         await expect(page.locator('[data-next-show]')).toBeHidden();
-        await expect(repeat).toHaveText('Catch the next show');
+        await expect(repeat).toHaveText('Follow the band');
         await expect(repeat).toHaveAttribute('href', 'https://www.instagram.com/stalemate.punk/');
         await expect(repeat).toHaveAttribute('data-track', 'show-cta-next-fallback');
     });
 
-    test.describe('after the show with a next show booked', () => {
-        test.use({ showTime: '2026-11-01T12:00:00-05:00' });
-        test('points at the next show', async ({ page }) => {
-            await page.route(/\/(index\.html)?$/, async (route) => {
-                const res = await route.fetch();
-                const html = (await res.text()).replace('data-show-cta ', 'data-show-cta data-next-starts="2026-12-05T20:00:00-06:00" data-next-href="https://example.com/next" data-next-label="See us Dec 5" ');
-                await route.fulfill({ response: res, body: html });
+    test.describe('complete rollover with a controlled clock', () => {
+        test.use({ showTime: null });
+        for (const path of ['/', '/StalemateSite/']) {
+            test(`all promotions and refresh stay accurate at the cutoff: ${path}`, async ({ page }) => {
+                // Install before all clock calls and load at a paused pre-cutoff time.
+                await page.clock.install({ time: new Date('2026-10-24T16:44:50-05:00') });
+                await page.clock.pauseAt(new Date('2026-10-24T16:44:59-05:00'));
+                await page.goto(path);
+                await expect(page.locator('.header-cta')).toHaveText('Show details');
+                await expect(page.locator('#listen-title')).toHaveText('Homework before the show');
+                await expect(page.locator('[data-show-before]')).toBeVisible();
+                await page.clock.runFor(1000);
+                for (const refresh of [false, true]) {
+                    if (refresh) await page.reload();
+                    await expect(page.locator('.header-cta')).toHaveText('Follow the band');
+                    await expect(page.locator('#listen-title')).toHaveText('Learn the words');
+                    await expect(page.locator('[data-next-show]')).toBeHidden();
+                    await expect(page.locator('[data-show-before]')).toBeHidden();
+                    expect(await page.locator('body').innerText()).not.toMatch(/Oct 24|Rockin’ October|Homework before/);
+                    for (const name of ['meta[name="description"]', 'meta[property="og:description"]', 'meta[name="twitter:description"]']) {
+                        expect(await page.locator(name).getAttribute('content')).not.toMatch(/Oct 24|Rockin/);
+                    }
+                }
             });
-            await page.goto('/');
-            const repeat = page.locator('#home .button-row [data-show-cta]');
-            await expect(repeat).toHaveText('See us Dec 5');
-            await expect(repeat).toHaveAttribute('href', 'https://example.com/next');
-            await expect(repeat).toHaveAttribute('data-track', 'show-cta-next');
-        });
+        }
     });
 });

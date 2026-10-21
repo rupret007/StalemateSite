@@ -12,3 +12,4 @@ body{background-color:transparent}
 .stalemate-end__copy[hidden]{display:none}
 /* 320px phones: keep the game-over kicker/title clear of the top-left Hub back pill. */
 @media (max-width:360px){#endScreen .result-kicker,#endScreen h1,#endScreen .quip{padding-left:52px;padding-right:52px}}
+.stalemate-end__show[hidden] { display:none!important; }

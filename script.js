@@ -169,26 +169,3 @@ document.addEventListener('click', function (e) {
     var el = e.target && e.target.closest ? e.target.closest('[data-track]') : null;
     if (el && typeof window.smTrack === 'function') window.smTrack(el.getAttribute('data-track'));
 });
-
-// Repeat show button: after the show, point at the next one (data-next-*) or fall back to "Catch the next show".
-(function () {
-    var el = document.querySelector('[data-show-cta]');
-    if (!el) return;
-    var ends = Date.parse(el.getAttribute('data-show-ends'));
-    if (!Number.isFinite(ends)) return;
-    function update() {
-        var now = Date.now();
-        if (now < ends) return true;
-        var next = Date.parse(el.getAttribute('data-next-starts') || '');
-        var useNext = Number.isFinite(next) && now < next && el.getAttribute('data-next-href');
-        el.setAttribute('href', useNext ? el.getAttribute('data-next-href') : el.getAttribute('data-fallback-href'));
-        el.textContent = useNext ? el.getAttribute('data-next-label') : el.getAttribute('data-fallback-label');
-        el.setAttribute('data-track', useNext ? 'show-cta-next' : 'show-cta-next-fallback');
-        return Boolean(useNext);
-    }
-    if (update()) {
-        var timer = window.setInterval(function () {
-            if (!update()) window.clearInterval(timer);
-        }, 1000);
-    }
-})();
