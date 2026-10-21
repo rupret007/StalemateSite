@@ -10,8 +10,7 @@ async function activate(page, target) {
         return;
     }
     await expect(target).toBeVisible();
-    await target.scrollIntoViewIfNeeded();
-    const point = await target.evaluate((el) => {
+    const inspect = () => target.evaluate((el) => {
         const rect = el.getBoundingClientRect();
         const x = rect.x + rect.width / 2;
         const y = rect.y + rect.height / 2;
@@ -20,9 +19,16 @@ async function activate(page, target) {
             x, y,
             onScreen: rect.width > 0 && rect.height > 0 && rect.x >= 0 && rect.y >= 0
                 && rect.right <= innerWidth && rect.bottom <= innerHeight,
-            receivesTouch: hit === el || el.contains(hit)
+            receivesTouch: hit === el || el.contains(hit),
+            boardTile: el.matches('#board .tile')
         };
     });
+    let point = await inspect();
+    // Game tiles must fit without scrolling; tall homepage links may need it.
+    if (!point.onScreen && !point.boardTile) {
+        await target.scrollIntoViewIfNeeded();
+        point = await inspect();
+    }
     expect(point.onScreen, 'The control must fit on screen').toBe(true);
     expect(point.receivesTouch, 'The control must receive the touch').toBe(true);
     await page.touchscreen.tap(point.x, point.y);
@@ -32,12 +38,21 @@ async function popOne(page) {
     const move = await page.evaluate(() => {
         const { state, Core } = window.__turdomania;
         if (state.over) return null;
+        const seen = new Set();
+        let move = null;
+        let largest = 1;
         for (let c = 0; c < state.board.length; c++) {
             for (let r = 0; r < state.board[c].length; r++) {
-                if (Core.findGroup(state.board, c, r).length >= 2) return { cell: [c, r], previousMoves: state.moves };
+                if (seen.has(`${c},${r}`)) continue;
+                const group = Core.findGroup(state.board, c, r);
+                for (const [col, row] of group) seen.add(`${col},${row}`);
+                if (group.length > largest) {
+                    largest = group.length;
+                    move = { cell: [c, r], previousMoves: state.moves };
+                }
             }
         }
-        return null;
+        return move;
     });
     if (!move) return false;
     await activate(page, page.locator(`.tile[data-col="${move.cell[0]}"][data-row="${move.cell[1]}"]`));
