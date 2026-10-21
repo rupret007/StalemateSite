@@ -47,12 +47,35 @@ Privacy-safe [GoatCounter](https://www.goatcounter.com/) events (account `stalem
 
 - `hub-open` — hub load
 - `hub-card-<game>` — game card clicks (`turdanoid`, `turdtris`, …)
+- `hub-daily-open` — today's challenge or a saved older challenge link
 
 **Per game** (`<g>` = slug: `turdanoid`, `turdtris`, `turdjack`, `crapeights`, `turdrummy`, `turdspades`, `turdomania`, `neon-arkanoid`)
 
 - `play-<g>-start`, `play-<g>-over`, `play-<g>-dur-<bucket>`, `play-<g>-level-<n>` — buckets: `lt30s`, `30s-2m`, `2-5m`, `5-15m`, `15m+`; levels `1`–`9`, `10plus`
 - `gameover-turdanoid-share`, `gameover-turdanoid-listen-manic` — Turdanoid end screen
-- `music-ingame-manic-play`, `music-ingame-mute` — Turdanoid overlay playlist
+- `music-ingame-play`, `music-ingame-mute` — shared arcade playlist playback and mute actions; playback is counted once per game page, without inferring which song played
+- `play-daily-dump-start`, `play-daily-dump-completed` — first daily run interaction and its result screen, once per run; practice replays and opening an existing result do not count as new daily completions
+- `gameover-daily-dump-share` — Share or Copy action on a daily result; this counts an attempt, including when the native share sheet is later canceled
+
+These events measure actual visits and actions. Retention improvements require usage data; the release itself establishes no retention uplift.
+
+## Arcade source and synchronization
+
+Reusable gameplay, Daily Dump rules, shared art, and the playlist player live in [Turdanoid](https://github.com/rupret007/Turdanoid). Site-specific branding and analytics live in `scripts/stalemate-overlay/`, `scripts/stalemate-strip.css`, and `scripts/play-track.js`. The generated `play/` files are replaced during synchronization; edit their source instead.
+
+Synchronize a reviewed branch, tag, or exact commit. A local repository avoids a network clone and imports committed files at the requested revision:
+
+```bash
+scripts/sync-turdanoid.sh --source ../Turdanoid <full-upstream-commit-SHA>
+# Or fetch a reviewed remote branch, tag, or SHA:
+scripts/sync-turdanoid.sh <branch-tag-or-SHA>
+cat play/VENDORED.txt
+npm run test:unit -- --maxWorkers=2
+npm run test:e2e
+npm run package:pages
+```
+
+The importer records the full resolved upstream revision in `play/VENDORED.txt`, copies the shared playlist audio, applies site security/branding/analytics, and removes upstream test files. Repeating synchronization with the same committed source should preserve the generated result. Validate with the Node 24 runtime used by this site's CI; review the generated diff before committing.
 
 ## Local checks
 
