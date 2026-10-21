@@ -24,14 +24,12 @@
     ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2, 4); else ctx.rect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
     ctx.clip();
-    ctx.globalAlpha = 0.62;
+    // A narrow top edge carries the band signature while leaving damage cracks,
+    // health pips and power-up symbols in the stock brick fully readable.
+    ctx.globalAlpha = 1;
     ctx.translate(b.x, b.y);
     ctx.fillStyle = pattern;
-    ctx.fillRect(0, 0, b.w, b.h);
-    ctx.restore();
-    ctx.save();
-    ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5;
-    ctx.strokeRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
+    ctx.fillRect(0, 0, b.w, Math.min(4, b.h * 0.18));
     ctx.restore();
   };
   if (reduce) document.documentElement.classList.add('stalemate-reduced');
