@@ -21,21 +21,27 @@ and records remain supported; removing a feature does not require deleting devic
   retain the seven direct game links, and remove daily-specific analytics.
 - Upstream source: remove challenge rules/UI/assets and hub promotion while retaining
   ordinary Turdomania controls, artwork, records, and the shared arcade presentation.
-  Removal revision: `f75f41b882bb8293a3cd13e4212d728c8b83e845` (committed, not yet imported here).
+  Removal revision: `bf35c83ec2d18a4df3ded7c258db5e133cd36592` (imported exactly).
 - Browser regressions now cover root/project paths, former daily URLs, playable free play
   and undo, completed-game record compatibility, and denied storage across all five projects.
-- Integration is pending the committed upstream removal revision. The root agent owns the
-  exact SHA import, final gates, new screenshots, review/publication, and live verification.
+- The exact committed removal was imported twice: all 160 generated files were byte-identical.
+  Site full unit checks passed 103/103 and packaging passed; all 20 changed browser cases
+  passed across the five projects, with no retries. The full upstream CI runs on PR #91.
+  Integrated desktop/phone screenshots were inspected. A 375×667 score-row wrap was found
+  during review, fixed upstream, and verified independently in Chromium and WebKit; all
+  three stats now remain above the board. Eight focused source browser cases pass.
+  The final integrated 13-check smoke passes with no page errors, including actual phone
+  pop/undo and unchanged saved scores. WebKit external SVG faces settle after row moves;
+  captures wait for actual painted symbol bounds rather than capturing an intermediate frame.
 
 Site source checks with Node 24.22.0: four targeted unit files / 22 tests passed; all three
-changed browser files passed syntax checks. New browser regressions await the upstream import.
+changed browser files passed syntax checks. The post-import browser results are recorded above.
 The first source check rejected new copy containing a word prohibited by the existing content
 boundary test; the copy was corrected and the assertion retained. Successful raw output is
 `/private/tmp/stalemate-arcade-evidence/remove-daily-source-unit.log`.
 
-Next executable step: import that committed upstream revision with `scripts/sync-turdanoid.sh`,
-run the required site/upstream gates, and verify the published removal on both Pages and
-the band domain. The domain served the first release after a later host refresh; verify its
+Next executable step: finish the required remote site/upstream gates,
+then publish and verify the removal on both Pages and the band domain. The domain served the first release after a later host refresh; verify its
 actual content rather than assuming both hosts update together.
 
 ## Historical first-release investigation

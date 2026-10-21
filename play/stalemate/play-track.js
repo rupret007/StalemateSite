@@ -33,12 +33,6 @@
   }
 
   var state = round();
-  var dailyStarted = false;
-  var dailyCompleted = false;
-
-  function rankedDaily() {
-    return g === 'turdomania' && document.body.classList.contains('daily-dump') && !document.body.classList.contains('daily-practice');
-  }
 
   function markStart() {
     if (state.startSent) return;
@@ -46,20 +40,12 @@
     state.active = true;
     state.startedAt = Date.now();
     if (g && g !== 'hub') track('play-' + g + '-start');
-    if (rankedDaily() && !dailyStarted) {
-      dailyStarted = true;
-      track('play-daily-dump-start');
-    }
   }
 
   function markOver(levelValue) {
     if (!state.active || state.overSent) return;
     state.overSent = true;
     state.active = false;
-    if (rankedDaily() && dailyStarted && !dailyCompleted) {
-      dailyCompleted = true;
-      track('play-daily-dump-completed');
-    }
     if (g && g !== 'hub') {
       track('play-' + g + '-over');
       if (!state.durSent) {
@@ -97,10 +83,6 @@
   if (g === 'hub') {
     track('hub-open');
     document.addEventListener('click', function (e) {
-      if (e.target && e.target.closest && e.target.closest('#daily-hub-play, #daily-hub-previous')) {
-        track('hub-daily-open');
-        return;
-      }
       var card = e.target && e.target.closest ? e.target.closest('a.game-card[href]') : null;
       if (!card) return;
       var href = (card.getAttribute('href') || '').replace(/\.html$/i, '').toLowerCase();
@@ -262,13 +244,6 @@
     observeVisible(document.getElementById('overlay'), function () {
       markOver(null);
     });
-    document.addEventListener('click', function (e) {
-      if (!rankedDaily() || !e.target || !e.target.closest || !e.target.closest('#dailyShare, #dailyCopy')) return;
-      var result = document.getElementById('overlay');
-      if (result && result.classList.contains('show') && result.offsetParent !== null) {
-        track('gameover-daily-dump-share');
-      }
-    }, true);
     return;
   }
 
