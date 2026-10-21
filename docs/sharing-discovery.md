@@ -6,7 +6,7 @@ Turdomania, plus an indexable arcade hub. Keep Daily Dump removed and preserve
 all seven games, records/saves, optional audio, keyboard access and both hosts.
 
 Reusable sharing lives upstream in Turdanoid PR #94, source
-`37cf287862191eb05d861e108142a67571c157dc`. It prepares a branded 1080-square PNG
+`cd79b2125d122fbce6184e94e834e1e76734ed95`. It prepares a branded 1080-square PNG
 before the sharing gesture, includes actual mode/difficulty and clean game URL,
 and distinguishes completed Sprint times from unfinished runs. Save image,
 clipboard and selectable-text fallbacks work without automatic posting.
@@ -51,3 +51,7 @@ Primary references:
 - https://developers.google.com/search/docs/crawling-indexing/block-indexing
 - https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls
 - https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share
+
+Final phone result inset also includes the top safe area so notched screens keep
+the hub/audio controls clear. Existing emulated captures have zero safe insets;
+final gate and release smoke qualify the exact revised source.
