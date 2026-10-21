@@ -5,7 +5,24 @@ test.beforeEach(async ({ page }) => {
     const errors = []; pageErrors.set(page, errors);
     page.on('pageerror', error => errors.push(error.message));
 });
-test.afterEach(async ({ page }) => { expect(pageErrors.get(page)).toEqual([]); });
+test.afterEach(async ({ page }, info) => {
+    if (info.status !== info.expectedStatus) {
+        const layout = await page.evaluate(() => {
+            const describe = el => {
+                if (!el) return null;
+                const r = el.getBoundingClientRect(), s = getComputedStyle(el);
+                return { id: el.id, className: el.className, rect: r.toJSON(), scrollTop: el.scrollTop,
+                    scrollHeight: el.scrollHeight, clientHeight: el.clientHeight, display: s.display,
+                    opacity: s.opacity, transform: s.transform, overflow: s.overflow, position: s.position,
+                    animations: el.getAnimations().map(a => ({ playState: a.playState, currentTime: a.currentTime })) };
+            };
+            return { viewport: [innerWidth, innerHeight], scroll: [scrollX, scrollY],
+                elements: ['html', 'body', '#gameOverOverlay', '#endOverlayCard', '.suite-result-share', '.suite-result-share button'].map(s => describe(document.querySelector(s))) };
+        });
+        await info.attach('result-layout.json', { body: JSON.stringify(layout, null, 2), contentType: 'application/json' });
+    }
+    expect(pageErrors.get(page)).toEqual([]);
+});
 
 async function activate(page, locator, minimumHeight = 44) {
     // Linux WebKit's animation-frame actionability waits dominate long touch
