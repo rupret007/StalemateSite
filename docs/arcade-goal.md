@@ -27,7 +27,7 @@ Candidate root: `/Users/jeffstory/Documents/ChatGPT/Stalemate Website`.
 - [x] Integrate returning-player hub and homepage Daily entry.
 - [x] Inspect actual integrated candidate screenshots for every game, daily/result and hub.
 - [x] Required local gates, repeatable import, packaging and independent visual checks pass.
-- [ ] Finish PR publication and record remote checks.
+- [x] Published review branches and draft PRs; remote checks are tracked on the PRs.
 
 ## Decisions and compatibility
 - Daily v1 pins Chicago date, rules/generator versions, normal difficulty, 8x10, four kinds and
@@ -118,8 +118,13 @@ Upstream locked dependency audit reported four existing advisories; lockfile unc
 retains one existing unused-variable warning and zero errors. This release does not add offline,
 public leaderboards, new achievements or verified band scores.
 Upstream draft review: https://github.com/rupret007/Turdanoid/pull/90 (exact `4dc8730`).
-Next executable step: publish the site candidate PR and record both remote CI outcomes, then
-ordinary reviewer consideration. Main updates would trigger Pages publication.
+Site draft review: https://github.com/rupret007/StalemateSite/pull/70.
+Site product/evidence revision: `4987120588be15955f93a6ac159689d0dd494738`; this final record update changes documentation only.
+Both branches are pushed. Required remote CI is visible on those PRs; do not infer acceptance
+from draft status or local results. First CI was still running when this record was committed.
+Next executable step: inspect the PR checks and ordinary reviewer feedback, then review upstream
+#90 before site #70. Preserve the exact imported upstream commit through merge. Main updates
+would trigger Pages publication; neither merge nor deployment is authorized by this candidate.
 
 ## Prioritized follow-on backlog
 1. Beat the Band weekly challenge using actual Jeff/Che/Sean scores.
