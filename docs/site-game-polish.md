@@ -7,7 +7,7 @@ controls, reduced motion, optional music, and root/project-path hosting.
 ## Baseline and implementation
 
 Workspace: `/Users/jeffstory/Documents/ChatGPT/Stalemate Website`.
-Both clean checkouts use `codex/site-game-polish`, based on current remote mains:
+The original polish branches used `codex/site-game-polish`, based on these mains:
 Turdanoid `98e6fd8a5bd9984811e45f87acf101f46c8d8c5f`; StalemateSite
 `f39341748c2841514e17404f733dcbf1d6709e38`. No applicable AGENTS.md found.
 Original checkouts and earlier release branches remain untouched.
@@ -27,7 +27,7 @@ Original checkouts and earlier release branches remain untouched.
 
 ## Acceptance and evidence
 
-Pending: before/at/after cutoff + refresh/back-forward/no-JS/metadata checks;
+Behavior coverage includes before/at/after cutoff + refresh/back-forward/no-JS/metadata checks;
 selected-mode and Ultra-link behavior; full visible/readable phone records;
 first-success hint, Undo/New/difficulty/denied storage; actual music track advance,
 mute/replay/navigation/hidden-tab behavior; no overlapping controls or page errors.
@@ -40,11 +40,12 @@ Create reviewable PRs; merge upstream first after checks, then site. Follow Page
 deployment and verify both `https://stalemate.band/` and
 `https://rupret007.github.io/StalemateSite/` in fresh browser contexts.
 
-Current status: implementation complete; final gates and publication pending.
-Source PR #92 uses `codex/site-game-polish`; final source revision is
-`fd35ce12175c4cbd23c0aa8ebc2cfebe97a57847`. Source is merged first only after its
-required lint/unit/96 mobile/browser-smoke CI passes. The final site import must
-pin this exact SHA, repeat byte-for-byte, then pass the full site gate and package.
+Current status: publication pending. Source PR #92 merged after its required
+Node 22 CI passed (1,873 units, one pre-existing optional Mac fixture skipped,
+96 mobile cases and smoke). Its tested/merged trees are identical. Followup
+source PR #93 corrects a late music footer that CI showed covering Undo; the
+site import pins `e3f55f5ad43b477236eeb15d9e884a465562c9ff`. Qualify and merge
+that source revision first, then merge site PR #72 after its full gate passes.
 
 Completed evidence: source full local suite 1,865 tests before final guards,
 190 focused checks, 96 mobile cases and browser smoke; later directed checks
@@ -89,7 +90,16 @@ The social card was an image of an XML error, and its SVG contained a legacy
 encoding byte and dated labels. The UTF-8 evergreen SVG now renders a valid
 1200×630 PNG; both the actual image and homepage metadata were inspected.
 
-Next: qualify final source/site commits, create the site PR, merge source then
-site after required checks, and verify both independently refreshed public hosts.
+The d65 remote PR run failed Undo’s unchanged native touch assertion; the push
+run passed only after two retries. The new always-upload step preserved the
+screenshot and trace. They show `--mobile-footer: 0px` after the shared status
+appeared, leaving controls underneath it. PR #93 measures late footer insertion
+immediately and observes its dimensions. Its regression fails on the merged
+baseline and passes with the fix. The first regression attempt had an invalid
+filesystem URL in its harness; that failure is retained too. Final local and
+remote gates must qualify the corrected import before publication.
+
+Next: finish source #93/site #72 checks, merge source then site, and verify both
+independently refreshed public hosts.
 Evidence directory: `release-evidence/site-game-polish/` at the workspace root.
 Missing input: a genuine approved band photo (file or approved original URL).
