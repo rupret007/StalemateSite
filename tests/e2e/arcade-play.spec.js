@@ -65,6 +65,7 @@ async function popOne(page) {
 async function ready(page, path) {
     await page.goto(path);
     await page.waitForFunction(() => !!window.__turdomania);
+    await page.evaluate(() => document.fonts.ready);
     await expect(page).toHaveTitle('Turdomania');
     await expect(page.locator('#newBtn')).toHaveText(/New board/);
     await expect(page.locator('#levelSel')).toBeEnabled();

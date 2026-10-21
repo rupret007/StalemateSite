@@ -42,7 +42,7 @@ deployment and verify both `https://stalemate.band/` and
 
 Current status: implementation complete; final gates and publication pending.
 Source PR #92 uses `codex/site-game-polish`; final source revision is
-`ce02be336de54018e1606d8105d9ad768ded4f10`. Source is merged first only after its
+`fd35ce12175c4cbd23c0aa8ebc2cfebe97a57847`. Source is merged first only after its
 required lint/unit/96 mobile/browser-smoke CI passes. The final site import must
 pin this exact SHA, repeat byte-for-byte, then pass the full site gate and package.
 
@@ -71,10 +71,19 @@ email, and delayed real-time ticks in the new exact-cutoff test. The allowlist n
 accepts only that exact mailto address. Boundary tests install the browser clock
 before loading and advance its actual timer exactly through the cutoff, keeping
 all before/at/refresh assertions. No test assertions/time limits were relaxed.
-Tab focus/visibility also refreshes stale promotions immediately. The final upstream
-smoke update targets the primary menu summary after Bet Tools became nested; all
-gameplay assertions are retained. That test-only revision changes no imported
-runtime bytes (only the VENDORED marker).
+Tab focus/visibility also refreshes stale promotions immediately. The upstream smoke update targets the primary menu summary after Bet Tools
+became nested; all gameplay assertions are retained.
+
+The first remote c818 runs completed green but needed two/three retries. Their
+logs showed an immediate Undo touch during the first hint's toolbar reflow, and
+one video visibility measurement missing its unchanged 40px requirement by 1px.
+The hint now disappears without moving the board or Undo during that visit, with
+a regression asserting stable control coordinates. Phone show-card padding now
+provides more above-fold video space; touch preparation waits for actual fonts.
+All affected cases passed 42 repeated local checks with unchanged assertions.
+The previous failure-only artifact upload omitted images from successful runs
+with retries; raw first-failure logs are preserved, and CI now always retains
+Playwright reports/results so those traces survive future retries.
 
 The social card was an image of an XML error, and its SVG contained a legacy
 encoding byte and dated labels. The UTF-8 evergreen SVG now renders a valid

@@ -1549,7 +1549,7 @@ textarea:focus-visible {
 }
 @media (max-width: 719px) {
     .hero-show-card { gap: 0.4rem; }
-    .panel.hero-show-card { padding: 0.75rem 1rem 0.85rem; }
+    .panel.hero-show-card { padding: 0.4rem 1rem 0.55rem; }
 }
 @media (max-width: 719px) {
     .hero-show { margin-top: 0.4rem; }

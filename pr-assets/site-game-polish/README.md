@@ -1,12 +1,12 @@
 # Website and arcade polish — actual release captures
 
 Captured October 21, 2026 from the integrated site importing Turdanoid
-`ce02be336de54018e1606d8105d9ad768ded4f10`. The runtime bytes are identical to
-the captured f3e663c revision; the final upstream change only narrows a test
-selector. The homepage's clock is set after the
+`fd35ce12175c4cbd23c0aa8ebc2cfebe97a57847`. The homepage's clock is set after the
 existing show cutoff. Phones use emulated WebKit; no physical-device acceptance
 is claimed. The full 23-image gallery, capture script, first failures and receipts
 remain in the parent workspace's `release-evidence/site-game-polish/` folder.
+
+Record screenshots use seeded local fixtures, not claimed band/player results.
 
 Full-page hub captures show the fixed site strip at the viewport boundary;
 the separate record detail shows the complete score after normal scrolling.
