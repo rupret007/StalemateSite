@@ -33,6 +33,9 @@ async function activate(page, locator, minimumHeight = 44) {
     else await locator.scrollIntoViewIfNeeded();
     await expect(locator).toBeVisible();
     const inspect = () => locator.evaluate(el => {
+        // Rotation/font refits can move the target after the first scroll.
+        // Recheck the actual scrolling container before geometry and hit tests.
+        el.scrollIntoView({ block: 'nearest', behavior: 'instant' });
         const b = el.getBoundingClientRect(), x = b.x + b.width / 2, y = b.y + b.height / 2;
         const hit = document.elementFromPoint(x, y);
         return { x, y, width: b.width, height: b.height, fits: b.x >= 0 && b.y >= 0 && b.right <= innerWidth && b.bottom <= innerHeight, hit: hit === el || el.contains(hit) };
