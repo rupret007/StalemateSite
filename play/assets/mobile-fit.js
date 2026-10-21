@@ -137,6 +137,8 @@
     }
     move(document.querySelector('#suite-music-toggle'), document.body);
     move(document.querySelector('#suite-arcade-a11y-mount'), document.body);
+    // A fixed result sheet must escape the playfield's isolated stacking layer.
+    if (game === 'turdtris') move(document.getElementById('gameOverOverlay'), document.body);
 
   }
   function init() {

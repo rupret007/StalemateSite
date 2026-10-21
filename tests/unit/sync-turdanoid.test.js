@@ -77,10 +77,13 @@ describe('committed Turdanoid synchronization', () => {
         const hub = readFileSync(join(play, 'index.html'), 'utf8');
         expect(hub).not.toMatch(/changelog/i);
         expect(hub.match(/name="robots"/g)).toHaveLength(1);
+        expect(hub).toContain('content="index,follow"');
+        expect(hub).toContain('<link rel="canonical" href="https://stalemate.band/play/">');
+        expect(readFileSync(join(play, 'turdtris.html'), 'utf8')).toContain('content="noindex,nofollow"');
         expect(hub.match(/http-equiv="Content-Security-Policy"/g)).toHaveLength(1);
         expect(hub).toContain("default-src 'self'");
         expect(hub).toContain('Stalemate Arcade');
-        expect(hub).toContain('https://rupret007.github.io/StalemateSite/play/stalemate/og-play.png');
+        expect(hub).toContain('https://stalemate.band/play/stalemate/og-play.png');
         expect(readFileSync(join(play, 'TurdAnoid.html'), 'utf8').match(/src="stalemate\/stalemate-overlay.js"/g)).toHaveLength(1);
         for (const ref of [f.first, 'release-test']) {
             const repeated = sync(f, ref);

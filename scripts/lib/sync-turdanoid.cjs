@@ -69,8 +69,17 @@ function transform(stage) {
         html = html.replace(/<meta\b[^>]*\bname\s*=\s*["']robots["'][^>]*>\s*/gi, '')
             .replace(/<meta\b[^>]*\bhttp-equiv\s*=\s*["']Content-Security-Policy["'][^>]*>\s*/gi, '');
         if (!/<head\b[^>]*>/i.test(html)) throw new Error(`${filename}: missing head`);
-        html = html.replace(/<head\b[^>]*>/i, `$&\n<meta name="robots" content="noindex,nofollow">\n<meta http-equiv="Content-Security-Policy" content="${CSP}">`);
+        const robots = filename === 'index.html' ? 'index,follow' : 'noindex,nofollow';
+        html = html.replace(/<head\b[^>]*>/i, `$&\n<meta name="robots" content="${robots}">\n<meta http-equiv="Content-Security-Policy" content="${CSP}">`);
         if (filename === 'index.html') {
+            html = html.replace(/<link\b[^>]*\brel=["']canonical["'][^>]*>\s*/gi, '')
+                .replace(/<meta\b[^>]*\bname=["']description["'][^>]*>\s*/gi, '');
+            html = insert(html, '</head>', [
+                '<link rel="canonical" href="https://stalemate.band/play/">',
+                '<meta name="description" content="Play seven free browser games at Stalemate Arcade: brick breaking, block stacking, matching puzzles and card games, with optional music by punk rock band Stalemate.">',
+                '<meta property="og:url" content="https://stalemate.band/play/">',
+                '<meta property="og:type" content="website">'
+            ].join('\n'), filename);
             html = html.replace(/\s*<details class="changelog">[\s\S]*?<\/details>/i, '')
                 .replace(/\s*\/\* -+ Changelog -+ \*\/[\s\S]*?\.changelog li \{[^}]*\}/i, '')
                 .replace(/\n[ \t]*\.changelog \{[^}]*\}/gi, '');
@@ -86,7 +95,7 @@ function transform(stage) {
             html = insert(html, '</head>', [
                 '<meta property="og:title" content="Stalemate Arcade">',
                 '<meta property="og:description" content="Seven free browser games. Music by Stalemate.">',
-                '<meta property="og:image" content="https://rupret007.github.io/StalemateSite/play/stalemate/og-play.png">',
+                '<meta property="og:image" content="https://stalemate.band/play/stalemate/og-play.png">',
                 '<meta property="og:image:width" content="1200">',
                 '<meta property="og:image:height" content="630">',
                 '<meta name="twitter:card" content="summary_large_image">'
