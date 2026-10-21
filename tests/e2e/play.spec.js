@@ -4,11 +4,11 @@ const { test, expect } = require('@playwright/test');
 
 const ROOT = path.join(__dirname, '..', '..');
 
-test('/play/ hosts Turdanoid same-origin, hidden and noindex', async ({ page }) => {
+test('/play/ is discoverable and hosts same-origin games that remain noindex', async ({ page }) => {
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto('/play/');
-    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex,nofollow');
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index,follow');
     await expect(page.locator('iframe')).toHaveCount(0);
     const strip = page.locator('nav.stalemate-strip');
     await expect(strip.locator('a.sm-home')).toHaveAttribute('href', '../');
@@ -82,7 +82,7 @@ test('shared music advances once per track, persists preferences, and pauses in 
     expect(errors).toEqual([]);
 });
 
-test('homepage Games card and nav link go to /play/, which stays noindex and out of the Pages package', async ({ page }) => {
+test('homepage Games links reach the hub, with individual games excluded from search', async ({ page }) => {
     await page.goto('/');
     const nav = page.getByRole('navigation', { name: 'Primary navigation', exact: true });
     const navLinks = nav.getByRole('link');
@@ -117,14 +117,14 @@ test('homepage Games card and nav link go to /play/, which stays noindex and out
     const pkg = fs.readFileSync(path.join(ROOT, 'scripts/package-pages.cjs'), 'utf8');
     expect(pkg).not.toMatch(/play\//);
     for (const f of fs.readdirSync(path.join(ROOT, 'play')).filter((n) => n.endsWith('.html'))) {
-        expect(fs.readFileSync(path.join(ROOT, 'play', f), 'utf8'), f).toContain('<meta name="robots" content="noindex,nofollow">');
+        expect(fs.readFileSync(path.join(ROOT, 'play', f), 'utf8'), f).toContain(`<meta name="robots" content="${f === 'index.html' ? 'index,follow' : 'noindex,nofollow'}">`);
     }
 });
 
 test('/play/ has a share image', async ({ page, request }) => {
     for (const p of ['/play/', '/play/TurdAnoid.html']) {
         await page.goto(p);
-        await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', 'https://rupret007.github.io/StalemateSite/play/stalemate/og-play.png');
+        await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', 'https://stalemate.band/play/stalemate/og-play.png');
     }
     const img = await request.get('/play/stalemate/og-play.png');
     expect(img.status()).toBe(200);

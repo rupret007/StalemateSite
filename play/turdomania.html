@@ -3,6 +3,7 @@
 <head>
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+<script src="assets/suite-share.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Turdomania: a free click-to-pop puzzle in the Turdanoid suite. Pop matching piles of 2 or more, bigger piles score more, flush the whole board for a bonus.">
@@ -237,6 +238,7 @@ const qs = new URLSearchParams(location.search);
 const boardEl = document.getElementById('board');
 const wrap = document.getElementById('boardWrap');
 const overlay = document.getElementById('overlay');
+const resultShare = window.SuiteShare?.create({ host: overlay.firstElementChild, game: 'turdomania' });
 const liveEl = document.getElementById('live');
 const els = {
   score: document.getElementById('score'), best: document.getElementById('best'), left: document.getElementById('left'),
@@ -277,6 +279,7 @@ let popTimer = 0;
 let generation = 0;
 
 function resetView() {
+  resultShare?.setResult(null);
   generation++;
   clearTimeout(popTimer);
   busy = false;
@@ -478,6 +481,7 @@ function doUndo() {
   const prev = state && Core.undo(state);
   if (!prev) return;
   state = prev;
+  resultShare?.setResult(null);
   overlay.classList.remove('show');
   // Rebuild tiles: undone tiles come back with their old ids.
   render();
@@ -493,6 +497,7 @@ function showOver() {
     ? `Board flushed. +${Core.CLEAR_BONUS} bonus. Final ${state.score}.${state.score >= best ? ' New best!' : ''}`
     : `No more matches. ${left} turd${left === 1 ? '' : 's'} left behind. Final ${state.score}.${state.score >= best && state.score > 0 ? ' New best!' : ''}`;
   overlay.classList.add('show');
+  resultShare?.setResult({ level: state.level, score: state.score, left, cleared: state.cleared });
   sfx(state.cleared ? 'win' : 'lose');
   announce(els.overTitle.textContent + ' ' + els.overText.textContent);
   setTimeout(() => els.again.focus({ preventScroll: true }), 30);

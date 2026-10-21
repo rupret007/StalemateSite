@@ -29,8 +29,9 @@ describe('vendored /play/ copy', () => {
   it('has pages to check', () => expect(pages.length).toBeGreaterThanOrEqual(9));
   for (const f of pages) {
     const html = readFileSync(join(dir, f), 'utf8');
-    it(`${f} is noindex with exactly one robots meta and a strict CSP allowlist`, () => {
+    it(`${f} has the intended indexing policy, one robots meta and strict CSP`, () => {
       expect(html.match(/<meta name="robots"/g)).toHaveLength(1);
+      expect(html).toContain(`<meta name="robots" content="${f === 'index.html' ? 'index,follow' : 'noindex,nofollow'}">`);
       const csp = html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/);
       expect(csp).not.toBeNull();
       assertPlayCsp(csp[1]);

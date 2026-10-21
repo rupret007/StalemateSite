@@ -10,6 +10,8 @@ const FILES = [
     '.nojekyll',
     '404.html',
     'index.html',
+    'robots.txt',
+    'sitemap.xml',
     'countdown.js',
     'script.js',
     'show-state.js',

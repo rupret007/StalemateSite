@@ -3,6 +3,7 @@
 <head>
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <script src="assets/suite-share.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1664,6 +1665,7 @@ let b2b = 0;
 let softDrop = false;
 let paused = false;
 let gameOver = false;
+const resultShare = window.SuiteShare?.create({ host: document.getElementById('endOverlayCard'), game: 'turdtris' });
 let statusText = 'Guideline-inspired run: SRS, bag randomizer, and escalating garbage.';
 let activeMutator = 'Warmup Flow';
 let sceneShake = 0;
@@ -3380,6 +3382,7 @@ function showGameOver(won) {
   }
 
   playSfx(isWin ? 'victory' : 'gameover');
+  resultShare?.setResult({ mode: runMode, score, lines: linesCleared, elapsedMs: runStats.elapsedMs, completed: isWin });
   updateScore();
 }
 
@@ -3404,6 +3407,7 @@ function togglePause() {
 }
 
 function restartGame() {
+  resultShare?.setResult(null);
   const menu = document.querySelector('.mobile-menu details');
   if (menu) menu.open = false;
   clearHeldInput();
