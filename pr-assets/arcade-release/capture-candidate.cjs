@@ -16,6 +16,6 @@ const base=process.env.STALEMATE_CAPTURE_BASE || 'http://127.0.0.1:4320/Stalemat
  for(const [file,start] of [['turdtris','button:has-text("Quick Start")'],['turdjack','#quickGuideBtn'],['crapeights','#quickStartBtn'],['turdrummy','#startRoundBtn'],['turdspades','#quickStart']]){
   await phone.goto(base+'play/'+file+'.html');const action=phone.locator(start).first();if(await action.isVisible())await action.click();const skip=phone.locator('#coachSkipBtn');if(await skip.isVisible())await skip.click();await phone.waitForTimeout(500);await phone.screenshot({path:out+'/'+file+'-phone.png'});
  }
- fs.writeFileSync(out+'/capture.json',JSON.stringify({date:'2026-10-21',browser:'Chromium desktop + emulated touch viewport; not physical-phone acceptance',upstream:'4dc8730f5bce149c71c5708a1e0996cb0ce2ec0b',errors},null,2)+'\n');
+ fs.writeFileSync(out+'/capture.json',JSON.stringify({date:'2026-10-21',browser:'Chromium desktop + emulated touch viewport; not physical-phone acceptance',upstream:'5160ba6a0520fca5ba4a0ed9ec739eea3f19539e',errors},null,2)+'\n');
  await browser.close();if(errors.length)throw new Error(errors.join('\n'));
 })().catch(e=>{console.error(e);process.exitCode=1});

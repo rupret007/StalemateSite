@@ -1,0 +1,7 @@
+{"scenario":"insurance","step":"beforeQuickStart"}
+{"scenario":"insurance","step":"afterQuickStart","active":true,"pending":"insurance","tableFirst":true,"dialog":"false","status":"Choose whether to buy insurance."}
+{"scenario":"insurance","oldWait":"passed"}
+{"scenario":"insurance","step":"afterDecline","active":false,"pending":null,"tableFirst":false,"dialog":"true","status":"Dealer blackjack. You got flushed."}
+{"scenario":"blackjack","step":"beforeQuickStart"}
+{"scenario":"blackjack","step":"afterQuickStart","active":false,"pending":null,"tableFirst":false,"dialog":"true","status":"Blackjack! Paid $25 at 3:2."}
+{"scenario":"blackjack","oldWait":"timed out: legitimate completed hand"}

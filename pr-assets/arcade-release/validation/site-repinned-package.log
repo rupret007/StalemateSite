@@ -1,0 +1,5 @@
+
+> stalemate-site@1.0.0 package:pages
+> node scripts/package-pages.cjs
+
+Packaged 25 GitHub Pages files into dist/

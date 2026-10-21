@@ -11,7 +11,7 @@ next external step after validation below; physical-phone acceptance is still un
 ## Checkouts and exact source
 Candidate root: `/Users/jeffstory/Documents/ChatGPT/Stalemate Website`.
 - `StalemateSite/`, branch `codex/arcade-release`, base `bfbd8dd8190925330e874d402197bec4450e5e8e`.
-- `Turdanoid/`, branch `codex/arcade-release`, final upstream `4dc8730f5bce149c71c5708a1e0996cb0ce2ec0b`, base `76b7bc8e8f017f2b68062636e764b91a4ed924b5`.
+- `Turdanoid/`, branch `codex/arcade-release`, final upstream `5160ba6a0520fca5ba4a0ed9ec739eea3f19539e`, base `76b7bc8e8f017f2b68062636e764b91a4ed924b5`.
 - Both remote mains were rechecked and matched those bases. Site's old import was `d87b967`.
 - `play/VENDORED.txt` records the full upstream revision above. Source changes belong upstream;
   site transforms belong in `scripts/`, and generated `play/` changes must come from sync.
@@ -73,7 +73,7 @@ Unrelated collaboration/watch-room branches are outside this release.
 ## Repeatable import and packaging
 Run from the site with a committed upstream checkout:
 ```sh
-bash scripts/sync-turdanoid.sh --source '../Turdanoid' 4dc8730f5bce149c71c5708a1e0996cb0ce2ec0b
+bash scripts/sync-turdanoid.sh --source '../Turdanoid' 5160ba6a0520fca5ba4a0ed9ec739eea3f19539e
 npm run package:pages
 ```
 Remote SHA/branch/tag imports remain supported. The Node-backed script is portable to macOS,
@@ -86,12 +86,14 @@ play/assets while excluding internal docs/evidence from public output.
 Runtime: upstream Node22.22.3; site Node24.22.0. Locked `npm ci` completed for both. Matching
 Chromium1228 used from `/private/tmp/stalemate-playwright` upstream; site Chromium1248/WebKit2370
 used its normal cache. Upstream CI uses Node22, site CI Node24.
-- Site full unit gate after analytics followup: 104/104 passed with `--maxWorkers=2`.
+- Site full unit gate on the final repin: 104/104 passed with `--maxWorkers=2`; packaging passed.
+  After the touchscreen-driver fix, all 20 Daily browser cases passed across all five projects,
+  zero retries, retaining result/share/storage assertions and checking each actual move.
 - Final integrated full browser gate: 98/98 passed directly across Chromium, three emulated
   WebKit iPhones and emulated Chromium Android; zero retries. Earlier complete run also passed 98/98.
-- Final upstream full unit gate: 137 files / 1883 tests passed, zero skips/errors, two workers.
+- Upstream full local gate at `4dc8730`:137 files /1883 tests passed, zero skips/errors, two workers.
   Full browser smoke passed; both mobile matrices passed 96/96 including added status/menu checks.
-  Lint passed with one existing warning. Smoke/mobile started `10b34ae`; final `4dc8730` adds docs only, identical product source.
+  Lint passed with one existing warning. Followups `123adb4`/`5160ba6` add visible next-arrival results and deterministic opening-hand setup;7 Daily browser and59 related music/modal checks pass.
 - Daily core17/17; focused Daily/browser/layout28/28; actual native PNG/text/cancel/manual-copy,
   denied-storage getter, refresh/resume, rollover, stale-pop, keyboard and control hit tests pass.
 - Candidate captures: `pr-assets/arcade-release/{hub-desktop,hub-phone,daily-phone,daily-landscape,
@@ -117,11 +119,22 @@ server-verified or cross-device; storage can be cleared. No retention study has 
 Upstream locked dependency audit reported four existing advisories; lockfile unchanged. Lint
 retains one existing unused-variable warning and zero errors. This release does not add offline,
 public leaderboards, new achievements or verified band scores.
-Upstream draft review: https://github.com/rupret007/Turdanoid/pull/90 (exact `4dc8730`).
+Upstream draft review: https://github.com/rupret007/Turdanoid/pull/90 (exact `5160ba6`).
 Site draft review: https://github.com/rupret007/StalemateSite/pull/70.
-Site product/evidence revision: `4987120588be15955f93a6ac159689d0dd494738`; this final record update changes documentation only.
-Both branches are pushed. Required remote CI is visible on those PRs; do not infer acceptance
-from draft status or local results. First CI was still running when this record was committed.
+Initial site product/evidence revision:`4987120588be15955f93a6ac159689d0dd494738`; final followups are recorded by PR head. The imported upstream revision above is authoritative.
+Both branches are pushed. Upstream final CI [39612388898](https://github.com/rupret007/Turdanoid/actions/runs/39612388898)
+passed at `5160ba6`: lint, 137 unit files (1882 passed/one existing local-fixture skip),
+96 mobile cases and browser smoke. Site final CI is visible on its PR; do not infer acceptance
+from draft status or local results. First upstream CI (39610502854) failed a test waiting for an
+active Crapjack hand after an immediate natural blackjack. Deterministic natural/insurance/
+even-money/live-hand coverage fixes the setup without raising timeouts or changing layout assertions.
+First site head9702ba0 PR/push CI (39611152493/39611145068) passed104 units and95 browser cases;
+all3 WebKit Daily-completion cases exceeded total time under slow mouse input and failed their
+automatic retry too. Trace showed visible unobstructed targets and cumulative click latency.
+The phone driver now uses actual touchscreen taps, checks hit targets and exact move increments.
+Raw first CI logs and later results are retained in validation/; all six first-CI failure
+screenshots/contexts are in failed-site-ci-first/. Linux upstream CI lacks one
+historical on-device captured-save fixture; its existing optional compatibility case passed locally.
 Next executable step: inspect the PR checks and ordinary reviewer feedback, then review upstream
 #90 before site #70. Preserve the exact imported upstream commit through merge. Main updates
 would trigger Pages publication; neither merge nor deployment is authorized by this candidate.

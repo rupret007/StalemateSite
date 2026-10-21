@@ -161,10 +161,12 @@ export function createDailyUI({ params, storage, gameURL, announce }) {
   manual.hidden = true;
   const firstNote = element('p');
   firstNote.id = 'dailyResultNote';
+  const resultNext = element('p', '', 'daily-share-status');
+  resultNext.id = 'dailyResultNext';
   const resultFree = element('a', 'Keep playing in free play →');
   resultFree.href = free.href;
   resultFree.className = 'daily-result-free';
-  document.querySelector('#overlay > div').append(firstNote, shareRow, shareStatus, manual, resultFree);
+  document.querySelector('#overlay > div').append(firstNote, resultNext, shareRow, shareStatus, manual, resultFree);
 
   function message(text) { shareStatus.textContent = text; announce(text); }
   function payload() {
@@ -209,6 +211,9 @@ export function createDailyUI({ params, storage, gameURL, announce }) {
     const remaining = Math.max(1, Math.ceil((next - now) / 60000));
     const hours = Math.floor(remaining / 60);
     const minutes = remaining % 60;
+    resultNext.textContent = challenge.date === Daily.challengeDate(now)
+      ? `Next puzzle: midnight America/Chicago · ${hours ? `${hours}h ` : ''}${minutes}m.`
+      : 'Today’s puzzle is ready. Open Today’s puzzle above.';
     reset.textContent = `Next puzzle in ${hours ? `${hours}h ` : ''}${minutes}m, at midnight America/Chicago (including daylight saving). Your active puzzle stays ${challenge.date}.`;
     today.hidden = challenge.date === Daily.challengeDate(now);
     today.href = Daily.challengeLink(Daily.makeChallenge(Daily.challengeDate(now)), gameURL);
