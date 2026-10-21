@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mobile-game="turdspades">
 <head>
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
@@ -10,8 +10,10 @@
   <meta name="theme-color" content="#102016">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="assets/turdsuite.css">
+<link rel="stylesheet" href="assets/arcade.css">
   <script src="games/table-continue-core.js"></script>
   <script src="assets/turdsuite.js"></script>
+  <!-- Bot strength follows turdsuite_difficulty_v1 / Suite.difficulty (see turdspades-client.js). -->
   <title>TurdSpades</title>
   <style>
     :root {
@@ -724,7 +726,7 @@
       .message { margin: 0 14px; }
       .ts-score-strip { margin: 0 14px; }
     }
-    @media (max-width: 920px) {
+    @media (max-width: 980px) {
       .message{padding-right:14px}
       .message::after{content:none}
       .stats { grid-template-columns: repeat(3,minmax(0,1fr)); }
@@ -856,7 +858,7 @@
     }
 
     /* One felt surface, with secondary controls in the table menu (phone / narrow only). */
-    @media (max-width: 920px) {
+    @media (max-width: 980px) {
     .app { display:flex; flex-direction:column; height:calc(100svh - 16px); min-height:0; max-height:none; }
     .topbar { flex:none; flex-wrap:nowrap; padding:8px 14px; }
     .title { min-width:0; }
@@ -1013,7 +1015,7 @@
     }
 
     /* A finger needs the complete target, not only the exposed edge of a fan. */
-    @media (pointer: coarse) and (max-width: 920px) {
+    @media (pointer: coarse) and (max-width: 980px) {
       #youCards {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
@@ -1048,8 +1050,10 @@
       #youCards .card .r:last-child { display: none; }
     }
   </style>
+<link rel="stylesheet" href="assets/mobile-fit.css">
+<script src="assets/mobile-fit.js" defer></script>
 </head>
-<body class="suite-ambient suite-no-zoom">
+<body class="suite-ambient suite-no-zoom arcade" data-arcade-game="turdspades" data-suite-no-difficulty="1">
   <div class="guide" id="guide">
     <div class="guide-card">
       <h2>TurdSpades</h2>
@@ -1706,7 +1710,7 @@
         const deal = dealAnimClass(`${state.round}:${c.id}`, 'deal-in');
         const safeId = window.Suite && Suite.escapeAttr ? Suite.escapeAttr(c.id) : String(c.id).replace(/[<>"]/g, '');
         const suitName = { C: 'clubs', D: 'diamonds', H: 'hearts', S: 'spades' }[c.suit];
-        const phoneZ = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 920px)').matches
+        const phoneZ = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 980px)').matches
           ? `;--hand-z:${i + 1};z-index:${i + 1}` : '';
         return `<button type="button" class="card ${red} ${illegal} ${sel} ${deal}" data-id="${safeId}" data-suit="${c.suit}" aria-label="${rankLabel(c.rank)} of ${suitName}${illegal ? ', cannot follow suit' : ''}" aria-pressed="${!!sel}" ${legal ? '' : 'disabled'} tabindex="${legal ? '0' : '-1'}"${faceAttrs} style="animation-delay:${i * 26}ms${phoneZ}">
           <div class="r">${rankLabel(c.rank)}</div><div class="s">${SUIT_SYMBOL[c.suit]}</div><div class="r">${rankLabel(c.rank)}</div></button>`;
@@ -1717,7 +1721,7 @@
 
     // Geometry depends only on the hand's available width; resize/render work, no frame loop.
     function layoutPhoneCards() {
-      if (!window.__tsPhoneHand || !window.matchMedia('(max-width: 920px)').matches) return;
+      if (!window.__tsPhoneHand || !window.matchMedia('(max-width: 980px)').matches) return;
       const width = el.youCards.clientWidth;
       // Flex layout can report 0 width before the first paint; ResizeObserver retries.
       if (width < 48) return;
@@ -2025,6 +2029,18 @@
     window.low = low;
     window.high = high;
     window.render = render;
+
+    function suiteMusicBlocked() {
+      try {
+        if (window.Suite && typeof Suite.isMusicEnabled === 'function' && !Suite.isMusicEnabled()) return true;
+      } catch (e) { /* ignore */ }
+      return false;
+    }
+    try {
+      if (window.Suite && typeof Suite.setMusicGameBlocked === 'function') {
+        Suite.setMusicGameBlocked(suiteMusicBlocked);
+      }
+    } catch (e) { /* ignore */ }
 
     bind();
     const restoredTable = tryRestoreTable();

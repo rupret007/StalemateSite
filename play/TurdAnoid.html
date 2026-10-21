@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mobile-game="turdanoid">
 <head>
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
@@ -11,8 +11,9 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <title>Turdanoid — Bricks. Busted.</title>
 <link rel="stylesheet" href="assets/turdsuite.css">
+<link rel="stylesheet" href="assets/arcade.css">
 <style>
-  :root{
+  body{
     --bg-a:var(--ta-ink, #0a1820); --bg-b:var(--ta-ink-mid, #123040); --bg-c:#1a3a34;
     --ink:var(--ta-ink-text, #eaf6f0); --accent:var(--ta-slime, #3ecf9a); --hot:var(--ta-coral, #ff6d5a); --gold:var(--ta-brass, #e8c56a);
     --pink:var(--ta-rose, #d878a8); --violet:var(--ta-indigo, #8a82d8); --aqua:var(--ta-aqua, #5ec8e0);
@@ -54,7 +55,7 @@
   .hud .col{display:flex;flex-direction:column;gap:1px;padding:7px 12px 8px;border-radius:14px;background:linear-gradient(180deg,rgba(255,248,220,.12),rgba(255,255,255,.02)),var(--panel);border:1px solid var(--panel-border);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 0 0 1px rgba(232,197,106,.16),0 10px 24px rgba(0,0,0,.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);min-width:74px}
   .hud .lbl{font-size:.72em;color:var(--ta-muted,#9ab4aa);opacity:1;letter-spacing:.08em}
   .hud .val{font-size:1.45em;color:var(--accent);text-shadow:0 0 16px rgba(62,207,154,.4),0 2px 6px rgba(0,0,0,.75);font-variant-numeric:tabular-nums}
-  .hud .right{text-align:right;margin-right:104px}
+  .hud .right{text-align:right;margin-right:0}
   .hud .right .val{color:var(--gold);text-shadow:0 0 16px rgba(232,197,106,.4),0 2px 6px rgba(0,0,0,.75)}
   .hud .center{text-align:center}
   .hud .center .val{color:var(--hot);text-shadow:0 0 16px rgba(255,109,90,.45),0 2px 6px rgba(0,0,0,.75)}
@@ -86,8 +87,12 @@
   #announcer{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   @keyframes chipIn{from{transform:translateY(8px) scale(.8);opacity:0}to{transform:none;opacity:1}}
 
-  /* Buttons row */
-  .topbtns{position:absolute;right:10px;top:max(10px,calc(var(--safe-top) + 6px));display:flex;gap:6px;z-index:5}
+  /* Buttons row — pause/sound only; shared difficulty lives on the title screen */
+  .topbtns{position:absolute;right:10px;top:max(10px,calc(var(--safe-top) + 6px));display:flex;flex-direction:column;align-items:flex-end;gap:5px;z-index:5;max-width:min(220px,calc(100% - 20px));pointer-events:none}
+  .topbtns-icons{display:flex;gap:6px;pointer-events:auto}
+  .title-difficulty-wrap{width:min(280px,calc(100% - 12px));margin:16px auto 0;pointer-events:auto}
+  .title-difficulty-wrap .suite-difficulty-seg{width:100%;justify-content:stretch}
+  #titleScreen:not(.show) .title-difficulty-wrap{display:none}
   .iconbtn{width:44px;height:44px;min-width:44px;min-height:44px;border-radius:12px;background:linear-gradient(180deg,rgba(255,248,220,.12),rgba(255,255,255,.02)),var(--panel);border:1px solid var(--panel-border);color:var(--ink);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 8px 18px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.16),0 0 0 1px rgba(232,197,106,.14);transition:transform .15s,border-color .15s}
   .iconbtn:hover{border-color:var(--ta-brass,#e8c56a)}
   .iconbtn:active{transform:scale(.92)}
@@ -192,8 +197,9 @@
     .hud .col{padding:4px 9px 5px;min-width:0}
   }
   @media (max-width:520px){
-    .hud{left:max(10px, calc(env(safe-area-inset-left, 0px) + 68px));right:108px;padding:4px 2px 5px;border-radius:16px;background:linear-gradient(180deg,rgba(255,248,220,.12),rgba(255,255,255,.02)),var(--panel);border:1px solid var(--panel-border);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 0 0 1px rgba(232,197,106,.26),0 10px 22px rgba(0,0,0,.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);gap:0;align-items:stretch}
-    .hud .right,.hud .center{margin-right:0;text-align:center}
+    .hud{left:max(10px, calc(env(safe-area-inset-left, 0px) + 68px));right:max(10px,calc(env(safe-area-inset-right, 0px) + 4px));padding:4px 2px 5px;border-radius:16px;background:linear-gradient(180deg,rgba(255,248,220,.12),rgba(255,255,255,.02)),var(--panel);border:1px solid var(--panel-border);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 0 0 1px rgba(232,197,106,.26),0 10px 22px rgba(0,0,0,.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);gap:0;align-items:stretch}
+    .hud .right{margin-right:0px;text-align:center}
+    .hud .center{margin-right:0px;text-align:center}
     .hud .col{padding:3px 7px 4px;min-width:0;flex:1 1 0;align-items:center;background:transparent;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;border-radius:0}
     .hud .col + .col{border-left:1px solid rgba(232,197,106,.18)}
     /* The HUD box already starts right of the back pill (left:68px). turdsuite.css
@@ -203,7 +209,8 @@
   }
   @media (max-width:420px){
     .hud{font-size:clamp(11px,2.9vw,13px)}
-    .hud .right,.hud .center{margin-right:0;text-align:center}
+    .hud .right{margin-right:0px;text-align:center}
+    .hud .center{margin-right:0px;text-align:center}
     .hud .val{font-size:1.28em;text-shadow:0 0 14px rgba(62,207,154,.45),0 2px 8px #000}
     .topbtns{gap:4px}
     .iconbtn{width:44px;height:44px;font-size:16px}
@@ -214,7 +221,8 @@
     .how-card p{font-size:12px}
   }
   @media (max-width:360px){
-    .hud .right,.hud .center{margin-right:0}
+    .hud .right{margin-right:0px}
+    .hud .center{margin-right:0px}
     .hud .center .val{font-size:1.2em}
     .life-pip{width:9px;height:11px}
   }
@@ -231,15 +239,17 @@
   #coachCard button{padding:12px 28px;font-size:15px;font-weight:800}
   #coachStep{font-size:12px;letter-spacing:.2em;text-transform:uppercase;opacity:.65;margin-bottom:6px}
 </style>
+<link rel="stylesheet" href="assets/mobile-fit.css">
+<script src="assets/mobile-fit.js" defer></script>
 <link rel="stylesheet" href="stalemate/stalemate-overlay.css">
-<meta property="og:title" content="Turdanoid on stalemate.band">
-<meta property="og:description" content="Brick-breaker, but gross. Free, plays in the browser.">
-<meta property="og:image" content="https://stalemate.band/play/stalemate/og-play.png">
+<meta property="og:title" content="Stalemate Arcade">
+<meta property="og:description" content="Seven free browser games. Music by Stalemate.">
+<meta property="og:image" content="https://rupret007.github.io/StalemateSite/play/stalemate/og-play.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 </head>
-<body data-suite-no-bg="1">
+<body class="arcade" data-arcade-game="turdanoid" data-suite-no-bg="1">
 <div id="app">
   <div id="announcer" role="status" aria-live="polite" aria-atomic="true"></div>
   <div id="stage">
@@ -262,14 +272,17 @@
     </div>
 
     <div class="topbtns">
-      <button class="iconbtn" id="btnSound" type="button" title="Sound" aria-label="Mute sound" aria-pressed="false">🔊</button>
-      <button class="iconbtn" id="btnPause" type="button" title="Pause" aria-label="Pause game">⏸</button>
+      <div class="topbtns-icons">
+        <button class="iconbtn" id="btnSound" type="button" title="Sound" aria-label="Mute sound" aria-pressed="false">🔊</button>
+        <button class="iconbtn" id="btnPause" type="button" title="Pause" aria-label="Pause game">⏸</button>
+      </div>
     </div>
 
     <div id="combo"></div>
     <div id="hype"></div>
     <div id="powers"></div>
     <div id="toast"></div>
+    <div class="arc-hint" id="arcHint" hidden aria-hidden="true">Drag to move · tap to launch</div>
     <button id="mobileLaunch">TAP TO LAUNCH 💩</button>
     <div id="coachOverlay" role="dialog" aria-labelledby="coachTitle" aria-modal="true">
       <div id="coachCard">
@@ -290,6 +303,7 @@
         <span>Tap to launch</span>
         <span>← → Space</span>
       </div>
+      <div class="suite-hud-settings title-difficulty-wrap" id="suite-difficulty-mount"></div>
       <button id="btnStart">START FLUSHING</button>
       <div class="menu-secondary">
         <button id="btnBoss" type="button">Boss Flush</button>
@@ -586,6 +600,24 @@ function suiteMuted(){
   } catch (e) { return false; }
 }
 function soundBlocked(){ return !soundOn || suiteMuted(); }
+function suiteMusicBlocked(){
+  try {
+    if (window.Suite && typeof Suite.isMusicEnabled === 'function' && !Suite.isMusicEnabled()) return true;
+  } catch (e) { /* ignore */ }
+  return soundBlocked();
+}
+function syncSuiteMusic(){
+  try {
+    if (window.Suite && typeof Suite.music === 'function') {
+      Suite.music().then(function (player) { if (player) player.sync(); });
+    }
+  } catch (e) {}
+}
+try {
+  if (window.Suite && typeof Suite.setMusicGameBlocked === 'function') {
+    Suite.setMusicGameBlocked(function () { return suiteMusicBlocked(); });
+  }
+} catch (e) {}
 let ambientOn = !!prefs.ambientOn;
 let hapticOn = prefs.hapticOn !== false;
 let gameMode = 'classic';
@@ -843,8 +875,8 @@ function resize(){
     playShell.style.width = '100%';
     playShell.style.height = '100%';
   }
-  W = Math.max(280, canvasW);
-  H = Math.max(380, canvasH);
+  W = r.width > 0 ? Math.max(1, canvasW) : 280;
+  H = r.height > 0 ? Math.max(1, canvasH) : 380;
   DPR = Math.max(1, Math.min(window.devicePixelRatio||1, 2));
   cv.width = Math.floor(W*DPR);
   cv.height = Math.floor(H*DPR);
@@ -995,6 +1027,27 @@ const FEEL_SHAKE_DECAY = 0.6;
 const FEEL_HIT_STOP_BREAK = 2;
 const FEEL_BALL_DANGER_START = 0.68;
 const LIFE_GRACE_FRAMES = 90;
+// Suite playlist difficulty (turdsuite_difficulty_v1) via Suite.difficulty.
+function suiteSpeedMul(){
+  try{
+    const t = window.Suite && Suite.difficulty && Suite.difficulty.tuning();
+    return t && Number.isFinite(t.speed) ? t.speed : 1;
+  }catch(e){ return 1; }
+}
+function suiteSpawnMul(){
+  try{
+    const t = window.Suite && Suite.difficulty && Suite.difficulty.tuning();
+    return t && Number.isFinite(t.spawn) ? t.spawn : 1;
+  }catch(e){ return 1; }
+}
+function suiteStartingLives(base){
+  try{
+    const t = window.Suite && Suite.difficulty && Suite.difficulty.tuning();
+    const bonus = t && Number.isFinite(t.lives) ? t.lives : 0;
+    if(!bonus) return base;
+    return Math.max(1, base + bonus);
+  }catch(e){ return base; }
+}
 function tryLightHaptic(ms){
   if(!hapticOn || (reducedMotion && reducedMotion.matches)) return;
   try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){}
@@ -1110,11 +1163,23 @@ function drawTitleAttract(rts){
   }
   ctx.restore();
 }
+// Ten-second rule: first run never blocks play with a modal. Show a
+// pulsing one-line hint chip that clears on the first move or launch.
 function maybeShowCoach(){
   if(!TCOACH || TCOACH.coachSeen(persist)) return;
-  coachStep = 0;
-  updateCoachCard();
-  $('coachOverlay').classList.add('show');
+  TCOACH.markCoachSeen(persist);
+  const hint = $('arcHint');
+  if(!hint) return;
+  hint.hidden = false;
+  const clear = () => {
+    hint.hidden = true;
+    clearTimeout(t);
+    $('playShell').removeEventListener('pointerdown', clear);
+    window.removeEventListener('keydown', clear);
+  };
+  const t = setTimeout(clear, 10000);
+  $('playShell').addEventListener('pointerdown', clear, { once: true });
+  window.addEventListener('keydown', clear, { once: true });
 }
 function updateCoachCard(){
   const steps = TCOACH ? TCOACH.STEPS : [];
@@ -1193,7 +1258,7 @@ function syncTimedBallSpeeds(){
 }
 function newBall(stuck=true){
   const r = Math.max(8, Math.min(11, W*0.018));
-  const baseSpeed = 5.4 + Math.min(level*0.16, 3.0);
+  const baseSpeed = (5.4 + Math.min(level*0.16, 3.0)) * suiteSpeedMul();
   // Death and round changes clear activePowers first; any chip still alive
   // (direct newLevel() rebuilds) keeps its ball-scoped effect on the new ball.
   const speed = computeTimedBallSpeed(baseSpeed);
@@ -1254,7 +1319,7 @@ function newLevel(){
     const swatch = flags && Number.isInteger(flags.color) && BRICK_ART && BRICK_ART.ROW_PALETTES[flags.color];
     const colors = swatch ? { c1: swatch[0], c2: swatch[1], glow: swatch[2], material: 'sewer' }
       : (BRICK_ART ? BRICK_ART.assignBrickStyle(r, rows, c, level, Math.random, wi) : brickColors(r, rows));
-    const brick = {x,y,w:bw,h:bh,hp,maxHp:hp,c1:colors.c1,c2:colors.c2,glow:colors.glow,material:forced || colors.material||'sewer',wob:Math.random()*Math.PI*2,hitFlash:0,metal:!!(flags&&flags.metal),indestructible:!!(flags&&flags.indestructible),hazard:flags&&flags.hazard||null,hazardCd:0};
+    const brick = {x,y,w:bw,h:bh,hp,maxHp:hp,c1:colors.c1,c2:colors.c2,glow:colors.glow,material:forced || colors.material||'sewer',wob:Math.random()*Math.PI*2,hitFlash:0,metal:!!(flags&&flags.metal),heavy:!!(flags&&flags.heavy),indestructible:!!(flags&&flags.indestructible),hazard:flags&&flags.hazard||null,hazardCd:0};
     if(forced) paintSpecialBrick(brick);
     bricks.push(brick);
   }
@@ -1432,6 +1497,7 @@ btnSound.addEventListener('click', ()=>{
   syncSoundButton();
   if(!soundBlocked()){ sfx.power(); startAmbient(); }
   else stopAmbient();
+  syncSuiteMusic();
 });
 btnPause.addEventListener('click', ()=>{ if(state==='playing') doPause(); else if(state==='paused') doResume(); });
 if(tClearTally){
@@ -1530,7 +1596,7 @@ function startBossGame(){
 function beginRun(){
   resize();
   paddle = newPaddle();
-  score=0; level=1; lives=3; comboHits=0; comboTimer=0; stink=0; flash=0; shake=0; hitStop=0; lifeGrace=0;
+  score=0; level=1; lives=suiteStartingLives(3); comboHits=0; comboTimer=0; stink=0; flash=0; shake=0; hitStop=0; lifeGrace=0;
   runStats = { bricks: 0, maxCombo: 0, startedAt: Date.now() };
   shards = []; impactRings = []; confettiBits = []; clearParty = null; boss = null; sludges = [];
   activePowers = {};
@@ -1848,7 +1914,7 @@ function maybeDrop(x,y){
   else if(level <= 8) chance = 0.26 - (level-2)*0.02;
   else                chance = Math.max(0.12, 0.16 - (level-8)*0.005);
   if(remaining < 24) chance += 0.06; // last-stand boost
-  if(Math.random() < chance){
+  if(Math.random() < chance * suiteSpawnMul()){
     // Filter pool by what's unlocked at this level
     const pool = POWERS.filter(p => level >= (p.unlock||1));
     const goodPool = pool.filter(p=>!p.bad);
@@ -2207,7 +2273,7 @@ function step(dt){
   if(physicsFrozen) hitStop = Math.max(0, hitStop - ts);
   for(const s of bgStars){ s.t += 0.02*ts; }
 
-  const speed = 7.0 + Math.min(level*0.2, 4);
+  const speed = (7.0 + Math.min(level*0.2, 4)) * suiteSpeedMul();
   const left  = activePowers.reverse ? keys.right : keys.left;
   const right = activePowers.reverse ? keys.left  : keys.right;
   if(left)  paddle.x -= speed*ts;
@@ -2232,6 +2298,8 @@ function step(dt){
       if(k==='slow' || k==='fast') speedPowersChanged = true;
       if(k==='big' && !activePowers.shrink) paddle.w = paddle.baseW;
       if(k==='shrink') paddle.w = paddle.baseW;
+      // Shared expiry also reaches caught balls and balls paused by hit-stop.
+      if(k==='fire') balls.forEach(b=>b.fire=0);
       if(k==='ghost') balls.forEach(b=>b.ghost=0);
       if(k==='gold'){
         // Restore brick colors when gold rush ends
@@ -2414,11 +2482,13 @@ function step(dt){
 
   // No life lost while a level transition is pending, or when the wall was
   // cleared this same frame (the clear block below will start the transition).
-  if(balls.length === 0 && !levelTransition && breakableLeft() > 0){
+  // Boss Flush has no brick wall, but still needs a last-ball life/relaunch.
+  if(balls.length === 0 && !levelTransition && (gameMode === 'boss' || breakableLeft() > 0)){
     lives--;
     sfx.death();
     floatText('OUT OF TURDS', W/2, H/2, '#ff9d74');
     shake = Math.max(shake, 12);
+    lifeGrace = LIFE_GRACE_FRAMES;
     if(lives <= 0){ gameOver(false); return; }
     paddle.w = paddle.baseW;
     activePowers = {}; updatePowers();
@@ -2703,8 +2773,9 @@ function render(){
 
   // Parallax sewer layers — driven by wall-clock time so they drift on the
   // title screen too and stay frame-rate independent.
+  const calmBg = !!(reducedMotion && reducedMotion.matches);
   for(const layer of bgLayers){
-    const off = (bgT * layer.speed) % W;
+    const off = calmBg ? 0 : (bgT * layer.speed) % W;
     ctx.globalAlpha = layer.alpha;
     for(const s of layer.shapes){
       const bx = ((s.x - off) % W + W) % W;
@@ -2743,11 +2814,13 @@ function render(){
   }
   ctx.globalAlpha = 1;
   // bubbles (parallax bubble field, drifting up)
-  const tAmb = performance.now() * 0.0006;
+  const tAmb = calmBg ? 0 : performance.now() * 0.0006;
   for(const s of bgStars){
-    s.x += Math.sin(s.t + tAmb*4) * 0.18;
-    s.y -= 0.22 + s.r*0.18;
-    if(s.y < -10) { s.y = H + 10; s.x = Math.random()*W; }
+    if(!calmBg){
+      s.x += Math.sin(s.t + tAmb*4) * 0.18;
+      s.y -= 0.22 + s.r*0.18;
+      if(s.y < -10) { s.y = H + 10; s.x = Math.random()*W; }
+    }
     ctx.globalAlpha = s.a * (0.55 + Math.sin(s.t)*0.35);
     ctx.fillStyle = (TSPRITE && TSPRITE.worldBubbleColor) ? TSPRITE.worldBubbleColor(world) : 'rgba(94,200,224,.48)';
     ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,6.283); ctx.fill();
@@ -3095,6 +3168,16 @@ function drawBoss(b){
   roundRect(ctx, barX, barY, barW * pct, 6, 3); ctx.fill();
 }
 
+function paintCbHeavyBrickMark(ctx, b, px, py, pw, ph){
+  const cb = typeof Suite !== 'undefined' && Suite.isColorblindMode && Suite.isColorblindMode();
+  const paint = globalThis.TurdanoidBrick && TurdanoidBrick.paintCbHeavyBrickMark;
+  if(paint){
+    paint(ctx, b, px, py, pw, ph, cb, roundRect);
+    return;
+  }
+  if(!b.heavy || !cb) return;
+}
+
 function drawBrick(b){
   b.wob += 0.04;
   if(b.hitFlash > 0) b.hitFlash = Math.max(0, b.hitFlash - 0.35);
@@ -3102,6 +3185,7 @@ function drawBrick(b){
   const spr = getBrickSpriteCanvas(b);
   if(spr){
     ctx.drawImage(spr, px, py, pw, ph);
+    paintCbHeavyBrickMark(ctx, b, px, py, pw, ph);
     if(TSPRITE){ TSPRITE.paintHpPips(ctx, b); }
     if(b.hitFlash > 0){
       ctx.save();
@@ -3152,6 +3236,7 @@ function drawBrick(b){
       ctx.fillStyle = 'rgba(255,255,255,.8)';
       ctx.beginPath(); ctx.arc(cx, cy, 1.2, 0, 6.283); ctx.fill();
     }
+    paintCbHeavyBrickMark(ctx, b, px, py, pw, ph);
   }
   // Metal: corner rivets + brushed band
   if(b.metal){
@@ -3544,6 +3629,9 @@ requestAnimationFrame(loop);
 
 let lastTouch = 0;
 document.addEventListener('touchend', e=>{
+  // Native controls already disable double-tap zoom via touch-action. Keep
+  // successive taps available to settings and menu buttons.
+  if(e.target.closest('button, a, input, select, textarea')) return;
   const now = Date.now();
   if(now - lastTouch <= 350) e.preventDefault();
   lastTouch = now;
@@ -3562,6 +3650,8 @@ document.body.addEventListener('touchmove', e=>{ if(e.touches.length < 2) e.prev
     if (host !== 'localhost' && host !== '127.0.0.1' && host !== '[::1]') return;
   } catch (e) { return; }
   window.__turdanoid = {
+    render,
+    sampleBgStar(){ const s = bgStars[0]; return s ? { x: s.x, y: s.y } : null; },
     startGame, step, newLevel, quitToMenu, doPause, doResume,
     applyPower, spawnMulti, handleWindowBlur, pointerMove, launch, skipClearTally,
     qaSpawnCapsule, qaActivatePower, qaBossSetPhase, qaBeginClearTally, qaShowGameOver, qaResetPowers, qaJumpToLevel, qaJumpLevel,

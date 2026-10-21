@@ -5,7 +5,14 @@
 
 export function prefersReducedMotion(doc = document) {
   try {
-    return !!doc.defaultView?.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (doc.documentElement?.classList?.contains('suite-motion-reduce')) {
+      return true;
+    }
+    const win = doc.defaultView;
+    if (win?.Suite && typeof win.Suite.prefersReducedMotion === 'function') {
+      return win.Suite.prefersReducedMotion();
+    }
+    return !!win?.matchMedia('(prefers-reduced-motion: reduce)').matches;
   } catch {
     return false;
   }

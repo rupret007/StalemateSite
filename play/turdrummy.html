@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mobile-game="turdrummy">
 <head>
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
@@ -10,8 +10,10 @@
   <meta name="theme-color" content="#18311f">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="assets/turdsuite.css">
+<link rel="stylesheet" href="assets/arcade.css">
   <script src="games/table-continue-core.js"></script>
   <script src="assets/turdsuite.js"></script>
+  <!-- Bot strength follows turdsuite_difficulty_v1 / Suite.difficulty (turdrummy-ai-core.js). -->
   <script src="games/turdrummy-ai-core.js"></script>
   <script src="games/turdrummy-audio-core.js"></script>
   <script src="games/turdrummy-fx-core.js"></script>
@@ -1213,6 +1215,22 @@
       opacity: 0.8;
     }
 
+    .tr-difficulty-stat {
+      justify-content: center;
+      padding: 2px 0 0;
+    }
+
+    .tr-difficulty-topbar {
+      flex: 1 1 100%;
+      order: 3;
+      justify-content: center;
+      margin-top: 2px;
+    }
+
+    .app:has(.tr-difficulty-stat .suite-difficulty) #difficultyBtn {
+      display: none;
+    }
+
     /* ---------- Overlay / guide ---------- */
     .overlay {
       position: absolute;
@@ -1919,6 +1937,25 @@
         border-radius: 8px;
       }
 
+      .tr-difficulty-stat .suite-difficulty-btn {
+        min-height: 28px;
+        min-width: 0;
+        padding: 0 5px;
+        font-size: 0.58rem;
+      }
+
+      .tr-difficulty-stat .suite-difficulty-seg {
+        padding: 2px;
+      }
+
+      .tr-difficulty-topbar {
+        display: none !important;
+      }
+
+      #difficultyBtn {
+        display: inline-flex !important;
+      }
+
       .status {
         grid-template-columns: repeat(6, minmax(0, 1fr));
         gap: 2px 3px;
@@ -2240,15 +2277,48 @@
       .coach-actions { display: grid; grid-template-columns: 44px 44px; gap: 4px; }
       .coach-actions .btn { padding: 2px; font-size: 10px; }
     }
+
+    @media (orientation: landscape) and (max-height: 440px) {
+      .tr-difficulty-topbar {
+        order: 2;
+        flex: 1 1 auto;
+        margin-top: 0;
+        justify-content: flex-end;
+        max-width: min(220px, 42vw);
+      }
+
+      .top-links {
+        flex: 1 1 auto;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .title-group p {
+        display: none;
+      }
+
+      .status {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        padding: 4px 8px;
+        gap: 4px;
+      }
+
+      .action-dock {
+        z-index: 24;
+      }
+    }
   </style>
+<link rel="stylesheet" href="assets/mobile-fit.css">
+<script src="assets/mobile-fit.js" defer></script>
 </head>
-<body class="suite-ambient suite-no-zoom">
+<body class="suite-ambient suite-no-zoom arcade" data-arcade-game="turdrummy">
   <div class="app">
     <header class="topbar">
       <div class="title-group">
         <h1>TurdRummy</h1>
         <p>Gin Rummy with smug deadwood math and a table that looks slightly too damp.</p>
       </div>
+      <div class="suite-hud-settings tr-difficulty-stat tr-difficulty-topbar" id="suite-difficulty-mount"></div>
       <div class="top-links">
         <a href="./" aria-label="Back to game hub">&#x1F3E0; Hub</a>
         <button class="btn" id="soundToggleBtn" data-sound-toggle aria-pressed="true">&#x1F50A; Sound On</button>
@@ -2732,15 +2802,50 @@
       el.difficultyBtn.setAttribute("aria-label", "Bot: " + label + ". Activate to change difficulty.");
     }
 
+    function suiteLevelToAi(level) {
+      const id = typeof level === "string" ? level.trim().toLowerCase() : "normal";
+      if (id === "hard") { return "sharp"; }
+      if (id === "easy") { return "easy"; }
+      return "normal";
+    }
+
+    function applyAiLevel(next) {
+      if (!DIFFICULTY_ORDER.includes(next)) { return; }
+      aiLevel = next;
+      if (AIApi) { AIApi.saveDifficulty(window.localStorage, aiLevel); }
+      updateDifficultyLabel();
+      try {
+        if (window.Suite && Suite.difficulty) {
+          const suiteId = aiLevel === "sharp" ? "hard" : aiLevel === "easy" ? "easy" : "normal";
+          if (Suite.difficulty.get() !== suiteId) {
+            Suite.difficulty.set(suiteId);
+          }
+        }
+      } catch (err) { /* optional */ }
+    }
+
     function cycleDifficulty() {
       const at = DIFFICULTY_ORDER.indexOf(aiLevel);
-      aiLevel = DIFFICULTY_ORDER[(at + 1) % DIFFICULTY_ORDER.length];
-      if (AIApi) AIApi.saveDifficulty(window.localStorage, aiLevel);
-      updateDifficultyLabel();
+      applyAiLevel(DIFFICULTY_ORDER[(at + 1) % DIFFICULTY_ORDER.length]);
       playSfx("select");
       try {
         if (window.Suite) Suite.toast("Bot is now " + DIFFICULTY_LABELS[aiLevel] + ".");
       } catch (err) { /* cosmetic only */ }
+    }
+
+    function wireSuiteDifficultySync() {
+      if (!window.Suite || !Suite.difficulty) { return; }
+      Suite.difficulty.onChange((level) => {
+        applyAiLevel(suiteLevelToAi(level));
+      });
+      window.addEventListener("storage", (event) => {
+        if (event.key !== "turdsuite_difficulty_v1" || event.newValue == null) { return; }
+        applyAiLevel(suiteLevelToAi(event.newValue));
+      });
+      window.addEventListener("turdsuite:difficulty", (event) => {
+        const level = event && event.detail && event.detail.level;
+        if (level) { applyAiLevel(suiteLevelToAi(level)); }
+      });
     }
 
     // Coach: a first-round, non-blocking card. The page reports the real actions it teaches.
@@ -4488,6 +4593,7 @@
     function init() {
       loadStats();
       bindEvents();
+      wireSuiteDifficultySync();
       updateSoundToggleLabel();
       updateDifficultyLabel();
       // The stats drawer starts open on wide screens and folded on phones, where the table needs the room.
@@ -4510,6 +4616,27 @@
       else resumeAiFromBackground();
     });
 
+    function suiteMusicBlocked() {
+      try {
+        if (window.Suite && typeof Suite.isMusicEnabled === 'function' && !Suite.isMusicEnabled()) return true;
+      } catch (err) { /* ignore */ }
+      return !(audioPlayer && audioPlayer.isEnabled());
+    }
+
+    function syncSuiteMusic() {
+      try {
+        if (window.Suite && typeof Suite.music === 'function') {
+          Suite.music().then(function (player) { if (player) player.sync(); });
+        }
+      } catch (err) { /* ignore */ }
+    }
+
+    try {
+      if (window.Suite && typeof Suite.setMusicGameBlocked === 'function') {
+        Suite.setMusicGameBlocked(suiteMusicBlocked);
+      }
+    } catch (err) { /* ignore */ }
+
     (function setupAudioUnlock() {
       if (!audioPlayer) return;
       const unlockOnce = () => {
@@ -4520,6 +4647,10 @@
       window.addEventListener("pointerdown", unlockOnce, { once: true });
       window.addEventListener("keydown", unlockOnce, { once: true });
     })();
+
+    if (el.soundToggleBtn) {
+      el.soundToggleBtn.addEventListener('click', () => { syncSuiteMusic(); });
+    }
 
     init();
   

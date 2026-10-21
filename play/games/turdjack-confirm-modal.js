@@ -47,9 +47,8 @@ export function isFocusableButton(node) {
 
 /**
  * @param {Document} doc
- * @param {Window} win
  */
-export function createJackConfirmAsk(doc, win) {
+export function createJackConfirmAsk(doc) {
   const overlay = doc.getElementById(JACK_CONFIRM_IDS.overlay);
   const titleEl = doc.getElementById(JACK_CONFIRM_IDS.title);
   const messageEl = doc.getElementById(JACK_CONFIRM_IDS.message);
@@ -141,9 +140,8 @@ export function createJackConfirmAsk(doc, win) {
       doc.addEventListener('keydown', onKeydown, true);
       acceptBtn.addEventListener('click', onAccept);
       declineBtn.addEventListener('click', onDecline);
-      win.requestAnimationFrame(() => {
-        declineBtn.focus();
-      });
+      // Focus as soon as the modal is visible; a deferred frame can steal the first Tab.
+      declineBtn.focus({ preventScroll: true });
     });
   }
 

@@ -705,6 +705,27 @@
     if (!rules || !stats || status === null) {
       return null;
     }
+    // Missing in legacy v1 saves: those snapshots already represent player turns.
+    const pendingDecision = snapshot.pendingDecision === undefined ? null : snapshot.pendingDecision;
+    if (pendingDecision !== null && pendingDecision !== 'insurance' && pendingDecision !== 'even-money') {
+      return null;
+    }
+    if (pendingDecision !== null) {
+      const playerNatural = playerHand.length === 2 &&
+        playerHand.some((card) => card.rank === 'A') &&
+        playerHand.some((card) => ['10', 'J', 'Q', 'K'].includes(card.rank));
+      if (
+        !rules.allowInsurance || dealerHand[0].rank !== 'A' ||
+        playerHand.length !== 2 || dealerHand.length !== 2 ||
+        snapshot.splitRound || splitBet !== 0 || activeHandIndex !== 0 ||
+        !snapshot.firstDecisionOpen || !snapshot.dealerHoleHidden ||
+        snapshot.dealerHoleCountResolved || dealerHoleShoeGeneration !== shoeGeneration ||
+        (pendingDecision === 'even-money') !== playerNatural ||
+        (pendingDecision === 'insurance' && bankroll < Math.floor(currentBet / 2))
+      ) {
+        return null;
+      }
+    }
     const decisionStreak = finiteInt(snapshot.decisionStreak, 0, 10000);
     const hotStreak = finiteInt(snapshot.hotStreak, 0, 10000);
     const coldStreak = finiteInt(snapshot.coldStreak, 0, 10000);
@@ -714,6 +735,7 @@
     return {
       kind: 'turdjack',
       v: CONTINUE_VERSION,
+      pendingDecision,
       bankroll,
       currentBet,
       splitBet,

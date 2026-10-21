@@ -159,6 +159,22 @@ export function popGroup(board, col, row) {
 }
 
 /** Full game state helpers (immutable). */
+/** Viewport space for the board (mirrors turdomania.html tmView). */
+export function computeTmAvail(viewportW, viewportH) {
+  const w = viewportW;
+  const h = viewportH;
+  const compact = w <= 360 || h <= 600;
+  return {
+    availW: Math.min(w, 760) - 36,
+    availH: h - (compact ? 182 : 230)
+  };
+}
+
+export function fitBoardForViewport(levelKey, viewportW, viewportH, minCell = 32) {
+  const { availW, availH } = computeTmAvail(viewportW, viewportH);
+  return fitDims(levelKey, availW, availH, minCell);
+}
+
 /**
  * Board size that keeps every tile at least `minCell` px inside `availW` x `availH`.
  * The level's full size is used whenever it fits; narrow phones get fewer columns/rows

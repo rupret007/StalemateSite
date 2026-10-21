@@ -22,12 +22,18 @@ export function shakeIntensity(amount, reducedMotion) {
  * @param {HTMLElement | null} root
  * @param {{ reducedMotion?: boolean, particleCap?: number }} options
  */
+function resolveReducedMotion(options) {
+  if (typeof options.getReducedMotion === 'function') {
+    return !!options.getReducedMotion();
+  }
+  if (options.reducedMotion !== undefined) {
+    return !!options.reducedMotion;
+  }
+  return prefersReducedMotion((q) => (typeof window !== 'undefined' ? window.matchMedia(q) : null));
+}
+
 export function createSuiteFX(root, options = {}) {
   const doc = root && root.ownerDocument ? root.ownerDocument : document;
-  const reduced =
-    options.reducedMotion !== undefined
-      ? options.reducedMotion
-      : prefersReducedMotion((q) => (typeof window !== 'undefined' ? window.matchMedia(q) : null));
   const particleCap = options.particleCap ?? DEFAULT_PARTICLE_CAP;
   let shakeTimer = 0;
   let overlay = null;
@@ -42,11 +48,12 @@ export function createSuiteFX(root, options = {}) {
   }
 
   return {
-    prefersReducedMotion: () => reduced,
+    prefersReducedMotion: () => resolveReducedMotion(options),
 
     screenShake(target, amount = 6, ms = 280) {
       const el = target || root || doc.body;
       if (!el || !el.classList) return;
+      const reduced = resolveReducedMotion(options);
       const px = shakeIntensity(amount, reduced);
       if (px < 0.5) return;
       el.classList.remove('suite-shake');
@@ -60,7 +67,7 @@ export function createSuiteFX(root, options = {}) {
     },
 
     flash(color = 'rgba(255, 255, 255, 0.35)', ms = 120) {
-      if (reduced) return;
+      if (resolveReducedMotion(options)) return;
       const layer = ensureOverlay();
       layer.style.background = color;
       layer.classList.add('show');
@@ -68,6 +75,7 @@ export function createSuiteFX(root, options = {}) {
     },
 
     confetti(count = 24, origin = { x: 0.5, y: 0.4 }) {
+      const reduced = resolveReducedMotion(options);
       const n = capParticleCount(count, reduced, particleCap);
       if (!n || !doc.body) return;
       const host = doc.createElement('div');
