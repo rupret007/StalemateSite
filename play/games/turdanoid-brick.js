@@ -11,4 +11,5 @@ export const brickColors = api.brickColors;
 export const assignBrickStyle = api.assignBrickStyle;
 export const rowPaletteIndex = api.rowPaletteIndex;
 export const distinctRowHueCount = api.distinctRowHueCount;
+export const paintCbHeavyBrickMark = api.paintCbHeavyBrickMark;
 export const ROW_PALETTES = api.ROW_PALETTES;

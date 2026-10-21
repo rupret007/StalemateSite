@@ -40,29 +40,25 @@ describe('vendored /play/ copy', () => {
     const hub = readFileSync(join(dir, 'index.html'), 'utf8');
     expect(hub).not.toMatch(/changelog/i);
   });
-  it('the first share attempt carries text and a link with the score image', () => {
-    const js = readFileSync(join(dir, 'stalemate', 'stalemate-overlay.js'), 'utf8');
-    expect(js).toMatch(/files: \[file\], title: 'Turdanoid', text: text, url: url \}/);
-    // the link is passed once (url), never also appended to the text
-    expect(js).not.toMatch(/text: text \+ ' ' \+ url/);
-    expect(js).not.toMatch(/navigator\.share\(\{ files: \[file\] \}\)/);
-  });
   it('ships the Stalemate playlist (Manic, Andrea, It\u2019s Only Been 18, Wham Bam, Planet of the Flakes) as small same-origin AAC files, identical to the overlay source', () => {
     const src = join(dir, '..', 'scripts', 'stalemate-overlay');
     for (const f of ['manic.m4a', 'andrea.m4a', 'only-been-18.m4a', 'wham-bam.m4a', 'planet-of-the-flakes.m4a']) {
       const vendored = readFileSync(join(dir, 'stalemate', f));
       expect(vendored.equals(readFileSync(join(src, f)))).toBe(true);
+      expect(readFileSync(join(dir, 'assets', 'stalemate', f)).equals(vendored)).toBe(true);
       expect(vendored.subarray(4, 8).toString('latin1')).toBe('ftyp');
       expect(vendored.length).toBeGreaterThan(1_000_000);
       expect(vendored.length).toBeLessThan(3_500_000);
     }
     const js = readFileSync(join(dir, 'stalemate', 'stalemate-overlay.js'), 'utf8');
     expect(js).toBe(readFileSync(join(src, 'stalemate-overlay.js'), 'utf8'));
-    const order = ['manic.m4a', 'andrea.m4a', 'only-been-18.m4a', 'wham-bam.m4a', 'planet-of-the-flakes.m4a'].map((f) => js.indexOf(`'stalemate/${f}'`));
+    expect(js).not.toMatch(/new Audio\(|trackForLevel/);
+    const music = readFileSync(join(dir, 'assets', 'suite-music.js'), 'utf8');
+    const order = ['manic.m4a', 'andrea.m4a', 'only-been-18.m4a', 'wham-bam.m4a', 'planet-of-the-flakes.m4a'].map((f) => music.indexOf(`'stalemate/${f}'`));
     expect(order.every((i) => i > 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order); // Manic first
-    expect(js).toContain("title: 'It\\u2019s Only Been 18'");
-    expect(js).not.toMatch(/Over 18|Been Only/);
+    expect(music).toContain("'It\\u2019s Only Been 18'");
+    expect(music).not.toMatch(/Over 18|Been Only/);
   });
   it('hub links seven games including Turdomania', () => {
     const hub = readFileSync(join(dir, 'index.html'), 'utf8');

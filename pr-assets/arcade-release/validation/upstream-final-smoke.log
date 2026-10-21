@@ -1,0 +1,62 @@
+Command: npm run test:smoke
+Runtime: v22.22.3
+07327fc3b0c4ed5344b7517af671bc941785e03c
+
+> turdanoid@1.0.0 test:smoke
+> node smoke-runner.js
+
+hub-phone-320: Turdanoid clips its name, genre, or launch action
+hub-phone-320: Turdtris clips its name, genre, or launch action
+hub-phone-320: Crapjack 21 clips its name, genre, or launch action
+hub-phone-320: Crappy Eights clips its name, genre, or launch action
+hub-phone-320: TurdRummy clips its name, genre, or launch action
+hub-phone-320: TurdSpades clips its name, genre, or launch action
+hub-phone-320: Turdomania clips its name, genre, or launch action
+hub-phone-320-returning: Turdanoid clips its name, genre, or launch action
+hub-phone-320-returning: Turdtris clips its name, genre, or launch action
+hub-phone-320-returning: Crapjack 21 clips its name, genre, or launch action
+hub-phone-320-returning: Crappy Eights clips its name, genre, or launch action
+hub-phone-320-returning: TurdRummy clips its name, genre, or launch action
+hub-phone-320-returning: TurdSpades clips its name, genre, or launch action
+hub-phone-320-returning: Turdomania escaped the first screen: {"left":21,"right":157,"top":522.296875,"bottom":578.296875,"height":56}
+hub-phone-320-returning: Turdomania clips its name, genre, or launch action
+hub-phone-320-large-text: Turdanoid clips its name, genre, or launch action
+hub-phone-320-large-text: Turdtris clips its name, genre, or launch action
+hub-phone-320-large-text: Crapjack 21 clips its name, genre, or launch action
+hub-phone-320-large-text: Crappy Eights clips its name, genre, or launch action
+hub-phone-320-large-text: TurdRummy clips its name, genre, or launch action
+hub-phone-320-large-text: TurdSpades clips its name, genre, or launch action
+hub-phone-320-large-text: Turdomania clips its name, genre, or launch action
+hub-phone-390: Turdanoid clips its name, genre, or launch action
+hub-phone-390: Turdtris clips its name, genre, or launch action
+hub-phone-390: Crapjack 21 clips its name, genre, or launch action
+hub-phone-390: Crappy Eights clips its name, genre, or launch action
+hub-phone-390: TurdRummy clips its name, genre, or launch action
+hub-phone-390: TurdSpades clips its name, genre, or launch action
+hub-phone-390: Turdomania clips its name, genre, or launch action
+hub-phone-390-returning: Turdanoid clips its name, genre, or launch action
+hub-phone-390-returning: Turdtris clips its name, genre, or launch action
+hub-phone-390-returning: Crapjack 21 clips its name, genre, or launch action
+hub-phone-390-returning: Crappy Eights clips its name, genre, or launch action
+hub-phone-390-returning: TurdRummy clips its name, genre, or launch action
+hub-phone-390-returning: TurdSpades clips its name, genre, or launch action
+hub-phone-390-returning: Turdomania clips its name, genre, or launch action
+hub-phone-390-large-text: Turdanoid clips its name, genre, or launch action
+hub-phone-390-large-text: Turdtris clips its name, genre, or launch action
+hub-phone-390-large-text: Crapjack 21 clips its name, genre, or launch action
+hub-phone-390-large-text: Crappy Eights clips its name, genre, or launch action
+hub-phone-390-large-text: TurdRummy clips its name, genre, or launch action
+hub-phone-390-large-text: TurdSpades clips its name, genre, or launch action
+hub-phone-390-large-text: Turdomania clips its name, genre, or launch action
+hub-phone-no-script: Turdanoid clips its name, genre, or launch action
+hub-phone-no-script: Turdtris clips its name, genre, or launch action
+hub-phone-no-script: Crapjack 21 clips its name, genre, or launch action
+hub-phone-no-script: Crappy Eights clips its name, genre, or launch action
+hub-phone-no-script: TurdRummy clips its name, genre, or launch action
+hub-phone-no-script: TurdSpades clips its name, genre, or launch action
+hub-phone-no-script: Turdomania clips its name, genre, or launch action
+turdomania-320: tiles must be at least 32px: 29
+turdomania-size-320-normal: tiles must be >=32px, saw 29x29
+turdomania-size-320-hard: tiles must be >=32px, saw 29x29
+
+Exit: 1; seconds: 127.4

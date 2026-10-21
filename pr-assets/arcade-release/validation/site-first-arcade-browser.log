@@ -1,0 +1,122 @@
+
+Running 9 tests using 2 workers
+
+(node:66476) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:66477) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  2 [chromium] › tests/e2e/play.spec.js:7:1 › /play/ hosts Turdanoid same-origin, hidden and noindex (45.2s)
+  ✘  1 [chromium] › tests/e2e/arcade-play.spec.js:30:1 › Daily Dump preserves one logical board across viewports, rotation, refresh, and the project prefix (48.8s)
+(node:67215) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:67235) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  3 [chromium] › tests/e2e/play.spec.js:49:1 › shared music advances once per track, persists preferences, and pauses in hidden tabs (17.4s)
+(node:67355) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  5 [chromium] › tests/e2e/play.spec.js:85:1 › homepage Games card and nav link go to /play/, which stays noindex and out of the Pages package (9.6s)
+  ✓  6 [chromium] › tests/e2e/play.spec.js:124:1 › /play/ has a share image (4.8s)
+  ✘  4 [chromium] › tests/e2e/arcade-play.spec.js:64:1 › a completed Daily Dump keeps its first result, offers valid sharing, and separates practice/free play (35.1s)
+(node:67514) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  7 [chromium] › tests/e2e/play.spec.js:134:1 › game over offers Listen to Manic, the Oct 24 show and Share score next to Play again (1.7s)
+  ✓  8 [chromium] › tests/e2e/arcade-play.spec.js:119:1 › Daily Dump starts with denied storage, rejects malformed challenge parameters, without disrupting the hub (1.9s)
+  ✓  9 [chromium] › tests/e2e/arcade-play.spec.js:140:1 › corrupt or stale daily saves leave existing free-play records intact (923ms)
+
+
+  1) [chromium] › tests/e2e/arcade-play.spec.js:30:1 › Daily Dump preserves one logical board across viewports, rotation, refresh, and the project prefix 
+
+    Tearing down "context" exceeded the test timeout of 30000ms.
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/arcade-play-Daily-Dump-pre-de44e-resh-and-the-project-prefix-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/arcade-play-Daily-Dump-pre-de44e-resh-and-the-project-prefix-chromium/error-context.md
+
+  2) [chromium] › tests/e2e/arcade-play.spec.js:64:1 › a completed Daily Dump keeps its first result, offers valid sharing, and separates practice/free play 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: locator('#dailyShareStatus')
+    Expected substring: "canceled"
+    Received string:    "Select and copy the result text below."
+    Timeout: 5000ms
+
+    Call log:
+      - Expect "toContainText" locator('#dailyShareStatus') with timeout 5000ms
+      - waiting for locator('#dailyShareStatus')
+        14 × locator resolved to <p role="status" id="dailyShareStatus" class="daily-share-status">Select and copy the result text below.</p>
+           - unexpected value "Select and copy the result text below."
+
+
+      88 |     });
+      89 |     await page.locator('#dailyShare').click();
+    > 90 |     await expect(page.locator('#dailyShareStatus')).toContainText('canceled');
+         |                                                     ^
+      91 |     await page.evaluate(() => {
+      92 |         navigator.canShare = () => true;
+      93 |         navigator.share = (data) => { window.__dailyShared = data; return Promise.resolve(); };
+        at /Users/jeffstory/Documents/ChatGPT/Stalemate Website/StalemateSite/tests/e2e/arcade-play.spec.js:90:53
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/arcade-play-a-completed-Da-b71e0-eparates-practice-free-play-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/arcade-play-a-completed-Da-b71e0-eparates-practice-free-play-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/arcade-play-a-completed-Da-b71e0-eparates-practice-free-play-chromium/error-context.md
+
+  3) [chromium] › tests/e2e/play.spec.js:7:1 › /play/ hosts Turdanoid same-origin, hidden and noindex 
+
+    Tearing down "context" exceeded the test timeout of 30000ms.
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/play--play-hosts-Turdanoid-same-origin-hidden-and-noindex-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/play--play-hosts-Turdanoid-same-origin-hidden-and-noindex-chromium/error-context.md
+
+  4) [chromium] › tests/e2e/play.spec.js:49:1 › shared music advances once per track, persists preferences, and pauses in hidden tabs 
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator:  locator('html')
+    Expected: "paused"
+    Received: ""
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveAttribute" locator('html') with timeout 5000ms
+      - waiting for locator('html')
+        13 × locator resolved to <html lang="en" data-mobile-game="turdanoid" class="suite-touch-manipulation">…</html>
+           - unexpected value "null"
+
+
+      52 |     await page.goto('/play/TurdAnoid.html');
+      53 |     const html = page.locator('html');
+    > 54 |     await expect(html).toHaveAttribute('data-stalemate-music', 'paused');
+         |                        ^
+      55 |     await page.locator('#btnStart').click();
+      56 |     await expect(html).toHaveAttribute('data-stalemate-music', 'playing');
+      57 |     const titles = ['Andrea', 'It’s Only Been 18', 'Wham Bam', 'Planet of the Flakes', 'Manic'];
+        at /Users/jeffstory/Documents/ChatGPT/Stalemate Website/StalemateSite/tests/e2e/play.spec.js:54:24
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/play-shared-music-advances-1baf7-s-and-pauses-in-hidden-tabs-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/play-shared-music-advances-1baf7-s-and-pauses-in-hidden-tabs-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/play-shared-music-advances-1baf7-s-and-pauses-in-hidden-tabs-chromium/error-context.md
+
+  4 failed
+    [chromium] › tests/e2e/arcade-play.spec.js:30:1 › Daily Dump preserves one logical board across viewports, rotation, refresh, and the project prefix 
+    [chromium] › tests/e2e/arcade-play.spec.js:64:1 › a completed Daily Dump keeps its first result, offers valid sharing, and separates practice/free play 
+    [chromium] › tests/e2e/play.spec.js:7:1 › /play/ hosts Turdanoid same-origin, hidden and noindex 
+    [chromium] › tests/e2e/play.spec.js:49:1 › shared music advances once per track, persists preferences, and pauses in hidden tabs 
+  5 passed (1.8m)

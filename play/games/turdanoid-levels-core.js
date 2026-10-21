@@ -327,6 +327,7 @@
           indestructible: !!spec.indestructible,
           hazard: spec.hazard || null,
           material: spec.material || null,
+          heavy: !!spec.heavy,
           color: cellColor(spec)
         });
       }

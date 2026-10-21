@@ -1,0 +1,6 @@
+{
+  "date": "2026-10-21",
+  "browser": "Chromium desktop + emulated touch viewport; not physical-phone acceptance",
+  "upstream": "5160ba6a0520fca5ba4a0ed9ec739eea3f19539e",
+  "errors": []
+}

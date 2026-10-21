@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mobile-game="turdomania">
 <head>
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
@@ -9,6 +9,7 @@
 <meta name="theme-color" content="#1a120c">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="assets/turdsuite.css">
+<link rel="stylesheet" href="assets/arcade.css">
 <script src="games/table-continue-core.js"></script>
 <script src="assets/turdsuite.js"></script>
 <title>Turdomania</title>
@@ -59,6 +60,7 @@ main.tm { display: contents; }
 .tile.cursor { outline: 3px solid var(--accent-2); outline-offset: -2px; z-index: 3; }
 .tile.popping { opacity: 0; transform: var(--pos) scale(1.6) rotate(25deg) !important; pointer-events: none; }
 .tile.nope { animation: nope 260ms; }
+.tile svg { width:92%; height:92%; pointer-events:none; filter:drop-shadow(0 1px 0 #0005); }
 @keyframes nope { 25% { margin-left: -3px; } 75% { margin-left: 3px; } }
 .float { position: absolute; pointer-events: none; font-weight: 900; color: #fff; text-shadow: 0 2px 0 #000; animation: floatUp 800ms ease-out forwards; z-index: 5; }
 @keyframes floatUp { from { transform: translate(-50%, 0); opacity: 1; } to { transform: translate(-50%, -40px); opacity: 0; } }
@@ -88,14 +90,68 @@ body.reduced .tile.popping { transform: var(--pos) !important; }
   .dock { margin-top: 6px; gap: 6px; flex-wrap: wrap; }
   .dock button, .dock select { padding: 0 10px; font-size: .85rem; white-space: nowrap; }
   .dock select { min-width: 0; flex: 1 1 100%; max-width: none; }
+  .dock .suite-difficulty-seg { max-width: 100%; }
+  .dock .suite-difficulty-btn { min-width: 0; padding: 0 8px; font-size: 0.62rem; }
 }
+.dock:has(.suite-difficulty) #levelSel { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .tile, .float { transition: none !important; animation: none !important; }
   .tile.popping { transform: var(--pos) !important; }
 }
 </style>
+<link rel="stylesheet" href="assets/mobile-fit.css">
+<script src="assets/mobile-fit.js" defer></script>
+<style>
+.daily-info { width:100%; font-size:.8rem; text-align:center; display:grid; grid-template-columns:1fr auto; align-items:center; gap:2px 12px; }
+.daily-info a { color:#a9f4d5; display:inline-flex; align-items:center; min-height:44px; padding:0 8px; }
+.daily-cta { grid-template-columns:1fr; }
+.daily-cta > p { line-height:1.35; color:#ffe398; }
+.daily-identity, .daily-storage-note { grid-column:1/-1; }
+.daily-identity { font-weight:bold; color:#ffe398; line-height:1.35; }
+.daily-storage-note { color:#ffe398; }
+.daily-storage-note:empty { display:none; }
+.daily-rules { text-align:left; }
+.daily-rules summary { cursor:pointer; display:flex; align-items:center; justify-content:center; min-height:44px; padding:0 8px; text-decoration:underline; }
+.daily-rules summary::before { content:'▸ '; margin-right:5px; }
+.daily-rules[open] summary::before { content:'▾ '; }
+.daily-rules-body { position:fixed; z-index:80; top:130px; left:50%; transform:translateX(-50%); width:min(430px,calc(100vw - 24px)); max-height:calc(100dvh - 150px); overflow:auto; padding:16px; border:2px solid #ffe398; border-radius:12px; background:#211a25; box-shadow:0 8px 35px #000a; font-size:.85rem; line-height:1.5; }
+.daily-rules-body p + p { margin-top:10px; }
+.daily-links { display:flex; justify-content:center; align-items:center; }
+.daily-info [hidden], .daily-dump [hidden] { display:none!important; }
+.daily-dump #overlay { overflow:auto; align-items:safe center; }
+.daily-dump #overlay > div { max-width:100%; }
+.daily-share { margin-top:10px; }
+.daily-share-status, #dailyResultNote { font-size:.78rem; margin-top:8px; }
+#dailyShareFallback { width:100%; min-height:135px; color:#fff; background:#211a25; padding:8px; font:13px sans-serif; }
+.daily-result-free { display:inline-flex; min-height:44px; align-items:center; color:#a9f4d5; padding:4px; }
+.daily-info a:focus-visible, .daily-rules summary:focus-visible { outline:3px solid #a9f4d5; }
+@media(max-width:980px) {
+  html[data-mobile-game="turdomania"] body:not(.daily-entry) header.hud { height:56px; }
+  html[data-mobile-game="turdomania"] .dock .suite-difficulty-seg { padding:0; }
+  html[data-mobile-game="turdomania"] body.daily-entry header.hud { height:auto; padding:2px 4px; flex-wrap:wrap; }
+  .daily-entry header.hud .stat { flex:1; min-width:0; }
+  .daily-entry header.hud .stat:first-of-type { margin-left:48px; }
+  .daily-entry header.hud .stat:nth-of-type(3) { margin-right:100px; }
+  .daily-info { font-size:.72rem; gap:0 4px; }
+  .daily-dump .daily-identity { margin-top:3px; }
+  .daily-dump .dock { max-width:100%; }
+  .daily-dump .dock button { font-size:.75rem; padding:0 8px; }
+  .daily-dump #boardWrap { margin:4px auto!important; }
+  html[data-mobile-game="turdomania"] .tm-aim nav { position:fixed; left:50%; right:auto; bottom:calc(100dvh - var(--tm-dock-top, 100dvh) + 8px); transform:translateX(-50%); width:max-content; max-width:calc(100vw - 12px); flex-wrap:wrap; justify-content:center; z-index:60; }
+}
+@media(max-width:980px) and (orientation:landscape) {
+  html[data-mobile-game="turdomania"] body.daily-entry header.hud { top:56px; width:188px; right:8px; }
+  .daily-entry header.hud .stat:first-of-type, .daily-entry header.hud .stat:nth-of-type(3) { margin:0; }
+  .daily-dump .daily-info { display:block; }
+  .daily-dump .daily-identity { font-size:.68rem; }
+  html[data-mobile-game="turdomania"] body.daily-dump .dock { position:absolute; right:8px; bottom:calc(8px + var(--mobile-footer,0px)); margin:0; width:188px; gap:2px; }
+  .daily-dump .daily-links { margin-top:-4px; }
+  html[data-mobile-game="turdomania"] body.daily-dump #boardWrap { position:absolute; margin:0!important; left:max(4px,calc((100vw - 220px - var(--board-w) - 16px) / 2)); top:max(4px,calc((100dvh - var(--mobile-footer,0px) - var(--board-h) - 16px) / 2)); }
+  .daily-rules-body { top:56px; max-height:calc(100dvh - 72px); }
+}
+</style>
 </head>
-<body class="suite-ambient">
+<body class="suite-ambient turdomania arcade" data-arcade-game="turdomania">
 <header class="hud">
   <h1>💩 Turdomania</h1>
   <div class="stat">Score<b id="score">0</b></div>
@@ -118,8 +174,16 @@ body.reduced .tile.popping { transform: var(--pos) !important; }
   </div>
 </div>
 <div class="dock" role="toolbar" aria-label="Game controls">
+  <div class="suite-hud-settings" id="suite-difficulty-mount"></div>
   <button type="button" id="undoBtn" aria-keyshortcuts="U">↶ Undo</button>
   <button type="button" id="newBtn" aria-keyshortcuts="N">🚽 New board</button>
+  <details class="tm-aim"><summary>Aim</summary><nav aria-label="Precise board controls">
+    <button type="button" data-board-key="ArrowLeft" aria-label="Aim left">←</button>
+    <button type="button" data-board-key="ArrowUp" aria-label="Aim up">↑</button>
+    <button type="button" data-board-key="ArrowDown" aria-label="Aim down">↓</button>
+    <button type="button" data-board-key="ArrowRight" aria-label="Aim right">→</button>
+    <button type="button" data-board-key="Enter">Pop</button>
+  </nav></details>
   <label class="sr-only" for="levelSel">Difficulty</label>
   <select id="levelSel" aria-label="Difficulty">
     <option value="easy">Squirt · 3 kinds</option>
@@ -138,17 +202,33 @@ window.tmView = function () {
   var w = Math.min(window.innerWidth || Infinity, de.clientWidth || Infinity);
   var h = Math.min(window.innerHeight || Infinity, de.clientHeight || Infinity);
   var compact = w <= 360 || h <= 600;
-  return { availW: Math.min(w, 760) - 36, availH: h - (compact ? 170 : 230) };
+  var mobile = w <= 980;
+  var landscape = w > h;
+  var strip = document.querySelector('.stalemate-strip');
+  var footer = strip ? strip.getBoundingClientRect().height : 0;
+  var hud = document.querySelector('header.hud');
+  var dock = document.querySelector('.dock');
+  var chrome = mobile ? (landscape ? 24 : (hud ? hud.offsetHeight : 64) + (dock ? dock.offsetHeight : 100) + 20) : (compact ? 182 : 230);
+  return { availW: Math.min(w - (mobile && landscape ? 210 : 0), 760) - 36, availH: h - chrome - footer };
 };
 window.tmFit = function (levelKey) {
   var d = TM_DIMS[levelKey] || TM_DIMS.normal;
-  var v = tmView(), availW = v.availW, availH = v.availH;
+  // Preserve the established board sizes; layout() fits this same board after rotation.
+  var w = Math.min(window.innerWidth, document.documentElement.clientWidth);
+  var h = Math.min(window.innerHeight, document.documentElement.clientHeight);
+  var availW = Math.min(w, 760) - 36, availH = h - (w <= 360 || h <= 600 ? 182 : 230);
   var fit = function (n, avail, floor) { return Math.max(Math.min(n, floor), Math.min(n, Math.floor(avail / 32))); };
   return { availW: availW, availH: availH, cols: fit(d[0], availW, 6), rows: fit(d[1], availH, 8) };
 };
 (function () {
   var q = new URLSearchParams(location.search), lvl = q.get('level');
-  if (!TM_DIMS[lvl]) { try { lvl = (JSON.parse(localStorage.getItem('turdomania_prefs_v1') || 'null') || {}).level; } catch (e) { lvl = null; } }
+  if (!TM_DIMS[lvl]) {
+    try {
+      if (window.Suite && Suite.difficulty) { lvl = Suite.difficulty.get(); }
+      else { lvl = localStorage.getItem('turdsuite_difficulty_v1'); }
+    } catch (e) { lvl = null; }
+    if (!TM_DIMS[lvl]) { try { lvl = (JSON.parse(localStorage.getItem('turdomania_prefs_v1') || 'null') || {}).level; } catch (e) { lvl = null; } }
+  }
   var f = tmFit(TM_DIMS[lvl] ? lvl : 'normal');
   window.TM_INIT = { level: TM_DIMS[lvl] ? lvl : 'normal', cols: f.cols, rows: f.rows };
   var cell = Math.max(22, Math.min(56, Math.floor(Math.min(f.availW / f.cols, f.availH / f.rows))));
@@ -162,6 +242,8 @@ window.tmFit = function (levelKey) {
 
 <script type="module">
 import * as Core from './games/turdomania-core.js';
+import * as Daily from './games/turdomania-daily.js';
+import { createDailyUI } from './games/turdomania-daily-ui.js';
 
 const qs = new URLSearchParams(location.search);
 const boardEl = document.getElementById('board');
@@ -176,11 +258,13 @@ const els = {
 };
 const reduced = () => qs.get('reducedMotion') === '1' || matchMedia('(prefers-reduced-motion: reduce)').matches;
 if (reduced()) document.body.classList.add('reduced');
+// Accessing the storage property itself can throw in private/embedded browsers.
+const safeStorage = (() => { try { return window.localStorage; } catch { return null; } })();
 
 function readPrefs() {
-  try { const p = JSON.parse(localStorage.getItem(Core.PREFS_KEY) || 'null'); return p && p.v === 1 ? p : { v: 1 }; } catch { return { v: 1 }; }
+  try { const p = JSON.parse(safeStorage.getItem(Core.PREFS_KEY) || 'null'); return p && p.v === 1 ? p : { v: 1 }; } catch { return { v: 1 }; }
 }
-function writePrefs(p) { try { localStorage.setItem(Core.PREFS_KEY, JSON.stringify({ ...p, v: 1 })); } catch { /* full */ } }
+function writePrefs(p) { try { safeStorage.setItem(Core.PREFS_KEY, JSON.stringify({ ...p, v: 1 })); } catch { /* full */ } }
 
 // Sound hooks: shared suite synth, which honours the suite mute toggle.
 function sfx(name) {
@@ -196,13 +280,15 @@ let cursor = { c: 0, r: 0 };
 let cell = 32;
 const tileEls = new Map();
 const fixedSeed = qs.has('seed') ? Number(qs.get('seed')) >>> 0 : null;
+const daily = createDailyUI({ params: qs, storage: safeStorage, gameURL: location.href, announce });
+let busy = false;
+let popTimer = 0;
+let generation = 0;
 
-function start(levelKey, seed) {
-  // First board reuses the size reserved before paint; later boards re-measure.
-  const init = window.TM_INIT && window.TM_INIT.level === levelKey ? window.TM_INIT : null;
-  window.TM_INIT = null;
-  const fit = init || (window.tmFit ? window.tmFit(levelKey) : null);
-  state = Core.newGame(levelKey, seed ?? (fixedSeed ?? ((Math.random() * 2 ** 32) >>> 0)), fit && !qs.has('fullsize') ? { cols: fit.cols, rows: fit.rows } : null);
+function resetView() {
+  generation++;
+  clearTimeout(popTimer);
+  busy = false;
   boardEl.innerHTML = '';
   rowEls.length = 0;
   tileEls.clear();
@@ -213,13 +299,40 @@ function start(levelKey, seed) {
   sfx('shuffle');
 }
 
+function start(levelKey, seed) {
+  if (daily.enabled) {
+    if (!daily.startPractice()) return;
+    state = daily.run.state;
+    resetView();
+    return;
+  }
+  // First board reuses the size reserved before paint; later boards re-measure.
+  const init = window.TM_INIT && window.TM_INIT.level === levelKey ? window.TM_INIT : null;
+  window.TM_INIT = null;
+  const fit = init || (window.tmFit ? window.tmFit(levelKey) : null);
+  state = Core.newGame(levelKey, seed ?? (fixedSeed ?? ((Math.random() * 2 ** 32) >>> 0)), fit && !qs.has('fullsize') ? { cols: fit.cols, rows: fit.rows } : null);
+  resetView();
+}
+
 function layout() {
-  const { availW, availH } = window.tmView();
-  cell = Math.max(22, Math.min(56, Math.floor(Math.min(availW / state.cols, availH / state.rows))));
+  let { availW, availH } = window.tmView();
+  const viewH = Math.min(window.innerHeight, document.documentElement.clientHeight);
+  const viewW = Math.min(window.innerWidth, document.documentElement.clientWidth);
+  const footer = document.querySelector('.stalemate-strip')?.getBoundingClientRect().height || 0;
+  const landscape = viewW <= 980 && viewW > viewH;
+  const bodyStyle = getComputedStyle(document.body);
+  const padding = (parseFloat(bodyStyle.paddingTop) || 0) + (parseFloat(bodyStyle.paddingBottom) || 0);
+  const help = document.querySelector('.help');
+  const helpHeight = help && getComputedStyle(help).display !== 'none' ? help.getBoundingClientRect().height + 8 : 0;
+  // Measure the actual kit, daily banner and footer; fonts and settings can change their height.
+  availH = landscape ? viewH - footer - 24 : viewH - document.querySelector('header.hud').offsetHeight - document.querySelector('.dock').offsetHeight - helpHeight - Math.max(footer, padding) - 24;
+  if (landscape) availW = viewW - 224;
+  cell = Math.max(daily.enabled ? 18 : 22, Math.min(56, Math.floor(Math.min(availW / state.cols, availH / state.rows))));
   const st = document.documentElement.style;
   st.setProperty('--cell', cell + 'px');
   st.setProperty('--board-w', cell * state.cols + 'px');
   st.setProperty('--board-h', cell * state.rows + 'px');
+  st.setProperty('--tm-dock-top', document.querySelector('.dock').getBoundingClientRect().top + 'px');
 }
 
 // Grid semantics: one role="row" per visual row (top to bottom); each tile lives in its row.
@@ -253,12 +366,21 @@ function render() {
       el.className = 'tile';
       el.id = 'tile-' + t.id;
       el.setAttribute('role', 'gridcell');
-      el.textContent = kind.emoji;
-      el.style.setProperty('--k', kind.color);
+      const art = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      art.setAttribute('viewBox', '0 0 64 64');
+      art.setAttribute('aria-hidden', 'true');
+      const icon = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+      icon.setAttribute('href', './assets/turdomania-tiles.svg#' + ['swirl', 'corn', 'splat', 'paper', 'bean', 'cheese'][t.kind]);
+      art.appendChild(icon);
+      el.appendChild(art);
+      el.dataset.kind = String(t.kind);
+      el.style.setProperty('--k', (window.Suite && Suite.turdomaniaKindColor) ? Suite.turdomaniaKindColor(t.kind, kind.color) : kind.color);
       el.dataset.id = t.id;
       tileEls.set(t.id, el);
     }
     el.classList.remove('popping');
+    el.dataset.kind = String(t.kind);
+    el.style.setProperty('--k', (window.Suite && Suite.turdomaniaKindColor) ? Suite.turdomaniaKindColor(t.kind, kind.color) : kind.color);
     el.dataset.col = c; el.dataset.row = r;
     const rowEl = rowEls[state.rows - 1 - r];
     if (el.parentNode !== rowEl) {
@@ -279,15 +401,16 @@ function render() {
   }));
   for (const [id, el] of tileEls) if (!live.has(id)) { el.remove(); tileEls.delete(id); }
   els.score.textContent = state.score;
-  const best = Core.readBest(localStorage)[state.level];
+  const best = daily.enabled ? (daily.firstResult?.score || 0) : Core.readBest(safeStorage)[state.level];
   els.best.textContent = Math.max(best, state.score);
   els.left.textContent = Core.tileCount(state.board);
   els.undo.disabled = state.history.length === 0;
   els.level.value = state.level;
+  if (daily.enabled) daily.update();
   clampCursor();
   paintCursor();
   if (state.over) showOver();
-  window.__turdomania = { state, Core };
+  window.__turdomania = { state, Core, daily: daily.enabled ? daily.run : null };
 }
 
 function clampCursor() {
@@ -331,10 +454,9 @@ function floatText(text, c, r) {
   setTimeout(() => f.remove(), 850);
 }
 
-let busy = false;
 function popAt(c, r) {
   if (busy || !state) return;
-  const res = Core.play(state, c, r);
+  const res = daily.enabled ? Daily.playMove(daily.run, c, r) : Core.play(state, c, r);
   if (!res) {
     const t = Core.cellAt(state.board, c, r);
     const el = t && tileEls.get(t.id);
@@ -348,21 +470,27 @@ function popAt(c, r) {
   floatText(res.points ? `+${res.points}` : 'plop', c, r);
   sfx(res.removed.length >= 6 ? 'ding' : 'blip');
   state = res.state;
-  if (state.over) Core.recordBest(localStorage, state.level, state.score);
+  if (daily.enabled) { daily.run = res.run; daily.persist(); }
+  else if (state.over) Core.recordBest(safeStorage, state.level, state.score);
+  const startedGeneration = generation;
   const finish = () => {
+    if (startedGeneration !== generation) return;
     removedEls.forEach((el) => { el.remove(); tileEls.delete(Number(el.dataset.id)); });
     busy = false;
     render();
     announce(`Popped ${res.removed.length}${res.points ? `, +${res.points}` : ''}. Score ${state.score}.`);
   };
   if (reduced()) finish();
-  else { busy = true; setTimeout(finish, 170); }
+  else { busy = true; popTimer = setTimeout(finish, 170); }
 }
 
 function doUndo() {
-  const prev = state && Core.undo(state);
+  if (busy) return;
+  const previousRun = daily.enabled ? Daily.undoPractice(daily.run) : null;
+  const prev = daily.enabled ? previousRun?.state : state && Core.undo(state);
   if (!prev) return;
   state = prev;
+  if (daily.enabled) { daily.run = previousRun; daily.persist(); }
   overlay.classList.remove('show');
   // Rebuild tiles: undone tiles come back with their old ids.
   render();
@@ -372,11 +500,16 @@ function doUndo() {
 
 function showOver() {
   const left = Core.tileCount(state.board);
-  const best = Core.readBest(localStorage)[state.level];
+  const best = Core.readBest(safeStorage)[state.level];
   els.overTitle.textContent = state.cleared ? 'Squeaky clean! 🧼' : 'Clogged! 🪠';
   els.overText.textContent = state.cleared
     ? `Board flushed. +${Core.CLEAR_BONUS} bonus. Final ${state.score}.${state.score >= best ? ' New best!' : ''}`
     : `No more matches. ${left} turd${left === 1 ? '' : 's'} left behind. Final ${state.score}.${state.score >= best && state.score > 0 ? ' New best!' : ''}`;
+  if (daily.enabled) {
+    const result = daily.run.practice ? Daily.summarize(daily.run) : daily.firstResult || Daily.summarize(daily.run);
+    els.overTitle.textContent = daily.run.practice ? 'Practice complete!' : 'Daily Dump complete!';
+    els.overText.textContent = `${result.challenge.date} · ${result.score} points · ${result.moves} pops · ${result.cleared ? 'Board flushed!' : result.left + ' tiles left.'}`;
+  }
   overlay.classList.add('show');
   sfx(state.cleared ? 'win' : 'lose');
   announce(els.overTitle.textContent + ' ' + els.overText.textContent);
@@ -410,16 +543,81 @@ document.addEventListener('keydown', (e) => {
   if (moves[k]) { e.preventDefault(); cursor.c += moves[k][0]; cursor.r += moves[k][1]; clampCursor(); paintCursor(); return; }
   if (k === 'Enter' || k === ' ') { e.preventDefault(); popAt(cursor.c, cursor.r); }
 });
+document.querySelectorAll('[data-board-key]').forEach(button => {
+  button.addEventListener('click', () => {
+    boardEl.focus({ preventScroll: true });
+    boardEl.dispatchEvent(new KeyboardEvent('keydown', { key: button.dataset.boardKey, bubbles: true }));
+  });
+});
 els.undo.addEventListener('click', doUndo);
 els.overUndo.addEventListener('click', doUndo);
 els.newBtn.addEventListener('click', () => start(state.level));
 els.again.addEventListener('click', () => { start(state.level); boardEl.focus({ preventScroll: true }); });
-els.level.addEventListener('change', () => { writePrefs({ level: els.level.value }); start(els.level.value); });
+function suiteBoardLevel() {
+  try {
+    if (window.Suite && Suite.difficulty) { return Suite.difficulty.get(); }
+    const raw = localStorage.getItem('turdsuite_difficulty_v1');
+    return Core.LEVELS[raw] ? raw : null;
+  } catch { return null; }
+}
+els.level.addEventListener('change', () => {
+  if (daily.enabled) return;
+  const lvl = els.level.value;
+  writePrefs({ level: lvl });
+  try {
+    if (window.Suite && Suite.difficulty) { Suite.difficulty.set(lvl); }
+    else { localStorage.setItem('turdsuite_difficulty_v1', lvl); }
+  } catch { /* ignore */ }
+  start(lvl);
+});
+const pinnedLevel = Core.LEVELS[qs.get('level')] ? qs.get('level') : null;
+
+if (window.Suite && Suite.difficulty) {
+  Suite.difficulty.onChange((lvl) => {
+    if (pinnedLevel || daily.enabled) { return; }
+    if (!Core.LEVELS[lvl] || (state && state.level === lvl)) { return; }
+    if (els.level.value !== lvl) { els.level.value = lvl; }
+    writePrefs({ level: lvl });
+    start(lvl);
+  });
+}
 let rz = 0;
 window.addEventListener('resize', () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(() => { if (state) { layout(); render(); } }); });
 
-const startLevel = Core.LEVELS[qs.get('level')] ? qs.get('level') : (readPrefs().level || 'normal');
-start(startLevel);
+function armSuiteMusic() {
+  try {
+    if (window.Suite && typeof Suite.music === 'function') {
+      Suite.music().then((player) => { if (player) player.armFromGesture(); });
+    }
+  } catch { /* optional */ }
+}
+function suiteMusicBlocked() {
+  try {
+    if (window.Suite && typeof Suite.isMusicEnabled === 'function' && !Suite.isMusicEnabled()) return true;
+  } catch { /* optional */ }
+  return false;
+}
+try {
+  if (window.Suite && typeof Suite.setMusicGameBlocked === 'function') {
+    Suite.setMusicGameBlocked(suiteMusicBlocked);
+  }
+} catch { /* optional */ }
+
+boardEl.addEventListener('pointerdown', armSuiteMusic, { once: true, passive: true });
+boardEl.addEventListener('keydown', armSuiteMusic, { once: true });
+
+const startLevel = pinnedLevel
+  || (window.TM_INIT && window.TM_INIT.level)
+  || suiteBoardLevel()
+  || readPrefs().level
+  || 'normal';
+if (daily.enabled) { state = daily.run.state; resetView(); }
+else start(startLevel);
+try {
+  if (!daily.enabled && pinnedLevel && window.Suite && Suite.difficulty && Suite.difficulty.get() !== pinnedLevel) {
+    Suite.difficulty.set(pinnedLevel);
+  }
+} catch { /* ignore */ }
 // Test hook: deterministic actions without hunting pixels.
 window.__turdomaniaPop = (c, r) => popAt(c, r);
 window.__turdomaniaUndo = doUndo;

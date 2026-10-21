@@ -1,11 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mobile-game="neon-arkanoid">
 <head>
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="assets/turdsuite.css">
+  <script src="assets/turdsuite.js"></script>
     <title>Neon Arkanoid</title>
     <style>
         :root {
@@ -304,6 +306,9 @@
 
         .how-card {
             width: min(520px, 100%);
+            max-height: calc(100dvh - 40px);
+            overflow-y: auto;
+            overscroll-behavior: contain;
             background: rgba(9, 18, 36, 0.94);
             border: 1px solid rgba(127, 245, 220, 0.45);
             border-radius: 16px;
@@ -333,10 +338,43 @@
         }
 
         .guide-actions {
-            margin-top: 10px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(127, 245, 220, 0.2);
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
+        }
+
+        .guide-actions .btn {
+            flex: 1 1 140px;
+            min-height: 46px;
+            font-size: 14px;
+            font-weight: 700;
+            touch-action: manipulation;
+        }
+
+        .guide-actions .btn:not(.subtle) {
+            color: #071c26;
+            background: linear-gradient(180deg, #9dffe9, var(--accent));
+            border-color: var(--accent);
+        }
+
+        .guide-actions .btn:not(.subtle):hover {
+            background: #b5ffef;
+        }
+
+        .guide-actions .btn.subtle {
+            border-color: rgba(127, 245, 220, 0.5);
+        }
+
+        .guide-actions .btn:focus-visible {
+            outline: 2px solid #effffb;
+            outline-offset: 3px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .guide-actions .btn { transition: none; transform: none; }
         }
 
         .achievement-toast {
@@ -504,6 +542,8 @@
             outline-offset: 3px;
         }
     </style>
+<link rel="stylesheet" href="assets/mobile-fit.css">
+<script src="assets/mobile-fit.js" defer></script>
 </head>
 <body>
     <div class="how-to-play" id="howToPlay">
@@ -520,7 +560,7 @@
             <p>Tip: keep the ball alive and stack power-ups to build huge score multipliers.</p>
             <div class="guide-actions">
                 <button class="btn" onclick="quickStartPlay()">Quick Start</button>
-                <button class="btn subtle" onclick="dismissHowToPlay()">Review Then Start</button>
+                <button class="btn subtle" onclick="dismissHowToPlay()">Close Guide</button>
             </div>
         </div>
     </div>
@@ -685,6 +725,16 @@
         window.addEventListener('load', function () {
             showHowToPlay();
         });
+
+        try {
+          if (window.Suite && typeof Suite.setMusicGameBlocked === 'function') {
+            Suite.setMusicGameBlocked(function () {
+              try {
+                return window.Suite && typeof Suite.isMusicEnabled === 'function' && !Suite.isMusicEnabled();
+              } catch (e) { return false; }
+            });
+          }
+        } catch (e) { /* ignore */ }
     </script>
 <script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>
 <script src="../js/track.js" defer></script>

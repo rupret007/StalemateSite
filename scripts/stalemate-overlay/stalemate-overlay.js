@@ -1,76 +1,8 @@
-/* Stalemate overlay for vendored Turdanoid. Applied by scripts/sync-turdanoid.sh after each sync.
-   1) Stalemate songs as game music: Manic on level 1, then Andrea, then It's Only Been 18, Wham Bam and Planet of the Flakes, rotating per level.
-      Starts on first tap/key (iOS needs a gesture), loops within a level, follows the game's own mute/sound setting,
-      pauses while the tab is hidden.
-   2) Black-and-white checkerboard on alternating bricks, mixed with the stock poop sprites. */
+/* Site-specific Turdanoid decoration and results. Music belongs to the shared
+   Suite player in assets/suite-music.js; this overlay never creates audio. */
 (function () {
   'use strict';
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  // ---------- Music ----------
-  var PLAYLIST = [
-    { file: 'stalemate/manic.m4a', title: 'Manic' },
-    { file: 'stalemate/andrea.m4a', title: 'Andrea' },
-    { file: 'stalemate/only-been-18.m4a', title: 'It\u2019s Only Been 18' },
-    { file: 'stalemate/wham-bam.m4a', title: 'Wham Bam' },
-    { file: 'stalemate/planet-of-the-flakes.m4a', title: 'Planet of the Flakes' }
-  ];
-  function trackForLevel(n) {
-    n = Math.floor(Number(n));
-    if (!(n >= 1)) n = 1;
-    return PLAYLIST[(n - 1) % PLAYLIST.length];
-  }
-  function currentLevel() {
-    try { return typeof level === 'number' ? level : 1; } catch (e) { return 1; } // the game's top-level `let level`
-  }
-  window.StalematePlaylist = { tracks: PLAYLIST.slice(), trackForLevel: trackForLevel };
-  var music = new Audio();
-  var track = trackForLevel(currentLevel());
-  music.src = track.file;
-  music.id = 'stalemate-music';
-  music.loop = true;
-  music.preload = 'none';
-  music.volume = 0.45;
-  music.setAttribute('playsinline', '');
-  window.StalemateMusic = music;
-  var started = false;
-  function blocked() {
-    try { return typeof window.soundBlocked === 'function' ? !!window.soundBlocked() : false; } catch (e) { return false; }
-  }
-  function sync() {
-    var d = document.documentElement.dataset;
-    d.stalemateMusic = music.paused ? 'paused' : 'playing';
-    d.stalemateTrack = track.title;
-  }
-  function apply() {
-    if (!started || blocked() || document.hidden) { music.pause(); sync(); return; }
-    var p = music.play();
-    if (p && p.then) p.then(sync, sync); else sync();
-  }
-  function checkLevel() {
-    var next = trackForLevel(currentLevel());
-    if (next === track) return;
-    track = next;
-    music.pause();
-    music.src = track.file; // new song starts from the top on each level change
-    apply();
-  }
-  function firstGesture() {
-    if (started) return;
-    started = true;
-    apply();
-  }
-  music.addEventListener('play', sync);
-  music.addEventListener('pause', sync);
-  ['pointerdown', 'touchend', 'keydown'].forEach(function (t) {
-    window.addEventListener(t, firstGesture, { capture: true, passive: true });
-  });
-  // The game's own sound button and settings toggles: re-check after they update.
-  document.addEventListener('click', function () { setTimeout(apply, 0); }, true);
-  document.addEventListener('change', function () { setTimeout(apply, 0); }, true);
-  document.addEventListener('visibilitychange', apply);
-  setInterval(checkLevel, 400);
-  sync();
 
   // ---------- Checkerboard bricks ----------
   var cv = document.getElementById('game');
@@ -92,14 +24,12 @@
     ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2, 4); else ctx.rect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
     ctx.clip();
-    ctx.globalAlpha = 0.62;
+    // A narrow top edge carries the band signature while leaving damage cracks,
+    // health pips and power-up symbols in the stock brick fully readable.
+    ctx.globalAlpha = 1;
     ctx.translate(b.x, b.y);
     ctx.fillStyle = pattern;
-    ctx.fillRect(0, 0, b.w, b.h);
-    ctx.restore();
-    ctx.save();
-    ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5;
-    ctx.strokeRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
+    ctx.fillRect(0, 0, b.w, Math.min(4, b.h * 0.18));
     ctx.restore();
   };
   if (reduce) document.documentElement.classList.add('stalemate-reduced');
@@ -124,12 +54,28 @@
     if (typeof window.smTrack === 'function') window.smTrack('gameover-turdanoid-show');
   });
   var shareBtn = box.querySelector('#stalemateShare');
+  var status = document.createElement('p');
+  status.className = 'stalemate-end__status';
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
+  box.appendChild(status);
+  var fallback = document.createElement('textarea');
+  fallback.className = 'stalemate-end__copy';
+  fallback.setAttribute('aria-label', 'Score and link to copy');
+  fallback.readOnly = true;
+  fallback.hidden = true;
+  box.appendChild(fallback);
   var file = null;
+  var renderedScore = null;
+  var renderVersion = 0;
   function score() {
     var el = document.getElementById('endScore');
     return el ? el.textContent.trim() : '0';
   }
   function render() {
+    file = null;
+    renderedScore = score();
+    var version = ++renderVersion;
     var c = document.createElement('canvas');
     c.width = 1080; c.height = 1080;
     var g = c.getContext('2d');
@@ -142,21 +88,49 @@
     g.fillStyle = '#ed2765'; g.font = '900 110px Impact, "Arial Black", sans-serif'; g.fillText('TURDANOID', 540, 370);
     g.fillStyle = '#f4f0e6'; g.font = '900 150px Impact, "Arial Black", sans-serif'; g.fillText(score(), 540, 560);
     g.font = '700 54px Impact, "Arial Black", sans-serif'; g.fillText('POINTS. GROSS.', 540, 640);
-    g.fillStyle = '#b5dc08'; g.font = '700 50px Impact, "Arial Black", sans-serif'; g.fillText('stalemate.band/play', 540, 780);
-    if (c.toBlob) c.toBlob(function (b) { file = b ? new File([b], 'turdanoid-score.png', { type: 'image/png' }) : null; }, 'image/png');
+    g.fillStyle = '#b5dc08'; g.font = '700 50px Impact, "Arial Black", sans-serif'; g.fillText('STALEMATE ARCADE', 540, 740);
+    g.fillStyle = '#f4f0e6'; g.font = '700 28px sans-serif'; g.fillText(shareUrl.replace(/^https?:\/\//, ''), 540, 805, 840);
+    if (c.toBlob) c.toBlob(function (b) {
+      if (version === renderVersion) file = b && typeof File === 'function' ? new File([b], 'turdanoid-score.png', { type: 'image/png' }) : null;
+    }, 'image/png');
   }
   function visible() { return !end.hasAttribute('inert') && end.offsetParent !== null; }
   new MutationObserver(function () { if (visible()) render(); }).observe(end, { attributes: true, attributeFilter: ['class', 'inert', 'style'] });
-  var url = location.origin + location.pathname.replace(/[^/]*$/, '');
-  shareBtn.addEventListener('click', function () {
-    var text = 'I scored ' + score() + ' in Turdanoid. Brick-breaker, but gross.';
-    var withFile = file ? { files: [file], title: 'Turdanoid', text: text, url: url } : null;
-    if (withFile && navigator.canShare && navigator.canShare(withFile)) {
-      navigator.share(withFile).catch(function () {});
-    } else if (navigator.share) {
-      navigator.share({ text: text, url: url }).catch(function () {});
-    } else if (navigator.clipboard) {
-      navigator.clipboard.writeText(text + ' ' + url).then(function () { shareBtn.textContent = 'Copied!'; }, function () {});
+  var shareUrl = new URL('TurdAnoid.html', location.href).href;
+  async function copyResult(text) {
+    var fullText = text + ' ' + shareUrl;
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.writeText) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(fullText);
+      status.textContent = 'Score and link copied.';
+    } catch (error) {
+      fallback.value = fullText;
+      fallback.hidden = false;
+      fallback.focus();
+      fallback.select();
+      status.textContent = 'Select and copy your score and link below.';
     }
+  }
+  shareBtn.addEventListener('click', async function () {
+    status.textContent = '';
+    fallback.hidden = true;
+    var text = 'I scored ' + score() + ' in Turdanoid. Brick-breaker, but gross.';
+    var payload = { title: 'Turdanoid · Stalemate Arcade', text: text, url: shareUrl };
+    if (file && renderedScore === score() && navigator.canShare) {
+      try {
+        var withFile = { files: [file], title: payload.title, text: text, url: shareUrl };
+        if (navigator.canShare(withFile)) payload = withFile;
+      } catch (error) { /* Continue with text and link when files are unsupported. */ }
+    }
+    if (navigator.share) {
+      try {
+        await navigator.share(payload);
+        status.textContent = 'Shared.';
+        return;
+      } catch (error) {
+        if (error && error.name === 'AbortError') { status.textContent = 'Sharing cancelled.'; return; }
+      }
+    }
+    await copyResult(text);
   });
 })();

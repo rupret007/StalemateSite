@@ -1,0 +1,74 @@
+
+> stalemate-site@1.0.0 test:unit
+> vitest run
+
+
+ RUN  v4.1.12 /Users/jeffstory/Documents/ChatGPT/Stalemate Website/StalemateSite
+
+ ❯ tests/unit/sync-turdanoid.test.js (2 tests | 2 failed) 31458ms
+     × imports exact SHA, tag and branch reproducibly, discarding uncommitted source edits 13964ms
+     × preserves the previous import when ref resolution or transformation fails 17482ms
+ ❯ tests/unit/serve-test.test.js (9 tests | 2 failed) 102361ms
+     × serves the full file with its byte length and range support 66709ms
+     × serves the requested bytes for bytes=20- 35099ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/serve-test.test.js > test server media responses > serves the full file with its byte length and range support
+Error: Test timed out in 30000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/unit/serve-test.test.js:53:5
+     51| // Loaded CI runners can take >5s to stream the 1.5 MB fixture; allow …
+     52| describe('test server media responses', { timeout: 30000 }, () => {
+     53|     it('serves the full file with its byte length and range support', …
+       |     ^
+     54|         const response = await getMedia();
+     55|         expect(response.status).toBe(200);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  tests/unit/serve-test.test.js > test server media responses > serves the requested bytes for bytes=20-
+Error: Test timed out in 30000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/unit/serve-test.test.js:67:7
+     65|         ['bytes=-8', media.length - 8, media.length - 1],
+     66|         [`bytes=${media.length - 2}-${media.length + 10}`, media.lengt…
+     67|     ])('serves the requested bytes for %s', async (range, start, end) …
+       |       ^
+     68|         const response = await getMedia({ headers: { Range: range } });
+     69|         expect(response.status).toBe(206);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  tests/unit/sync-turdanoid.test.js > committed Turdanoid synchronization > imports exact SHA, tag and branch reproducibly, discarding uncommitted source edits
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/unit/sync-turdanoid.test.js:63:5
+     61|
+     62| describe('committed Turdanoid synchronization', () => {
+     63|     it('imports exact SHA, tag and branch reproducibly, discarding unc…
+       |     ^
+     64|         const f = fixture();
+     65|         writeFileSync(join(f.upstream, 'game.js'), '/* second committe…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  tests/unit/sync-turdanoid.test.js > committed Turdanoid synchronization > preserves the previous import when ref resolution or transformation fails
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/unit/sync-turdanoid.test.js:95:5
+     93|     });
+     94|
+     95|     it('preserves the previous import when ref resolution or transform…
+       |     ^
+     96|         const f = fixture();
+     97|         mkdirSync(join(f.root, 'play'));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  2 failed | 17 passed (19)
+      Tests  4 failed | 90 passed (94)
+   Start at  08:20:24
+   Duration  102.72s (transform 5.01s, setup 3.39s, import 27.99s, tests 156.65s, environment 75.54s)
+

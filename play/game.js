@@ -889,6 +889,10 @@ class Game {
     handleKeyDown(event) {
         this.unlockAudio();
         if (this.isBlockingGuideOpen()) {
+            // Let the focused guide button perform its native keyboard action.
+            if ((event.code === 'Enter' || event.code === 'Space') && event.target?.closest?.('#howToPlay button')) {
+                return;
+            }
             if (event.code === 'Escape' || event.code === 'Enter' || event.code === 'Space') {
                 this.dismissBlockingGuide();
                 event.preventDefault();

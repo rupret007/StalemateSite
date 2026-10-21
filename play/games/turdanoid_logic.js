@@ -6,6 +6,13 @@
  * update this module and tests/turdanoid.test.js to match.
  */
 
+import {
+  applySpeedMultiplier,
+  applySpawnMultiplier,
+  applyStartingLives,
+  isNormalDifficulty
+} from './suite-difficulty.js';
+
 export const TURDANOID_BALANCE = {
   ball: {
     baseSpeed: 5.4,
@@ -197,3 +204,21 @@ export function computeFlushBreakScore(level, goldActive = false) {
   const s = TURDANOID_BALANCE.scoring;
   return (goldActive ? 2 : 1) * s.flushBreakPerLevel * level;
 }
+
+export function computeBallSpeedForDifficulty(level, difficulty = 'normal') {
+  return applySpeedMultiplier(computeBallSpeed(level), difficulty);
+}
+
+export function computePaddleSpeedForDifficulty(level, difficulty = 'normal') {
+  return applySpeedMultiplier(computePaddleSpeed(level), difficulty);
+}
+
+export function computeDropChanceForDifficulty(level, remainingBricks, difficulty = 'normal') {
+  return applySpawnMultiplier(computeDropChance(level, remainingBricks), difficulty);
+}
+
+export function startingLivesForDifficulty(baseLives = 3, difficulty = 'normal') {
+  return applyStartingLives(baseLives, difficulty);
+}
+
+export { isNormalDifficulty };

@@ -296,12 +296,26 @@ function mountDifficultySelect() {
   }
   sel.value = loadAiDifficulty();
   sel.addEventListener('change', () => {
+    const next = normalizeAiDifficulty(sel.value);
     try {
-      localStorage.setItem(AI_DIFFICULTY_KEY, normalizeAiDifficulty(sel.value));
+      if (globalThis.Suite?.difficulty) {
+        globalThis.Suite.difficulty.set(next);
+      } else {
+        localStorage.setItem('turdsuite_difficulty_v1', next);
+      }
+      localStorage.setItem(AI_DIFFICULTY_KEY, next);
     } catch {
       /* ignore */
     }
   });
+  if (globalThis.Suite?.difficulty) {
+    globalThis.Suite.difficulty.onChange((level) => {
+      const mapped = level === 'easy' || level === 'hard' ? level : 'normal';
+      if (sel.value !== mapped) {
+        sel.value = mapped;
+      }
+    });
+  }
   host.appendChild(sel);
 }
 

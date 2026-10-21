@@ -37,8 +37,8 @@ test('/play/ hosts Turdanoid same-origin, hidden and noindex', async ({ page }) 
     await page.waitForTimeout(600);
     // Stalemate overlay: Manic starts after the first gesture and follows the game's mute button.
     await expect(page.locator('html')).toHaveAttribute('data-stalemate-music', 'playing');
-    expect(await page.evaluate(() => window.StalemateMusic.src)).toMatch(/\/play\/stalemate\/manic\.m4a$/);
-    expect(await page.evaluate(() => window.StalemateMusic.loop)).toBe(true);
+    expect(await page.evaluate(async () => (await window.Suite.music()).audioElement.src)).toMatch(/\/play\/assets\/stalemate\/manic\.m4a$/);
+    expect(await page.evaluate(async () => (await window.Suite.music()).audioElement.loop)).toBe(false);
     await page.locator('#btnSound').dispatchEvent('click');
     await expect(page.locator('html')).toHaveAttribute('data-stalemate-music', 'paused');
     await page.locator('#btnSound').dispatchEvent('click');
@@ -46,40 +46,28 @@ test('/play/ hosts Turdanoid same-origin, hidden and noindex', async ({ page }) 
     expect(errors).toEqual([]);
 });
 
-test('Turdanoid music rotates Stalemate songs per level, Manic first, and keeps mute and hidden-tab pauses', async ({ page }) => {
+test('shared music advances once per track, persists preferences, and pauses in hidden tabs', async ({ page }) => {
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto('/play/TurdAnoid.html');
     const html = page.locator('html');
-    const src = () => page.evaluate(() => window.StalemateMusic.src);
-    // Nothing plays or loads before a gesture.
-    await expect(html).toHaveAttribute('data-stalemate-music', 'paused');
-    await expect(html).toHaveAttribute('data-stalemate-track', 'Manic');
+    expect(await page.evaluate(async () => { const player = await window.Suite.music(); return { armed: player.armed, paused: player.audioElement.paused }; })).toEqual({ armed: false, paused: true });
     await page.locator('#btnStart').click();
     await expect(html).toHaveAttribute('data-stalemate-music', 'playing');
-    expect(await src()).toMatch(/\/play\/stalemate\/manic\.m4a$/);
-    const expectTrack = async (lvl, file, title) => {
-        await page.evaluate((n) => { level = n; }, lvl);
+    const titles = ['Andrea', 'It’s Only Been 18', 'Wham Bam', 'Planet of the Flakes', 'Manic'];
+    for (const title of titles) {
+        await page.evaluate(async () => (await window.Suite.music()).audioElement.dispatchEvent(new Event('ended')));
         await expect(html).toHaveAttribute('data-stalemate-track', title);
-        expect(await src()).toMatch(new RegExp(`/play/stalemate/${file.replace('.', '\\.')}$`));
-        expect(await page.evaluate(() => window.StalemateMusic.loop)).toBe(true);
-    };
-    await expectTrack(2, 'andrea.m4a', 'Andrea');
-    await expect(html).toHaveAttribute('data-stalemate-music', 'playing');
-    await expectTrack(3, 'only-been-18.m4a', 'It\u2019s Only Been 18');
-    await expect(html).toHaveAttribute('data-stalemate-music', 'playing');
-    await expectTrack(4, 'wham-bam.m4a', 'Wham Bam');
-    await expectTrack(5, 'planet-of-the-flakes.m4a', 'Planet of the Flakes');
-    await expectTrack(6, 'manic.m4a', 'Manic');
-    // Muted in the game: a level change switches the song but stays silent.
-    await page.locator('#btnSound').dispatchEvent('click');
+        expect(await page.evaluate(async () => (await window.Suite.music()).audioElement.loop)).toBe(false);
+    }
+    await page.locator('#suite-music-toggle').click();
     await expect(html).toHaveAttribute('data-stalemate-music', 'paused');
-    await expectTrack(7, 'andrea.m4a', 'Andrea');
-    await page.waitForTimeout(600);
+    expect(await page.evaluate(() => localStorage.getItem('stalemate.music'))).toBe('off');
+    await page.goto('/play/turdomania.html');
+    await page.locator('#board').click();
     await expect(html).toHaveAttribute('data-stalemate-music', 'paused');
-    await page.locator('#btnSound').dispatchEvent('click');
+    await page.locator('#suite-music-toggle').click();
     await expect(html).toHaveAttribute('data-stalemate-music', 'playing');
-    // Hidden tab pauses; visible again resumes.
     await page.evaluate(() => {
         Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
         document.dispatchEvent(new Event('visibilitychange'));
@@ -90,8 +78,7 @@ test('Turdanoid music rotates Stalemate songs per level, Manic first, and keeps 
         document.dispatchEvent(new Event('visibilitychange'));
     });
     await expect(html).toHaveAttribute('data-stalemate-music', 'playing');
-    expect(await page.evaluate(() => [1, 2, 3, 4, 5, 6, 0, -1, NaN].map((n) => window.StalematePlaylist.trackForLevel(n).title)))
-        .toEqual(['Manic', 'Andrea', 'It\u2019s Only Been 18', 'Wham Bam', 'Planet of the Flakes', 'Manic', 'Manic', 'Manic', 'Manic']);
+    expect(await page.evaluate(() => typeof window.StalematePlaylist)).toBe('undefined');
     expect(errors).toEqual([]);
 });
 
@@ -102,12 +89,12 @@ test('homepage Games card and nav link go to /play/, which stays noindex and out
     await expect(navLinks.last()).toHaveText('Games');
     await expect(navLinks.last()).toHaveAttribute('href', 'play/#hub-games');
     const games = page.locator('#games');
-    await expect(games.locator('.board-square')).toHaveText('Games');
-    await expect(games).toContainText('Free, in the browser, scored by Stalemate songs.');
-    await expect(games).toContainText('Brick-breaker, but gross.');
+    await expect(games.locator('.board-square')).toHaveText('Stalemate Arcade');
+    await expect(games).toContainText('A fresh Daily Dump puzzle, seven free games, and optional Stalemate songs.');
+    await expect(games).toContainText('Make every pop count.');
     await expect(games.locator('.games-card__thumb')).toBeVisible();
-    const play = games.getByRole('link', { name: 'Play Turdanoid' });
-    await expect(play).toHaveAttribute('href', 'play/TurdAnoid.html');
+    const play = games.getByRole('link', { name: 'Play The Daily Dump' });
+    await expect(play).toHaveAttribute('href', 'play/turdomania.html?daily=today');
     await expect(games.getByRole('heading', { level: 2 })).toHaveText('Seven free arcade games. Zero dignity.');
     await expect(games.getByRole('link', { name: 'All seven games' })).toHaveAttribute('href', 'play/');
     for (const img of await games.locator('.games-shot img').all()) {
@@ -124,7 +111,7 @@ test('homepage Games card and nav link go to /play/, which stays noindex and out
     expect(box.height).toBeLessThan((page.viewportSize().width <= 760) ? 740 : 480);
     // Countdown, show and Manic hero stay first; Games follows, then Listen and the band.
     expect(await page.locator('main > section').evaluateAll((s) => s.map((e) => e.id))).toEqual(['home', 'games', 'listen', 'about']);
-    expect(await page.locator('a[href*="play"]').evaluateAll((a) => a.map((e) => e.getAttribute('href')))).toEqual(['play/#hub-games', 'play/TurdAnoid.html', 'play/turdomania.html', 'play/turdtris.html', 'play/turdjack.html', 'play/turdrummy.html', 'play/turdspades.html', 'play/crapeights.html', 'play/TurdAnoid.html', 'play/', 'play/TurdAnoid.html', 'play/turdomania.html']);
+    expect(await page.locator('a[href*="play"]').evaluateAll((a) => a.map((e) => e.getAttribute('href')))).toEqual(['play/#hub-games', 'play/TurdAnoid.html', 'play/turdomania.html', 'play/turdtris.html', 'play/turdjack.html', 'play/turdrummy.html', 'play/turdspades.html', 'play/crapeights.html', 'play/turdomania.html?daily=today', 'play/', 'play/TurdAnoid.html', 'play/turdomania.html']);
     await expect(page.locator('#home a[href="#games"]')).toHaveCount(0);
     await expect(page.locator('#listen .listen-games-link a')).toHaveAttribute('href', '#games');
     const pkg = fs.readFileSync(path.join(ROOT, 'scripts/package-pages.cjs'), 'utf8');
@@ -137,7 +124,7 @@ test('homepage Games card and nav link go to /play/, which stays noindex and out
 test('/play/ has a share image', async ({ page, request }) => {
     for (const p of ['/play/', '/play/TurdAnoid.html']) {
         await page.goto(p);
-        await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', 'https://stalemate.band/play/stalemate/og-play.png');
+        await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', 'https://rupret007.github.io/StalemateSite/play/stalemate/og-play.png');
     }
     const img = await request.get('/play/stalemate/og-play.png');
     expect(img.status()).toBe(200);

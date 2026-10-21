@@ -5,3 +5,6 @@
 *.webp binary
 *.ico binary
 *.mp4 binary
+
+# Preserve vendored font license bytes across sync and checkout.
+play/assets/fonts/*.txt -text

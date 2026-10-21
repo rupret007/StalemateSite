@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mobile-game="crapeights">
 <head>
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
@@ -10,6 +10,7 @@
   <meta name="theme-color" content="#121a11">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="assets/turdsuite.css">
+<link rel="stylesheet" href="assets/arcade.css">
   <script src="games/table-continue-core.js"></script>
   <script src="assets/turdsuite.js"></script>
   <title>Crappy Eights</title>
@@ -553,6 +554,7 @@
     #playerHand .card-btn.selected,#playerHand .card-btn:focus-visible{transform:translateY(-28px) rotate(0deg);z-index:80;box-shadow:0 0 0 3px #ffe199,0 0 22px #ffdc7966,0 16px 18px #001b1980}
     #playerHand .card-btn>div:first-child{font-size:20px;left:8px;top:7px}#playerHand .card-btn .center{font-size:38px}
     .hand-head .btn{min-height:44px}.hand-head{min-height:44px}.selection-note{margin:0;font-size:11px}
+    .table-settings{display:flex;align-items:center;gap:6px;flex-shrink:0}
     .drawer-launch{min-height:44px;padding:8px 12px;font:700 11px 'Trebuchet MS',sans-serif;letter-spacing:.03em;color:#ead5a3;border:1px solid #c1b47966;border-radius:8px;background:#102b23;cursor:pointer}
     .drawer-titlebar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:16px}.drawer-titlebar h2{font-size:22px}.drawer-card{width:min(640px,100%)}.sidebar{gap:12px}.panel summary{min-height:44px;line-height:44px}.panel{padding:12px}.panel ul{padding-left:18px}
     .difficulty-label{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px;color:#e7dfc4}.difficulty-label select{font:700 13px 'Trebuchet MS',sans-serif;color:#f5efd3;background:#153c30;border:1px solid #a2b997;border-radius:8px;min-height:44px;padding:8px 12px;max-width:150px}#difficultyHint{font-size:11px;line-height:1.5;margin-top:9px;color:#bdcfc8}#roundTwoStats{font-size:11px;line-height:1.7;color:#e8d69f;margin-top:8px}
@@ -597,8 +599,10 @@
     }
 
 </style>
+<link rel="stylesheet" href="assets/mobile-fit.css">
+<script src="assets/mobile-fit.js" defer></script>
 </head>
-<body class="suite-ambient">
+<body class="suite-ambient arcade" data-arcade-game="crapeights">
   <a class="ce-skip" href="#playTable">Skip to card table</a>
   <div class="overlay" id="welcomeGuide" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
     <div class="overlay-card">
@@ -689,11 +693,12 @@
       <div class="hud-card"><div class="k">Active Suit</div><div class="v" id="suitText">-</div></div>
       <div class="hud-card hot"><div class="k">Your Cards</div><div class="v" id="youCardsText">0</div></div>
       <div class="hud-card"><div class="k">Leader</div><div class="v" id="leaderText">-</div></div>
+      <div class="suite-hud-settings" id="suite-difficulty-mount"></div>
     </div>
 
     <div class="layout">
       <section class="table" id="playTable" tabindex="-1" aria-label="Crappy Eights card table">
-        <div class="turn-banner"><div><strong id="turnPrompt">Your move</strong><span id="turnHint">Match suit or rank.</span></div><span id="flowBadge" class="flow-badge">↻</span><button class="drawer-launch" id="tableDrawerBtn" aria-haspopup="dialog">Table details</button></div>
+        <div class="turn-banner"><div><strong id="turnPrompt">Your move</strong><span id="turnHint">Match suit or rank.</span></div><span id="flowBadge" class="flow-badge">↻</span><div class="table-settings" data-suite-music-slot><button class="drawer-launch" id="tableDrawerBtn" aria-haspopup="dialog">Table details</button></div></div>
         <div class="status" id="statusText" role="status" aria-live="polite" aria-atomic="true">Deal in progress. Match suit, sling chaos, and pretend this smell is strategic.</div>
         <div class="arena">
         <div class="table-stamp" aria-hidden="true"><b>THE DIRTY DECK</b><span>EST. IN THE SEWER</span></div>
@@ -856,8 +861,58 @@
     let aiMemory = CrapeightsAI.createMemory();
     let sortMode = 'suit';
     let drawerOpen = false;
-    let aiDifficulty = 'normal';
-    try { aiDifficulty = CrapeightsAI.normalizeDifficulty?.(localStorage.getItem('crapeights_difficulty_v1')) || 'normal'; } catch (e) {}
+    function suiteToEightsAi(level) {
+      const id = typeof level === 'string' ? level.trim().toLowerCase() : 'normal';
+      if (id === 'hard') { return 'sharp'; }
+      if (id === 'easy') { return 'easy'; }
+      return 'normal';
+    }
+    function migrateLegacyEightsDifficulty() {
+      try {
+        const suiteKey = 'turdsuite_difficulty_v1';
+        const legacyKey = 'crapeights_difficulty_v1';
+        let suiteRaw = localStorage.getItem(suiteKey);
+        const legacyRaw = localStorage.getItem(legacyKey);
+        if (suiteRaw === 'sharp') {
+          suiteRaw = 'hard';
+          if (window.Suite && Suite.difficulty) {
+            Suite.difficulty.set('hard');
+          } else {
+            localStorage.setItem(suiteKey, 'hard');
+          }
+        }
+        if ((suiteRaw == null || suiteRaw === '') && legacyRaw) {
+          const leg = CrapeightsAI.normalizeDifficulty?.(legacyRaw) || 'normal';
+          const suiteLevel = leg === 'sharp' ? 'hard' : leg;
+          if (window.Suite && Suite.difficulty) {
+            Suite.difficulty.set(suiteLevel);
+          } else {
+            localStorage.setItem(suiteKey, suiteLevel);
+          }
+          return leg;
+        }
+      } catch (e) { /* ignore */ }
+      return null;
+    }
+    function loadAiDifficultyPref() {
+      try {
+        const migrated = migrateLegacyEightsDifficulty();
+        if (migrated) {
+          return migrated;
+        }
+        if (window.Suite && Suite.difficulty) {
+          return suiteToEightsAi(Suite.difficulty.get());
+        }
+        const suiteRaw = localStorage.getItem('turdsuite_difficulty_v1');
+        if (suiteRaw != null && suiteRaw !== '') {
+          return suiteToEightsAi(suiteRaw);
+        }
+        return CrapeightsAI.normalizeDifficulty?.(localStorage.getItem('crapeights_difficulty_v1')) || 'normal';
+      } catch (e) {
+        return 'normal';
+      }
+    }
+    let aiDifficulty = loadAiDifficultyPref();
     let eventTimer = null;
     let dialogReturnFocus = null;
     let nextCardId = 1;
@@ -896,6 +951,7 @@
 
     function toggleSound() {
       soundEnabled = !soundEnabled;
+      syncSuiteMusic();
       saveSoundPref();
       tableAudio.syncMute();
       updateSoundButtons();
@@ -1822,10 +1878,18 @@
     }
 
     function trapDialogTab(event, modal) {
-      const buttons = [...modal.querySelectorAll('button:not([disabled]),a[href],select,summary')].filter(el => el.style.display !== 'none');
-      const index = buttons.indexOf(document.activeElement);
-      if (event.shiftKey && index <= 0) { event.preventDefault(); buttons.at(-1)?.focus(); }
-      else if (!event.shiftKey && (index < 0 || index === buttons.length - 1)) { event.preventDefault(); buttons[0]?.focus(); }
+      const visible = el => el && el.getClientRects().length > 0 && !['hidden', 'collapse'].includes(getComputedStyle(el).visibility);
+      const controls = [...modal.querySelectorAll('button:not([disabled]),a[href],select:not([disabled]),summary')].filter(visible);
+      const hub = document.querySelector('.suite-back-pill');
+      // On phones the shared Hub replaces the hidden dialog exit. Include it
+      // in the focus loop even though it lives outside the overlay's DOM tree.
+      if (!controls.some(el => el.matches('a[href="./"]')) && visible(hub)) controls.push(hub);
+      if (!controls.length) return;
+      const index = controls.indexOf(document.activeElement);
+      const next = index < 0 ? (event.shiftKey ? controls.length - 1 : 0)
+        : (index + (event.shiftKey ? -1 : 1) + controls.length) % controls.length;
+      event.preventDefault();
+      controls[next].focus({ preventScroll: true });
     }
 
     function openTableDrawer() {
@@ -1868,9 +1932,27 @@
       document.getElementById('aiDifficulty').addEventListener('change', event => {
         playSfx('ui');
         aiDifficulty = CrapeightsAI.normalizeDifficulty?.(event.target.value) || 'normal';
-        try { localStorage.setItem('crapeights_difficulty_v1', aiDifficulty); } catch (e) {}
+        const suiteLevel = aiDifficulty === 'sharp' ? 'hard' : aiDifficulty;
+        try {
+          if (window.Suite && Suite.difficulty) {
+            Suite.difficulty.set(suiteLevel);
+          } else {
+            localStorage.setItem('turdsuite_difficulty_v1', suiteLevel);
+          }
+          localStorage.setItem('crapeights_difficulty_v1', aiDifficulty);
+        } catch (e) {}
         updateDifficulty();
       });
+      if (window.Suite && Suite.difficulty) {
+        Suite.difficulty.onChange((level) => {
+          aiDifficulty = suiteToEightsAi(level);
+          const sel = document.getElementById('aiDifficulty');
+          if (sel && sel.value !== aiDifficulty) {
+            sel.value = aiDifficulty;
+          }
+          updateDifficulty();
+        });
+      }
       if (window.ResizeObserver) new ResizeObserver(() => renderPlayerHand()).observe(ui.playerHand);
       else window.addEventListener('resize', renderPlayerHand);
 
@@ -1907,7 +1989,7 @@
             else if (pendingWildCard) { hideSuitChooser(); updateAll(); }
             return;
           }
-          if (onboardingOpen && (e.code === 'Enter' || e.code === 'Space') && !e.target.closest?.('button')) {
+          if (onboardingOpen && (e.code === 'Enter' || e.code === 'Space') && !e.target.closest?.('button,a[href],select,summary')) {
             e.preventDefault(); hideWelcomeGuide();
           }
           return;
@@ -1932,10 +2014,32 @@
       });
     }
 
+    function suiteMusicBlocked() {
+      try {
+        if (window.Suite && typeof Suite.isMusicEnabled === 'function' && !Suite.isMusicEnabled()) return true;
+      } catch (err) { /* ignore */ }
+      return !soundEnabled;
+    }
+
+    function syncSuiteMusic() {
+      try {
+        if (window.Suite && typeof Suite.music === 'function') {
+          Suite.music().then(function (player) { if (player) player.sync(); });
+        }
+      } catch (err) { /* ignore */ }
+    }
+
+    try {
+      if (window.Suite && typeof Suite.setMusicGameBlocked === 'function') {
+        Suite.setMusicGameBlocked(suiteMusicBlocked);
+      }
+    } catch (err) { /* ignore */ }
+
     function init() {
       players = createPlayers();
       soundEnabled = loadSoundPref();
       updateSoundButtons();
+      updateDifficulty();
       wireEvents();
       const restoredTable = tryRestoreTable();
       if (!restoredTable) {

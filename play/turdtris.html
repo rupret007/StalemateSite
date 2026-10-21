@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mobile-game="turdtris">
 <head>
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
@@ -10,6 +10,7 @@
 <meta name="theme-color" content="#120d0a">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="assets/turdsuite.css">
+<link rel="stylesheet" href="assets/arcade.css">
 <script src="games/table-continue-core.js"></script>
 <script src="assets/turdsuite.js"></script>
 <title>Turdtris</title>
@@ -141,6 +142,17 @@ body::after {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.topbar-difficulty {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.topbar-difficulty .suite-difficulty-btn {
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .mobile-menu {
@@ -1178,8 +1190,19 @@ body.desktop-cabinet .status {
   .top-actions {
     display: none;
   }
+  .topbar {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .topbar-difficulty {
+    order: 2;
+    width: 100%;
+    justify-content: center;
+    margin-top: 4px;
+  }
   .mobile-menu {
     display: block;
+    order: 3;
   }
   .hud {
     grid-template-columns: repeat(2, minmax(70px, 1fr));
@@ -1391,8 +1414,10 @@ body.desktop-cabinet .status {
   .control-btn:active, .control-btn.is-pressed { transform: none; }
 }
 </style>
+<link rel="stylesheet" href="assets/mobile-fit.css">
+<script src="assets/mobile-fit.js" defer></script>
 </head>
-<body class="suite-ambient suite-no-zoom board-focus">
+<body class="suite-ambient suite-no-zoom board-focus arcade" data-arcade-game="turdtris">
 <div id="statusLive" class="sr-live" aria-live="polite" aria-atomic="true"></div>
 <div class="desktop-scene" id="desktopScene" aria-hidden="true"></div>
 <div class="welcome-guide" id="welcomeGuide">
@@ -1437,6 +1462,7 @@ body.desktop-cabinet .status {
       <h1>Turdtris</h1>
       <p>Hold system, ghost piece, chaos modifiers, and the energy of a suspiciously spicy arcade booth.</p>
     </div>
+    <div class="suite-hud-settings topbar-difficulty" id="suite-difficulty-mount"></div>
     <div class="top-actions">
       <button class="btn subtle" onclick="location.href='./'">🏠 Hub</button>
       <button class="btn" onclick="showWelcomeGuide()">❓ How To Play</button>
@@ -1712,13 +1738,16 @@ let dasLeftMs = 0;
 let dasRightMs = 0;
 let arrLeftMs = 0;
 let arrRightMs = 0;
+const MAX_FRAME_MS = 33;
 
 function tickDasRepeat(delta) {
   if (!tetromino || gameOver || paused) return;
+  const dt = !Number.isFinite(delta) || delta <= 0 ? 0 : Math.min(MAX_FRAME_MS, delta);
   if (dasLeftHeld) {
-    dasLeftMs += delta;
+    const delayRemaining = Math.max(0, inputSettings.das - dasLeftMs);
+    dasLeftMs += dt;
     if (dasLeftMs >= inputSettings.das) {
-      arrLeftMs += delta;
+      arrLeftMs += Math.max(0, dt - delayRemaining);
       while (arrLeftMs >= inputSettings.arr) {
         arrLeftMs -= inputSettings.arr;
         movePiece(-1);
@@ -1726,9 +1755,10 @@ function tickDasRepeat(delta) {
     }
   }
   if (dasRightHeld) {
-    dasRightMs += delta;
+    const delayRemaining = Math.max(0, inputSettings.das - dasRightMs);
+    dasRightMs += dt;
     if (dasRightMs >= inputSettings.das) {
-      arrRightMs += delta;
+      arrRightMs += Math.max(0, dt - delayRemaining);
       while (arrRightMs >= inputSettings.arr) {
         arrRightMs -= inputSettings.arr;
         movePiece(1);
@@ -1854,7 +1884,6 @@ let lastKickUsed = false;
 let dropAccumulator = 0;
 let lockAccumulator = 0;
 let lockResets = 0;
-const MAX_FRAME_MS = 33;
 let lastFrameTime = 0;
 let rAF = null;
 let onboardingOpen = false;
@@ -2048,6 +2077,11 @@ function armAudio(event) {
   audioArmed = true;
   if (window.__turdtrisAudio) window.__turdtrisAudio.arm();
   unlockAudio();
+  try {
+    if (window.Suite && typeof Suite.music === 'function') {
+      Suite.music().then(function (player) { if (player) player.armFromGesture(); });
+    }
+  } catch (e) { /* ignore */ }
 }
 document.addEventListener('pointerdown', armAudio, { capture: true });
 document.addEventListener('keydown', armAudio, { capture: true });
@@ -2061,9 +2095,16 @@ function updateMusic() {
 
 function toggleMusic() {
   musicEnabled = !musicEnabled;
-  try { localStorage.setItem(MUSIC_STORAGE_KEY, musicEnabled ? '1' : '0'); } catch (e) {}
+  try {
+    if (window.Suite && typeof Suite.setMusicEnabled === 'function') {
+      Suite.setMusicEnabled(musicEnabled);
+    } else {
+      localStorage.setItem(MUSIC_STORAGE_KEY, musicEnabled ? '1' : '0');
+    }
+  } catch (e) {}
   syncSettings();
   updateMusic();
+  syncSuiteMusic();
 }
 
 function syncSettings() {
@@ -2146,6 +2187,7 @@ function toggleSound() {
   } else {
     setHype('Sound muted. Silent stink mode.', 84);
   }
+  syncSuiteMusic();
   updateScore();
 }
 
@@ -2163,9 +2205,21 @@ function generateSequence() {
   }
 }
 
+function suiteGravityMul() {
+  try {
+    const t = window.Suite && Suite.difficulty && Suite.difficulty.tuning();
+    return t && Number.isFinite(t.speed) ? t.speed : 1;
+  } catch (e) {
+    return 1;
+  }
+}
 function getGravityMs() {
-  if (level <= gravityTable.length) return gravityTable[level - 1];
-  return 1;
+  let ms = level <= gravityTable.length ? gravityTable[level - 1] : 1;
+  const mul = suiteGravityMul();
+  if (mul !== 1) {
+    ms = Math.max(1, Math.round(ms / mul));
+  }
+  return ms;
 }
 
 function getLinesGoalForLevel(currentLevel) {
@@ -2387,6 +2441,7 @@ function holdCurrentPiece() {
       lastActionRotate: false,
       lastKick: false
     };
+    lockResets = 0;
 
     if (!isValidMove(tetromino.matrix, tetromino.row, tetromino.col)) {
       if (!recoverSpawnPlacement(tetromino)) {
@@ -3511,14 +3566,12 @@ function loop(timestamp) {
       }
     }
 
+    // Airborne frames pause the timer; only a new piece renews the reset budget.
     if (isGrounded(tetromino)) {
       lockAccumulator += delta;
       if (lockAccumulator >= lockDelayMs) {
         lockPiece();
       }
-    } else {
-      lockAccumulator = 0;
-      lockResets = 0;
     }
 
     tickDasRepeat(delta);
@@ -3757,7 +3810,34 @@ if (canvas) {
   }, { passive: true });
 }
 
-try { musicEnabled = localStorage.getItem(MUSIC_STORAGE_KEY) !== '0'; } catch (e) {}
+try {
+  if (window.Suite && typeof Suite.isMusicEnabled === 'function') {
+    musicEnabled = Suite.isMusicEnabled();
+  } else {
+    const siteMusic = localStorage.getItem('stalemate.music');
+    if (siteMusic === 'off') musicEnabled = false;
+    else if (siteMusic === 'on') musicEnabled = true;
+    else musicEnabled = localStorage.getItem(MUSIC_STORAGE_KEY) !== '0';
+  }
+} catch (e) {}
+function suiteMusicBlocked() {
+  try {
+    if (window.Suite && typeof Suite.isMusicEnabled === 'function' && !Suite.isMusicEnabled()) return true;
+  } catch (e) { /* ignore */ }
+  return suiteMuted() || !soundEnabled || !musicEnabled;
+}
+function syncSuiteMusic() {
+  try {
+    if (window.Suite && typeof Suite.music === 'function') {
+      Suite.music().then(function (player) { if (player) player.sync(); });
+    }
+  } catch (e) {}
+}
+try {
+  if (window.Suite && typeof Suite.setMusicGameBlocked === 'function') {
+    Suite.setMusicGameBlocked(suiteMusicBlocked);
+  }
+} catch (e) {}
 syncSettings();
 soundEnabled = loadSoundPref();
 gesturesEnabled = loadGesturesPref();
@@ -3976,7 +4056,9 @@ function paintAttractFrame(now) {
   attractLast = now;
   attractField.step(delta);
   ctx.clearRect(0, 0, w, h);
-  const colors = { I: '#7ad7ff', O: '#ffd56a', T: '#c98bff', S: '#7dffb2', Z: '#ff8f8f', J: '#7f9dff', L: '#ffb07a' };
+  const colors = (window.Suite && typeof Suite.turdtrisPieceColors === 'function')
+    ? Suite.turdtrisPieceColors()
+    : { I: '#7ad7ff', O: '#ffd56a', T: '#c98bff', S: '#7dffb2', Z: '#ff8f8f', J: '#7f9dff', L: '#ffb07a' };
   for (const piece of attractField.pieces()) {
     ctx.save();
     ctx.globalAlpha = piece.alpha;
