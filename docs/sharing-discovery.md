@@ -55,3 +55,18 @@ Primary references:
 Final phone result inset also includes the top safe area so notched screens keep
 the hub/audio controls clear. Existing emulated captures have zero safe insets;
 final gate and release smoke qualify the exact revised source.
+
+Final Linux CI at site9f01284 failed the new long WebKit touch sequences. Preserved
+traces show3–7seconds in individual locator.tap frame-actionability waits, while
+pre-touch viewport/hit checks passed; the existing suite uses coordinate touches.
+The new tests now use that same native touchscreen path, with two identical
+geometry samples separated by at least50ms, unchanged44px controls/32px phone
+tiles, and exact one-move-per-touch state assertions. Desktop tiles use their
+existing22px layout floor (the first helper incorrectly applied the phone floor
+to desktop27px tiles). It also waits for entry animation to reach full control
+size. All16focused cases pass. No production code, timeout, CSP or original
+assertion was relaxed. Raw failed PR/push logs, screenshots/traces and extracted
+actionability timings are retained. Source#94 passed1895tests plus one optional
+existing fixture skip,96mobilecases and smoke; it merged as
+073918da2057a3b4301066969272365e840f3845 with tested/merged tree equality verified.
+Final site CI and publication remain pending.

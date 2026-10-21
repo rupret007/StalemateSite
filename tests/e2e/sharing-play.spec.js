@@ -7,16 +7,27 @@ test.beforeEach(async ({ page }) => {
 });
 test.afterEach(async ({ page }) => { expect(pageErrors.get(page)).toEqual([]); });
 
-async function activate(page, locator) {
-    await locator.scrollIntoViewIfNeeded();
+async function activate(page, locator, minimumHeight = 44) {
+    // Linux WebKit's animation-frame actionability waits dominate long touch
+    // sequences. Use the suite's native-coordinate touch approach and prove
+    // stable geometry, a clear hit target and the resulting game state instead.
+    if (test.info().project.use.hasTouch) await locator.evaluate(el => el.scrollIntoView({ block: 'nearest' }));
+    else await locator.scrollIntoViewIfNeeded();
     await expect(locator).toBeVisible();
-    const target = await locator.evaluate(el => {
+    const inspect = () => locator.evaluate(el => {
         const b = el.getBoundingClientRect(), x = b.x + b.width / 2, y = b.y + b.height / 2;
         const hit = document.elementFromPoint(x, y);
-        return { fits: b.x >= 0 && b.y >= 0 && b.right <= innerWidth && b.bottom <= innerHeight, hit: hit === el || el.contains(hit), height: b.height };
+        return { x, y, width: b.width, height: b.height, fits: b.x >= 0 && b.y >= 0 && b.right <= innerWidth && b.bottom <= innerHeight, hit: hit === el || el.contains(hit) };
     });
-    expect(target.fits).toBe(true); expect(target.hit).toBe(true); expect(target.height).toBeGreaterThanOrEqual(44);
-    if (test.info().project.use.hasTouch) await locator.tap(); else await locator.click();
+    let target, previous = null;
+    await expect.poll(async () => {
+        target = await inspect();
+        const stable = previous && target.x === previous.x && target.y === previous.y && target.width === previous.width && target.height === previous.height;
+        previous = target;
+        return !!stable && target.fits && target.hit && target.height >= minimumHeight;
+    }, { message: 'The touch target must be stable, clear and fully sized', intervals: [50, 100, 250] }).toBe(true);
+    expect(target.fits).toBe(true); expect(target.hit).toBe(true); expect(target.height).toBeGreaterThanOrEqual(minimumHeight);
+    if (test.info().project.use.hasTouch) await page.touchscreen.tap(target.x, target.y); else await locator.click();
 }
 async function nativeStub(page, kind = 'file') {
     await page.addInitScript(kind => {
@@ -122,13 +133,16 @@ test('Turdomania shares a real completed board, allows Undo, clears stale output
             let chosen = null, largest = 1;
             for (let c = 0; c < state.board.length; c++) for (let r = 0; r < state.board[c].length; r++) {
                 const size = Core.findGroup(state.board, c, r).length;
-                if (size > largest) { largest = size; chosen = [c, r]; }
+                if (size > largest) { largest = size; chosen = { cell: [c, r], previousMoves: state.moves }; }
             }
             return chosen;
         });
         if (!move) break;
-        const tile = page.locator(`.tile[data-col="${move[0]}"][data-row="${move[1]}"]`);
-        if (test.info().project.use.hasTouch) await tile.tap(); else await tile.click();
+        const tile = page.locator(`.tile[data-col="${move.cell[0]}"][data-row="${move.cell[1]}"]`);
+        await activate(page, tile, test.info().project.use.hasTouch ? 32 : 22);
+        await expect.poll(() => page.evaluate(() => window.__turdomania.state.moves), {
+            message: 'One real touch must complete exactly one legal pop'
+        }).toBe(move.previousMoves + 1);
     }
     await expect(page.locator('#overlay')).toHaveClass(/show/);
     await page.evaluate(() => document.fonts.ready);
