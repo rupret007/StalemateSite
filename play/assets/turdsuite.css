@@ -592,7 +592,7 @@ body label:has(input:is([type="checkbox"], [type="radio"])) {
 /* Completed-game sharing keeps native controls and copy fallbacks accessible. */
 .suite-result-share[hidden], .suite-result-share [hidden] { display:none!important; }
 .suite-result-share { margin-top:8px; width:100%; }
-.suite-result-share-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
+.suite-result-share-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
 .suite-result-share-actions :is(button,a) { display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding:8px 12px; border:2px solid #8ee8c7; border-radius:10px; background:#171c17; color:#f4f0e6; font:700 14px/1.2 system-ui,sans-serif; text-decoration:none; cursor:pointer; }
 .suite-result-share-actions :is(button,a):focus-visible, .suite-result-share textarea:focus-visible { outline:3px solid #ffcb87; outline-offset:2px; }
 .suite-result-share .suite-result-share-status { font:13px/1.3 system-ui,sans-serif; margin:6px 0 0; overflow-wrap:anywhere; }

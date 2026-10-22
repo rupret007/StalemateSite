@@ -188,6 +188,12 @@ test('Turdomania shares a real completed board, allows Undo, clears stale output
 test('phone results are immediately readable and offer full-size native share targets in every Turdtris mode', async ({ page }) => {
     await page.setViewportSize({ width: 430, height: 932 });
     await nativeStub(page, 'cancel');
+    await page.addInitScript(() => {
+        const toBlob = HTMLCanvasElement.prototype.toBlob;
+        HTMLCanvasElement.prototype.toBlob = function (callback, ...args) {
+            return toBlob.call(this, blob => { window.__finishScoreImage = () => callback(blob); }, ...args);
+        };
+    });
     for (const mode of ['classic', 'sprint', 'ultra']) {
         await page.goto('/play/turdtris.html?mode=' + mode);
         await expect(page.locator('#attractPlay')).toBeEnabled();
@@ -205,7 +211,13 @@ test('phone results are immediately readable and offer full-size native share ta
         }, mode);
         expect(first, mode).toMatchObject({ opacity: 1, hit: true, onScreen: true });
         expect(first.height, mode).toBeGreaterThanOrEqual(44);
-        await activate(page, page.locator('#gameOverOverlay').getByRole('button', { name: 'Share score' }));
+        const button = page.locator('#gameOverOverlay').getByRole('button', { name: 'Share score' });
+        await page.waitForFunction(() => typeof window.__finishScoreImage === 'function');
+        const beforeImage = await button.boundingBox();
+        await page.evaluate(() => window.__finishScoreImage());
+        await expect(page.locator('#gameOverOverlay').getByRole('link', { name: 'Save image' })).toBeVisible();
+        expect(await button.boundingBox(), 'Image readiness must not move a pending share target').toEqual(beforeImage);
+        await activate(page, button);
         await expect(page.locator('#gameOverOverlay').getByRole('status')).toHaveText('Sharing cancelled.');
     }
 });
