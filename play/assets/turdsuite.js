@@ -691,7 +691,12 @@
       label.htmlFor = 'suite-song-select'; label.textContent = 'Choose a song';
       const select = document.createElement('select');
       select.id = 'suite-song-select'; select.disabled = true;
-      picker.append(label, select); document.body.append(picker);
+      const retry = document.createElement('button');
+      retry.type = 'button'; retry.id = 'suite-music-retry'; retry.textContent = 'Retry song'; retry.hidden = true;
+      retry.addEventListener('click', function () {
+        Suite.music().then(function (player) { if (player) { player.retryTrack(); select.focus(); } });
+      });
+      picker.append(label, select, retry); document.body.append(picker);
       function closePicker() { picker.hidden = true; songs.setAttribute('aria-expanded', 'false'); }
       songs.addEventListener('click', function () {
         picker.hidden = !picker.hidden; songs.setAttribute('aria-expanded', String(!picker.hidden));
@@ -739,11 +744,14 @@
     musicState = state;
     const status = document.getElementById('suite-music-status');
     if (!status) return;
-    const label = !musicEnabled ? 'Music off' : state.title ? `${state.paused ? 'Paused' : 'Now playing'}: ${state.title}` : 'Stalemate music · play to listen';
+    const prefix = { loading: 'Loading', error: 'Can’t load', blocked: 'Tap Retry in Songs', playing: 'Now playing', paused: 'Paused' };
+    const label = !musicEnabled ? 'Music off' : state.title ? `${prefix[state.status] || (state.paused ? 'Paused' : 'Now playing')}: ${state.title}` : 'Stalemate music · play to listen';
     const title = status.querySelector('.suite-music-title');
     if (title) { title.textContent = label; title.title = label; }
     const select = document.getElementById('suite-song-select');
     if (select && Number.isInteger(state.index)) select.value = String(state.index);
+    const retry = document.getElementById('suite-music-retry');
+    if (retry) retry.hidden = !musicEnabled || !state.canRetry;
     const link = status.querySelector('.suite-music-listen');
     if (link) {
       link.hidden = !state.listenUrl;

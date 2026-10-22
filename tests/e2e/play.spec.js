@@ -66,8 +66,26 @@ test('shared music advances once per track, persists preferences, and pauses in 
     await page.goto('/play/turdomania.html');
     await page.locator('#board').click();
     await expect(html).toHaveAttribute('data-stalemate-music', 'paused');
+    await page.evaluate(async () => {
+        const audio = (await Suite.music()).audioElement;
+        const play = audio.play.bind(audio);
+        window.__unmutePlayCalls = 0;
+        window.__unmuteEvents = [];
+        for (const event of ['playing', 'waiting', 'stalled', 'loadedmetadata', 'canplay', 'seeking', 'seeked', 'timeupdate', 'pause', 'error']) {
+            audio.addEventListener(event, () => {
+                window.__unmuteEvents.push({ event, time: audio.currentTime, paused: audio.paused, ready: audio.readyState, seeking: audio.seeking });
+                if (window.__unmuteEvents.length > 64) window.__unmuteEvents.shift();
+            });
+        }
+        audio.play = () => { window.__unmutePlayCalls++; return play(); };
+    });
     await page.locator('#suite-music-toggle').click();
     await expect(html).toHaveAttribute('data-stalemate-music', 'playing');
+    expect(await page.evaluate(() => window.__unmutePlayCalls)).toBe(1);
+    const resumedAt = await page.evaluate(async () => (await Suite.music()).audioElement.currentTime);
+    await expect.poll(() => page.evaluate(async () => (await Suite.music()).audioElement.currentTime)).toBeGreaterThan(resumedAt + 0.25);
+    await expect(html).toHaveAttribute('data-stalemate-music', 'playing');
+    await expect(page.locator('.suite-music-title')).not.toContainText('Loading');
     await page.evaluate(() => {
         Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
         document.dispatchEvent(new Event('visibilitychange'));
@@ -80,6 +98,20 @@ test('shared music advances once per track, persists preferences, and pauses in 
     await expect(html).toHaveAttribute('data-stalemate-music', 'playing');
     expect(await page.evaluate(() => typeof window.StalematePlaylist)).toBe('undefined');
     expect(errors).toEqual([]);
+});
+
+test.afterEach(async ({ page }, info) => {
+    if (info.status === info.expectedStatus) return;
+    const state = await page.evaluate(async () => {
+        const player = await window.Suite?.music();
+        const audio = player?.audioElement;
+        return { title: player?.trackTitle, label: document.querySelector('.suite-music-title')?.textContent,
+            paused: audio?.paused, seconds: audio?.currentTime, ready: audio?.readyState,
+            network: audio?.networkState, seeking: audio?.seeking, error: audio?.error?.code,
+            musicEnabled: window.Suite?.isMusicEnabled(), hidden: document.hidden,
+            playCalls: window.__unmutePlayCalls, events: window.__unmuteEvents };
+    }).catch(error => ({ diagnosticError: error.message }));
+    await info.attach('music-state-first-failure', { body: JSON.stringify(state, null, 2), contentType: 'application/json' });
 });
 
 test('homepage Games links reach the hub, with individual games excluded from search', async ({ page }) => {

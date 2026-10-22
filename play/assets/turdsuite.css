@@ -615,13 +615,18 @@ body label:has(input:is([type="checkbox"], [type="radio"])) {
 .suite-music-status .suite-music-title { min-width:0; flex:1; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
 .suite-music-status a { color:#bcf6d2; display:inline-flex; align-items:center; min-height:44px; flex-shrink:0; }
 .suite-music-status [hidden], #suite-music-picker[hidden] { display:none!important; }
-.suite-music-status button { min-height:44px; min-width:44px; flex-shrink:0; padding:4px 8px; color:#f4f0e6; background:#263329; border:1px solid #8ee8c7; border-radius:8px; font:700 12px system-ui,sans-serif; cursor:pointer; }
-.suite-music-status :is(button,a):focus-visible, #suite-music-picker select:focus-visible { outline:3px solid #ffcb87; outline-offset:1px; }
+.suite-music-status button, #suite-music-picker button { min-height:44px; min-width:44px; flex-shrink:0; padding:4px 8px; color:#f4f0e6; background:#263329; border:1px solid #8ee8c7; border-radius:8px; font:700 12px system-ui,sans-serif; cursor:pointer; }
+.suite-music-status :is(button,a):focus-visible, #suite-music-picker :is(select,button):focus-visible { outline:3px solid #ffcb87; outline-offset:1px; }
 #suite-music-picker { position:fixed; bottom:calc(58px + env(safe-area-inset-bottom)); right:max(8px,env(safe-area-inset-right)); z-index:10004; width:min(300px,calc(100vw - 16px)); max-height:calc(100dvh - 130px - env(safe-area-inset-top)); overflow:auto; box-sizing:border-box; padding:12px; border:2px solid #8ee8c7; border-radius:12px; background:#171c17; color:#f4f0e6; font:14px/1.4 system-ui,sans-serif; }
 #suite-music-picker label { display:block; margin-bottom:6px; }
 #suite-music-picker select { width:100%; min-height:44px; font:16px system-ui,sans-serif; color:#171c17; background:#f4f0e6; }
+#suite-music-retry { margin-top:8px; }
+#suite-music-retry[hidden] { display:none!important; }
 body:has(.suite-music-status):not(.suite-hub-door) { padding-bottom:calc(52px + env(safe-area-inset-bottom)); }
 body.suite-hub-door .suite-music-status { position:static; border-radius:8px; margin:8px auto 0; width:min(100%,560px); }
+@media(min-width:981px) {
+  body:has(.suite-back-pill):not([data-suite-back="top"]):not(.suite-hub-door) .suite-music-status { padding-left:calc(104px + env(safe-area-inset-left)); }
+}
 @media(max-width:600px) { .suite-music-status { gap:6px; padding-left:8px; padding-right:8px; } }
 @media(max-width:980px) and (orientation:landscape) {
   .suite-music-status { height:calc(46px + env(safe-area-inset-bottom)); padding-top:0; padding-bottom:env(safe-area-inset-bottom); }
