@@ -1,4 +1,6 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../helpers/media-diagnostics');
+
+test.use({ trace: 'retain-on-failure' });
 
 async function activate(page, target) {
     if (!test.info().project.use.hasTouch) return target.click();
@@ -48,7 +50,7 @@ test('music selection, next, saved position and mute work across game navigation
     expect(errors).toEqual([]);
 });
 
-test('failed audio has honest feedback and an explicit Retry restores decoded playback', async ({ page }) => {
+test('failed audio has honest feedback and an explicit Retry restores decoded playback', async ({ page, mediaDiagnostics }) => {
     let fail = true, requests = 0;
     await page.route('**/assets/stalemate/manic.m4a', route => { requests++; return fail ? route.abort() : route.continue(); });
     await page.goto('/play/turdomania.html?seed=42');
@@ -56,6 +58,9 @@ test('failed audio has honest feedback and an explicit Retry restores decoded pl
     await activate(page, page.locator('#newBtn'));
     const label = page.locator('.suite-music-title');
     await expect(label).toHaveText('Can’t load: Manic');
+    const diagnostics = await mediaDiagnostics.read();
+    expect(diagnostics.current.events.some(event => event.event === 'error' && event.error?.code)).toBe(true);
+    expect(diagnostics.network.some(event => event.event === 'request-failed' && event.url.includes('manic.m4a'))).toBe(true);
     const before = await page.evaluate(() => window.__turdomania.state.board.map(col => col.map(tile => tile.id)));
     const count = requests;
     await page.evaluate(async () => { const player = await Suite.music(); for (let i = 0; i < 8; i++) player.sync(); });

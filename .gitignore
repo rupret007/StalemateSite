@@ -30,3 +30,5 @@ secrets*
 !secrets.example*
 *.tar.gz
 *.zip
+
+live-results/

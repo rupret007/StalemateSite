@@ -2088,8 +2088,15 @@ function updateMusic() {
   if (window.__turdtrisAudio) window.__turdtrisAudio.update(musicUpdateOptions);
 }
 
+function currentMusicEnabled() {
+  try {
+    if (window.Suite && typeof Suite.isMusicEnabled === 'function') return Suite.isMusicEnabled();
+  } catch (e) { /* Standalone play can use the local preference. */ }
+  return musicEnabled;
+}
+
 function toggleMusic() {
-  musicEnabled = !musicEnabled;
+  musicEnabled = !currentMusicEnabled();
   try {
     if (window.Suite && typeof Suite.setMusicEnabled === 'function') {
       Suite.setMusicEnabled(musicEnabled);
@@ -2105,8 +2112,9 @@ function toggleMusic() {
 function syncSettings() {
   const music = document.getElementById('musicToggle');
   if (music) {
-    music.textContent = musicEnabled ? '♫ Music on' : '♫ Music off';
-    music.setAttribute('aria-pressed', String(musicEnabled));
+    const enabled = currentMusicEnabled();
+    music.textContent = enabled ? '♫ Music on' : '♫ Music off';
+    music.setAttribute('aria-pressed', String(enabled));
   }
   for (const [id, key] of [['dasSetting', 'das'], ['arrSetting', 'arr'], ['softSetting', 'softDrop']]) {
     const field = document.getElementById(id);
@@ -3823,10 +3831,7 @@ try {
   }
 } catch (e) {}
 function suiteMusicBlocked() {
-  try {
-    if (window.Suite && typeof Suite.isMusicEnabled === 'function' && !Suite.isMusicEnabled()) return true;
-  } catch (e) { /* ignore */ }
-  return suiteMuted() || !soundEnabled || !musicEnabled;
+  return suiteMuted() || !soundEnabled || !currentMusicEnabled();
 }
 function syncSuiteMusic() {
   try {
@@ -3988,7 +3993,7 @@ if (!(window.Suite && Suite.guide && Suite.guide.hasSeen('turdtris.html'))) {
 window.turdtrisRuntime = {
   ensureAudio,
   soundEnabled: () => soundEnabled,
-  musicEnabled: () => musicEnabled,
+  musicEnabled: () => currentMusicEnabled(),
   audioArmed: () => audioArmed,
   initializePresentation(helpers, theme) {
     window.TurdtrisPresentation = helpers;

@@ -1,0 +1,62 @@
+name: Verify published site
+
+on:
+  workflow_run:
+    workflows: [Test and Pages]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    concurrency:
+      group: verify-published-${{ matrix.host }}
+      cancel-in-progress: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: band
+            base: https://stalemate.band/
+          - host: pages
+            base: https://rupret007.github.io/StalemateSite/
+    env:
+      STALEMATE_LIVE_BASE: ${{ matrix.base }}
+      STALEMATE_LIVE_OUT: live-results/${{ matrix.host }}
+      STALEMATE_EXPECT_SITE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Check out the exact successfully deployed commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ env.STALEMATE_EXPECT_SITE_SHA }}
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
+      - name: Wait for the expected public files and check live behavior once
+        run: npm run verify:live
+      - name: Preserve readiness history and first-failure evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: live-${{ matrix.host }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: live-results/
+          if-no-files-found: warn
+          retention-days: 14
