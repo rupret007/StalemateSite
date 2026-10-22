@@ -9,6 +9,8 @@ browser gesture rejection. A failed song offers Retry song inside Songs; Next ca
 also recover. Retry respects mute, game pause and hidden-page gates and preserves
 the current song/position. Game and visibility events never trigger repeated failed
 downloads. Older playback promises cannot overwrite the newer song or paused state.
+Preference and gesture updates share one native play request; a stalled fetch does
+not label already buffered playback as loading.
 The footer retains its existing height and control count.
 
 Native keyboard/touch play and graphics review covers all seven games at desktop,

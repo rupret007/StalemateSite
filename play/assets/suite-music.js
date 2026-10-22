@@ -122,6 +122,7 @@ export function createSuiteMusic(opts) {
   let phase = 'paused';
   let failure = '';
   let generation = 0;
+  let pendingPlay = 0;
   try {
     const saved = JSON.parse(storage?.getItem(PLAYBACK_KEY) || 'null');
     if (saved?.v === 1 && saved.track === playlist[index]?.path && Number.isFinite(saved.seconds)
@@ -168,6 +169,7 @@ export function createSuiteMusic(opts) {
 
   function loadIndex(nextIndex, resume = 0) {
     generation += 1;
+    pendingPlay = 0;
     failure = '';
     phase = 'paused';
     pendingResume = resume;
@@ -189,21 +191,33 @@ export function createSuiteMusic(opts) {
     failure = error?.name === 'NotAllowedError' ? 'blocked' : 'error';
     phase = 'paused';
     generation += 1;
+    pendingPlay = 0;
     audio.pause();
     publishState();
   }
 
   function play() {
+    // Turning music on can sync both the preference and the gesture. Keep the
+    // original request (and its playing event) instead of resetting it twice.
+    if (pendingPlay || (!audio.paused && phase === 'playing')) {
+      publishState();
+      return;
+    }
     const request = ++generation;
+    pendingPlay = request;
     phase = 'loading';
     publishState();
     try {
       Promise.resolve(audio.play()).then(() => {
-        if (request !== generation || blocked() || audio.paused || failure) return;
+        if (request !== generation) return;
+        pendingPlay = 0;
+        if (blocked() || audio.paused || failure) return;
         phase = 'playing';
         publishState();
       }, error => {
-        if (request === generation && !blocked()) failed(error);
+        if (request !== generation) return;
+        pendingPlay = 0;
+        if (!blocked()) failed(error);
       });
     } catch (error) {
       if (request === generation && !blocked()) failed(error);
@@ -221,6 +235,8 @@ export function createSuiteMusic(opts) {
   });
   for (const event of ['waiting', 'stalled']) audio.addEventListener(event, () => {
     if (failure || blocked() || !armed) return;
+    // A stalled network fetch does not stop playback of already buffered data.
+    if (event === 'stalled' && Number(audio.readyState) >= 3 && !audio.paused) return;
     phase = 'loading'; publishState();
   });
   audio.addEventListener('error', () => { if (audio.error) failed(audio.error); });
@@ -238,6 +254,7 @@ export function createSuiteMusic(opts) {
   function sync() {
     if (!armed || blocked()) {
       generation += 1;
+      pendingPlay = 0;
       audio.pause();
       publishState();
       return;
@@ -295,6 +312,7 @@ export function createSuiteMusic(opts) {
     sync,
     pause() {
       generation += 1;
+      pendingPlay = 0;
       audio.pause();
       publishState();
     },
