@@ -84,6 +84,8 @@ npm run test:install-browsers
 npm test
 ```
 
+Run `npm run test:live:local` to validate the deployment checker at both local URL prefixes. See [audio diagnostics and live verification](docs/audio-live-verification.md) for manual live commands and the explicitly unverified physical-iPhone checklist.
+
 Unit tests use Vitest. Browser tests use Playwright against a local server on **4320** (override with `STALEMATE_TEST_PORT`). The server also mounts the site at `/StalemateSite/` so the GitHub Pages project path can be exercised. Navigation and song names work with JavaScript disabled.
 
 ## GitHub Pages (temporary host)
@@ -92,7 +94,7 @@ Intended URL until a custom domain exists:
 
 `https://rupret007.github.io/StalemateSite/`
 
-The workflow in `.github/workflows/ci.yml` runs Vitest + Playwright on every push and pull request. After those checks pass, a **deploy-pages** job runs on **push to `main` only**. This pull request does not enable Pages and does not merge.
+The workflow in `.github/workflows/ci.yml` runs Vitest + Playwright on every push and pull request. After those checks pass, a **deploy-pages** job runs on **push to `main` only**. The separate `Verify published site` workflow then checks both public hosts against that exact revision, with Chromium/WebKit gameplay and real audio checks. Readiness waits for the independently refreshed band domain; browser failures are not retried. Reports and first-failure diagnostics are retained as Actions artifacts.
 
 When you are ready to publish:
 

@@ -33,6 +33,9 @@ jobs:
       - name: Run automated tests
         run: npm test
 
+      - name: Verify deployment checks at local root and project paths
+        run: npm run test:live:local
+
       - name: Preserve Playwright evidence including first failures before retries
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -41,6 +44,7 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            live-results/
           if-no-files-found: ignore
           retention-days: 7
 

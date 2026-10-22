@@ -1,6 +1,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../helpers/media-diagnostics');
+
+test.use({ trace: 'retain-on-failure' });
 
 const ROOT = path.join(__dirname, '..', '..');
 
@@ -98,20 +100,6 @@ test('shared music advances once per track, persists preferences, and pauses in 
     await expect(html).toHaveAttribute('data-stalemate-music', 'playing');
     expect(await page.evaluate(() => typeof window.StalematePlaylist)).toBe('undefined');
     expect(errors).toEqual([]);
-});
-
-test.afterEach(async ({ page }, info) => {
-    if (info.status === info.expectedStatus) return;
-    const state = await page.evaluate(async () => {
-        const player = await window.Suite?.music();
-        const audio = player?.audioElement;
-        return { title: player?.trackTitle, label: document.querySelector('.suite-music-title')?.textContent,
-            paused: audio?.paused, seconds: audio?.currentTime, ready: audio?.readyState,
-            network: audio?.networkState, seeking: audio?.seeking, error: audio?.error?.code,
-            musicEnabled: window.Suite?.isMusicEnabled(), hidden: document.hidden,
-            playCalls: window.__unmutePlayCalls, events: window.__unmuteEvents };
-    }).catch(error => ({ diagnosticError: error.message }));
-    await info.attach('music-state-first-failure', { body: JSON.stringify(state, null, 2), contentType: 'application/json' });
 });
 
 test('homepage Games links reach the hub, with individual games excluded from search', async ({ page }) => {
