@@ -35,6 +35,17 @@
     updateFooter();
     pagers.forEach(update => update());
     if (!phone.matches) return;
+    if (game === 'turdjack') {
+      document.querySelectorAll('#dealerCards, #playerCards, #splitCards').forEach(hand => {
+        const count = hand.children.length;
+        const step = count > 1 ? Math.max(24, Math.min(54, (hand.clientWidth - 4 - 54) / (count - 1))) : 54;
+        hand.style.setProperty('--mobile-jack-overlap', `${54 - step}px`);
+        const bottom = Math.min(hand.parentElement.getBoundingClientRect().bottom,
+          document.getElementById('suite-music-status')?.getBoundingClientRect().top || innerHeight);
+        const height = Math.max(44, Math.min(75, bottom - hand.getBoundingClientRect().top - 4));
+        hand.style.setProperty('--mobile-jack-card-height', `${height}px`);
+      });
+    }
     if (game === 'turdtris') canvasFit(document.querySelector('#game'), document.querySelector('.game-grid'), 0.5, 14);
     if (game === 'neon-arkanoid') canvasFit(document.querySelector('#gameCanvas'), document.querySelector('.play-area'), 1.5, 4);
   }
@@ -166,6 +177,10 @@
     }
     new MutationObserver(() => { placeSettings(); watchFooters(); }).observe(document.body, { childList:true, subtree:true });
     if (['crapeights', 'turdrummy'].includes(game)) handPager(document.querySelector('#playerHand'));
+    if (game === 'turdjack') document.querySelectorAll('#dealerCards, #playerCards, #splitCards').forEach(hand => {
+      new MutationObserver(schedule).observe(hand, { childList:true });
+      new ResizeObserver(schedule).observe(hand.parentElement);
+    });
     if (game === 'turdspades') handPager(document.querySelector('#youCards'));
     const host = document.querySelector(game === 'turdtris' ? '.game-grid' : '.play-area');
     if (host) new ResizeObserver(schedule).observe(host);

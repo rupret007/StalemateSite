@@ -277,11 +277,11 @@
    * Brick placement for a playfield. Fewer, wider columns (9) with a 0.7
    * height ratio so a 320px phone still gets ~28x20 bricks.
    */
-  function brickGeometry(width, height, cols = CAMPAIGN_COLS, rows = 1) {
+  function brickGeometry(width, height, cols = CAMPAIGN_COLS, rows = 1, topInset = 70) {
     const W = Math.max(1, Number(width) || 0);
     const H = Math.max(1, Number(height) || 0);
     const n = Math.max(1, Math.floor(cols) || CAMPAIGN_COLS);
-    const top = 70;
+    const top = Math.max(70, Number(topInset) || 70);
     const padX = Math.max(8, Math.round(W * 0.03));
     const gap = W < 420 ? 4 : 6;
     let rowGap = 4;

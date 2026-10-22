@@ -528,6 +528,8 @@ textarea:focus-visible {
 
 .hero-show .button-row {
     grid-area: ctas;
+    padding: 0.75rem;
+    background: var(--ink);
 }
 
 .hero-video {
@@ -557,6 +559,8 @@ textarea:focus-visible {
     align-items: center;
     gap: 0.4rem 0.65rem;
     margin-top: 0.5rem;
+    padding: 0.75rem;
+    background: var(--ink);
 }
 
 .hero-video__label {

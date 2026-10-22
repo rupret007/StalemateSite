@@ -882,6 +882,18 @@ function resize(){
   cv.height = Math.floor(H*DPR);
   cv.style.width = W+'px'; cv.style.height = H+'px';
   ctx.setTransform(DPR,0,0,DPR,0,0);
+  if(brickWallGeometry && bricks.length && TLEVELS && TLEVELS.brickGeometry){
+    const previous = brickWallGeometry;
+    const next = TLEVELS.brickGeometry(W, H, previous.cols, previous.rows, brickTopInset());
+    for(const brick of bricks){
+      const col = Math.round((brick.x - previous.padX) / (previous.bw + previous.gap));
+      const row = Math.round((brick.y - previous.top) / (previous.bh + previous.rowGap));
+      brick.x = next.padX + col * (next.bw + next.gap);
+      brick.y = next.top + row * (next.bh + next.rowGap);
+      brick.w = next.bw; brick.h = next.bh;
+    }
+    brickWallGeometry = {...next, cols:previous.cols, rows:previous.rows};
+  }
   if(paddle){
     paddle.y = H - paddle.h - 36;
     paddle.x = Math.min(Math.max(paddle.x, paddle.w/2), W - paddle.w/2);
@@ -1275,12 +1287,19 @@ function newBall(stuck=true){
 
 /* ---- Level generation ---- */
 const PATTERN_NAMES = TLEVELS ? TLEVELS.allPatternNames() : ['Classic Wall','Checker','Tunnel','Wave','Pyramid','Diamond','Cross','Spiral','Hourglass','Brick House','Skull','Funhouse','Sewer Maze'];
+let brickWallGeometry = null;
 function steel(br){ return !!(br && br.indestructible); }
 function breakableLeft(){ return TLEVELS ? TLEVELS.remainingBreakable(bricks) : bricks.filter(b => !b.indestructible).length; }
 function paintSpecialBrick(b){
   if(!BRICK_ART || !b.material || !BRICK_ART.MATERIAL_PALETTES[b.material]) return;
   const pal = BRICK_ART.MATERIAL_PALETTES[b.material];
   b.c1 = pal[0]; b.c2 = pal[1]; b.glow = pal[2];
+}
+function brickTopInset(){
+  const hud = document.querySelector('.hud');
+  const canvas = cv.getBoundingClientRect();
+  if(!hud || canvas.height <= 0) return 70;
+  return Math.max(70, Math.ceil((hud.getBoundingClientRect().bottom + 8 - canvas.top) * H / canvas.height));
 }
 function newLevel(){
   levelStats = { bricks: 0, maxCombo: 0, startedAt: Date.now() };
@@ -1291,8 +1310,10 @@ function newLevel(){
   const campaign = TLEVELS && TLEVELS.definitionForLevel ? TLEVELS.definitionForLevel(level) : null;
   const cols = campaign ? campaign.cols : Math.max(8, Math.min(13, Math.floor(W/52)));
   const rows = campaign ? campaign.rows : Math.min(10, 4 + Math.floor(level/2));
-  const geo = TLEVELS && TLEVELS.brickGeometry ? TLEVELS.brickGeometry(W, H, cols, rows) : null;
-  const top = geo ? geo.top : 70;
+  const inset = brickTopInset();
+  const geo = TLEVELS && TLEVELS.brickGeometry ? TLEVELS.brickGeometry(W, H, cols, rows, inset) : null;
+  const top = geo ? geo.top : inset;
+  brickWallGeometry = geo ? {...geo, cols, rows} : null;
   const padX = geo ? geo.padX : Math.max(10, W*0.04);
   const gapX = geo ? geo.gap : 6;
   const gapY = geo ? geo.rowGap : 5;
