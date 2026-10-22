@@ -10,7 +10,9 @@ also recover. Retry respects mute, game pause and hidden-page gates and preserve
 the current song/position. Game and visibility events never trigger repeated failed
 downloads. Older playback promises cannot overwrite the newer song or paused state.
 Preference and gesture updates share one native play request; a stalled fetch does
-not label already buffered playback as loading.
+not label already buffered playback as loading. After a restored seek, actual
+advancing playback also clears a stale WebKit loading state; the seek alone does
+not count as progress.
 The footer retains its existing height and control count.
 
 Native keyboard/touch play and graphics review covers all seven games at desktop,

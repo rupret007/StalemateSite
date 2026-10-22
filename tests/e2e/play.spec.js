@@ -71,7 +71,7 @@ test('shared music advances once per track, persists preferences, and pauses in 
         const play = audio.play.bind(audio);
         window.__unmutePlayCalls = 0;
         window.__unmuteEvents = [];
-        for (const event of ['playing', 'waiting', 'stalled', 'loadedmetadata', 'canplay', 'seeked', 'pause', 'error']) {
+        for (const event of ['playing', 'waiting', 'stalled', 'loadedmetadata', 'canplay', 'seeking', 'seeked', 'timeupdate', 'pause', 'error']) {
             audio.addEventListener(event, () => {
                 window.__unmuteEvents.push({ event, time: audio.currentTime, paused: audio.paused, ready: audio.readyState, seeking: audio.seeking });
                 if (window.__unmuteEvents.length > 64) window.__unmuteEvents.shift();
@@ -84,6 +84,8 @@ test('shared music advances once per track, persists preferences, and pauses in 
     expect(await page.evaluate(() => window.__unmutePlayCalls)).toBe(1);
     const resumedAt = await page.evaluate(async () => (await Suite.music()).audioElement.currentTime);
     await expect.poll(() => page.evaluate(async () => (await Suite.music()).audioElement.currentTime)).toBeGreaterThan(resumedAt + 0.25);
+    await expect(html).toHaveAttribute('data-stalemate-music', 'playing');
+    await expect(page.locator('.suite-music-title')).not.toContainText('Loading');
     await page.evaluate(() => {
         Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
         document.dispatchEvent(new Event('visibilitychange'));

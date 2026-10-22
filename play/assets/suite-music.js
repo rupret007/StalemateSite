@@ -123,6 +123,8 @@ export function createSuiteMusic(opts) {
   let failure = '';
   let generation = 0;
   let pendingPlay = 0;
+  let observedTime = 0;
+  let seeking = false;
   try {
     const saved = JSON.parse(storage?.getItem(PLAYBACK_KEY) || 'null');
     if (saved?.v === 1 && saved.track === playlist[index]?.path && Number.isFinite(saved.seconds)
@@ -170,6 +172,8 @@ export function createSuiteMusic(opts) {
   function loadIndex(nextIndex, resume = 0) {
     generation += 1;
     pendingPlay = 0;
+    observedTime = 0;
+    seeking = false;
     failure = '';
     phase = 'paused';
     pendingResume = resume;
@@ -231,20 +235,37 @@ export function createSuiteMusic(opts) {
 
   audio.addEventListener('playing', () => {
     if (failure || blocked() || !armed) return;
+    observedTime = Number(audio.currentTime);
     phase = 'playing'; publishState();
   });
   for (const event of ['waiting', 'stalled']) audio.addEventListener(event, () => {
     if (failure || blocked() || !armed) return;
     // A stalled network fetch does not stop playback of already buffered data.
     if (event === 'stalled' && Number(audio.readyState) >= 3 && !audio.paused) return;
+    observedTime = Number(audio.currentTime);
     phase = 'loading'; publishState();
   });
   audio.addEventListener('error', () => { if (audio.error) failed(audio.error); });
   audio.addEventListener('pause', () => { phase = 'paused'; savePosition(); publishState(); });
   audio.addEventListener('loadedmetadata', restorePosition);
   audio.addEventListener('canplay', restorePosition);
+  audio.addEventListener('seeking', () => { seeking = true; });
+  audio.addEventListener('seeked', () => {
+    seeking = false;
+    observedTime = Number(audio.currentTime);
+  });
   audio.addEventListener('timeupdate', () => {
     restorePosition();
+    const seconds = Number(audio.currentTime);
+    // WebKit can emit waiting after a restored seek while decoded audio keeps
+    // advancing, without another playing event. A completed seek alone is not
+    // progress; require a later advancing sample with every playback gate open.
+    if (phase === 'loading' && armed && !failure && !blocked() && !audio.paused
+        && !seeking && !audio.seeking && seconds > observedTime) {
+      phase = 'playing';
+      publishState();
+    }
+    observedTime = seconds;
     if (Math.abs(Math.floor(audio.currentTime) - lastSavedSecond) >= 5) savePosition();
   });
   audio.addEventListener('ended', onEnded);
