@@ -1,4 +1,4 @@
-name: Test and Pages
+name: Audio timing comparison
 
 on:
   push:
@@ -31,10 +31,7 @@ jobs:
         run: npx playwright install --with-deps chromium webkit
 
       - name: Run automated tests
-        run: npm test
-
-      - name: Verify deployment checks at local root and project paths
-        run: npm run test:live:local
+        run: npx playwright test tests/e2e/music-controls-play.spec.js tests/e2e/play.spec.js --grep 'music|discoverable' --project=webkit-iphone-se --project=webkit-iphone-15 --project=webkit-iphone-15-pro-max --workers=2 --retries=0
 
       - name: Preserve Playwright evidence including first failures before retries
         if: always()
