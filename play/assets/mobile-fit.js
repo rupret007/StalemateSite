@@ -125,6 +125,15 @@
     }
     menu = document.querySelector('.mobile-settings-panel') || menu;
     if (game === 'turdrummy') ['.tr-difficulty-topbar'].forEach(selector => move(document.querySelector(selector), menu));
+    if (game === 'turdrummy') {
+      const drawer = document.querySelector('.tr-drawer');
+      if (innerWidth > innerHeight) move(drawer, menu);
+      else if (placements.has(drawer)) {
+        const place = placements.get(drawer);
+        place.parent.insertBefore(drawer, place.next?.parentNode === place.parent ? place.next : null);
+        placements.delete(drawer);
+      }
+    }
     if (menu) {
       const settings = game === 'turdtris' ? ['#suite-difficulty-mount', '.run-settings']
         : game === 'crapeights' ? ['#suite-difficulty-mount']

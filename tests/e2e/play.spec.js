@@ -222,10 +222,11 @@ test('shared music displays the actual track, confirmed links, mute and visibili
     await page.goto('/play/turdomania.html?seed=42');
     const toggle = page.locator('#suite-music-toggle');
     await toggle.click();
-    await expect(page.locator('#suite-music-status')).toHaveText('Music off');
+    await expect(page.locator('.suite-music-title')).toHaveText('Music off');
     await toggle.click();
     await page.evaluate(async () => { const player = await Suite.music(); player.playTrackAt(1); });
     const status = page.locator('#suite-music-status');
+    const title = status.locator('.suite-music-title');
     await expect(status).toContainText('Now playing: Andrea');
     await expect(status.getByRole('link')).toHaveAttribute('href', 'https://music.apple.com/us/album/andrea/1718463871?i=1718463872');
     await page.evaluate(async () => { (await Suite.music()).advanceForTest(); });
@@ -243,12 +244,12 @@ test('shared music displays the actual track, confirmed links, mute and visibili
     });
     await expect(status).toContainText('Now playing: It’s Only Been 18');
     await page.evaluate(async () => { (await Suite.music()).advanceForTest(); });
-    await expect(status).toHaveText('Now playing: Wham Bam');
+    await expect(title).toHaveText('Now playing: Wham Bam');
     await expect(status.getByRole('link')).toHaveCount(0);
     await toggle.click();
-    await expect(status).toHaveText('Music off');
+    await expect(title).toHaveText('Music off');
     await page.reload();
-    await expect(status).toHaveText('Music off');
+    await expect(title).toHaveText('Music off');
     expect(await page.evaluate(() => localStorage.getItem('stalemate.music'))).toBe('off');
 });
 

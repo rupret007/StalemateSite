@@ -350,3 +350,30 @@ body[data-arcade-game="turdtris"] .welcome-card .mobile-guide-details { display:
   html[data-mobile-game] .mobile-hand .card { position:relative!important; inset:auto!important; width:100%!important; height:var(--mobile-card-height,84px)!important; min-width:44px!important; min-height:44px; margin:0!important; transform:none!important; translate:none!important; rotate:none!important; animation:none!important; }
   html[data-mobile-game="turdspades"] #youCards.mobile-hand .card.selected { translate:0 -6px!important; }
 }
+
+/* Landscape leaves the music player its full 44px controls without covering hands. */
+@media(max-width:980px) and (orientation:landscape) and (max-height:340px) {
+  html[data-mobile-game="turdomania"] #boardWrap { padding:0; border-width:1px; margin:0 auto; }
+}
+@media(max-width:980px) and (orientation:landscape) {
+  html[data-mobile-game="crapeights"] .hand-wrap { position:relative; }
+  html[data-mobile-game="crapeights"] .hand-head { padding-right:149px; gap:4px; align-items:center; }
+  html[data-mobile-game="crapeights"] .hand-head strong { font-size:11px; min-width:0; }
+  html[data-mobile-game="crapeights"] #handRisk { position:absolute; left:0; top:28px; font-size:9px; }
+  html[data-mobile-game="crapeights"] #sortHandBtn { font-size:10px; padding:2px; min-width:64px; }
+  html[data-mobile-game="crapeights"] .mobile-hand-pager { position:absolute; top:0; right:0; width:145px; margin:0; }
+  html[data-mobile-game="turdrummy"] .status { grid-template-columns:repeat(6,minmax(0,1fr)); gap:2px; padding:2px!important; }
+  html[data-mobile-game="turdrummy"] .status .stat { display:flex; align-items:center; justify-content:space-between; gap:2px; padding:2px!important; min-width:0; }
+  html[data-mobile-game="turdrummy"] .zone--hand { grid-row:1/3; min-height:0; }
+  html[data-mobile-game="turdrummy"] .zone--opponent { grid-column:1; grid-row:1; }
+  html[data-mobile-game="turdrummy"] .zone--center .piles { flex-wrap:nowrap; width:100%; gap:6px; }
+  html[data-mobile-game="turdrummy"] .zone--center .pile { flex:1 1 0; min-width:0; padding:0; }
+  html[data-mobile-game="turdrummy"] .zone--center .pile-body { flex-direction:column; min-height:0; gap:4px; }
+  html[data-mobile-game="turdrummy"] .zone--center .stock-stack { width:56px; height:78px; margin-right:0; }
+  html[data-mobile-game="turdrummy"] .mobile-settings-panel .tr-drawer[open] .tr-drawer-body { position:static; max-height:40dvh; overflow:auto; }
+  html[data-mobile-game="turdspades"] .bid-box { grid-template-columns:40px minmax(0,1fr); gap:2px; }
+  html[data-mobile-game="turdspades"] .bid-box .name { font-size:10px; }
+  html[data-mobile-game="turdspades"] .bid-controls { grid-template-columns:44px 44px 44px minmax(44px,1fr) minmax(60px,1fr); grid-template-rows:44px; padding:0; }
+  html[data-mobile-game="turdspades"] #lockBid { grid-column:5; grid-row:1; }
+  html[data-mobile-game="turdspades"] .bid-v { width:44px; height:44px; padding:0; font-size:1.4rem; }
+}

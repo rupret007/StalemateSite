@@ -5,6 +5,7 @@
 export const MUTE_STORAGE_KEY = 'turdsuite_muted';
 export const MUSIC_PREF_KEY = 'stalemate.music';
 export const TRACK_INDEX_KEY = 'turdsuite_music_track_v1';
+export const PLAYBACK_KEY = 'turdsuite_music_playback_v1';
 
 const LEGACY_MUSIC_OFF = [
   ['turdtrisMusic_v1', (v) => v === '0']
@@ -96,7 +97,7 @@ export function readTrackIndex(storage, length) {
  * @param {(path: string) => string} opts.resolveSrc
  * @param {Storage|null} [opts.storage]
  * @param {typeof Audio} [opts.AudioCtor]
- * @param {(state: { paused: boolean, title: string, listenUrl: string }) => void} [opts.onStateChange]
+ * @param {(state: { paused: boolean, title: string, listenUrl: string, index: number }) => void} [opts.onStateChange]
  */
 export function createSuiteMusic(opts) {
   const playlist = opts.playlist || STALEMATE_PLAYLIST;
@@ -116,6 +117,30 @@ export function createSuiteMusic(opts) {
 
   let armed = false;
   let index = readTrackIndex(storage, playlist.length);
+  let pendingResume = 0;
+  let lastSavedSecond = -1;
+  try {
+    const saved = JSON.parse(storage?.getItem(PLAYBACK_KEY) || 'null');
+    if (saved?.v === 1 && saved.track === playlist[index]?.path && Number.isFinite(saved.seconds)
+        && saved.seconds >= 0 && saved.seconds < 86400) pendingResume = saved.seconds;
+  } catch { /* Storage is optional; malformed saves start at the track beginning. */ }
+
+  function savePosition() {
+    if (pendingResume > 0) return; // An unarmed/new page must not erase its pending seek.
+    const seconds = Number(audio.currentTime);
+    if (!Number.isFinite(seconds) || seconds < 0) return;
+    try { storage?.setItem(PLAYBACK_KEY, JSON.stringify({ v: 1, track: playlist[index]?.path, seconds })); }
+    catch { /* Music keeps working when storage is denied or full. */ }
+    lastSavedSecond = Math.floor(seconds);
+  }
+
+  function restorePosition() {
+    if (!pendingResume || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
+    const seconds = pendingResume < audio.duration - 1 ? pendingResume : 0;
+    try { audio.currentTime = seconds; pendingResume = 0; }
+    catch { return; } // Some media engines cannot seek until metadata/data is ready.
+    savePosition();
+  }
 
   function blocked() {
     return !!isSuiteMuted() || !!isGameBlocked() || !!isDocumentHidden();
@@ -129,13 +154,16 @@ export function createSuiteMusic(opts) {
     const track = currentTrack();
     onStateChange({
       paused: blocked() || audio.paused,
+      index,
       title: track ? track.title : '',
       listenUrl: track ? track.listenUrl || '' : ''
     });
   }
 
-  function loadIndex(nextIndex) {
+  function loadIndex(nextIndex, resume = 0) {
+    pendingResume = resume;
     index = nextIndex;
+    lastSavedSecond = -1;
     try {
       if (storage) storage.setItem(TRACK_INDEX_KEY, String(index));
     } catch {
@@ -145,6 +173,7 @@ export function createSuiteMusic(opts) {
     if (track) {
       audio.src = resolveSrc(track.path);
     }
+    if (!resume) savePosition();
   }
 
   function onEnded() {
@@ -163,10 +192,16 @@ export function createSuiteMusic(opts) {
   }
 
   audio.addEventListener('play', publishState);
-  audio.addEventListener('pause', publishState);
+  audio.addEventListener('pause', () => { savePosition(); publishState(); });
+  audio.addEventListener('loadedmetadata', restorePosition);
+  audio.addEventListener('canplay', restorePosition);
+  audio.addEventListener('timeupdate', () => {
+    restorePosition();
+    if (Math.abs(Math.floor(audio.currentTime) - lastSavedSecond) >= 5) savePosition();
+  });
   audio.addEventListener('ended', onEnded);
 
-  loadIndex(index);
+  loadIndex(index, pendingResume);
 
   function sync() {
     if (!armed || blocked()) {
@@ -183,6 +218,9 @@ export function createSuiteMusic(opts) {
   }
 
   return {
+    get tracks() { return playlist.map((track, trackIndex) => ({ index: trackIndex, title: track.title })); },
+    savePosition,
+    nextTrack() { this.playTrackAt(advanceTrackIndex(index, playlist.length)); },
     get armed() {
       return armed;
     },
