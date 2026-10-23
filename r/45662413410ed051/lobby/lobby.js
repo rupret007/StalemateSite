@@ -676,6 +676,14 @@
         if (!text) return;
         if (connectionState !== 'connected') return toast('Not connected yet. Your draft is still here.');
         if (!app.band && (app.netLock === 'readonly' || app.budget === 'readonly') && !text.startsWith('/')) return toast('Chat is paused. Your draft is still here.');
+        // Joining an existing tab selects it without replaying a server join or clearing its history.
+        const joined = /^\/join\s+(#[a-z0-9-]{2,30})$/i.exec(text);
+        if (joined && app.chans.has(joined[1].toLowerCase())) {
+            input.value = '';
+            drafts.delete(app.active);
+            switchTo(joined[1].toLowerCase());
+            return;
+        }
         const sent = app.active.startsWith('pm:') && !text.startsWith('/') ? cmd('msg', [app.active.slice(3), ...text.split(' ')]) : send({ t: 'say', ch: app.active.startsWith('pm:') ? '#stalemate' : app.active, text });
         if (sent) { input.value = ''; drafts.delete(app.active); }
     });
