@@ -2,8 +2,6 @@ const { test, expect } = require('@playwright/test');
 const { randomUUID } = require('node:crypto');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
-test.skip(({ browserName }) => browserName !== 'chromium', 'IRC command navigation uses the real Chromium relay.');
-
 let relay;
 test.beforeEach(({ baseURL }) => { relay = hangoutRelayWsBase(baseURL, `join-focus-${randomUUID()}`); });
 
