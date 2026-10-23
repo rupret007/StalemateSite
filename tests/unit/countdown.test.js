@@ -53,10 +53,13 @@ describe('hero countdown remaining time', () => {
         for (const selector of ['meta[name="description"]', 'meta[property="og:description"]', 'meta[name="twitter:description"]']) {
             expect(document.querySelector(selector).getAttribute('content')).not.toMatch(/Oct 24|Rockin/);
         }
-        expect(document.querySelector('[data-next-show]').hidden).toBe(true);
+        expect(document.querySelector('[data-next-show]').hidden).toBe(false);
+        expect(document.querySelector('[data-countdown-clock]').hidden).toBe(true);
+        expect(document.querySelector('[data-track="show-cta-hero"]').href).toBe('https://studio801.ticketspice.com/rockin-october');
         expect(document.querySelector('.header-cta').textContent).toBe('Follow the band');
         StalemateCountdown.apply(document, AFTER - 1);
-        expect(document.querySelector('.header-cta').textContent).toBe('Show details');
+        expect(document.querySelector('.header-cta').textContent).toBe('Get Saturday tickets');
+        expect(document.querySelector('.header-cta').href).toBe('https://studio801.ticketspice.com/rockin-october');
         expect(document.querySelector('#listen-title').textContent).toBe('Homework before the show');
         expect(document.querySelector('[data-show-before]').hidden).toBe(false);
         for (const now of [AFTER, AFTER + 86400000]) {

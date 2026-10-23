@@ -23,7 +23,7 @@ Do not publish guesses for any of these:
 - TikTok handle
 - Press kit / EPK / QR landing (do not publish until the band has them)
 
-The homepage uses evergreen metadata and no-JavaScript content. The existing `2026-10-24T16:45:00-05:00` cutoff controls all dated promotions and show actions together; after it, the band/social links remain. This is a promotion cutoff, not a confirmed set end time. The Manic lyric video stays.
+The homepage uses evergreen metadata. Its static show card keeps the confirmed date, set time, venue and direct Saturday ticket link usable when JavaScript is disabled or the countdown fails to load. Checkout guidance asks visitors to choose October 24, then select Stalemate; the full festival lineup stays linked separately. This dated fallback cannot expire without JavaScript and needs an HTML update after the show. When the countdown runs, the existing `2026-10-24T16:45:00-05:00` cutoff controls all dated promotions and show actions together; after it, the band/social links remain. This is a promotion cutoff, not a confirmed set end time. The Manic lyric video stays.
 
 Booking/contact: **stalemate.punk@gmail.com**, supplied by the owner and corroborated October 21, 2026. Mail delivery has not been tested.
 
@@ -40,7 +40,8 @@ Privacy-safe [GoatCounter](https://www.goatcounter.com/) events (account `stalem
 - `music-apple`, `music-spotify`, `music-youtube`, `music-bandcamp` — streaming links in Listen (not social icons)
 - `manic-video-play` — Manic lyric video play
 - `show-details` — Rockin’ October info links
-- `` `show-tick` + `et-<venue-slug>` `` — admission links when present
+- `show-ticket-rockin-october` — the official Rockin’ October TicketSpice link
+- `show-cta-header`, `show-cta-hero`, `show-cta-under-video` — existing show-action placements, recorded alongside the ticket category; `show-cta-next-fallback` remains the evergreen follow action
 - `nav-home`, `nav-listen`, `nav-about`, `nav-games`, `nav-contact`, … — header/footer in-page nav
 - `social-instagram`, `social-youtube`, `social-facebook`, … — `.social-link` clicks
 - `scroll-home-25`, `scroll-home-50`, `scroll-home-75`, `scroll-home-100` (and `scroll-404-*` on `404.html`)

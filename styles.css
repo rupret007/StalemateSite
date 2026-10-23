@@ -1510,7 +1510,9 @@ textarea:focus-visible {
 /* Show first: countdown + Oct 24 card, then Manic, then the repeat show button. */
 .hero-show { grid-template-areas: "next" "video" "ctas"; }
 .hero-show__cta { margin: 0.75rem 0 0; }
-.hero-show__cta .button--big { display: flex; justify-content: center; width: 100%; font-size: 1.15rem; min-height: 52px; }
+.hero-show__cta .button--big { display: flex; justify-content: center; width: 100%; padding: 0.65rem 0.75rem; font-size: 1rem; letter-spacing: 0.04em; line-height: 1.2; text-align: center; min-height: 52px; }
+.hero-show__cta .hero-show__guidance { margin: 0.5rem 0 0; color: var(--cream); font-size: 0.875rem; line-height: 1.3; }
+.hero-show__festival { display: inline-flex; align-items: center; min-height: 44px; color: var(--cream); font-size: 0.875rem; }
 @media (min-width: 900px) {
     .hero-show {
         grid-template-columns: minmax(17.25rem, 0.95fr) minmax(0, 1.45fr);
@@ -1520,6 +1522,9 @@ textarea:focus-visible {
 @media (max-width: 719px) {
     /* Socials already live in the header; drop the hero copy so Manic makes the first phone screen. */
     .hero .social-nav--row { display: none; }
+    /* Keep the date, venue, checkout guidance and Manic ahead of repeated show copy on phones. */
+    .hero-show-card .hero-show__tie,
+    .hero-show-card .next-show-organizers { display: none; }
 }
 @media (max-width: 719px) {
     /* Tighter phone spacing so the countdown, show and the top of Manic share the first screen. */
