@@ -41,7 +41,9 @@ describe('content boundaries', () => {
         expect(home).not.toMatch(/SoCal|Southern California|do not link|other act|Head2Wall/i);
         expect(home).not.toMatch(/Ska \/ punk/i);
         expect(home).not.toMatch(/ska\/punk/i);
-        expect(home).not.toMatch(/ticket/i);
+        expect(home).toContain('https://studio801.ticketspice.com/rockin-october');
+        expect(home).toContain('Choose October 24, then select Stalemate at checkout.');
+        expect(home).toContain('Full festival lineup');
         expect(home).toContain('href="#top">Home');
         expect(home).toContain('href="#about">About');
         expect(home).not.toMatch(/href=["'][^"']*(epk|qr)[^"']*["']/i);
@@ -51,7 +53,7 @@ describe('content boundaries', () => {
         expect(home).toContain('2026-10-24T16:45:00-05:00');
         expect(home).toContain('Rockin’ October');
         expect(home).toContain('Los Amigo’s');
-        expect(home).toContain('Show details');
+        expect(home).toContain('Get Saturday tickets');
         expect(home).toContain('assets/manic.mp4');
         expect(home).toContain('Hear it loud Oct 24');
         expect(home).toContain('at Los Amigo’s, Plano');
@@ -70,7 +72,8 @@ describe('content boundaries', () => {
         expect(readme).toContain('original songs');
         expect(readme).not.toMatch(/Lewisville|Flower Mound/);
         expect(readme).toContain('Member names and roles');
-        expect(readme).not.toMatch(/ticket/i);
+        expect(readme).toContain('show-ticket-rockin-october');
+        expect(readme).toContain('This dated fallback cannot expire without JavaScript');
         expect(readme).not.toMatch(/\[(MAILING LIST TOOL|MERCH|BOOKING EMAIL|HANDLE) NEEDED\]/);
     });
 

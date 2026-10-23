@@ -10,6 +10,7 @@ const OURS = [
     /^https:\/\/www\.youtube\.com\/@stalemate\.punkband$/,
     /^https:\/\/www\.facebook\.com\/stalemate\.band\/$/,
     /^https:\/\/rockinoctober\.com\/?$/,
+    /^https:\/\/studio801\.ticketspice\.com\/rockin-october$/,
     /^https:\/\/music\.apple\.com\/us\/album\/(my-mom-says-were-cool\/1718884118|andrea\/1718463871\?i=1718463872|its-been-only-18\/1718464113\?i=1718464114)$/,
     /^https:\/\/open\.spotify\.com\/(artist\/5cZqYe3bDw3xcKIk4aPHNH|track\/6GBydFSUtZ7wZ7pSAvbytw|track\/00i8GYyog0bCGJnhtqNJKo)$/
 ];
