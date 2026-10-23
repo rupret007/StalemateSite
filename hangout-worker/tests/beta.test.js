@@ -72,6 +72,28 @@ describe('real invitation-only beta boundary', () => {
             expect((await betaFetch(request('/r/45662413410ed051/lobby/'), config, deps)).status).toBe(503);
         }
     });
+    it('protects Web Join assets before lookup and scopes its stricter audio policy to that page', async () => {
+        const config = env();
+        for (const path of ['/join/', '/join/app.js', '/%6aoin/index.html']) {
+            for (const method of ['GET', 'HEAD']) expect((await betaFetch(request(path, { method }), config, deps)).status).toBe(401);
+        }
+        expect(config.ASSETS.fetch).not.toHaveBeenCalled();
+        const cookie = await unlock(config);
+        for (const path of ['/join/', '/join/app.js', '/%6aoin/index.html']) {
+            const result = await betaFetch(request(path, { cookie }), config, deps);
+            expect(result.status).toBe(200);
+            expect(result.headers.get('Cache-Control')).toBe('no-store');
+            expect(result.headers.get('X-Robots-Tag')).toContain('noindex');
+            expect(result.headers.get('Content-Security-Policy')).toContain("default-src 'none'; script-src 'self'; style-src 'self'");
+            expect(result.headers.get('Content-Security-Policy')).toContain('https://webjam-turn-credentials.jeffstory007.workers.dev');
+            expect(result.headers.get('Content-Security-Policy')).not.toMatch(/youtube|unsafe-inline|wss:/);
+            expect(result.headers.get('Permissions-Policy')).toBe('camera=(), geolocation=(), microphone=(self)');
+            expect(await result.text()).not.toContain('/beta/bootstrap.js');
+        }
+        const lobby = await betaFetch(request('/r/45662413410ed051/lobby/', { cookie }), config, deps);
+        expect(lobby.headers.get('Content-Security-Policy')).not.toContain('webjam-turn-credentials');
+        expect(await lobby.text()).toContain('/beta/bootstrap.js');
+    });
     it('does not accept an operator code, role selection, forged identity or a pilot cookie', async () => {
         const config = env();
         expect((await betaFetch(request('/beta/unlock', { method: 'POST', body: { key: 'wrong', role: 'owner' } }), config, deps)).status).toBe(403);
