@@ -3,9 +3,10 @@
 The website now includes `/join/`, the static browser client used by WebJam's
 compiled invitation address. Its source is pinned in
 [`join/PROVENANCE.json`](../join/PROVENANCE.json) to WebJam commit
-`07a509b475c44f704af55fbe1a1f010a49e653bf` and
+`4263e1f9f2718b06c6de0239822c929d44683347` and
 [PR398](https://github.com/rupret007/webjam/pull/398). That source contains the
-interrupted-Join recovery and delayed-playback cancellation fixes. The MIT license is shipped with the client.
+interrupted-Join recovery, delayed-playback cancellation and background-audio
+resume fixes. The MIT license is shipped with the client.
 Every runtime file is copied unchanged except for the page's noindex metadata;
 the manifest records both source and shipped hashes. No dependency installer,
 test harness, provider key or generated invitation is part of the page.
@@ -40,7 +41,7 @@ StoryPool 10-21-26 owns review coordination and deployment. Before activating:
   network failure and recovery. Local synthetic audio and provider fixtures do
   not establish WAN timing, physical iPhone behavior or TURN reachability.
 
-Use WebJam's [canonical creator guide](https://github.com/rupret007/webjam/blob/07a509b475c44f704af55fbe1a1f010a49e653bf/USER_GUIDE.md)
-and [Web Join protocol guide](https://github.com/rupret007/webjam/blob/07a509b475c44f704af55fbe1a1f010a49e653bf/docs/web-join.md)
+Use WebJam's [canonical creator guide](https://github.com/rupret007/webjam/blob/4263e1f9f2718b06c6de0239822c929d44683347/USER_GUIDE.md)
+and [Web Join protocol guide](https://github.com/rupret007/webjam/blob/4263e1f9f2718b06c6de0239822c929d44683347/docs/web-join.md)
 for the existing host/guest workflow. Browser joining is a separate higher-delay
 option; it does not satisfy the remaining native Windows/Linux/Mac acceptance.
