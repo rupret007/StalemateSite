@@ -5,6 +5,7 @@
     const $ = (s, el = document) => el.querySelector(s);
     const $$ = (s, el = document) => [...el.querySelectorAll(s)];
     const params = new URLSearchParams(location.search);
+    const resumeSignin = params.get('signed-in') === '1';
     const isLocal = /^(127\.0\.0\.1|localhost)$/.test(location.hostname);
     const previewKey = params.get('preview') || sessionStorage.getItem('hangout-preview') || '';
     if (params.get('preview')) sessionStorage.setItem('hangout-preview', params.get('preview'));
@@ -34,7 +35,7 @@
         $('[data-gate]').hidden = false;
     }
 
-    $('[data-enter]').addEventListener('click', () => {
+    function connectPanel() {
         if (!relayBase) return status('The chat server isn’t switched on yet.');
         const q = new URLSearchParams({ preview: previewKey });
         if (devAdmin) q.set('devadmin', devAdmin);
@@ -44,19 +45,27 @@
         const ws = new WebSocket(`${relayBase}/lobby-admin?${q}`);
         app.ws = ws;
         clearPanel();
+        status('Connecting to the moderation panel…');
         if (previous && previous.readyState < 2) previous.close(1000, 'staff connection replaced');
         let opened = false;
+        let timedOut = false;
+        const deadline = setTimeout(() => {
+            if (app.ws !== ws) return;
+            timedOut = true;
+            ws.close(1000, 'staff connection timed out');
+        }, 12000);
         ws.onopen = () => { if (app.ws === ws) opened = true; };
         ws.onclose = (event) => {
+            clearTimeout(deadline);
             if (app.ws !== ws) return;
             app.ws = null;
             clearPanel();
-            const message = !opened
+            const message = timedOut ? 'The panel didn’t respond. Try “Open the panel” again. If it keeps happening, check your connection.' : !opened
                 ? 'Not signed in as a site moderator. Tap “Sign in with email code” first.'
                 : event.code === 4401 ? 'Staff session ended. Tap “Sign in with email code”, then reconnect.'
                     : 'Disconnected. Reconnect to load the current review queue.';
             status(message); toast(message);
-            $('[data-signin]').focus({ preventScroll: true });
+            $(timedOut ? '[data-enter]' : '[data-signin]').focus({ preventScroll: true });
         };
         ws.onmessage = (e) => {
             if (app.ws !== ws || ws.readyState !== 1) return;
@@ -64,14 +73,15 @@
             if (m.t === 'device') localStorage.setItem('hangout-dev', m.token);
             if (m.t === 'hello') send({ t: 'hello', nick: $('[data-nick]').value.trim() || 'Helper', age13: true });
             if (m.t === 'nick-error') status(m.text);
-            if (m.t === 'welcome') { $('[data-gate]').hidden = true; $('[data-panel]').hidden = false; }
-            if (m.t === 'admin') { app.state = m.state; draw(); }
+            if (m.t === 'welcome') status('Loading the review queue…');
+            if (m.t === 'admin') { app.state = m.state; draw(); clearTimeout(deadline); status('Connected.'); $('[data-gate]').hidden = true; $('[data-panel]').hidden = false; }
             if (m.t === 'notice' && m.kind === 'error') toast(m.text);
             if (m.t === 'rate-limit') toast(m.text);
             if (m.t === 'denied') toast(m.text);
         };
         return undefined;
-    });
+    }
+    $('[data-enter]').addEventListener('click', connectPanel);
 
     const el = (tag, text, cls) => { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e; };
     const btn = (label, fn, cls = 'btn btn--small') => { const b = el('button', label, cls); b.type = 'button'; b.addEventListener('click', fn); return b; };
@@ -284,4 +294,7 @@
     }));
     let tt;
     function toast(text) { const t = $('[data-toast]'); t.textContent = text; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => { t.hidden = true; }, 4000); }
+    // This is a navigation hint, never an identity assertion. The server still
+    // verifies the invitation session and staff Access JWT on the new socket.
+    if (resumeSignin) connectPanel();
 })();

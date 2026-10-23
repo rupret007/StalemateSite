@@ -10,6 +10,14 @@ Before inviting visitors, agree review hours and an incident handoff, then
 recheck the displayed contact after deployment. Do not advertise immediate
 response or 24-hour coverage.
 
+Use your private beta invitation in the same browser first, then choose
+**Moderator sign-in** and enter the emailed code. An accepted sign-in returns
+to the panel and connects automatically; the review queue appears after the
+server sends its current snapshot. If you open the panel directly, use
+**Open the panel**. A connection timeout offers that same explicit retry
+instead of repeatedly reconnecting. Email verification does not replace the
+private beta invitation or grant a staff role to an unappointed visitor.
+
 ## Review a report
 
 1. Open the staff panel through the beta sign-in and choose **Queue**. Check both

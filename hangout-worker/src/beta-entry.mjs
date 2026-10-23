@@ -104,7 +104,7 @@ async function betaRequest(request, env, deps = {}) {
         const next = await newAccess(env, { exp: session.access.exp, ip: request.headers.get('CF-Connecting-IP') || '0.0.0.0' });
         const identity = { v: 1, sid: next.access.sid, exp: Math.min(next.access.exp, gate.identity.expiresAt), kind: owner ? 'owner' : 'staff', email: gate.identity.email, role: owner ? 'fan' : gate.identity.role };
         const token = await signBeta('identity', identity, env.HANGOUT_HMAC_KEY);
-        const result = redirect(owner ? `${ROOT}lobby/?owner=1` : `${ROOT}admin/`, { 'Set-Cookie': betaCookie(BETA_IDENTITY_COOKIE, token, identity.exp - Date.now()) });
+        const result = redirect(owner ? `${ROOT}lobby/?owner=1` : `${ROOT}admin/?signed-in=1`, { 'Set-Cookie': betaCookie(BETA_IDENTITY_COOKIE, token, identity.exp - Date.now()) });
         result.headers.append('Set-Cookie', next.cookie);
         return result;
     }

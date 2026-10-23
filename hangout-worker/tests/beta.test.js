@@ -173,6 +173,18 @@ describe('real email and staff authorization', () => {
         }
         expect((await betaFetch(request('/lobby-admin/login', { cookie: await unlock(config), token: await jwt('unknown@example.test', staffAudience) }), config, deps)).status).toBe(403);
     });
+    it('continues an accepted staff callback into the panel without putting credentials in its URL', async () => {
+        const config = env(), cookie = await unlock(config);
+        const login = await betaFetch(request('/lobby-admin/login', { cookie, token: await jwt('admin@example.test', staffAudience) }), config, deps);
+        expect(login.status).toBe(303);
+        expect(login.headers.get('Location')).toBe('/r/45662413410ed051/admin/?signed-in=1');
+        expect(login.headers.get('Cache-Control')).toBe('no-store');
+        const signedIn = cookieOf(login);
+        expect((await betaFetch(request('/r/45662413410ed051/admin/?signed-in=1', { cookie: signedIn }), config, deps)).status).toBe(200);
+        // The hint grants neither the protected page nor the staff socket.
+        expect((await betaFetch(request('/r/45662413410ed051/admin/?signed-in=1', { cookie: await unlock(config) }), config, deps)).status).toBe(403);
+        expect((await betaFetch(request(`/lobby-admin?preview=${preview}&signed-in=1`, { cookie: signedIn, upgrade: true }), config, deps)).status).toBe(403);
+    });
     it('binds identity cookies to their invitation session and rejects wrong-purpose and pilot signatures', async () => {
         const config = env(), cookie = await unlock(config), other = await unlock(config);
         const login = await betaFetch(request('/lobby-admin/login', { cookie, token: await jwt('admin@example.test', staffAudience) }), config, deps);
