@@ -90,8 +90,10 @@ test.describe('390x844 first screen', () => {
     test.use({ viewport: { width: 390, height: 844 } });
     test('Manic video top is above the fold with the countdown and show card', async ({ page }) => {
         await page.goto('/');
-        // Measure the settled layout: web fonts swapping in can shift the hero a few px.
+        // Measure after font swaps and the hero's entrance animation have settled.
         await page.evaluate(() => document.fonts.ready);
+        await page.locator('.hero__copy').evaluate(copy =>
+            Promise.all(copy.getAnimations().map(animation => animation.finished)));
         const video = await page.locator('.hero-video__player').boundingBox();
         expect(video.y).toBeLessThan(844);
         expect(844 - video.y, 'a real slice of the video shows').toBeGreaterThanOrEqual(40);
