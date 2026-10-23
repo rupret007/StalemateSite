@@ -47,7 +47,9 @@ Only unresolved files are polled; a final complete comparison prevents accepting
 a mixed copy from different observations. Readiness waiting does not retry failed
 browser assertions. Once ready, Chromium and emulated WebKit check the homepage,
 all seven game pages, a real puzzle move/Undo, muted game navigation/unmute, one
-native music stream, Next and deliberate failed-song/Retry recovery. Media must
+native music stream, Next and deliberate failed-song/Retry recovery. The checker
+also plays a Rummy turn with storage access denied and verifies QR music can
+reload and advance after a deliberately failed download. Media must
 advance in real time; a play label alone is insufficient. Requests to GoatCounter
 are blocked so checks do not inflate visitor analytics.
 

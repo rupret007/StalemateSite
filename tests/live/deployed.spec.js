@@ -1,4 +1,5 @@
 const { test, expect } = require('../helpers/media-diagnostics');
+const { rummyWithoutStorage, qrDownloadRetry } = require('../helpers/recovery-flows');
 
 const games = ['TurdAnoid', 'turdomania', 'turdtris', 'turdjack', 'crapeights', 'turdrummy', 'turdspades'];
 const target = (base, relative) => new URL(relative, base).href;
@@ -13,7 +14,8 @@ test.beforeEach(async ({ context, page, baseURL }, info) => {
     page.on('requestfailed', request => {
         const message = request.failure()?.errorText || '';
         if (/goatcounter\.com/.test(request.url()) || /ERR_ABORTED|cancelled/i.test(message)) return;
-        if (info.title.startsWith('a failed song') && /\/manic\.m4a$/.test(request.url())) return;
+        const deliberateFailure = info.title.startsWith('a failed song') || info.title === 'QR music reloads after a failed download';
+        if (deliberateFailure && /\/manic\.m4a$/.test(request.url())) return;
         errors.push(`${message} ${request.url()}`);
     });
     info._liveErrors = errors;
@@ -120,4 +122,12 @@ test('a failed song reports an error and Retry restores real playback', async ({
     await expect(page.locator('.suite-music-title')).toHaveText('Now playing: Manic');
     await assertAdvancing(page);
     expect(await page.evaluate(() => __turdomania.state.board.map(col => col.map(tile => tile.id)))).toEqual(before);
+});
+
+test('Rummy remains playable when browser storage is denied', async ({ page, baseURL, hasTouch }) => {
+    await rummyWithoutStorage(page, target(baseURL, 'play/turdrummy.html'), hasTouch);
+});
+
+test('QR music reloads after a failed download', async ({ page, baseURL, hasTouch }) => {
+    await qrDownloadRetry(page, target(baseURL, 'qr/'), hasTouch);
 });

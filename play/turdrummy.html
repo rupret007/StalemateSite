@@ -2518,8 +2518,10 @@
     let aiTurnTimeoutId = null;
     let focusPausedAiTurn = false;
 
+    // Acquiring storage can itself throw before the helpers can handle failure.
+    const rummyStorage = (() => { try { return window.localStorage; } catch { return null; } })();
     const audioPlayer = (window.TurdRummyAudio && TurdRummyAudio.createPlayer)
-      ? TurdRummyAudio.createPlayer(window.localStorage)
+      ? TurdRummyAudio.createPlayer(rummyStorage)
       : null;
 
     function playSfx(name) {
@@ -2541,7 +2543,7 @@
     const reducedMotionQuery = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
     const presentationTimers = [];
     const roundLog = [];
-    let aiLevel = AIApi ? AIApi.loadDifficulty(window.localStorage) : "normal";
+    let aiLevel = AIApi ? AIApi.loadDifficulty(rummyStorage) : "normal";
     let coachIndex = 0;
     let handLayoutQueued = false;
     let bannerTimer = 0;
@@ -2812,7 +2814,7 @@
     function applyAiLevel(next) {
       if (!DIFFICULTY_ORDER.includes(next)) { return; }
       aiLevel = next;
-      if (AIApi) { AIApi.saveDifficulty(window.localStorage, aiLevel); }
+      if (AIApi) { AIApi.saveDifficulty(rummyStorage, aiLevel); }
       updateDifficultyLabel();
       try {
         if (window.Suite && Suite.difficulty) {
@@ -2850,7 +2852,7 @@
 
     // Coach: a first-round, non-blocking card. The page reports the real actions it teaches.
     function coachIsDone() {
-      return !!Coach && Coach.loadCoachDone(window.localStorage);
+      return !!Coach && Coach.loadCoachDone(rummyStorage);
     }
 
     function syncCoach() {
@@ -2871,7 +2873,7 @@
     }
 
     function finishCoach() {
-      if (Coach) Coach.markCoachDone(window.localStorage);
+      if (Coach) Coach.markCoachDone(rummyStorage);
       coachIndex = Coach ? Coach.COACH_STEPS.length : 0;
       syncCoach();
     }
