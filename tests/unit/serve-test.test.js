@@ -129,7 +129,9 @@ describe('same-origin lobby test namespaces', () => {
             const blocked = guest('quota-first', 'HostFourth'); peers.push(blocked);
             await blocked.joined;
             blocked.ws.send(JSON.stringify({ t: 'cmd', name: 'join', args: ['#art-fourth'], ch: '#stalemate' }));
-            const refusal = await blocked.next((frame) => frame.t === 'notice' && frame.kind === 'error');
+            // A deliberately legacy peer also receives an update notice. Wait
+            // for the actual quota decision, preserving the admission assertion.
+            const refusal = await blocked.next((frame) => frame.t === 'notice' && frame.kind === 'error' && frame.text.includes('Too many new rooms'));
             expect(refusal.text).toContain('Too many new rooms');
 
             // Same origin/IP and same nickname as the first engine, but a new scenario.

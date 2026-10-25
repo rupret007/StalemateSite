@@ -10,7 +10,7 @@ The local application candidate passed **11 new Chromium checks plus 6 existing 
 - A queued native dialog `close` event could clear the request from a newer opening. The room joined successfully while its modal remained open with “Joining…”, trapping Tab. The listener now clears the request only while that dialog is actually closed.
 - In a narrow 256px-high viewport, the return link and connection indicator could turn the header into an 80px row. Compact header sizing, smaller vertical spacing and ordinary vertical page scrolling preserve the composer and a readable chat line. The short workspace has a 252px minimum height; vertical scrolling is intentional when the viewport cannot contain its controls. Horizontal page scrolling remains disallowed.
 
-Application changes are limited to [lobby markup](../r/45662413410ed051/lobby/index.html), [styles](../r/45662413410ed051/lobby/lobby.css), and the close-listener/notice-focus handling in [the client](../r/45662413410ed051/lobby/lobby.js). Existing chat, admission, moderation and transport limits were not weakened for these checks.
+Application changes are limited to the protected lobby's markup and styles, and the close-listener/notice-focus handling in its client. Private preview routes remain undisclosed in public documentation. Existing chat, admission, moderation and transport limits were not weakened for these checks.
 
 ## New coverage
 
