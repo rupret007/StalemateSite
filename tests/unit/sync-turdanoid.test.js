@@ -18,7 +18,7 @@ function fixture() {
     const upstream = join(base, 'upstream');
     mkdirSync(join(root, 'scripts/lib'), { recursive: true });
     mkdirSync(join(root, 'scripts/stalemate-overlay'), { recursive: true });
-    for (const file of ['scripts/sync-turdanoid.sh', 'scripts/lib/sync-turdanoid.cjs', 'scripts/play-track.js', 'scripts/stalemate-strip.css']) {
+    for (const file of ['scripts/sync-turdanoid.sh', 'scripts/lib/sync-turdanoid.cjs', 'scripts/play-track.js', 'scripts/stalemate-strip.css', 'scripts/chess-stockfish-loader.js']) {
         cpSync(join(sourceRoot, file), join(root, file));
     }
     for (const song of songs) writeFileSync(join(root, 'scripts/stalemate-overlay', song), song);
@@ -33,6 +33,9 @@ function fixture() {
     writeFileSync(join(upstream, 'assets/suite-music.js'), 'export const music = true;');
     writeFileSync(join(upstream, 'games/core.js'), 'export const core = true;');
     writeFileSync(join(upstream, 'games/core.test.js'), 'do not ship');
+    mkdirSync(join(upstream, 'assets/chess'), { recursive: true });
+    writeFileSync(join(upstream, 'assets/chess/credits.html'), '<a href="../../games/chess-engine.js">UCI client</a>');
+    writeFileSync(join(upstream, 'games/chess-engine.js'), "new globalThis.URL('../assets/chess/stockfish-19-lite-single.js', import.meta.url)");
     const git = (...args) => execFileSync('git', args, { cwd: upstream, encoding: 'utf8' }).trim();
     git('init', '--quiet', '-b', 'main');
     git('add', '.');
@@ -83,6 +86,9 @@ describe('committed Turdanoid synchronization', () => {
         const chess = readFileSync(join(play, 'chess.html'), 'utf8');
         expect(chess).toContain("worker-src 'self'");
         expect(chess).toContain('stalemate/play-track.js');
+        expect(readFileSync(join(play, 'games/chess-engine.js'), 'utf8')).toContain('stockfish-loader.js#stockfish-19-lite-single.wasm');
+        expect(readFileSync(join(play, 'assets/chess/stockfish-loader.js'), 'utf8')).toBe(readFileSync(join(sourceRoot, 'scripts/chess-stockfish-loader.js'), 'utf8'));
+        expect(readFileSync(join(play, 'assets/chess/credits.html'), 'utf8')).toContain('<a href="stockfish-loader.js">worker delivery loader</a>');
         expect(readFileSync(join(play, 'VENDORED.txt'), 'utf8')).toContain('GPL-3.0-or-later');
         expect(hub.match(/http-equiv="Content-Security-Policy"/g)).toHaveLength(1);
         expect(hub).toContain("default-src 'self'");

@@ -50,7 +50,7 @@ export class ChessEngine {
         }
       };
       try {
-        job.worker = warm || this.workerFactory(new globalThis.URL('../assets/chess/stockfish-19-lite-single.js', import.meta.url));
+        job.worker = warm || this.workerFactory(new globalThis.URL('../assets/chess/stockfish-loader.js#stockfish-19-lite-single.wasm', import.meta.url));
         job.timer = setTimeout(() => finish(null, new Error('The computer took too long to respond.')), this.timeout);
         job.worker.onerror = event => { event.preventDefault?.(); finish(null, new Error('The computer could not load.')); };
         job.worker.onmessage = event => {

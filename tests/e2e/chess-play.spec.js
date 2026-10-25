@@ -93,6 +93,22 @@ test('chess local checkmate, result review and PGN export work without a server 
     await expect(page.locator('.game-card[href="chess.html"] .suite-hub-stat')).toContainText('1 completed');
 });
 
+for (const mime of ['', 'application/octet-stream']) {
+    test(`the real computer streams its unchanged binary with ${mime || 'empty'} server MIME metadata`, async ({ page }) => {
+        let downloads = 0;
+        await page.context().route('**/stockfish-19-lite-single.wasm', async route => {
+            downloads++;
+            const response = await route.fetch();
+            await route.fulfill({ response, headers: { ...response.headers(), 'content-type': mime } });
+        });
+        await start(page);
+        await move(page, 'e2', 'e4'); await expect(page.locator('#moves button')).toHaveCount(2);
+        await move(page, 'g1', 'f3'); await expect(page.locator('#moves button')).toHaveCount(4);
+        await expect(page.locator('#engine-recovery')).toBeHidden();
+        expect(downloads).toBe(1);
+    });
+}
+
 test('phone visitors can select two players immediately without downloading the computer', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 568 });
     const engine = [];
