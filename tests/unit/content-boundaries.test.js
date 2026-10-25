@@ -23,7 +23,7 @@ const PUBLIC_COPY = [
 ];
 
 describe('content boundaries', () => {
-    it('keeps confirmed facts and finished CTAs without template slots or member names', async () => {
+    it('keeps confirmed facts and finished CTAs without template slots', async () => {
         const home = await readFile(join(repoRoot, 'index.html'), 'utf8');
         const readme = await readFile(join(repoRoot, 'README.md'), 'utf8');
         expect(home).not.toMatch(/Better Than Now|named cut|on this page|A lyric video\. A Saturday set\.|Originals\. Punk rock\. Live\./);
@@ -83,9 +83,12 @@ describe('content boundaries', () => {
         expect(css).toMatch(/\.social-link\s*\{[^}]*min-width:\s*46px/);
     });
 
-    it('never names band members on public surfaces', async () => {
+    it('confines member names to the approved About list', async () => {
         for (const relativePath of PUBLIC_COPY) {
-            const source = await readFile(join(repoRoot, relativePath), 'utf8');
+            const original = await readFile(join(repoRoot, relativePath), 'utf8');
+            const source = relativePath === 'index.html'
+                ? original.replace(/<ul class="band-members"[^>]*>[\s\S]*?<\/ul>/, '')
+                : original;
             expect(source, relativePath).not.toMatch(/\bJeff\b/);
             expect(source, relativePath).not.toMatch(/\bChe\b/);
             expect(source, relativePath).not.toMatch(/\bSean\b/);

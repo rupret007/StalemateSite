@@ -60,9 +60,10 @@ test('homepage is a finished band page with originals, show and real links', asy
     expect(await page.locator('meta[property="og:description"]').getAttribute('content')).not.toMatch(/SoCal/);
     expect(await page.locator('meta[name="twitter:description"]').getAttribute('content')).not.toMatch(/SoCal/);
     await expect(page.locator('.hero-show__cta .button--hot')).toHaveText('Get Saturday tickets');
-    await expect(page.locator('body')).not.toContainText(/\bJeff\b/);
-    await expect(page.locator('body')).not.toContainText(/\bChe\b/);
-    await expect(page.locator('body')).not.toContainText(/\bSean\b/);
+    const members = page.getByRole('list', { name: 'Band members' });
+    await expect(members.getByRole('listitem')).toHaveText([
+        'Sean Bass and Vocals', 'Jeff Guitars and Vocals', 'Che’ Drums and Vocals'
+    ]);
     const metadata = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent());
     expect(metadata['@type']).toBe('MusicGroup');
     expect(metadata.name).toBe('Stalemate');

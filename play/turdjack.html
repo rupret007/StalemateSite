@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="assets/turdsuite.css">
 <link rel="stylesheet" href="assets/arcade.css">
   <script src="games/table-continue-core.js"></script>
+  <script src="games/suite-dialog-focus.js"></script>
   <script src="assets/turdsuite.js"></script>
   <title>Crapjack 21</title>
   <style>
@@ -2158,6 +2159,9 @@
     .welcome-card {
       position: relative;
       width: min(640px, 100%);
+      max-height: calc(100dvh - 40px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
       border: 1px solid rgba(255, 215, 106, 0.45);
       border-radius: 18px;
       background:
@@ -2614,6 +2618,18 @@
         gap: 2px 8px;
         margin-bottom: 4px;
         align-content: start;
+        overflow: auto;
+      }
+      .table-stage .felt-inlay { height: 24px; aspect-ratio: auto; margin-bottom: 2px; }
+      .table-stage .hand-title { margin-bottom: 4px; }
+      .table-stage .total-badge { min-height: 28px; min-width: 34px; padding: 2px 6px; font-size: .85rem; }
+      .table-stage .hand-meter { margin-top: 2px; }
+      .table-stage .cards { gap: 6px; }
+      .table::after { top: 120px; bottom: auto; }
+      .table-stage:has(#splitHandWrap:not([hidden])) {
+        grid-template-columns: 72px minmax(0, 1fr) minmax(0, 1fr) 72px;
+        grid-template-rows: auto auto auto auto;
+        grid-template-areas: "discard dealer dealer shoe" ". inlay inlay ." "player player split split" "bet bet bet bet";
       }
       .table-stage .hand {
         margin-bottom: 4px;
@@ -2749,7 +2765,7 @@
 </head>
 <body class="suite-ambient suite-no-zoom arcade" data-arcade-game="crapjack">
   <div id="jackLiveRegion" class="sr-live" aria-live="polite" aria-atomic="true"></div>
-  <div class="welcome-guide" id="welcomeGuide" role="region" aria-label="Start Crapjack 21">
+  <div class="welcome-guide" id="welcomeGuide" role="dialog" aria-modal="true" aria-label="Start Crapjack 21">
     <div class="welcome-card">
           <h2>Crapjack 21</h2>
       <p>Beat the dealer without busting. Manage bankroll, pick smart actions, and use house rules to your advantage.</p>
@@ -2805,6 +2821,7 @@
         <button class="btn" data-sound-toggle onclick="toggleSound()">🔊 Sound On</button>
         <button class="btn danger" id="resetStatsBtn" data-reset-bank>↻ Reset Bank</button>
       </div>
+      <span class="suite-a11y-header-slot" id="suite-arcade-a11y-mount"></span>
       <div class="mobile-menu">
         <details>
           <summary>Table Menu</summary>
@@ -3159,6 +3176,7 @@
     let lastBet = Math.max(MIN_BET, readNumber(STORAGE.lastBet, MIN_BET));
     let splitBet = 0;
     let roundActive = false;
+    let dealerResolving = false;
     let pendingDecision = null;
     let openingHandInFlight = false;
     let dealerHoleHidden = true;
@@ -3457,7 +3475,7 @@
     function canDoubleOnActiveHand() {
       const hand = getActiveHand();
       const activeBet = getActiveBet();
-      if (!roundActive || pendingDecision || !firstDecisionOpen || hand.length !== 2) return false;
+      if (!roundActive || dealerResolving || pendingDecision || !firstDecisionOpen || hand.length !== 2) return false;
       if (splitRound && !rules.allowDoubleAfterSplit) return false;
       return bankroll >= activeBet;
     }
@@ -3572,6 +3590,7 @@
         cutCardsRemaining,
         shoeDecks,
         roundActive: true,
+        dealerResolving,
         pendingDecision,
         rules: {
           dealerHitsSoft17: !!rules.dealerHitsSoft17,
@@ -3626,6 +3645,7 @@
       cutCardsRemaining = snap.cutCardsRemaining;
       shoeDecks = snap.shoeDecks;
       roundActive = true;
+      dealerResolving = false;
       pendingDecision = snap.pendingDecision ?? null;
       rules = normalizeRules(snap.rules);
       stats = normalizeStats(snap.stats);
@@ -3636,7 +3656,7 @@
     }
 
     function tryRestoreTable() {
-      if (openingHandInFlight) return true;
+      if (openingHandInFlight || dealerResolving) return true;
       if (!window.Suite || !Suite.table) return false;
       const snap = Suite.table.load('turdjack.html');
       if (!snap || !applyJackSnapshot(snap)) {
@@ -3648,7 +3668,8 @@
       renderCards();
       setStatus(snap.status || 'Picked up the live hand.');
       updateHud();
-      if (pendingDecision) resolveOpeningHand();
+      if (snap.dealerResolving === true) dealerTurnAndResolve();
+      else if (pendingDecision) resolveOpeningHand();
       try { Suite.toast('Picked up where you left off.'); } catch (e) {}
       return true;
     }
@@ -3761,12 +3782,19 @@
       const guide = document.getElementById('welcomeGuide');
       if (guide) guide.style.display = 'flex';
       onboardingOpen = true;
+      window.SuiteDialogFocus?.open(guide, {
+        initialFocus: '#quickGuideBtn',
+        fallbackFocus: () => [...document.querySelectorAll('[data-mobile-action="hit"], [data-mobile-action="deal"]'), ui.hitBtn, ui.dealBtn, document.getElementById('helpBtn')]
+          .find(button => button && !button.disabled && button.getClientRects().length > 0),
+        onEscape: hideWelcomeGuide
+      });
     }
 
     function hideWelcomeGuide() {
       const guide = document.getElementById('welcomeGuide');
       if (guide) guide.style.display = 'none';
       onboardingOpen = false;
+      window.SuiteDialogFocus?.close(guide);
       if (window.Suite && Suite.guide) Suite.guide.mark('turdjack.html');
     }
 
@@ -4024,6 +4052,7 @@
     function canSplitActiveHand() {
       return (
         roundActive &&
+        !dealerResolving &&
         !pendingDecision &&
         firstDecisionOpen &&
         ALLOW_ONE_SPLIT &&
@@ -4045,7 +4074,7 @@
     }
 
     function strategyDecision() {
-      if (!roundActive || pendingDecision || dealerHand.length === 0) return null;
+      if (!roundActive || dealerResolving || pendingDecision || dealerHand.length === 0) return null;
 
       const hand = getActiveHand();
       if (!hand || hand.length === 0) return null;
@@ -4195,11 +4224,11 @@
         canSplitActiveHand();
 
       ui.dealBtn.disabled = roundActive;
-      ui.hitBtn.disabled = !roundActive || !!pendingDecision;
-      ui.standBtn.disabled = !roundActive || !!pendingDecision;
+      ui.hitBtn.disabled = !roundActive || dealerResolving || !!pendingDecision;
+      ui.standBtn.disabled = !roundActive || dealerResolving || !!pendingDecision;
       ui.doubleBtn.disabled = !canDoubleOnActiveHand();
       ui.splitBtn.disabled = !canSplit;
-      ui.surrenderBtn.disabled = !roundActive || !!pendingDecision || !firstDecisionOpen || splitRound || !rules.allowSurrender;
+      ui.surrenderBtn.disabled = !roundActive || dealerResolving || !!pendingDecision || !firstDecisionOpen || splitRound || !rules.allowSurrender;
 
       const lockedBet = roundActive;
       document.querySelectorAll('[data-chip]').forEach((btn) => {
@@ -4268,7 +4297,7 @@
       setMobileActionState('max-bet', ui.maxBetBtn.disabled);
       setMobileActionState('rebet', ui.rebetBtn.disabled);
       setMobileActionState('new-shoe', ui.newShoeBtn.disabled);
-      setMobileActionState('smart', !!pendingDecision);
+      setMobileActionState('smart', dealerResolving || !!pendingDecision);
     }
 
     function setStatus(text) {
@@ -4361,6 +4390,12 @@
       if (shoe.length <= cutCardsRemaining) {
         createShoe(rules.decks || 4);
         setStatus('Cut card reached. Fresh shoe shuffled.');
+      }
+
+      // Keep this shoe's complete inventory for Continue after the first hand.
+      // A manual/cut shuffle already replaced that inventory with a new shoe.
+      if (dealerHoleShoeGeneration === shoeGeneration) {
+        discard.push(...playerHand, ...dealerHand, ...splitHand);
       }
 
       lastBet = currentBet;
@@ -4530,7 +4565,7 @@
     }
 
     function playerHit() {
-      if (!roundActive || pendingDecision) return;
+      if (!roundActive || dealerResolving || pendingDecision) return;
       trackDecision('hit');
       const hand = getActiveHand();
       firstDecisionOpen = false;
@@ -4556,7 +4591,7 @@
     }
 
     function playerStand() {
-      if (!roundActive || pendingDecision) return;
+      if (!roundActive || dealerResolving || pendingDecision) return;
       trackDecision('stand');
       firstDecisionOpen = false;
       playSfx('stand');
@@ -4565,7 +4600,7 @@
     }
 
     function playerDouble() {
-      if (!roundActive || pendingDecision) return;
+      if (!roundActive || dealerResolving || pendingDecision) return;
       const hand = getActiveHand();
       const activeBet = getActiveBet();
       if (!firstDecisionOpen || hand.length !== 2) {
@@ -4599,7 +4634,7 @@
     }
 
     function playerSplit() {
-      if (!roundActive || pendingDecision || !firstDecisionOpen) return;
+      if (!roundActive || dealerResolving || pendingDecision || !firstDecisionOpen) return;
       if (!ALLOW_ONE_SPLIT) {
         setStatus('Split is disabled for this table.');
         return;
@@ -4645,7 +4680,7 @@
     }
 
     function playerSurrender() {
-      if (!roundActive || pendingDecision || !firstDecisionOpen) return;
+      if (!roundActive || dealerResolving || pendingDecision || !firstDecisionOpen) return;
       if (!rules.allowSurrender) {
         setStatus('Surrender is disabled at this table.');
         return;
@@ -4673,6 +4708,7 @@
     }
 
     function smartAction() {
+      if (dealerResolving) return;
       if (!roundActive) {
         if (currentBet < MIN_BET && lastBet >= MIN_BET && lastBet <= bankroll) {
           currentBet = lastBet;
@@ -4723,10 +4759,15 @@
     }
 
     function dealerTurnAndResolve() {
+      if (!roundActive || dealerResolving) return;
+      dealerResolving = true;
       firstDecisionOpen = false;
+      updateHud();
       const runAfterReveal = () => {
+      if (!dealerResolving || !roundActive) return;
       revealDealerHole();
       renderCards();
+      updateHud();
       const hands = [
         { cards: playerHand, bet: currentBet, label: splitRound ? 'Hand 1' : 'Main hand' }
       ];
@@ -4760,6 +4801,7 @@
       };
 
       const resolveRound = () => {
+      if (!dealerResolving || !roundActive) return;
       const dealer = handValue(dealerHand);
       const notes = [];
       let roundWins = 0;
@@ -4813,6 +4855,7 @@
       if (coldStreak >= 3) notes.push(`Cold streak x${coldStreak}.`);
 
       roundActive = false;
+      dealerResolving = false;
       firstDecisionOpen = false;
       splitRound = false;
       splitBet = 0;
@@ -4835,12 +4878,14 @@
         const shown = handValue(dealerHand);
         announceDealerLive(revealAnnouncement(shown));
         const step = () => {
+          if (!dealerResolving || !roundActive) return;
           if (!dealerNeedsHit()) {
             resolveRound();
             return;
           }
           dealerHand.push(drawCard());
           renderCards();
+          updateHud();
           const total = handValue(dealerHand);
           announceDealerLive(hitAnnouncement(total));
           playSfx('card');
@@ -4974,6 +5019,10 @@
     }
 
     function wireEvents() {
+      const tableMenu = document.querySelector('.mobile-menu details');
+      tableMenu?.addEventListener('click', event => {
+        if (event.target.closest('button, a')) tableMenu.open = false;
+      });
       document.querySelectorAll('[data-chip]').forEach((btn) => {
         btn.addEventListener('click', () => addBet(parseInt(btn.dataset.chip, 10)));
       });
@@ -5087,8 +5136,7 @@
         .then((m) => {
           m.attachTurdjackDev(window, {
             dismissGuide() {
-              const g = document.getElementById('welcomeGuide');
-              if (g) g.style.display = 'none';
+              hideWelcomeGuide();
             },
             prepareBetting() {
               roundActive = false;

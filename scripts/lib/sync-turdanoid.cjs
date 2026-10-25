@@ -7,7 +7,7 @@ const { execFileSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '../..');
 const UPSTREAM = 'https://github.com/rupret007/Turdanoid.git';
-const PIN = '10a0e6e201946247ddf4a7ca06f3786a93e69805';
+const PIN = '1a8a6edaf679ca3eaec37347d80ef885650a97ca';
 const FILES = [
     'index.html', 'TurdAnoid.html', 'turdtris.html', 'turdjack.html', 'crapeights.html',
     'turdrummy.html', 'turdspades.html', 'turdomania.html', 'chess.html', 'neon-arkanoid.html',
@@ -71,13 +71,19 @@ function transform(stage) {
     const engine = fs.readFileSync(engineFile, 'utf8');
     const nativeWorker = "new globalThis.URL('../assets/chess/stockfish-19-lite-single.js', import.meta.url)";
     const loaderWorker = "new globalThis.URL('../assets/chess/stockfish-loader.js#stockfish-19-lite-single.wasm', import.meta.url)";
-    if (!engine.includes(nativeWorker)) throw new Error('Chess worker integration changed upstream');
-    fs.writeFileSync(engineFile, engine.replace(nativeWorker, loaderWorker));
-    fs.copyFileSync(path.join(ROOT, 'scripts/chess-stockfish-loader.js'), path.join(stage, 'assets/chess/stockfish-loader.js'));
+    if (engine.includes(nativeWorker)) {
+        // Older pinned sources predate the shared delivery loader.
+        fs.writeFileSync(engineFile, engine.replace(nativeWorker, loaderWorker));
+        fs.copyFileSync(path.join(ROOT, 'scripts/chess-stockfish-loader.js'), path.join(stage, 'assets/chess/stockfish-loader.js'));
+    } else if (!engine.includes(loaderWorker) || !fs.existsSync(path.join(stage, 'assets/chess/stockfish-loader.js'))) {
+        throw new Error('Chess worker integration changed upstream');
+    }
     const creditsFile = path.join(stage, 'assets/chess/credits.html');
     if (fs.existsSync(creditsFile)) {
         const credits = fs.readFileSync(creditsFile, 'utf8');
-        fs.writeFileSync(creditsFile, credits.replace('UCI client</a>', 'UCI client</a>, <a href="stockfish-loader.js">worker delivery loader</a>'));
+        if (!credits.includes('href="stockfish-loader.js"')) {
+            fs.writeFileSync(creditsFile, credits.replace('UCI client</a>', 'UCI client</a>, <a href="stockfish-loader.js">worker delivery loader</a>'));
+        }
     }
 
     for (const filename of fs.readdirSync(stage).filter((name) => name.endsWith('.html'))) {

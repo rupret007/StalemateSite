@@ -1460,6 +1460,10 @@ cv.addEventListener('touchend', e=>{ e.preventDefault(); pointerUp(); }, {passiv
 cv.addEventListener('touchcancel', pointerUp);
 
 window.addEventListener('keydown', e=>{
+  // Focused controls own their native activation; Space on Boss/Help must not
+  // bypass that button and start a Classic run behind it.
+  if(e.target?.closest?.('input, select, textarea, [contenteditable="true"]')) return;
+  if((e.key===' ' || e.key==='Enter') && e.target?.closest?.('button, a, summary')) return;
   if(clearTally && (e.key===' ' || e.key==='Enter')){
     e.preventDefault();
     skipClearTally();
