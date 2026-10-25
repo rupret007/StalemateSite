@@ -22,6 +22,7 @@ const MIME = {
     '.svg': 'image/svg+xml',
     '.txt': 'text/plain; charset=utf-8',
     '.webp': 'image/webp',
+    '.wasm': 'application/wasm',
     '.xml': 'application/xml; charset=utf-8',
     '.ics': 'text/calendar; charset=utf-8'
 };

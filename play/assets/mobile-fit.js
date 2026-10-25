@@ -67,7 +67,7 @@
     let size = 5;
     function update() {
       const cards = [...hand.querySelectorAll('button, .card')];
-      const fitted = phone.matches && window.innerWidth >= 360;
+      const fitted = phone.matches && (window.innerWidth >= 360 || game === 'crapeights');
       const paginate = game === 'crapeights';
       hand.classList.toggle('mobile-hand', fitted);
       // Width comes from the hand, since landscape tables use side-by-side columns.
@@ -128,6 +128,9 @@
       const panel = document.createElement('div');
       panel.className = 'mobile-settings-panel';
       details.append(summary, panel);
+      details.addEventListener('click', event => {
+        if (event.target.closest('#quickGuideBtn, #newRoundBtn, #resetMatchBtn')) details.open = false;
+      });
       document.querySelector('.topbar').append(details);
       ['.tr-difficulty-topbar'].forEach(selector => {
         const element = document.querySelector(selector);
@@ -135,10 +138,12 @@
       });
     }
     menu = document.querySelector('.mobile-settings-panel') || menu;
-    if (game === 'turdrummy') ['.tr-difficulty-topbar'].forEach(selector => move(document.querySelector(selector), menu));
+    if (game === 'turdrummy') ['.tr-difficulty-topbar', '.top-links'].forEach(selector => move(document.querySelector(selector), menu));
     if (game === 'turdrummy') {
       const drawer = document.querySelector('.tr-drawer');
-      if (innerWidth > innerHeight) move(drawer, menu);
+      // Brief coaching needs the center band. Restore the familiar stats
+      // drawer below the hand once coaching ends in portrait.
+      if (innerWidth > innerHeight || document.querySelector('.coach:not([hidden])')) move(drawer, menu);
       else if (placements.has(drawer)) {
         const place = placements.get(drawer);
         place.parent.insertBefore(drawer, place.next?.parentNode === place.parent ? place.next : null);
@@ -191,6 +196,7 @@
   }
   window.addEventListener('resize', schedule);
   window.addEventListener('orientationchange', schedule);
+  window.addEventListener('turdrummy:coach-visibility', schedule);
   window.visualViewport?.addEventListener('resize', schedule);
   phone.addEventListener('change', schedule);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

@@ -1,0 +1,13 @@
+# Chess in Stalemate Arcade
+
+The arcade now offers eight games. Royal Flush Chess is linked from the band homepage and hub. Choose the computer or two players sharing the same device; online multiplayer is not offered.
+
+The integration uses the exact finished Rad Dad gameplay source, Turdanoid `10a0e6e201946247ddf4a7ca06f3786a93e69805`. It retains Chessground 10.5.0, Maurizio Monge's Spatial pieces, chess.js rules, the local Stockfish worker, difficulty choices, hints, undo, review, PGN export and saved-game continuation. Stalemate's existing branding, optional five-song playlist, preferences and records remain enabled. Rad Dad's music-disabling transformations are not applied.
+
+`scripts/lib/sync-turdanoid.cjs` defaults to that exact source revision and imports `chess.html` with its assets and modules. Run `scripts/sync-turdanoid.sh` to reproduce it, or supply `--source` and an explicit reviewed revision. Edit upstream gameplay or importer/overlay sources rather than generated `play/`. The pinned source also contains the shared startup, touch and accessibility fixes already qualified with chess; the existing seven games are included in regression checks.
+
+The page CSP explicitly allows same-origin workers without adding a script evaluation exception or external engine. The local server serves WebAssembly with its correct MIME type. Public chess credits include separate GPL/BSD/MIT notices and the matching engine/board source archives; `.gitignore` permits only those two named archives. Existing hosting configuration and deployment workflows are unchanged.
+
+`tests/e2e/chess-play.spec.js` exercises native dragging/tapping, the self-hosted computer, result review/PGN, save recovery, asset and engine failures, keyboard input, both modes and landscape rotation. Its name matches all existing desktop and emulated-phone projects. `tests/live/deployed.spec.js` checks the eighth game and actual computer/local play, Flip/Continue, music playback/Next and mute at both existing public hosts. Importer, vendor hashes, metadata and eight-game links have unit checks. Existing gates also cover the prior games, root/project URL paths, audio recovery and private-file exclusions.
+
+Required CI and publication receipts belong in the pull request and workspace `release-evidence/stalemate-chess/`; the persistent progress record is `STALEMATE-CHESS-HANDOFF.md`. Physical phones and real-player enjoyment remain unverified. This release does not establish a retention increase, calibrated computer Elo or a bug-free site.

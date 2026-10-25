@@ -26,7 +26,7 @@ function fixture() {
     mkdirSync(join(upstream, 'assets'), { recursive: true });
     mkdirSync(join(upstream, 'games'), { recursive: true });
     const html = '<!doctype html><html><head><meta name="robots" content="index"><meta http-equiv="Content-Security-Policy" content="default-src *"></head><body><h1>First revision</h1></body></html>';
-    for (const page of ['index', 'TurdAnoid', 'turdtris', 'turdjack', 'crapeights', 'turdrummy', 'turdspades', 'turdomania', 'neon-arkanoid', 'hub']) writeFileSync(join(upstream, `${page}.html`), html);
+    for (const page of ['index', 'TurdAnoid', 'turdtris', 'turdjack', 'crapeights', 'turdrummy', 'turdspades', 'turdomania', 'chess', 'neon-arkanoid', 'hub']) writeFileSync(join(upstream, `${page}.html`), html);
     writeFileSync(join(upstream, 'index.html'), html.replace('</body>', '<details class="changelog"><summary>Latest Changelog</summary>Private dev notes</details></body>'));
     writeFileSync(join(upstream, 'game.js'), '/* upstream game */');
     writeFileSync(join(upstream, 'favicon.svg'), '<svg/>');
@@ -80,6 +80,10 @@ describe('committed Turdanoid synchronization', () => {
         expect(hub).toContain('content="index,follow"');
         expect(hub).toContain('<link rel="canonical" href="https://stalemate.band/play/">');
         expect(readFileSync(join(play, 'turdtris.html'), 'utf8')).toContain('content="noindex,nofollow"');
+        const chess = readFileSync(join(play, 'chess.html'), 'utf8');
+        expect(chess).toContain("worker-src 'self'");
+        expect(chess).toContain('stalemate/play-track.js');
+        expect(readFileSync(join(play, 'VENDORED.txt'), 'utf8')).toContain('GPL-3.0-or-later');
         expect(hub.match(/http-equiv="Content-Security-Policy"/g)).toHaveLength(1);
         expect(hub).toContain("default-src 'self'");
         expect(hub).toContain('Stalemate Arcade');

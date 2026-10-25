@@ -3,6 +3,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
 const dir = join(fileURLToPath(new URL('../..', import.meta.url)), 'play');
@@ -20,12 +21,28 @@ function assertPlayCsp(policy) {
     expect(origin).toBe(ALLOWED_EXTERNAL);
   }
   expect(policy).toContain(`connect-src 'self' ${ALLOWED_EXTERNAL}`);
+  expect(policy).toContain("worker-src 'self'");
   expect(policy).toContain(`img-src 'self' data: blob: ${ALLOWED_EXTERNAL}`);
   expect(policy).not.toMatch(/http:/);
   expect(policy).not.toMatch(/\*/);
 }
 
 describe('vendored /play/ copy', () => {
+  it('retains pinned chess vendors, piece art and both matching public GPL source archives', () => {
+    const assets = join(dir, 'assets/chess');
+    for (const lock of ['vendor-lock.json', 'board-vendor-lock.json']) {
+      const pinned = JSON.parse(readFileSync(join(assets, lock), 'utf8'));
+      const files = pinned.files || Object.fromEntries(Object.entries(pinned).filter(([, value]) => value.sha256));
+      for (const [file, expected] of Object.entries(files)) {
+        const bytes = readFileSync(join(assets, file));
+        expect(createHash('sha256').update(bytes).digest('hex'), file).toBe(expected.sha256);
+      }
+    }
+    for (const archive of ['stockfish-19.0.1-source.tar.gz', 'chessground-10.5.0-source.tar.gz']) {
+      expect(readFileSync(join(assets, archive)).subarray(0, 2).toString('hex')).toBe('1f8b');
+      expect(readFileSync(join(assets, 'credits.html'), 'utf8')).toContain(archive);
+    }
+  });
   it('has pages to check', () => expect(pages.length).toBeGreaterThanOrEqual(9));
   for (const f of pages) {
     const html = readFileSync(join(dir, f), 'utf8');
@@ -61,11 +78,13 @@ describe('vendored /play/ copy', () => {
     expect(music).toContain("'It\\u2019s Only Been 18'");
     expect(music).not.toMatch(/Over 18|Been Only/);
   });
-  it('hub links seven games including Turdomania', () => {
+  it('hub links eight games including chess and Turdomania', () => {
     const hub = readFileSync(join(dir, 'index.html'), 'utf8');
-    expect(hub).toMatch(/Seven games/i);
+    expect(hub).toMatch(/Eight games/i);
     expect(hub).toContain('href="turdomania.html"');
     expect(readdirSync(dir)).toContain('turdomania.html');
+    expect(hub).toContain('href="chess.html"');
+    expect(readdirSync(dir)).toContain('chess.html');
   });
   it('strip "Listen to Manic" link meets WCAG AA 4.5:1 on the strip background', () => {
     const css = readFileSync(join(dir, 'stalemate-strip.css'), 'utf8');

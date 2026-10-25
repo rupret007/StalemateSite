@@ -450,7 +450,11 @@ export function createArcadeA11yToggle(doc, Suite) {
         ? 'Colorblind-safe colors on, tap to use standard colors'
         : 'Colorblind-safe colors off, tap for high-contrast palettes and suit patterns'
     );
-    btn.textContent = on ? 'CB' : 'Clr';
+    const chess = doc.body?.dataset.arcadeGame === 'chess';
+    btn.textContent = chess ? (on ? 'Contrast on' : 'High contrast') : (on ? 'CB' : 'Clr');
+    if (chess) {
+      btn.setAttribute('aria-label', on ? 'High contrast board on. Use standard board colors' : 'Use high contrast board colors');
+    }
   }
   sync();
   btn.addEventListener('click', () => {

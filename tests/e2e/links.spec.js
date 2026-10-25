@@ -22,7 +22,8 @@ const GAMES = [
     ['Crapjack 21', 'play/turdjack.html', /^Crapjack 21$/],
     ['TurdRummy', 'play/turdrummy.html', /^TurdRummy/],
     ['TurdSpades', 'play/turdspades.html', /^TurdSpades$/],
-    ['Crappy Eights', 'play/crapeights.html', /^Crappy Eights$/]
+    ['Crappy Eights', 'play/crapeights.html', /^Crappy Eights$/],
+    ['Royal Flush Chess · 1 or 2 players', 'play/chess.html', /^Royal Flush Chess/]
 ];
 
 test('every link on every page resolves and every external link is our Stalemate', async ({ page, request, baseURL }) => {
@@ -60,9 +61,9 @@ test('homepage arcade action and every game link open their destination', async 
     await expect(games.getByRole('link', { name: 'Open Stalemate Arcade' })).toHaveAttribute('href', 'play/');
     await expect(games.getByRole('link', { name: 'Play Turdanoid' })).toHaveAttribute('href', 'play/TurdAnoid.html');
     const list = games.locator('.games-card__list');
-    await expect(list.locator('a')).toHaveCount(7);
+    await expect(list.locator('a')).toHaveCount(8);
     const hrefs = await list.locator('a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
-    expect(new Set(hrefs).size).toBe(7);
+    expect(new Set(hrefs).size).toBe(8);
     for (const [name, href, title] of GAMES) {
         const link = list.getByRole('link', { name, exact: true });
         await expect(link).toHaveAttribute('href', href);
@@ -83,7 +84,7 @@ test('homepage arcade action and every game link open their destination', async 
 test('the /play/ hub cards each open a different game', async ({ page }) => {
     await page.goto('/play/');
     const cards = page.locator('a.game-card');
-    await expect(cards).toHaveCount(7);
+    await expect(cards).toHaveCount(8);
     const hrefs = await cards.evaluateAll((as) => as.map((a) => a.getAttribute('href')));
     expect(hrefs.sort()).toEqual(GAMES.map(([, h]) => h.replace('play/', '')).sort());
     await cards.first().click();
@@ -98,14 +99,14 @@ test('no page calls any game "Turbo"', async ({ page }) => {
     }
 });
 
-test('Games nav goes straight to all seven game cards in one click', async ({ page }) => {
+test('Games nav goes straight to all eight game cards in one click', async ({ page }) => {
     for (const [start, nav] of [['/', 'Primary navigation'], ['/qr/', null]]) {
         await page.goto(start);
         const link = nav ? page.getByRole('navigation', { name: nav, exact: true }).getByRole('link', { name: 'Games', exact: true }) : page.locator('header').getByRole('link', { name: 'Games', exact: true });
         await link.click();
         await expect(page).toHaveURL(/\/play\/#hub-games$/);
         const cards = page.locator('#hub-games a.game-card');
-        await expect(cards).toHaveCount(7);
+        await expect(cards).toHaveCount(8);
         await expect(cards.first()).toBeInViewport();
     }
 });

@@ -2,7 +2,8 @@
 <html lang="en" data-mobile-game="turdanoid">
 <head>
 <meta name="robots" content="noindex,nofollow">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<script src="assets/suite-loading.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -119,10 +120,10 @@
   .overlay.show > *:nth-child(7){animation-delay:.4s}
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
   @keyframes riseIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-  .overlay h1{font-size:clamp(36px,9vw,56px);letter-spacing:-.03em;margin-bottom:6px;line-height:.92;font-weight:800;
+  .overlay h2{font-size:clamp(36px,9vw,56px);letter-spacing:-.03em;margin-bottom:6px;line-height:.92;font-weight:800;
     background:linear-gradient(180deg,#fff8d8 0%,var(--gold) 42%,#c88820 100%);-webkit-background-clip:text;background-clip:text;color:transparent;
     filter:drop-shadow(0 0 28px rgba(255,215,106,.5)) drop-shadow(0 6px 0 rgba(70,40,0,.55)) drop-shadow(0 16px 28px rgba(0,0,0,.7))}
-  .overlay h1 .sub{display:block;font-size:.34em;letter-spacing:.12em;margin-top:10px;background:none;-webkit-text-fill-color:var(--accent);color:var(--accent);text-shadow:0 0 12px rgba(62,207,154,.45);filter:none}
+  .overlay h2 .sub{display:block;font-size:.34em;letter-spacing:.12em;margin-top:10px;background:none;-webkit-text-fill-color:var(--accent);color:var(--accent);text-shadow:0 0 12px rgba(62,207,154,.45);filter:none}
   .title-kicker{margin:0 0 8px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);text-shadow:0 0 12px rgba(62,207,154,.35)}
   .title-kicker::before,.title-kicker::after{content:"";display:inline-block;width:28px;height:1px;margin:0 10px 4px;vertical-align:middle;background:linear-gradient(90deg,transparent,var(--ta-brass,#e8c56a),transparent)}
   .title-deck{max-width:22ch !important;font-size:clamp(16px,4vw,20px) !important;line-height:1.35 !important;font-weight:600;letter-spacing:0}
@@ -137,9 +138,9 @@
   #playShell:has(#endScreen.show) .topbtns,
   #playShell:has(#clearTally.show) .topbtns,
   #playShell:has(#howScreen.show) .topbtns{visibility:hidden}
-  #titleScreen h1{position:relative}
-  #titleScreen h1::after{content:"";display:block;width:76px;height:3px;margin:12px auto 0;border-radius:99px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
-  #titleScreen.show h1{animation:riseIn .48s cubic-bezier(.2,1.15,.3,1) both, titleBob 3.6s ease-in-out .5s infinite}
+  #titleScreen h2{position:relative}
+  #titleScreen h2::after{content:"";display:block;width:76px;height:3px;margin:12px auto 0;border-radius:99px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+  #titleScreen.show h2{animation:riseIn .48s cubic-bezier(.2,1.15,.3,1) both, titleBob 3.6s ease-in-out .5s infinite}
   #titleScreen.show #btnStart{animation:riseIn .48s cubic-bezier(.2,1.15,.3,1) .22s both, ctaPulse 2.4s ease-in-out .8s infinite}
   @keyframes titleBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
   @keyframes ctaPulse{0%,100%{box-shadow:0 12px 28px rgba(232,197,106,.32),inset 0 -3px 0 rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.7)}50%{box-shadow:0 16px 42px rgba(232,197,106,.55),inset 0 -3px 0 rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.7)}}
@@ -161,7 +162,7 @@
   #endScreen.show .stat:nth-child(6){animation-delay:.25s}
   @keyframes statIn{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:none}}
   #clearTally.tally-overlay{background:linear-gradient(180deg,rgba(6,16,24,.28),rgba(4,12,16,.94));backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
-  #clearTally h1{font-size:clamp(28px,8vw,48px);margin-bottom:12px}
+  #clearTally h2{font-size:clamp(28px,8vw,48px);margin-bottom:12px}
   .tally-card{width:min(340px,92vw);padding:8px;border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.02)),var(--panel);border:1px solid var(--panel-border);box-shadow:0 18px 40px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.1)}
   #tallyLines{display:flex;flex-direction:column;gap:8px;min-width:0;text-align:left}
   .tally-line{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:12px;background:rgba(6,16,22,.35);border:1px solid rgba(232,197,106,.12);font-weight:700;letter-spacing:.03em}
@@ -215,7 +216,7 @@
     .topbtns{gap:4px}
     .iconbtn{width:44px;height:44px;font-size:16px}
     .overlay{padding:18px 14px}
-    .overlay h1{font-size:clamp(32px,10vw,64px)}
+    .overlay h2{font-size:clamp(32px,10vw,64px)}
     .overlay button{padding:13px 22px;font-size:16px}
     .how-grid{gap:8px}
     .how-card p{font-size:12px}
@@ -227,7 +228,7 @@
     .life-pip{width:9px;height:11px}
   }
   @media (prefers-reduced-motion:reduce){
-    #titleScreen h1,#titleScreen.show h1,#titleScreen.show #btnStart,#mobileLaunch.show,.chip,.hud .col.critical,
+    #titleScreen h2,#titleScreen.show h2,#titleScreen.show #btnStart,#mobileLaunch.show,.chip,.hud .col.critical,
     .overlay,.overlay.show,.overlay.show > *,
     #combo,#hype,#toast,.hud .val.bump,#endScreen.show .stat{animation:none;transition:none}
   }
@@ -243,14 +244,15 @@
 <script src="assets/mobile-fit.js" defer></script>
 <link rel="stylesheet" href="stalemate/stalemate-overlay.css">
 <meta property="og:title" content="Stalemate Arcade">
-<meta property="og:description" content="Seven free browser games. Music by Stalemate.">
+<meta property="og:description" content="Eight free browser games, including chess. Music by Stalemate.">
 <meta property="og:image" content="https://stalemate.band/play/stalemate/og-play.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 </head>
 <body class="arcade" data-arcade-game="turdanoid" data-suite-no-bg="1">
-<div id="app">
+<div id="app" role="main">
+<h1 class="suite-game-heading">Turdanoid</h1>
   <div id="announcer" role="status" aria-live="polite" aria-atomic="true"></div>
   <div id="stage">
     <aside id="sideLeft" class="side-gutter" aria-hidden="true">
@@ -296,7 +298,7 @@
     <!-- Title screen -->
     <div class="overlay show title-poster" id="titleScreen">
       <p class="title-kicker">Midnight Porcelain Arcade</p>
-      <h1>Turdanoid</h1>
+      <h2>Turdanoid</h2>
       <p class="title-deck">Smash the wall. Catch the weird stuff. Don't get flushed.</p>
       <div class="helprow">
         <span>Drag to move</span>
@@ -304,10 +306,10 @@
         <span>← → Space</span>
       </div>
       <div class="suite-hud-settings title-difficulty-wrap" id="suite-difficulty-mount"></div>
-      <button id="btnStart">START FLUSHING</button>
+      <button id="btnStart" disabled>Loading game…</button>
       <div class="menu-secondary">
-        <button id="btnBoss" type="button">Boss Flush</button>
-        <button id="btnHowTo">How To Play</button>
+        <button id="btnBoss" type="button" disabled>Boss Flush</button>
+        <button id="btnHowTo" disabled>How To Play</button>
         <button id="btnHub" onclick="location.href='./'">Game Hub</button>
       </div>
       <p class="quip" id="titleQuip"></p>
@@ -315,7 +317,7 @@
 
     <!-- Pause -->
     <div class="overlay" id="pauseScreen" inert>
-      <h1>Paused<span class="sub">take a breather</span></h1>
+      <h2>Paused<span class="sub">take a breather</span></h2>
       <p>The stink waits for no one. Or does it? It does, but only because you paused.</p>
       <div class="helprow">
         <span>←/→ or drag — move seat</span>
@@ -331,7 +333,7 @@
     <!-- How to play -->
     <div class="overlay" id="howScreen" inert>
       <p class="title-kicker">House rules</p>
-      <h1>How To Play<span class="sub">brick breaker, but worse</span></h1>
+      <h2>How To Play<span class="sub">brick breaker, but worse</span></h2>
       <div class="how-grid">
         <article class="how-card"><h3>Move</h3><p>Drag or ← →. Tap or Space to launch and fire.</p></article>
         <article class="how-card"><h3>Break</h3><p>Bounce the turd. Clear the wall. Combos multiply score.</p></article>
@@ -343,7 +345,7 @@
 
     <div class="overlay tally-overlay" id="clearTally" role="dialog" aria-labelledby="clearTallyTitle" aria-modal="true" tabindex="-1" inert>
       <p class="title-kicker">Stage bonus</p>
-      <h1 id="clearTallyTitle">Level clear</h1>
+      <h2 id="clearTallyTitle">Level clear</h2>
       <div class="tally-card">
         <div id="tallyLines"></div>
       </div>
@@ -353,7 +355,7 @@
     <!-- Game Over / Win -->
     <div class="overlay" id="endScreen" inert>
       <p class="result-kicker" id="endKicker">Run complete</p>
-      <h1 id="endTitle">Game Over<span class="sub" id="endSub">you got flushed</span></h1>
+      <h2 id="endTitle">Game Over<span class="sub" id="endSub">you got flushed</span></h2>
       <p class="quip" id="endQuip"></p>
       <div class="stats">
         <div class="stat"><span class="l">Score</span><span class="v" id="endScore">0</span></div>
@@ -1760,7 +1762,7 @@ function quitToMenu(){
   showOverlay(tTitle); pickTitleQuip();
   $('btnStart').focus();
 }
-function restartGame(){ hideOverlay(tEnd); startGame(); }
+function restartGame(){ hideOverlay(tEnd); beginRun(); }
 function gameOver(won){
   state = won?'win':'gameover';
   running=false;
@@ -3647,6 +3649,9 @@ pickTitleQuip();
 updateSideStats();
 lastTime = performance.now();
 requestAnimationFrame(loop);
+$('btnStart').textContent = 'START FLUSHING';
+for (const id of ['btnStart', 'btnBoss', 'btnHowTo']) $(id).disabled = false;
+window.SuiteLoading?.ready();
 
 let lastTouch = 0;
 document.addEventListener('touchend', e=>{

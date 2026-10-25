@@ -2,7 +2,8 @@
 <html lang="en" data-mobile-game="turdomania">
 <head>
 <meta name="robots" content="noindex,nofollow">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<script src="assets/suite-loading.js"></script>
 <script src="assets/suite-share.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -234,10 +235,10 @@ window.tmFit = function (levelKey) {
 })();
 </script>
 </main>
-<p class="help">Tap a pile of 2+ touching matches. Stuff falls, empty columns slide left. Score = (pile − 2)². Keys: arrows, Enter/Space, U undo, N new.</p>
+<p class="help" role="region" aria-label="How to play">Tap a pile of 2+ touching matches. Stuff falls, empty columns slide left. Score = (pile − 2)². Keys: arrows, Enter/Space, U undo, N new.</p>
 <div id="live" class="sr-only" aria-live="polite"></div>
 
-<script type="module">
+<script type="module" data-game-required>
 import * as Core from './games/turdomania-core.js';
 
 const qs = new URLSearchParams(location.search);
@@ -618,6 +619,7 @@ try {
 // Test hook: deterministic actions without hunting pixels.
 window.__turdomaniaPop = (c, r) => popAt(c, r);
 window.__turdomaniaUndo = doUndo;
+window.SuiteLoading?.ready();
 </script>
 <script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>
 <script src="../js/track.js" defer></script>

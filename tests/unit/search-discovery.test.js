@@ -13,10 +13,10 @@ describe('arcade search discovery', () => {
         expect(document.querySelector('meta[name="robots"]').content).toBe('index,follow');
         expect(document.querySelectorAll('link[rel="canonical"]')).toHaveLength(1);
         expect(document.querySelector('link[rel="canonical"]').href).toBe('https://stalemate.band/play/');
-        expect(document.querySelector('meta[name="description"]').content).toMatch(/seven free browser games/i);
+        expect(document.querySelector('meta[name="description"]').content).toMatch(/eight free browser games/i);
         expect(document.querySelector('meta[property="og:url"]').content).toBe('https://stalemate.band/play/');
         expect(document.querySelector('meta[property="og:image"]').content).toBe('https://stalemate.band/play/stalemate/og-play.png');
-        expect(document.querySelectorAll('a.game-card')).toHaveLength(7);
+        expect(document.querySelectorAll('a.game-card')).toHaveLength(8);
     });
     it('lists only the band homepage and hub, leaving all games and legacy pages excluded', () => {
         const xml = readFileSync(join(root, 'sitemap.xml'), 'utf8');

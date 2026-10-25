@@ -71,7 +71,7 @@ async function ready(page, path) {
     await expect(page.locator('#levelSel')).toBeEnabled();
 }
 
-test('homepage and hub offer seven ordinary games at root and project paths', async ({ page }) => {
+test('homepage and hub offer eight ordinary games at root and project paths', async ({ page }) => {
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     for (const prefix of ['', '/StalemateSite']) {
@@ -84,7 +84,7 @@ test('homepage and hub offer seven ordinary games at root and project paths', as
         await expect(page.locator('h1')).toHaveText('Stalemate Arcade');
         await expect(page.locator('body')).not.toContainText('Daily Dump');
         await expect(page.locator('a[href*="daily="]')).toHaveCount(0);
-        await expect(page.locator('.game-card')).toHaveCount(7);
+        await expect(page.locator('.game-card')).toHaveCount(8);
         const turdomania = page.locator('a.game-card[href="turdomania.html"]');
         await activate(page, turdomania);
         await expect(page).toHaveURL(new RegExp(prefix + '/play/turdomania\\.html$'));
@@ -155,7 +155,7 @@ test('free play and the arcade hub remain usable when storage is unavailable', a
     await activate(page, page.locator('#undoBtn'));
     expect(await board(page)).toEqual(initial);
     await page.goto('/StalemateSite/play/');
-    await expect(page.locator('.game-card')).toHaveCount(7);
+    await expect(page.locator('.game-card')).toHaveCount(8);
     await expect(page.locator('body')).not.toContainText('Daily Dump');
     expect(errors).toEqual([]);
 });

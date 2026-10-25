@@ -11,7 +11,8 @@ export const LIVE_HUB_PAGES = [
   'crapeights.html',
   'turdrummy.html',
   'turdspades.html',
-  'turdomania.html'
+  'turdomania.html',
+  'chess.html'
 ];
 
 export function parseSafeInt(raw, fallback = 0) {
@@ -88,6 +89,12 @@ export function readHubStatBadge(getItem, href) {
       const played = parseSafeInt(stats.matchesPlayed ?? stats.gamesPlayed);
       if (won > 0) return { text: `${won} match win${won === 1 ? '' : 's'}` };
       return played > 0 ? { text: `${played} played` } : null;
+    }
+    case 'chess.html': {
+      const stats = readJsonObject(getItem, 'arcade_chess_results_v1');
+      if (!stats || stats.version !== 1 || !['wins', 'losses', 'draws', 'local'].every(key => Number.isSafeInteger(stats[key]) && stats[key] >= 0)) return null;
+      const played = stats.wins + stats.losses + stats.draws + stats.local;
+      return played ? { text: `${played} completed · ${stats.wins} computer wins`, title: 'Casual games on this device; hints and takebacks allowed.' } : null;
     }
     case 'turdomania.html': {
       const wrap = readJsonObject(getItem, 'turdomania_best_v1');
