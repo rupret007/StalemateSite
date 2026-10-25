@@ -1613,13 +1613,21 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (meta.authorDev === c.dev) return bot(c, 'You can’t report yourself.', 'error');
         let r = reports.get(id);
         if (!r) {
+            pruneModerationQueue();
+            // Accepted pending evidence must never be displaced by a later
+            // report. Completed tombstones need no active-queue capacity.
+            for (const [doneId, done] of reports) {
+                if (reports.size < MODERATION_QUEUE_MAX) break;
+                if (done.done) reports.delete(doneId);
+            }
+            if (reports.size >= MODERATION_QUEUE_MAX)
+                return bot(c, 'The report queue is full. Try again later or use the moderation contact in House rules.', 'error');
             const chan = ch(l.ch);
             const hist = chan ? chan.moderationContext : [];
             const at = hist.findIndex((h) => h.id === id);
             const context = at >= 0 ? hist.slice(Math.max(0, at - 5), at + 6).map((h) => `${h.from ? `<${h.from}> ` : '* '}${h.text}`) : [`<${l.from}> ${l.text}`];
             r = { devs: new Set(), iphs: new Set(), ch: l.ch, from: l.from, text: l.text, hidden: false, context, at: now(), authorDev: meta.authorDev };
             reports.set(id, r);
-            while (reports.size > MODERATION_QUEUE_MAX) reports.delete(reports.keys().next().value);
         }
         // Spoof-proof: one vote per signed device AND per daily IP hash.
         if (r.devs.has(c.dev) || r.iphs.has(c.iph)) {
