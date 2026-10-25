@@ -1,11 +1,20 @@
 /* #stalemate lobby client. Hidden preview. Everything is rendered with textContent; the server decides every
  * permission and filters every line. This file only draws buttons and sends {t:'say'|'cmd'|...} frames. */
+import { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff, readEntryHandoff } from '../entry-sites.mjs';
+import { createChatAnnouncements } from './chat-announcements.mjs';
+import { createEntrySharing } from './entry-sharing.mjs';
 (() => {
     'use strict';
     const $ = (s, el = document) => el.querySelector(s);
     const $$ = (s, el = document) => [...el.querySelectorAll(s)];
     const Discovery = window.HangoutDiscovery;
     const params = new URLSearchParams(location.search);
+    const entrySites = createEntrySiteRegistry(window.HangoutEntrySites);
+    const handoff = params.get('entry-return') === '1' ? readEntryHandoff(sessionStorage.getItem(ENTRY_HANDOFF_KEY), Date.now(), entrySites) : null;
+    sessionStorage.removeItem(ENTRY_HANDOFF_KEY);
+    const entrySource = params.has('via') ? entrySourceFromParams(params, entrySites) : handoff?.source || '';
+    let shareEntry = handoff?.share !== false;
+    let entrySourcesSupported = null;
     let ownerSession = params.get('owner') === '1' || sessionStorage.getItem('hangout-owner') === '1';
     if (ownerSession) sessionStorage.setItem('hangout-owner', '1');
     const isLocal = /^(127\.0\.0\.1|localhost)$/.test(location.hostname);
@@ -30,11 +39,32 @@
     const slug = () => `${pick(WORDS)}-${pick(THINGS)}`.replace(/[^a-z0-9-]/g, '');
 
     const app = window.__lobby = { ws: null, me: '', role: 'fan', band: false, chans: new Map(), pms: new Map(), active: '#stalemate', rooms: [], ignores: new Set(), pending: null };
+    const entrySharing = createEntrySharing({ source: entrySource, enabled: shareEntry, registry: entrySites, send: (frame) => send(frame) });
+    const saveEntryHandoff = () => sessionStorage.setItem(ENTRY_HANDOFF_KEY, entryHandoff(entrySource, shareEntry, Date.now(), entrySites));
+    function drawEntryChoice() {
+        $$('[data-entry-context]').forEach((element) => { element.hidden = !entrySource || entrySourcesSupported === false; });
+        $$('[data-entry-unavailable]').forEach((element) => { element.hidden = !entrySource || entrySourcesSupported !== false; });
+        $$('[data-entry-label]').forEach((element) => { element.textContent = entryBadge(entrySource, entrySites); });
+        $$('[data-entry-share]').forEach((element) => { element.checked = shareEntry; element.disabled = entrySourcesSupported === false; });
+        const back = entryReturn(entrySource, entrySites);
+        $$('[data-entry-return]').forEach((element) => {
+            element.hidden = !back;
+            if (back) { element.href = back.href; element.textContent = back.label; }
+        });
+    }
+    $$('[data-entry-share]').forEach((element) => element.addEventListener('change', () => {
+        shareEntry = element.checked;
+        drawEntryChoice();
+        entrySharing.setEnabled(shareEntry);
+    }));
+    drawEntryChoice();
     // Drafts are tab-local only. Chat, PMs and invitation links are never copied into browser storage.
     const drafts = new Map();
     const pendingReports = new Map();
     let connectionState = 'offline';
     let replaying = false;
+    const announcements = createChatAnnouncements($('[data-buffer]'));
+    $('[data-chat-announcements]').addEventListener('change', (event) => announcements.setEnabled(event.currentTarget.checked));
     let belowFold = 0;
     let roomApi = null;
     function room() {
@@ -127,8 +157,12 @@
         }
         drawCommunity(); drawRooms();
     }
+    let cancelTransportAck = () => {};
     async function connect(nick) {
         const attempt = ++connectionAttempt;
+        cancelTransportAck();
+        entrySharing.disconnect();
+        entrySourcesSupported = null; drawEntryChoice();
         clearTimeout(retryTimer);
         setConnection(app.me ? 'reconnecting' : 'connecting');
         const tsToken = ownerSession ? '' : await loadTurnstile();
@@ -143,6 +177,20 @@
         app.ws = ws;
         let opened = false;
         let sessionNick = nick;
+        let ackTimer, ackSeq = 0, ackFrames = 0, ackSentAt = -Infinity;
+        cancelTransportAck = () => { clearTimeout(ackTimer); ackTimer = null; ackFrames = 0; };
+        const flushAck = () => {
+            clearTimeout(ackTimer); ackTimer = null;
+            if (attempt === connectionAttempt && ws.readyState === 1 && ackFrames) {
+                // Coalesce a busy room's handled frames without exceeding the
+                // server's 20-controls/second allowance during join bursts.
+                const remaining = 50 - (performance.now() - ackSentAt);
+                if (remaining > 0) { ackTimer = setTimeout(flushAck, remaining); return; }
+                ws.send(JSON.stringify({ t: 'transport-ack', seq: ackSeq }));
+                ackSentAt = performance.now();
+            }
+            ackFrames = 0;
+        };
         ws.onopen = () => { opened = true; };
         ws.onmessage = (e) => {
             if (attempt !== connectionAttempt) return;
@@ -150,24 +198,43 @@
             if (!m || typeof m !== 'object') return;
             if (m.t === 'welcome') sessionNick = m.nick;
             handle(m, sessionNick);
+            if (Number.isSafeInteger(m.transportSeq) && m.transportSeq > 0) {
+                ackSeq = Math.max(ackSeq, m.transportSeq); ackFrames += 1;
+                if (ackFrames >= 8) flushAck();
+                else if (!ackTimer) ackTimer = setTimeout(flushAck, 50);
+            }
         };
         ws.onclose = (e) => {
             if (attempt !== connectionAttempt) return;
+            cancelTransportAck();
+            entrySharing.disconnect();
             resetPendingReports();
             setConnection('offline');
             if (roomApi) roomApi.onLeave();
             if (ownerSession && (!opened || e.code === 4401)) { $('[data-gate-guest]').hidden = false; return gateStatus('Email sign-in is unavailable or expired. Sign in again to manage your rooms, or continue as a guest.'); }
             if (!opened) return gateStatus('Couldn’t get in. Maybe it’s full, locked, or you got the boot. Try again in a bit.');
+            if ([1009, 4400, 4413, 4429].includes(e.code)) {
+                clearTimeout(retryTimer);
+                const message = 'Connection paused to protect community capacity. Choose Try again when ready; reload if this keeps happening.';
+                gateStatus(message);
+                line(app.active, { event: true, text: `* ${message}` });
+                return;
+            }
             if ([4001, 4003, 4503, 4403].includes(e.code) || app.kicked || e.code === 1000) return;
             line(app.active, { event: true, text: '* Disconnected. Reconnecting…' });
             setConnection('reconnecting');
-            retryTimer = setTimeout(() => connect(app.me || nick), Math.min(10000, 1000 * (2 ** retry++)));
+            retryTimer = setTimeout(() => connect(app.me || nick), Math.min(10000, 1000 * (2 ** Math.min(retry++, 4))) * (0.75 + Math.random() * 0.25));
         };
     }
     const send = (obj) => {
         if (!app.ws || app.ws.readyState !== 1) return false;
         if (obj.t !== 'hello' && connectionState !== 'connected') return false;
-        app.ws.send(JSON.stringify(obj)); return true;
+        const payload = JSON.stringify(obj);
+        if (Number.isFinite(app.ws.bufferedAmount) && app.ws.bufferedAmount + new Blob([payload]).size > 2 * 1024 * 1024) {
+            app.ws.close(4413, 'outgoing connection fell behind');
+            return false;
+        }
+        try { app.ws.send(payload); return true; } catch { return false; }
     };
     const cmd = (name, args = [], ch = app.active) => send({ t: 'cmd', name, args, ch: ch.startsWith('pm:') ? '#stalemate' : ch });
     app.cmd = cmd;
@@ -184,6 +251,8 @@
         case 'owner-offer': toast(`${m.by} offered you ownership of ${m.ch}`, [['Accept ownership', () => { if (confirm(`Accept ownership of ${m.ch}?`)) cmd('acceptowner', [], m.ch); }]]); break;
         case 'device': localStorage.setItem('hangout-dev', m.token); break;
         case 'hello':
+            entrySourcesSupported = m.features?.entrySources === 1;
+            entrySharing.setSupported(entrySourcesSupported); drawEntryChoice();
             app.role = m.role; app.verified = m.verified === true; app.capabilities = m.capabilities || {}; $('[data-owner-signout]').hidden = !ownerSession; app.netLock = m.lock; app.budget = m.budget;
             if (app.me) {
                 app.resetSession = true; setConnection('reconnecting');
@@ -195,7 +264,8 @@
                 $('[data-pmreqs]').replaceChildren();
                 $('[data-text]').value = drafts.get('#stalemate') || '';
             }
-            send({ t: 'hello', nick, age13: true }); break;
+            send({ t: 'hello', nick, age13: true, entrySource: entrySharing.helloSource(), transport: 1 }); break;
+        case 'entry-source': break;
         case 'nick-error': setConnection('offline'); gateStatus(m.text); $('[data-gate]').hidden = false; $('[data-app]').hidden = true; break;
         case 'welcome': {
             const wasIn = !!app.me;
@@ -206,6 +276,7 @@
             $('[data-self-nick]').textContent = m.nick;
             $('[data-self-role]').textContent = app.capabilities.configure ? 'Site administrator' : app.capabilities.moderate ? 'Community moderator' : app.verified ? 'Room owner account' : 'Guest access';
             app.kicked = false; retry = 0; setConnection('connected');
+            entrySharing.joined();
             const returnRoom = sessionStorage.getItem('hangout-return-room');
             if (returnRoom && app.verified) { sessionStorage.removeItem('hangout-return-room'); cmd('join', [returnRoom]); }
             if (app.restorePmOff) { cmd('pm', ['off']); app.restorePmOff = false; }
@@ -342,6 +413,8 @@
             who.textContent = l.me ? `* ${l.prefix || ''}${l.from}` : `<${l.prefix || ''}${l.from}>`;
             who.addEventListener('click', () => nickSheet(l.from));
             li.append(who);
+            const entryText = entryBadge(l.entrySource, entrySites);
+            if (entryText) { const entry = document.createElement('span'); entry.className = 'entry-badge'; entry.textContent = entryText; li.append(' ', entry); }
             if (l.moderator) { const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = 'MOD'; li.append(' ', badge); }
             if (l.band) { const s = document.createElement('span'); s.className = 'badge'; s.textContent = '⭐ BAND'; li.append(' ', s); }
             li.append(' ', l.text);
@@ -386,8 +459,10 @@
         const c = store(key);
         if (c) { c.unread = 0; c.mentions = 0; }
         belowFold = 0; drawNewMessages(); replaying = true;
-        $('[data-buffer]').replaceChildren();
-        (c ? c.lines : []).forEach(appendLine);
+        announcements.replace(() => {
+            $('[data-buffer]').replaceChildren();
+            (c ? c.lines : []).forEach(appendLine);
+        });
         replaying = false;
         drawTabs(); drawChan();
         drawCommunity(); drawRooms();
@@ -481,7 +556,10 @@
             b.dataset.self = String(n.nick === app.me);
             b.textContent = `${n.prefix}${n.nick}${n.band ? ' ⭐' : n.moderator ? ' MOD' : ''}${n.cam ? ' 📷' : ''}${n.away ? ' 💤' : ''}`;
             b.addEventListener('click', () => nickSheet(n.nick));
-            li.append(b); ul.append(li);
+            li.append(b);
+            const entryText = entryBadge(n.entrySource, entrySites);
+            if (entryText) { const entry = document.createElement('span'); entry.className = 'entry-badge'; entry.textContent = entryText; li.append(entry); }
+            ul.append(li);
         });
     }
 
@@ -517,7 +595,8 @@
 
     $('[data-room-filter]').addEventListener('change', drawRooms);
     $('[data-room-search]').addEventListener('input', drawRooms);
-    $('[data-owner-signin]').href = relayBase ? `${relayBase.replace(/^ws/, 'http')}/lobby-owner/login` : '#';
+    $('[data-owner-signin]').href = relayBase ? `${relayBase.replace(/^ws/, 'http')}/lobby-owner/login?entry-return=1` : '#';
+    $('[data-owner-signin]').addEventListener('click', saveEntryHandoff);
     $('[data-gate-guest]').hidden = !ownerSession;
     $('[data-gate-guest]').addEventListener('click', () => { ownerSession = false; sessionStorage.removeItem('hangout-owner'); $('[data-gate-guest]').hidden = true; connect(app.me || nickInput.value); });
     $('[data-owner-signout]').addEventListener('click', () => {
@@ -555,7 +634,11 @@
         count(`room-start-${b.dataset.start}`); cmd('join', [`#${b.dataset.start}-${slug()}`]);
     }));
     $('[data-channel-cancel]').addEventListener('click', () => $('[data-channel-dialog]').close());
-    $('[data-channel-dialog]').addEventListener('close', () => { app.pendingChannel = ''; });
+    $('[data-channel-dialog]').addEventListener('close', () => {
+        // A queued close event may belong to an earlier opening. Preserve the
+        // current request if the visitor has already opened the dialog again.
+        if (!$('[data-channel-dialog]').open) app.pendingChannel = '';
+    });
     $('[data-channel-form]').addEventListener('submit', (e) => {
         e.preventDefault();
         const name = `#${$('[data-channel-name]').value.trim().replace(/^#/, '').toLowerCase()}`;
@@ -731,13 +814,23 @@
     $$('[data-show]').forEach((b) => b.addEventListener('click', () => show(b.dataset.show)));
     show('chat');
 
-    let toastTimer;
+    let toastTimer, toastDuration = 4000;
+    const toastRegion = $('[data-toast]');
+    function scheduleToastDismiss() {
+        clearTimeout(toastTimer);
+        if (toastRegion.hidden || toastRegion.contains(document.activeElement)) return;
+        toastTimer = setTimeout(() => {
+            if (!toastRegion.contains(document.activeElement)) toastRegion.hidden = true;
+        }, toastDuration);
+    }
+    toastRegion.addEventListener('focusin', () => clearTimeout(toastTimer));
+    toastRegion.addEventListener('focusout', () => queueMicrotask(scheduleToastDismiss));
     function toast(text, actions = []) {
         const t = $('[data-toast]');
         t.replaceChildren(text);
         for (const [label, fn] of actions) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--small'; b.textContent = label; b.addEventListener('click', () => { fn(); t.hidden = true; }); t.append(' ', b); }
         t.hidden = false;
-        clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => { t.hidden = true; }, actions.length ? 12000 : 4000);
+        toastDuration = actions.length ? 12000 : 4000;
+        scheduleToastDismiss();
     }
 })();

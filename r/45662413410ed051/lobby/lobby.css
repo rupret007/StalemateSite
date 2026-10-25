@@ -27,7 +27,7 @@ button, input, select { font: inherit; }
 button, summary { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .45; }
 button, input, select { border-radius: 4px; }
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, .toast:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
 ::selection { background: var(--lime); color: var(--ink); }
 a { color: var(--blue); text-underline-offset: 3px; }
 h1, h2, h3, p { margin-top: 0; }
@@ -53,7 +53,8 @@ input::placeholder { color: #8b958f; opacity: 1; }
 .brand b { display: block; font: 800 13px/1.4 var(--mono); letter-spacing: .14em; }
 .brand-caption { display: block; color: var(--muted); font: 9px/1.6 var(--mono); letter-spacing: .1em; }
 .title-extra { border-left: 1px solid var(--line); padding-left: 20px; margin-left: 12px; color: var(--muted); font: 12px var(--mono); }
-.connection-tools { display: flex; gap: 10px; align-items: center; }
+.connection-tools { display: flex; flex-wrap: wrap; justify-content: flex-end; min-width: 0; gap: 10px; align-items: center; }
+.entry-return { display: inline-flex; align-items: center; min-height: 44px; font: 10px/1.5 var(--mono); overflow-wrap: anywhere; }
 .connection { color: var(--muted); font: 11px var(--mono); white-space: nowrap; }
 .connection::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 8px 1px 0; background: var(--amber); border-radius: 50%; }
 .connection[data-state=connected]::before { background: var(--lime); box-shadow: 0 0 0 3px #d1fa7810; }
@@ -88,7 +89,7 @@ input::placeholder { color: #8b958f; opacity: 1; }
 .entry-details p { margin: 12px 0 0; }
 .gate-disclosure { margin: -3px 0 0; font-size: 10px; line-height: 1.65; }
 /* The IRC workspace: three panes, fine rules, generous message space. */
-.irc { flex: 1; min-height: 0; display: grid; grid-template-columns: 290px minmax(0, 1fr) 210px; grid-template-rows: minmax(0, 1fr); gap: 1px; background: var(--line); }
+.irc { flex: 1; min-height: 0; display: grid; grid-template-columns: 290px minmax(0, 1fr) 210px; grid-template-rows: minmax(0, 1fr) auto; gap: 1px; background: var(--line); }
 .pane { min-width: 0; min-height: 0; overflow: auto; background: var(--surface); scrollbar-width: thin; scrollbar-color: #465144 transparent; }
 .rooms { padding: 22px 18px; }
 .channel-home { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 100%; padding: 12px 14px; background: #222d1c; color: var(--cream); border: 1px solid #43543a; border-left: 3px solid var(--lime); }
@@ -159,6 +160,12 @@ input::placeholder { color: #8b958f; opacity: 1; }
 .act { color: #c6a5db; }
 .who { padding: 0; border: 0; background: transparent; font: 600 12px var(--mono); }
 .badge { padding: 1px 4px; border: 1px solid #806b3c; border-radius: 2px; color: var(--amber); font: 9px var(--mono); }
+.entry-badge { color: var(--muted); font: 10px/1.5 var(--mono); overflow-wrap: anywhere; }
+.nicks .entry-badge { display: block; padding: 0 6px 5px 20px; }
+.entry-choice { margin-block: 12px; padding: 10px; border: 1px solid var(--line); }
+.entry-choice label { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; min-height: 44px; font-size: 12px; }
+.entry-choice input { width: 18px; height: 18px; min-height: 0; margin: 0 3px 0 0; accent-color: var(--lime); }
+.entry-choice p { margin: 5px 0 0; }
 .flag { display: inline-grid; place-items: center; vertical-align: middle; min-height: 32px; min-width: 32px; margin: -3px 0; padding: 0; border: 0; background: transparent; font-size: 11px; opacity: .55; }
 .buffer li:hover .flag, .flag:focus-visible { opacity: 1; }
 .jump-new { flex: none; min-height: 36px; background: #263a3d; color: var(--blue); border: 0; border-top: 1px solid #47696c; font: 600 11px var(--mono); }
@@ -240,7 +247,10 @@ input::placeholder { color: #8b958f; opacity: 1; }
 [data-channel-name] { width: 100%; }
 .check { display: flex; align-items: center; gap: 10px; min-height: 44px; }
 .check input { min-height: 0; accent-color: var(--lime); }
-.toast { position: fixed; z-index: 20; bottom: 95px; left: 50%; transform: translateX(-50%); max-width: min(540px, 92vw); padding: 12px 16px; border: 1px solid var(--lime); border-radius: 4px; color: var(--cream); background: var(--surface); box-shadow: 0 8px 30px #0008; font-size: 13px; }
+/* Status owns a bounded grid row, never an overlay over the composer. It is
+   keyboard-focusable so a long notice and its actions can scroll in place. */
+.toast { grid-column: 1 / -1; grid-row: 2; min-width: 0; max-width: 100%; max-height: min(20dvh, 120px); overflow: auto; overflow-wrap: anywhere; padding: 8px 16px; border-top: 1px solid var(--lime); color: var(--cream); background: var(--surface); font-size: 13px; }
+.toast .btn { margin: 4px; }
 .guest-check { position: fixed; z-index: 20; right: 16px; bottom: 80px; width: min(340px, calc(100vw - 32px)); padding: 16px; background: var(--surface); border: 1px solid var(--amber); border-radius: 4px; }
 .guest-check p { margin: 0 0 10px; font-size: 12px; }
 @media (min-width: 1200px) {
@@ -268,11 +278,11 @@ input::placeholder { color: #8b958f; opacity: 1; }
   .gate-command { display: none; }
   .gate-card { gap: 15px; padding: 22px; }
   .window-chrome { margin: -22px -22px 3px; }
-  .irc { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: 0; }
+  .irc { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto auto; gap: 0; }
   .pane { display: none; grid-column: 1; grid-row: 1; }
   body[data-show=chat] .chat { display: flex; }
   body[data-show=rooms] .rooms, body[data-show=people] .people { display: block; }
-  .phonetabs { display: grid; grid-column: 1; grid-row: 2; grid-template-columns: repeat(3, 1fr); min-height: 60px; padding-bottom: env(safe-area-inset-bottom, 0px); border-top: 1px solid var(--line); background: var(--surface); }
+  .phonetabs { display: grid; grid-column: 1; grid-row: 3; grid-template-columns: repeat(3, 1fr); min-height: 60px; padding-bottom: env(safe-area-inset-bottom, 0px); border-top: 1px solid var(--line); background: var(--surface); }
   .phonetabs button { min-height: 56px; border: 0; border-top: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 550; }
   .phonetabs button[aria-current=true] { border-top-color: var(--lime); color: var(--lime); background: #20271d; }
   .tabs { min-height: 47px; padding: 4px 10px 0; }
@@ -369,19 +379,31 @@ input::placeholder { color: #8b958f; opacity: 1; }
   .buffer { min-height: 80px; }
 }
 @media (max-height: 450px) and (max-width: 900px) {
-  .titlebar { min-height: 40px; padding-block: 6px; }
+  /* At deep zoom, allow ordinary vertical page scrolling instead of clipping
+     the conversation/composer below fixed workspace rows. */
+  body { overflow-y: auto; }
+  .irc { min-height: 252px; flex-shrink: 0; }
+  .titlebar { min-height: 35px; padding-block: 4px; gap: 8px; }
+  .brand { flex: none; gap: 8px; }
+  .brand b { font-size: 10px; white-space: nowrap; }
+  .connection-tools { gap: 6px; }
+  .entry-return { min-height: 26px; }
   .brand-mark { width: 26px; height: 26px; font-size: 23px; }
   .brand-caption, .lobby-welcome, .quick, .chat-status { display: none; }
-  .tabs { min-height: 36px; padding-top: 2px; }
-  .tabs button { min-height: 33px; padding-block: 6px; }
+  .tabs { min-height: 34px; padding-top: 2px; }
+  .tabs button { min-height: 31px; padding-block: 5px; }
   .topic { max-height: 32px; min-height: 0; padding: 5px 12px; font-size: 9px; }
-  .roombar { padding: 5px 12px; }
+  .roombar { padding: 4px 12px; }
+  .roombar .btn { min-height: 30px; padding: 4px 6px; }
   .modes { flex: 1 1 auto; }
   .activity { min-height: 28px; }
   .activity-heading { padding-block: 8px; }
-  .buffer { min-height: 40px; }
-  .say { margin-block: 6px 8px; }
-  .say input { min-height: 42px; }
+  .buffer { min-height: 0; padding-block: 1px; }
+  .buffer li { padding-block: 0; }
+  .say { margin-block: 4px; }
+  .say input { min-height: 36px; padding-block: 8px; }
+  .say .btn { min-height: 32px; padding: 6px 8px; margin: 3px; }
+  .toast { padding: 4px 12px; }
   .phonetabs { min-height: 44px; }
   .phonetabs button { min-height: 44px; }
 }

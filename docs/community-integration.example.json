@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "communityAddress": "https://community.example.test/beta/",
+  "sites": [
+    {
+      "id": "stalemate",
+      "label": "Stalemate",
+      "origins": ["https://stalemate.band"],
+      "returnUrl": "https://stalemate.band/",
+      "permissions": ["link", "badge", "return"],
+      "enabled": false,
+      "domainVerified": false
+    },
+    {
+      "id": "rad-dad",
+      "label": "Rad Dad",
+      "origins": ["https://raddadband.com"],
+      "returnUrl": "https://raddadband.com/",
+      "permissions": ["link", "badge", "return"],
+      "enabled": false,
+      "domainVerified": false
+    }
+  ]
+}

@@ -5,6 +5,8 @@ import { ROOM_TTL, LOG_TTL, OWNER_TRANSFER_TTL, roomRecord, validRoom, createRat
 import { checkNick, checkText, defaultLists, normalize } from './filter.mjs';
 import { actSnapshot, applyClear, applyStroke, applyVideo, cleanRtc, parseActFrame, PAINT_KINDS, VIDEO_KINDS } from './lobby-act.mjs';
 import { messageReceipt, receiptDigest } from './message-receipts.mjs';
+import { TRANSPORT_CONTROL_BLOCK } from './transport-budget.mjs';
+import { ENTRY_SITES, normalizeEntrySource } from '../../r/45662413410ed051/entry-sites.mjs';
 
 export const BOT = 'StaleBot';
 export const LOBBY = '#stalemate';
@@ -119,8 +121,9 @@ export const COMMANDS = Object.freeze({
     camoff: 'moderator', approve: 'moderator', dismiss: 'moderator', aidismiss: 'moderator', privatereport: 'moderator', log: 'moderator', delete: 'moderator', slow: 'band'
 });
 
-export function createLobby({ now = () => Date.now(), send = () => {}, close = () => {}, persist: persistImpl = () => {}, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
+export function createLobby({ now = () => Date.now(), send = () => {}, close = () => {}, persist: persistImpl = () => {}, deferPresence = null, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
     const L = { ...LOBBY_LIMITS, ...limits };
+    const entrySites = L.entrySites || ENTRY_SITES;
     const roomStateLimit = Math.max(32768, Math.min(ROOM_STATE_MAX_BYTES, Number(L.roomStateBytes) || ROOM_STATE_MAX_BYTES));
     const conns = new Map();          // connId -> conn
     const channels = new Map();       // lc(name) -> channel
@@ -128,6 +131,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     const devStats = new Map();       // dev -> {day, msgs, lastRoom}
     const ipRooms = new Map();        // iph -> [timestamps]
     let seq = 0;
+    let channelGeneration = 0;
     const rates = createRateLimits(now);
     let roomsBroken = false;
     let outputBatch = null;
@@ -185,7 +189,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     const aiReviews = new Map();      // bounded admin-only evidence, separate from chat and network snapshots
 
     const mkChannel = (name, kind, title, founder) => ({
-        name, kind, title, founder, created: now(), topic: kind === 'lobby' ? 'Welcome to #stalemate. Pull up a nick, say hello, make something together. /help for commands.' : '',
+        name, kind, title, founder, generation: ++channelGeneration, created: now(), topic: kind === 'lobby' ? 'Welcome to #stalemate. Pull up a nick, say hello, make something together. /help for commands.' : '',
         modes: { m: false, i: false, k: '', l: kind === 'lobby' ? L.lobbyMax : L.roomMax, t: true, S: kind === 'lobby' ? L.defaultSlow : 0, C: kind !== 'lobby' && kind !== 'chat', Q: false, locked: false },
         jam: kind === 'jam' ? { desktop: '', web: '' } : null, ops: new Set(founder ? [founder] : []), opAccounts: new Map(), voice: new Set(), bans: [], invites: new Set(), kicks: {},
         owner: '', cohostLabels: {}, cohosts: new Set(), renewed: now(), transfer: null, members: new Set(), moderationContext: [], emptySince: null,
@@ -195,6 +199,12 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
 
     // ---------- helpers ----------
     const out = (c, msg) => { try { if (outputBatch) outputBatch.push([c.id, msg]); else send(c.id, msg); } catch (e) { /* gone */ } };
+    const queuePresence = marker => {
+        // Mark only after the durable command commits. No prepared projection,
+        // transcript, room key or account identity enters the scheduler.
+        if (outputBatch) outputBatch.push([null, null, marker]);
+        else deferPresence(marker);
+    };
     const isBand = (c) => c && (c.role === 'band' || c.role === 'owner');
     const isStaff = (c) => isBand(c) || c?.role === 'moderator';
     const owns = (c, room) => !!c?.account && room?.owner === c.account;
@@ -234,10 +244,11 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (chan.moderationContext.length > L.moderationContext) chan.moderationContext.shift();
         cast(chan, msg);
     };
-    const names = (chan) => membersOf(chan).filter((m) => m.nick).map((m) => ({ id: m.id, nick: m.nick, prefix: prefix(m, chan), band: isBand(m), moderator: m.role === 'moderator', verified: !!m.account, owner: owns(m, chan), away: !!m.away, cam: !!(m.cams && m.cams.has(lc(chan.name))) }))
+    const names = (chan) => membersOf(chan).filter((m) => m.nick).map((m) => ({ id: m.id, nick: m.nick, entrySource: m.entrySource, prefix: prefix(m, chan), band: isBand(m), moderator: m.role === 'moderator', verified: !!m.account, owner: owns(m, chan), away: !!m.away, cam: !!(m.cams && m.cams.has(lc(chan.name))) }))
         .sort((a, b) => (a.prefix === b.prefix ? lc(a.nick).localeCompare(lc(b.nick)) : a.prefix === '@' ? -1 : b.prefix === '@' ? 1 : a.prefix === '+' ? -1 : 1));
     const chanView = (chan) => ({ name: chan.name, kind: chan.kind, title: chan.title, topic: chan.topic, modes: { ...chan.modes, k: chan.modes.k ? true : false }, count: chan.members.size, persistent: !!chan.owner, expiresAt: chan.owner ? chan.renewed + ROOM_TTL : null, names: names(chan), jam: chan.jam ? { desktop: chan.jam.desktop, invitation: chan.jam.invitation || chan.jam.desktop, web: chan.jam.web, webReady: !!chan.jam.web } : null });
-    const sendChan = (chan) => {
+    const sendChan = (chan, { presence = false } = {}) => {
+        if (presence && typeof deferPresence === 'function') return queuePresence({ channel: chan.name, generation: chan.generation });
         cast(chan, { t: 'chan', ch: chanView(chan) });
         for (const c of membersOf(chan)) if (owns(c, chan)) out(c, { t: 'ownership', ch: chan.name,
             cohosts: [...chan.cohosts].map((id) => ({ id, label: chan.cohostLabels[id] || 'Verified co-host' })) });
@@ -245,7 +256,20 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     const visibleRoom = (viewer, room) => publicChannel(room) || isStaff(viewer) || !!viewer && (hosts(viewer, room) || room.members.has(viewer.id));
     const directory = (viewer) => [...channels.values()].filter((r) => r.kind !== 'lobby' && visibleRoom(viewer, r))
         .map((r) => ({ name: r.name, kind: r.kind, title: r.title, count: r.members.size, max: r.modes.l, locked: r.modes.locked || r.modes.i, key: !!r.modes.k, cams: r.modes.C, persistent: !!r.owner, mine: !!viewer && owns(viewer, r), hostPresent: membersOf(r).some((m) => hosts(m, r)) }));
-    const pushList = () => { for (const c of conns.values()) if (c.nick) out(c, { t: 'list', rooms: directory(c) }); pushAdmin(); };
+    const pushList = ({ presence = false } = {}) => {
+        if (presence && typeof deferPresence === 'function') queuePresence({ directory: true });
+        else for (const c of conns.values()) if (c.nick) out(c, { t: 'list', rooms: directory(c) });
+        pushAdmin();
+    };
+    function flushPresence(batch) {
+        if (roomsBroken || pendingCommits) return;
+        const current = batch.allChannels ? [...channels.values()].filter(room => room.members.size)
+            : batch.channels.map(({ name, generation }) => ch(name)).filter((room, index) => room && room.generation === batch.channels[index].generation);
+        // Resolve current members/roles/visibility, not the recipients or values
+        // that existed when a presence marker was made.
+        for (const room of current) sendChan(room);
+        if (batch.directory) pushList();
+    }
     const banned = (list, c) => list.some((b) => (!b.until || b.until > now()) && (b.mask === `dev:${c.dev}` || c.account && b.mask === `account:${c.account}` || b.mask === `iph:${c.iph}` || (c.nick && b.mask === `nick:${lc(c.nick)}`)));
     const pairKey = (a, b) => [a, b].sort().join('|');
 
@@ -412,6 +436,17 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     }
     function spend(n) { budgetLevel(); net.budget.requests += n; }
 
+    const transportControlReady = id => conns.has(id) && !roomsBroken && !net.lockAuto;
+    function reserveTransportControl(id) {
+        // Internal adapter entry only; no chat command or role can mint grants.
+        // Failed storage/corrupt state must not reset into a new UTC-day budget.
+        if (!transportControlReady(id) || budgetLevel() === 'closed'
+            || net.budget.requests + 1 > L.requestBudget * .95) return { ok: false };
+        spend(1);
+        saveNet(); // durable() withholds the grant until this required write commits.
+        return { ok: true, day: net.budget.day, controls: TRANSPORT_CONTROL_BLOCK };
+    }
+
     // ---------- connection lifecycle ----------
     function connect({ id, dev, iph, role = 'fan', email = '', account = '', admin = false }) {
         if (conns.size >= SESSION_CONNECTIONS) return { ok: false, status: 429, reason: 'full' };
@@ -426,11 +461,11 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             const inLobby = [...conns.values()].filter((c) => !isBand(c)).length;
             if (inLobby >= L.lobbyMax) return { ok: false, status: 429, reason: 'full' };
         }
-        const c = { id, dev, iph, role, email, account, admin: band && admin, nick: '', channels: new Set(), away: '', ignores: new Set(), blocks: new Set(), pmOff: false,
+        const c = { id, dev, iph, role, email, account, admin: band && admin, nick: '', entrySource: '', channels: new Set(), away: '', ignores: new Set(), blocks: new Set(), pmOff: false,
             cams: new Set(), since: now(), lastNick: 0, tokens: L.burst, last: now(), frames: 0, lastSaid: {}, actTokens: L.actBurst, actLast: now() };
         conns.set(id, c);
         if (band) { net.lastBand = now(); if (net.shieldAuto || net.lockAuto) bot(c, 'A saved safety state needs review: fans can read but not talk while the lobby is read-only. Check the band panel; /lobby unlock and /shieldoff when you are ready.'); saveNet(); }
-        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c) });
+        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1 } });
         return { ok: true };
     }
 
@@ -454,10 +489,10 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         c.channels.delete(chan.name);
         c.cams.delete(lc(chan.name));
         event(chan, quitting ? `${nickOf(c)} has quit (${why || 'Quit'})` : `${nickOf(c)} has left ${chan.name}${why ? ` (${why})` : ''}`);
-        sendChan(chan);
+        sendChan(chan, { presence: true });
         if (chan.kind !== 'lobby' && chan.members.size === 0) chan.emptySince = now();
         if (!quitting) out(c, { t: 'part', ch: chan.name });
-        pushList();
+        pushList({ presence: true });
     }
 
     function enter(c, chan, { key = '' } = {}) {
@@ -485,8 +520,8 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         else if (chan.kind === 'jam') bot(c, `welcome to ${chan.name}. Music runs in the WebJam desktop app (Jamulus) for tight timing. Plug in Ethernet: Wi-Fi adds lag and dropouts.`);
         else if (chan.kind === 'chat') bot(c, `welcome to ${chan.name}. The room host runs this conversation; site moderators handle abuse. Chat starts when you join. Start an activity room to draw, watch or use optional cameras.`);
         else bot(c, `welcome to ${chan.name}. The room host runs this activity; site moderators handle abuse. Cameras stay off unless you turn yours on (18+).`);
-        sendChan(chan);
-        pushList();
+        sendChan(chan, { presence: true });
+        pushList({ presence: true });
         return true;
     }
 
@@ -508,6 +543,11 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (f.t !== 'act' && f.t !== 'say' && f.t !== 'cmd' && !limited(c, 'command', 10, 1, true)) return;
         switch (f.t) {
         case 'hello': return hello(c, f);
+        case 'entry-source': {
+            c.entrySource = normalizeEntrySource(f.source, entrySites);
+            for (const name of c.channels) sendChan(ch(name));
+            return out(c, { t: 'entry-source', source: c.entrySource });
+        }
         case 'say': {
             const text = typeof f.text === 'string' ? f.text : '';
             if (text.startsWith('/') && !text.startsWith('//')) return runLine(c, f.ch, text);
@@ -537,6 +577,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (byNick(v.nick)) return out(c, { t: 'nick-error', text: 'That nick is taken right now.' });
         if (!isBand(c) && banned(net.bans, { ...c, nick: v.nick })) { kill(c, 4403, 'banned'); return undefined; }
         c.nick = v.nick;
+        c.entrySource = normalizeEntrySource(f.entrySource, entrySites);
         c.lastNick = now();
         statHour().joins += 1; statPeak();
         out(c, { t: 'welcome', nick: c.nick, role: c.role, band: isBand(c), moderator: c.role === 'moderator', verified: !!c.account, capabilities: capabilities(c) });
@@ -648,7 +689,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         const live = [...conns.values()].filter((c) => c.nick);
         return { version: 1, connections: live.map((c) => ({
             id: c.id, dev: c.dev, iph: c.iph, account: c.account || '', role: c.role, admin: c.admin,
-            nick: c.nick, channels: [...c.channels], away: c.away, ignores: [...c.ignores], blocks: [...c.blocks], pmOff: c.pmOff,
+            nick: c.nick, entrySource: c.entrySource, channels: [...c.channels], away: c.away, ignores: [...c.ignores], blocks: [...c.blocks], pmOff: c.pmOff,
             cams: [...c.cams], since: c.since, lastNick: c.lastNick, tokens: c.tokens, last: c.last, frames: c.frames,
             lastSaid: Object.fromEntries(Object.entries(c.lastSaid).filter(([name]) => c.channels.has(name))),
             actTokens: c.actTokens, actLast: c.actLast, camReports: c.camReports || 0
@@ -707,7 +748,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             const active = new Set([...channels.values()].filter((room) => room.kind !== 'lobby' && room.members.size).map((room) => room.name));
             for (const name of s.channels) if (name !== LOBBY) active.add(name);
             if (active.size > L.roomsListed) { deny('session-capacity'); continue; }
-            const c = { ...s, email: identity.email || '', channels: new Set(s.channels), ignores: new Set(s.ignores), blocks: new Set(s.blocks),
+            const c = { ...s, entrySource: normalizeEntrySource(s.entrySource, entrySites), email: identity.email || '', channels: new Set(s.channels), ignores: new Set(s.ignores), blocks: new Set(s.blocks),
                 cams: new Set(s.cams.filter((name) => !net.shield && ch(name)?.modes.C)), lastSaid: { ...s.lastSaid } };
             conns.set(c.id, c);
             for (const name of c.channels) { const room = ch(name); room.members.add(c.id); room.emptySince = null; }
@@ -793,7 +834,9 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             else writes.push(persist('sessions', { ...metadata, receipts: [...receipts.values()] }));
         }
         const flush = () => {
-            for (const [id, frame] of frames) try { send(id, frame); } catch { /* one gone socket must not stop delivery to everyone else */ }
+            for (const [id, frame, marker] of frames) try {
+                if (marker) deferPresence(marker); else send(id, frame);
+            } catch { /* one gone socket must not stop delivery to everyone else */ }
             for (const args of closing) try { close(...args); } catch { /* already gone */ }
             return result;
         };
@@ -1416,7 +1459,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (!isBand(c) && c.lastText === norm && now() - (c.lastTextAt || 0) < 30000) { log(BOT, 'filter-block', c.nick, 'spam:repeat', chan.name); return bot(c, 'Heard you the first time. 🦜', 'error'); }
         c.lastText = norm; c.lastTextAt = now();
         const v = checkText(rawText, net.lists);
-        const line = { t: 'line', id: `m${now().toString(36)}${(seq += 1).toString(36)}`, ch: chan.name, from: c.nick, prefix: prefix(c, chan), band: isBand(c), moderator: c.role === 'moderator', me: !!action, text: v.text, ts: now() };
+        const line = { t: 'line', id: `m${now().toString(36)}${(seq += 1).toString(36)}`, ch: chan.name, from: c.nick, entrySource: c.entrySource, prefix: prefix(c, chan), band: isBand(c), moderator: c.role === 'moderator', me: !!action, text: v.text, ts: now() };
         if (v.verdict === 'block' && !(isBand(c) && v.reason.startsWith('link'))) {
             if (v.reason !== 'empty') { bot(c, v.reason.startsWith('personal-info') ? 'Not cool here: no phone numbers, emails, addresses or socials in public chat.' : v.reason === 'link' ? 'Only YouTube links are allowed.' : v.reason === 'threat' ? 'Nope. No threats. Don’t be a dick.' : v.reason === 'spam' ? 'Easy on the keyboard mash.' : 'Don’t be a dick. Message not sent.', 'error'); log(BOT, 'filter-block', c.nick, v.reason, chan.name); }
             return undefined;
@@ -1587,7 +1630,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (to.blocks.has(from.dev)) return bot(from, `${to.nick} isn't taking PMs.`, 'error');
         const v = checkText(rawText, net.lists);
         if (v.verdict !== 'ok') { log(BOT, 'pm-filter', from.nick, v.reason); return bot(from, v.reason.startsWith('personal-info') ? 'Not cool here: no phone numbers, emails, addresses or socials, even in PMs.' : 'Not cool here. Message not sent.', 'error'); }
-        const msg = { t: 'pm', id: `p${now().toString(36)}${(seq += 1).toString(36)}`, from: from.nick, to: to.nick, text: v.text, band: isBand(from), ts: now() };
+        const msg = { t: 'pm', id: `p${now().toString(36)}${(seq += 1).toString(36)}`, from: from.nick, entrySource: from.entrySource, to: to.nick, text: v.text, band: isBand(from), ts: now() };
         const recipients = new Set([from.id]);
         if (!to.ignores.has(lc(from.nick))) recipients.add(to.id);
         rememberLine({ ...msg, ch: `pm:${from.nick}>${to.nick}` }, { authorDev: from.dev, recipients });
@@ -1777,5 +1820,5 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     }
     function restoreLog(entries = []) { net.modlog = entries.filter((e) => Number.isFinite(e.at) && now() - e.at < LOG_TTL).slice(-L.modlogKeep); }
 
-    return { connect, disconnect: (...args) => durable(disconnect, args), message: (...args) => durable(message, args), completePrivateReportAction: (...args) => durable(completePrivateReportAction, args), tick: (...args) => durable(tick, args), roomSnapshot, restoreRooms, sessionSnapshot, restoreSessions, abuseSnapshot, restoreAbuse, snapshot, restore, restoreLog, restoreModerationQueue, restoreAiReviews, applyAiReview, notifyAiStatus: pushAdmin, adminState, budgetLevel, spend, get modlog() { return net.modlog.slice(); }, _debug: { conns, channels, net, pm, reports, held, lines } };
+    return { connect, disconnect: (...args) => durable(disconnect, args), message: (...args) => durable(message, args), flushPresence, transportControlReady, reserveTransportControl: (...args) => durable(reserveTransportControl, args), completePrivateReportAction: (...args) => durable(completePrivateReportAction, args), tick: (...args) => durable(tick, args), roomSnapshot, restoreRooms, sessionSnapshot, restoreSessions, abuseSnapshot, restoreAbuse, snapshot, restore, restoreLog, restoreModerationQueue, restoreAiReviews, applyAiReview, notifyAiStatus: pushAdmin, adminState, budgetLevel, spend, get modlog() { return net.modlog.slice(); }, _debug: { conns, channels, net, pm, reports, held, lines } };
 }

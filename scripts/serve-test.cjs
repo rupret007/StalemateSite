@@ -89,6 +89,7 @@ function sendFile(request, response, filePath, status = 200) {
 
 async function main() {
     const { createHangoutRelay } = await import('./hangout-relay-dev.mjs');
+    const { createEntrySiteRegistry } = await import('../hangout-worker/src/community-integration.mjs');
     const origin = `http://127.0.0.1:${PORT}`;
     // Each browser scenario can choose a namespace while retaining CSP's same-origin
     // relay. Engines keep their real limits, moderation state and membership rules.
@@ -98,7 +99,10 @@ async function main() {
             previewKey: 'local-preview-key-0001',
             devAdminKey: process.env.HANGOUT_DEV_ADMIN_KEY || 'local-dev-admin-key-0001',
             origins: origin,
-            lobbyLimits: { pmMinLobbyMs: 1500 }
+            lobbyLimits: { pmMinLobbyMs: 1500,
+                // Explicit loopback-only partner fixture. Never added to the
+                // production registry or enabled by a visitor query parameter.
+                ...(namespace.startsWith('shared-community-') ? { entrySites: createEntrySiteRegistry([{ id: 'makers', label: 'Makers & Friends' }]) } : {}) }
         }));
         return hangoutRelays.get(namespace);
     };

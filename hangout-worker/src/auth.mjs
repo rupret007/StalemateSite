@@ -40,7 +40,9 @@ export async function verifyAccessJwt(token, { team, aud, now = Date.now(), fetc
     if (!auds.includes(aud)) throw new Error('audience');
     if (typeof claims.exp !== 'number' || claims.exp <= t) throw new Error('expired');
     if (typeof claims.nbf === 'number' && claims.nbf > t + 30) throw new Error('not-yet');
-    if (typeof claims.email !== 'string' || !claims.email.includes('@')) throw new Error('email');
+    // Match the beta identity bound before hashing/storing an issuer's claim.
+    // A valid signature alone must not permit unbounded socket attachments.
+    if (typeof claims.email !== 'string' || claims.email.length > 254 || enc.encode(claims.email).byteLength > 254 || !claims.email.includes('@')) throw new Error('email');
     return { email: claims.email.toLowerCase(), expiresAt: claims.exp * 1000 };
 }
 
