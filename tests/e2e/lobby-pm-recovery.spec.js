@@ -46,6 +46,9 @@ test('an existing PM Accept button survives wake and explains that unsaved first
         await expect(accept).toHaveAttribute('data-original-prompt', 'yes'); await accept.click();
         for (const page of [sender, recipient]) {
             await expect(page.locator('[data-chat-context]')).toHaveText(page === sender ? 'PM · Recipient' : 'PM · Sender');
+            await expect(page.locator('[data-topic]')).toContainText('not end-to-end encrypted');
+            await expect(page.locator('[data-topic]')).toContainText('report shares selected text');
+            await expect(page.locator('[data-topic]')).not.toContainText('· filtered ·');
             await expect(page.locator('[data-buffer]')).toContainText('first message was not retained');
             await expect(page.locator('[data-buffer]')).not.toContainText('A first sentence');
             await expect(page.locator('[data-connection]')).toHaveText('Connected');

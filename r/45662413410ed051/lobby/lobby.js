@@ -530,7 +530,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const isPm = key.startsWith('pm:');
         $('[data-lobby-welcome]').hidden = key !== '#stalemate';
         $('[data-chat-context]').textContent = isPm ? `PM · ${key.slice(3)}` : key;
-        $('[data-topic]').textContent = isPm ? `Private chat with ${key.slice(3)} · filtered · tap their name to block` : c ? `${c.topic || ''}` : '';
+        $('[data-topic]').textContent = isPm ? `Private chat with ${key.slice(3)} · not end-to-end encrypted · report shares selected text · tap their name to block` : c ? `${c.topic || ''}` : '';
         const room = !isPm && c && c.kind !== 'lobby';
         $('[data-roombar]').hidden = !room;
         $('[data-jam]').hidden = !(room && c.kind === 'jam');

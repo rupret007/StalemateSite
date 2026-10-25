@@ -1497,6 +1497,10 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     function rememberLine(line, meta) {
         lines.set(line.id, line); lineMeta.set(line.id, meta);
         while (lines.size > 1000) { const oldest = lines.keys().next().value; lines.delete(oldest); lineMeta.delete(oldest); aiPending.delete(oldest); }
+        rememberDelivery(line, meta);
+    }
+
+    function rememberDelivery(line, meta) {
         setReceipt(line.id, messageReceipt(line, meta));
         pruneReceipts(false);
     }
@@ -1618,12 +1622,9 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             if (now() - c.since < L.pmMinLobbyMs) return bot(c, `Hang in the lobby for ${Math.ceil(L.pmMinLobbyMs / MIN)} minutes before sending PM requests.`, 'error');
         }
         if (!limited(c, 'pm-request', 3, 3 / 60)) return;
-        let first = '';
-        if (rawText) {
-            const v = checkText(rawText, net.lists);
-            if (v.verdict !== 'ok') { log(BOT, 'pm-filter', c.nick, v.reason); return bot(c, v.reason.startsWith('personal-info') ? 'Not cool here: no phone numbers, emails, addresses or socials, even in PMs.' : 'Not cool here. Message not sent.', 'error'); }
-            first = v.text;
-        }
+        // Normalize/bound protocol text, without public-content classification.
+        // The first body stays volatile only until acceptance/expiry/disconnect.
+        const first = rawText ? normalize(rawText, L.maxChars) : '';
         if (p && p.state === 'pending') return bot(c, `Still waiting for ${t.nick} to accept.`);
         pm.set(k, { state: 'pending', from: c.dev, fromId: c.id, toId: t.id, first, at: now() });
         out(t, { t: 'pm-request', from: c.nick, band: isBand(c) });
@@ -1636,12 +1637,14 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (!isBand(from) && (net.lock === 'readonly' || budgetLevel() !== 'ok')) return bot(from, 'The lobby is read-only right now, PMs too.', 'error');
         if (!isBand(from) && Math.max(net.mutes[from.dev] || 0, net.mutes[from.account] || 0) > now()) return bot(from, 'You’re muted for now.', 'error');
         if (to.blocks.has(from.dev)) return bot(from, `${to.nick} isn't taking PMs.`, 'error');
-        const v = checkText(rawText, net.lists);
-        if (v.verdict !== 'ok') { log(BOT, 'pm-filter', from.nick, v.reason); return bot(from, v.reason.startsWith('personal-info') ? 'Not cool here: no phone numbers, emails, addresses or socials, even in PMs.' : 'Not cool here. Message not sent.', 'error'); }
-        const msg = { t: 'pm', id: `p${now().toString(36)}${(seq += 1).toString(36)}`, from: from.nick, entrySource: from.entrySource, to: to.nick, text: v.text, band: isBand(from), ts: now() };
+        const text = normalize(rawText, L.maxChars);
+        if (!text) return undefined;
+        const msg = { t: 'pm', id: `p${now().toString(36)}${(seq += 1).toString(36)}`, from: from.nick, entrySource: from.entrySource, to: to.nick, text, band: isBand(from), ts: now() };
         const recipients = new Set([from.id]);
         if (!to.ignores.has(lc(from.nick))) recipients.add(to.id);
-        rememberLine({ ...msg, ch: `pm:${from.nick}>${to.nick}` }, { authorDev: from.dev, recipients });
+        // Keep bounded delivery metadata/digest, not a recent private-body log.
+        // Staff receive the exact selected text only when a participant reports it.
+        rememberDelivery({ ...msg, ch: `pm:${from.nick}>${to.nick}` }, { authorDev: from.dev, recipients });
         out(from, msg);
         if (!to.ignores.has(lc(from.nick))) out(to, msg);
         return undefined;

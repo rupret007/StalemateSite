@@ -12,7 +12,7 @@ The old persisted `lockAuto` flag also indicated corrupt or missing safety state
 
 When enabled, new public lobby and unrestricted-room text is classified **after publication**. Suspected abuse appears in an admin-only AI review queue with the actual message, channel, author display name, time, model and category labels. These labels are signals for review, not findings of fact. AI does not ban, mute, kick, change permissions, publish chat, or automatically remove messages.
 
-The review UI offers two actions: delete that exact message, or dismiss the AI signal. Other existing moderation controls remain human-operated. Ordinary deterministic filters can still block or hold messages before publication, independently of AI.
+The review UI offers two actions: delete that exact message, or dismiss the AI signal. Other existing moderation controls remain human-operated. Ordinary deterministic filters can still block or hold channel messages before publication, independently of AI. PMs use acceptance, blocking and rate/abuse controls without automatic content classification or accepted-body moderation buffering. A participant can submit an exact selected PM to staff using its bounded delivery digest/witness record; adjacent private messages are not included. PMs are server-routed, not end-to-end encrypted.
 
 Only the single eligible message text is sent to OpenAI. Nickname, device, IP hash, channel name and message ID are not added to the request. Text can itself contain information the author supplied; this is data minimization, not an anonymity guarantee. The preexisting personal-information filter runs first.
 
