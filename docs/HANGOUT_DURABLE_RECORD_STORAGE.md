@@ -63,7 +63,7 @@ back on callback rejection.
 
 The test driver uses real temporary SQLite files and actual SQL transactions.
 Process restart and failure-injection tests qualify this mapping against that
-driver. The focused suites contain 70 codec/SQLite/incident cases and six
+driver. The focused suites contain 71 codec/SQLite/incident cases and six
 participation-domain cases. They exercise actual C2/C3 enrollment, guest chat,
 withdrawal, final-write authorization denial, maintenance pages and reopening;
 the identity/policy/guardian adapters remain explicitly synthetic. The incident

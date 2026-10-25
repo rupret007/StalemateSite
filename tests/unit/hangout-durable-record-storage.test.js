@@ -29,6 +29,15 @@ afterEach(async () => {
 const read = (f, key) => f.store.transaction(tx => tx.get(key));
 const write = (f, key, value) => f.store.transaction(tx => tx.put(key, value));
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
+// Hash every physical key/type/value byte; avoid a JS matcher walking millions
+// of individual typed-array elements when proving an unchanged large record.
+const physicalSnapshot = driver => {
+    const records = [...driver.rows()].map(([key, value]) => {
+        const binary = value instanceof Uint8Array, bytes = binary ? value : enc.encode(JSON.stringify(value));
+        return { key, type: binary ? 'bytes' : 'json', bytes: bytes.byteLength, sha256: sha(bytes) };
+    });
+    return { rows: records.length, records };
+};
 const manifestKey = (f, key) => [...f.driver.rows().keys()].find(k => k.includes(':manifest:') && k.endsWith(Buffer.from(key).toString('hex')));
 const partKey = (manifest, index) => manifest.replace(':manifest:', ':part:') + ':' + String(index).padStart(4, '0');
 const pause = () => { let release; const promise = new Promise(resolve => { release = resolve; }); return { promise, release }; };
@@ -275,19 +284,26 @@ describe('strict representation, physical corruption and resource ceilings', () 
         await expect(read(f, 'record')).rejects.toThrow('storage-corrupt');
     });
 
-    it('bounds total transaction write/read bytes independently of the per-record allowance', async () => {
+    it('bounds aggregate transaction writes at 16 MiB and rolls back two accepted 8 MiB records', async () => {
         const f = await fixture({ maxRecordBytes: 16 * 1024 * 1024 });
         const value = 'x'.repeat(8 * 1024 * 1024 - 2);
         await expect(f.store.transaction(async tx => {
             await tx.put('one', value); await tx.put('two', value); await tx.put('third', 1);
         })).rejects.toThrow('record-capacity');
         expect(f.driver.rows().size).toBe(0);
-        await write(f, 'one', value); const before = f.driver.rows();
+    });
+
+    it('bounds aggregate transaction reads at 32 MiB and preserves every physical record byte', async () => {
+        const f = await fixture({ maxRecordBytes: 16 * 1024 * 1024 });
+        const value = 'x'.repeat(8 * 1024 * 1024 - 2);
+        await write(f, 'one', value); const before = physicalSnapshot(f.driver);
+        f.driver.resetOperations(); // Release retained seed buffers, not persisted records.
         await expect(f.store.transaction(async tx => {
-            for (let i = 0; i < 5; i += 1) await tx.get('one');
+            for (let i = 0; i < 4; i += 1) expect(await tx.get('one')).toBe(value);
+            await tx.get('one');
         })).rejects.toThrow('record-capacity');
-        expect(f.driver.rows()).toEqual(before);
-    }, 10000);
+        expect(physicalSnapshot(f.driver)).toEqual(before);
+    });
 
     it('bounds physical operations and poisons a swallowed ceiling failure', async () => {
         const f = await fixture(); f.driver.resetOperations();
