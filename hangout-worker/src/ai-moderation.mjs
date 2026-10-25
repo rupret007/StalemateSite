@@ -78,7 +78,7 @@ export function createAiModerator({ enabled = false, apiKey = '', fetchImpl = gl
         checked, flagged, failed, skipped, used, limit, pending };
     }
     function skip(reason) { skipped += 1; changed(); return { status: 'unavailable', reason }; }
-    async function review({ text } = {}) {
+    async function review({ text, beforeDispatch, startDispatch } = {}) {
         resetDay();
         if (!enabled) return { status: 'unavailable', reason: 'disabled' };
         if (!configured) return skip('not-configured');
@@ -98,11 +98,17 @@ export function createAiModerator({ enabled = false, apiKey = '', fetchImpl = gl
                 // The deadline includes storage. A late reservation must never start a late API call.
                 await saveUsage(reservation);
                 if (controller.signal.aborted) throw new Error('timeout');
-                const response = await fetchImpl(ENDPOINT, {
+                if (beforeDispatch !== undefined && (typeof beforeDispatch !== 'function' || await beforeDispatch() !== true)) throw new Error('participation-denied');
+                if (controller.signal.aborted) throw new Error('timeout');
+                const start = () => {
+                if (controller.signal.aborted) throw new Error('timeout');
+                return fetchImpl(ENDPOINT, {
                     method: 'POST', redirect: 'manual', signal: controller.signal,
                     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
                     body: JSON.stringify({ model: AI_MODERATION_MODEL, input: text })
-                });
+                }); };
+                if (startDispatch !== undefined && typeof startDispatch !== 'function') throw new Error('participation-denied');
+                const response = await (startDispatch ? startDispatch(start) : start());
                 if (!response.ok) throw new Error('provider-unavailable');
                 const body = await boundedBody(response, controller.signal);
                 const result = parseModerationResult(JSON.parse(body));
