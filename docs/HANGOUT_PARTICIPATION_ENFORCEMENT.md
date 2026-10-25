@@ -148,8 +148,10 @@ identity preservation, opaque safety boundaries and resource rejection. No real
 guardian, evidence, provider request, browser media, Cloudflare runtime or public
 route is exercised by those fixtures.
 
-Configured C3 currently prepares views for connected peers and performs ledger,
-transaction and checkpoint copies. **The earlier 150-client beta load does not
+Configured C3 prepares a fresh author view for ordinary public text; private
+contact, media, commands and other actions retain connected-peer preparation.
+See [the dependency selection contract](HANGOUT_PARTICIPATION_READ_SCOPE.md).
+Ledger, transaction and checkpoint copies remain. **The earlier 150-client beta load does not
 qualify consent-enabled C3 throughput, latency, memory, request or storage cost.**
 Any such benchmark needs stable source, its own bounded local evidence and an
 owner-approved hosted plan. The C2 ledger's defensive subject count is also not

@@ -243,6 +243,22 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return SAFE_COMMANDS.has(command);
         } catch { return true; } // Malformed frames retain the existing protocol refusal.
     }
+    function participationConnections(fn, args) {
+        // Only ordinary text in a currently joined public channel depends on
+        // the author alone. Commands, PM contexts, media and every other action
+        // retain the full roster. This selects dependencies, never permissions:
+        // prepare, both atomic commit checks and any provider start stay fresh.
+        if (fn === message && typeof args[1] === 'string' && args[1].length <= L.frameBytes
+            && encoder.encode(args[1]).byteLength <= L.frameBytes) {
+            try {
+                const frame = JSON.parse(args[1]), actor = conns.get(args[0]);
+                const room = typeof frame?.ch === 'string' && !isPrivateContext(frame.ch) ? ch(frame.ch) : null;
+                if (frame?.t === 'say' && typeof frame.text === 'string' && !frame.text.startsWith('/')
+                    && actor?.nick && publicChannel(room) && room.members.has(actor.id)) return [connectionView(actor)];
+            } catch { /* Invalid/ambiguous frames keep the conservative full path. */ }
+        }
+        return [...conns.values()].map(connectionView);
+    }
     async function controlledRun(fn, args, safe = false) {
         if (participationBroken) return { ok: false, reason: 'participation-unavailable' };
         if (participationBusy || safetyDrainScheduled) {
@@ -258,7 +274,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         try {
             checkpoint = createParticipationCheckpoint({ conns, channels, pm, devStats, ipRooms, net, reports, held, lines, lineMeta,
                 receipts, receiptSizes, heldChannels, aiPending, aiReviews, participationMedia }, safe ? { opaque: [...channels.values()].map(room => room.act) } : {});
-            const context = participationReady ? await participation.prepare([...conns.values()].map(connectionView)) : null;
+            const context = participationReady ? await participation.prepare(participationConnections(fn, args)) : null;
             stage = controlled = { context, effects: [], frames: [], closes: [], presence: [], providers: [], bytes: 0, effectBytes: 0, capacity: false };
             result = await durable(fn, args);
             if (stage.capacity) throw Object.assign(new Error('participation-denied'), { participationDenied: true, reason: 'participation-capacity' });

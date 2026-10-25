@@ -31,7 +31,7 @@ function store() {
         failNext: () => fail = true, badList: () => badList = true, afterPut: fn => afterPut = fn, snapshot: () => clone(committed), metrics
     };
 }
-async function fixture({ short = false, capacity = 128 } = {}) {
+async function fixture({ short = false, capacity = 128, reviewPublicText = null } = {}) {
     let at = START, serial = 0, forced = [];
     const randomRef = () => forced.shift() || `synthetic_partition_${String(++serial).padStart(8, '0')}`;
     const storage = store(), people = new Map(), proofs = new Map(), decisions = new Map(), guardians = new Map();
@@ -40,7 +40,7 @@ async function fixture({ short = false, capacity = 128 } = {}) {
         issuedAt: START - 100, effectiveAt: START - 100, expiresAt: START + 1000000, maxSessionMs: 10000 },
         rules: { version: 1, verifierRef: 'synthetic_partition_verifier', pendingMs: short ? 100 : 10000, grantMs: short ? 500 : 500000,
             subjectTailMs: 100, guardianTailMs: 100, receiptTailMs: 100, callbackMs: 100, operationMs: short ? 100 : 10000 } };
-    const controls = { beforeCommit: null, failAllocation: false, expireAllocation: false, maintenance: true, flood: '', reclaim: false, failRelease: false };
+    const controls = { beforeCommit: null, afterEffects: null, failAllocation: false, expireAllocation: false, maintenance: true, flood: '', reclaim: false, failRelease: false };
     const adapters = {
         qualifyPolicy: async ({ proof }) => proof === 'operator' ? { config: clone(config), expiresAt: at + 1000000 } : null,
         authenticateParticipant: async ({ proof, purpose }) => {
@@ -99,15 +99,97 @@ async function fixture({ short = false, capacity = 128 } = {}) {
                 && ['dev', 'account', 'role', 'admin'].every(key => session[key] === connection[key]);
         }, providerQualified: () => true, dispatchStart: storage.dispatchStart,
         beforeCommit: async ({ costsOnly }) => { if (!costsOnly && controls.beforeCommit) { const gate = controls.beforeCommit; controls.beforeCommit = null; await gate.wait(); } },
-        writeEffects: async ({ tx, effects }) => { for (const [kind, value] of effects) await tx.put(`lobby:${kind}`, value); }
+        writeEffects: async ({ tx, effects, costsOnly }) => {
+            for (const [kind, value] of effects) await tx.put(`lobby:${kind}`, value);
+            if (!costsOnly && controls.afterEffects) { const run = controls.afterEffects; controls.afterEffects = null; await run(); }
+        }
     });
-    const engine = createLobby({ now: () => at, participation: enforcement, send: (id, frame) => frames.push({ recipient: id, ...clone(frame) }), close: (...args) => closed.push(args) });
+    const legacyPersist = vi.fn();
+    const engine = createLobby({ now: () => at, participation: enforcement, reviewPublicText, persist: legacyPersist,
+        send: (id, frame) => frames.push({ recipient: id, ...clone(frame) }), close: (...args) => closed.push(args) });
     const connect = async person => { expect((await engine.connect(person)).ok).toBe(true); await engine.message(person.id, JSON.stringify({ t: 'hello', nick: person.nick, age13: true })); expect(engine._debug.conns.get(person.id).nick).toBe(person.nick); };
     const message = (person, frame) => engine.message(person.id, JSON.stringify(frame));
     const cmd = (person, name, args) => message(person, { t: 'cmd', ch: '#stalemate', name, args });
     return { storage, ledger, makeLedger, adapters, controls, config, proofs, decisions, guardians, begin, complete, enroll, record, guardianProof, withdraw, read,
-        identity, engine, enforcement, reader, frames, closed, connect, message, cmd, advance: ms => at += ms, force: refs => forced = [...refs], now: () => at };
+        identity, engine, enforcement, reader, frames, closed, legacyPersist, connect, message, cmd, advance: ms => at += ms, force: refs => forced = [...refs], now: () => at };
 }
+
+describe('fresh author dependencies for ordinary public text', () => {
+    it('uses 23 point reads regardless of an unrelated peer while preserving PM, held text and active media', async () => {
+        const f = await fixture(), alice = await f.enroll('alice'), bravo = await f.enroll('bravo'); await f.connect(alice); await f.connect(bravo); f.advance(120001);
+        await f.cmd(bravo, 'msg', [alice.nick, 'Synthetic pending contact']);
+        await f.cmd(bravo, 'join', ['#watch-scope']); await f.cmd(alice, 'join', ['#watch-scope']);
+        await f.message(bravo, { t: 'cam', ch: '#watch-scope', on: true, adult18: true });
+        await f.message(bravo, { t: 'act', kind: 'video', ch: '#watch-scope', source: { kind: 'yt', id: 'dQw4w9WgXcQ' }, playing: false, pos: 0 });
+        await f.message(bravo, { t: 'say', ch: '#stalemate', text: 'you are an idiot' });
+        expect(f.engine._debug.pm.size).toBe(1); expect(f.engine._debug.held.size).toBe(1);
+        const pm = [...f.engine._debug.pm.values()][0], queued = [...f.engine._debug.held.values()][0], room = f.engine._debug.channels.get('#watch-scope');
+        expect(f.engine._debug.conns.get(bravo.id).cams.has(room.name)).toBe(true); expect(room.act.video.source.id).toBe('dQw4w9WgXcQ');
+        const activity = clone(room.act), count = f.storage.metrics.length; f.reader.mockClear(); f.frames.length = 0;
+        await f.message(alice, { t: 'say', ch: '#stalemate', text: 'Ordinary public message with independent state' });
+        expect(f.frames.filter(frame => frame.t === 'line' && frame.text === 'Ordinary public message with independent state')).toHaveLength(2);
+        expect(f.reader.mock.calls).toHaveLength(3); expect(f.reader.mock.calls.every(([arg]) => arg.identities.length === 1 && arg.identities[0].principalRef === alice.principalRef)).toBe(true);
+        expect(f.storage.metrics.slice(count).reduce((n, item) => n + item.reads, 0)).toBe(23);
+        expect([...f.engine._debug.pm.values()][0]).toBe(pm); expect([...f.engine._debug.held.values()][0]).toBe(queued); expect(room.act).toEqual(activity);
+        expect(f.engine._debug.conns.get(bravo.id).cams.has(room.name)).toBe(true); expect(f.legacyPersist).not.toHaveBeenCalled();
+        const authorOnly = await f.enforcement.prepare([{ id: alice.id, dev: alice.dev, account: alice.account, role: alice.role, admin: alice.admin }]);
+        expect(f.enforcement.allows(authorOnly, { actorId: alice.id, peerId: bravo.id, action: 'requestDirectContact' })).toBe(false);
+    });
+    it.each(['pm-context', 'slash-command', 'rtc'])('keeps full peer preparation for %s and denies a withdrawn peer', async kind => {
+        const f = await fixture(), alice = await f.enroll('alice'), bravo = await f.enroll('bravo'); await f.connect(alice); await f.connect(bravo); f.advance(120001);
+        await f.cmd(alice, 'msg', [bravo.nick, 'Synthetic initial contact']); await f.cmd(bravo, 'accept', [alice.nick]);
+        if (kind === 'rtc') {
+            await f.cmd(alice, 'join', ['#art-scope']); await f.cmd(bravo, 'join', ['#art-scope']);
+            await f.message(alice, { t: 'cam', ch: '#art-scope', on: true, adult18: true });
+        }
+        expect((await f.withdraw(bravo)).state).toBe('withdrawn'); f.reader.mockClear(); f.frames.length = 0;
+        const frame = kind === 'pm-context' ? { t: 'say', ch: `pm:${bravo.nick}`, text: 'Withdrawn peer cannot receive this' }
+            : kind === 'slash-command' ? { t: 'say', ch: '#stalemate', text: `/msg ${bravo.nick} Withdrawn peer cannot receive this` }
+                : { t: 'act', kind: 'rtc', ch: '#art-scope', to: bravo.id, sdp: { type: 'offer', sdp: 'v=0\r\nm=video 9 RTP/AVP 96\r\n' } };
+        expect((await f.message(alice, frame)).ok).toBe(false);
+        expect(f.reader.mock.calls.length).toBeGreaterThan(0); expect(f.reader.mock.calls.every(([arg]) => arg.identities.length === 2)).toBe(true);
+        expect(f.frames.some(frame => frame.t === 'pm' || frame.kind === 'rtc')).toBe(false);
+    });
+    it.each(['withdrawal', 'session-role', 'storage'])('refuses public output and rolls back receipts when %s changes before commit', async kind => {
+        const f = await fixture(), alice = await f.enroll('alice'), bravo = await f.enroll('bravo'); await f.connect(alice); await f.connect(bravo);
+        const gate = held(), before = f.engine._debug.conns.get(alice.id).frames; f.controls.beforeCommit = gate; f.frames.length = 0; f.reader.mockClear();
+        const pending = f.message(alice, { t: 'say', ch: '#stalemate', text: 'No stale author publication' }); await gate.entered;
+        expect(f.frames).toEqual([]);
+        if (kind === 'withdrawal') expect((await f.withdraw(alice)).state).toBe('withdrawn');
+        else if (kind === 'session-role') await f.storage.transaction(async tx => { const session = await tx.get(`session:${alice.id}`); await tx.put(`session:${alice.id}`, { ...session, role: 'moderator' }); });
+        else f.storage.failNext();
+        gate.release(); expect((await pending).ok).toBe(false);
+        expect(f.frames.some(frame => frame.text === 'No stale author publication')).toBe(false); expect(JSON.stringify([...f.storage.snapshot()])).not.toContain('No stale author publication');
+        expect([...f.engine._debug.lines.values()].some(line => line.text === 'No stale author publication')).toBe(false);
+        expect(f.engine._debug.conns.get(alice.id).frames).toBe(before + 1); expect(f.legacyPersist).not.toHaveBeenCalled();
+        expect(f.reader.mock.calls.every(([arg]) => arg.identities.length === 1 && arg.identities[0].principalRef === alice.principalRef)).toBe(true);
+    });
+    it('rechecks public-text expiry after awaited effect writes and denies a retained session after final subject cleanup', async () => {
+        const f = await fixture({ short: true }), alice = await f.enroll('alice'), bravo = await f.enroll('bravo'); await f.connect(alice); await f.connect(bravo);
+        f.controls.afterEffects = async () => f.advance(501); f.frames.length = 0;
+        expect((await f.message(alice, { t: 'say', ch: '#stalemate', text: 'Expired during awaited writes' })).ok).toBe(false);
+        expect(f.frames.some(frame => frame.text === 'Expired during awaited writes')).toBe(false); expect(JSON.stringify([...f.storage.snapshot()])).not.toContain('Expired during awaited writes');
+        f.advance(1000); expect((await f.ledger.sweep('maintenance')).ok).toBe(true); expect(f.record(alice)).toBeUndefined();
+        expect(f.engine._debug.conns.has(alice.id)).toBe(true);
+        f.advance(3001); // Preserve the ordinary chat slow-mode guard before testing the missing subject.
+        expect((await f.message(alice, { t: 'say', ch: '#stalemate', text: 'Old session cannot recreate a grant' })).ok).toBe(false);
+        expect(f.frames.some(frame => frame.text === 'Old session cannot recreate a grant')).toBe(false);
+        await f.cmd(alice, 'quit', []); expect(f.engine._debug.conns.has(alice.id)).toBe(false); expect(f.record(alice)).toBeUndefined();
+    });
+    it('keeps fresh same-author provider barriers after committed public text without preparing unrelated peers', async () => {
+        const requests = [], start = vi.fn(() => 'synthetic-provider-no-network'), f = await fixture({ reviewPublicText: request => requests.push(request) });
+        const alice = await f.enroll('alice'), bravo = await f.enroll('bravo'); await f.connect(alice); await f.connect(bravo); f.reader.mockClear();
+        await f.message(alice, { t: 'say', ch: '#stalemate', text: 'Synthetic eligible public review' }); expect(requests).toHaveLength(1);
+        const request = requests[0]; expect(JSON.stringify([...f.storage.snapshot()])).not.toContain(request.text);
+        expect(f.frames.filter(frame => frame.text === request.text)).toHaveLength(2);
+        expect(await request.beforeDispatch()).toBe(true); expect(await request.startDispatch(start)).toBe('synthetic-provider-no-network'); expect(start).toHaveBeenCalledOnce();
+        expect((await f.withdraw(alice)).state).toBe('withdrawn'); expect(await request.beforeDispatch()).toBe(false);
+        await expect(request.startDispatch(start)).rejects.toThrow(); expect(start).toHaveBeenCalledOnce();
+        expect(f.reader.mock.calls.every(([arg]) => arg.identities.length === 1 && arg.identities[0].principalRef === alice.principalRef)).toBe(true);
+        await f.engine.applyAiReview(request.id, { status: 'reviewed', flagged: true, model: 'synthetic-review', categories: ['harassment'] });
+        expect(f.engine._debug.held.size).toBe(0); expect(f.legacyPersist).not.toHaveBeenCalled();
+    });
+});
 
 describe('bounded per-principal C2 partitions', () => {
     it('enrolls 96 actual subjects and uses distant records in the actual C3 lobby without a larger aggregate', async () => {
