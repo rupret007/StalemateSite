@@ -86,6 +86,10 @@ test('AI status explains outages and limits, and old snapshots never imply that 
     await expect(page.locator('[data-moderation-storage]')).toContainText('could not be saved');
     fixture.publish(snapshot());
     await expect(page.locator('[data-moderation-storage]')).toBeHidden();
+    fixture.publish(snapshot({ aiModeration: { ...aiStatus(), enabled: false, state: 'not-qualified' } }));
+    await expect(page.locator('[data-ai-state]')).toHaveText('AI review is paused · privacy and provider readiness need qualification');
+    await expect(page.locator('[data-ai-state]')).toHaveAttribute('data-ai-health', 'not-qualified');
+    await expect(page.locator('[data-ai-counts]')).toContainText('Ordinary filters and visitor reports remain available');
     for (const [state, description] of [['degraded', 'interrupted'], ['capped', 'usage limit'], ['misconfigured', 'server configuration']]) {
         fixture.publish(snapshot({ aiModeration: aiStatus(state) }));
         await expect(page.locator('[data-ai-state]')).toContainText(description);

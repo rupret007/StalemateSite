@@ -5,6 +5,7 @@ import { accountId, accessConfigured, hmacKeyOk, ipHash, newDeviceId, roleForEma
 import { createLobby, LOBBY_LIMITS } from './lobby-core.mjs';
 import { LOG_TTL } from './community-state.mjs';
 import { createAiModerator } from './ai-moderation.mjs';
+import { aiEligibility } from './ai-eligibility.mjs';
 import { activeBetaSession, validBetaSession } from './beta-session-client.mjs';
 import { INTERNAL_HEALTH_PATH, aiHealth, dailyUsage, healthJson } from './beta-ops.mjs';
 import { createPrivateReportQueue, privateReportRef, validatePrivateReportControl, LIMITS as PRIVATE_REPORT_LIMITS } from './private-reports.mjs';
@@ -142,8 +143,9 @@ export class HangoutLobby {
                 this.privateReportQueue = createPrivateReportQueue({ storage: state.storage });
                 await this.refreshPrivateReports(false);
             }
+            const eligibility = aiEligibility(env);
             this.aiModerator = createAiModerator({
-                enabled: env.HANGOUT_AI_MODERATION === 'review',
+                enabled: eligibility.allowed,
                 apiKey: env.OPENAI_API_KEY,
                 dailyLimit: env.HANGOUT_AI_DAILY_LIMIT,
                 usage: await state.storage.get('ai-usage'),
@@ -154,8 +156,10 @@ export class HangoutLobby {
                 onChange: () => this.engine?.notifyAiStatus()
             });
             this.engine = createLobby({
-                aiModerationStatus: () => ({ ...this.aiModerator.status(), evidenceStorage: this.evidenceStorage }),
-                reviewPublicText: env.HANGOUT_AI_MODERATION === 'review' ? ({ id, text }) => {
+                aiModerationStatus: () => ({ ...this.aiModerator.status(), requested: eligibility.requested,
+                    ...(eligibility.requested && !eligibility.allowed ? { state: 'not-qualified' } : {}),
+                    eligibility, evidenceStorage: this.evidenceStorage }),
+                reviewPublicText: eligibility.allowed ? ({ id, text }) => {
                     const task = this.aiModerator.review({ text }).then((result) => this.engine.applyAiReview(id, result));
                     this.state.waitUntil?.(task);
                     return task;
