@@ -1,0 +1,6 @@
+# The Apache custom-domain mirror serves the repository root. Keep development
+# files outside its public boundary, as the Pages package already does.
+# Match root paths (and the existing project prefix), never public asset suffixes.
+RedirectMatch 404 "(?i)^/(?:StalemateSite/)?(?:\.git|\.github|\.openai|scripts|tests|node_modules|docs|pr-assets|dist|preview-dist|test-results|playwright-report|GPT|backup_restore_point)(?:/|$)"
+RedirectMatch 404 "(?i)^/(?:StalemateSite/)?(?:README\.md|AGENTS\.md|package\.json|package-lock\.json|playwright\.config\.js|playwright\.live\.config\.js|vitest\.config\.js|\.gitattributes|\.gitignore|\.htaccess)(?:/|$)"
+RedirectMatch 404 "(?i)^/(?:StalemateSite/)?\.env(?:\.[^/]+)?(?:/|$)"

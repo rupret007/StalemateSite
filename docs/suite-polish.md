@@ -12,6 +12,8 @@ Reusable game fixes live in Turdanoid: native focused controls, denied-storage r
 
 The final source follow-up keeps decorative Spades speech clear of desktop bid/play decisions and the AI-turn Sort dock. Native normal-intro and fast-Lock checks measure full control and label bounds in both sites' real footer configurations.
 
+The legacy Apache repository-root mirror also gets an exact-path source/configuration boundary in `.htaccess`, outside the explicit Pages package. Isolated real-Apache checks preserve every packaged public file and GPL source download; actual custom-domain enforcement must still be verified after publication.
+
 The existing unit, browser, root/project deployment and artifact gates remain required. Full release qualification includes the per-game matrix, inspected receiving screenshots, exact source pin, reproducible import, exact-head CI and verification of actual public bytes and native flows after publication. Focused source results alone are insufficient. Browser phone checks are emulated; they do not establish physical-device or speaker acceptance, every card position/campaign, enjoyment or retention.
 
 The workspace's `SUITE-POLISH-HANDOFF.md` and `release-evidence/suite-polish/REVIEW-MATRIX.md` retain commands, first failures, revisions, screenshots and release receipts. Both sites are now explicitly authorized to publish after qualification; the former Rad Dad preview-only restriction no longer applies.
