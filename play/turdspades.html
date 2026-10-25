@@ -805,6 +805,12 @@
     .ts-bubble{position:fixed;right:max(98px,env(safe-area-inset-right) + 92px);bottom:max(104px,env(safe-area-inset-bottom) + 96px);z-index:9998;max-width:240px;padding:10px 14px;font:600 13px/1.35 'Trebuchet MS','Segoe UI',system-ui,sans-serif;color:#0f1914;background:linear-gradient(180deg,#fffaf0,#fbe7c1);border:1px solid rgba(201,150,40,.55);border-radius:14px;box-shadow:0 0 0 3px rgba(255,215,106,.16),0 12px 28px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.8);opacity:0;transform:translateY(8px) scale(.92);transform-origin:bottom right;transition:opacity .22s ease,transform .25s cubic-bezier(.2,1.6,.4,1);pointer-events:none;letter-spacing:.01em}
     .ts-bubble::after{content:"";position:absolute;right:-6px;bottom:14px;width:14px;height:14px;background:linear-gradient(135deg,#fbe7c1,#fffaf0);border-right:1px solid rgba(201,150,40,.55);border-bottom:1px solid rgba(201,150,40,.55);transform:rotate(-45deg)}
     .ts-bubble.show{opacity:1;transform:translateY(0) scale(1)}
+    /* Keep human decisions and the desktop action dock free of decorative speech. */
+    body[data-turn="bid"] .ts-bubble { display: none; }
+    @media (min-width: 981px) {
+      .ts-bubble { bottom: max(112px, env(safe-area-inset-bottom) + 104px); }
+      body[data-turn="you"] .ts-bubble { display: none; }
+    }
     .ts-banner{position:fixed;left:50%;top:30%;transform:translate(-50%,-50%) scale(.4);z-index:9997;font:900 clamp(20px,5vw,28px) 'Trebuchet MS','Segoe UI',system-ui,sans-serif;color:#fff;text-shadow:0 0 24px rgba(255,215,106,.95),0 4px 14px rgba(0,0,0,.7);text-align:center;letter-spacing:.06em;pointer-events:none;opacity:0;transition:opacity .25s ease,transform .35s cubic-bezier(.2,1.6,.4,1);text-transform:uppercase;white-space:nowrap;padding:8px 22px;border-radius:999px;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.02)),rgba(6,18,13,.72);border:1px solid rgba(255,215,106,.45);box-shadow:0 0 0 1px rgba(0,0,0,.35),0 0 40px rgba(255,215,106,.25),0 16px 40px rgba(0,0,0,.5)}
     .ts-banner.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
     .ts-banner.cold{color:#cdd5ff;text-shadow:0 0 22px rgba(122,230,255,.85),0 4px 12px rgba(0,0,0,.7);border-color:rgba(122,230,255,.45);box-shadow:0 0 0 1px rgba(0,0,0,.35),0 0 40px rgba(122,230,255,.25),0 16px 40px rgba(0,0,0,.5)}
