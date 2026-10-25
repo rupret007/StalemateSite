@@ -1,0 +1,11 @@
+{
+  "name": "@stalemate/durable-runtime-proof",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Isolated local workerd qualification; never deployed or bound to production resources.",
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": { "test": "node runner.mjs" },
+  "devDependencies": { "miniflare": "5.20261019.2-beta" },
+  "overrides": { "undici": "7.30.1" }
+}
