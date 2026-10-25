@@ -7,8 +7,8 @@ const enc = new TextEncoder(), clone = value => structuredClone(value);
 const validIdentity = value => value && Object.keys(value).length === 3 && ['principalRef', 'communityRef', 'expiresAt'].every(key => Object.hasOwn(value, key))
     && [value.principalRef, value.communityRef].every(id => typeof id === 'string' && /^[A-Za-z0-9_-]{16,128}$/.test(id)) && Number.isSafeInteger(value.expiresAt);
 const limits = Object.freeze({ connections: 256, checks: 2048, writes: 128, bytes: 16 * 1024 * 1024 });
-export function createParticipationEnforcement({ storage, resolveConnection, validateConnection, writeEffects, dispatchStart = null, beforeCommit = async () => {}, providerQualified = () => false, now = () => Date.now() } = {}) {
-    if (typeof storage?.transaction !== 'function' || [resolveConnection, validateConnection, writeEffects, beforeCommit, providerQualified, now].some(fn => typeof fn !== 'function')
+export function createParticipationEnforcement({ storage, resolveConnection, validateConnection, writeEffects, readPrincipals = readParticipationPrincipals, dispatchStart = null, beforeCommit = async () => {}, providerQualified = () => false, now = () => Date.now() } = {}) {
+    if (typeof storage?.transaction !== 'function' || [resolveConnection, validateConnection, writeEffects, readPrincipals, beforeCommit, providerQualified, now].some(fn => typeof fn !== 'function')
         || dispatchStart !== null && typeof dispatchStart !== 'function') throw new TypeError('Explicit participation transaction adapters required');
     const contexts = new WeakMap();
     const check = (state, request, current = state.snapshot, at = now()) => {
@@ -21,7 +21,7 @@ export function createParticipationEnforcement({ storage, resolveConnection, val
             ...(['requestDirectContact', 'acceptDirectContact'].includes(request.action) ? { peer: { subject: current.subjects[other], binding: state.bindings[other] } } : {}) }).allowed;
     };
     const read = async (tx, identities) => {
-        const current = await readParticipationPrincipals({ tx, identities: identities.filter(Boolean), now: now() });
+        const current = await readPrincipals({ tx, identities: identities.filter(Boolean), now: now() });
         if (!current.ok) return current;
         let index = 0; return { ...current, subjects: identities.map(identity => identity ? current.subjects[index++] : null) };
     };

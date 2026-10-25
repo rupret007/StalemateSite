@@ -118,6 +118,36 @@ function remember(state, operationRef, kind, signature, subject, now, pendingRef
     return { ok: true, ...result };
 }
 
+function alignPolicy(state, config, time) {
+    if (config.policy.issuedAt > time) fail('invalid-policy');
+    if (!state) return { version: 1, revision: 0, config, subjects: [], guardians: [], receipts: [], pending: [], operations: [] };
+    if (state.config.policy.communityRef !== config.policy.communityRef || config.policy.revision < state.config.policy.revision) fail('stale-policy');
+    if (config.policy.revision === state.config.policy.revision) {
+        if (JSON.stringify(state.config) !== JSON.stringify(config)) fail('policy-conflict');
+        return state;
+    }
+    for (const subject of state.subjects) if (['authorized', 'pending'].includes(subject.record.state)) {
+        retireSubject(subject, 'policy-review-required'); invalidatePending(state, subject.record.subjectRef, 'policy-review-required');
+        retireReceipts(state, subject.record.subjectRef, 'policy-review-required', time);
+    }
+    state.config = config; return state;
+}
+
+// Server-only storage composition helpers. They preserve the same strict C2
+// record/transition rules; they do not authenticate policy or grant subjects.
+export function validParticipationLedgerState(value, limits = PARTICIPATION_LEDGER_LIMITS) {
+    try { return record(limits, Object.keys(PARTICIPATION_LEDGER_LIMITS))
+        && Object.keys(limits).every(key => positive(limits[key]) && limits[key] <= PARTICIPATION_LEDGER_LIMITS[key]) && validState(value, limits); }
+    catch { return false; }
+}
+export function alignParticipationLedgerPolicy(value, config, time, limits = PARTICIPATION_LEDGER_LIMITS) {
+    if (!integer(time) || !validConfig(config) || value !== undefined && !validParticipationLedgerState(value, limits)) throw Error('Invalid participation storage');
+    const state = alignPolicy(value === undefined ? null : clone(value), clone(config), time);
+    if (!value || JSON.stringify(state) !== JSON.stringify(value)) state.revision = next(state.revision);
+    if (!validParticipationLedgerState(state, limits)) throw Error('Invalid participation storage');
+    return state;
+}
+
 export function createParticipationConsents({ storage, adapters, now = () => Date.now(), randomRef = () => crypto.randomUUID(), limits: supplied = {} } = {}) {
     if (typeof storage?.transaction !== 'function' || !adapters || ['qualifyPolicy', 'authenticateParticipant', 'verifyConsent', 'authenticateGuardian'].some(key => typeof adapters[key] !== 'function')
         || typeof now !== 'function' || typeof randomRef !== 'function' || !record(supplied, Object.keys(supplied)) || Object.keys(supplied).some(key => !Object.hasOwn(PARTICIPATION_LEDGER_LIMITS, key))) throw new Error('Explicit transactional storage and trusted adapters are required.');
@@ -162,17 +192,7 @@ export function createParticipationConsents({ storage, adapters, now = () => Dat
             const config = authorization.config;
             return transact((state, time) => {
                 if (authorization.expiresAt <= time) fail('not-authorized');
-                if (config.policy.issuedAt > time) fail('invalid-policy');
-                if (state) {
-                    if (state.config.policy.communityRef !== config.policy.communityRef || config.policy.revision < state.config.policy.revision) fail('stale-policy');
-                    if (config.policy.revision === state.config.policy.revision) {
-                        if (JSON.stringify(state.config) !== JSON.stringify(config)) fail('policy-conflict');
-                        return { result: { ok: true, policyRevision: config.policy.revision } };
-                    }
-                    for (const subject of state.subjects) if (['authorized', 'pending'].includes(subject.record.state)) { retireSubject(subject, 'policy-review-required'); invalidatePending(state, subject.record.subjectRef, 'policy-review-required'); retireReceipts(state, subject.record.subjectRef, 'policy-review-required', time); }
-                    state.config = config;
-                } else state = { version: 1, revision: 0, config, subjects: [], guardians: [], receipts: [], pending: [], operations: [] };
-                return { result: { ok: true, policyRevision: config.policy.revision }, updated: state };
+                return { result: { ok: true, policyRevision: config.policy.revision }, updated: alignPolicy(state, config, time) };
             }, true, true);
         }),
         begin: guarded(async (proof, request) => {
