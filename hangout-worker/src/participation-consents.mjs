@@ -283,3 +283,22 @@ export function createParticipationConsents({ storage, adapters, now = () => Dat
         sweep: () => transact(state => ({ result: { ok: true, counts: Object.fromEntries(['subjects', 'guardians', 'receipts', 'pending', 'operations'].map(kind => [kind, state[kind].length])) } }))
     });
 }
+
+// Server-only C3 transaction accessor. Identity must already be authenticated by
+// the injected connection adapter, never selected by a frame. No nested storage
+// transaction, verifier calls, guardian/contact data or policy fallback.
+export async function readParticipationPrincipals({ tx, identities, now, limits = PARTICIPATION_LEDGER_LIMITS } = {}) {
+    try {
+        if (typeof tx?.get !== 'function' || !integer(now) || !Array.isArray(identities) || identities.length > 256
+            || identities.some(identity => !record(identity, ['principalRef', 'communityRef', 'expiresAt'])
+                || !ref(identity.principalRef) || !ref(identity.communityRef) || !integer(identity.expiresAt) || identity.expiresAt <= now)) fail('not-authorized');
+        const stored = await tx.get(PARTICIPATION_LEDGER_KEY);
+        if (stored === undefined) fail('not-initialized');
+        if (!validState(stored, limits)) fail('storage-corrupt');
+        const state = clone(stored); expire(state, now); const policy = currentPolicy(state, now);
+        return freeze({ ok: true, policy: clone(policy), subjects: identities.map(identity => {
+            const subject = state.subjects.find(item => item.record.principalRef === identity.principalRef)?.record;
+            return identity.communityRef === policy.communityRef && subject && activeGrant(state, subject, now) ? clone(subject) : null;
+        }) });
+    } catch (error) { return Object.freeze({ ok: false, reason: error instanceof LedgerFailure ? error.reason : 'unavailable' }); }
+}

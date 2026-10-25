@@ -7,6 +7,7 @@ import { actSnapshot, applyClear, applyStroke, applyVideo, cleanRtc, parseActFra
 import { messageReceipt, receiptDigest } from './message-receipts.mjs';
 import { TRANSPORT_CONTROL_BLOCK } from './transport-budget.mjs';
 import { ENTRY_SITES, normalizeEntrySource } from '../../r/45662413410ed051/entry-sites.mjs';
+import { createParticipationCheckpoint } from './participation-checkpoint.mjs';
 
 export const BOT = 'StaleBot';
 export const LOBBY = '#stalemate';
@@ -130,7 +131,7 @@ const CONTEXT_INDEPENDENT_COMMANDS = new Set([
 ]);
 const isPrivateContext = where => typeof where === 'string' && /^pm:/i.test(where);
 
-export function createLobby({ now = () => Date.now(), send = () => {}, close = () => {}, persist: persistImpl = () => {}, deferPresence = null, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
+export function createLobby({ now = () => Date.now(), send: sendImpl = () => {}, close: closeImpl = () => {}, persist: persistImpl = () => {}, deferPresence: deferPresenceImpl = null, participation = null, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
     const L = { ...LOBBY_LIMITS, ...limits };
     const entrySites = L.entrySites || ENTRY_SITES;
     const roomStateLimit = Math.max(32768, Math.min(ROOM_STATE_MAX_BYTES, Number(L.roomStateBytes) || ROOM_STATE_MAX_BYTES));
@@ -148,7 +149,25 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     let evidenceWrites = null;
     let pendingCommits = 0;
     let deferredAdmin = false;
+    let controlled = null, participationBusy = false, participationBroken = false, safetyDrainScheduled = false;
+    const safetyQueue = [];
+    const participationConfigured = participation !== null;
+    const participationReady = participation && ['prepare', 'allows', 'commit', 'providerAllowed', 'startProvider', 'revisionFor'].every(name => typeof participation[name] === 'function');
+    const send = (id, frame) => {
+        if (!controlled) return sendImpl(id, frame);
+        controlled.bytes += encoder.encode(JSON.stringify(frame)).byteLength;
+        if (controlled.frames.length >= 8192 || controlled.bytes > 16 * 1024 * 1024) { controlled.capacity = true; return; }
+        controlled.frames.push([id, frame]);
+    };
+    const close = (id, code, reason) => controlled ? controlled.closes.push([id, code, reason]) : closeImpl(id, code, reason);
+    const deferPresence = typeof deferPresenceImpl === 'function' ? marker => controlled ? controlled.presence.push(marker) : deferPresenceImpl(marker) : null;
     const persist = (kind, value) => {
+        if (controlled) {
+            controlled.effectBytes += encoder.encode(JSON.stringify(value)).byteLength;
+            if (controlled.effects.length >= 128 || controlled.effectBytes > 16 * 1024 * 1024) { controlled.capacity = true; return; }
+            controlled.effects.push([kind, structuredClone(value)]); return;
+        }
+        if (participationConfigured) throw new Error('Participation transaction required');
         const required = kind === 'moderation-queue' || kind === 'net';
         let task;
         try { task = persistImpl(kind, value); }
@@ -196,6 +215,132 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     const heldChannels = new Map();   // original channel object for live held-message approval; never restored
     const aiPending = new Map();      // current message + channel object identities; never persisted
     const aiReviews = new Map();      // bounded admin-only evidence, separate from chat and network snapshots
+    const participationMedia = new Map(); // connection -> required active browser media actions; never public
+    function noteParticipationMedia(c, ...actions) {
+        if (!participationConfigured) return;
+        if (!participationMedia.has(c.id)) participationMedia.set(c.id, new Set());
+        for (const action of actions) participationMedia.get(c.id).add(action);
+    }
+
+    function participationAllows(c, action, peer = null, record = true, providerReady = false) {
+        if (!participationConfigured) return true;
+        providerReady ||= ['externalProvider', 'aiPublicReview'].includes(action);
+        return !!(participationReady && controlled && participation.allows(controlled.context, { actorId: c?.id, action,
+            ...(peer ? { peerId: peer.id } : {}), ...(providerReady ? { providerReady: true, publicTextEligible: true } : {}) }, record));
+    }
+    function requireParticipation(c, action, peer = null) {
+        if (!participationAllows(c, action, peer)) throw Object.assign(new Error('participation-denied'), { participationDenied: true });
+    }
+    const connectionView = c => ({ id: c.id, dev: c.dev, account: c.account, role: c.role, admin: c.admin });
+    const SAFE_COMMANDS = new Set(['help', 'h', '?', 'list', 'names', 'who', 'whois', 'w', 'part', 'leave', 'quit', 'exit', 'bye',
+        'ignore', 'unignore', 'block', 'unblock', 'decline', 'deny', 'pm', 'admin-refresh', 'dismiss', 'aidismiss', 'privatereport', 'delete', 'purge', 'mute', 'gban', 'shield', 'shieldoff', 'lobby', 'filter', 'slow', 'camoff', 'log']);
+    function safetyMessage(raw) {
+        if (typeof raw !== 'string' || raw.length > L.actFrameBytes || encoder.encode(raw).byteLength > L.actFrameBytes) return true;
+        try {
+            const frame = JSON.parse(raw);
+            if (frame.t === 'report' || frame.t === 'admin-refresh' || frame.t === 'cam' && !frame.on || frame.t === 'entry-source' && !normalizeEntrySource(frame.source, entrySites)) return true;
+            const command = frame.t === 'cmd' ? lc(frame.name) : frame.t === 'say' && /^\//.test(frame.text || '') ? lc(frame.text.slice(1).split(' ')[0]) : '';
+            return SAFE_COMMANDS.has(command);
+        } catch { return true; } // Malformed frames retain the existing protocol refusal.
+    }
+    async function controlledRun(fn, args, safe = false) {
+        if (participationBroken) return { ok: false, reason: 'participation-unavailable' };
+        if (participationBusy || safetyDrainScheduled) {
+            if (args.some(value => typeof value === 'string' && value.length > 65536)) return { ok: false, reason: 'participation-busy' };
+            const bytes = encoder.encode(JSON.stringify(args)).byteLength;
+            if (!safe || safetyQueue.length >= 16 || bytes > 65536) return { ok: false, reason: 'participation-busy' };
+            return new Promise(resolve => safetyQueue.push({ fn, args, safe, resolve }));
+        }
+        participationBusy = true; pendingCommits += 1;
+        let checkpoint, stage, result, failure = '', restoreFailed = false;
+        const oldReceiptBytes = receiptBytes;
+        const oldLastStatSave = lastStatSave;
+        try {
+            checkpoint = createParticipationCheckpoint({ conns, channels, pm, devStats, ipRooms, net, reports, held, lines, lineMeta,
+                receipts, receiptSizes, heldChannels, aiPending, aiReviews, participationMedia }, safe ? { opaque: [...channels.values()].map(room => room.act) } : {});
+            const context = participationReady ? await participation.prepare([...conns.values()].map(connectionView)) : null;
+            stage = controlled = { context, effects: [], frames: [], closes: [], presence: [], providers: [], bytes: 0, effectBytes: 0, capacity: false };
+            result = await durable(fn, args);
+            if (stage.capacity) throw Object.assign(new Error('participation-denied'), { participationDenied: true, reason: 'participation-capacity' });
+            // Configured-but-broken adapters refuse grants, including commit;
+            // they never use ordinary persistImpl as a fallback.
+            const committed = participationReady ? await participation.commit(context, stage.effects) : { ok: false, reason: 'participation-unavailable' };
+            if (!committed?.ok) throw Object.assign(new Error('participation-denied'), { participationDenied: true, reason: committed?.reason });
+        } catch (error) {
+            failure = error?.participationDenied ? error.reason || 'participation-denied' : 'participation-unavailable';
+            if (checkpoint) {
+                // Spending is conservative even when semantic publication is
+                // rolled back. Do not refund frame/chat/activity/rate budgets.
+                const spent = { budget: structuredClone(net.budget), devices: structuredClone(devStats), ips: structuredClone(ipRooms),
+                    people: [...conns.values()].map(c => [c.id, Object.fromEntries(['frames', 'tokens', 'last', 'lastSaid', 'actTokens', 'actLast', 'rateNotice'].map(key => [key, structuredClone(c[key])]))]) };
+                try {
+                    checkpoint.restore(); net.budget = spent.budget;
+                    receiptBytes = oldReceiptBytes;
+                    lastStatSave = oldLastStatSave;
+                    devStats.clear(); for (const row of spent.devices) devStats.set(...row);
+                    ipRooms.clear(); for (const row of spent.ips) ipRooms.set(...row);
+                    for (const [id, values] of spent.people) if (conns.has(id)) Object.assign(conns.get(id), values);
+                } catch { failure = 'participation-unavailable'; restoreFailed = true; participationBroken = true; roomsBroken = true; }
+            }
+            if (!stage && !checkpoint) failure = 'participation-capacity';
+            if (participationReady && stage && !restoreFailed) {
+                const sessions = sessionSnapshot(), effects = [['abuse', abuseSnapshot()], ['net', snapshot()]];
+                if (encoder.encode(JSON.stringify(sessions)).byteLength <= SESSION_STATE_BYTES) effects.push(['sessions', sessions]);
+                const costs = await participation.commit(stage.context, effects, { costsOnly: true });
+                if (!costs?.ok) failure = 'participation-unavailable';
+            }
+        } finally {
+            controlled = null; participationBusy = false; pendingCommits -= 1;
+        }
+        if (!failure) {
+            for (const [id, frame] of stage.frames) try { sendImpl(id, frame); } catch { /* gone */ }
+            for (const marker of stage.presence) deferPresenceImpl?.(marker);
+            for (const closing of stage.closes) try { closeImpl(...closing); } catch { /* gone */ }
+            for (const provider of stage.providers) provider();
+        } else {
+            const actor = conns.get(typeof args[0] === 'string' ? args[0] : args[0]?.id);
+            if (actor) bot(actor, failure === 'participation-unavailable'
+                ? 'This action could not be confirmed. Try again or use the moderation contact in House rules.'
+                : 'This action is unavailable under the current participation permissions or capacity. Reporting, blocking and leaving remain available.', 'error');
+            if (restoreFailed) {
+                for (const queued of safetyQueue.splice(0)) queued.resolve({ ok: false, reason: 'participation-unavailable' });
+                safetyDrainScheduled = false;
+                for (const c of conns.values()) try { closeImpl(c.id, 1011, 'participation recovery required'); } catch { /* gone */ }
+                conns.clear();
+            } else if (failure === 'participation-unavailable') storageUnavailable();
+            result = { ok: false, reason: failure };
+        }
+        if (!pendingCommits && deferredAdmin) { deferredAdmin = false; pushAdmin(); }
+        if (safetyQueue.length && !safetyDrainScheduled) {
+            safetyDrainScheduled = true;
+            Promise.resolve().then(() => {
+                safetyDrainScheduled = false;
+                if (participationBusy) return;
+                const next = safetyQueue.shift();
+                if (next) controlledRun(next.fn, next.args, next.safe).then(next.resolve);
+            });
+        }
+        return result;
+    }
+    function refreshParticipationState() {
+        for (const c of [...conns.values()]) {
+            const required = participationMedia.get(c.id);
+            if (required && [...required].some(action => !participationAllows(c, action, null, false))) kill(c, 4401, 'participation media permissions changed; rejoin');
+        }
+        for (const c of conns.values()) if (c.cams.size && !participationAllows(c, 'sendCamera', null, false)) {
+            for (const name of [...c.cams]) { c.cams.delete(name); out(c, { t: 'cam', ch: name, on: false, by: BOT }); const room = ch(name); if (room) sendChan(room); }
+        }
+        for (const [key, entry] of pm) {
+            const from = conns.get(entry.fromId), to = conns.get(entry.toId);
+            if (from && to && participationAllows(from, 'requestDirectContact', to, false)) continue;
+            if (entry.state === 'pending') endPendingPm(key, entry, 'Participation permissions changed.');
+            else {
+                pm.delete(key);
+                if (from && to) { out(from, { t: 'pm-closed', with: to.nick }); out(to, { t: 'pm-closed', with: from.nick }); }
+            }
+        }
+        for (const [id, entry] of aiPending) if (!conns.has(entry.actorId) || !participationAllows(conns.get(entry.actorId), 'aiPublicReview', null, false)) aiPending.delete(id);
+    }
 
     const mkChannel = (name, kind, title, founder) => ({
         name, kind, title, founder, generation: ++channelGeneration, created: now(), topic: kind === 'lobby' ? 'Welcome to #stalemate. Pull up a nick, say hello, make something together. /help for commands.' : '',
@@ -383,20 +528,39 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     const aiModel = (model) => typeof model === 'string' && /^[A-Za-z0-9._:-]{1,100}$/.test(model);
     function requestAiReview(chan, line) {
         if (typeof reviewPublicText !== 'function' || !publicChannel(chan)) return;
-        aiPending.set(line.id, { line, chan });
+        const actor = byNick(line.from), context = controlled?.context;
+        if (participationConfigured && (!actor || !participationAllows(actor, 'aiPublicReview'))) return;
+        const dispatch = () => {
+        aiPending.set(line.id, { line, chan, ...(participationConfigured ? { actorId: actor.id, participationRevision: participation.revisionFor(context, actor.id) } : {}) });
         if (aiPending.size > 1000) aiPending.delete(aiPending.keys().next().value);
         try {
             // Only the fresh public text and its opaque id leave this engine. No nicks,
             // room names, device data, history, activity state or PM content are supplied.
-            const result = reviewPublicText({ id: line.id, text: line.text });
+            const beforeDispatch = participationConfigured ? async () => {
+                if (conns.get(actor.id) !== actor || lines.get(line.id) !== line || ch(chan.name) !== chan || !publicChannel(chan)) return false;
+                const allowed = await participation.providerAllowed(context, { actorId: actor.id, action: 'aiPublicReview', providerReady: true, publicTextEligible: true });
+                return allowed && conns.get(actor.id) === actor && lines.get(line.id) === line && ch(chan.name) === chan && publicChannel(chan);
+            } : undefined;
+            const startDispatch = participationConfigured ? start => participation.startProvider(context,
+                { actorId: actor.id, action: 'aiPublicReview', providerReady: true, publicTextEligible: true }, () => {
+                    if (conns.get(actor.id) !== actor || lines.get(line.id) !== line || ch(chan.name) !== chan || !publicChannel(chan)) throw Error('participation-denied');
+                    return start();
+                }) : undefined;
+            const result = reviewPublicText({ id: line.id, text: line.text, ...(beforeDispatch ? { beforeDispatch, startDispatch } : {}) });
             if (result && typeof result.catch === 'function') result.catch(() => aiPending.delete(line.id));
         } catch (e) { aiPending.delete(line.id); } // Review availability never blocks chat.
+        };
+        if (controlled) controlled.providers.push(dispatch); else dispatch();
     }
     function applyAiReview(id, result) {
         pruneAiReviews();
         const pending = aiPending.get(id);
         aiPending.delete(id); // A review result is consumed at most once, including unavailable results.
         if (!pending || lines.get(id) !== pending.line || ch(pending.line.ch) !== pending.chan || !publicChannel(pending.chan)) return false;
+        if (participationConfigured) {
+            const actor = conns.get(pending.actorId);
+            if (!actor || !participationAllows(actor, 'aiPublicReview') || participation.revisionFor(controlled.context, actor.id) !== pending.participationRevision) return false;
+        }
         if (!result || result.status !== 'reviewed' || typeof result.flagged !== 'boolean'
             || !aiModel(result.model) || !aiCategories(result.categories)
             || (result.flagged && !result.categories.length)) return false;
@@ -486,7 +650,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             if (v.state === 'pending') endPendingPm(k, v, 'The other visitor disconnected.');
             else pm.delete(k);
         }
-        conns.delete(id);
+        conns.delete(id); participationMedia.delete(id);
         pruneReceipts(); // A later connection must never inherit a departed socket's delivery witness.
         if (isBand(c)) { net.lastBand = now(); saveNet(); }
         pushAdmin();
@@ -496,6 +660,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (!chan || !chan.members.has(c.id)) return;
         chan.members.delete(c.id);
         c.channels.delete(chan.name);
+        if (![...c.channels].some(name => !['lobby', 'chat', 'jam'].includes(ch(name)?.kind))) participationMedia.delete(c.id);
         c.cams.delete(lc(chan.name));
         event(chan, quitting ? `${nickOf(c)} has quit (${why || 'Quit'})` : `${nickOf(c)} has left ${chan.name}${why ? ` (${why})` : ''}`);
         sendChan(chan, { presence: true });
@@ -521,6 +686,10 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (chan.kind !== 'lobby') bump(net.stats.rooms, (KINDS[chan.kind].endsWith(chan.title) ? KINDS[chan.kind] : `${KINDS[chan.kind]} · ${chan.title}`).slice(0, 60));
         c.channels.add(chan.name);
         const act = actSnapshot(chan);
+        if (act?.video) {
+            if (!participationAllows(c, 'receiveMedia') || !participationAllows(c, 'externalProvider')) act.video = null;
+            else noteParticipationMedia(c, 'receiveMedia', 'externalProvider');
+        }
         // Classic IRC: channel metadata/current activity may synchronize, but chat begins now.
         // The bounded moderation context above is not a visitor backlog.
         out(c, { t: 'join', ch: chanView(chan), act });
@@ -535,11 +704,10 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     }
 
     // ---------- inbound ----------
-    function message(id, raw) {
+    function message(id, raw, charged = false) {
         const c = conns.get(id);
         if (!c) return;
-        c.frames += 1;
-        spend(1 / 20);
+        if (!charged) { c.frames += 1; spend(1 / 20); }
         if (typeof raw !== 'string' || raw.length > L.actFrameBytes) return kill(c, 4400, 'bad frame');
         let f;
         try { f = JSON.parse(raw); } catch (e) { return kill(c, 4400, 'bad frame'); }
@@ -555,6 +723,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             // them to refill. Admission, frame/byte caps and daily accounting
             // above still apply. New sharing keeps the ordinary command limit.
             if (source && !limited(c, 'command', 10, 1, true)) return out(c, { t: 'entry-source', source: c.entrySource, accepted: false });
+            if (source) requireParticipation(c, 'publicArtifact');
             if (source !== c.entrySource) {
                 c.entrySource = source;
                 for (const name of c.channels) sendChan(ch(name));
@@ -594,6 +763,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (!v.ok) return out(c, { t: 'nick-error', text: v.reason });
         if (byNick(v.nick)) return out(c, { t: 'nick-error', text: 'That nick is taken right now.' });
         if (!isBand(c) && banned(net.bans, { ...c, nick: v.nick })) { kill(c, 4403, 'banned'); return undefined; }
+        requireParticipation(c, 'publicArtifact');
         c.nick = v.nick;
         c.entrySource = normalizeEntrySource(f.entrySource, entrySites);
         c.lastNick = now();
@@ -791,6 +961,8 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         for (const id of resumed) {
             const c = conns.get(id), s = records.get(id);
             for (const name of s.cams) if (!c.cams.has(name)) out(c, { t: 'cam', ch: name, on: false, by: BOT });
+            if (participationConfigured && [...c.channels].some(name => ch(name)?.act.video || membersOf(ch(name)).some(member => member.cams.has(name))))
+                noteParticipationMedia(c, 'restored-media-rejoin-required');
         }
         return { resumed, rejected };
     }
@@ -872,7 +1044,9 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             pendingCommits += 1;
             const finished = () => { pendingCommits -= 1; if (!pendingCommits && deferredAdmin) { deferredAdmin = false; pushAdmin(); } };
             return Promise.all(writes).then(() => { finished(); return flush(); }).catch(() => {
-                finished(); storageUnavailable();
+                finished();
+                if (controlled) throw Object.assign(new Error('participation-capacity'), { participationDenied: true, reason: 'participation-capacity' });
+                storageUnavailable();
                 // A failed ban/kick commit may already have removed an endpoint
                 // from engine memory. End its actual socket with a service error
                 // rather than leaving an admitted connection that can never act.
@@ -907,6 +1081,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             if (!c.account) return bot(c, 'Sign in with email to keep a room across visits.', 'error');
             if (room.kind === 'lobby' || room.owner || room.founder !== c.dev || !room.members.has(c.id)) return bot(c, 'Only this temporary room’s founder can register it.', 'error');
             if ([...channels.values()].filter((r) => r.owner === c.account).length >= 3 || [...channels.values()].filter((r) => r.owner).length >= 1000) return bot(c, 'Registered room allowance reached (3 per account; 1,000 sitewide).', 'error');
+            requireParticipation(c, 'registerRoom');
             room.owner = c.account; removeDeviceOp(room, c.dev); room.renewed = now();
             log(c.nick, 'room-register', room.name); sendChan(room); pushList();
             bot(c, 'Room registered. Ownership expires after 90 days without an owner or verified co-host visit.');
@@ -961,13 +1136,14 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             if (target_.kind === 'lobby' && !isBand(c)) return bot(c, 'You can’t part #stalemate, but you can /quit.', 'error');
             return leave(c, target_);
         },
-        quit(c, _chan, args) { kill(c, 1000, normalize(args.join(' '), 80) || 'Quit'); },
+        quit(c, _chan, args) { kill(c, 1000, participationConfigured ? 'Quit' : normalize(args.join(' '), 80) || 'Quit'); },
         nick(c, _chan, [n]) {
             if (now() - c.lastNick < L.nickEvery && !isBand(c)) return bot(c, 'One nick change per minute.', 'error');
             const v = checkNick(n, net.lists, { band: isBand(c) });
             if (!v.ok) return bot(c, v.reason, 'error');
             if (byNick(v.nick) && byNick(v.nick) !== c) return bot(c, 'That nick is taken right now.', 'error');
             if (!isBand(c) && banned(net.bans, { ...c, nick: v.nick })) return bot(c, 'That nick is banned.', 'error');
+            requireParticipation(c, 'publicArtifact');
             const old = c.nick;
             c.nick = v.nick;
             c.lastNick = now();
@@ -1004,6 +1180,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
                 return bot(c, 'This PM request expired or is no longer allowed. Ask for a new request if you want to chat.', 'error');
             }
             if ([...pm.values()].filter((item) => item.state === 'open').length >= SESSION_PM_PAIRS) return bot(c, 'Private conversation allowance is full. Try again later.', 'error');
+            requireParticipation(c, 'acceptDirectContact', t);
             p.state = 'open';
             out(c, { t: 'pm-open', with: t.nick });
             out(t, { t: 'pm-open', with: c.nick });
@@ -1047,6 +1224,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             return bot(c, `${t.nick}${isBand(t) ? ' ⭐ BAND' : ''} · on ${visible.join(' ')} · here ${mins}m${t.away ? ` · away: ${t.away}` : ''}`);
         },
         away(c, _chan, args) {
+            if (args.join(' ').trim()) requireParticipation(c, 'publicArtifact');
             c.away = normalize(args.join(' '), 80);
             if (c.away && checkText(c.away, net.lists).verdict !== 'ok') c.away = 'away';
             for (const name of c.channels) sendChan(ch(name));
@@ -1066,6 +1244,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             if (!visibleRoom(c, chan) || args.length && !chan.members.has(c.id) && !isOp(c, chan)) return bot(c, 'Join the room to view or change its topic.', 'error');
             if (!args.length) return bot(c, `${chan.name} topic: ${chan.topic || '(none)'}`);
             if (chan.modes.t && !isOp(c, chan) || (chan.kind === 'lobby' && !isBand(c))) { log(nickOf(c), 'denied', '/topic', 'not op', chan.name); return out(c, { t: 'denied', cmd: 'topic', text: '* /topic: only @ can set the topic (+t).' }); }
+            requireParticipation(c, 'publicArtifact');
             const v = checkText(args.join(' '), net.lists);
             if (v.verdict !== 'ok') return bot(c, 'Not cool here. Topic not set.', 'error');
             chan.topic = v.text.slice(0, 160);
@@ -1163,6 +1342,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         jamlink(c, chan, [which, link]) {
             if (!chan.jam) return bot(c, '/jamlink only works in a #jam room.', 'error');
             if (lc(which) === 'clear') { chan.jam = { desktop: '', web: '' }; event(chan, `${c.nick} cleared the jam links`); return sendChan(chan); }
+            requireParticipation(c, 'publicArtifact');
             const v = which === 'web' ? validWebJoin(link, L.webJoinOrigins) : which === 'invitation' ? validWebjamInvitation(link) : validWebjamInvite(which === 'desktop' ? link : which);
             if (!v) return bot(c, which === 'web' ? 'Browser joining is not configured for this beta.' : 'Paste the complete message from WebJam’s Copy Invite into the room’s invitation box (maximum 8 KB).', 'error');
             if (which === 'web') chan.jam.web = v;
@@ -1356,6 +1536,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (title.verdict !== 'ok') return bot(c, 'Not cool here. Pick another title.', 'error');
         const nameCheck = checkText(name.slice(1).replace(/-/g, ' '), net.lists, { handles: false });
         if (nameCheck.verdict !== 'ok') return bot(c, 'Not cool here. Pick another room name.', 'error');
+        requireParticipation(c, 'createRoom');
         const room = mkChannel(name, kind, title.text.slice(0, 40), c.dev);
         if (c.account) room.opAccounts.set(c.dev, c.account);
         if (key && /^[A-Za-z0-9]{3,20}$/.test(key)) room.modes.k = key;
@@ -1396,7 +1577,9 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (!chan.modes.C) return bot(c, `Cameras are off in ${chan.name} (-C).`, 'error');
         if (!adult18) return out(c, { t: 'cam-gate', ch: chan.name, text: 'Cameras in open rooms are 18+. Tick the box to turn yours on.' });
         if ((c.camReports || 0) >= L.reportsCamOff) return bot(c, 'Your camera is off pending moderator review.', 'error');
+        requireParticipation(c, 'sendCamera');
         c.cams.add(lc(chan.name));
+        noteParticipationMedia(c, 'sendCamera');
         out(c, { t: 'cam', ch: chan.name, on: true });
         return sendChan(chan);
     }
@@ -1417,7 +1600,11 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     }
 
     function castAct(chan, msg) {
-        cast(chan, msg, () => true);
+        cast(chan, msg, member => {
+            if (msg.kind !== 'video') return true;
+            if (!participationAllows(member, 'receiveMedia') || !participationAllows(member, 'externalProvider')) return false;
+            noteParticipationMedia(member, 'receiveMedia', 'externalProvider'); return true;
+        });
     }
 
     function roomAct(c, raw) {
@@ -1431,6 +1618,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         const relayT = now();
         if (f.kind === 'stroke') {
             if (!PAINT_KINDS.has(chan.kind)) return undefined;
+            requireParticipation(c, 'publicArtifact');
             const previous = structuredClone(chan.act.strokes);
             const stroke = applyStroke(chan, f.stroke);
             if (!stroke) return undefined;
@@ -1440,12 +1628,15 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         }
         if (f.kind === 'clear') {
             if (!isOp(c, chan)) return bot(c, 'Only @ can clear the canvas.', 'error');
+            requireParticipation(c, 'publicArtifact');
             if (!applyClear(chan)) return undefined;
             return castAct(chan, { t: 'act', ch: chan.name, kind: 'clear', by: c.nick, ts: relayT });
         }
         if (f.kind === 'video') {
             if (!VIDEO_KINDS.has(chan.kind)) return undefined;
             if (!isOp(c, chan)) return bot(c, 'Only @ drives the video in open rooms.', 'error');
+            requireParticipation(c, 'publicArtifact');
+            requireParticipation(c, 'externalProvider');
             const previous = chan.act.video;
             const video = applyVideo(chan, f, relayT);
             if (!video) return undefined;
@@ -1459,6 +1650,10 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             const target = conns.get(rtc.to);
             if (!target || !chan.members.has(target.id)) return undefined;
             if (!c.cams.has(lc(chan.name)) && !(target.cams && target.cams.has(lc(chan.name)))) return undefined;
+            for (const person of [c, target]) if (participationMedia.get(person.id)?.has('sendAudio')) requireParticipation(person, 'sendAudio');
+            if (c.cams.has(lc(chan.name))) { requireParticipation(c, 'sendCamera'); requireParticipation(target, 'receiveMedia'); noteParticipationMedia(c, 'sendCamera'); noteParticipationMedia(target, 'receiveMedia'); }
+            if (target.cams.has(lc(chan.name))) { requireParticipation(target, 'sendCamera'); requireParticipation(c, 'receiveMedia'); noteParticipationMedia(target, 'sendCamera'); noteParticipationMedia(c, 'receiveMedia'); }
+            if (rtc.sdp && /^m=audio\s/m.test(rtc.sdp.sdp)) { requireParticipation(c, 'sendAudio'); requireParticipation(target, 'sendAudio'); noteParticipationMedia(c, 'sendAudio'); noteParticipationMedia(target, 'sendAudio'); }
             return out(target, { t: 'act', ch: chan.name, kind: 'rtc', from: c.id, sdp: rtc.sdp, ice: rtc.ice });
         }
         return undefined;
@@ -1493,6 +1688,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             if (v.reason !== 'empty') { bot(c, v.reason.startsWith('personal-info') ? 'Not cool here: no phone numbers, emails, addresses or socials in public chat.' : v.reason === 'link' ? 'Only YouTube links are allowed.' : v.reason === 'threat' ? 'Nope. No threats. Don’t be a dick.' : v.reason === 'spam' ? 'Easy on the keyboard mash.' : 'Don’t be a dick. Message not sent.', 'error'); log(BOT, 'filter-block', c.nick, v.reason, chan.name); }
             return undefined;
         }
+        requireParticipation(c, 'publicText');
         if (v.verdict === 'hold' && !isBand(c)) {
             held.set(line.id, { ...line, reason: v.reason, dev: c.dev });
             heldChannels.set(line.id, chan);
@@ -1506,6 +1702,11 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     }
 
     function publish(chan, line, dev, reviewNewPublicLine = false) {
+        if (participationConfigured) {
+            const author = byNick(line.from);
+            if (!author || author.dev !== dev) throw Object.assign(new Error('participation-denied'), { participationDenied: true });
+            requireParticipation(author, 'publicText');
+        }
         statHour().lines += 1;
         const recipients = membersOf(chan).filter((m) => !m.ignores.has(lc(line.from)) && !(dev && m.blocks.has(dev)));
         rememberLine(line, { authorDev: dev, recipients: new Set(recipients.map((m) => m.id)) });
@@ -1629,6 +1830,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         const k = pairKey(c.id, t.id);
         const p = pm.get(k);
         if (!isBand(c) && (net.lock === 'readonly' || budgetLevel() !== 'ok')) return bot(c, 'The lobby is read-only right now, PMs too.', 'error');
+        requireParticipation(c, 'requestDirectContact', t);
         if (p && p.state === 'open') {
             if (!rawText) return out(c, { t: 'pm-open', with: t.nick });
             return deliverPm(c, t, rawText, action);
@@ -1660,6 +1862,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (to.blocks.has(from.dev)) return bot(from, `${to.nick} isn't taking PMs.`, 'error');
         const text = normalize(rawText, L.maxChars);
         if (!text) return undefined;
+        requireParticipation(from, 'requestDirectContact', to);
         const msg = { t: 'pm', id: `p${now().toString(36)}${(seq += 1).toString(36)}`, from: from.nick, entrySource: from.entrySource, to: to.nick, text, me: !!action, band: isBand(from), ts: now() };
         const recipients = new Set([from.id]);
         if (!to.ignores.has(lc(from.nick))) recipients.add(to.id);
@@ -1852,5 +2055,21 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     }
     function restoreLog(entries = []) { net.modlog = entries.filter((e) => Number.isFinite(e.at) && now() - e.at < LOG_TTL).slice(-L.modlogKeep); }
 
-    return { connect, disconnect: (...args) => durable(disconnect, args), message: (...args) => durable(message, args), flushPresence, transportControlReady, reserveTransportControl: (...args) => durable(reserveTransportControl, args), completePrivateReportAction: (...args) => durable(completePrivateReportAction, args), tick: (...args) => durable(tick, args), roomSnapshot, restoreRooms, sessionSnapshot, restoreSessions, abuseSnapshot, restoreAbuse, snapshot, restore, restoreLog, restoreModerationQueue, restoreAiReviews, applyAiReview, notifyAiStatus: pushAdmin, adminState, budgetLevel, spend, get modlog() { return net.modlog.slice(); }, _debug: { conns, channels, net, pm, reports, held, lines } };
+    const execute = (fn, args, safe = false) => participationConfigured ? controlledRun(fn, args, safe) : durable(fn, args);
+    return { connect: (...args) => participationConfigured ? controlledRun(connect, args) : connect(...args),
+        disconnect: (...args) => execute(disconnect, args, true), message: (...args) => {
+            if (!participationConfigured) return durable(message, args);
+            const c = conns.get(args[0]);
+            if (c) { c.frames += 1; spend(1 / 20); if (c.frames > L.framesPerConnection) { closeImpl(c.id, 4429, 'frame cap'); return Promise.resolve({ ok: false, reason: 'frame-cap' }); } }
+            return controlledRun(message, [...args, true], safetyMessage(args[1]));
+        }, flushPresence,
+        transportControlReady, reserveTransportControl: (...args) => execute(reserveTransportControl, args, true),
+        completePrivateReportAction: (...args) => execute(completePrivateReportAction, args, true), tick: (...args) => execute(tick, args, false),
+        roomSnapshot, restoreRooms: (...args) => participationConfigured ? controlledRun(restoreRooms, args) : restoreRooms(...args),
+        sessionSnapshot, restoreSessions, abuseSnapshot, restoreAbuse, snapshot, restore, restoreLog,
+        restoreModerationQueue: (...args) => participationConfigured ? controlledRun(restoreModerationQueue, args, true) : restoreModerationQueue(...args),
+        restoreAiReviews: (...args) => participationConfigured ? controlledRun(restoreAiReviews, args, true) : restoreAiReviews(...args),
+        applyAiReview: (...args) => participationConfigured ? controlledRun(applyAiReview, args, true) : applyAiReview(...args),
+        refreshParticipation: () => participationConfigured ? controlledRun(refreshParticipationState, [], true) : undefined,
+        notifyAiStatus: pushAdmin, adminState, budgetLevel, spend, get modlog() { return net.modlog.slice(); }, _debug: { conns, channels, net, pm, reports, held, lines } };
 }
