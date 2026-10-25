@@ -110,12 +110,12 @@ test('homepage Games links reach the hub, with individual games excluded from se
     await expect(navLinks.last()).toHaveAttribute('href', 'play/#hub-games');
     const games = page.locator('#games');
     await expect(games.locator('.board-square')).toHaveText('Stalemate Arcade');
-    await expect(games).toContainText('Seven free games and optional Stalemate songs.');
+    await expect(games).toContainText('Eight free games and optional Stalemate songs.');
     await expect(games).toContainText('Pick another round.');
     await expect(games.locator('.games-card__thumb')).toBeVisible();
     const play = games.getByRole('link', { name: 'Open Stalemate Arcade' });
     await expect(play).toHaveAttribute('href', 'play/');
-    await expect(games.getByRole('heading', { level: 2 })).toHaveText('Seven free arcade games. Zero dignity.');
+    await expect(games.getByRole('heading', { level: 2 })).toHaveText('Eight free arcade games. Zero dignity.');
     await expect(games.getByRole('link', { name: 'Play Turdanoid' })).toHaveAttribute('href', 'play/TurdAnoid.html');
     for (const img of await games.locator('.games-shot img').all()) {
         await img.scrollIntoViewIfNeeded();
@@ -125,13 +125,13 @@ test('homepage Games links reach the hub, with individual games excluded from se
         expect(await img.evaluate((i) => i.complete && i.naturalWidth)).toBe(480);
     }
     const box = await games.locator('.games-card').boundingBox();
-    // Phone limit raised 700 -> 740 (Oct 2026, PR #22): the seven game names are now real 44px
+    // Phone limit raised 700 -> 740 (Oct 2026, PR #22): the eight game names are now real 44px
     // tap chips with 8px gaps (Karen: no overlapping hit areas), which wrap to extra rows on phones.
     // Desktop still fits the original 480.
     expect(box.height).toBeLessThan((page.viewportSize().width <= 760) ? 740 : 480);
     // Countdown, show and Manic hero stay first; Games follows, then Listen and the band.
     expect(await page.locator('main > section').evaluateAll((s) => s.map((e) => e.id))).toEqual(['home', 'games', 'listen', 'about']);
-    expect(await page.locator('a[href*="play"]').evaluateAll((a) => a.map((e) => e.getAttribute('href')))).toEqual(['play/#hub-games', 'play/TurdAnoid.html', 'play/turdomania.html', 'play/turdtris.html', 'play/turdjack.html', 'play/turdrummy.html', 'play/turdspades.html', 'play/crapeights.html', 'play/', 'play/TurdAnoid.html', 'play/TurdAnoid.html', 'play/turdomania.html']);
+    expect(await page.locator('a[href*="play"]').evaluateAll((a) => a.map((e) => e.getAttribute('href')))).toEqual(['play/#hub-games', 'play/TurdAnoid.html', 'play/turdomania.html', 'play/turdtris.html', 'play/turdjack.html', 'play/turdrummy.html', 'play/turdspades.html', 'play/crapeights.html', 'play/chess.html', 'play/', 'play/TurdAnoid.html', 'play/TurdAnoid.html', 'play/turdomania.html']);
     await expect(page.locator('#home a[href="#games"]')).toHaveCount(0);
     await expect(page.locator('#listen .listen-games-link a')).toHaveAttribute('href', '#games');
     const pkg = fs.readFileSync(path.join(ROOT, 'scripts/package-pages.cjs'), 'utf8');

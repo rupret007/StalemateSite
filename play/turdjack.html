@@ -2,7 +2,8 @@
 <html lang="en" data-mobile-game="turdjack">
 <head>
 <meta name="robots" content="noindex,nofollow">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<script src="assets/suite-loading.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -2748,7 +2749,7 @@
 </head>
 <body class="suite-ambient suite-no-zoom arcade" data-arcade-game="crapjack">
   <div id="jackLiveRegion" class="sr-live" aria-live="polite" aria-atomic="true"></div>
-  <div class="welcome-guide" id="welcomeGuide">
+  <div class="welcome-guide" id="welcomeGuide" role="region" aria-label="Start Crapjack 21">
     <div class="welcome-card">
           <h2>Crapjack 21</h2>
       <p>Beat the dealer without busting. Manage bankroll, pick smart actions, and use house rules to your advantage.</p>
@@ -2790,7 +2791,7 @@
     </div>
   </div>
 
-  <div class="shell">
+  <div class="shell" role="main">
     <div class="topbar">
       <div>
           <h1>Crapjack 21</h1>
@@ -2815,7 +2816,7 @@
             <button class="btn" data-sound-toggle onclick="toggleSound()">🔊 Sound</button>
             <button class="btn danger" data-reset-bank onclick="resetBankroll()">↻ Reset Bank</button>
           </div>
-          <div class="mobile-menu-stats hud" aria-label="Session stats">
+          <div class="mobile-menu-stats hud" role="group" aria-label="Session stats">
             <div class="card-stat"><div class="k">Hands</div><div class="v" data-jack-mirror="handsText">0</div></div>
             <div class="card-stat"><div class="k">Wins</div><div class="v" data-jack-mirror="winsText">0</div></div>
             <div class="card-stat"><div class="k">Losses</div><div class="v" data-jack-mirror="lossesText">0</div></div>
@@ -2943,7 +2944,7 @@
           </div>
         </div>
 
-        <div class="mobile-felt-chip-rack" id="mobileFeltChipRack" aria-label="Quick bet chips">
+        <div class="mobile-felt-chip-rack" id="mobileFeltChipRack" role="group" aria-label="Quick bet chips">
           <button class="chip-btn" type="button" data-chip="10" aria-label="Bet ten dollars">+$10</button>
           <button class="chip-btn" type="button" data-chip="25" aria-label="Bet twenty-five dollars">+$25</button>
           <button class="chip-btn" type="button" data-chip="50" aria-label="Bet fifty dollars">+$50</button>
@@ -5019,6 +5020,10 @@
         if (isJackConfirmOpen()) {
           return;
         }
+        // Native links, form fields and focused buttons own their activation.
+        // Otherwise Enter on Hub deals a hand, and Quick Play only hides help.
+        if (e.code !== 'Escape' && e.target.closest?.('a, input, select, textarea, summary, [contenteditable="true"]')) return;
+        if ((e.code === 'Enter' || e.code === 'Space') && e.target.closest?.('button')) return;
         if (onboardingOpen) {
           if (e.code === 'Escape' || e.code === 'Enter' || e.code === 'Space') {
             e.preventDefault();
@@ -5161,6 +5166,7 @@
     }
 
     init();
+    window.SuiteLoading?.ready();
   
   
   // ============================================================

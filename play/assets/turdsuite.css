@@ -61,6 +61,8 @@
    Default wide: bottom-left. Narrow (≤520px): top-left compact icon so
    thumb docks / Sort buttons stay clear. Opt out with body data-suite-back="bottom".
    Force top on all widths with data-suite-back="top". */
+.suite-game-heading { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip-path:inset(50%); white-space:nowrap; }
+.suite-back-nav { position:fixed; top:0; left:0; width:0; height:0; z-index:10000; }
 .suite-back-pill {
   position: fixed;
   left: max(10px, calc(var(--suite-safe-left) + 8px));

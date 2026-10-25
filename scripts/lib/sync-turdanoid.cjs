@@ -7,13 +7,14 @@ const { execFileSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '../..');
 const UPSTREAM = 'https://github.com/rupret007/Turdanoid.git';
+const PIN = '10a0e6e201946247ddf4a7ca06f3786a93e69805';
 const FILES = [
     'index.html', 'TurdAnoid.html', 'turdtris.html', 'turdjack.html', 'crapeights.html',
-    'turdrummy.html', 'turdspades.html', 'turdomania.html', 'neon-arkanoid.html',
+    'turdrummy.html', 'turdspades.html', 'turdomania.html', 'chess.html', 'neon-arkanoid.html',
     'hub.html', 'game.js', 'favicon.svg', 'assets', 'games'
 ];
 const SONGS = ['manic.m4a', 'andrea.m4a', 'only-been-18.m4a', 'wham-bam.m4a', 'planet-of-the-flakes.m4a'];
-const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'";
+const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'";
 
 function options(args) {
     let source = UPSTREAM;
@@ -29,7 +30,7 @@ function options(args) {
             ref = args[i];
         }
     }
-    return { source, ref: ref || 'main' };
+    return { source, ref: ref || PIN };
 }
 
 function git(args, cwd) {
@@ -76,7 +77,7 @@ function transform(stage) {
                 .replace(/<meta\b[^>]*\bname=["']description["'][^>]*>\s*/gi, '');
             html = insert(html, '</head>', [
                 '<link rel="canonical" href="https://stalemate.band/play/">',
-                '<meta name="description" content="Play seven free browser games at Stalemate Arcade: brick breaking, block stacking, matching puzzles and card games, with optional music by punk rock band Stalemate.">',
+                '<meta name="description" content="Play eight free browser games at Stalemate Arcade: chess, brick breaking, block stacking, matching puzzles and card games, with optional music by punk rock band Stalemate.">',
                 '<meta property="og:url" content="https://stalemate.band/play/">',
                 '<meta property="og:type" content="website">'
             ].join('\n'), filename);
@@ -94,7 +95,7 @@ function transform(stage) {
         if (filename === 'index.html' || filename === 'TurdAnoid.html') {
             html = insert(html, '</head>', [
                 '<meta property="og:title" content="Stalemate Arcade">',
-                '<meta property="og:description" content="Seven free browser games. Music by Stalemate.">',
+                '<meta property="og:description" content="Eight free browser games, including chess. Music by Stalemate.">',
                 '<meta property="og:image" content="https://stalemate.band/play/stalemate/og-play.png">',
                 '<meta property="og:image:width" content="1200">',
                 '<meta property="og:image:height" content="630">',
@@ -121,7 +122,7 @@ function main() {
         git(['-c', 'advice.detachedHead=false', 'checkout', '--quiet', '--detach', sha], tmp);
         for (const name of FILES) fs.cpSync(path.join(tmp, name), path.join(stage, name), { recursive: true });
         transform(stage);
-        fs.writeFileSync(path.join(stage, 'VENDORED.txt'), `Vendored from github.com/rupret007/Turdanoid@${sha}. Same owner as this repo; no separate license file upstream.\nDo not edit by hand: run scripts/sync-turdanoid.sh ${sha}\n`);
+        fs.writeFileSync(path.join(stage, 'VENDORED.txt'), `Vendored from github.com/rupret007/Turdanoid@${sha}.\nOriginal arcade material: same owner as StalemateSite. New chess modules/page and Chessground 10.5.0: GPL-3.0-or-later. Spatial piece artwork by Maurizio Monge: MIT. chess.js 1.4.0: BSD-2-Clause. Stockfish.js 19.0.1: GPL-3.0. See assets/chess/credits.html, included licenses and corresponding-source archives.\nDo not edit by hand: run scripts/sync-turdanoid.sh ${sha}\n`);
         // Both renames stay on the destination filesystem. A failed transform leaves play intact.
         const hadDest = fs.existsSync(dest);
         if (hadDest) fs.renameSync(dest, backup);

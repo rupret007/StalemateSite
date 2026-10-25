@@ -2,7 +2,8 @@
 <html lang="en" data-mobile-game="turdspades">
 <head>
 <meta name="robots" content="noindex,nofollow">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<script src="assets/suite-loading.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1054,7 +1055,7 @@
 <script src="assets/mobile-fit.js" defer></script>
 </head>
 <body class="suite-ambient suite-no-zoom arcade" data-arcade-game="turdspades" data-suite-no-difficulty="1">
-  <div class="guide" id="guide">
+  <div class="guide" id="guide" role="region" aria-label="Spades rules">
     <div class="guide-card">
       <h2>TurdSpades</h2>
       <p>Classic 4-player Spades: you + North partner vs West/East bots.</p>
@@ -1075,7 +1076,7 @@
     </div>
   </div>
 
-  <div class="app">
+  <div class="app" role="main">
     <div class="topbar">
       <div class="title">
         <span class="club-label">The sewer social club</span>
@@ -1115,7 +1116,7 @@
         <div class="ts-seat-ring" aria-hidden="true"></div>
         <span class="ts-trick-stack" id="stackNorth" aria-hidden="true"></span>
         <div class="head"><div class="seat-head"><div class="ts-avatar" id="avatarNorth" aria-hidden="true"></div><div class="name">North <small>Partner</small></div></div><div class="meta" id="northMeta"></div></div>
-        <span class="seat-count" id="northCount"></span>
+        <span class="seat-count" id="northCount" role="group"></span>
         <div class="backs fan-north" id="northBack"></div>
       </div>
 
@@ -1124,7 +1125,7 @@
           <div class="ts-seat-ring" aria-hidden="true"></div>
           <span class="ts-trick-stack" id="stackWest" aria-hidden="true"></span>
           <div class="head"><div class="seat-head"><div class="ts-avatar" id="avatarWest" aria-hidden="true"></div><div class="name">West <small>Bot</small></div></div><div class="meta" id="westMeta"></div></div>
-          <span class="seat-count" id="westCount"></span>
+          <span class="seat-count" id="westCount" role="group"></span>
           <div class="backs fan-west" id="westBack"></div>
         </div>
 
@@ -1138,7 +1139,7 @@
           <div class="ts-seat-ring" aria-hidden="true"></div>
           <span class="ts-trick-stack" id="stackEast" aria-hidden="true"></span>
           <div class="head"><div class="seat-head"><div class="ts-avatar" id="avatarEast" aria-hidden="true"></div><div class="name">East <small>Bot</small></div></div><div class="meta" id="eastMeta"></div></div>
-          <span class="seat-count" id="eastCount"></span>
+          <span class="seat-count" id="eastCount" role="group"></span>
           <div class="backs fan-east" id="eastBack"></div>
         </div>
       </div>
@@ -1158,7 +1159,7 @@
         <div class="bid-contract" id="bidContractPreview" aria-hidden="true"></div>
         <div id="bidExpectedHint" aria-live="polite"></div>
         <div class="partner-bid-bubble" id="partnerBidBubble" role="status"></div>
-        <div class="bid-chips" id="bidChips" aria-label="Bid amount chips"></div>
+        <div class="bid-chips" id="bidChips" role="group" aria-label="Bid amount chips"></div>
         <div class="bid-controls">
           <button class="btn" id="bidDown">-</button>
           <div class="bid-v" id="bidV">4</div>
@@ -1975,6 +1976,8 @@
       el.quickStart.addEventListener('click', closeGuide);
       el.closeGuide.addEventListener('click', closeGuide);
       document.addEventListener('keydown', (e) => {
+        if (e.code !== 'Escape' && e.target.closest?.('a, input, select, textarea, summary, [contenteditable="true"]')) return;
+        if ((e.code === 'Enter' || e.code === 'Space') && e.target.closest?.('button') && !e.target.closest('#youCards button[data-id]')) return;
         if (el.guide.classList.contains('show')) {
           if (e.code === 'Enter' || e.code === 'Escape' || e.code === 'Space') {
             e.preventDefault();
@@ -2047,6 +2050,7 @@
     if (!restoredTable) startMatch();
     const skipGuide = restoredTable || (window.Suite && Suite.guide && Suite.guide.hasSeen('turdspades.html'));
     if (!skipGuide) openGuide();
+    window.SuiteLoading?.ready();
 
     if (!/jsdom/i.test(navigator.userAgent)) {
       import('./games/turdspades-client.js').catch(function () {});

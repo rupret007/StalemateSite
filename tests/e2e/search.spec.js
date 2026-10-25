@@ -11,7 +11,7 @@ test('raw arcade discovery metadata and sitemap work without JavaScript at both 
             await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index,follow');
             await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://stalemate.band/play/');
             await expect(page.locator('meta[property="og:url"]')).toHaveAttribute('content', 'https://stalemate.band/play/');
-            await expect(page.locator('a.game-card')).toHaveCount(7);
+            await expect(page.locator('a.game-card')).toHaveCount(8);
             const sitemap = await request.get(prefix + '/sitemap.xml');
             expect(sitemap.status()).toBe(200);
             expect(sitemap.headers()['content-type']).toContain('xml');
@@ -20,7 +20,7 @@ test('raw arcade discovery metadata and sitemap work without JavaScript at both 
             const robots = await request.get(prefix + '/robots.txt');
             expect(robots.status()).toBe(200);
             expect(await robots.text()).toContain('Sitemap: https://stalemate.band/sitemap.xml');
-            for (const file of ['TurdAnoid', 'turdtris', 'turdomania', 'turdjack', 'crapeights', 'turdrummy', 'turdspades', 'neon-arkanoid', 'hub']) {
+            for (const file of ['TurdAnoid', 'turdtris', 'turdomania', 'turdjack', 'crapeights', 'turdrummy', 'turdspades', 'chess', 'neon-arkanoid', 'hub']) {
                 const game = await request.get(`${prefix}/play/${file}.html`);
                 expect(game.status()).toBe(200);
                 expect(await game.text()).toContain('<meta name="robots" content="noindex,nofollow">');

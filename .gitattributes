@@ -9,5 +9,8 @@
 # Preserve vendored font license bytes across sync and checkout.
 play/assets/fonts/*.txt -text
 
+# Keep the pinned chess vendor/artwork/license hashes identical after checkout.
+play/assets/chess/** -text
+
 # iCalendar content lines require literal CRLF bytes on every host.
 events/*.ics -text

@@ -31,4 +31,8 @@ secrets*
 *.tar.gz
 *.zip
 
+# Public GPL corresponding source linked from the chess credits.
+!play/assets/chess/stockfish-19.0.1-source.tar.gz
+!play/assets/chess/chessground-10.5.0-source.tar.gz
+
 live-results/
