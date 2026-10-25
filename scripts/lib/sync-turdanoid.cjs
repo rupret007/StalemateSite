@@ -65,6 +65,21 @@ function transform(stage) {
     for (const song of SONGS) fs.copyFileSync(path.join(overlaySource, song), path.join(stage, 'assets/stalemate', song));
     stripTests(path.join(stage, 'games'));
 
+    // Supply missing MIME metadata inside the isolated worker, without changing
+    // pinned engine bytes or depending on access to the separate Apache host.
+    const engineFile = path.join(stage, 'games/chess-engine.js');
+    const engine = fs.readFileSync(engineFile, 'utf8');
+    const nativeWorker = "new globalThis.URL('../assets/chess/stockfish-19-lite-single.js', import.meta.url)";
+    const loaderWorker = "new globalThis.URL('../assets/chess/stockfish-loader.js#stockfish-19-lite-single.wasm', import.meta.url)";
+    if (!engine.includes(nativeWorker)) throw new Error('Chess worker integration changed upstream');
+    fs.writeFileSync(engineFile, engine.replace(nativeWorker, loaderWorker));
+    fs.copyFileSync(path.join(ROOT, 'scripts/chess-stockfish-loader.js'), path.join(stage, 'assets/chess/stockfish-loader.js'));
+    const creditsFile = path.join(stage, 'assets/chess/credits.html');
+    if (fs.existsSync(creditsFile)) {
+        const credits = fs.readFileSync(creditsFile, 'utf8');
+        fs.writeFileSync(creditsFile, credits.replace('UCI client</a>', 'UCI client</a>, <a href="stockfish-loader.js">worker delivery loader</a>'));
+    }
+
     for (const filename of fs.readdirSync(stage).filter((name) => name.endsWith('.html'))) {
         let html = fs.readFileSync(path.join(stage, filename), 'utf8');
         html = html.replace(/<meta\b[^>]*\bname\s*=\s*["']robots["'][^>]*>\s*/gi, '')
