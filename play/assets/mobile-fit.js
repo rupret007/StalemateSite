@@ -6,6 +6,7 @@
   const phone = matchMedia('(max-width: 980px)');
   const pagers = [];
   const placements = new Map();
+  const neonCanvasStyles = new WeakMap();
   function move(element, parent) {
     if (!element || !parent || element.parentNode === parent || element.contains(parent)) return;
     if (!placements.has(element)) placements.set(element, {parent:element.parentNode, next:element.nextSibling});
@@ -15,6 +16,11 @@
   const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(fit); };
   function canvasFit(canvas, host, aspect, reserve = 0) {
     if (!canvas || !host) return;
+    if (game === 'neon-arkanoid' && !neonCanvasStyles.has(canvas)) {
+      neonCanvasStyles.set(canvas, [[canvas, 'width'], [canvas, 'height'], [canvas.parentElement, 'width']].map(([element, property]) => ({
+        element, property, value:element.style.getPropertyValue(property), priority:element.style.getPropertyPriority(property)
+      })));
+    }
     const height = Math.max(1, host.clientHeight - reserve);
     const width = Math.max(1, Math.min(host.clientWidth - 12, height * aspect));
     canvas.style.setProperty('width', `${width}px`, 'important');
@@ -34,13 +40,27 @@
     placeSettings();
     updateFooter();
     pagers.forEach(update => update());
-    if (!phone.matches) return;
+    if (!phone.matches) {
+      if (game === 'neon-arkanoid') {
+        const canvas = document.getElementById('gameCanvas');
+        const styles = neonCanvasStyles.get(canvas);
+        if (styles) {
+          styles.forEach(({element, property, value, priority}) => {
+            if (value) element.style.setProperty(property, value, priority);
+            else element.style.removeProperty(property);
+          });
+          neonCanvasStyles.delete(canvas);
+        }
+      }
+      return;
+    }
     if (game === 'turdjack') {
       document.querySelectorAll('#dealerCards, #playerCards, #splitCards').forEach(hand => {
         const count = hand.children.length;
         const step = count > 1 ? Math.max(24, Math.min(54, (hand.clientWidth - 4 - 54) / (count - 1))) : 54;
         hand.style.setProperty('--mobile-jack-overlap', `${54 - step}px`);
         const bottom = Math.min(hand.parentElement.getBoundingClientRect().bottom,
+          (hand.closest('.table')?.getBoundingClientRect().bottom || innerHeight) - 6,
           document.getElementById('suite-music-status')?.getBoundingClientRect().top || innerHeight);
         const height = Math.max(44, Math.min(75, bottom - hand.getBoundingClientRect().top - 4));
         hand.style.setProperty('--mobile-jack-card-height', `${height}px`);
@@ -74,8 +94,10 @@
       size = Math.max(1, Math.min(8, Math.floor((hand.clientWidth - 4) / 48)));
       start = Math.min(start, Math.max(0, Math.ceil(cards.length / size) - 1) * size);
       nav.hidden = !fitted || !paginate || cards.length <= size;
-      hand.style.setProperty('--mobile-hand-height', `${paginate ? 88 : Math.max(1, Math.ceil(cards.length / size)) * 68}px`);
-      hand.style.setProperty('--mobile-card-height', paginate ? '84px' : '64px');
+      const shortLandscape = innerWidth > innerHeight && innerHeight <= 400;
+      const cardHeight = paginate ? 84 : shortLandscape ? 44 : 64;
+      hand.style.setProperty('--mobile-hand-height', `${paginate ? 88 : Math.max(1, Math.ceil(cards.length / size)) * (cardHeight + 4)}px`);
+      hand.style.setProperty('--mobile-card-height', `${cardHeight}px`);
       hand.style.setProperty('--hand-columns', size);
       const text = `${Math.min(start + 1, cards.length)}–${Math.min(start + size, cards.length)} / ${cards.length}`;
       if (label.textContent !== text) label.textContent = text;
@@ -88,11 +110,17 @@
     }
     prev.addEventListener('click', () => { start = Math.max(0, start - size); update(); });
     next.addEventListener('click', () => { start += size; update(); });
-    // Keyboard navigation in the game can move focus to another page.
-    hand.addEventListener('focusin', event => {
-      const index = [...hand.querySelectorAll('button, .card')].indexOf(event.target);
+    function reveal(card) {
+      const index = [...hand.querySelectorAll('button, .card')].indexOf(card);
       if (index >= 0 && (index < start || index >= start + size)) { start = Math.floor(index / size) * size; update(); }
-    });
+    }
+    // Hidden cards cannot receive focus. Reveal the intended page before the
+    // game's keyboard handler calls focus, then retain native focus behavior.
+    hand.addEventListener('suite:hand-reveal', event => reveal(event.detail?.card));
+    hand.addEventListener('focusin', event => reveal(event.target));
+    // A game render can replace card classes. Reapply paging synchronously so
+    // hidden cards never briefly reappear beneath the action dock.
+    hand.addEventListener('suite:hand-rendered', update);
     new MutationObserver(schedule).observe(hand, { childList:true, subtree:true });
     pagers.push(update);
   }

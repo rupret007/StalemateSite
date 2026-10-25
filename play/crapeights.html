@@ -599,7 +599,24 @@
       .selection-note{position:absolute;left:0;top:47px}
     }
 
-</style>
+    @media (min-width: 981px) {
+      .shell { height: calc(100dvh - var(--mobile-footer, 0px) - 20px); min-height: 0; }
+      .hud { grid-template-columns: repeat(7, minmax(0, 1fr)) auto; }
+      #suite-difficulty-mount { grid-column: auto; align-self: center; }
+      .layout, .table { min-height: 0; }
+      .table { overflow: auto; padding: 8px 16px; gap: 4px; }
+      .arena { min-height: 190px; max-height: none; }
+      .pile-row { top: 52px; }
+      .hand-wrap, .action-dock { flex-shrink: 0; }
+    }
+    @media (max-width: 980px) and (orientation: landscape) and (max-height: 400px) {
+      html[data-mobile-game="crapeights"] .shell .layout > .table { padding: 4px !important; gap: 2px; }
+      html[data-mobile-game="crapeights"] .table > .turn-banner { grid-column: 1; }
+      html[data-mobile-game="crapeights"] .table > .hand-wrap { grid-row: 1 / 3; }
+      html[data-mobile-game="crapeights"] .table .pile-row { top: 44px !important; }
+      html[data-mobile-game="crapeights"] .table .pile-stack { --pile-w: 46px; --pile-h: 64px; }
+    }
+  </style>
 <link rel="stylesheet" href="assets/mobile-fit.css">
 <script src="assets/mobile-fit.js" defer></script>
 </head>
@@ -1203,12 +1220,18 @@
     }
 
     const dealtCardIds = new Set(); // cosmetic: which hand cards have already played their deal-in animation
+    function focusHandCard(card) {
+      if (!card) return;
+      ui.playerHand.dispatchEvent(new CustomEvent('suite:hand-reveal', { detail: { card } }));
+      card.focus({ preventScroll: true });
+    }
     function renderPlayerHand() {
       const hand = players[0] ? players[0].hand : [];
       if (!ui.playerHand) return;
       const focusId = document.activeElement?.dataset.cardId;
       const focusIndex = [...ui.playerHand.children].indexOf(document.activeElement);
-      const geometry = window.CrapeightsHand?.layout(hand.length, ui.playerHand.clientWidth || 300, window.innerWidth > 760 && window.innerHeight <= 760);
+      const footerHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mobile-footer')) || 0;
+      const geometry = window.CrapeightsHand?.layout(hand.length, ui.playerHand.clientWidth || 300, window.innerWidth > 760 && window.innerHeight - footerHeight <= 760);
       if (geometry) {
         ui.playerHand.style.height = `${geometry.height}px`;
         ui.playerHand.style.setProperty('--fan-w', `${geometry.cardWidth}px`);
@@ -1252,10 +1275,11 @@
         fragment.appendChild(btn);
       });
       ui.playerHand.replaceChildren(fragment);
+      ui.playerHand.dispatchEvent(new CustomEvent('suite:hand-rendered'));
       if (focusId) {
         const nextFocus = ui.playerHand.querySelector(`[data-card-id="${focusId}"]`)
           || ui.playerHand.children[Math.min(Math.max(0, focusIndex), ordered.length - 1)];
-        nextFocus?.focus({ preventScroll: true });
+        focusHandCard(nextFocus);
       }
 
     }
@@ -1871,7 +1895,10 @@
         const target = opening.querySelector('.recommended') || opening.querySelector('button:not([disabled])');
         target?.focus({ preventScroll: true });
       } else if (!modal && dialogReturnFocus) {
-        const target = dialogReturnFocus.isConnected ? dialogReturnFocus : ui.drawBtn;
+        const previous = dialogReturnFocus;
+        const menu = previous.closest?.('details:not([open])')?.querySelector(':scope > summary');
+        const target = menu || (previous.isConnected && previous.tabIndex >= 0 && !previous.disabled
+          ? previous : document.getElementById('playTable'));
         dialogReturnFocus = null;
         target?.focus({ preventScroll: true });
       } else if (modal && !modal.contains(document.activeElement)) {
@@ -1891,7 +1918,7 @@
       const next = index < 0 ? (event.shiftKey ? controls.length - 1 : 0)
         : (index + (event.shiftKey ? -1 : 1) + controls.length) % controls.length;
       event.preventDefault();
-      controls[next].focus({ preventScroll: true });
+      controls[next].focus();
     }
 
     function openTableDrawer() {
@@ -1921,6 +1948,10 @@
       }[aiDifficulty];
     }
     function wireEvents() {
+      const tableMenu = document.querySelector('.mobile-menu details');
+      tableMenu?.addEventListener('click', event => {
+        if (event.target.closest('button, a')) tableMenu.open = false;
+      });
       // The suite's document touchend zoom guard cancels a second rapid tap,
       // even when it targets a different button. Native manipulation controls
       // already suppress double-tap zoom; preserve their native click sequence.
@@ -2002,7 +2033,7 @@
         if (focused >= 0 && ['ArrowLeft','ArrowRight','Home','End'].includes(e.code)) {
           e.preventDefault();
           const next = cards[CrapeightsTable.focusIndex(focused, e.code, cards.length)];
-          next.focus({ preventScroll: true }); next.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+          focusHandCard(next); next.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
           return;
         }
         // Let Enter/Space activate the focused native control once.

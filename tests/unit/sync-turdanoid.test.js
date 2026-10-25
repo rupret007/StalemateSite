@@ -119,4 +119,25 @@ describe('committed Turdanoid synchronization', () => {
         expect(snapshot(join(f.root, 'play'))).toEqual(before);
         expect(readdirSync(f.root).some((name) => name.startsWith('.play-sync-'))).toBe(false);
     });
+
+    it('retains a shared upstream worker loader and its single source credit', () => {
+        const f = fixture();
+        const loader = '/* Committed upstream loader, not the older site fallback. */';
+        writeFileSync(join(f.upstream, 'games/chess-engine.js'), "new globalThis.URL('../assets/chess/stockfish-loader.js#stockfish-19-lite-single.wasm', import.meta.url)");
+        writeFileSync(join(f.upstream, 'assets/chess/stockfish-loader.js'), loader);
+        writeFileSync(join(f.upstream, 'assets/chess/credits.html'), '<a href="../../games/chess-engine.js">UCI client</a>, <a href="stockfish-loader.js">worker delivery loader</a>');
+        f.git('add', '.');
+        f.git('-c', 'user.name=Arcade test', '-c', 'user.email=arcade-test@example.invalid', 'commit', '--quiet', '-m', 'Shared worker delivery');
+        const result = sync(f, 'main');
+        expect(result.status, result.stderr).toBe(0);
+        const play = join(f.root, 'play');
+        expect(readFileSync(join(play, 'assets/chess/stockfish-loader.js'), 'utf8')).toBe(loader);
+        expect(readFileSync(join(play, 'assets/chess/credits.html'), 'utf8').match(/href="stockfish-loader\.js"/g)).toHaveLength(1);
+        const before = snapshot(play);
+        rmSync(join(f.upstream, 'assets/chess/stockfish-loader.js'));
+        f.git('add', '.');
+        f.git('-c', 'user.name=Arcade test', '-c', 'user.email=arcade-test@example.invalid', 'commit', '--quiet', '-m', 'Missing worker loader');
+        expect(sync(f, 'main').status).not.toBe(0);
+        expect(snapshot(play)).toEqual(before);
+    });
 });

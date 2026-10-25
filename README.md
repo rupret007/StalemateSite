@@ -15,7 +15,6 @@ The public pages carry only confirmed facts. No empty shelves, stub forms, dummy
 
 Do not publish guesses for any of these:
 
-- Member names and roles (do not name anyone on the site)
 - Stream / store URLs for Better Than Now and Manic
 - A public YouTube watch URL for the Manic lyric video (the band channel lists Andrea and It’s Only Been 18)
 - ICS for Rockin’ October
@@ -26,6 +25,8 @@ Do not publish guesses for any of these:
 The homepage uses evergreen metadata. Its static show card keeps the confirmed date, set time, venue and direct Saturday ticket link usable when JavaScript is disabled or the countdown fails to load. Checkout guidance asks visitors to choose October 24, then select Stalemate; the full festival lineup stays linked separately. This dated fallback cannot expire without JavaScript and needs an HTML update after the show. When the countdown runs, the existing `2026-10-24T16:45:00-05:00` cutoff controls all dated promotions and show actions together; after it, the band/social links remain. This is a promotion cutoff, not a confirmed set end time. The Manic lyric video stays.
 
 Booking/contact: **stalemate.punk@gmail.com**, supplied by the owner and corroborated October 21, 2026. Mail delivery has not been tested.
+
+Member names and roles, confirmed by the owner October 25, 2026 and published in the existing About section: **Sean — Bass and Vocals; Jeff — Guitars and Vocals; Che’ — Drums and Vocals**.
 
 ## Visual identity
 
@@ -63,7 +64,7 @@ These events measure actual visits and actions. Retention improvements require u
 
 Reusable gameplay, shared art, and the playlist player live in [Turdanoid](https://github.com/rupret007/Turdanoid). The arcade offers eight games, including Royal Flush Chess against the computer or two players sharing this device, plus ordinary Turdomania with difficulty choices, new boards and undo. Site-specific branding and analytics live in `scripts/stalemate-overlay/`, `scripts/stalemate-strip.css`, and `scripts/play-track.js`. The generated `play/` files are replaced during synchronization; edit their source instead.
 
-The default import pins the reviewed chess release `10a0e6e201946247ddf4a7ca06f3786a93e69805`. Synchronize a reviewed branch, tag, or exact commit. A local repository avoids a network clone and imports committed files at the requested revision:
+The default import pins the shared arcade polish release `e73e8026925f7aca7a89f7dd0a78686cbc078f2d`. Synchronize a reviewed branch, tag, or exact commit. A local repository avoids a network clone and imports committed files at the requested revision:
 
 ```bash
 scripts/sync-turdanoid.sh --source ../Turdanoid <full-upstream-commit-SHA>

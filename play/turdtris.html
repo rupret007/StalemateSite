@@ -409,6 +409,8 @@ body::after {
 }
 
 body.desktop-cabinet {
+  height: 100dvh;
+  min-height: 0;
   padding: clamp(6px, 1vw, 12px);
   align-items: stretch;
   overflow-y: hidden;
@@ -416,7 +418,7 @@ body.desktop-cabinet {
 
 body.desktop-cabinet .layout {
   width: min(100vw - 16px, 1360px);
-  max-height: calc(100dvh - 12px);
+  max-height: calc(100dvh - 24px - var(--mobile-footer, 0px));
   display: flex;
   flex-direction: column;
   padding: 10px 12px 12px;
@@ -470,9 +472,9 @@ body.desktop-cabinet .cabinet-rail {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 100%;
-  overflow: hidden;
-  align-self: center;
+  max-height: calc(100dvh - 112px - var(--mobile-footer, 0px));
+  overflow: auto;
+  align-self: start;
 }
 
 body.desktop-cabinet .cabinet-rail .hud {
@@ -496,8 +498,14 @@ body.desktop-cabinet .cabinet-rail .rail-extra {
 }
 
 body.desktop-cabinet #game {
-  width: min(420px, calc((100dvh - 108px - env(safe-area-inset-bottom)) / 2), calc((100vw - 360px) / 2));
-  max-height: calc(100dvh - 120px);
+  width: min(420px, calc((100dvh - 160px - var(--mobile-footer, 0px) - env(safe-area-inset-bottom)) / 2), calc((100vw - 360px) / 2));
+  max-height: none;
+}
+
+body.desktop-cabinet .next-queue-slots canvas {
+  width: 96px;
+  height: 64px;
+  max-width: 100%;
 }
 
 body.desktop-cabinet .run-progress-copy {
@@ -1557,7 +1565,7 @@ body.desktop-cabinet .status {
     </aside>
   </div>
 
-    <aside class="cabinet-rail" aria-label="Run stats and queue">
+    <aside class="cabinet-rail" aria-label="Run stats and queue" tabindex="0">
       <div class="hud" id="hudRail">
         <div class="card"><div class="k">Score</div><div class="v" id="score">0</div></div>
         <div class="card"><div class="k" id="highLabel">High</div><div class="v" id="highScore">0</div></div>
@@ -3593,7 +3601,8 @@ function loop(timestamp) {
 
 document.addEventListener('keydown', (e) => {
   if (e.target?.matches?.('select, input, textarea, summary')) return;
-  if (!gameOver && e.target?.matches?.('button') && (e.code === 'Space' || e.code === 'Enter')) return;
+  if (e.target?.matches?.('.cabinet-rail')) return;
+  if (e.target?.closest?.('button, a') && (e.code === 'Space' || e.code === 'Enter')) return;
   if (onboardingOpen) {
     if (e.code === 'Enter' || e.code === 'Space') {
       e.preventDefault();
@@ -4056,7 +4065,12 @@ function applyBoardFocus() {
   const scene = document.getElementById('desktopScene');
   if (scene) scene.style.display = mobile ? 'none' : 'block';
   const board = document.getElementById('game');
-  if (board) board.style.width = boardCanvasCssWidth(window.innerWidth, window.innerHeight).width;
+  // Desktop CSS includes the measured music footer; keep that reservation
+  // authoritative instead of covering it with the footer-free inline width.
+  if (board) {
+    board.style.width = mobile ? boardCanvasCssWidth(window.innerWidth, window.innerHeight).width : '';
+    if (!mobile) board.style.removeProperty('height');
+  }
 }
 
 const attractCanvas = document.getElementById('attractCanvas');

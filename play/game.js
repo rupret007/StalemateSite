@@ -80,7 +80,8 @@ class Game {
 
         this.audioCtx = null;
         this.toastTimeoutId = null;
-        this.muted = localStorage.getItem('neonArkanoidMuted') === '1';
+        this.muted = false;
+        try { this.muted = localStorage.getItem('neonArkanoidMuted') === '1'; } catch (error) {}
 
         this.controls = {
             left: false,
@@ -149,6 +150,7 @@ class Game {
             canvasDown: () => this.handleCanvasInteraction(),
             windowBlur: () => this.handleWindowBlur(),
             visibilityChange: () => this.handleVisibilityChange(),
+            virtualClick: (event) => this.handleVirtualClick(event),
             virtualDown: (event) => this.handleVirtualControl(event, true),
             virtualUp: (event) => this.handleVirtualControl(event, false)
         };
@@ -171,18 +173,21 @@ class Game {
         document.addEventListener('keydown', this.boundHandlers.keyDown);
         document.addEventListener('keyup', this.boundHandlers.keyUp);
         this.canvas.addEventListener('mousedown', this.boundHandlers.canvasDown);
+        const mobileControls = document.getElementById('mobileControls');
+        if (mobileControls) {
+            mobileControls.addEventListener('click', this.boundHandlers.virtualClick);
+            mobileControls.addEventListener('pointerdown', this.boundHandlers.virtualDown);
+            mobileControls.addEventListener('pointerup', this.boundHandlers.virtualUp);
+            mobileControls.addEventListener('pointercancel', this.boundHandlers.virtualUp);
+            mobileControls.addEventListener('pointerleave', this.boundHandlers.virtualUp);
+        }
 
         const touchCapable = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
         if (touchCapable) {
             this.canvas.addEventListener('touchstart', this.boundHandlers.touchStart, { passive: false });
             this.canvas.addEventListener('touchmove', this.boundHandlers.touchMove, { passive: false });
-            const mobileControls = document.getElementById('mobileControls');
             if (mobileControls) {
                 mobileControls.style.display = 'flex';
-                mobileControls.addEventListener('pointerdown', this.boundHandlers.virtualDown);
-                mobileControls.addEventListener('pointerup', this.boundHandlers.virtualUp);
-                mobileControls.addEventListener('pointercancel', this.boundHandlers.virtualUp);
-                mobileControls.addEventListener('pointerleave', this.boundHandlers.virtualUp);
             }
         }
 
@@ -195,6 +200,7 @@ class Game {
         document.removeEventListener('keydown', this.boundHandlers.keyDown);
         document.removeEventListener('keyup', this.boundHandlers.keyUp);
         this.canvas.removeEventListener('mousedown', this.boundHandlers.canvasDown);
+        document.getElementById('mobileControls')?.removeEventListener('click', this.boundHandlers.virtualClick);
         this.canvas.removeEventListener('touchstart', this.boundHandlers.touchStart);
         this.canvas.removeEventListener('touchmove', this.boundHandlers.touchMove);
         window.removeEventListener('blur', this.boundHandlers.windowBlur);
@@ -744,7 +750,7 @@ class Game {
 
     toggleMute() {
         this.muted = !this.muted;
-        localStorage.setItem('neonArkanoidMuted', this.muted ? '1' : '0');
+        try { localStorage.setItem('neonArkanoidMuted', this.muted ? '1' : '0'); } catch (error) {}
         this.updateMuteButton();
     }
 
@@ -855,6 +861,23 @@ class Game {
         if (this.awaitingLaunch) this.launchBall();
     }
 
+    handleVirtualClick(event) {
+        // Pointer presses already act through virtualDown. Native keyboard
+        // activation makes one step and must not leave a held direction behind.
+        if (event.detail !== 0) return;
+        const action = event.target.closest('[data-action]')?.getAttribute('data-action');
+        if (!action) return;
+        if (action === 'launch') {
+            event.preventDefault();
+            this.handleCanvasInteraction();
+            return;
+        }
+        if (this.paused || !this.gameRunning || this.isBlockingGuideOpen()) return;
+        this.handleVirtualControl(event, true);
+        this.updatePaddleFromControls();
+        this.handleVirtualControl(event, false);
+    }
+
     handleVirtualControl(event, isPressed) {
         if (!isPressed) {
             event.preventDefault();
@@ -899,6 +922,9 @@ class Game {
             }
             return;
         }
+
+        if (event.target?.closest?.('input, select, textarea, [contenteditable="true"]')) return;
+        if ((event.code === 'Enter' || event.code === 'Space') && event.target?.closest?.('button, a, summary')) return;
 
         if (event.code === 'ArrowLeft' || event.code === 'KeyA') {
             this.controls.left = true;

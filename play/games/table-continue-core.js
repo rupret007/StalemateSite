@@ -262,6 +262,22 @@
     if (!uniqueCardKeys(allCards, (card) => card.id)) {
       return null;
     }
+    // Older v1 saves have no public play history. Preserve it when present so
+    // continuing a table does not erase the bots' already observed cards.
+    let playedThisRound;
+    if (snapshot.playedThisRound !== undefined) {
+      playedThisRound = cleanCardList(snapshot.playedThisRound, cleanSpadeCard, 52);
+      if (!playedThisRound ||
+        !uniqueCardKeys(playedThisRound, (card) => `${card.suit}:${card.rank}`) ||
+        !uniqueCardKeys(playedThisRound, (card) => card.id)) {
+        return null;
+      }
+      const held = hands.flat();
+      if (playedThisRound.some((card) => held.some((other) =>
+        other.id === card.id || (other.suit === card.suit && other.rank === card.rank)))) {
+        return null;
+      }
+    }
     const selected = snapshot.selected === null ? null : cleanCardId(snapshot.selected);
     if (snapshot.selected !== null && !selected) {
       return null;
@@ -301,7 +317,8 @@
       sortMode,
       msg,
       summary,
-      lastRoundTone
+      lastRoundTone,
+      ...(playedThisRound === undefined ? {} : { playedThisRound })
     };
   }
 
@@ -711,6 +728,13 @@
     if (pendingDecision !== null && pendingDecision !== 'insurance' && pendingDecision !== 'even-money') {
       return null;
     }
+    const dealerResolving = snapshot.dealerResolving === true;
+    if (snapshot.dealerResolving !== undefined && typeof snapshot.dealerResolving !== 'boolean') {
+      return null;
+    }
+    if (dealerResolving && (pendingDecision !== null || snapshot.firstDecisionOpen)) {
+      return null;
+    }
     if (pendingDecision !== null) {
       const playerNatural = playerHand.length === 2 &&
         playerHand.some((card) => card.rank === 'A') &&
@@ -737,6 +761,7 @@
       kind: 'turdjack',
       v: CONTINUE_VERSION,
       pendingDecision,
+      ...(snapshot.dealerResolving === undefined ? {} : { dealerResolving }),
       bankroll,
       currentBet,
       splitBet,
