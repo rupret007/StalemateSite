@@ -67,10 +67,18 @@ adapter. No real policy is bundled. Its strict versioned response supplies:
   idempotency-receipt and audit deadlines, all finite integers.
 - Explicit byte, case, evidence-size, audit, operation and tombstone limits.
 
-Policy is rechecked before commit using the same original request/case decision
-context. A changed decision, stale qualification, missing deadline or malformed
-budget refuses the operation. Source expiry cannot outlive the initial
-idempotency/tombstone protection. Starting/extending a hold requires a future
+Policy is rechecked before and after the final awaited state write using the
+same original request/case decision context. After the last awaited authority,
+assignee and policy lookups, a synchronous barrier uses fresh wall time to
+validate appointment/policy/source/evidence/receipt expiry. No state write follows
+that final barrier. A late staged write or lookup refuses success/plaintext at
+the operation's transaction/write fence and rolls back staged audit, receipt
+and case changes. No-write retries use the same final barrier. This depends on
+the same-domain transaction contract below; it does not promise network delivery
+before expiry or qualify backend commit latency or independent revocation
+ordering outside that contract. A changed decision, stale qualification, missing
+deadline or malformed budget refuses the operation. Source expiry cannot outlive
+the initial idempotency/tombstone protection. Starting/extending a hold requires a future
 deadline; extension cannot silently shorten existing evidence/case retention.
 There is no fallback retention duration, implicit forever-hold or default legal
 authority. The reason/authority codes are policy references, not legal findings.

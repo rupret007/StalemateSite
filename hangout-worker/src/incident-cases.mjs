@@ -185,7 +185,7 @@ export function createIncidentCases({ storage, resolveAuthority, resolveReviewer
                 if (prior && !['read-case', 'read-evidence'].includes(action)) {
                     const current = state.cases.find(c => c.id === prior.caseRef);
                     if (current && !current.access.includes(authority.actorRef)) fail('forbidden');
-                    await recheck(); return { ...copy(prior.receipt), replayed: true };
+                    (await recheck())(); return { ...copy(prior.receipt), replayed: true };
                 }
                 if (record && command.expectedRevision !== undefined && command.expectedRevision !== record.revision) fail('revision-conflict');
                 if (prior && ['read-case', 'read-evidence'].includes(action) && prior.receipt.revision !== record.revision) fail('revision-conflict');
@@ -273,25 +273,50 @@ export function createIncidentCases({ storage, resolveAuthority, resolveReviewer
                 if (state.cases.length > L.maxCases || state.audit.length > L.maxAuditEvents || state.operations.length > L.maxOperations
                     || state.tombstones.length > L.maxTombstones || size(state) > L.maxBytes) fail('capacity');
                 if (!validState(state)) fail('storage-unavailable');
-                await recheck();
-                if (!prior) await tx.put(key, state);
+                (await recheck())();
+                if (!prior) {
+                    await tx.put(key, state);
+                    // A final awaited write can cross expiry or observe changed
+                    // authority. Throwing here rolls the whole transaction back.
+                    // No state write follows this final authorization barrier.
+                    (await recheck())();
+                }
                 return { ...(prior ? { ...copy(prior.receipt), replayed: true } : receipt), ...copy(payload || {}) };
 
                 async function recheck() {
-                    const finish = now(); if (!time(finish) || finish < at) fail('unavailable');
-                    if (prior && prior.until <= finish) fail('operation-expired');
-                    const current = await resolveAuthority({ tx, principal, at: finish });
-                    if (!validAuthority(current, finish) || current.actorRef !== authority.actorRef || current.revision !== authority.revision
+                    const lookupAt = now(); if (!time(lookupAt) || lookupAt < at) fail('unavailable');
+                    if (prior && prior.until <= lookupAt) fail('operation-expired');
+                    const current = await resolveAuthority({ tx, principal, at: lookupAt });
+                    const authorityAt = now(); if (!time(authorityAt) || authorityAt < lookupAt) fail('unavailable');
+                    let checkedAt = authorityAt;
+                    if (!validAuthority(current, authorityAt) || current.actorRef !== authority.actorRef || current.revision !== authority.revision
                         || creating && current.canOpen !== true || maintenance && current.canMaintain !== true) fail('forbidden');
+                    const currentAssignees = [];
                     for (const assigned of assignees) {
-                        const currentAssignee = await resolveReviewer({ tx, actorRef: assigned.actorRef, at: finish });
-                        if (!validAuthority(currentAssignee, finish) || currentAssignee.actorRef !== assigned.actorRef || currentAssignee.revision !== assigned.revision) fail('forbidden');
+                        const currentAssignee = await resolveReviewer({ tx, actorRef: assigned.actorRef, at: lookupAt });
+                        const assigneeAt = now(); if (!time(assigneeAt) || assigneeAt < checkedAt) fail('unavailable');
+                        checkedAt = assigneeAt;
+                        if (!validAuthority(currentAssignee, assigneeAt) || currentAssignee.actorRef !== assigned.actorRef || currentAssignee.revision !== assigned.revision) fail('forbidden');
+                        currentAssignees.push(currentAssignee);
                     }
-                    const currentPolicy = await policyFor({ tx, action, at: finish, request: copy(command), case: copy(policyCase) });
-                    if (!validPolicy(currentPolicy, finish) || JSON.stringify(currentPolicy) !== policyStamp) fail('policy-unqualified');
-                    if (creating && !prior && record.source.expiresAt <= finish) fail('source-unavailable');
-                    if (creating && !prior && record.evidenceDeleteAt <= finish) fail('policy-unqualified');
-                    if (action === 'read-evidence' && !evidenceReadable(record, finish)) fail('evidence-retention-due');
+                    const currentPolicy = await policyFor({ tx, action, at: lookupAt, request: copy(command), case: copy(policyCase) });
+                    // The caller invokes this synchronously AFTER awaiting the
+                    // fresh views. No pre-await timestamp can grant a late read,
+                    // replay or write, including expiry during policy lookup.
+                    return () => {
+                        const finish = now(); if (!time(finish) || finish < checkedAt) fail('unavailable');
+                        if (prior && prior.until <= finish) fail('operation-expired');
+                        if (!validAuthority(current, finish) || current.actorRef !== authority.actorRef || current.revision !== authority.revision
+                            || creating && current.canOpen !== true || maintenance && current.canMaintain !== true) fail('forbidden');
+                        for (const [index, assigned] of assignees.entries()) {
+                            const currentAssignee = currentAssignees[index];
+                            if (!validAuthority(currentAssignee, finish) || currentAssignee.actorRef !== assigned.actorRef || currentAssignee.revision !== assigned.revision) fail('forbidden');
+                        }
+                        if (!validPolicy(currentPolicy, finish) || JSON.stringify(currentPolicy) !== policyStamp) fail('policy-unqualified');
+                        if (creating && !prior && record.source.expiresAt <= finish) fail('source-unavailable');
+                        if (creating && !prior && record.evidenceDeleteAt <= finish) fail('policy-unqualified');
+                        if (action === 'read-evidence' && !evidenceReadable(record, finish)) fail('evidence-retention-due');
+                    };
                 }
             });
         } catch (error) { return { ok: false, error: error?.incidentCode || 'storage-unavailable' }; }

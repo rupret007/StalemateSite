@@ -6,15 +6,16 @@ const STORE = 'restricted-incident-cases-v1';
 const enc = new TextEncoder(), dec = new TextDecoder();
 const clone = value => structuredClone(value);
 function storageFixture(initial) {
-    let values = new Map(initial), tail = Promise.resolve(), failPut = false, failAfterCommit = false, commitGate = null;
+    let values = new Map(initial), tail = Promise.resolve(), failPut = false, failAfterCommit = false, commitGate = null, afterPut = null;
     return {
         snapshot: () => clone(values), failPut: value => { failPut = value; }, failAfterCommit: value => { failAfterCommit = value; },
         gate: value => { commitGate = value; },
+        afterPut: value => { afterPut = value; },
         transaction(fn) {
             const task = tail.then(async () => {
                 const staged = clone(values);
                 const result = await fn({ get: async key => clone(staged.get(key)),
-                    put: async (key, value) => { if (failPut) throw Error('synthetic failure'); staged.set(key, clone(value)); },
+                    put: async (key, value) => { if (failPut) throw Error('synthetic failure'); staged.set(key, clone(value)); await afterPut?.(); },
                     delete: async key => staged.delete(key) });
                 if (commitGate) await commitGate;
                 values = staged;
@@ -39,10 +40,10 @@ async function fixture({ limits = {}, hold = false, provenance = 'reported-publi
         limits: { maxCases: 2, maxBytes: 100000, maxEvidenceBytes: 1000, maxAuditEvents: 100, maxOperations: 100, maxTombstones: 10, ...limits } };
     const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
     const realCipher = createIncidentEvidenceCipher({ keyId: 'synthetic_ephemeral_key', key });
-    const controls = { cipher: realCipher, load: ({ tx, sourceId }) => tx.get(`source:${sourceId}`), authority: ({ principal }) => reviewers.get(principal) };
+    const controls = { cipher: realCipher, load: ({ tx, sourceId }) => tx.get(`source:${sourceId}`), authority: ({ principal }) => reviewers.get(principal), policy: () => clone(policy) };
     const create = () => createIncidentCases({ storage, now: () => at, newRef: kind => `${kind}_${++sequence}`,
         resolveAuthority: async args => clone(await controls.authority(args)), resolveReviewer: async ({ actorRef }) => clone(reviewers.get(actorRef)),
-        policyFor: async () => clone(policy), loadEvidence: args => controls.load(args),
+        policyFor: async args => clone(await controls.policy(args)), loadEvidence: args => controls.load(args),
         cipher: { encrypt: (...args) => controls.cipher.encrypt(...args), decrypt: (...args) => controls.cipher.decrypt(...args) } });
     const model = create();
     const preserveInput = extra => ({ principal: 'alice', operationId: `op_${++op}`, sourceId: report.id, sourceRevision: report.revision, sourceDigest: report.digest, type: 'safety', ...extra });
@@ -214,6 +215,75 @@ describe('restricted selected-report case model', () => {
             if (invalidation === 'policy') f.policy({ version: 'synthetic_v2' });
             release(); expect((await pending).ok).toBe(false); expect(f.state()).toEqual(initialIncidentCaseState());
         }
+    });
+    it.each(['source-expiry', 'appointment-expiry', 'policy-expiry', 'revocation', 'appointment-revision', 'policy-revision'])('rolls back selected preservation when %s occurs during the final storage write', async invalidation => {
+        const f = await fixture();
+        if (invalidation === 'appointment-expiry') f.reviewers.get('alice').expiresAt = f.base + 400;
+        if (invalidation === 'policy-expiry') f.policy({ validUntil: f.base + 400 });
+        const before = f.state(); let puts = 0;
+        f.storage.afterPut(async () => {
+            puts++; await Promise.resolve();
+            if (invalidation === 'source-expiry') f.time(f.base + 500);
+            if (['appointment-expiry', 'policy-expiry'].includes(invalidation)) f.time(f.base + 400);
+            if (invalidation === 'revocation') f.reviewers.get('alice').active = false;
+            if (invalidation === 'appointment-revision') f.reviewers.get('alice').revision++;
+            if (invalidation === 'policy-revision') f.policy({ version: 'synthetic_v2' });
+        });
+        const result = await f.model.preserveSelectedReport(f.preserveInput());
+        expect(puts).toBe(1); expect(result).toEqual({ ok: false, error: invalidation === 'source-expiry' ? 'source-unavailable' : invalidation.startsWith('policy-') ? 'policy-unqualified' : 'forbidden' });
+        expect(f.state()).toEqual(before); expect(f.source()).toEqual(f.report);
+    });
+    it.each(['retention', 'appointment', 'policy', 'revocation'])('returns no plaintext or new audit when %s changes during the final evidence-read write', async invalidation => {
+        const f = await fixture(), saved = await f.model.preserveSelectedReport(f.preserveInput());
+        if (invalidation === 'appointment') f.reviewers.get('alice').expiresAt = f.base + 400;
+        if (invalidation === 'policy') f.policy({ validUntil: f.base + 400 });
+        const before = f.state(); let puts = 0;
+        f.storage.afterPut(async () => {
+            puts++; await Promise.resolve();
+            if (invalidation === 'retention') f.time(f.base + 3000);
+            if (['appointment', 'policy'].includes(invalidation)) f.time(f.base + 400);
+            if (invalidation === 'revocation') f.reviewers.get('alice').active = false;
+        });
+        const result = await f.model.readEvidence(f.request(saved.caseRef, 1));
+        expect(puts).toBe(1); expect(result).toEqual({ ok: false, error: invalidation === 'retention' ? 'evidence-retention-due' : invalidation === 'policy' ? 'policy-unqualified' : 'forbidden' });
+        expect(f.state()).toEqual(before); expect(f.source()).toEqual(f.report);
+    });
+    it.each(['preservation', 'evidence'])('does not let the last awaited authority check return a %s retry after appointment expiry', async retry => {
+        const f = await fixture(), input = f.preserveInput(), saved = await f.model.preserveSelectedReport(input), read = f.request(saved.caseRef, 1);
+        if (retry === 'evidence') expect((await f.model.readEvidence(read)).ok).toBe(true);
+        f.reviewers.get('alice').expiresAt = f.base + 400;
+        let calls = 0, puts = 0;
+        f.controls.authority = async ({ principal }) => {
+            const current = clone(f.reviewers.get(principal));
+            if (++calls === 2) { await Promise.resolve(); f.time(f.base + 400); }
+            return current;
+        };
+        f.storage.afterPut(() => { puts++; }); const before = f.state();
+        const result = await (retry === 'preservation' ? f.model.preserveSelectedReport(input) : f.model.readEvidence(read));
+        expect(calls).toBe(2); expect(puts).toBe(0); expect(result).toEqual({ ok: false, error: 'forbidden' }); expect(f.state()).toEqual(before);
+    });
+    it.each(['retention', 'policy', 'receipt'])('rechecks fresh time after the last awaited policy lookup before an evidence retry at %s expiry', async invalidation => {
+        const f = await fixture(), saved = await f.model.preserveSelectedReport(f.preserveInput()), input = f.request(saved.caseRef, 1);
+        expect((await f.model.readEvidence(input)).ok).toBe(true);
+        if (invalidation === 'policy') f.policy({ validUntil: f.base + 400 });
+        let calls = 0, puts = 0;
+        f.controls.policy = async () => {
+            const current = f.getPolicy();
+            if (++calls === 2) { await Promise.resolve(); f.time(f.base + (invalidation === 'policy' ? 400 : invalidation === 'receipt' ? 7000 : 3000)); }
+            return current;
+        };
+        f.storage.afterPut(() => { puts++; }); const before = f.state();
+        const result = await f.model.readEvidence(input);
+        expect(calls).toBe(2); expect(puts).toBe(0); expect(result).toEqual({ ok: false, error: invalidation === 'policy' ? 'policy-unqualified' : invalidation === 'receipt' ? 'operation-expired' : 'evidence-retention-due' });
+        expect(f.state()).toEqual(before);
+    });
+    it('does not grant case access when an assignee expires during the final awaited policy lookup', async () => {
+        const f = await fixture(), saved = await f.model.preserveSelectedReport(f.preserveInput()); f.reviewers.get('bravo').expiresAt = f.base + 400;
+        let calls = 0;
+        f.controls.policy = async () => { const current = f.getPolicy(); if (++calls === 2) { await Promise.resolve(); f.time(f.base + 400); } return current; };
+        const before = f.state();
+        expect(await f.model.setAccess(f.request(saved.caseRef, 1, { actorRefs: ['alice', 'bravo'] }))).toEqual({ ok: false, error: 'forbidden' });
+        expect(f.state()).toEqual(before);
     });
     it('allows only explicit appointed ACL members and enforces later revocation on metadata, plaintext and receipt replay', async () => {
         const f = await fixture(), input = f.preserveInput(), saved = await f.model.preserveSelectedReport(input);
