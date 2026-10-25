@@ -1,5 +1,5 @@
-/* #stalemate lobby client. Hidden preview. Everything is rendered with textContent; the server decides every
- * permission and filters every line. This file only draws buttons and sends {t:'say'|'cmd'|...} frames. */
+/* #stalemate lobby client. Hidden preview. Everything is rendered with textContent;
+ * the server enforces permissions, rate limits and public-content policies. */
 import { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff, readEntryHandoff } from '../entry-sites.mjs';
 import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
@@ -15,6 +15,14 @@ import { createEntrySharing } from './entry-sharing.mjs';
     const entrySource = params.has('via') ? entrySourceFromParams(params, entrySites) : handoff?.source || '';
     let shareEntry = handoff?.share !== false;
     let entrySourcesSupported = null;
+    let privateMessageContextSupported = false;
+    // With an older server, only commands with an explicit target or global
+    // meaning are safe in a private tab. Its channel fallback cannot route PM
+    // actions, so refuse them locally without clearing the visitor's draft.
+    const legacyPrivateCommands = new Set(['join', 'j', 'quit', 'exit', 'bye', 'nick', 'msg', 'm', 'query', 'q', 'whois', 'w', 'who',
+        'away', 'ignore', 'unignore', 'list', 'help', 'h', '?', 'accept', 'decline', 'deny', 'block', 'unblock', 'pm',
+        'mute', 'gban', 'purge', 'shield', 'shieldoff', 'lobby', 'filter', 'slow', 'approve', 'approveheld',
+        'dismiss', 'aidismiss', 'privatereport', 'log', 'delete']);
     let ownerSession = params.get('owner') === '1' || sessionStorage.getItem('hangout-owner') === '1';
     if (ownerSession) sessionStorage.setItem('hangout-owner', '1');
     const isLocal = /^(127\.0\.0\.1|localhost)$/.test(location.hostname);
@@ -176,6 +184,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const attempt = ++connectionAttempt;
         cancelTransportAck();
         entrySharing.disconnect();
+        privateMessageContextSupported = false;
         entrySourcesSupported = null; drawEntryChoice();
         clearTimeout(retryTimer);
         setConnection(app.me ? 'reconnecting' : 'connecting');
@@ -222,6 +231,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             if (attempt !== connectionAttempt) return;
             cancelTransportAck();
             entrySharing.disconnect();
+            privateMessageContextSupported = false;
             resetPendingReports();
             setConnection('offline');
             if (roomApi) roomApi.onLeave();
@@ -243,6 +253,16 @@ import { createEntrySharing } from './entry-sharing.mjs';
     const send = (obj) => {
         if (!app.ws || app.ws.readyState !== 1) return false;
         if (obj.t !== 'hello' && connectionState !== 'connected') return false;
+        if (!privateMessageContextSupported && typeof obj.ch === 'string' && obj.ch.startsWith('pm:')) {
+            const text = typeof obj.text === 'string' ? obj.text : '';
+            if (obj.t === 'say' && (!text.startsWith('/') || text.startsWith('//')))
+                return send({ t: 'cmd', name: 'msg', args: [obj.ch.slice(3), text.replace(/^\/\//, '/')], ch: obj.ch });
+            const name = obj.t === 'cmd' ? String(obj.name || '').toLowerCase() : text.slice(1).split(/\s/, 1)[0].toLowerCase();
+            if (!legacyPrivateCommands.has(name)) {
+                toast('This command is unavailable in private chat on this server. Choose a channel or send a normal PM. Your draft stays here.');
+                return false;
+            }
+        }
         const writesMessage = obj.t === 'say' || obj.t === 'cmd' && ['me', 'slap', 'msg', 'm'].includes(String(obj.name || '').toLowerCase());
         if (writesMessage && !entrySharing.canSend()) {
             toast('Wait for confirmation that your entrance is hidden, or reconnect. Your draft stays here.');
@@ -255,7 +275,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         }
         try { app.ws.send(payload); return true; } catch { return false; }
     };
-    const cmd = (name, args = [], ch = app.active) => send({ t: 'cmd', name, args, ch: ch.startsWith('pm:') ? '#stalemate' : ch });
+    const cmd = (name, args = [], ch = app.active) => send({ t: 'cmd', name, args, ch });
     app.cmd = cmd;
 
     function handle(m, nick) {
@@ -271,6 +291,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         case 'device': localStorage.setItem('hangout-dev', m.token); break;
         case 'hello':
             entrySourcesSupported = m.features?.entrySources === 1;
+            privateMessageContextSupported = m.features?.privateMessageContext === 1;
             entrySharing.setSupported(entrySourcesSupported); drawEntryChoice();
             app.role = m.role; app.verified = m.verified === true; app.capabilities = m.capabilities || {}; $('[data-owner-signout]').hidden = !ownerSession; app.netLock = m.lock; app.budget = m.budget;
             if (app.me) {
@@ -530,7 +551,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const isPm = key.startsWith('pm:');
         $('[data-lobby-welcome]').hidden = key !== '#stalemate';
         $('[data-chat-context]').textContent = isPm ? `PM · ${key.slice(3)}` : key;
-        $('[data-topic]').textContent = isPm ? `Private chat with ${key.slice(3)} · filtered · tap their name to block` : c ? `${c.topic || ''}` : '';
+        $('[data-topic]').textContent = isPm ? `Private chat with ${key.slice(3)} · not end-to-end encrypted · report shares selected text · tap their name to block` : c ? `${c.topic || ''}` : '';
         const room = !isPm && c && c.kind !== 'lobby';
         $('[data-roombar]').hidden = !room;
         $('[data-jam]').hidden = !(room && c.kind === 'jam');
@@ -786,7 +807,9 @@ import { createEntrySharing } from './entry-sharing.mjs';
             switchTo(joined[1].toLowerCase());
             return;
         }
-        const sent = app.active.startsWith('pm:') && !text.startsWith('/') ? cmd('msg', [app.active.slice(3), ...text.split(' ')]) : send({ t: 'say', ch: app.active.startsWith('pm:') ? '#stalemate' : app.active, text });
+        const sent = app.active.startsWith('pm:') && (!text.startsWith('/') || text.startsWith('//'))
+            ? cmd('msg', [app.active.slice(3), text.replace(/^\/\//, '/')])
+            : send({ t: 'say', ch: app.active, text });
         if (sent) { input.value = ''; drafts.delete(app.active); }
     });
     $$('[data-quick-line]').forEach((b) => b.addEventListener('click', () => send({ t: 'say', ch: app.active, text: b.dataset.quickLine })));

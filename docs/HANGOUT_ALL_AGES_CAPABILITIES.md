@@ -14,7 +14,7 @@ Keep one community, shared account/room identifiers and shared moderation across
 | Delivered-message reports, consented private allegations, bounded evidence queues and human review; accepted public reports are preserved when intake is full. | An independent restricted incident case/hold store, qualified statutory-notice workflows and case deadlines. |
 | Chat starts at join; no visitor archive; separate bounded evidence, pseudonymous identifiers and action logs. | A complete parental access/deletion implementation, reconciled backups/provider/inbox retention and a lawful-preservation exception. |
 
-See [the existing inventory](HANGOUT_DATA_INVENTORY.md) and [incident handling](HANGOUT_PRIVACY_AND_INCIDENTS.md). Existing lobby PMs still pass deterministic filters and a bounded server moderation buffer; encrypted private-room chat is different. Do not describe all private text as unprocessed or all chat as end-to-end encrypted.
+See [the inventory](HANGOUT_DATA_INVENTORY.md) and [incident handling](HANGOUT_PRIVACY_AND_INCIDENTS.md). Lobby PMs are server-routed, normalized and size/rate bounded, without automatic public-content classification, AI submission or accepted-body moderation buffering. A participant can report exact selected text against a bounded delivery digest/witness record. Pending first-message bodies are volatile until acceptance/expiry/disconnect. Encrypted private-room chat is separate; do not describe all private text as unprocessed or end-to-end encrypted.
 
 ## Current primary-source constraints
 

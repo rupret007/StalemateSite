@@ -364,7 +364,7 @@ describe('permissions are enforced on the server (forged commands)', () => {
     });
 });
 
-describe('PMs are accept-first, filtered, blockable, switchable and need lobby time', () => {
+describe('PMs are accept-first, blockable, switchable and need lobby time', () => {
     it('full flow', () => {
         const a = join('Alpha');
         const b = join('Bravo');
@@ -376,12 +376,12 @@ describe('PMs are accept-first, filtered, blockable, switchable and need lobby t
         expect(got(b).some((m) => m.t === 'pm')).toBe(false); // nothing delivered before accept
         cmd(b, 'accept', ['Alpha']);
         expect(got(b).find((m) => m.t === 'pm').text).toBe('hey great set');
-        cmd(a, 'msg', ['Bravo', 'text', 'me', '214-555-0199']);
-        expect(got(b).filter((m) => m.t === 'pm').length).toBe(1);
-        expect(notices(a)).toMatch(/even in PMs/);
+        cmd(a, 'msg', ['Bravo', 'Private', 'contact', 'choice:', 'person@example.test']);
+        expect(got(b).filter((m) => m.t === 'pm').length).toBe(2);
+        expect(got(b).filter((m) => m.t === 'pm').at(-1).text).toBe('Private contact choice: person@example.test');
         cmd(b, 'block', ['Alpha']);
         cmd(a, 'msg', ['Bravo', 'yo']);
-        expect(got(b).filter((m) => m.t === 'pm').length).toBe(1);
+        expect(got(b).filter((m) => m.t === 'pm').length).toBe(2);
     });
     it('/pm off refuses requests; decline clears', () => {
         const a = join('Alpha');

@@ -153,7 +153,7 @@ describe('HangoutLobby WebSocket admission', () => {
         const server = pairs[0][1];
         expect(state.getWebSockets()).toEqual([server]);
         expect(server.frames.filter((frame) => frame.t === 'hello')).toEqual([
-            { t: 'hello', role: 'fan', lock: 'off', shield: false, budget: 'ok', needNick: true, verified: false, capabilities: { moderate: false, configure: false, register: false }, features: { entrySources: 1 } }
+            { t: 'hello', role: 'fan', lock: 'off', shield: false, budget: 'ok', needNick: true, verified: false, capabilities: { moderate: false, configure: false, register: false }, features: { entrySources: 1, privateMessageContext: 1 } }
         ]);
         expect(server.frames.map((frame) => frame.t)).toEqual(devToken ? ['device', 'hello'] : ['hello']);
         expect(lobby.pendingAdmission.size).toBe(0);
