@@ -29,7 +29,7 @@
             myId: null, names: new Map(), camOn: false, ice: null,
             pcs: new Map(), stream: null, peers: new Set()
         };
-        const player = { yt: null, kind: null, key: '', readyKey: '', failedKey: '', loading: null, applying: 0, autoplayBlocked: false };
+        const player = { yt: null, kind: null, key: '', readyKey: '', failedKey: '', loading: null, applying: 0, autoplayBlocked: false, seenPlaying: false, playPending: false };
         const youtube = window.HangoutYouTube.create({
             getElement: () => ui.yt, setElement: (element) => { ui.yt = element; },
             onStateChange: onYtState, onAutoplayBlocked: onYtAutoplayBlocked,
@@ -73,6 +73,7 @@
             ui.tiles.replaceChildren();
             youtube.cancel(); player.yt = null;
             player.key = ''; player.readyKey = ''; player.failedKey = ''; player.loading = null; player.autoplayBlocked = false;
+            player.seenPlaying = false; player.playPending = false;
             ui.videoStatus.hidden = true; ui.videoStatus.textContent = '';
             ui.tap.hidden = true;
         }
@@ -280,6 +281,7 @@
         function videoFailure(key) {
             if (!state.ch || player.key !== key) return;
             player.yt = null; player.readyKey = ''; player.failedKey = key; player.autoplayBlocked = false;
+            player.seenPlaying = false; player.playPending = false;
             ui.videoStatus.textContent = 'YouTube couldn’t load. Retry video when you’re ready.';
             ui.videoStatus.hidden = false;
             ui.tap.textContent = 'Retry video'; ui.tap.hidden = false;
@@ -296,6 +298,7 @@
             player.key = key;
             player.readyKey = ''; player.failedKey = '';
             player.autoplayBlocked = false;
+            player.seenPlaying = false; player.playPending = false;
             ui.tap.hidden = true; ui.tap.textContent = 'Tap to play';
             ui.videoStatus.hidden = true; ui.videoStatus.textContent = '';
             player.kind = 'yt';
@@ -323,8 +326,8 @@
         function localPlaying() { return player.yt && player.yt.getPlayerState ? player.yt.getPlayerState() === 1 : false; }
         function hold(fn) { player.applying = Date.now() + 900; fn(); }
         function seekTo(s) { hold(() => { if (player.yt) player.yt.seekTo(s, true); }); }
-        function playLocal() { hold(() => { if (player.yt) player.yt.playVideo(); }); }
-        function pauseLocal() { hold(() => { if (player.yt) player.yt.pauseVideo(); }); }
+        function playLocal() { hold(() => { if (player.yt) { player.playPending = true; player.yt.playVideo(); } }); }
+        function pauseLocal() { hold(() => { player.playPending = false; if (player.yt) player.yt.pauseVideo(); }); }
 
         async function syncToState(force, retry = false) {
             const requested = state.room.video;
@@ -350,30 +353,34 @@
 
         function onYtAutoplayBlocked() {
             const v = state.room.video;
-            if (!state.ch || localPlaying() || !v?.playing || v.source.kind !== 'yt' || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
+            if (!state.ch || !player.playPending || localPlaying() || !v?.playing || v.source.kind !== 'yt' || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
             // Policy denial is local, not a request to pause everyone else.
             player.autoplayBlocked = true;
             ui.tap.hidden = false;
         }
         function onYtState(ev) {
-            if (!state.ch) return;
-            if (ev.data === 1) { player.autoplayBlocked = false; ui.tap.hidden = true; }
-            if (!isOp() || player.autoplayBlocked || Date.now() < player.applying || !state.room.video
+            if (!state.ch || ev.target !== player.yt || ev.data !== player.yt?.getPlayerState()) return;
+            if (ev.data === 1) { player.seenPlaying = true; player.playPending = false; player.autoplayBlocked = false; ui.tap.hidden = true; }
+            if (!isOp() || player.autoplayBlocked || !state.room.video || (!player.seenPlaying && state.room.video.playing)
                 || player.readyKey !== `${state.room.video.source.kind}:${state.room.video.source.id}`) return;
             if (ev.data !== 1 && ev.data !== 2) return;
             clearTimeout(videoPublishTimer);
-            const channel = state.ch;
+            const channel = state.ch, generation = roomGeneration, instance = player.yt, key = player.readyKey;
             videoPublishTimer = setTimeout(() => {
-                if (state.ch === channel && isOp() && !player.autoplayBlocked && state.room.video
-                    && player.readyKey === `${state.room.video.source.kind}:${state.room.video.source.id}` && Date.now() >= player.applying) {
-                    actSend({ kind: 'video', source: state.room.video.source, playing: localPlaying(), pos: localTime() });
+                if (generation === roomGeneration && state.ch === channel && isOp() && !player.autoplayBlocked && state.room.video
+                    && player.yt === instance && player.readyKey === key && key === `${state.room.video.source.kind}:${state.room.video.source.id}`) {
+                    const v = state.room.video, playing = localPlaying(), pos = localTime();
+                    // Suppress the echo of our own sync, not a subsequent
+                    // opposite host control within the same 900ms window.
+                    if (Date.now() < player.applying && playing === v.playing && Math.abs(pos - H.expectedPosition(v, state.clock.relayNow())) < 2) return;
+                    actSend({ kind: 'video', source: v.source, playing, pos });
                 }
             }, 100);
         }
         setInterval(() => {
             if (!isOp()) return syncToState(false);
             const v = state.room.video;
-            if (!v || !player.yt || player.autoplayBlocked || player.readyKey !== `${v.source.kind}:${v.source.id}` || Date.now() < player.applying) return;
+            if (!v || !player.yt || (!player.seenPlaying && v.playing) || player.autoplayBlocked || player.readyKey !== `${v.source.kind}:${v.source.id}` || Date.now() < player.applying) return;
             // YouTube does not reliably emit a state change when a paused
             // player is scrubbed. Publish the host's changed position instead
             // of correcting the host back to the previous shared position.

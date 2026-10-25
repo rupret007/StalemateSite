@@ -26,6 +26,7 @@ window.YT = {
         // when browser policy blocks playback; the API reports that separately.
         // Existing suites keep their original immediate-play behavior.
         const policy = window.__ytAutoplayControl || null;
+        let policyPlayer;
         const now = () => performance.now() / 1000;
         const time = () => (started === null ? base : base + (now() - started));
         const syncState = () => { playerState = started === null ? 2 : 1; };
@@ -54,13 +55,15 @@ window.YT = {
             policy.players = policy.players || [];
             // Stored callbacks let focused tests deliver a provider event after
             // a source change or room teardown without changing application state.
-            policy.players.push({ emitAutoplayBlocked: autoplayBlocked, finishPlayback: startPlaying });
+            policyPlayer = { emitAutoplayBlocked: autoplayBlocked, finishPlayback: startPlaying };
+            policy.players.push(policyPlayer);
         }
         this.playVideo = () => {
             if (policy) {
                 policy.playCalls = (policy.playCalls || 0) + 1;
                 if (policy.blocked) {
-                    setTimeout(autoplayBlocked, 0);
+                    if (policy.emitPausedOnBlocked) emit(2);
+                    setTimeout(autoplayBlocked, policy.blockedDelayMs || 0);
                     return;
                 }
                 if (policy.deferPlaying) return;
@@ -106,7 +109,15 @@ window.YT = {
         this.stopVideo = () => { base = 0; started = null; emit(2); render(); };
         render();
         window.__ytLog.push(this);
-        setTimeout(() => opts.events && opts.events.onReady && opts.events.onReady({ target: this }), 10);
+        let ready = false;
+        const finishReady = () => {
+            if (ready) return;
+            ready = true;
+            if (policy) policy.readyEvents = (policy.readyEvents || 0) + 1;
+            opts.events && opts.events.onReady && opts.events.onReady({ target: this });
+        };
+        if (policy?.deferReady) policyPlayer.finishReady = finishReady;
+        else setTimeout(finishReady, 10);
     }
 };
 setTimeout(() => window.onYouTubeIframeAPIReady && window.onYouTubeIframeAPIReady(), 0);
