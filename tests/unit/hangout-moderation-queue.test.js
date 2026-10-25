@@ -118,11 +118,51 @@ describe('human moderation evidence and recipient authorization', () => {
         for (let i = 0; i < 105; i += 1) { clock += 12000; report(witness, say(sender, `report queue words ${i}`)); }
         for (let i = 0; i < 105; i += 1) say(heldSender, `you are such a loser ${i}`);
         expect(engine.adminState().reports).toHaveLength(100); expect(engine.adminState().held).toHaveLength(100);
-        expect(saved().reports[0].text).toBe('report queue words 5');
+        // Accepted visitor reports keep their evidence when new intake is full.
+        // Filter-held messages retain their existing bounded rolling behavior.
+        expect(saved().reports[0].text).toBe('report queue words 0');
         expect(saved().held[0].text).toBe('you are such a loser 5');
         clock += DAY; engine.tick();
         expect(engine.adminState().reports).toEqual([]); expect(engine.adminState().held).toEqual([]);
         expect(saved()).toEqual({ reports: [], held: [] });
+    });
+
+    it('preserves accepted evidence at capacity, rejects new intake truthfully and accepts after a human dismissal', async () => {
+        const sender = guest('Drummer', 'band'), witness = guest('Witness'), other = guest('OtherWitness');
+        const band = guest('Reviewer', 'band'), accepted = [];
+        for (let i = 0; i < 100; i += 1) {
+            clock += 12000;
+            const id = say(sender, `accepted report evidence ${i}`);
+            await report(witness, id); accepted.push(id);
+        }
+        expect(saved().reports.map(entry => entry.id)).toEqual(accepted);
+        const rejected = say(sender, 'new evidence after the queue reached its capacity');
+        frames.set(witness.id, []);
+        await report(witness, rejected);
+        expect(got(witness)).toContainEqual(expect.objectContaining({ t: 'notice', kind: 'error',
+            text: 'The report queue is full. Try again later or use the moderation contact in House rules.' }));
+        expect(got(witness).some(frame => frame.t === 'report-status' && frame.id === rejected && frame.submitted)).toBe(false);
+        expect(engine.adminState().reports.map(entry => entry.id)).toEqual(accepted);
+        expect(saved().reports.map(entry => entry.id)).toEqual(accepted);
+        expect(engine._debug.reports.size).toBe(100);
+
+        clock += 12000; frames.set(witness.id, []);
+        await report(witness, accepted[0]);
+        expect(got(witness)).toContainEqual({ t: 'report-status', id: accepted[0], submitted: true });
+        expect(engine.adminState().reports[0].count).toBe(1);
+        await report(other, accepted[0]);
+        expect(engine.adminState().reports[0].count).toBe(2);
+        expect(engine._debug.reports.size).toBe(100);
+
+        await cmd(band, 'dismiss', [accepted[60]]);
+        expect(engine.adminState().reports).toHaveLength(99);
+        clock += 12000; frames.set(witness.id, []);
+        await report(witness, rejected);
+        expect(got(witness)).toContainEqual({ t: 'report-status', id: rejected, submitted: true });
+        const remaining = accepted.filter(id => id !== accepted[60]);
+        expect(saved().reports.map(entry => entry.id)).toEqual([...remaining, rejected]);
+        expect(engine._debug.reports.size).toBe(100);
+        expect(saved().reports[0]).toMatchObject({ id: accepted[0], text: 'accepted report evidence 0' });
     });
 
     it('sanitizes restored queues and rejects malformed, expired and unbounded evidence', () => {

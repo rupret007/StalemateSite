@@ -56,3 +56,26 @@ test('storage errors and report limits restore the report button for a truthful 
     await expect(flag).toHaveText('✓');
     await expect.poll(() => fixture.reports.length).toBe(3);
 });
+
+test('a full report queue explains the contact fallback and permits a manually confirmed retry', async ({ page, baseURL }) => {
+    const fixture = await openFixture(page, baseURL);
+    const flag = page.locator('[data-id="mreportfixture"] .flag');
+    await flag.click(); await expect(flag).toHaveText('…');
+    fixture.publish({ t: 'notice', from: 'StaleBot', kind: 'error',
+        text: 'The report queue is full. Try again later or use the moderation contact in House rules.' });
+    await expect(flag).toBeEnabled(); await expect(flag).toHaveText('🚩');
+    await expect(page.locator('[data-buffer]')).toContainText('moderation contact in House rules');
+    const rules = page.locator('.people-help').getByRole('link', { name: 'House rules', exact: true });
+    await expect(rules).toHaveAttribute('href', '../terms/');
+    // The fallback is available without destroying the current tab's session.
+    const rulesPage = await page.context().newPage();
+    await rulesPage.goto(new URL(await rules.getAttribute('href'), page.url()).href);
+    await expect(rulesPage.locator('#contact-details [data-contact]')).toBeVisible();
+    await expect(rulesPage.locator('#urgent-help')).toHaveText('Urgent safety concerns');
+    await rulesPage.close();
+    expect(fixture.reports).toHaveLength(1);
+    await flag.click(); await expect(flag).toHaveText('…');
+    await expect.poll(() => fixture.reports.length).toBe(2);
+    fixture.publish({ t: 'report-status', id: LINE.id, submitted: true });
+    await expect(flag).toHaveText('✓'); await expect(flag).toBeDisabled();
+});
