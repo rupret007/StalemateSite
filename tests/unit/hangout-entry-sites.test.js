@@ -86,6 +86,44 @@ describe('one community with optional entry context', () => {
         engine.message(a, JSON.stringify({ t: 'entry-source', source: '<script>site</script>', role: 'owner' }));
         expect(engine._debug.conns.get(a)).toMatchObject({ entrySource: '', role: 'fan' });
     });
+    it('honors hiding under command throttling without letting new sharing bypass that limit', () => {
+        const a = guest('Alice', 'stalemate'), b = guest('Bravo', 'rad-dad');
+        for (let i = 0; i < 12; i++) cmd(a, 'help');
+        expect(frames.some((frame) => frame.recipient === a && frame.t === 'rate-limit')).toBe(true);
+        frames.length = 0;
+        engine.message(a, JSON.stringify({ t: 'entry-source', source: '' }));
+        expect(engine._debug.conns.get(a).entrySource).toBe('');
+        expect(frames.filter((frame) => frame.recipient === b && frame.t === 'chan')).toHaveLength(1);
+        expect(frames.at(-1)).toMatchObject({ recipient: a, t: 'entry-source', source: '', accepted: true });
+        engine.message(a, JSON.stringify({ t: 'say', ch: '#stalemate', text: 'Hidden even after a command burst' }));
+        expect(frames.find((frame) => frame.recipient === b && frame.t === 'line')).toMatchObject({ entrySource: '' });
+        frames.length = 0;
+        engine.message(a, JSON.stringify({ t: 'entry-source', source: 'stalemate' }));
+        expect(engine._debug.conns.get(a).entrySource).toBe('');
+        expect(frames.at(-1)).toMatchObject({ recipient: a, t: 'entry-source', source: '', accepted: false });
+        expect(frames.some((frame) => frame.t === 'chan')).toBe(false);
+        now += 2000;
+        engine.message(a, JSON.stringify({ t: 'entry-source', source: 'stalemate' }));
+        expect(engine._debug.conns.get(a).entrySource).toBe('stalemate');
+        expect(frames.at(-1)).toMatchObject({ t: 'entry-source', source: 'stalemate', accepted: true });
+    });
+    it('does not amplify repeated no-op clears and still enforces frame and byte bounds', () => {
+        const a = guest('Alice', ''), b = guest('Bravo', 'rad-dad');
+        frames.length = 0;
+        const before = engine._debug.conns.get(a).frames;
+        const budget = engine._debug.net.budget.requests;
+        for (let i = 0; i < 20; i++) engine.message(a, JSON.stringify({ t: 'entry-source', source: '' }));
+        expect(engine._debug.conns.get(a).frames).toBe(before + 20);
+        expect(engine._debug.net.budget.requests - budget).toBeCloseTo(1);
+        expect(frames).toHaveLength(20);
+        expect(frames.every((frame) => frame.recipient === a && frame.t === 'entry-source' && frame.accepted === true)).toBe(true);
+        expect(frames.some((frame) => frame.recipient === b)).toBe(false);
+        engine._debug.conns.get(a).frames = 4000;
+        engine.message(a, JSON.stringify({ t: 'entry-source', source: '' }));
+        expect(engine._debug.conns.has(a)).toBe(false);
+        engine.message(b, JSON.stringify({ t: 'entry-source', source: '', padding: 'x'.repeat(2048) }));
+        expect(engine._debug.conns.has(b)).toBe(false);
+    });
     it('keeps direct and unknown entry neutral and never sends a newcomer previous messages', () => {
         const a = guest('Alice', 'stalemate');
         engine.message(a, JSON.stringify({ t: 'say', ch: '#stalemate', text: 'Before arrival' }));

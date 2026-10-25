@@ -540,14 +540,22 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (raw.length > maxBytes) return kill(c, 4400, 'bad frame');
         if (c.frames > L.framesPerConnection) return kill(c, 4429, 'frame cap');
         if (!c.nick && f.t !== 'hello') return bot(c, 'Pick a nickname first.', 'error');
+        if (f.t === 'entry-source') {
+            const source = normalizeEntrySource(f.source, entrySites);
+            // A privacy withdrawal must not consume command tokens or wait for
+            // them to refill. Admission, frame/byte caps and daily accounting
+            // above still apply. New sharing keeps the ordinary command limit.
+            if (source && !limited(c, 'command', 10, 1, true)) return out(c, { t: 'entry-source', source: c.entrySource, accepted: false });
+            if (source !== c.entrySource) {
+                c.entrySource = source;
+                for (const name of c.channels) sendChan(ch(name));
+            }
+            // No-op withdrawals acknowledge only their sender, never broadcast.
+            return out(c, { t: 'entry-source', source: c.entrySource, accepted: true });
+        }
         if (f.t !== 'act' && f.t !== 'say' && f.t !== 'cmd' && !limited(c, 'command', 10, 1, true)) return;
         switch (f.t) {
         case 'hello': return hello(c, f);
-        case 'entry-source': {
-            c.entrySource = normalizeEntrySource(f.source, entrySites);
-            for (const name of c.channels) sendChan(ch(name));
-            return out(c, { t: 'entry-source', source: c.entrySource });
-        }
         case 'say': {
             const text = typeof f.text === 'string' ? f.text : '';
             if (text.startsWith('/') && !text.startsWith('//')) return runLine(c, f.ch, text);

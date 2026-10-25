@@ -47,7 +47,7 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }) {
 }
 
 describe('browser client privacy and bounded delivery wiring', () => {
-    it('sends the latest privacy choice before any post-welcome user message', async () => {
+    it('waits for confirmation of the latest privacy choice before any post-welcome user message', async () => {
         const { window, ws, welcome } = await visitor('rad-dad');
         expect(ws.sent[0]).toMatchObject({ t: 'hello', entrySource: 'rad-dad', transport: 1 });
         window.document.querySelector('[data-entry-share]').click();
@@ -55,8 +55,53 @@ describe('browser client privacy and bounded delivery wiring', () => {
         welcome();
         window.document.querySelector('[data-text]').value = 'A new message';
         window.document.querySelector('[data-say]').dispatchEvent(new window.Event('submit', { cancelable: true }));
+        expect(ws.sent.slice(1)).toEqual([{ t: 'entry-source', source: '' }]);
+        expect(window.document.querySelector('[data-text]').value).toBe('A new message');
+        expect(window.document.querySelector('[data-entry-status]').textContent).toContain('confirmation');
+        ws.receive({ t: 'entry-source', source: '', accepted: true });
+        window.document.querySelector('[data-say]').dispatchEvent(new window.Event('submit', { cancelable: true }));
         expect(ws.sent.slice(1, 3)).toEqual([{ t: 'entry-source', source: '' }, { t: 'say', ch: '#stalemate', text: 'A new message' }]);
         expect([...window.document.querySelectorAll('[data-entry-share]')].every((input) => !input.checked)).toBe(true);
+    });
+    it('keeps messages and quick actions unsent after a rejected hide while reports remain usable', async () => {
+        const { window, ws, welcome } = await visitor(); welcome();
+        window.document.querySelector('[data-entry-share]').click();
+        ws.receive({ t: 'entry-source', source: 'stalemate', accepted: false });
+        expect(window.document.querySelector('[data-entry-status]').textContent).toContain('still shared');
+        const input = window.document.querySelector('[data-text]'); input.value = 'Keep this private choice';
+        window.document.querySelector('[data-say]').dispatchEvent(new window.Event('submit', { cancelable: true }));
+        window.document.querySelector('[data-quick-line]').click();
+        window.document.querySelector('[data-quick-me]').click();
+        expect(ws.sent.some(frame => frame.t === 'say' || frame.t === 'cmd' && frame.name === 'me')).toBe(false);
+        expect(input.value).toBe('Keep this private choice');
+        window.__lobby.cmd('report', ['Troublemaker']);
+        expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'report' });
+        const choice = window.document.querySelector('[data-entry-share]');
+        choice.checked = false; choice.dispatchEvent(new window.Event('change'));
+        expect(ws.sent.at(-1)).toEqual({ t: 'entry-source', source: '' });
+        ws.receive({ t: 'entry-source', source: '', accepted: true });
+        expect(window.document.querySelector('[data-entry-status]').textContent).toContain('Entrance hidden');
+        window.document.querySelector('[data-say]').dispatchEvent(new window.Event('submit', { cancelable: true }));
+        expect(ws.sent.at(-1)).toMatchObject({ t: 'say', text: 'Keep this private choice' });
+    });
+    it('waits for a later clear when sharing is enabled and then hidden before the first update returns', async () => {
+        const { window, ws, welcome } = await visitor(); welcome();
+        const choice = window.document.querySelector('[data-entry-share]');
+        choice.click(); ws.receive({ t: 'entry-source', source: '', accepted: true });
+        choice.click(); choice.click();
+        const input = window.document.querySelector('[data-text]'); input.value = 'Wait for my hidden badge';
+        const submit = () => window.document.querySelector('[data-say]').dispatchEvent(new window.Event('submit', { cancelable: true }));
+        submit();
+        expect(ws.sent.filter(frame => frame.t === 'say')).toEqual([]);
+        expect(ws.sent.filter(frame => frame.t === 'entry-source')).toEqual([
+            { t: 'entry-source', source: '' }, { t: 'entry-source', source: 'stalemate' }
+        ]);
+        ws.receive({ t: 'entry-source', source: 'stalemate', accepted: true });
+        expect(ws.sent.at(-1)).toEqual({ t: 'entry-source', source: '' });
+        submit(); expect(ws.sent.filter(frame => frame.t === 'say')).toEqual([]);
+        expect(input.value).toBe('Wait for my hidden badge');
+        ws.receive({ t: 'entry-source', source: '', accepted: true }); submit();
+        expect(ws.sent.at(-1)).toMatchObject({ t: 'say', text: 'Wait for my hidden badge' });
     });
     it('keeps a rollback server usable without unsupported sharing frames or a false badge promise', async () => {
         const { window, ws, welcome, flush } = await visitor('rad-dad', null);

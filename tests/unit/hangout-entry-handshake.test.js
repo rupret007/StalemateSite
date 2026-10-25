@@ -47,4 +47,45 @@ describe('entry sharing during socket admission', () => {
         sharing.disconnect(); sharing.setEnabled(true); sharing.helloSource(); sharing.setEnabled(false); sharing.joined();
         expect(sent).toHaveLength(1);
     });
+    it('does not treat a queued privacy update as confirmation and reconciles rapid changes in order', () => {
+        const sent = [];
+        const sharing = createEntrySharing({ source: 'stalemate', enabled: false, send: frame => { sent.push(frame); return true; } });
+        sharing.setSupported(true); sharing.helloSource(); sharing.joined();
+        sharing.setEnabled(true);
+        expect(sharing.snapshot()).toMatchObject({ state: 'pending', source: '', requested: 'stalemate' });
+        sharing.setEnabled(false);
+        expect(sharing.canSend()).toBe(false);
+        expect(sent).toEqual([{ t: 'entry-source', source: 'stalemate' }]);
+        sharing.acknowledge({ source: 'stalemate', accepted: true });
+        expect(sent).toEqual([{ t: 'entry-source', source: 'stalemate' }, { t: 'entry-source', source: '' }]);
+        expect(sharing.canSend()).toBe(false);
+        sharing.acknowledge({ source: '', accepted: true });
+        expect(sharing.snapshot()).toMatchObject({ state: 'confirmed', source: '', requested: '' });
+        expect(sharing.canSend()).toBe(true);
+        sharing.acknowledge({ source: 'stalemate', accepted: true });
+        expect(sharing.snapshot().source).toBe('');
+    });
+    it('shows rejection honestly without a retry loop and accepts the earlier source protocol acknowledgement', () => {
+        const sent = [];
+        const sharing = createEntrySharing({ source: 'rad-dad', send: frame => { sent.push(frame); return true; } });
+        sharing.setSupported(true); sharing.helloSource(); sharing.joined(); sharing.setEnabled(false);
+        sharing.acknowledge({ source: 'rad-dad', accepted: false });
+        expect(sharing.snapshot()).toMatchObject({ state: 'rejected', source: 'rad-dad', requested: '' });
+        expect(sharing.canSend()).toBe(false); expect(sent).toHaveLength(1);
+        sharing.setEnabled(false); expect(sent).toHaveLength(2);
+        sharing.acknowledge({ source: '' });
+        expect(sharing.canSend()).toBe(true); expect(sharing.snapshot().state).toBe('confirmed');
+        sharing.disconnect(); sharing.acknowledge({ source: 'rad-dad' });
+        expect(sharing.snapshot()).toMatchObject({ state: 'offline', source: null });
+    });
+    it('accepts a rejected in-flight share as confirmation of a newer hidden choice', () => {
+        const sent = [];
+        const sharing = createEntrySharing({ source: 'stalemate', enabled: false, send: frame => { sent.push(frame); return true; } });
+        sharing.setSupported(true); sharing.helloSource(); sharing.joined();
+        sharing.setEnabled(true); sharing.setEnabled(false);
+        expect(sharing.canSend()).toBe(false);
+        sharing.acknowledge({ source: '', accepted: false });
+        expect(sharing.snapshot()).toMatchObject({ state: 'confirmed', source: '', requested: '' });
+        expect(sharing.canSend()).toBe(true); expect(sent).toHaveLength(1);
+    });
 });

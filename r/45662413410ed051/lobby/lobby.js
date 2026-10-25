@@ -39,13 +39,27 @@ import { createEntrySharing } from './entry-sharing.mjs';
     const slug = () => `${pick(WORDS)}-${pick(THINGS)}`.replace(/[^a-z0-9-]/g, '');
 
     const app = window.__lobby = { ws: null, me: '', role: 'fan', band: false, chans: new Map(), pms: new Map(), active: '#stalemate', rooms: [], ignores: new Set(), pending: null };
-    const entrySharing = createEntrySharing({ source: entrySource, enabled: shareEntry, registry: entrySites, send: (frame) => send(frame) });
+    const entrySharing = createEntrySharing({ source: entrySource, enabled: shareEntry, registry: entrySites, send: (frame) => send(frame), onChange: () => drawEntryChoice() });
     const saveEntryHandoff = () => sessionStorage.setItem(ENTRY_HANDOFF_KEY, entryHandoff(entrySource, shareEntry, Date.now(), entrySites));
     function drawEntryChoice() {
         $$('[data-entry-context]').forEach((element) => { element.hidden = !entrySource || entrySourcesSupported === false; });
         $$('[data-entry-unavailable]').forEach((element) => { element.hidden = !entrySource || entrySourcesSupported !== false; });
         $$('[data-entry-label]').forEach((element) => { element.textContent = entryBadge(entrySource, entrySites); });
         $$('[data-entry-share]').forEach((element) => { element.checked = shareEntry; element.disabled = entrySourcesSupported === false; });
+        const sharing = entrySharing.snapshot();
+        $$('[data-entry-context]').forEach((element) => {
+            let status = $('[data-entry-status]', element);
+            if (!status) {
+                status = document.createElement('p'); status.className = 'small';
+                status.dataset.entryStatus = ''; status.setAttribute('role', 'status'); element.append(status);
+            }
+            status.hidden = sharing.state === 'offline' || sharing.state === 'unavailable';
+            status.textContent = sharing.state === 'rejected'
+                ? (shareEntry ? 'Entrance sharing was not updated. Choose again or reconnect.' : 'Your entrance is still shared. Try hiding again or reconnect before sending.')
+                : sharing.state === 'pending'
+                    ? (shareEntry ? 'Updating entrance sharing…' : 'Hiding your entrance… Messages wait for confirmation.')
+                    : (shareEntry ? 'Entrance shared with People and new messages.' : 'Entrance hidden from People and new messages.');
+        });
         const back = entryReturn(entrySource, entrySites);
         $$('[data-entry-return]').forEach((element) => {
             element.hidden = !back;
@@ -229,6 +243,11 @@ import { createEntrySharing } from './entry-sharing.mjs';
     const send = (obj) => {
         if (!app.ws || app.ws.readyState !== 1) return false;
         if (obj.t !== 'hello' && connectionState !== 'connected') return false;
+        const writesMessage = obj.t === 'say' || obj.t === 'cmd' && ['me', 'slap', 'msg', 'm'].includes(String(obj.name || '').toLowerCase());
+        if (writesMessage && !entrySharing.canSend()) {
+            toast('Wait for confirmation that your entrance is hidden, or reconnect. Your draft stays here.');
+            return false;
+        }
         const payload = JSON.stringify(obj);
         if (Number.isFinite(app.ws.bufferedAmount) && app.ws.bufferedAmount + new Blob([payload]).size > 2 * 1024 * 1024) {
             app.ws.close(4413, 'outgoing connection fell behind');
@@ -265,7 +284,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
                 $('[data-text]').value = drafts.get('#stalemate') || '';
             }
             send({ t: 'hello', nick, age13: true, entrySource: entrySharing.helloSource(), transport: 1 }); break;
-        case 'entry-source': break;
+        case 'entry-source': entrySharing.acknowledge(m); break;
         case 'nick-error': setConnection('offline'); gateStatus(m.text); $('[data-gate]').hidden = false; $('[data-app]').hidden = true; break;
         case 'welcome': {
             const wasIn = !!app.me;

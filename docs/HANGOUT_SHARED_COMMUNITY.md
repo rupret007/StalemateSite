@@ -37,6 +37,14 @@ not reuse support from a previous server. A sharing change between hello and
 welcome is reconciled before the connected client sends its next message.
 These are protocol capabilities, independent of account and staff capabilities.
 
+Hiding is confirmed by the server, not by successfully enqueueing a browser
+frame. While a hide is pending or rejected, unsent messages keep their drafts
+and wait; reports and room controls remain usable. A withdrawal does not need
+command-rate tokens, but existing admission, byte/frame and daily-accounting
+limits still apply. Repeating an already-hidden choice acknowledges only its
+sender instead of broadcasting another People update. New nonempty sharing
+choices retain the ordinary command limit and show an explicit rejection.
+
 The People panel also lets a visitor pause screen-reader chat announcements.
 Previously received scrollback stays quiet while channel navigation repaints
 it; pausing announcements does not remove messages. Automated DOM/browser checks
