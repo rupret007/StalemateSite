@@ -17,7 +17,8 @@ separately reviewable safety slices:
 | --- | --- | --- |
 | Preserve accepted reports at queue capacity | [PR 87](https://github.com/rupret007/StalemateSite/pull/87), head `35506907a472fde3e56e17890af7e07b872351ea`, based on `codex/webjam-setup-help` | Revalidate the current head, CI and normal exact-head Karen result. A full intake queue must not silently displace an accepted report. |
 | AI provider/child-data readiness gate and design documents | [PR 88](https://github.com/rupret007/StalemateSite/pull/88), head `0249a6a23d92a2e73f29fbf56a556a12dc7edccc`, based on `codex/moderation-queue-capacity` | Resolve the stacked dependency through normal review. Do not enable AI merely because readiness configuration names exist. |
-| Shared entry, client controls and bounded transport | `codex/shared-community-entry`, initially based on the PR 88 head above | Attach the final PR URL, exact head, test receipts and clean package hashes when published. Uncommitted source and this document are not a release artifact. |
+| Shared entry, client controls and bounded transport | [PR 89](https://github.com/rupret007/StalemateSite/pull/89), head `6597aa21ba8f3f338672e3222038269345b73bf7`, based on PR 88 | Source-bound local validation and package receipts are listed below. CI was green and normal Karen review requested on October 25; revalidate the current head/verdict before admission. Neither request nor CI is a Karen PASS or deployment. |
+| Inactive purpose-bound participation policy | [PR 90](https://github.com/rupret007/StalemateSite/pull/90), head `61261470c0ed591c2ef7733db40ec5a95afb9c95`, based on PR 89 | C1 pure evaluator only. Real consent/guardian verification, durable receipts and integration/revocation remain separate work. It does not change current beta admission. |
 
 Those heads are source snapshots, not claims that the PRs remain unchanged,
 have passed review or are deployed. The initial October 25 reconciliation also
@@ -204,6 +205,47 @@ churn; do not interpret unchanged schemas or compatible frame shapes as proof
 that the older artifact is safe under the same load.
 
 ## Evidence and remaining qualification
+
+### Final shared-entry source and standalone artifact
+
+The exact PR 89 head `6597aa21ba8f3f338672e3222038269345b73bf7` passed
+840 unit tests and all 298 configured browser tests. Both private-beta and Pages
+packages built with file/hash inventories. The Pages artifact includes the
+application branch's website snapshot; it must not overwrite newer public-band
+work from website main. Consume the selected app assets/source and reviewed
+navigation changes through the receiving owner.
+
+Receipts are in the application-local directory
+`.local/webjam-product-finish/shared-community-20261025/`:
+
+- `final-unit-6597aa21ba8f-privacy.json` and matching log;
+- `final-browser-6597aa21ba8f-privacy.json`, log and result directory;
+- `final-packages-6597aa21ba8f-privacy.json`, including both artifact inventories;
+- `final-load-6597aa21ba8f.json`, with exact head and module hashes;
+- `toolkit-extracted-smoke-6597aa21ba8f.json`;
+- `final-screenshots-6597aa21ba8f/`, including provenance and 375/390px captures;
+- `review-entry-final-evidence.json`, the dated CI read and review-request receipt.
+
+The final-source loopback run passed 150 guests, 30 rooms and 16 simultaneous
+reconnects in 127.326 ms, with no replayed backlog. Hot-lobby delivery p95 was
+15.754 ms and peak logical pending delivery was 4,480,982 bytes. Existing caps
+remained unchanged. Exactly the intentionally unacknowledging peer was retired;
+healthy peers continued, excess admission returned 429, and 30 rooms survived a
+memory-adapter restart without stored ordinary chat. The short local sample is
+not Cloudflare capacity, an invoice, real suspended TCP behavior or hosted
+recovery qualification.
+
+`community-entry-toolkit-6597aa21ba8f.zip` is a 54,384-byte standalone entry
+toolkit with SHA-256
+`4df5bdc29698e1eab12bd654fe61beacee9dd34f2fb66f9b9bd7eb46e81bfe5e`.
+Fresh extraction produced the three reviewed synthetic-site snippets without
+npm installation or network access. The real-site example remains disabled and
+unverified. The toolkit does not deploy the application, select the real
+canonical URL, verify DNS, provide SSO or grant staff permissions.
+
+Use [the demonstration guide](HANGOUT_DEMO_GUIDE.md) for a local dry run and the
+separate owner-qualified hosted journey. Preserve all earlier failure receipts
+below; they explain the pacing/coalescing changes and rollback risk.
 
 The local 50-client/10-room paid-control receipt and its SHA-256 are recorded in
 [the shared-community document](HANGOUT_SHARED_COMMUNITY.md#measured-scope-and-overload-behavior).

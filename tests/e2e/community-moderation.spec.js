@@ -1,5 +1,5 @@
 // Real local WebSockets, application engine, report/reviewer UI and independent
-// entry origins. devadmin/as are the loopback relay's explicit identity fixture,
+// entry origins. devadmin/as/devowner are the loopback relay's explicit identity fixture,
 // not Cloudflare Access. Socket close + credential removal below do not prove
 // hosted logout, JWT expiry or beta-registry revocation; those have separate tests.
 const http = require('node:http');
@@ -15,10 +15,11 @@ const escapeHtml = value => value.replace(/[&<>"']/g, character => ({ '&': '&amp
 async function scenario(browser, baseURL) {
     const contexts = [], websites = [], errors = [], providerRequests = [];
     const relay = hangoutRelayWsBase(baseURL, `shared-community-moderation-${randomUUID()}`);
-    const lobbyUrl = source => {
+    const lobbyUrl = (source, owner = false) => {
         const target = new URL(`${ROOT}lobby/`, baseURL);
         target.searchParams.set('preview', PREVIEW); target.searchParams.set('relay', relay);
         if (source) target.searchParams.set('via', source);
+        if (owner) target.searchParams.set('owner', '1');
         return target.href;
     };
     const adminUrl = credential => {
@@ -27,8 +28,10 @@ async function scenario(browser, baseURL) {
         if (credential) target.searchParams.set('devadmin', credential);
         return target.href;
     };
-    async function context() {
-        const value = await browser.newContext(); contexts.push(value);
+    async function context(options = {}) {
+        const value = await browser.newContext(options); contexts.push(value);
+        // Matches only the explicit shared-community namespace's relay fixture.
+        await value.addInitScript(() => { window.HangoutEntrySites = [{ id: 'makers', label: 'Makers & Friends' }]; });
         value.on('page', page => page.on('pageerror', error => errors.push(error.message)));
         value.on('request', request => {
             if (new URL(request.url()).hostname === 'api.openai.com') providerRequests.push(request.url());
@@ -39,26 +42,42 @@ async function scenario(browser, baseURL) {
         });
         return value;
     }
-    async function website(source, label) {
+    async function website(source, label, owner) {
         const server = http.createServer((_request, response) => {
             response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
-            response.end(`<!doctype html><html lang="en"><title>${escapeHtml(label)} moderation fixture</title><h1>${escapeHtml(label)}</h1><a href="${escapeHtml(lobbyUrl(source))}">Hang Out</a></html>`);
+            response.end(`<!doctype html><html lang="en"><title>${escapeHtml(label)} moderation fixture</title><h1>${escapeHtml(label)}</h1><a href="${escapeHtml(lobbyUrl(source, owner))}">Hang Out</a></html>`);
         });
         await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
         const url = `http://127.0.0.1:${server.address().port}/`;
         websites.push(server);
         return url;
     }
-    async function guest(source, nickname, existingContext) {
-        const profile = existingContext || await context(), page = await profile.newPage();
+    async function guest(source, nickname, existingContext, { account, viewport } = {}) {
+        const profile = existingContext || await context(viewport ? { viewport } : {});
+        if (account) await profile.addInitScript(identity => {
+            const NativeSocket = window.WebSocket;
+            window.WebSocket = class extends NativeSocket {
+                constructor(address, protocols) {
+                    const url = new URL(address);
+                    // TEST-ONLY authenticated adapter; no real email/Access flow.
+                    if (url.pathname.endsWith('/lobby-owner')) {
+                        url.searchParams.set('devowner', 'local-dev-admin-key-0001');
+                        url.searchParams.set('account', identity);
+                    }
+                    super(url.href, protocols);
+                }
+            };
+        }, account);
+        const page = await profile.newPage();
         if (source) {
-            const origin = await website(source, source === 'stalemate' ? 'Stalemate' : 'Rad Dad');
+            const origin = await website(source, { stalemate: 'Stalemate', 'rad-dad': 'Rad Dad', makers: 'Makers & Friends' }[source], !!account);
             await page.goto(origin); await page.getByRole('link', { name: 'Hang Out', exact: true }).click();
-        } else await page.goto(lobbyUrl(''));
+        } else await page.goto(lobbyUrl('', !!account));
         await page.fill('[data-nick]', nickname); await page.click('[data-enter]');
         await expect(page.locator('[data-connection]')).toHaveText('Connected');
         await expect(page.locator('[data-app]')).toBeVisible();
         expect(new URL(page.url()).origin).toBe(new URL(baseURL).origin);
+        expect(await page.evaluate(() => window.__lobby.verified)).toBe(!!account);
         return page;
     }
     async function moderator(nickname = 'FixtureMod') {
@@ -80,7 +99,7 @@ async function scenario(browser, baseURL) {
         expect(await page.evaluate(() => window.__admin.state.capabilities)).toMatchObject({ moderate: true, configure: false });
         return page;
     }
-    return { guest, moderator, adminUrl,
+    return { guest, moderator, adminUrl, websiteOrigins: () => websites.map(server => `http://127.0.0.1:${server.address().port}`),
         close: async () => {
             await Promise.all(contexts.map(value => value.close()));
             await Promise.all(websites.map(server => new Promise(resolve => { server.closeIdleConnections(); server.close(resolve); })));
@@ -95,21 +114,41 @@ async function say(page, text) {
 const received = (page, text) => page.locator('[data-buffer] li[data-id]').filter({ hasText: text });
 const reportRow = (page, text) => page.locator('[data-reports] > li').filter({ hasText: text });
 
-test('mixed entrances share real reports, authorized disposition and restrictions that follow the signed device', async ({ browser, baseURL }) => {
+test('three entrances share a guest-hosted creative room, real report review and signed-device restrictions', async ({ browser, baseURL }, testInfo) => {
     const app = await scenario(browser, baseURL);
     try {
-        const author = await app.guest('stalemate', 'StaleAuthor');
+        const author = await app.guest('stalemate', 'StaleAuthor', null, { viewport: { width: 390, height: 844 } });
+        const beforeJoin = 'This earlier lobby line belongs only to its connected session';
+        await say(author, beforeJoin); await expect(received(author, beforeJoin)).toHaveCount(1);
         const witness = await app.guest('rad-dad', 'RadWitness');
-        const observer = await app.guest('', 'DirectObserver');
+        const observer = await app.guest('makers', 'MakerObserver');
+        expect(new Set(app.websiteOrigins()).size).toBe(3);
+        for (const page of [witness, observer]) await expect(received(page, beforeJoin)).toHaveCount(0);
+        // An unverified visitor really creates and hosts this activity room.
+        await witness.click('[data-start="art"]');
+        await expect(witness.locator('[data-act-canvas]')).toBeVisible();
+        await expect(witness.locator('[data-roomtools]')).toBeVisible();
+        const room = await witness.evaluate(() => window.__lobby.active);
+        for (const page of [author, observer]) {
+            await page.evaluate(name => window.__lobby.cmd('join', [name]), room);
+            await expect(page.locator('[data-chat-context]')).toHaveText(room);
+            await expect(page.locator('[data-act-canvas]')).toBeVisible();
+            await expect(page.locator('[data-roomtools]')).toBeHidden();
+        }
+        await author.click('nav [data-show="people"]');
+        await expect(author.locator('[data-nicks] .entry-badge')).toHaveText(['via Rad Dad', 'via Makers & Friends', 'via Stalemate']);
+        await author.click('nav [data-show="chat"]');
         const moderator = await app.moderator();
         const text = 'Synthetic shared community report for this test only';
         await say(author, text);
         for (const page of [author, witness, observer]) await expect(received(page, text)).toContainText('via Stalemate');
         const messageId = await received(witness, text).getAttribute('data-id');
 
-        // A source label and forged JSON role never grant message deletion.
-        await witness.evaluate(id => window.__lobby.ws.send(JSON.stringify({ t: 'cmd', name: 'delete', args: [id],
-            ch: '#stalemate', role: 'owner', admin: true, entrySource: 'stalemate' })), messageId);
+        await author.screenshot({ path: testInfo.outputPath('shared-creative-report-390.png'), fullPage: true });
+        // Even the guest room host cannot acquire global message deletion by
+        // supplying a source label and invented authority in its JSON frame.
+        await witness.evaluate(({ id, ch }) => window.__lobby.ws.send(JSON.stringify({ t: 'cmd', name: 'delete', args: [id],
+            ch, role: 'owner', admin: true, entrySource: 'stalemate' })), { id: messageId, ch: room });
         await expect(witness.locator('[data-buffer]')).toContainText('permission denied');
         for (const page of [author, witness, observer]) await expect(received(page, text)).toHaveCount(1);
         expect(await witness.evaluate(() => window.__lobby.capabilities.moderate)).toBe(false);
@@ -136,6 +175,10 @@ test('mixed entrances share real reports, authorized disposition and restriction
         // Same canonical-origin browser context keeps its genuine signed device
         // token, but now enters through the other website under a fresh nickname.
         const returning = await app.guest('rad-dad', 'OtherEntrance', author.context());
+        await returning.evaluate(name => window.__lobby.cmd('join', [name]), room);
+        await expect(returning.locator('[data-chat-context]')).toHaveText(room);
+        await expect(received(returning, beforeJoin)).toHaveCount(0);
+        await expect(received(returning, text)).toHaveCount(0);
         const blocked = 'A muted device must not gain another allowance through another entrance';
         await say(returning, blocked);
         await expect(returning.locator('[data-buffer]')).toContainText('You’re muted for now');
@@ -182,5 +225,124 @@ test('a real local staff disconnect clears evidence and withdrawing the fixture 
         await expect(reportRow(replacement, text)).toHaveCount(0);
         // Dismissal removes review evidence, not the already delivered message.
         for (const page of [author, witness]) await expect(received(page, text)).toHaveCount(1);
+    } finally { await app.close(); }
+});
+
+test('visible Ignore and Block protect a visitor across a third site and a changed entry and nickname', async ({ browser, baseURL }, testInfo) => {
+    const app = await scenario(browser, baseURL);
+    try {
+        const host = await app.guest('rad-dad', 'RadRoomHost', null, { viewport: { width: 375, height: 812 } });
+        const witness = await app.guest('stalemate', 'StaleWitness');
+        const maker = await app.guest('makers', 'MakerGuest');
+        await host.click('[data-show="rooms"].startroom');
+        await host.click('[data-start="art"]');
+        await expect(host.locator('[data-act-canvas]')).toBeVisible();
+        const room = await host.evaluate(() => window.__lobby.active);
+        for (const page of [witness, maker]) {
+            await page.evaluate(name => window.__lobby.cmd('join', [name]), room);
+            await expect(page.locator('[data-chat-context]')).toHaveText(room);
+        }
+        const earlier = 'A line received before choosing Ignore stays in session scrollback';
+        await say(maker, earlier);
+        for (const page of [host, witness]) await expect(received(page, earlier)).toContainText('via Makers & Friends');
+        await host.click('nav [data-show="people"]');
+        await host.locator('[data-nicks] button').filter({ hasText: /MakerGuest$/ }).click();
+        await host.locator('[data-sheet-buttons]').getByRole('button', { name: 'Ignore', exact: true }).click();
+        await host.click('nav [data-show="chat"]');
+        await expect(host.locator('[data-buffer]')).toContainText('Ignoring MakerGuest.');
+
+        const ignored = 'Other visitors still see this line after one person chooses Ignore';
+        await say(maker, ignored);
+        await expect(received(witness, ignored)).toHaveCount(1);
+        await expect(received(host, ignored)).toHaveCount(0);
+        await expect(received(host, earlier)).toHaveCount(1);
+
+        await host.click('nav [data-show="people"]');
+        await host.locator('[data-nicks] button').filter({ hasText: /MakerGuest$/ }).click();
+        await host.locator('[data-sheet-buttons]').getByRole('button', { name: 'Block', exact: true }).click();
+        await host.click('nav [data-show="chat"]');
+        await expect(host.locator('[data-buffer]')).toContainText("Blocked MakerGuest. They can't PM you and you won't see them.");
+
+        // A fresh tab keeps its real signed device token, not its old nickname
+        // or website badge. Blocking must follow the device on this connection.
+        const returning = await app.guest('stalemate', 'DifferentMaker', maker.context());
+        await returning.evaluate(name => window.__lobby.cmd('join', [name]), room);
+        await expect(returning.locator('[data-chat-context]')).toHaveText(room);
+        await expect(received(returning, earlier)).toHaveCount(0);
+        await expect(received(returning, ignored)).toHaveCount(0);
+        const blocked = 'A different nickname and entrance still respect this visitor block';
+        await say(returning, blocked);
+        await expect(received(witness, blocked)).toContainText('via Stalemate');
+        await expect(received(host, blocked)).toHaveCount(0);
+        await returning.evaluate(() => window.__lobby.cmd('query', ['RadRoomHost']));
+        await expect(returning.locator('[data-buffer]')).toContainText("RadRoomHost isn't taking PMs.");
+        await expect(host.locator('[data-pmreqs]')).toHaveText('');
+        // Personal controls have no effect on other visitors or staff powers.
+        expect(await host.evaluate(() => window.__lobby.capabilities.moderate)).toBe(false);
+        expect(await returning.evaluate(() => window.__lobby.capabilities.register)).toBe(false);
+        expect(await host.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+        await host.screenshot({ path: testInfo.outputPath('shared-personal-controls-375.png'), fullPage: true });
+    } finally { await app.close(); }
+});
+
+test('one fixture-verified account keeps ownership across entries and revokes an offline cross-entry co-host', async ({ browser, baseURL }, testInfo) => {
+    testInfo.annotations.push({ type: 'identity-scope', description: 'Loopback devowner account adapter; not a hosted Cloudflare Access or email-delivery qualification.' });
+    const app = await scenario(browser, baseURL);
+    try {
+        const account = 'journey-owner@example.test', cohostAccount = 'journey-cohost@example.test';
+        const owner = await app.guest('stalemate', 'OriginalOwner', null, { account });
+        const cohost = await app.guest('rad-dad', 'RadCoHost', null, { account: cohostAccount });
+        const guest = await app.guest('makers', 'UnverifiedMaker');
+        const room = '#cross-entry-owners';
+        for (const page of [owner, cohost, guest]) {
+            await page.evaluate(name => window.__lobby.cmd('join', [name]), room);
+            await expect(page.locator('[data-chat-context]')).toHaveText(room);
+        }
+        await owner.click('[data-roomtools]');
+        await owner.getByRole('button', { name: 'Keep this room', exact: true }).click();
+        await expect(owner.locator('[data-host-status]')).toContainText('Registered');
+        await owner.click('[data-roomtools]');
+        owner.once('dialog', dialog => dialog.accept('RadCoHost'));
+        await owner.getByRole('button', { name: 'Add verified co-host', exact: true }).click();
+        await expect(cohost.locator('[data-roomtools]')).toBeVisible();
+        await expect(guest.locator('[data-roomtools]')).toBeHidden();
+        await guest.evaluate(ch => window.__lobby.ws.send(JSON.stringify({ t: 'cmd', name: 'cohost', args: ['add', 'UnverifiedMaker'], ch,
+            account: 'journey-owner@example.test', verified: true, role: 'owner', entrySource: 'stalemate' })), room);
+        await expect(guest.locator('[data-buffer]')).toContainText('Only the registered room owner can do that.');
+        expect(await guest.evaluate(() => window.__lobby.verified)).toBe(false);
+        await expect(guest.locator('[data-roomtools]')).toBeHidden();
+        const earlier = 'Registered ownership is retained while ordinary chat remains ephemeral';
+        await say(owner, earlier); await expect(received(cohost, earlier)).toHaveCount(1);
+        const oldDevice = await owner.evaluate(() => localStorage.getItem('hangout-dev'));
+        await owner.context().close(); await cohost.context().close();
+
+        // New browser storage/device; only the adapter's authenticated account
+        // is the same. Website source is deliberately changed.
+        const returnedOwner = await app.guest('rad-dad', 'ReturnedOwner', null, { account, viewport: { width: 390, height: 844 } });
+        expect(await returnedOwner.evaluate(() => localStorage.getItem('hangout-dev'))).not.toBe(oldDevice);
+        await returnedOwner.click('nav [data-show="rooms"]');
+        await returnedOwner.selectOption('[data-room-filter]', 'mine');
+        await returnedOwner.fill('[data-room-search]', 'cross-entry');
+        await returnedOwner.locator(`[data-room="${room}"]`).click();
+        await expect(returnedOwner.locator('[data-chat-context]')).toHaveText(room);
+        await expect(returnedOwner.locator('[data-roomtools]')).toBeVisible();
+        await expect(received(returnedOwner, earlier)).toHaveCount(0);
+        expect(await returnedOwner.evaluate(name => window.__lobby.chans.get(name).names.find(person => person.nick === window.__lobby.me).owner, room)).toBe(true);
+        expect(await returnedOwner.evaluate(() => window.__lobby.capabilities.moderate)).toBe(false);
+        await returnedOwner.click('[data-roomtools]');
+        returnedOwner.once('dialog', dialog => dialog.accept());
+        await returnedOwner.getByRole('button', { name: 'Remove verified co-host: RadCoHost', exact: true }).click();
+        await expect.poll(() => returnedOwner.evaluate(name => window.__lobby.chans.get(name).cohosts.length, room)).toBe(0);
+
+        const revoked = await app.guest('makers', 'ReturnedCoHost', null, { account: cohostAccount });
+        await revoked.evaluate(name => window.__lobby.cmd('join', [name]), room);
+        await expect(revoked.locator('[data-chat-context]')).toHaveText(room);
+        await expect(revoked.locator('[data-roomtools]')).toBeHidden();
+        await expect(received(revoked, earlier)).toHaveCount(0);
+        await revoked.evaluate(ch => window.__lobby.cmd('topic', ['A revoked host cannot replace the room topic'], ch), room);
+        await expect(revoked.locator('[data-buffer]')).toContainText('only @ can set the topic');
+        await expect(returnedOwner.locator('[data-topic]')).not.toContainText('A revoked host');
+        await returnedOwner.screenshot({ path: testInfo.outputPath('shared-owner-revocation-390.png'), fullPage: true });
+        expect(await returnedOwner.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
     } finally { await app.close(); }
 });
