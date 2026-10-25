@@ -56,6 +56,8 @@ function syncMute() {
   $('mute').setAttribute('aria-pressed', String(muted));
   $('mute').setAttribute('aria-label', muted ? 'Sound off. Unmute game sounds' : 'Sound on. Mute game sounds');
 }
+function musicBlocked() { return !opened || !!game?.result || suspended || !!document.querySelector('dialog[open]'); }
+function syncMusicGate() { suite?.setMusicGameBlocked?.(musicBlocked); }
 function humanTurn() { return game && (game.mode === 'local' || game.chess.turn() === game.side); }
 function livePosition() { return reviewing === null; }
 function playablePosition() { return opened && game && !game.result && humanTurn() && livePosition() && !suspended; }
@@ -169,6 +171,7 @@ function renderHistory() {
   if (reviewing === null) { list.scrollTop = list.scrollHeight; }
 }
 function render() {
+  syncMusicGate();
   if (!game || !opened) { return; }
   renderBoard(); renderHistory(); syncMute();
   const ended = game.result;
@@ -244,6 +247,7 @@ function enterGame() {
 }
 function openSetup() {
   cancelSearch(); opened = false;
+  syncMusicGate();
   $('setup').hidden = false; $('game').hidden = true;
   $('continue').hidden = !game;
   $('continue').textContent = game?.result ? 'Review last game' : 'Continue game';
@@ -404,6 +408,7 @@ function suspendGame() {
   cancelSearch(); suspended = true; selected = null; hintMove = null; promotionMove = null; confirmAction = null;
   for (const dialog of document.querySelectorAll('dialog[open]')) { dialog.close(); }
   persist();
+  syncMusicGate();
 }
 document.addEventListener('visibilitychange', () => {
   if (!opened) { return; }
@@ -421,5 +426,10 @@ settings(); syncMute(); openSetup();
 const playButton = $('new-game').querySelector('button[type=submit]');
 playButton.disabled = false;
 $('how-to').disabled = false;
-suite?.setMusicGameBlocked?.(() => !opened || !!game?.result || suspended || !!document.querySelector('dialog[open]'));
+// Native dialog close/cancel paths can change the gate without redrawing the
+// board. Resync the existing player; never create a second player or preference.
+const musicDialogs = new globalThis.MutationObserver(syncMusicGate);
+for (const dialog of document.querySelectorAll('dialog')) {
+  musicDialogs.observe(dialog, { attributes: true, attributeFilter: ['open'] });
+}
 globalThis.SuiteLoading?.ready();

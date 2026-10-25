@@ -1,6 +1,6 @@
 # Site and arcade polish
 
-Shared Turdanoid source pin: `e73e8026925f7aca7a89f7dd0a78686cbc078f2d`.
+Shared Turdanoid source pin: `e07511d991ea8cd40b313e45f7b6826b48ac27be`.
 
 This release preserves the accepted Stalemate design, content, section order and optional five-song arcade playlist. The owner approved one content addition: Sean — Bass and Vocals; Jeff — Guitars and Vocals; Che’ — Drums and Vocals, in the existing About section. The earlier member-name restriction is superseded by that explicit request.
 

@@ -2,7 +2,7 @@
 
 The arcade now offers eight games. Royal Flush Chess is linked from the band homepage and hub. Choose the computer or two players sharing the same device; online multiplayer is not offered.
 
-The integration now pins shared arcade polish source, Turdanoid `e73e8026925f7aca7a89f7dd0a78686cbc078f2d`, built on the accepted Rad Dad chess release `10a0e6e201946247ddf4a7ca06f3786a93e69805`. It retains Chessground 10.5.0, Maurizio Monge's Spatial pieces, chess.js rules, the local Stockfish worker, difficulty choices, hints, undo, review, PGN export and saved-game continuation. Stalemate's existing branding, optional five-song playlist, preferences and records remain enabled. Rad Dad's music-disabling transformations are not applied.
+The integration now pins shared arcade polish source, Turdanoid `e07511d991ea8cd40b313e45f7b6826b48ac27be`, built on the accepted Rad Dad chess release `10a0e6e201946247ddf4a7ca06f3786a93e69805`. It retains Chessground 10.5.0, Maurizio Monge's Spatial pieces, chess.js rules, the local Stockfish worker, difficulty choices, hints, undo, review, PGN export and saved-game continuation. Stalemate's existing branding, optional five-song playlist, preferences and records remain enabled. Rad Dad's music-disabling transformations are not applied.
 
 `scripts/lib/sync-turdanoid.cjs` defaults to that exact source revision and imports `chess.html` with its assets and modules. Run `scripts/sync-turdanoid.sh` to reproduce it, or supply `--source` and an explicit reviewed revision. Edit upstream gameplay or importer/overlay sources rather than generated `play/`. The pinned source also contains the shared startup, touch and accessibility fixes already qualified with chess; the existing seven games are included in regression checks.
 

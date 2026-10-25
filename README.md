@@ -64,7 +64,7 @@ These events measure actual visits and actions. Retention improvements require u
 
 Reusable gameplay, shared art, and the playlist player live in [Turdanoid](https://github.com/rupret007/Turdanoid). The arcade offers eight games, including Royal Flush Chess against the computer or two players sharing this device, plus ordinary Turdomania with difficulty choices, new boards and undo. Site-specific branding and analytics live in `scripts/stalemate-overlay/`, `scripts/stalemate-strip.css`, and `scripts/play-track.js`. The generated `play/` files are replaced during synchronization; edit their source instead.
 
-The default import pins the shared arcade polish release `e73e8026925f7aca7a89f7dd0a78686cbc078f2d`. Synchronize a reviewed branch, tag, or exact commit. A local repository avoids a network clone and imports committed files at the requested revision:
+The default import pins the shared arcade polish release `e07511d991ea8cd40b313e45f7b6826b48ac27be`. Synchronize a reviewed branch, tag, or exact commit. A local repository avoids a network clone and imports committed files at the requested revision:
 
 ```bash
 scripts/sync-turdanoid.sh --source ../Turdanoid <full-upstream-commit-SHA>
