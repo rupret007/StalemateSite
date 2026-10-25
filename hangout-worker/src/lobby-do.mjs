@@ -9,6 +9,10 @@ import { aiEligibility } from './ai-eligibility.mjs';
 import { activeBetaSession, validBetaSession } from './beta-session-client.mjs';
 import { INTERNAL_HEALTH_PATH, aiHealth, dailyUsage, healthJson } from './beta-ops.mjs';
 import { createPrivateReportQueue, privateReportRef, validatePrivateReportControl, LIMITS as PRIVATE_REPORT_LIMITS } from './private-reports.mjs';
+import { createSocketDelivery } from './socket-delivery.mjs';
+import { createTransportControlBudget } from './transport-budget.mjs';
+import { createPresenceProjections } from './presence-projections.mjs';
+import { entrySitesFromConfig } from '../../r/45662413410ed051/entry-sites.mjs';
 
 const privateReportResponse = (value) => new Response(JSON.stringify(value), {
     status: value.ok ? 200 : Number.isInteger(value.status) ? value.status : 503,
@@ -126,6 +130,26 @@ export class HangoutLobby {
         this.state = state;
         this.env = env;
         this.pendingAdmission = new Map();
+        this.presence = createPresenceProjections({
+            flush: batch => this.engine.flushPresence(batch),
+            serialize: async fn => { await this.ready; return this.state.blockConcurrencyWhile(async () => fn()); }
+        });
+        this.controlBudget = createTransportControlBudget({
+            reserve: id => this.engine.reserveTransportControl(id),
+            available: id => this.engine.transportControlReady(id),
+            readState: ws => ws.deserializeAttachment()?.controlGrant,
+            writeState: (ws, controlGrant) => ws.serializeAttachment({ ...(ws.deserializeAttachment() || {}), controlGrant })
+        });
+        this.delivery = createSocketDelivery({
+            readState: ws => ws.deserializeAttachment()?.delivery,
+            writeState: (ws, delivery) => ws.serializeAttachment({ ...(ws.deserializeAttachment() || {}), delivery }),
+            onClosed: ws => {
+                // Retire membership without waiting for a slow peer's close handshake.
+                // Scheduling preserves the current engine command's commit/flush ordering.
+                const ended = Promise.resolve().then(() => this.webSocketClose(ws)).catch(() => this.storageFailed());
+                this.state.waitUntil?.(ended);
+            }
+        });
         this.evidenceStorage = 'ready';
         this.privateReportState = { storage: 'disabled', reports: [] };
         this.privateAdminDispatch = new WeakMap();
@@ -156,6 +180,7 @@ export class HangoutLobby {
                 onChange: () => this.engine?.notifyAiStatus()
             });
             this.engine = createLobby({
+                deferPresence: marker => this.presence.mark(marker),
                 aiModerationStatus: () => ({ ...this.aiModerator.status(), requested: eligibility.requested,
                     ...(eligibility.requested && !eligibility.allowed ? { state: 'not-qualified' } : {}),
                     eligibility, evidenceStorage: this.evidenceStorage }),
@@ -181,17 +206,17 @@ export class HangoutLobby {
                             this.sendPrivateAdmin(ws, id, msg);
                             return;
                         }
-                        ws.send(JSON.stringify(msg));
+                        this.delivery.send(ws, msg);
                     }
                     else this.pendingAdmission.get(id)?.push(msg);
                 },
-                close: (id, code, reason) => { const ws = this.byId(id); if (ws) try { ws.close(code, reason); } catch (e) { /* gone */ } },
+                close: (id, code, reason) => { const ws = this.byId(id); if (ws) { this.delivery.forget(ws); try { ws.close(code, reason); } catch (e) { /* gone */ } } },
                 persist: (kind, data) => {
                     if (['rooms', 'abuse', 'sessions', 'moderation-queue', 'net'].includes(kind)) return this.persistRequired(kind, data);
                     if (kind === 'ai-reviews') return this.persistState(kind, data);
                     if (kind === 'modlog') { this.logSeq = (this.logSeq || 0) + 1; this.persistState(`log:${String(Date.now()).padStart(15, '0')}:${crypto.randomUUID()}`, data); }
                 },
-                limits: { webJoinOrigins: String(env.WEBJAM_WEB_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean) }
+                limits: { webJoinOrigins: String(env.WEBJAM_WEB_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean), entrySites: entrySitesFromConfig(env.HANGOUT_ENTRY_SITES) }
             });
             this.engine.restore((await state.storage.get('net')) || {});
             this.engine.restoreAiReviews((await state.storage.get('ai-reviews')) || []);
@@ -223,12 +248,16 @@ export class HangoutLobby {
                     if (!betaChecks.has(a.betaSid)) betaChecks.set(a.betaSid, activeBetaSession(env, a));
                     if (!await betaChecks.get(a.betaSid)) { ws.close(4401, 'beta session ended'); continue; }
                 }
+                if (!this.delivery.adopt(ws)) continue;
                 live.push(a); sockets.set(a.id, ws);
             }
             const roomsBeforeResume = JSON.stringify(this.engine.roomSnapshot());
             const savedSessions = await state.storage.get('sessions');
             const restored = this.engine.restoreSessions(savedSessions, live);
-            for (const rejected of restored.rejected) sockets.get(rejected.id)?.close(4401, rejected.reason);
+            for (const rejected of restored.rejected) {
+                const ws = sockets.get(rejected.id);
+                if (ws) { this.delivery.forget(ws); ws.close(4401, rejected.reason); }
+            }
             const currentRooms = this.engine.roomSnapshot();
             if (JSON.stringify(currentRooms) !== roomsBeforeResume) await this.persistRequired('rooms', currentRooms);
             const currentSessions = this.engine.sessionSnapshot();
@@ -270,7 +299,7 @@ export class HangoutLobby {
                 Number.isFinite(report.at) && report.at <= now && now - report.at < PRIVATE_REPORT_LIMITS.ttlMs) };
             // Read the current queue only after authentication, and supersede
             // older checks so an old frame cannot restore dismissed evidence.
-            ws.send(JSON.stringify({ ...msg, state: { ...msg.state, privateReports } }));
+            this.delivery.send(ws, { ...msg, state: { ...msg.state, privateReports } });
         })().catch(() => { /* No private evidence is sent on delivery failure. */ });
         this.state.waitUntil?.(task);
         return task;
@@ -373,7 +402,7 @@ export class HangoutLobby {
                     if (!betaChecks.has(a.betaSid)) betaChecks.set(a.betaSid, activeBetaSession(this.env, a));
                     ended = !await betaChecks.get(a.betaSid);
                 }
-                if (ended) { ws.close(4401, 'sign in again'); await this.engine.disconnect(a.id); }
+                if (ended) { this.delivery.forget(ws); ws.close(4401, 'sign in again'); await this.engine.disconnect(a.id); }
             }
             await this.engine.tick(); await this.pruneLogs();
             await this.refreshPrivateReports();
@@ -407,7 +436,7 @@ export class HangoutLobby {
             return this.state.blockConcurrencyWhile(async () => {
                 for (const ws of this.state.getWebSockets()) {
                     const a = ws.deserializeAttachment() || {};
-                    if (a.pilotSid === identity.pilotSid) { ws.close(4401, 'pilot identity changed'); await this.engine.disconnect(a.id); }
+                    if (a.pilotSid === identity.pilotSid) { this.delivery.forget(ws); ws.close(4401, 'pilot identity changed'); await this.engine.disconnect(a.id); }
                 }
                 return new Response('ok');
             });
@@ -416,7 +445,7 @@ export class HangoutLobby {
             return this.state.blockConcurrencyWhile(async () => {
                 for (const ws of this.state.getWebSockets()) {
                     const a = ws.deserializeAttachment() || {};
-                    if (a.betaSid === identity.betaSid) { ws.serializeAttachment({ ...a, betaEnded: true }); ws.close(4401, 'beta session ended'); await this.engine.disconnect(a.id); }
+                    if (a.betaSid === identity.betaSid) { this.delivery.forget(ws); ws.serializeAttachment({ ...a, betaEnded: true }); ws.close(4401, 'beta session ended'); await this.engine.disconnect(a.id); }
                 }
                 return new Response('ok');
             });
@@ -444,10 +473,10 @@ export class HangoutLobby {
             betaSid: this.env.HANGOUT_BETA_MODE === 'protected' ? identity.betaSid : undefined,
             betaInviteVersion: this.env.HANGOUT_BETA_MODE === 'protected' ? identity.betaInviteVersion : undefined,
             dev: identity.dev, iph: identity.iph, role: identity.role, email: identity.email, account: identity.account, expiresAt: identity.expiresAt, admin: identity.admin });
-        if (identity.devToken) pair[1].send(JSON.stringify({ t: 'device', token: identity.devToken }));
+        if (identity.devToken) this.delivery.send(pair[1], { t: 'device', token: identity.devToken });
         for (const frame of initialFrames) {
             if (frame.t === 'admin' && this.env.HANGOUT_BETA_MODE === 'protected') this.sendPrivateAdmin(pair[1], id, frame);
-            else pair[1].send(JSON.stringify(frame));
+            else this.delivery.send(pair[1], frame);
         }
         return new Response(null, { status: 101, webSocket: pair[0] });
         });
@@ -456,7 +485,21 @@ export class HangoutLobby {
         await this.ready;
         return this.state.blockConcurrencyWhile(async () => {
             const a = ws.deserializeAttachment() || {};
-            if (socketIdentityInvalid(a, this.env)) { ws.close(4401, 'sign in again'); return this.engine.disconnect(a.id); }
+            if (socketIdentityInvalid(a, this.env)) { this.delivery.forget(ws); ws.close(4401, 'sign in again'); return this.engine.disconnect(a.id); }
+            // Transport control prepays request units from the same daily budget,
+            // but never spends a person's chat allowance or mutates room authority.
+            if (typeof raw === 'string' && raw.length <= LOBBY_LIMITS.actFrameBytes) {
+                let control;
+                try { control = JSON.parse(raw); } catch { /* The engine refuses malformed application frames. */ }
+                if (control?.t === 'transport-ack') {
+                    if (!await this.controlBudget.take(ws, a.id)) {
+                        this.delivery.forget(ws); ws.close(4413, 'community control allowance unavailable');
+                        return this.engine.disconnect(a.id);
+                    }
+                    return this.delivery.acknowledge(ws, control.seq);
+                }
+                if (control?.t === 'hello' && !this.delivery.negotiate(ws, control.transport)) return;
+            }
             const result = await this.engine.message(this.state.getTags(ws)[0], typeof raw === 'string' ? raw : '');
             if (result?.privateReportAction) {
                 let resolved;
@@ -467,6 +510,6 @@ export class HangoutLobby {
             return result;
         });
     }
-    async webSocketClose(ws) { await this.ready; return this.state.blockConcurrencyWhile(() => Promise.resolve(this.engine.disconnect(this.state.getTags(ws)[0]))); }
+    async webSocketClose(ws) { this.delivery.forget(ws); await this.ready; return this.state.blockConcurrencyWhile(() => Promise.resolve(this.engine.disconnect(this.state.getTags(ws)[0]))); }
     async webSocketError(ws) { return this.webSocketClose(ws); }
 }

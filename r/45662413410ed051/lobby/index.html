@@ -16,7 +16,7 @@
     <link rel="stylesheet" href="lobby.css">
 </head>
 <body>
-    <header class="titlebar"><div class="brand"><span class="brand-mark" aria-hidden="true">s.</span><span><b>STALEMATE</b><span class="brand-caption">IRC / COMMUNITY</span></span><span class="title-extra">A place to hang out.</span></div><div class="connection-tools"><span class="connection" data-connection role="status" data-state="offline">Not connected</span><button type="button" data-reconnect hidden>Try again</button></div></header>
+    <header class="titlebar"><div class="brand"><span class="brand-mark" aria-hidden="true">#</span><span><b>HANG OUT</b><span class="brand-caption">IRC / COMMUNITY</span></span><span class="title-extra">A place to hang out.</span></div><div class="connection-tools"><a class="entry-return" data-entry-return hidden></a><span class="connection" data-connection role="status" data-state="offline">Not connected</span><button type="button" data-reconnect hidden>Try again</button></div></header>
 
     <section class="gate" data-gate>
         <div class="gate-layout">
@@ -35,6 +35,8 @@
                 <span class="nickbox"><input data-nick maxlength="20" autocomplete="off" spellcheck="false" aria-label="Your nick" placeholder="Type a nickname… or roll one →"><button class="btn btn--ghost dice" type="button" data-reroll aria-label="Make me a random fun nickname" title="Make me a random fun nickname">🎲 Make me a name</button></span>
             </label>
             <p class="small gate-hint">Remembered on this device, not reserved. Camera &amp; mic stay off.</p>
+            <div class="entry-choice" data-entry-context hidden><label><input type="checkbox" data-entry-share checked> Show <span data-entry-label></span> beside my name</label><p class="small">Your entrance, not a verified identity. You can hide it in People.</p></div>
+            <p class="small" data-entry-unavailable hidden>Entry-site badges aren’t available on this server. Your return link still works.</p>
             <button class="btn btn--big" type="button" data-enter disabled>I’m 13+ and I agree · Let me in ↗</button>
             <p class="rules"><b>One rule: Don’t be a dick.</b> Swear all you want. You own what you post; site moderators can remove abusive content. <a href="../terms/" data-terms>House rules &amp; privacy</a></p>
             <details class="entry-details"><summary>How session scrollback works</summary><p class="small">Chat starts when you join. Scrollback stays in this tab for your connected session.</p></details>
@@ -159,10 +161,15 @@
             <p class="eyebrow people-eyebrow">IN THIS CHANNEL</p><h2 data-people-title>People</h2>
             <ul class="nicks" data-nicks></ul>
             <label class="pmtoggle"><input type="checkbox" data-pm-off> Turn off PM requests</label>
+            <label class="pmtoggle"><input type="checkbox" data-chat-announcements checked aria-describedby="chat-announcements-help"> Announce new chat messages</label>
+            <p class="small" id="chat-announcements-help">Pause screen-reader announcements to read at your own pace. Messages remain visible.</p>
             <p class="small people-help"><a href="../terms/">House rules</a><br>Use 🚩 beside a message to report it.</p>
             <div class="session-card"><span class="eyebrow">YOUR SESSION</span><b data-self-nick>Guest</b><span data-self-role>Guest access</span><span class="session-history">Chat starts when you join.</span></div>
+            <div class="entry-choice" data-entry-context hidden><label><input type="checkbox" data-entry-share checked> Show <span data-entry-label></span></label><p class="small">People and new messages. Earlier messages may still show your entrance.</p></div>
+            <p class="small" data-entry-unavailable hidden>Entry-site badges aren’t available on this server.</p>
         </aside>
 
+        <div class="toast" data-toast role="status" tabindex="0" hidden></div>
         <nav class="phonetabs" aria-label="Sections">
             <button type="button" data-show="rooms">🎨 Rooms</button>
             <button type="button" data-show="chat" aria-current="true">💬 Chat</button>
@@ -182,25 +189,24 @@
         </form>
         <p class="small">Give another member @ with /op nick before you leave. Rooms close after 10 minutes empty.</p>
     </dialog>
-    <dialog class="sheet" data-sheet>
-        <h3 data-sheet-title></h3>
+    <dialog class="sheet" data-sheet aria-labelledby="person-dialog-title">
+        <h3 id="person-dialog-title" data-sheet-title></h3>
         <div class="sheet-buttons" data-sheet-buttons></div>
         <button class="btn btn--ghost" type="button" data-sheet-close>Close</button>
     </dialog>
-    <dialog class="sheet" data-cam-gate>
-        <h3>Camera on?</h3>
+    <dialog class="sheet" data-cam-gate aria-labelledby="camera-dialog-title">
+        <h3 id="camera-dialog-title">Camera on?</h3>
         <p>Cameras in open rooms are for grown-ups. Others in this room will see you.</p>
         <label class="check"><input type="checkbox" data-adult> I’m 18 or older</label>
         <div class="sheet-buttons"><button class="btn" type="button" data-cam-yes>Turn it on</button><button class="btn btn--ghost" type="button" data-cam-no>Never mind</button></div>
     </dialog>
-    <dialog class="sheet" data-palette>
-        <h3>Commands</h3>
+    <dialog class="sheet" data-palette aria-labelledby="commands-dialog-title">
+        <h3 id="commands-dialog-title">Commands</h3>
         <p class="small">Tap one. Typing them works too.</p>
         <div class="sheet-buttons" data-palette-buttons></div>
         <button class="btn btn--ghost" type="button" data-palette-close>Close</button>
     </dialog>
     <aside class="guest-check" data-guest-check hidden><p role="status">Checking your guest connection…</p><div data-turnstile></div></aside>
-    <div class="toast" data-toast role="status" hidden></div>
     <!-- Page-level counts only: fixed event names, no query string (the preview key is stripped first), no referrer. -->
     <script data-goatcounter="https://stalemate.goatcounter.com/count" data-goatcounter-settings='{"no_onload": true}' async src="../../../js/count.js"></script>
     <script src="../names.js"></script>
@@ -211,6 +217,6 @@
     <script src="../bob-ross.js"></script>
     <script src="discovery-core.js"></script>
     <script src="lobby-room.js"></script>
-    <script src="lobby.js"></script>
+    <script type="module" src="lobby.js"></script>
 </body>
 </html>

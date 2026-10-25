@@ -27,6 +27,14 @@ describe('Cloudflare Access JWT', async () => {
     it('accepts a valid token and lowercases the email', async () => {
         expect(await verifyAccessJwt(await token(pair, good), opts)).toEqual({ email: 'jeff@example.com', expiresAt: good.exp * 1000 });
     });
+    it('bounds signed email claims before constructing durable identities', async () => {
+        const boundary = `${'a'.repeat(64)}@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(58)}.co`;
+        expect(boundary.length).toBe(254);
+        expect(await verifyAccessJwt(await token(pair, { ...good, email: boundary }), opts)).toMatchObject({ email: boundary });
+        for (const email of [`${boundary}x`, `${'x'.repeat(20000)}@example.test`, `${'é'.repeat(125)}@e.test`]) {
+            await expect(verifyAccessJwt(await token(pair, { ...good, email }), opts)).rejects.toThrow('email');
+        }
+    });
     it.each([
         ['missing', async () => ''],
         ['bad aud', async () => token(pair, { ...good, aud: ['nope'] })],

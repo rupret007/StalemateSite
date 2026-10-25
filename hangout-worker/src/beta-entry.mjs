@@ -6,6 +6,7 @@ import { previewKeyOk } from './core.mjs';
 import { BETA_TTL, BETA_COOKIE, BETA_IDENTITY_COOKIE, BetaSessionUnavailable, equalInvite, signBeta, betaCookie, betaSession, readBetaBody } from './beta-auth.mjs';
 import { registryRequest } from './beta-session-client.mjs';
 import { betaHealth } from './beta-ops.mjs';
+import { entrySitesFromConfig } from '../../r/45662413410ed051/entry-sites.mjs';
 export { BetaSessions } from './beta-sessions.mjs';
 export { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget };
 
@@ -27,7 +28,35 @@ export function betaAccessConfigured(env) {
 
 const SHELL = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Stalemate · Private community beta</title><link rel="stylesheet" href="/beta/style.css"><script defer src="/beta/client.js"></script></head><body><main><p class="eyebrow">STALEMATE / INVITATION ONLY</p><h1>Hang Out<span aria-hidden="true">_</span></h1><p class="lede">Pick a nick. Find your people.<br>Make something together.</p><p id="status" role="status">Checking your invitation…</p><section id="login" hidden><h2>Your private invitation</h2><p>Open the invitation you received, or enter its code here.</p><form id="unlock"><label>Invitation code<input id="code" type="password" autocomplete="off" required></label><button>Enter the community ↗</button></form></section><section id="inside" hidden><h2>You’re on the guest list.</h2><p id="identity"></p><a class="button" href="${ROOT}lobby/">Choose a nickname and join ↗</a><div class="options"><a id="owner" href="/lobby-owner/login">Verify your email to keep a room</a><a id="staff" href="/lobby-admin/login">Moderator sign-in</a><a id="moderation" href="${ROOT}admin/" hidden>Open moderation panel</a></div><p class="muted">Guest chat needs no account. Email verification is optional and lets you recover your registered rooms on another device. Staff permissions are granted separately.</p><form id="logout"><button class="secondary">Leave this beta</button></form></section><aside><h2>A little field guide</h2><ol><li>Say hello in #stalemate. Chat starts when you join; there’s no earlier backlog.</li><li>Start your own channel, shared canvas, watch room, or WebJam room.</li><li>Use Host tools → Keep this room after verifying your email to reserve its name.</li><li>Report abusive messages from their message menu. Hosts manage their rooms; community moderators review reports.</li></ol><a href="/beta/privacy">House rules, data handling &amp; contact</a></aside><p class="muted">Private beta. Cameras stay off until you choose them. Email sign-in uses Cloudflare Access.</p></main></body></html>`;
 const STYLE = `:root{color-scheme:dark;font:16px/1.6 system-ui,sans-serif;background:#101414;color:#eeeeda}*{box-sizing:border-box}body{margin:0;padding:32px 20px}main{max-width:680px;margin:auto}h1{font-size:clamp(3rem,12vw,5rem);line-height:1;letter-spacing:-.06em;margin:24px 0}h1 span,a,.eyebrow{color:#d1fa78}h2{font-size:1.35rem;line-height:1.3}p,li{overflow-wrap:anywhere}.eyebrow{font:11px/1.5 ui-monospace,monospace;letter-spacing:.08em}.lede{font-size:1.3rem}section,aside{padding:24px;border:1px solid #343d36;margin:24px 0;background:#171d1a}[hidden]{display:none!important}label{display:block;font-size:14px}input{display:block;width:100%;min-width:0;font:16px/1.5 ui-monospace,monospace;padding:12px;margin:8px 0 16px;background:#101414;color:inherit;border:1px solid #65725d}.button,button{display:inline-flex;justify-content:center;align-items:center;min-height:46px;max-width:100%;padding:12px 18px;font:600 14px/1.4 ui-monospace,monospace;border:1px solid #d1fa78;background:#d1fa78;color:#142014;text-decoration:none;cursor:pointer}.secondary{background:none;border-color:#65725d;color:inherit;font-size:12px}.options{display:flex;flex-wrap:wrap;gap:12px 20px;margin:24px 0;font-size:14px}.muted{font-size:13px;color:#a1aaa2}ol{padding-left:20px}li{padding-bottom:10px}a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #d1fa78;outline-offset:4px}#status{color:#e5c181;font:12px/1.6 ui-monospace,monospace}@media(max-width:480px){body{padding:24px 16px}section,aside{padding:20px}.options{flex-direction:column}.button{width:100%}}`;
-const CLIENT = `(()=>{const $=s=>document.querySelector(s);async function post(path,body){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const value=await r.json();if(!r.ok)throw Error(value.error||'Request failed');return value}function error(e){$('#status').textContent=e.message||String(e)}async function draw(){const r=await fetch('/beta/state');if(!r.ok){$('#status').textContent='A private invitation is required.';$('#login').hidden=false;$('#inside').hidden=true;return}const s=await r.json();$('#login').hidden=true;$('#inside').hidden=false;$('#status').textContent='Invitation accepted.';$('#identity').textContent=s.kind==='staff'?'Signed in as '+s.role+'.':s.kind==='owner'?'Email verified. You can keep and recover rooms.':'Join as a guest with just a nickname.';$('#owner').hidden=s.kind==='owner';$('#staff').hidden=!s.staffConfigured;$('#moderation').hidden=s.kind!=='staff';$('#owner').hidden=!s.emailConfigured||s.kind==='owner'}$('#unlock').addEventListener('submit',async e=>{e.preventDefault();try{await post('/beta/unlock',{key:$('#code').value});$('#code').value='';await draw()}catch(e){error(e)}});$('#logout').addEventListener('submit',async e=>{e.preventDefault();try{await post('/beta/logout',{});sessionStorage.removeItem('hangout-owner');sessionStorage.removeItem('hangout-preview');await draw()}catch(e){error(e)}});const fragment=new URLSearchParams(location.hash.slice(1));const key=fragment.get('invite');if(location.hash)history.replaceState(null,'',location.pathname+location.search);(async()=>{try{if(key)await post('/beta/unlock',{key});await draw()}catch(e){error(e);$('#login').hidden=false}})()})();`;
+const CLIENT = `import { createEntrySiteRegistry, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff } from '/beta/entry-sites.mjs';
+const entrySites = createEntrySiteRegistry(__ENTRY_SITES__);
+const source = entrySourceFromParams(new URLSearchParams(location.search), entrySites);
+const $ = s => document.querySelector(s);
+const rememberEntry = () => sessionStorage.setItem(ENTRY_HANDOFF_KEY, entryHandoff(source, true, Date.now(), entrySites));
+$('#inside .button').href = '${ROOT}lobby/?entry-return=1';
+$('#owner').href = '/lobby-owner/login?entry-return=1';
+$('#inside .button').addEventListener('click', rememberEntry);
+$('#owner').addEventListener('click', rememberEntry);
+async function post(path, body) {
+    const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const value = await r.json();
+    if (!r.ok) throw Error(value.error || 'Request failed');
+    return value;
+}
+function error(e) { $('#status').textContent = e.message || String(e); }
+async function draw() {
+    const r = await fetch('/beta/state');
+    if (!r.ok) { $('#status').textContent = 'A private invitation is required.'; $('#login').hidden = false; $('#inside').hidden = true; return; }
+    const s = await r.json();
+    $('#login').hidden = true; $('#inside').hidden = false; $('#status').textContent = 'Invitation accepted.';
+    $('#identity').textContent = s.kind === 'staff' ? 'Signed in as ' + s.role + '.' : s.kind === 'owner' ? 'Email verified. You can keep and recover rooms.' : 'Join as a guest with just a nickname.';
+    $('#staff').hidden = !s.staffConfigured; $('#moderation').hidden = s.kind !== 'staff'; $('#owner').hidden = !s.emailConfigured || s.kind === 'owner';
+}
+$('#unlock').addEventListener('submit', async e => { e.preventDefault(); try { await post('/beta/unlock', { key: $('#code').value }); $('#code').value = ''; await draw(); } catch (e) { error(e); } });
+$('#logout').addEventListener('submit', async e => { e.preventDefault(); try { await post('/beta/logout', {}); sessionStorage.removeItem('hangout-owner'); sessionStorage.removeItem('hangout-preview'); sessionStorage.removeItem(ENTRY_HANDOFF_KEY); await draw(); } catch (e) { error(e); } });
+const key = new URLSearchParams(location.hash.slice(1)).get('invite');
+if (location.hash || location.search) history.replaceState(null, '', location.pathname);
+(async () => { try { if (key) await post('/beta/unlock', { key }); await draw(); } catch (e) { error(e); $('#login').hidden = false; } })();`;
 
 async function disconnect(env, session) {
     let result;
@@ -64,9 +93,18 @@ async function betaRequest(request, env, deps = {}) {
     if (url.pathname === '/robots.txt') return reply('User-agent: *\nDisallow: /\n');
     if (url.pathname === '/beta/health') return betaHealth(request, env, { betaConfigured: !!betaConfigured(env), accessConfigured: betaAccessConfigured(env) });
     if (!betaConfigured(env)) return reply('Private community beta is not configured.', 503);
-    if (['/', '/beta', '/beta/'].includes(url.pathname)) return reply(SHELL, 200, 'text/html; charset=utf-8');
+    if (['/', '/beta', '/beta/'].includes(url.pathname)) return reply(SHELL
+        .replace('Stalemate · Private community beta', 'Hang Out · Private community beta')
+        .replace('STALEMATE / INVITATION ONLY', 'HANG OUT / INVITATION ONLY')
+        .replace('<script defer src="/beta/client.js">', '<script type="module" src="/beta/client.js">'), 200, 'text/html; charset=utf-8');
     if (url.pathname === '/beta/style.css') return reply(STYLE, 200, 'text/css');
-    if (url.pathname === '/beta/client.js') return reply(CLIENT, 200, 'text/javascript');
+    if (url.pathname === '/beta/client.js') return reply(CLIENT.replace('__ENTRY_SITES__', () => JSON.stringify(Object.values(entrySitesFromConfig(env.HANGOUT_ENTRY_SITES)))), 200, 'text/javascript');
+    if (url.pathname === '/beta/entry-sites.mjs') {
+        // Only this public, credential-free display registry is available before
+        // invitation admission. Other collaboration assets remain protected.
+        const asset = await env.ASSETS.fetch(new Request(`${url.origin}${ROOT}entry-sites.mjs`));
+        return reply(asset.body, asset.status, 'text/javascript');
+    }
     if (request.method === 'POST' && url.pathname.startsWith('/beta/')) {
         if (!sameOrigin(request) || !/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type') || '')) return json({ error: 'Same-origin JSON request required.' }, 403);
         if (Number(request.headers.get('Content-Length') || 0) > 2048) return json({ error: 'Request too large.' }, 413);
@@ -91,7 +129,7 @@ async function betaRequest(request, env, deps = {}) {
     if (!session) return reply('Private invitation required. Open your invitation link.', 401);
     if (url.pathname === '/beta/privacy') return redirect(`${ROOT}terms/`);
     if (url.pathname === '/beta/state') return json({ kind: session.identity?.kind || 'guest', role: session.identity?.role || 'fan', emailConfigured: betaAccessConfigured(env), staffConfigured: betaAccessConfigured(env) });
-    if (url.pathname === '/beta/bootstrap.js') return reply(`sessionStorage.setItem('hangout-preview',${JSON.stringify(env.HANGOUT_PREVIEW_KEY)});sessionStorage.setItem('hangout-owner',${JSON.stringify(session.identity?.kind === 'owner' ? '1' : '0')});`, 200, 'text/javascript');
+    if (url.pathname === '/beta/bootstrap.js') return reply(`sessionStorage.setItem('hangout-preview',${JSON.stringify(env.HANGOUT_PREVIEW_KEY)});sessionStorage.setItem('hangout-owner',${JSON.stringify(session.identity?.kind === 'owner' ? '1' : '0')});window.HangoutEntrySites=${JSON.stringify(Object.values(entrySitesFromConfig(env.HANGOUT_ENTRY_SITES)))};`, 200, 'text/javascript');
     if (url.pathname === '/lobby-owner/login' || url.pathname === '/lobby-admin/login') {
         if (request.method !== 'GET') return reply('GET required.', 405);
         if (!betaAccessConfigured(env)) return reply('Email verification is not configured. Guest chat is still available from your invitation.', 503);
@@ -105,7 +143,7 @@ async function betaRequest(request, env, deps = {}) {
         const next = await newAccess(env, { exp: session.access.exp, ip: request.headers.get('CF-Connecting-IP') || '0.0.0.0' });
         const identity = { v: 1, sid: next.access.sid, exp: Math.min(next.access.exp, gate.identity.expiresAt), kind: owner ? 'owner' : 'staff', email: gate.identity.email, role: owner ? 'fan' : gate.identity.role };
         const token = await signBeta('identity', identity, env.HANGOUT_HMAC_KEY);
-        const result = redirect(owner ? `${ROOT}lobby/?owner=1` : `${ROOT}admin/?signed-in=1`, { 'Set-Cookie': betaCookie(BETA_IDENTITY_COOKIE, token, identity.exp - Date.now()) });
+        const result = redirect(owner ? `${ROOT}lobby/?owner=1${url.searchParams.get('entry-return') === '1' ? '&entry-return=1' : ''}` : `${ROOT}admin/?signed-in=1`, { 'Set-Cookie': betaCookie(BETA_IDENTITY_COOKIE, token, identity.exp - Date.now()) });
         result.headers.append('Set-Cookie', next.cookie);
         return result;
     }
