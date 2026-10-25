@@ -120,6 +120,15 @@ export const COMMANDS = Object.freeze({
     mute: 'moderator', gban: 'moderator', purge: 'moderator', shield: 'band', shieldoff: 'band', lobby: 'band', filter: 'band',
     camoff: 'moderator', approve: 'moderator', dismiss: 'moderator', aidismiss: 'moderator', privatereport: 'moderator', log: 'moderator', delete: 'moderator', slow: 'band'
 });
+// These commands choose their own explicit target or have a documented global
+// effect. Every other command needs a real channel, never an implicit fallback
+// from a private conversation or a channel that has disappeared.
+const CONTEXT_INDEPENDENT_COMMANDS = new Set([
+    'join', 'quit', 'nick', 'msg', 'query', 'whois', 'away', 'ignore', 'unignore', 'list', 'help',
+    'accept', 'decline', 'block', 'unblock', 'pm', 'mute', 'gban', 'purge', 'shield', 'shieldoff',
+    'lobby', 'filter', 'slow', 'approve', 'dismiss', 'aidismiss', 'privatereport', 'log', 'delete'
+]);
+const isPrivateContext = where => typeof where === 'string' && /^pm:/i.test(where);
 
 export function createLobby({ now = () => Date.now(), send = () => {}, close = () => {}, persist: persistImpl = () => {}, deferPresence = null, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
     const L = { ...LOBBY_LIMITS, ...limits };
@@ -465,7 +474,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             cams: new Set(), since: now(), lastNick: 0, tokens: L.burst, last: now(), frames: 0, lastSaid: {}, actTokens: L.actBurst, actLast: now() };
         conns.set(id, c);
         if (band) { net.lastBand = now(); if (net.shieldAuto || net.lockAuto) bot(c, 'A saved safety state needs review: fans can read but not talk while the lobby is read-only. Check the band panel; /lobby unlock and /shieldoff when you are ready.'); saveNet(); }
-        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1 } });
+        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1 } });
         return { ok: true };
     }
 
@@ -559,6 +568,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         case 'say': {
             const text = typeof f.text === 'string' ? f.text : '';
             if (text.startsWith('/') && !text.startsWith('//')) return runLine(c, f.ch, text);
+            if (isPrivateContext(f.ch)) return privmsg(c, f.ch.slice(3), text.replace(/^\/\//, '/'));
             return say(c, f.ch, text.replace(/^\/\//, '/'), false);
         }
         case 'cmd': {
@@ -617,12 +627,22 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         name = alias[name] || name;
         const scope = COMMANDS[name];
         if (!scope) return bot(c, `Unknown command /${String(name).slice(0, 20)}. Try /help.`, 'error');
+        if (isPrivateContext(where) && ['me', 'slap'].includes(name)) {
+            const recipient = where.slice(3);
+            if (name === 'me') return privmsg(c, recipient, args.join(' '), true);
+            const person = target(c, args[0] || recipient);
+            return person ? privmsg(c, recipient, `slaps ${person.nick} around a bit with a large trout`, true) : undefined;
+        }
         // Channel-scoped op commands may name the channel as the first argument (/mode #room +m, /close #room).
-        let chan = ch(where) || ch(LOBBY);
+        let chan = ch(where);
         if (['mode', 'close', 'lock', 'invite'].includes(name) && /^#/.test(args[0] || '') && ch(args[0])) {
             if (name !== 'invite') chan = ch(args.shift());
         }
         if (name === 'invite' && args[1] && ch(args[1])) chan = ch(args[1]);
+        if (['part', 'names'].includes(name) && args[0] && ch(args[0])) chan = ch(args[0]);
+        if (!chan && where && !CONTEXT_INDEPENDENT_COMMANDS.has(name))
+            return bot(c, 'Choose a channel before using this command. Your private conversation is not the lobby.', 'error');
+        chan ||= ch(LOBBY);
         if (!allowed(c, scope, chan)) {
             log(nickOf(c), 'denied', `/${name}`, 'not permitted', chan ? chan.name : '');
             return out(c, { t: 'denied', cmd: name, text: `* /${name}: permission denied. ${scope === 'band' ? 'Band administrators only.' : scope === 'moderator' ? 'Site moderators only.' : `You need @ in ${chan ? chan.name : 'that room'}.`}` });
@@ -987,13 +1007,14 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             p.state = 'open';
             out(c, { t: 'pm-open', with: t.nick });
             out(t, { t: 'pm-open', with: c.nick });
-            if (p.first) deliverPm(t, c, p.first);
+            if (p.first) deliverPm(t, c, p.first, p.firstMe === true);
             if (p.lostFirst) {
                 bot(t, `Your PM with ${c.nick} is open. Your undelivered first message was not retained during a server restart. Please send it again.`);
                 bot(c, `Your PM with ${t.nick} is open. Their undelivered first message was not retained during a server restart; ask them to resend it.`);
                 p.lostFirst = false;
             }
             p.first = '';
+            p.firstMe = false;
             return undefined;
         },
         decline(c, _chan, [n]) {
@@ -1600,7 +1621,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         }
     }
 
-    function privmsg(c, to, rawText) {
+    function privmsg(c, to, rawText, action = false) {
         prunePendingPm();
         const t = byNick(to);
         if (!t || t === c) return bot(c, `No such nick: ${String(to || '').slice(0, 20)}`, 'error');
@@ -1610,7 +1631,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (!isBand(c) && (net.lock === 'readonly' || budgetLevel() !== 'ok')) return bot(c, 'The lobby is read-only right now, PMs too.', 'error');
         if (p && p.state === 'open') {
             if (!rawText) return out(c, { t: 'pm-open', with: t.nick });
-            return deliverPm(c, t, rawText);
+            return deliverPm(c, t, rawText, action);
         }
         if (!pendingPmAllowed(c, t)) return bot(c, `${t.nick} isn't taking PMs.`, 'error');
         if ([...pm.values()].filter((x) => x.state === 'pending').length >= SESSION_PM_PENDING) return bot(c, 'Private request allowance is full. Try again later.', 'error');
@@ -1626,12 +1647,12 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         // The first body stays volatile only until acceptance/expiry/disconnect.
         const first = rawText ? normalize(rawText, L.maxChars) : '';
         if (p && p.state === 'pending') return bot(c, `Still waiting for ${t.nick} to accept.`);
-        pm.set(k, { state: 'pending', from: c.dev, fromId: c.id, toId: t.id, first, at: now() });
+        pm.set(k, { state: 'pending', from: c.dev, fromId: c.id, toId: t.id, first, firstMe: !!action, at: now() });
         out(t, { t: 'pm-request', from: c.nick, band: isBand(c) });
         return bot(c, `PM request sent to ${t.nick}. It opens if they accept.`);
     }
 
-    function deliverPm(from, to, rawText) {
+    function deliverPm(from, to, rawText, action = false) {
         if (!limited(from, 'chat', L.burst, L.perSecond)) return;
         if (!isBand(from) && !consumeDaily(from)) return;
         if (!isBand(from) && (net.lock === 'readonly' || budgetLevel() !== 'ok')) return bot(from, 'The lobby is read-only right now, PMs too.', 'error');
@@ -1639,7 +1660,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (to.blocks.has(from.dev)) return bot(from, `${to.nick} isn't taking PMs.`, 'error');
         const text = normalize(rawText, L.maxChars);
         if (!text) return undefined;
-        const msg = { t: 'pm', id: `p${now().toString(36)}${(seq += 1).toString(36)}`, from: from.nick, entrySource: from.entrySource, to: to.nick, text, band: isBand(from), ts: now() };
+        const msg = { t: 'pm', id: `p${now().toString(36)}${(seq += 1).toString(36)}`, from: from.nick, entrySource: from.entrySource, to: to.nick, text, me: !!action, band: isBand(from), ts: now() };
         const recipients = new Set([from.id]);
         if (!to.ignores.has(lc(from.nick))) recipients.add(to.id);
         // Keep bounded delivery metadata/digest, not a recent private-body log.
