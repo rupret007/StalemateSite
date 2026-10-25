@@ -6,6 +6,28 @@ does not execute a deployment, change a hold, choose a public launch date or
 claim legal/platform readiness. Read [the product/integration description](HANGOUT_SHARED_COMMUNITY.md)
 and the existing beta identity, privacy and data-inventory documents together.
 
+## Current source continuation
+
+The later application stack reaches `97cb762bcea6e939a0b8873601c8c372b055069e`
+through [PR100](https://github.com/rupret007/StalemateSite/pull/100) (final incident
+authority/deadline checks), [PR101](https://github.com/rupret007/StalemateSite/pull/101)
+(bounded public-author reads) and [PR102](https://github.com/rupret007/StalemateSite/pull/102)
+(watch initialization and host-control synchronization). Source-bound local
+receipts at that candidate contain 1,039 passing unit tests, 324 browser checks,
+both package builds and ten screenshots. These results do not qualify a later
+commit, deployment or public all-ages service. Revalidate current review state.
+
+The following continuation adds [bounded physical record mapping](HANGOUT_DURABLE_RECORD_STORAGE.md)
+for the existing participation and incident interfaces, including maintenance
+listing. It keeps authority, record chunks and effects in one caller-supplied
+async transaction; it does not supply production authority or activate the
+adapter in `lobby-do.mjs`. Its real local SQLite transaction/restart tests are a
+separate scope from Cloudflare runtime, hosted session revocation and migration.
+
+The older dependency tables and API-pause statements below retain their dated
+historical scope. They are a source trail, not a statement that those changes
+are still unpublished or that a shared API pause remains in effect.
+
 ## Source and review dependencies
 
 The shared-community branch started from application candidate `c91c625`, rather
