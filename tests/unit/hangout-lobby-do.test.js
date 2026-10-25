@@ -83,7 +83,8 @@ describe('HangoutLobby AI review integration', () => {
         })));
         vi.stubGlobal('fetch', fetchImpl);
         const state = stateWith();
-        const env = { HANGOUT_AI_MODERATION: 'review', OPENAI_API_KEY: 'test-only-secret', HANGOUT_AI_DAILY_LIMIT: '1' };
+        const env = { HANGOUT_AI_MODERATION: 'review', OPENAI_API_KEY: 'test-only-secret', HANGOUT_AI_DAILY_LIMIT: '1',
+            HANGOUT_AI_PROVIDER_READINESS: 'qualified', HANGOUT_AI_CHILD_DATA_READINESS: 'qualified' };
         const lobby = new HangoutLobby(state, env);
         await lobby.fetch(request());
         const server = pairs[0][1];
@@ -105,6 +106,23 @@ describe('HangoutLobby AI review integration', () => {
         expect(restored.engine.adminState().aiReviews).toHaveLength(1);
         expect(restored.engine.adminState().aiModeration).toMatchObject({ state: 'capped', used: 1 });
         expect(fetchImpl).toHaveBeenCalledTimes(1);
+    });
+
+    it('makes no provider request when review is requested without qualified provider and child-data handling', async () => {
+        const pairs = installUpgradeRuntime();
+        const fetchImpl = vi.fn(); vi.stubGlobal('fetch', fetchImpl);
+        const state = stateWith();
+        const lobby = new HangoutLobby(state, { HANGOUT_AI_MODERATION: 'review', OPENAI_API_KEY: 'test-only-secret' });
+        await lobby.fetch(request());
+        const socket = pairs[0][1];
+        await lobby.webSocketMessage(socket, JSON.stringify({ t: 'hello', nick: 'UnqualifiedReview', age13: true,
+            providerReady: true, childConsent: true, HANGOUT_AI_CHILD_DATA_READINESS: 'qualified' }));
+        await lobby.webSocketMessage(socket, JSON.stringify({ t: 'say', ch: '#stalemate', text: 'Ordinary chat stays available without AI qualification' }));
+        await Promise.all(state.background);
+        expect(fetchImpl).not.toHaveBeenCalled();
+        expect(socket.frames.some((frame) => frame.t === 'line')).toBe(true);
+        expect(lobby.engine.adminState().aiModeration).toMatchObject({ enabled: false, requested: true, state: 'not-qualified',
+            eligibility: { allowed: false, reasons: ['provider-not-qualified', 'child-data-not-qualified'] } });
     });
 
     it('makes no provider request in the default local/production configuration', async () => {

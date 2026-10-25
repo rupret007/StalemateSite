@@ -23,11 +23,11 @@ The integration uses the fixed `/v1/moderations` endpoint and `omni-moderation-l
 ## Availability and limits
 
 - Default: `HANGOUT_AI_MODERATION="off"`; the local preview makes no provider calls.
-- Enable only with `HANGOUT_AI_MODERATION="review"` and an `OPENAI_API_KEY` Worker secret. The key never goes in a page, browser request, committed file or status response.
+- Review also requires the server-side assertions `HANGOUT_AI_PROVIDER_READINESS="qualified"` and `HANGOUT_AI_CHILD_DATA_READINESS="qualified"`, plus `HANGOUT_AI_MODERATION="review"` and an `OPENAI_API_KEY` Worker secret. Without completed external qualification, requested review is `not-qualified` and makes no provider calls. These assertions neither create parental consent nor certify legal compliance. The key never goes in a page, browser request, committed file or status response.
 - Default allowance: 1,000 classifier requests per UTC day for the lobby Durable Object, configurable downward or up to a hard maximum of 10,000. Each reservation is stored before the API call, so hibernation cannot reset the counter. Failed calls still consume a reservation.
 - Maximum three concurrent calls; no unbounded text backlog. A busy classifier skips the new check and records that skip.
 - Four-second provider deadline, then 30-second failure backoff. No automatic retry of the same message. Invalid responses, provider errors, absent credentials and exhausted budgets are not treated as successful checks.
-- The admin UI distinguishes off, ready, unavailable/degraded, misconfigured and capped. Session counters show checked/flagged/failed/skipped work; daily usage survives hibernation. A ready label means the adapter is available, not that every message was examined.
+- The admin UI distinguishes off, not-qualified, ready, unavailable/degraded, misconfigured and capped. Session counters show checked/flagged/failed/skipped work; daily usage survives hibernation. A ready label means the adapter is available, not that every message was examined.
 - AI outages leave ordinary chat and existing safeguards running. Reports remain available. This is review assistance, not a pre-publication AI gate.
 - Evidence/storage write failures are tracked and shown in the review panel; in-memory evidence is not presented as reliably saved when persistence fails. A failed AI quota reservation prevents the provider call.
 
@@ -49,8 +49,8 @@ Both retained AI and visitor-report queues expose message-ID delete/dismiss acti
 
 Configuration is prepared but has not been activated or deployed:
 
-1. Configure a dedicated project credential as the Worker's `OPENAI_API_KEY` secret through the normal secret-management process.
-2. Set `HANGOUT_AI_MODERATION="review"` and choose `HANGOUT_AI_DAILY_LIMIT` in Worker configuration.
+1. Resolve provider data controls and the applicable age/consent/legal processing model through the existing owners. Keep review off until qualified; see [privacy and incidents](HANGOUT_PRIVACY_AND_INCIDENTS.md). Record readiness with the two server assertions above only after that work is complete.
+2. Configure a dedicated `OPENAI_API_KEY` Worker secret through normal secret management, set `HANGOUT_AI_MODERATION="review"` and choose `HANGOUT_AI_DAILY_LIMIT`. Do not enable this service or access paused credentials from the application session.
 3. Deploy through the site's existing release process, with the guest disclosure and moderator UI in the same release.
 4. Verify a small set of synthetic messages in an isolated staging community. Confirm disabled/degraded/capped states and the human dismiss/delete flow before enabling it for visitors.
 

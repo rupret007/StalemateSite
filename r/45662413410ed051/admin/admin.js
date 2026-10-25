@@ -96,6 +96,7 @@
             : ai.enabled === true ? 'unknown' : 'disabled';
         const labels = {
             disabled: 'AI review is off',
+            'not-qualified': 'AI review is paused · privacy and provider readiness need qualification',
             ready: 'AI review is ready · review only',
             degraded: 'AI review is interrupted · some messages may be unchecked',
             capped: 'AI review reached its usage limit · further checks are paused',

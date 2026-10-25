@@ -161,7 +161,8 @@ afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('private Room → durable Lobby queue → restricted staff review', () => {
     it('delivers unverified allegations only to staff, persists them, and resolves through the actual staff command', async () => {
-        const h = harness({ HANGOUT_AI_MODERATION: 'review', OPENAI_API_KEY: 'synthetic-provider-key-unused' });
+        const h = harness({ HANGOUT_AI_MODERATION: 'review', OPENAI_API_KEY: 'synthetic-provider-key-unused',
+            HANGOUT_AI_PROVIDER_READINESS: 'qualified', HANGOUT_AI_CHILD_DATA_READINESS: 'qualified' });
         const ordinary = await lobbyVisitor(h), staff = await lobbyVisitor(h, { role: 'moderator', admin: true });
         const reporter = await roomVisitor(h), target = await roomVisitor(h);
         const review = vi.spyOn(h.lobby().aiModerator, 'review');

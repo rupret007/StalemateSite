@@ -10,6 +10,7 @@ import { LIMITS as PRIVATE_REPORT_LIMITS } from '../src/private-reports.mjs';
 
 const origin = 'https://beta.example';
 const OPS = 'ops-health-test-key-'.repeat(3), INVITE = 'invitation-test-key-'.repeat(3), SECRET = 'signing-test-key-'.repeat(3);
+const AI_QUALIFIED = Object.freeze({ HANGOUT_AI_PROVIDER_READINESS: 'qualified', HANGOUT_AI_CHILD_DATA_READINESS: 'qualified' });
 const today = () => new Date().toISOString().slice(0, 10);
 function state(entries = []) {
     const values = new Map(entries);
@@ -115,6 +116,19 @@ describe('sanitized truthful operational status', () => {
         expect(body.features.email.configured).toBe(true); expect(body.features.staffAuth.configured).toBe(false);
         expect(body.service.state).toBe('degraded'); expect(body.service.reasons).toContain('staff-unconfigured');
     });
+    it('does not call an unqualified classifier ready even when stale internal health says ready', async () => {
+        const { env, binding } = config(), provider = vi.fn(); vi.stubGlobal('fetch', provider);
+        Object.assign(env, { HANGOUT_AI_MODERATION: 'review', OPENAI_API_KEY: 'synthetic-provider-key' });
+        env.LOBBY = binding({ storage: 'ok', lock: 'off', shield: false, lockAuto: false, evidenceStorage: 'ready',
+            quota: { day: today(), used: 1, limit: 40000 }, ai: { state: 'ready', quota: { day: today(), used: 0, limit: 100 },
+                currentInstance: { checked: 0, flagged: 0, failed: 0, skipped: 0, pending: 0 } } });
+        const body = await (await betaFetch(request(), env)).json();
+        expect(body.features.ai).toMatchObject({ requested: true, enabled: false, configured: true, state: 'not-qualified',
+            eligibility: { allowed: false, reasons: ['provider-not-qualified', 'child-data-not-qualified'] } });
+        expect(body.service.reasons).toContain('ai-not-qualified');
+        expect(JSON.stringify(body)).not.toContain('synthetic-provider-key');
+        expect(provider).not.toHaveBeenCalled();
+    });
     it('reports exhausted application admission budgets without presenting them as provider billing', async () => {
         const { env, binding } = config();
         env.QUOTA = binding({ storage: 'ok', quota: { day: today(), used: 200, limit: 200 } });
@@ -149,7 +163,7 @@ describe('sanitized truthful operational status', () => {
 describe('actual DO health reads do not spend or reset application state', () => {
     it.each([true, false])('reports actual instance review outcomes (provider success: %s) without health probes sending text', async (success) => {
         const { env } = config();
-        Object.assign(env, { HANGOUT_AI_MODERATION: 'review', OPENAI_API_KEY: 'synthetic-provider-key' });
+        Object.assign(env, AI_QUALIFIED, { HANGOUT_AI_MODERATION: 'review', OPENAI_API_KEY: 'synthetic-provider-key' });
         const fixture = { model: 'test-moderation', results: [{ flagged: false,
             categories: Object.fromEntries(AI_CATEGORIES.map((c) => [c, false])),
             category_scores: Object.fromEntries(AI_CATEGORIES.map((c) => [c, 0.01])) }] };
@@ -206,8 +220,8 @@ describe('actual DO health reads do not spend or reset application state', () =>
     });
     it('describes old-day allowances as a new period without mutating or resetting the stored record', () => {
         const stored = { day: '2025-01-01', used: 99 }; expect(dailyUsage(stored, 'used')).toEqual({ day: today(), used: 0 }); expect(stored.used).toBe(99);
-        expect(aiHealth({ HANGOUT_AI_MODERATION: 'review', OPENAI_API_KEY: 'configured', HANGOUT_AI_DAILY_LIMIT: '10' }, { day: today(), used: 10 })).toMatchObject({ state: 'capped', quota: { used: 10, limit: 10 } });
-        expect(aiHealth({ HANGOUT_AI_MODERATION: 'review', OPENAI_API_KEY: 'configured' }, { day: '2099-01-01', used: 1 }).quota).toBeNull();
+        expect(aiHealth({ ...AI_QUALIFIED, HANGOUT_AI_MODERATION: 'review', OPENAI_API_KEY: 'configured', HANGOUT_AI_DAILY_LIMIT: '10' }, { day: today(), used: 10 })).toMatchObject({ state: 'capped', quota: { used: 10, limit: 10 } });
+        expect(aiHealth({ ...AI_QUALIFIED, HANGOUT_AI_MODERATION: 'review', OPENAI_API_KEY: 'configured' }, { day: '2099-01-01', used: 1 }).quota).toBeNull();
     });
 });
 

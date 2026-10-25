@@ -1,5 +1,6 @@
 // Separate read-only operations credential. It never admits a guest or grants a moderation role.
 import { equalInvite } from './beta-auth.mjs';
+import { aiEligibility } from './ai-eligibility.mjs';
 
 export const INTERNAL_HEALTH_PATH = '/__beta/health';
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -21,13 +22,15 @@ export function aiObservation(value) {
     return Object.fromEntries(fields.map((field) => [field, value[field]]));
 }
 export function aiHealth(env, stored, runtime) {
-    const enabled = env.HANGOUT_AI_MODERATION === 'review';
+    const eligibility = aiEligibility(env);
+    const enabled = eligibility.allowed;
     const configured = typeof env.OPENAI_API_KEY === 'string' && !!env.OPENAI_API_KEY.trim();
     const rawLimit = Number(env.HANGOUT_AI_DAILY_LIMIT);
     const limit = Number.isSafeInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 10000) : 1000;
     const daily = stored !== undefined && !Number.isSafeInteger(stored?.used) ? null : dailyUsage(stored, 'used');
     const observed = aiObservation(runtime);
-    return { enabled, configured, state: !enabled ? 'disabled' : !configured ? 'misconfigured' : !daily ? 'unknown' : daily.used >= limit ? 'capped'
+    return { enabled, requested: eligibility.requested, eligibility, configured,
+        state: !eligibility.requested ? 'disabled' : !enabled ? 'not-qualified' : !daily ? 'unknown' : daily.used >= limit ? 'capped'
         : observed && ['ready', 'degraded', 'capped'].includes(runtime.state) ? runtime.state : 'unknown',
         quota: daily && { ...daily, limit }, currentInstance: observed };
 }
@@ -90,10 +93,14 @@ export async function betaHealth(request, env, { betaConfigured = false, accessC
     if (!staffConfigured) reasons.push('staff-unconfigured');
     const contactConfigured = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,63}$/i.test(String(env.HANGOUT_MODERATION_CONTACT || '').trim());
     if (!contactConfigured) reasons.push('contact-unconfigured');
-    const ai = { enabled: env.HANGOUT_AI_MODERATION === 'review', configured: typeof env.OPENAI_API_KEY === 'string' && !!env.OPENAI_API_KEY.trim(),
-        state: inSet(lobby?.ai?.state, ['disabled', 'misconfigured', 'ready', 'degraded', 'capped', 'unknown']),
+    const eligibility = aiEligibility(env);
+    const ai = { enabled: eligibility.allowed, requested: eligibility.requested, eligibility,
+        configured: typeof env.OPENAI_API_KEY === 'string' && !!env.OPENAI_API_KEY.trim(),
+        state: !eligibility.requested ? 'disabled' : !eligibility.allowed ? 'not-qualified'
+            : inSet(lobby?.ai?.state, ['disabled', 'misconfigured', 'ready', 'degraded', 'capped', 'unknown']),
         currentInstance: aiObservation(lobby?.ai?.currentInstance) };
-    if (ai.enabled && !ai.configured) reasons.push('ai-misconfigured');
+    if (ai.requested && !ai.configured) reasons.push('ai-misconfigured');
+    if (ai.requested && !ai.enabled) reasons.push('ai-not-qualified');
     if (ai.state === 'capped') reasons.push('ai-capped');
     if (ai.enabled && ai.state === 'degraded') reasons.push('ai-unavailable');
     const turnBudget = Number(env.HANGOUT_TURN_MONTHLY_GB);

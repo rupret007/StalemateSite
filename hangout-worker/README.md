@@ -87,9 +87,13 @@ Guest rooms remain open when band members are away. Manual locks/shield, stored-
 validation and infrastructure caps still apply. Legacy automatic locks need explicit human
 review because the stored flag can also indicate lost or corrupt moderation state.
 
-`HANGOUT_AI_MODERATION="off"` is the default and the deployed pilot setting. Enabling
-`"review"` with an `OPENAI_API_KEY` Worker secret adds bounded review-only classification of
-new eligible public text. It never grants automatic punishment powers. AI flags, human
+`HANGOUT_AI_MODERATION="off"` is the default; the release owner verifies deployed settings.
+Review mode additionally requires an `OPENAI_API_KEY` Worker secret and the explicit
+server assertions `HANGOUT_AI_PROVIDER_READINESS="qualified"` and
+`HANGOUT_AI_CHILD_DATA_READINESS="qualified"`. These record completed external qualification,
+not parental consent or legal certification. Without them, status is `not-qualified` and
+no text is submitted. Qualified review adds bounded classification of new eligible public
+text. It never grants automatic punishment powers. AI flags, human
 reports and held-message evidence use separate bounded 24-hour queues and never become
 visitor chat history. See [AI data scope and activation](../docs/HANGOUT_SAFEGUARDS_AI.md).
 
