@@ -17,6 +17,7 @@ const ORIGIN = 'https://local-fixture.invalid', INVITE = 'owned-fixture-invite-n
 const ENV = ['PATH', 'TMPDIR', 'TEMP', 'TMP', 'SystemRoot', 'SYSTEMROOT', 'WINDIR'];
 const PARTICIPATION = process.argv.includes('--participation'), INCIDENT = process.argv.includes('--incident-sources'), TRAFFIC_ACKS = process.argv.includes('--traffic-acks'), PRESSURE_ONLY = process.argv.includes('--pressure-only'), DIAGNOSE_CLOSE = process.argv.includes('--diagnose-close'), FANOUT_50 = process.argv.includes('--fanout-50');
 const MODE = [...(PARTICIPATION ? ['--participation'] : []), ...(INCIDENT ? ['--incident-sources'] : []), ...(TRAFFIC_ACKS ? ['--traffic-acks'] : []), ...(PRESSURE_ONLY ? ['--pressure-only'] : []), ...(DIAGNOSE_CLOSE ? ['--diagnose-close'] : []), ...(FANOUT_50 ? ['--fanout-50'] : [])];
+const RETENTION_PROOF = PARTICIPATION && !INCIDENT && !TRAFFIC_ACKS && !PRESSURE_ONLY && !DIAGNOSE_CLOSE && !FANOUT_50;
 assert.ok(!TRAFFIC_ACKS || PARTICIPATION && !INCIDENT, '--traffic-acks requires --participation and does not select incident mode');
 assert.ok(!PRESSURE_ONLY || PARTICIPATION && !INCIDENT && !TRAFFIC_ACKS, '--pressure-only requires --participation and refuses incident/traffic flags');
 assert.ok(!DIAGNOSE_CLOSE || PARTICIPATION && TRAFFIC_ACKS && !INCIDENT && !PRESSURE_ONLY, '--diagnose-close is an explicit traffic-ACK-only diagnostic');
@@ -217,6 +218,7 @@ async function runtime(phase, state, nonce) {
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true } },
         bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected',
             ...(PARTICIPATION ? { HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1' } : {}),
+            ...(RETENTION_PROOF ? { FIXTURE_RETENTION_PROOF: 'retention-v1' } : {}),
             ...(TRAFFIC_ACKS ? { FIXTURE_TRAFFIC_ACKS: 'ack-v1' } : {}),
             ...(PRESSURE_ONLY ? { FIXTURE_PRESSURE_ONLY: 'pressure-v1' } : {}),
             ...(DIAGNOSE_CLOSE ? { FIXTURE_CLOSE_DIAGNOSTIC: 'close-v1' } : {}),
@@ -291,7 +293,7 @@ async function runtime(phase, state, nonce) {
         assert.ok(Number.isSafeInteger(deadline) && deadline >= 0 && deadline - Date.now() <= 1000, 'unexpected current command deadline');
         while (Date.now() < deadline) await delay(deadline - Date.now());
     };
-    let proof, secrets, incidentSource, sharing, safetyCookie, traffic;
+    let proof, secrets, incidentSource, sharing, safetyCookie, traffic, retention;
     const trafficMetrics = () => control('traffic-metrics');
     const assertTrafficAccounting = (metrics, snapshots) => {
         assert.equal(metrics.sockets.length, 3);
@@ -981,6 +983,42 @@ async function runtime(phase, state, nonce) {
                     ...(INCIDENT ? { nextGeneration: 2, sourceCount: 2, originalCaseAndSourceUnchanged: true } : {}) };
             }
             assert.equal(afterFault.bindingCount, 2, 'lost-socket checkpoint needs live durable bindings'); assert.equal(b.closed, null); assert.equal(c.closed, null);
+            if (RETENTION_PROOF) {
+                // Additional stored-boundary proof after every canonical
+                // assertion. No new visitor, clock override, wait cap or mode flag.
+                const original = afterFault, seeded = await control('retention-seed', { cookie: cookieB });
+                assert.deepEqual(Object.keys(seeded).sort(), ['healthyActiveSha256', 'storedSchemaBoundaryOnly', 'targetCounts', 'targetLogicalKeysPresent', 'targetRawManifestsPresent', 'targetRawPartPrefixesPresent', 'targetRecordBytes'].sort());
+                assert.equal(seeded.storedSchemaBoundaryOnly, true); assert.deepEqual(seeded.targetCounts, [1, 1, 1, 1, 2]);
+                assert.equal(seeded.targetLogicalKeysPresent, 9); assert.ok(seeded.targetRecordBytes > 0 && seeded.targetRecordBytes <= 65536); assert.match(seeded.healthyActiveSha256, /^[a-f0-9]{64}$/);
+                assert.equal(seeded.targetRawManifestsPresent, 9); assert.equal(seeded.targetRawPartPrefixesPresent, 9);
+                const seededScan = await control('inspect');
+                assert.equal(seededScan.logicalScan.requiredRecordsPresent, true); assert.ok(Object.values(seededScan.ordinaryBodiesAbsent).every(Boolean));
+                assert.ok(Object.values(seededScan.rawScan.perChunkOrdinaryBodiesAbsent).every(Boolean));
+                let observed, alarms = 0;
+                for (; alarms < 4;) {
+                    assert.deepEqual(await control('participation-alarm'), { completed: true }); alarms++;
+                    observed = await control('retention-read', { cookie: cookieB });
+                    assert.deepEqual(Object.keys(observed).sort(), ['alarmElapsedMs', 'alarmHandlerCompleted', 'cursorValid', 'cursorWrapped', 'handlerHealthy',
+                        'healthyActivePermissionPreserved', 'healthyActiveSha256', 'healthyStoredRowValid', 'onlyExpiredAncillaryRowsRemoved',
+                        'targetLogicalKeysAbsent', 'targetRawManifestsAbsent', 'targetRawPartPrefixesEmpty'].sort());
+                    assert.equal(observed.healthyActiveSha256, seeded.healthyActiveSha256); assert.equal(observed.healthyStoredRowValid, true);
+                    assert.equal(observed.healthyActivePermissionPreserved, true); assert.equal(observed.onlyExpiredAncillaryRowsRemoved, true);
+                    assert.equal(observed.handlerHealthy, true, 'alarm handler left evidence storage or authority degraded');
+                    assert.equal(observed.alarmHandlerCompleted, true); assert.ok(Number.isSafeInteger(observed.alarmElapsedMs) && observed.alarmElapsedMs >= 0);
+                    assert.equal(observed.cursorValid, true);
+                    if (observed.targetLogicalKeysAbsent === 9 && observed.cursorWrapped) break;
+                }
+                assert.equal(observed.targetLogicalKeysAbsent, 9); assert.equal(observed.targetRawManifestsAbsent, 9); assert.equal(observed.targetRawPartPrefixesEmpty, 9);
+                assert.equal(observed.cursorWrapped, true); assert.ok(alarms > 0 && alarms <= 4);
+                for (const peer of [b, c]) { await waitCommandBudget(peer); await peer.barrier(); }
+                afterFault = await control('inspect');
+                for (const key of ['rooms', 'reports', 'nativeRollbackWitnesses', 'faultHistory', 'durableSessionNicks', 'engineSessionNicks']) assert.deepEqual(afterFault[key], original[key], 'retention changed canonical ' + key);
+                assert.equal(afterFault.bindingCount, 2); assert.equal(afterFault.liveBindingCount, 2); assert.equal(b.closed, null); assert.equal(c.closed, null);
+                assert.equal(afterFault.logicalScan.requiredRecordsPresent, true); assert.ok(Object.values(afterFault.ordinaryBodiesAbsent).every(Boolean));
+                assert.ok(Object.values(afterFault.rawScan.perChunkOrdinaryBodiesAbsent).every(Boolean));
+                retention = { storedSchemaBoundaryOnly: true, actualAlarmInvocations: alarms, seeded, completed: observed,
+                    healthyPeerBarriersCompleted: true, originalCanonicalStatePreserved: true, completePrivacyScans: true, noNewVisitorOrGrant: true, hostedSchedulerQualified: false };
+            }
             secrets = { revokedCookie: cookieA, liveCookie: cookieB, ...(PARTICIPATION ? { safetyCookie } : {}) };
             proof = { admissionDenials, missingMarkerRefused: true, cookiePolicyVerified: true, actualGatewayVisitors: 3, originalGatewayVisitors: 3, totalRealAdmittedVisitors: PARTICIPATION ? 5 : 3,
                 checks: ['actual-beta-unlock-and-WebSocket-admission', 'stalemate-rad-dad-shared-chat-and-canvas', 'direct-newcomer-neutral-without-prejoin-chat', 'actual-report-persisted', 'connected-logout-and-cookie-replay-denied', 'ordinary-chat-excluded-from-durable-records', 'actual-device-block-policy-and-RTC-denial-persisted', 'actual-post-native-session-write-rollback-before-block-success', 'actual-post-native-write-rollback-before-success'],
@@ -988,6 +1026,7 @@ async function runtime(phase, state, nonce) {
                 ...(PARTICIPATION ? { sharingChecks: ['actual-caller-only-GET-and-native-self-withdrawal', 'same-WebSocket-old-delivered-report-ACK-with-new-publishing-denied', 'closed-safety-socket-retires-before-original-two-live-bindings-checkpoint'], sharing } : {}),
                 ...(INCIDENT ? { incidentSourceChecks: ['actual-public-report-index-and-I1-copy-share-native-transaction-domain', 'selected-only-encrypted-case-and-metadata-only-index'], incidentSource } : {}),
                 ...(TRAFFIC_ACKS ? { trafficChecks: ['actual-transport-v1-raw-sequence-and-paced-ACK-accounting', 'three-current-C3-guests-rotating-public-text', 'actual-Stop-and-healthy-ACK-continuation'], traffic } : {}),
+                ...(RETENTION_PROOF ? { retentionChecks: ['actual-alarm-removes-valid-stored-expired-C2-record-and-owned-native-keys', 'healthy-active-permission-preserved-with-only-expired-history-cleanup', 'bounded-cursor-wrap-with-complete-logical-and-raw-privacy-scans'], retention } : {}),
                 checkpoint: afterFault, sources: before, versions, binarySha256, rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs,
                 outboundCalls, runtimeRestarts, workerdPids: group(process.pid).filter(row => row.command.includes('workerd')).map(row => row.pid) };
             assert.equal(outboundCalls, 1); assert.equal(runtimeRestarts, 0); assert.deepEqual(sources(), before);
@@ -1015,6 +1054,17 @@ async function runtime(phase, state, nonce) {
             assert.ok(recovered.rawScan.rows > 0 && recovered.rawScan.bytes > 0);
             assert.equal(recovered.rawScan.perChunkOrdinaryBodiesAbsent['native-media-control-no-body-persistence'], true);
             assert.ok(Object.values(recovered.rawScan.perChunkOrdinaryBodiesAbsent).every(Boolean));
+            if (RETENTION_PROOF) {
+                assert.ok(received.retention && received.retention.storedSchemaBoundaryOnly === true);
+                const current = await control('retention-read', { cookie: secrets.liveCookie });
+                assert.deepEqual(Object.keys(current).sort(), ['cursorValid', 'cursorWrapped', 'handlerHealthy', 'healthyActiveSha256', 'healthyStoredRowValid', 'targetLogicalKeysAbsent', 'targetRawManifestsAbsent', 'targetRawPartPrefixesEmpty'].sort());
+                assert.equal(current.targetLogicalKeysAbsent, 9); assert.equal(current.targetRawManifestsAbsent, 9); assert.equal(current.targetRawPartPrefixesEmpty, 9);
+                assert.equal(current.cursorValid, true); assert.equal(current.cursorWrapped, true); assert.equal(current.healthyStoredRowValid, true);
+                assert.equal(current.handlerHealthy, true, 'cold retention read found degraded evidence storage or authority');
+                assert.equal(current.healthyActiveSha256, received.retention.seeded.healthyActiveSha256);
+                retention = { persistedTargetLogicalAndRawAbsence: true, healthyActivePermissionPreserved: true, persistedCursorWrapped: true, current,
+                    actualFreshProcessAndDiskRead: true, hostedSchedulerQualified: false };
+            }
             const returning = await connect(secrets.liveCookie, 'NativeReturn', 'rad-dad', '192.0.2.12');
             if (PARTICIPATION) {
                 const device = returning.frames.find(frame => frame.t === 'device')?.token; assert.equal(typeof device, 'string');
@@ -1040,6 +1090,7 @@ async function runtime(phase, state, nonce) {
                 ...(PARTICIPATION ? { participationChecks: ['actual-C3-reloads-partition-grant-after-process-loss', 'new-SID-cannot-inherit-grant-through-same-signed-device-IP-or-old-nickname'] } : {}),
                 ...(PARTICIPATION ? { sharingChecks: ['actual-withdrawn-own-status-and-denied-new-hello-after-whole-process-loss', 'real-logout-revokes-retained-safety-cookie'], sharing } : {}),
                 ...(INCIDENT ? { incidentSourceChecks: ['actual-current-SID-rebind-and-I1-encrypted-evidence-reload-after-whole-process-loss'], incidentSource } : {}),
+                ...(RETENTION_PROOF ? { retentionChecks: ['expired-C2-target-does-not-resurrect-after-owned-process-loss', 'healthy-current-cookie-grant-and-cursor-survive-native-disk-reopen'], retention } : {}),
                 sources: before, versions, binarySha256, rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs, outboundCalls, runtimeRestarts,
                 workerdPids: group(process.pid).filter(row => row.command.includes('workerd')).map(row => row.pid) };
             assert.equal(outboundCalls, 0); assert.equal(runtimeRestarts, 0); assert.deepEqual(sources(), before);
@@ -1075,6 +1126,7 @@ async function parent() {
         if (phase === 'visitors' && INCIDENT) proc.send({ type: 'incident-key', nonce, key: fixtureIncidentKey }, error => { if (error) fail(error); });
         if (phase === 'recover') proc.send({ type: 'recovery', nonce, checkpoint: recovery.proof.checkpoint, secrets: recovery.secrets,
             ...(INCIDENT ? { fixtureIncidentKey, incidentSource: recovery.proof.incidentSource } : {}),
+            ...(RETENTION_PROOF ? { retention: recovery.proof.retention } : {}),
             ...(PARTICIPATION ? { sharing: recovery.proof.sharing } : {}) }, error => { if (error) fail(error); });
         proc.on('message', message => { try {
             assert.equal(message?.nonce, nonce); assert.equal(message.phase, phase); if (message.type === 'failure') throw Error(message.error);
@@ -1123,6 +1175,7 @@ async function parent() {
         ...(FANOUT_50 ? { nativeLocalFiftyGuestFanoutQualified: true, originalNinePlusThreeQualifiedByThisMode: false, hostedScaleQualified: false } : {}),
         ...(PRESSURE_ONLY ? { nativeLocalNonAckPressureQualified: true, originalNinePlusThreeQualifiedByThisMode: false, hostedScaleQualified: false } : {}),
         ...(TRAFFIC_ACKS ? { nativeLocalHealthyAckProbeQualified: !DIAGNOSE_CLOSE, hostedScaleQualified: false } : {}),
+        ...(RETENTION_PROOF ? { nativeC2RetentionHandlerQualified: true, hostedAlarmSchedulerQualified: false } : {}),
         ...(PARTICIPATION && INCIDENT ? { combinedParticipationIncidentSourceCompositionQualified: true } : {}), first, recovered, node: process.version, platform: process.platform, architecture: process.arch,
         temporaryStateRemoved: true, scope: DIAGNOSE_CLOSE ? 'Explicit pass-through close-order diagnostic only. A passing instrumented run means no reproduction in that run, not a retirement fix, ordinary mode qualification, hosted readiness or overall completion. All original assertions/waits remain. No production behavior is replaced.' : FANOUT_50 ? 'Separate50-real-guest native C3 fanout proof:12publications/600actualdeliveries,50pacedACKstreams,actualrevocation49livebindings thenwholeprocessloss/coldpruning/nohistory. Syntheticpolicy/grants only. Native-local Node/Miniflare bridge observations,notbrowser/WAN/150tier/reconnectstorm/many-room/soak/hostedcapacityorSLO. Doesnotrequalifycanonical9+3/fault/Stop/reportmodes.' : PRESSURE_ONLY ? 'Separate three-current-SID C3 application-ACK credit pressure proof in actual local workerd/SQLite. Real HELP output, zero-ACK probe4413 with128-frame/native-send/credit witness, healthy ACK/publication and real revocation isolation, one-binding owned-process-loss recovery and no text replay. Synthetic consent only. Does not requalify original9+3/Delta/Echo modes, physical slow TCP/browser/WAN/shared-fanout capacity/150-native/soak or hosted limits/cost.' : 'Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. ' + (PARTICIPATION ? 'Required production C3 bridge selected; actual caller-only HTTP status/Stop narrows the existing synthetic ledger, keeps the same socket for a delivered-message report, then persists withdrawal across process loss before real logout. Only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. ' : '') + (INCIDENT ? 'Required production I3a source bridge and existing I1 over actual records transactions; separate incident appointment/policy and privately retained test key are synthetic only. This does not qualify real incident authority, purpose-key provisioning or key recovery. ' : '') + (TRAFFIC_ACKS ? 'Optional three-visitor paced native-local ACK workload; raw envelopes validated before semantic normalization and actual serialized control grants reconciled. Latencies include Node/Miniflare native bridge; no throughput tier or public SLO claim. ' : '') + 'No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.' }, null, 2));
 }

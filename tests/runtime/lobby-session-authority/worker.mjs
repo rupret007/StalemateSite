@@ -3,7 +3,8 @@
 import { betaFetch, HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget } from '../../../hangout-worker/src/beta-entry.mjs';
 import { LOBBY_AUTHORITY_PATH, LOBBY_AUTHORITY_COMMUNITY } from '../../../hangout-worker/src/lobby-session-authority.mjs';
 import { readBeta } from '../../../hangout-worker/src/beta-auth.mjs';
-import { createPartitionedParticipationConsents, PARTICIPATION_POLICY_KEY } from '../../../hangout-worker/src/participation-partitions.mjs';
+import { createPartitionedParticipationConsents, PARTICIPATION_POLICY_KEY, PARTICIPATION_RECORD_LIMITS, PARTICIPATION_MAINTENANCE_CURSOR_KEY } from '../../../hangout-worker/src/participation-partitions.mjs';
+import { validParticipationLedgerState } from '../../../hangout-worker/src/participation-consents.mjs';
 import { HELP } from '../../../hangout-worker/src/lobby-core.mjs';
 import { PARTICIPATION_PURPOSES } from '../../../hangout-worker/src/participation-policy.mjs';
 import { createIncidentCases, createIncidentEvidenceCipher, incidentEvidenceDigest, initialIncidentCaseState } from '../../../hangout-worker/src/incident-cases.mjs';
@@ -17,6 +18,9 @@ const SELECTED_REPORT = 'Native selected report greeting';
 const TRAFFIC_PREFIX = 'ACK probe ephemeral marker ';
 const PRESSURE_PREFIX = 'Pressure probe ephemeral marker ';
 const FANOUT_PREFIX = 'Fanout fifty ephemeral marker ';
+const RETENTION = Object.freeze({ principal: 'synthetic_native_retention_principal', subject: 'synthetic_native_retention_subject',
+    guardian: 'synthetic_native_retention_guardian', consent: 'synthetic_native_retention_consent', pending: 'synthetic_native_retention_pending',
+    decision: 'synthetic_native_retention_decision', begin: 'synthetic_native_retention_begin', complete: 'synthetic_native_retention_complete' });
 const TRAFFIC_LABELS = ['NativeAlpha', 'NativeBravo', 'NativeCharlie'];
 const ordinaryNeedles = ['Native Stalemate ephemeral greeting', 'Native Rad Dad ephemeral greeting', 'Native remaining visitor greeting', 'native-media-control-no-body-persistence'];
 const NATIVE_METHODS = ['get', 'put', 'delete', 'list', 'getAlarm', 'setAlarm', 'deleteAlarm'];
@@ -302,6 +306,133 @@ export class FixtureLobby extends HangoutLobby {
                 authorizeMaintenance: async () => null
             } });
         return this.fixtureLedger = { ledger, proofs, decisions, guardians, config };
+    }
+    fixtureRetentionMode() {
+        ensure(this.env.FIXTURE_RETENTION_PROOF === 'retention-v1' && this.participationMode && !this.incidentSourceMode
+            && this.env.FIXTURE_TRAFFIC_ACKS === undefined && this.env.FIXTURE_PRESSURE_ONLY === undefined && this.env.FIXTURE_FANOUT_50 === undefined, 'fixture-retention-plain-mode');
+    }
+    async fixtureRetention(operation, body) {
+        this.fixtureRetentionMode(); ensure(Object.keys(body).join(',') === 'cookie', 'fixture-retention-body');
+        const identity = await this.fixtureParticipant(body.cookie), prefix = 'participation-records:v1:';
+        const route = async principal => prefix + 'record:' + await sha(LOBBY_AUTHORITY_COMMUNITY + '\0' + principal);
+        const targetKey = await route(RETENTION.principal), healthyKey = await route(identity.principalRef);
+        const targetKeys = [targetKey, prefix + 'anchor:' + targetKey.split(':').at(-1), prefix + 'subject:' + await sha(RETENTION.subject),
+            ...await Promise.all([['pending', RETENTION.pending], ['guardian', RETENTION.guardian], ['consent', RETENTION.consent],
+                ['decision', 'synthetic_fixture_verifier\0' + RETENTION.decision]].map(async ([space, ref]) => prefix + 'unique:' + space + ':' + await sha(ref))),
+            prefix + 'operation:' + await sha(RETENTION.begin), prefix + 'operation:' + await sha(RETENTION.complete)];
+        ensure(new Set(targetKeys).size === 9, 'fixture-retention-nine-owned-keys');
+        const active = state => ({ version: state.version, config: state.config,
+            subjects: state.subjects, guardians: state.guardians, receipts: state.receipts });
+        let baseline;
+        const result = await this.authority.records.transaction(async (tx, raw) => {
+            const policy = await tx.get(PARTICIPATION_POLICY_KEY), healthy = await tx.get(healthyKey), at = Date.now();
+            ensure(validParticipationLedgerState(policy, PARTICIPATION_RECORD_LIMITS) && policy.config.policy.communityRef === identity.communityRef
+                && validParticipationLedgerState(healthy, PARTICIPATION_RECORD_LIMITS), 'fixture-retention-current-policy-and-healthy');
+            const subject = healthy.subjects[0]?.record, receipt = healthy.receipts.find(row => row.consentRef === subject?.consentRefs[0]), guardian = healthy.guardians.find(row => row.guardianRef === receipt?.guardianRef);
+            ensure(subject?.principalRef === identity.principalRef && subject.state === 'authorized' && subject.expiresAt > at
+                && receipt?.state === 'active' && receipt.expiresAt > at && guardian?.state === 'verified' && guardian.expiresAt > at, 'fixture-retention-healthy-active-grant');
+            const healthyActiveSha256 = await sha(JSON.stringify(active(healthy)));
+            if (operation === 'retention-seed') {
+                ensure(!this.fixtureRetentionBaseline, 'fixture-retention-one-seed');
+                for (const key of targetKeys) ensure(await tx.get(key) === undefined, 'fixture-retention-target-already-present');
+                const candidates = []; let startAfter;
+                for (let pageNumber = 0; pageNumber < 2; pageNumber++) {
+                    const page = await tx.list({ prefix: prefix + 'record:', limit: 4, ...(startAfter ? { startAfter } : {}) });
+                    for (const [key, value] of page) { candidates.push([key, value]); startAfter = key; }
+                    if (page.size < 4) break;
+                }
+                ensure(candidates.length === 5, 'fixture-retention-five-existing-subjects');
+                const source = candidates.find(([, value]) => validParticipationLedgerState(value, PARTICIPATION_RECORD_LIMITS)
+                    && value.subjects.length === 1 && value.guardians.length && value.receipts.length && value.pending.length
+                    && value.operations.some(row => row.kind === 'begin') && value.operations.some(row => row.kind === 'complete'));
+                ensure(source, 'fixture-retention-real-stored-template');
+                const [sourceKey, template] = source, value = structuredClone(template), rules = policy.config.rules;
+                const expiresAt = at - Math.max(...Object.entries(rules).filter(([key]) => key.endsWith('Ms')).map(([, duration]) => duration)) - 1000, issuedAt = expiresAt - 1000;
+                ensure(Number.isSafeInteger(issuedAt) && issuedAt > 0, 'fixture-retention-past-window');
+                value.config = structuredClone(policy.config);
+                value.subjects = [{ record: { ...structuredClone(template.subjects[0].record), subjectRef: RETENTION.subject, principalRef: RETENTION.principal,
+                    communityRef: identity.communityRef, state: 'expired', purposes: [], consentRefs: [], issuedAt, effectiveAt: issuedAt, expiresAt }, deleteAt: expiresAt + rules.subjectTailMs }];
+                value.guardians = [{ ...structuredClone(template.guardians[0]), guardianRef: RETENTION.guardian, subjectRef: RETENTION.subject,
+                    decisionRef: RETENTION.decision, state: 'expired', issuedAt, expiresAt, deleteAt: expiresAt + rules.guardianTailMs }];
+                value.receipts = [{ ...structuredClone(template.receipts[0]), consentRef: RETENTION.consent, guardianRef: RETENTION.guardian,
+                    subjectRef: RETENTION.subject, decisionRef: RETENTION.decision, state: 'expired', issuedAt, expiresAt, deleteAt: expiresAt + rules.receiptTailMs }];
+                ensure(value.receipts[0].verifierRef === 'synthetic_fixture_verifier', 'fixture-retention-current-verifier');
+                value.pending = [{ ...structuredClone(template.pending[0]), pendingRef: RETENTION.pending, subjectRef: RETENTION.subject, principalRef: RETENTION.principal,
+                    state: 'expired', issuedAt, expiresAt, grantExpiresAt: expiresAt, deleteAt: expiresAt + rules.callbackMs }];
+                value.operations = ['begin', 'complete'].map(kind => {
+                    const row = structuredClone(template.operations.find(item => item.kind === kind)), signature = JSON.parse(row.signature);
+                    row.operationRef = RETENTION[kind]; row.issuedAt = issuedAt; row.deleteAt = issuedAt + rules.operationMs;
+                    row.result.subjectRef = RETENTION.subject; if (row.result.pendingRef) row.result.pendingRef = RETENTION.pending;
+                    signature.principalRef = RETENTION.principal;
+                    if (kind === 'begin') signature.communityRef = identity.communityRef;
+                    else Object.assign(signature, { operationRef: row.operationRef, pendingRef: RETENTION.pending, subjectRef: RETENTION.subject,
+                        guardianPrincipalRef: value.guardians[0].principalRef, decisionRef: RETENTION.decision, verifiedAt: issuedAt, expiresAt });
+                    row.signature = JSON.stringify(signature); return row;
+                });
+                ensure(validParticipationLedgerState(value, PARTICIPATION_RECORD_LIMITS)
+                    && ['subjects', 'guardians', 'receipts', 'pending', 'operations'].every(kind => value[kind].every(row => row.deleteAt <= at)), 'fixture-retention-valid-expired-record');
+                const anchor = await tx.get(prefix + 'anchor:' + sourceKey.split(':').at(-1));
+                ensure(anchor?.partitionKey === sourceKey, 'fixture-retention-real-anchor');
+                const own = { ...structuredClone(anchor), principalRef: RETENTION.principal, communityRef: identity.communityRef, partitionKey: targetKey, subjectRef: RETENTION.subject };
+                await tx.put(targetKeys[0], value); await tx.put(targetKeys[1], own); await tx.put(targetKeys[2], own);
+                const refs = [['pending', value.pending[0].pendingRef, value.pending[0].deleteAt], ['guardian', value.guardians[0].guardianRef, value.guardians[0].deleteAt],
+                    ['consent', value.receipts[0].consentRef, value.receipts[0].deleteAt], ['decision', value.receipts[0].verifierRef + '\0' + value.receipts[0].decisionRef, value.receipts[0].deleteAt]];
+                for (let i = 0; i < refs.length; i++) {
+                    const [space, reference, deleteAt] = refs[i], original = space === 'pending' ? template.pending[0].pendingRef : space === 'guardian' ? template.guardians[0].guardianRef
+                        : space === 'consent' ? template.receipts[0].consentRef : template.receipts[0].verifierRef + '\0' + template.receipts[0].decisionRef;
+                    const stored = await tx.get(prefix + 'unique:' + space + ':' + await sha(original));
+                    ensure(stored?.partitionKey === sourceKey && stored.space === space, 'fixture-retention-real-global-reference');
+                    await tx.put(targetKeys[3 + i], { ...stored, reference, deleteAt, principalRef: RETENTION.principal, communityRef: identity.communityRef, partitionKey: targetKey });
+                }
+                for (let i = 0; i < value.operations.length; i++) {
+                    const row = value.operations[i], original = template.operations.find(item => item.kind === row.kind), stored = await tx.get(prefix + 'operation:' + await sha(original.operationRef));
+                    ensure(stored?.partitionKey === sourceKey, 'fixture-retention-real-operation-reference');
+                    await tx.put(targetKeys[7 + i], { ...stored, operationRef: row.operationRef, deleteAt: row.deleteAt, principalRef: RETENTION.principal, communityRef: identity.communityRef, partitionKey: targetKey });
+                }
+                let manifestsPresent = 0, partPrefixesPresent = 0;
+                for (const key of targetKeys) {
+                    ensure(await tx.get(key) !== undefined, 'fixture-retention-native-seed-unconfirmed');
+                    const encoded = [...new TextEncoder().encode(key)].map(byte => byte.toString(16).padStart(2, '0')).join(''), base = 'durable-record:v1:lobby-authority-v1:';
+                    ensure(await raw.get(base + 'manifest:' + encoded) !== undefined, 'fixture-retention-seed-raw-manifest-missing'); manifestsPresent++;
+                    const parts = await raw.list({ prefix: base + 'part:' + encoded + ':', limit: 1 });
+                    ensure(parts instanceof Map && parts.size === 1, 'fixture-retention-seed-raw-part-missing'); partPrefixesPresent++;
+                }
+                baseline = structuredClone(healthy);
+                return { storedSchemaBoundaryOnly: true, targetCounts: [1, 1, 1, 1, 2], targetLogicalKeysPresent: targetKeys.length,
+                    targetRawManifestsPresent: manifestsPresent, targetRawPartPrefixesPresent: partPrefixesPresent,
+                    targetRecordBytes: new TextEncoder().encode(JSON.stringify(value)).byteLength, healthyActiveSha256 };
+            }
+            ensure(operation === 'retention-read', 'fixture-retention-operation');
+            let logicalAbsent = 0, manifestAbsent = 0, partsAbsent = 0;
+            for (const key of targetKeys) {
+                if (await tx.get(key) === undefined) logicalAbsent++;
+                const encoded = [...new TextEncoder().encode(key)].map(byte => byte.toString(16).padStart(2, '0')).join(''), base = 'durable-record:v1:lobby-authority-v1:';
+                if (await raw.get(base + 'manifest:' + encoded) === undefined) manifestAbsent++;
+                const parts = await raw.list({ prefix: base + 'part:' + encoded + ':', limit: 1 }); if (!parts.size) partsAbsent++;
+            }
+            const cursor = await tx.get(PARTICIPATION_MAINTENANCE_CURSOR_KEY);
+            ensure(cursor && Object.keys(cursor).sort().join(',') === 'after,communityRef,version' && cursor.version === 1 && cursor.communityRef === identity.communityRef
+                && (cursor.after === '' || /^participation-records:v1:record:[a-f0-9]{64}$/.test(cursor.after)), 'fixture-retention-current-cursor');
+            let history;
+            if (this.fixtureRetentionBaseline) {
+                const before = this.fixtureRetentionBaseline, completedAt = this.fixtureRetentionAlarm?.completedAt;
+                ensure(Number.isSafeInteger(completedAt) && completedAt >= this.fixtureRetentionAlarm.startedAt, 'fixture-retention-actual-alarm-boundary');
+                ensure(JSON.stringify(active(before)) === JSON.stringify(active(healthy)), 'fixture-retention-active-grant-changed');
+                let removed = 0;
+                for (const [kind, ref] of [['pending', 'pendingRef'], ['operations', 'operationRef']]) {
+                    for (const row of healthy[kind]) ensure(before[kind].some(old => old[ref] === row[ref] && JSON.stringify(old) === JSON.stringify(row)), 'fixture-retention-unexpected-history-change');
+                    for (const row of before[kind]) if (!healthy[kind].some(current => current[ref] === row[ref])) { ensure(row.deleteAt <= completedAt, 'fixture-retention-unexpired-history-removed'); removed++; }
+                }
+                ensure(removed ? healthy.revision > before.revision && healthy.revision <= before.revision + removed : healthy.revision === before.revision, 'fixture-retention-unrelated-ledger-revision-change');
+                history = { healthyActivePermissionPreserved: true, onlyExpiredAncillaryRowsRemoved: true, alarmHandlerCompleted: true,
+                    alarmElapsedMs: completedAt - this.fixtureRetentionAlarm.startedAt };
+            }
+            return { targetLogicalKeysAbsent: logicalAbsent, targetRawManifestsAbsent: manifestAbsent, targetRawPartPrefixesEmpty: partsAbsent,
+                cursorValid: true, cursorWrapped: cursor.after === '', healthyActiveSha256, healthyStoredRowValid: true,
+                handlerHealthy: this.evidenceStorage === 'ready' && !this.authorityUnavailable, ...history };
+        });
+        if (baseline) this.fixtureRetentionBaseline = baseline;
+        return result;
     }
     async fixtureParticipation(operation, body) {
         ensure(this.participationMode === true, 'fixture-participation-mode-required');
@@ -621,14 +752,18 @@ export class FixtureLobby extends HangoutLobby {
         await this.ready;
         if (path.startsWith(PREFIX + 'fanout-') && this.env.FIXTURE_FANOUT_50 !== 'fanout-v1') return denied();
         if (path === PREFIX + 'traffic-metrics' && this.env.FIXTURE_TRAFFIC_ACKS !== 'ack-v1') return denied();
+        if (path.startsWith(PREFIX + 'retention-') && this.env.FIXTURE_RETENTION_PROOF !== 'retention-v1') return denied();
         if (['pressure-register', 'pressure-metrics'].includes(path.slice(PREFIX.length)) && this.env.FIXTURE_PRESSURE_ONLY !== 'pressure-v1') return denied();
         if (path === PREFIX + 'participation-alarm' && this.participationMode && Object.keys(body).length === 0) {
-            await this.alarm(); return Response.json({ completed: true });
+            const startedAt = Date.now(); await this.alarm();
+            if (this.fixtureRetentionBaseline) this.fixtureRetentionAlarm = { startedAt: this.fixtureRetentionAlarm?.startedAt ?? startedAt, completedAt: Date.now() };
+            return Response.json({ completed: true });
         }
         return this.state.blockConcurrencyWhile(async () => {
             try {
                 if (['incident-initialize', 'incident-preserve', 'incident-read'].includes(path.slice(PREFIX.length))) return Response.json(await this.fixtureIncident(path.slice(PREFIX.length), body));
                 if (['participation-policy', 'participation-grant', 'participation-reduce'].includes(path.slice(PREFIX.length))) return Response.json(await this.fixtureParticipation(path.slice(PREFIX.length), body));
+                if (['retention-seed', 'retention-read'].includes(path.slice(PREFIX.length))) return Response.json(await this.fixtureRetention(path.slice(PREFIX.length), body));
                 if (path === PREFIX + 'fanout-metrics' && Object.keys(body).length === 0) return Response.json(this.fixtureFanoutMetrics());
                 if (path === PREFIX + 'fanout-summary' && Object.keys(body).length === 0) return Response.json(await this.fixtureFanoutSummary());
                 if (path === PREFIX + 'fanout-scan') return Response.json(await this.fixtureFanoutScan(body));
@@ -658,12 +793,13 @@ export default { async fetch(request, env) {
         const body = await readControl(request); if (!body) return denied();
         if (url.pathname.startsWith(PREFIX + 'fanout-') && env.FIXTURE_FANOUT_50 !== 'fanout-v1') return denied();
         if (url.pathname === PREFIX + 'traffic-metrics' && env.FIXTURE_TRAFFIC_ACKS !== 'ack-v1') return denied();
+        if (url.pathname.startsWith(PREFIX + 'retention-') && env.FIXTURE_RETENTION_PROOF !== 'retention-v1') return denied();
         if (['pressure-register', 'pressure-metrics'].includes(url.pathname.slice(PREFIX.length)) && env.FIXTURE_PRESSURE_ONLY !== 'pressure-v1') return denied();
         if (url.pathname === PREFIX + 'initialize' && Object.keys(body).length === 0) {
             // Explicit fixture lifecycle action; betaFetch never forwards it.
             return stub.fetch(new Request(ORIGIN + LOBBY_AUTHORITY_PATH + 'initialize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }));
         }
-        if (['fanout-metrics', 'fanout-summary', 'fanout-scan', 'pressure-register', 'pressure-metrics', 'traffic-metrics', 'inspect', 'fault', 'participation-policy', 'participation-grant', 'participation-reduce', 'participation-alarm', 'incident-initialize', 'incident-preserve', 'incident-read'].includes(url.pathname.slice(PREFIX.length))) return stub.fetch(new Request(request.url, {
+        if (['fanout-metrics', 'fanout-summary', 'fanout-scan', 'pressure-register', 'pressure-metrics', 'traffic-metrics', 'inspect', 'fault', 'participation-policy', 'participation-grant', 'participation-reduce', 'participation-alarm', 'retention-seed', 'retention-read', 'incident-initialize', 'incident-preserve', 'incident-read'].includes(url.pathname.slice(PREFIX.length))) return stub.fetch(new Request(request.url, {
             method: 'POST', headers: request.headers, body: JSON.stringify(body)
         }));
         if (url.pathname === PREFIX + 'egress-probe' && Object.keys(body).length === 0) {
