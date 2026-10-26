@@ -1,6 +1,9 @@
 const { defineConfig, configDefaults } = require('vitest/config');
 
-const capacityFixture = 'tests/unit/hangout-lobby-media-blocking-capacity.test.js';
+const capacityFixtures = [
+    'tests/unit/hangout-lobby-media-blocking-capacity.test.js',
+    'tests/unit/hangout-participation-capacity.test.js'
+];
 
 module.exports = defineConfig({
     test: {
@@ -17,7 +20,7 @@ module.exports = defineConfig({
                 test: {
                     name: 'unit',
                     include: ['tests/unit/**/*.test.js', 'hangout-worker/tests/**/*.test.js'],
-                    exclude: [...configDefaults.exclude, capacityFixture],
+                    exclude: [...configDefaults.exclude, ...capacityFixtures],
                     // Positive groups preserve this order with --no-file-parallelism.
                     sequence: { groupOrder: 1 }
                 }
@@ -26,8 +29,8 @@ module.exports = defineConfig({
                 extends: true,
                 test: {
                     name: 'accepted-room-capacity',
-                    include: [capacityFixture],
-                    // This fixture fills 30 rooms through actual admission.
+                    include: capacityFixtures,
+                    // These fixtures fill 30 rooms or admit 150 C3 guests.
                     // Reduce test-runner CPU contention during setup by running
                     // after the other files. Keep the real 50ms overload guard,
                     // all setup actions and refusal assertions.

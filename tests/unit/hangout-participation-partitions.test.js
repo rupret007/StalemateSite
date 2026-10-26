@@ -5,6 +5,7 @@ import { PARTICIPATION_PURPOSES } from '../../hangout-worker/src/participation-p
 import { PARTICIPATION_LEDGER_KEY, PARTICIPATION_LEDGER_LIMITS } from '../../hangout-worker/src/participation-consents.mjs';
 import { createParticipationEnforcement } from '../../hangout-worker/src/participation-enforcement.mjs';
 import { createPartitionedParticipationConsents, readPartitionedParticipationPrincipals, readPartitionedParticipationWithdrawals,
+    readPartitionedParticipationPreparation,
     PARTICIPATION_PARTITION_PREFIX as PREFIX, PARTICIPATION_POLICY_KEY, PARTICIPATION_RECORD_LIMITS } from '../../hangout-worker/src/participation-partitions.mjs';
 
 const START = 1800000000000, clone = value => structuredClone(value), size = value => Buffer.byteLength(JSON.stringify(value));
@@ -31,13 +32,13 @@ function store() {
         failNext: () => fail = true, badList: () => badList = true, afterPut: fn => afterPut = fn, snapshot: () => clone(committed), metrics
     };
 }
-async function fixture({ short = false, capacity = 128, reviewPublicText = null } = {}) {
+async function fixture({ short = false, capacity = 128, reviewPublicText = null, combinedPreparation = false, policyExpiresIn = 1000000 } = {}) {
     let at = START, serial = 0, forced = [];
     const randomRef = () => forced.shift() || `synthetic_partition_${String(++serial).padStart(8, '0')}`;
     const storage = store(), people = new Map(), proofs = new Map(), decisions = new Map(), guardians = new Map();
     const config = { policy: { version: 1, policyVersion: 'partition-test-v1', revision: 1, communityRef: 'synthetic_partition_community',
         noticeDigest: 'a'.repeat(64), decisionRef: 'synthetic_operator_decision', state: 'qualified', purposes: [...PARTICIPATION_PURPOSES],
-        issuedAt: START - 100, effectiveAt: START - 100, expiresAt: START + 1000000, maxSessionMs: 10000 },
+        issuedAt: START - 100, effectiveAt: START - 100, expiresAt: START + policyExpiresIn, maxSessionMs: Math.min(10000, policyExpiresIn) },
         rules: { version: 1, verifierRef: 'synthetic_partition_verifier', pendingMs: short ? 100 : 10000, grantMs: short ? 500 : 500000,
             subjectTailMs: 100, guardianTailMs: 100, receiptTailMs: 100, callbackMs: 100, operationMs: short ? 100 : 10000 } };
     const controls = { beforeCommit: null, afterEffects: null, failAllocation: false, expireAllocation: false, maintenance: true, flood: '', reclaim: false, failRelease: false };
@@ -92,6 +93,7 @@ async function fixture({ short = false, capacity = 128, reviewPublicText = null 
     const read = people => storage.transaction(tx => readPartitionedParticipationPrincipals({ tx, identities: people.map(identity), now: at }));
     const frames = [], closed = [], reader = vi.fn(readPartitionedParticipationPrincipals);
     const enforcement = createParticipationEnforcement({ storage, now: () => at, readPrincipals: reader,
+        ...(combinedPreparation ? { readPreparation: readPartitionedParticipationPreparation, readWithdrawn: readPartitionedParticipationWithdrawals } : {}),
         resolveConnection: async ({ id }) => { const p = people.get(id); return p ? identity(p) : null; },
         validateConnection: async ({ tx, connection, identity, at: time }) => {
             const session = await tx.get(`session:${connection.id}`);
@@ -101,7 +103,7 @@ async function fixture({ short = false, capacity = 128, reviewPublicText = null 
         beforeCommit: async ({ costsOnly }) => { if (!costsOnly && controls.beforeCommit) { const gate = controls.beforeCommit; controls.beforeCommit = null; await gate.wait(); } },
         writeEffects: async ({ tx, effects, costsOnly }) => {
             for (const [kind, value] of effects) await tx.put(`lobby:${kind}`, value);
-            if (!costsOnly && controls.afterEffects) { const run = controls.afterEffects; controls.afterEffects = null; await run(); }
+            if (!costsOnly && controls.afterEffects) { const run = controls.afterEffects; controls.afterEffects = null; await run(tx); }
         }
     });
     const legacyPersist = vi.fn();
@@ -188,6 +190,49 @@ describe('fresh author dependencies for ordinary public text', () => {
         expect(f.reader.mock.calls.every(([arg]) => arg.identities.length === 1 && arg.identities[0].principalRef === alice.principalRef)).toBe(true);
         await f.engine.applyAiReview(request.id, { status: 'reviewed', flagged: true, model: 'synthetic-review', categories: ['harassment'] });
         expect(f.engine._debug.held.size).toBe(0); expect(f.legacyPersist).not.toHaveBeenCalled();
+    });
+});
+
+describe('combined current participation preparation', () => {
+    it('keeps withdrawn and duplicate-principal slots aligned without allocating unknown subjects', async () => {
+        const f = await fixture({ combinedPreparation: true }), alice = await f.enroll('alice'), bravo = await f.enroll('bravo');
+        expect((await f.withdraw(bravo)).state).toBe('withdrawn');
+        const identities = [f.identity(alice), f.identity(bravo), { ...f.identity(alice), principalRef: 'synthetic_unknown_principal' }, f.identity(alice)];
+        const before = f.storage.snapshot();
+        const current = await f.storage.transaction(tx => readPartitionedParticipationPreparation({ tx, identities, now: f.now() }));
+        expect(current.ok).toBe(true); expect(current.withdrawn).toEqual([false, true, false, false]);
+        expect(current.subjects.map(subject => subject?.principalRef ?? null)).toEqual([alice.principalRef, null, null, alice.principalRef]);
+        expect(f.storage.snapshot()).toEqual(before);
+    });
+    it('retains a verified withdrawal when affirmative policy eligibility expires', async () => {
+        const f = await fixture({ combinedPreparation: true, policyExpiresIn: 200 }), alice = await f.enroll('alice');
+        f.advance(150);
+        expect((await f.withdraw(alice)).state).toBe('withdrawn');
+        f.advance(51); // Valid policy expired; the recent withdrawal is retained.
+        const before = f.storage.snapshot(), context = await f.enforcement.prepare([alice]);
+        expect(f.enforcement.isWithdrawn(context, alice.id)).toBe(true);
+        expect(f.enforcement.allows(context, { actorId: alice.id, action: 'publicArtifact' })).toBe(false);
+        expect(f.storage.snapshot()).toEqual(before);
+    });
+    it.each(['guardian', 'consent', 'decision'])('does not project a grant or withdrawal after a corrupt global %s reference', async kind => {
+        const f = await fixture({ combinedPreparation: true }), alice = await f.enroll('alice');
+        const entry = [...f.storage.snapshot()].find(([key, value]) => key.startsWith(`${PREFIX}unique:${kind}:`) && value.space === kind);
+        expect(entry).toBeTruthy(); await f.storage.transaction(tx => tx.delete(entry[0]));
+        const before = f.storage.snapshot(), current = await f.storage.transaction(tx => readPartitionedParticipationPreparation({ tx, identities: [f.identity(alice)], now: f.now() }));
+        expect(current.ok).toBe(false); expect(current.withdrawn).toBeUndefined();
+        const context = await f.enforcement.prepare([alice]);
+        expect(f.enforcement.allows(context, { actorId: alice.id, action: 'publicArtifact' })).toBe(false);
+        expect(f.enforcement.isWithdrawn(context, alice.id)).toBe(false); expect(f.storage.snapshot()).toEqual(before);
+    });
+    it('rechecks the actual peer after awaited writes with an unrelated missing slot before both parties', async () => {
+        const f = await fixture({ combinedPreparation: true }), alice = await f.enroll('alice'), bravo = await f.enroll('bravo');
+        const missing = { ...alice, id: 'missing-old-connection' }, context = await f.enforcement.prepare([missing, bravo, alice]);
+        expect(f.enforcement.allows(context, { actorId: alice.id, peerId: bravo.id, action: 'requestDirectContact' })).toBe(true);
+        const saved = f.storage.snapshot().get(`session:${bravo.id}`);
+        f.controls.afterEffects = tx => tx.delete(`session:${bravo.id}`);
+        expect((await f.enforcement.commit(context, [['net', { unconfirmedPeerPublication: true }]])).ok).toBe(false);
+        expect(f.storage.snapshot().get('lobby:net')).toBeUndefined();
+        expect(f.storage.snapshot().get(`session:${bravo.id}`)).toEqual(saved);
     });
 });
 

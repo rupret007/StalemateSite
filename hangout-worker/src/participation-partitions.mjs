@@ -133,10 +133,11 @@ export async function readPartitionedParticipationWithdrawals({ tx, identities, 
 // Passed directly to createParticipationEnforcement({readPrincipals: ...}).
 // Every prepare/commit/provider fence sees the current policy and peer rows in
 // its existing transaction; never nest lookup() or trust a requested principal.
-export async function readPartitionedParticipationPrincipals({ tx, identities, now } = {}) {
+async function projectParticipation({ tx, identities, now } = {}, includeWithdrawn = false) {
     try {
         if (typeof tx?.get !== 'function' || !integer(now) || !Array.isArray(identities) || identities.length > PARTICIPATION_PARTITION_BOUNDS.identities) fail('not-authorized');
-        const policy = await root(tx), subjects = [], cache = new Map();
+        const policy = await root(tx), subjects = [], withdrawn = [], cache = new Map();
+        let denial = '';
         for (const identity of identities) {
             if (!exact(identity, ['principalRef', 'communityRef', 'expiresAt']) || !integer(identity.expiresAt) || identity.expiresAt <= now) fail('not-authorized');
             const route = await routeFor(identity.principalRef, identity.communityRef);
@@ -144,17 +145,36 @@ export async function readPartitionedParticipationPrincipals({ tx, identities, n
                 const { state } = await loadPartition(tx, route, policy, now);
                 const aligned = alignParticipationLedgerPolicy(state, policy.config, now, PARTICIPATION_RECORD_LIMITS);
                 const result = await readParticipationPrincipals({ tx: { get: async () => clone(aligned) }, identities: [identity], now, limits: PARTICIPATION_RECORD_LIMITS });
-                if (!result.ok) fail(result.reason);
-                cache.set(route.partitionKey, result.subjects[0]);
+                if (!result.ok) {
+                    if (!includeWithdrawn) fail(result.reason);
+                    denial ||= result.reason;
+                }
+                cache.set(route.partitionKey, { subject: result.ok ? result.subjects[0] : null,
+                    withdrawn: !!state?.subjects.some(row => row.record.state === 'withdrawn' && row.deleteAt > now) });
             }
-            subjects.push(clone(cache.get(route.partitionKey)));
+            const current = cache.get(route.partitionKey);
+            subjects.push(clone(current.subject)); withdrawn.push(current.withdrawn);
         }
         // Empty reads must also reject an inactive policy, without initializing it.
         const checked = await readParticipationPrincipals({ tx: { get: async () => clone(policy) }, identities: [], now, limits: PARTICIPATION_RECORD_LIMITS });
-        if (!checked.ok) fail(checked.reason);
-        return freeze({ ok: true, policy: checked.policy, subjects });
+        if (!checked.ok) {
+            if (!includeWithdrawn) fail(checked.reason);
+            denial ||= checked.reason;
+        }
+        // A valid retained withdrawal still narrows sharing when affirmative
+        // policy eligibility has expired. Corrupt/incomplete raw reads above
+        // never provide such a projection, matching the separate readers.
+        if (denial) return freeze({ ok: false, reason: denial, withdrawn });
+        return freeze({ ok: true, policy: checked.policy, subjects, ...(includeWithdrawn ? { withdrawn } : {}) });
     } catch (error) { return Object.freeze({ ok: false, reason: error.partitionReason || 'unavailable' }); }
 }
+
+export const readPartitionedParticipationPrincipals = input => projectParticipation(input);
+
+// One current read-only preparation projection. Withdrawal and grant state
+// come from the same validated partition, without a second native traversal.
+// This result is never reused for either effect-commit authorization fence.
+export const readPartitionedParticipationPreparation = input => projectParticipation(input, true);
 
 export function createPartitionedParticipationConsents({ storage, adapters, admitSubject, releaseSubject = null, now = () => Date.now(), randomRef = () => crypto.randomUUID() } = {}) {
     if (typeof storage?.transaction !== 'function' || typeof admitSubject !== 'function' || typeof now !== 'function' || typeof randomRef !== 'function'

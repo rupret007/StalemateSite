@@ -419,14 +419,14 @@ async function participationLedger(f) {
             authorizeMaintenance: async () => ({ communityRef: LOBBY_AUTHORITY_COMMUNITY, expiresAt: f.now() + 1000 })
         } });
     expect((await ledger.installPolicy('synthetic-operator')).ok).toBe(true);
-    return { ledger, async grant(binding) {
+    return { ledger, async grant(binding, { expiresIn = 100000 } = {}) {
         const identity = await f.authority.resolveParticipationConnection(binding), proof = crypto.randomUUID(); expect(identity).not.toBeNull();
         participant.set(proof, { ...identity, operationRef: crypto.randomUUID() });
         const pending = await ledger.begin(proof, { expectedRevision: 0, purposes: [...PARTICIPATION_PURPOSES] }); expect(pending.ok).toBe(true);
         const decision = crypto.randomUUID(); decisions.set(decision, { operationRef: crypto.randomUUID(), pendingRef: pending.pendingRef,
             subjectRef: pending.subjectRef, principalRef: identity.principalRef, guardianPrincipalRef: 'synthetic_guardian_principal',
             decisionRef: crypto.randomUUID(), verifierRef: config.rules.verifierRef, status: 'approved', purposes: [...PARTICIPATION_PURPOSES],
-            verifiedAt: f.now(), expiresAt: f.now() + 100000 });
+            verifiedAt: f.now(), expiresAt: f.now() + expiresIn });
         const result = await ledger.complete(decision); expect(result.state).toBe('authorized'); return { ...pending, identity };
     }, async withdraw(binding, purposes = []) {
         const identity = await f.authority.resolveParticipationConnection(binding);
@@ -494,20 +494,43 @@ describe('production participation session/partition/effect composition', () => 
         const context = await fresh.prepare([person.binding]); expect(fresh.allows(context, { actorId: person.binding.id, action: 'publicText' })).toBe(true);
         expect(fresh.allows(context, { actorId: person.binding.id, action: 'aiPublicReview', providerReady: true, publicTextEligible: true })).toBe(false);
     });
-    it.each(['expiry', 'revocation', 'role removal'])('rolls back real room effects when %s occurs after the native effect writes', async change => {
+    it.each(['expiry', 'revocation', 'role removal', 'subject expiry', 'policy change', 'subject revision', 'SID replacement'])('rolls back real room effects when %s occurs after the native effect writes', async change => {
         const f = await fixture({ participation: true }), profile = { kind: 'staff', account: await accountId('reviewer@example.invalid', f.env.HANGOUT_HMAC_KEY), role: 'moderator', admin: true, expiresAt: NOW + 90000 };
-        const person = await f.enroll('latecheck', profile); await (await participationLedger(f)).grant(person.binding);
+        const person = await f.enroll('latecheck', profile); await (await participationLedger(f)).grant(person.binding,
+            change === 'subject expiry' ? { expiresIn: 1000 } : {});
+        const replacement = change === 'SID replacement' ? await f.enroll('newsession', profile) : null;
+        const policyBefore = await f.authority.records.transaction(tx => tx.get(PARTICIPATION_POLICY_KEY));
+        const bindingBefore = await f.authority.records.transaction(tx => tx.get('authority-connection:' + person.binding.id));
+        const subjectBefore = await f.authority.records.transaction(async tx => [...(await tx.list({ prefix: 'participation-records:v1:record:', limit: 4 }))][0]);
         const app = f.makeEngine({ participation: productionParticipation(f) }); await app.engine.connect(person.binding); await app.message(person.binding.id, { t: 'hello', nick: 'LateCheck', age13: true }); app.frames.length = 0;
         let reached = false; f.controls.afterEffects = async ({ tx, costsOnly }) => {
             if (costsOnly || reached) return; reached = true;
             if (change === 'expiry') f.advance(100001);
+            else if (change === 'subject expiry') f.advance(1001); // Session/profile remain valid.
             else if (change === 'role removal') f.env.HANGOUT_MODERATOR_EMAILS = '';
+            else if (change === 'policy change') {
+                const value = await tx.get(PARTICIPATION_POLICY_KEY);
+                value.config.policy = { ...value.config.policy, revision: value.config.policy.revision + 1,
+                    policyVersion: 'synthetic-production-composition-v2', noticeDigest: 'c'.repeat(64), decisionRef: 'synthetic_operator_update' };
+                await tx.put(PARTICIPATION_POLICY_KEY, value);
+            } else if (change === 'subject revision') {
+                const [key] = subjectBefore, value = await tx.get(key);
+                value.subjects[0].record.revision++; await tx.put(key, value);
+            } else if (change === 'SID replacement') {
+                await tx.put('authority-connection:' + person.binding.id, { ...bindingBefore, betaSid: replacement.request.sid });
+            }
             else { const key = 'authority-session:' + person.request.sid, row = await tx.get(key); await tx.put(key, { ...row, revoked: true }); }
         };
         expect((await app.message(person.binding.id, { t: 'cmd', ch: '#stalemate', name: 'join', args: ['#late-denied'] })).ok).toBe(false);
         expect(reached).toBe(true); expect(app.engine.roomSnapshot().rooms.some(room => room.name === '#late-denied')).toBe(false);
         expect(app.frames.some(frame => frame.t === 'join' && frame.ch.name === '#late-denied')).toBe(false);
         expect(await f.authority.records.transaction(tx => tx.get('community-room:#late-denied'))).toBeUndefined(); expect(f.driver.stats.rollbacks).toBeGreaterThan(0);
+        if (['subject expiry', 'policy change', 'subject revision', 'SID replacement'].includes(change)) {
+            expect(await f.authority.validate(person.binding)).toBe(true);
+            expect(await f.authority.records.transaction(tx => tx.get(PARTICIPATION_POLICY_KEY))).toEqual(policyBefore);
+            expect(await f.authority.records.transaction(tx => tx.get('authority-connection:' + person.binding.id))).toEqual(bindingBefore);
+            expect(await f.authority.records.transaction(tx => tx.get(subjectBefore[0]))).toEqual(subjectBefore[1]);
+        }
     });
     it('retains a separately committed C2 withdrawal and denies queued room publication while the real session remains valid', async () => {
         const f = await fixture({ participation: true }), person = await f.enroll('withdrawn'), ledger = await participationLedger(f); await ledger.grant(person.binding);
