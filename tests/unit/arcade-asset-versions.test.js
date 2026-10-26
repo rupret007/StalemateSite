@@ -24,6 +24,20 @@ function fixture() {
     return { root, write, read, hash };
 }
 describe('content-versioned arcade delivery', () => {
+    it('versions the changed board styling, board module and classic sprite script', () => {
+        const f = fixture();
+        f.write('games/chess-board.js', 'export const animationMs = 160;');
+        f.write('games/chess-ui.js', "import { animationMs } from './chess-board.js';");
+        f.write('assets/chess/chess-board.css', 'piece.black { filter: drop-shadow(0 0 1px white) }');
+        f.write('games/turdanoid-sprites-core.js', 'globalThis.spriteRevision = 2;');
+        f.write('chess.html', '<script type="module" src="games/chess-ui.js"></script><link rel="stylesheet" href="assets/chess/chess-board.css">');
+        f.write('TurdAnoid.html', '<script src="games/turdanoid-sprites-core.js"></script>');
+        versionArcadeAssets(f.root);
+        expect(f.read('games/chess-ui.js')).toContain('./chess-board.js?v=' + f.hash('games/chess-board.js'));
+        expect(f.read('chess.html')).toContain('games/chess-ui.js?v=' + f.hash('games/chess-ui.js'));
+        expect(f.read('chess.html')).toContain('assets/chess/chess-board.css?v=' + f.hash('assets/chess/chess-board.css'));
+        expect(f.read('TurdAnoid.html')).toContain('games/turdanoid-sprites-core.js?v=' + f.hash('games/turdanoid-sprites-core.js'));
+    });
     it('keeps one current Core URL through Engine, UI and the HTML entry point without changing unrelated destinations', () => {
         const f = fixture(); versionArcadeAssets(f.root);
         const core = './chess-core.js?v=' + f.hash('games/chess-core.js');

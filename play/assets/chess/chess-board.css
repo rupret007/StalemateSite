@@ -15,6 +15,10 @@ body.chess-page #board .square:focus-visible{outline:3px solid #101d2a;outline-o
 #board .check-label{bottom:1px;background:#a40e2c;color:#fff;font:800 clamp(7px,1vw,9px)/1.1 system-ui;padding:2px 4px;border-radius:3px;letter-spacing:.025em}
 #board piece{background-size:100%;background-repeat:no-repeat;background-position:center;filter:drop-shadow(0 1.5px 1px #08121d66)}
 #board piece.dragging{filter:drop-shadow(0 7px 3px #08121d77);cursor:grabbing}
+/* Keep the dark silhouette distinct on either square without recoloring the
+   licensed artwork. The steady fine edge also survives reduced motion. */
+#board piece.black{filter:drop-shadow(0 0 .7px #fff6dc) drop-shadow(0 1.5px 1px #08121d66)}
+#board piece.black.dragging{filter:drop-shadow(0 0 .7px #fff6dc) drop-shadow(0 7px 3px #08121d77)}
 #board piece.ghost{opacity:.25;filter:none}
 #board square.selected{background:var(--board-selection);box-shadow:inset 0 0 0 2px #476324}
 #board square.last-move{background:#c8dd865c;box-shadow:inset 0 0 0 2px #213a3155}

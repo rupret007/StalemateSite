@@ -149,6 +149,20 @@ body.tm-hint-space .tm-start-hint[hidden] { display:block!important; visibility:
   html[data-mobile-game="turdomania"] .dock:has(.tm-start-hint:not([hidden])),
   html[data-mobile-game="turdomania"] body.tm-hint-space .dock { margin-top:124px; }
 }
+/* A wide window gives the same puzzle a larger board beside its controls.
+   Mobile keeps its established layout and logical board dimensions. */
+@media(min-width:981px) {
+  body.turdomania { display:grid; grid-template-columns:var(--board-w) clamp(260px,24vw,320px); grid-template-rows:max-content max-content minmax(0,1fr); grid-template-areas:"board hud" "board dock" "board help"; gap:16px 28px; justify-content:center; align-content:start; align-items:start; padding:24px 24px calc(24px + var(--mobile-footer,0px)); }
+  body.turdomania #boardWrap { grid-area:board; margin:0; justify-self:center; }
+  body.turdomania header.hud { grid-area:hud; padding:18px 12px; gap:12px 8px; }
+  body.turdomania header.hud h1 { font-size:32px; }
+  body.turdomania .stat { flex:1; min-width:0; padding:8px 4px; }
+  body.turdomania .stat b { font-size:24px; }
+  body.turdomania .tagline { font-size:14px; min-height:42px; }
+  body.turdomania .dock { grid-area:dock; margin:0; padding:12px 0; gap:10px; }
+  body.turdomania #suite-difficulty-mount { flex-basis:100%; justify-content:center; }
+  body.turdomania .help { grid-area:help; margin:0; font-size:14px; line-height:1.5; }
+}
 </style>
 </head>
 <body class="suite-ambient turdomania arcade" data-arcade-game="turdomania">
@@ -211,7 +225,11 @@ window.tmView = function () {
   var hud = document.querySelector('header.hud');
   var dock = document.querySelector('.dock');
   var chrome = mobile ? (landscape ? 24 : (hud ? hud.offsetHeight : 64) + (dock ? dock.offsetHeight : 100) + 20) : (compact ? 182 : 230);
-  return { availW: Math.min(w - (mobile && landscape ? 210 : 0), 760) - 36, availH: h - chrome - footer };
+  if (!mobile) {
+    var side = Math.max(260, Math.min(320, w * .24));
+    return { availW: w - 48 - side - 28 - 16, availH: h - footer - 48 - 16, desktop: true };
+  }
+  return { availW: Math.min(w - (mobile && landscape ? 210 : 0), 760) - 36, availH: h - chrome - footer, desktop: false };
 };
 window.tmFit = function (levelKey) {
   var d = TM_DIMS[levelKey] || TM_DIMS.normal;
@@ -233,7 +251,8 @@ window.tmFit = function (levelKey) {
   }
   var f = tmFit(TM_DIMS[lvl] ? lvl : 'normal');
   window.TM_INIT = { level: TM_DIMS[lvl] ? lvl : 'normal', cols: f.cols, rows: f.rows };
-  var cell = Math.max(22, Math.min(56, Math.floor(Math.min(f.availW / f.cols, f.availH / f.rows))));
+  var view = tmView();
+  var cell = Math.max(22, Math.min(view.desktop ? 72 : 56, Math.floor(Math.min(view.availW / f.cols, view.availH / f.rows))));
   var st = document.documentElement.style;
   st.setProperty('--cell', cell + 'px'); st.setProperty('--board-w', cell * f.cols + 'px'); st.setProperty('--board-h', cell * f.rows + 'px');
 })();
@@ -324,7 +343,8 @@ function start(levelKey, seed) {
 }
 
 function layout() {
-  let { availW, availH } = window.tmView();
+  const view = window.tmView();
+  let { availW, availH } = view;
   const viewH = Math.min(window.innerHeight, document.documentElement.clientHeight);
   const viewW = Math.min(window.innerWidth, document.documentElement.clientWidth);
   const footer = (document.querySelector('.stalemate-strip')?.getBoundingClientRect().height || 0) + (document.getElementById('suite-music-status')?.getBoundingClientRect().height || 0);
@@ -336,9 +356,9 @@ function layout() {
   // Measure the actual kit and footer; fonts and settings can change their height.
   const frameHeight = wrap.offsetHeight - boardEl.offsetHeight;
   const reserve = viewW <= 980 && frameHeight > 0 ? frameHeight + (parseFloat(getComputedStyle(document.querySelector('.dock')).marginTop) || 0) : 24;
-  availH = landscape ? viewH - footer - 24 : viewH - document.querySelector('header.hud').offsetHeight - document.querySelector('.dock').offsetHeight - helpHeight - Math.max(footer, padding) - reserve;
+  if (!view.desktop) availH = landscape ? viewH - footer - 24 : viewH - document.querySelector('header.hud').offsetHeight - document.querySelector('.dock').offsetHeight - helpHeight - Math.max(footer, padding) - reserve;
   if (landscape) availW = viewW - 224;
-  cell = Math.max(22, Math.min(56, Math.floor(Math.min(availW / state.cols, availH / state.rows))));
+  cell = Math.max(22, Math.min(view.desktop ? 72 : 56, Math.floor(Math.min(availW / state.cols, availH / state.rows))));
   const st = document.documentElement.style;
   st.setProperty('--cell', cell + 'px');
   st.setProperty('--board-w', cell * state.cols + 'px');
@@ -431,12 +451,18 @@ function clampCursor() {
   cursor.r = Math.max(0, Math.min(h - 1, cursor.r));
 }
 
-function clearHot() { boardEl.querySelectorAll('.hot').forEach((e) => e.classList.remove('hot')); }
+const tagline = document.getElementById('tagline');
+const defaultTagline = tagline.textContent;
+function clearHot() {
+  boardEl.querySelectorAll('.hot').forEach((e) => e.classList.remove('hot'));
+  tagline.textContent = defaultTagline;
+}
 function highlight(c, r) {
   clearHot();
   const g = Core.findGroup(state.board, c, r);
   if (g.length < 2) return g.length;
   for (const [gc, gr] of g) { const t = state.board[gc][gr]; tileEls.get(t.id)?.classList.add('hot'); }
+  tagline.textContent = `${g.length} matching tiles · ${Core.scoreForGroup(g.length)} points`;
   return g.length;
 }
 function paintCursor() {

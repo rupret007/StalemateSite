@@ -606,6 +606,8 @@
     }
 
     @media (min-width: 981px) {
+      /* Match the shell's 20px height budget at tall desktop/tablet sizes too. */
+      body { padding-block: 10px; }
       .shell { height: calc(100dvh - var(--mobile-footer, 0px) - 20px); min-height: 0; }
       .hud { grid-template-columns: repeat(7, minmax(0, 1fr)) auto; }
       #suite-difficulty-mount { grid-column: auto; align-self: center; }

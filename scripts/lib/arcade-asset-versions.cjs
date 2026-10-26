@@ -13,6 +13,8 @@ const TARGETS = new Set([
     'games/crapeights-presentation.js',
     'games/suite-progress-core.js', 'games/table-continue-core.js',
     'games/chess-core.js', 'games/chess-engine.js', 'games/chess-ui.js',
+    'games/chess-board.js', 'assets/chess/chess-board.css',
+    'games/turdanoid-sprites-core.js',
     'stalemate/stalemate-overlay.js'
 ]);
 function versionArcadeAssets(stage) {

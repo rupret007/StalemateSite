@@ -3655,6 +3655,12 @@ document.addEventListener('keydown', (e) => {
   if (e.target?.matches?.('select, input, textarea, summary')) return;
   if (e.target?.matches?.('.cabinet-rail')) return;
   if (e.target?.closest?.('button, a') && (e.code === 'Space' || e.code === 'Enter')) return;
+  // Discrete actions belong to a fresh press. OS key-repeat must never drop
+  // the following pieces, toggle pause/mute again, or rotate after one intent.
+  if (e.repeat && ['Space', 'Enter', 'KeyC', 'KeyP', 'KeyM', 'ArrowUp', 'KeyX', 'KeyZ'].includes(e.code)) {
+    e.preventDefault();
+    return;
+  }
   if (onboardingOpen) {
     if (e.code === 'Enter' || e.code === 'Space') {
       e.preventDefault();

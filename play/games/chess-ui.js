@@ -3,7 +3,7 @@ import { Chess, createGame, playMove, claimDraw, claimReason, intendedClaims, un
   loadGame, saveGame, recordResult, readResults, exportPgn, LEVELS, colorName, pieceName } from './chess-core.js?v=99a08f6ff639de1d';
 import { ChessEngine } from './chess-engine.js?v=278c2488721a0324';
 import { pieceSvg, PIECE_GUIDE, loadPieceArtwork } from './chess-pieces.js';
-import { ChessBoard } from './chess-board.js';
+import { ChessBoard, MOVE_ANIMATION_MS } from './chess-board.js?v=9a72af72421e8d82';
 
 // The game is not ready with missing pieces or board styling. Keep the existing
 // deliberate loading/retry UI and saved position until every visual asset loads.
@@ -254,10 +254,17 @@ async function queueComputer(hint = false) {
   const turnGame = game;
   const fen = game.chess.fen();
   const ticket = ++generation;
+  const startedAt = globalThis.performance.now();
+  const settle = !hint && game.chess.history().length && !boardView.motion.matches ? MOVE_ANIMATION_MS : 0;
   busy = true; failure = false; feedback = '';
   render();
   try {
     const move = await engine.search(game.chess.history({ verbose: true }).map(item => item.lan), game.level, { hint });
+    // A warm low-depth search can finish in 10–20ms. Let the human's existing
+    // piece animation settle so the reply does not visually swallow that move.
+    // Search time counts toward this bound; reduced motion adds no wait.
+    const remaining = settle - (globalThis.performance.now() - startedAt);
+    if (move && remaining > 0) { await new Promise(resolve => setTimeout(resolve, remaining)); }
     if (!move || generation !== ticket || turnGame !== game || game.chess.fen() !== fen || game.result || suspended) { return; }
     busy = false;
     if (!game.chess.moves({ verbose: true }).some(item => item.lan === move)) { throw new Error('The computer returned an illegal move.'); }
