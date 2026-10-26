@@ -1,5 +1,5 @@
 // Real beta admission is separate from the pilot's synthetic test identities.
-import { hmacKeyOk, roleForEmail } from './auth.mjs';
+import { accountId, hmacKeyOk, roleForEmail } from './auth.mjs';
 import { BETA_TTL, registryRequest } from './beta-session-client.mjs';
 export { BETA_TTL } from './beta-session-client.mjs';
 
@@ -55,9 +55,15 @@ export async function betaSession(request, env, now = Date.now(), { allowRevoked
     catch { throw new BetaSessionUnavailable('Beta session registry is unavailable.'); }
     if (checked.status === 403) return null;
     if (checked.status !== 200) throw new BetaSessionUnavailable('Beta session registry is unavailable.');
-    const revoked = allowRevoked && (await checked.json()).reason === 'revoked';
+    const metadata = allowRevoked || env.HANGOUT_SESSION_AUTHORITY === 'lobby-v1' ? await checked.json() : null;
+    const revoked = allowRevoked && metadata.reason === 'revoked';
     const identity = await readBeta('identity', cookie(request, BETA_IDENTITY_COOKIE), env.HANGOUT_HMAC_KEY, now);
     if (identity && identity.sid === access.sid && identity.exp <= access.exp && typeof identity.email === 'string' && identity.email.length <= 254) {
+        if (env.HANGOUT_SESSION_AUTHORITY === 'lobby-v1') {
+            const profile = metadata?.profile;
+            if (!profile || profile.kind !== identity.kind || profile.account !== await accountId(identity.email, env.HANGOUT_HMAC_KEY)
+                || profile.role !== identity.role || profile.expiresAt < identity.exp) return { access, identity: null, revoked };
+        }
         if (identity.kind === 'owner') return { access, identity: { ...identity, role: 'fan' }, revoked };
         if (identity.kind === 'staff' && roleForEmail(identity.email, env) === identity.role) return { access, identity, revoked };
     }

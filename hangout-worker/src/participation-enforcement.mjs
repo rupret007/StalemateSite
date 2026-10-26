@@ -59,10 +59,11 @@ export function createParticipationEnforcement({ storage, resolveConnection, val
             const state = contexts.get(context), index = state?.connections.findIndex(c => c.id === actorId), binding = state?.bindings[index];
             return binding ? JSON.stringify([binding.subjectRef, binding.subjectRevision, binding.policyVersion, binding.policyRevision, binding.noticeDigest]) : '';
         },
-        async commit(context, effects, { costsOnly = false } = {}) {
+        async commit(context, effects, { costsOnly = false, transaction = operation => storage.transaction(operation) } = {}) {
             try {
                 const state = contexts.get(context);
                 if (!state || !Array.isArray(effects) || effects.length > limits.writes || enc.encode(JSON.stringify(effects)).byteLength > limits.bytes) return { ok: false, reason: 'participation-capacity' };
+                if (typeof transaction !== 'function') return { ok: false, reason: 'participation-unavailable' };
                 const writes = clone(effects); await beforeCommit({ effects: clone(writes), costsOnly });
                 if (!costsOnly && state.checks.length) {
                     const affected = new Set(state.checks.flatMap(request => [request.actorId, request.peerId].filter(Boolean)));
@@ -73,7 +74,9 @@ export function createParticipationEnforcement({ storage, resolveConnection, val
                             || identity.communityRef !== state.identities[i]?.communityRef) return { ok: false, reason: 'participation-denied' };
                     }
                 }
-                return await storage.transaction(async tx => {
+                // A trusted session fence supplies the same serializable
+                // transaction wrapper rather than nesting another transaction.
+                return await transaction(async tx => {
                     const authorize = async () => {
                         if (costsOnly || !state.checks.length) return;
                         for (const actorId of new Set(state.checks.flatMap(request => [request.actorId, request.peerId].filter(Boolean)))) {

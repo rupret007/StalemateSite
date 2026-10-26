@@ -7,8 +7,10 @@ export function validBetaSession(value, env, now = Date.now()) {
         Number.isFinite(value.expiresAt) && value.expiresAt > now && value.expiresAt <= now + BETA_TTL;
 }
 export function registryRequest(env, operation, data) {
-    if (!env.BETA_SESSIONS) throw new Error('Beta session registry is unavailable.');
-    return env.BETA_SESSIONS.get(env.BETA_SESSIONS.idFromName('global')).fetch(new Request(`https://beta-sessions/${operation}`, {
+    const collocated = env.HANGOUT_SESSION_AUTHORITY === 'lobby-v1';
+    if (env.HANGOUT_SESSION_AUTHORITY && !collocated || !(collocated ? env.LOBBY : env.BETA_SESSIONS)) throw new Error('Beta session registry is unavailable.');
+    const binding = collocated ? env.LOBBY : env.BETA_SESSIONS;
+    return binding.get(binding.idFromName(collocated ? 'stalemate' : 'global')).fetch(new Request(`https://beta-sessions/${collocated ? '__beta/authority/' : ''}${operation}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
     }));
 }
