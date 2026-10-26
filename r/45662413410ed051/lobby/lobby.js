@@ -35,6 +35,9 @@ import { createEntrySharing } from './entry-sharing.mjs';
     if (isLocal && params.get('relay')) sessionStorage.setItem('hangout-relay', params.get('relay'));
     if (location.search) history.replaceState(null, '', location.pathname + location.hash);
     const siteKey = $('meta[name="hangout-turnstile"]').content || '';
+    // Only the actual beta shell adds this marker. A local preview has its own
+    // admission flow and must never be sent to an invented beta endpoint.
+    const betaShell = !!$('script[src="/beta/bootstrap.js"]');
 
     // GoatCounter: fixed, privacy-safe event names only (no nicks, no room names, no query string).
     const count = (event) => { try { if (window.goatcounter && window.goatcounter.count) window.goatcounter.count({ path: `hangout-${event}`, title: 'Hang Out', event: true, referrer: '' }); } catch (e) { /* analytics never breaks chat */ } };
@@ -84,6 +87,8 @@ import { createEntrySharing } from './entry-sharing.mjs';
     const drafts = new Map();
     const pendingReports = new Map();
     let connectionState = 'offline';
+    let sessionEnded = false;
+    let inviteContext = null;
     let replaying = false;
     const announcements = createChatAnnouncements($('[data-buffer]'));
     $('[data-chat-announcements]').addEventListener('change', (event) => announcements.setEnabled(event.currentTarget.checked));
@@ -168,12 +173,12 @@ import { createEntrySharing } from './entry-sharing.mjs';
     function setConnection(state) {
         connectionState = state;
         if (state !== 'connected') clearJamInvitations();
-        const label = { offline: 'Offline', connecting: 'Connecting…', reconnecting: 'Reconnecting…', connected: 'Connected' }[state];
+        const label = { offline: 'Offline', connecting: 'Connecting…', reconnecting: 'Reconnecting…', connected: 'Connected', ended: 'Session ended' }[state];
         $('[data-connection]').textContent = label;
         $('[data-connection]').dataset.state = state;
         $('[data-send]').disabled = state !== 'connected';
-        $('[data-enter]').disabled = state === 'connecting' || state === 'reconnecting';
-        $('[data-reconnect]').hidden = state !== 'offline' || !app.me;
+        $('[data-enter]').disabled = state === 'connecting' || state === 'reconnecting' || state === 'ended' && betaShell;
+        $('[data-reconnect]').hidden = !(state === 'offline' || state === 'ended' && !betaShell) || !app.me;
         $$('[data-start]').forEach((b) => { b.disabled = state !== 'connected'; });
         if (state === 'offline' && app.pendingChannel) {
             app.pendingChannel = '';
@@ -183,6 +188,8 @@ import { createEntrySharing } from './entry-sharing.mjs';
     }
     let cancelTransportAck = () => {};
     async function connect(nick) {
+        if (sessionEnded && betaShell) return;
+        sessionEnded = false; $('[data-session-ended]').hidden = true; $('[data-text]').readOnly = false;
         const attempt = ++connectionAttempt;
         cancelTransportAck();
         entrySharing.disconnect();
@@ -237,7 +244,13 @@ import { createEntrySharing } from './entry-sharing.mjs';
             resetPendingReports();
             setConnection('offline');
             if (roomApi) roomApi.onLeave();
-            if (ownerSession && (!opened || e.code === 4401)) { $('[data-gate-guest]').hidden = false; return gateStatus('Email sign-in is unavailable or expired. Sign in again to manage your rooms, or continue as a guest.'); }
+            if (e.code === 4401) return endSession();
+            if (!opened && app.me) return endSession('admission');
+            if (ownerSession && !opened) {
+                $('[data-gate]').hidden = false; $('[data-app]').hidden = true;
+                $('[data-gate-guest]').hidden = false;
+                return gateStatus('Email sign-in is unavailable or expired. Sign in again to manage your rooms, or continue as a guest.');
+            }
             if (!opened) return gateStatus('Couldn’t get in. Maybe it’s full, locked, or you got the boot. Try again in a bit.');
             if ([1009, 4400, 4413, 4429].includes(e.code)) {
                 clearTimeout(retryTimer);
@@ -251,6 +264,41 @@ import { createEntrySharing } from './entry-sharing.mjs';
             setConnection('reconnecting');
             retryTimer = setTimeout(() => connect(app.me || nick), Math.min(10000, 1000 * (2 ** Math.min(retry++, 4))) * (0.75 + Math.random() * 0.25));
         };
+    }
+    function endSession(reason = 'expired') {
+        const wasVerified = ownerSession || app.verified;
+        sessionEnded = true; connectionAttempt++;
+        clearTimeout(retryTimer); cancelTransportAck();
+        // Keep the unsent text under its original channel/PM key. Never move a
+        // private draft into #stalemate or persist it during re-authentication.
+        drafts.set(app.active, $('[data-text]').value);
+        app.chans.clear(); app.pms.clear(); app.rooms = []; app.pendingChannel = '';
+        app.band = false; app.verified = false; app.role = 'fan'; app.capabilities = {};
+        ownerSession = false; sessionStorage.removeItem('hangout-owner');
+        $('[data-owner-signout]').hidden = true; $('[data-gate-guest]').hidden = true;
+        $('[data-self-role]').textContent = 'Session ended';
+        $('[data-room-filter] option[value=mine]').disabled = true;
+        if ($('[data-room-filter]').value === 'mine') $('[data-room-filter]').value = 'active';
+        app.ignores.clear(); $('[data-pmreqs]').replaceChildren();
+        clearTimeout(toastTimer); toastRegion.replaceChildren(); toastRegion.hidden = true;
+        for (const dialog of $$('dialog')) if (dialog.open) dialog.close();
+        inviteContext = null; $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
+        $('[data-sheet-buttons]').replaceChildren(); $('[data-palette-buttons]').replaceChildren();
+        $('[data-adult]').checked = false;
+        document.body.classList.remove('is-band', 'am-op');
+        announcements.replace(() => $('[data-buffer]').replaceChildren());
+        setConnection('ended'); drawTabs(); drawChan();
+        $('[data-text]').readOnly = true;
+        const ended = reason === 'admission'
+            ? 'Couldn’t reconnect. The service may be unavailable or your sign-in may have expired.'
+            : wasVerified ? 'Your verified sign-in expired or was revoked.' : 'Your guest session expired or was revoked.';
+        const next = betaShell
+            ? wasVerified ? 'Return to your invitation, then verify your email again to recover your rooms.' : 'Return to your private invitation to join again.'
+            : wasVerified ? 'Choose Try again to continue as a guest. Sign in again to recover your registered rooms.' : 'Choose Try again to start a fresh session.';
+        $('[data-session-reason]').textContent = `${ended} ${next} Cameras are off.`;
+        $('[data-session-reentry]').hidden = !betaShell;
+        $('[data-session-ended]').hidden = false;
+        show('chat'); $('#session-ended-title').focus({ preventScroll: true });
     }
     const send = (obj) => {
         if (!app.ws || app.ws.readyState !== 1) return false;
@@ -610,6 +658,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         $('[data-chat-context]').textContent = isPm ? `PM · ${key.slice(3)}` : key;
         $('[data-topic]').textContent = isPm ? `Private chat with ${key.slice(3)} · not end-to-end encrypted · report shares selected text · tap their name to block` : c ? `${c.topic || ''}` : '';
         const room = !isPm && c && c.kind !== 'lobby';
+        if (inviteContext && (inviteContext !== c || connectionState !== 'connected' || !amOp(c))) closeInviteDialog();
         $('[data-roombar]').hidden = !room;
         drawJam();
         const showAct = room && ['bobross', 'watch', 'art'].includes(c.kind);
@@ -688,6 +737,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const lobby = app.chans.get('#stalemate');
         const summary = Discovery.summarizeLobby(lobby, app.me);
         const connected = connectionState === 'connected';
+        $('[data-owner-signin]').hidden = sessionEnded;
         $('[data-lobby-count]').textContent = connected ? `${summary.others + (app.me ? 1 : 0)} here · chat` : 'Main conversation';
         $('[data-presence-title]').textContent = connected ? summary.headline : 'Connection paused';
         $('[data-presence-detail]').textContent = connected ? summary.detail : 'Room counts may be out of date. Your unsent words stay in this tab.';
@@ -695,7 +745,8 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const paused = !app.band && (app.netLock === 'readonly' || app.budget === 'readonly');
         const note = $('[data-network-note]');
         note.hidden = !paused && connected;
-        note.textContent = !connected ? 'You’re offline. Your draft stays here until you reconnect.' : 'Chat is read-only for now. Your unsent draft stays here.';
+        note.textContent = sessionEnded ? 'This session is closed. Your unsent message is available to copy.'
+            : !connected ? 'You’re offline. Your draft stays here until you reconnect.' : 'Chat is read-only for now. Your unsent draft stays here.';
     }
     $('[data-lobby-home]').addEventListener('click', () => { if (app.chans.has('#stalemate')) switchTo('#stalemate'); });
     $('[data-reconnect]').addEventListener('click', () => connect(app.me || nickInput.value.trim()));
@@ -800,7 +851,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         ['/topic', 'topic'], ['/whois', 'whois', 'nick'], ['/msg', 'msg', 'nick then message'], ['/ignore', 'ignore', 'nick'], ['/join', 'join', '#room'],
         ['/slap', 'slap', 'nick'], ['/help', 'help'], ['/quit', 'quit']
     ];
-    const OP_PALETTE = [['/mode +m', 'mode', null, ['+m']], ['/mode -m', 'mode', null, ['-m']], ['/mode +i', 'mode', null, ['+i']], ['/mode -i', 'mode', null, ['-i']], ['Slow 10s', 'mode', null, ['+S', '10']], ['Slow off', 'mode', null, ['-S']],
+    const OP_PALETTE = [['Invite guest', 'invite-guest'], ['/mode +m', 'mode', null, ['+m']], ['/mode -m', 'mode', null, ['-m']], ['/mode +i', 'mode', null, ['+i']], ['/mode -i', 'mode', null, ['-i']], ['Slow 10s', 'mode', null, ['+S', '10']], ['Slow off', 'mode', null, ['-S']],
         ['Cams off', 'mode', null, ['-C']], ['Cams allowed', 'mode', null, ['+C']], ['/topic …', 'topic', 'new topic'], ['🔒 Lock', 'lock'], ['🔓 Unlock', 'lock', null, ['off']], ['Add guest co-host', 'op', 'nickname'], ['Remove guest co-host', 'deop', 'nickname'], ['Keep this room', 'register'], ['Add verified co-host', 'cohost', 'add nickname'], ['Remove verified co-host', 'cohost', 'remove nickname'], ['Transfer ownership', 'transfer', 'verified co-host nickname'], ['Delete registration', 'unregister'], ['Close room', 'close']];
     function openPalette(ops) {
         const box = $('[data-palette-buttons]');
@@ -815,6 +866,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--small'; b.textContent = label;
             b.addEventListener('click', () => {
                 $('[data-palette]').close();
+                if (name === 'invite-guest') return openInviteDialog();
                 if (['deop', 'unregister', 'transfer', 'close'].includes(name) && !confirm(current?.persistent && ['close', 'unregister'].includes(name) ? `Permanently delete ${app.active} and release its registered name?` : `${label} in ${app.active}?`)) return;
                 if (name === 'register' && !app.verified) { sessionStorage.setItem('hangout-return-room', app.active); location.assign($('[data-owner-signin]').href); return; }
                 if (name === 'cohost') { const who = prompt(`${label}: nickname`); if (!who) return; if (label.startsWith('Remove') && !confirm(`Remove ${who} as co-host?`)) return; return cmd(name, [label.startsWith('Remove') ? 'remove' : 'add', who.trim()]); }
@@ -833,6 +885,41 @@ import { createEntrySharing } from './entry-sharing.mjs';
     $('[data-palette-open]').addEventListener('click', () => openPalette(false));
     $('[data-roomtools]').addEventListener('click', () => openPalette(true));
     $('[data-palette-close]').addEventListener('click', () => $('[data-palette]').close());
+
+    function closeInviteDialog() {
+        inviteContext = null; $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
+        if ($('[data-invite-dialog]').open) $('[data-invite-dialog]').close();
+    }
+    function openInviteDialog() {
+        const current = store(app.active);
+        if (connectionState !== 'connected' || !current || current.kind === 'lobby' || !amOp(current)) return;
+        inviteContext = current; $('[data-invite-room]').textContent = current.name; $('[data-invite-error]').textContent = '';
+        $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
+        for (const person of app.chans.get('#stalemate')?.names || []) {
+            if (person.nick === app.me || current.names.some(member => member.nick === person.nick)) continue;
+            const option = document.createElement('option'); option.value = person.nick; $('[data-invite-options]').append(option);
+        }
+        $('[data-invite-dialog]').showModal(); $('[data-invite-nick]').focus();
+    }
+    $('[data-invite-cancel]').addEventListener('click', closeInviteDialog);
+    $('[data-invite-dialog]').addEventListener('close', () => {
+        if ($('[data-invite-dialog]').open) return;
+        closeInviteDialog();
+        if (connectionState === 'connected') $(amOp(store(app.active)) ? '[data-roomtools]' : '[data-text]').focus({ preventScroll: true });
+    });
+    $('[data-invite-form]').addEventListener('submit', event => {
+        event.preventDefault();
+        const current = store(app.active), nick = $('[data-invite-nick]').value.trim();
+        if (!inviteContext || inviteContext !== current || connectionState !== 'connected' || !amOp(current)) return closeInviteDialog();
+        if (!/^[A-Za-z][A-Za-z0-9_\-[\]{}^`|]{2,19}$/.test(nick)) {
+            $('[data-invite-error]').textContent = 'Use their current nickname: 3–20 letters, numbers or IRC nickname symbols.';
+            $('[data-invite-nick]').focus(); return;
+        }
+        // This is only an affordance. The server checks the current host,
+        // recipient and room before granting an invitation.
+        if (cmd('invite', [nick], current.name)) closeInviteDialog();
+        else $('[data-invite-error]').textContent = 'Reconnect before sending an invitation.';
+    });
 
     $('[data-say]').addEventListener('submit', (e) => {
         e.preventDefault();

@@ -18,6 +18,11 @@
 <body>
     <header class="titlebar"><div class="brand"><span class="brand-mark" aria-hidden="true">#</span><span><b>HANG OUT</b><span class="brand-caption">IRC / COMMUNITY</span></span><span class="title-extra">A place to hang out.</span></div><div class="connection-tools"><a class="entry-return" data-entry-return hidden></a><span class="connection" data-connection role="status" data-state="offline">Not connected</span><button type="button" data-reconnect hidden>Try again</button></div></header>
 
+    <section class="session-ended" data-session-ended hidden aria-labelledby="session-ended-title">
+        <div><h2 id="session-ended-title" tabindex="-1">Session ended</h2><p data-session-reason role="status"></p><p class="small">Your current unsent message stays below for copying. Leaving this page clears unsent drafts; they are never sent automatically.</p></div>
+        <a class="btn" data-session-reentry href="/beta/" hidden>Return to invitation</a>
+    </section>
+
     <section class="gate" data-gate>
         <div class="gate-layout">
           <div class="gate-intro">
@@ -193,6 +198,18 @@
         <h3 id="person-dialog-title" data-sheet-title></h3>
         <div class="sheet-buttons" data-sheet-buttons></div>
         <button class="btn btn--ghost" type="button" data-sheet-close>Close</button>
+    </dialog>
+    <dialog class="sheet" data-invite-dialog aria-labelledby="invite-dialog-title">
+        <h3 id="invite-dialog-title">Invite a guest</h3>
+        <p>Invite someone to <b data-invite-room></b>. They choose whether to join.</p>
+        <form data-invite-form>
+            <label class="channel-label" for="invite-nickname">Guest nickname</label>
+            <input id="invite-nickname" data-invite-nick list="invite-nickname-options" maxlength="20" autocomplete="off" spellcheck="false" aria-describedby="invite-nickname-hint invite-nickname-error" required>
+            <datalist id="invite-nickname-options" data-invite-options></datalist>
+            <p class="small" id="invite-nickname-hint">Use their current nickname from #stalemate. An invitation does not give host controls.</p>
+            <p class="status" id="invite-nickname-error" data-invite-error role="status"></p>
+            <div class="sheet-buttons"><button class="btn" type="submit">Send invitation</button><button class="btn btn--ghost" type="button" data-invite-cancel>Cancel</button></div>
+        </form>
     </dialog>
     <dialog class="sheet" data-cam-gate aria-labelledby="camera-dialog-title">
         <h3 id="camera-dialog-title">Camera on?</h3>

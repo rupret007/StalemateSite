@@ -62,6 +62,12 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .connection[data-state=connected]::before { background: var(--lime); box-shadow: 0 0 0 3px #d1fa7810; }
 .connection[data-state=offline]::before { background: var(--pink); }
 .connection-tools button { min-height: 36px; background: transparent; border: 1px solid var(--line); color: var(--cream); font: 11px var(--mono); padding: 5px 9px; }
+.session-ended { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding: 12px 20px; background: #24291c; border-bottom: 1px solid var(--control-line); }
+.session-ended > div { flex: 1 1 250px; min-width: 0; }
+.session-ended h2 { margin: 0 0 4px; font-size: 16px; }
+.session-ended p { margin: 4px 0; font-size: 13px; overflow-wrap: anywhere; }
+.session-ended .small { color: var(--muted); font-size: 12px; }
+.session-ended .btn { flex: none; }
 /* Entry: the room's character on the left, one clear action on the right. */
 .gate { display: grid; place-items: center; flex: 1; overflow: auto; min-height: 0; padding: 48px 36px; background-image: radial-gradient(#343d3655 .6px, transparent .6px); background-size: 22px 22px; }
 .gate-layout { width: min(1080px, 100%); display: grid; grid-template-columns: 1.1fr 1fr; gap: 72px; align-items: center; }
@@ -246,7 +252,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .sheet-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 16px 0; }
 .sheet-buttons .btn { font-size: 12px; }
 .channel-label { display: block; margin: 16px 0 8px; font-size: 12px; }
-[data-channel-name] { width: 100%; }
+[data-channel-name], [data-invite-nick] { width: 100%; }
 .check { display: flex; align-items: center; gap: 10px; min-height: 44px; }
 .check input { min-height: 0; accent-color: var(--lime); }
 /* Status owns a bounded grid row, never an overlay over the composer. It is
