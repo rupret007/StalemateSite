@@ -771,11 +771,25 @@ describe('read-only preparation cohort on the actual SQLite authority', () => {
             authority: { ...legacy, resolveParticipationConnections: value }, now: f.now })).toThrow('participation-authority-unavailable');
     });
 
-    it('reads 200 admitted authority bindings in one bounded native transaction with less amplification', async () => {
+    it('reads 200 stored authority bindings in one bounded native transaction with less amplification', async () => {
         const f = await fixture({ participation: true }), descriptors = [];
-        // This is the existing authority boundary, not 200 ordinary lobby
-        // guests: no engine admission, nickname or public-room cap is raised.
-        for (let index = 0; index < 200; index++) descriptors.push((await f.enroll('cohort-' + String(index).padStart(3, '0'))).binding);
+        // This tests stored authority reads, not 200 ordinary admissions/mints.
+        // One real enrollment supplies the current guest record schema. The
+        // remaining fixture rows use the real codec/SQLite, with at most 16
+        // logical writes per batch and both indices committed atomically.
+        const template = await f.enroll('cohort-000'); descriptors.push(template.binding);
+        const record = await f.authority.records.transaction(tx => tx.get('authority-session:' + template.request.sid));
+        for (let start = 1; start < 200; start += 7) await f.authority.records.transaction(async tx => {
+            const sessions = await tx.get(SESSION_INDEX), connections = await tx.get(CONNECTION_INDEX);
+            for (let index = start; index < Math.min(start + 7, 200); index++) {
+                const id = 'cohort-' + String(index).padStart(3, '0'), request = f.registration(id);
+                const binding = { ...template.binding, id, authorityRef: id, betaSid: request.sid, dev: 'device_' + id, iph: request.iph };
+                await tx.put('authority-session:' + request.sid, { ...record, sid: request.sid });
+                await tx.put('authority-connection:' + id, binding);
+                sessions.entries.push({ sid: request.sid, exp: record.exp }); connections.ids.push(id); descriptors.push(binding);
+            }
+            await tx.put(SESSION_INDEX, sessions); await tx.put(CONNECTION_INDEX, connections);
+        });
         const before = fingerprint(f.driver);
         f.driver.resetOperations();
         const expected = await individualCohortIdentities(f.authority, descriptors), singleReads = f.driver.stats.operations.length;
