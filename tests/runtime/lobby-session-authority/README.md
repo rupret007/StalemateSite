@@ -368,3 +368,20 @@ Node/Miniflare/native application-ACK credit isolation, not physical slow TCP,
 browser suspension, shared high-fanout capacity, WAN,150-native scale, soak,
 hosted cost/SLO or real guardian/provider qualification. No pressure execution is
 implied by source or syntax checks alone.
+
+
+## Explicit close-order diagnostic (not qualification)
+
+`npm run --silent test:lobby-session-runtime -- --participation --traffic-acks
+--diagnose-close` permits one explicitly selected observational mode. Only after
+engine initialization, its first traffic-metrics call installs pass-through
+observers on the real engine disconnect and authority unbind. They preserve the
+actual returns/throws and add no storage operations. At most32 anonymous numeric/
+allowlisted events and an overflow flag record engine/empty-nickname/live counts,
+result status and ordering. Inspection additionally marks before/after load and
+return. On a checkpoint mismatch, the existing exact assertion includes this
+bounded metadata; its predicate, wait and all limits remain unchanged. No IDs,
+cookies, bodies or raw error stacks enter the observer metadata. A passing run
+means no reproduction in that instrumented run, not a close-retirement fix or
+normal-mode/overall qualification. The canonical six modes do not install these
+observers when the diagnostic flag is absent.

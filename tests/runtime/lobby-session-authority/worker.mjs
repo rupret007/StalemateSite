@@ -316,6 +316,49 @@ export class FixtureLobby extends HangoutLobby {
             nativeProbeSends: { initialSequence: meter.initialSequence, calls: meter.nativeSendCalls, returned: meter.nativeSendReturned },
             witness: meter.witness ? { ...meter.witness } : null };
     }
+    fixtureInstallCloseDiagnostic() {
+        const meter = this.fixtureControl.traffic;
+        if (this.env.FIXTURE_CLOSE_DIAGNOSTIC !== 'close-v1' || !meter || meter.closeDiagnostic) return;
+        const diagnostic = meter.closeDiagnostic = { ordinal: 0, events: [], overflow: false };
+        const observe = (phase, id, result, threw = false) => {
+            try {
+                const people = this.engine.sessionSnapshot().connections;
+                const known = ['participation-busy', 'participation-capacity', 'participation-denied', 'participation-unavailable', 'session-unavailable'];
+                const event = { ordinal: Math.min(33, diagnostic.ordinal + 1), phase, slot: meter.slots.get(id) ?? -1,
+                    engineCount: people.length, emptyNickCount: people.filter(person => person.nick === '').length,
+                    targetPresent: people.some(person => person.id === id), liveBindingCount: this.liveBindings.size,
+                    targetLive: this.liveBindings.has(id), threw, resultObserved: phase.endsWith('-end') || threw,
+                    returnedUndefined: result === undefined, resultOk: typeof result?.ok === 'boolean' ? result.ok : null,
+                    reason: typeof result?.reason !== 'string' ? 'absent' : known.includes(result.reason) ? result.reason : 'unclassified' };
+                diagnostic.ordinal = event.ordinal;
+                if (diagnostic.events.length < 32) diagnostic.events.push(event); else diagnostic.overflow = true;
+            } catch { diagnostic.overflow = true; } // Observation must never replace actual behavior/results.
+        };
+        const disconnect = this.engine.disconnect.bind(this.engine);
+        this.engine.disconnect = async (...args) => {
+            observe('disconnect-start', args[0]);
+            try { const result = await disconnect(...args); observe('disconnect-end', args[0], result); return result; }
+            catch (error) { observe('disconnect-throw', args[0], undefined, true); throw error; }
+        };
+        const original = this.authority;
+        // The actual authority is frozen: a get-proxy cannot override its
+        // nonconfigurable data methods. This fixture-only facade retains every
+        // original value/closure and delegates the one observed method exactly.
+        this.authority = Object.freeze({ ...original, unbind: async (...args) => {
+            observe('unbind-start', args[0]);
+            try { const result = await original.unbind(...args); observe('unbind-end', args[0], result); return result; }
+            catch (error) { observe('unbind-throw', args[0], undefined, true); throw error; }
+        } });
+    }
+    fixtureCloseDiagnosticMark() {
+        const diagnostic = this.fixtureControl.traffic?.closeDiagnostic;
+        if (!diagnostic || this.env.FIXTURE_CLOSE_DIAGNOSTIC !== 'close-v1') return null;
+        try {
+            const people = this.engine.sessionSnapshot().connections;
+            return { ordinal: diagnostic.ordinal, engineCount: people.length,
+                emptyNickCount: people.filter(person => person.nick === '').length, liveBindingCount: this.liveBindings.size };
+        } catch { return { ordinal: diagnostic.ordinal, observationUnavailable: true }; }
+    }
     fixtureTrafficMetrics() {
         const meter = this.fixtureControl.traffic;
         ensure(this.env.FIXTURE_TRAFFIC_ACKS === 'ack-v1' && meter && this.participationMode && !this.incidentSourceMode, 'fixture-traffic-mode-required');
@@ -329,6 +372,7 @@ export class FixtureLobby extends HangoutLobby {
             for (const person of current) meter.slots.set(person.id, TRAFFIC_LABELS.indexOf(person.nick));
         }
         ensure(meter.slots.size === 3 && current.every(person => meter.slots.has(person.id) && this.liveBindings.has(person.id)), 'fixture-traffic-current-bindings-required');
+        this.fixtureInstallCloseDiagnostic();
         const sockets = current.map(person => {
             const matches = this.state.getWebSockets().filter(socket => socket.readyState === 1 && socket.deserializeAttachment()?.id === person.id);
             ensure(matches.length === 1, 'fixture-traffic-current-socket-required');
@@ -347,7 +391,9 @@ export class FixtureLobby extends HangoutLobby {
     async fixtureInspect() {
         const needles = [...ordinaryNeedles, ...(this.env.FIXTURE_TRAFFIC_ACKS === 'ack-v1' ? [TRAFFIC_PREFIX] : []),
             ...(this.env.FIXTURE_PRESSURE_ONLY === 'pressure-v1' ? [PRESSURE_PREFIX] : [])];
+        const beforeLoad = this.fixtureCloseDiagnosticMark();
         const saved = await this.authority.load();
+        const afterLoad = this.fixtureCloseDiagnosticMark();
         let commandReadyAt, sharingStates, incidentSources;
         if (this.participationMode) {
             const current = this.engine.sessionSnapshot().connections, buckets = new Map(this.engine.abuseSnapshot().buckets), at = Date.now();
@@ -420,7 +466,12 @@ export class FixtureLobby extends HangoutLobby {
             logicalScan, rawScan: { rows, bytes, perChunkOrdinaryBodiesAbsent: rawAbsent },
             faultHistory: [...this.fixtureControl.history],
             nativeRollbackWitnesses: this.fixtureControl.rollbackWitnesses.map(item => ({ ...item })),
-            fault: { tripped: this.fixtureControl.tripped, nativeWriteCompleted: this.fixtureControl.nativeWriteCompleted } };
+            fault: { tripped: this.fixtureControl.tripped, nativeWriteCompleted: this.fixtureControl.nativeWriteCompleted },
+            ...(beforeLoad ? { closeDiagnostic: { beforeLoad, afterLoad, beforeReturn: this.fixtureCloseDiagnosticMark(),
+                loadedSessionCount: saved.state.sessions.connections.length,
+                loadedEmptyNickCount: saved.state.sessions.connections.filter(person => person.nick === '').length,
+                loadedBindingCount: saved.bindings.length, overflow: this.fixtureControl.traffic.closeDiagnostic.overflow,
+                events: this.fixtureControl.traffic.closeDiagnostic.events.map(event => ({ ...event })) } } : {}) };
     }
     async fetch(request) {
         const path = new URL(request.url).pathname;
