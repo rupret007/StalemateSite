@@ -43,6 +43,63 @@ The command without the flag retains the original beta baseline; source-bound
 receipts distinguish the two modes and do not qualify public enrollment, real
 guardian rights, provider dispatch or hosted rollout.
 
+The plain `--participation` run also adds a C2 retention proof **after** its
+canonical visitor/rollback/Stop/report assertions. Other modes keep their
+existing journeys. This adds no CLI flag, workflow step, production endpoint,
+policy change, clock override, wait cap or capacity increase. The two added
+healthy-peer barriers reuse the existing command-budget pacing and timeouts.
+
+A nonce-only fixture control clones an actual stored C2 schema into one
+explicitly synthetic, expired historical target: one subject, guardian,
+receipt, pending row and two operation rows, with nine matching owned logical
+keys. The production record validator must accept it before the real codec
+commits it in native SQLite. Each logical key must also have a raw native
+manifest and at least one chunk in its exact part prefix inside that seed
+transaction; the later raw absence checks cannot pass against an empty or
+misaddressed namespace. Its past windows use the actual finite policy
+tails and may precede the fresh fixture policy's issuance; this is a stored
+schema/cleanup boundary, **not ordinary issuance chronology, enrollment or
+guardian verification**. It allocates no visitor or affirmative permission.
+
+At most four invocations of the existing actual alarm handler allow the
+unchanged four-record cursor page to wrap past the six stored subjects. The
+proof checks target partition/reference/index absence through both decoded
+records and raw manifest/chunk prefixes. The current healthy guest's active
+subject, guardian, receipt, purposes and subject revision remain exact. Only
+pending/operation entries whose stored deletion deadline has passed by the
+completed alarm may disappear; their surviving entries cannot change.
+
+Complete existing logical/raw privacy scans and canonical room/report/native
+rollback state are checked again after those real peer barriers. Every alarm
+and cold read must leave both evidence storage and authority healthy; an alarm
+that returns after marking storage degraded cannot pass. The existing owned
+process kill and fresh native-disk reopen must retain deletion, healthy
+permission and cursor state.
+A plain-retention-only diagnostic observes actual production stages without
+clearing degraded state or changing a result, argument or thrown error. Start
+entry, fulfillment and rejection are recorded around the real `super.start`,
+including the constructor's known-empty pre-initialize rejection; the original
+error is rethrown unchanged. After successful `super.start`, a frozen authority
+facade wraps only maintenance/due/schedule
+and preserves all other property references; those calls retain the original
+authority receiver. Engine refresh/tick and Lobby log/private-report calls
+likewise delegate to their original receivers. The existing `storageFailed`
+method is counted before delegating unchanged. No extra RPC or storage read is
+introduced. Up to 128 fixed stage/outcome/reason observations and an overflow
+flag distinguish existing degradation from a newly failed alarm stage. Unknown
+reasons become `other`; no arbitrary error message/stack, key, identity or body
+is returned. Pre-seed health must already be ready, and existing after-alarm and
+cold-read readiness assertions retain safe diagnostic context on failure. This
+follow-up is observational source only until a fresh run qualifies it; the prior
+19cf handler-health failures remain failed evidence.
+
+Only bounded fixed diagnostic enums/counts plus existing counts, digests and
+booleans enter the added receipt; signed cookies still
+travel solely over the existing private IPC channel. This qualifies the actual
+local alarm **handler** only when its source-bound run passes. It does not prove
+hosted alarm delivery, deadline/SLO guarantees, backup erasure, a new native
+retention-fault injection or real parental/legal rights handling.
+
 For a fresh checkout:
 
 ```sh

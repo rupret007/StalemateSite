@@ -79,6 +79,17 @@ recoverable copy and independently verify a full writer/socket/in-flight drain.
 staff route or old private Room. Preserve every operational hold and review rule.
 
 Known-new initialization refuses known legacy Lobby, report and budget state.
+A first known-empty startup can be quarantined because no authority exists yet.
+Only successful binding-only `initialize`, with no prior engine, sockets, live
+bindings, pending admission/retirement or scheduled retirement retry, may retire
+that quarantine. The actual empty-domain transaction and full awaited restore
+must succeed; a fresh engine, unchanged opaque failure identity, ready private
+queue and ready queue projection, cleared maintenance actor and repeated
+quiescence are required before evidence storage becomes ready. Encoded queue
+failures still refuse completion. Ordinary startup, alarms, migration, rotation,
+duplicate initialization and preexisting engine failures never clear degradation;
+a later failure immediately marks it degraded again. This is not an old-writer
+drain, migration, data repair or general recovery mechanism.
 Migration requires validated existing Lobby state and an actual read-only old
 registry export. Every nonexpired old SID must be revoked with closure confirmed.
 The export does not perform that drain. Existing mint budgets are copied rather
