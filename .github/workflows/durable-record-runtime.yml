@@ -182,6 +182,18 @@ jobs:
           printf '%s\n' "$status" > runtime-proof-artifacts/lobby-participation-runtime.exit-code.txt
           exit "$status"
 
+      - name: Prove paced native ACKs and C3 withdrawal with healthy peers
+        shell: bash
+        run: |
+          set +e
+          npm run --silent test:lobby-session-runtime -- --participation --traffic-acks > runtime-proof-artifacts/lobby-traffic-acks-runtime.stdout.log 2> runtime-proof-artifacts/lobby-traffic-acks-runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/lobby-traffic-acks-runtime.stdout.log
+          cat runtime-proof-artifacts/lobby-traffic-acks-runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/lobby-traffic-acks-runtime.exit-code.txt
+          exit "$status"
+
       - name: Prove public report source composition with synthetic incident authority
         shell: bash
         run: |

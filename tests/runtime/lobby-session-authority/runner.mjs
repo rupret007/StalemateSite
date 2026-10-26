@@ -15,11 +15,18 @@ const APP = fileURLToPath(new URL('../../../', import.meta.url));
 const TOOLS = fileURLToPath(new URL('../durable-records/', import.meta.url));
 const ORIGIN = 'https://local-fixture.invalid', INVITE = 'owned-fixture-invite-not-a-production-credential-2026', PREVIEW = 'owned-fixture-preview-token-20261025';
 const ENV = ['PATH', 'TMPDIR', 'TEMP', 'TMP', 'SystemRoot', 'SYSTEMROOT', 'WINDIR'];
-const PARTICIPATION = process.argv.includes('--participation'), INCIDENT = process.argv.includes('--incident-sources');
-const MODE = [...(PARTICIPATION ? ['--participation'] : []), ...(INCIDENT ? ['--incident-sources'] : [])];
+const PARTICIPATION = process.argv.includes('--participation'), INCIDENT = process.argv.includes('--incident-sources'), TRAFFIC_ACKS = process.argv.includes('--traffic-acks');
+const MODE = [...(PARTICIPATION ? ['--participation'] : []), ...(INCIDENT ? ['--incident-sources'] : []), ...(TRAFFIC_ACKS ? ['--traffic-acks'] : [])];
+assert.ok(!TRAFFIC_ACKS || PARTICIPATION && !INCIDENT, '--traffic-acks requires --participation and does not select incident mode');
+const TRAFFIC_PREFIX = 'ACK probe ephemeral marker ';
+const latencySummary = values => {
+    assert.ok(values.length > 0 && values.length <= 2000 && values.every(value => Number.isFinite(value) && value >= 0));
+    const sorted = [...values].sort((a, b) => a - b), at = fraction => +sorted[Math.ceil(sorted.length * fraction) - 1].toFixed(3);
+    return { samples: sorted.length, p50Ms: at(.5), p95Ms: at(.95), p99Ms: at(.99), maxMs: +sorted.at(-1).toFixed(3) };
+};
 const OWN_KEYS = ['available', 'canStop', 'ok', 'purposes', 'reason', 'revision', 'state'].sort();
 const OWN_PURPOSES = ['public-text', 'public-artifact', 'public-disclosure', 'room-creation', 'room-registration', 'direct-contact', 'camera', 'audio', 'media-reception', 'external-provider', 'ai-public-review'].sort();
-const EPHEMERAL_BODY_MARKERS = ['Native Stalemate ephemeral greeting', 'Native Rad Dad ephemeral greeting', 'Native remaining visitor greeting', 'native-media-control-no-body-persistence'].sort();
+const EPHEMERAL_BODY_MARKERS = ['Native Stalemate ephemeral greeting', 'Native Rad Dad ephemeral greeting', 'Native remaining visitor greeting', 'native-media-control-no-body-persistence', ...(TRAFFIC_ACKS ? [TRAFFIC_PREFIX] : [])].sort();
 function assertNativeRollback(witness, record) {
     assert.deepEqual(Object.keys(witness).sort(), ['record', 'originalSha256', 'stagedSha256', 'restoredSha256', 'nativeWriteCompleted', 'stagedChanged', 'nativeTransactionRejected', 'restoredBeforeEngineRecovery'].sort());
     assert.equal(witness.record, record);
@@ -59,20 +66,62 @@ function receive(expected, nonce) {
 }
 
 class Visitor {
-    constructor(socket, label) {
+    constructor(socket, label, transport = false) {
+        this.transport = transport; this.rawTransport = { count: 0, bytes: 0, firstSequence: 0, lastSequence: 0, firstAt: null, lastAt: null, kinds: {} };
+        this.rawTransportHash = createHash('sha256'); this.frameTimes = [];
+        this.ack = { sent: 0, lastSequence: 0, lastAt: -Infinity, pending: 0, minSpacingMs: null }; this.ackTimer = null;
         this.socket = socket; this.label = label; this.frames = []; this.bytes = 0; this.waiters = new Set(); this.closed = null; this.failure = null;
         this.commandCount = 0; this.barrierSequence = 0; this.lastCommand = null;
         socket.addEventListener('message', event => {
             try {
                 assert.equal(typeof event.data, 'string', label + ': text frame required');
                 this.bytes += event.data.length; assert.ok(this.bytes <= 2 * 1024 * 1024 && this.frames.length < 2000, label + ': output cap');
-                const frame = JSON.parse(event.data); assert.equal(typeof frame?.t, 'string'); this.frames.push(frame);
+                let frame = JSON.parse(event.data); assert.equal(typeof frame?.t, 'string');
+                const receivedAt = performance.now();
+                if (this.transport) {
+                    if (Object.hasOwn(frame, 'transportSeq')) {
+                        // Witness the actual native envelope before a semantic copy
+                        // strips ONLY this transport field for the old assertions.
+                        assert.ok(Number.isSafeInteger(frame.transportSeq) && frame.transportSeq === this.rawTransport.lastSequence + 1, label + ': raw sequence gap/duplicate');
+                        const raw = this.rawTransport; raw.count++; raw.bytes += Buffer.byteLength(event.data);
+                        assert.match(frame.t, /^[a-z-]{1,40}$/); raw.kinds[frame.t] = (raw.kinds[frame.t] || 0) + 1;
+                        assert.ok(Object.keys(raw.kinds).length <= 32, label + ': raw frame kind bound');
+                        raw.firstSequence ||= frame.transportSeq; raw.lastSequence = frame.transportSeq; raw.firstAt ??= receivedAt; raw.lastAt = receivedAt;
+                        this.rawTransportHash.update(event.data);
+                        this.ack.pending++;
+                        const semantic = { ...frame }; delete semantic.transportSeq; frame = semantic;
+                    } else assert.ok(this.rawTransport.count === 0 && ['device', 'hello'].includes(frame.t), label + ': unsequenced non-handshake frame');
+                }
+                this.frames.push(frame); this.frameTimes.push(receivedAt);
+                if (this.transport && this.ack.pending) {
+                    if (this.ack.pending >= 8) this.flushAck();
+                    else if (!this.ackTimer) this.ackTimer = setTimeout(() => this.flushAck(), 50);
+                }
                 for (const check of [...this.waiters]) check();
-            } catch (error) { this.failure = error; for (const check of [...this.waiters]) check(); }
+            } catch (error) { this.cancelAck(); this.failure = error; for (const check of [...this.waiters]) check(); }
         });
-        socket.addEventListener('close', event => { this.closed = { code: event.code, reason: event.reason }; for (const check of [...this.waiters]) check(); });
-        socket.addEventListener('error', () => { this.failure = Error(label + ': websocket error'); for (const check of [...this.waiters]) check(); });
+        socket.addEventListener('close', event => { this.cancelAck(); this.closed = { code: event.code, reason: event.reason }; for (const check of [...this.waiters]) check(); });
+        socket.addEventListener('error', () => { this.cancelAck(); this.failure = Error(label + ': websocket error'); for (const check of [...this.waiters]) check(); });
         socket.accept();
+    }
+    cancelAck() { clearTimeout(this.ackTimer); this.ackTimer = null; }
+    flushAck() {
+        this.cancelAck();
+        if (!this.transport || !this.ack.pending || this.closed || this.failure || this.socket.readyState !== 1) return;
+        const remaining = 50 - (performance.now() - this.ack.lastAt);
+        if (remaining > 0) { this.ackTimer = setTimeout(() => this.flushAck(), remaining); return; }
+        try {
+            const at = performance.now(), sequence = this.rawTransport.lastSequence;
+            assert.ok(sequence > this.ack.lastSequence, this.label + ': duplicate client ACK');
+            this.socket.send(JSON.stringify({ t: 'transport-ack', seq: sequence }));
+            if (this.ack.sent) this.ack.minSpacingMs = Math.min(this.ack.minSpacingMs ?? Infinity, at - this.ack.lastAt);
+            this.ack.sent++; this.ack.lastSequence = sequence; this.ack.lastAt = at; this.ack.pending = 0;
+        } catch (error) { this.failure = error; for (const check of [...this.waiters]) check(); }
+    }
+    transportSnapshot() {
+        assert.ok(this.transport && !this.failure && this.ack.pending === 0 && this.ack.lastSequence === this.rawTransport.lastSequence);
+        return { ...this.rawTransport, kinds: { ...this.rawTransport.kinds }, rawEnvelopeSha256: this.rawTransportHash.copy().digest('hex'),
+            acknowledgementsSent: this.ack.sent, acknowledgedSequence: this.ack.lastSequence, minAckSpacingMs: this.ack.minSpacingMs };
     }
     send(value) {
         assert.equal(this.closed, null, this.label + ': unexpectedly closed');
@@ -158,6 +207,7 @@ async function runtime(phase, state, nonce) {
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true } },
         bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected',
             ...(PARTICIPATION ? { HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1' } : {}),
+            ...(TRAFFIC_ACKS ? { FIXTURE_TRAFFIC_ACKS: 'ack-v1' } : {}),
             ...(INCIDENT ? { HANGOUT_INCIDENT_SOURCE_BRIDGE: 'i3a-v1', FIXTURE_INCIDENT_KEY: fixtureIncidentKey } : {}),
             HANGOUT_HMAC_KEY: 'owned-fixture-hmac-not-a-production-credential-2026', HANGOUT_BETA_INVITE_KEY: INVITE, HANGOUT_PREVIEW_KEY: PREVIEW,
             HANGOUT_BETA_INVITE_VERSION: '1', HANGOUT_OPEN: '1', HANGOUT_AI_ENABLED: '0', HANGOUT_TURN_ENABLED: '0' },
@@ -182,12 +232,12 @@ async function runtime(phase, state, nonce) {
         if (PARTICIPATION && grant) assert.deepEqual(await control('participation-grant', { cookie }), { authorizedSyntheticGrant: true });
         return cookie;
     };
-    const connect = async (cookie, label, source, ip) => {
+    const connect = async (cookie, label, source, ip, transport = false) => {
         const response = await mf.dispatchFetch(ORIGIN + '/lobby?preview=' + PREVIEW, { headers: { ...headers(cookie, ip), Upgrade: 'websocket' } });
         assert.equal(response.status, 101, label + ': actual gateway upgrade refused'); assert.ok(response.webSocket, label + ': missing WebSocket');
-        const visitor = new Visitor(response.webSocket, label); visitors.push(visitor);
+        const visitor = new Visitor(response.webSocket, label, transport); visitors.push(visitor);
         const hello = await visitor.wait(f => f.t === 'hello', 'actual hello'); assert.deepEqual(hello.features, { entrySources: 1, privateMessageContext: 1, roomKeep: 1, messageResults: 1 }); assert.equal(hello.role, 'fan');
-        visitor.send({ t: 'hello', nick: label, age13: true, entrySource: source });
+        visitor.send({ t: 'hello', nick: label, age13: true, entrySource: source, ...(transport ? { transport: 1 } : {}) });
         await visitor.wait(f => f.t === 'join' && f.ch.name === '#stalemate', 'lobby membership');
         return visitor;
     };
@@ -214,7 +264,53 @@ async function runtime(phase, state, nonce) {
         assert.ok(Number.isSafeInteger(deadline) && deadline >= 0 && deadline - Date.now() <= 1000, 'unexpected current command deadline');
         while (Date.now() < deadline) await delay(deadline - Date.now());
     };
-    let proof, secrets, incidentSource, sharing, safetyCookie;
+    let proof, secrets, incidentSource, sharing, safetyCookie, traffic;
+    const trafficMetrics = () => control('traffic-metrics');
+    const assertTrafficAccounting = (metrics, snapshots) => {
+        assert.equal(metrics.sockets.length, 3);
+        for (let slot = 0; slot < 3; slot++) {
+            const socket = metrics.sockets[slot], peer = snapshots[slot];
+            assert.equal(socket.slot, slot); assert.equal(socket.controls, peer.acknowledgementsSent);
+            assert.equal(socket.sequence, peer.lastSequence); assert.equal(socket.acknowledged, socket.sequence);
+            assert.equal(socket.remainingControls, 20 * Math.ceil(socket.controls / 20) - socket.controls);
+            assert.equal(socket.pendingFrames, 0);
+            assert.ok(peer.minAckSpacingMs === null || peer.minAckSpacingMs >= 50, 'native client ACK spacing below current frontend policy');
+        }
+        assert.equal(metrics.delivery.controlFrames, snapshots.reduce((sum, peer) => sum + peer.acknowledgementsSent, 0));
+        assert.equal(metrics.controlBudget.consumedControls, metrics.delivery.controlFrames);
+        assert.equal(metrics.controlBudget.reservations, metrics.sockets.reduce((sum, socket) => sum + Math.ceil(socket.controls / 20), 0));
+        assert.equal(metrics.controlBudget.prepaidControls, metrics.controlBudget.reservations * 20);
+        assert.equal(metrics.sockets.reduce((sum, socket) => sum + socket.remainingControls, 0), metrics.controlBudget.prepaidControls - metrics.controlBudget.consumedControls);
+        for (const field of ['pressureCloses', 'failures', 'legacyCloses', 'controlCloses']) assert.equal(metrics.delivery[field], 0);
+        assert.equal(metrics.controlBudget.refused, 0); assert.equal(metrics.delivery.pendingFrames, 0); assert.equal(metrics.delivery.pendingBytes, 0);
+        assert.equal(metrics.transactions.started, metrics.transactions.committed + metrics.transactions.rejected);
+    };
+    const drainTraffic = async peers => {
+        const deadline = performance.now() + 6000;
+        for (;;) {
+            for (const peer of peers) { if (peer.failure) throw peer.failure; assert.equal(peer.closed, null, 'healthy traffic peer closed'); }
+            const metrics = await trafficMetrics();
+            if (peers.every(peer => peer.ack.pending === 0 && peer.ack.lastSequence === peer.rawTransport.lastSequence)
+                && metrics.sockets.length === 3 && metrics.sockets.every((socket, slot) => socket.slot === slot
+                    && socket.enabled && socket.sequence === peers[slot].rawTransport.lastSequence && socket.acknowledged === socket.sequence
+                    && socket.controls === peers[slot].ack.sent && socket.pendingFrames === 0)) return metrics;
+            assert.ok(performance.now() < deadline, 'actual native ACK drain exceeded existing6s wait'); await delay(25);
+        }
+    };
+    const probeLine = async (writer, peers, suffix, messageNumber) => {
+        const offsets = peers.map(peer => peer.frames.length), text = TRAFFIC_PREFIX + suffix;
+        const id = messageNumber.toString(16).padStart(32, '0'), started = performance.now();
+        writer.send({ t: 'say', ch: '#stalemate', text, clientMessageId: id });
+        const lines = await Promise.all(peers.map((peer, index) => peer.wait(frame => frame.t === 'line' && frame.text === text, 'traffic line delivery', offsets[index])));
+        assert.equal(new Set(lines.map(line => line.id)).size, 1, 'traffic peers received different native line identities');
+        const deliveries = lines.map((line, index) => {
+            assert.equal(peers[index].frames.slice(offsets[index]).filter(frame => frame.t === 'line' && frame.text === text).length, 1, 'duplicate native traffic line');
+            return peers[index].frameTimes[peers[index].frames.indexOf(line)] - started;
+        });
+        const result = await writer.wait(frame => frame.t === 'message-result' && frame.id === id, 'traffic sender result', offsets[peers.indexOf(writer)]);
+        assert.equal(result.status, 'published', 'native traffic publication refused');
+        return { started, deliveries, disposition: writer.frameTimes[writer.frames.indexOf(result)] - started };
+    };
     try {
         assert.equal((await mf.ready).hostname, '127.0.0.1');
         if (phase === 'visitors') {
@@ -233,8 +329,8 @@ async function runtime(phase, state, nonce) {
             }
             const egress = await control('egress-probe'); assert.deepEqual(egress, { status: 503, denied: true });
             const cookieA = await unlock('192.0.2.11'), cookieB = await unlock('192.0.2.12');
-            const a = await connect(cookieA, 'NativeAlpha', 'stalemate', '192.0.2.11');
-            const b = await connect(cookieB, 'NativeBravo', 'rad-dad', '192.0.2.12');
+            const a = await connect(cookieA, 'NativeAlpha', 'stalemate', '192.0.2.11', TRAFFIC_ACKS);
+            const b = await connect(cookieB, 'NativeBravo', 'rad-dad', '192.0.2.12', TRAFFIC_ACKS);
             if (PARTICIPATION) {
                 const privateRoom = await mf.dispatchFetch(ORIGIN + '/room?room=' + 'a'.repeat(64), { headers: { ...headers(cookieB), Upgrade: 'websocket' } });
                 assert.equal(privateRoom.status, 503); assert.match(await privateRoom.text(), /participation/);
@@ -265,11 +361,63 @@ async function runtime(phase, state, nonce) {
             const stroke = { id: 'native-stroke-1', color: '#009ee8', size: 4, pts: [[0.1, 0.2], [0.3, 0.4]] }, paintAt = a.frames.length;
             b.send({ t: 'act', ch: '#art-native-canvas', kind: 'stroke', stroke });
             assert.deepEqual((await a.wait(f => f.t === 'act' && f.kind === 'stroke' && f.stroke.id === stroke.id, 'cross-site canvas', paintAt)).stroke, stroke);
-            const cookieC = await unlock('192.0.2.13'), c = await connect(cookieC, 'NativeCharlie', '', '192.0.2.13');
+            const cookieC = await unlock('192.0.2.13'), c = await connect(cookieC, 'NativeCharlie', '', '192.0.2.13', TRAFFIC_ACKS);
             const newcomer = await joinRoom(c, '#native-channel');
             assert.equal(newcomer.ch.names.find(person => person.nick === 'NativeCharlie').entrySource, '');
             const canvasC = await joinRoom(c, '#art-native-canvas'); assert.deepEqual(canvasC.act.strokes, [stroke]);
             await c.barrier(); assert.ok(c.frames.every(frame => frame.t !== 'line' || !['Native selected report greeting', 'Native Rad Dad ephemeral greeting', 'Native Stalemate ephemeral greeting'].includes(frame.text)), 'new visitor received pre-join chat');
+            if (TRAFFIC_ACKS) {
+                const peers = [a, b, c], warmupUntil = performance.now() + 3300;
+                while (performance.now() < warmupUntil) await delay(warmupUntil - performance.now());
+                const before = await drainTraffic(peers), snapshots = peers.map(peer => peer.transportSnapshot());
+                assertTrafficAccounting(before, snapshots);
+                const started = performance.now(), firstAt = started, deliveryMs = [], senderMs = [], latenessMs = [], sendGapsMs = [];
+                let lastSent = -Infinity;
+                for (let index = 0; index < 22; index++) {
+                    const planned = firstAt + index * 1100, earliest = Math.max(planned, lastSent + 1100);
+                    while (performance.now() < earliest) await delay(earliest - performance.now());
+                    const sent = await probeLine(peers[index % 3], peers, String(index).padStart(2, '0'), index + 1);
+                    latenessMs.push(sent.started - planned); if (index) sendGapsMs.push(sent.started - lastSent);
+                    lastSent = sent.started; deliveryMs.push(...sent.deliveries); senderMs.push(sent.disposition);
+                }
+                const after = await drainTraffic(peers), afterSnapshots = peers.map(peer => peer.transportSnapshot());
+                const expectedLines = Array.from({ length: 22 }, (_, index) => TRAFFIC_PREFIX + String(index).padStart(2, '0'));
+                for (let slot = 0; slot < 3; slot++) {
+                    for (const text of expectedLines) assert.equal(peers[slot].frames.filter(frame => frame.t === 'line' && frame.text === text).length, 1);
+                    assert.ok(after.sockets[slot].controls - before.sockets[slot].controls >= 21, 'same native socket did not exercise >20 new controls');
+                }
+                assertTrafficAccounting(after, afterSnapshots);
+                assert.equal(after.transactions.rejected, before.transactions.rejected, 'native transaction rejected during healthy traffic');
+                const own = await ownSharing(cookieA), beforeB = await ownSharing(cookieB), beforeC = await ownSharing(cookieC), stopAt = a.frames.length;
+                assert.equal(own.revision, 2); assert.equal(own.state, 'authorized');
+                const response = await call('/beta/participation/stop', cookieA, { expectedRevision: own.revision }); assert.equal(response.status, 200);
+                const stop = await response.json(); assert.deepEqual(stop, { reason: 'sharing withdrawn', ok: true, state: 'withdrawn', available: false, purposes: [], revision: 3, canStop: true, cleanup: 'confirmed' });
+                await a.wait(frame => frame.t === 'sharing-stopped', 'traffic actual Stop transition', stopAt); assert.equal(a.closed, null);
+                const deniedAt = a.frames.length, deniedId = 'f'.repeat(32);
+                a.send({ t: 'say', ch: '#stalemate', text: TRAFFIC_PREFIX + 'withdrawn-denied', clientMessageId: deniedId });
+                assert.equal((await a.wait(frame => frame.t === 'message-result' && frame.id === deniedId, 'traffic withdrawn sender denial', deniedAt)).status, 'rejected');
+                // B last posted in round20, C in round21. A real slow-mode
+                // interval precedes the healthy continuation; never retry it.
+                const continuationAt = lastSent + 3300; while (performance.now() < continuationAt) await delay(continuationAt - performance.now());
+                const continued = await probeLine(b, [b, c], 'healthy-after-stop', 23);
+                const final = await drainTraffic(peers), finalSnapshots = peers.map(peer => peer.transportSnapshot());
+                assertTrafficAccounting(final, finalSnapshots);
+                for (let slot = 0; slot < 3; slot++) assert.ok(final.sockets[slot].controls > after.sockets[slot].controls, 'native ACK continuation did not progress after Stop');
+                assert.deepEqual(await ownSharing(cookieA), { reason: 'own sharing', ok: true, state: 'withdrawn', available: false, purposes: [], revision: 3, canStop: true });
+                assert.deepEqual(await ownSharing(cookieB), beforeB); assert.deepEqual(await ownSharing(cookieC), beforeC);
+                assert.ok(a.frames.slice(stopAt).every(frame => frame.t !== 'line'), 'withdrawn native visitor received new line');
+                for (const peer of peers) assert.ok(peer.frames.every(frame => frame.t !== 'line' || frame.text !== TRAFFIC_PREFIX + 'withdrawn-denied'));
+                traffic = { kind: 'small-native-local-C3-hot-room-ACK-probe', visitors: 3, messages: 22, expectedHealthyDeliveries: 66,
+                    durationMs: +(lastSent - firstAt).toFixed(3), steadyAndStopMs: +(performance.now() - started).toFixed(3),
+                    aggregateSendGap: latencySummary(sendGapsMs), schedulerLateness: latencySummary(latenessMs),
+                    peerDelivery: latencySummary(deliveryMs), senderDisposition: latencySummary(senderMs),
+                    before, after, final, rawTransportBefore: snapshots, rawTransportAfter: afterSnapshots, rawTransportFinal: finalSnapshots,
+                    nativeStorageMethodCalls: after.nativeStorageMethodCalls - before.nativeStorageMethodCalls,
+                    freshWithdrawalWithOriginalLaterSafetyReportUnchanged: true, withdrawnRevision: 3, deniedNewPublication: true,
+                    healthyContinuation: { delivered: continued.deliveries.length, peerDelivery: latencySummary(continued.deliveries) },
+                    noBodiesOrIdentitiesInMetrics: true, transportSequenceWitnessedBeforeSemanticNormalization: true,
+                    scope: 'Node/Miniflare/native WebSocket bridge end-to-end on this host, not isolated workerd CPU/SQL, browser/WAN, 150 native guests, soak or hosted SLO.' };
+            }
             const logout = await call('/beta/logout', cookieA, {}); assert.equal(logout.status, 200); assert.deepEqual(await logout.json(), { ok: true });
             assert.ok(/__Host-hangout-beta=; Path=\/; HttpOnly; Secure; SameSite=Lax; Max-Age=0/.test(logout.headers.get('Set-Cookie') || ''), 'logout cookie clearing policy was not satisfied');
             assert.equal((await a.wait(() => false, 'revoked socket close', 0, true)).code, 4401);
@@ -321,6 +469,7 @@ async function runtime(phase, state, nonce) {
             const beforeFault = await control('inspect');
             assert.equal(beforeFault.bindingCount, 2); assert.equal(beforeFault.liveBindingCount, 2);
             assert.deepEqual(beforeFault.durableSessionNicks, ['NativeBravo', 'NativeCharlie']); assert.equal(beforeFault.reports.length, 1); assert.equal(beforeFault.reports[0].id, selected.id);
+            if (TRAFFIC_ACKS) { assert.equal(beforeFault.reports[0].votes, 1); assert.equal(beforeFault.reports[0].textSha256, createHash('sha256').update(selected.text).digest('hex')); }
             assert.ok(Object.values(beforeFault.ordinaryBodiesAbsent).every(Boolean), 'ordinary chat persisted outside selected report'); assert.equal(beforeFault.sqlite, true);
             assert.deepEqual(Object.keys(beforeFault.ordinaryBodiesAbsent).sort(), EPHEMERAL_BODY_MARKERS);
             assert.deepEqual(Object.keys(beforeFault.rawScan.perChunkOrdinaryBodiesAbsent).sort(), EPHEMERAL_BODY_MARKERS);
@@ -446,6 +595,7 @@ async function runtime(phase, state, nonce) {
                 ...(PARTICIPATION ? { participationChecks: ['actual-DO-missing-policy-denies-without-provisioning', 'real-signed-SID-principal-with-explicit-synthetic-C2-grants', 'unfenced-private-room-and-TURN-denied', 'committed-media-reduction-production-alarm-closes-only-affected-visitor'] } : {}),
                 ...(PARTICIPATION ? { sharingChecks: ['actual-caller-only-GET-and-native-self-withdrawal', 'same-WebSocket-old-delivered-report-ACK-with-new-publishing-denied', 'closed-safety-socket-retires-before-original-two-live-bindings-checkpoint'], sharing } : {}),
                 ...(INCIDENT ? { incidentSourceChecks: ['actual-public-report-index-and-I1-copy-share-native-transaction-domain', 'selected-only-encrypted-case-and-metadata-only-index'], incidentSource } : {}),
+                ...(TRAFFIC_ACKS ? { trafficChecks: ['actual-transport-v1-raw-sequence-and-paced-ACK-accounting', 'three-current-C3-guests-rotating-public-text', 'actual-Stop-and-healthy-ACK-continuation'], traffic } : {}),
                 checkpoint: afterFault, sources: before, versions, binarySha256, rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs,
                 outboundCalls, runtimeRestarts, workerdPids: group(process.pid).filter(row => row.command.includes('workerd')).map(row => row.pid) };
             assert.equal(outboundCalls, 1); assert.equal(runtimeRestarts, 0); assert.deepEqual(sources(), before);
@@ -510,7 +660,7 @@ async function runtime(phase, state, nonce) {
         }
     } catch (error) {
         if (process.connected) await ipc({ type: 'failure', phase, nonce, error: String(error.stack || error).slice(0, 16384) }); throw error;
-    } finally { await mf.dispose(); }
+    } finally { for (const visitor of visitors) visitor.cancelAck(); await mf.dispose(); }
     process.off('disconnect', disconnected); process.disconnect();
 }
 
@@ -577,8 +727,9 @@ async function parent() {
     console.log(JSON.stringify({ localGatewayWebSocketSessionAuthorityQualified: true, ...(PARTICIPATION ? { productionParticipationCompositionQualified: true, guardianDecisionsQualified: false } : {}),
         ...(INCIDENT ? { productionIncidentSourceCompositionQualified: true, incidentAuthorityAndKeyQualified: false } : {}),
         ...(PARTICIPATION ? { productionOwnSharingCompositionQualified: true } : {}),
+        ...(TRAFFIC_ACKS ? { nativeLocalHealthyAckProbeQualified: true, hostedScaleQualified: false } : {}),
         ...(PARTICIPATION && INCIDENT ? { combinedParticipationIncidentSourceCompositionQualified: true } : {}), first, recovered, node: process.version, platform: process.platform, architecture: process.arch,
-        temporaryStateRemoved: true, scope: 'Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. ' + (PARTICIPATION ? 'Required production C3 bridge selected; actual caller-only HTTP status/Stop narrows the existing synthetic ledger, keeps the same socket for a delivered-message report, then persists withdrawal across process loss before real logout. Only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. ' : '') + (INCIDENT ? 'Required production I3a source bridge and existing I1 over actual records transactions; separate incident appointment/policy and privately retained test key are synthetic only. This does not qualify real incident authority, purpose-key provisioning or key recovery. ' : '') + 'No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.' }, null, 2));
+        temporaryStateRemoved: true, scope: 'Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. ' + (PARTICIPATION ? 'Required production C3 bridge selected; actual caller-only HTTP status/Stop narrows the existing synthetic ledger, keeps the same socket for a delivered-message report, then persists withdrawal across process loss before real logout. Only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. ' : '') + (INCIDENT ? 'Required production I3a source bridge and existing I1 over actual records transactions; separate incident appointment/policy and privately retained test key are synthetic only. This does not qualify real incident authority, purpose-key provisioning or key recovery. ' : '') + (TRAFFIC_ACKS ? 'Optional three-visitor paced native-local ACK workload; raw envelopes validated before semantic normalization and actual serialized control grants reconciled. Latencies include Node/Miniflare native bridge; no throughput tier or public SLO claim. ' : '') + 'No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.' }, null, 2));
 }
 try { if (process.argv[2] === '--isolated' && process.argv.length === (6 + MODE.length)) await runtime(process.argv[3], process.argv[4], process.argv[5]); else await parent(); }
 catch (error) { console.error(error.stack || error); process.exitCode = 1; }

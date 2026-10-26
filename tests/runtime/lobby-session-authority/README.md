@@ -230,3 +230,74 @@ sending, and no refused action is retried.
 The private parent-held I1 test key and synthetic incident/guardian decisions stay
 explicitly unqualified. No live guardian enrollment, legal policy, production
 purpose key, provider, deployment or public all-ages activation is supplied.
+
+## Optional healthy native ACK probe
+
+```sh
+npm run test:lobby-session-runtime -- --participation --traffic-acks
+```
+
+This separate optional fixture mode keeps the original nine first-phase and
+three recovery check groups, two native rollback faults, and participation/own-
+sharing journeys. It requires C3 and refuses an incident-mode combination; the
+four existing commands retain their existing workload when the flag is absent.
+It changes only this local fixture, not application limits, authority, TTLs,
+provider state or deployment configuration. It installs nothing.
+CI runs this mode separately as `npm run --silent test:lobby-session-runtime --
+--participation --traffic-acks`, retaining `lobby-traffic-acks-runtime.stdout.log`,
+`.stderr.log` and `.exit-code.txt` in the existing runtime diagnostic artifact.
+The existing job and runner deadlines remain unchanged.
+
+Alpha, Bravo and Charlie negotiate `transport:1` on their actual cookie-bound
+WebSockets. Their raw incoming envelopes must carry contiguous sequences from
+one once sequencing begins; only initial `device` and `hello` frames before
+the first sequenced frame may be unsequenced. Before a separate semantic copy removes **only** `transportSeq`,
+the visitor validates the raw envelope and records bounded count/byte/kind/time
+summaries plus a SHA-256 of the exact sequenced envelope stream. The original
+semantic assertions therefore remain independent of transport decoration.
+
+ACKs use the page's existing policy: highest processed sequence, an eight-frame
+or 50 ms flush, and at least 50 ms between actual sends. Timers are cancelled on
+close, error and runtime cleanup. No fake replies, application clock, retry or
+per-message inspection/barrier is used. Before and after the workload, a nonce-
+only lightweight control reads actual delivery/control-budget counters and
+serialized native socket sequence, ACK, control-count and prepaid remainder.
+Numeric slots come from the three real current bindings and remain stable when
+Alpha's Stop clears its nickname; no fixture identifier is written to storage.
+Each **same socket** must accept more than 20 new controls. Client sends must
+match server-consumed controls; reservations and each socket's remaining grant
+must reconcile exactly at the existing 20-control boundary. Native storage-method
+and transaction counts are observed by the existing test wrapper, not inferred
+Cloudflare kernel or invoice measurements.
+
+After a real 3,300 ms slow-mode warmup, 22 unique short public lines rotate among
+three guests at least 1,100 ms apart globally and 3,300 ms per author. The intended
+steady schedule spans 23.1 seconds; real lateness is recorded and delays the next
+send rather than creating a catch-up burst. Each line must reach all three peers
+exactly once, and the sender must receive its separately correlated `published`
+result. Latency summaries distinguish sender disposition from the 66 peer
+observations. No percentile is promoted to a public SLO or a pass threshold.
+
+Alpha then calls the real own-status/Stop HTTP flow, remains on the same socket
+in withdrawn revision 3, receives a rejected new-publication result, and receives
+no later public lines. Bravo/Charlie continue publishing and ACKing; their own
+projections remain unchanged. The original later Echo same-socket selected-
+report/close/restart journey is unchanged. Alpha cannot report its own earlier
+selected line, so this mode does not manufacture another report or preserve hot-
+loop text. The ordinary logical/raw absence scan additionally checks the common
+probe marker, including after cold recovery. The selected report/privacy
+semantics remain unchanged.
+
+The fixed 60-second child deadline, six-second waits, 2 MiB/2,000-frame visitor
+bounds and every production policy/control/storage/checkpoint cap remain. Full
+inspection/raw scans happen outside the timed workload. This mode adds no slow
+or non-ACK reader; that is a separate bounded pressure qualification. Existing
+whole-process loss, new-runtime recovery, binding retirement, same-SID authority
+checks and owned-process/temporary-state cleanup still run.
+
+Results are small native-local Node/Miniflare/WebSocket-bridge end-to-end samples
+on the recorded host. They include IPC, serialization and scheduling; they are
+neither isolated workerd CPU/SQLite latency, physical browser/WAN behavior, a
+150-native-client throughput tier, a soak, hosted capacity/cost, nor guardian or
+provider qualification. The source-bound receipt reports no cookies, identities
+or message-body arrays in the probe metrics.
