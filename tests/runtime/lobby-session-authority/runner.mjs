@@ -58,6 +58,7 @@ function receive(expected, nonce) {
 class Visitor {
     constructor(socket, label) {
         this.socket = socket; this.label = label; this.frames = []; this.bytes = 0; this.waiters = new Set(); this.closed = null; this.failure = null;
+        this.commandCount = 0; this.barrierSequence = 0; this.lastCommand = null;
         socket.addEventListener('message', event => {
             try {
                 assert.equal(typeof event.data, 'string', label + ': text frame required');
@@ -70,7 +71,11 @@ class Visitor {
         socket.addEventListener('error', () => { this.failure = Error(label + ': websocket error'); for (const check of [...this.waiters]) check(); });
         socket.accept();
     }
-    send(value) { assert.equal(this.closed, null, this.label + ': unexpectedly closed'); this.socket.send(JSON.stringify(value)); }
+    send(value) {
+        assert.equal(this.closed, null, this.label + ': unexpectedly closed');
+        if (value.t === 'cmd') { this.commandCount++; this.lastCommand = { name: String(value.name).slice(0, 32), channel: typeof value.ch === 'string' ? value.ch : '' }; }
+        this.socket.send(JSON.stringify(value));
+    }
     async wait(predicate, label, since = 0, close = false) {
         return new Promise((resolve, reject) => {
             let timer;
@@ -81,7 +86,12 @@ class Visitor {
                 if (value) return finish(null, value);
                 if (this.closed && !close) finish(Error(this.label + ': closed before ' + label));
             };
-            timer = setTimeout(() => finish(Error(this.label + ': missing ' + label)), 6000); this.waiters.add(check); check();
+            timer = setTimeout(() => finish(Error(this.label + ': missing ' + label + ' ' + JSON.stringify({
+                commandCount: this.commandCount, barrierSequence: this.barrierSequence, lastCommand: this.lastCommand, closeCode: this.closed?.code || null,
+                recent: this.frames.slice(-6).map(frame => ({ t: frame.t, kind: typeof frame.kind === 'string' ? frame.kind : '',
+                    text: typeof frame.text === 'string' ? frame.text.slice(0, 120) : '',
+                    channel: typeof frame.ch === 'string' ? frame.ch : typeof frame.ch?.name === 'string' ? frame.ch.name : '' }))
+            }))), 6000); this.waiters.add(check); check();
         });
     }
     async command(name, args = [], channel = '#stalemate', predicate = null, label = name) {
@@ -89,6 +99,7 @@ class Visitor {
         return predicate ? this.wait(predicate, label, since) : undefined;
     }
     async barrier(channel = '#stalemate') {
+        this.barrierSequence++;
         await this.command('names', [channel], channel, f => f.t === 'notice' && f.text.startsWith(channel + ':'), 'ordered names response');
     }
 }
@@ -309,7 +320,17 @@ async function runtime(phase, state, nonce) {
                 assert.equal(d.closed, null, 'ledger reduction bypassed production alarm ordering');
                 assert.deepEqual(await control('participation-alarm'), { completed: true });
                 assert.equal((await d.wait(() => false, 'production C3 alarm media close', 0, true)).code, 4401);
-                await b.barrier(mediaRoom); await c.barrier(mediaRoom); assert.equal(b.closed, null); assert.equal(c.closed, null);
+                const pacing = await control('inspect');
+                for (const visitor of [b, c]) {
+                    const deadline = pacing.commandReadyAt.find(row => row.nick === visitor.label)?.at;
+                    assert.ok(Number.isSafeInteger(deadline) && deadline >= 0);
+                    assert.ok(deadline - Date.now() <= 1000, 'unexpected command refill deadline');
+                    // The new post-alarm command must honor the actual current
+                    // protocol budget before sending; no refused action retries.
+                    while (Date.now() < deadline) await delay(deadline - Date.now());
+                    await visitor.barrier(mediaRoom);
+                }
+                assert.equal(b.closed, null); assert.equal(c.closed, null);
                 afterFault = await control('inspect'); assert.equal(afterFault.participationPolicyPresent, true);
             }
             assert.equal(afterFault.bindingCount, 2, 'lost-socket checkpoint needs live durable bindings'); assert.equal(b.closed, null); assert.equal(c.closed, null);
