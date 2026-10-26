@@ -66,10 +66,12 @@ async function probeRelease(base, files, fetcher = fetch, deadlineSignal) {
 async function waitForRelease({ base, manifest, timeoutMs = 20 * 60 * 1000, pollMs = 30000,
     fetcher = fetch, now = Date.now, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), record = () => {} }) {
     const started = now(), attempts = [];
+    // One abort timer owns the whole readiness operation. Wall-clock rounding
+    // must not restart requests after that timer has already expired.
+    const deadlineSignal = AbortSignal.timeout(timeoutMs);
     let pending = manifest.files;
     while (true) {
-        const remaining = Math.max(1, timeoutMs - (now() - started));
-        const results = await probeRelease(base, pending, fetcher, AbortSignal.timeout(remaining));
+        const results = await probeRelease(base, pending, fetcher, deadlineSignal);
         const mismatches = results.filter(result => !result.matches);
         attempts.push({ at: new Date(now()).toISOString(), checked: results.length, mismatches });
         const receipt = { base, upstream: manifest.upstream, startedAt: new Date(started).toISOString(),
@@ -85,7 +87,7 @@ async function waitForRelease({ base, manifest, timeoutMs = 20 * 60 * 1000, poll
             pending = manifest.files;
             continue;
         }
-        if (now() - started >= timeoutMs) {
+        if (deadlineSignal.aborted || now() - started >= timeoutMs) {
             record({ ...receipt, status: 'failed', finishedAt: new Date(now()).toISOString() });
             throw Error(`Published files did not match the tested release: ${mismatches.map(r => r.path).join(', ')}`);
         }
