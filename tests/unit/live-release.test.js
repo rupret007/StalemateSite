@@ -91,6 +91,9 @@ describe('public deployment qualification', () => {
         let startedRequests = 0;
         const history = [];
         await expect(waitForRelease({ base: 'https://stalemate.band/', timeoutMs: 20,
+            // The monotonic abort timer can fire before the wall clock reports
+            // the deadline. Once aborted, readiness must not start another pass.
+            now: () => 0, sleep: async () => { throw Error('must not poll after deadline abort'); },
             manifest: { upstream: 'b'.repeat(40), files: Array.from({ length: 12 }, (_, i) => file(`asset${i}.js`, 'new')) },
             record: value => history.push(structuredClone(value)),
             fetcher: (_, { signal }) => new Promise((resolve, reject) => {

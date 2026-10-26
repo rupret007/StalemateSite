@@ -49,7 +49,7 @@ function scheduleBoardFit() {
     if (section.hidden) { return; }
     const previous = section.style.getPropertyValue('--chess-table-limit');
     let next = '';
-    if (globalThis.innerWidth > 740 && globalThis.innerHeight > 520) {
+    if (globalThis.innerHeight > 520) {
       const style = globalThis.getComputedStyle(host.parentElement);
       const padding = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
       const bottomPadding = parseFloat(globalThis.getComputedStyle(document.body).paddingBottom) || 0;

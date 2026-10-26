@@ -43,6 +43,9 @@ Each job packages that checkout and compares expected public bytes with its host
 
 The band domain mirrors independently. Readiness may poll for up to 20 minutes,
 preserving the first mismatch, HTTP/cache headers and every subsequent observation.
+One abort timer owns the complete readiness operation. Once it expires, queued
+requests and further polling stop even if wall-clock rounding still reports a
+small amount of time remaining; the first mismatch and unresolved paths remain.
 Only unresolved files are polled; a final complete comparison prevents accepting
 a mixed copy from different observations. Readiness waiting does not retry failed
 browser assertions. Once ready, Chromium and emulated WebKit check the homepage,
