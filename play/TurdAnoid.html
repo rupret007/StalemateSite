@@ -413,7 +413,7 @@
 <script src="games/turdanoid-tally-core.js"></script>
 <script src="games/turdanoid-layout-core.js"></script>
 <script src="games/turdanoid-qa-core.js"></script>
-<script src="assets/turdsuite.js"></script>
+<script src="assets/turdsuite.js?v=d802b7c5e60f2e68"></script>
 <script>
   if (typeof TurdanoidTheme !== 'undefined') {
     TurdanoidTheme.applyCssVars(document.documentElement);
@@ -607,6 +607,7 @@ const prefs = loadGamePrefs();
 let best = Number.isFinite(prefs.best) ? prefs.best : 0;
 let bossBest = Number.isFinite(prefs.bossBest) ? prefs.bossBest : 0;
 let soundOn = prefs.soundOn !== false;
+window.Suite?.setSoundLocalEnabled?.(() => soundOn);
 function suiteMuted(){
   try {
     if (window.Suite && typeof Suite.isMuted === 'function') return !!Suite.isMuted();
@@ -768,9 +769,14 @@ const TITLE_QUIPS = [
 
 /* ---- Audio (Web Audio API, no files) ---- */
 let actx = null;
-function audio(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return actx; }
+function audio(){
+  if (window.Suite?.isStudioAudio?.()) return Suite.getSoundContext();
+  if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+  return actx;
+}
 function beep(freq=440, dur=0.08, type='square', vol=0.06, slide=0){
   if(soundBlocked()) return;
+  if (window.Suite?.isStudioAudio?.()) return Suite.playSound('shared.beep');
   const a = audio(); if(!a) return;
   try{
     const o = a.createOscillator(), g = a.createGain();
@@ -784,6 +790,7 @@ function beep(freq=440, dur=0.08, type='square', vol=0.06, slide=0){
 }
 function fart(){
   if(soundBlocked()) return;
+  if (window.Suite?.isStudioAudio?.()) return Suite.playSound('shared.fart');
   const a = audio(); if(!a) return;
   try{
     const o=a.createOscillator(), g=a.createGain(), lfo=a.createOscillator(), lg=a.createGain();
@@ -798,15 +805,28 @@ function fart(){
   }catch(e){}
 }
 let ambientNodes = null;
+const ambientTails = new Set();
 function stopAmbient(){
   if(!ambientNodes) return;
+  const previous = ambientNodes;
+  ambientNodes = null;
+  ambientTails.add(previous);
   try{
-    ambientNodes.gain.gain.exponentialRampToValueAtTime(0.001, audio().currentTime + 0.4);
-    setTimeout(()=>{ try{ ambientNodes.osc.stop(); ambientNodes.lfo.stop(); }catch(e){} ambientNodes = null; }, 450);
-  }catch(e){ ambientNodes = null; }
+    const now = previous.context.currentTime;
+    previous.gain.gain.cancelScheduledValues(now);
+    previous.gain.gain.setTargetAtTime(.0001, now, .006);
+    previous.osc.onended = () => {
+      ambientTails.delete(previous);
+      previous.osc.disconnect(); previous.lfo.disconnect(); previous.mod.disconnect(); previous.gain.disconnect();
+    };
+    previous.osc.stop(now + .03); previous.lfo.stop(now + .03);
+  }catch(e){ ambientTails.delete(previous); }
 }
 function startAmbient(){
-  if(soundBlocked() || !ambientOn) return;
+  if(soundBlocked() || !ambientOn || state !== 'playing' || paused || document.hidden) return;
+  if (ambientNodes || ambientTails.size >= 2) return;
+  const volume = window.Suite?.isStudioAudio?.() ? Suite.getEffectsVolume() : 1;
+  if (!volume) return;
   const a = audio(); if(!a) return;
   stopAmbient();
   try{
@@ -815,10 +835,10 @@ function startAmbient(){
     lfo.type = 'sine'; lfo.frequency.value = 0.07; lg.gain.value = 6;
     lfo.connect(lg).connect(osc.frequency);
     g.gain.value = 0.0001;
-    g.gain.exponentialRampToValueAtTime(0.006, a.currentTime + 1.2);
+    g.gain.exponentialRampToValueAtTime(0.006 * volume, a.currentTime + 1.2);
     osc.connect(g).connect(a.destination);
     osc.start(); lfo.start();
-    ambientNodes = { osc, lfo, gain: g };
+    ambientNodes = { osc, lfo, mod: lg, gain: g, context: a };
   }catch(e){}
 }
 function playProfile(name){
@@ -849,6 +869,26 @@ const sfx = {
   flushWarp: ()=>{ beep(620,0.35,'sine',0.07,-520); setTimeout(()=>beep(300,0.3,'triangle',0.06,-200),180); },
   chord: ()=>{ beep(110,0.4,'sawtooth',0.07,0); beep(165,0.4,'sawtooth',0.06,0); beep(220,0.35,'square',0.04,0); },
 };
+// The receiver selects its palette; game events and rules are unchanged.
+for (const name of Object.keys(sfx)) {
+  const original = sfx[name];
+  sfx[name] = (...args) => {
+    if (window.Suite?.isStudioAudio?.()) return Suite.playSound('ta.' + name, { strength: args[0] });
+    return original(...args);
+  };
+}
+window.Suite?.setSoundSettingsPause?.(() => {
+  if (state === 'playing') doPause();
+  return state === 'paused' ? tPause.querySelector('button') : null;
+});
+window.addEventListener('suite:audiochange', () => {
+  syncSoundButton();
+  const volume = window.Suite?.isStudioAudio?.() ? Suite.getEffectsVolume() : 1;
+  if (soundBlocked() || !volume || document.hidden || state !== 'playing' || paused) stopAmbient();
+  else if (ambientOn && !ambientNodes) startAmbient();
+  else if (ambientNodes) ambientNodes.gain.gain.setTargetAtTime(.006 * volume, ambientNodes.context.currentTime, .01);
+});
+window.addEventListener('pagehide', stopAmbient);
 
 /* ---- DOM helpers ---- */
 const $ = id => document.getElementById(id);
@@ -1546,6 +1586,7 @@ btnSound.addEventListener('click', ()=>{
     soundOn = false;
   }
   persistPrefs({ soundOn });
+  window.Suite?.syncSoundState?.();
   syncSoundButton();
   if(!soundBlocked()){ sfx.power(); startAmbient(); }
   else stopAmbient();
@@ -1646,6 +1687,8 @@ function startBossGame(){
   beginRun();
 }
 function beginRun(){
+  window.Suite?.stopSounds?.();
+  window.Suite?.setSoundPaused?.(false);
   resultShare?.setResult(null);
   progressRunId = window.SuiteProgress?.newRunId('turdanoid') || null;
   progressRunResult = null;
@@ -1682,11 +1725,13 @@ function hideOverlay(el){
   el.setAttribute('inert', '');
   el.setAttribute('aria-hidden', 'true');
 }
-function doPause(){ if(state!=='playing') return; state='paused'; paused=true; showOverlay(tPause); syncPauseButton(); }
+function doPause(){ if(state!=='playing') return; state='paused'; paused=true; window.Suite?.setSoundPaused?.(true); stopAmbient(); showOverlay(tPause); syncPauseButton(); }
 function doResume(){
   if(state!=='paused') return;
   state='playing';
   paused=false;
+  window.Suite?.setSoundPaused?.(false);
+  if (ambientOn) startAmbient();
   // Same clock reset Turdtris already uses after blur: a hidden tab can
   // freeze rAF, and the first playing frame must not inherit that gap.
   lastTime = performance.now();

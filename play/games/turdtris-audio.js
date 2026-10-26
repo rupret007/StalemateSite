@@ -137,6 +137,7 @@ export function createTurdtrisAudioPlayer(deps) {
   }
 
   function stop() {
+    if (globalThis.Suite?.isStudioAudio?.()) {globalThis.Suite.stopSounds();}
     musicVoices = silence(musicVoices);
     nextBeat = 0;
     nextHeartbeat = 0;
@@ -158,6 +159,7 @@ export function createTurdtrisAudioPlayer(deps) {
     stop,
     play(type, opts) {
       if (soundBlocked()) {return;}
+      if (globalThis.Suite?.isStudioAudio?.()) { globalThis.Suite.playSound('tris.' + type, opts || {}); return; }
       const ctx = getCtx();
       if (!ctx || ctx.state !== 'running') {return;}
       lastContext = ctx;
@@ -172,6 +174,12 @@ export function createTurdtrisAudioPlayer(deps) {
     },
     update({ active = false, level = 1, danger = false } = {}) {
       if (soundBlocked()) {return;}
+      if (globalThis.Suite?.isStudioAudio?.()) {
+        if (!active || !danger) { nextHeartbeat = 0; return; }
+        const now = (globalThis.performance?.now?.() || 0) / 1000;
+        if (now >= nextHeartbeat) { globalThis.Suite.playSound('tris.heartbeat'); nextHeartbeat = now + 1.1; }
+        return;
+      }
       if (!active) {
         stop();
         return;

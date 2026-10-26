@@ -17,7 +17,7 @@
   <script src="assets/suite-progress.js?v=5fdc02c46aa62534"></script>
   <script src="assets/suite-share.js?v=85ff7f9230484519"></script>
   <script src="games/suite-dialog-focus.js"></script>
-  <script src="assets/turdsuite.js"></script>
+  <script src="assets/turdsuite.js?v=d802b7c5e60f2e68"></script>
   <title>Crapjack 21</title>
   <style>
     :root {
@@ -3203,6 +3203,7 @@
     let roundHistory = [];
     const SOUND_STORAGE_KEY = 'turdjackSoundOn_v1';
     let soundEnabled = true;
+    window.Suite?.setSoundLocalEnabled?.(() => soundEnabled);
     let audioCtx = null;
     let statusPulseTimer = null;
     let turdjackKit = null;
@@ -3338,6 +3339,7 @@
 
     function suiteMutedGlobal() {
       try {
+        if (window.Suite && typeof Suite.isMuted === 'function') return !!Suite.isMuted();
         return localStorage.getItem('turdsuite_muted') === '1';
       } catch (e) {
         return false;
@@ -3366,6 +3368,7 @@
     } catch (e) { /* ignore */ }
 
     function unlockAudio() {
+      if (window.Suite?.isStudioAudio?.()) return;
       if (!soundEnabled || suiteMutedGlobal()) return;
       if (window.__turdjackAudio) {
         window.__turdjackAudio.unlock();
@@ -3380,6 +3383,7 @@
 
     function playSfx(type) {
       if (!soundEnabled || suiteMutedGlobal()) return;
+      if (window.Suite?.isStudioAudio?.()) return Suite.playSound('jack.' + type);
       if (window.__turdjackAudio) {
         window.__turdjackAudio.play(type);
         return;
@@ -3434,6 +3438,7 @@
 
     function toggleSound() {
       soundEnabled = !soundEnabled;
+      window.Suite?.syncSoundState?.();
       syncKitSoundFlag();
       saveSoundPref();
       updateSoundButtons();
@@ -4372,8 +4377,8 @@
       try {
         const note = String(text || '').toLowerCase();
         if (!window.Suite) return;
-        if (note.includes('blackjack') && !note.includes('dealer')) { Suite.hype('BLACKJACK!'); Suite.win(); }
-        else if (note.includes('bust')) { Suite.hype(Suite.quip('bust') || 'BUSTED'); Suite.fart(); }
+        if (note.includes('blackjack') && !note.includes('dealer')) { Suite.hype('BLACKJACK!');  }
+        else if (note.includes('bust')) { Suite.hype(Suite.quip('bust') || 'BUSTED');  }
         else if (statusMood.tone === 'win') { Suite.toast('💰 ' + (Suite.quip('win_s') || 'NICE')); }
         else if (statusMood.tone === 'loss' && note.includes('dealer')) { Suite.toast('💩 ' + (Suite.quip('lose_s') || 'oof')); }
       } catch (e) {}
@@ -4439,6 +4444,7 @@
     }
 
     async function startRound() {
+      window.Suite?.stopSounds?.();
       if (roundActive) return;
       unlockAudio();
       if (currentBet < MIN_BET) {
@@ -4652,7 +4658,7 @@
         return;
       } else if (value === 21) {
         setStatus(`${handTag(activeHandIndex)} locks 21.`);
-        playSfx('win');
+        playSfx(window.Suite?.isStudioAudio?.() ? 'twentyOne' : 'win');
         if (advanceToNextHand()) return;
         dealerTurnAndResolve();
         return;
@@ -4940,7 +4946,11 @@
       setStatus(finalNote);
       logHistory(finalNote);
       if (roundWins > roundLosses) playSfx('win');
-      else if (roundLosses > roundWins) playSfx('lose');
+      else if (roundLosses > roundWins) {
+        // A busted hand already has immediate feedback; don't announce the
+        // same all-busted loss again after the dealer's reveal animation.
+        if (!window.Suite?.isStudioAudio?.() || !allBusted) playSfx('lose');
+      }
       else playSfx('push');
       renderCards();
       updateHud();
@@ -5281,7 +5291,7 @@
         .catch(() => {});
 
       if (!window.__TURDJACK_SKIP_KIT__) {
-        import('./games/turdjack-page-kit.js')
+        import('./games/turdjack-page-kit.js?v=d36643080fe94fbc')
           .then((m) => {
             turdjackKit = m.installTurdjackKit(window);
             updateHud();

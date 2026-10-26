@@ -1,4 +1,4 @@
-import './turdrummy-audio-core.js';
+import './turdrummy-audio-core.js?v=bfc951560116f766';
 
 const api = globalThis.TurdRummyAudio;
 

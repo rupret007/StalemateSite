@@ -16,7 +16,7 @@
   <script src="games/suite-progress-core.js?v=26280b3adb2d8c25"></script>
   <script src="assets/suite-progress.js?v=5fdc02c46aa62534"></script>
   <script src="assets/suite-share.js?v=85ff7f9230484519"></script>
-  <script src="assets/turdsuite.js"></script>
+  <script src="assets/turdsuite.js?v=d802b7c5e60f2e68"></script>
   <title>Crappy Eights</title>
   <style>
     :root{
@@ -782,7 +782,7 @@
   </div>
 
   <script src="games/crapeights-ai.js"></script>
-  <script src="games/crapeights-presentation.js"></script>
+  <script src="games/crapeights-presentation.js?v=7243470350b7a5dc"></script>
   <script src="games/crapeights-table.js"></script>
   <script src="games/crapeights-hand.js"></script>
   <script src="games/crapeights-effects.js"></script>
@@ -877,6 +877,7 @@
     let focusSuspendedRound = false;
     let resumeHumanAutoPassAfterFocus = false;
     let soundEnabled = true;
+    window.Suite?.setSoundLocalEnabled?.(() => soundEnabled);
     const tableAudio = CrapeightsPresentation.createAudio({ readLocalEnabled: () => soundEnabled });
     const tableEffects = window.CrapeightsEffects?.createController({
       seat: index => index === 0 ? document.querySelector('.hand-wrap') : ui.oppCards[index - 1],
@@ -1906,6 +1907,7 @@
     }
 
     function startFreshMatch() {
+      window.Suite?.stopSounds?.();
       progressMeta = newCardProgress();
       clearAiTimer();
       clearHumanAutoPassTimer();

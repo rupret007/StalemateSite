@@ -17,10 +17,10 @@
   <script src="assets/suite-progress.js?v=5fdc02c46aa62534"></script>
   <script src="assets/suite-share.js?v=85ff7f9230484519"></script>
   <script src="games/suite-dialog-focus.js"></script>
-  <script src="assets/turdsuite.js"></script>
+  <script src="assets/turdsuite.js?v=d802b7c5e60f2e68"></script>
   <!-- Bot strength follows turdsuite_difficulty_v1 / Suite.difficulty (turdrummy-ai-core.js). -->
   <script src="games/turdrummy-ai-core.js"></script>
-  <script src="games/turdrummy-audio-core.js"></script>
+  <script src="games/turdrummy-audio-core.js?v=bfc951560116f766"></script>
   <script src="games/turdrummy-fx-core.js"></script>
   <script src="games/turdrummy-meld-core.js"></script>
   <script src="games/turdrummy-hand-visibility-core.js"></script>
@@ -2564,6 +2564,7 @@
     const audioPlayer = (window.TurdRummyAudio && TurdRummyAudio.createPlayer)
       ? TurdRummyAudio.createPlayer(rummyStorage)
       : null;
+    window.Suite?.setSoundLocalEnabled?.(() => !!audioPlayer?.isEnabled());
 
     function playSfx(name) {
       try {
@@ -3806,13 +3807,13 @@
         if (!window.Suite) return;
         const note = (String(text || "") + " " + String(summary || "")).toLowerCase();
         const last = setMessage._last || ""; if (note === last) return; setMessage._last = note;
-        if (note.includes("you called gin"))           { Suite.hype(Suite.quip('gin') || 'GIN!'); Suite.win(); }
-        else if (note.includes("you knocked"))         { Suite.hype(Suite.quip('knock') || 'KNOCK KNOCK'); Suite.ding(); }
-        else if (note.includes("undercut! you"))       { Suite.hype('UNDERCUT!'); Suite.win(); }
-        else if (note.includes("match winner: player")){ Suite.hype(Suite.quip('win') || 'CHAMPION'); Suite.win(); }
-        else if (note.includes("ai called gin"))       { Suite.toast('💩 BOT GIN'); Suite.fart(); }
+        if (note.includes("you called gin"))           { Suite.hype(Suite.quip('gin') || 'GIN!');  }
+        else if (note.includes("you knocked"))         { Suite.hype(Suite.quip('knock') || 'KNOCK KNOCK');  }
+        else if (note.includes("undercut! you"))       { Suite.hype('UNDERCUT!');  }
+        else if (note.includes("match winner: player")){ Suite.hype(Suite.quip('win') || 'CHAMPION');  }
+        else if (note.includes("ai called gin"))       { Suite.toast('💩 BOT GIN');  }
         else if (note.includes("ai knocked"))          { Suite.toast('💩 BOT KNOCK'); }
-        else if (note.includes("match winner: ai"))    { Suite.hype(Suite.quip('lose') || 'OUTPLAYED'); Suite.fart(); }
+        else if (note.includes("match winner: ai"))    { Suite.hype(Suite.quip('lose') || 'OUTPLAYED');  }
       } catch (e) {}
     }
 
@@ -4504,6 +4505,7 @@
     }
 
     function resetMatch() {
+      window.Suite?.stopSounds?.();
       progressMeta = null;
       clearCardProgressResult();
       clearAiTurnTimeout();

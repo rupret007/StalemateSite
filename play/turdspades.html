@@ -17,7 +17,7 @@
   <script src="assets/suite-progress.js?v=5fdc02c46aa62534"></script>
   <script src="assets/suite-share.js?v=85ff7f9230484519"></script>
   <script src="games/suite-dialog-focus.js"></script>
-  <script src="assets/turdsuite.js"></script>
+  <script src="assets/turdsuite.js?v=d802b7c5e60f2e68"></script>
   <!-- Bot strength follows turdsuite_difficulty_v1 / Suite.difficulty (see turdspades-client.js). -->
   <title>TurdSpades</title>
   <style>
@@ -1465,17 +1465,17 @@
         const note = (String(text || '') + ' ' + String(summary || '')).toLowerCase();
         const last = setMessage._last || ''; if (note === last) return; setMessage._last = note;
         if (note.includes('spades broken') || note.includes('spades break')) {
-          Suite.hype(Suite.quip('spades_break') || 'SPADES BROKEN'); Suite.beep(420, 0.12, 'square', 0.07, -200);
+          Suite.hype(Suite.quip('spades_break') || 'SPADES BROKEN');
         } else if (note.includes('match winner: us') || note.includes('we won the match')) {
-          Suite.hype(Suite.quip('win') || 'MATCH WIN'); Suite.win();
+          Suite.hype(Suite.quip('win') || 'MATCH WIN');
         } else if (note.includes('match winner: them') || note.includes('they won the match')) {
-          Suite.hype(Suite.quip('lose') || 'OUTPLAYED'); Suite.fart();
+          Suite.hype(Suite.quip('lose') || 'OUTPLAYED');
         } else if (note.includes('we won the round') || note.includes('our team made')) {
           Suite.toast('🚽 ' + (Suite.quip('win_s') || 'NICE'));
         } else if (note.includes('they made bid') || note.includes('they won the round')) {
           Suite.toast('💩 ' + (Suite.quip('lose_s') || 'oof'));
         } else if (note.includes('bag') && note.includes('penalty')) {
-          Suite.hype('BAG PENALTY!'); Suite.fart();
+          Suite.hype('BAG PENALTY!');
         }
       } catch (e) {}
     }
@@ -1507,6 +1507,7 @@
     }
 
     function startMatch() {
+      window.Suite?.stopSounds?.();
       progressMeta = newCardProgress();
       state.scores = [0, 0];
       state.bags = [0, 0];
@@ -2209,7 +2210,7 @@
     window.SuiteLoading?.ready();
 
     if (!/jsdom/i.test(navigator.userAgent)) {
-      import('./games/turdspades-client.js').catch(function () {});
+      import('./games/turdspades-client.js?v=4f0ec34d37081d9f').catch(function () {});
       import('./games/turdspades-phone-hand.js').then(({ layoutPhoneHand }) => {
         window.__tsPhoneHand = layoutPhoneHand;
         layoutPhoneCards();
