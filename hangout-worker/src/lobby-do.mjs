@@ -420,7 +420,11 @@ export class HangoutLobby {
         try {
             if (value.id) return await this.authority.validate(value);
             return !!await this.authority.check({ sid: value.betaSid, version: value.betaInviteVersion, exp: value.expiresAt });
-        } catch { return false; }
+        } catch {
+            // An unavailable/corrupt strict authority is different from an
+            // ordinary validation denial or a controlled retirement refusal.
+            this.authorityUnavailable = true; this.storageFailed(); return false;
+        }
     }
     async closeLocalSession(sid, gate, attempted) {
         for (const [id, binding] of this.liveBindings) if (binding.betaSid === sid) {
@@ -678,8 +682,12 @@ export class HangoutLobby {
         if (this.authorityMode) {
             let due = []; const attempted = new Set();
             const retryAlarm = async () => {
-                try { const at = Date.now() + 60000, earlier = await this.state.storage.getAlarm(); if (earlier === null || earlier === undefined || earlier > at) await this.state.storage.setAlarm(at); }
-                catch { this.authorityUnavailable = true; }
+                try {
+                    const now = Date.now(), at = now + 60000, earlier = await this.state.storage.getAlarm();
+                    // Reaffirm the alarm even when its earlier future deadline
+                    // wins: an actual scheduling failure must remain visible.
+                    await this.state.storage.setAlarm(Number.isFinite(earlier) && earlier > now ? Math.min(earlier, at) : at);
+                } catch { this.authorityUnavailable = true; this.storageFailed(); }
             };
             const schedule = async () => {
                 const earlier = this.pendingClosed.size ? await this.state.storage.getAlarm() : null;
