@@ -253,12 +253,18 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         } catch { return true; } // Malformed frames retain the existing protocol refusal.
     }
     function participationConnections(fn, args) {
+        // A reservation prepays this actor's controls from the shared request
+        // budget. It grants no peer purpose; current actor commit fences stay.
+        if (fn === reserveTransportControl) {
+            const actor = conns.get(args[0]);
+            return actor ? [connectionView(actor)] : [];
+        }
         if (fn === connect) {
             const candidate = { account: '', role: 'fan', admin: false, ...args[0] };
             candidate.admin = ['band', 'owner', 'moderator'].includes(candidate.role) && candidate.admin;
             return [...conns.values()].map(connectionView).concat(connectionView(candidate));
         }
-        // Only ordinary text in a currently joined public channel depends on
+        // Ordinary text in a currently joined public channel also depends on
         // the author alone. Commands, PM contexts, media and every other action
         // retain the full roster. This selects dependencies, never permissions:
         // prepare, both atomic commit checks and any provider start stay fresh.
