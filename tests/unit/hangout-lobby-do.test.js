@@ -25,7 +25,7 @@ function stateWith(net = { lock: 'off' }) {
             put: async (key, value) => values.set(key, value),
             list: async (options = {}) => new Map([...values].filter(([k]) => k.startsWith(options.prefix || '') && (!options.end || k < options.end)).sort(([a], [b]) => options.reverse ? b.localeCompare(a) : a.localeCompare(b)).slice(0, options.limit || Infinity)),
             delete: async (keys) => { for (const k of Array.isArray(keys) ? keys : [keys]) values.delete(k); },
-            transaction: async (fn) => fn({ get: async (k) => values.get(k), put: async (k, v) => values.set(k, structuredClone(v)), delete: async (k) => values.delete(k) }),
+            transaction: async (fn) => fn({ list: async ({ prefix = '', startAfter = '', limit = Infinity } = {}) => new Map([...values].filter(([key]) => key.startsWith(prefix) && key > startAfter).sort(([a], [b]) => a.localeCompare(b)).slice(0, limit)), get: async (k) => values.get(k), put: async (k, v) => values.set(k, structuredClone(v)), delete: async (k) => values.delete(k) }),
             getAlarm: async () => 1,
             setAlarm: async () => {}
         },

@@ -84,6 +84,21 @@
             <nav class="tabs" data-tabs role="tablist"></nav>
             <div class="topic" data-topic></div>
             <p class="network-note" data-network-note role="status" hidden></p>
+            <details class="network-note" data-sharing-controls hidden>
+                <summary>My sharing controls</summary>
+                <div data-sharing-region tabindex="-1" role="region" aria-label="My sharing status">
+                    <p data-sharing-status role="status">Sharing permissions have not been checked.</p>
+                    <p class="small">Email verifies your account, not permission to share. Stopping prevents new sharing; it does not erase messages or copies already received.</p>
+                    <button class="btn btn--small btn--ghost" type="button" data-sharing-check>Check my sharing</button>
+                    <button class="btn btn--small btn--ghost" type="button" data-sharing-stop disabled>Stop all my sharing</button>
+                    <button class="btn btn--small btn--ghost" type="button" data-sharing-leave disabled>Leave chat</button>
+                    <span data-sharing-confirm hidden>
+                        <span>Stop new chat, direct contact and media sharing?</span>
+                        <button class="btn btn--small" type="button" data-sharing-accept>Yes, stop sharing</button>
+                        <button class="btn btn--small btn--ghost" type="button" data-sharing-cancel>Not now</button>
+                    </span>
+                </div>
+            </details>
             <section class="lobby-welcome" data-lobby-welcome aria-label="Conversation starters">
                 <div class="welcome-symbol" aria-hidden="true">#</div><div class="welcome-copy"><b data-welcome-title>Make yourself at home.</b><p>Chat starts here, when you join. Say hello or just settle in.</p>
                 <div class="conversation-starters">

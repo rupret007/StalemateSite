@@ -1,7 +1,7 @@
 // Production composition only. This does not install a policy, enroll a person,
 // verify guardianship or enable provider dispatch.
 import { createParticipationEnforcement } from './participation-enforcement.mjs';
-import { readPartitionedParticipationPrincipals } from './participation-partitions.mjs';
+import { readPartitionedParticipationPrincipals, readPartitionedParticipationWithdrawals } from './participation-partitions.mjs';
 
 export const LOBBY_PARTICIPATION_MODE = 'c3-v1';
 export function lobbyParticipationMode(env = {}) {
@@ -23,6 +23,7 @@ export function createLobbyParticipation({ env, authority, now = () => Date.now(
         resolveConnection: connection => authority.resolveParticipationConnection(connection),
         validateConnection: input => authority.validateParticipationConnection(input),
         readPrincipals: readPartitionedParticipationPrincipals,
+        readWithdrawn: readPartitionedParticipationWithdrawals,
         writeEffects: input => authority.writeParticipationEffects(input),
         // No external start fence has been qualified. Never supply one here.
         providerQualified: () => false,

@@ -34,14 +34,14 @@ function freshState(at = NOW) {
     return clone({ net: lobby.snapshot(), rooms: lobby.roomSnapshot(), abuse: lobby.abuseSnapshot(), sessions: lobby.sessionSnapshot(),
         moderationQueue: { reports: [], held: [] }, aiReviews: [], modlog: [] });
 }
-async function fixture({ initialize = true } = {}) {
+async function fixture({ initialize = true, participation = false } = {}) {
     let at = NOW;
     const directory = await mkdtemp(join(tmpdir(), 'lobby-session-authority-')), filename = join(directory, 'authority.sqlite'), hooks = {}, controls = {};
     const driver = openDurableRecordSqlite(filename, hooks), cleanup = { directory, drivers: [driver] }; cleanups.push(cleanup);
     const wrap = disk => ({ transaction: operation => disk.transaction(raw => operation({ ...raw,
         getAlarm: () => raw.get(ALARM), setAlarm: value => raw.put(ALARM, value), deleteAlarm: () => raw.delete(ALARM) })) });
     const storage = wrap(driver), state = freshState();
-    const env = { HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_BETA_INVITE_VERSION: '1',
+    const env = { ...(participation ? { HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1' } : {}), HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_BETA_INVITE_VERSION: '1',
         HANGOUT_HMAC_KEY: 'synthetic-lobby-authority-test-key-not-a-secret', HANGOUT_OWNER_EMAIL: 'owner@example.invalid',
         HANGOUT_MODERATOR_EMAILS: 'reviewer@example.invalid' };
     const makeAuthority = native => createLobbySessionAuthority({ storage: native, env, now: () => at,
@@ -83,6 +83,14 @@ async function seedLegacy(f) {
 }
 
 describe('explicit collocated lobby authority initialization and migration', () => {
+    it('latches explicitly selected C3 before any policy exists and refuses its removal without rewriting the marker', async () => {
+        const f = await fixture({ participation: true });
+        const saved = await f.authority.records.transaction(tx => tx.get(LOBBY_AUTHORITY_MARKER)); expect(saved.participationMode).toBe('c3-v1');
+        expect(await f.authority.records.transaction(tx => tx.get(PARTICIPATION_POLICY_KEY))).toBeUndefined();
+        const before = fingerprint(f.driver); delete f.env.HANGOUT_PARTICIPATION_AUTHORITY;
+        await expect(f.authority.load()).rejects.toThrow(); expect(fingerprint(f.driver)).toBe(before);
+    });
+
     it('refuses ordinary startup initialization, preserves unrelated raw rows, and reopens the actual persisted domain', async () => {
         const f = await fixture({ initialize: false });
         await expect(f.authority.load()).rejects.toThrow();
@@ -392,6 +400,7 @@ describe('tick contributor authority fences', () => {
 // Only operator/guardian decisions are synthetic here. Production principal
 // resolution, current binding checks, partition reads and effect writes are real.
 async function participationLedger(f) {
+    expect(f.env.HANGOUT_PARTICIPATION_AUTHORITY).toBe('c3-v1');
     const participant = new Map(), decisions = new Map(), guardians = new Map();
     const config = { policy: { version: 1, policyVersion: 'synthetic-production-composition-v1', revision: 1,
         communityRef: LOBBY_AUTHORITY_COMMUNITY, noticeDigest: 'b'.repeat(64), decisionRef: 'synthetic_operator_decision', state: 'qualified',
@@ -429,17 +438,20 @@ async function participationLedger(f) {
         return ledger.change(proof, { expectedRevision: subject.revision, purposes });
     } };
 }
-const productionParticipation = f => createLobbyParticipation({ env: { ...f.env, HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1' }, authority: f.authority, now: f.now });
+const productionParticipation = f => {
+    expect(f.env.HANGOUT_PARTICIPATION_AUTHORITY).toBe('c3-v1');
+    return createLobbyParticipation({ env: f.env, authority: f.authority, now: f.now });
+};
 
 describe('production participation session/partition/effect composition', () => {
     it('requires one explicit compatible opt-in and never constructs a default grant adapter', async () => {
         expect(lobbyParticipationMode({})).toBe(false); expect(createLobbyParticipation({ env: {} })).toBeNull();
         for (const extra of [{ HANGOUT_PARTICIPATION_AUTHORITY: '' }, { HANGOUT_PARTICIPATION_AUTHORITY: 'future' },
             { HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1' }, { HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1', HANGOUT_BETA_MODE: 'protected' }]) expect(() => lobbyParticipationMode(extra)).toThrow();
-        const f = await fixture(); expect(lobbyParticipationMode({ ...f.env, HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1' })).toBe(true);
+        const f = await fixture({ participation: true }); expect(lobbyParticipationMode({ ...f.env, HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1' })).toBe(true);
     });
     it.each(['missing', 'corrupt'])('denies publishing with a %s partition policy, without provisioning it', async condition => {
-        const f = await fixture(), person = await f.enroll('c3missing');
+        const f = await fixture({ participation: true }), person = await f.enroll('c3missing');
         if (condition === 'corrupt') await f.authority.records.transaction(tx => tx.put(PARTICIPATION_POLICY_KEY, { forged: true }));
         const before = await f.authority.records.transaction(tx => tx.get(PARTICIPATION_POLICY_KEY));
         const app = f.makeEngine({ participation: productionParticipation(f) }); expect((await app.engine.connect(person.binding)).ok).toBe(true);
@@ -448,7 +460,7 @@ describe('production participation session/partition/effect composition', () => 
         expect(await f.authority.records.transaction(tx => tx.get(PARTICIPATION_POLICY_KEY))).toEqual(before); expect(app.persist).not.toHaveBeenCalled();
     });
     it('binds guest principals to the saved SID and refuses copied device/account/identity fields', async () => {
-        const f = await fixture(), a = await f.enroll('guestalpha'), b = await f.enroll('guestbravo');
+        const f = await fixture({ participation: true }), a = await f.enroll('guestalpha'), b = await f.enroll('guestbravo');
         const identity = await f.authority.resolveParticipationConnection(a.binding);
         expect(identity.principalRef).toBe(`s_${a.request.sid}`); expect(identity.communityRef).toBe(LOBBY_AUTHORITY_COMMUNITY);
         for (const changes of [{ betaSid: b.request.sid }, { account: 'a_' + 'q'.repeat(43) }, { role: 'moderator', admin: true }, { dev: b.binding.dev }, { expiresAt: a.binding.expiresAt + 1 }]) {
@@ -463,7 +475,7 @@ describe('production participation session/partition/effect composition', () => 
         expect((await f.authority.resolveParticipationConnection(c.binding)).principalRef).not.toBe(identity.principalRef);
     });
     it('uses verified account identity without transferring an earlier guest grant', async () => {
-        const f = await fixture(), guest = await f.enroll('guestowner'), ledger = await participationLedger(f); await ledger.grant(guest.binding);
+        const f = await fixture({ participation: true }), guest = await f.enroll('guestowner'), ledger = await participationLedger(f); await ledger.grant(guest.binding);
         const profile = { kind: 'owner', account: await accountId('holder@example.invalid', f.env.HANGOUT_HMAC_KEY), role: 'fan', admin: false, expiresAt: NOW + 90000 };
         const owner = await f.enroll('verifiedowner', profile); expect((await f.authority.resolveParticipationConnection(owner.binding)).principalRef).toBe(profile.account);
         const app = f.makeEngine({ participation: productionParticipation(f) }); expect((await app.engine.connect(owner.binding)).ok).toBe(true);
@@ -471,19 +483,19 @@ describe('production participation session/partition/effect composition', () => 
         expect(app.frames.some(frame => frame.t === 'welcome')).toBe(false);
     });
     it('publishes only after the actual partition and session/effect transaction and reloads that grant on disk reopen', async () => {
-        const f = await fixture(), person = await f.enroll('realcompose'); await (await participationLedger(f)).grant(person.binding);
+        const f = await fixture({ participation: true }), person = await f.enroll('realcompose'); await (await participationLedger(f)).grant(person.binding);
         const app = f.makeEngine({ participation: productionParticipation(f) }); expect((await app.engine.connect(person.binding)).ok).toBe(true);
         expect((await app.message(person.binding.id, { t: 'hello', nick: 'RealCompose', age13: true }))?.ok).not.toBe(false);
         expect(app.frames.some(frame => frame.t === 'welcome')).toBe(true);
         await app.message(person.binding.id, { t: 'cmd', ch: '#stalemate', name: 'join', args: ['#art-composed'] });
         expect((await f.authority.load()).state.rooms.rooms.map(room => room.name)).toContain('#art-composed');
         const reopened = await f.reopen(), identity = await reopened.authority.resolveParticipationConnection(person.binding); expect(identity).not.toBeNull();
-        const fresh = createLobbyParticipation({ env: { ...f.env, HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1' }, authority: reopened.authority, now: f.now });
+        const fresh = createLobbyParticipation({ env: f.env, authority: reopened.authority, now: f.now });
         const context = await fresh.prepare([person.binding]); expect(fresh.allows(context, { actorId: person.binding.id, action: 'publicText' })).toBe(true);
         expect(fresh.allows(context, { actorId: person.binding.id, action: 'aiPublicReview', providerReady: true, publicTextEligible: true })).toBe(false);
     });
     it.each(['expiry', 'revocation', 'role removal'])('rolls back real room effects when %s occurs after the native effect writes', async change => {
-        const f = await fixture(), profile = { kind: 'staff', account: await accountId('reviewer@example.invalid', f.env.HANGOUT_HMAC_KEY), role: 'moderator', admin: true, expiresAt: NOW + 90000 };
+        const f = await fixture({ participation: true }), profile = { kind: 'staff', account: await accountId('reviewer@example.invalid', f.env.HANGOUT_HMAC_KEY), role: 'moderator', admin: true, expiresAt: NOW + 90000 };
         const person = await f.enroll('latecheck', profile); await (await participationLedger(f)).grant(person.binding);
         const app = f.makeEngine({ participation: productionParticipation(f) }); await app.engine.connect(person.binding); await app.message(person.binding.id, { t: 'hello', nick: 'LateCheck', age13: true }); app.frames.length = 0;
         let reached = false; f.controls.afterEffects = async ({ tx, costsOnly }) => {
@@ -498,7 +510,7 @@ describe('production participation session/partition/effect composition', () => 
         expect(await f.authority.records.transaction(tx => tx.get('community-room:#late-denied'))).toBeUndefined(); expect(f.driver.stats.rollbacks).toBeGreaterThan(0);
     });
     it('retains a separately committed C2 withdrawal and denies queued room publication while the real session remains valid', async () => {
-        const f = await fixture(), person = await f.enroll('withdrawn'), ledger = await participationLedger(f); await ledger.grant(person.binding);
+        const f = await fixture({ participation: true }), person = await f.enroll('withdrawn'), ledger = await participationLedger(f); await ledger.grant(person.binding);
         let reduceBeforeCommit = false;
         const fence = { prepare: (...args) => f.authority.effectCommit.prepare(...args), commit: async (...args) => {
             if (reduceBeforeCommit && !args[2]?.costsOnly) { reduceBeforeCommit = false; expect((await ledger.withdraw(person.binding)).state).toBe('withdrawn'); }
@@ -519,6 +531,7 @@ describe('production participation session/partition/effect composition', () => 
 });
 
 async function productionDo(f) {
+    expect(f.env.HANGOUT_PARTICIPATION_AUTHORITY).toBe('c3-v1');
     const sockets = [], background = [], originalResponse = globalThis.Response;
     class Socket {
         frames = []; readyState = 1;
@@ -540,7 +553,7 @@ async function productionDo(f) {
     const state = { storage, blockConcurrencyWhile: fn => fn(), waitUntil: task => background.push(task),
         getWebSockets: id => sockets.filter(ws => !id || ws.tags.includes(id)), getTags: ws => ws.tags,
         acceptWebSocket: (ws, tags) => { ws.tags = tags; sockets.push(ws); } };
-    const lobby = new HangoutLobby(state, { ...f.env, HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1' }); await lobby.ready;
+    const lobby = new HangoutLobby(state, f.env); await lobby.ready;
     expect(lobby.authorityUnavailable).toBe(false);
     return { lobby, sockets, async connect(person, nick) {
         // The actual gateway has no connection ID before the DO admits it.
@@ -556,7 +569,7 @@ async function productionDo(f) {
 
 describe('actual HangoutLobby constructs the required participation bridge', () => {
     it('does not publish an unknown guest nickname when the actual DO has no C2 policy', async () => {
-        const f = await fixture(), person = await f.enroll('missingpolicy'), app = await productionDo(f);
+        const f = await fixture({ participation: true }), person = await f.enroll('missingpolicy'), app = await productionDo(f);
         try {
             const ws = await app.connect(person, 'NotEnrolled');
             expect(ws.frames.some(frame => frame.t === 'hello')).toBe(true);
@@ -566,7 +579,7 @@ describe('actual HangoutLobby constructs the required participation bridge', () 
         } finally { await app.dispose(); }
     });
     it('uses its actual composed alarm to retire lost media permission while keeping another current peer', async () => {
-        const f = await fixture(), a = await f.enroll('alarmalpha'), b = await f.enroll('alarmbravo'), ledger = await participationLedger(f);
+        const f = await fixture({ participation: true }), a = await f.enroll('alarmalpha'), b = await f.enroll('alarmbravo'), ledger = await participationLedger(f);
         await ledger.grant(a.binding); await ledger.grant(b.binding); const app = await productionDo(f);
         try {
             const wa = await app.connect(a, 'AlarmAlpha'), wb = await app.connect(b, 'AlarmBravo');

@@ -7,8 +7,9 @@ const enc = new TextEncoder(), clone = value => structuredClone(value);
 const validIdentity = value => value && Object.keys(value).length === 3 && ['principalRef', 'communityRef', 'expiresAt'].every(key => Object.hasOwn(value, key))
     && [value.principalRef, value.communityRef].every(id => typeof id === 'string' && /^[A-Za-z0-9_-]{16,128}$/.test(id)) && Number.isSafeInteger(value.expiresAt);
 const limits = Object.freeze({ connections: 256, checks: 2048, writes: 128, bytes: 16 * 1024 * 1024 });
-export function createParticipationEnforcement({ storage, resolveConnection, validateConnection, writeEffects, readPrincipals = readParticipationPrincipals, dispatchStart = null, beforeCommit = async () => {}, providerQualified = () => false, now = () => Date.now() } = {}) {
+export function createParticipationEnforcement({ storage, resolveConnection, validateConnection, writeEffects, readPrincipals = readParticipationPrincipals, readWithdrawn = null, dispatchStart = null, beforeCommit = async () => {}, providerQualified = () => false, now = () => Date.now() } = {}) {
     if (typeof storage?.transaction !== 'function' || [resolveConnection, validateConnection, writeEffects, readPrincipals, beforeCommit, providerQualified, now].some(fn => typeof fn !== 'function')
+        || readWithdrawn !== null && typeof readWithdrawn !== 'function'
         || dispatchStart !== null && typeof dispatchStart !== 'function') throw new TypeError('Explicit participation transaction adapters required');
     const contexts = new WeakMap();
     const check = (state, request, current = state.snapshot, at = now()) => {
@@ -27,7 +28,7 @@ export function createParticipationEnforcement({ storage, resolveConnection, val
     };
     return Object.freeze({
         async prepare(connections) {
-            const context = Object.freeze({}), state = { connections: [], identities: [], bindings: [], checks: [], snapshot: null };
+            const context = Object.freeze({}), state = { connections: [], identities: [], bindings: [], checks: [], withdrawnChecks: [], withdrawn: [], snapshot: null };
             contexts.set(context, state);
             try {
                 if (!Array.isArray(connections) || connections.length > limits.connections) return context;
@@ -37,7 +38,13 @@ export function createParticipationEnforcement({ storage, resolveConnection, val
                     try { identity = await resolveConnection(clone(connection)); } catch { /* this connection receives no affirmative grant */ }
                     state.identities.push(validIdentity(identity) && identity.expiresAt > now() ? clone(identity) : null);
                 }
-                state.snapshot = await storage.transaction(tx => read(tx, state.identities));
+                state.snapshot = await storage.transaction(async tx => {
+                    const identities = state.identities.filter(Boolean);
+                    const values = readWithdrawn ? await readWithdrawn({ tx, identities, now: now() }) : identities.map(() => false);
+                    if (!Array.isArray(values) || values.length !== identities.length || values.some(value => typeof value !== 'boolean')) throw Error('participation-unavailable');
+                    let index = 0; state.withdrawn = state.identities.map(identity => identity ? values[index++] : false);
+                    return read(tx, state.identities);
+                });
                 if (!state.snapshot.ok) return context;
                 const at = now();
                 state.bindings = state.snapshot.subjects.map((subject, index) => subject ? {
@@ -55,6 +62,12 @@ export function createParticipationEnforcement({ storage, resolveConnection, val
             if (record && !state.checks.some(item => JSON.stringify(item) === JSON.stringify(request))) state.checks.push(clone(request));
             return true;
         },
+        isWithdrawn(context, actorId) {
+            const state = contexts.get(context), index = state?.connections.findIndex(c => c.id === actorId);
+            if (index < 0 || !state?.identities[index] || state.identities[index].expiresAt <= now() || state.withdrawn[index] !== true) return false;
+            if (!state.withdrawnChecks.includes(actorId)) state.withdrawnChecks.push(actorId);
+            return true;
+        },
         revisionFor(context, actorId) {
             const state = contexts.get(context), index = state?.connections.findIndex(c => c.id === actorId), binding = state?.bindings[index];
             return binding ? JSON.stringify([binding.subjectRef, binding.subjectRevision, binding.policyVersion, binding.policyRevision, binding.noticeDigest]) : '';
@@ -65,8 +78,8 @@ export function createParticipationEnforcement({ storage, resolveConnection, val
                 if (!state || !Array.isArray(effects) || effects.length > limits.writes || enc.encode(JSON.stringify(effects)).byteLength > limits.bytes) return { ok: false, reason: 'participation-capacity' };
                 if (typeof transaction !== 'function') return { ok: false, reason: 'participation-unavailable' };
                 const writes = clone(effects); await beforeCommit({ effects: clone(writes), costsOnly });
-                if (!costsOnly && state.checks.length) {
-                    const affected = new Set(state.checks.flatMap(request => [request.actorId, request.peerId].filter(Boolean)));
+                if (!costsOnly && (state.checks.length || state.withdrawnChecks.length)) {
+                    const affected = new Set([...state.withdrawnChecks, ...state.checks.flatMap(request => [request.actorId, request.peerId].filter(Boolean))]);
                     for (let i = 0; i < state.connections.length; i++) {
                         if (!affected.has(state.connections[i].id)) continue;
                         const identity = await resolveConnection(clone(state.connections[i]));
@@ -78,11 +91,15 @@ export function createParticipationEnforcement({ storage, resolveConnection, val
                 // transaction wrapper rather than nesting another transaction.
                 return await transaction(async tx => {
                     const authorize = async () => {
-                        if (costsOnly || !state.checks.length) return;
-                        for (const actorId of new Set(state.checks.flatMap(request => [request.actorId, request.peerId].filter(Boolean)))) {
+                        if (costsOnly || !state.checks.length && !state.withdrawnChecks.length) return;
+                        for (const actorId of new Set([...state.withdrawnChecks, ...state.checks.flatMap(request => [request.actorId, request.peerId].filter(Boolean))])) {
                             const i = state.connections.findIndex(c => c.id === actorId);
                             if (i < 0 || !state.identities[i] || state.identities[i].expiresAt <= now()
                                 || await validateConnection({ tx, connection: clone(state.connections[i]), identity: clone(state.identities[i]), at: now() }) !== true) throw Error('participation-denied');
+                        }
+                        if (state.withdrawnChecks.length) {
+                            const identities = state.withdrawnChecks.map(actorId => state.identities[state.connections.findIndex(c => c.id === actorId)]);
+                            if (!readWithdrawn || !(await readWithdrawn({ tx, identities, now: now() })).every(value => value === true)) throw Error('participation-denied');
                         }
                         const current = await read(tx, state.identities);
                         if (!state.checks.every(request => check(state, request, current))) throw Error('participation-denied');

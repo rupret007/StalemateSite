@@ -1,7 +1,7 @@
 // Server-only C2 record partitions in ONE serializable rollback transaction
 // domain. No production route, migration, remote guardian or provider adapter.
 import { createParticipationConsents, PARTICIPATION_LEDGER_KEY, readParticipationPrincipals,
-    validParticipationLedgerState, alignParticipationLedgerPolicy } from './participation-consents.mjs';
+    validParticipationLedgerState, alignParticipationLedgerPolicy, accessParticipationSelf } from './participation-consents.mjs';
 
 export const PARTICIPATION_PARTITION_PREFIX = 'participation-records:v1:';
 export const PARTICIPATION_POLICY_KEY = `${PARTICIPATION_PARTITION_PREFIX}policy`;
@@ -98,6 +98,36 @@ async function loadPartition(tx, route, policy, at) {
         }
     }
     return { state, anchor };
+}
+
+// Caller-only controls composed inside the actual native authority transaction.
+// No partition allocation, verifier/guardian adapter or nested transaction.
+export async function accessPartitionedParticipationSelf({ tx, identity, now, request } = {}) {
+    const bounded = boundedRecordTransaction(tx), policy = await root(bounded), route = await routeFor(identity?.principalRef, identity?.communityRef);
+    const loaded = await loadPartition(bounded, route, policy, now);
+    let value = loaded.state === undefined ? undefined : alignParticipationLedgerPolicy(loaded.state, policy.config, now, PARTICIPATION_RECORD_LIMITS);
+    const result = await accessParticipationSelf({ tx: { get: async () => clone(value), put: async (_, next) => { value = clone(next); } },
+        identity, now, request, limits: PARTICIPATION_RECORD_LIMITS });
+    if (request !== undefined && loaded.state !== undefined && JSON.stringify(value) !== JSON.stringify(loaded.state)) {
+        await syncReferences(bounded, loaded.state, value, route, now);
+        await bounded.put(route.partitionKey, value);
+    }
+    return result;
+}
+
+export async function readPartitionedParticipationWithdrawals({ tx, identities, now } = {}) {
+    if (!integer(now) || !Array.isArray(identities) || identities.length > PARTICIPATION_PARTITION_BOUNDS.identities) fail('not-authorized');
+    const policy = await root(tx), withdrawn = [], cache = new Map();
+    for (const identity of identities) {
+        if (!exact(identity, ['principalRef', 'communityRef', 'expiresAt']) || !integer(identity.expiresAt) || identity.expiresAt <= now) fail('not-authorized');
+        const route = await routeFor(identity.principalRef, identity.communityRef);
+        if (!cache.has(route.partitionKey)) {
+            const { state } = await loadPartition(tx, route, policy, now);
+            cache.set(route.partitionKey, !!state?.subjects.some(row => row.record.state === 'withdrawn' && row.deleteAt > now));
+        }
+        withdrawn.push(cache.get(route.partitionKey));
+    }
+    return withdrawn;
 }
 
 // Passed directly to createParticipationEnforcement({readPrincipals: ...}).
@@ -221,7 +251,7 @@ export function createPartitionedParticipationConsents({ storage, adapters, admi
             } else await tx.put(route.partitionKey, value);
             currentTime(); return result;
         }) };
-        const cached = { ...adapters, [authMethod === 'begin' || authMethod === 'lookup' ? 'authenticateParticipant' : authMethod === 'complete' ? 'verifyConsent' : 'authenticateGuardian']: async () => clone(authorization) };
+        const cached = { ...adapters, [['begin', 'lookup', 'selfWithdraw'].includes(authMethod) ? 'authenticateParticipant' : authMethod === 'complete' ? 'verifyConsent' : 'authenticateGuardian']: async () => clone(authorization) };
         return createParticipationConsents({ storage: partitionStorage, adapters: cached, now, randomRef, limits: PARTICIPATION_RECORD_LIMITS });
     };
     return Object.freeze({
@@ -250,6 +280,11 @@ export function createPartitionedParticipationConsents({ storage, adapters, admi
         lookup: guarded(async proof => {
             const auth = await authenticate('authenticateParticipant', { proof, purpose: 'lookup' }), route = await routeFor(auth?.principalRef, auth?.communityRef);
             return ledgerFor(route, auth, 'lookup').lookup(proof);
+        }),
+        selfWithdraw: guarded(async (proof, request) => {
+            const auth = await authenticate('authenticateParticipant', { proof, purpose: 'self-withdraw', request });
+            const route = await routeFor(auth?.principalRef, auth?.communityRef);
+            return ledgerFor(route, auth, 'selfWithdraw').selfWithdraw(proof, request);
         }),
         change: guarded(async (proof, request) => {
             const auth = await authenticate('authenticateGuardian', { proof, request });

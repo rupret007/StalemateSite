@@ -10,6 +10,7 @@ import { initializeLobbyEffects, readLobbyState, writeLobbyEffects, pruneLobbyEf
 import { lobbyIncidentSourceMode } from './lobby-incident-sources.mjs';
 import { validPrivateReportState } from './private-reports.mjs';
 import { createLobby } from './lobby-core.mjs';
+import { accessPartitionedParticipationSelf, PARTICIPATION_POLICY_KEY } from './participation-partitions.mjs';
 
 export const LOBBY_AUTHORITY_MODE = 'lobby-v1';
 export const LOBBY_AUTHORITY_MARKER = 'lobby-session-authority:v1';
@@ -67,7 +68,9 @@ export function createLobbyAuthorityStorage(storage) {
 }
 async function marker(tx) {
     const saved = await tx.get(LOBBY_AUTHORITY_MARKER);
-    ensure(exact(saved, ['version', 'communityRef', 'initializedAt', 'inviteVersion', 'generation', 'usedVersions']) && saved.version === 1
+    const keys = ['version', 'communityRef', 'initializedAt', 'inviteVersion', 'generation', 'usedVersions'];
+    const requiredMode = saved && Object.hasOwn(saved, 'participationMode');
+    ensure(exact(saved, requiredMode ? [...keys, 'participationMode'] : keys) && (!requiredMode || saved.participationMode === 'c3-v1') && saved.version === 1
         && saved.communityRef === LOBBY_AUTHORITY_COMMUNITY && integer(saved.initializedAt) && version(saved.inviteVersion)
         && Number.isSafeInteger(saved.generation) && saved.generation > 0 && Array.isArray(saved.usedVersions) && saved.usedVersions.length <= 128
         && saved.usedVersions.length === saved.generation && saved.usedVersions.every(version) && new Set(saved.usedVersions).size === saved.usedVersions.length
@@ -106,18 +109,19 @@ export async function initializeLobbySessionAuthority({ storage, env, state, pri
         // Refuse an old initialized Lobby: migration must read and validate it.
         for (const key of ['net', 'room-index', 'rooms', 'abuse', 'sessions', 'moderation-queue', 'ai-reviews', 'beta-initialized', 'private-reports-v1', 'ai-usage', 'mint-rates']) ensure(await raw.get(key) === undefined);
         for (const prefix of ['community-room:', 'log:']) ensure((await raw.list({ prefix, limit: 1 })).size === 0);
-        await seed(tx, state, privateReports, now, betaVersion(env), {}, incidentSources); await raw.setAlarm(now + INTERVAL);
+        await seed(tx, state, privateReports, now, betaVersion(env), {}, { incidentSources, participationMode: env.HANGOUT_PARTICIPATION_AUTHORITY }); await raw.setAlarm(now + INTERVAL);
     });
 }
-async function seed(tx, state, privateReports, now, inviteVersion, mintRates = {}, incidentSources = false) {
-    ensure(version(inviteVersion));
+async function seed(tx, state, privateReports, now, inviteVersion, mintRates = {}, { incidentSources = false, participationMode } = {}) {
+    ensure(version(inviteVersion) && (participationMode === undefined || participationMode === 'c3-v1'));
+    if (participationMode === undefined) ensure(await tx.get(PARTICIPATION_POLICY_KEY) === undefined);
     for (const key of [LOBBY_AUTHORITY_MARKER, SESSION_INDEX, CONNECTION_INDEX, RATES, 'private-reports-v1']) ensure(await tx.get(key) === undefined);
     for (const prefix of [SESSION, CONNECTION]) ensure((await tx.list({ prefix, limit: 1 })).size === 0);
     await initializeLobbyEffects({ tx, state, now, incidentSources });
     ensure(await validPrivateReportState(privateReports, now));
     await tx.put('private-reports-v1', privateReports);
     await tx.put(SESSION_INDEX, { version: 1, entries: [] }); await tx.put(CONNECTION_INDEX, { version: 1, ids: [] }); await tx.put(RATES, mintRates); await rates(tx);
-    await tx.put(LOBBY_AUTHORITY_MARKER, { version: 1, communityRef: LOBBY_AUTHORITY_COMMUNITY, initializedAt: now, inviteVersion, generation: 1, usedVersions: [inviteVersion] });
+    await tx.put(LOBBY_AUTHORITY_MARKER, { version: 1, communityRef: LOBBY_AUTHORITY_COMMUNITY, initializedAt: now, inviteVersion, generation: 1, usedVersions: [inviteVersion], ...(participationMode ? { participationMode } : {}) });
 }
 // Owner must independently drain old writers and expire/invalidate old beta
 // generations before invoking this bound-only migration. No request boolean
@@ -157,7 +161,7 @@ export async function migrateLobbySessionAuthority({ storage, env, registrySnaps
             if (page.size < 4) break;
         } while (true);
         const privateReports = await optional('private-reports-v1', { v: 1, reports: [], receipts: [] });
-        await seed(tx, { net, abuse, sessions, rooms, moderationQueue, aiReviews, modlog: [...logRows.values()] }, privateReports, now, betaVersion(env), registrySnapshot.mintRates, incidentSources);
+        await seed(tx, { net, abuse, sessions, rooms, moderationQueue, aiReviews, modlog: [...logRows.values()] }, privateReports, now, betaVersion(env), registrySnapshot.mintRates, { incidentSources, participationMode: env.HANGOUT_PARTICIPATION_AUTHORITY });
         await raw.setAlarm(now + INTERVAL);
     });
 }
@@ -177,13 +181,23 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
         return roleMap;
     }
     const active = record => !!record && record.exp > now() && record.version === betaVersion(env) && !record.revoked;
+    async function configuredMarker(tx) {
+        const current = await marker(tx), mode = env.HANGOUT_PARTICIPATION_AUTHORITY;
+        ensure(mode === undefined || mode === 'c3-v1');
+        ensure((current.participationMode === 'c3-v1') === (mode === 'c3-v1'));
+        // Old unlatched domains containing C2 are never silently treated as
+        // ordinary beta, nor automatically upgraded to the required mode.
+        if (mode === undefined) ensure(await tx.get(PARTICIPATION_POLICY_KEY) === undefined);
+        return current;
+    }
     async function validateBinding(tx, candidate) {
         if (!bindingValid(candidate) || candidate.expiresAt <= now()) return false;
+        const modeMarker = await configuredMarker(tx);
         const ids = await connections(tx), saved = await tx.get(CONNECTION + candidate.id); ensure(saved === undefined || bindingValid(saved));
         ensure(ids.ids.includes(candidate.id) ? saved !== undefined : saved === undefined);
         if (!saved || bindingKeys.some(key => saved[key] !== candidate[key])) return false;
         const record = await session(tx, saved.betaSid);
-        if (!active(record) || record.generation !== (await marker(tx)).generation || saved.betaInviteVersion !== record.version || saved.expiresAt > record.exp) return false;
+        if (!active(record) || record.generation !== modeMarker.generation || saved.betaInviteVersion !== record.version || saved.expiresAt > record.exp) return false;
         if (!saved.account) return saved.role === 'fan' && saved.admin === false;
         const profile = record.profile;
         return !!profile && profile.expiresAt > now() && saved.expiresAt <= profile.expiresAt && saved.account === profile.account
@@ -191,8 +205,17 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
     }
     // A principal identifies an authenticated session/account, never a consent
     // grant. Guest principals do not survive a different issued beta SID.
-    const participationIdentity = binding => ({ principalRef: binding.account || `s_${binding.betaSid}`,
-        communityRef: LOBBY_AUTHORITY_COMMUNITY, expiresAt: binding.expiresAt });
+    // Consent identity and room/staff role are separate. A profiled SID uses
+    // its verified account even on the ordinary fan socket; expired profiles
+    // never fall back to an unrelated guest grant.
+    async function participationIdentity(tx, sid, expiresAt) {
+        const record = await session(tx, sid);
+        if (!active(record) || record.generation !== (await configuredMarker(tx)).generation || expiresAt > record.exp) return null;
+        const profile = record.profile;
+        if (profile && (profile.expiresAt <= now() || profile.admin && (await currentRoles()).get(profile.account) !== profile.role)) return null;
+        return { principalRef: profile?.account || `s_${sid}`, communityRef: LOBBY_AUTHORITY_COMMUNITY,
+            expiresAt: Math.min(expiresAt, profile?.expiresAt ?? expiresAt) };
+    }
     async function prune(tx, at) {
         const rows = await index(tx); let removed = 0;
         for (const item of [...rows.entries]) if (item.exp <= at && removed < BATCH) {
@@ -211,30 +234,44 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
         await raw.setAlarm(Math.min(at + INTERVAL, ...rows.entries.map(row => Math.max(at + 1, row.exp)), ...Object.values(budgets).map(row => Math.max(at + 1, row.until))));
     }
     const transact = operation => records.transaction(async (tx, raw) => {
-        await initialized(tx); ensure((await marker(tx)).inviteVersion === betaVersion(env)); return operation(tx, raw);
+        await initialized(tx); ensure((await configuredMarker(tx)).inviteVersion === betaVersion(env));
+        const result = await operation(tx, raw); await configuredMarker(tx); return result;
     });
     return Object.freeze({
         records,
         resolveParticipationConnection: value => transact(async tx => {
             const binding = bindingFrom(value);
-            return await validateBinding(tx, binding) ? participationIdentity(binding) : null;
+            return await validateBinding(tx, binding) ? participationIdentity(tx, binding.betaSid, binding.expiresAt) : null;
         }),
         async validateParticipationConnection({ tx, connection, identity } = {}) {
             try {
                 const binding = bindingFrom(connection);
                 if (!exact(identity, ['principalRef', 'communityRef', 'expiresAt']) || !await validateBinding(tx, binding)) return false;
-                const current = participationIdentity(binding);
-                return Object.keys(current).every(key => current[key] === identity[key]);
+                const current = await participationIdentity(tx, binding.betaSid, binding.expiresAt);
+                return !!current && Object.keys(current).every(key => current[key] === identity[key]);
             } catch { return false; }
         },
         writeParticipationEffects: commitEffects,
         loadIncidentEvidence: input => { ensure(incidentSources); return loadLobbyIncidentEvidence({ ...input, now: now() }); },
+        ownParticipation: value => transact(async tx => {
+            ensure(env.HANGOUT_PARTICIPATION_AUTHORITY === 'c3-v1' && exact(value, value.request === undefined ? ['sid', 'version', 'exp'] : ['sid', 'version', 'exp', 'request']));
+            const authorize = async () => {
+                const record = await session(tx, value.sid);
+                ensure(active(record) && value.version === record.version && value.exp <= record.exp && value.exp > now());
+                const identity = await participationIdentity(tx, value.sid, value.exp); ensure(identity); return identity;
+            };
+            const identity = await authorize();
+            const result = await accessPartitionedParticipationSelf({ tx, identity, now: now(), ...(value.request === undefined ? {} : { request: value.request }) });
+            const after = await authorize(); ensure(JSON.stringify(identity) === JSON.stringify(after));
+            return result;
+        }),
+
         // TRUSTED CALLER-GATED recovery: the actual Lobby holds its event gate
         // for this entire read, so no app mutator or output may interleave. A
         // snapshot/flag alone does not establish that exclusion. Every native
         // read transaction remains bounded; semantic writes still use ONE tx.
         async load() {
-            const config = () => JSON.stringify([betaVersion(env), env.HANGOUT_HMAC_KEY, env.HANGOUT_OWNER_EMAIL, env.HANGOUT_BAND_EMAILS, env.HANGOUT_MODERATOR_EMAILS, env.HANGOUT_INCIDENT_SOURCE_BRIDGE]);
+            const config = () => JSON.stringify([betaVersion(env), env.HANGOUT_HMAC_KEY, env.HANGOUT_OWNER_EMAIL, env.HANGOUT_BAND_EMAILS, env.HANGOUT_MODERATOR_EMAILS, env.HANGOUT_INCIDENT_SOURCE_BRIDGE, env.HANGOUT_PARTICIPATION_AUTHORITY]);
             const configBefore = config(), at = now();
             const capture = () => transact(async tx => ({ marker: await marker(tx), sessions: await index(tx), connections: await connections(tx), rates: await rates(tx) }));
             const before = await capture(), serialized = JSON.stringify(before);
@@ -358,7 +395,8 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
         }),
         health: () => transact(async tx => ({ used: (await index(tx)).entries.filter(row => row.exp > now()).length, limit: LIMIT })),
         rotate: nextVersion => records.transaction(async (tx, raw) => {
-            await initialized(tx); const current = await marker(tx);
+            await initialized(tx); const current = await configuredMarker(tx);
+            const finish = async value => { await configuredMarker(tx); return value; };
             ensure(version(nextVersion) && nextVersion === betaVersion(env) && nextVersion !== current.inviteVersion && !current.usedVersions.includes(nextVersion)
                 && current.usedVersions.length < 128 && Number.isSafeInteger(current.generation + 1));
             const rows = await index(tx), batch = rows.entries.slice(0, BATCH);
@@ -366,13 +404,13 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
             // Preflight this bounded batch before touching any rows.
             for (const item of batch) {
                 const record = await session(tx, item.sid, rows);
-                if (record.exp > now() && (!record.revoked || record.pending)) return { status: 409, reason: 'old sessions require confirmed closure' };
+                if (record.exp > now() && (!record.revoked || record.pending)) return finish({ status: 409, reason: 'old sessions require confirmed closure' });
             }
             for (const item of batch) await tx.delete(SESSION + item.sid);
             if (batch.length) { rows.entries = rows.entries.slice(batch.length); await tx.put(SESSION_INDEX, rows); }
-            if (rows.entries.length || (await connections(tx)).ids.length) return { status: 409, reason: 'old session metadata cleanup remains' };
+            if (rows.entries.length || (await connections(tx)).ids.length) return finish({ status: 409, reason: 'old session metadata cleanup remains' });
             await tx.put(LOBBY_AUTHORITY_MARKER, { ...current, inviteVersion: nextVersion, generation: current.generation + 1, usedVersions: [...current.usedVersions, nextVersion] });
-            await schedule(tx, raw, now()); return { status: 200, reason: 'rotated' };
+            await schedule(tx, raw, now()); return finish({ status: 200, reason: 'rotated' });
         }),
         maintenance: () => transact(async tx => { await pruneLobbyEffectLogs({ tx, now: now() }); }),
         // Queue writes are fenced in this same domain; the queue commits its

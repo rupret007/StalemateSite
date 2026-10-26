@@ -123,6 +123,12 @@ async function betaRequest(request, env, deps = {}) {
         }
         const session = await betaSession(request, env, Date.now(), { allowRevoked: url.pathname === '/beta/logout' });
         if (!session) return json({ error: 'Private invitation required.' }, 401);
+        if (url.pathname === '/beta/participation/stop') {
+            if (!lobbyParticipationMode(env)) return json({ error: 'Unknown request.' }, 404);
+            if (Object.keys(body).length !== 1 || !Number.isSafeInteger(body.expectedRevision) || body.expectedRevision < 0) return json({ error: 'Invalid request.' }, 400);
+            const result = await registryRequest(env, 'participation-stop', { sid: session.access.sid, version: session.access.version, exp: session.access.exp, request: { expectedRevision: body.expectedRevision } });
+            return json(await result.json(), result.status);
+        }
         if (url.pathname === '/beta/logout') {
             await disconnect(env, session);
             return json({ ok: true }, 200, { 'Set-Cookie': betaCookie(BETA_COOKIE, '', 0) });
@@ -131,9 +137,15 @@ async function betaRequest(request, env, deps = {}) {
     }
     const session = await betaSession(request, env);
     if (!session) return reply('Private invitation required. Open your invitation link.', 401);
+    if (url.pathname === '/beta/participation') {
+        if (!lobbyParticipationMode(env)) return json({ error: 'Unknown request.' }, 404);
+        if (request.method !== 'GET' || url.search) return json({ error: 'GET without parameters required.' }, 400);
+        const result = await registryRequest(env, 'participation', { sid: session.access.sid, version: session.access.version, exp: session.access.exp });
+        return json(await result.json(), result.status);
+    }
     if (url.pathname === '/beta/privacy') return redirect(`${ROOT}terms/`);
     if (url.pathname === '/beta/state') return json({ kind: session.identity?.kind || 'guest', role: session.identity?.role || 'fan', emailConfigured: betaAccessConfigured(env), staffConfigured: betaAccessConfigured(env) });
-    if (url.pathname === '/beta/bootstrap.js') return reply(`sessionStorage.setItem('hangout-preview',${JSON.stringify(env.HANGOUT_PREVIEW_KEY)});sessionStorage.setItem('hangout-owner',${JSON.stringify(session.identity?.kind === 'owner' ? '1' : '0')});window.HangoutEntrySites=${JSON.stringify(Object.values(entrySitesFromConfig(env.HANGOUT_ENTRY_SITES)))};`, 200, 'text/javascript');
+    if (url.pathname === '/beta/bootstrap.js') return reply(`sessionStorage.setItem('hangout-preview',${JSON.stringify(env.HANGOUT_PREVIEW_KEY)});sessionStorage.setItem('hangout-owner',${JSON.stringify(session.identity?.kind === 'owner' ? '1' : '0')});window.HangoutEntrySites=${JSON.stringify(Object.values(entrySitesFromConfig(env.HANGOUT_ENTRY_SITES)))};${lobbyParticipationMode(env) ? 'window.HangoutParticipationControls=true;' : ''}`, 200, 'text/javascript');
     if (url.pathname === '/lobby-owner/login' || url.pathname === '/lobby-admin/login') {
         if (request.method !== 'GET') return reply('GET required.', 405);
         if (!betaAccessConfigured(env)) return reply('Email verification is not configured. Guest chat is still available from your invitation.', 503);

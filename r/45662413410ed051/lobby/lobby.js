@@ -58,6 +58,111 @@ import { createEntrySharing } from './entry-sharing.mjs';
     const slug = () => `${pick(WORDS)}-${pick(THINGS)}`.replace(/[^a-z0-9-]/g, '');
 
     const app = window.__lobby = { ws: null, me: '', role: 'fan', band: false, chans: new Map(), pms: new Map(), active: '#stalemate', rooms: [], ignores: new Set(), pending: null };
+    const sharingControls = betaShell && window.HangoutParticipationControls === true;
+    let sharingState = null, sharingBusy = false, sharingCleanup = 'unknown', sharingConfirmation = 0;
+    const sharingRegion = $('[data-sharing-region]');
+    const sharingStatus = text => { $('[data-sharing-status]').textContent = text; };
+    function closeSharingConfirm() {
+        const focused = $('[data-sharing-confirm]').contains(document.activeElement);
+        $('[data-sharing-confirm]').hidden = true;
+        if (focused) $('[data-sharing-stop]').focus({ preventScroll: true });
+    }
+    function drawSharing(value) {
+        sharingState = value;
+        $('[data-sharing-leave]').disabled = sessionEnded || !app.me || app.ws?.readyState !== 1;
+        if (value.state !== 'withdrawn') sharingCleanup = 'unknown';
+        else if (value.cleanup === 'confirmed') sharingCleanup = 'confirmed';
+        else if (value.cleanup === 'unconfirmed') sharingCleanup = 'unconfirmed';
+        const labels = { authorized: 'Sharing is available for the approved purposes shown below.', withdrawn: app.me && app.ws?.readyState === 1 ? 'Sharing is stopped. Reporting, blocking and leaving remain available in this session.' : 'Sharing is stopped. No new sharing is available.',
+            unknown: 'No current sharing permission is recorded. Email verification does not grant it.', expired: 'Sharing permission has expired.', pending: 'Sharing permission is pending. Sharing is unavailable.',
+            'policy-unavailable': 'Sharing is unavailable under the current policy.', 'policy-review-required': 'Sharing requires a policy review.', declined: 'Sharing is unavailable.', unavailable: 'Sharing permission could not be confirmed.' };
+        const names = { 'public-text': 'public chat', 'public-disclosure': 'public display', 'direct-contact': 'direct contact', 'audio': 'audio', 'camera': 'camera', 'external-provider': 'external services', 'public-artifact': 'shared creative work', 'room-creation': 'creating rooms', 'room-registration': 'keeping rooms', 'media-reception': 'receiving media', 'ai-public-review': 'AI review' };
+        const purposes = Array.isArray(value.purposes) ? value.purposes.map(p => names[p] || p).join(', ') : '';
+        sharingStatus((labels[value.state] || labels.unavailable) + (value.available && purposes ? ` Approved: ${purposes}.` : '')
+            + (app.localMediaPaused && value.state !== 'withdrawn' ? ' Local media remains off in this tab; checking permissions does not restart it.' : '')
+            + (value.state === 'withdrawn' && sharingCleanup !== 'confirmed' ? ' The permission withdrawal is saved. Local media is off; server cleanup is unconfirmed. Retry stopping live sharing; close this tab if your browser still indicates capture.' : ''));
+        $('[data-sharing-stop]').textContent = value.state === 'withdrawn' && sharingCleanup !== 'confirmed' ? 'Retry stopping live sharing' : 'Stop all my sharing';
+        $('[data-sharing-stop]').disabled = !value.canStop || value.state === 'withdrawn' && sharingCleanup === 'confirmed';
+    }
+    async function sharingRequest(stop = false) {
+        if (!sharingControls || sharingBusy) return;
+        sharingBusy = true;
+        if (stop) pauseLocalMedia();
+        const confirmedBefore = sharingConfirmation;
+        if (sharingRegion.contains(document.activeElement)) sharingRegion.focus({ preventScroll: true });
+        for (const button of sharingRegion.querySelectorAll('button:not([data-sharing-leave])')) button.disabled = true;
+        sharingStatus(stop ? 'Local media is off. Stopping new sharing… Waiting for server confirmation.' : 'Checking current sharing…');
+        try {
+            const response = await fetch(stop ? '/beta/participation/stop' : '/beta/participation', { credentials: 'same-origin', cache: 'no-store',
+                ...(stop ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedRevision: sharingState?.revision }) } : {}) });
+            if (!response.ok) throw Error('unconfirmed');
+            const value = await response.json();
+            if (value.ok !== true || !Number.isSafeInteger(value.revision) || typeof value.canStop !== 'boolean') throw Error('unconfirmed');
+            drawSharing(value);
+            if (value.state === 'withdrawn') stopLocalSharing();
+        } catch {
+            if (sharingConfirmation > confirmedBefore) {
+                drawSharing({ ok: true, state: 'withdrawn', available: false, purposes: [], revision: sharingState?.revision || 0, canStop: true, cleanup: 'confirmed' });
+            } else if (sharingState?.state === 'withdrawn') {
+                if (stop) sharingCleanup = 'unconfirmed'; drawSharing({ ...sharingState, cleanup: sharingCleanup === 'confirmed' ? 'confirmed' : 'unconfirmed' });
+            } else {
+                sharingState = null; sharingCleanup = 'unknown'; sharingStatus(stop ? 'Local media remains off. The server withdrawal could not be confirmed. Check my sharing before trying again; close this tab if your browser still indicates capture.' : 'Sharing status is unknown. Check again; email verification does not authorize sharing.');
+            }
+        } finally {
+            sharingBusy = false; $('[data-sharing-confirm]').hidden = true;
+            $('[data-sharing-check]').disabled = false;
+            $('[data-sharing-accept]').disabled = false; $('[data-sharing-cancel]').disabled = false;
+            $('[data-sharing-stop]').disabled = !sharingState?.canStop || sharingState.state === 'withdrawn' && sharingCleanup === 'confirmed';
+            if (document.activeElement === sharingRegion) $('[data-sharing-check]').focus({ preventScroll: true });
+        }
+    }
+    // Local opt-out is immediate and separate from saved server permission.
+    // onLeave invalidates capture/room generations as well as live tracks/PCs.
+    function pauseLocalMedia() {
+        app.localMediaPaused = true;
+        if (roomApi) roomApi.onLeave();
+        $('[data-activity]').hidden = true; $('[data-jam]').hidden = true; $('[data-cam]').hidden = true;
+        $('[data-quick]').hidden = true; $('[data-lobby-welcome]').hidden = true;
+        $('[data-text]').disabled = true; $('[data-send]').disabled = true; $('[data-palette-open]').disabled = true;
+        for (const button of $$('[data-start]')) button.disabled = true;
+        $('[data-roomtools]').hidden = true;
+        $('[data-private]').hidden = true;
+        if ($('[data-cam-gate]').open) $('[data-cam-gate]').close();
+        $('[data-adult]').checked = false;
+    }
+    function leaveSharingChat() {
+        if (sessionEnded || !app.ws) return;
+        pauseLocalMedia();
+        const socket = app.ws; socket.onclose = null; socket.onmessage = null;
+        if (socket.readyState === 0 || socket.readyState === 1) socket.close(1000, 'Left chat');
+        endSession('left');
+        $('[data-sharing-leave]').disabled = true;
+    }
+    function stopLocalSharing() {
+        if (!sharingControls) return;
+        app.sharingStopped = true; app.capabilities = {};
+        pauseLocalMedia();
+        if (pendingKeep) clearKeep('Sharing is stopped. No room action was confirmed here.');
+        $('[data-activity]').hidden = true; $('[data-roombar]').hidden = true; $('[data-jam]').hidden = true;
+        $('[data-pmreqs]').replaceChildren();
+        $('[data-text]').disabled = true; $('[data-say] button[type="submit"]').disabled = true;
+        $('[data-self-role]').textContent = 'Sharing stopped · safety controls available';
+        for (const channel of app.chans.values()) { channel.names = []; channel.readOnly = true; }
+        for (const channel of app.pms.values()) { channel.names = []; channel.readOnly = true; }
+        app.rooms = []; drawRooms(); $('[data-nicks]').replaceChildren();
+    }
+    if (sharingControls) {
+        $('[data-sharing-controls]').hidden = false;
+        // Status and reduction remain reachable before permission to join.
+        $('.gate-card').append($('[data-sharing-controls]'));
+        $('[data-sharing-check]').addEventListener('click', () => sharingRequest());
+        $('[data-sharing-leave]').addEventListener('click', leaveSharingChat);
+        $('[data-sharing-stop]').addEventListener('click', () => { $('[data-sharing-confirm]').hidden = false; $('[data-sharing-accept]').focus(); });
+        $('[data-sharing-cancel]').addEventListener('click', closeSharingConfirm);
+        $('[data-sharing-accept]').addEventListener('click', () => sharingRequest(true));
+        // One initial read and explicit refresh only; never poll private status.
+        Promise.resolve().then(() => sharingRequest());
+    }
     const entrySharing = createEntrySharing({ source: entrySource, enabled: shareEntry, registry: entrySites, send: (frame) => send(frame), onChange: () => drawEntryChoice() });
     function prepareOwnerSignin(current = null) {
         const intent = current ? keepRoomIntent(current, Date.now()) : null;
@@ -164,6 +269,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     let roomApi = null;
     let jamContext = null;
     function room() {
+        if (app.sharingStopped || app.localMediaPaused) return null;
         if (!roomApi && window.LobbyRoom) {
             roomApi = window.LobbyRoom.attach({ app, send, $, previewKey, turnUrl, isLocal, params });
         }
@@ -357,18 +463,23 @@ import { createEntrySharing } from './entry-sharing.mjs';
         announcements.replace(() => $('[data-buffer]').replaceChildren());
         setConnection('ended'); drawTabs(); drawChan();
         $('[data-text]').readOnly = true;
-        const ended = reason === 'admission'
+        const ended = reason === 'left' ? 'You left this chat. Your sign-in and any recorded sharing withdrawal have not been changed.' : reason === 'admission'
             ? 'Couldn’t reconnect. The service may be unavailable or your sign-in may have expired.'
             : wasVerified ? 'Your verified sign-in expired or was revoked.' : 'Your guest session expired or was revoked.';
-        const next = betaShell
+        const next = reason === 'left' ? 'Return to the community to start a new chat session.' : betaShell
             ? wasVerified ? 'Return to your invitation, then verify your email again to recover your rooms.' : 'Return to your private invitation to join again.'
             : wasVerified ? 'Choose Try again to continue as a guest. Sign in again to recover your registered rooms.' : 'Choose Try again to start a fresh session.';
         $('[data-session-reason]').textContent = `${ended} ${next} Cameras are off.`;
         $('[data-session-reentry]').hidden = !betaShell;
+        $('[data-session-reentry]').textContent = reason === 'left' ? 'Return to community' : 'Return to invitation';
         $('[data-session-ended]').hidden = false;
         show('chat'); $('#session-ended-title').focus({ preventScroll: true });
     }
     const send = (obj) => {
+        if (app.sharingStopped || app.localMediaPaused) {
+            const safe = obj.t === 'report' || obj.t === 'cmd' && ['block', 'unblock', 'ignore', 'unignore', 'part', 'leave', 'quit', 'exit', 'help', 'camoff'].includes(String(obj.name || '').toLowerCase());
+            if (!safe) return false;
+        }
         if (!app.ws || app.ws.readyState !== 1) return false;
         if (obj.t !== 'hello' && connectionState !== 'connected') return false;
         if (!privateMessageContextSupported && typeof obj.ch === 'string' && obj.ch.startsWith('pm:')) {
@@ -407,6 +518,11 @@ import { createEntrySharing } from './entry-sharing.mjs';
         case 'report-status': if (m.submitted === true) finishReport(m.id, true); break;
         case 'ownership': { const c = store(m.ch); if (c) c.cohosts = m.cohosts; break; }
         case 'owner-offer': toast(`${m.by} offered you ownership of ${m.ch}`, [['Accept ownership', () => { if (confirm(`Accept ownership of ${m.ch}?`)) cmd('acceptowner', [], m.ch); }]]); break;
+        case 'sharing-stopped':
+            sharingConfirmation++; sharingCleanup = 'confirmed';
+            stopLocalSharing();
+            if (sharingControls) { drawSharing({ ok: true, state: 'withdrawn', available: false, purposes: [], revision: sharingState?.revision || 0, canStop: true, cleanup: 'confirmed' }); }
+            break;
         case 'device': localStorage.setItem('hangout-dev', m.token); break;
         case 'hello':
             entrySourcesSupported = m.features?.entrySources === 1;
@@ -428,6 +544,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         case 'entry-source': entrySharing.acknowledge(m); break;
         case 'nick-error': setConnection('offline'); gateStatus(m.text); $('[data-gate]').hidden = false; $('[data-app]').hidden = true; break;
         case 'welcome': {
+            if (sharingControls) { $('.chat').insertBefore($('[data-sharing-controls]'), $('[data-lobby-welcome]')); $('[data-sharing-leave]').disabled = false; }
             const wasIn = !!app.me;
             if (!wasIn) count('lobby-join');
             app.verified = m.verified === true; app.capabilities = m.capabilities || app.capabilities;
@@ -493,7 +610,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             const r = room();
             if (r) r.onAct(m);
             const ch = app.chans.get(m.ch);
-            if (ch && window.__lobbyRoom) {
+            if (ch && !app.localMediaPaused && window.__lobbyRoom?.state.room) {
                 ch.actSnap = { strokes: window.__lobbyRoom.state.room.strokes.slice(-400), video: window.__lobbyRoom.state.room.video };
             }
             break;
@@ -550,7 +667,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             if (m.by && !m.on) toast(`Camera switched off by ${m.by}.`);
             break;
         }
-        case 'cam-gate': $('[data-cam-gate]').showModal(); break;
+        case 'cam-gate': if (!app.localMediaPaused) $('[data-cam-gate]').showModal(); break;
         case 'net': app.netLock = m.lock; drawCommunity(); if (m.shield) toast('🛡️ Shield’s up: slow mode, cameras off for a bit.'); break;
         case 'modlog': m.entries.forEach((e) => line(app.active, { notice: true, from: 'log', text: `${new Date(e.at).toLocaleTimeString()} ${e.by} ${e.action} ${e.target} ${e.reason}` })); break;
         default: break;
@@ -716,6 +833,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         return connectionState === 'connected' && c?.kind === 'jam' && c.names?.some(n => n.nick === app.me) ? c : null;
     }
     function drawJam() {
+        if (app.sharingStopped || app.localMediaPaused) { resetJamControls(); $('[data-jam]').hidden = true; return; }
         const c = currentJam();
         const next = c ? { room: c, host: !!amOp(c), invitation: c.jam?.invitation || c.jam?.desktop || '',
             desktop: c.jam?.desktop || '', web: c.jam?.web || '', webReady: c.jam?.webReady === true } : null;
@@ -743,25 +861,25 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const key = app.active;
         const c = store(key);
         const isPm = key.startsWith('pm:');
-        $('[data-lobby-welcome]').hidden = key !== '#stalemate';
+        $('[data-lobby-welcome]').hidden = app.localMediaPaused || key !== '#stalemate';
         $('[data-chat-context]').textContent = isPm ? `PM · ${key.slice(3)}` : key;
         $('[data-topic]').textContent = isPm ? `Private chat with ${key.slice(3)} · not end-to-end encrypted · report shares selected text · tap their name to block` : c ? `${c.topic || ''}` : '';
         const room = !isPm && c && c.kind !== 'lobby';
         if (inviteContext && (inviteContext !== c || connectionState !== 'connected' || !amOp(c))) closeInviteDialog();
-        $('[data-roombar]').hidden = !room;
+        $('[data-roombar]').hidden = app.sharingStopped || app.localMediaPaused || !room;
         drawJam();
-        const showAct = room && ['bobross', 'watch', 'art'].includes(c.kind);
+        const showAct = !app.sharingStopped && !app.localMediaPaused && room && ['bobross', 'watch', 'art'].includes(c.kind);
         $('[data-activity]').hidden = !showAct;
         $('[data-activity-title]').textContent = showAct ? c.kind === 'art' ? 'A canvas for everyone' : c.kind === 'bobross' ? 'A little paint. A little Bob Ross.' : 'Watching together' : 'Shared activity';
         $('[data-act-stage]').hidden = !showAct;
-        document.body.classList.toggle('am-op', !!(c && amOp(c)));
+        document.body.classList.toggle('am-op', !app.localMediaPaused && !!(c && amOp(c)));
         if (room) {
             const m = c.modes;
             const hosts = c.names.filter((n) => n.prefix === '@').map((n) => n.nick);
             $('[data-host-status]').textContent = (c.persistent ? `Registered · expires ${new Date(c.expiresAt).toLocaleDateString()} · ` : 'Temporary · ') + (amOp(c) ? 'You have @ host controls · /op nick adds a co-host' : hosts.length ? `Hosts: ${hosts.map((nick) => `@${nick}`).join(', ')}` : 'No room host online. An existing host can return, or a site moderator can help.');
             $('[data-modes]').textContent = `${KIND_NAME[c.kind]} · +t${m.m ? 'm' : ''}${m.i ? 'i' : ''}${m.k ? 'k' : ''}${m.C ? 'C' : ''}${m.Q ? 'Q' : ''}${m.S ? ` slow ${m.S}s` : ''}${m.locked ? ' 🔒' : ''} · ${c.count}/${m.l}`;
             const cam = $('[data-cam]');
-            cam.hidden = c.kind === 'chat';
+            cam.hidden = app.localMediaPaused || c.kind === 'chat';
             cam.setAttribute('aria-pressed', String(!!c.myCam));
             cam.textContent = c.myCam ? '📷 Camera on' : m.C ? '📷 Camera (18+)' : '📷 Cameras off here';
             cam.disabled = !m.C && !c.myCam;
@@ -799,7 +917,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             b.type = 'button'; b.className = 'room';
             b.dataset.room = r.name;
             b.dataset.state = r.state;
-            b.disabled = !r.canJoin || connectionState !== 'connected';
+            b.disabled = app.localMediaPaused || !r.canJoin || connectionState !== 'connected';
             const t = document.createElement('b'); t.textContent = `${KIND_ICON[r.kind]} ${r.title}`;
             const s = document.createElement('span'); s.textContent = `${r.name} · ${r.count}/${r.max} here · ${r.persistent ? 'Registered' : 'Temporary'} · ${r.hostPresent ? 'Host here' : 'Host away'}`;
             const action = document.createElement('span'); action.className = 'room-action'; action.textContent = `${r.statusLabel} · ${r.actionLabel}`;
@@ -925,6 +1043,11 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const box = $('[data-sheet-buttons]');
         box.replaceChildren();
         const act = (label, fn, cls = '') => { const b = document.createElement('button'); b.type = 'button'; b.className = `btn ${cls}`; b.textContent = label; b.addEventListener('click', () => { fn(); sheet.close(); }); box.append(b); };
+        if (app.localMediaPaused || app.sharingStopped) {
+            act('Ignore', () => { app.ignores.add(nick); cmd('ignore', [nick]); });
+            act('Block', () => cmd('block', [nick]), 'btn--ghost');
+            sheet.showModal(); return;
+        }
         act('✉ PM', () => cmd('query', [nick]));
         act('🐟 Slap', () => cmd('slap', [nick]));
         act('Who?', () => cmd('whois', [nick]));
@@ -1049,13 +1172,14 @@ import { createEntrySharing } from './entry-sharing.mjs';
     $('[data-leave]').addEventListener('click', () => cmd('part', [app.active]));
     $('[data-pm-off]').addEventListener('change', (e) => cmd('pm', [e.target.checked ? 'off' : 'on']));
     $('[data-cam]').addEventListener('click', () => {
+        if (app.localMediaPaused) return toast('Local media stays off while this Stop request is unresolved.');
         const c = store(app.active);
         if (!c) return;
         if (c.myCam) return send({ t: 'cam', ch: c.name, on: false });
         $('[data-adult]').checked = false;
         return $('[data-cam-gate]').showModal();
     });
-    $('[data-cam-yes]').addEventListener('click', () => { if (!$('[data-adult]').checked) return toast('Tick the 18+ box first.'); send({ t: 'cam', ch: app.active, on: true, adult18: true }); return $('[data-cam-gate]').close(); });
+    $('[data-cam-yes]').addEventListener('click', () => { if (app.localMediaPaused) return; if (!$('[data-adult]').checked) return toast('Tick the 18+ box first.'); send({ t: 'cam', ch: app.active, on: true, adult18: true }); return $('[data-cam-gate]').close(); });
     $('[data-cam-no]').addEventListener('click', () => $('[data-cam-gate]').close());
     $('[data-jam-form]').addEventListener('submit', (e) => {
         e.preventDefault();

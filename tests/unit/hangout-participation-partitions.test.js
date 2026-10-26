@@ -4,7 +4,7 @@ import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 import { PARTICIPATION_PURPOSES } from '../../hangout-worker/src/participation-policy.mjs';
 import { PARTICIPATION_LEDGER_KEY, PARTICIPATION_LEDGER_LIMITS } from '../../hangout-worker/src/participation-consents.mjs';
 import { createParticipationEnforcement } from '../../hangout-worker/src/participation-enforcement.mjs';
-import { createPartitionedParticipationConsents, readPartitionedParticipationPrincipals,
+import { createPartitionedParticipationConsents, readPartitionedParticipationPrincipals, readPartitionedParticipationWithdrawals,
     PARTICIPATION_PARTITION_PREFIX as PREFIX, PARTICIPATION_POLICY_KEY, PARTICIPATION_RECORD_LIMITS } from '../../hangout-worker/src/participation-partitions.mjs';
 
 const START = 1800000000000, clone = value => structuredClone(value), size = value => Buffer.byteLength(JSON.stringify(value));
@@ -375,4 +375,27 @@ describe('bounded per-principal C2 partitions', () => {
         expect((await f.ledger.lookup(alice.proof)).ok).toBe(true); expect(f.storage.snapshot().get(key)).toEqual(owned);
         expect((await f.complete(bravo)).result.state).toBe('authorized');
     });
+});
+
+describe('participant-authenticated partition reduction', () => {
+    it('routes self withdrawal by trusted participant identity, never through guardian authentication or new allocation', async () => {
+        const f = await fixture(), alice = await f.enroll('alice'), bravo = await f.enroll('bravo');
+        const before = clone(f.record(alice)[1]), other = clone(f.record(bravo)[1]);
+        f.adapters.authenticateGuardian = async () => { throw Error('Self withdrawal must never request guardian authentication'); };
+        expect(await f.ledger.selfWithdraw(alice.proof, { expectedRevision: before.subjects[0].record.revision })).toMatchObject({ ok: true, state: 'withdrawn' });
+        const after = f.record(alice)[1]; expect(after.guardians).toEqual(before.guardians); expect(after.operations).toEqual(before.operations);
+        expect(f.record(bravo)[1]).toEqual(other);
+        expect(await f.makeLedger().selfWithdraw(alice.proof, { expectedRevision: before.subjects[0].record.revision })).toMatchObject({ ok: true, state: 'withdrawn' });
+        expect(f.record(alice)[1]).toEqual(after);
+    });
+    it('keeps repeated same-principal withdrawal reads inside the same bounded transaction without duplicate record reads', async () => {
+        const f = await fixture(), alice = await f.enroll('alice');
+        await f.ledger.selfWithdraw(alice.proof, { expectedRevision: f.record(alice)[1].subjects[0].record.revision });
+        const identity = { principalRef: alice.principalRef, communityRef: f.config.policy.communityRef, expiresAt: f.now() + 10000 };
+        let reads = 0;
+        const read = identities => f.storage.transaction(tx => readPartitionedParticipationWithdrawals({ tx: { ...tx, get: key => { reads++; return tx.get(key); } }, identities, now: f.now() }));
+        expect(await read([identity])).toEqual([true]); const single = reads; reads = 0;
+        expect(await read([identity, identity])).toEqual([true, true]); expect(reads).toBe(single);
+    });
+
 });
