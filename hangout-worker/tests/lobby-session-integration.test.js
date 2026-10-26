@@ -16,7 +16,7 @@ import { accountId } from '../src/auth.mjs';
 import { privateReportRef, LIMITS as PRIVATE_LIMITS } from '../src/private-reports.mjs';
 import { writeLobbyEffects } from '../src/lobby-effect-records.mjs';
 import { LOG_TTL } from '../src/community-state.mjs';
-import { LOBBY_AUTHORITY_COMMUNITY } from '../src/lobby-session-authority.mjs';
+import { LOBBY_AUTHORITY_COMMUNITY, LOBBY_AUTHORITY_MARKER, createLobbyAuthorityStorage } from '../src/lobby-session-authority.mjs';
 import { createPartitionedParticipationConsents } from '../src/participation-partitions.mjs';
 import * as partitionMaintenance from '../src/participation-partitions.mjs';
 import { PARTICIPATION_PURPOSES } from '../src/participation-policy.mjs';
@@ -694,5 +694,144 @@ describe('cohort preparation through the actual cookie gateway and SQLite Lobby'
         const current = await authority.resolveParticipationConnections([alice.binding, bravo.binding]);
         expect(current[0]).toBeNull(); expect(current[1]?.principalRef).toBe('s_' + bravo.access.sid);
         expect(h.env.BETA_SESSIONS.idFromName).not.toHaveBeenCalled();
+    });
+});
+
+// Actual bound initialization and disk SQLite. Existing Date/socket doubles
+// remain explicit; no hosted or native-workerd readiness is claimed here.
+describe('known-new authority initialization readiness', () => {
+    async function rejectRequiredSessionWrite(h) {
+        const lobby = h.lobby(), previous = h.hooks.after, before = [...h.driver.rows()];
+        const sessionsHex = Buffer.from('sessions').toString('hex'), rollbacks = h.driver.stats.rollbacks;
+        let tripped = false;
+        h.hooks.after = async event => {
+            await previous?.(event);
+            if (!tripped && event.name === 'put' && event.key?.includes(':manifest:') && event.key.endsWith(sessionsHex)) {
+                tripped = true; throw Error('Synthetic post-native required session write failure');
+            }
+        };
+        try {
+            await expect(lobby.persistRequired('sessions', lobby.engine.sessionSnapshot()))
+                .rejects.toThrow('Synthetic post-native required session write failure');
+            expect(tripped).toBe(true); expect(h.driver.stats.rollbacks).toBe(rollbacks + 1);
+            expect([...h.driver.rows()]).toEqual(before);
+        } finally { h.hooks.after = previous; }
+    }
+
+    it.each([false, true])('promotes only bound known-empty initialization after full healthy restore (C3=%s)', async participation => {
+        const h = await harness({ initialize: false, participation }), lobby = h.lobby(); await lobby.ready;
+        expect(lobby.authorityUnavailable).toBe(true); expect(lobby.engine).toBeUndefined();
+        expect(lobby.evidenceStorage).toBe('degraded'); expect(h.driver.rows().size).toBe(0);
+        expect((await h.bound('initialize')).status).toBe(200);
+        expect(lobby.engine).toBeTruthy(); expect(lobby.authorityUnavailable).toBe(false);
+        expect(lobby.evidenceStorage).toBe('ready'); expect(lobby.privateQueueActor).toBeNull();
+        expect(lobby.privateReportQueue.status()).toMatchObject({ storage: 'ready', pending: 0, receipts: 0 });
+        expect(lobby.privateReportState).toEqual({ storage: 'ready', reports: [] });
+        const saved = await lobby.authority.load();
+        expect(saved.bindings).toEqual([]); expect(saved.state.sessions.connections).toEqual([]);
+        expect(saved.state.moderationQueue).toEqual({ reports: [], held: [] });
+        const who = await h.guest(), checked = await lobby.authority.check({ sid: who.access.sid, version: who.access.version, exp: who.access.exp });
+        expect(checked).toEqual({ reason: 'active', profile: null });
+        expect(lobby.engine._debug.conns.size).toBe(0);
+        if (participation) {
+            expect(await lobby.authority.records.transaction(tx => tx.get(partitionMaintenance.PARTICIPATION_POLICY_KEY))).toBeUndefined();
+            expect(await lobby.authority.records.transaction(tx => tx.list({ prefix: 'participation-records:v1:record:', limit: 4 }))).toEqual(new Map());
+        }
+        expect(h.env.BETA_SESSIONS.get).not.toHaveBeenCalled(); expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it('does not expose bound initialization to an admitted guest with forged owner headers', async () => {
+        const h = await harness(), who = await h.guest(), lobby = h.lobby(), engine = lobby.engine;
+        const before = [...h.driver.rows()];
+        const denied = await betaFetch(request('/__beta/authority/initialize', { cookie: who.cookie, body: {},
+            headers: { 'X-Hangout-Role': 'owner', 'X-Hangout-Authority': 'initialize' } }), h.env);
+        expect(denied.status).toBe(405); expect([...h.driver.rows()]).toEqual(before);
+        expect(lobby.engine).toBe(engine); expect(lobby.authorityUnavailable).toBe(false); expect(lobby.evidenceStorage).toBe('ready');
+        expect((await lobby.authority.check({ sid: who.access.sid, version: who.access.version, exp: who.access.exp })).profile).toBeNull();
+    });
+
+    it('does not clear a real prior-engine storage failure through start, alarm or duplicate initialization', async () => {
+        const h = await harness(), lobby = h.lobby(); expect(lobby.evidenceStorage).toBe('ready');
+        await rejectRequiredSessionWrite(h); expect(lobby.evidenceStorage).toBe('degraded');
+        await lobby.start(); expect(lobby.evidenceStorage).toBe('degraded');
+        await lobby.alarm(); await h.settle(); expect(lobby.evidenceStorage).toBe('degraded');
+        const before = [...h.driver.rows()];
+        expect((await h.bound('initialize')).status).toBe(503);
+        expect([...h.driver.rows()]).toEqual(before); expect(lobby.evidenceStorage).toBe('degraded');
+    });
+
+    it.each(['legacy', 'corrupt'])('refuses %s nonempty storage without changing its rows or clearing quarantine', async kind => {
+        const h = await harness({ initialize: false }), lobby = h.lobby(); await lobby.ready;
+        if (kind === 'legacy') await h.state.storage.put('net', { lock: 'off' });
+        else await createLobbyAuthorityStorage(h.state.storage).transaction(tx => tx.put(LOBBY_AUTHORITY_MARKER, { invalid: true }));
+        const before = [...h.driver.rows()];
+        expect((await h.bound('initialize')).status).toBe(503); expect([...h.driver.rows()]).toEqual(before);
+        expect(lobby.engine).toBeUndefined(); expect(lobby.authorityUnavailable).toBe(true); expect(lobby.evidenceStorage).toBe('degraded');
+    });
+
+    it('refuses promotion when the real private queue encodes an unavailable read without throwing', async () => {
+        let armed = false, tripped = false; const privateHex = Buffer.from('private-reports-v1').toString('hex');
+        const h = await harness({ initialize: false, hooks: { before(event) {
+            if (armed && !tripped && event.name === 'get' && event.key?.includes(':manifest:') && event.key.endsWith(privateHex)) {
+                tripped = true; throw Error('Synthetic private-queue read unavailable');
+            }
+        } } }), lobby = h.lobby(); await lobby.ready;
+        const realRefresh = lobby.refreshPrivateReports;
+        const refresh = vi.spyOn(lobby, 'refreshPrivateReports').mockImplementation(function (...args) {
+            // Construction enqueues the actual native read. Arm at the real
+            // refresh call, after authority.load and before that read executes.
+            armed = true; return Reflect.apply(realRefresh, this, args);
+        });
+        expect((await h.bound('initialize')).status).toBe(503); expect(refresh).toHaveBeenCalled(); expect(tripped).toBe(true);
+        expect(lobby.engine).toBeTruthy(); expect(lobby.privateReportQueue.status().storage).toBe('unavailable');
+        expect(lobby.privateReportState.storage).toBe('unavailable');
+        expect(lobby.authorityUnavailable).toBe(true); expect(lobby.evidenceStorage).toBe('degraded');
+        expect((await betaFetch(request('/beta/unlock', { body: { key: INVITE } }), h.env)).status).toBe(503);
+    });
+
+    it('does not promote after a genuine newer disk-write failure while the original restore still finishes', async () => {
+        const h = await harness({ initialize: false }), lobby = h.lobby(); await lobby.ready;
+        const realPrune = lobby.pruneLogs; let observed = false;
+        const prune = vi.spyOn(lobby, 'pruneLogs').mockImplementation(async function (...args) {
+            const result = await Reflect.apply(realPrune, this, args);
+            // Required persistence is the actual production writer/SQLite TX.
+            // Only its caller contains the intentional refusal, permitting the
+            // surrounding unmodified start to reach its normal return.
+            await rejectRequiredSessionWrite(h); observed = true; return result;
+        });
+        expect((await h.bound('initialize')).status).toBe(503); expect(prune).toHaveBeenCalled(); expect(observed).toBe(true);
+        expect(lobby.engine).toBeTruthy(); expect(lobby.privateReportQueue.status().storage).toBe('ready');
+        expect(lobby.privateReportState.storage).toBe('ready');
+        expect(lobby.authorityUnavailable).toBe(true); expect(lobby.evidenceStorage).toBe('degraded');
+    });
+
+    it('refuses a known-empty initialization while an admission is pending', async () => {
+        const h = await harness({ initialize: false }), lobby = h.lobby(); await lobby.ready;
+        // An explicit controlled outstanding adapter input; it does not mint
+        // a session, grant consent, or synthesize a successful engine action.
+        lobby.pendingAdmission.set('synthetic_pending_admission', []);
+        try {
+            expect((await h.bound('initialize')).status).toBe(503); expect(h.driver.rows().size).toBe(0);
+            expect(lobby.engine).toBeUndefined(); expect(lobby.authorityUnavailable).toBe(true); expect(lobby.evidenceStorage).toBe('degraded');
+        } finally { lobby.pendingAdmission.delete('synthetic_pending_admission'); }
+    });
+
+    it('contains a synchronous socket-enumeration failure before initialization can write', async () => {
+        const h = await harness({ initialize: false }), lobby = h.lobby(); await lobby.ready;
+        const originalSockets = h.state.getWebSockets, before = [...h.driver.rows()]; let calls = 0;
+        h.state.getWebSockets = () => { calls++; throw Error('Synthetic socket enumeration unavailable'); };
+        try {
+            await expect(h.bound('initialize')).resolves.toMatchObject({ status: 503 }); expect(calls).toBeGreaterThan(0);
+            expect([...h.driver.rows()]).toEqual(before); expect(lobby.engine).toBeUndefined();
+            expect(lobby.authorityUnavailable).toBe(true); expect(lobby.evidenceStorage).toBe('degraded');
+        } finally { h.state.getWebSockets = originalSockets; }
+    });
+
+    it('observes a later real write failure after a valid promotion and never clears it through another initialization', async () => {
+        const h = await harness({ initialize: false }), lobby = h.lobby(); await lobby.ready;
+        expect((await h.bound('initialize')).status).toBe(200); expect(lobby.evidenceStorage).toBe('ready');
+        await rejectRequiredSessionWrite(h); expect(lobby.evidenceStorage).toBe('degraded');
+        const before = [...h.driver.rows()]; expect((await h.bound('initialize')).status).toBe(503);
+        expect([...h.driver.rows()]).toEqual(before); expect(lobby.evidenceStorage).toBe('degraded');
     });
 });

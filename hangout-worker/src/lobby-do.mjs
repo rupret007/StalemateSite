@@ -244,13 +244,14 @@ export class HangoutLobby {
             }
         });
         this.evidenceStorage = 'ready';
+        this.storageFailureToken = {}; // Opaque identity; never wraps or enters durable state.
         this.privateReportState = { storage: 'disabled', reports: [] };
         this.privateAdminDispatch = new WeakMap();
         this.authorityMode = lobbyAuthorityMode(env);
         this.liveBindings = new Map();
         this.ready = state.blockConcurrencyWhile(async () => {
             try { await this.start(); }
-            catch (error) { if (!this.authorityMode) throw error; this.authorityUnavailable = true; this.evidenceStorage = 'degraded'; }
+            catch (error) { if (!this.authorityMode) throw error; this.storageFailureToken = {}; this.authorityUnavailable = true; this.evidenceStorage = 'degraded'; }
         });
     }
     async start() {
@@ -485,8 +486,14 @@ export class HangoutLobby {
                 // Export happens outside this gate. Preserve the health at gate
                 // entry, including any newer quarantine while export waited.
                 const healthyBefore = !this.authorityUnavailable && !!this.engine;
-                let restoring = false;
+                const previousEngine = this.engine, failureToken = this.storageFailureToken;
+                const quiescent = () => this.state.getWebSockets().length === 0 && this.liveBindings.size === 0
+                    && this.pendingAdmission.size === 0 && this.pendingClosed.size === 0 && !this.retirementRetryScheduled;
+                const initializingQuarantine = operation === 'initialize' && !previousEngine && this.authorityUnavailable === true;
+                let restoring = false, knownNew = false;
                 try {
+                    knownNew = initializingQuarantine && quiescent();
+                    if (initializingQuarantine && !knownNew) return reply(503, 'authority initialize unavailable');
                     if (this.state.getWebSockets().some(ws => ws.readyState === undefined || ws.readyState === 1)) return reply(409, 'live Lobby sockets require drain');
                     if (operation === 'rotate') {
                         this.authority ||= createLobbySessionAuthority({ storage: this.state.storage, env: this.env });
@@ -500,6 +507,19 @@ export class HangoutLobby {
                     } else await migrateLobbySessionAuthority({ storage: this.state.storage, env: this.env, registrySnapshot });
                     restoring = true; await this.start();
                     if (this.authorityUnavailable || !this.engine) return reply(503, 'authority restore unavailable');
+                    if (knownNew) {
+                        // Only this successful empty-domain transaction can
+                        // retire the known-empty constructor quarantine. No
+                        // prior engine means no detached engine/provider work.
+                        // Queue failures may be encoded rather than thrown.
+                        if (this.engine === previousEngine || this.storageFailureToken !== failureToken
+                            || this.privateQueueActor !== null || this.privateReportQueue?.status().storage !== 'ready'
+                            || this.privateReportState.storage !== 'ready' || !quiescent()) {
+                            this.authorityUnavailable = true;
+                            return reply(503, 'authority restore unavailable');
+                        }
+                        this.evidenceStorage = 'ready';
+                    }
                     return reply(200, operation + ' complete');
                 } catch {
                     // A duplicate/refused owner control is not evidence that
@@ -634,6 +654,7 @@ export class HangoutLobby {
         finally { this.privateQueueActor = null; }
     }
     storageFailed() {
+        this.storageFailureToken = {};
         this.evidenceStorage = 'degraded';
         this.engine?.notifyAiStatus();
     }
