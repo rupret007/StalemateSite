@@ -72,6 +72,19 @@ transaction. A large simultaneous set of true withdrawals or peer-dependent
 checks can remain expensive; no universal 150-person/all-actions or 200-person
 capacity claim follows from this admission case.
 
+A later combined-source full run at `5bb8b455f525` timed out in a setup hook
+that grouped five admissions under the unchanged 10,000 ms hook deadline. The
+reported fixture duration was 116.074 seconds and its final 150-guest assertion
+was skipped; no specific guest refusal or final capacity metric payload was established.
+That result remains a failed setup qualification, not a demonstrated product
+refusal or a transferred pass from an earlier source revision.
+
+Setup now gives each genuine admission its own existing hook deadline, retaining
+all 150 guests in order, the same ACK flow, assertions, caps and real clocks.
+This removes the arbitrary five-admission runner boundary without changing the
+application's separate 50 ms rollback-checkpoint guard. A new clean combined
+full run is required; no standalone unchanged retry qualifies this correction.
+
 The earlier default-relay 50/150 measurements, current C3 admission proof,
 physical slow-reader/reconnect behavior, native media and hosted staging are
 separate qualifications. See [the scale plan](HANGOUT_SCALE_QUALIFICATION.md)

@@ -182,10 +182,12 @@ beforeAll(async () => {
     };
 });
 
-// Bounded setup phases retain the existing hook deadline. Each person uses
-// real admission once; later phases stop after the first actual refusal.
-for (let start = 0; start < LOBBY_LIMITS.lobbyMax; start += 5) beforeAll(async () => {
-    for (let n = start; n < Math.min(start + 5, LOBBY_LIMITS.lobbyMax) && !f.firstFailure; n++) await f.admit(n);
+// One genuine admission per unchanged hook deadline, in the same order. A
+// five-person batch could exhaust a test-runner hook without any single
+// application action failing. Never retry a refused admission or extend its
+// deadline; later hooks stop after the first actual refusal.
+for (let index = 0; index < LOBBY_LIMITS.lobbyMax; index++) beforeAll(async () => {
+    if (!f.firstFailure) await f.admit(index);
 });
 afterAll(async () => {
     if (f) { f.lobby?.presence.dispose(); await Promise.allSettled(f.background.splice(0)); await f.driver.close(); await rm(f.directory, { recursive: true, force: true }); }
