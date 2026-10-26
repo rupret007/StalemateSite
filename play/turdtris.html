@@ -17,7 +17,7 @@
 <link rel="stylesheet" href="assets/arcade.css">
 <link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
 <script src="games/table-continue-core.js?v=30dfab772a1ae911"></script>
-<script src="assets/turdsuite.js"></script>
+<script src="assets/turdsuite.js?v=774bbd998fa5fa55"></script>
 <title>Turdtris</title>
 <style>
 :root {
@@ -1697,6 +1697,11 @@ let hypeText = '';
 let hypeTimer = 0;
 const SOUND_STORAGE_KEY = 'turdtrisSoundOn_v1';
 let soundEnabled = true;
+window.Suite?.setSoundLocalEnabled?.(() => soundEnabled);
+window.Suite?.setSoundSettingsPause?.(() => {
+  if (!paused && !gameOver && hasStartedRun && !onboardingOpen) togglePause();
+  return paused ? document.querySelector('#pauseOverlay button') : null;
+});
 let audioCtx = null;
 let audioArmed = false;
 const MUSIC_STORAGE_KEY = 'turdtrisMusic_v1';
@@ -2009,6 +2014,7 @@ function startAttractMode() {
 }
 
 function handleWindowBlur() {
+  window.Suite?.setSoundPaused?.(true);
   syncChallengeClock();
   clearHeldInput();
   stopLoop();
@@ -2055,6 +2061,7 @@ function ensureAudio() {
 }
 
 function unlockAudio() {
+  if (window.Suite?.isStudioAudio?.()) return;
   if (!audioArmed || !soundEnabled || suiteMuted()) return;
   const ctx = ensureAudio();
   if (!ctx) return;
@@ -2064,6 +2071,9 @@ function unlockAudio() {
 }
 
 function suiteMuted() {
+  try {
+    if (window.Suite && typeof window.Suite.isMuted === 'function') return !!window.Suite.isMuted();
+  } catch (err) {}
   try {
     const stored = localStorage.getItem('turdsuite_muted');
     if (stored !== null) return stored === '1';
@@ -2077,6 +2087,7 @@ function suiteMuted() {
 
 function playSfx(type, opts) {
   if (!audioArmed || !soundEnabled || suiteMuted()) return;
+  if (window.Suite?.isStudioAudio?.()) return Suite.playSound('tris.' + type, opts || {});
   unlockAudio();
   if (window.__turdtrisAudio) {
     window.__turdtrisAudio.play(type, opts || {});
@@ -2204,6 +2215,7 @@ function toggleGestures() {
 
 function toggleSound() {
   soundEnabled = !soundEnabled;
+  window.Suite?.syncSoundState?.();
   saveSoundPref();
   updateSoundButtons();
   updateMusic();
@@ -3438,6 +3450,7 @@ function togglePause() {
   if (gameOver) return;
   if (syncChallengeClock()) return;
   paused = !paused;
+  window.Suite?.setSoundPaused?.(paused);
   if (!paused) {
     const menu = document.querySelector('.mobile-menu details');
     if (menu) menu.open = false;
@@ -3455,6 +3468,8 @@ function togglePause() {
 }
 
 function restartGame() {
+  window.Suite?.stopSounds?.();
+  window.Suite?.setSoundPaused?.(false);
   resultShare?.setResult(null);
   progressRunId = window.SuiteProgress?.newRunId('turdtris') || null;
   progressRunResult = null;
@@ -4059,7 +4074,7 @@ import * as TurdtrisFx from './games/turdtris-fx.js';
 import * as TurdtrisPresentation from './games/turdtris-presentation.js';
 import * as TurdtrisModes from './games/turdtris-modes.js';
 import { createTurdtrisArt, themeForLevel } from './games/turdtris-art.js';
-import { createTurdtrisAudioPlayer, playTurdtrisSfx } from './games/turdtris-audio.js';
+import { createTurdtrisAudioPlayer, playTurdtrisSfx } from './games/turdtris-audio.js?v=48556fe58f015741';
 import { shouldUseBoardFocusLayout, boardCanvasCssWidth } from './games/turdtris-layout.js';
 import * as TurdtrisQueue from './games/turdtris-queue.js';
 import { createAttractField } from './games/turdtris-attract.js';

@@ -7,6 +7,8 @@
  *   audio.masterVolume — 0..1
  */
 
+import { createStudioAudio } from './suite-sound.js?v=cf7cbe844bb48795';
+
 export const MUTE_STORAGE_KEY = 'turdsuite_muted';
 
 export const AUDIO_PRESETS = {
@@ -28,6 +30,7 @@ export const PRESET_ALIASES = { fanfare: 'win', wah: 'lose' };
  * @param {{ isMuted: () => boolean, getContext: () => AudioContext | null, masterVolume?: number }} deps
  */
 export function createSuiteAudio(deps) {
+  if (deps.profile === 'studio') return createStudioAudio(deps);
   const master = Math.max(0, Math.min(1, deps.masterVolume ?? 1));
 
   function playTone(freq, dur, type, vol, slide) {

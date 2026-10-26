@@ -79,6 +79,7 @@ function syncMute() {
   $('mute').setAttribute('aria-pressed', String(muted));
   $('mute').setAttribute('aria-label', muted ? 'Sound off. Unmute game sounds' : 'Sound on. Mute game sounds');
 }
+globalThis.addEventListener('suite:audiochange', syncMute);
 function musicBlocked() { return !opened || !!game?.result || suspended || !!document.querySelector('dialog[open]'); }
 function syncMusicGate() { suite?.setMusicGameBlocked?.(musicBlocked); }
 function humanTurn() { return game && (game.mode === 'local' || game.chess.turn() === game.side); }
@@ -235,7 +236,12 @@ function afterMove(move) {
   focused = move.to;
   persist();
   if (game.result) { engine.cancel(); }
-  if (game.result?.winner) {
+  if (suite?.isStudioAudio?.()) {
+    const cue = game.result ? !game.result.winner ? 'draw'
+      : game.mode === 'local' || game.result.winner === game.side ? 'win' : 'lose'
+      : move.captured ? 'capture' : 'move';
+    suite.playSound('chess.' + cue);
+  } else if (game.result?.winner) {
     if (game.mode === 'local' || game.result.winner === game.side) { suite?.win?.(); } else { suite?.buzz?.(); }
   } else if (game.result) { suite?.ding?.(); }
   else { suite?.beep?.(move.captured ? 330 : 520, 0.045, 'triangle', 0.035); }
@@ -267,6 +273,7 @@ async function queueComputer(hint = false) {
   }
 }
 function enterGame() {
+  suite?.stopSounds?.(); suite?.setSoundPaused?.(false);
   opened = true; suspended = false; failure = false; selected = null; hintMove = null; reviewing = null; feedback = '';
   $('setup').hidden = true; $('game').hidden = false;
   focused = game.flipped ? 'e7' : 'e2';
@@ -274,6 +281,7 @@ function enterGame() {
   void queueComputer();
 }
 function openSetup() {
+  suite?.stopSounds?.(); suite?.setSoundPaused?.(true);
   cancelSearch(); opened = false;
   syncMusicGate();
   $('setup').hidden = false; $('game').hidden = true;
@@ -310,6 +318,7 @@ function activate(square) {
   render();
 }
 function review(ply) {
+  suite?.stopSounds?.();
   cancelSearch(); selected = null; hintMove = null;
   reviewing = ply >= game.chess.history().length ? null : Math.max(0, ply);
   render();
@@ -431,13 +440,18 @@ $('export').addEventListener('click', () => {
 });
 const resume = document.createElement('button'); resume.id = 'resume-playing'; resume.type = 'button'; resume.textContent = 'Continue playing'; resume.hidden = true;
 $('status').after(resume);
-resume.addEventListener('click', () => { suspended = false; feedback = ''; render(); void queueComputer(); });
+resume.addEventListener('click', () => { suspended = false; suite?.setSoundPaused?.(false); feedback = ''; render(); void queueComputer(); });
 function suspendGame() {
+  suite?.stopSounds?.(); suite?.setSoundPaused?.(true);
   cancelSearch(); suspended = true; selected = null; hintMove = null; promotionMove = null; confirmAction = null;
   for (const dialog of document.querySelectorAll('dialog[open]')) { dialog.close(); }
   persist();
   syncMusicGate();
 }
+suite?.setSoundSettingsPause?.(() => {
+  if (opened && game && !game.result) { suspendGame(); render(); return resume; }
+  return null;
+});
 document.addEventListener('visibilitychange', () => {
   if (!opened) { return; }
   if (document.hidden) { suspendGame(); }

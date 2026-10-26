@@ -1,6 +1,6 @@
 /* global CustomEvent */
 
-import { createTurdspadesAudio } from './turdspades-audio.js';
+import { createTurdspadesAudio } from './turdspades-audio.js?v=2f2769ce478a9faa';
 import {
   prefersReducedMotion,
   pulseSpadesBroken,
