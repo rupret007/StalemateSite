@@ -1260,15 +1260,19 @@ import { createEntrySharing } from './entry-sharing.mjs';
         sheet.showModal();
     }
     $('[data-sheet-close]').addEventListener('click', () => $('[data-sheet]').close());
-    $('[data-sheet]').addEventListener('close', () => {
+    $('[data-sheet]').addEventListener('close', event => {
         // A queued close event must not consume a newer open sheet's return.
-        if ($('[data-sheet]').open) return;
+        const sheet = event.currentTarget;
+        if (sheet.open) return;
         const destination = personSheetReturn;
         personSheetReturn = null;
+        // Recover only body focus or a control in this now-closed sheet.
+        // An intentionally focused control elsewhere keeps its focus.
+        const focused = document.activeElement;
         if (!destination || destination.opener.isConnected || app.active !== destination.channel
-            || document.activeElement !== document.body || $('dialog[open]')) return;
+            || focused !== document.body && !sheet.contains(focused) || $('dialog[open]')) return;
         const heading = $('[data-people-title]');
-        if (heading.getClientRects().length) heading.focus();
+        if (heading?.isConnected && heading.getClientRects().length) heading.focus();
     });
 
     // Command palette: every slash command as a button.
