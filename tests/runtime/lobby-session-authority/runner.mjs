@@ -246,6 +246,7 @@ async function runtime(phase, state, nonce) {
             for (const visitor of visitors) if (!visitor.closed) visitor.socket.close(1000, 'owned proof complete');
             await mf.dispose();
             assert.deepEqual(sources(), before); assert.equal(hash(workerd.default), binarySha256);
+            assert.equal(hash(binding), rolldownBindingSha256);
             await ipc({ type: 'result', phase, nonce, proof, miniflareDisposed: true });
         }
     } catch (error) {
@@ -297,6 +298,8 @@ async function parent() {
         first = await run('visitors'); assert.deepEqual(sources(), before);
         recovered = await run('recover', first); assert.deepEqual(sources(), before);
         assert.equal(recovered.proof.binarySha256, first.proof.binarySha256); assert.equal(recovered.proof.bundleSha256, first.proof.bundleSha256);
+        assert.equal(recovered.proof.rolldownVersion, first.proof.rolldownVersion);
+        assert.equal(recovered.proof.rolldownBindingSha256, first.proof.rolldownBindingSha256);
         assert.deepEqual(recovered.proof.bundleInputs, first.proof.bundleInputs); assert.deepEqual(recovered.proof.versions, first.proof.versions);
         assert.ok(recovered.proof.workerdPids.every(pid => !first.proof.workerdPids.includes(pid)), 'workerd process was reused');
     } finally {
