@@ -608,8 +608,27 @@
             const channel = state.ch, generation = roomGeneration;
             const pc = new RTCPeerConnection({ iceServers: state.ice || STUN });
             const polite = (state.myId || '') > id;
-            const entry = { pc, polite, makingOffer: false, offerNeeded: false, remoteOfferJobs: 0, settingRemoteAnswer: false, ignoreOffer: false, descriptionEpoch: 0, pendingIce: [], stream: new MediaStream() };
+            const entry = { pc, polite, makingOffer: false, offerNeeded: false, remoteOfferJobs: 0, localOperation: null, settingRemoteAnswer: false, ignoreOffer: false, descriptionEpoch: 0, pendingIce: [], stream: new MediaStream() };
             entry.current = () => generation === roomGeneration && state.ch === channel && app.active === channel && state.pcs.get(id) === entry && mediaPeerAllowed(id);
+            entry.writeLocalDescription = async description => {
+                // Publish ownership before native invocation: native wrappers can
+                // synchronously deliver a peer offer before returning a promise.
+                while (entry.localOperation) {
+                    await entry.localOperation.done;
+                    if (!entry.current()) return;
+                }
+                if (!entry.current()) return;
+                if (description?.type === 'rollback' && (pc.signalingState !== 'have-local-offer' || entry.settingRemoteAnswer)) return;
+                let finish;
+                const operation = { done: new Promise(resolve => { finish = resolve; }), finish: () => finish() };
+                entry.localOperation = operation;
+                try {
+                    await (description === undefined ? pc.setLocalDescription() : pc.setLocalDescription(description));
+                } finally {
+                    if (entry.localOperation === operation) entry.localOperation = null;
+                    operation.finish();
+                }
+            };
             entry.signal = message => {
                 if (entry.current()) send({ t: 'act', ch: channel, kind: 'rtc', to: id, ...message }, entry,
                     message.sdp?.type === 'answer' ? () => entry.pumpOffer() : null);
@@ -630,7 +649,7 @@
                     const epoch = ++entry.descriptionEpoch;
                     // Let the native operation choose its current offer/answer
                     // atomically; a separately awaited offer can already be stale.
-                    await pc.setLocalDescription();
+                    await entry.writeLocalDescription();
                     if (entry.current() && entry.descriptionEpoch === epoch) entry.signal({ sdp: pc.localDescription.toJSON() });
                 } catch (e) { failed = true; entry.offerNeeded = entry.current(); }
                 finally {
@@ -668,6 +687,15 @@
                     const answer = msg.sdp.type === 'answer';
                     let completed = false;
                     try {
+                        if (offer) {
+                            const localOperation = entry.localOperation;
+                            if (localOperation) await localOperation.done;
+                            if (!entry.current()) return;
+                            if (pc.signalingState === 'have-local-offer' && !entry.settingRemoteAnswer) {
+                                await entry.writeLocalDescription({ type: 'rollback' });
+                                if (!entry.current()) return;
+                            }
+                        }
                         if (answer) entry.settingRemoteAnswer = true;
                         try { await pc.setRemoteDescription(msg.sdp); }
                         finally { if (answer) entry.settingRemoteAnswer = false; }
@@ -681,7 +709,7 @@
                             // native answer. Later events retain separate debt.
                             entry.offerNeeded = false;
                             const epoch = ++entry.descriptionEpoch;
-                            await pc.setLocalDescription();
+                            await entry.writeLocalDescription();
                             if (entry.current() && entry.descriptionEpoch === epoch) entry.signal({ sdp: pc.localDescription.toJSON() });
                         }
                         completed = true;
@@ -701,6 +729,8 @@
             state.pcs.delete(id);
             if (e) {
                 e.offerNeeded = false;
+                const localOperation = e.localOperation; e.localOperation = null;
+                localOperation?.finish();
                 purgeActivity(e);
                 e.pc.onicecandidate = null; e.pc.ontrack = null; e.pc.onnegotiationneeded = null;
                 e.pendingIce.length = 0;

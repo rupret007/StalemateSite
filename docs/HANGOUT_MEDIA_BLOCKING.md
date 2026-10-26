@@ -49,6 +49,12 @@ answer creation. Later negotiation work is retained and starts when that fence
 clears and the answer has received its raw send attempt. This is not a server
 acknowledgement. Block, room exit and transport failure prevent stale work from
 resuming; a native failure does not start a retry loop.
+If a polite peer accepts an offer after its own native local-description call
+has begun, it waits for that owned operation and explicitly rolls back a pending
+local offer before applying the remote offer. Ownership is recorded before the
+native call; close releases waiting work, and each later phase checks that the
+peer is still current. Rollback remains native-only, never a new wire message.
+An already-pending remote answer keeps its existing native answer-then-offer order.
 
 Policy outputs use the existing effect-commit boundary. A failed commit must
 not publish a successful Block, PM closure or changed media policy. Duplicate

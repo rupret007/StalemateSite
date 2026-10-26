@@ -41,6 +41,7 @@ async function fixture({ inboundBeforeCapture = false, receiveOnly = false, cloc
         createOffer = vi.fn(async () => ({ type: 'offer', sdp: 'synthetic-offer' }));
         createAnswer = vi.fn(async () => ({ type: 'answer', sdp: 'synthetic-answer' }));
         setLocalDescription = vi.fn(async value => {
+            if (value?.type === 'rollback') { this.localDescription = null; this.signalingState = 'stable'; return; }
             const chosen = value || { type: this.signalingState === 'have-remote-offer' ? 'answer' : 'offer', sdp: 'native-current-description' };
             this.localDescription = { ...chosen, toJSON: () => chosen }; this.signalingState = chosen.type === 'answer' ? 'stable' : 'have-local-offer';
         });
@@ -422,15 +423,20 @@ describe('public-room Block retires only the affected pair', () => {
     it('accepts a newer offer queued behind an incoming answer instead of treating it as an impolite collision', async () => {
         const f = await fixture(), entry = f.state.pcs.get('third'), held = deferred(), pc = entry.pc;
         expect(entry.polite).toBe(false); pc.signalingState = 'have-local-offer';
+        const nativeLocal = pc.setLocalDescription.getMockImplementation();
+        pc.setLocalDescription.mockImplementation(async value => {
+            if (value?.type === 'rollback' && entry.settingRemoteAnswer) throw new Error('synthetic rollback queued behind the pending successful answer');
+            return nativeLocal(value);
+        });
         pc.setRemoteDescription.mockImplementation(async description => {
-            if (description.type === 'answer') await held.promise;
+            if (description.type === 'answer' || entry.settingRemoteAnswer) await held.promise;
             pc.remoteDescription = description; pc.signalingState = description.type === 'offer' ? 'have-remote-offer' : 'stable';
         });
         f.room.onAct({ ch: f.channel.name, kind: 'rtc', from: 'third', sdp: { type: 'answer', sdp: 'prior-offer-answer' } });
         f.room.onAct({ ch: f.channel.name, kind: 'rtc', from: 'third', sdp: { type: 'offer', sdp: 'next-peer-offer' } });
-        const accepted = pc.setRemoteDescription.mock.calls.map(([description]) => description.type);
         held.resolve(); await new Promise(done => setTimeout(done, 0));
-        expect(accepted).toEqual(['answer', 'offer']);
+        await vi.waitFor(() => expect(pc.setRemoteDescription.mock.calls.map(([description]) => description.type)).toEqual(['answer', 'offer']));
+        expect(pc.setLocalDescription.mock.calls.some(([description]) => description?.type === 'rollback')).toBe(false);
     });
 
     it.each(['remote description', 'local answer'])('does not create a local offer while an incoming %s is pending', async phase => {
@@ -543,7 +549,102 @@ describe('public-room Block retires only the affected pair', () => {
         expect(f.capture).toHaveBeenCalledOnce(); expect(f.localTrack.stop).not.toHaveBeenCalled();
     });
 
-    it('does not publish an obsolete generated offer after a newer remote offer has been answered', async () => {
+    it('waits for reentrant local completion and explicit rollback before applying the accepted peer offer', async () => {
+        const f = await fixture(), pc = f.state.pcs.get('peer').pc, heldLocal = deferred(), heldRollback = deferred(), order = [];
+        const nativeLocal = pc.setLocalDescription.getMockImplementation(), nativeRemote = pc.setRemoteDescription.getMockImplementation();
+        pc.setRemoteDescription.mockImplementation(async value => { order.push('remote'); return nativeRemote(value); });
+        pc.setLocalDescription.mockImplementation(async value => {
+            if (value?.type === 'rollback') { order.push('rollback-start'); await heldRollback.promise; order.push('rollback-end'); }
+            return nativeLocal(value);
+        });
+        pc.setLocalDescription.mockImplementationOnce(value => {
+            const effect = nativeLocal(value); // Native offer effect precedes its completion.
+            f.incoming({ sdp: { type: 'offer', sdp: 'genuine-reentrant-offer' } }); // BEFORE this call returns a promise.
+            return (async () => { await effect; await heldLocal.promise; order.push('local-end'); })();
+        });
+        const work = pc.onnegotiationneeded();
+        try {
+            expect(pc.setLocalDescription).toHaveBeenCalledOnce(); expect(pc.setRemoteDescription).not.toHaveBeenCalled();
+            expect(f.sent.filter(frame => frame.sdp)).toEqual([]);
+            heldLocal.resolve(); await work;
+            await vi.waitFor(() => expect(pc.setLocalDescription.mock.calls[1]).toEqual([{ type: 'rollback' }]));
+            expect(pc.setRemoteDescription).not.toHaveBeenCalled(); expect(order).toEqual(['local-end', 'rollback-start']);
+            heldRollback.resolve();
+            await vi.waitFor(() => expect(f.sent.filter(frame => frame.sdp).map(frame => frame.sdp.type)).toEqual(['answer']));
+            expect(order).toEqual(['local-end', 'rollback-start', 'rollback-end', 'remote']);
+            expect(pc.signalingState).toBe('stable'); expect(pc.setLocalDescription).toHaveBeenCalledTimes(3);
+        } finally { heldLocal.resolve(); heldRollback.resolve(); await work; await new Promise(resolve => setTimeout(resolve, 0)); }
+    });
+
+    it('rechecks queued rollback eligibility and keeps overlapping accepted offers fenced', async () => {
+        const f = await fixture(), entry = f.state.pcs.get('peer'), pc = entry.pc;
+        const heldLocal = deferred(), heldRollback = deferred(), heldRemote = deferred(), rollbackStates = [];
+        const nativeLocal = pc.setLocalDescription.getMockImplementation(), nativeRemote = pc.setRemoteDescription.getMockImplementation();
+        pc.setLocalDescription.mockImplementation(async value => {
+            if (value?.type === 'rollback') {
+                rollbackStates.push(pc.signalingState);
+                if (rollbackStates.length === 1) await heldRollback.promise;
+                if (pc.signalingState !== 'have-local-offer') throw new Error('synthetic invalid second rollback');
+            }
+            return nativeLocal(value);
+        });
+        pc.setLocalDescription.mockImplementationOnce(value => { const effect = nativeLocal(value); return (async () => { await effect; await heldLocal.promise; })(); });
+        pc.setRemoteDescription.mockImplementation(async value => {
+            if (value.sdp === 'overlap-first') await heldRemote.promise;
+            return nativeRemote(value);
+        });
+        const work = pc.onnegotiationneeded();
+        f.incoming({ sdp: { type: 'offer', sdp: 'overlap-first' } });
+        f.incoming({ sdp: { type: 'offer', sdp: 'overlap-second' } });
+        try {
+            expect(entry.remoteOfferJobs).toBe(2); expect(pc.setRemoteDescription).not.toHaveBeenCalled();
+            heldLocal.resolve(); await work;
+            await vi.waitFor(() => expect(rollbackStates).toEqual(['have-local-offer']));
+            heldRollback.resolve(); await new Promise(resolve => setTimeout(resolve, 0));
+            expect(rollbackStates).toEqual(['have-local-offer']);
+            await vi.waitFor(() => expect(entry.remoteOfferJobs).toBe(1));
+            const localCalls = pc.setLocalDescription.mock.calls.length;
+            await pc.onnegotiationneeded(); expect(pc.setLocalDescription).toHaveBeenCalledTimes(localCalls);
+            heldRemote.resolve(); await vi.waitFor(() => expect(entry.remoteOfferJobs).toBe(0));
+            expect(rollbackStates).toEqual(['have-local-offer']);
+        } finally { heldLocal.resolve(); heldRollback.resolve(); heldRemote.resolve(); await work; await new Promise(resolve => setTimeout(resolve, 0)); }
+    });
+
+    it.each(['local completion', 'explicit rollback'])('does not resume retired incoming signaling after Block during %s', async phase => {
+        const f = await fixture(), entry = f.state.pcs.get('peer'), third = f.state.pcs.get('third'), pc = entry.pc;
+        const heldLocal = deferred(), heldRollback = deferred(), nativeLocal = pc.setLocalDescription.getMockImplementation();
+        let localCompleted = false;
+        pc.setLocalDescription.mockImplementation(async value => {
+            if (value?.type === 'rollback') await heldRollback.promise;
+            return nativeLocal(value);
+        });
+        pc.setLocalDescription.mockImplementationOnce(value => {
+            const effect = nativeLocal(value);
+            f.incoming({ sdp: { type: 'offer', sdp: 'genuine-offer-before-retirement' } });
+            return (async () => { await effect; await heldLocal.promise; localCompleted = true; })();
+        });
+        const work = pc.onnegotiationneeded();
+        try {
+            expect(pc.setRemoteDescription).not.toHaveBeenCalled();
+            if (phase === 'explicit rollback') {
+                heldLocal.resolve(); await work;
+                await vi.waitFor(() => expect(pc.setLocalDescription.mock.calls[1]).toEqual([{ type: 'rollback' }]));
+            }
+            f.policy(['peer']); f.policy([]);
+            const replacement = f.state.pcs.get('peer'); expect(replacement).not.toBe(entry);
+            if (phase === 'local completion') {
+                await vi.waitFor(() => expect(entry.remoteOfferJobs).toBe(0)); // Close releases the waiter while native completion stays held.
+                expect(localCompleted).toBe(false);
+            }
+            expect(pc.setRemoteDescription).not.toHaveBeenCalled(); expect(pc.close).toHaveBeenCalledOnce();
+            expect(f.state.pcs.get('third')).toBe(third); expect(third.pc.close).not.toHaveBeenCalled();
+        } finally { heldLocal.resolve(); heldRollback.resolve(); await work; await new Promise(resolve => setTimeout(resolve, 0)); }
+        expect(pc.setRemoteDescription).not.toHaveBeenCalled(); expect(entry.remoteOfferJobs).toBe(0);
+        expect(f.sent.filter(frame => frame.sdp)).toEqual([]);
+        expect(f.capture).toHaveBeenCalledOnce(); expect(f.localTrack.stop).not.toHaveBeenCalled();
+    });
+
+    it('does not publish an obsolete generated offer while a newer peer offer waits for its local completion', async () => {
         const f = await fixture(), entry = f.state.pcs.get('peer'), pc = entry.pc, held = deferred();
         const nativeLocalEffect = pc.setLocalDescription.getMockImplementation();
         let firstCompleted = false;
@@ -557,9 +658,12 @@ describe('public-room Block retires only the affected pair', () => {
             expect(entry.polite).toBe(true); expect(firstCompleted).toBe(false);
             expect(f.sent.filter(frame => frame.sdp)).toEqual([]);
             f.incoming({ sdp: { type: 'offer', sdp: 'newer-peer-offer' } });
+            expect(pc.setRemoteDescription).not.toHaveBeenCalled(); expect(pc.setLocalDescription).toHaveBeenCalledOnce();
+            expect(firstCompleted).toBe(false);
+            held.resolve(); await work;
             await vi.waitFor(() => expect(f.sent.filter(frame => frame.sdp).map(frame => frame.sdp.type)).toEqual(['answer']));
-            expect(pc.signalingState).toBe('stable'); expect(firstCompleted).toBe(false);
-            expect(pc.setLocalDescription).toHaveBeenCalledTimes(2);
+            expect(pc.signalingState).toBe('stable'); expect(firstCompleted).toBe(true);
+            expect(pc.setLocalDescription.mock.calls.map(([value]) => value?.type || 'auto')).toEqual(['auto', 'rollback', 'auto']);
         } finally { held.resolve(); await work; }
         // A stale completion must not send either the old offer or a duplicate
         // of the now-current answer that replaced it in localDescription.

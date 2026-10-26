@@ -122,7 +122,7 @@ async function scenario(browser, baseURL, width, { heldCaptureFor = null } = {})
                             const native = super.setLocalDescription(description);
                             if (window.__releaseOfferAtLocalStart && !window.__heldOfferReleased) window.__releaseHeldOffer();
                             await native;
-                            this.__localSnapshot = this.localDescription?.toJSON(); record({ pc: this.__probeId, op: 'local', type: this.localDescription?.type, state: this.signalingState });
+                            this.__localSnapshot = this.localDescription?.toJSON(); record({ pc: this.__probeId, op: 'local', argument: description?.type || 'auto', type: this.localDescription?.type, state: this.signalingState });
                         }
                         catch (error) { record({ pc: this.__probeId, op: 'local-error', name: error.name, state: this.signalingState }); throw error; }
                     }
@@ -347,7 +347,15 @@ for (const width of [375, 390]) test(`an already-invoked native offer survives p
         for (const [index, page] of [alpha, bravo].entries()) await expect.poll(async () => {
             const peer = (await peerState(page))[0]; return peer.connected === 'connected' && peer.decoded > before[index][0].decoded;
         }).toBe(true);
-        later = true; expect(app.errors).toEqual([]);
+        later = true;
+        const nativeOrder = await receiver.evaluate(() => window.__mediaDiagnostics.filter(event => event.pc === 1));
+        const ownStart = nativeOrder.findIndex(event => event.op === 'local-start' && event.argument === 'auto');
+        const ownDone = nativeOrder.findIndex(event => event.op === 'local' && event.argument === 'auto' && event.type === 'offer');
+        const rollbackStart = nativeOrder.findIndex(event => event.op === 'local-start' && event.argument === 'rollback');
+        const rollbackDone = nativeOrder.findIndex(event => event.op === 'local' && event.argument === 'rollback');
+        const remoteStart = nativeOrder.findIndex(event => event.op === 'remote-start' && event.type === 'offer');
+        expect(ownStart >= 0 && ownDone > ownStart && rollbackStart > ownDone && rollbackDone > rollbackStart && remoteStart > rollbackDone).toBe(true);
+        expect(app.errors).toEqual([]);
         for (const page of [alpha, bravo]) expect(await page.evaluate(() => window.__captureCalls)).toBe(1);
     } finally {
         if (alpha && bravo) console.log('Already-invoked native glare outcome', JSON.stringify({ width, decoded, laterRenegotiated: later,
