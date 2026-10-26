@@ -15,7 +15,8 @@ const APP = fileURLToPath(new URL('../../../', import.meta.url));
 const TOOLS = fileURLToPath(new URL('../durable-records/', import.meta.url));
 const ORIGIN = 'https://local-fixture.invalid', INVITE = 'owned-fixture-invite-not-a-production-credential-2026', PREVIEW = 'owned-fixture-preview-token-20261025';
 const ENV = ['PATH', 'TMPDIR', 'TEMP', 'TMP', 'SystemRoot', 'SYSTEMROOT', 'WINDIR'];
-const PARTICIPATION = process.argv.includes('--participation');
+const PARTICIPATION = process.argv.includes('--participation'), INCIDENT = process.argv.includes('--incident-sources');
+const MODE = PARTICIPATION ? ['--participation'] : INCIDENT ? ['--incident-sources'] : [];
 const EPHEMERAL_BODY_MARKERS = ['Native Stalemate ephemeral greeting', 'Native Rad Dad ephemeral greeting', 'Native remaining visitor greeting', 'native-media-control-no-body-persistence'].sort();
 function assertNativeRollback(witness, record) {
     assert.deepEqual(Object.keys(witness).sort(), ['record', 'originalSha256', 'stagedSha256', 'restoredSha256', 'nativeWriteCompleted', 'stagedChanged', 'nativeTransactionRejected', 'restoredBeforeEngineRecovery'].sort());
@@ -112,6 +113,7 @@ async function runtime(phase, state, nonce) {
     // Install before the first async import so private parent input cannot be
     // delivered before the recovery listener exists.
     const recoveryMessage = phase === 'recover' ? receive('recovery', nonce) : null;
+    const incidentKeyMessage = INCIDENT && phase === 'visitors' ? receive('incident-key', nonce) : null;
     assert.deepEqual(Object.keys(process.env).filter(name => ![...ENV, ...(process.platform === 'darwin' ? ['__CF_USER_TEXT_ENCODING'] : [])].includes(name)), []);
     const disconnected = () => kill(process.pid); process.on('disconnect', disconnected);
     const require = createRequire(join(TOOLS, 'package.json'));
@@ -140,6 +142,11 @@ async function runtime(phase, state, nonce) {
         assert.ok(Object.keys(bundleInputs).some(path => path.endsWith(suffix)), 'missing actual source ' + suffix);
     if (PARTICIPATION) for (const suffix of ['/lobby-participation.mjs', '/participation-enforcement.mjs', '/participation-partitions.mjs', '/participation-policy.mjs'])
         assert.ok(Object.keys(bundleInputs).some(path => path.endsWith(suffix)), 'missing actual participation source ' + suffix);
+    if (INCIDENT) for (const suffix of ['/lobby-incident-sources.mjs', '/incident-cases.mjs'])
+        assert.ok(Object.keys(bundleInputs).some(path => path.endsWith(suffix)), 'missing actual incident source ' + suffix);
+    const recoveryInput = INCIDENT && phase === 'recover' ? await recoveryMessage : null;
+    const fixtureIncidentKey = INCIDENT ? (phase === 'visitors' ? (await incidentKeyMessage).key : recoveryInput.fixtureIncidentKey) : null;
+    if (INCIDENT) assert.ok(typeof fixtureIncidentKey === 'string' && /^[a-f0-9]{64}$/.test(fixtureIncidentKey), 'private synthetic key input invalid');
     let outboundCalls = 0, runtimeRestarts = 0;
     const options = convertV4MiniflareOptions({
         name: 'webjam-local-session-authority', rootPath: state, modulesRoot: state,
@@ -149,6 +156,7 @@ async function runtime(phase, state, nonce) {
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true } },
         bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected',
             ...(PARTICIPATION ? { HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1' } : {}),
+            ...(INCIDENT ? { HANGOUT_INCIDENT_SOURCE_BRIDGE: 'i3a-v1', FIXTURE_INCIDENT_KEY: fixtureIncidentKey } : {}),
             HANGOUT_HMAC_KEY: 'owned-fixture-hmac-not-a-production-credential-2026', HANGOUT_BETA_INVITE_KEY: INVITE, HANGOUT_PREVIEW_KEY: PREVIEW,
             HANGOUT_BETA_INVITE_VERSION: '1', HANGOUT_OPEN: '1', HANGOUT_AI_ENABLED: '0', HANGOUT_TURN_ENABLED: '0' },
         outboundService: () => { outboundCalls++; return new Response('denied', { status: 503, headers: { 'X-WebJam-Test-Egress': 'denied' } }); },
@@ -194,7 +202,7 @@ async function runtime(phase, state, nonce) {
         const logout = await call('/beta/logout', cookie, {}); assert.equal(logout.status, 200); await logout.body?.cancel();
         assert.equal((await visitor.wait(() => false, 'ungranted session logout', 0, true)).code, 4401);
     };
-    let proof, secrets;
+    let proof, secrets, incidentSource;
     try {
         assert.equal((await mf.ready).hostname, '127.0.0.1');
         if (phase === 'visitors') {
@@ -227,6 +235,15 @@ async function runtime(phase, state, nonce) {
             const selected = await b.wait(f => f.t === 'line' && f.text === 'Native selected report greeting', 'cross-site chat', lineAt); assert.equal(selected.entrySource, 'stalemate');
             b.send({ t: 'report', id: selected.id });
             await b.wait(f => f.t === 'report-status' && f.id === selected.id && f.submitted === true, 'accepted real report', lineAt);
+            if (INCIDENT) {
+                assert.deepEqual(await control('incident-initialize', { cookie: cookieB }), { initializedSyntheticIncidentAuthority: true });
+                incidentSource = await control('incident-preserve', { cookie: cookieB, id: selected.id });
+                assert.equal(incidentSource.digest, createHash('sha256').update(selected.text).digest('hex'));
+                assert.equal(incidentSource.provenance, 'reported-public');
+                for (const field of ['exactSelectedBytes', 'metadataOnlyIndex', 'noCasePlaintext']) assert.equal(incidentSource[field], true);
+                assert.equal(incidentSource.sourceCount, 1); assert.equal(incidentSource.caseCount, 1);
+                assert.equal(incidentSource.sourceRevision, 1); assert.equal(incidentSource.nextGeneration, 1);
+            }
             const bAt = b.frames.length, aAt = a.frames.length;
             b.send({ t: 'say', ch: '#stalemate', text: 'Native Rad Dad ephemeral greeting' });
             assert.equal((await a.wait(f => f.t === 'line' && f.text === 'Native Rad Dad ephemeral greeting', 'Rad Dad badge', aAt)).entrySource, 'rad-dad');
@@ -338,6 +355,7 @@ async function runtime(phase, state, nonce) {
             proof = { admissionDenials, missingMarkerRefused: true, cookiePolicyVerified: true, actualGatewayVisitors: 3,
                 checks: ['actual-beta-unlock-and-WebSocket-admission', 'stalemate-rad-dad-shared-chat-and-canvas', 'direct-newcomer-neutral-without-prejoin-chat', 'actual-report-persisted', 'connected-logout-and-cookie-replay-denied', 'ordinary-chat-excluded-from-durable-records', 'actual-device-block-policy-and-RTC-denial-persisted', 'actual-post-native-session-write-rollback-before-block-success', 'actual-post-native-write-rollback-before-success'],
                 ...(PARTICIPATION ? { participationChecks: ['actual-DO-missing-policy-denies-without-provisioning', 'real-signed-SID-principal-with-explicit-synthetic-C2-grants', 'unfenced-private-room-and-TURN-denied', 'committed-media-reduction-production-alarm-closes-only-affected-visitor'] } : {}),
+                ...(INCIDENT ? { incidentSourceChecks: ['actual-public-report-index-and-I1-copy-share-native-transaction-domain', 'selected-only-encrypted-case-and-metadata-only-index'], incidentSource } : {}),
                 checkpoint: afterFault, sources: before, versions, binarySha256, rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs,
                 outboundCalls, runtimeRestarts, workerdPids: group(process.pid).filter(row => row.command.includes('workerd')).map(row => row.pid) };
             assert.equal(outboundCalls, 1); assert.equal(runtimeRestarts, 0); assert.deepEqual(sources(), before);
@@ -348,7 +366,7 @@ async function runtime(phase, state, nonce) {
             await ipc({ type: 'checkpoint', phase, nonce, proof, secrets });
             await new Promise(() => {});
         } else {
-            const received = await recoveryMessage; secrets = received.secrets;
+            const received = recoveryInput || await recoveryMessage; secrets = received.secrets;
             assert.ok(secrets && typeof secrets.revokedCookie === 'string' && typeof secrets.liveCookie === 'string');
             const revoked = await call('/beta/state', secrets.revokedCookie); assert.equal(revoked.status, 401); await revoked.body?.cancel();
             const active = await call('/beta/state', secrets.liveCookie); assert.equal(active.status, 200); assert.equal((await active.json()).kind, 'guest');
@@ -369,10 +387,16 @@ async function runtime(phase, state, nonce) {
                 const device = returning.frames.find(frame => frame.t === 'device')?.token; assert.equal(typeof device, 'string');
                 await denyUnknown(await unlock('192.0.2.12', { grant: false }), 'NativeBravo', device);
             }
+            if (INCIDENT) {
+                incidentSource = await control('incident-read', { cookie: secrets.liveCookie, caseRef: received.incidentSource.caseRef });
+                for (const field of ['caseRef', 'revision', 'sourceRevision', 'digest', 'provenance', 'exactSelectedBytes', 'metadataOnlyIndex', 'noCasePlaintext', 'nextGeneration', 'sourceCount', 'caseCount'])
+                    assert.equal(incidentSource[field], received.incidentSource[field], 'cold incident source/evidence mismatch: ' + field);
+            }
             const canvas = await joinRoom(returning, '#art-native-canvas'); assert.equal(canvas.ch.count, 1); assert.equal(canvas.act.strokes[0].id, 'native-stroke-1');
             await returning.barrier(); assert.ok(returning.frames.every(frame => frame.t !== 'line'), 'cold newcomer received prior chat');
             proof = { checks: ['cold-process-loss-retires-missing-socket-bindings', 'committed-rooms-canvas-and-report-survive', 'revoked-cookie-stays-denied-active-cookie-reconnects'], recovered,
                 ...(PARTICIPATION ? { participationChecks: ['actual-C3-reloads-partition-grant-after-process-loss', 'new-SID-cannot-inherit-grant-through-same-signed-device-IP-or-old-nickname'] } : {}),
+                ...(INCIDENT ? { incidentSourceChecks: ['actual-current-SID-rebind-and-I1-encrypted-evidence-reload-after-whole-process-loss'], incidentSource } : {}),
                 sources: before, versions, binarySha256, rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs, outboundCalls, runtimeRestarts,
                 workerdPids: group(process.pid).filter(row => row.command.includes('workerd')).map(row => row.pid) };
             assert.equal(outboundCalls, 0); assert.equal(runtimeRestarts, 0); assert.deepEqual(sources(), before);
@@ -390,21 +414,25 @@ async function runtime(phase, state, nonce) {
 }
 
 async function parent() {
-    assert.deepEqual(process.argv.slice(2), PARTICIPATION ? ['--participation'] : []); bindingPackage();
+    assert.ok(!(PARTICIPATION && INCIDENT), 'native modes are separately qualified');
+    assert.deepEqual(process.argv.slice(2), MODE); bindingPackage();
     const before = sources(), state = realpathSync(await mkdtemp(join(tmpdir(), 'webjam-session-native-'))), nonce = randomBytes(16).toString('hex');
+    const fixtureIncidentKey = INCIDENT ? randomBytes(32).toString('hex') : null;
     let current, groupNeedsCleanup = false, interrupted;
     const interrupt = signal => { interrupted ||= Error('interrupted ' + signal); if (groupNeedsCleanup) kill(current?.pid); };
     process.on('SIGINT', interrupt); process.on('SIGTERM', interrupt);
     const run = (phase, recovery) => new Promise((resolve, reject) => {
         let stdout = '', stderr = '', checkpoint, result, preKill, timer, settled = false;
         const fail = error => { if (settled) return; settled = true; clearTimeout(timer); if (groupNeedsCleanup) kill(current?.pid); reject(error); };
-        current = spawn(process.execPath, [FILE, '--isolated', phase, state, nonce, ...(PARTICIPATION ? ['--participation'] : [])], { cwd: HERE,
+        current = spawn(process.execPath, [FILE, '--isolated', phase, state, nonce, ...MODE], { cwd: HERE,
             env: Object.fromEntries(ENV.filter(name => typeof process.env[name] === 'string').map(name => [name, process.env[name]])), detached: true, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] }); groupNeedsCleanup = true;
         const proc = current;
         const append = (value, chunk) => { const next = value + chunk; if (next.length > 262144) { fail(Error('bounded runtime logs exceeded')); return value; } return next; };
         proc.stdout.on('data', chunk => { stdout = append(stdout, chunk.toString()); }); proc.stderr.on('data', chunk => { stderr = append(stderr, chunk.toString()); });
         proc.on('error', fail); timer = setTimeout(() => fail(Error(phase + ': 60s proof timeout; no automatic retry\n' + stderr)), 60000);
-        if (phase === 'recover') proc.send({ type: 'recovery', nonce, checkpoint: recovery.proof.checkpoint, secrets: recovery.secrets }, error => { if (error) fail(error); });
+        if (phase === 'visitors' && INCIDENT) proc.send({ type: 'incident-key', nonce, key: fixtureIncidentKey }, error => { if (error) fail(error); });
+        if (phase === 'recover') proc.send({ type: 'recovery', nonce, checkpoint: recovery.proof.checkpoint, secrets: recovery.secrets,
+            ...(INCIDENT ? { fixtureIncidentKey, incidentSource: recovery.proof.incidentSource } : {}) }, error => { if (error) fail(error); });
         proc.on('message', message => { try {
             assert.equal(message?.nonce, nonce); assert.equal(message.phase, phase); if (message.type === 'failure') throw Error(message.error);
             assert.deepEqual(message.proof?.sources, before);
@@ -445,8 +473,9 @@ async function parent() {
     // Private signed cookies travel only over parent/child IPC; omit them from
     // the receipt and never persist/log the invitation or HMAC values.
     delete first.secrets;
-    console.log(JSON.stringify({ localGatewayWebSocketSessionAuthorityQualified: true, ...(PARTICIPATION ? { productionParticipationCompositionQualified: true, guardianDecisionsQualified: false } : {}), first, recovered, node: process.version, platform: process.platform, architecture: process.arch,
-        temporaryStateRemoved: true, scope: 'Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. ' + (PARTICIPATION ? 'Required production C3 bridge selected; only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. ' : '') + 'No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.' }, null, 2));
+    console.log(JSON.stringify({ localGatewayWebSocketSessionAuthorityQualified: true, ...(PARTICIPATION ? { productionParticipationCompositionQualified: true, guardianDecisionsQualified: false } : {}),
+        ...(INCIDENT ? { productionIncidentSourceCompositionQualified: true, incidentAuthorityAndKeyQualified: false } : {}), first, recovered, node: process.version, platform: process.platform, architecture: process.arch,
+        temporaryStateRemoved: true, scope: 'Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. ' + (PARTICIPATION ? 'Required production C3 bridge selected; only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. ' : '') + (INCIDENT ? 'Required production I3a source bridge and existing I1 over actual records transactions; separate incident appointment/policy and privately retained test key are synthetic only. This does not qualify real incident authority, purpose-key provisioning or key recovery. ' : '') + 'No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.' }, null, 2));
 }
-try { if (process.argv[2] === '--isolated' && process.argv.length === (PARTICIPATION ? 7 : 6)) await runtime(process.argv[3], process.argv[4], process.argv[5]); else await parent(); }
+try { if (process.argv[2] === '--isolated' && process.argv.length === (PARTICIPATION || INCIDENT ? 7 : 6)) await runtime(process.argv[3], process.argv[4], process.argv[5]); else await parent(); }
 catch (error) { console.error(error.stack || error); process.exitCode = 1; }

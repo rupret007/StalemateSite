@@ -71,7 +71,8 @@ jobs:
             hangout-worker/src/lobby-session-authority.mjs hangout-worker/src/beta-entry.mjs hangout-worker/src/index.mjs \
             hangout-worker/src/private-reports.mjs hangout-worker/src/participation-enforcement.mjs hangout-worker/src/lobby-do.mjs \
             hangout-worker/src/lobby-participation.mjs hangout-worker/src/participation-policy.mjs hangout-worker/src/participation-consents.mjs \
-            hangout-worker/src/participation-partitions.mjs docs/HANGOUT_PRODUCTION_PARTICIPATION.md > runtime-proof-artifacts/source-sha256.txt
+            hangout-worker/src/participation-partitions.mjs docs/HANGOUT_PRODUCTION_PARTICIPATION.md \
+            hangout-worker/src/lobby-incident-sources.mjs hangout-worker/src/incident-cases.mjs docs/HANGOUT_INCIDENT_SOURCES.md > runtime-proof-artifacts/source-sha256.txt
 
       - name: Install only the isolated locked runtime tools
         shell: bash
@@ -179,6 +180,18 @@ jobs:
           cat runtime-proof-artifacts/lobby-participation-runtime.stdout.log
           cat runtime-proof-artifacts/lobby-participation-runtime.stderr.log >&2
           printf '%s\n' "$status" > runtime-proof-artifacts/lobby-participation-runtime.exit-code.txt
+          exit "$status"
+
+      - name: Prove public report source composition with synthetic incident authority
+        shell: bash
+        run: |
+          set +e
+          npm run test:lobby-session-runtime -- --incident-sources > runtime-proof-artifacts/lobby-incident-sources-runtime.stdout.log 2> runtime-proof-artifacts/lobby-incident-sources-runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/lobby-incident-sources-runtime.stdout.log
+          cat runtime-proof-artifacts/lobby-incident-sources-runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/lobby-incident-sources-runtime.exit-code.txt
           exit "$status"
 
       - name: Preserve source-bound runtime diagnostics

@@ -14,8 +14,8 @@ import { createTransportControlBudget } from './transport-budget.mjs';
 import { createPresenceProjections } from './presence-projections.mjs';
 import { entrySitesFromConfig } from '../../r/45662413410ed051/entry-sites.mjs';
 import { lobbyAuthorityMode, createLobbySessionAuthority, initializeLobbySessionAuthority, migrateLobbySessionAuthority, LOBBY_AUTHORITY_PATH } from './lobby-session-authority.mjs';
-import { writeLobbyEffects } from './lobby-effect-records.mjs';
 import { createLobbyParticipation, lobbyParticipationMode, participationConfigurationValid } from './lobby-participation.mjs';
+import { lobbyIncidentSourceMode, incidentSourceConfigurationValid } from './lobby-incident-sources.mjs';
 
 const privateReportResponse = (value) => new Response(JSON.stringify(value), {
     status: value.ok ? 200 : Number.isInteger(value.status) ? value.status : 503,
@@ -42,7 +42,7 @@ async function legacyRegistrySnapshot(env) {
 }
 
 export function lobbyConfigured(env = {}) {
-    return !!(participationConfigurationValid(env) && env.LOBBY && env.QUOTA && hmacKeyOk(env.HANGOUT_HMAC_KEY) && typeof env.HANGOUT_PREVIEW_KEY === 'string' && env.HANGOUT_TURNSTILE_SECRET);
+    return !!(participationConfigurationValid(env) && incidentSourceConfigurationValid(env) && env.LOBBY && env.QUOTA && hmacKeyOk(env.HANGOUT_HMAC_KEY) && typeof env.HANGOUT_PREVIEW_KEY === 'string' && env.HANGOUT_TURNSTILE_SECRET);
 }
 
 async function turnstileOk(token, ip, secret, fetchImpl = fetch) {
@@ -184,7 +184,7 @@ export class HangoutLobby {
     }
     async start() {
         const state = this.state, env = this.env;
-        try { this.participationMode = lobbyParticipationMode(env); }
+        try { this.participationMode = lobbyParticipationMode(env); this.incidentSourceMode = lobbyIncidentSourceMode(env); }
         catch { this.authorityUnavailable = true; return; }
         if (env.HANGOUT_SESSION_AUTHORITY && !this.authorityMode) { this.authorityUnavailable = true; return; }
         if (this.authorityMode && env.HANGOUT_BETA_MODE !== 'protected') { this.authorityUnavailable = true; return; }
@@ -224,6 +224,7 @@ export class HangoutLobby {
             onChange: () => this.engine?.notifyAiStatus()
         });
         this.engine = createLobby({
+            incidentSources: !!this.incidentSourceMode,
             ...(this.authorityMode ? { effectCommit: this.authority.effectCommit } : {}),
             ...(this.participationMode ? { participation: createLobbyParticipation({ env, authority: this.authority }) } : {}),
             deferPresence: marker => this.presence.mark(marker),
@@ -373,7 +374,7 @@ export class HangoutLobby {
     }
     async authorityRequest(request, operation) {
         const reply = (status, reason, extra = {}) => Response.json({ reason, ...extra }, { status, headers: { 'Cache-Control': 'no-store' } });
-        if (!participationConfigurationValid(this.env)) return reply(503, 'participation authority unavailable');
+        if (!participationConfigurationValid(this.env) || !incidentSourceConfigurationValid(this.env)) return reply(503, 'application authority unavailable');
         if (!this.authorityMode || this.env.HANGOUT_BETA_MODE !== 'protected') return reply(404, 'not found');
         if (operation === 'health' && request.method === 'GET') {
             if (this.authorityUnavailable) return healthJson({ storage: 'unavailable' }, 503);
@@ -541,7 +542,7 @@ export class HangoutLobby {
     byId(id) { return this.state.getWebSockets(id)[0]; }
     async persistRequired(key, value) {
         try {
-            if (this.authorityMode) return await this.authority.records.transaction(tx => writeLobbyEffects({ tx, effects: [[key, value]] }));
+            if (this.authorityMode) return await this.authority.records.transaction(tx => this.authority.writeParticipationEffects({ tx, effects: [[key, value]] }));
             if (key === 'rooms') {
                 await this.state.storage.transaction(async (txn) => {
                     const old = await txn.get('room-index');

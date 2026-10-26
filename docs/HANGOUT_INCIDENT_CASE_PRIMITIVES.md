@@ -126,8 +126,11 @@ Use a fresh operation for current metadata. An evidence retry reauthorizes and
 checks current retention, even when its original read succeeded. It cannot
 return bytes after their deadline merely because an old receipt exists.
 
-This transaction contract is **not yet provided by the existing report queues**.
-A loader reading a cached engine map or ordinary queue snapshot cannot claim
+The optional [I3a public-report source bridge](HANGOUT_INCIDENT_SOURCES.md) now
+provides this source/version contract in the existing lobby-v1 transaction domain,
+without supplying incident appointments, policy, keys or a production case route.
+Other report queues do not gain that contract. A loader reading a cached engine
+map or ordinary queue snapshot cannot claim
 atomicity with dismissal, purge or expiry. All such updates must participate in
 the same serialized transactional source/revision protocol. A separate source
 service requires a reviewed durable handoff/reservation/acknowledgement design.

@@ -5,10 +5,14 @@ import { LOBBY_AUTHORITY_PATH, LOBBY_AUTHORITY_COMMUNITY } from '../../../hangou
 import { readBeta } from '../../../hangout-worker/src/beta-auth.mjs';
 import { createPartitionedParticipationConsents, PARTICIPATION_POLICY_KEY } from '../../../hangout-worker/src/participation-partitions.mjs';
 import { PARTICIPATION_PURPOSES } from '../../../hangout-worker/src/participation-policy.mjs';
+import { createIncidentCases, createIncidentEvidenceCipher, incidentEvidenceDigest, initialIncidentCaseState } from '../../../hangout-worker/src/incident-cases.mjs';
+import { LOBBY_INCIDENT_SOURCE_KEY } from '../../../hangout-worker/src/lobby-incident-sources.mjs';
 export { HangoutRoom, HangoutQuota, HangoutTurnBudget };
 
 const ORIGIN = 'https://local-fixture.invalid';
 const PREFIX = '/_fixture/';
+const INCIDENT_CASES = 'restricted-incident-cases-v1', INCIDENT_APPOINTMENT = 'fixture-incident-appointment', INCIDENT_POLICY = 'fixture-incident-policy';
+const SELECTED_REPORT = 'Native selected report greeting';
 const ordinaryNeedles = ['Native Stalemate ephemeral greeting', 'Native Rad Dad ephemeral greeting', 'Native remaining visitor greeting', 'native-media-control-no-body-persistence'];
 const ensure = (condition, label) => { if (!condition) throw Error(label); };
 const denied = () => new Response('local fixture admission denied', { status: 403 });
@@ -99,6 +103,78 @@ export class FixtureLobby extends HangoutLobby {
         } });
         super(wrappedState, env);
         this.fixtureControl = control;
+    }
+    async fixtureIncidentActor(cookie) {
+        ensure(!!this.incidentSourceMode, 'fixture-incident-mode-required');
+        const identity = await this.fixtureParticipant(cookie);
+        const candidates = [...this.liveBindings.values()].filter(binding => `s_${binding.betaSid}` === identity.principalRef);
+        ensure(candidates.length === 1 && !candidates[0].account, 'fixture-incident-current-guest-required');
+        const binding = candidates[0];
+        return { binding, identity: { ...identity, expiresAt: binding.expiresAt } };
+    }
+    async fixtureIncidentModel(actor) {
+        if (!this.fixtureIncidentCipher) {
+            // Synthetic test purpose key only, delivered privately by the
+            // parent and never exported. No production key provisioning.
+            const hex = this.env.FIXTURE_INCIDENT_KEY; ensure(typeof hex === 'string' && /^[a-f0-9]{64}$/.test(hex), 'fixture-incident-key-required');
+            const raw = Uint8Array.from(hex.match(/../g), part => parseInt(part, 16));
+            const key = await crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']); raw.fill(0);
+            this.fixtureIncidentCipher = createIncidentEvidenceCipher({ keyId: 'synthetic_native_incident_key', key });
+        }
+        return createIncidentCases({ storage: this.authority.records, cipher: this.fixtureIncidentCipher,
+            resolveAuthority: async ({ tx, principal }) => {
+                if (principal !== actor.identity.principalRef || !await this.authority.validateParticipationConnection({ tx, connection: actor.binding, identity: actor.identity })) return null;
+                const appointment = await tx.get(INCIDENT_APPOINTMENT);
+                return appointment?.principalRef === principal ? appointment : null;
+            },
+            resolveReviewer: ({ tx }) => tx.get(INCIDENT_APPOINTMENT), policyFor: ({ tx }) => tx.get(INCIDENT_POLICY),
+            loadEvidence: input => this.authority.loadIncidentEvidence(input) });
+    }
+    async fixtureIncident(operation, body) {
+        const keys = operation === 'incident-initialize' ? ['cookie'] : operation === 'incident-preserve' ? ['cookie', 'id'] : ['cookie', 'caseRef'];
+        ensure(Object.keys(body).length === keys.length && keys.every(key => Object.hasOwn(body, key)), 'fixture-incident-shape');
+        const actor = await this.fixtureIncidentActor(body.cookie), at = Date.now(), day = 86400000;
+        if (operation === 'incident-initialize') {
+            await this.authority.records.transaction(async tx => {
+                ensure(await tx.get(INCIDENT_CASES) === undefined && await tx.get(INCIDENT_APPOINTMENT) === undefined && await tx.get(INCIDENT_POLICY) === undefined, 'fixture-incident-already-initialized');
+                ensure(await this.authority.validateParticipationConnection({ tx, connection: actor.binding, identity: actor.identity }), 'fixture-incident-current-binding');
+                await tx.put(INCIDENT_CASES, initialIncidentCaseState());
+                await tx.put(INCIDENT_APPOINTMENT, { actorRef: 'synthetic_native_handler', principalRef: actor.identity.principalRef,
+                    incidentReviewer: true, active: true, revision: 1, expiresAt: actor.identity.expiresAt, canOpen: true, canMaintain: true });
+                await tx.put(INCIDENT_POLICY, { qualified: true, version: 'synthetic_native_v1', procedure: 'synthetic_only', authority: 'synthetic_decision', reason: 'selected_report',
+                    validFrom: at, validUntil: actor.identity.expiresAt, reviewAt: at + day + 1000, holdUntil: null,
+                    evidenceDeleteAt: at + day + 2000, caseDeleteAt: at + day + 3000, tombstoneUntil: at + 2 * day,
+                    receiptUntil: at + 2 * day, auditUntil: at + 2 * day,
+                    limits: { maxCases: 4, maxBytes: 100000, maxEvidenceBytes: 1200, maxAuditEvents: 100, maxOperations: 100, maxTombstones: 10 } });
+            });
+            return { initializedSyntheticIncidentAuthority: true };
+        }
+        const model = await this.fixtureIncidentModel(actor), principal = actor.identity.principalRef;
+        let receipt;
+        if (operation === 'incident-preserve') {
+            ensure(typeof body.id === 'string' && /^m[a-z0-9]{1,80}$/i.test(body.id), 'fixture-incident-source-id');
+            const source = await this.authority.records.transaction(tx => this.authority.loadIncidentEvidence({ tx, sourceId: body.id }));
+            ensure(source && new TextDecoder().decode(source.bytes) === SELECTED_REPORT, 'fixture-incident-fixed-selected-source');
+            receipt = await model.preserveSelectedReport({ principal, operationId: 'native_preserve_' + crypto.randomUUID().replaceAll('-', ''),
+                sourceId: source.id, sourceRevision: source.revision, sourceDigest: source.digest, type: 'safety' });
+        } else {
+            ensure(typeof body.caseRef === 'string' && /^[A-Za-z0-9_-]{1,96}$/.test(body.caseRef), 'fixture-incident-case-id');
+            const found = await model.readCase({ principal, operationId: 'native_metadata_' + crypto.randomUUID().replaceAll('-', ''), caseRef: body.caseRef });
+            ensure(found.ok, 'fixture-incident-recovered-case'); receipt = { ok: true, caseRef: found.caseRef, revision: found.revision };
+        }
+        ensure(receipt.ok === true, 'fixture-incident-preservation-unconfirmed');
+        const evidence = await model.readEvidence({ principal, operationId: 'native_evidence_' + crypto.randomUUID().replaceAll('-', ''), caseRef: receipt.caseRef, expectedRevision: receipt.revision });
+        ensure(evidence.ok && new TextDecoder().decode(evidence.evidence.bytes) === SELECTED_REPORT && evidence.evidence.provenance === 'reported-public', 'fixture-incident-exact-evidence');
+        const digest = await incidentEvidenceDigest(evidence.evidence.bytes); evidence.evidence.bytes.fill(0);
+        return this.authority.records.transaction(async tx => {
+            const index = await tx.get(LOBBY_INCIDENT_SOURCE_KEY), cases = await tx.get(INCIDENT_CASES), record = cases.cases.find(row => row.id === receipt.caseRef);
+            ensure(record && !JSON.stringify(cases).includes(SELECTED_REPORT), 'fixture-incident-plaintext-copy');
+            ensure(Object.keys(index).sort().join(',') === 'entries,nextGeneration,v'
+                && index.entries.every(row => Object.keys(row).sort().join(',') === 'digest,expiresAt,id,originDigest,revision'), 'fixture-incident-index-metadata-only');
+            return { caseRef: receipt.caseRef, revision: receipt.revision, sourceRevision: record.source.revision, digest,
+                provenance: 'reported-public', exactSelectedBytes: true, metadataOnlyIndex: true, noCasePlaintext: true,
+                nextGeneration: index.nextGeneration, sourceCount: index.entries.length, caseCount: cases.cases.length };
+        });
     }
     async fixtureParticipant(cookie) {
         ensure(typeof cookie === 'string' && cookie.startsWith('__Host-hangout-beta=') && cookie.length <= 2048, 'fixture-cookie-shape');
@@ -236,6 +312,7 @@ export class FixtureLobby extends HangoutLobby {
         }
         return this.state.blockConcurrencyWhile(async () => {
             try {
+                if (['incident-initialize', 'incident-preserve', 'incident-read'].includes(path.slice(PREFIX.length))) return Response.json(await this.fixtureIncident(path.slice(PREFIX.length), body));
                 if (['participation-policy', 'participation-grant', 'participation-reduce'].includes(path.slice(PREFIX.length))) return Response.json(await this.fixtureParticipation(path.slice(PREFIX.length), body));
                 if (path === PREFIX + 'inspect' && Object.keys(body).length === 0) return Response.json(await this.fixtureInspect());
                 if (path === PREFIX + 'fault' && (Object.keys(body).join(',') === 'room' && body.room === '#art-native-canvas'
@@ -262,7 +339,7 @@ export default { async fetch(request, env) {
             // Explicit fixture lifecycle action; betaFetch never forwards it.
             return stub.fetch(new Request(ORIGIN + LOBBY_AUTHORITY_PATH + 'initialize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }));
         }
-        if (['inspect', 'fault', 'participation-policy', 'participation-grant', 'participation-reduce', 'participation-alarm'].includes(url.pathname.slice(PREFIX.length))) return stub.fetch(new Request(request.url, {
+        if (['inspect', 'fault', 'participation-policy', 'participation-grant', 'participation-reduce', 'participation-alarm', 'incident-initialize', 'incident-preserve', 'incident-read'].includes(url.pathname.slice(PREFIX.length))) return stub.fetch(new Request(request.url, {
             method: 'POST', headers: request.headers, body: JSON.stringify(body)
         }));
         if (url.pathname === PREFIX + 'egress-probe' && Object.keys(body).length === 0) {

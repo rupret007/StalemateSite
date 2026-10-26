@@ -9,6 +9,7 @@ import { INTERNAL_HEALTH_PATH, healthJson } from './beta-ops.mjs';
 import { hmacKeyOk } from './auth.mjs';
 import { privateReportRef, validatePrivateReportControl } from './private-reports.mjs';
 import { lobbyParticipationMode, participationConfigurationValid } from './lobby-participation.mjs';
+import { incidentSourceConfigurationValid } from './lobby-incident-sources.mjs';
 
 export { HangoutLobby, HangoutTurnBudget };
 
@@ -16,6 +17,7 @@ export default {
     async fetch(request, env) {
         const url = new URL(request.url);
         if (!participationConfigurationValid(env)) return new Response('participation authority unavailable', { status: 503 });
+        if (!incidentSourceConfigurationValid(env)) return new Response('incident source authority unavailable', { status: 503 });
         if (lobbyParticipationMode(env) && ['/room', '/turn'].includes(url.pathname)) return new Response('media participation unavailable', { status: 503 });
         if (url.pathname === '/turn') return admitTurn(request, env, url);
         if (url.pathname === '/lobby-owner/login' || url.pathname === '/lobby-admin/login') {

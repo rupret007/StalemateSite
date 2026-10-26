@@ -8,6 +8,7 @@ import { messageReceipt, receiptDigest } from './message-receipts.mjs';
 import { TRANSPORT_CONTROL_BLOCK } from './transport-budget.mjs';
 import { ENTRY_SITES, normalizeEntrySource } from '../../r/45662413410ed051/entry-sites.mjs';
 import { createParticipationCheckpoint } from './participation-checkpoint.mjs';
+import { validPublicReportOrigin } from './lobby-incident-sources.mjs';
 
 export const BOT = 'StaleBot';
 export const LOBBY = '#stalemate';
@@ -131,7 +132,8 @@ const CONTEXT_INDEPENDENT_COMMANDS = new Set([
 ]);
 const isPrivateContext = where => typeof where === 'string' && /^pm:/i.test(where);
 
-export function createLobby({ now = () => Date.now(), send: sendImpl = () => {}, close: closeImpl = () => {}, persist: persistImpl = () => {}, deferPresence: deferPresenceImpl = null, participation = null, effectCommit = null, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
+export function createLobby({ now = () => Date.now(), send: sendImpl = () => {}, close: closeImpl = () => {}, persist: persistImpl = () => {}, deferPresence: deferPresenceImpl = null, participation = null, effectCommit = null, incidentSources = false, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
+    if (typeof incidentSources !== 'boolean') throw Error('incident-source-configuration');
     const L = { ...LOBBY_LIMITS, ...limits };
     const entrySites = L.entrySites || ENTRY_SITES;
     const roomStateLimit = Math.max(32768, Math.min(ROOM_STATE_MAX_BYTES, Number(L.roomStateBytes) || ROOM_STATE_MAX_BYTES));
@@ -553,7 +555,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         return {
             reports: [...reports].filter(([, r]) => !r.done && now() - r.at < MODERATION_QUEUE_TTL).map(([id, r]) => ({
                 id, ch: r.ch, from: r.from, text: r.text, at: r.at, hidden: r.hidden,
-                context: [...r.context], devs: [...r.devs], iphs: [...r.iphs], authorDev: r.authorDev
+                context: [...r.context], devs: [...r.devs], iphs: [...r.iphs], authorDev: r.authorDev,
+                ...(r.publicOrigin ? { publicOrigin: { ...r.publicOrigin } } : {})
             })),
             held: [...held.values()].filter((h) => now() - h.ts < MODERATION_QUEUE_TTL).map((h) => ({
                 id: h.id, ch: h.ch, from: h.from, text: h.text, ts: h.ts, prefix: h.prefix,
@@ -582,12 +585,14 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             && moderationId(item.id) && moderationNick(item.from) && moderationChannel(item.ch) && moderationText(item.text, L.maxChars);
         const goodReports = (Array.isArray(entries.reports) ? entries.reports : []).filter((r) => common(r) && moderationTime(r.at)
             && typeof r.hidden === 'boolean' && moderationIdentity(r.authorDev)
+            && (!Object.hasOwn(r, 'publicOrigin') || r.id.startsWith('m') && r.ch.startsWith('#') && validPublicReportOrigin(r.publicOrigin, now()) && r.publicOrigin.at <= r.at)
             && Array.isArray(r.context) && r.context.length >= 1 && r.context.length <= 11 && r.context.every((line) => moderationText(line, 400))
             && [r.devs, r.iphs].every((list) => Array.isArray(list) && list.length > 0 && list.length <= L.lobbyMax && list.every(moderationIdentity)))
             .sort((a, b) => a.at - b.at).slice(-MODERATION_QUEUE_MAX);
         for (const r of goodReports) reports.set(r.id, {
             ch: r.ch, from: r.from, text: r.text, at: r.at, hidden: r.hidden, context: [...r.context],
-            devs: new Set(r.devs), iphs: new Set(r.iphs), authorDev: r.authorDev, done: false
+            devs: new Set(r.devs), iphs: new Set(r.iphs), authorDev: r.authorDev, done: false,
+            ...(r.publicOrigin ? { publicOrigin: { ...r.publicOrigin } } : {})
         });
         const goodHeld = (Array.isArray(entries.held) ? entries.held : []).filter((h) => common(h) && h.id.startsWith('m') && h.ch.startsWith('#')
             && moderationTime(h.ts) && moderationIdentity(h.dev) && moderationText(h.reason, 160)
@@ -1811,7 +1816,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
         statHour().lines += 1;
         const recipients = membersOf(chan).filter((m) => !m.ignores.has(lc(line.from)) && !(dev && m.blocks.has(dev)));
-        rememberLine(line, { authorDev: dev, recipients: new Set(recipients.map((m) => m.id)) });
+        rememberLine(line, { authorDev: dev, recipients: new Set(recipients.map((m) => m.id)),
+            ...(incidentSources && publicChannel(chan) ? { publicOrigin: { v: 1, at: now() } } : {}) });
         chan.moderationContext.push(line);
         if (chan.moderationContext.length > L.moderationContext) chan.moderationContext.shift();
         for (const member of recipients) out(member, line);
@@ -1865,6 +1871,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (!r || typeof r !== 'object' || Array.isArray(r) || !moderationId(r.id)
                 || !['line', 'pm'].includes(r.t) || !moderationChannel(r.ch) || !moderationNick(r.from)
                 || !moderationIdentity(r.authorDev) || !/^[a-f0-9]{64}$/.test(r.digest)
+                || Object.hasOwn(r, 'publicOrigin') && (r.t !== 'line' || !r.id.startsWith('m') || !r.ch.startsWith('#') || !validPublicReportOrigin(r.publicOrigin, now()) || r.publicOrigin.at < r.ts)
                 || !moderationTime(r.ts) || typeof r.prefix !== 'string' || !['', '@', '+'].includes(r.prefix)
                 || ['band', 'moderator', 'me'].some((key) => typeof r[key] !== 'boolean')
                 || typeof r.to !== 'string' || (r.t === 'pm' ? !moderationNick(r.to) || r.ch !== `pm:${r.from}>${r.to}` || !r.id.startsWith('p') : !!r.to || !r.ch.startsWith('#') || !r.id.startsWith('m'))
@@ -1873,7 +1880,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             const eligible = r.recipients.filter((id) => conns.has(id));
             if (eligible.length) setReceipt(r.id, { t: r.t, id: r.id, ch: r.ch, from: r.from, to: r.to,
                 prefix: r.prefix, band: r.band, moderator: r.moderator, me: r.me, ts: r.ts,
-                authorDev: r.authorDev, digest: r.digest, recipients: eligible });
+                authorDev: r.authorDev, digest: r.digest, recipients: eligible,
+                ...(r.publicOrigin ? { publicOrigin: { ...r.publicOrigin } } : {}) });
         }
     }
 
@@ -1985,7 +1993,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (receipt && now() - receipt.ts < DAY && typeof text === 'string' && moderationText(text, L.maxChars)
                 && receipt.digest === receiptDigest(receipt, receipt.authorDev, text)) {
                 l = { ...receipt, text };
-                meta = { authorDev: receipt.authorDev, recipients: new Set(receipt.recipients) };
+                meta = { authorDev: receipt.authorDev, recipients: new Set(receipt.recipients),
+                    ...(receipt.publicOrigin ? { publicOrigin: { ...receipt.publicOrigin } } : {}) };
             }
         }
         if (!l) return bot(c, 'That message is gone already.', 'error');
@@ -2006,7 +2015,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             const hist = chan ? chan.moderationContext : [];
             const at = hist.findIndex((h) => h.id === id);
             const context = at >= 0 ? hist.slice(Math.max(0, at - 5), at + 6).map((h) => `${h.from ? `<${h.from}> ` : '* '}${h.text}`) : [`<${l.from}> ${l.text}`];
-            r = { devs: new Set(), iphs: new Set(), ch: l.ch, from: l.from, text: l.text, hidden: false, context, at: now(), authorDev: meta.authorDev };
+            r = { devs: new Set(), iphs: new Set(), ch: l.ch, from: l.from, text: l.text, hidden: false, context, at: now(), authorDev: meta.authorDev,
+                ...(meta.publicOrigin ? { publicOrigin: { ...meta.publicOrigin } } : {}) };
             reports.set(id, r);
         }
         // Spoof-proof: one vote per signed device AND per daily IP hash.
