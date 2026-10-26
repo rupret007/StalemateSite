@@ -17,9 +17,11 @@ Open the launcher address printed by the command. It binds to loopback and is
 available on that computer only. The launcher offers explicit Guest, Room owner,
 Community moderator and Site owner fixtures. Those identities are local
 stand-ins; they do not demonstrate Cloudflare sign-in or production staff
-permissions. AI stays off. Stop the preview with Ctrl+C. Its separately scoped
-room/moderation state and preview links last seven days; ordinary chat is not
-restored after reconnect/restart. Do not enter real incident evidence.
+permissions. AI stays off. Stop the preview with Ctrl+C. Preview session links
+expire after seven days. The separately scoped local state file is printed by
+the launcher; room, report and moderation-log retention follows their own engine
+rules, with no blanket seven-day state-file purge. Ordinary chat is not restored
+after reconnect/restart. Do not enter real incident evidence.
 
 For a hosted demonstration, use the existing owner's qualified private-beta
 invitation. A localhost link cannot connect Che from another house. Do not put
@@ -62,6 +64,37 @@ cannot perform either staff action. Personal Ignore/Block and community staff
 restrictions have different scopes; neither an entry change nor a nickname
 should manufacture new authority or bypass a device restriction.
 
+## Staged camera Block acceptance
+
+These are acceptance instructions for the pending media-blocking candidate,
+not a claim about a live beta or the earlier `282163e9cbc` package. Identify the
+new reviewed source, matching Worker/browser assets and its actual test evidence
+before running the check in the receiving owner's permitted environment. An
+engine/client regression result alone does not prove this browser journey.
+
+For the camera Block check, use three consenting adult browser profiles in one
+Hang Out drawing or watch room. Turn cameras on through the visible controls and
+confirm video in both directions. Choose **People → the other nickname → Block**.
+The updated clients close that pair's camera connections and received tracks;
+both visitors keep their local capture and connections with the third person.
+The server refuses further signaling between the pair. A new nickname, entry
+label or parallel tab with the blocked visitor's same signed device token does
+not bypass the blocker’s current connection preference. A new blocker session
+does not inherit an earlier connection's preferences. `/unblock CurrentNick`
+removes only your block: the other person's block still applies. Existing active
+camera opt-in may negotiate again after both blocks are gone; a stopped camera
+is not restarted and prior PM consent is not restored.
+
+This requires the matching updated Worker and browser assets. The receiving
+release owner must drain older clients; server signaling refusal alone cannot
+close an already connected pair running older clients. Blocking cannot recall
+media already received or control copies held by another person. Encrypted
+invitation rooms use separate relay identities: their **Hide for me** currently
+hides a tile, not this device-scoped lobby Block. Do not present those controls
+as equivalent or claim native WebJam/TURN/WAN coverage from this browser check.
+
+## Ownership and existing review evidence
+
 Preserve Jeff's previously completed real synthetic-report dismissal as evidence
 for that tested release. Do not create repeated live reports merely to repeat an
 unchanged check. Requalify a changed staff path with the release owner.
@@ -90,7 +123,8 @@ expired message. The local preview keeps **Try again**, returning a former owner
 as an unverified guest until a new sign-in. Cameras, stale invitation/PM actions
 and displayed owner powers are cleared. The current unsent message remains
 available to copy in its original channel or PM; it is never moved into public
-chat or sent automatically. Leaving the page clears unsent drafts.
+chat or sent automatically. Drafts belong to the current page instance and are
+not saved in browser storage; a new page instance starts without them.
 
 Show the invitation/opening flow separately from playing music. Qualify the
 actual native package, installation/trust, join/leave and bidirectional audio on

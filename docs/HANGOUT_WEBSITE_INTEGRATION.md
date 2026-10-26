@@ -1,0 +1,97 @@
+# Website integration: one shared Hang Out
+
+Use this short guide to prepare the receiving owner's release. This application
+session supplies source, tests and integration assets. StoryPool 10-21-26 owns
+deployments, core, Karen administration and shared operations. This document is
+not a release approval or evidence that a live website contains the candidate.
+
+## Select one tested candidate
+
+Use the delivered source commit and its matching CI/review receipts. The entry
+toolkit's `SOURCE-MANIFEST.json` names the commit used to build that archive; it
+contains link tooling and documentation, not the whole application. Obtain the
+application from the corresponding source branch or verified source patch.
+Revalidate the exact current commit's normal CI and Karen result. Historical
+dependency tables are an audit trail, not a list to cherry-pick blindly.
+
+Retain newer Stalemate and Rad Dad pages, navigation, media consent and the
+permanent Rad Dad `/tap/` to `/qr/` path. Do not replace either site with a stale
+application checkout.
+
+## Prepare the two entrance links
+
+1. The release owner selects one approved canonical community address and one
+   authoritative backend/namespace. Both band sites and future integrations
+   must reach it. Two independent Worker namespaces create two communities.
+2. Prepare a nonsecret registry using
+   [`community-integration.example.json`](community-integration.example.json).
+   Approve each site's domain control, exact origins, permitted return URL,
+   display label and scopes. Example fixtures do not prove real domain control.
+   Keep unapproved entries disabled; an integration receives no staff powers.
+3. From the application repository root or extracted toolkit root, generate the
+   snippets with an installed Node runtime. Choose a new output directory whose
+   parent already exists; the builder refuses to replace an existing directory.
+
+   ```sh
+   node scripts/package-community-entry.mjs --config /path/to/approved-sites.json --out /path/to/generated-links
+   ```
+
+4. For additional badge sites, the release owner also sets the canonical
+   Worker's public `HANGOUT_ENTRY_SITES` JSON array to the reviewed generated
+   `manifest.json` → `entrySites` value. The built-in band entries stay built in.
+   The Worker supplies the sanitized registry to both client and engine. A
+   custom link without this matching configuration joins with a neutral badge;
+   the link builder itself does not configure the Worker or verify domains.
+5. Add each generated Hang Out link to the relevant site's existing navigation.
+   Use the same community address with its registered entry identifier. Never
+   put a private invitation, email code, cookie or credential in the link.
+
+Visitors share channels, room IDs, moderation and first-party community sessions.
+The optional “via Stalemate” or “via Rad Dad” badge describes this entrance only.
+It grants no identity or permissions; direct entry stays neutral. Do not copy
+cookies across band domains or assume an existing site-account SSO service.
+
+## Release the matching application and state
+
+The release owner follows [session-authority migration and recovery](HANGOUT_SESSION_AUTHORITY.md)
+and the [full handoff](HANGOUT_SHARED_COMMUNITY_HANDOFF.md). Preserve bindings,
+IDs, account-key continuity, room ownership, bans and selected evidence.
+Independently establish old-writer, socket and in-flight drain; a mode flag or
+export is not drain proof. The opt-in Lobby authority mode is not activated by
+the entry archive. A flag reversal is not sufficient rollback between different
+authorities. Qualify recoverable state and matched assets/backend before use.
+
+Publish only intended site/application assets. Local role selectors, incident
+fixtures, synthetic bootstrap Workers, raw evidence and operational files are
+not authentication services or website content. Keep existing holds and trust
+checks. Configuration names are documented without supplying secret values.
+
+## Verify the staged visitor journey
+
+Use two separate browser contexts entering through the actual two site links:
+
+1. Join as guests, exchange text in the same lobby and inspect both entry badges
+   in messages and People. Hide one badge; try neutral direct entry separately.
+2. Create and join a permitted room, draw together and exercise watch controls.
+   Invite a guest to a Jam room and verify the full WebJam invitation handoff.
+3. Confirm a fresh visitor receives no earlier chat. Test long text and controls
+   at 375/390px, keyboard navigation, reconnect and expired-session recovery.
+4. Report only a benign synthetic message. An authorized moderator reviews it;
+   an ordinary visitor cannot access staff actions. Preserve unrelated reports.
+   Check block/mute behavior and changed roles on existing connections.
+5. Verify logout/revocation and private-room denial. If testing camera blocking,
+   use updated clients and server: signaling denial alone cannot terminate an
+   already established P2P connection between two outdated clients. Check that
+   an unrelated participant continues and no new camera prompt is triggered.
+6. Verify a separately registered third test-site entrance reaches the same
+   service without gaining moderator or owner permissions.
+
+Record the actual deployed revision, environment, observed results and failures.
+Local fixtures do not establish real Access sign-in, public all-ages readiness,
+physical-device accessibility, hosted capacity or native audio. Keep current
+safeguards until qualified guardian/legal/staffing paths are ready. AI and TURN
+activation remain separate owner-qualified work; Windows remains unsigned.
+
+Use [the Che demo guide](HANGOUT_DEMO_GUIDE.md) for the short walkthrough. A
+cross-house native session additionally needs actual installation, trust,
+join/leave and bidirectional audio evidence on the advertised platforms.
