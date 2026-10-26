@@ -187,6 +187,10 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
         return !!profile && profile.expiresAt > now() && saved.expiresAt <= profile.expiresAt && saved.account === profile.account
             && saved.role === profile.role && saved.admin === profile.admin && (!profile.admin || (await currentRoles()).get(profile.account) === profile.role);
     }
+    // A principal identifies an authenticated session/account, never a consent
+    // grant. Guest principals do not survive a different issued beta SID.
+    const participationIdentity = binding => ({ principalRef: binding.account || `s_${binding.betaSid}`,
+        communityRef: LOBBY_AUTHORITY_COMMUNITY, expiresAt: binding.expiresAt });
     async function prune(tx, at) {
         const rows = await index(tx); let removed = 0;
         for (const item of [...rows.entries]) if (item.exp <= at && removed < BATCH) {
@@ -209,6 +213,19 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
     });
     return Object.freeze({
         records,
+        resolveParticipationConnection: value => transact(async tx => {
+            const binding = bindingFrom(value);
+            return await validateBinding(tx, binding) ? participationIdentity(binding) : null;
+        }),
+        async validateParticipationConnection({ tx, connection, identity } = {}) {
+            try {
+                const binding = bindingFrom(connection);
+                if (!exact(identity, ['principalRef', 'communityRef', 'expiresAt']) || !await validateBinding(tx, binding)) return false;
+                const current = participationIdentity(binding);
+                return Object.keys(current).every(key => current[key] === identity[key]);
+            } catch { return false; }
+        },
+        writeParticipationEffects: input => writeEffects({ ...input, now: now() }),
         // TRUSTED CALLER-GATED recovery: the actual Lobby holds its event gate
         // for this entire read, so no app mutator or output may interleave. A
         // snapshot/flag alone does not establish that exclusion. Every native

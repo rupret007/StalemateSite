@@ -1,8 +1,10 @@
 # Controlled participation enforcement (C3)
 
-October 25, 2026 application slice. This connects the C1 evaluator and C2 ledger
-to actual engine mutations in an injected synthetic fixture. **No production
-route supplies this adapter.** It does not activate child enrollment, guardian
+October 25, 2026 application foundation, with October 26 initially inactive
+[production composition](HANGOUT_PRODUCTION_PARTICIPATION.md). C1/C2 checks now
+have an explicit optional bridge to the actual beta session authority and
+effect transaction; the default remains off and no production grant is supplied.
+This does not activate child enrollment, guardian
 contact, public identity, providers or an all-ages release. Existing 13+ admission
 and 18+ camera checks remain. The qualified operator/consent/rights process and
 real hosted implementation are still prerequisites.
@@ -59,7 +61,8 @@ service needs a real commit-side revision fence; a preflight lookup is not one.
 The production owner must map known kinds to approved rows, enforce provider
 value/transaction limits, and keep all required writes atomic with current C2
 and session revisions. A failed or ambiguous commit cannot acknowledge success.
-No production implementation is supplied. The fixture uses one serial staged
+The optional production bridge uses the canonical Lobby authority's records
+and actual effect writer. The original controlled fixture uses one serial staged
 store shared with the real C2 ledger; two unrelated databases/writes do not
 satisfy this contract. Startup restoration that can write is also staged;
 configured callers must await those restoration methods before accepting work.
@@ -108,9 +111,12 @@ commit. Tests commit C2 withdrawal/policy change while work waits before the
 effect transaction, then prove no room/artifact/log/receipt/PM or success frame
 escapes. Restored metadata and a new device cannot recover a withdrawn grant.
 
-The owning withdrawal/session service must call and await
+The owning future withdrawal/session service must call and await
 `engine.refreshParticipation()` after a committed permission change, with a
-bounded retry/acknowledgement path if notification fails. The method removes PM
+bounded retry/acknowledgement path if notification fails. The optional production
+bridge invokes the same refresh at restoration and in the existing composed
+alarm before tick; this periodic cleanup is not instant guardian notification.
+The method removes PM
 grants and tears down active browser media sessions whose required purpose was
 lost, using a socket close/rejoin. Existing frontend close handling clears its
 capture, peer connections and watch iframe. Media-only withdrawal preserves

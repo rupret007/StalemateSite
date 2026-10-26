@@ -15,6 +15,7 @@ const APP = fileURLToPath(new URL('../../../', import.meta.url));
 const TOOLS = fileURLToPath(new URL('../durable-records/', import.meta.url));
 const ORIGIN = 'https://local-fixture.invalid', INVITE = 'owned-fixture-invite-not-a-production-credential-2026', PREVIEW = 'owned-fixture-preview-token-20261025';
 const ENV = ['PATH', 'TMPDIR', 'TEMP', 'TMP', 'SystemRoot', 'SYSTEMROOT', 'WINDIR'];
+const PARTICIPATION = process.argv.includes('--participation');
 const EPHEMERAL_BODY_MARKERS = ['Native Stalemate ephemeral greeting', 'Native Rad Dad ephemeral greeting', 'Native remaining visitor greeting', 'native-media-control-no-body-persistence'].sort();
 function assertNativeRollback(witness, record) {
     assert.deepEqual(Object.keys(witness).sort(), ['record', 'originalSha256', 'stagedSha256', 'restoredSha256', 'nativeWriteCompleted', 'stagedChanged', 'nativeTransactionRejected', 'restoredBeforeEngineRecovery'].sort());
@@ -57,6 +58,7 @@ function receive(expected, nonce) {
 class Visitor {
     constructor(socket, label) {
         this.socket = socket; this.label = label; this.frames = []; this.bytes = 0; this.waiters = new Set(); this.closed = null; this.failure = null;
+        this.commandCount = 0; this.barrierSequence = 0; this.lastCommand = null;
         socket.addEventListener('message', event => {
             try {
                 assert.equal(typeof event.data, 'string', label + ': text frame required');
@@ -69,7 +71,11 @@ class Visitor {
         socket.addEventListener('error', () => { this.failure = Error(label + ': websocket error'); for (const check of [...this.waiters]) check(); });
         socket.accept();
     }
-    send(value) { assert.equal(this.closed, null, this.label + ': unexpectedly closed'); this.socket.send(JSON.stringify(value)); }
+    send(value) {
+        assert.equal(this.closed, null, this.label + ': unexpectedly closed');
+        if (value.t === 'cmd') { this.commandCount++; this.lastCommand = { name: String(value.name).slice(0, 32), channel: typeof value.ch === 'string' ? value.ch : '' }; }
+        this.socket.send(JSON.stringify(value));
+    }
     async wait(predicate, label, since = 0, close = false) {
         return new Promise((resolve, reject) => {
             let timer;
@@ -80,7 +86,12 @@ class Visitor {
                 if (value) return finish(null, value);
                 if (this.closed && !close) finish(Error(this.label + ': closed before ' + label));
             };
-            timer = setTimeout(() => finish(Error(this.label + ': missing ' + label)), 6000); this.waiters.add(check); check();
+            timer = setTimeout(() => finish(Error(this.label + ': missing ' + label + ' ' + JSON.stringify({
+                commandCount: this.commandCount, barrierSequence: this.barrierSequence, lastCommand: this.lastCommand, closeCode: this.closed?.code || null,
+                recent: this.frames.slice(-6).map(frame => ({ t: frame.t, kind: typeof frame.kind === 'string' ? frame.kind : '',
+                    text: typeof frame.text === 'string' ? frame.text.slice(0, 120) : '',
+                    channel: typeof frame.ch === 'string' ? frame.ch : typeof frame.ch?.name === 'string' ? frame.ch.name : '' }))
+            }))), 6000); this.waiters.add(check); check();
         });
     }
     async command(name, args = [], channel = '#stalemate', predicate = null, label = name) {
@@ -88,6 +99,7 @@ class Visitor {
         return predicate ? this.wait(predicate, label, since) : undefined;
     }
     async barrier(channel = '#stalemate') {
+        this.barrierSequence++;
         await this.command('names', [channel], channel, f => f.t === 'notice' && f.text.startsWith(channel + ':'), 'ordered names response');
     }
 }
@@ -126,6 +138,8 @@ async function runtime(phase, state, nonce) {
     const bundleCode = generated.output[0].code, bundleSha256 = createHash('sha256').update(bundleCode).digest('hex');
     for (const suffix of ['/beta-entry.mjs', '/lobby-do.mjs', '/lobby-session-authority.mjs', '/lobby-core.mjs', '/lobby-effect-records.mjs', '/durable-record-storage.mjs'])
         assert.ok(Object.keys(bundleInputs).some(path => path.endsWith(suffix)), 'missing actual source ' + suffix);
+    if (PARTICIPATION) for (const suffix of ['/lobby-participation.mjs', '/participation-enforcement.mjs', '/participation-partitions.mjs', '/participation-policy.mjs'])
+        assert.ok(Object.keys(bundleInputs).some(path => path.endsWith(suffix)), 'missing actual participation source ' + suffix);
     let outboundCalls = 0, runtimeRestarts = 0;
     const options = convertV4MiniflareOptions({
         name: 'webjam-local-session-authority', rootPath: state, modulesRoot: state,
@@ -134,6 +148,7 @@ async function runtime(phase, state, nonce) {
         resourcePersistencePath: join(state, 'persist'), resourceTmpPath: join(state, 'runtime-' + phase),
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true } },
         bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected',
+            ...(PARTICIPATION ? { HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1' } : {}),
             HANGOUT_HMAC_KEY: 'owned-fixture-hmac-not-a-production-credential-2026', HANGOUT_BETA_INVITE_KEY: INVITE, HANGOUT_PREVIEW_KEY: PREVIEW,
             HANGOUT_BETA_INVITE_VERSION: '1', HANGOUT_OPEN: '1', HANGOUT_AI_ENABLED: '0', HANGOUT_TURN_ENABLED: '0' },
         outboundService: () => { outboundCalls++; return new Response('denied', { status: 503, headers: { 'X-WebJam-Test-Egress': 'denied' } }); },
@@ -148,12 +163,14 @@ async function runtime(phase, state, nonce) {
         const response = await mf.dispatchFetch(ORIGIN + '/_fixture/' + operation, { method: 'POST', headers: { 'X-Fixture-Nonce': nonce, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         assert.equal(response.status, 200, 'fixture control ' + operation + ' refused'); return response.json();
     };
-    const unlock = async ip => {
+    const unlock = async (ip, { grant = true } = {}) => {
         const response = await call('/beta/unlock', '', { key: INVITE }, ip); assert.equal(response.status, 200, 'real guest unlock refused');
         assert.deepEqual(await response.json(), { ok: true });
         const value = response.headers.get('Set-Cookie'); assert.equal(typeof value, 'string', 'missing real signed cookie');
         assert.ok(/^__Host-hangout-beta=[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}; Path=\/; HttpOnly; Secure; SameSite=Lax; Max-Age=[1-9][0-9]*$/.test(value), 'signed guest cookie policy was not satisfied');
-        return value.split(';', 1)[0];
+        const cookie = value.split(';', 1)[0];
+        if (PARTICIPATION && grant) assert.deepEqual(await control('participation-grant', { cookie }), { authorizedSyntheticGrant: true });
+        return cookie;
     };
     const connect = async (cookie, label, source, ip) => {
         const response = await mf.dispatchFetch(ORIGIN + '/lobby?preview=' + PREVIEW, { headers: { ...headers(cookie, ip), Upgrade: 'websocket' } });
@@ -165,6 +182,18 @@ async function runtime(phase, state, nonce) {
         return visitor;
     };
     const joinRoom = (visitor, room) => visitor.command('join', [room], '#stalemate', f => f.t === 'join' && f.ch.name === room, 'join ' + room);
+    const denyUnknown = async (cookie, label, dev = '') => {
+        const query = new URLSearchParams({ preview: PREVIEW }); if (dev) query.set('dev', dev);
+        const response = await mf.dispatchFetch(ORIGIN + '/lobby?' + query, { headers: { ...headers(cookie, '192.0.2.12'), Upgrade: 'websocket',
+            'X-Hangout-Identity': JSON.stringify({ account: 'a_' + 'x'.repeat(43), role: 'owner', admin: true, principalRef: 'forged_principal_ref' }) } });
+        assert.equal(response.status, 101); const visitor = new Visitor(response.webSocket, label); visitors.push(visitor);
+        assert.equal((await visitor.wait(frame => frame.t === 'hello', 'actual ungranted hello')).role, 'fan');
+        visitor.send({ t: 'hello', nick: label, age13: true, subjectRef: 'forged_subject_ref', principalRef: 'forged_principal_ref' });
+        await visitor.wait(frame => frame.t === 'notice' && frame.kind === 'error' && /participation/.test(frame.text), 'actual ungranted refusal');
+        assert.ok(visitor.frames.every(frame => frame.t !== 'welcome' && frame.t !== 'join'));
+        const logout = await call('/beta/logout', cookie, {}); assert.equal(logout.status, 200); await logout.body?.cancel();
+        assert.equal((await visitor.wait(() => false, 'ungranted session logout', 0, true)).code, 4401);
+    };
     let proof, secrets;
     try {
         assert.equal((await mf.ready).hostname, '127.0.0.1');
@@ -176,10 +205,21 @@ async function runtime(phase, state, nonce) {
             }
             const missing = await call('/beta/unlock', '', { key: INVITE }); assert.equal(missing.status, 503, 'missing marker must refuse real unlock'); await missing.body?.cancel();
             const initialized = await control('initialize'); assert.equal(initialized.reason, 'initialize complete');
+            if (PARTICIPATION) {
+                const empty = await control('inspect'); assert.equal(empty.participationRequired, true); assert.equal(empty.participationPolicyPresent, false);
+                await denyUnknown(await unlock('192.0.2.15', { grant: false }), 'NativeUngrant');
+                assert.equal((await control('inspect')).participationPolicyPresent, false, 'missing policy was initialized by an ordinary visitor');
+                assert.deepEqual(await control('participation-policy'), { installed: true });
+            }
             const egress = await control('egress-probe'); assert.deepEqual(egress, { status: 503, denied: true });
             const cookieA = await unlock('192.0.2.11'), cookieB = await unlock('192.0.2.12');
             const a = await connect(cookieA, 'NativeAlpha', 'stalemate', '192.0.2.11');
             const b = await connect(cookieB, 'NativeBravo', 'rad-dad', '192.0.2.12');
+            if (PARTICIPATION) {
+                const privateRoom = await mf.dispatchFetch(ORIGIN + '/room?room=' + 'a'.repeat(64), { headers: { ...headers(cookieB), Upgrade: 'websocket' } });
+                assert.equal(privateRoom.status, 503); assert.match(await privateRoom.text(), /participation/);
+                const turn = await call('/turn', cookieB, {}); assert.equal(turn.status, 503); assert.match(await turn.text(), /participation/);
+            }
             await joinRoom(a, '#native-channel'); const joinedB = await joinRoom(b, '#native-channel');
             assert.deepEqual(joinedB.ch.names.map(({ nick, entrySource }) => ({ nick, entrySource })), [{ nick: 'NativeAlpha', entrySource: 'stalemate' }, { nick: 'NativeBravo', entrySource: 'rad-dad' }]);
             const lineAt = b.frames.length;
@@ -263,7 +303,7 @@ async function runtime(phase, state, nonce) {
             await control('fault', { room: '#art-native-canvas' }); const faultAt = b.frames.length, faultAtC = c.frames.length;
             b.send({ t: 'cmd', ch: '#art-native-canvas', name: 'topic', args: ['Uncommitted native topic'] });
             await b.wait(frame => frame.t === 'notice' && frame.kind === 'error', 'actual failed-write refusal', faultAt);
-            const afterFault = await control('inspect'); assert.deepEqual(afterFault.rooms, beforeFault.rooms); assert.deepEqual(afterFault.reports, beforeFault.reports);
+            let afterFault = await control('inspect'); assert.deepEqual(afterFault.rooms, beforeFault.rooms); assert.deepEqual(afterFault.reports, beforeFault.reports);
             assert.deepEqual(afterFault.fault, { tripped: true, nativeWriteCompleted: true });
             assert.deepEqual(afterFault.faultHistory, ['sessions', 'community-room:#art-native-canvas']);
             assert.equal(afterFault.nativeRollbackWitnesses.length, 2);
@@ -271,10 +311,33 @@ async function runtime(phase, state, nonce) {
             assertNativeRollback(afterFault.nativeRollbackWitnesses[1], 'community-room:#art-native-canvas');
             for (const [visitor, since] of [[b, faultAt], [c, faultAtC]])
                 assert.ok(visitor.frames.slice(since).every(frame => !(frame.t === 'chan' && frame.ch?.topic === 'Uncommitted native topic') && !(frame.t === 'event' && String(frame.text).includes('Uncommitted native topic'))), 'failed write published success');
+            if (PARTICIPATION) {
+                const cookieD = await unlock('192.0.2.14'), d = await connect(cookieD, 'NativeDelta', '', '192.0.2.14');
+                await joinRoom(d, mediaRoom); const cameraAt = d.frames.length;
+                d.send({ t: 'cam', ch: mediaRoom, on: true, adult18: true });
+                await d.wait(frame => frame.t === 'cam' && frame.on === true, 'actual C3 camera opt-in', cameraAt);
+                assert.deepEqual(await control('participation-reduce', { cookie: cookieD }), { reduced: true });
+                assert.equal(d.closed, null, 'ledger reduction bypassed production alarm ordering');
+                assert.deepEqual(await control('participation-alarm'), { completed: true });
+                assert.equal((await d.wait(() => false, 'production C3 alarm media close', 0, true)).code, 4401);
+                const pacing = await control('inspect');
+                for (const visitor of [b, c]) {
+                    const deadline = pacing.commandReadyAt.find(row => row.nick === visitor.label)?.at;
+                    assert.ok(Number.isSafeInteger(deadline) && deadline >= 0);
+                    assert.ok(deadline - Date.now() <= 1000, 'unexpected command refill deadline');
+                    // The new post-alarm command must honor the actual current
+                    // protocol budget before sending; no refused action retries.
+                    while (Date.now() < deadline) await delay(deadline - Date.now());
+                    await visitor.barrier(mediaRoom);
+                }
+                assert.equal(b.closed, null); assert.equal(c.closed, null);
+                afterFault = await control('inspect'); assert.equal(afterFault.participationPolicyPresent, true);
+            }
             assert.equal(afterFault.bindingCount, 2, 'lost-socket checkpoint needs live durable bindings'); assert.equal(b.closed, null); assert.equal(c.closed, null);
             secrets = { revokedCookie: cookieA, liveCookie: cookieB };
             proof = { admissionDenials, missingMarkerRefused: true, cookiePolicyVerified: true, actualGatewayVisitors: 3,
                 checks: ['actual-beta-unlock-and-WebSocket-admission', 'stalemate-rad-dad-shared-chat-and-canvas', 'direct-newcomer-neutral-without-prejoin-chat', 'actual-report-persisted', 'connected-logout-and-cookie-replay-denied', 'ordinary-chat-excluded-from-durable-records', 'actual-device-block-policy-and-RTC-denial-persisted', 'actual-post-native-session-write-rollback-before-block-success', 'actual-post-native-write-rollback-before-success'],
+                ...(PARTICIPATION ? { participationChecks: ['actual-DO-missing-policy-denies-without-provisioning', 'real-signed-SID-principal-with-explicit-synthetic-C2-grants', 'unfenced-private-room-and-TURN-denied', 'committed-media-reduction-production-alarm-closes-only-affected-visitor'] } : {}),
                 checkpoint: afterFault, sources: before, versions, binarySha256, rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs,
                 outboundCalls, runtimeRestarts, workerdPids: group(process.pid).filter(row => row.command.includes('workerd')).map(row => row.pid) };
             assert.equal(outboundCalls, 1); assert.equal(runtimeRestarts, 0); assert.deepEqual(sources(), before);
@@ -302,9 +365,14 @@ async function runtime(phase, state, nonce) {
             assert.equal(recovered.rawScan.perChunkOrdinaryBodiesAbsent['native-media-control-no-body-persistence'], true);
             assert.ok(Object.values(recovered.rawScan.perChunkOrdinaryBodiesAbsent).every(Boolean));
             const returning = await connect(secrets.liveCookie, 'NativeReturn', 'rad-dad', '192.0.2.12');
+            if (PARTICIPATION) {
+                const device = returning.frames.find(frame => frame.t === 'device')?.token; assert.equal(typeof device, 'string');
+                await denyUnknown(await unlock('192.0.2.12', { grant: false }), 'NativeBravo', device);
+            }
             const canvas = await joinRoom(returning, '#art-native-canvas'); assert.equal(canvas.ch.count, 1); assert.equal(canvas.act.strokes[0].id, 'native-stroke-1');
             await returning.barrier(); assert.ok(returning.frames.every(frame => frame.t !== 'line'), 'cold newcomer received prior chat');
             proof = { checks: ['cold-process-loss-retires-missing-socket-bindings', 'committed-rooms-canvas-and-report-survive', 'revoked-cookie-stays-denied-active-cookie-reconnects'], recovered,
+                ...(PARTICIPATION ? { participationChecks: ['actual-C3-reloads-partition-grant-after-process-loss', 'new-SID-cannot-inherit-grant-through-same-signed-device-IP-or-old-nickname'] } : {}),
                 sources: before, versions, binarySha256, rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs, outboundCalls, runtimeRestarts,
                 workerdPids: group(process.pid).filter(row => row.command.includes('workerd')).map(row => row.pid) };
             assert.equal(outboundCalls, 0); assert.equal(runtimeRestarts, 0); assert.deepEqual(sources(), before);
@@ -322,7 +390,7 @@ async function runtime(phase, state, nonce) {
 }
 
 async function parent() {
-    assert.equal(process.argv.length, 2); bindingPackage();
+    assert.deepEqual(process.argv.slice(2), PARTICIPATION ? ['--participation'] : []); bindingPackage();
     const before = sources(), state = realpathSync(await mkdtemp(join(tmpdir(), 'webjam-session-native-'))), nonce = randomBytes(16).toString('hex');
     let current, groupNeedsCleanup = false, interrupted;
     const interrupt = signal => { interrupted ||= Error('interrupted ' + signal); if (groupNeedsCleanup) kill(current?.pid); };
@@ -330,7 +398,7 @@ async function parent() {
     const run = (phase, recovery) => new Promise((resolve, reject) => {
         let stdout = '', stderr = '', checkpoint, result, preKill, timer, settled = false;
         const fail = error => { if (settled) return; settled = true; clearTimeout(timer); if (groupNeedsCleanup) kill(current?.pid); reject(error); };
-        current = spawn(process.execPath, [FILE, '--isolated', phase, state, nonce], { cwd: HERE,
+        current = spawn(process.execPath, [FILE, '--isolated', phase, state, nonce, ...(PARTICIPATION ? ['--participation'] : [])], { cwd: HERE,
             env: Object.fromEntries(ENV.filter(name => typeof process.env[name] === 'string').map(name => [name, process.env[name]])), detached: true, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] }); groupNeedsCleanup = true;
         const proc = current;
         const append = (value, chunk) => { const next = value + chunk; if (next.length > 262144) { fail(Error('bounded runtime logs exceeded')); return value; } return next; };
@@ -377,8 +445,8 @@ async function parent() {
     // Private signed cookies travel only over parent/child IPC; omit them from
     // the receipt and never persist/log the invitation or HMAC values.
     delete first.secrets;
-    console.log(JSON.stringify({ localGatewayWebSocketSessionAuthorityQualified: true, first, recovered, node: process.version, platform: process.platform, architecture: process.arch,
-        temporaryStateRemoved: true, scope: 'Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.' }, null, 2));
+    console.log(JSON.stringify({ localGatewayWebSocketSessionAuthorityQualified: true, ...(PARTICIPATION ? { productionParticipationCompositionQualified: true, guardianDecisionsQualified: false } : {}), first, recovered, node: process.version, platform: process.platform, architecture: process.arch,
+        temporaryStateRemoved: true, scope: 'Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. ' + (PARTICIPATION ? 'Required production C3 bridge selected; only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. ' : '') + 'No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.' }, null, 2));
 }
-try { if (process.argv[2] === '--isolated' && process.argv.length === 6) await runtime(process.argv[3], process.argv[4], process.argv[5]); else await parent(); }
+try { if (process.argv[2] === '--isolated' && process.argv.length === (PARTICIPATION ? 7 : 6)) await runtime(process.argv[3], process.argv[4], process.argv[5]); else await parent(); }
 catch (error) { console.error(error.stack || error); process.exitCode = 1; }

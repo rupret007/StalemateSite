@@ -69,7 +69,9 @@ jobs:
             hangout-worker/src/transport-budget.mjs hangout-worker/src/participation-checkpoint.mjs r/45662413410ed051/sync-core.js r/45662413410ed051/entry-sites.mjs \
             tests/runtime/lobby-session-authority/runner.mjs tests/runtime/lobby-session-authority/worker.mjs tests/runtime/lobby-session-authority/README.md \
             hangout-worker/src/lobby-session-authority.mjs hangout-worker/src/beta-entry.mjs hangout-worker/src/index.mjs \
-            hangout-worker/src/private-reports.mjs hangout-worker/src/participation-enforcement.mjs > runtime-proof-artifacts/source-sha256.txt
+            hangout-worker/src/private-reports.mjs hangout-worker/src/participation-enforcement.mjs hangout-worker/src/lobby-do.mjs \
+            hangout-worker/src/lobby-participation.mjs hangout-worker/src/participation-policy.mjs hangout-worker/src/participation-consents.mjs \
+            hangout-worker/src/participation-partitions.mjs docs/HANGOUT_PRODUCTION_PARTICIPATION.md > runtime-proof-artifacts/source-sha256.txt
 
       - name: Install only the isolated locked runtime tools
         shell: bash
@@ -165,6 +167,18 @@ jobs:
           cat runtime-proof-artifacts/lobby-session-runtime.stdout.log
           cat runtime-proof-artifacts/lobby-session-runtime.stderr.log >&2
           printf '%s\n' "$status" > runtime-proof-artifacts/lobby-session-runtime.exit-code.txt
+          exit "$status"
+
+      - name: Prove production C3 composition with synthetic consent decisions
+        shell: bash
+        run: |
+          set +e
+          npm run test:lobby-session-runtime -- --participation > runtime-proof-artifacts/lobby-participation-runtime.stdout.log 2> runtime-proof-artifacts/lobby-participation-runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/lobby-participation-runtime.stdout.log
+          cat runtime-proof-artifacts/lobby-participation-runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/lobby-participation-runtime.exit-code.txt
           exit "$status"
 
       - name: Preserve source-bound runtime diagnostics
