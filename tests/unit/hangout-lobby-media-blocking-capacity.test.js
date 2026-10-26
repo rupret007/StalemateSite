@@ -22,26 +22,44 @@ beforeAll(async () => {
     // room-admission exception; 50 is a fixture size, not a claimed profile cap.
     // Eight ordinary visitors are admitted before staff. No limit is raised.
     const staff = Array.from({ length: 50 }, (_, n) => make('Staff', n, true));
-    const views = new Map(), published = [], commits = { semantic: 0, costs: 0 };
-    f = { guests, staff, views, published, commits, monitoring: false };
+    const views = new Map(), published = [], commits = { prepared: 0, semantic: 0, costs: 0 };
+    const setup = { actions: 0, refusals: [], maxElapsedMs: 0 };
+    f = { guests, staff, views, published, commits, setup, monitoring: false };
     const engine = createLobby({ now: () => at,
         limits: { entrySites: createEntrySiteRegistry([{ id: SOURCE, label: 'Capacity fixture only' }]) },
         send: (id, frame) => {
             if (id === guests[0].id && frame.t === 'chan' && frame.ch.kind !== 'lobby') views.set(frame.ch.name, frame.ch);
             if (f.monitoring) published.push({ recipient: id, ...structuredClone(frame) });
         },
-        effectCommit: { prepare: operation => operation, commit: async (_context, _effects, { costsOnly }) => {
+        effectCommit: { prepare: operation => { commits.prepared += 1; return operation; }, commit: async (_context, _effects, { costsOnly }) => {
             commits[costsOnly ? 'costs' : 'semantic'] += 1; return { ok: true };
         } } });
-    const message = async (who, frame) => {
-        const result = await engine.message(who.id, JSON.stringify(frame));
-        expect(result?.ok, `setup action ${frame.t}/${frame.name || ''} for ${who.nick}`).not.toBe(false);
+    const setupAction = async (who, frame, invoke) => {
+        const room = frame.t === 'cmd' && frame.name === 'join' ? frame.args[0] : frame.ch;
+        const state = () => ({ ...commits, roomIndex: ROOMS.indexOf(room),
+            memberCount: engine._debug.channels.get(room)?.members.size ?? 0,
+            memberPresent: engine._debug.channels.get(room)?.members.has(who.id) ?? false });
+        const before = state(), started = performance.now();
+        const result = await invoke();
+        const elapsedMs = performance.now() - started, after = state();
+        setup.actions += 1; setup.maxElapsedMs = Math.max(setup.maxElapsedMs, elapsedMs);
+        const diagnostic = { scope: 'capacity-fixture-setup-only', action: `${frame.t}/${frame.name || ''}`,
+            nick: who.nick, room: room ?? null, reason: typeof result?.reason === 'string' ? result.reason.slice(0, 128) : null,
+            elapsedMs: Math.round(elapsedMs * 1000) / 1000, before, after };
+        if (result?.ok === false) {
+            // Retain bounded evidence and fail. Never retry the Block under test,
+            // suppress an admission failure or change the real monotonic clock.
+            if (setup.refusals.length < 8) setup.refusals.push(diagnostic);
+            console.warn(JSON.stringify(diagnostic));
+        }
+        expect(result?.ok, JSON.stringify(diagnostic)).not.toBe(false);
         return result;
     };
+    const message = (who, frame) => setupAction(who, frame, () => engine.message(who.id, JSON.stringify(frame)));
     const cmd = (who, name, args, ch = '#stalemate') => message(who, { t: 'cmd', ch, name, args });
     Object.assign(f, { engine, message, cmd, advance: ms => { at += ms; } });
     for (const person of [...guests, ...staff]) {
-        expect(await engine.connect(person)).toMatchObject({ ok: true });
+        expect(await setupAction(person, { t: 'connect' }, () => engine.connect(person))).toMatchObject({ ok: true });
         await message(person, { t: 'hello', nick: person.nick, age13: true, entrySource: SOURCE });
         expect(engine._debug.conns.get(person.id).nick).toBe(person.nick);
     }
@@ -64,6 +82,8 @@ for (const [index, room] of ROOMS.entries()) beforeAll(async () => {
 describe('Block remains available at accepted shared-room membership', () => {
     it('commits one device block across 30 accepted rooms without exceeding the existing staged-output budget', async () => {
         const blocker = f.guests[0], target = f.staff[0];
+        console.log(JSON.stringify({ scope: 'capacity-fixture-setup-summary', actions: f.setup.actions,
+            refusals: f.setup.refusals, maxElapsedMs: Math.round(f.setup.maxElapsedMs * 1000) / 1000 }));
         expect(f.views.size).toBe(LOBBY_LIMITS.roomsListed);
         const baselineRefreshBytes = [...f.views.values()].reduce((total, view) =>
             total + Buffer.byteLength(JSON.stringify({ t: 'chan', ch: view })) * view.count, 0);
