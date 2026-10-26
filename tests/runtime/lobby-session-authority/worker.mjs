@@ -13,6 +13,8 @@ const ORIGIN = 'https://local-fixture.invalid';
 const PREFIX = '/_fixture/';
 const INCIDENT_CASES = 'restricted-incident-cases-v1', INCIDENT_APPOINTMENT = 'fixture-incident-appointment', INCIDENT_POLICY = 'fixture-incident-policy';
 const SELECTED_REPORT = 'Native selected report greeting';
+const TRAFFIC_PREFIX = 'ACK probe ephemeral marker ';
+const TRAFFIC_LABELS = ['NativeAlpha', 'NativeBravo', 'NativeCharlie'];
 const ordinaryNeedles = ['Native Stalemate ephemeral greeting', 'Native Rad Dad ephemeral greeting', 'Native remaining visitor greeting', 'native-media-control-no-body-persistence'];
 const ensure = (condition, label) => { if (!condition) throw Error(label); };
 const denied = () => new Response('local fixture admission denied', { status: 403 });
@@ -36,7 +38,8 @@ async function readControl(request) {
 
 export class FixtureLobby extends HangoutLobby {
     constructor(state, env) {
-        const control = { faultKey: '', tripped: false, nativeWriteCompleted: false, nativeCalls: 0, history: [], rollbackWitnesses: [] };
+        const control = { faultKey: '', tripped: false, nativeWriteCompleted: false, nativeCalls: 0, history: [], rollbackWitnesses: [],
+            traffic: env.FIXTURE_TRAFFIC_ACKS === 'ack-v1' ? { slots: new Map(), transactionsStarted: 0, transactionsCommitted: 0, transactionsRejected: 0 } : null };
         const manifestDigest = async (storage, key) => {
             control.nativeCalls++;
             const value = await storage.get(key);
@@ -54,8 +57,13 @@ export class FixtureLobby extends HangoutLobby {
                 // Unexpected nesting must fail rather than replace a witness.
                 ensure(transactionWitness === null, 'fixture-nested-native-transaction');
                 const witness = { fault: null };
-                try { return await method.call(raw, tx => operation(wrap(tx, witness))); }
-                catch (error) {
+                if (control.traffic) control.traffic.transactionsStarted++;
+                try {
+                    const result = await method.call(raw, tx => operation(wrap(tx, witness)));
+                    if (control.traffic) control.traffic.transactionsCommitted++;
+                    return result;
+                } catch (error) {
+                    if (control.traffic) control.traffic.transactionsRejected++;
                     if (witness.fault) {
                         const { physicalKey, ...observation } = witness.fault;
                         observation.restoredSha256 = await manifestDigest(raw, physicalKey);
@@ -235,7 +243,36 @@ export class FixtureLobby extends HangoutLobby {
         const result = await f.ledger.change(proof, { expectedRevision: subject.revision, purposes: subject.purposes.filter(purpose => purpose !== 'camera') });
         f.guardians.delete(proof); ensure(result.state === 'authorized', 'fixture-reduction-refused'); return { reduced: true };
     }
+    fixtureTrafficMetrics() {
+        const meter = this.fixtureControl.traffic;
+        ensure(this.env.FIXTURE_TRAFFIC_ACKS === 'ack-v1' && meter && this.participationMode && !this.incidentSourceMode, 'fixture-traffic-mode-required');
+        const current = this.engine.sessionSnapshot().connections;
+        ensure(current.length === 3 && current.every(person => !person.account), 'fixture-three-traffic-guests-required');
+        // Ephemeral slot mapping derives only from real current engine/binding
+        // identities. It survives Alpha's empty safety-only nickname locally,
+        // but never writes a fixture ID/metric into the authority namespace.
+        if (!meter.slots.size) {
+            ensure(TRAFFIC_LABELS.every(label => current.filter(person => person.nick === label).length === 1), 'fixture-traffic-labels-required');
+            for (const person of current) meter.slots.set(person.id, TRAFFIC_LABELS.indexOf(person.nick));
+        }
+        ensure(meter.slots.size === 3 && current.every(person => meter.slots.has(person.id) && this.liveBindings.has(person.id)), 'fixture-traffic-current-bindings-required');
+        const sockets = current.map(person => {
+            const matches = this.state.getWebSockets().filter(socket => socket.readyState === 1 && socket.deserializeAttachment()?.id === person.id);
+            ensure(matches.length === 1, 'fixture-traffic-current-socket-required');
+            const attachment = matches[0].deserializeAttachment(), delivery = attachment.delivery, grant = attachment.controlGrant;
+            ensure(delivery?.enabled === true && delivery.negotiated === true && Array.isArray(delivery.sizes)
+                && (grant === undefined && delivery.control.count === 0 || grant?.v === 1 && Number.isSafeInteger(grant.remaining) && grant.remaining >= 0 && grant.remaining < 20), 'fixture-traffic-native-transport-state-required');
+            return { slot: meter.slots.get(person.id), enabled: delivery.enabled, sequence: delivery.seq, acknowledged: delivery.ack,
+                controls: delivery.control.count, pendingFrames: delivery.sizes.length, remainingControls: grant?.remaining ?? 0 };
+        }).sort((a, b) => a.slot - b.slot);
+        const requestUnits = this.engine.snapshot().budget.requests;
+        ensure(Number.isFinite(requestUnits) && requestUnits >= 0, 'fixture-traffic-request-counter-required');
+        return { sockets, delivery: this.delivery.snapshot(), controlBudget: this.controlBudget.snapshot(), requestUnits,
+            nativeStorageMethodCalls: this.fixtureControl.nativeCalls,
+            transactions: { started: meter.transactionsStarted, committed: meter.transactionsCommitted, rejected: meter.transactionsRejected } };
+    }
     async fixtureInspect() {
+        const needles = [...ordinaryNeedles, ...(this.env.FIXTURE_TRAFFIC_ACKS === 'ack-v1' ? [TRAFFIC_PREFIX] : [])];
         const saved = await this.authority.load();
         let commandReadyAt, sharingStates, incidentSources;
         if (this.participationMode) {
@@ -260,7 +297,7 @@ export class FixtureLobby extends HangoutLobby {
             id: report.id, ch: report.ch, from: report.from, textSha256: await sha(report.text),
             contextSha256: await Promise.all(report.context.map(sha)), votes: report.devs.length, hidden: report.hidden
         })));
-        const absent = Object.fromEntries(ordinaryNeedles.map(needle => [needle, true]));
+        const absent = Object.fromEntries(needles.map(needle => [needle, true]));
         const logicalScan = await this.authority.records.transaction(async tx => {
             let cursor, rows = 0, bytes = 0; const known = new Set();
             for (;;) {
@@ -271,7 +308,7 @@ export class FixtureLobby extends HangoutLobby {
                     ensure(++rows <= 256, 'logical-scan-row-cap');
                     const text = JSON.stringify(value); bytes += new TextEncoder().encode(text).byteLength;
                     ensure(bytes <= 8 * 1024 * 1024, 'logical-scan-byte-cap');
-                    for (const needle of ordinaryNeedles) if (text.includes(needle)) absent[needle] = false;
+                    for (const needle of needles) if (text.includes(needle)) absent[needle] = false;
                     known.add(key); cursor = key;
                 }
             }
@@ -281,7 +318,7 @@ export class FixtureLobby extends HangoutLobby {
             return { rows, bytes, requiredRecordsPresent: true };
         });
         let cursor, rows = 0, bytes = 0;
-        const rawAbsent = Object.fromEntries(ordinaryNeedles.map(needle => [needle, true]));
+        const rawAbsent = Object.fromEntries(needles.map(needle => [needle, true]));
         // Own fresh fixture keyspace only. This does not inventory production
         // raw keys or establish an old-writer drain/migration prerequisite.
         for (;;) {
@@ -292,7 +329,7 @@ export class FixtureLobby extends HangoutLobby {
                 ensure(++rows <= 256, 'raw-scan-row-cap');
                 const text = value instanceof Uint8Array ? new TextDecoder().decode(value) : value instanceof ArrayBuffer ? new TextDecoder().decode(value) : JSON.stringify(value);
                 bytes += new TextEncoder().encode(text).byteLength; ensure(bytes <= 8 * 1024 * 1024, 'raw-scan-byte-cap');
-                for (const needle of ordinaryNeedles) if (text.includes(needle)) rawAbsent[needle] = false;
+                for (const needle of needles) if (text.includes(needle)) rawAbsent[needle] = false;
                 cursor = key;
             }
         }
@@ -317,6 +354,7 @@ export class FixtureLobby extends HangoutLobby {
         if (!admitted(request, this.env)) return denied();
         const body = await readControl(request); if (!body) return denied();
         await this.ready;
+        if (path === PREFIX + 'traffic-metrics' && this.env.FIXTURE_TRAFFIC_ACKS !== 'ack-v1') return denied();
         if (path === PREFIX + 'participation-alarm' && this.participationMode && Object.keys(body).length === 0) {
             await this.alarm(); return Response.json({ completed: true });
         }
@@ -325,6 +363,7 @@ export class FixtureLobby extends HangoutLobby {
                 if (['incident-initialize', 'incident-preserve', 'incident-read'].includes(path.slice(PREFIX.length))) return Response.json(await this.fixtureIncident(path.slice(PREFIX.length), body));
                 if (['participation-policy', 'participation-grant', 'participation-reduce'].includes(path.slice(PREFIX.length))) return Response.json(await this.fixtureParticipation(path.slice(PREFIX.length), body));
                 if (path === PREFIX + 'inspect' && Object.keys(body).length === 0) return Response.json(await this.fixtureInspect());
+                if (path === PREFIX + 'traffic-metrics' && Object.keys(body).length === 0) return Response.json(this.fixtureTrafficMetrics());
                 if (path === PREFIX + 'fault' && (Object.keys(body).join(',') === 'room' && body.room === '#art-native-canvas'
                     || Object.keys(body).join(',') === 'record' && body.record === 'sessions')) {
                     const key = body.record === 'sessions' ? 'sessions' : 'community-room:' + body.room;
@@ -345,11 +384,12 @@ export default { async fetch(request, env) {
     const url = new URL(request.url), stub = env.LOBBY.get(env.LOBBY.idFromName('stalemate'));
     if (url.pathname.startsWith(PREFIX)) {
         const body = await readControl(request); if (!body) return denied();
+        if (url.pathname === PREFIX + 'traffic-metrics' && env.FIXTURE_TRAFFIC_ACKS !== 'ack-v1') return denied();
         if (url.pathname === PREFIX + 'initialize' && Object.keys(body).length === 0) {
             // Explicit fixture lifecycle action; betaFetch never forwards it.
             return stub.fetch(new Request(ORIGIN + LOBBY_AUTHORITY_PATH + 'initialize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }));
         }
-        if (['inspect', 'fault', 'participation-policy', 'participation-grant', 'participation-reduce', 'participation-alarm', 'incident-initialize', 'incident-preserve', 'incident-read'].includes(url.pathname.slice(PREFIX.length))) return stub.fetch(new Request(request.url, {
+        if (['traffic-metrics', 'inspect', 'fault', 'participation-policy', 'participation-grant', 'participation-reduce', 'participation-alarm', 'incident-initialize', 'incident-preserve', 'incident-read'].includes(url.pathname.slice(PREFIX.length))) return stub.fetch(new Request(request.url, {
             method: 'POST', headers: request.headers, body: JSON.stringify(body)
         }));
         if (url.pathname === PREFIX + 'egress-probe' && Object.keys(body).length === 0) {
