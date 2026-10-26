@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { openDurableRecordSqlite } from '../support/durable-record-sqlite.mjs';
 import { createDurableRecordStorage } from '../../hangout-worker/src/durable-record-storage.mjs';
 import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
+import { initializeLobbyEffects, writeLobbyEffects, readLobbyState, LOBBY_LOG_INDEX } from '../../hangout-worker/src/lobby-effect-records.mjs';
 import { PARTICIPATION_PURPOSES } from '../../hangout-worker/src/participation-policy.mjs';
 import { createParticipationEnforcement } from '../../hangout-worker/src/participation-enforcement.mjs';
 import { createPartitionedParticipationConsents, readPartitionedParticipationPrincipals,
@@ -79,7 +80,7 @@ async function fixture({ short = false, policyExpiresIn = 1000000 } = {}) {
         return ledger.change(proof, { expectedRevision: subject.revision, purposes: [] });
     };
     const frames = [], controls = { finalWrite: null, commits: [] }, legacyPersist = vi.fn();
-    const enforcement = createParticipationEnforcement({ storage, now: () => at, readPrincipals: readPartitionedParticipationPrincipals,
+    const makeEnforcement = store => createParticipationEnforcement({ storage: store, now: () => at, readPrincipals: readPartitionedParticipationPrincipals,
         resolveConnection: async ({ id }) => people.has(id) ? identity(people.get(id)) : null,
         validateConnection: async ({ tx, connection, identity: id, at: time }) => {
             const session = await tx.get(sessionKey(connection));
@@ -87,18 +88,19 @@ async function fixture({ short = false, policyExpiresIn = 1000000 } = {}) {
                 && ['dev', 'account', 'role', 'admin'].every(key => session[key] === connection[key]);
         },
         writeEffects: async ({ tx, effects, costsOnly }) => {
-            for (const [kind, value] of effects) await tx.put(`lobby:${kind}`, value);
+            await writeLobbyEffects({ tx, effects, costsOnly, now: at });
             if (!costsOnly && controls.finalWrite) {
                 const action = controls.finalWrite; controls.finalWrite = null;
                 await action(tx);
-                // Last physical manifest write remains inside the same SQLite
-                // transaction; authorize() must run again before publication.
-                await tx.put('synthetic:final-effect-fence', { attempted: true });
             }
         }
     });
-    const engine = createLobby({ now: () => at, participation: enforcement, persist: legacyPersist,
+    const engine = createLobby({ now: () => at, participation: makeEnforcement(storage), persist: legacyPersist,
         send: (id, frame) => { frames.push({ recipient: id, ...clone(frame) }); controls.commits.push(driver.stats.commits); } });
+    // Explicit test-only initialization of a known-new domain. No application
+    // route provisions this state or treats missing data as a fresh community.
+    await storage.transaction(tx => initializeLobbyEffects({ tx, now: at, state: { net: engine.snapshot(), rooms: engine.roomSnapshot(),
+        abuse: engine.abuseSnapshot(), sessions: engine.sessionSnapshot(), moderationQueue: { reports: [], held: [] }, aiReviews: [], modlog: [] } }));
     const message = (person, frame) => engine.message(person.id, JSON.stringify(frame));
     const cmd = (person, name, args = []) => message(person, { t: 'cmd', ch: '#stalemate', name, args });
     const connect = async person => {
@@ -111,11 +113,78 @@ async function fixture({ short = false, policyExpiresIn = 1000000 } = {}) {
         const raw = openDurableRecordSqlite(filename); cleanup.drivers.push(raw);
         return { driver: raw, storage: wrap(raw) };
     };
-    return { driver, storage, hooks, controls, config, ledger, makeLedger, enroll, identity, read, records, withdraw, frames, engine,
+    return { driver, storage, hooks, controls, config, ledger, makeLedger, makeEnforcement, people, enroll, identity, read, records, withdraw, frames, engine,
         legacyPersist, message, cmd, connect, reopen, now: () => at, advance: ms => at += ms };
 }
 
 describe('actual durable C2/C3 participation domain', () => {
+    it('stores created rooms in the actual indexed lobby layout used by restart recovery', async () => {
+        const f = await fixture(), alice = await f.enroll('alice'); await f.connect(alice);
+        await f.cmd(alice, 'join', ['#durable-layout']);
+        expect(f.engine.roomSnapshot().rooms.map(room => room.name)).toContain('#durable-layout');
+        const index = await f.storage.transaction(tx => tx.get('room-index'));
+        expect(index).toEqual({ version: 1, names: ['#durable-layout'] });
+        const room = await f.storage.transaction(tx => tx.get('community-room:#durable-layout'));
+        expect(room).toEqual(f.engine.roomSnapshot().rooms[0]);
+        expect(await f.storage.transaction(tx => tx.get('rooms'))).toBeUndefined();
+    });
+    it('restores actual ownership, membership, blocks, selected reports and net bans into a fresh lobby after disk reopen', async () => {
+        const f = await fixture(), alice = await f.enroll('alice'), bravo = await f.enroll('bravo'), charlie = await f.enroll('charlie');
+        Object.assign(alice, { role: 'owner', admin: true }); bravo.account = 'b'.repeat(64); charlie.account = 'c'.repeat(64);
+        for (const person of [alice, bravo, charlie]) await f.storage.transaction(tx => tx.put(sessionKey(person), person));
+        for (const person of [alice, bravo, charlie]) await f.connect(person);
+        await f.cmd(alice, 'join', ['#durable-restart']); await f.cmd(bravo, 'join', ['#durable-restart']);
+        await f.message(alice, { t: 'cmd', ch: '#durable-restart', name: 'register', args: [] });
+        expect(f.engine.roomSnapshot().rooms[0].owner).toBe(alice.account);
+        await f.message(bravo, { t: 'say', ch: '#stalemate', text: 'Selected durable report target' });
+        const target = f.frames.find(frame => frame.t === 'line' && frame.text === 'Selected durable report target');
+        await f.message(alice, { t: 'report', id: target.id });
+        await f.cmd(alice, 'block', [bravo.nick]);
+        await f.cmd(alice, 'gban', [charlie.nick, 'Synthetic moderation acceptance check']);
+        await f.message(alice, { t: 'say', ch: '#stalemate', text: 'Ordinary unselected text after the report stays ephemeral' });
+        expect(f.engine.adminState().reports).toHaveLength(1); expect(f.engine._debug.conns.has(charlie.id)).toBe(false);
+        const recovered = await f.reopen(), saved = await recovered.storage.transaction(tx => readLobbyState({ tx, now: f.now() }));
+        const frames = [], fallback = vi.fn(), fresh = createLobby({ now: f.now, participation: f.makeEnforcement(recovered.storage), persist: fallback,
+            send: (recipient, frame) => frames.push({ recipient, ...clone(frame) }) });
+        fresh.restore(saved.net); await fresh.restoreAiReviews(saved.aiReviews); await fresh.restoreModerationQueue(saved.moderationQueue);
+        await fresh.restoreRooms(saved.rooms); fresh.restoreAbuse(saved.abuse);
+        expect(fresh.restoreSessions(saved.sessions, [alice, bravo])).toEqual({ resumed: [alice.id, bravo.id], rejected: [] });
+        fresh.restoreLog(saved.modlog);
+        expect(fresh.roomSnapshot().rooms[0].owner).toBe(alice.account);
+        expect([...fresh._debug.channels.get('#durable-restart').members].sort()).toEqual([alice.id, bravo.id].sort());
+        expect(fresh._debug.conns.get(alice.id).blocks.has(bravo.dev)).toBe(true);
+        expect(fresh.adminState().reports[0].text).toBe('Selected durable report target');
+        expect(fresh.snapshot().bans.some(ban => ban.mask === `dev:${charlie.dev}`)).toBe(true);
+        expect(fresh.modlog.some(row => row.action === 'room-register')).toBe(true);
+        expect(frames.some(frame => frame.t === 'line')).toBe(false); expect(fallback).not.toHaveBeenCalled();
+        const stored = [...recovered.driver.rows().values()].filter(value => value instanceof Uint8Array).map(value => Buffer.from(value).toString('utf8')).join('');
+        expect(stored).not.toContain('Ordinary unselected text after the report stays ephemeral');
+    });
+    it('rolls back an actual room-row write before its index/session update and releases no success frame', async () => {
+        const f = await fixture(), alice = await f.enroll('alice'); await f.connect(alice); f.frames.length = 0;
+        const before = await f.storage.transaction(tx => readLobbyState({ tx, now: f.now() }));
+        let injected = false;
+        f.hooks.after = event => { if (!injected && logicalKey(event) === 'community-room:#durable-failed') { injected = true; throw Error('after real room-row write'); } };
+        expect(await f.cmd(alice, 'join', ['#durable-failed'])).toMatchObject({ ok: false, reason: 'participation-unavailable' });
+        f.hooks.after = undefined; expect(injected).toBe(true);
+        const after = await f.storage.transaction(tx => readLobbyState({ tx, now: f.now() }));
+        expect(after.rooms).toEqual(before.rooms); expect(after.modlog).toEqual(before.modlog);
+        expect(after.sessions.connections[0].channels).toEqual(before.sessions.connections[0].channels);
+        expect(await f.storage.transaction(tx => tx.get('community-room:#durable-failed'))).toBeUndefined();
+        expect(f.frames.some(frame => frame.t === 'join' && frame.ch?.name === '#durable-failed')).toBe(false);
+        expect(f.legacyPersist).not.toHaveBeenCalled();
+    });
+    it('deletes the obsolete room, its chunks and a legacy aggregate in the same successful close transaction', async () => {
+        const f = await fixture(), alice = await f.enroll('alice'); await f.connect(alice);
+        await f.cmd(alice, 'join', ['#durable-delete']);
+        await f.storage.transaction(tx => tx.put('rooms', f.engine.roomSnapshot()));
+        await f.message(alice, { t: 'cmd', ch: '#durable-delete', name: 'close', args: [] });
+        const saved = await f.storage.transaction(tx => readLobbyState({ tx, now: f.now() }));
+        expect(saved.rooms.rooms).toEqual([]);
+        expect(await f.storage.transaction(tx => tx.get('rooms'))).toBeUndefined();
+        expect(await f.storage.transaction(tx => tx.get('community-room:#durable-delete'))).toBeUndefined();
+        expect([...f.driver.rows().keys()].some(key => key.includes(Buffer.from('community-room:#durable-delete').toString('hex')))).toBe(false);
+    });
     it('exchanges guest chat only after SQLite commit and recovers the authorized records from disk', async () => {
         const f = await fixture(), alice = await f.enroll('alice'), bravo = await f.enroll('bravo');
         await f.connect(alice); await f.connect(bravo); f.frames.length = 0; f.controls.commits.length = 0;
@@ -159,16 +228,17 @@ describe('actual durable C2/C3 participation domain', () => {
         const beforeFrames = f.engine._debug.conns.get(alice.id).frames, beforeRollbacks = f.driver.stats.rollbacks;
         let sawFinalWrite = false, earlyOutput = false;
         f.hooks.after = event => {
-            if (logicalKey(event) === 'synthetic:final-effect-fence') {
-                sawFinalWrite = true; earlyOutput = f.frames.length !== 0;
-                if (kind === 'policy-expiry') f.advance(f.config.policy.expiresAt - f.now() + 1);
-            }
+            if (logicalKey(event) === LOBBY_LOG_INDEX) { sawFinalWrite = true; earlyOutput = f.frames.length !== 0; }
         };
         // Authority mutations are explicitly staged by a trusted fixture in
         // this SAME serializable domain, not a claimed concurrent remote edit.
         f.controls.finalWrite = async tx => {
+            // The domain writer has completed its final actual log-index write;
+            // this trusted fixture changes authority in that SAME transaction.
+            expect(sawFinalWrite).toBe(true);
             if (kind === 'stored-session-revocation') await tx.delete(sessionKey(alice));
             if (kind === 'stored-role-change') await tx.put(sessionKey(alice), { ...beforeSession, role: 'moderator', admin: true });
+            if (kind === 'policy-expiry') f.advance(f.config.policy.expiresAt - f.now() + 1);
         };
         expect(await f.cmd(alice, 'join', ['#art-durable-denied'])).toMatchObject({ ok: false, reason: 'participation-denied' });
         expect(sawFinalWrite).toBe(true); expect(earlyOutput).toBe(false); expect(f.driver.stats.rollbacks).toBe(beforeRollbacks + 1);
@@ -176,10 +246,9 @@ describe('actual durable C2/C3 participation domain', () => {
         expect(f.engine.sessionSnapshot().receipts).toEqual(beforeReceipts);
         expect(f.frames.some(frame => frame.t === 'join' && frame.ch?.name === '#art-durable-denied')).toBe(false);
         expect(f.engine._debug.conns.get(alice.id).frames).toBe(beforeFrames + 1);
-        expect(await f.storage.transaction(tx => tx.get('synthetic:final-effect-fence'))).toBeUndefined();
         expect(await f.storage.transaction(tx => tx.get(sessionKey(alice)))).toEqual(beforeSession);
         expect(beforeSession.expiresAt).toBeGreaterThan(f.now());
-        const sessions = await f.storage.transaction(tx => tx.get('lobby:sessions'));
+        const sessions = await f.storage.transaction(tx => tx.get('sessions'));
         expect(JSON.stringify(sessions)).not.toContain('#art-durable-denied');
         expect(f.legacyPersist).not.toHaveBeenCalled();
     });
