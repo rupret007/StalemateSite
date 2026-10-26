@@ -412,7 +412,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
 
     const mkChannel = (name, kind, title, founder) => ({
-        name, kind, title, founder, generation: ++channelGeneration, created: now(), topic: kind === 'lobby' ? 'Welcome to #stalemate. Pull up a nick, say hello, make something together. /help for commands.' : '',
+        name, kind, title, founder, keepRef: crypto.randomUUID().replace(/-/g, ''), generation: ++channelGeneration, created: now(), topic: kind === 'lobby' ? 'Welcome to #stalemate. Pull up a nick, say hello, make something together. /help for commands.' : '',
         modes: { m: false, i: false, k: '', l: kind === 'lobby' ? L.lobbyMax : L.roomMax, t: true, S: kind === 'lobby' ? L.defaultSlow : 0, C: kind !== 'lobby' && kind !== 'chat', Q: false, locked: false },
         jam: kind === 'jam' ? { desktop: '', web: '' } : null, ops: new Set(founder ? [founder] : []), opAccounts: new Map(), voice: new Set(), bans: [], invites: new Set(), kicks: {},
         owner: '', cohostLabels: {}, cohosts: new Set(), renewed: now(), transfer: null, members: new Set(), moderationContext: [], emptySince: null,
@@ -473,7 +473,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         : membersOf(chan).filter(peer => peer.id !== viewer.id && (viewer.blocks.has(peer.dev) || peer.blocks.has(viewer.dev))).map(peer => peer.id);
     // Only current connection IDs are disclosed to the affected recipient.
     // Device block references remain private session preferences.
-    const chanView = (chan, viewer) => ({ name: chan.name, kind: chan.kind, title: chan.title, topic: chan.topic, modes: { ...chan.modes, k: chan.modes.k ? true : false }, count: chan.members.size, persistent: !!chan.owner, expiresAt: chan.owner ? chan.renewed + ROOM_TTL : null, names: names(chan), mediaBlocked: mediaBlocked(chan, viewer), jam: chan.jam ? { desktop: chan.jam.desktop, invitation: chan.jam.invitation || chan.jam.desktop, web: chan.jam.web, webReady: !!chan.jam.web } : null });
+    const chanView = (chan, viewer) => ({ name: chan.name, kind: chan.kind, title: chan.title, topic: chan.topic, modes: { ...chan.modes, k: chan.modes.k ? true : false }, count: chan.members.size, keepRef: chan.keepRef, persistent: !!chan.owner, expiresAt: chan.owner ? chan.renewed + ROOM_TTL : null, names: names(chan), mediaBlocked: mediaBlocked(chan, viewer), jam: chan.jam ? { desktop: chan.jam.desktop, invitation: chan.jam.invitation || chan.jam.desktop, web: chan.jam.web, webReady: !!chan.jam.web } : null });
     const sendChan = (chan, { presence = false } = {}) => {
         if (presence && typeof deferPresence === 'function') return queuePresence({ channel: chan.name, generation: chan.generation });
         const view = chanView(chan);
@@ -729,7 +729,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             cams: new Set(), since: now(), lastNick: 0, tokens: L.burst, last: now(), frames: 0, lastSaid: {}, actTokens: L.actBurst, actLast: now() };
         conns.set(id, c);
         if (band) { net.lastBand = now(); if (net.shieldAuto || net.lockAuto) bot(c, 'A saved safety state needs review: fans can read but not talk while the lobby is read-only. Check the band panel; /lobby unlock and /shieldoff when you are ready.'); saveNet(); }
-        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1 } });
+        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, roomKeep: 1 } });
         return { ok: true };
     }
 
@@ -835,7 +835,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             const name = lc(f.name);
             const args = jamEnvelope ? ['invitation', typeof f.args[1] === 'string' ? f.args[1] : '']
                 : Array.isArray(f.args) ? f.args.slice(0, 8).map((a) => String(a).slice(0, 300)) : [];
-            return command(c, f.ch, name, args);
+            return command(c, f.ch, name, args, Object.hasOwn(f, 'roomInstance') ? f.roomInstance : undefined);
         }
         case 'report': return report(c, String(f.id || ''), f.text);
         case 'cam': return cam(c, f.ch, !!f.on, f.adult18 === true);
@@ -881,7 +881,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         return false;
     }
 
-    function command(c, where, name, args) {
+    function command(c, where, name, args, roomInstance) {
         if (!limited(c, 'command', 10, 1, true)) return;
         if (roomsBroken && !['help', 'list', 'names', 'whois', 'part', 'quit', 'lobby', 'log'].includes(name)) return bot(c, 'Storage needs administrator recovery before changes can continue.', 'error');
         const alias = { j: 'join', leave: 'part', m: 'msg', q: 'query', w: 'whois', who: 'names', exit: 'quit', bye: 'quit', h: 'help', '?': 'help', deny: 'decline', approveheld: 'approve' };
@@ -919,7 +919,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             || name === 'mode' && String(args[0] || '').startsWith('+'));
         if (growsRoom && !roomCapacity()) return bot(c, 'Room storage is full. Clear an idle canvas or remove unused room grants before adding more.', 'error');
         const fn = handlers[name];
-        return fn(c, chan, args);
+        return fn(c, chan, args, roomInstance);
     }
 
     const target = (c, nick) => {
@@ -962,7 +962,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         for (const [dev, grantedAccount] of room.opAccounts) if (grantedAccount === account) removeDeviceOp(room, dev);
         for (const person of conns.values()) if (person.account === account && !room.opAccounts.has(person.dev)) removeDeviceOp(room, person.dev);
     }
-    const roomMetadata = (room) => ({ ...roomRecord(room), opAccounts: [...room.opAccounts] });
+    const roomMetadata = (room) => ({ ...roomRecord(room), keepRef: room.keepRef, opAccounts: [...room.opAccounts] });
     function roomSnapshot() { return { version: 1, rooms: [...channels.values()].filter((r) => r.kind !== 'lobby').map(roomMetadata) }; }
     function validOpAccounts(room) {
         // The optional field keeps existing ops arrays readable without inventing
@@ -1171,7 +1171,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
 
     const handlers = {
-        register(c, room) {
+        register(c, room, _args, roomInstance) {
+            if (roomInstance !== undefined && (typeof roomInstance !== 'string' || !/^[a-f0-9]{32}$/.test(roomInstance) || room.keepRef !== roomInstance))
+                return bot(c, 'That room changed or closed. Choose the current room before keeping it.', 'error');
             if (roomsBroken || net.lock !== 'off' || net.shield) return bot(c, 'Registration is paused while the community is restricted.', 'error');
             if (!c.account) return bot(c, 'Sign in with email to keep a room across visits.', 'error');
             if (room.kind === 'lobby' || room.owner || room.founder !== c.dev || !room.members.has(c.id)) return bot(c, 'Only this temporary room’s founder can register it.', 'error');
@@ -1216,13 +1218,15 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return closeRoom(room, c.nick, 'registration removed by owner');
         },
         help(c) { HELP.forEach((h) => bot(c, h)); },
-        join(c, _chan, [rawName, key = '', ...titleWords]) {
+        join(c, _chan, [rawName, key = '', ...titleWords], roomInstance) {
             let name = String(rawName || '');
             if (!name.startsWith('#')) name = `#${name}`;
             name = name.toLowerCase();
             if (name.startsWith('&')) return bot(c, 'Private rooms live outside the lobby and are end-to-end encrypted. Use “Start a private room”.', 'error');
             if (!/^#[a-z0-9-]{2,30}$/.test(name)) return bot(c, 'Room names look like #bobross-tuesday (letters, numbers, dashes).', 'error');
             const existing = ch(name);
+            if (roomInstance !== undefined && (typeof roomInstance !== 'string' || !/^[a-f0-9]{32}$/.test(roomInstance) || !existing || existing.keepRef !== roomInstance))
+                return bot(c, 'That room changed or closed while you signed in. Choose a room to continue.', 'error');
             if (existing) return enter(c, existing, { key });
             return create(c, name, key, titleWords.join(' '));
         },

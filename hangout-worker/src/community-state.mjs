@@ -21,6 +21,7 @@ export function validRoom(r, now) {
         && typeof r.title === 'string' && r.title.length <= 40 && typeof r.topic === 'string' && r.topic.length <= 300
         && (r.cohostLabels === undefined || obj(r.cohostLabels) && Object.entries(r.cohostLabels).every(([key, label]) => id(key) && typeof label === 'string' && label.length <= 20))
         && id(r.founder) && (r.owner === '' || id(r.owner)) && ids(r.cohosts)
+        && (r.keepRef === undefined || typeof r.keepRef === 'string' && /^[a-f0-9]{32}$/.test(r.keepRef))
         && Number.isFinite(r.created) && r.created >= 0 && r.created <= now
         && Number.isFinite(r.renewed) && r.renewed >= r.created && r.renewed <= now
         && (r.transfer == null || obj(r.transfer) && Object.keys(r.transfer).length === 3

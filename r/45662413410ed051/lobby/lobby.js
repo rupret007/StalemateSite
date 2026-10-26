@@ -1,6 +1,6 @@
 /* #stalemate lobby client. Hidden preview. Everything is rendered with textContent;
  * the server enforces permissions, rate limits and public-content policies. */
-import { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff, readEntryHandoff } from '../entry-sites.mjs';
+import { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff, readEntryHandoff, KEEP_ROOM_INTENT_KEY, KEEP_ROOM_INTENT_TTL, keepRoomIntent, consumeKeepRoomIntent } from '../entry-sites.mjs';
 import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
 (() => {
@@ -9,13 +9,21 @@ import { createEntrySharing } from './entry-sharing.mjs';
     const $$ = (s, el = document) => [...el.querySelectorAll(s)];
     const Discovery = window.HangoutDiscovery;
     const params = new URLSearchParams(location.search);
+    const readTab = key => { try { return sessionStorage.getItem(key); } catch { return null; } };
+    const writeTab = (key, value) => { try { sessionStorage.setItem(key, value); } catch { /* Tab storage is optional for ordinary chat. */ } };
+    const removeTab = key => { try { sessionStorage.removeItem(key); } catch { /* A failed Keep read is handled separately. */ } };
+
     const entrySites = createEntrySiteRegistry(window.HangoutEntrySites);
-    const handoff = params.get('entry-return') === '1' ? readEntryHandoff(sessionStorage.getItem(ENTRY_HANDOFF_KEY), Date.now(), entrySites) : null;
-    sessionStorage.removeItem(ENTRY_HANDOFF_KEY);
+    let handoff = null;
+    try {
+        if (params.get('entry-return') === '1') handoff = readEntryHandoff(sessionStorage.getItem(ENTRY_HANDOFF_KEY), Date.now(), entrySites);
+        sessionStorage.removeItem(ENTRY_HANDOFF_KEY);
+    } catch { /* A blocked tab store must not prevent ordinary chat. */ }
     const entrySource = params.has('via') ? entrySourceFromParams(params, entrySites) : handoff?.source || '';
     let shareEntry = handoff?.share !== false;
     let entrySourcesSupported = null;
     let privateMessageContextSupported = false;
+    let keepSupported = false, keepReturnChecked = false, pendingKeep = null, keepTimer;
     // With an older server, only commands with an explicit target or global
     // meaning are safe in a private tab. Its channel fallback cannot route PM
     // actions, so refuse them locally without clearing the visitor's draft.
@@ -23,16 +31,16 @@ import { createEntrySharing } from './entry-sharing.mjs';
         'away', 'ignore', 'unignore', 'list', 'help', 'h', '?', 'accept', 'decline', 'deny', 'block', 'unblock', 'pm',
         'mute', 'gban', 'purge', 'shield', 'shieldoff', 'lobby', 'filter', 'slow', 'approve', 'approveheld',
         'dismiss', 'aidismiss', 'privatereport', 'log', 'delete']);
-    let ownerSession = params.get('owner') === '1' || sessionStorage.getItem('hangout-owner') === '1';
-    if (ownerSession) sessionStorage.setItem('hangout-owner', '1');
+    let ownerSession = params.get('owner') === '1' || readTab('hangout-owner') === '1';
+    if (ownerSession) writeTab('hangout-owner', '1');
     const isLocal = /^(127\.0\.0\.1|localhost)$/.test(location.hostname);
     // Read the preview key once, then drop the query from the address bar (keeps it out of history,
     // screenshots and page analytics).
-    const previewKey = params.get('preview') || sessionStorage.getItem('hangout-preview') || '';
-    if (params.get('preview')) sessionStorage.setItem('hangout-preview', params.get('preview'));
-    const relayBase = ((isLocal && (params.get('relay') || sessionStorage.getItem('hangout-relay'))) || $('meta[name="hangout-relay"]').content || '').replace(/\/$/, '');
+    const previewKey = params.get('preview') || readTab('hangout-preview') || '';
+    if (params.get('preview')) writeTab('hangout-preview', params.get('preview'));
+    const relayBase = ((isLocal && (params.get('relay') || readTab('hangout-relay'))) || $('meta[name="hangout-relay"]').content || '').replace(/\/$/, '');
     const turnUrl = ((isLocal && params.get('turn')) || $('meta[name="hangout-turn"]').content || '').trim();
-    if (isLocal && params.get('relay')) sessionStorage.setItem('hangout-relay', params.get('relay'));
+    if (isLocal && params.get('relay')) writeTab('hangout-relay', params.get('relay'));
     if (location.search) history.replaceState(null, '', location.pathname + location.hash);
     const siteKey = $('meta[name="hangout-turnstile"]').content || '';
     // Only the actual beta shell adds this marker. A local preview has its own
@@ -51,7 +59,67 @@ import { createEntrySharing } from './entry-sharing.mjs';
 
     const app = window.__lobby = { ws: null, me: '', role: 'fan', band: false, chans: new Map(), pms: new Map(), active: '#stalemate', rooms: [], ignores: new Set(), pending: null };
     const entrySharing = createEntrySharing({ source: entrySource, enabled: shareEntry, registry: entrySites, send: (frame) => send(frame), onChange: () => drawEntryChoice() });
-    const saveEntryHandoff = () => sessionStorage.setItem(ENTRY_HANDOFF_KEY, entryHandoff(entrySource, shareEntry, Date.now(), entrySites));
+    function prepareOwnerSignin(current = null) {
+        const intent = current ? keepRoomIntent(current, Date.now()) : null;
+        if (current && (!keepSupported || !intent)) {
+            toast('This chat version cannot return safely to this room. Use the email sign-in link, then choose the current room.');
+            return false;
+        }
+        try {
+            sessionStorage.removeItem(KEEP_ROOM_INTENT_KEY);
+            sessionStorage.setItem(ENTRY_HANDOFF_KEY, entryHandoff(entrySource, shareEntry, Date.now(), entrySites));
+            if (intent) sessionStorage.setItem(KEEP_ROOM_INTENT_KEY, intent);
+        } catch { toast('This tab cannot save your sign-in return. You can keep chatting; allow tab storage before trying again.'); return false; }
+        return true;
+    }
+    function clearKeep(message = '') {
+        const prompt = $('[data-keep-prompt]'), heldFocus = prompt.contains(document.activeElement);
+        clearTimeout(keepTimer); pendingKeep = null;
+        prompt.hidden = true;
+        if (heldFocus) {
+            const current = app.chans.get(app.active);
+            const visible = element => element && !element.disabled && !element.closest('[hidden]') && getComputedStyle(element).display !== 'none';
+            const host = current && current.kind !== 'lobby' && amOp(current) ? $('[data-roomtools]') : null;
+            const target = [host, $('[data-text]')].find(visible);
+            target?.focus({ preventScroll: true });
+        }
+        if (message) toast(message);
+    }
+    function drawKeepPrompt() {
+        if (!pendingKeep || pendingKeep.stage === 'joining') return;
+        const current = app.chans.get(pendingKeep.room);
+        if (Date.now() - pendingKeep.at >= KEEP_ROOM_INTENT_TTL || Date.now() < pendingKeep.at)
+            return clearKeep(pendingKeep.stage === 'submitted' ? 'Keeping this room was not confirmed. Check Host tools before trying again.' : 'Your room return expired. Choose the current room before keeping it.');
+        if (connectionState !== 'connected' || !app.verified || !current || current.keepRef !== pendingKeep.ref)
+            return clearKeep(pendingKeep.stage === 'submitted' ? 'The room or sign-in changed before confirmation. Check Host tools after signing in again.' : 'That room or sign-in changed. Nothing was kept.');
+        if (current.persistent) return clearKeep('This room is registered. Check Host tools for your current access.');
+        if (!amOp(current)) return clearKeep(pendingKeep.stage === 'submitted' ? 'Your host controls changed before confirmation. Check Host tools for the current status.' : 'Your host controls changed. Nothing was kept.');
+        $('[data-keep-prompt]').hidden = app.active !== pendingKeep.room;
+        $('[data-keep-message]').textContent = pendingKeep.stage === 'submitted'
+            ? `Asking the server to keep ${pendingKeep.room}…`
+            : `Email verified. Keep ${pendingKeep.room} across visits?`;
+        // Keep focus in the labelled region before disabling its focused button.
+        // An acknowledgement must not later steal focus if the visitor moved away.
+        if (pendingKeep.stage === 'submitted' && $('[data-keep-prompt]').contains(document.activeElement))
+            $('[data-keep-prompt]').focus({ preventScroll: true });
+        $('[data-keep-accept]').disabled = pendingKeep.stage === 'submitted';
+        $('[data-keep-cancel]').disabled = pendingKeep.stage === 'submitted';
+    }
+    function returnToKeepRoom() {
+        if (keepReturnChecked) return;
+        keepReturnChecked = true;
+        let result;
+        try { result = consumeKeepRoomIntent(sessionStorage, Date.now()); }
+        catch { result = { unavailable: true }; }
+        if (result.unavailable) return toast('This tab could not read your room return. Chat is available; choose the current room manually.');
+        if (!result.intent) { if (result.hadIntent) toast('Your room return expired or was not recognized. Nothing was kept.'); return; }
+        if (!app.verified || !keepSupported || params.get('owner') !== '1' || params.get('entry-return') !== '1')
+            return toast('The room return was not confirmed by this sign-in. Choose the current room manually.');
+        pendingKeep = { ...result.intent, stage: 'joining' };
+        keepTimer = setTimeout(() => clearKeep(pendingKeep?.stage === 'submitted' ? 'Keeping this room was not confirmed. Check Host tools before trying again.' : 'Your room return expired. Nothing was kept.'), KEEP_ROOM_INTENT_TTL - (Date.now() - pendingKeep.at));
+        if (!cmd('join', [pendingKeep.room], '#stalemate', pendingKeep.ref)) clearKeep('The room return could not be sent. Nothing was kept.');
+    }
+
     function drawEntryChoice() {
         $$('[data-entry-context]').forEach((element) => { element.hidden = !entrySource || entrySourcesSupported === false; });
         $$('[data-entry-unavailable]').forEach((element) => { element.hidden = !entrySource || entrySourcesSupported !== false; });
@@ -172,7 +240,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     let connectionAttempt = 0;
     function setConnection(state) {
         connectionState = state;
-        if (state !== 'connected') clearJamInvitations();
+        if (state !== 'connected') { clearJamInvitations(); if (pendingKeep) clearKeep(pendingKeep.stage === 'submitted' ? 'Keeping this room was not confirmed. Check Host tools after reconnecting.' : 'Your room return was interrupted. Nothing was kept.'); }
         const label = { offline: 'Offline', connecting: 'Connecting…', reconnecting: 'Reconnecting…', connected: 'Connected', ended: 'Session ended' }[state];
         $('[data-connection]').textContent = label;
         $('[data-connection]').dataset.state = state;
@@ -193,7 +261,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const attempt = ++connectionAttempt;
         cancelTransportAck();
         entrySharing.disconnect();
-        privateMessageContextSupported = false;
+        privateMessageContextSupported = false; keepSupported = false;
         entrySourcesSupported = null; drawEntryChoice();
         clearTimeout(retryTimer);
         setConnection(app.me ? 'reconnecting' : 'connecting');
@@ -274,7 +342,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         drafts.set(app.active, $('[data-text]').value);
         app.chans.clear(); app.pms.clear(); app.rooms = []; app.pendingChannel = '';
         app.band = false; app.verified = false; app.role = 'fan'; app.capabilities = {};
-        ownerSession = false; sessionStorage.removeItem('hangout-owner');
+        ownerSession = false; removeTab('hangout-owner');
         $('[data-owner-signout]').hidden = true; $('[data-gate-guest]').hidden = true;
         $('[data-self-role]').textContent = 'Session ended';
         $('[data-room-filter] option[value=mine]').disabled = true;
@@ -325,12 +393,13 @@ import { createEntrySharing } from './entry-sharing.mjs';
         }
         try { app.ws.send(payload); return true; } catch { return false; }
     };
-    const cmd = (name, args = [], ch = app.active) => send({ t: 'cmd', name, args, ch });
+    const cmd = (name, args = [], ch = app.active, roomInstance) => send({ t: 'cmd', name, args, ch, ...(roomInstance === undefined ? {} : { roomInstance }) });
     app.cmd = cmd;
 
     function handle(m, nick) {
         switch (m.t) {
         case 'rate-limit':
+            if (pendingKeep) clearKeep('The Keep request was not confirmed. Choose the current room and try again later.');
             resetPendingReports();
             if (connectionState !== 'connected') { setConnection('offline'); gateStatus(m.text); app.ws?.close(1000); }
             else toast(m.text);
@@ -343,6 +412,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             entrySourcesSupported = m.features?.entrySources === 1;
             privateMessageContextSupported = m.features?.privateMessageContext === 1;
             entrySharing.setSupported(entrySourcesSupported); drawEntryChoice();
+            keepSupported = m.features?.roomKeep === 1;
             app.role = m.role; app.verified = m.verified === true; app.capabilities = m.capabilities || {}; $('[data-owner-signout]').hidden = !ownerSession; app.netLock = m.lock; app.budget = m.budget;
             if (app.me) {
                 app.resetSession = true; setConnection('reconnecting');
@@ -367,8 +437,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             $('[data-self-role]').textContent = app.capabilities.configure ? 'Site administrator' : app.capabilities.moderate ? 'Community moderator' : app.verified ? 'Room owner account' : 'Guest access';
             app.kicked = false; retry = 0; setConnection('connected');
             entrySharing.joined();
-            const returnRoom = sessionStorage.getItem('hangout-return-room');
-            if (returnRoom && app.verified) { sessionStorage.removeItem('hangout-return-room'); cmd('join', [returnRoom]); }
+            returnToKeepRoom();
             if (app.restorePmOff) { cmd('pm', ['off']); app.restorePmOff = false; }
             $('[data-gate]').hidden = true; $('[data-app]').hidden = false;
             if (wasIn && app.resetSession) toast('Connected. Room ownership and settings are kept; chat starts fresh. Choose a room to rejoin. Cameras stay off.');
@@ -384,6 +453,10 @@ import { createEntrySharing } from './entry-sharing.mjs';
                 $('[data-channel-dialog]').close();
             }
             app.chans.set(m.ch.name, c);
+            if (pendingKeep?.stage === 'joining' && c.name === pendingKeep.room) {
+                if (c.keepRef === pendingKeep.ref) pendingKeep.stage = 'confirm';
+                else clearKeep('That room changed while you signed in. Nothing was kept.');
+            }
             // Classic IRC: joining begins a fresh buffer; never render pre-join backlog.
             if (m.act) c.actSnap = m.act;
             switchTo(m.ch.name);
@@ -437,6 +510,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         case 'notice':
             line(app.active, { notice: true, from: m.from, text: m.text, kind: m.kind });
             if (m.kind === 'error') {
+                if (pendingKeep) clearKeep();
                 resetPendingReports();
                 if (app.pendingChannel && $('[data-channel-dialog]').open) {
                     $('[data-channel-error]').textContent = m.text;
@@ -444,7 +518,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
                 } else toast(m.text);
             }
             break;
-        case 'denied': line(app.active, { notice: true, from: 'StaleBot', text: m.text, kind: 'error' }); break;
+        case 'denied': if (pendingKeep) clearKeep(); line(app.active, { notice: true, from: 'StaleBot', text: m.text, kind: 'error' }); break;
         case 'list': app.rooms = m.rooms; drawRooms(); if (m.show) show('rooms'); break;
         case 'delete': for (const c of [...app.chans.values(), ...app.pms.values()]) c.lines = c.lines.filter((l) => !m.ids.includes(l.id)); $$('[data-id]').forEach((li) => { if (m.ids.includes(li.dataset.id)) li.remove(); }); break;
         case 'pm-request': pmRequest(m.from, m.band); break;
@@ -665,6 +739,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         };
     }
     function drawChan() {
+        drawKeepPrompt();
         const key = app.active;
         const c = store(key);
         const isPm = key.startsWith('pm:');
@@ -741,11 +816,18 @@ import { createEntrySharing } from './entry-sharing.mjs';
     $('[data-room-filter]').addEventListener('change', drawRooms);
     $('[data-room-search]').addEventListener('input', drawRooms);
     $('[data-owner-signin]').href = relayBase ? `${relayBase.replace(/^ws/, 'http')}/lobby-owner/login?entry-return=1` : '#';
-    $('[data-owner-signin]').addEventListener('click', saveEntryHandoff);
+    $('[data-owner-signin]').addEventListener('click', event => { if (!prepareOwnerSignin()) event.preventDefault(); });
+    $('[data-keep-cancel]').addEventListener('click', () => clearKeep('Room not kept. You can keep it later from Host tools.'));
+    $('[data-keep-accept]').addEventListener('click', () => {
+        drawKeepPrompt();
+        if (!pendingKeep || pendingKeep.stage !== 'confirm' || app.active !== pendingKeep.room) return;
+        pendingKeep.stage = 'submitted'; drawKeepPrompt();
+        if (pendingKeep && !cmd('register', [], pendingKeep.room, pendingKeep.ref)) clearKeep('The Keep request was not confirmed. Check Host tools before trying again.');
+    });
     $('[data-gate-guest]').hidden = !ownerSession;
-    $('[data-gate-guest]').addEventListener('click', () => { ownerSession = false; sessionStorage.removeItem('hangout-owner'); $('[data-gate-guest]').hidden = true; connect(app.me || nickInput.value); });
+    $('[data-gate-guest]').addEventListener('click', () => { ownerSession = false; removeTab('hangout-owner'); $('[data-gate-guest]').hidden = true; connect(app.me || nickInput.value); });
     $('[data-owner-signout]').addEventListener('click', () => {
-        ownerSession = false; sessionStorage.removeItem('hangout-owner'); connect(app.me || nickInput.value);
+        ownerSession = false; removeTab('hangout-owner'); connect(app.me || nickInput.value);
     });
     function drawCommunity() {
         const lobby = app.chans.get('#stalemate');
@@ -882,7 +964,8 @@ import { createEntrySharing } from './entry-sharing.mjs';
                 $('[data-palette]').close();
                 if (name === 'invite-guest') return openInviteDialog();
                 if (['deop', 'unregister', 'transfer', 'close'].includes(name) && !confirm(current?.persistent && ['close', 'unregister'].includes(name) ? `Permanently delete ${app.active} and release its registered name?` : `${label} in ${app.active}?`)) return;
-                if (name === 'register' && !app.verified) { sessionStorage.setItem('hangout-return-room', app.active); location.assign($('[data-owner-signin]').href); return; }
+                if (name === 'register' && !app.verified) { if (prepareOwnerSignin(current)) location.assign($('[data-owner-signin]').href); return; }
+                if (name === 'register' && current?.keepRef) return cmd(name, [], app.active, current.keepRef);
                 if (name === 'cohost') { const who = prompt(`${label}: nickname`); if (!who) return; if (label.startsWith('Remove') && !confirm(`Remove ${who} as co-host?`)) return; return cmd(name, [label.startsWith('Remove') ? 'remove' : 'add', who.trim()]); }
                 if (fixed) return cmd(name, fixed);
                 if (ask) { const v = prompt(`${label}: ${ask}`); if (v === null) return undefined; return cmd(name, v.trim() ? v.trim().split(' ') : []); }
