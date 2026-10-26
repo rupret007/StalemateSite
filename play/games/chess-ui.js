@@ -3,7 +3,7 @@ import { Chess, createGame, playMove, claimDraw, claimReason, intendedClaims, un
   loadGame, saveGame, recordResult, readResults, exportPgn, LEVELS, colorName, pieceName } from './chess-core.js?v=99a08f6ff639de1d';
 import { ChessEngine } from './chess-engine.js?v=278c2488721a0324';
 import { pieceSvg, PIECE_GUIDE, loadPieceArtwork } from './chess-pieces.js';
-import { ChessBoard } from './chess-board.js';
+import { ChessBoard, MOVE_ANIMATION_MS } from './chess-board.js?v=9a72af72421e8d82';
 
 // The game is not ready with missing pieces or board styling. Keep the existing
 // deliberate loading/retry UI and saved position until every visual asset loads.
@@ -40,6 +40,41 @@ let progressReceiptId = null;
 const resultShare = globalThis.SuiteShare?.create({ host: $('chess-result-share'), game: 'chess' });
 const squares = new Map();
 let boardView;
+let boardFitFrame = 0;
+function scheduleBoardFit() {
+  if (boardFitFrame) { return; }
+  boardFitFrame = globalThis.requestAnimationFrame(() => {
+    boardFitFrame = 0;
+    const section = $('game'), host = $('board');
+    if (section.hidden) { return; }
+    const previous = section.style.getPropertyValue('--chess-table-limit');
+    let next = '';
+    if (globalThis.innerWidth > 740 && globalThis.innerHeight > 520) {
+      const style = globalThis.getComputedStyle(host.parentElement);
+      const padding = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+      const bottomPadding = parseFloat(globalThis.getComputedStyle(document.body).paddingBottom) || 0;
+      const top = host.getBoundingClientRect().top + globalThis.scrollY;
+      const player = $('bottom-player').parentElement.getBoundingClientRect().height;
+      const footer = [...document.querySelectorAll('.stalemate-strip, #suite-music-status')]
+        .filter(node => globalThis.getComputedStyle(node).position === 'fixed')
+        .reduce((height, node) => height + node.getBoundingClientRect().height, 0);
+      const available = Math.max(216, Math.floor(globalThis.innerHeight - top - player - bottomPadding - footer - 6));
+      next = `${Math.min(620, available + padding)}px`;
+    }
+    if (next === previous) { return; }
+    if (next) { section.style.setProperty('--chess-table-limit', next); }
+    else { section.style.removeProperty('--chess-table-limit'); }
+    // Chessground observes its wrapper and updates bounds after a resize.
+    // Rebuilding it here would replace the keyboard grid and active gestures.
+  });
+}
+globalThis.addEventListener('resize', scheduleBoardFit);
+globalThis.visualViewport?.addEventListener('resize', scheduleBoardFit);
+if (globalThis.ResizeObserver) {
+  const sizeObserver = new globalThis.ResizeObserver(scheduleBoardFit);
+  for (const node of [document.querySelector('.chess-header'), $('top-player').parentElement, $('bottom-player').parentElement]) { sizeObserver.observe(node); }
+}
+document.fonts?.ready.then(scheduleBoardFit);
 
 function cancelSearch(keepWarm = false) {
   if (!keepWarm) { boardView?.cancel(); }
@@ -198,6 +233,7 @@ function render() {
   syncMusicGate();
   if (!game || !opened) { return; }
   renderBoard(); renderHistory(); syncMute();
+  scheduleBoardFit();
   const ended = game.result;
   const local = game.mode === 'local';
   $('game-label').textContent = local ? 'PASS & PLAY · UNTIMED' : `${LEVELS[game.level].label} · COMPUTER PRACTICE`;
@@ -254,10 +290,17 @@ async function queueComputer(hint = false) {
   const turnGame = game;
   const fen = game.chess.fen();
   const ticket = ++generation;
+  const startedAt = globalThis.performance.now();
+  const settle = !hint && game.chess.history().length && !boardView.motion.matches ? MOVE_ANIMATION_MS : 0;
   busy = true; failure = false; feedback = '';
   render();
   try {
     const move = await engine.search(game.chess.history({ verbose: true }).map(item => item.lan), game.level, { hint });
+    // A warm low-depth search can finish in 10–20ms. Let the human's existing
+    // piece animation settle so the reply does not visually swallow that move.
+    // Search time counts toward this bound; reduced motion adds no wait.
+    const remaining = settle - (globalThis.performance.now() - startedAt);
+    if (move && remaining > 0) { await new Promise(resolve => setTimeout(resolve, remaining)); }
     if (!move || generation !== ticket || turnGame !== game || game.chess.fen() !== fen || game.result || suspended) { return; }
     busy = false;
     if (!game.chess.moves({ verbose: true }).some(item => item.lan === move)) { throw new Error('The computer returned an illegal move.'); }

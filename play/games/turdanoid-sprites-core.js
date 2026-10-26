@@ -374,8 +374,10 @@
     ctx.beginPath();
     ctx.arc(x, y, drawR, 0, 6.283);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,244,220,.45)';
-    ctx.lineWidth = 1.05;
+    // Steady porcelain edge remains visible against bright bricks and dark
+    // scenery, including when reduced motion removes the trail.
+    ctx.strokeStyle = 'rgba(255,244,220,.92)';
+    ctx.lineWidth = 1.65;
     ctx.beginPath();
     ctx.arc(x, y, drawR - 0.55, 0, 6.283);
     ctx.stroke();
@@ -477,13 +479,18 @@
     ctx.textBaseline = 'middle';
     ctx.fillText(powerup.e || '?', 0, 0);
     ctx.restore();
-    ctx.font = 'bold 9px "Segoe UI", system-ui, sans-serif';
+    const label = (powerup.bad ? '! ' : '') + (powerup.lab || '');
+    const labelWidth = Math.max(32, Math.min(76, label.length * 6.5 + 10));
+    ctx.fillStyle = 'rgba(6,16,22,.94)';
+    roundRect(ctx, x - labelWidth / 2, y + 16, labelWidth, 16, 5);
+    ctx.fill();
+    ctx.font = 'bold 10.5px "Segoe UI", system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(6,16,22,.85)';
-    ctx.strokeText(powerup.lab || '', x, y + 22);
+    ctx.strokeText(label, x, y + 25);
     ctx.fillStyle = t.inkText;
-    ctx.fillText(powerup.lab || '', x, y + 22);
+    ctx.fillText(label, x, y + 25);
     ctx.textBaseline = 'alphabetic';
     return { x: x, y: y, vial: true, sparkle: !reduced };
   }

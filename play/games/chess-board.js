@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { Chessground } from '../assets/chess/chessground.js';
+export const MOVE_ANIMATION_MS = 160;
 
 // Chessground owns pointer movement and animation. The existing square buttons
 // remain the keyboard/assistive interface to the same authoritative game state.
@@ -107,7 +108,7 @@ export class ChessBoard {
       movable: { free: false, color: allowed ? chess.turn() === 'w' ? 'white' : 'black' : undefined,
         dests, showDests: true, rookCastle: false,
         events: { after: (from, to) => { if (valid()) { this.actions.move(from, to); } } } },
-      animation: { enabled: !this.motion.matches, duration: 160 },
+      animation: { enabled: !this.motion.matches, duration: MOVE_ANIMATION_MS },
       events: { select: square => { if (validSelect()) { this.actions.select(square); } } }
     };
     // Always reconcile optimistic artwork against chess.js, including a pending
