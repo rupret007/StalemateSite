@@ -29,6 +29,13 @@ changes only to an existing joined channel and its current member IDs; it does
 not replace the roster or create a new channel. Raw device references stay in
 private session preferences.
 
+RTC routing preserves the complete admitted connection ID. The gateway issues
+`c` plus 32 hexadecimal characters; the existing reference contract permits
+1–128 ASCII letters, digits, underscores or hyphens. Invalid or oversized
+recipients are rejected, never truncated into another participant's prefix.
+The local relay uses the gateway's ID shape so browser tests exercise this
+boundary. Membership, bilateral Block and current authority still decide access.
+
 Both signaling directions consult the current bilateral block sets before media
 bookkeeping. Updated clients retire only the affected peer connection and
 received tracks, remove its tile and invalidate queued negotiation. Unrelated

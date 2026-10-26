@@ -46,8 +46,8 @@ export function applyVideo(chan, body, relayNow) {
 
 export function cleanRtc(body) {
     if (!body || typeof body !== 'object') return null;
-    const to = typeof body.to === 'string' ? body.to.slice(0, 24) : '';
-    if (!to) return null;
+    const to = body.to;
+    if (typeof to !== 'string' || !to.length || to.length > 128 || /[^A-Za-z0-9_-]/.test(to)) return null;
     if (body.sdp) {
         const type = body.sdp && body.sdp.type;
         const sdp = body.sdp && body.sdp.sdp;

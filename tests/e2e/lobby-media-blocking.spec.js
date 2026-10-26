@@ -90,6 +90,9 @@ for (const width of [375, 390]) test(`Block retires live camera pairs across ent
         await alpha.click('nav [data-show="rooms"]'); await alpha.click('[data-start="art"]');
         await expect(alpha.locator('[data-act-canvas]')).toBeVisible(); const room = await alpha.locator('[data-chat-context]').innerText();
         for (const page of [bravo, witness]) { await command(page, `/join ${room}`); await expect(page.locator('[data-chat-context]')).toHaveText(room); }
+        const connectionIds = await Promise.all([alpha, bravo, witness].map(page => page.evaluate(() => window.__lobbyRoom.state.myId)));
+        expect(new Set(connectionIds).size).toBe(3);
+        for (const id of connectionIds) expect(id).toMatch(/^c[a-f0-9]{32}$/);
         for (const page of [alpha, bravo, witness]) await camera(page);
         try {
             for (const page of [alpha, bravo, witness]) await expect.poll(async () => {
