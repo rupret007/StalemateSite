@@ -54,9 +54,9 @@ beforeAll(async () => {
 });
 // Keep actual issuance in bounded setup phases under the existing hook timeout;
 // the dataset and each native authority transaction remain unchanged.
-for (const offset of [0, 250, 500, 750]) beforeAll(async () => {
+for (const offset of [0, 100, 200, 300, 400, 500, 600, 700, 800, 900]) beforeAll(async () => {
     const { authority, account, issued } = f;
-    for (let n = offset; n < offset + 250; n++) {
+    for (let n = offset; n < offset + 100; n++) {
         const id = `capacity_${String(n).padStart(4, '0')}`, sid = `capacity-session-${String(n).padStart(4, '0')}`;
         const profile = n < 50 ? { kind: 'staff', account, role: 'owner', admin: true, expiresAt: NOW + 1000000 } : null;
         const iph = `capacity-ip-${String(n).padStart(10, '0')}`;
@@ -97,6 +97,7 @@ afterAll(async () => { if (f) { await f.driver.close(); await rm(f.directory, { 
 
 describe('bounded recovery of the existing maximum session and connection allowances', () => {
     const verify = async count => {
+        expect(f.issued).toHaveLength(1000);
         const expected = f.snapshot(); expect(expected.sessions.connections).toHaveLength(count); expect(expected.modlog).toHaveLength(2000);
         expect(expected.rooms.rooms[0].act.strokes).toHaveLength(24); expect(Buffer.byteLength(JSON.stringify(expected.rooms.rooms[0]))).toBeGreaterThan(65536);
         const before = fingerprint(f.driver), first = f.metrics.length;
