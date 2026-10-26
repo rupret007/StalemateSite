@@ -463,10 +463,12 @@ the actual minimal-data consent/capability and incident-preservation paths.
 See [privacy and incidents](HANGOUT_PRIVACY_AND_INCIDENTS.md) and
 [the data inventory](HANGOUT_DATA_INVENTORY.md). The existing age/media guards
 remain until a qualified replacement is implemented; a readiness flag or policy
-document does not complete it. Resolve the legal operator and intended markets,
-approved notices/purposes, real guardian/public-identity verification and rights
-process, contact/media rules, staffed incident authority and lawful retention
-decisions with their qualified owner. Then qualify actual hosted enrollment,
+document does not complete it. Carry forward [the confirmed personal Texas
+operating arrangement](HANGOUT_ALL_AGES_CAPABILITIES.md) and preserve Jeff-only
+initial owner/reviewer/contact permissions. Qualify legal responsibilities and
+intended markets, approved notices/purposes, real guardian/public-identity
+verification and rights process, contact/media rules, staffed incident authority
+and lawful retention decisions with the responsible people. Then qualify actual hosted enrollment,
 withdrawal, moderation and incident journeys with minimal data. Local fixture
 appointments and synthetic policy dates cannot supply those decisions.
 
