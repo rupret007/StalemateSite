@@ -16,6 +16,9 @@ import { accountId } from '../src/auth.mjs';
 import { privateReportRef, LIMITS as PRIVATE_LIMITS } from '../src/private-reports.mjs';
 import { writeLobbyEffects } from '../src/lobby-effect-records.mjs';
 import { LOG_TTL } from '../src/community-state.mjs';
+import { LOBBY_AUTHORITY_COMMUNITY } from '../src/lobby-session-authority.mjs';
+import { createPartitionedParticipationConsents } from '../src/participation-partitions.mjs';
+import { PARTICIPATION_PURPOSES } from '../src/participation-policy.mjs';
 import { openDurableRecordSqlite } from '../../tests/support/durable-record-sqlite.mjs';
 
 const ORIGIN = 'https://collocated-beta.fixture.test', NOW = Date.UTC(2026, 9, 25, 12);
@@ -53,7 +56,7 @@ function request(path, { cookie, body, upgrade = false, method = body === undefi
         ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(upgrade ? { Upgrade: 'websocket' } : {}), ...headers },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
-async function harness({ initialize = true, mode = 'lobby-v1' } = {}) {
+async function harness({ initialize = true, mode = 'lobby-v1', participation = false } = {}) {
     const directory = await mkdtemp(join(tmpdir(), 'lobby-session-integration-')), driver = openDurableRecordSqlite(join(directory, 'lobby.sqlite'));
     const background = [], sockets = new Map(), lobbies = [], releases = []; let queue = Promise.resolve(), lobby;
     const transaction = operation => driver.transaction(raw => operation({ ...raw,
@@ -65,6 +68,7 @@ async function harness({ initialize = true, mode = 'lobby-v1' } = {}) {
         getWebSockets: tag => [...sockets].filter(([ws, tags]) => ws.readyState === 1 && (!tag || tags.includes(tag))).map(([ws]) => ws),
         getTags: ws => sockets.get(ws) || [], acceptWebSocket: (ws, tags) => sockets.set(ws, tags), waitUntil: task => background.push(task) };
     const env = { HANGOUT_BETA_MODE: 'protected', HANGOUT_SESSION_AUTHORITY: mode, HANGOUT_BETA_INVITE_VERSION: '1',
+        ...(participation ? { HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1' } : {}),
         HANGOUT_BETA_INVITE_KEY: INVITE, HANGOUT_PREVIEW_KEY: PREVIEW, HANGOUT_HMAC_KEY: 'synthetic-collocated-signing-key-'.repeat(2),
         HANGOUT_MODERATOR_EMAILS: 'reviewer@example.invalid', HANGOUT_OWNER_EMAIL: 'owner@example.invalid',
         ASSETS: { fetch: async () => new Response('fixture asset', { headers: { 'Content-Type': 'text/plain' } }) },
@@ -501,5 +505,65 @@ describe('opt-in session authority through the actual beta gateway and Lobby', (
         expect(JSON.stringify(staff.socket.frames)).not.toContain(QUOTE); expect(JSON.stringify(guest.socket.frames)).not.toContain(QUOTE);
         expect(staff.socket.frames.some(frame => frame.t === 'admin')).toBe(false);
         expect((await h.lobby().privateReportQueue.snapshot()).reports).toHaveLength(1);
+    });
+});
+
+describe('cohort preparation through the actual cookie gateway and SQLite Lobby', () => {
+    it('keeps current C2 withdrawal, selected reporting, healthy progress and SID revocation authoritative', async () => {
+        const h = await harness({ participation: true }), authority = h.lobby().authority;
+        const participants = new Map(), decisions = new Map(); let serial = 0;
+        const reference = () => 'synthetic_cohort_' + String(++serial).padStart(10, '0');
+        const config = { policy: { version: 1, policyVersion: 'synthetic-cohort-gateway-v1', revision: 1,
+            communityRef: LOBBY_AUTHORITY_COMMUNITY, noticeDigest: 'c'.repeat(64), decisionRef: 'synthetic_cohort_operator',
+            state: 'qualified', purposes: [...PARTICIPATION_PURPOSES], issuedAt: NOW - 100, effectiveAt: NOW - 100,
+            expiresAt: NOW + 1000000, maxSessionMs: 10000 },
+            rules: { version: 1, verifierRef: 'synthetic_cohort_verifier', pendingMs: 10000, grantMs: 500000,
+                subjectTailMs: 10000, guardianTailMs: 10000, receiptTailMs: 10000, callbackMs: 10000, operationMs: 10000 } };
+        // Only these operator/relationship decisions are synthetic. Cookies,
+        // current bound identity, C2 partitions, engine and SQL commits are real.
+        const ledger = createPartitionedParticipationConsents({ storage: authority.records, now: () => Date.now(), randomRef: reference,
+            admitSubject: async () => true, adapters: {
+                qualifyPolicy: async () => ({ config, expiresAt: NOW + 1000000 }),
+                authenticateParticipant: async ({ proof, purpose }) => { const value = participants.get(proof);
+                    return purpose === 'begin' ? value : value && { principalRef: value.principalRef, communityRef: value.communityRef, expiresAt: value.expiresAt }; },
+                verifyConsent: async ({ proof }) => decisions.get(proof), authenticateGuardian: async () => null, authorizeMaintenance: async () => null
+            } });
+        expect((await ledger.installPolicy('synthetic-cohort-operator')).ok).toBe(true);
+        const visitor = async nick => {
+            const who = await h.guest(), proof = reference(), principalRef = 's_' + who.access.sid;
+            participants.set(proof, { operationRef: reference(), principalRef, communityRef: LOBBY_AUTHORITY_COMMUNITY, expiresAt: NOW + 500000 });
+            const pending = await ledger.begin(proof, { expectedRevision: 0, purposes: [...PARTICIPATION_PURPOSES] }); expect(pending.ok).toBe(true);
+            const decision = reference(); decisions.set(decision, { operationRef: reference(), pendingRef: pending.pendingRef, subjectRef: pending.subjectRef,
+                principalRef, guardianPrincipalRef: 'synthetic_cohort_guardian', decisionRef: reference(), verifierRef: config.rules.verifierRef,
+                status: 'approved', purposes: [...PARTICIPATION_PURPOSES], verifiedAt: NOW, expiresAt: NOW + 500000 });
+            expect((await ledger.complete(decision)).state).toBe('authorized');
+            const response = await betaFetch(request('/lobby?preview=' + PREVIEW, { cookie: who.cookie, upgrade: true }), h.env);
+            expect(response.status).toBe(101); const socket = h.state.getWebSockets().at(-1);
+            await h.message({ socket }, { t: 'hello', nick, age13: true });
+            expect(socket.frames.some(frame => frame.t === 'welcome' && frame.nick === nick)).toBe(true);
+            return { ...who, socket, binding: socket.deserializeAttachment() };
+        };
+        const alice = await visitor('CohortAlice'), bravo = await visitor('CohortBravo');
+        const initial = await authority.resolveParticipationConnections([alice.binding, bravo.binding]);
+        expect(initial.map(value => value?.principalRef)).toEqual(['s_' + alice.access.sid, 's_' + bravo.access.sid]);
+        await h.message(bravo, { t: 'say', ch: '#stalemate', text: 'Selected cohort safety witness' });
+        const received = alice.socket.frames.find(frame => frame.t === 'line' && frame.text === 'Selected cohort safety witness'); expect(received).toBeTruthy();
+        const own = await betaFetch(request('/beta/participation', { cookie: alice.cookie }), h.env);
+        const status = await own.json(); expect(status).toMatchObject({ state: 'authorized', revision: 2 });
+        const stopped = await betaFetch(request('/beta/participation/stop', { cookie: alice.cookie, body: { expectedRevision: status.revision } }), h.env);
+        expect(stopped.status).toBe(200); expect(await stopped.json()).toMatchObject({ state: 'withdrawn', revision: 3 }); await h.settle();
+        expect(alice.socket.readyState).toBe(1); expect(alice.socket.frames.some(frame => frame.t === 'sharing-stopped')).toBe(true);
+        await h.message(alice, { t: 'report', id: received.id, text: received.text });
+        expect(alice.socket.frames.some(frame => frame.t === 'report-status' && frame.id === received.id && frame.submitted === true)).toBe(true);
+        await h.message(alice, { t: 'say', ch: '#stalemate', text: 'Never publish after cohort withdrawal' });
+        expect(bravo.socket.frames.some(frame => frame.t === 'line' && frame.text === 'Never publish after cohort withdrawal')).toBe(false);
+        vi.setSystemTime(Date.now() + 4000);
+        await h.message(bravo, { t: 'say', ch: '#stalemate', text: 'Healthy cohort peer continues' });
+        expect(bravo.socket.frames.some(frame => frame.t === 'line' && frame.text === 'Healthy cohort peer continues')).toBe(true);
+        expect((await logout(h, alice)).status).toBe(200); await h.settle();
+        expect(await betaSession(request('/beta/state', { cookie: alice.cookie }), h.env)).toBeNull();
+        const current = await authority.resolveParticipationConnections([alice.binding, bravo.binding]);
+        expect(current[0]).toBeNull(); expect(current[1]?.principalRef).toBe('s_' + bravo.access.sid);
+        expect(h.env.BETA_SESSIONS.idFromName).not.toHaveBeenCalled();
     });
 });

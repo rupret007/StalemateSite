@@ -17,10 +17,12 @@ export function participationConfigurationValid(env) {
 export function createLobbyParticipation({ env, authority, now = () => Date.now() } = {}) {
     if (!lobbyParticipationMode(env)) return null;
     if (!authority || typeof authority.records?.transaction !== 'function'
-        || ['resolveParticipationConnection', 'validateParticipationConnection', 'writeParticipationEffects'].some(name => typeof authority[name] !== 'function')) throw Error('participation-authority-unavailable');
+        || ['resolveParticipationConnection', 'validateParticipationConnection', 'writeParticipationEffects'].some(name => typeof authority[name] !== 'function')
+        || authority.resolveParticipationConnections !== undefined && typeof authority.resolveParticipationConnections !== 'function') throw Error('participation-authority-unavailable');
     return createParticipationEnforcement({
         storage: authority.records,
         resolveConnection: connection => authority.resolveParticipationConnection(connection),
+        ...(authority.resolveParticipationConnections === undefined ? {} : { resolveConnections: connections => authority.resolveParticipationConnections(connections) }),
         validateConnection: input => authority.validateParticipationConnection(input),
         readPrincipals: readPartitionedParticipationPrincipals,
         readWithdrawn: readPartitionedParticipationWithdrawals,

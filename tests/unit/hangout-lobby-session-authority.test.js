@@ -623,3 +623,191 @@ describe('actual HangoutLobby constructs the required participation bridge', () 
         } finally { await app.dispose(); }
     });
 });
+
+// Compare observable identities with the existing resolver, not a reimplementation
+// of its binding/profile rules. Per-descriptor denial/exception means no identity.
+async function individualCohortIdentities(authority, descriptors) {
+    const identities = [];
+    for (const descriptor of descriptors) {
+        try { identities.push(await authority.resolveParticipationConnection(descriptor)); }
+        catch { identities.push(null); }
+    }
+    return identities;
+}
+
+describe('read-only preparation cohort on the actual SQLite authority', () => {
+    it('preserves order and independently validates duplicate IDs, shared SIDs and changed claims', async () => {
+        const f = await fixture({ participation: true }), guest = await f.enroll('cohort-guest');
+        const profile = { kind: 'owner', account: await accountId('cohort-holder@example.invalid', f.env.HANGOUT_HMAC_KEY),
+            role: 'fan', admin: false, expiresAt: NOW + 50000 };
+        const owner = await f.enroll('cohort-owner', profile);
+        const fan = { ...owner.binding, id: 'cohort-owner-fan', authorityRef: 'cohort-owner-fan',
+            account: '', role: 'fan', admin: false, expiresAt: owner.request.exp };
+        await f.authority.bind(fan);
+        const descriptors = [guest.binding, { ...guest.binding, role: 'owner', admin: true }, guest.binding,
+            { ...guest.binding, dev: 'copied-wrong-device' }, owner.binding, fan,
+            { ...guest.binding, principalRef: 'client_forged_principal', subjectRef: 'client_forged_subject' }, null];
+        const original = clone(descriptors), expected = await individualCohortIdentities(f.authority, descriptors), before = fingerprint(f.driver);
+        f.driver.resetOperations();
+        const result = await f.authority.resolveParticipationConnections(descriptors);
+        expect(result).toEqual(expected); expect(descriptors).toEqual(original);
+        expect(result.map(value => value?.principalRef ?? null)).toEqual([
+            's_' + guest.request.sid, null, 's_' + guest.request.sid, null,
+            profile.account, profile.account, 's_' + guest.request.sid, null
+        ]);
+        expect(result[0]).not.toBe(result[2]);
+        result[0].principalRef = 'mutated_result_only';
+        expect(result[2].principalRef).toBe('s_' + guest.request.sid);
+        expect((await f.authority.resolveParticipationConnections([guest.binding]))[0]).toEqual(expected[0]);
+        expect(fingerprint(f.driver)).toBe(before);
+        expect(f.driver.stats.operations.every(event => ['get', 'list'].includes(event.name))).toBe(true);
+    });
+
+    it.each(['logical corruption', 'connection index removal', 'session index removal', 'revocation', 'SID replacement'])(
+        'matches individual denial for %s without granting a different slot', async damage => {
+            const f = await fixture({ participation: true }), target = await f.enroll('cohort-target'), healthy = await f.enroll('cohort-healthy');
+            const key = 'authority-connection:' + target.binding.id;
+            if (damage === 'logical corruption') await f.authority.records.transaction(tx => tx.put(key, { corrupt: true }));
+            if (damage === 'connection index removal') await f.authority.records.transaction(async tx => {
+                const index = await tx.get(CONNECTION_INDEX); index.ids = index.ids.filter(id => id !== target.binding.id); await tx.put(CONNECTION_INDEX, index);
+            });
+            if (damage === 'session index removal') await f.authority.records.transaction(async tx => {
+                const index = await tx.get(SESSION_INDEX); index.entries = index.entries.filter(row => row.sid !== target.request.sid); await tx.put(SESSION_INDEX, index);
+            });
+            if (damage === 'revocation') await f.authority.revoke(target.request);
+            if (damage === 'SID replacement') await f.authority.records.transaction(async tx => {
+                const binding = await tx.get(key); await tx.put(key, { ...binding, betaSid: healthy.request.sid });
+            });
+            const descriptors = [target.binding, healthy.binding, target.binding], before = fingerprint(f.driver);
+            const expected = await individualCohortIdentities(f.authority, descriptors);
+            expect(expected[0]).toBeNull(); expect(expected[1]?.principalRef).toBe('s_' + healthy.request.sid);
+            expect(await f.authority.resolveParticipationConnections(descriptors)).toEqual(expected);
+            expect(fingerprint(f.driver)).toBe(before);
+        });
+
+    it('rechecks profile expiry and current staff roles without falling back to a SID principal', async () => {
+        const f = await fixture({ participation: true }), healthy = await f.enroll('cohort-other');
+        const account = await accountId('reviewer@example.invalid', f.env.HANGOUT_HMAC_KEY);
+        const staff = await f.enroll('cohort-staff', { kind: 'staff', account, role: 'moderator', admin: true, expiresAt: NOW + 50000 });
+        const fan = { ...staff.binding, id: 'cohort-profile-fan', authorityRef: 'cohort-profile-fan',
+            account: '', role: 'fan', admin: false, expiresAt: staff.request.exp };
+        await f.authority.bind(fan);
+        expect((await f.authority.resolveParticipationConnections([staff.binding, fan])).map(value => value?.principalRef)).toEqual([account, account]);
+        f.env.HANGOUT_MODERATOR_EMAILS = '';
+        expect(await f.authority.resolveParticipationConnections([staff.binding, fan, healthy.binding]))
+            .toEqual(await individualCohortIdentities(f.authority, [staff.binding, fan, healthy.binding]));
+        expect((await f.authority.resolveParticipationConnections([staff.binding, fan])).every(value => value === null)).toBe(true);
+        f.env.HANGOUT_MODERATOR_EMAILS = 'reviewer@example.invalid'; f.advance(50001);
+        const result = await f.authority.resolveParticipationConnections([fan, healthy.binding]);
+        expect(result[0]).toBeNull(); expect(result[1]?.principalRef).toBe('s_' + healthy.request.sid);
+    });
+
+    it('does not freeze the clock for a later duplicate descriptor using cached raw rows', async () => {
+        const f = await fixture({ participation: true }), person = await f.enroll('cohort-clock');
+        let calls = 0, expireAfter = Infinity;
+        const authority = createLobbySessionAuthority({ storage: f.storage, env: f.env,
+            now: () => ++calls <= expireAfter ? NOW : NOW + 100001, writeEffects: writeLobbyEffects });
+        expect(await authority.resolveParticipationConnection(person.binding)).not.toBeNull();
+        // Calibrate with the existing single resolver rather than bake its
+        // current number of clock reads into this regression.
+        expireAfter = calls; calls = 0;
+        const result = await authority.resolveParticipationConnections([person.binding, person.binding]);
+        expect(result[0]?.principalRef).toBe('s_' + person.request.sid); expect(result[1]).toBeNull();
+        expect(calls).toBeGreaterThan(expireAfter);
+    });
+
+    it('keeps caches transaction-local and rejects real codec/native failure for the whole cohort', async () => {
+        const f = await fixture({ participation: true }), first = await f.enroll('cohort-fresh'), second = await f.enroll('cohort-revoke');
+        expect((await f.authority.resolveParticipationConnections([first.binding, second.binding])).every(Boolean)).toBe(true);
+        await f.authority.revoke(second.request);
+        expect((await f.authority.resolveParticipationConnections([first.binding, second.binding])).map(value => value?.principalRef ?? null))
+            .toEqual(['s_' + first.request.sid, null]);
+        const hex = Buffer.from('authority-connection:' + first.binding.id).toString('hex');
+        const physical = [...f.driver.rows().keys()].find(key => key.includes(':part:' + hex + ':'));
+        expect(physical).toBeDefined(); await f.rawPut(physical, new Uint8Array([255]));
+        const before = fingerprint(f.driver);
+        await expect(f.authority.resolveParticipationConnections([first.binding, second.binding])).rejects.toThrow();
+        expect(fingerprint(f.driver)).toBe(before);
+    });
+
+    it('fails a missing initialized marker globally without provisioning or repairing it', async () => {
+        const f = await fixture({ participation: true }), person = await f.enroll('cohort-marker');
+        await f.authority.records.transaction(tx => tx.delete(LOBBY_AUTHORITY_MARKER));
+        const before = fingerprint(f.driver);
+        await expect(f.authority.resolveParticipationConnections([person.binding])).rejects.toThrow();
+        expect(fingerprint(f.driver)).toBe(before);
+    });
+
+    it('does not convert a real native read refusal into per-slot denial or fallback', async () => {
+        const f = await fixture({ participation: true }), person = await f.enroll('cohort-native');
+        const suffix = Buffer.from('authority-connection:' + person.binding.id).toString('hex'), before = fingerprint(f.driver);
+        let refused = false;
+        f.hooks.before = event => {
+            if (event.name === 'get' && event.key.endsWith(':manifest:' + suffix)) {
+                refused = true; throw Error('Synthetic native read refusal inside actual SQLite transaction');
+            }
+        };
+        await expect(f.authority.resolveParticipationConnections([person.binding])).rejects.toThrow();
+        expect(refused).toBe(true); expect(fingerprint(f.driver)).toBe(before);
+    });
+
+    it('wires the optional authority method only when present and otherwise preserves real individual preparation', async () => {
+        const f = await fixture({ participation: true }), person = await f.enroll('cohort-factory'), grants = await participationLedger(f);
+        await grants.grant(person.binding);
+        const { resolveParticipationConnections, ...legacy } = f.authority;
+        const single = vi.fn(connection => f.authority.resolveParticipationConnection(connection));
+        const bulk = vi.fn(values => resolveParticipationConnections(values));
+        const old = createLobbyParticipation({ env: f.env, authority: { ...legacy, resolveParticipationConnection: single }, now: f.now });
+        const oldContext = await old.prepare([person.binding]);
+        expect(old.allows(oldContext, { actorId: person.binding.id, action: 'publicText' })).toBe(true);
+        expect(single).toHaveBeenCalledTimes(1);
+        single.mockClear();
+        const current = createLobbyParticipation({ env: f.env, authority: { ...legacy, resolveParticipationConnection: single,
+            resolveParticipationConnections: bulk }, now: f.now });
+        const context = await current.prepare([person.binding]);
+        expect(current.allows(context, { actorId: person.binding.id, action: 'publicText' })).toBe(true);
+        expect(bulk).toHaveBeenCalledTimes(1); expect(single).not.toHaveBeenCalled();
+        for (const value of [null, {}, true]) expect(() => createLobbyParticipation({ env: f.env,
+            authority: { ...legacy, resolveParticipationConnections: value }, now: f.now })).toThrow('participation-authority-unavailable');
+    });
+
+    it('reads 200 stored authority bindings in one bounded native transaction with less amplification', async () => {
+        const f = await fixture({ participation: true }), descriptors = [];
+        // This tests stored authority reads, not 200 ordinary admissions/mints.
+        // One real enrollment supplies the current guest record schema. The
+        // remaining fixture rows use the real codec/SQLite, with at most 16
+        // logical writes per batch and both indices committed atomically.
+        const template = await f.enroll('cohort-000'); descriptors.push(template.binding);
+        const record = await f.authority.records.transaction(tx => tx.get('authority-session:' + template.request.sid));
+        for (let start = 1; start < 200; start += 7) await f.authority.records.transaction(async tx => {
+            const sessions = await tx.get(SESSION_INDEX), connections = await tx.get(CONNECTION_INDEX);
+            for (let index = start; index < Math.min(start + 7, 200); index++) {
+                const id = 'cohort-' + String(index).padStart(3, '0'), request = f.registration(id);
+                const binding = { ...template.binding, id, authorityRef: id, betaSid: request.sid, dev: 'device_' + id, iph: request.iph };
+                await tx.put('authority-session:' + request.sid, { ...record, sid: request.sid });
+                await tx.put('authority-connection:' + id, binding);
+                sessions.entries.push({ sid: request.sid, exp: record.exp }); connections.ids.push(id); descriptors.push(binding);
+            }
+            await tx.put(SESSION_INDEX, sessions); await tx.put(CONNECTION_INDEX, connections);
+        });
+        const before = fingerprint(f.driver);
+        f.driver.resetOperations();
+        const expected = await individualCohortIdentities(f.authority, descriptors), singleReads = f.driver.stats.operations.length;
+        const transactions = f.driver.stats.transactions; f.driver.resetOperations();
+        const result = await f.authority.resolveParticipationConnections(descriptors), events = [...f.driver.stats.operations];
+        expect(result).toEqual(expected); expect(result).toHaveLength(200); expect(result.every(Boolean)).toBe(true);
+        expect(f.driver.stats.transactions - transactions).toBe(1);
+        expect(events.length).toBeLessThanOrEqual(4096); expect(events.length).toBeLessThan(singleReads / 2);
+        expect(events.every(event => ['get', 'list'].includes(event.name))).toBe(true);
+        const physical = f.driver.rows(), size = value => value === undefined ? 0 : value instanceof Uint8Array
+            ? value.byteLength : new TextEncoder().encode(JSON.stringify(value)).byteLength;
+        const readBytes = events.reduce((sum, event) => {
+            if (event.name === 'get') return sum + size(physical.get(event.key));
+            const rows = [...physical].filter(([key]) => key.startsWith(event.value.prefix)
+                && (!event.value.startAfter || key > event.value.startAfter)).slice(0, event.value.limit);
+            return sum + rows.reduce((bytes, [, value]) => bytes + size(value), 0);
+        }, 0);
+        expect(readBytes).toBeLessThanOrEqual(32 * 1024 * 1024); expect(fingerprint(f.driver)).toBe(before);
+        await expect(f.authority.resolveParticipationConnections([...descriptors, descriptors[0]])).rejects.toThrow();
+    });
+});

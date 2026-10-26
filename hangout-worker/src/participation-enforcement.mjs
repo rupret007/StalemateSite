@@ -7,8 +7,9 @@ const enc = new TextEncoder(), clone = value => structuredClone(value);
 const validIdentity = value => value && Object.keys(value).length === 3 && ['principalRef', 'communityRef', 'expiresAt'].every(key => Object.hasOwn(value, key))
     && [value.principalRef, value.communityRef].every(id => typeof id === 'string' && /^[A-Za-z0-9_-]{16,128}$/.test(id)) && Number.isSafeInteger(value.expiresAt);
 const limits = Object.freeze({ connections: 256, checks: 2048, writes: 128, bytes: 16 * 1024 * 1024 });
-export function createParticipationEnforcement({ storage, resolveConnection, validateConnection, writeEffects, readPrincipals = readParticipationPrincipals, readWithdrawn = null, readPreparation = null, dispatchStart = null, beforeCommit = async () => {}, providerQualified = () => false, now = () => Date.now() } = {}) {
+export function createParticipationEnforcement({ storage, resolveConnection, resolveConnections, validateConnection, writeEffects, readPrincipals = readParticipationPrincipals, readWithdrawn = null, readPreparation = null, dispatchStart = null, beforeCommit = async () => {}, providerQualified = () => false, now = () => Date.now() } = {}) {
     if (typeof storage?.transaction !== 'function' || [resolveConnection, validateConnection, writeEffects, readPrincipals, beforeCommit, providerQualified, now].some(fn => typeof fn !== 'function')
+        || resolveConnections !== undefined && typeof resolveConnections !== 'function'
         || readWithdrawn !== null && typeof readWithdrawn !== 'function'
         || readPreparation !== null && typeof readPreparation !== 'function'
         || dispatchStart !== null && typeof dispatchStart !== 'function') throw new TypeError('Explicit participation transaction adapters required');
@@ -34,10 +35,23 @@ export function createParticipationEnforcement({ storage, resolveConnection, val
             try {
                 if (!Array.isArray(connections) || connections.length > limits.connections) return context;
                 state.connections = clone(connections);
-                for (const connection of state.connections) {
-                    let identity;
-                    try { identity = await resolveConnection(clone(connection)); } catch { /* this connection receives no affirmative grant */ }
-                    state.identities.push(validIdentity(identity) && identity.expiresAt > now() ? clone(identity) : null);
+                if (resolveConnections !== undefined) {
+                    const identities = await resolveConnections(clone(state.connections));
+                    if (!Array.isArray(identities) || Object.getPrototypeOf(identities) !== Array.prototype
+                        || identities.length !== state.connections.length || Reflect.ownKeys(identities).length !== identities.length + 1) throw Error('participation-unavailable');
+                    for (let i = 0; i < identities.length; i++) {
+                        const slot = Object.getOwnPropertyDescriptor(identities, String(i)), identity = slot?.value;
+                        if (!slot?.enumerable || !Object.hasOwn(slot, 'value') || identity !== null && (!validIdentity(identity)
+                            || Object.getPrototypeOf(identity) !== Object.prototype || Reflect.ownKeys(identity).length !== 3
+                            || Object.values(Object.getOwnPropertyDescriptors(identity)).some(value => !value.enumerable || !Object.hasOwn(value, 'value')))) throw Error('participation-unavailable');
+                    }
+                    state.identities = identities.map(identity => identity && identity.expiresAt > now() ? clone(identity) : null);
+                } else {
+                    for (const connection of state.connections) {
+                        let identity;
+                        try { identity = await resolveConnection(clone(connection)); } catch { /* this connection receives no affirmative grant */ }
+                        state.identities.push(validIdentity(identity) && identity.expiresAt > now() ? clone(identity) : null);
+                    }
                 }
                 state.snapshot = await storage.transaction(async tx => {
                     const identities = state.identities.filter(Boolean);

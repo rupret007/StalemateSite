@@ -93,7 +93,7 @@ async function setup({ purposes = PARTICIPATION_PURPOSES, peerPurposes = PARTICI
         guardians.set(proof, { operationRef: reference(), subjectRef: subject.subjectRef, principalRef: guardian.principalRef, guardianRef: guardian.guardianRef, guardianRevision: guardian.revision, expiresAt: at + 10000 });
         return ledger.change(proof, { expectedRevision: subject.revision, purposes: [...allowed] });
     };
-    return { storage, ledger, engine, enforcement, controls, frames, closed, identities, sessionBindings, config, alice, bravo, connect, message, cmd, withdraw, legacyPersist,
+    return { storage, ledger, engine, enforcement, controls, frames, closed, identities, sessionBindings, validateConnection, config, alice, bravo, connect, message, cmd, withdraw, legacyPersist,
         providerFetch, providerControls, providerTasks, moderator, make, advance: ms => { at += ms; }, now: () => at,
         policyChange: async () => { config.policy = { ...config.policy, revision: 2, policyVersion: 'synthetic-policy-v2', noticeDigest: 'b'.repeat(64), decisionRef: 'synthetic_operator_change' }; return ledger.installPolicy('synthetic_operator'); } };
 }
@@ -317,5 +317,111 @@ describe('controlled C3 engine integration', () => {
         await f.message('alice', { t: 'say', ch: '#stalemate', text: 'Benign late response fixture' }); await held.entered;
         expect(f.providerFetch).toHaveBeenCalledTimes(1); await f.withdraw(); held.release(); await Promise.all(f.providerTasks);
         expect(f.engine.adminState().aiReviews).toEqual([]); expect((await f.ledger.lookup(f.alice.proof)).subject.state).toBe('withdrawn');
+    });
+});
+
+async function cohortEnforcerFixture() {
+    const f = await setup(); await f.connect('alice'); await f.connect('bravo');
+    const connections = ['alice', 'bravo'].map(id => ({ id, ...clone(f.sessionBindings.get(id)) }));
+    const individual = vi.fn(async connection => clone(f.identities.get(connection.id)));
+    const bulk = vi.fn(async values => values.map(connection => clone(f.identities.get(connection.id)) ?? null));
+    const writes = vi.fn(async ({ tx, effects }) => {
+        for (const [kind, value] of effects) await tx.put('cohort:' + kind, value);
+    });
+    const make = extra => createParticipationEnforcement({ storage: f.storage, now: f.now, resolveConnection: individual,
+        validateConnection: f.validateConnection, writeEffects: writes, providerQualified: () => true,
+        dispatchStart: f.storage.dispatchStart, ...extra });
+    return { f, connections, individual, bulk, writes, make };
+}
+
+describe('optional cohort preparation with real C2 permission reads', () => {
+    it.each([false, true])('uses legacy individual preparation only when the optional method is absent/undefined (%s)', async explicitUndefined => {
+        const f = await cohortEnforcerFixture(), adapter = f.make(explicitUndefined ? { resolveConnections: undefined } : {});
+        const before = f.f.storage.snapshot(), context = await adapter.prepare(f.connections);
+        expect(f.individual).toHaveBeenCalledTimes(2); expect(f.bulk).not.toHaveBeenCalled();
+        expect(adapter.allows(context, { actorId: 'alice', action: 'publicText' })).toBe(true);
+        expect(f.f.storage.snapshot()).toEqual(before);
+        expect(await adapter.commit(context, [['net', { synthetic: 'legacy still works' }]])).toEqual({ ok: true });
+        expect(f.f.storage.snapshot().get('cohort:net')).toEqual({ synthetic: 'legacy still works' });
+    });
+
+    it.each([null, {}, true])('rejects an explicitly invalid optional adapter instead of treating it as absent (%s)', value => {
+        expect(() => createParticipationEnforcement({ storage: store(), resolveConnection: async () => null,
+            validateConnection: async () => false, writeEffects: async () => {}, resolveConnections: value })).toThrow(TypeError);
+    });
+
+    it('uses ordered nullable cohort slots and keeps adapter mutations outside the caller/context descriptors', async () => {
+        const f = await cohortEnforcerFixture(), original = clone(f.connections);
+        const bulk = vi.fn(async values => {
+            const result = [clone(f.f.identities.get(values[0].id)), null];
+            values[0].id = 'adapter_mutated_copy'; return result;
+        });
+        const adapter = f.make({ resolveConnections: bulk }), before = f.f.storage.snapshot();
+        const context = await adapter.prepare(f.connections);
+        expect(bulk).toHaveBeenCalledTimes(1); expect(f.individual).not.toHaveBeenCalled(); expect(f.connections).toEqual(original);
+        expect(adapter.allows(context, { actorId: 'alice', action: 'publicText' })).toBe(true);
+        expect(adapter.allows(context, { actorId: 'bravo', action: 'publicText' })).toBe(false);
+        expect(adapter.allows(context, { actorId: 'adapter_mutated_copy', action: 'publicText' })).toBe(false);
+        expect(f.f.storage.snapshot()).toEqual(before);
+        expect(await adapter.commit(context, [['net', { synthetic: 'current alice only' }]])).toEqual({ ok: true });
+        expect(f.individual).toHaveBeenCalledTimes(1); expect(bulk).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(['throw', 'not array', 'wrong length', 'sparse', 'undefined slot', 'extra identity field', 'identity accessor', 'nonplain array'])(
+        'fails closed without individual fallback on %s cohort output', async damage => {
+            const f = await cohortEnforcerFixture(), alice = clone(f.f.identities.get('alice')), bravo = clone(f.f.identities.get('bravo'));
+            const bulk = vi.fn(async () => {
+                if (damage === 'throw') throw Error('Synthetic cohort authority unavailable');
+                if (damage === 'not array') return null;
+                if (damage === 'wrong length') return [alice];
+                if (damage === 'sparse') { const values = new Array(2); values[0] = alice; return values; }
+                if (damage === 'undefined slot') return [alice, undefined];
+                if (damage === 'extra identity field') return [{ ...alice, role: 'owner' }, bravo];
+                if (damage === 'identity accessor') {
+                    Object.defineProperty(alice, 'expiresAt', { enumerable: true, get() { throw Error('Synthetic accessor'); } });
+                    return [alice, bravo];
+                }
+                return Object.setPrototypeOf([alice, bravo], null);
+            });
+            const adapter = f.make({ resolveConnections: bulk }), before = f.f.storage.snapshot();
+            const context = await adapter.prepare(f.connections);
+            expect(adapter.allows(context, { actorId: 'alice', action: 'publicText' })).toBe(false);
+            expect(adapter.allows(context, { actorId: 'bravo', action: 'publicText' })).toBe(false);
+            expect(f.individual).not.toHaveBeenCalled(); expect(f.writes).not.toHaveBeenCalled();
+            expect(f.f.storage.snapshot()).toEqual(before);
+        });
+
+    it('prepares again from fresh cohort identities and does not use a previous affirmative result', async () => {
+        const f = await cohortEnforcerFixture(), adapter = f.make({ resolveConnections: f.bulk });
+        const first = await adapter.prepare(f.connections);
+        expect(adapter.allows(first, { actorId: 'alice', action: 'publicText' })).toBe(true);
+        f.f.identities.get('alice').expiresAt = f.f.now();
+        const second = await adapter.prepare(f.connections);
+        expect(adapter.allows(second, { actorId: 'alice', action: 'publicText' })).toBe(false);
+        expect(adapter.allows(second, { actorId: 'bravo', action: 'publicText' })).toBe(true);
+        expect(f.bulk).toHaveBeenCalledTimes(2); expect(f.individual).not.toHaveBeenCalled();
+    });
+
+    it('does not reuse preparation grants for commit or provider fences after real C2 withdrawal', async () => {
+        const f = await cohortEnforcerFixture(), adapter = f.make({ resolveConnections: f.bulk }), context = await adapter.prepare(f.connections);
+        const text = { actorId: 'alice', action: 'publicText' }, ai = { actorId: 'alice', action: 'aiPublicReview', providerReady: true, publicTextEligible: true };
+        expect(adapter.allows(context, text)).toBe(true); expect(adapter.allows(context, ai)).toBe(true);
+        expect((await f.f.withdraw('alice')).state).toBe('withdrawn');
+        const start = vi.fn();
+        expect((await adapter.commit(context, [['net', { never: 'withdrawn publication' }]])).ok).toBe(false);
+        expect(await adapter.providerAllowed(context, ai)).toBe(false);
+        await expect(adapter.startProvider(context, ai, start)).rejects.toThrow();
+        expect(start).not.toHaveBeenCalled(); expect(f.writes).not.toHaveBeenCalled();
+        expect(f.f.storage.snapshot().has('cohort:net')).toBe(false);
+        expect(f.individual).toHaveBeenCalled(); expect(f.bulk).toHaveBeenCalledTimes(1);
+    });
+
+    it('rechecks the individual session fence even while the C2 grant remains valid', async () => {
+        const f = await cohortEnforcerFixture(), adapter = f.make({ resolveConnections: f.bulk }), context = await adapter.prepare(f.connections);
+        expect(adapter.allows(context, { actorId: 'alice', action: 'publicText' })).toBe(true);
+        f.f.identities.delete('alice');
+        expect((await adapter.commit(context, [['net', { never: 'revoked session' }]])).ok).toBe(false);
+        expect(f.writes).not.toHaveBeenCalled(); expect(f.individual).toHaveBeenCalledTimes(1);
+        expect(f.bulk).toHaveBeenCalledTimes(1);
     });
 });

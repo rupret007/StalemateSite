@@ -15,11 +15,13 @@ const APP = fileURLToPath(new URL('../../../', import.meta.url));
 const TOOLS = fileURLToPath(new URL('../durable-records/', import.meta.url));
 const ORIGIN = 'https://local-fixture.invalid', INVITE = 'owned-fixture-invite-not-a-production-credential-2026', PREVIEW = 'owned-fixture-preview-token-20261025';
 const ENV = ['PATH', 'TMPDIR', 'TEMP', 'TMP', 'SystemRoot', 'SYSTEMROOT', 'WINDIR'];
-const PARTICIPATION = process.argv.includes('--participation'), INCIDENT = process.argv.includes('--incident-sources'), TRAFFIC_ACKS = process.argv.includes('--traffic-acks'), PRESSURE_ONLY = process.argv.includes('--pressure-only'), DIAGNOSE_CLOSE = process.argv.includes('--diagnose-close');
-const MODE = [...(PARTICIPATION ? ['--participation'] : []), ...(INCIDENT ? ['--incident-sources'] : []), ...(TRAFFIC_ACKS ? ['--traffic-acks'] : []), ...(PRESSURE_ONLY ? ['--pressure-only'] : []), ...(DIAGNOSE_CLOSE ? ['--diagnose-close'] : [])];
+const PARTICIPATION = process.argv.includes('--participation'), INCIDENT = process.argv.includes('--incident-sources'), TRAFFIC_ACKS = process.argv.includes('--traffic-acks'), PRESSURE_ONLY = process.argv.includes('--pressure-only'), DIAGNOSE_CLOSE = process.argv.includes('--diagnose-close'), FANOUT_50 = process.argv.includes('--fanout-50');
+const MODE = [...(PARTICIPATION ? ['--participation'] : []), ...(INCIDENT ? ['--incident-sources'] : []), ...(TRAFFIC_ACKS ? ['--traffic-acks'] : []), ...(PRESSURE_ONLY ? ['--pressure-only'] : []), ...(DIAGNOSE_CLOSE ? ['--diagnose-close'] : []), ...(FANOUT_50 ? ['--fanout-50'] : [])];
 assert.ok(!TRAFFIC_ACKS || PARTICIPATION && !INCIDENT, '--traffic-acks requires --participation and does not select incident mode');
 assert.ok(!PRESSURE_ONLY || PARTICIPATION && !INCIDENT && !TRAFFIC_ACKS, '--pressure-only requires --participation and refuses incident/traffic flags');
 assert.ok(!DIAGNOSE_CLOSE || PARTICIPATION && TRAFFIC_ACKS && !INCIDENT && !PRESSURE_ONLY, '--diagnose-close is an explicit traffic-ACK-only diagnostic');
+assert.ok(!FANOUT_50 || PARTICIPATION && !INCIDENT && !TRAFFIC_ACKS && !PRESSURE_ONLY && !DIAGNOSE_CLOSE, '--fanout-50 requires only --participation');
+const FANOUT_PREFIX = 'Fanout fifty ephemeral marker ';
 const PRESSURE_PREFIX = 'Pressure probe ephemeral marker ';
 const TRAFFIC_PREFIX = 'ACK probe ephemeral marker ';
 const latencySummary = values => {
@@ -218,6 +220,7 @@ async function runtime(phase, state, nonce) {
             ...(TRAFFIC_ACKS ? { FIXTURE_TRAFFIC_ACKS: 'ack-v1' } : {}),
             ...(PRESSURE_ONLY ? { FIXTURE_PRESSURE_ONLY: 'pressure-v1' } : {}),
             ...(DIAGNOSE_CLOSE ? { FIXTURE_CLOSE_DIAGNOSTIC: 'close-v1' } : {}),
+            ...(FANOUT_50 ? { FIXTURE_FANOUT_50: 'fanout-v1' } : {}),
             ...(INCIDENT ? { HANGOUT_INCIDENT_SOURCE_BRIDGE: 'i3a-v1', FIXTURE_INCIDENT_KEY: fixtureIncidentKey } : {}),
             HANGOUT_HMAC_KEY: 'owned-fixture-hmac-not-a-production-credential-2026', HANGOUT_BETA_INVITE_KEY: INVITE, HANGOUT_PREVIEW_KEY: PREVIEW,
             HANGOUT_BETA_INVITE_VERSION: '1', HANGOUT_OPEN: '1', HANGOUT_AI_ENABLED: '0', HANGOUT_TURN_ENABLED: '0' },
@@ -233,22 +236,36 @@ async function runtime(phase, state, nonce) {
         const response = await mf.dispatchFetch(ORIGIN + '/_fixture/' + operation, { method: 'POST', headers: { 'X-Fixture-Nonce': nonce, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         assert.equal(response.status, 200, 'fixture control ' + operation + ' refused'); return response.json();
     };
-    const unlock = async (ip, { grant = true } = {}) => {
+    const unlock = async (ip, { grant = true, admissionProfile = null } = {}) => {
+        if (FANOUT_50 && admissionProfile) admissionProfile.unlockStart = performance.now();
         const response = await call('/beta/unlock', '', { key: INVITE }, ip); assert.equal(response.status, 200, 'real guest unlock refused');
-        assert.deepEqual(await response.json(), { ok: true });
+        const body = await response.json();
+        if (FANOUT_50 && admissionProfile) admissionProfile.unlockParsed = performance.now();
+        assert.deepEqual(body, { ok: true });
         const value = response.headers.get('Set-Cookie'); assert.equal(typeof value, 'string', 'missing real signed cookie');
         assert.ok(/^__Host-hangout-beta=[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}; Path=\/; HttpOnly; Secure; SameSite=Lax; Max-Age=[1-9][0-9]*$/.test(value), 'signed guest cookie policy was not satisfied');
         const cookie = value.split(';', 1)[0];
-        if (PARTICIPATION && grant) assert.deepEqual(await control('participation-grant', { cookie }), { authorizedSyntheticGrant: true });
+        if (PARTICIPATION && grant) {
+            if (FANOUT_50 && admissionProfile) admissionProfile.grantStart = performance.now();
+            const result = await control('participation-grant', { cookie });
+            if (FANOUT_50 && admissionProfile) admissionProfile.grantParsed = performance.now();
+            assert.deepEqual(result, { authorizedSyntheticGrant: true });
+        }
         return cookie;
     };
-    const connect = async (cookie, label, source, ip, transport = false, acknowledge = true) => {
+    const connect = async (cookie, label, source, ip, transport = false, acknowledge = true, admissionProfile = null) => {
+        if (FANOUT_50 && admissionProfile) admissionProfile.upgradeStart = performance.now();
         const response = await mf.dispatchFetch(ORIGIN + '/lobby?preview=' + PREVIEW, { headers: { ...headers(cookie, ip), Upgrade: 'websocket' } });
+        if (FANOUT_50 && admissionProfile) admissionProfile.upgrade101 = performance.now();
         assert.equal(response.status, 101, label + ': actual gateway upgrade refused'); assert.ok(response.webSocket, label + ': missing WebSocket');
         const visitor = new Visitor(response.webSocket, label, transport, acknowledge); visitors.push(visitor);
-        const hello = await visitor.wait(f => f.t === 'hello', 'actual hello'); assert.deepEqual(hello.features, { entrySources: 1, privateMessageContext: 1, roomKeep: 1, messageResults: 1 }); assert.equal(hello.role, 'fan');
+        const hello = await visitor.wait(f => f.t === 'hello', 'actual hello');
+        if (FANOUT_50 && admissionProfile) admissionProfile.serverHello = performance.now();
+        assert.deepEqual(hello.features, { entrySources: 1, privateMessageContext: 1, roomKeep: 1, messageResults: 1 }); assert.equal(hello.role, 'fan');
+        if (FANOUT_50 && admissionProfile) admissionProfile.clientHello = performance.now();
         visitor.send({ t: 'hello', nick: label, age13: true, entrySource: source, ...(transport ? { transport: 1 } : {}) });
         await visitor.wait(f => f.t === 'join' && f.ch.name === '#stalemate', 'lobby membership');
+        if (FANOUT_50 && admissionProfile) admissionProfile.joined = performance.now();
         return visitor;
     };
     const joinRoom = (visitor, room) => visitor.command('join', [room], '#stalemate', f => f.t === 'join' && f.ch.name === room, 'join ' + room);
@@ -323,7 +340,191 @@ async function runtime(phase, state, nonce) {
     };
     try {
         assert.equal((await mf.ready).hostname, '127.0.0.1');
-        if (PRESSURE_ONLY) {
+        if (FANOUT_50) {
+            const storageMethods = ['get', 'put', 'delete', 'list', 'getAlarm', 'setAlarm', 'deleteAlarm'];
+            const storageFamilies = ['authorityMarker', 'sessionIndex', 'connectionIndex', 'mintRates', 'authoritySession', 'authorityConnection',
+                'participationPolicy', 'participationRecord', 'participationAnchor', 'participationSubject', 'participationOperation', 'net', 'sessions', 'room', 'authorityOther', 'alarm', 'other'];
+            const checkStorageCounters = observed => {
+                const value = observed.nativeStorageCounters;
+                assert.deepEqual(Object.keys(value).sort(), ['v', 'families', 'methods', 'transactions', 'overflow', 'resolverTelemetry'].sort());
+                assert.equal(value.v, 1); assert.equal(value.overflow, false);
+                assert.deepEqual(value.resolverTelemetry, { available: false, reason: 'frozen-captured-authority' });
+                assert.deepEqual(Object.keys(value.families).sort(), [...storageFamilies].sort());
+                assert.deepEqual(Object.keys(value.methods).sort(), [...storageMethods].sort());
+                const count = number => assert.ok(Number.isSafeInteger(number) && number >= 0, 'fanout native counter must be a nonnegative safe integer');
+                for (const family of storageFamilies) {
+                    assert.deepEqual(Object.keys(value.families[family]).sort(), [...storageMethods].sort());
+                    for (const method of storageMethods) count(value.families[family][method]);
+                }
+                let total = 0;
+                for (const method of storageMethods) {
+                    const row = value.methods[method];
+                    assert.deepEqual(Object.keys(row).sort(), ['attempted', 'returned', 'threw']);
+                    for (const number of Object.values(row)) count(number);
+                    assert.ok(row.returned + row.threw <= row.attempted);
+                    assert.equal(storageFamilies.reduce((sum, family) => sum + value.families[family][method], 0), row.attempted);
+                    total += row.attempted;
+                }
+                count(observed.nativeStorageMethodCalls); assert.equal(total, observed.nativeStorageMethodCalls);
+                assert.deepEqual(Object.keys(value.transactions).sort(), ['started', 'committed', 'rejected'].sort());
+                for (const number of Object.values(value.transactions)) count(number);
+                assert.ok(value.transactions.committed + value.transactions.rejected <= value.transactions.started);
+            };
+            const metrics = () => control('fanout-metrics'), summary = () => control('fanout-summary');
+            const completeScan = async () => {
+                let token = '', last; const pages = [];
+                for (let pass = 0; pass < 14; pass++) {
+                    last = await control('fanout-scan', { token });
+                    assert.ok(last.rows <= 256 && last.bytes <= 8 * 1024 * 1024 && last.logicalRows <= 1024 && last.rawRows <= 2048);
+                    assert.ok(last.combinedRows <= 3072 && last.combinedBytes <= 32 * 1024 * 1024 && last.ordinaryMarkerAbsent);
+                    pages.push({ domain: last.domain, rows: last.rows, bytes: last.bytes });
+                    if (last.complete) {
+                        assert.equal(last.token, null); assert.equal(last.requiredRecordsPresent, true); assert.ok(last.logicalRows > 0 && last.rawRows > 0);
+                        const { token: privateContinuation, ...result } = last; return { ...result, pages };
+                    }
+                    assert.match(last.token, /^[a-f0-9-]{36}$/); token = last.token;
+                }
+                assert.fail('fanout complete scan exceeded its fixed continuation bound');
+            };
+            const drain = async (all, expectedLive) => {
+                const deadline = performance.now() + 6000;
+                for (;;) {
+                    for (const peer of all) if (peer.failure) throw peer.failure;
+                    const observed = await metrics();
+                    checkStorageCounters(observed);
+                    assert.equal(observed.sockets.length, 50); assert.equal(observed.engineCount, expectedLive); assert.equal(observed.liveBindingCount, expectedLive);
+                    if (observed.sockets.every((socket, slot) => socket.slot === slot && socket.controls === all[slot].ack.sent
+                        && (!socket.live || all[slot].closed === null && all[slot].ack.pending === 0
+                            && socket.sequence === all[slot].rawTransport.lastSequence && socket.acknowledged === socket.sequence && socket.pendingFrames === 0))) {
+                        assert.equal(observed.sockets.filter(socket => socket.live).length, expectedLive);
+                        assert.equal(observed.controlBudget.consumedControls, all.reduce((sum, peer) => sum + peer.ack.sent, 0));
+                        assert.equal(observed.delivery.controlFrames, observed.controlBudget.consumedControls);
+                        assert.equal(observed.controlBudget.reservations, observed.sockets.reduce((sum, socket) => sum + Math.ceil(socket.controls / 20), 0));
+                        assert.equal(observed.controlBudget.prepaidControls, observed.controlBudget.reservations * 20);
+                        for (const socket of observed.sockets) assert.equal(socket.remainingControls, 20 * Math.ceil(socket.controls / 20) - socket.controls);
+                        for (const field of ['pressureCloses', 'failures', 'legacyCloses', 'controlCloses']) assert.equal(observed.delivery[field], 0);
+                        assert.equal(observed.controlBudget.refused, 0); assert.equal(observed.delivery.pendingFrames, 0); assert.equal(observed.delivery.pendingBytes, 0);
+                        for (const peer of all) assert.ok(peer.ack.minSpacingMs === null || peer.ack.minSpacingMs >= 50);
+                        return observed;
+                    }
+                    assert.ok(performance.now() < deadline, 'fanout actual native ACK drain exceeded existing6s wait'); await delay(25);
+                }
+            };
+            const waitSummary = async expected => {
+                const deadline = performance.now() + 6000;
+                for (;;) {
+                    const value = await summary();
+                    assert.equal(value.authorityUnavailable, false); assert.equal(value.reports, 0); assert.equal(value.held, 0);
+                    if (value.bindingCount === expected && value.liveBindingCount === expected && value.storedConnections === expected && value.engineConnections === expected) return value;
+                    assert.ok(performance.now() < deadline, 'fanout real binding/session convergence exceeded existing6s wait'); await delay(25);
+                }
+            };
+            if (phase === 'visitors') {
+                const missing = await call('/beta/unlock', '', { key: INVITE }); assert.equal(missing.status, 503); await missing.body?.cancel();
+                assert.equal((await control('initialize')).reason, 'initialize complete');
+                assert.deepEqual(await control('participation-policy'), { installed: true });
+                assert.deepEqual(await control('egress-probe'), { status: 503, denied: true });
+                const admissionProfiles = Array.from({ length: 50 }, () => ({}));
+                const peers = [], cookies = [], admissionMs = [], started = performance.now();
+                for (let index = 0; index < 50; index++) {
+                    const profile = admissionProfiles[index];
+                    const at = performance.now(), ip = `192.0.2.${index + 1}`, cookie = await unlock(ip, { admissionProfile: profile });
+                    assert.ok(!cookies.includes(cookie), 'fanout gateway reused an issued SID cookie'); cookies.push(cookie);
+                    peers.push(await connect(cookie, `NativeFan${String(index).padStart(2, '0')}`, index % 2 ? 'rad-dad' : 'stalemate', ip, true, true, profile));
+                    const endedAt = performance.now(); admissionMs.push(endedAt - at);
+                    profile.outerStart = at; profile.outerEnd = endedAt;
+                }
+                const admissionPhases = admissionProfiles.map((profile, index) => {
+                    const points = [profile.outerStart, profile.unlockStart, profile.unlockParsed, profile.grantStart, profile.grantParsed,
+                        profile.upgradeStart, profile.upgrade101, profile.serverHello, profile.clientHello, profile.joined, profile.outerEnd];
+                    assert.ok(points.every((value, at) => Number.isFinite(value) && value >= 0 && (!at || value >= points[at - 1])), 'fanout admission phase order');
+                    const row = { ordinal: index + 1, totalMs: admissionMs[index], unlockHttpMs: points[2] - points[1], c2GrantHttpMs: points[4] - points[3],
+                        upgrade101Ms: points[6] - points[5], serverHelloMs: points[7] - points[6], helloJoinMs: points[9] - points[8],
+                        // Add actual non-overlapping runner gaps; never clamp a
+                        // negative total-minus-components difference to zero.
+                        residualMs: (points[1] - points[0]) + (points[3] - points[2]) + (points[5] - points[4]) + (points[8] - points[7]) + (points[10] - points[9]) };
+                    assert.equal(row.totalMs, profile.outerEnd - profile.outerStart);
+                    const spans = [row.unlockHttpMs, row.c2GrantHttpMs, row.upgrade101Ms, row.serverHelloMs, row.helloJoinMs, row.residualMs];
+                    const tolerance = Number.EPSILON * Math.max(1, ...points) * 16;
+                    assert.ok(spans.every(value => Number.isFinite(value) && value >= 0 && value <= row.totalMs + tolerance), 'fanout admission phase bound');
+                    assert.ok(Math.abs(spans.reduce((sum, value) => sum + value, 0) - row.totalMs) <= tolerance, 'fanout admission total reconciliation');
+                    return row;
+                });
+                assert.equal(admissionPhases.length, 50);
+                assert.ok(Buffer.byteLength(JSON.stringify(admissionPhases)) <= 32768, 'fanout admission metadata bound');
+                assert.equal(peers.length, 50); assert.ok(peers.every(peer => peer.closed === null));
+                const admitted = await waitSummary(50); await delay(200);
+                const beforeMetrics = await drain(peers, 50), deliveryMs = [], resultMs = [], latenessMs = [], gapMs = [];
+                const serverMessageIds = new Set();
+                const trafficAt = performance.now(); let lastAt = -Infinity;
+                for (let index = 0; index < 12; index++) {
+                    const planned = trafficAt + index * 1100, earliest = Math.max(planned, lastAt + 1100);
+                    while (performance.now() < earliest) await delay(earliest - performance.now());
+                    const writer = peers[index], text = FANOUT_PREFIX + String(index).padStart(2, '0'), id = (index + 1).toString(16).padStart(32, '0');
+                    const offsets = peers.map(peer => peer.frames.length), sentAt = performance.now();
+                    latenessMs.push(sentAt - planned); if (index) gapMs.push(sentAt - lastAt); lastAt = sentAt;
+                    writer.send({ t: 'say', ch: '#stalemate', text, clientMessageId: id });
+                    const copies = await Promise.all(peers.map((peer, slot) => peer.wait(frame => frame.t === 'line' && frame.text === text, 'fifty-recipient actual line', offsets[slot])));
+                    for (const copy of copies) {
+                        assert.equal(typeof copy.id, 'string'); assert.ok(copy.id.length > 0, 'fanout missing authoritative message ID');
+                        assert.equal(copy.ch, '#stalemate'); assert.equal(copy.from, `NativeFan${String(index).padStart(2, '0')}`);
+                        assert.equal(copy.entrySource, index % 2 ? 'rad-dad' : 'stalemate');
+                    }
+                    assert.equal(new Set(copies.map(frame => frame.id)).size, 1);
+                    assert.equal(serverMessageIds.has(copies[0].id), false, 'fanout reused a server message ID'); serverMessageIds.add(copies[0].id);
+                    for (let slot = 0; slot < 50; slot++) deliveryMs.push(peers[slot].frameTimes[peers[slot].frames.indexOf(copies[slot])] - sentAt);
+                    const result = await writer.wait(frame => frame.t === 'message-result' && frame.id === id, 'fanout actual sender result', offsets[index]);
+                    assert.equal(result.status, 'published'); resultMs.push(writer.frameTimes[writer.frames.indexOf(result)] - sentAt);
+                }
+                const afterMetrics = await drain(peers, 50), raw = peers.map(peer => peer.transportSnapshot());
+                for (let slot = 0; slot < 50; slot++) {
+                    for (let index = 0; index < 12; index++) assert.equal(peers[slot].frames.filter(frame => frame.t === 'line' && frame.text === FANOUT_PREFIX + String(index).padStart(2, '0')).length, 1, 'fanout duplicate/missing line');
+                    const results = peers[slot].frames.filter(frame => frame.t === 'message-result');
+                    assert.equal(results.length, slot < 12 ? 1 : 0, 'fanout extra/missing sender result');
+                }
+                assert.equal(deliveryMs.length, 600); assert.equal(resultMs.length, 12); assert.equal(serverMessageIds.size, 12);
+                const logout = await call('/beta/logout', cookies[0], {}, '192.0.2.1'); assert.equal(logout.status, 200); assert.deepEqual(await logout.json(), { ok: true });
+                assert.equal((await peers[0].wait(() => false, 'fanout revoked native socket close', 0, true)).code, 4401);
+                const denied = await call('/beta/state', cookies[0]); assert.equal(denied.status, 401); await denied.body?.cancel();
+                const replay = await mf.dispatchFetch(ORIGIN + '/lobby?preview=' + PREVIEW, { headers: { ...headers(cookies[0], '192.0.2.1'), Upgrade: 'websocket' } });
+                assert.equal(replay.status, 401); await replay.body?.cancel();
+                const revokedFrameCount = peers[0].frames.length;
+                await waitSummary(49); await peers[1].barrier(); await delay(200);
+                const finalMetrics = await drain(peers, 49), preKillScan = await completeScan(), checkpoint = await waitSummary(49);
+                assert.equal(peers[0].frames.length, revokedFrameCount); assert.ok(peers.slice(1).every(peer => peer.closed === null));
+                for (let slot = 0; slot < 50; slot++) for (let index = 0; index < 12; index++) assert.equal(peers[slot].frames.filter(frame => frame.t === 'line' && frame.text === FANOUT_PREFIX + String(index).padStart(2, '0')).length, 1);
+                proof = { checks: ['fifty-real-cookie-SID-granted-native-WebSocket-members', 'twelve-publications-exactly-six-hundred-native-deliveries', 'fifty-raw-streams-and-real-paced-ACK-prepayment-accounting', 'real-logout-replay-denial-with49-current-members', 'complete-prekill-logical-raw-no-ordinary-archive'],
+                    fanout: { realGuests: 50, syntheticConsentSubjects: 50, nativeSockets: 50, publications: 12, deliveredCopies: 600, senderResults: 12, uniqueServerMessageIds: serverMessageIds.size,
+                        admission: latencySummary(admissionMs), admissionPhases, publicDelivery: latencySummary(deliveryMs), senderDisposition: latencySummary(resultMs),
+                        aggregateSendGap: latencySummary(gapMs), scheduleLateness: latencySummary(latenessMs), trafficDurationMs: lastAt - trafficAt,
+                        totalFirstPhaseWorkMs: performance.now() - started, admitted, beforeMetrics, afterMetrics, finalMetrics, raw,
+                        nativeStorageMethodCallDelta: afterMetrics.nativeStorageMethodCalls - beforeMetrics.nativeStorageMethodCalls,
+                        revokedClose: 4401, revokedReplayDenied: true, checkpointMembers: 49, preKillScan,
+                        scope: 'Fixed50-native local Node/Miniflare bridge workload, not production capacity/SLO, physical browser/WAN,150tier,16-reconnect storm,many-room or soak.' },
+                    checkpoint, sources: before, versions, binarySha256, rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs, outboundCalls, runtimeRestarts,
+                    workerdPids: group(process.pid).filter(row => row.command.includes('workerd')).map(row => row.pid) };
+                secrets = { revokedCookie: cookies[0], liveCookie: cookies[1] };
+                assert.equal(outboundCalls, 1); assert.equal(runtimeRestarts, 0); assert.deepEqual(sources(), before);
+                for (const [path, digest] of Object.entries(bundleInputs)) assert.equal(hash(path), digest);
+                assert.ok(proof.workerdPids.length); await ipc({ type: 'checkpoint', phase, nonce, proof, secrets }); await new Promise(() => {});
+            } else {
+                const received = await recoveryMessage; secrets = received.secrets;
+                const denied = await call('/beta/state', secrets.revokedCookie); assert.equal(denied.status, 401); await denied.body?.cancel();
+                const active = await call('/beta/state', secrets.liveCookie); assert.equal(active.status, 200); await active.body?.cancel();
+                const recovered = await waitSummary(0); assert.equal(recovered.domainDigest, received.checkpoint.domainDigest); assert.equal(received.checkpoint.bindingCount, 49);
+                const coldScan = await completeScan();
+                const returning = await connect(secrets.liveCookie, 'NativeReturn', 'rad-dad', '192.0.2.2', true);
+                await returning.barrier(); assert.ok(returning.frames.every(frame => frame.t !== 'line'), 'fanout cold reconnect offered old chat');
+                assert.equal((await summary()).bindingCount, 1);
+                proof = { checks: ['whole-native-process-loss-prunes49-missing-sockets', 'complete-cold-logical-raw-scan-keeps-revocation-and-no-archive', 'current-same-SID-new-native-binding-without-chat-replay'], recovered, coldScan,
+                    sources: before, versions, binarySha256, rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs, outboundCalls, runtimeRestarts,
+                    workerdPids: group(process.pid).filter(row => row.command.includes('workerd')).map(row => row.pid) };
+                returning.socket.close(1000, 'owned fanout proof complete'); assert.equal((await returning.wait(() => false, 'fanout recovery normal close', 0, true)).code, 1000);
+                assert.equal(outboundCalls, 0); assert.equal(runtimeRestarts, 0); assert.deepEqual(sources(), before);
+                for (const [path, digest] of Object.entries(bundleInputs)) assert.equal(hash(path), digest);
+                await mf.dispose(); await ipc({ type: 'result', phase, nonce, proof, miniflareDisposed: true });
+            }
+        } else if (PRESSURE_ONLY) {
             const pressureMetrics = () => control('pressure-metrics');
             const until = async (predicate, label) => {
                 const deadline = performance.now() + 6000;
@@ -918,11 +1119,12 @@ async function parent() {
     console.log(JSON.stringify({ localGatewayWebSocketSessionAuthorityQualified: !DIAGNOSE_CLOSE,
         ...(DIAGNOSE_CLOSE ? { diagnosticCloseObservationOnly: true, diagnosticPassMeansNoReproductionOnly: true } : {}), ...(PARTICIPATION ? { productionParticipationCompositionQualified: !DIAGNOSE_CLOSE, guardianDecisionsQualified: false } : {}),
         ...(INCIDENT ? { productionIncidentSourceCompositionQualified: true, incidentAuthorityAndKeyQualified: false } : {}),
-        ...(PARTICIPATION && !PRESSURE_ONLY ? { productionOwnSharingCompositionQualified: !DIAGNOSE_CLOSE } : {}),
+        ...(PARTICIPATION && !PRESSURE_ONLY && !FANOUT_50 ? { productionOwnSharingCompositionQualified: !DIAGNOSE_CLOSE } : {}),
+        ...(FANOUT_50 ? { nativeLocalFiftyGuestFanoutQualified: true, originalNinePlusThreeQualifiedByThisMode: false, hostedScaleQualified: false } : {}),
         ...(PRESSURE_ONLY ? { nativeLocalNonAckPressureQualified: true, originalNinePlusThreeQualifiedByThisMode: false, hostedScaleQualified: false } : {}),
         ...(TRAFFIC_ACKS ? { nativeLocalHealthyAckProbeQualified: !DIAGNOSE_CLOSE, hostedScaleQualified: false } : {}),
         ...(PARTICIPATION && INCIDENT ? { combinedParticipationIncidentSourceCompositionQualified: true } : {}), first, recovered, node: process.version, platform: process.platform, architecture: process.arch,
-        temporaryStateRemoved: true, scope: DIAGNOSE_CLOSE ? 'Explicit pass-through close-order diagnostic only. A passing instrumented run means no reproduction in that run, not a retirement fix, ordinary mode qualification, hosted readiness or overall completion. All original assertions/waits remain. No production behavior is replaced.' : PRESSURE_ONLY ? 'Separate three-current-SID C3 application-ACK credit pressure proof in actual local workerd/SQLite. Real HELP output, zero-ACK probe4413 with128-frame/native-send/credit witness, healthy ACK/publication and real revocation isolation, one-binding owned-process-loss recovery and no text replay. Synthetic consent only. Does not requalify original9+3/Delta/Echo modes, physical slow TCP/browser/WAN/shared-fanout capacity/150-native/soak or hosted limits/cost.' : 'Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. ' + (PARTICIPATION ? 'Required production C3 bridge selected; actual caller-only HTTP status/Stop narrows the existing synthetic ledger, keeps the same socket for a delivered-message report, then persists withdrawal across process loss before real logout. Only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. ' : '') + (INCIDENT ? 'Required production I3a source bridge and existing I1 over actual records transactions; separate incident appointment/policy and privately retained test key are synthetic only. This does not qualify real incident authority, purpose-key provisioning or key recovery. ' : '') + (TRAFFIC_ACKS ? 'Optional three-visitor paced native-local ACK workload; raw envelopes validated before semantic normalization and actual serialized control grants reconciled. Latencies include Node/Miniflare native bridge; no throughput tier or public SLO claim. ' : '') + 'No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.' }, null, 2));
+        temporaryStateRemoved: true, scope: DIAGNOSE_CLOSE ? 'Explicit pass-through close-order diagnostic only. A passing instrumented run means no reproduction in that run, not a retirement fix, ordinary mode qualification, hosted readiness or overall completion. All original assertions/waits remain. No production behavior is replaced.' : FANOUT_50 ? 'Separate50-real-guest native C3 fanout proof:12publications/600actualdeliveries,50pacedACKstreams,actualrevocation49livebindings thenwholeprocessloss/coldpruning/nohistory. Syntheticpolicy/grants only. Native-local Node/Miniflare bridge observations,notbrowser/WAN/150tier/reconnectstorm/many-room/soak/hostedcapacityorSLO. Doesnotrequalifycanonical9+3/fault/Stop/reportmodes.' : PRESSURE_ONLY ? 'Separate three-current-SID C3 application-ACK credit pressure proof in actual local workerd/SQLite. Real HELP output, zero-ACK probe4413 with128-frame/native-send/credit witness, healthy ACK/publication and real revocation isolation, one-binding owned-process-loss recovery and no text replay. Synthetic consent only. Does not requalify original9+3/Delta/Echo modes, physical slow TCP/browser/WAN/shared-fanout capacity/150-native/soak or hosted limits/cost.' : 'Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. ' + (PARTICIPATION ? 'Required production C3 bridge selected; actual caller-only HTTP status/Stop narrows the existing synthetic ledger, keeps the same socket for a delivered-message report, then persists withdrawal across process loss before real logout. Only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. ' : '') + (INCIDENT ? 'Required production I3a source bridge and existing I1 over actual records transactions; separate incident appointment/policy and privately retained test key are synthetic only. This does not qualify real incident authority, purpose-key provisioning or key recovery. ' : '') + (TRAFFIC_ACKS ? 'Optional three-visitor paced native-local ACK workload; raw envelopes validated before semantic normalization and actual serialized control grants reconciled. Latencies include Node/Miniflare native bridge; no throughput tier or public SLO claim. ' : '') + 'No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.' }, null, 2));
 }
 try { if (process.argv[2] === '--isolated' && process.argv.length === (6 + MODE.length)) await runtime(process.argv[3], process.argv[4], process.argv[5]); else await parent(); }
 catch (error) { console.error(error.stack || error); process.exitCode = 1; }

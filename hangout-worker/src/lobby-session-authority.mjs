@@ -243,6 +243,33 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
             const binding = bindingFrom(value);
             return await validateBinding(tx, binding) ? participationIdentity(tx, binding.betaSid, binding.expiresAt) : null;
         }),
+        async resolveParticipationConnections(values) {
+            ensure(Array.isArray(values) && values.length <= CONNECTION_LIMIT);
+            const descriptors = clone(values);
+            return records.transaction(async tx => {
+                // Preparation only: native reads are shared inside this one
+                // read-only transaction, never across actions or commit fences.
+                // Each validator still sees an independent row and checks its
+                // own descriptor, current role and live clock on every call.
+                const rows = new Map();
+                const current = Object.freeze({ get: async key => {
+                    if (!rows.has(key)) rows.set(key, await tx.get(key));
+                    return clone(rows.get(key));
+                } });
+                await initialized(current); ensure((await configuredMarker(current)).inviteVersion === betaVersion(env));
+                const identities = [];
+                for (const value of descriptors) {
+                    let identity = null;
+                    try {
+                        const binding = bindingFrom(value);
+                        if (await validateBinding(current, binding)) identity = await participationIdentity(current, binding.betaSid, binding.expiresAt);
+                    } catch { /* This descriptor receives no affirmative grant. */ }
+                    identities.push(identity);
+                }
+                await configuredMarker(current);
+                return identities;
+            });
+        },
         async validateParticipationConnection({ tx, connection, identity } = {}) {
             try {
                 const binding = bindingFrom(connection);
