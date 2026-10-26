@@ -37,6 +37,43 @@ cascade. Neither failure was resolved by raising caps or omitting recipients.
 One short passing run is not a soak test or proof against every adversarial
 reader. Raw private-room relay and media traffic have separate limits.
 
+## Separate native fifty-guest workload
+
+The explicit local command is:
+
+```sh
+npm run test:lobby-session-runtime -- --participation --fanout-50
+```
+
+This mode must admit fifty distinct real gateway cookies/SIDs and actual local
+WebSockets through the production C3 composition. Test-only controls supply
+explicitly synthetic guardian decisions; no real enrollment is qualified.
+Twelve distinct authors each publish one paced lobby message. All fifty guests
+must observe each message exactly once, giving 600 line deliveries and twelve
+published sender results. Raw sequence, ACK and prepaid-control accounting must
+reconcile without healthy-peer pressure closures.
+
+Actual logout retires one guest and denies copied-cookie replay. Forty-nine
+bindings remain at the checkpoint; a fresh process must retire those lost
+bindings, preserve the revoked SID denial and let a current SID reconnect
+without earlier chat. Complete bounded logical and physical scans check that
+ordinary messages were not stored. A failure is retained rather than resolved
+by omitting guests, recipients, state or existing protections.
+
+Run receipts are required before claiming this workload passes. It uses the
+existing sixty-second phase deadline and production limits. Existing canonical
+modes retain their assertions. It does not prove 150 native guests, thirty
+native creative rooms, a sixteen-client reconnect storm, sustained load,
+physical slow TCP, browser suspension, hosted performance or native audio.
+
+Wrapped storage-method counts remain diagnostic, not billable usage. Cloudflare
+separates incoming WebSocket request billing, active duration and storage;
+local counters do not establish an account invoice or cost ceiling. See the
+[current pricing dimensions](https://developers.cloudflare.com/durable-objects/platform/pricing/),
+[workload-dependent object limits](https://developers.cloudflare.com/durable-objects/platform/limits/)
+and [hibernation behavior](https://developers.cloudflare.com/durable-objects/best-practices/websockets/).
+No hosted load, deployment, provider activation or spending is authorized here.
+
 ## Hosted staging handoff
 
 The later public-room camera/blocking candidate adds a separate browser activity

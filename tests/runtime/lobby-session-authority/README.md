@@ -385,3 +385,64 @@ cookies, bodies or raw error stacks enter the observer metadata. A passing run
 means no reproduction in that instrumented run, not a close-retirement fix or
 normal-mode/overall qualification. The canonical six modes do not install these
 observers when the diagnostic flag is absent.
+
+## Separate fifty-guest native fanout mode
+
+```sh
+npm run --silent test:lobby-session-runtime -- --participation --fanout-50
+```
+
+This new optional mode refuses incident, three-client traffic, pressure and close-
+diagnostic flags. Unknown parent arguments are refused by the existing exact CLI
+check. Its distinct `nativeLocalFiftyGuestFanoutQualified` result requires fifty
+real signed guest cookies/SIDs, fifty successful actual native WebSocket upgrades
+and nickname joins, and fifty current C3 grants from the existing explicitly
+synthetic operator/guardian adapter. Fifty control registrations alone cannot
+pass. Each guest uses a distinct fixture IP, retaining the real twenty-mints-per-
+IP/hour check. No staff identity or production authority/consent bypass is used.
+
+Only this profile permits fifty synthetic subjects and fifty-member inspection/
+metrics; the existing five-subject, four-current and three-client canonical
+fixture profiles remain unchanged. All production lobby (150 guests) and room (8 guests), binding200,
+record/transaction/checkpoint/abuse/request/transport caps and provider-off states
+remain. This is the first 50 native tier, not admission to the150 ceiling.
+
+All fifty sockets negotiate transport v1, witness continuous raw sequences before
+semantic normalization and use the existing eight-frame/50ms ACK policy. Twelve
+unique ordinary public messages rotate twelve different authors at least 1,100 ms
+apart, with no catch-up burst or action retry. Exactly 600 recipient line copies
+and twelve correlated published sender results must arrive, with no duplicates
+or missing recipients. Before/after delivery/control counters reconcile each
+socket's actual ACK consumption, reservations and serialized prepaid remainder.
+Latencies report native-local Node/Miniflare bridge observations with sample
+counts, not isolated workerd latency, a public SLO or invoice cost.
+
+Real logout closes one guest with close code 4401 and denies its cookie state/upgrade replay. The
+other 49 remain native members and ACK a real ordered names response. Their
+actual durable/session/binding convergence must reach 49 before the checkpoint.
+The owned runtime is killed with those 49 connected; fresh-process recovery must
+prune all 49 missing sockets, retain revocation, and let one current SID create a
+new binding without old chat. Its normal close with code 1000 and owned-process/temporary-
+state cleanup remain required. No earlier binding is claimed to have survived.
+
+Complete logical and raw privacy scans run before the kill and after cold
+pruning, without creating a selected report. Continuations are opaque, one-use,
+nonce-bound and never expose keys or values. Each pass reads at most 256 rows/
+8 MiB. The new profile has fixed ceilings of 1,024 logical rows, 2,048 physical rows,
+3,072 combined rows and 32 MiB combined, with at most 14 passes. The initial planning
+estimate of 1,024 combined rows was never executed: the real fifty-subject shape
+already needs about 515 logical records and at least 1,030 physical manifest/chunk
+rows. The revised finite limits are explicit test-profile bounds, not changes to
+canonical scans or production record guards. A bound, mutation-counter change,
+missing required record, unfinished scan or retained ordinary marker fails the
+mode; nothing is truncated or automatically expanded. Full logical decoding also
+checks markers across physical chunk boundaries; the raw scan visits every
+physical row and checks its contents separately.
+
+The original 60-second child deadline includes bundling, every admission, traffic,
+privacy and checkpoint work. Six-second waits and each Visitor's 2 MiB/2,000-frame
+bound remain. This mode does not shorten the fifty-client/600-delivery workload
+if time is tight. Its first-phase and recovery groups are separate from original
+9+3, injected-fault, Stop/report and pressure proofs. Sixteen-client reconnect
+storms, many-room/30-room recovery, 150-native load, longer soak, physical browser/
+WAN, hosted capacity/cost and real guardian/provider qualification remain open.

@@ -16,6 +16,7 @@ const INCIDENT_CASES = 'restricted-incident-cases-v1', INCIDENT_APPOINTMENT = 'f
 const SELECTED_REPORT = 'Native selected report greeting';
 const TRAFFIC_PREFIX = 'ACK probe ephemeral marker ';
 const PRESSURE_PREFIX = 'Pressure probe ephemeral marker ';
+const FANOUT_PREFIX = 'Fanout fifty ephemeral marker ';
 const TRAFFIC_LABELS = ['NativeAlpha', 'NativeBravo', 'NativeCharlie'];
 const ordinaryNeedles = ['Native Stalemate ephemeral greeting', 'Native Rad Dad ephemeral greeting', 'Native remaining visitor greeting', 'native-media-control-no-body-persistence'];
 const ensure = (condition, label) => { if (!condition) throw Error(label); };
@@ -40,9 +41,10 @@ async function readControl(request) {
 
 export class FixtureLobby extends HangoutLobby {
     constructor(state, env) {
-        const control = { faultKey: '', tripped: false, nativeWriteCompleted: false, nativeCalls: 0, history: [], rollbackWitnesses: [],
+        const control = { faultKey: '', tripped: false, nativeWriteCompleted: false, nativeCalls: 0, nativeMutations: 0, history: [], rollbackWitnesses: [],
             traffic: env.FIXTURE_TRAFFIC_ACKS === 'ack-v1' ? { slots: new Map(), transactionsStarted: 0, transactionsCommitted: 0, transactionsRejected: 0 } : null,
-            pressure: env.FIXTURE_PRESSURE_ONLY === 'pressure-v1' ? { slots: new Map(), probeSocket: null, helpAttempts: [], overflow: false, witness: null, nativeSendCalls: 0, nativeSendReturned: 0, initialSequence: 0 } : null };
+            pressure: env.FIXTURE_PRESSURE_ONLY === 'pressure-v1' ? { slots: new Map(), probeSocket: null, helpAttempts: [], overflow: false, witness: null, nativeSendCalls: 0, nativeSendReturned: 0, initialSequence: 0 } : null,
+            fanout: env.FIXTURE_FANOUT_50 === 'fanout-v1' ? { slots: new Map(), scan: null, scanStarted: false } : null };
         const manifestDigest = async (storage, key) => {
             control.nativeCalls++;
             const value = await storage.get(key);
@@ -91,6 +93,7 @@ export class FixtureLobby extends HangoutLobby {
                 }
                 control.nativeCalls++;
                 const result = await method.apply(raw, args);
+                if (['put', 'delete', 'setAlarm', 'deleteAlarm'].includes(key)) control.nativeMutations++;
                 // Fault only after the actual native SQLite write resolved.
                 if (armed) {
                     ensure(!transactionWitness.fault, 'fixture-duplicate-native-fault');
@@ -235,7 +238,7 @@ export class FixtureLobby extends HangoutLobby {
         const ledger = createPartitionedParticipationConsents({ storage: this.authority.records,
             // Five lifetime synthetic subjects A/B/C/D/E for the new real
             // self-withdrawal journey; no production capacity is changed.
-            admitSubject: async ({ tx }) => { const n = await tx.get('fixture-participation-allocation') || 0; if (n >= 5) return false; await tx.put('fixture-participation-allocation', n + 1); return true; },
+            admitSubject: async ({ tx }) => { const n = await tx.get('fixture-participation-allocation') || 0; if (n >= (this.env.FIXTURE_FANOUT_50 === 'fanout-v1' ? 50 : 5)) return false; await tx.put('fixture-participation-allocation', n + 1); return true; },
             adapters: {
                 qualifyPolicy: async () => ({ config, expiresAt: Date.now() + 10000 }),
                 authenticateParticipant: async ({ proof, purpose }) => {
@@ -272,6 +275,89 @@ export class FixtureLobby extends HangoutLobby {
             guardianRef: guardian.guardianRef, guardianRevision: guardian.revision, expiresAt: Date.now() + 10000 });
         const result = await f.ledger.change(proof, { expectedRevision: subject.revision, purposes: subject.purposes.filter(purpose => purpose !== 'camera') });
         f.guardians.delete(proof); ensure(result.state === 'authorized', 'fixture-reduction-refused'); return { reduced: true };
+    }
+    fixtureFanoutMode() {
+        ensure(this.env.FIXTURE_FANOUT_50 === 'fanout-v1' && this.fixtureControl.fanout && this.participationMode && !this.incidentSourceMode,
+            'fixture-fanout-mode-required'); return this.fixtureControl.fanout;
+    }
+    fixtureFanoutMetrics() {
+        const meter = this.fixtureFanoutMode(), current = this.engine.sessionSnapshot().connections;
+        ensure(current.length <= 50 && current.every(person => !person.account && person.role === 'fan'), 'fixture-fanout-current-guests-required');
+        if (!meter.slots.size) {
+            ensure(current.length === 50 && Array.from({ length: 50 }, (_, index) => `NativeFan${String(index).padStart(2, '0')}`)
+                .every(label => current.filter(person => person.nick === label).length === 1), 'fixture-fifty-real-members-required');
+            for (const person of current) {
+                ensure(this.liveBindings.has(person.id), 'fixture-fanout-live-binding-required');
+                const selected = this.state.getWebSockets().filter(socket => socket.readyState === 1 && socket.deserializeAttachment()?.id === person.id);
+                ensure(selected.length === 1, 'fixture-fanout-native-socket-required');
+                meter.slots.set(person.id, { slot: Number(person.nick.slice(-2)), socket: selected[0] });
+            }
+        }
+        ensure(meter.slots.size === 50 && current.every(person => meter.slots.has(person.id)), 'fixture-fanout-fixed-fifty-required');
+        const sockets = [...meter.slots].map(([id, entry]) => {
+            const { delivery, controlGrant } = entry.socket.deserializeAttachment();
+            ensure(delivery?.enabled === true && delivery.negotiated === true && Array.isArray(delivery.sizes), 'fixture-fanout-native-transport-required');
+            return { slot: entry.slot, live: current.some(person => person.id === id) && this.liveBindings.has(id) && entry.socket.readyState === 1,
+                sequence: delivery.seq, acknowledged: delivery.ack, controls: delivery.control.count, pendingFrames: delivery.sizes.length,
+                remainingControls: controlGrant?.remaining ?? 0 };
+        }).sort((a, b) => a.slot - b.slot);
+        return { sockets, engineCount: current.length, liveBindingCount: this.liveBindings.size,
+            delivery: this.delivery.snapshot(), controlBudget: this.controlBudget.snapshot(), nativeStorageMethodCalls: this.fixtureControl.nativeCalls,
+            nativeMutations: this.fixtureControl.nativeMutations };
+    }
+    async fixtureFanoutSummary() {
+        this.fixtureFanoutMode(); const saved = await this.authority.load(), current = this.engine.sessionSnapshot().connections;
+        ensure(saved.bindings.length <= 50 && saved.state.sessions.connections.length <= 50 && current.length <= 50
+            && saved.bindings.every(({ binding }) => !binding.account && binding.role === 'fan'), 'fixture-fanout-summary-bound');
+        return { domainDigest: await sha(this.state.id.toString()), authorityUnavailable: !!this.authorityUnavailable,
+            bindingCount: saved.bindings.length, liveBindingCount: this.liveBindings.size, storedConnections: saved.state.sessions.connections.length,
+            engineConnections: current.length, reports: saved.state.moderationQueue.reports.length, held: saved.state.moderationQueue.held.length,
+            rooms: saved.state.rooms.rooms.length };
+    }
+    async fixtureFanoutScan(body) {
+        const meter = this.fixtureFanoutMode();
+        ensure(Object.keys(body).join(',') === 'token' && typeof body.token === 'string', 'fixture-fanout-scan-request');
+        if (!meter.scanStarted) {
+            ensure(body.token === '', 'fixture-fanout-scan-start'); meter.scanStarted = true;
+            meter.scan = { token: '', domain: 'logical', cursor: '', logicalRows: 0, rawRows: 0, bytes: 0, passes: 0,
+                mutations: this.fixtureControl.nativeMutations, required: new Set(), absent: true, complete: false, failed: false };
+        }
+        const scan = meter.scan;
+        ensure(scan && !scan.failed && !scan.complete && body.token === scan.token && ++scan.passes <= 14, 'fixture-fanout-scan-token-or-bound');
+        scan.token = null; // Consume continuation before any awaited native read.
+        try {
+            ensure(this.fixtureControl.nativeMutations === scan.mutations, 'fixture-fanout-scan-mutated');
+            const domain = scan.domain; let rows = 0, bytes = 0, ended = false;
+            while (rows < 256 && !ended) {
+                const page = domain === 'logical' ? await this.authority.records.transaction(tx => tx.list({ prefix: '', ...(scan.cursor ? { startAfter: scan.cursor } : {}), limit: 4 }))
+                    : await this.state.storage.list({ prefix: 'durable-record:v1:lobby-authority-v1:', ...(scan.cursor ? { startAfter: scan.cursor } : {}), limit: 4 });
+                ensure(page instanceof Map && page.size <= 4, 'fixture-fanout-scan-page');
+                for (const [key, value] of page) {
+                    ensure(key > scan.cursor && ++rows <= 256, 'fixture-fanout-scan-order-or-page-bound');
+                    const text = domain === 'logical' ? JSON.stringify(value) : value instanceof Uint8Array ? new TextDecoder().decode(value)
+                        : value instanceof ArrayBuffer ? new TextDecoder().decode(value) : JSON.stringify(value);
+                    const length = new TextEncoder().encode(text).byteLength; bytes += length; scan.bytes += length;
+                    ensure(bytes <= 8 * 1024 * 1024 && scan.bytes <= 32 * 1024 * 1024, 'fixture-fanout-scan-byte-bound');
+                    if (text.includes(FANOUT_PREFIX)) scan.absent = false;
+                    if (domain === 'logical') {
+                        ensure(++scan.logicalRows <= 1024, 'fixture-fanout-logical-row-bound');
+                        if (['net', 'room-index', 'moderation-queue', 'private-reports-v1', 'authority-session-index:v1', 'authority-connection-index:v1'].includes(key)) scan.required.add(key);
+                    } else ensure(++scan.rawRows <= 2048, 'fixture-fanout-raw-row-bound');
+                    ensure(scan.logicalRows + scan.rawRows <= 3072, 'fixture-fanout-combined-row-bound'); scan.cursor = key;
+                }
+                ended = page.size < 4;
+            }
+            ensure(this.fixtureControl.nativeMutations === scan.mutations, 'fixture-fanout-scan-mutated');
+            if (ended) {
+                if (domain === 'logical') { ensure(scan.logicalRows > 0 && scan.required.size === 6, 'fixture-fanout-required-records'); scan.domain = 'raw'; scan.cursor = ''; }
+                else { ensure(scan.rawRows > 0, 'fixture-fanout-raw-nonempty'); scan.complete = true; }
+            }
+            ensure(scan.absent, 'fixture-fanout-ordinary-body-persisted');
+            scan.token = scan.complete ? null : crypto.randomUUID();
+            return { domain, rows, bytes, logicalRows: scan.logicalRows, rawRows: scan.rawRows, combinedRows: scan.logicalRows + scan.rawRows,
+                combinedBytes: scan.bytes, passes: scan.passes, ordinaryMarkerAbsent: scan.absent, requiredRecordsPresent: scan.required.size === 6,
+                complete: scan.complete, token: scan.token };
+        } catch (error) { scan.failed = true; throw error; }
     }
     async fixturePressureRegister(cookie) {
         const meter = this.fixtureControl.pressure;
@@ -479,6 +565,7 @@ export class FixtureLobby extends HangoutLobby {
         if (!admitted(request, this.env)) return denied();
         const body = await readControl(request); if (!body) return denied();
         await this.ready;
+        if (path.startsWith(PREFIX + 'fanout-') && this.env.FIXTURE_FANOUT_50 !== 'fanout-v1') return denied();
         if (path === PREFIX + 'traffic-metrics' && this.env.FIXTURE_TRAFFIC_ACKS !== 'ack-v1') return denied();
         if (['pressure-register', 'pressure-metrics'].includes(path.slice(PREFIX.length)) && this.env.FIXTURE_PRESSURE_ONLY !== 'pressure-v1') return denied();
         if (path === PREFIX + 'participation-alarm' && this.participationMode && Object.keys(body).length === 0) {
@@ -488,6 +575,9 @@ export class FixtureLobby extends HangoutLobby {
             try {
                 if (['incident-initialize', 'incident-preserve', 'incident-read'].includes(path.slice(PREFIX.length))) return Response.json(await this.fixtureIncident(path.slice(PREFIX.length), body));
                 if (['participation-policy', 'participation-grant', 'participation-reduce'].includes(path.slice(PREFIX.length))) return Response.json(await this.fixtureParticipation(path.slice(PREFIX.length), body));
+                if (path === PREFIX + 'fanout-metrics' && Object.keys(body).length === 0) return Response.json(this.fixtureFanoutMetrics());
+                if (path === PREFIX + 'fanout-summary' && Object.keys(body).length === 0) return Response.json(await this.fixtureFanoutSummary());
+                if (path === PREFIX + 'fanout-scan') return Response.json(await this.fixtureFanoutScan(body));
                 if (path === PREFIX + 'inspect' && Object.keys(body).length === 0) return Response.json(await this.fixtureInspect());
                 if (path === PREFIX + 'pressure-register' && Object.keys(body).join(',') === 'cookie') return Response.json(await this.fixturePressureRegister(body.cookie));
                 if (path === PREFIX + 'pressure-metrics' && Object.keys(body).length === 0) return Response.json(this.fixturePressureMetrics());
@@ -512,13 +602,14 @@ export default { async fetch(request, env) {
     const url = new URL(request.url), stub = env.LOBBY.get(env.LOBBY.idFromName('stalemate'));
     if (url.pathname.startsWith(PREFIX)) {
         const body = await readControl(request); if (!body) return denied();
+        if (url.pathname.startsWith(PREFIX + 'fanout-') && env.FIXTURE_FANOUT_50 !== 'fanout-v1') return denied();
         if (url.pathname === PREFIX + 'traffic-metrics' && env.FIXTURE_TRAFFIC_ACKS !== 'ack-v1') return denied();
         if (['pressure-register', 'pressure-metrics'].includes(url.pathname.slice(PREFIX.length)) && env.FIXTURE_PRESSURE_ONLY !== 'pressure-v1') return denied();
         if (url.pathname === PREFIX + 'initialize' && Object.keys(body).length === 0) {
             // Explicit fixture lifecycle action; betaFetch never forwards it.
             return stub.fetch(new Request(ORIGIN + LOBBY_AUTHORITY_PATH + 'initialize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }));
         }
-        if (['pressure-register', 'pressure-metrics', 'traffic-metrics', 'inspect', 'fault', 'participation-policy', 'participation-grant', 'participation-reduce', 'participation-alarm', 'incident-initialize', 'incident-preserve', 'incident-read'].includes(url.pathname.slice(PREFIX.length))) return stub.fetch(new Request(request.url, {
+        if (['fanout-metrics', 'fanout-summary', 'fanout-scan', 'pressure-register', 'pressure-metrics', 'traffic-metrics', 'inspect', 'fault', 'participation-policy', 'participation-grant', 'participation-reduce', 'participation-alarm', 'incident-initialize', 'incident-preserve', 'incident-read'].includes(url.pathname.slice(PREFIX.length))) return stub.fetch(new Request(request.url, {
             method: 'POST', headers: request.headers, body: JSON.stringify(body)
         }));
         if (url.pathname === PREFIX + 'egress-probe' && Object.keys(body).length === 0) {
