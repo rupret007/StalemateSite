@@ -18,7 +18,8 @@ module.exports = defineConfig({
                     name: 'unit',
                     include: ['tests/unit/**/*.test.js', 'hangout-worker/tests/**/*.test.js'],
                     exclude: [...configDefaults.exclude, capacityFixture],
-                    sequence: { groupOrder: 0 }
+                    // Positive groups preserve this order with --no-file-parallelism.
+                    sequence: { groupOrder: 1 }
                 }
             },
             {
@@ -30,7 +31,7 @@ module.exports = defineConfig({
                     // Reduce test-runner CPU contention during setup by running
                     // after the other files. Keep the real 50ms overload guard,
                     // all setup actions and refusal assertions.
-                    sequence: { groupOrder: 1 },
+                    sequence: { groupOrder: 2 },
                     maxWorkers: 1,
                     fileParallelism: false
                 }
