@@ -85,7 +85,7 @@
   #hype .hype-title{letter-spacing:.02em;color:var(--ink);white-space:nowrap}
 
   /* Power chips */
-  #powers{position:absolute;left:8px;right:8px;bottom:max(120px,calc(var(--safe-bot) + 110px));display:flex;flex-wrap:wrap;justify-content:center;gap:6px;pointer-events:none}
+  #powers{position:absolute;left:8px;right:8px;bottom:var(--powers-bottom,max(120px,calc(var(--safe-bot) + 110px)));display:flex;flex-wrap:wrap;justify-content:center;gap:6px;pointer-events:none}
   .chip{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.02)),var(--panel);border:1px solid var(--panel-border);color:var(--ink);padding:5px 10px 6px;border-radius:999px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 6px 14px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08);animation:chipIn .3s cubic-bezier(.2,1.5,.4,1) both;display:inline-flex;flex-direction:column;align-items:center;gap:4px;min-width:64px}
   .chip .chip-bar{width:100%;height:3px;border-radius:99px;background:rgba(0,0,0,.35);overflow:hidden}
   .chip .chip-bar span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--gold));transition:width .12s linear}
@@ -196,8 +196,12 @@
   .menu-secondary button:hover{border-color:var(--ta-brass,#e8c56a)}
 
   /* Mobile launch button */
-  #mobileLaunch{position:absolute;left:50%;bottom:max(20px,calc(var(--safe-bot) + 14px));transform:translateX(-50%);padding:12px 28px;font-size:14px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;background:linear-gradient(180deg,#ffe9a8,#ffd76a 45%,#f1a83b);color:#3a1d00;border:0;border-radius:999px;box-shadow:0 8px 20px rgba(241,168,59,.45),inset 0 1px 0 rgba(255,255,255,.7),inset 0 -2px 0 rgba(0,0,0,.15);display:none;z-index:6;font-family:inherit}
+  #mobileLaunch{position:absolute;left:50%;bottom:max(88px,calc(var(--safe-bot) + 82px));transform:translateX(-50%);padding:12px 28px;font-size:14px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;background:linear-gradient(180deg,#ffe9a8,#ffd76a 45%,#f1a83b);color:#3a1d00;border:0;border-radius:999px;box-shadow:0 8px 20px rgba(241,168,59,.45),inset 0 1px 0 rgba(255,255,255,.7),inset 0 -2px 0 rgba(0,0,0,.15);display:none;z-index:6;font-family:inherit}
   #mobileLaunch.show{display:block;animation:pulse 1.4s infinite ease-in-out}
+  body.arcade #mobileLaunch{width:max-content;max-width:calc(100% - 24px);white-space:nowrap;font-size:clamp(14px,4vw,18px)}
+  /* Keep both the caught ball/paddle and the first-play hint unobstructed. */
+  #arcHint{bottom:max(156px,calc(var(--safe-bot) + 150px))}
+  #playShell:has(#mobileLaunch.show){--powers-bottom:max(152px,calc(var(--safe-bot) + 146px))}
   @keyframes pulse{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.06)}}
 
   /* Toast for power-up pickups */
@@ -413,7 +417,7 @@
 <script src="games/turdanoid-tally-core.js"></script>
 <script src="games/turdanoid-layout-core.js"></script>
 <script src="games/turdanoid-qa-core.js"></script>
-<script src="assets/turdsuite.js?v=d802b7c5e60f2e68"></script>
+<script src="assets/turdsuite.js?v=c914240f3c8b717d"></script>
 <script>
   if (typeof TurdanoidTheme !== 'undefined') {
     TurdanoidTheme.applyCssVars(document.documentElement);

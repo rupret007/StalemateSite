@@ -73,11 +73,14 @@
 
   function ctx() {
     if (AUDIO_PROFILE === 'studio' && (!canPlayStudioSound() || muted || effectsVolume === 0)) return null;
+    // A closed effects context cannot be resumed. Recreate it only when a
+    // fresh, allowed cue asks for sound; preserve mute and gesture gates.
+    if (AUDIO_PROFILE === 'studio' && actx && actx.state === 'closed') actx = null;
     if (!actx) {
       try { actx = new (window.AudioContext || window.webkitAudioContext)(); }
       catch (e) { actx = null; }
     }
-    if (AUDIO_PROFILE === 'studio' && actx && actx.state === 'suspended') {
+    if (AUDIO_PROFILE === 'studio' && actx && (actx.state === 'suspended' || actx.state === 'interrupted')) {
       try { actx.resume().catch(function () {}); } catch (e) {}
     }
     return actx;
@@ -965,7 +968,7 @@
       try { audio = ctx(); } finally { soundPreviewing = false; }
       // Safari can resolve gesture unlock on the next audio quantum. Only this
       // explicit audition may wait briefly; gameplay cues are never queued.
-      try { if (audio?.state === 'suspended') await audio.resume(); } catch (e) { return; }
+      try { if (audio?.state === 'suspended' || audio?.state === 'interrupted') await audio.resume(); } catch (e) { return; }
       if (ticket !== previewTicket || !soundSettingsOpen || Date.now() - requestedAt > 250) return;
       soundPreviewing = true;
       try { Suite.playSound('shared.beep'); } finally { soundPreviewing = false; renderAudioControls(); }
