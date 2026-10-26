@@ -74,6 +74,26 @@ async function fixture({ inboundBeforeCapture = false, receiveOnly = false, cloc
     sent.length = 0; return { window, room, state, peers, sent, capture, localTrack, channel, app, policy, incoming, advance, draw, selectVideo };
 }
 
+// ICE credentials are deliberately synthetic. These tests exercise only the
+// real client's public native-candidate callback and its existing activity queue.
+function mediaIceDescription(sections, session = {}) {
+    const credentials = value => [value.ufrag && `a=ice-ufrag:${value.ufrag}`, value.pwd && `a=ice-pwd:${value.pwd}`].filter(Boolean);
+    const lines = ['v=0', 'o=- 1 1 IN IP4 0.0.0.0', 's=-', 't=0 0', ...credentials(session)];
+    for (const section of sections) lines.push('m=video 9 UDP/TLS/RTP/SAVPF 96', `a=mid:${section.mid}`, ...credentials(section));
+    return { type: 'offer', sdp: `${lines.join('\r\n')}\r\n` };
+}
+async function queuedMediaIce(description, ice) {
+    const f = await fixture({ clock: { at: 1800000000000 } }), pc = f.state.pcs.get('peer').pc;
+    pc.localDescription = description;
+    for (let i = 0; i < 8; i++) pc.onicecandidate({ candidate: { toJSON: () => ({
+        candidate: `candidate:synthetic-budget-${i}`, sdpMid: 'camera', sdpMLineIndex: 0
+    }) } });
+    expect(f.sent).toHaveLength(8);
+    pc.onicecandidate({ candidate: { toJSON: () => ice } });
+    expect(f.sent).toHaveLength(8);
+    return { f, pc };
+}
+
 function actualEngine(clock) {
     const received = [];
     const engine = createLobby({ now: () => clock.at, limits: { defaultSlow: 0 }, send: (recipient, frame) => received.push({ recipient, ...frame }) });
@@ -210,6 +230,70 @@ describe('public-room Block retires only the affected pair', () => {
         expect(f.sent.at(-1)).toMatchObject({ ice: { candidate: 'current-epoch' } });
     });
 
+    it.each([
+        ['MID', { sdpMid: 'camera' }],
+        ['media index', { sdpMLineIndex: 0 }],
+        ['matching MID and index', { sdpMid: 'camera', sdpMLineIndex: 0 }]
+    ])('keeps queued ICE selected by %s when only another media section changes', async (_label, selector) => {
+        const camera = { mid: 'camera', ufrag: 'camera-a', pwd: 'synthetic-camera-password-a' };
+        const other = { mid: 'other', ufrag: 'other-b', pwd: 'synthetic-other-password-b' };
+        const ice = { candidate: 'candidate:unchanged-selected-media', usernameFragment: 'camera-a', ...selector };
+        const { f, pc } = await queuedMediaIce(mediaIceDescription([camera, other]), ice);
+        pc.localDescription = mediaIceDescription([camera, { ...other, ufrag: 'other-c', pwd: 'synthetic-other-password-c' }]);
+        f.advance(125);
+        expect(f.sent).toHaveLength(9); expect(f.sent.at(-1)).toMatchObject({ to: 'peer', ice });
+    });
+
+    it('rejects selected-media ICE after its tuple changes even when that tuple remains in another section', async () => {
+        const camera = { mid: 'camera', ufrag: 'camera-a', pwd: 'synthetic-camera-password-a' };
+        const other = { mid: 'other', ufrag: 'other-b', pwd: 'synthetic-other-password-b' };
+        const ice = { candidate: 'candidate:wrong-selected-generation', usernameFragment: 'camera-a', sdpMid: 'camera', sdpMLineIndex: 0 };
+        const { f, pc } = await queuedMediaIce(mediaIceDescription([camera, other]), ice);
+        // The whole SDP's credential union is unchanged; only the MID ownership
+        // of those tuples changed. Finding the old ufrag elsewhere is not valid.
+        pc.localDescription = mediaIceDescription([{ ...other, mid: 'camera' }, { ...camera, mid: 'other' }]);
+        f.advance(125); expect(f.sent).toHaveLength(8);
+    });
+
+    it('rejects contradictory ICE MID and media-index selectors', async () => {
+        const description = mediaIceDescription([
+            { mid: 'camera', ufrag: 'camera-a', pwd: 'synthetic-camera-password-a' },
+            { mid: 'other', ufrag: 'other-b', pwd: 'synthetic-other-password-b' }
+        ]);
+        const ice = { candidate: 'candidate:contradictory-selectors', usernameFragment: 'camera-a', sdpMid: 'camera', sdpMLineIndex: 1 };
+        const { f } = await queuedMediaIce(description, ice);
+        f.advance(125); expect(f.sent).toHaveLength(8);
+    });
+
+    it('inherits session-level ICE credentials for the selected media section', async () => {
+        const session = { ufrag: 'session-a', pwd: 'synthetic-session-password-a' }, camera = { mid: 'camera' };
+        const other = { mid: 'other', ufrag: 'other-b', pwd: 'synthetic-other-password-b' };
+        const ice = { candidate: 'candidate:inherited-selected-generation', usernameFragment: 'session-a', sdpMid: 'camera', sdpMLineIndex: 0 };
+        const { f, pc } = await queuedMediaIce(mediaIceDescription([camera, other], session), ice);
+        pc.localDescription = mediaIceDescription([camera, { ...other, ufrag: 'other-c', pwd: 'synthetic-other-password-c' }], session);
+        f.advance(125);
+        expect(f.sent).toHaveLength(9); expect(f.sent.at(-1)).toMatchObject({ to: 'peer', ice });
+    });
+
+    it('keeps queued legacy ICE bound to its selected tuple when another section changes', async () => {
+        const camera = { mid: 'camera', ufrag: 'camera-a', pwd: 'synthetic-camera-password-a' };
+        const other = { mid: 'other', ufrag: 'other-b', pwd: 'synthetic-other-password-b' };
+        const ice = { candidate: 'candidate:legacy-selected-media', sdpMid: 'camera', sdpMLineIndex: 0 };
+        const { f, pc } = await queuedMediaIce(mediaIceDescription([camera, other]), ice);
+        pc.localDescription = mediaIceDescription([camera, { ...other, ufrag: 'other-c', pwd: 'synthetic-other-password-c' }]);
+        f.advance(125);
+        expect(f.sent).toHaveLength(9); expect(f.sent.at(-1)).toMatchObject({ to: 'peer', ice });
+    });
+
+    it('rejects queued legacy ICE if its selected password changes while the global union stays equal', async () => {
+        const camera = { mid: 'camera', ufrag: 'camera-a', pwd: 'synthetic-camera-password-a' };
+        const other = { mid: 'other', ufrag: 'other-b', pwd: 'synthetic-other-password-b' };
+        const ice = { candidate: 'candidate:legacy-wrong-selected-password', sdpMid: 'camera', sdpMLineIndex: 0 };
+        const { f, pc } = await queuedMediaIce(mediaIceDescription([camera, other]), ice);
+        pc.localDescription = mediaIceDescription([{ ...camera, pwd: other.pwd }, { ...other, pwd: camera.pwd }]);
+        f.advance(125); expect(f.sent).toHaveLength(8);
+    });
+
     it('keeps a queued description valid when native trickle ICE appends candidates to the same negotiation', async () => {
         const f = await fixture({ clock: { at: 1800000000000 } }), pc = f.state.pcs.get('peer').pc;
         for (let i = 0; i < 8; i++) pc.onicecandidate({ candidate: { toJSON: () => ({ candidate: `initial-${i}` }) } });
@@ -302,6 +386,7 @@ describe('public-room Block retires only the affected pair', () => {
     });
     it('attaches opted-in capture to a current receive-only peer created while the browser camera was pending', async () => {
         const f = await fixture({ inboundBeforeCapture: true });
+        expect(f.state.pcs.get('peer').pc.addTransceiver).not.toHaveBeenCalled();
         expect(f.state.pcs.get('peer').pc.addTrack).toHaveBeenCalledExactlyOnceWith(f.localTrack, f.state.stream);
         expect(f.capture).toHaveBeenCalledOnce();
     });
@@ -338,12 +423,28 @@ describe('public-room Block retires only the affected pair', () => {
     });
 
     it('does not publish an obsolete generated offer after a newer remote offer has been answered', async () => {
-        const f = await fixture(), pc = f.state.pcs.get('peer').pc, held = deferred();
-        pc.createOffer.mockImplementation(() => held.promise); const work = pc.onnegotiationneeded();
-        f.incoming({ sdp: { type: 'offer', sdp: 'newer-peer-offer' } });
-        await new Promise(done => setTimeout(done, 0)); held.resolve({ type: 'offer', sdp: 'obsolete-after-remote-offer' }); await work;
-        expect(f.sent.some(frame => frame.sdp?.sdp === 'obsolete-after-remote-offer')).toBe(false);
-        expect(f.sent.some(frame => frame.sdp?.type === 'answer')).toBe(true);
+        const f = await fixture(), entry = f.state.pcs.get('peer'), pc = entry.pc, held = deferred();
+        const nativeLocalEffect = pc.setLocalDescription.getMockImplementation();
+        let firstCompleted = false;
+        pc.setLocalDescription.mockImplementationOnce(async value => {
+            await nativeLocalEffect(value); // Native local-offer effect occurs first.
+            await held.promise; // Delay only its wrapper completion/callback.
+        });
+        const work = pc.onnegotiationneeded().then(() => { firstCompleted = true; });
+        try {
+            await vi.waitFor(() => expect(pc.signalingState).toBe('have-local-offer'));
+            expect(entry.polite).toBe(true); expect(firstCompleted).toBe(false);
+            expect(f.sent.filter(frame => frame.sdp)).toEqual([]);
+            f.incoming({ sdp: { type: 'offer', sdp: 'newer-peer-offer' } });
+            await vi.waitFor(() => expect(f.sent.filter(frame => frame.sdp).map(frame => frame.sdp.type)).toEqual(['answer']));
+            expect(pc.signalingState).toBe('stable'); expect(firstCompleted).toBe(false);
+            expect(pc.setLocalDescription).toHaveBeenCalledTimes(2);
+        } finally { held.resolve(); await work; }
+        // A stale completion must not send either the old offer or a duplicate
+        // of the now-current answer that replaced it in localDescription.
+        expect(firstCompleted).toBe(true);
+        expect(f.sent.filter(frame => frame.sdp).map(frame => frame.sdp)).toEqual([{ type: 'answer', sdp: 'native-current-description' }]);
+        expect(pc.createOffer).not.toHaveBeenCalled();
     });
 
     it('closes the existing pair and received tracks, preserving local capture and the third participant', async () => {

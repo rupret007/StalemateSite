@@ -73,10 +73,34 @@
             return JSON.stringify([description.type, origin, media,
                 lines.filter(line => /^a=(?:ice-(?:ufrag|pwd):|mid:|group:|sendrecv$|sendonly$|recvonly$|inactive$)/.test(line))]);
         }
-        function iceGeneration(description) {
+        function iceGeneration(description, candidate, ufrag) {
             if (!description || typeof description.sdp !== 'string') return null;
-            const credentials = [...new Set(description.sdp.split(/\r?\n/).filter(line => /^a=ice-(?:ufrag|pwd):/.test(line)))].sort();
-            return credentials.length ? JSON.stringify(credentials) : descriptionKey(description);
+            const session = [], media = []; let lines = session;
+            for (const line of description.sdp.split(/\r?\n/).filter(Boolean)) {
+                if (line.startsWith('m=')) { lines = []; media.push(lines); } lines.push(line);
+            }
+            // Retain the description identity fallback for legacy descriptions
+            // without media sections. Native media SDP uses the exact section
+            // named by this candidate, never a union of unrelated ICE tuples.
+            if (!media.length) {
+                if (ufrag && !session.includes(`a=ice-ufrag:${ufrag}`)) return null;
+                return descriptionKey(description);
+            }
+            const hasMid = candidate?.sdpMid !== undefined && candidate.sdpMid !== null;
+            const hasIndex = candidate?.sdpMLineIndex !== undefined && candidate.sdpMLineIndex !== null;
+            if ((!hasMid && !hasIndex) || (hasMid && typeof candidate.sdpMid !== 'string') ||
+                (hasIndex && (!Number.isInteger(candidate.sdpMLineIndex) || candidate.sdpMLineIndex < 0))) return null;
+            const matching = hasMid ? media.filter(section => section.includes(`a=mid:${candidate.sdpMid}`)) : [];
+            const indexed = hasIndex ? media[candidate.sdpMLineIndex] : null;
+            const selected = hasMid ? matching.length === 1 ? matching[0] : null : indexed;
+            if (!selected || (hasIndex && indexed !== selected)) return null;
+            const attribute = name => {
+                const prefix = `a=ice-${name}:`;
+                return (selected.find(line => line.startsWith(prefix)) || session.find(line => line.startsWith(prefix)) || '').slice(prefix.length);
+            };
+            const fragment = attribute('ufrag'), password = attribute('pwd');
+            if (!fragment || !password || (ufrag && ufrag !== fragment)) return null;
+            return JSON.stringify([fragment, password]);
         }
         function currentActivity(item) {
             if (item.generation !== roomGeneration || item.channel !== state.ch || state.ch !== app.active || !state.names.has(state.myId)) return false;
@@ -85,9 +109,7 @@
             if (!item.entry?.current()) return false;
             const current = item.entry.pc.localDescription;
             if (item.sdp) return item.epoch === item.entry.descriptionEpoch && descriptionKey(item.sdp) !== null && descriptionKey(current) === descriptionKey(item.sdp);
-            if (!item.iceGeneration || iceGeneration(current) !== item.iceGeneration) return false;
-            if (!item.ufrag) return true;
-            return !!current?.sdp && current.sdp.split(/\r?\n/).includes(`a=ice-ufrag:${item.ufrag}`);
+            return !!item.iceGeneration && iceGeneration(current, item.iceSelector, item.ufrag) === item.iceGeneration;
         }
         function removeActivity(index) {
             const [item] = activity.queue.splice(index, 1); activity.bytes -= item.bytes; return item;
@@ -124,7 +146,8 @@
             const ufrag = frame.ice?.usernameFragment || /(?:^|\s)ufrag\s+(\S+)/.exec(frame.ice?.candidate || '')?.[1] || '';
             const item = { raw, bytes, channel: frame.ch, generation: roomGeneration, kind: frame.kind,
                 entry, to: frame.to, sdp: frame.sdp, ufrag, onSent,
-                epoch: entry?.descriptionEpoch, iceGeneration: frame.ice ? iceGeneration(entry?.pc.localDescription) : null,
+                iceSelector: frame.ice ? { sdpMid: frame.ice.sdpMid, sdpMLineIndex: frame.ice.sdpMLineIndex } : null,
+                epoch: entry?.descriptionEpoch, iceGeneration: frame.ice ? iceGeneration(entry?.pc.localDescription, frame.ice, ufrag) : null,
                 priority: frame.kind === 'rtc' && !!frame.sdp };
             purgeActivity();
             if (!currentActivity(item)) return false;
@@ -603,9 +626,9 @@
                 } catch (e) { /* */ } finally { entry.makingOffer = false; }
             };
             if (state.stream) state.stream.getTracks().forEach((t) => pc.addTrack(t, state.stream));
-            else {
-                pc.addTransceiver('video', { direction: 'recvonly' });
-            }
+            // An incoming offer creates its receiver through native SRD. An
+            // empty PC created by early ICE must not invent a competing offer
+            // while the visitor's opted-in camera capture is still pending.
         }
 
         async function onRtc(from, msg) {

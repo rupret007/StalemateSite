@@ -41,6 +41,9 @@ bookkeeping. Updated clients retire only the affected peer connection and
 received tracks, remove its tile and invalidate queued negotiation. Unrelated
 participants and shared local capture continue. Pending capture attaches its
 tracks once to still-allowed existing receive-only peers when it completes.
+Early ICE may create an empty peer connection while capture is pending. The
+incoming offer creates its receiving transceiver through the native browser;
+the client does not invent a competing receive-only offer during that wait.
 
 Policy outputs use the existing effect-commit boundary. A failed commit must
 not publish a successful Block, PM closure or changed media policy. Duplicate
@@ -70,6 +73,10 @@ Queued work rechecks membership, current host authority where needed, peer
 policy and native negotiation generation before sending. Peer retirement,
 Block and room teardown discard invalid work. There is no automatic retry or
 server-delivery acknowledgement implied by local queue acceptance.
+Queued ICE uses its selected media section's effective username fragment and
+password, including session-level inheritance. MID and media-index selectors
+must agree. Changing another section does not invalidate that candidate;
+changing the selected credentials does. No BUNDLE transport is guessed.
 
 ## Privacy and rollout boundaries
 
@@ -88,7 +95,9 @@ and transport boundaries; they do not inherit a global Lobby block.
 
 Verify the [demo journey](HANGOUT_DEMO_GUIDE.md) at 375/390px with actual decoded
 camera frames before Block, pair teardown, continuing third-peer frames,
-parallel-device/nickname/entry changes and mutual unblock. Synthetic RTC in the
-local SQLite authority proof verifies signaling and storage, not camera capture,
+parallel-device/nickname/entry changes and mutual unblock.
+Run the separate pending-capture/early-ICE startup regression at both widths too.
+Synthetic RTC in the local SQLite authority proof verifies signaling and storage,
+not camera capture,
 physical media, TURN or WAN connectivity. Existing consent/age safeguards remain
 until their replacement is qualified; AI/provider activation is separate work.
