@@ -16,6 +16,8 @@ const FILES = [
     'show-state.js',
     'site-base.js',
     'js/count.js',
+    'js/count.LICENSE',
+    'js/count.PROVENANCE.json',
     'js/track.js',
     'js/site-track.js',
     'styles.css',
