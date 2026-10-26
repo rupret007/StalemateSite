@@ -15,9 +15,11 @@ const APP = fileURLToPath(new URL('../../../', import.meta.url));
 const TOOLS = fileURLToPath(new URL('../durable-records/', import.meta.url));
 const ORIGIN = 'https://local-fixture.invalid', INVITE = 'owned-fixture-invite-not-a-production-credential-2026', PREVIEW = 'owned-fixture-preview-token-20261025';
 const ENV = ['PATH', 'TMPDIR', 'TEMP', 'TMP', 'SystemRoot', 'SYSTEMROOT', 'WINDIR'];
-const PARTICIPATION = process.argv.includes('--participation'), INCIDENT = process.argv.includes('--incident-sources'), TRAFFIC_ACKS = process.argv.includes('--traffic-acks');
-const MODE = [...(PARTICIPATION ? ['--participation'] : []), ...(INCIDENT ? ['--incident-sources'] : []), ...(TRAFFIC_ACKS ? ['--traffic-acks'] : [])];
+const PARTICIPATION = process.argv.includes('--participation'), INCIDENT = process.argv.includes('--incident-sources'), TRAFFIC_ACKS = process.argv.includes('--traffic-acks'), PRESSURE_ONLY = process.argv.includes('--pressure-only');
+const MODE = [...(PARTICIPATION ? ['--participation'] : []), ...(INCIDENT ? ['--incident-sources'] : []), ...(TRAFFIC_ACKS ? ['--traffic-acks'] : []), ...(PRESSURE_ONLY ? ['--pressure-only'] : [])];
 assert.ok(!TRAFFIC_ACKS || PARTICIPATION && !INCIDENT, '--traffic-acks requires --participation and does not select incident mode');
+assert.ok(!PRESSURE_ONLY || PARTICIPATION && !INCIDENT && !TRAFFIC_ACKS, '--pressure-only requires --participation and refuses incident/traffic flags');
+const PRESSURE_PREFIX = 'Pressure probe ephemeral marker ';
 const TRAFFIC_PREFIX = 'ACK probe ephemeral marker ';
 const latencySummary = values => {
     assert.ok(values.length > 0 && values.length <= 2000 && values.every(value => Number.isFinite(value) && value >= 0));
@@ -26,7 +28,7 @@ const latencySummary = values => {
 };
 const OWN_KEYS = ['available', 'canStop', 'ok', 'purposes', 'reason', 'revision', 'state'].sort();
 const OWN_PURPOSES = ['public-text', 'public-artifact', 'public-disclosure', 'room-creation', 'room-registration', 'direct-contact', 'camera', 'audio', 'media-reception', 'external-provider', 'ai-public-review'].sort();
-const EPHEMERAL_BODY_MARKERS = ['Native Stalemate ephemeral greeting', 'Native Rad Dad ephemeral greeting', 'Native remaining visitor greeting', 'native-media-control-no-body-persistence', ...(TRAFFIC_ACKS ? [TRAFFIC_PREFIX] : [])].sort();
+const EPHEMERAL_BODY_MARKERS = ['Native Stalemate ephemeral greeting', 'Native Rad Dad ephemeral greeting', 'Native remaining visitor greeting', 'native-media-control-no-body-persistence', ...(TRAFFIC_ACKS ? [TRAFFIC_PREFIX] : []), ...(PRESSURE_ONLY ? [PRESSURE_PREFIX] : [])].sort();
 function assertNativeRollback(witness, record) {
     assert.deepEqual(Object.keys(witness).sort(), ['record', 'originalSha256', 'stagedSha256', 'restoredSha256', 'nativeWriteCompleted', 'stagedChanged', 'nativeTransactionRejected', 'restoredBeforeEngineRecovery'].sort());
     assert.equal(witness.record, record);
@@ -66,8 +68,8 @@ function receive(expected, nonce) {
 }
 
 class Visitor {
-    constructor(socket, label, transport = false) {
-        this.transport = transport; this.rawTransport = { count: 0, bytes: 0, firstSequence: 0, lastSequence: 0, firstAt: null, lastAt: null, kinds: {} };
+    constructor(socket, label, transport = false, acknowledge = true) {
+        this.acknowledge = acknowledge; this.transport = transport; this.rawTransport = { count: 0, bytes: 0, firstSequence: 0, lastSequence: 0, firstAt: null, lastAt: null, kinds: {} };
         this.rawTransportHash = createHash('sha256'); this.frameTimes = [];
         this.ack = { sent: 0, lastSequence: 0, lastAt: -Infinity, pending: 0, minSpacingMs: null }; this.ackTimer = null;
         this.socket = socket; this.label = label; this.frames = []; this.bytes = 0; this.waiters = new Set(); this.closed = null; this.failure = null;
@@ -93,7 +95,7 @@ class Visitor {
                     } else assert.ok(this.rawTransport.count === 0 && ['device', 'hello'].includes(frame.t), label + ': unsequenced non-handshake frame');
                 }
                 this.frames.push(frame); this.frameTimes.push(receivedAt);
-                if (this.transport && this.ack.pending) {
+                if (this.transport && this.acknowledge && this.ack.pending) {
                     if (this.ack.pending >= 8) this.flushAck();
                     else if (!this.ackTimer) this.ackTimer = setTimeout(() => this.flushAck(), 50);
                 }
@@ -107,7 +109,7 @@ class Visitor {
     cancelAck() { clearTimeout(this.ackTimer); this.ackTimer = null; }
     flushAck() {
         this.cancelAck();
-        if (!this.transport || !this.ack.pending || this.closed || this.failure || this.socket.readyState !== 1) return;
+        if (!this.transport || !this.acknowledge || !this.ack.pending || this.closed || this.failure || this.socket.readyState !== 1) return;
         const remaining = 50 - (performance.now() - this.ack.lastAt);
         if (remaining > 0) { this.ackTimer = setTimeout(() => this.flushAck(), remaining); return; }
         try {
@@ -122,6 +124,11 @@ class Visitor {
         assert.ok(this.transport && !this.failure && this.ack.pending === 0 && this.ack.lastSequence === this.rawTransport.lastSequence);
         return { ...this.rawTransport, kinds: { ...this.rawTransport.kinds }, rawEnvelopeSha256: this.rawTransportHash.copy().digest('hex'),
             acknowledgementsSent: this.ack.sent, acknowledgedSequence: this.ack.lastSequence, minAckSpacingMs: this.ack.minSpacingMs };
+    }
+    pressureSnapshot() {
+        assert.ok(this.transport && !this.acknowledge && !this.failure && this.closed?.code === 4413);
+        return { ...this.rawTransport, kinds: { ...this.rawTransport.kinds }, rawEnvelopeSha256: this.rawTransportHash.copy().digest('hex'),
+            acknowledgementsSent: this.ack.sent, acknowledgedSequence: this.ack.lastSequence, pendingUnhandledCredit: this.ack.pending };
     }
     send(value) {
         assert.equal(this.closed, null, this.label + ': unexpectedly closed');
@@ -208,6 +215,7 @@ async function runtime(phase, state, nonce) {
         bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected',
             ...(PARTICIPATION ? { HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1' } : {}),
             ...(TRAFFIC_ACKS ? { FIXTURE_TRAFFIC_ACKS: 'ack-v1' } : {}),
+            ...(PRESSURE_ONLY ? { FIXTURE_PRESSURE_ONLY: 'pressure-v1' } : {}),
             ...(INCIDENT ? { HANGOUT_INCIDENT_SOURCE_BRIDGE: 'i3a-v1', FIXTURE_INCIDENT_KEY: fixtureIncidentKey } : {}),
             HANGOUT_HMAC_KEY: 'owned-fixture-hmac-not-a-production-credential-2026', HANGOUT_BETA_INVITE_KEY: INVITE, HANGOUT_PREVIEW_KEY: PREVIEW,
             HANGOUT_BETA_INVITE_VERSION: '1', HANGOUT_OPEN: '1', HANGOUT_AI_ENABLED: '0', HANGOUT_TURN_ENABLED: '0' },
@@ -232,10 +240,10 @@ async function runtime(phase, state, nonce) {
         if (PARTICIPATION && grant) assert.deepEqual(await control('participation-grant', { cookie }), { authorizedSyntheticGrant: true });
         return cookie;
     };
-    const connect = async (cookie, label, source, ip, transport = false) => {
+    const connect = async (cookie, label, source, ip, transport = false, acknowledge = true) => {
         const response = await mf.dispatchFetch(ORIGIN + '/lobby?preview=' + PREVIEW, { headers: { ...headers(cookie, ip), Upgrade: 'websocket' } });
         assert.equal(response.status, 101, label + ': actual gateway upgrade refused'); assert.ok(response.webSocket, label + ': missing WebSocket');
-        const visitor = new Visitor(response.webSocket, label, transport); visitors.push(visitor);
+        const visitor = new Visitor(response.webSocket, label, transport, acknowledge); visitors.push(visitor);
         const hello = await visitor.wait(f => f.t === 'hello', 'actual hello'); assert.deepEqual(hello.features, { entrySources: 1, privateMessageContext: 1, roomKeep: 1, messageResults: 1 }); assert.equal(hello.role, 'fan');
         visitor.send({ t: 'hello', nick: label, age13: true, entrySource: source, ...(transport ? { transport: 1 } : {}) });
         await visitor.wait(f => f.t === 'join' && f.ch.name === '#stalemate', 'lobby membership');
@@ -313,7 +321,188 @@ async function runtime(phase, state, nonce) {
     };
     try {
         assert.equal((await mf.ready).hostname, '127.0.0.1');
-        if (phase === 'visitors') {
+        if (PRESSURE_ONLY) {
+            const pressureMetrics = () => control('pressure-metrics');
+            const until = async (predicate, label) => {
+                const deadline = performance.now() + 6000;
+                while (!predicate()) {
+                    for (const visitor of visitors) if (visitor.failure) throw visitor.failure;
+                    assert.ok(performance.now() < deadline, label + ': existing6s wait exceeded'); await delay(10);
+                }
+            };
+            const drainHealthy = async peers => {
+                let metrics; const deadline = performance.now() + 6000;
+                for (;;) {
+                    for (const peer of peers) { if (peer.failure) throw peer.failure; assert.equal(peer.closed, null, 'healthy pressure peer closed'); }
+                    metrics = await pressureMetrics();
+                    if (peers.every(peer => peer.ack.pending === 0 && peer.ack.lastSequence === peer.rawTransport.lastSequence)
+                        && metrics.sockets.filter(socket => socket.slot !== 2).every(socket => {
+                            const peer = peers.find(value => value.label === ['NativeAlpha', 'NativeBravo'][socket.slot]);
+                            return peer && socket.sequence === peer.rawTransport.lastSequence && socket.acknowledged === socket.sequence
+                                && socket.controls === peer.ack.sent && socket.pendingFrames === 0;
+                        }) && metrics.sockets.filter(socket => socket.slot !== 2).length === peers.length) return metrics;
+                    assert.ok(performance.now() < deadline, 'pressure healthy native ACK drain exceeded existing6s wait'); await delay(25);
+                }
+            };
+            const inspectBindings = async expected => {
+                const deadline = performance.now() + 6000;
+                for (;;) {
+                    const observed = await control('inspect');
+                    if (observed.bindingCount === expected && observed.liveBindingCount === expected
+                        && observed.engineSessionNicks.length === expected) return observed;
+                    assert.ok(performance.now() < deadline, 'pressure actual binding retirement exceeded existing6s wait'); await delay(25);
+                }
+            };
+            const line = async (writer, recipients, number) => {
+                const text = PRESSURE_PREFIX + number, id = number.toString(16).padStart(32, '0');
+                const offsets = new Map(recipients.map(peer => [peer, peer.frames.length])); const at = performance.now();
+                writer.send({ t: 'say', ch: '#stalemate', text, clientMessageId: id });
+                const delivered = await Promise.all(recipients.map(peer => peer.wait(frame => frame.t === 'line' && frame.text === text, 'pressure healthy line', offsets.get(peer))));
+                assert.equal(new Set(delivered.map(frame => frame.id)).size, 1);
+                for (const peer of recipients) assert.equal(peer.frames.slice(offsets.get(peer)).filter(frame => frame.t === 'line' && frame.text === text).length, 1);
+                assert.equal((await writer.wait(frame => frame.t === 'message-result' && frame.id === id, 'pressure sender result', offsets.get(writer))).status, 'published');
+                return at;
+            };
+            const assertHealthyAccounting = (metrics, peers) => {
+                assert.equal(metrics.controlBudget.refused, 0);
+                assert.equal(metrics.controlBudget.consumedControls, metrics.delivery.controlFrames);
+                assert.equal(metrics.delivery.controlFrames, peers.reduce((sum, peer) => sum + peer.ack.sent, 0));
+                assert.equal(metrics.controlBudget.reservations, metrics.sockets.filter(socket => socket.slot !== 2).reduce((sum, socket) => sum + Math.ceil(socket.controls / 20), 0));
+                assert.equal(metrics.controlBudget.prepaidControls, metrics.controlBudget.reservations * 20);
+                for (const socket of metrics.sockets.filter(value => value.slot !== 2)) {
+                    assert.equal(socket.remainingControls, 20 * Math.ceil(socket.controls / 20) - socket.controls);
+                    assert.equal(socket.pendingFrames, 0);
+                }
+                for (const peer of peers) assert.ok(peer.ack.minSpacingMs === null || peer.ack.minSpacingMs >= 50);
+                for (const field of ['failures', 'legacyCloses', 'controlCloses']) assert.equal(metrics.delivery[field], 0);
+                assert.ok(metrics.delivery.peakPendingFrames <= 8192 && metrics.delivery.peakPendingBytes <= 32 * 1024 * 1024);
+            };
+            if (phase === 'visitors') {
+                const missing = await call('/beta/unlock', '', { key: INVITE }); assert.equal(missing.status, 503); await missing.body?.cancel();
+                assert.equal((await control('initialize')).reason, 'initialize complete');
+                assert.deepEqual(await control('participation-policy'), { installed: true });
+                assert.deepEqual(await control('egress-probe'), { status: 503, denied: true });
+                const cookieA = await unlock('192.0.2.11'), cookieB = await unlock('192.0.2.12'), cookieC = await unlock('192.0.2.13');
+                const a = await connect(cookieA, 'NativeAlpha', 'stalemate', '192.0.2.11', true);
+                const b = await connect(cookieB, 'NativeBravo', 'rad-dad', '192.0.2.12', true);
+                const probe = await connect(cookieC, 'NativeCharlie', '', '192.0.2.13', true, false);
+                // Allow the ordinary initial presence projection to settle. No
+                // clock/cap alteration, barrier command or refused-action retry.
+                await delay(200);
+                const contract = await control('pressure-register', { cookie: cookieC });
+                assert.equal(contract.registeredCurrentGuest, true); assert.equal(contract.helpCount, 10);
+                assert.equal(contract.helpDigests.length, 10); for (const digest of contract.helpDigests) assert.match(digest, /^[a-f0-9]{64}$/);
+                await drainHealthy([a, b]);
+                const beforeMetrics = await pressureMetrics(), initialFrames = probe.frames.length;
+                assert.equal(beforeMetrics.delivery.pressureCloses, 0); assert.equal(beforeMetrics.helpAttempts.length, 0);
+                const firstPublicationAt = await line(a, [a, b, probe], 1), healthyCountsBefore = [a.ack.sent, b.ack.sent];
+                let commands = 0, duringPublicationAt; const pressureStarted = performance.now();
+                for (let index = 0; index < 15; index++) {
+                    if (probe.closed || probe.socket.readyState !== 1) break;
+                    const offset = probe.frames.length;
+                    probe.send({ t: 'cmd', name: 'help', args: [], ch: '#stalemate' }); commands++;
+                    await until(() => probe.closed || probe.frames.slice(offset).filter(frame => frame.t === 'notice').length >= contract.helpCount, 'real HELP output or pressure close');
+                    if (probe.closed || probe.socket.readyState !== 1) break;
+                    if (index === 4) duringPublicationAt = await line(b, [a, b, probe], 2);
+                    await delay(index < 8 ? 25 : 1100);
+                }
+                assert.equal((await probe.wait(() => false, 'intended native pressure close', 0, true)).code, 4413);
+                const pressureDurationMs = performance.now() - pressureStarted;
+                assert.ok(Number.isFinite(duringPublicationAt), 'pressure ended before healthy during-publication observation');
+                const retired = await inspectBindings(2);
+                const after = await drainHealthy([a, b]);
+                assert.equal(after.overflow, false); assert.ok(commands >= 1);
+                // Once the real refusal closes the socket, byId may exclude it
+                // from later frames of that final staged response. Every earlier
+                // complete command is ten accepted notices; the final attempt is
+                // a valid prefix containing the actual refused envelope.
+                const completeAttempts = (commands - 1) * contract.helpCount;
+                assert.ok(after.helpAttempts.length > completeAttempts && after.helpAttempts.length <= commands * contract.helpCount);
+                assert.ok(after.helpAttempts.slice(0, completeAttempts).every(attempt => attempt.accepted));
+                assert.ok(after.helpAttempts.slice(completeAttempts).some(attempt => !attempt.accepted));
+                let refused = false;
+                for (let index = 0; index < after.helpAttempts.length; index++) {
+                    const attempt = after.helpAttempts[index];
+                    assert.equal(attempt.index, index % 10, 'refusal/non-HELP output caused pressure');
+                    if (!attempt.accepted) refused = true; else assert.equal(refused, false, 'native send resumed after pressure refusal');
+                }
+                const receivedHelp = probe.frames.slice(initialFrames).filter(frame => frame.t === 'notice');
+                for (let index = 0; index < receivedHelp.length; index++) {
+                    assert.notEqual(receivedHelp[index].kind, 'error');
+                    assert.equal(createHash('sha256').update(receivedHelp[index].text).digest('hex'), contract.helpDigests[index % 10]);
+                }
+                assert.equal(after.helpAttempts.filter(attempt => attempt.accepted).length, receivedHelp.length, 'actual HELP sends/receipts differ');
+                const rawProbe = probe.pressureSnapshot(), witness = after.witness;
+                assert.equal(rawProbe.count, 128); assert.equal(rawProbe.lastSequence, 128); assert.equal(rawProbe.firstSequence, 1);
+                assert.equal(rawProbe.acknowledgementsSent, 0); assert.equal(rawProbe.acknowledgedSequence, 0); assert.equal(rawProbe.pendingUnhandledCredit, 128);
+                assert.ok(rawProbe.bytes < 2 * 1024 * 1024);
+                assert.ok(witness); assert.equal(witness.sequence, 128); assert.equal(witness.acknowledged, 0); assert.equal(witness.pendingFrames, 128); assert.equal(witness.controls, 0);
+                assert.ok(witness.pendingBytes > 0 && witness.pendingBytes < 16 * 1024 * 1024);
+                assert.equal(witness.refusedKind, 'notice'); assert.ok(witness.refusedHelpIndex >= 0 && witness.refusedHelpIndex < 10);
+                assert.equal(witness.nativeSendCallsAfter, witness.nativeSendCallsBefore, 'refused129th envelope reached native send');
+                assert.equal(after.nativeProbeSends.calls, after.nativeProbeSends.returned);
+                assert.equal(after.nativeProbeSends.initialSequence + after.nativeProbeSends.calls, 128);
+                assert.equal(witness.pressureClosesBefore, 0); assert.equal(witness.pressureClosesAfter, 1); assert.equal(after.delivery.pressureCloses, 1);
+                assert.equal(witness.pendingFramesBefore - witness.pendingFramesAfter, 128);
+                assert.equal(witness.pendingBytesBefore - witness.pendingBytesAfter, witness.pendingBytes);
+                assert.equal(after.sockets.some(socket => socket.slot === 2), false);
+                assert.equal(after.engineConnections, 2); assert.equal(after.liveBindingCount, 2);
+                assertHealthyAccounting(after, [a, b]);
+                assert.equal(retired.bindingCount, 2); assert.equal(retired.liveBindingCount, 2); assert.equal(retired.reports.length, 0);
+                const continuationAt = firstPublicationAt + 3300; while (performance.now() < continuationAt) await delay(continuationAt - performance.now());
+                await line(a, [a, b], 3);
+                const progressed = await drainHealthy([a, b]); assertHealthyAccounting(progressed, [a, b]);
+                const healthyRawProgressed = [a.transportSnapshot(), b.transportSnapshot()];
+                assert.ok(a.ack.sent > healthyCountsBefore[0] && b.ack.sent > healthyCountsBefore[1]);
+                const logout = await call('/beta/logout', cookieA, {}); assert.equal(logout.status, 200); assert.deepEqual(await logout.json(), { ok: true });
+                assert.equal((await a.wait(() => false, 'pressure healthy guest real revocation close', 0, true)).code, 4401);
+                const revoked = await call('/beta/state', cookieA); assert.equal(revoked.status, 401); await revoked.body?.cancel();
+                const replay = await mf.dispatchFetch(ORIGIN + '/lobby?preview=' + PREVIEW, { headers: { ...headers(cookieA, '192.0.2.11'), Upgrade: 'websocket' } });
+                assert.equal(replay.status, 401); await replay.body?.cancel();
+                const revokedCount = a.frames.length, probeCount = probe.frames.length, lastHealthyAt = duringPublicationAt + 3300;
+                while (performance.now() < lastHealthyAt) await delay(lastHealthyAt - performance.now());
+                await inspectBindings(1); await line(b, [b], 4); await drainHealthy([b]);
+                assert.equal(a.frames.length, revokedCount); assert.equal(probe.frames.length, probeCount);
+                const checkpoint = await control('inspect');
+                assert.equal(checkpoint.bindingCount, 1); assert.equal(checkpoint.liveBindingCount, 1); assert.deepEqual(checkpoint.durableSessionNicks, ['NativeBravo']);
+                assert.equal(checkpoint.reports.length, 0); assert.equal(checkpoint.nativeRollbackWitnesses.length, 0);
+                assert.deepEqual(Object.keys(checkpoint.ordinaryBodiesAbsent).sort(), EPHEMERAL_BODY_MARKERS);
+                assert.deepEqual(Object.keys(checkpoint.rawScan.perChunkOrdinaryBodiesAbsent).sort(), EPHEMERAL_BODY_MARKERS);
+                assert.ok(Object.values(checkpoint.ordinaryBodiesAbsent).every(Boolean) && Object.values(checkpoint.rawScan.perChunkOrdinaryBodiesAbsent).every(Boolean));
+                proof = { checks: ['actual-three-current-SID-C3-transport-v1-guests', 'real-HELP-fills128-window-and-refuses129th-before-native-send', 'only-probe-pressure-close-credit-and-binding-retire', 'healthy-publication-ACK-and-real-logout-isolation', 'ordinary-bodies-absent-before-one-live-binding-process-loss'],
+                    pressure: { visitors: 3, syntheticSubjects: 3, commands, pressureDurationMs, nativeStorageMethodCallDelta: after.nativeStorageMethodCalls - beforeMetrics.nativeStorageMethodCalls, helpNoticeCount: receivedHelp.length, before: beforeMetrics, after, progressed,
+                        rawProbe, healthyRaw: healthyRawProgressed, survivorRaw: b.transportSnapshot(), actualRevocationClose: 4401,
+                        replayDenied: true, healthyPublicationStages: 4, checkpointBindings: 1, selectedReportsCreated: 0,
+                        scope: 'Probe-directed application-ACK credit window on actual local native transport; not physical TCP/browser suspension, shared-fanout capacity, WAN,150-native tier or soak.' },
+                    checkpoint, sources: before, versions, binarySha256, rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs, outboundCalls, runtimeRestarts,
+                    workerdPids: group(process.pid).filter(row => row.command.includes('workerd')).map(row => row.pid) };
+                secrets = { revokedCookie: cookieA, liveCookie: cookieB };
+                assert.equal(outboundCalls, 1); assert.equal(runtimeRestarts, 0); assert.deepEqual(sources(), before);
+                for (const [path, digest] of Object.entries(bundleInputs)) assert.equal(hash(path), digest);
+                assert.ok(proof.workerdPids.length); await ipc({ type: 'checkpoint', phase, nonce, proof, secrets }); await new Promise(() => {});
+            } else {
+                const received = await recoveryMessage; secrets = received.secrets;
+                const revoked = await call('/beta/state', secrets.revokedCookie); assert.equal(revoked.status, 401); await revoked.body?.cancel();
+                const active = await call('/beta/state', secrets.liveCookie); assert.equal(active.status, 200); await active.body?.cancel();
+                const recovered = await control('inspect');
+                assert.equal(recovered.objectId, received.checkpoint.objectId); assert.equal(received.checkpoint.bindingCount, 1);
+                assert.equal(recovered.bindingCount, 0); assert.equal(recovered.liveBindingCount, 0); assert.deepEqual(recovered.durableSessionNicks, []); assert.deepEqual(recovered.engineSessionNicks, []);
+                assert.deepEqual(recovered.rooms, received.checkpoint.rooms); assert.deepEqual(recovered.reports, []);
+                assert.deepEqual(Object.keys(recovered.ordinaryBodiesAbsent).sort(), EPHEMERAL_BODY_MARKERS);
+                assert.deepEqual(Object.keys(recovered.rawScan.perChunkOrdinaryBodiesAbsent).sort(), EPHEMERAL_BODY_MARKERS);
+                assert.ok(Object.values(recovered.ordinaryBodiesAbsent).every(Boolean) && Object.values(recovered.rawScan.perChunkOrdinaryBodiesAbsent).every(Boolean));
+                const returning = await connect(secrets.liveCookie, 'NativeReturn', 'rad-dad', '192.0.2.12', true);
+                await returning.barrier();
+                assert.ok(returning.frames.every(frame => frame.t !== 'line'), 'pressure recovery replayed ordinary text');
+                proof = { checks: ['cold-loss-retires-the-one-pressure-mode-binding', 'revoked-cookie-denied-current-SID-rejoins-under-C3', 'no-ordinary-replay-or-selected-body-archive'], recovered,
+                    sources: before, versions, binarySha256, rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs, outboundCalls, runtimeRestarts,
+                    workerdPids: group(process.pid).filter(row => row.command.includes('workerd')).map(row => row.pid) };
+                assert.equal(outboundCalls, 0); assert.equal(runtimeRestarts, 0); assert.deepEqual(sources(), before);
+                for (const [path, digest] of Object.entries(bundleInputs)) assert.equal(hash(path), digest);
+                returning.socket.close(1000, 'owned pressure proof complete'); assert.equal((await returning.wait(() => false, 'pressure recovery normal close', 0, true)).code, 1000);
+                await mf.dispose(); await ipc({ type: 'result', phase, nonce, proof, miniflareDisposed: true });
+            }
+        } else if (phase === 'visitors') {
             let admissionDenials = 0;
             for (const requestHeaders of [{ 'X-Fixture-Nonce': nonce + 'x', 'Content-Type': 'application/json' }, { 'X-Fixture-Nonce': nonce, 'Content-Type': 'application/json', Origin: 'https://hostile.invalid' }, { 'X-Fixture-Nonce': nonce, 'Content-Type': 'text/plain' }]) {
                 const response = await mf.dispatchFetch(ORIGIN + '/_fixture/inspect', { method: 'POST', headers: requestHeaders, body: '{}' });
@@ -726,10 +915,11 @@ async function parent() {
     delete first.secrets;
     console.log(JSON.stringify({ localGatewayWebSocketSessionAuthorityQualified: true, ...(PARTICIPATION ? { productionParticipationCompositionQualified: true, guardianDecisionsQualified: false } : {}),
         ...(INCIDENT ? { productionIncidentSourceCompositionQualified: true, incidentAuthorityAndKeyQualified: false } : {}),
-        ...(PARTICIPATION ? { productionOwnSharingCompositionQualified: true } : {}),
+        ...(PARTICIPATION && !PRESSURE_ONLY ? { productionOwnSharingCompositionQualified: true } : {}),
+        ...(PRESSURE_ONLY ? { nativeLocalNonAckPressureQualified: true, originalNinePlusThreeQualifiedByThisMode: false, hostedScaleQualified: false } : {}),
         ...(TRAFFIC_ACKS ? { nativeLocalHealthyAckProbeQualified: true, hostedScaleQualified: false } : {}),
         ...(PARTICIPATION && INCIDENT ? { combinedParticipationIncidentSourceCompositionQualified: true } : {}), first, recovered, node: process.version, platform: process.platform, architecture: process.arch,
-        temporaryStateRemoved: true, scope: 'Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. ' + (PARTICIPATION ? 'Required production C3 bridge selected; actual caller-only HTTP status/Stop narrows the existing synthetic ledger, keeps the same socket for a delivered-message report, then persists withdrawal across process loss before real logout. Only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. ' : '') + (INCIDENT ? 'Required production I3a source bridge and existing I1 over actual records transactions; separate incident appointment/policy and privately retained test key are synthetic only. This does not qualify real incident authority, purpose-key provisioning or key recovery. ' : '') + (TRAFFIC_ACKS ? 'Optional three-visitor paced native-local ACK workload; raw envelopes validated before semantic normalization and actual serialized control grants reconciled. Latencies include Node/Miniflare native bridge; no throughput tier or public SLO claim. ' : '') + 'No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.' }, null, 2));
+        temporaryStateRemoved: true, scope: PRESSURE_ONLY ? 'Separate three-current-SID C3 application-ACK credit pressure proof in actual local workerd/SQLite. Real HELP output, zero-ACK probe4413 with128-frame/native-send/credit witness, healthy ACK/publication and real revocation isolation, one-binding owned-process-loss recovery and no text replay. Synthetic consent only. Does not requalify original9+3/Delta/Echo modes, physical slow TCP/browser/WAN/shared-fanout capacity/150-native/soak or hosted limits/cost.' : 'Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. ' + (PARTICIPATION ? 'Required production C3 bridge selected; actual caller-only HTTP status/Stop narrows the existing synthetic ledger, keeps the same socket for a delivered-message report, then persists withdrawal across process loss before real logout. Only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. ' : '') + (INCIDENT ? 'Required production I3a source bridge and existing I1 over actual records transactions; separate incident appointment/policy and privately retained test key are synthetic only. This does not qualify real incident authority, purpose-key provisioning or key recovery. ' : '') + (TRAFFIC_ACKS ? 'Optional three-visitor paced native-local ACK workload; raw envelopes validated before semantic normalization and actual serialized control grants reconciled. Latencies include Node/Miniflare native bridge; no throughput tier or public SLO claim. ' : '') + 'No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.' }, null, 2));
 }
 try { if (process.argv[2] === '--isolated' && process.argv.length === (6 + MODE.length)) await runtime(process.argv[3], process.argv[4], process.argv[5]); else await parent(); }
 catch (error) { console.error(error.stack || error); process.exitCode = 1; }
