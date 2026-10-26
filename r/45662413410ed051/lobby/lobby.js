@@ -1057,21 +1057,42 @@ import { createEntrySharing } from './entry-sharing.mjs';
             cam.textContent = c.myCam ? '📷 Camera on' : m.C ? '📷 Camera (18+)' : '📷 Cameras off here';
             cam.disabled = !m.C && !c.myCam;
         }
-        $('[data-people-title]').textContent = isPm ? 'PM' : c ? `${c.name} · ${c.count || c.names?.length || 0}` : 'People';
+        const peopleHeading = $('[data-people-title]');
+        peopleHeading.textContent = isPm ? 'PM' : c ? `${c.name} · ${c.count || c.names?.length || 0}` : 'People';
+        peopleHeading.tabIndex = -1;
         const ul = $('[data-nicks]');
-        ul.replaceChildren();
-        (c && c.names || []).forEach((n) => {
-            const li = document.createElement('li');
-            const b = document.createElement('button');
+        const focusedPerson = ul.contains(document.activeElement) && document.activeElement.matches('button.nick') ? document.activeElement : null;
+        const focusedId = focusedPerson?.dataset.connectionId;
+        const previous = new Map([...ul.children].filter(li => li.dataset.connectionId).map(li => [li.dataset.connectionId, li]));
+        const rows = (c && c.names || []).map((n) => {
+            // Reuse only a server connection identity, never a nickname. Keeping
+            // the button also preserves a still-present person's dialog opener.
+            const id = typeof n.id === 'string' && n.id ? n.id : null;
+            const li = id && previous.get(id) || document.createElement('li');
+            const b = li.querySelector('button.nick') || document.createElement('button');
+            if (id) { li.dataset.connectionId = id; b.dataset.connectionId = id; }
             b.type = 'button'; b.className = 'nick'; b.style.color = colorOf(n.nick);
             b.dataset.self = String(n.nick === app.me);
             b.textContent = `${n.prefix}${n.nick}${n.band ? ' ⭐' : n.moderator ? ' MOD' : ''}${n.cam ? ' 📷' : ''}${n.away ? ' 💤' : ''}`;
-            b.addEventListener('click', () => nickSheet(n.nick));
-            li.append(b);
+            b.onclick = () => nickSheet(n.nick);
+            if (!b.parentElement) li.append(b);
             const entryText = entryBadge(n.entrySource, entrySites);
-            if (entryText) { const entry = document.createElement('span'); entry.className = 'entry-badge'; entry.textContent = entryText; li.append(entry); }
-            ul.append(li);
+            const entry = li.querySelector('.entry-badge');
+            if (entryText) {
+                const badge = entry || document.createElement('span');
+                badge.className = 'entry-badge'; badge.textContent = entryText;
+                if (!badge.parentElement) li.append(badge);
+            } else entry?.remove();
+            return li;
         });
+        ul.replaceChildren(...rows);
+        if (focusedPerson) {
+            const target = (focusedId && rows.find(li => li.dataset.connectionId === focusedId)?.querySelector('button.nick')) || peopleHeading;
+            if (document.activeElement !== target) {
+                if (target === peopleHeading) target.focus();
+                else target.focus({ preventScroll: true });
+            }
+        }
     }
 
     function drawRooms() {
@@ -1208,10 +1229,13 @@ import { createEntrySharing } from './entry-sharing.mjs';
     }
     function clearPmRequest(from) { $$('[data-pm-from]', $('[data-pmreqs]')).forEach((request) => { if (request.dataset.pmFrom === from) request.remove(); }); }
 
+    let personSheetReturn = null;
     function nickSheet(nick) {
         if (!nick || nick === app.me) return;
         const c = store(app.active);
         const sheet = $('[data-sheet]');
+        const opener = document.activeElement;
+        personSheetReturn = $('[data-nicks]').contains(opener) && opener.matches('button.nick') ? { opener, channel: app.active } : null;
         $('[data-sheet-title]').textContent = nick;
         const box = $('[data-sheet-buttons]');
         box.replaceChildren();
@@ -1236,6 +1260,20 @@ import { createEntrySharing } from './entry-sharing.mjs';
         sheet.showModal();
     }
     $('[data-sheet-close]').addEventListener('click', () => $('[data-sheet]').close());
+    $('[data-sheet]').addEventListener('close', event => {
+        // A queued close event must not consume a newer open sheet's return.
+        const sheet = event.currentTarget;
+        if (sheet.open) return;
+        const destination = personSheetReturn;
+        personSheetReturn = null;
+        // Recover only body focus or a control in this now-closed sheet.
+        // An intentionally focused control elsewhere keeps its focus.
+        const focused = document.activeElement;
+        if (!destination || destination.opener.isConnected || app.active !== destination.channel
+            || focused !== document.body && !sheet.contains(focused) || $('dialog[open]')) return;
+        const heading = $('[data-people-title]');
+        if (heading?.isConnected && heading.getClientRects().length) heading.focus();
+    });
 
     // Command palette: every slash command as a button.
     const PALETTE = [
