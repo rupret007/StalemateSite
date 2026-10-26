@@ -8,7 +8,7 @@
     const CAM = { width: { ideal: 480, max: 640 }, height: { ideal: 360, max: 480 }, frameRate: { ideal: 15, max: 20 } };
 
     function attach(deps) {
-        const { app, send, $, previewKey, turnUrl, isLocal, params } = deps;
+        const { app, send: rawSend, $, previewKey, turnUrl, isLocal, params } = deps;
         const ui = {
             stage: $('[data-act-stage]'),
             paint: $('[data-act-paint]'),
@@ -40,10 +40,15 @@
         let pendingPts = [];
         let flushTimer = 0;
         let roomGeneration = 0, captureVersion = 0, turnClient = null, turnInit = null;
+        // The server keeps one activity allowance (burst 24, refill 10/s).
+        // Drawing and camera signaling share this smaller client allowance so
+        // an ICE burst queues rather than silently consuming an SDP's budget.
+        const activity = { tokens: 8, at: Date.now(), queue: [], bytes: 0, timer: 0 };
+        const ACT_QUEUE_FRAMES = 128, ACT_QUEUE_BYTES = 256 * 1024;
 
         window.__lobbyRoom = { state, player }; // test hook
 
-        const actSend = (obj) => send(Object.assign({ t: 'act', ch: state.ch }, obj));
+        const actSend = (obj, onSent) => send(Object.assign({ t: 'act', ch: state.ch }, obj), null, onSent);
         const isOp = () => {
             const c = app.chans.get(state.ch);
             return app.band || (c && c.names && c.names.some((n) => n.nick === app.me && n.prefix === '@'));
@@ -52,8 +57,110 @@
         const mq = (q) => { try { return Boolean(window.matchMedia && window.matchMedia(q).matches); } catch (e) { return false; } };
         const phone = V.isPhoneDevice({ ua: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints, coarse: mq('(pointer: coarse)'), fine: mq('(any-pointer: fine)'), cores: navigator.hardwareConcurrency });
 
+        function activityNotice(text) { ui.relayStatus.textContent = text; }
+        function descriptionKey(description) {
+            if (!description || typeof description.sdp !== 'string') return null;
+            const lines = description.sdp.split(/\r?\n/).filter(Boolean), origin = lines.filter(line => /^o=/.test(line));
+            if (!origin.length) return `${description.type}\n${lines.filter(line => !/^a=(?:candidate:|end-of-candidates$)/.test(line)).join('\n')}`;
+            // API epochs bind every local-description write and incoming-offer
+            // rollback. This additional identity check preserves origin, ICE,
+            // media/direction and rejected-port identity without mistaking
+            // native gathered transport addresses/ports for a new negotiation.
+            const media = lines.filter(line => /^m=/.test(line)).map(line => {
+                const [kind, port, ...format] = line.slice(2).trim().split(/\s+/);
+                return [kind, port.split('/')[0] === '0' ? 'rejected' : 'active', port.includes('/') ? port.slice(port.indexOf('/')) : '', ...format];
+            });
+            return JSON.stringify([description.type, origin, media,
+                lines.filter(line => /^a=(?:ice-(?:ufrag|pwd):|mid:|group:|sendrecv$|sendonly$|recvonly$|inactive$)/.test(line))]);
+        }
+        function iceGeneration(description) {
+            if (!description || typeof description.sdp !== 'string') return null;
+            const credentials = [...new Set(description.sdp.split(/\r?\n/).filter(line => /^a=ice-(?:ufrag|pwd):/.test(line)))].sort();
+            return credentials.length ? JSON.stringify(credentials) : descriptionKey(description);
+        }
+        function currentActivity(item) {
+            if (item.generation !== roomGeneration || item.channel !== state.ch || state.ch !== app.active || !state.names.has(state.myId)) return false;
+            if (item.kind === 'clear' || item.kind === 'video') return isOp();
+            if (item.kind !== 'rtc') return paintActive();
+            if (!item.entry?.current()) return false;
+            const current = item.entry.pc.localDescription;
+            if (item.sdp) return item.epoch === item.entry.descriptionEpoch && descriptionKey(item.sdp) !== null && descriptionKey(current) === descriptionKey(item.sdp);
+            if (!item.iceGeneration || iceGeneration(current) !== item.iceGeneration) return false;
+            if (!item.ufrag) return true;
+            return !!current?.sdp && current.sdp.split(/\r?\n/).includes(`a=ice-ufrag:${item.ufrag}`);
+        }
+        function removeActivity(index) {
+            const [item] = activity.queue.splice(index, 1); activity.bytes -= item.bytes; return item;
+        }
+        function purgeActivity(entry) {
+            for (let index = activity.queue.length - 1; index >= 0; index--) {
+                if (entry ? activity.queue[index].entry === entry : !currentActivity(activity.queue[index])) removeActivity(index);
+            }
+            if (!activity.queue.length) { clearTimeout(activity.timer); activity.timer = 0; }
+        }
+        function flushActivity() {
+            clearTimeout(activity.timer); activity.timer = 0; purgeActivity();
+            const at = Date.now();
+            activity.tokens = Math.min(8, activity.tokens + Math.max(0, at - activity.at) * 8 / 1000); activity.at = at;
+            while (activity.queue.length && activity.tokens >= 1) {
+                const item = removeActivity(0); activity.tokens -= 1;
+                let sent = false;
+                try { sent = rawSend(JSON.parse(item.raw)) !== false; } catch (_) { /* connection ended */ }
+                if (!sent) {
+                    item.failed = true;
+                    activityNotice('Activity connection interrupted. Rejoin this room to refresh shared activity.');
+                    const pending = activity.queue.splice(0); activity.bytes = 0;
+                    if (item.entry) closePc(item.to);
+                    for (const queued of pending) { queued.failed = true; if (queued.entry) closePc(queued.to); }
+                    cancelStroke(); redraw(); break;
+                }
+                item.onSent?.();
+            }
+            if (activity.queue.length) activity.timer = window.setTimeout(flushActivity, 125);
+        }
+        function send(frame, entry, onSent) {
+            if (frame.t !== 'act') return rawSend(frame) !== false;
+            const raw = JSON.stringify(frame), bytes = new Blob([raw]).size;
+            const ufrag = frame.ice?.usernameFragment || /(?:^|\s)ufrag\s+(\S+)/.exec(frame.ice?.candidate || '')?.[1] || '';
+            const item = { raw, bytes, channel: frame.ch, generation: roomGeneration, kind: frame.kind,
+                entry, to: frame.to, sdp: frame.sdp, ufrag, onSent,
+                epoch: entry?.descriptionEpoch, iceGeneration: frame.ice ? iceGeneration(entry?.pc.localDescription) : null,
+                priority: frame.kind === 'rtc' && !!frame.sdp };
+            purgeActivity();
+            if (!currentActivity(item)) return false;
+            // Consecutive unsent chunks of one brush stroke can share a frame.
+            // Every point stays in order, and no clear/video/other stroke is
+            // crossed. This keeps ordinary 80ms brush sampling responsive while
+            // all activity stays below the shared server allowance.
+            const tail = activity.queue.at(-1);
+            if (frame.kind === 'stroke' && tail?.kind === 'stroke' && tail.channel === item.channel && tail.generation === item.generation) {
+                const previous = JSON.parse(tail.raw), a = previous.stroke, b = frame.stroke;
+                if (a.id === b.id && a.color === b.color && a.size === b.size && a.pts.length + b.pts.length <= 400) {
+                    previous.stroke.pts = a.pts.concat(b.pts);
+                    const combined = JSON.stringify(previous), combinedBytes = new Blob([combined]).size;
+                    if (combinedBytes <= 16384 && activity.bytes - tail.bytes + combinedBytes <= ACT_QUEUE_BYTES) {
+                        activity.bytes += combinedBytes - tail.bytes; tail.raw = combined; tail.bytes = combinedBytes;
+                        flushActivity(); return !tail.failed;
+                    }
+                }
+            }
+            if (bytes > 16384 || activity.queue.length >= ACT_QUEUE_FRAMES || activity.bytes + bytes > ACT_QUEUE_BYTES) {
+                activityNotice('Activity is busy. This action was not queued; wait a moment before trying again.');
+                if (entry) closePc(frame.to);
+                return false;
+            }
+            // SDP can precede queued candidates; the receiver already buffers
+            // early ICE. Preserve SDP order and the order of all paint/clear/
+            // video operations. Never shed an accepted drawing to make space.
+            const before = item.priority ? activity.queue.findIndex(queued => !queued.priority) : -1;
+            if (before < 0) activity.queue.push(item); else activity.queue.splice(before, 0, item);
+            activity.bytes += bytes; flushActivity();
+            return !item.failed; // Queued locally, not acknowledged by the server.
+        }
+
         function teardown() {
             roomGeneration += 1; captureVersion += 1;
+            clearTimeout(activity.timer); activity.timer = 0; activity.queue = []; activity.bytes = 0;
             cancelStroke();
             clearTimeout(videoPublishTimer);
             turnClient?.stop(); turnClient = null; turnInit = null; state.ice = null;
@@ -229,7 +336,9 @@
             flushTimer = 0;
             if (!currentStroke()) { cancelStroke(); return; }
             if (!pendingPts.length) return;
-            send({ t: 'act', ch: live.channel, kind: 'stroke', stroke: { id: live.id, color: live.color, size: live.size, pts: pendingPts } });
+            if (!send({ t: 'act', ch: live.channel, kind: 'stroke', stroke: { id: live.id, color: live.color, size: live.size, pts: pendingPts } })) {
+                cancelStroke(); redraw(); return;
+            }
             H.apply(state.room, { type: 'stroke', stroke: { id: live.id, color: live.color, size: live.size, pts: pendingPts } });
             pendingPts = [];
         }
@@ -346,9 +455,10 @@
 
         function hostVideo(source, playing, pos) {
             if (!isOp()) return;
-            actSend({ kind: 'video', source, playing, pos });
-            H.apply(state.room, { type: 'video', source, playing, pos }, { t: state.clock.relayNow() });
-            syncToState(true, true);
+            actSend({ kind: 'video', source, playing, pos }, () => {
+                H.apply(state.room, { type: 'video', source, playing, pos }, { t: state.clock.relayNow() });
+                syncToState(true, true);
+            });
         }
 
         function onYtAutoplayBlocked() {
@@ -386,8 +496,8 @@
             // of correcting the host back to the previous shared position.
             const pos = localTime(), playing = localPlaying();
             if (playing !== v.playing || H.needsCorrection(pos, H.expectedPosition(v, state.clock.relayNow()))) {
-                actSend({ kind: 'video', source: v.source, playing, pos });
-                H.apply(state.room, { type: 'video', source: v.source, playing, pos }, { t: state.clock.relayNow() });
+                actSend({ kind: 'video', source: v.source, playing, pos }, () =>
+                    H.apply(state.room, { type: 'video', source: v.source, playing, pos }, { t: state.clock.relayNow() }));
             }
         }, 2000);
 
@@ -433,6 +543,12 @@
                     got.getTracks().forEach((track) => track.stop()); return;
                 }
                 state.stream = got;
+                // Signaling can create a receive-only pair while the browser
+                // permission/capture promise is pending. Add our opted-in
+                // tracks to those current pairs too, without another capture.
+                for (const entry of state.pcs.values()) if (entry.current()) {
+                    for (const track of got.getTracks()) if (!entry.pc.getSenders().some(sender => sender.track === track)) entry.pc.addTrack(track, got);
+                }
                 for (const id of state.peers) if (!state.pcs.has(id)) openPc(id);
                 layoutTiles();
             } catch (e) { /* denied */ }
@@ -448,23 +564,30 @@
 
         function refreshAv() {
             const c = app.chans.get(state.ch);
-            const ids = new Set((c && c.names || []).filter((n) => n.cam && n.id).map((n) => n.id));
+            const ids = new Set((c && c.names || []).filter((n) => n.cam && n.id && mediaPeerAllowed(n.id)).map((n) => n.id));
             if (state.camOn && state.myId) ids.add(state.myId);
             state.peers = ids;
             if (state.camOn && state.stream) ids.forEach((id) => { if (id !== state.myId && !state.pcs.has(id)) openPc(id); });
             ids.forEach((id) => { if (id !== state.myId && !state.pcs.has(id) && state.stream) openPc(id); });
-            for (const id of [...state.pcs.keys()]) if (!ids.has(id)) closePc(id);
+            // An existing receiver need not publish their own camera. Preserve
+            // that current allowed pair while our opted-in capture is active.
+            for (const [id, entry] of [...state.pcs]) if (!entry.current() || !ids.has(id) && !(state.camOn && state.stream)) closePc(id);
             layoutTiles();
         }
 
+        function mediaPeerAllowed(id) {
+            const c = app.chans.get(state.ch);
+            return state.names.has(id) && !(Array.isArray(c?.mediaBlocked) && c.mediaBlocked.includes(id));
+        }
+
         function openPc(id) {
-            if (!state.ch || state.ch !== app.active || state.pcs.has(id) || id === state.myId) return;
+            if (!state.ch || state.ch !== app.active || state.pcs.has(id) || id === state.myId || !mediaPeerAllowed(id)) return;
             const channel = state.ch, generation = roomGeneration;
             const pc = new RTCPeerConnection({ iceServers: state.ice || STUN });
             const polite = (state.myId || '') > id;
-            const entry = { pc, polite, makingOffer: false, ignoreOffer: false, pendingIce: [], stream: new MediaStream() };
-            entry.current = () => generation === roomGeneration && state.ch === channel && app.active === channel && state.pcs.get(id) === entry;
-            entry.signal = message => { if (entry.current()) send({ t: 'act', ch: channel, kind: 'rtc', to: id, ...message }); };
+            const entry = { pc, polite, makingOffer: false, settingRemoteAnswer: false, ignoreOffer: false, descriptionEpoch: 0, pendingIce: [], stream: new MediaStream() };
+            entry.current = () => generation === roomGeneration && state.ch === channel && app.active === channel && state.pcs.get(id) === entry && mediaPeerAllowed(id);
+            entry.signal = message => { if (entry.current()) send({ t: 'act', ch: channel, kind: 'rtc', to: id, ...message }, entry); };
             state.pcs.set(id, entry);
             pc.onicecandidate = (e) => { if (entry.current() && e.candidate) entry.signal({ ice: e.candidate.toJSON() }); };
             pc.ontrack = (e) => { if (!entry.current()) { e.track.stop(); return; } entry.stream.addTrack(e.track); layoutTiles(); };
@@ -472,10 +595,11 @@
                 try {
                     if (!entry.current()) return;
                     entry.makingOffer = true;
-                    const offer = await pc.createOffer();
-                    if (!entry.current()) return;
-                    await pc.setLocalDescription(offer);
-                    if (entry.current()) entry.signal({ sdp: pc.localDescription.toJSON() });
+                    const epoch = ++entry.descriptionEpoch;
+                    // Let the native operation choose its current offer/answer
+                    // atomically; a separately awaited offer can already be stale.
+                    await pc.setLocalDescription();
+                    if (entry.current() && entry.descriptionEpoch === epoch) entry.signal({ sdp: pc.localDescription.toJSON() });
                 } catch (e) { /* */ } finally { entry.makingOffer = false; }
             };
             if (state.stream) state.stream.getTracks().forEach((t) => pc.addTrack(t, state.stream));
@@ -485,26 +609,31 @@
         }
 
         async function onRtc(from, msg) {
+            if (!mediaPeerAllowed(from)) return;
             if (!state.pcs.has(from)) openPc(from);
             const entry = state.pcs.get(from);
             if (!entry?.current()) return;
             const pc = entry.pc;
             try {
                 if (msg.sdp) {
-                    const collision = msg.sdp.type === 'offer' && (entry.makingOffer || pc.signalingState !== 'stable');
+                    const readyForOffer = !entry.makingOffer && (pc.signalingState === 'stable' || entry.settingRemoteAnswer);
+                    const collision = msg.sdp.type === 'offer' && !readyForOffer;
                     entry.ignoreOffer = collision && !entry.polite;
                     if (entry.ignoreOffer) return;
-                    await pc.setRemoteDescription(msg.sdp);
+                    if (msg.sdp.type === 'offer') entry.descriptionEpoch += 1;
+                    const answer = msg.sdp.type === 'answer';
+                    if (answer) entry.settingRemoteAnswer = true;
+                    try { await pc.setRemoteDescription(msg.sdp); }
+                    finally { if (answer) entry.settingRemoteAnswer = false; }
                     if (!entry.current()) return;
                     for (const ice of entry.pendingIce.splice(0)) {
                         try { await pc.addIceCandidate(ice); } catch (_) { /* stale negotiation */ }
                         if (!entry.current()) return;
                     }
                     if (msg.sdp.type === 'offer') {
-                        const answer = await pc.createAnswer();
-                        if (!entry.current()) return;
-                        await pc.setLocalDescription(answer);
-                        if (entry.current()) entry.signal({ sdp: pc.localDescription.toJSON() });
+                        const epoch = ++entry.descriptionEpoch;
+                        await pc.setLocalDescription();
+                        if (entry.current() && entry.descriptionEpoch === epoch) entry.signal({ sdp: pc.localDescription.toJSON() });
                     }
                 } else if (msg.ice) {
                     if (!pc.remoteDescription) { if (entry.pendingIce.length < 64) entry.pendingIce.push(msg.ice); }
@@ -517,6 +646,7 @@
             const e = state.pcs.get(id);
             state.pcs.delete(id);
             if (e) {
+                purgeActivity(e);
                 e.pc.onicecandidate = null; e.pc.ontrack = null; e.pc.onnegotiationneeded = null;
                 e.pendingIce.length = 0;
                 e.stream.getTracks().forEach(track => track.stop());

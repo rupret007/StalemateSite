@@ -24,8 +24,12 @@ function fixture() {
         constructor() { peers.push(this); }
         createOffer = vi.fn(async () => ({ type: 'offer', sdp: 'synthetic-offer' }));
         createAnswer = vi.fn(async () => ({ type: 'answer', sdp: 'synthetic-answer' }));
-        setLocalDescription = vi.fn(async value => { this.localDescription = { ...value, toJSON: () => value }; });
-        setRemoteDescription = vi.fn(async value => { this.remoteDescription = value; });
+        setLocalDescription = vi.fn(async value => {
+            const type = this.signalingState === 'have-remote-offer' ? 'answer' : 'offer';
+            const chosen = value || { type, sdp: `synthetic-${type}` };
+            this.localDescription = { ...chosen, toJSON: () => chosen }; this.signalingState = chosen.type === 'answer' ? 'stable' : 'have-local-offer';
+        });
+        setRemoteDescription = vi.fn(async value => { this.remoteDescription = value; this.signalingState = value.type === 'offer' ? 'have-remote-offer' : 'stable'; });
         addIceCandidate = vi.fn(async () => {});
         addTransceiver = vi.fn();
         close = vi.fn();
@@ -83,18 +87,18 @@ describe('activity work belongs to its original room lifetime', () => {
         expect(f.state.ch).toBeNull(); expect(f.state.room.strokes).toEqual([]);
     });
 
-    it('drops a delayed local camera offer after changing rooms, before setting a description or signaling', async () => {
+    it('closes the old pair and drops publication of a native local description that finishes after changing rooms', async () => {
         const f = fixture(); f.incoming({ ice: { candidate: 'synthetic' } }); const pc = f.peers[0], held = deferred();
-        pc.createOffer.mockImplementation(() => held.promise); const work = pc.onnegotiationneeded();
+        pc.setLocalDescription.mockImplementation(() => held.promise); const work = pc.onnegotiationneeded();
         f.join('#art-second'); held.resolve({ type: 'offer', sdp: 'old-room' }); await work;
-        expect(pc.setLocalDescription).not.toHaveBeenCalled(); expect(f.sent).toEqual([]);
+        expect(pc.setLocalDescription).toHaveBeenCalledOnce(); expect(pc.close).toHaveBeenCalledOnce(); expect(f.sent).toEqual([]);
     });
 
     it('drops a delayed remote camera offer before creating its answer in a replacement room', async () => {
         const f = fixture(); f.incoming({ ice: { candidate: 'synthetic' } }); const pc = f.peers[0], held = deferred();
         pc.setRemoteDescription.mockImplementation(() => held.promise); f.incoming({ sdp: { type: 'offer', sdp: 'old-room' } });
         expect(pc.setRemoteDescription).toHaveBeenCalledOnce(); f.join('#art-second'); held.resolve();
-        await new Promise(done => setTimeout(done, 0)); expect(pc.createAnswer).not.toHaveBeenCalled(); expect(f.sent).toEqual([]);
+        await new Promise(done => setTimeout(done, 0)); expect(pc.setLocalDescription).not.toHaveBeenCalled(); expect(f.sent).toEqual([]);
     });
 
     it('does not signal a local description which finishes after teardown', async () => {
@@ -104,13 +108,13 @@ describe('activity work belongs to its original room lifetime', () => {
         f.room.onLeave(); held.resolve(); await work; expect(f.sent).toEqual([]);
     });
 
-    it('does not set a delayed answer or reuse a removed peer even in the same room', async () => {
+    it('does not publish a delayed native answer or reuse a removed peer even in the same room', async () => {
         const f = fixture(); f.incoming({ ice: { candidate: 'synthetic' } }); const old = f.peers[0], held = deferred();
-        old.createAnswer.mockImplementation(() => held.promise); f.incoming({ sdp: { type: 'offer', sdp: 'old-offer' } });
-        await vi.waitFor(() => expect(old.createAnswer).toHaveBeenCalledOnce()); f.room.onCam('#art-first', false);
+        old.setLocalDescription.mockImplementation(() => held.promise); f.incoming({ sdp: { type: 'offer', sdp: 'old-offer' } });
+        await vi.waitFor(() => expect(old.setLocalDescription).toHaveBeenCalledOnce()); f.room.onCam('#art-first', false);
         f.incoming({ ice: { candidate: 'replacement-peer' } }); const replacement = f.peers[1]; expect(replacement).toBeDefined();
         held.resolve({ type: 'answer', sdp: 'old-answer' }); await new Promise(done => setTimeout(done, 0));
-        expect(old.setLocalDescription).not.toHaveBeenCalled(); expect(f.sent).toEqual([]);
+        expect(old.setLocalDescription).toHaveBeenCalledOnce(); expect(old.close).toHaveBeenCalledOnce(); expect(f.sent).toEqual([]);
         await replacement.onnegotiationneeded(); expect(f.sent[0]).toMatchObject({ ch: '#art-first', kind: 'rtc', to: 'peer' });
     });
 

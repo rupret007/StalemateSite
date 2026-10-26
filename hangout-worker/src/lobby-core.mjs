@@ -469,13 +469,35 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     };
     const names = (chan) => membersOf(chan).filter((m) => m.nick).map((m) => ({ id: m.id, nick: m.nick, entrySource: m.entrySource, prefix: prefix(m, chan), band: isBand(m), moderator: m.role === 'moderator', verified: !!m.account, owner: owns(m, chan), away: !!m.away, cam: !!(m.cams && m.cams.has(lc(chan.name))) }))
         .sort((a, b) => (a.prefix === b.prefix ? lc(a.nick).localeCompare(lc(b.nick)) : a.prefix === '@' ? -1 : b.prefix === '@' ? 1 : a.prefix === '+' ? -1 : 1));
-    const chanView = (chan) => ({ name: chan.name, kind: chan.kind, title: chan.title, topic: chan.topic, modes: { ...chan.modes, k: chan.modes.k ? true : false }, count: chan.members.size, persistent: !!chan.owner, expiresAt: chan.owner ? chan.renewed + ROOM_TTL : null, names: names(chan), jam: chan.jam ? { desktop: chan.jam.desktop, invitation: chan.jam.invitation || chan.jam.desktop, web: chan.jam.web, webReady: !!chan.jam.web } : null });
+    const mediaBlocked = (chan, viewer) => !viewer || ['lobby', 'chat'].includes(chan.kind) ? []
+        : membersOf(chan).filter(peer => peer.id !== viewer.id && (viewer.blocks.has(peer.dev) || peer.blocks.has(viewer.dev))).map(peer => peer.id);
+    // Only current connection IDs are disclosed to the affected recipient.
+    // Device block references remain private session preferences.
+    const chanView = (chan, viewer) => ({ name: chan.name, kind: chan.kind, title: chan.title, topic: chan.topic, modes: { ...chan.modes, k: chan.modes.k ? true : false }, count: chan.members.size, persistent: !!chan.owner, expiresAt: chan.owner ? chan.renewed + ROOM_TTL : null, names: names(chan), mediaBlocked: mediaBlocked(chan, viewer), jam: chan.jam ? { desktop: chan.jam.desktop, invitation: chan.jam.invitation || chan.jam.desktop, web: chan.jam.web, webReady: !!chan.jam.web } : null });
     const sendChan = (chan, { presence = false } = {}) => {
         if (presence && typeof deferPresence === 'function') return queuePresence({ channel: chan.name, generation: chan.generation });
-        cast(chan, { t: 'chan', ch: chanView(chan) });
+        const view = chanView(chan);
+        for (const member of membersOf(chan)) out(member, { t: 'chan', ch: { ...view, mediaBlocked: mediaBlocked(chan, member) } });
         for (const c of membersOf(chan)) if (owns(c, chan)) out(c, { t: 'ownership', ch: chan.name,
             cohosts: [...chan.cohosts].map((id) => ({ id, label: chan.cohostLabels[id] || 'Verified co-host' })) });
     };
+    function refreshBlockedMedia(viewer, dev) {
+        // A parallel connection of this device may be in another shared room,
+        // even when the nickname selected for /block is not in that room.
+        // Update only changed pairs. Repeating every full roster can exceed the
+        // existing staged-output ceiling and roll back the safety action.
+        for (const name of viewer.channels) {
+            const room = ch(name);
+            if (!room || ['lobby', 'chat'].includes(room.kind)) continue;
+            const peers = membersOf(room).filter(peer => peer.id !== viewer.id && peer.dev === dev);
+            if (!peers.length) continue;
+            const blocked = peer => viewer.blocks.has(peer.dev) || peer.blocks.has(viewer.dev);
+            out(viewer, { t: 'media-policy', ch: room.name,
+                changes: peers.map(peer => ({ id: peer.id, blocked: blocked(peer) })) });
+            for (const peer of peers) out(peer, { t: 'media-policy', ch: room.name,
+                changes: [{ id: viewer.id, blocked: blocked(peer) }] });
+        }
+    }
     const visibleRoom = (viewer, room) => publicChannel(room) || isStaff(viewer) || !!viewer && (hosts(viewer, room) || room.members.has(viewer.id));
     const directory = (viewer) => [...channels.values()].filter((r) => r.kind !== 'lobby' && visibleRoom(viewer, r))
         .map((r) => ({ name: r.name, kind: r.kind, title: r.title, count: r.members.size, max: r.modes.l, locked: r.modes.locked || r.modes.i, key: !!r.modes.k, cams: r.modes.C, persistent: !!r.owner, mine: !!viewer && owns(viewer, r), hostPresent: membersOf(r).some((m) => hosts(m, r)) }));
@@ -761,10 +783,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
         // Classic IRC: channel metadata/current activity may synchronize, but chat begins now.
         // The bounded moderation context above is not a visitor backlog.
-        out(c, { t: 'join', ch: chanView(chan), act });
+        out(c, { t: 'join', ch: chanView(chan, c), act });
         event(chan, `${nickOf(c)} has joined ${chan.name}`);
         if (chan.kind === 'lobby') bot(c, `welcome to #stalemate, ${c.nick}. One rule: Don’t be a dick. Swear all you want; no hate, threats, creepy stuff or personal info. 🚩 anything gross. /help for commands.`);
-        else if (chan.kind === 'jam') bot(c, `welcome to ${chan.name}. Music runs in the WebJam desktop app (Jamulus) for tight timing. Plug in Ethernet: Wi-Fi adds lag and dropouts.`);
+        else if (chan.kind === 'jam') bot(c, `welcome to ${chan.name}. Music runs in the WebJam desktop app using Jamulus. Ethernet is recommended; actual delay and dropouts depend on the devices and network.`);
         else if (chan.kind === 'chat') bot(c, `welcome to ${chan.name}. The room host runs this conversation; site moderators handle abuse. Chat starts when you join. Start an activity room to draw, watch or use optional cameras.`);
         else bot(c, `welcome to ${chan.name}. The room host runs this activity; site moderators handle abuse. Cameras stay off unless you turn yours on (18+).`);
         sendChan(chan, { presence: true });
@@ -1278,6 +1300,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         block(c, _chan, [n]) {
             const t = target(c, n); if (!t) return undefined;
             if ((!c.blocks.has(t.dev) && c.blocks.size >= SESSION_PREFERENCES) || (!c.ignores.has(lc(t.nick)) && c.ignores.size >= SESSION_PREFERENCES)) return bot(c, 'Your block or ignore list is full (50 each). Remove an entry before adding another.', 'error');
+            const mediaChanged = !c.blocks.has(t.dev);
             c.blocks.add(t.dev); c.ignores.add(lc(t.nick));
             for (const [key, pending] of pm) if ((pending.fromId === c.id && conns.get(pending.toId)?.dev === t.dev)
                 || (pending.toId === c.id && conns.get(pending.fromId)?.dev === t.dev)) {
@@ -1286,9 +1309,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             }
             out(t, { t: 'pm-closed', with: c.nick });
             out(c, { t: 'pm-closed', with: t.nick });
+            if (mediaChanged) refreshBlockedMedia(c, t.dev);
             return bot(c, `Blocked ${t.nick}. They can't PM you and you won't see them.`);
         },
-        unblock(c, _chan, [n]) { const t = byNick(n); if (t) { c.blocks.delete(t.dev); c.ignores.delete(lc(t.nick)); } return bot(c, `Unblocked ${String(n || '').slice(0, 20)}.`); },
+        unblock(c, _chan, [n]) { const t = byNick(n); if (t) { const mediaChanged = c.blocks.delete(t.dev); c.ignores.delete(lc(t.nick)); if (mediaChanged) refreshBlockedMedia(c, t.dev); } return bot(c, `Unblocked ${String(n || '').slice(0, 20)}.`); },
         pm(c, _chan, [v]) { c.pmOff = lc(v) === 'off'; if (c.pmOff) for (const [k, p] of pm) if ((p.fromId === c.id || p.toId === c.id) && p.state === 'pending') endPendingPm(k, p, 'PM requests were turned off.'); return out(c, { t: 'pm-setting', off: c.pmOff, text: c.pmOff ? 'PMs are off. Nobody can send you requests.' : 'PMs are on (accept-first).' }); },
         whois(c, _chan, [n]) {
             const t = target(c, n); if (!t) return undefined;
@@ -1722,6 +1746,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (!rtc) return undefined;
             const target = conns.get(rtc.to);
             if (!target || !chan.members.has(target.id)) return undefined;
+            if (c.blocks.has(target.dev) || target.blocks.has(c.dev)) return undefined;
             if (!c.cams.has(lc(chan.name)) && !(target.cams && target.cams.has(lc(chan.name)))) return undefined;
             for (const person of [c, target]) if (participationMedia.get(person.id)?.has('sendAudio')) requireParticipation(person, 'sendAudio');
             if (c.cams.has(lc(chan.name))) { requireParticipation(c, 'sendCamera'); requireParticipation(target, 'receiveMedia'); noteParticipationMedia(c, 'sendCamera'); noteParticipationMedia(target, 'receiveMedia'); }
