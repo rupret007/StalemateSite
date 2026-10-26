@@ -145,8 +145,8 @@ Do not deploy it or expose its known-empty initializer as public onboarding.
 
 `npm run test:lobby-session-runtime -- --incident-sources` explicitly enables the
 production public-report source bridge in the owned test Worker. It is a separate
-qualification from the default and `--participation` modes; simultaneous fixture
-modes are refused. The real gateway, guest cookie, current lobby-v1 SID/binding,
+qualification from the default and `--participation` modes. Both flags can also
+be selected explicitly for the combined integration proof described below. The real gateway, guest cookie, current lobby-v1 SID/binding,
 queue/effect writer, indexed source loader and native SQLite mapping remain in
 use. The original nine first-phase and three recovery check groups and both
 physical fault witnesses stay intact.
@@ -175,3 +175,58 @@ witnesses remain its only injected native failures. All existing storage/frame/
 log caps, deadlines, ordinary expiry and egress denial stay unchanged. CI runs
 this mode as a distinct command with its own `lobby-incident-sources-runtime.*`
 raw artifacts; the baseline alone cannot qualify it.
+
+
+## Combined production sharing controls and public source mode
+
+`npm run test:lobby-session-runtime -- --participation --incident-sources` selects
+both real production compositions in the owned Worker. CI keeps separate default,
+C3-only, I3-only and combined commands/raw artifacts. A passing single mode does
+not qualify the combined path. The actual production C3 mode must be present at
+explicit known-new authority initialization so its durable required-mode latch is
+seeded by that real initializer; the fixture does not fabricate the latch.
+
+The original nine first-phase and three recovery check groups, original two
+native physical fault witnesses and Delta's partial camera-purpose reduction
+with close4401 remain. A separate Echo (E) journey runs after those first-phase
+checks in its own `#chat-native-safety` report context. The synthetic grant fixture
+now admits five lifetime subjects A/B/C/D/E instead of four; this changes only the
+bounded test workload, not any production quota, frame/storage cap or deadline.
+The legacy `actualGatewayVisitors:3` value retains its original A/B/C meaning.
+`originalGatewayVisitors:3` makes that explicit, while `totalRealAdmittedVisitors`
+is five named, granted first-phase guests in participation mode (A/B/C/D/E), or
+three in other modes. The separate ungranted socket-denial check is outside that
+named-participant count. The sharing proof identifies the real E guest separately.
+
+E uses an actual signed SID and synthetic C2 grant, opts into camera signaling,
+and calls the real caller-only GET and same-origin Stop POST through betaFetch.
+The response schema contains only E's current state, purposes, revision and
+control availability. The real C2 withdrawal and immediate engine refresh must
+keep E's existing socket open in safety-only state, clear server membership and
+camera permission, deny new text/RTC, and accept a report of a message genuinely
+delivered to that same socket before withdrawal. B/C's own HTTP projections must
+stay unchanged. This is server permission/signaling proof, not decoded camera or
+remote P2P transport proof; the separate browser camera evidence has its own scope.
+
+The dedicated report must not include any of the four original ephemeral-body
+sentinels in neighbouring context. Combined mode checks exactly two ordinary
+reports/source entries and global generation2 after E's report: original source
+revision1 and its encrypted I1 case remain unchanged, while only E's new selected
+source gets revision2. Full source entries/digests/expiry bounds are checked;
+counts are not loosened to minimums. The existing fixed I1 selection remains the
+original benign greeting, not a replacement quote.
+
+E closes its real socket before the original two-binding checkpoint, but retains
+its issued cookie privately over IPC. A bounded read-only observation confirms
+actual connection/binding retirement; it never unbinds or repairs the engine.
+After whole owned process loss, real GET must still show E withdrawn at the exact
+revision, a fresh hello must be denied, and real logout then invalidates that
+cookie. The new-SID/device/IP isolation helper preserves its original `.12` default and
+receives E's `.16` explicitly for the new recovery journey. No old proof or
+production admission rule is changed. All60s/6s deadlines and command budgets remain;
+new setup/barrier sends wait for the current real command-ready deadline before
+sending, and no refused action is retried.
+
+The private parent-held I1 test key and synthetic incident/guardian decisions stay
+explicitly unqualified. No live guardian enrollment, legal policy, production
+purpose key, provider, deployment or public all-ages activation is supplied.

@@ -194,6 +194,18 @@ jobs:
           printf '%s\n' "$status" > runtime-proof-artifacts/lobby-incident-sources-runtime.exit-code.txt
           exit "$status"
 
+      - name: Prove combined C3 sharing controls and public report sources
+        shell: bash
+        run: |
+          set +e
+          npm run test:lobby-session-runtime -- --participation --incident-sources > runtime-proof-artifacts/lobby-combined-runtime.stdout.log 2> runtime-proof-artifacts/lobby-combined-runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/lobby-combined-runtime.stdout.log
+          cat runtime-proof-artifacts/lobby-combined-runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/lobby-combined-runtime.exit-code.txt
+          exit "$status"
+
       - name: Preserve source-bound runtime diagnostics
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

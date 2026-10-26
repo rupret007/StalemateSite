@@ -16,7 +16,9 @@ const TOOLS = fileURLToPath(new URL('../durable-records/', import.meta.url));
 const ORIGIN = 'https://local-fixture.invalid', INVITE = 'owned-fixture-invite-not-a-production-credential-2026', PREVIEW = 'owned-fixture-preview-token-20261025';
 const ENV = ['PATH', 'TMPDIR', 'TEMP', 'TMP', 'SystemRoot', 'SYSTEMROOT', 'WINDIR'];
 const PARTICIPATION = process.argv.includes('--participation'), INCIDENT = process.argv.includes('--incident-sources');
-const MODE = PARTICIPATION ? ['--participation'] : INCIDENT ? ['--incident-sources'] : [];
+const MODE = [...(PARTICIPATION ? ['--participation'] : []), ...(INCIDENT ? ['--incident-sources'] : [])];
+const OWN_KEYS = ['available', 'canStop', 'ok', 'purposes', 'reason', 'revision', 'state'].sort();
+const OWN_PURPOSES = ['public-text', 'public-artifact', 'public-disclosure', 'room-creation', 'room-registration', 'direct-contact', 'camera', 'audio', 'media-reception', 'external-provider', 'ai-public-review'].sort();
 const EPHEMERAL_BODY_MARKERS = ['Native Stalemate ephemeral greeting', 'Native Rad Dad ephemeral greeting', 'Native remaining visitor greeting', 'native-media-control-no-body-persistence'].sort();
 function assertNativeRollback(witness, record) {
     assert.deepEqual(Object.keys(witness).sort(), ['record', 'originalSha256', 'stagedSha256', 'restoredSha256', 'nativeWriteCompleted', 'stagedChanged', 'nativeTransactionRejected', 'restoredBeforeEngineRecovery'].sort());
@@ -190,9 +192,9 @@ async function runtime(phase, state, nonce) {
         return visitor;
     };
     const joinRoom = (visitor, room) => visitor.command('join', [room], '#stalemate', f => f.t === 'join' && f.ch.name === room, 'join ' + room);
-    const denyUnknown = async (cookie, label, dev = '') => {
+    const denyUnknown = async (cookie, label, dev = '', ip = '192.0.2.12') => {
         const query = new URLSearchParams({ preview: PREVIEW }); if (dev) query.set('dev', dev);
-        const response = await mf.dispatchFetch(ORIGIN + '/lobby?' + query, { headers: { ...headers(cookie, '192.0.2.12'), Upgrade: 'websocket',
+        const response = await mf.dispatchFetch(ORIGIN + '/lobby?' + query, { headers: { ...headers(cookie, ip), Upgrade: 'websocket',
             'X-Hangout-Identity': JSON.stringify({ account: 'a_' + 'x'.repeat(43), role: 'owner', admin: true, principalRef: 'forged_principal_ref' }) } });
         assert.equal(response.status, 101); const visitor = new Visitor(response.webSocket, label); visitors.push(visitor);
         assert.equal((await visitor.wait(frame => frame.t === 'hello', 'actual ungranted hello')).role, 'fan');
@@ -202,7 +204,17 @@ async function runtime(phase, state, nonce) {
         const logout = await call('/beta/logout', cookie, {}); assert.equal(logout.status, 200); await logout.body?.cancel();
         assert.equal((await visitor.wait(() => false, 'ungranted session logout', 0, true)).code, 4401);
     };
-    let proof, secrets, incidentSource;
+    const ownSharing = async cookie => {
+        const response = await call('/beta/participation', cookie); assert.equal(response.status, 200, 'actual caller sharing GET refused');
+        const value = await response.json(); assert.deepEqual(Object.keys(value).sort(), OWN_KEYS, 'sharing GET exposed unexpected caller fields');
+        return value;
+    };
+    const waitCommandBudget = async visitor => {
+        const pacing = await control('inspect'), deadline = pacing.commandReadyAt.find(row => row.nick === visitor.label)?.at;
+        assert.ok(Number.isSafeInteger(deadline) && deadline >= 0 && deadline - Date.now() <= 1000, 'unexpected current command deadline');
+        while (Date.now() < deadline) await delay(deadline - Date.now());
+    };
+    let proof, secrets, incidentSource, sharing, safetyCookie;
     try {
         assert.equal((await mf.ready).hostname, '127.0.0.1');
         if (phase === 'visitors') {
@@ -350,11 +362,89 @@ async function runtime(phase, state, nonce) {
                 assert.equal(b.closed, null); assert.equal(c.closed, null);
                 afterFault = await control('inspect'); assert.equal(afterFault.participationPolicyPresent, true);
             }
+            if (PARTICIPATION) {
+                // Separate fifth synthetic subject. Its selected report must
+                // never capture the old four ordinary-body sentinel contexts.
+                safetyCookie = await unlock('192.0.2.16');
+                const e = await connect(safetyCookie, 'NativeEcho', '', '192.0.2.16'), socketE = e.socket;
+                const safetyRoom = '#chat-native-safety';
+                await joinRoom(e, safetyRoom); await waitCommandBudget(b); await joinRoom(b, safetyRoom);
+                const mediaJoin = await joinRoom(e, mediaRoom), eId = mediaJoin.ch.names.find(person => person.nick === 'NativeEcho')?.id;
+                assert.equal(typeof eId, 'string');
+                const eCameraAt = e.frames.length; e.send({ t: 'cam', ch: mediaRoom, on: true, adult18: true });
+                await e.wait(frame => frame.t === 'cam' && frame.ch === mediaRoom && frame.on === true, 'E actual camera permission opt-in', eCameraAt);
+                const beforeOwn = await ownSharing(safetyCookie), beforeB = await ownSharing(cookieB), beforeC = await ownSharing(cookieC);
+                assert.deepEqual(beforeOwn, { reason: 'own sharing', ok: true, state: 'authorized', available: true, purposes: OWN_PURPOSES, revision: 2, canStop: true });
+                const safetyText = 'Native sharing safety report selection', eLineAt = e.frames.length;
+                b.send({ t: 'say', ch: safetyRoom, text: safetyText });
+                const safetyLine = await e.wait(frame => frame.t === 'line' && frame.text === safetyText, 'E actual delivered safety selection', eLineAt);
+                const indexBefore = INCIDENT ? (await control('inspect')).incidentSources : null;
+                if (INCIDENT) { assert.equal(indexBefore.nextGeneration, 1); assert.equal(indexBefore.entries.length, 1); assert.equal(indexBefore.entries[0].id, selected.id); }
+                const stoppedAt = e.frames.length, stopped = await call('/beta/participation/stop', safetyCookie, { expectedRevision: beforeOwn.revision });
+                assert.equal(stopped.status, 200); const stoppedBody = await stopped.json();
+                assert.deepEqual(stoppedBody, { reason: 'sharing withdrawn', ok: true, state: 'withdrawn', available: false, purposes: [], revision: 3, canStop: true, cleanup: 'confirmed' });
+                await e.wait(frame => frame.t === 'sharing-stopped', 'E actual same-socket safety transition', stoppedAt);
+                assert.equal(e.socket, socketE); assert.equal(e.closed, null);
+                const afterStop = await control('inspect');
+                assert.equal(afterStop.bindingCount, 3); assert.equal(afterStop.liveBindingCount, 3);
+                assert.deepEqual(afterStop.sharingStates.filter(row => row.safetyOnly), [{ nick: '', safetyOnly: true, channels: 0, cameras: 0 }]);
+                assert.deepEqual(await ownSharing(safetyCookie), { reason: 'own sharing', ok: true, state: 'withdrawn', available: false, purposes: [], revision: 3, canStop: true });
+                assert.deepEqual(await ownSharing(cookieB), beforeB); assert.deepEqual(await ownSharing(cookieC), beforeC);
+                const deniedAtB = b.frames.length, deniedAtC = c.frames.length, deniedAtE = e.frames.length;
+                const deniedText = 'Native withdrawn publication must remain absent', deniedSdp = 'v=0\r\nnative-withdrawn-rtc-must-not-relay';
+                e.send({ t: 'say', ch: safetyRoom, text: deniedText });
+                e.send({ t: 'act', ch: mediaRoom, kind: 'rtc', to: ids.NativeBravo, sdp: { type: 'offer', sdp: deniedSdp } });
+                await e.wait(frame => frame.t === 'notice' && frame.kind === 'error', 'E actual post-withdrawal denial', deniedAtE);
+                const reportAt = e.frames.length, reportRequestedAt = Date.now();
+                e.send({ t: 'report', id: safetyLine.id, text: safetyLine.text });
+                await e.wait(frame => frame.t === 'report-status' && frame.id === safetyLine.id && frame.submitted === true, 'E same-socket old-delivery report ACK', reportAt);
+                const reportAcknowledgedAt = Date.now(); assert.equal(e.socket, socketE); assert.equal(e.closed, null);
+                for (const visitor of [b, c]) { await waitCommandBudget(visitor); await visitor.barrier(mediaRoom); }
+                for (const [visitor, offset] of [[b, deniedAtB], [c, deniedAtC]]) assert.ok(visitor.frames.slice(offset).every(frame =>
+                    !(frame.t === 'line' && frame.text === deniedText) && !(frame.kind === 'rtc' && frame.from === eId) && !JSON.stringify(frame).includes(deniedSdp)), 'withdrawn E publication or RTC reached peer');
+                const progressAt = c.frames.length, progressText = 'Native unaffected peer after sharing withdrawal';
+                b.send({ t: 'say', ch: mediaRoom, text: progressText });
+                await c.wait(frame => frame.t === 'line' && frame.text === progressText, 'unaffected real peer publication progresses', progressAt);
+                assert.ok(e.frames.slice(stoppedAt).every(frame => frame.t !== 'line'), 'stopped E received a new public line');
+                const reported = await control('inspect');
+                assert.deepEqual(reported.reports.map(row => row.id).sort(), [selected.id, safetyLine.id].sort());
+                assert.equal(reported.reports.find(row => row.id === safetyLine.id).textSha256, createHash('sha256').update(safetyText).digest('hex'));
+                if (INCIDENT) {
+                    assert.equal(reported.incidentSources.nextGeneration, 2); assert.equal(reported.incidentSources.entries.length, 2);
+                    assert.deepEqual(reported.incidentSources.entries.find(row => row.id === selected.id), indexBefore.entries[0]);
+                    const newSource = reported.incidentSources.entries.find(row => row.id === safetyLine.id);
+                    assert.deepEqual(Object.keys(newSource).sort(), ['digest', 'expiresAt', 'id', 'originDigest', 'revision']);
+                    assert.match(newSource.originDigest, /^[a-f0-9]{64}$/);
+                    assert.equal(newSource.revision, 2); assert.equal(newSource.digest, createHash('sha256').update(safetyText).digest('hex'));
+                    assert.ok(newSource.expiresAt >= reportRequestedAt + 86400000 && newSource.expiresAt <= reportAcknowledgedAt + 86400000);
+                    const priorCase = incidentSource;
+                    incidentSource = await control('incident-read', { cookie: cookieB, caseRef: priorCase.caseRef });
+                    for (const field of ['caseRef', 'revision', 'sourceRevision', 'digest', 'provenance', 'exactSelectedBytes', 'metadataOnlyIndex', 'noCasePlaintext', 'caseCount']) assert.equal(incidentSource[field], priorCase[field]);
+                    assert.equal(incidentSource.sourceCount, 2); assert.equal(incidentSource.nextGeneration, 2);
+                }
+                e.socket.close(1000, 'owned E safety connection complete');
+                assert.equal((await e.wait(() => false, 'E real socket close', 0, true)).code, 1000);
+                const closeDeadline = Date.now() + 6000; let bindingDrainReads = 0;
+                for (;;) {
+                    afterFault = await control('inspect'); bindingDrainReads++;
+                    if (afterFault.bindingCount === 2 && afterFault.liveBindingCount === 2) break;
+                    assert.ok(Date.now() < closeDeadline, 'E closed socket binding did not retire within existing6s bound'); await delay(25);
+                }
+                assert.deepEqual(afterFault.durableSessionNicks, ['NativeBravo', 'NativeCharlie']);
+                assert.deepEqual(afterFault.sharingStates.filter(row => row.safetyOnly), []);
+                assert.deepEqual(afterFault.reports.map(row => row.id).sort(), [selected.id, safetyLine.id].sort());
+                sharing = { additionalRealGuest: 'E', initialRevision: 2, withdrawnRevision: 3, callerOnlyProjection: true, realStopCleanup: 'confirmed',
+                    sameSocketSharingStopped: true, sameSocketReportAcknowledged: true, deniedNewPublicationAndRtc: true,
+                    otherCallersUnchanged: true, otherPeerPublicationProgress: true, realSocketClosedBeforeCheckpoint: true, bindingDrainReads,
+                    retainedIssuedCookieForRecovery: true, reportId: safetyLine.id,
+                    ...(INCIDENT ? { nextGeneration: 2, sourceCount: 2, originalCaseAndSourceUnchanged: true } : {}) };
+            }
             assert.equal(afterFault.bindingCount, 2, 'lost-socket checkpoint needs live durable bindings'); assert.equal(b.closed, null); assert.equal(c.closed, null);
-            secrets = { revokedCookie: cookieA, liveCookie: cookieB };
-            proof = { admissionDenials, missingMarkerRefused: true, cookiePolicyVerified: true, actualGatewayVisitors: 3,
+            secrets = { revokedCookie: cookieA, liveCookie: cookieB, ...(PARTICIPATION ? { safetyCookie } : {}) };
+            proof = { admissionDenials, missingMarkerRefused: true, cookiePolicyVerified: true, actualGatewayVisitors: 3, originalGatewayVisitors: 3, totalRealAdmittedVisitors: PARTICIPATION ? 5 : 3,
                 checks: ['actual-beta-unlock-and-WebSocket-admission', 'stalemate-rad-dad-shared-chat-and-canvas', 'direct-newcomer-neutral-without-prejoin-chat', 'actual-report-persisted', 'connected-logout-and-cookie-replay-denied', 'ordinary-chat-excluded-from-durable-records', 'actual-device-block-policy-and-RTC-denial-persisted', 'actual-post-native-session-write-rollback-before-block-success', 'actual-post-native-write-rollback-before-success'],
                 ...(PARTICIPATION ? { participationChecks: ['actual-DO-missing-policy-denies-without-provisioning', 'real-signed-SID-principal-with-explicit-synthetic-C2-grants', 'unfenced-private-room-and-TURN-denied', 'committed-media-reduction-production-alarm-closes-only-affected-visitor'] } : {}),
+                ...(PARTICIPATION ? { sharingChecks: ['actual-caller-only-GET-and-native-self-withdrawal', 'same-WebSocket-old-delivered-report-ACK-with-new-publishing-denied', 'closed-safety-socket-retires-before-original-two-live-bindings-checkpoint'], sharing } : {}),
                 ...(INCIDENT ? { incidentSourceChecks: ['actual-public-report-index-and-I1-copy-share-native-transaction-domain', 'selected-only-encrypted-case-and-metadata-only-index'], incidentSource } : {}),
                 checkpoint: afterFault, sources: before, versions, binarySha256, rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs,
                 outboundCalls, runtimeRestarts, workerdPids: group(process.pid).filter(row => row.command.includes('workerd')).map(row => row.pid) };
@@ -372,6 +462,7 @@ async function runtime(phase, state, nonce) {
             const active = await call('/beta/state', secrets.liveCookie); assert.equal(active.status, 200); assert.equal((await active.json()).kind, 'guest');
             const recovered = await control('inspect');
             assert.equal(recovered.objectId, received.checkpoint.objectId); assert.deepEqual(recovered.rooms, received.checkpoint.rooms); assert.deepEqual(recovered.reports, received.checkpoint.reports);
+            if (INCIDENT) assert.deepEqual(recovered.incidentSources, received.checkpoint.incidentSources, 'cold exact source metadata mismatch');
             assert.equal(recovered.bindingCount, 0); assert.equal(recovered.liveBindingCount, 0); assert.deepEqual(recovered.durableSessionNicks, []); assert.deepEqual(recovered.engineSessionNicks, []);
             assert.deepEqual(recovered.nativeRollbackWitnesses, []);
             assert.equal(recovered.authorityUnavailable, false); assert.equal(recovered.sqlite, true); assert.ok(Object.values(recovered.ordinaryBodiesAbsent).every(Boolean));
@@ -385,7 +476,16 @@ async function runtime(phase, state, nonce) {
             const returning = await connect(secrets.liveCookie, 'NativeReturn', 'rad-dad', '192.0.2.12');
             if (PARTICIPATION) {
                 const device = returning.frames.find(frame => frame.t === 'device')?.token; assert.equal(typeof device, 'string');
-                await denyUnknown(await unlock('192.0.2.12', { grant: false }), 'NativeBravo', device);
+                await denyUnknown(await unlock('192.0.2.12', { grant: false }), 'NativeBravo', device, '192.0.2.12');
+            }
+            if (PARTICIPATION) {
+                assert.ok(received.sharing && typeof secrets.safetyCookie === 'string');
+                const recoveredOwn = await ownSharing(secrets.safetyCookie);
+                assert.deepEqual(recoveredOwn, { reason: 'own sharing', ok: true, state: 'withdrawn', available: false, purposes: [], revision: received.sharing.withdrawnRevision, canStop: true });
+                await denyUnknown(secrets.safetyCookie, 'NativeEcho', '', '192.0.2.16');
+                const loggedOut = await call('/beta/state', secrets.safetyCookie); assert.equal(loggedOut.status, 401); await loggedOut.body?.cancel();
+                sharing = { persistedWithdrawnRevision: recoveredOwn.revision, callerOnlyProjection: true, currentIssuedSidStatusWithdrawn: true,
+                    newHelloDeniedAfterRestart: true, realLogoutAndReplayDenied: true };
             }
             if (INCIDENT) {
                 incidentSource = await control('incident-read', { cookie: secrets.liveCookie, caseRef: received.incidentSource.caseRef });
@@ -396,6 +496,7 @@ async function runtime(phase, state, nonce) {
             await returning.barrier(); assert.ok(returning.frames.every(frame => frame.t !== 'line'), 'cold newcomer received prior chat');
             proof = { checks: ['cold-process-loss-retires-missing-socket-bindings', 'committed-rooms-canvas-and-report-survive', 'revoked-cookie-stays-denied-active-cookie-reconnects'], recovered,
                 ...(PARTICIPATION ? { participationChecks: ['actual-C3-reloads-partition-grant-after-process-loss', 'new-SID-cannot-inherit-grant-through-same-signed-device-IP-or-old-nickname'] } : {}),
+                ...(PARTICIPATION ? { sharingChecks: ['actual-withdrawn-own-status-and-denied-new-hello-after-whole-process-loss', 'real-logout-revokes-retained-safety-cookie'], sharing } : {}),
                 ...(INCIDENT ? { incidentSourceChecks: ['actual-current-SID-rebind-and-I1-encrypted-evidence-reload-after-whole-process-loss'], incidentSource } : {}),
                 sources: before, versions, binarySha256, rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs, outboundCalls, runtimeRestarts,
                 workerdPids: group(process.pid).filter(row => row.command.includes('workerd')).map(row => row.pid) };
@@ -414,7 +515,6 @@ async function runtime(phase, state, nonce) {
 }
 
 async function parent() {
-    assert.ok(!(PARTICIPATION && INCIDENT), 'native modes are separately qualified');
     assert.deepEqual(process.argv.slice(2), MODE); bindingPackage();
     const before = sources(), state = realpathSync(await mkdtemp(join(tmpdir(), 'webjam-session-native-'))), nonce = randomBytes(16).toString('hex');
     const fixtureIncidentKey = INCIDENT ? randomBytes(32).toString('hex') : null;
@@ -432,7 +532,8 @@ async function parent() {
         proc.on('error', fail); timer = setTimeout(() => fail(Error(phase + ': 60s proof timeout; no automatic retry\n' + stderr)), 60000);
         if (phase === 'visitors' && INCIDENT) proc.send({ type: 'incident-key', nonce, key: fixtureIncidentKey }, error => { if (error) fail(error); });
         if (phase === 'recover') proc.send({ type: 'recovery', nonce, checkpoint: recovery.proof.checkpoint, secrets: recovery.secrets,
-            ...(INCIDENT ? { fixtureIncidentKey, incidentSource: recovery.proof.incidentSource } : {}) }, error => { if (error) fail(error); });
+            ...(INCIDENT ? { fixtureIncidentKey, incidentSource: recovery.proof.incidentSource } : {}),
+            ...(PARTICIPATION ? { sharing: recovery.proof.sharing } : {}) }, error => { if (error) fail(error); });
         proc.on('message', message => { try {
             assert.equal(message?.nonce, nonce); assert.equal(message.phase, phase); if (message.type === 'failure') throw Error(message.error);
             assert.deepEqual(message.proof?.sources, before);
@@ -474,8 +575,10 @@ async function parent() {
     // the receipt and never persist/log the invitation or HMAC values.
     delete first.secrets;
     console.log(JSON.stringify({ localGatewayWebSocketSessionAuthorityQualified: true, ...(PARTICIPATION ? { productionParticipationCompositionQualified: true, guardianDecisionsQualified: false } : {}),
-        ...(INCIDENT ? { productionIncidentSourceCompositionQualified: true, incidentAuthorityAndKeyQualified: false } : {}), first, recovered, node: process.version, platform: process.platform, architecture: process.arch,
-        temporaryStateRemoved: true, scope: 'Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. ' + (PARTICIPATION ? 'Required production C3 bridge selected; only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. ' : '') + (INCIDENT ? 'Required production I3a source bridge and existing I1 over actual records transactions; separate incident appointment/policy and privately retained test key are synthetic only. This does not qualify real incident authority, purpose-key provisioning or key recovery. ' : '') + 'No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.' }, null, 2));
+        ...(INCIDENT ? { productionIncidentSourceCompositionQualified: true, incidentAuthorityAndKeyQualified: false } : {}),
+        ...(PARTICIPATION ? { productionOwnSharingCompositionQualified: true } : {}),
+        ...(PARTICIPATION && INCIDENT ? { combinedParticipationIncidentSourceCompositionQualified: true } : {}), first, recovered, node: process.version, platform: process.platform, architecture: process.arch,
+        temporaryStateRemoved: true, scope: 'Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. ' + (PARTICIPATION ? 'Required production C3 bridge selected; actual caller-only HTTP status/Stop narrows the existing synthetic ledger, keeps the same socket for a delivered-message report, then persists withdrawal across process loss before real logout. Only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. ' : '') + (INCIDENT ? 'Required production I3a source bridge and existing I1 over actual records transactions; separate incident appointment/policy and privately retained test key are synthetic only. This does not qualify real incident authority, purpose-key provisioning or key recovery. ' : '') + 'No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.' }, null, 2));
 }
-try { if (process.argv[2] === '--isolated' && process.argv.length === (PARTICIPATION || INCIDENT ? 7 : 6)) await runtime(process.argv[3], process.argv[4], process.argv[5]); else await parent(); }
+try { if (process.argv[2] === '--isolated' && process.argv.length === (6 + MODE.length)) await runtime(process.argv[3], process.argv[4], process.argv[5]); else await parent(); }
 catch (error) { console.error(error.stack || error); process.exitCode = 1; }
