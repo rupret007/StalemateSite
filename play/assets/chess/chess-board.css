@@ -44,3 +44,6 @@ body.chess-page #board .square:focus-visible{outline:3px solid #101d2a;outline-o
 /* Ordinary desktop/tablet rows also respect available height. Header/player
    strips are measured because fonts, mode labels and captured pieces can grow. */
 @media(min-width:741px) and (min-height:521px){body.chess-page .chess-game{grid-template-columns:minmax(0,var(--chess-table-limit,620px)) minmax(250px,1fr)}}
+/* Narrow zoomed windows keep the whole board above the footer too. Tall
+   phones still use all available width; the measured limit only caps height. */
+@media(max-width:740px) and (min-height:521px){.chess-table{width:min(100%,560px,var(--chess-table-limit,560px))}}
