@@ -4,6 +4,7 @@ import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 import { PARTICIPATION_PURPOSES } from '../../hangout-worker/src/participation-policy.mjs';
 import { PARTICIPATION_LEDGER_KEY, PARTICIPATION_LEDGER_LIMITS } from '../../hangout-worker/src/participation-consents.mjs';
 import { createParticipationEnforcement } from '../../hangout-worker/src/participation-enforcement.mjs';
+import * as partitionMaintenance from '../../hangout-worker/src/participation-partitions.mjs';
 import { createPartitionedParticipationConsents, readPartitionedParticipationPrincipals, readPartitionedParticipationWithdrawals,
     readPartitionedParticipationPreparation,
     PARTICIPATION_PARTITION_PREFIX as PREFIX, PARTICIPATION_POLICY_KEY, PARTICIPATION_RECORD_LIMITS } from '../../hangout-worker/src/participation-partitions.mjs';
@@ -191,6 +192,93 @@ describe('fresh author dependencies for ordinary public text', () => {
         await f.engine.applyAiReview(request.id, { status: 'reviewed', flagged: true, model: 'synthetic-review', categories: ['harassment'] });
         expect(f.engine._debug.held.size).toBe(0); expect(f.legacyPersist).not.toHaveBeenCalled();
     });
+});
+
+// These are injected-clock, staged-store unit checks. Actual codec/SQLite and
+// the C3 alarm are exercised separately in the authority/integration files.
+const maintainedStep = f => f.storage.transaction(tx => partitionMaintenance.maintainPartitionedParticipation({
+    tx, now: f.now(), communityRef: f.config.policy.communityRef
+}));
+const partitionRows = f => [...f.storage.snapshot()].filter(([key]) => key.startsWith(PREFIX + 'record:'));
+
+describe('trusted partition retention without consent-decision adapters', () => {
+    it('starts a missing advisory cursor only after policy validation and removes due records and references', async () => {
+        const f = await fixture({ short: true }); await f.enroll('retention-a'); await f.enroll('retention-b'); f.advance(601);
+        const key = partitionMaintenance.PARTICIPATION_MAINTENANCE_CURSOR_KEY;
+        expect(f.storage.snapshot().has(key)).toBe(false);
+        // Retention does not ask a verifier, guardian or fixture maintenance
+        // proof to manufacture authority for the already-trusted transaction.
+        for (const name of Object.keys(f.adapters)) f.adapters[name] = async () => { throw Error('No decision adapter in retention'); };
+        const first = await maintainedStep(f);
+        expect(first).toMatchObject({ ok: true, examined: 1, deleted: 1, wrapped: false });
+        expect(partitionRows(f)).toHaveLength(1);
+        expect(f.storage.snapshot().get(key)).toMatchObject({ version: 1, communityRef: f.config.policy.communityRef });
+        expect((await maintainedStep(f)).deleted).toBe(1);
+        expect(await maintainedStep(f)).toEqual({ ok: true, examined: 0, deleted: 0, wrapped: true });
+        expect([...f.storage.snapshot().keys()].filter(name => name.startsWith(PREFIX) && name !== PARTICIPATION_POLICY_KEY)).toEqual([]);
+        expect(f.storage.snapshot().get(key).after).toBe('');
+        expect(f.storage.metrics.filter(metric => metric.lists).every(metric => metric.limit <= 4)).toBe(true);
+    });
+
+    it.each(['null', 'wrong version', 'wrong community', 'wrong path', 'extra field'])(
+        'refuses a present %s cursor without deleting records or resetting it', async damage => {
+            const f = await fixture({ short: true }); await f.enroll('bad-cursor'); f.advance(601);
+            const key = partitionMaintenance.PARTICIPATION_MAINTENANCE_CURSOR_KEY;
+            let cursor = { version: 1, communityRef: f.config.policy.communityRef, after: '' };
+            if (damage === 'null') cursor = null;
+            if (damage === 'wrong version') cursor.version = 2;
+            if (damage === 'wrong community') cursor.communityRef = 'synthetic_other_community';
+            if (damage === 'wrong path') cursor.after = 'private-room:guessed';
+            if (damage === 'extra field') cursor.grant = true;
+            await f.storage.transaction(tx => tx.put(key, cursor)); const before = f.storage.snapshot();
+            await expect(maintainedStep(f)).rejects.toThrow(); expect(f.storage.snapshot()).toEqual(before);
+        });
+
+    it.each(['missing', 'corrupt'])('refuses %s policy before creating a cursor or changing any record', async damage => {
+        const f = await fixture({ short: true }); await f.enroll('bad-policy'); f.advance(601);
+        await f.storage.transaction(tx => damage === 'missing' ? tx.delete(PARTICIPATION_POLICY_KEY) : tx.put(PARTICIPATION_POLICY_KEY, { corrupt: true }));
+        const before = f.storage.snapshot();
+        await expect(maintainedStep(f)).rejects.toThrow(); expect(f.storage.snapshot()).toEqual(before);
+        expect(f.storage.snapshot().has(partitionMaintenance.PARTICIPATION_MAINTENANCE_CURSOR_KEY)).toBe(false);
+    });
+
+    it.each(['expired', 'unqualified'])('cleans eligible rows under a valid %s policy without authorizing a new grant', async state => {
+        const f = await fixture({ short: true, policyExpiresIn: state === 'expired' ? 200 : 1000000 }); await f.enroll('inactive');
+        if (state === 'unqualified') {
+            f.config.policy = { ...f.config.policy, revision: 2, policyVersion: 'partition-unqualified-v2', state: 'unqualified' };
+            expect((await f.ledger.installPolicy('operator')).ok).toBe(true);
+        }
+        f.advance(601); expect((await maintainedStep(f)).deleted).toBe(1); expect(partitionRows(f)).toEqual([]);
+        expect((await f.begin('must-not-grant')).result.ok).toBe(false); expect(partitionRows(f)).toEqual([]);
+    });
+
+    it('does not erase a still-live global operation reference reused by another partition', async () => {
+        const f = await fixture({ short: true }), alice = await f.enroll('old-ref');
+        const operationRef = f.proofs.get(alice.proof).operationRef; f.advance(601);
+        const bravo = await f.begin('new-ref', { operationRef }); expect(bravo.result.ok).toBe(true);
+        const [key, owned] = [...f.storage.snapshot()].find(([name, value]) => name.startsWith(PREFIX + 'operation:') && value.operationRef === operationRef);
+        expect(owned.principalRef).toBe(bravo.principalRef); expect(owned.deleteAt).toBeGreaterThan(f.now());
+        for (let count = 0; count < 3; count++) {
+            const result = await maintainedStep(f); expect(f.storage.snapshot().get(key)).toEqual(owned); if (result.wrapped) break;
+        }
+        expect(partitionRows(f)).toHaveLength(1); expect(partitionRows(f)[0][1].subjects[0].record.principalRef).toBe(bravo.principalRef);
+    });
+
+    it.each(['route', 'anchor', 'subject index', 'active reference'])(
+        'does not advance the cursor or alter records after a corrupt %s', async damage => {
+            const f = await fixture({ short: true }), person = await f.enroll('corrupt-current');
+            const [key, state] = f.record(person);
+            await f.storage.transaction(async tx => {
+                if (damage === 'route') { state.config.policy.communityRef = 'synthetic_other_community'; await tx.put(key, state); }
+                else {
+                    const target = [...f.storage.snapshot()].find(([name, value]) => value?.partitionKey === key
+                        && (damage === 'anchor' ? name.startsWith(PREFIX + 'anchor:') : damage === 'subject index' ? name.startsWith(PREFIX + 'subject:') : value.space === 'consent'));
+                    expect(target).toBeTruthy(); await tx.put(target[0], { corrupt: true });
+                }
+            });
+            const before = f.storage.snapshot();
+            await expect(maintainedStep(f)).rejects.toThrow(); expect(f.storage.snapshot()).toEqual(before);
+        });
 });
 
 describe('combined current participation preparation', () => {

@@ -194,6 +194,19 @@ export function alignParticipationLedgerPolicy(value, config, time, limits = PAR
     return state;
 }
 
+// Trusted retention composition only. Reuse the same absolute deadlines and
+// transitions as sweep(), without authenticating or granting any participant.
+export function expireParticipationLedgerState(value, time, limits = PARTICIPATION_LEDGER_LIMITS) {
+    if (!integer(time) || !validParticipationLedgerState(value, limits)) throw Error('Invalid participation storage');
+    const state = clone(value), before = JSON.stringify(state);
+    expire(state, time);
+    if (JSON.stringify(state) !== before) {
+        state.revision = next(state.revision);
+        if (!validState(state, limits) || new TextEncoder().encode(JSON.stringify(state)).byteLength + state.subjects.length * 64 > limits.bytes) fail('capacity-or-invalid-state');
+    }
+    return state;
+}
+
 export function createParticipationConsents({ storage, adapters, now = () => Date.now(), randomRef = () => crypto.randomUUID(), limits: supplied = {} } = {}) {
     if (typeof storage?.transaction !== 'function' || !adapters || ['qualifyPolicy', 'authenticateParticipant', 'verifyConsent', 'authenticateGuardian'].some(key => typeof adapters[key] !== 'function')
         || typeof now !== 'function' || typeof randomRef !== 'function' || !record(supplied, Object.keys(supplied)) || Object.keys(supplied).some(key => !Object.hasOwn(PARTICIPATION_LEDGER_LIMITS, key))) throw new Error('Explicit transactional storage and trusted adapters are required.');

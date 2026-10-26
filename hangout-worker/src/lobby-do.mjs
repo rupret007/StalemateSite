@@ -712,6 +712,9 @@ export class HangoutLobby {
                             }
                         }
                     }
+                    // Retention is reducing housekeeping. Run it before the
+                    // affirmative refresh, which can refuse an expired policy.
+                    if (this.participationMode && (await this.authority.maintainParticipation())?.ok !== true) throw Error('participation retention unavailable');
                     if (this.participationMode && (await this.engine.refreshParticipation())?.ok === false) throw Error('participation refresh unavailable');
                     const ticked = await this.engine.tick();
                     if (this.participationMode && ticked?.ok === false) throw Error('participation tick unavailable');

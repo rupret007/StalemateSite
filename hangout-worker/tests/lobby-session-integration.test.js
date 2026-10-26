@@ -18,7 +18,9 @@ import { writeLobbyEffects } from '../src/lobby-effect-records.mjs';
 import { LOG_TTL } from '../src/community-state.mjs';
 import { LOBBY_AUTHORITY_COMMUNITY } from '../src/lobby-session-authority.mjs';
 import { createPartitionedParticipationConsents } from '../src/participation-partitions.mjs';
+import * as partitionMaintenance from '../src/participation-partitions.mjs';
 import { PARTICIPATION_PURPOSES } from '../src/participation-policy.mjs';
+import { createIncidentCases, createIncidentEvidenceCipher, incidentEvidenceDigest, initialIncidentCaseState } from '../src/incident-cases.mjs';
 import { openDurableRecordSqlite } from '../../tests/support/durable-record-sqlite.mjs';
 
 const ORIGIN = 'https://collocated-beta.fixture.test', NOW = Date.UTC(2026, 9, 25, 12);
@@ -56,8 +58,8 @@ function request(path, { cookie, body, upgrade = false, method = body === undefi
         ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(upgrade ? { Upgrade: 'websocket' } : {}), ...headers },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
-async function harness({ initialize = true, mode = 'lobby-v1', participation = false } = {}) {
-    const directory = await mkdtemp(join(tmpdir(), 'lobby-session-integration-')), driver = openDurableRecordSqlite(join(directory, 'lobby.sqlite'));
+async function harness({ initialize = true, mode = 'lobby-v1', participation = false, hooks = {} } = {}) {
+    const directory = await mkdtemp(join(tmpdir(), 'lobby-session-integration-')), driver = openDurableRecordSqlite(join(directory, 'lobby.sqlite'), hooks);
     const background = [], sockets = new Map(), lobbies = [], releases = []; let queue = Promise.resolve(), lobby;
     const transaction = operation => driver.transaction(raw => operation({ ...raw,
         getAlarm: () => raw.get(ALARM), setAlarm: value => raw.put(ALARM, value), deleteAlarm: () => raw.delete(ALARM) }));
@@ -102,7 +104,7 @@ async function harness({ initialize = true, mode = 'lobby-v1', participation = f
     const message = async (who, frame) => { await getLobby().webSocketMessage(who.socket, JSON.stringify(frame)); await settle(); };
     const cmd = (who, name, args = [], ch = '#stalemate') => message(who, { t: 'cmd', name, args, ch });
     if (initialize) expect((await bound('initialize')).status).toBe(200);
-    return { driver, state, env, background, sockets, releases, lobby: getLobby, bound, settle, guest, visitor, message, cmd,
+    return { driver, state, env, background, sockets, releases, hooks, lobby: getLobby, bound, settle, guest, visitor, message, cmd,
         async wake({ dropSockets = false } = {}) {
             getLobby().presence.dispose(); if (dropSockets) sockets.clear();
             lobby = new HangoutLobby(state, env); lobbies.push(lobby); await lobby.ready; await settle(); return lobby;
@@ -505,6 +507,133 @@ describe('opt-in session authority through the actual beta gateway and Lobby', (
         expect(JSON.stringify(staff.socket.frames)).not.toContain(QUOTE); expect(JSON.stringify(guest.socket.frames)).not.toContain(QUOTE);
         expect(staff.socket.frames.some(frame => frame.t === 'admin')).toBe(false);
         expect((await h.lobby().privateReportQueue.snapshot()).reports).toHaveLength(1);
+    });
+});
+
+async function alarmRetentionFixture({ policyExpiresIn = 60000 } = {}) {
+    const h = await harness({ participation: true }), records = h.lobby().authority.records, proofs = new Map(), decisions = new Map(); let serial = 0;
+    const reference = () => 'synthetic_retention_' + String(++serial).padStart(8, '0');
+    const config = { policy: { version: 1, policyVersion: 'retention-alarm-v1', revision: 1, communityRef: LOBBY_AUTHORITY_COMMUNITY,
+        noticeDigest: 'd'.repeat(64), decisionRef: 'synthetic_retention_operator', state: 'qualified', purposes: [...PARTICIPATION_PURPOSES],
+        issuedAt: NOW - 100, effectiveAt: NOW - 100, expiresAt: NOW + policyExpiresIn, maxSessionMs: Math.min(1000, policyExpiresIn) },
+        rules: { version: 1, verifierRef: 'synthetic_retention_verifier', pendingMs: 100, grantMs: 500,
+            subjectTailMs: 100, guardianTailMs: 100, receiptTailMs: 100, callbackMs: 100, operationMs: 100 } };
+    // Only decisions/authentication in the fixture are synthetic. The alarm,
+    // production authority, record codec and disk rollback domain are actual.
+    const ledger = createPartitionedParticipationConsents({ storage: records, now: () => Date.now(), randomRef: reference, admitSubject: async () => true,
+        adapters: { qualifyPolicy: async () => ({ config: clone(config), expiresAt: Date.now() + 100000 }),
+            authenticateParticipant: async ({ proof, purpose }) => { const value = proofs.get(proof);
+                return purpose === 'begin' ? value : value && { principalRef: value.principalRef, communityRef: value.communityRef, expiresAt: value.expiresAt }; },
+            verifyConsent: async ({ proof }) => decisions.get(proof), authenticateGuardian: async () => null, authorizeMaintenance: async () => null } });
+    expect((await ledger.installPolicy('synthetic-retention-policy')).ok).toBe(true);
+    const grant = async (name, { pendingOnly = false, principalRef = 'synthetic_retention_principal_' + name } = {}) => {
+        const proof = reference(); proofs.set(proof, { operationRef: reference(), principalRef, communityRef: LOBBY_AUTHORITY_COMMUNITY, expiresAt: Date.now() + 100000 });
+        const pending = await ledger.begin(proof, { expectedRevision: 0, purposes: [...PARTICIPATION_PURPOSES] }); expect(pending.ok).toBe(true);
+        if (!pendingOnly) {
+            const decision = reference(); decisions.set(decision, { operationRef: reference(), pendingRef: pending.pendingRef, subjectRef: pending.subjectRef,
+                principalRef, guardianPrincipalRef: 'synthetic_retention_guardian', decisionRef: reference(), verifierRef: config.rules.verifierRef,
+                status: 'approved', purposes: [...PARTICIPATION_PURPOSES], verifiedAt: Date.now(), expiresAt: Date.now() + 500 });
+            expect((await ledger.complete(decision)).state).toBe('authorized');
+        }
+        return { proof, principalRef, ...pending };
+    };
+    const rows = () => records.transaction(async tx => {
+        const found = new Map(); let startAfter;
+        while (true) {
+            const page = await tx.list({ prefix: 'participation-records:v1:', limit: 4, ...(startAfter ? { startAfter } : {}) });
+            for (const [key, value] of page) { found.set(key, value); startAfter = key; }
+            if (page.size < 4) return found;
+        }
+    });
+    const visitor = async nick => {
+        const who = await h.guest(), participation = await grant(nick, { principalRef: 's_' + who.access.sid });
+        expect((await betaFetch(request('/lobby?preview=' + PREVIEW, { cookie: who.cookie, upgrade: true }), h.env)).status).toBe(101);
+        const socket = h.state.getWebSockets().at(-1); await h.message({ socket }, { t: 'hello', nick, age13: true });
+        expect(socket.frames.some(frame => frame.t === 'welcome' && frame.nick === nick)).toBe(true); return { ...who, socket, participation };
+    };
+    return { h, records, ledger, config, grant, rows, visitor };
+}
+async function selectedRetentionEvidence(records) {
+    const bytes = new TextEncoder().encode('Benign selected incident retained independently of C2'), digest = await incidentEvidenceDigest(bytes);
+    const reviewer = { actorRef: 'synthetic_retention_reviewer', incidentReviewer: true, active: true, revision: 1, expiresAt: NOW + 100000, canOpen: true, canMaintain: true };
+    const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    const cipher = createIncidentEvidenceCipher({ keyId: 'synthetic_retention_key', key });
+    await records.transaction(tx => tx.put('restricted-incident-cases-v1', initialIncidentCaseState()));
+    const model = createIncidentCases({ storage: records, now: () => Date.now(), cipher,
+        resolveAuthority: async () => clone(reviewer), resolveReviewer: async () => clone(reviewer),
+        loadEvidence: async () => ({ id: 'retention_selected_report', revision: 1, bytes, digest, expiresAt: NOW + 1000, provenance: 'reported-public' }),
+        policyFor: async () => ({ qualified: true, version: 'synthetic_retention_v1', procedure: 'synthetic_only', authority: 'synthetic_authority', reason: 'selected_report',
+            validFrom: NOW, validUntil: NOW + 100000, reviewAt: NOW + 5000, holdUntil: NOW + 10000, evidenceDeleteAt: NOW + 20000,
+            caseDeleteAt: NOW + 30000, tombstoneUntil: NOW + 40000, receiptUntil: NOW + 50000, auditUntil: NOW + 60000,
+            limits: { maxCases: 2, maxBytes: 100000, maxEvidenceBytes: 1000, maxAuditEvents: 100, maxOperations: 100, maxTombstones: 10 } }) });
+    expect((await model.preserveSelectedReport({ principal: 'synthetic_retention_reviewer', operationId: 'preserve_retention_selected', sourceId: 'retention_selected_report',
+        sourceRevision: 1, sourceDigest: digest, type: 'rights' })).ok).toBe(true);
+    return records.transaction(tx => tx.get('restricted-incident-cases-v1'));
+}
+
+describe('C3 retention through the actual Lobby alarm and disk SQLite', () => {
+    it('deletes due subjects and global references without visitor traffic while preserving current consent and selected I1 evidence', async () => {
+        const f = await alarmRetentionFixture(); await f.grant('old-a'); await f.grant('old-b'); await f.grant('old-pending', { pendingOnly: true });
+        const evidence = await selectedRetentionEvidence(f.records);
+        vi.setSystemTime(NOW + 550); const healthy = await f.grant('healthy');
+        const before = await f.rows(), healthyKey = [...before].find(([key, value]) => key.includes(':record:') && value.subjects[0].record.principalRef === healthy.principalRef)[0];
+        expect([...before.values()].filter(value => Array.isArray(value.subjects)).some(value => value.guardians.length && value.receipts.length && value.pending.length && value.operations.length)).toBe(true);
+        vi.setSystemTime(NOW + 601); await f.h.lobby().alarm(); await f.h.settle();
+        const after = await f.rows(), remaining = [...after].filter(([key]) => key.includes(':record:'));
+        expect(remaining.map(([key]) => key)).toEqual([healthyKey]); expect(after.get(healthyKey)).toEqual(before.get(healthyKey));
+        expect([...after.values()].filter(value => value?.partitionKey).every(value => value.principalRef === healthy.principalRef)).toBe(true);
+        expect((await f.ledger.lookup(healthy.proof)).subject.state).toBe('authorized');
+        expect(await f.records.transaction(tx => tx.get('restricted-incident-cases-v1'))).toEqual(evidence);
+        expect(await f.h.state.storage.getAlarm()).toBeGreaterThan(Date.now());
+    });
+
+    it.each(['expired', 'unqualified'])('retains alarm cleanup before real participation refresh under a valid %s policy', async policyState => {
+        const f = await alarmRetentionFixture({ policyExpiresIn: policyState === 'expired' ? 200 : 60000 }), who = await f.visitor('RetentionVisitor');
+        if (policyState === 'unqualified') {
+            f.config.policy = { ...f.config.policy, revision: 2, policyVersion: 'retention-unqualified-v2', state: 'unqualified' };
+            expect((await f.ledger.installPolicy('synthetic-retention-policy')).ok).toBe(true);
+        }
+        const events = [], realRefresh = f.h.lobby().engine.refreshParticipation;
+        const refresh = vi.spyOn(f.h.lobby().engine, 'refreshParticipation').mockImplementation((...args) => { events.push('refresh'); return realRefresh(...args); });
+        f.h.hooks.after = event => { if (event.name === 'delete' && event.key.includes(':manifest:')
+            && Buffer.from(event.key.split(':manifest:')[1], 'hex').toString('ascii').startsWith('participation-records:v1:record:')) events.push('retention-delete'); };
+        vi.setSystemTime(NOW + 601); await f.h.lobby().alarm(); await f.h.settle();
+        expect(events.indexOf('retention-delete')).toBeGreaterThanOrEqual(0); expect(events.indexOf('refresh')).toBeGreaterThan(events.indexOf('retention-delete'));
+        expect([...await f.rows()].filter(([key]) => key.includes(':record:'))).toEqual([]); expect(refresh).toHaveBeenCalled();
+        who.socket.frames.length = 0; await f.h.message(who, { t: 'say', ch: '#stalemate', text: 'Never authorize from retention' });
+        expect(who.socket.frames.some(frame => frame.t === 'line' && frame.text === 'Never authorize from retention')).toBe(false);
+        const denied = await f.ledger.begin(who.participation.proof, { expectedRevision: 0, purposes: [...PARTICIPATION_PURPOSES] }); expect(denied.ok).toBe(false);
+    });
+
+    it('rolls back a real alarm cursor-write failure and recovers on the next existing alarm', async () => {
+        const f = await alarmRetentionFixture(); await f.grant('failed-alarm'); vi.setSystemTime(NOW + 601);
+        const before = await f.rows(), rollbacks = f.h.driver.stats.rollbacks, cursorKey = partitionMaintenance.PARTICIPATION_MAINTENANCE_CURSOR_KEY;
+        let deleted = false, injected = false;
+        f.h.hooks.after = event => {
+            const logical = event.key?.includes(':manifest:') ? Buffer.from(event.key.split(':manifest:')[1], 'hex').toString('ascii') : '';
+            if (event.name === 'delete' && logical.startsWith('participation-records:v1:record:')) deleted = true;
+            if (!injected && deleted && event.name === 'put' && logical === cursorKey) { injected = true; throw Error('Synthetic post-native alarm cursor failure'); }
+        };
+        await f.h.lobby().alarm(); await f.h.settle();
+        expect(injected).toBe(true); expect(deleted).toBe(true); expect(f.h.driver.stats.rollbacks - rollbacks).toBe(1);
+        expect(await f.rows()).toEqual(before); expect(await f.records.transaction(tx => tx.get(cursorKey))).toBeUndefined();
+        expect(f.h.lobby().evidenceStorage).toBe('degraded'); expect(f.h.lobby().authorityUnavailable).toBe(false);
+        expect(await f.h.state.storage.getAlarm()).toBeGreaterThan(Date.now());
+        delete f.h.hooks.after; await f.h.lobby().alarm(); await f.h.settle();
+        expect([...await f.rows()].filter(([key]) => key.includes(':record:'))).toEqual([]);
+        expect((await f.records.transaction(tx => tx.get(cursorKey))).after).toBe('');
+    });
+
+    it('keeps maintenance private and does not create C2 housekeeping in ordinary beta mode', async () => {
+        const f = await alarmRetentionFixture(); await f.grant('private-maintenance'); const who = await f.h.guest(); vi.setSystemTime(NOW + 601);
+        const before = await f.rows();
+        const response = await betaFetch(request('/beta/participation/maintenance', { cookie: who.cookie, body: { communityRef: LOBBY_AUTHORITY_COMMUNITY, after: '' },
+            headers: { 'X-Hangout-Authority': 'maintenance', 'X-Hangout-Role': 'owner' } }), f.h.env);
+        expect(response.status).toBe(404); expect(await f.rows()).toEqual(before);
+        expect(await f.records.transaction(tx => tx.get(partitionMaintenance.PARTICIPATION_MAINTENANCE_CURSOR_KEY))).toBeUndefined();
+        const ordinary = await harness(); await ordinary.visitor('OrdinaryRetainCtrl'); await ordinary.lobby().alarm(); await ordinary.settle();
+        expect(await ordinary.lobby().authority.records.transaction(tx => tx.get(partitionMaintenance.PARTICIPATION_MAINTENANCE_CURSOR_KEY))).toBeUndefined();
+        expect(ordinary.lobby().engine._debug.conns.size).toBe(1);
     });
 });
 
