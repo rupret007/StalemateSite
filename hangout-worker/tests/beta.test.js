@@ -35,15 +35,15 @@ function env() {
         QUOTA: { idFromName: (name) => name, get: () => ({ fetch: async () => new Response('ok') }) }
     };
     const values = new Map();
-    const registry = new BetaSessions({
-        blockConcurrencyWhile: (fn) => fn(),
-        storage: {
-            get: async (key) => values.get(key), put: async (key, value) => values.set(key, structuredClone(value)),
-            list: async ({ prefix, limit }) => new Map([...values].filter(([key]) => key.startsWith(prefix)).slice(0, limit)),
-            delete: async (keys) => { for (const key of Array.isArray(keys) ? keys : [keys]) values.delete(key); },
-            setAlarm: async () => {}, deleteAlarm: async () => {}
-        }
-    }, config);
+    const storage = {
+        get: async (key) => values.get(key), put: async (key, value) => values.set(key, structuredClone(value)),
+        list: async ({ prefix, limit }) => new Map([...values].filter(([key]) => key.startsWith(prefix)).slice(0, limit)),
+        delete: async (keys) => { for (const key of Array.isArray(keys) ? keys : [keys]) values.delete(key); },
+        setAlarm: async () => {}, deleteAlarm: async () => {}
+    };
+    // Simple successful-auth fixture; rollback/failure behavior has its own suite.
+    storage.transaction = async (fn) => fn(storage);
+    const registry = new BetaSessions({ blockConcurrencyWhile: (fn) => fn(), storage }, config);
     config.BETA_SESSIONS = { idFromName: (name) => name, get: () => registry };
     return config;
 }
