@@ -159,7 +159,7 @@ async function runtime(phase, state, nonce) {
         const response = await mf.dispatchFetch(ORIGIN + '/lobby?preview=' + PREVIEW, { headers: { ...headers(cookie, ip), Upgrade: 'websocket' } });
         assert.equal(response.status, 101, label + ': actual gateway upgrade refused'); assert.ok(response.webSocket, label + ': missing WebSocket');
         const visitor = new Visitor(response.webSocket, label); visitors.push(visitor);
-        const hello = await visitor.wait(f => f.t === 'hello', 'actual hello'); assert.deepEqual(hello.features, { entrySources: 1, privateMessageContext: 1 }); assert.equal(hello.role, 'fan');
+        const hello = await visitor.wait(f => f.t === 'hello', 'actual hello'); assert.deepEqual(hello.features, { entrySources: 1, privateMessageContext: 1, roomKeep: 1 }); assert.equal(hello.role, 'fan');
         visitor.send({ t: 'hello', nick: label, age13: true, entrySource: source });
         await visitor.wait(f => f.t === 'join' && f.ch.name === '#stalemate', 'lobby membership');
         return visitor;
