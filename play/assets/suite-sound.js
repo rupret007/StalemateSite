@@ -39,7 +39,7 @@ const banks = {
   shared: { beep: 'tap', ding: 'accent', buzz: 'invalid', fart: 'failure', win: 'success' },
   ta: { hit: 'paddle', brick: 'brick', break: 'break', power: 'power', bad: 'failure', life: 'milestone', death: 'failure', win: 'success', laser: 'laser', combo: 'accent', launch: 'piece', bounce: 'wall', metal: 'metal', gold: 'chip', flushWarp: 'power', chord: 'milestone' },
   tris: { move: 'soft', soft: 'soft', rotate: 'rotate', hold: 'swipe', drop: 'drop', lock: 'lock', clear: 'clear', clear1: 'clear', clear2: 'clear', clear3: 'clear', clear4: 'milestone', level: 'accent', pause: 'pause', victory: 'success', gameover: 'failure', heartbeat: 'warning' },
-  jack: { chip: 'chip', deal: 'card', hit: 'card', stand: 'piece', split: 'accent', double: 'accent', surrender: 'failure', shuffle: 'shuffle', win: 'success', lose: 'failure', push: 'neutral', blackjack: 'milestone', bust: 'failure', drumroll: 'shuffle', fanfare: 'milestone' },
+  jack: { chip: 'chip', card: 'card', deal: 'card', hit: 'card', stand: 'piece', twentyOne: 'accent', split: 'accent', double: 'accent', surrender: 'failure', shuffle: 'shuffle', win: 'success', lose: 'failure', push: 'neutral', blackjack: 'milestone', bust: 'failure', drumroll: 'shuffle', fanfare: 'milestone' },
   eights: { select: 'soft', pass: 'neutral', ui: 'tap', deal: 'card', play: 'card', draw: 'shuffle', wild: 'accent', reverse: 'swipe', skip: 'piece', penalty: 'failure', win: 'success', lose: 'failure' },
   rummy: { select: 'soft', drawStock: 'card', drawDiscard: 'card', discard: 'card', invalid: 'invalid', deal: 'shuffle', aiMove: 'card', knock: 'piece', gin: 'milestone', undercut: 'accent', roundWin: 'success', roundLose: 'failure', matchWin: 'milestone', matchLose: 'failure', layoff: 'card', tick: 'soft' },
   spades: { card: 'card', trump: 'capture', trick: 'accent', broken: 'power', bid: 'soft', lock: 'piece', nil: 'neutral', bag: 'failure', win: 'milestone', lose: 'failure' },
@@ -47,7 +47,10 @@ const banks = {
   chess: { move: 'piece', capture: 'capture', check: 'accent', win: 'success', lose: 'failure', draw: 'neutral' }
 };
 export const STUDIO_EVENTS = Object.freeze(Object.fromEntries(Object.entries(banks).flatMap(([bank, entries]) => Object.entries(entries).map(([event, cue]) => [`${bank}.${event}`, cue]))));
-export function resolveStudioCue(event) { return STUDIO_EVENTS[event] || null; }
+export function resolveStudioCue(event, options = {}) {
+  if (event === 'tris.clear' && Number(options.linesCleared) >= 4) return 'milestone';
+  return STUDIO_EVENTS[event] || null;
+}
 
 const noiseBuffers = new WeakMap();
 function noiseBuffer(context) {
@@ -145,7 +148,7 @@ export function createStudioAudio(deps) {
     return true;
   }
   function playEvent(event, options = {}) {
-    const name = resolveStudioCue(event);
+    const name = resolveStudioCue(event, options);
     if (!name || !allowed()) { counts.dropped++; return false; }
     let audio;
     try { audio = deps.getContext(); } catch { unavailable = true; counts.dropped++; return false; }

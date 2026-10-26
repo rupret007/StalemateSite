@@ -17,7 +17,7 @@
   <script src="assets/suite-progress.js?v=5fdc02c46aa62534"></script>
   <script src="assets/suite-share.js?v=85ff7f9230484519"></script>
   <script src="games/suite-dialog-focus.js"></script>
-  <script src="assets/turdsuite.js?v=774bbd998fa5fa55"></script>
+  <script src="assets/turdsuite.js?v=d802b7c5e60f2e68"></script>
   <title>Crapjack 21</title>
   <style>
     :root {
@@ -4658,7 +4658,7 @@
         return;
       } else if (value === 21) {
         setStatus(`${handTag(activeHandIndex)} locks 21.`);
-        playSfx('win');
+        playSfx(window.Suite?.isStudioAudio?.() ? 'twentyOne' : 'win');
         if (advanceToNextHand()) return;
         dealerTurnAndResolve();
         return;
@@ -4946,7 +4946,11 @@
       setStatus(finalNote);
       logHistory(finalNote);
       if (roundWins > roundLosses) playSfx('win');
-      else if (roundLosses > roundWins) playSfx('lose');
+      else if (roundLosses > roundWins) {
+        // A busted hand already has immediate feedback; don't announce the
+        // same all-busted loss again after the dealer's reveal animation.
+        if (!window.Suite?.isStudioAudio?.() || !allBusted) playSfx('lose');
+      }
       else playSfx('push');
       renderCards();
       updateHud();

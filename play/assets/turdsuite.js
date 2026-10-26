@@ -281,7 +281,7 @@
   Suite.audio = function () {
     if (audioEngine) return Promise.resolve(audioEngine);
     if (!audioPromise) {
-      audioPromise = suiteImport('./suite-audio.js?v=35197dbe9ebb7107').then(function (m) {
+      audioPromise = suiteImport('./suite-audio.js?v=56880d0186677986').then(function (m) {
         if (!m) return null;
         audioEngine = m.createSuiteAudio({
           isMuted: sharedEffectsMuted,

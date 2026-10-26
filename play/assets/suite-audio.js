@@ -7,7 +7,7 @@
  *   audio.masterVolume — 0..1
  */
 
-import { createStudioAudio } from './suite-sound.js?v=cf7cbe844bb48795';
+import { createStudioAudio } from './suite-sound.js?v=58cdcfb08a9c117b';
 
 export const MUTE_STORAGE_KEY = 'turdsuite_muted';
 

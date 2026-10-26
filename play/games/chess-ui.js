@@ -239,7 +239,7 @@ function afterMove(move) {
   if (suite?.isStudioAudio?.()) {
     const cue = game.result ? !game.result.winner ? 'draw'
       : game.mode === 'local' || game.result.winner === game.side ? 'win' : 'lose'
-      : move.captured ? 'capture' : 'move';
+      : game.chess.isCheck() ? 'check' : move.captured ? 'capture' : 'move';
     suite.playSound('chess.' + cue);
   } else if (game.result?.winner) {
     if (game.mode === 'local' || game.result.winner === game.side) { suite?.win?.(); } else { suite?.buzz?.(); }
