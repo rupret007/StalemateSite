@@ -66,3 +66,29 @@ export function readEntryHandoff(raw, now = Date.now(), registry = ENTRY_SITES) 
         return source ? { source, share: value.share } : null;
     } catch { return null; }
 }
+
+// One-use navigation context, never an account, permission or room capability.
+export const KEEP_ROOM_INTENT_KEY = 'hangout-return-room';
+export const KEEP_ROOM_INTENT_TTL = 10 * 60 * 1000;
+export function keepRoomIntent(room, now = Date.now()) {
+    if (!room || !/^#[a-z0-9-]{2,30}$/.test(room.name) || room.name === '#stalemate'
+        || typeof room.keepRef !== 'string' || !/^[a-f0-9]{32}$/.test(room.keepRef) || !Number.isFinite(now) || now < 0) return null;
+    return JSON.stringify({ v: 1, room: room.name, ref: room.keepRef, at: now });
+}
+export function readKeepRoomIntent(raw, now = Date.now()) {
+    if (!Number.isFinite(now) || typeof raw !== 'string' || raw.length > 256) return null;
+    try {
+        const value = JSON.parse(raw);
+        if (!value || Object.keys(value).sort().join(',') !== 'at,ref,room,v' || value.v !== 1
+            || !Number.isFinite(value.at) || value.at < 0 || value.at > now || now - value.at >= KEEP_ROOM_INTENT_TTL
+            || keepRoomIntent({ name: value.room, keepRef: value.ref }, value.at) === null) return null;
+        return { room: value.room, ref: value.ref, at: value.at };
+    } catch { return null; }
+}
+export function consumeKeepRoomIntent(storage, now = Date.now()) {
+    try {
+        const raw = storage.getItem(KEEP_ROOM_INTENT_KEY);
+        storage.removeItem(KEEP_ROOM_INTENT_KEY);
+        return { intent: readKeepRoomIntent(raw, now), unavailable: false, hadIntent: raw !== null };
+    } catch { return { intent: null, unavailable: true, hadIntent: false }; }
+}

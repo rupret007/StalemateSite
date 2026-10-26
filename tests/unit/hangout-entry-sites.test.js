@@ -63,7 +63,7 @@ beforeEach(() => { now = 1800000000000; ids = []; boot(); });
 describe('one community with optional entry context', () => {
     it('shares rooms and messages across entry sites while keeping source separate from identity and authority', () => {
         const a = guest('Alice', 'stalemate'), b = guest('Bravo', 'rad-dad');
-        expect(frames.find((frame) => frame.recipient === a && frame.t === 'hello').features).toEqual({ entrySources: 1, privateMessageContext: 1 });
+        expect(frames.find((frame) => frame.recipient === a && frame.t === 'hello').features).toEqual({ entrySources: 1, privateMessageContext: 1, roomKeep: 1 });
         cmd(a, 'join', ['#our-room']); cmd(b, 'join', ['#our-room']);
         const room = frames.filter((f) => f.recipient === b && f.t === 'join').at(-1).ch;
         expect(room.names.map(({ nick, entrySource }) => ({ nick, entrySource }))).toEqual([

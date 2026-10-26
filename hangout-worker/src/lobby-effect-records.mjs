@@ -59,7 +59,7 @@ const bytes = value => ownedJson(value).bytes;
 function validRoomRecord(room, now) {
     const required = ['name', 'kind', 'title', 'topic', 'founder', 'created', 'modes', 'ops', 'voice', 'bans', 'invites', 'kicks',
         'emptySince', 'owner', 'cohostLabels', 'cohosts', 'renewed', 'act', 'opAccounts'];
-    return shape(room, required, ['transfer']) && validRoom(room, now)
+    return shape(room, required, ['transfer', 'keepRef']) && validRoom(room, now)
         && shape(room.modes, ['m', 'i', 't', 'C', 'Q', 'locked', 'k', 'l', 'S'])
         && (!room.transfer || shape(room.transfer, ['from', 'to', 'until']))
         && unique(room.ops, 150, id) && unique(room.voice, 150, id) && unique(room.invites, 150, id) && unique(room.cohosts, 150, id)

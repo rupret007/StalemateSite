@@ -100,6 +100,11 @@
                 <button class="btn btn--small btn--ghost" type="button" data-leave>Leave</button>
                 <span class="small host-status" data-host-status></span>
             </div>
+            <section class="network-note" data-keep-prompt hidden tabindex="-1" aria-label="Keep this room">
+                <p data-keep-message role="status"></p>
+                <button class="btn btn--small" type="button" data-keep-accept>Keep this room</button>
+                <button class="btn btn--small btn--ghost" type="button" data-keep-cancel>Not now</button>
+            </section>
             <div class="jam" data-jam hidden>
                 <p><b>Music runs in the WebJam desktop app</b> using Jamulus. Ethernet is recommended; actual delay and dropouts depend on the devices and network.</p>
                 <p class="small">Use the beta app supplied by your host; the public download may reject this invitation. A Mac hosts music. Windows remote music needs a signed build and is unavailable in the current unsigned app.</p>

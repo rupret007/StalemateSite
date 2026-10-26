@@ -201,3 +201,34 @@ describe('known lobby effects in one physical-record transaction', () => {
         const index = await f.storage.transaction(tx => tx.get(LOBBY_LOG_INDEX)); expect(index.next).toBe(70); expect(index.segments.map(row => row.count)).toEqual([64, 6]);
     });
 });
+
+
+describe('optional room-instance metadata in indexed state', () => {
+    it('round-trips a live room reference and rejects corrupt writes without replacing prior indexed state', async () => {
+        const f = await fixture(), engine = createLobby({ now: () => NOW, limits: { defaultSlow: 0 } });
+        engine.connect({ id: 'founder', dev: 'founder-device', iph: 'founder-network', account: 'founder-account' });
+        engine.message('founder', JSON.stringify({ t: 'hello', nick: 'Founder', age13: true }));
+        engine.message('founder', JSON.stringify({ t: 'cmd', name: 'join', args: ['#keep-reference'], ch: '#stalemate' }));
+        const rooms = engine.roomSnapshot(), ref = rooms.rooms[0].keepRef;
+        expect(ref).toMatch(/^[a-f0-9]{32}$/);
+        await f.write([['rooms', rooms]]);
+        expect((await f.read()).rooms.rooms[0].keepRef).toBe(ref);
+        const before = hashRows(f.driver), corrupt = structuredClone(rooms); corrupt.rooms[0].keepRef = 'not-a-room-instance';
+        await expect(f.write([['net', { ...f.initial.net, lock: 'readonly' }], ['rooms', corrupt]])).rejects.toThrow();
+        expect(hashRows(f.driver)).toBe(before);
+        const restored = createLobby({ now: () => NOW }); restored.restoreRooms((await f.read()).rooms);
+        expect(restored._debug.channels.get('#keep-reference').keepRef).toBe(ref);
+    });
+    it('accepts legacy rows without a reference, then gives restoration a fresh nonmatching instance', async () => {
+        const f = await fixture(), engine = createLobby({ now: () => NOW });
+        engine.connect({ id: 'founder', dev: 'founder-device', iph: 'founder-network' });
+        engine.message('founder', JSON.stringify({ t: 'hello', nick: 'Founder', age13: true }));
+        engine.message('founder', JSON.stringify({ t: 'cmd', name: 'join', args: ['#legacy-reference'], ch: '#stalemate' }));
+        const legacy = engine.roomSnapshot(), prior = legacy.rooms[0].keepRef; delete legacy.rooms[0].keepRef;
+        await f.write([['rooms', legacy]]);
+        expect((await f.read()).rooms).toEqual(legacy);
+        const restored = createLobby({ now: () => NOW }); restored.restoreRooms((await f.read()).rooms);
+        expect(restored._debug.channels.get('#legacy-reference').keepRef).toMatch(/^[a-f0-9]{32}$/);
+        expect(restored._debug.channels.get('#legacy-reference').keepRef).not.toBe(prior);
+    });
+});
