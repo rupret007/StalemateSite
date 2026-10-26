@@ -74,3 +74,93 @@ test('denied progress storage leaves native completed play and replay available'
     await page.locator('#rematch').click();
     await expect(page.locator('#result')).toBeHidden();
 });
+
+
+// Synthetic stale-cache fixture: only obsolete bare JavaScript URLs are
+// replaced. Versioned requests pass through to the real local imported files.
+test('content versions bypass stale arcade scripts through a native completed chess game', async ({ page }, testInfo) => {
+    const { createHash } = require('node:crypto');
+    const path = require('node:path');
+    const changedScripts = [
+        'assets/suite-progress.js', 'assets/suite-share.js',
+        'games/suite-progress-core.js', 'games/table-continue-core.js',
+        'games/chess-core.js', 'games/chess-engine.js', 'games/chess-ui.js'
+    ];
+    const sha = body => createHash('sha256').update(body).digest('hex');
+    const expected = new Map(await Promise.all(changedScripts.map(async asset =>
+        [asset, sha(await readFile(path.join(__dirname, '../../play', asset))).slice(0, 16)]
+    )));
+    const staleRequests = [], errors = [], responseTasks = [];
+    const requests = new Map(), responses = new Map();
+    const assetFor = value => {
+        const url = new URL(value);
+        const asset = url.pathname.match(/\/play\/(.+)$/)?.[1];
+        return expected.has(asset) ? { url, asset } : null;
+    };
+    page.on('pageerror', error => errors.push(error.message));
+    await page.route('**/*', async route => {
+        const hit = assetFor(route.request().url());
+        if (!hit) return route.fallback();
+        if (!hit.url.searchParams.has('v')) {
+            staleRequests.push(hit.url.href);
+            return route.fulfill({
+                contentType: 'application/javascript',
+                body: 'globalThis.__staleArcadeExecutions = (globalThis.__staleArcadeExecutions || []).concat("old-asset"); throw new Error("Synthetic stale arcade script executed");'
+            });
+        }
+        requests.set(hit.asset, [...(requests.get(hit.asset) || []), hit.url.href]);
+        return route.fallback();
+    });
+    page.on('response', response => {
+        const hit = assetFor(response.url());
+        if (hit && hit.url.searchParams.has('v')) {
+            responseTasks.push(response.body().then(body => responses.set(hit.asset,
+                { url: response.url(), status: response.status(), body, sha256: sha(body) })));
+        }
+    });
+    await page.goto('/play/chess.html?mode=local');
+    await expect.poll(() => requests.has('games/chess-ui.js')).toBe(true);
+    await page.locator('input[name=mode][value=local]').check();
+    await page.locator('#new-game button[type=submit]').click();
+    for (const lan of ['e2e4', 'e7e5', 'd1h5', 'b8c6', 'f1c4', 'g8f6', 'h5f7']) {
+        await move(page, lan, !!testInfo.project.use.hasTouch);
+    }
+    await expect(page.locator('#result')).toBeVisible();
+    await expect(page.locator('#progress-result')).toContainText('Final move');
+    const result = await page.evaluate(() => SuiteProgress.snapshot());
+    expect(result.history.chess).toHaveLength(1);
+    expect(result.history.chess[0]).toMatchObject({ mode: 'local', local: true, assisted: false, moves: 7, winner: 'w' });
+    expect(result.earned['chess-finish'].source).toBe('event');
+    const nativeShareAvailable = await page.evaluate(() => typeof navigator.share === 'function');
+    await page.locator('.suite-result-share button').click();
+    if (nativeShareAvailable) await expect(page.locator('.suite-result-share-status')).toHaveText('Shared.');
+    else await expect(page.locator('.suite-result-share-status')).toContainText(/copied|Select and copy/);
+    await Promise.all(responseTasks);
+    for (const asset of changedScripts) {
+        expect(requests.get(asset), asset + ' loads once at its content version').toHaveLength(1);
+        const url = new URL(requests.get(asset)[0]);
+        expect(url.searchParams.get('v'), asset).toBe(expected.get(asset));
+        expect(responses.get(asset).status, asset).toBe(200);
+        expect(responses.get(asset).sha256.slice(0, 16), asset + ' delivers current bytes').toBe(expected.get(asset));
+    }
+    const coreUrl = requests.get('games/chess-core.js')[0];
+    const engineUrl = requests.get('games/chess-engine.js')[0];
+    const uiUrl = requests.get('games/chess-ui.js')[0];
+    const engineBody = responses.get('games/chess-engine.js').body.toString('utf8');
+    const uiBody = responses.get('games/chess-ui.js').body.toString('utf8');
+    const specifier = (body, name) => body.match(new RegExp("from\\s*['\"]([^'\"]*" + name + "\\.js\\?[^'\"]+)['\"]"))?.[1];
+    expect(new URL(specifier(engineBody, 'chess-core'), engineUrl).href).toBe(coreUrl);
+    expect(new URL(specifier(uiBody, 'chess-core'), uiUrl).href).toBe(coreUrl);
+    expect(new URL(specifier(uiBody, 'chess-engine'), uiUrl).href).toBe(engineUrl);
+    expect(staleRequests).toEqual([]);
+    expect(await page.evaluate(() => globalThis.__staleArcadeExecutions || [])).toEqual([]);
+    expect(errors).toEqual([]);
+    await page.screenshot({ path: testInfo.outputPath('stale-cache-fixture-native-mate.png'), fullPage: true });
+    await testInfo.attach('stale-cache-fixture-network', {
+        body: JSON.stringify({ method: 'Synthetic old bare-script responses; real versioned responses and natural native seven-move mate.',
+            requests: Object.fromEntries(requests), staleRequests, errors,
+            responses: Object.fromEntries([...responses].map(([asset, response]) =>
+                [asset, { url: response.url, status: response.status, sha256: response.sha256 }])) }, null, 2),
+        contentType: 'application/json'
+    });
+});

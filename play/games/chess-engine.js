@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { LEVELS } from './chess-core.js';
+import { LEVELS } from './chess-core.js?v=99a08f6ff639de1d';
 
 // One active request owns the worker. A completed search leaves it warm for the
 // next turn, avoiding repeated WASM downloads/compilation. Cancellation terminates

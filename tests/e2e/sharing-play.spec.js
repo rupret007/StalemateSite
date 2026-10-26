@@ -218,6 +218,6 @@ test('phone results are immediately readable and offer full-size native share ta
         await expect(page.locator('#gameOverOverlay').getByRole('link', { name: 'Save image' })).toBeVisible();
         expect(await button.boundingBox(), 'Image readiness must not move a pending share target').toEqual(beforeImage);
         await activate(page, button);
-        await expect(page.locator('#gameOverOverlay').getByRole('status')).toHaveText('Sharing cancelled.');
+        await expect(page.locator('#gameOverOverlay .suite-result-share-status')).toHaveText('Sharing cancelled.');
     }
 });

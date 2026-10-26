@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,7 +19,7 @@ function fixture() {
     const upstream = join(base, 'upstream');
     mkdirSync(join(root, 'scripts/lib'), { recursive: true });
     mkdirSync(join(root, 'scripts/stalemate-overlay'), { recursive: true });
-    for (const file of ['scripts/sync-turdanoid.sh', 'scripts/lib/sync-turdanoid.cjs', 'scripts/play-track.js', 'scripts/stalemate-strip.css', 'scripts/chess-stockfish-loader.js']) {
+    for (const file of ['scripts/sync-turdanoid.sh', 'scripts/lib/sync-turdanoid.cjs', 'scripts/lib/arcade-asset-versions.cjs', 'scripts/play-track.js', 'scripts/stalemate-strip.css', 'scripts/chess-stockfish-loader.js']) {
         cpSync(join(sourceRoot, file), join(root, file));
     }
     for (const song of songs) writeFileSync(join(root, 'scripts/stalemate-overlay', song), song);
@@ -94,7 +95,8 @@ describe('committed Turdanoid synchronization', () => {
         expect(hub).toContain("default-src 'self'");
         expect(hub).toContain('Stalemate Arcade');
         expect(hub).toContain('https://stalemate.band/play/stalemate/og-play.png');
-        expect(readFileSync(join(play, 'TurdAnoid.html'), 'utf8').match(/src="stalemate\/stalemate-overlay.js"/g)).toHaveLength(1);
+        const overlayVersion = createHash('sha256').update(readFileSync(join(play, 'stalemate/stalemate-overlay.js'))).digest('hex').slice(0, 16);
+        expect(readFileSync(join(play, 'TurdAnoid.html'), 'utf8').match(/src="stalemate\/stalemate-overlay\.js(?:\?[^"]*)?"/g)).toEqual([`src="stalemate/stalemate-overlay.js?v=${overlayVersion}"`]);
         for (const ref of [f.first, 'release-test']) {
             const repeated = sync(f, ref);
             expect(repeated.status, repeated.stderr).toBe(0);

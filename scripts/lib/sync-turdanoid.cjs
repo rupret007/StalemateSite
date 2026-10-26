@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
+const { versionArcadeAssets } = require('./arcade-asset-versions.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const UPSTREAM = 'https://github.com/rupret007/Turdanoid.git';
@@ -143,6 +144,7 @@ function main() {
         git(['-c', 'advice.detachedHead=false', 'checkout', '--quiet', '--detach', sha], tmp);
         for (const name of FILES) fs.cpSync(path.join(tmp, name), path.join(stage, name), { recursive: true });
         transform(stage);
+        versionArcadeAssets(stage);
         fs.writeFileSync(path.join(stage, 'VENDORED.txt'), `Vendored from github.com/rupret007/Turdanoid@${sha}.\nOriginal arcade material: same owner as StalemateSite. New chess modules/page and Chessground 10.5.0: GPL-3.0-or-later. Spatial piece artwork by Maurizio Monge: MIT. chess.js 1.4.0: BSD-2-Clause. Stockfish.js 19.0.1: GPL-3.0. See assets/chess/credits.html, included licenses and corresponding-source archives.\nDo not edit by hand: run scripts/sync-turdanoid.sh ${sha}\n`);
         // Both renames stay on the destination filesystem. A failed transform leaves play intact.
         const hadDest = fs.existsSync(dest);
