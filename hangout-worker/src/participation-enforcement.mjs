@@ -7,9 +7,10 @@ const enc = new TextEncoder(), clone = value => structuredClone(value);
 const validIdentity = value => value && Object.keys(value).length === 3 && ['principalRef', 'communityRef', 'expiresAt'].every(key => Object.hasOwn(value, key))
     && [value.principalRef, value.communityRef].every(id => typeof id === 'string' && /^[A-Za-z0-9_-]{16,128}$/.test(id)) && Number.isSafeInteger(value.expiresAt);
 const limits = Object.freeze({ connections: 256, checks: 2048, writes: 128, bytes: 16 * 1024 * 1024 });
-export function createParticipationEnforcement({ storage, resolveConnection, validateConnection, writeEffects, readPrincipals = readParticipationPrincipals, readWithdrawn = null, dispatchStart = null, beforeCommit = async () => {}, providerQualified = () => false, now = () => Date.now() } = {}) {
+export function createParticipationEnforcement({ storage, resolveConnection, validateConnection, writeEffects, readPrincipals = readParticipationPrincipals, readWithdrawn = null, readPreparation = null, dispatchStart = null, beforeCommit = async () => {}, providerQualified = () => false, now = () => Date.now() } = {}) {
     if (typeof storage?.transaction !== 'function' || [resolveConnection, validateConnection, writeEffects, readPrincipals, beforeCommit, providerQualified, now].some(fn => typeof fn !== 'function')
         || readWithdrawn !== null && typeof readWithdrawn !== 'function'
+        || readPreparation !== null && typeof readPreparation !== 'function'
         || dispatchStart !== null && typeof dispatchStart !== 'function') throw new TypeError('Explicit participation transaction adapters required');
     const contexts = new WeakMap();
     const check = (state, request, current = state.snapshot, at = now()) => {
@@ -40,6 +41,17 @@ export function createParticipationEnforcement({ storage, resolveConnection, val
                 }
                 state.snapshot = await storage.transaction(async tx => {
                     const identities = state.identities.filter(Boolean);
+                    if (readPreparation) {
+                        const current = await readPreparation({ tx, identities, now: now() });
+                        if (!Array.isArray(current?.withdrawn) || current.withdrawn.length !== identities.length
+                            || current.withdrawn.some(value => typeof value !== 'boolean')) throw Error('participation-unavailable');
+                        let index = 0;
+                        state.withdrawn = state.identities.map(identity => identity ? current.withdrawn[index++] : false);
+                        if (!current.ok) return current;
+                        if (!Array.isArray(current.subjects) || current.subjects.length !== identities.length) throw Error('participation-unavailable');
+                        index = 0;
+                        return { ...current, subjects: state.identities.map(identity => identity ? current.subjects[index++] : null) };
+                    }
                     const values = readWithdrawn ? await readWithdrawn({ tx, identities, now: now() }) : identities.map(() => false);
                     if (!Array.isArray(values) || values.length !== identities.length || values.some(value => typeof value !== 'boolean')) throw Error('participation-unavailable');
                     let index = 0; state.withdrawn = state.identities.map(identity => identity ? values[index++] : false);
@@ -92,7 +104,8 @@ export function createParticipationEnforcement({ storage, resolveConnection, val
                 return await transaction(async tx => {
                     const authorize = async () => {
                         if (costsOnly || !state.checks.length && !state.withdrawnChecks.length) return;
-                        for (const actorId of new Set([...state.withdrawnChecks, ...state.checks.flatMap(request => [request.actorId, request.peerId].filter(Boolean))])) {
+                        const affected = new Set([...state.withdrawnChecks, ...state.checks.flatMap(request => [request.actorId, request.peerId].filter(Boolean))]);
+                        for (const actorId of affected) {
                             const i = state.connections.findIndex(c => c.id === actorId);
                             if (i < 0 || !state.identities[i] || state.identities[i].expiresAt <= now()
                                 || await validateConnection({ tx, connection: clone(state.connections[i]), identity: clone(state.identities[i]), at: now() }) !== true) throw Error('participation-denied');
@@ -101,7 +114,11 @@ export function createParticipationEnforcement({ storage, resolveConnection, val
                             const identities = state.withdrawnChecks.map(actorId => state.identities[state.connections.findIndex(c => c.id === actorId)]);
                             if (!readWithdrawn || !(await readWithdrawn({ tx, identities, now: now() })).every(value => value === true)) throw Error('participation-denied');
                         }
-                        const current = await read(tx, state.identities);
+                        // Preparation may need the whole roster, but these
+                        // recorded checks depend only on their actors/peers.
+                        // Preserve original slots, including missing peers,
+                        // and re-read independently on BOTH sides of writes.
+                        const current = await read(tx, state.identities.map((identity, i) => affected.has(state.connections[i].id) ? identity : null));
                         if (!state.checks.every(request => check(state, request, current))) throw Error('participation-denied');
                     };
                     await authorize(); await writeEffects({ tx, effects: clone(writes), costsOnly }); await authorize();
