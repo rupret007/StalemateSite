@@ -93,3 +93,14 @@ Relevant primary references: [storage API](https://developers.cloudflare.com/dur
 and [Node crypto](https://developers.cloudflare.com/workers/runtime-apis/nodejs/crypto/).
 
 Inspection/fault routes exist only in this test Worker. Do not deploy it.
+
+The bundler proof now compares every normalized input against the explicit
+`source-catalogue.mjs` catalogue: the fixture Worker, eleven named application
+modules (including the I3a source bridge and I1 digest implementation), two shared
+browser modules and thirty named files from the locked obscenity package. Equal
+counts with substituted files, missing/extra inputs, aliases and unknown external
+roots fail; each actual input digest still matches its file. The catalogue and
+both new transitive application modules are included in recorded source hashes.
+Early bundler/catalogue errors use the same bounded IPC failure message so the
+parent can preserve the primary error and clean its owned process without waiting
+for the unchanged 45-second failure deadline. No API cap or deadline is raised.

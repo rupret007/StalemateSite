@@ -140,3 +140,38 @@ qualifies only its recorded source and executing host.
 
 The Worker wrapper's inspection/fault/control routes exist only in this test.
 Do not deploy it or expose its known-empty initializer as public onboarding.
+
+## Separate I3a production source composition
+
+`npm run test:lobby-session-runtime -- --incident-sources` explicitly enables the
+production public-report source bridge in the owned test Worker. It is a separate
+qualification from the default and `--participation` modes; simultaneous fixture
+modes are refused. The real gateway, guest cookie, current lobby-v1 SID/binding,
+queue/effect writer, indexed source loader and native SQLite mapping remain in
+use. The original nine first-phase and three recovery check groups and both
+physical fault witnesses stay intact.
+
+After an actual delivered public message is reported, nonce-only controls
+explicitly initialize a synthetic appointment, policy and case record. I1 then
+preserves one source through the production loader in the same authority.records
+transaction domain, encrypts and reads back its exact selected UTF-8, and verifies
+a metadata-only source index with no plaintext case copy. No unrestricted quote,
+media upload, real incident, handler grant or production endpoint is accepted.
+The bound guest SID remains separate from the explicit synthetic appointment;
+I1 revalidates the current actual binding inside each case transaction.
+
+A parent-generated random test-only AES key travels privately over owned child
+IPC and becomes a nonextractable purpose key in each test Worker. It is excluded
+from stdout, receipt objects, source metadata and process environment. Retaining
+that test key over the fixture phases proves encrypted record reload after whole
+owned process loss, not real purpose-key provisioning, rotation, backup or owner
+recovery. A current reconnected binding for the original signed SID is required
+for the recovered I1 read.
+
+The new source-index and final case-write rollback failures are qualified by the
+actual disk SQLite unit integration. This native mode does not add a third fault
+or claim those two new physical-manifest witnesses; the original session/room
+witnesses remain its only injected native failures. All existing storage/frame/
+log caps, deadlines, ordinary expiry and egress denial stay unchanged. CI runs
+this mode as a distinct command with its own `lobby-incident-sources-runtime.*`
+raw artifacts; the baseline alone cannot qualify it.

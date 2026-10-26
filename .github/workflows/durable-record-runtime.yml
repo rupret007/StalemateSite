@@ -63,7 +63,7 @@ jobs:
             tests/runtime/beta-sessions/runner.mjs tests/runtime/beta-sessions/worker.mjs \
             hangout-worker/src/beta-sessions.mjs hangout-worker/src/beta-session-state.mjs hangout-worker/src/core.mjs hangout-worker/src/beta-session-client.mjs \
             hangout-worker/src/beta-ops.mjs hangout-worker/src/beta-auth.mjs hangout-worker/src/ai-eligibility.mjs hangout-worker/src/auth.mjs \
-            package-lock.json tests/runtime/lobby-effects/runner.mjs tests/runtime/lobby-effects/worker.mjs \
+            package-lock.json tests/runtime/lobby-effects/runner.mjs tests/runtime/lobby-effects/worker.mjs tests/runtime/lobby-effects/source-catalogue.mjs \
             hangout-worker/wrangler.beta.toml hangout-worker/src/lobby-effect-records.mjs hangout-worker/src/lobby-core.mjs \
             hangout-worker/src/community-state.mjs hangout-worker/src/filter.mjs hangout-worker/src/lobby-act.mjs hangout-worker/src/message-receipts.mjs \
             hangout-worker/src/transport-budget.mjs hangout-worker/src/participation-checkpoint.mjs r/45662413410ed051/sync-core.js r/45662413410ed051/entry-sites.mjs \
@@ -71,7 +71,8 @@ jobs:
             hangout-worker/src/lobby-session-authority.mjs hangout-worker/src/beta-entry.mjs hangout-worker/src/index.mjs \
             hangout-worker/src/private-reports.mjs hangout-worker/src/participation-enforcement.mjs hangout-worker/src/lobby-do.mjs \
             hangout-worker/src/lobby-participation.mjs hangout-worker/src/participation-policy.mjs hangout-worker/src/participation-consents.mjs \
-            hangout-worker/src/participation-partitions.mjs docs/HANGOUT_PRODUCTION_PARTICIPATION.md > runtime-proof-artifacts/source-sha256.txt
+            hangout-worker/src/participation-partitions.mjs docs/HANGOUT_PRODUCTION_PARTICIPATION.md \
+            hangout-worker/src/lobby-incident-sources.mjs hangout-worker/src/incident-cases.mjs docs/HANGOUT_INCIDENT_SOURCES.md > runtime-proof-artifacts/source-sha256.txt
 
       - name: Install only the isolated locked runtime tools
         shell: bash
@@ -179,6 +180,18 @@ jobs:
           cat runtime-proof-artifacts/lobby-participation-runtime.stdout.log
           cat runtime-proof-artifacts/lobby-participation-runtime.stderr.log >&2
           printf '%s\n' "$status" > runtime-proof-artifacts/lobby-participation-runtime.exit-code.txt
+          exit "$status"
+
+      - name: Prove public report source composition with synthetic incident authority
+        shell: bash
+        run: |
+          set +e
+          npm run test:lobby-session-runtime -- --incident-sources > runtime-proof-artifacts/lobby-incident-sources-runtime.stdout.log 2> runtime-proof-artifacts/lobby-incident-sources-runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/lobby-incident-sources-runtime.stdout.log
+          cat runtime-proof-artifacts/lobby-incident-sources-runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/lobby-incident-sources-runtime.exit-code.txt
           exit "$status"
 
       - name: Preserve source-bound runtime diagnostics

@@ -2,6 +2,8 @@
 // This is not session/guardian authority, automatic provisioning or a migration.
 import { validRoom, LOG_TTL } from './community-state.mjs';
 import H from '../../r/45662413410ed051/sync-core.js';
+import { LOBBY_INCIDENT_SOURCE_KEY, validPublicReportOrigin, initializeLobbyIncidentSources,
+    validateLobbyIncidentSources, reconcileLobbyIncidentSources, loadLobbyIncidentSource } from './lobby-incident-sources.mjs';
 
 export const LOBBY_EFFECT_MARKER = 'lobby-effects:v1';
 export const LOBBY_LOG_INDEX = 'lobby-log:v1:index';
@@ -104,12 +106,13 @@ function validSessions(value, now) {
     const connections = new Map(value.connections.map(row => [row.id, row]));
     const endpoints = row => id(row.from) && id(row.fromId) && id(row.toId) && row.fromId !== row.toId
         && row.key === [row.fromId, row.toId].sort().join('|') && connections.get(row.fromId)?.dev === row.from && connections.has(row.toId);
-    const receipt = row => shape(row, ['t', 'id', 'ch', 'from', 'to', 'prefix', 'band', 'moderator', 'me', 'ts', 'authorDev', 'digest', 'recipients'])
+    const receipt = row => shape(row, ['t', 'id', 'ch', 'from', 'to', 'prefix', 'band', 'moderator', 'me', 'ts', 'authorDev', 'digest', 'recipients'], ['publicOrigin'])
         && nick(row.from) && id(row.authorDev) && /^[a-f0-9]{64}$/.test(row.digest) && time(row.ts, now) && ['', '@', '+'].includes(row.prefix)
         && ['band', 'moderator', 'me'].every(key => typeof row[key] === 'boolean')
         && (row.t === 'line' && /^m[a-z0-9]{1,80}$/i.test(row.id) && channel(row.ch) && row.to === ''
             || row.t === 'pm' && /^p[a-z0-9]{1,80}$/i.test(row.id) && nick(row.to) && row.ch === `pm:${row.from}>${row.to}`)
-        && names(row.recipients, 200, id) && row.recipients.length > 0;
+        && names(row.recipients, 200, id) && row.recipients.length > 0
+        && (!Object.hasOwn(row, 'publicOrigin') || row.t === 'line' && validPublicReportOrigin(row.publicOrigin, now) && row.publicOrigin.at >= row.ts);
     return list(value.pm, 2000, row => shape(row, ['key', 'from', 'fromId', 'toId', 'state']) && row.state === 'open' && endpoints(row))
         && new Set(value.pm.map(row => row.key)).size === value.pm.length
         && list(value.pendingPm, 1000, row => shape(row, ['key', 'from', 'fromId', 'toId', 'at', 'hadFirst']) && endpoints(row) && time(row.at, now) && typeof row.hadFirst === 'boolean')
@@ -137,9 +140,10 @@ const moderationChannel = value => channel(value) || typeof value === 'string' &
 const commonReport = (row, now) => moderationId(row.id) && nick(row.from) && moderationChannel(row.ch) && text(row.text, 300, 1) && time(row.at ?? row.ts, now);
 function validModeration(value, now) {
     return shape(value, ['reports', 'held'])
-        && list(value.reports, 100, row => shape(row, ['id', 'ch', 'from', 'text', 'at', 'hidden', 'context', 'devs', 'iphs', 'authorDev']) && commonReport(row, now)
+        && list(value.reports, 100, row => shape(row, ['id', 'ch', 'from', 'text', 'at', 'hidden', 'context', 'devs', 'iphs', 'authorDev'], ['publicOrigin']) && commonReport(row, now)
             && typeof row.hidden === 'boolean' && id(row.authorDev) && list(row.context, 11, line => text(line, 400, 1)) && row.context.length > 0
-            && unique(row.devs, 150, id) && row.devs.length > 0 && unique(row.iphs, 150, id) && row.iphs.length > 0)
+            && unique(row.devs, 150, id) && row.devs.length > 0 && unique(row.iphs, 150, id) && row.iphs.length > 0
+            && (!Object.hasOwn(row, 'publicOrigin') || row.id.startsWith('m') && channel(row.ch) && validPublicReportOrigin(row.publicOrigin, now) && row.publicOrigin.at <= row.at))
         && list(value.held, 100, row => shape(row, ['id', 'ch', 'from', 'text', 'ts', 'prefix', 'band', 'me', 'reason', 'dev']) && commonReport(row, now)
             && row.id.startsWith('m') && channel(row.ch) && ['', '@', '+'].includes(row.prefix) && typeof row.band === 'boolean' && typeof row.me === 'boolean' && text(row.reason, 160, 1) && id(row.dev))
         && new Set(value.reports.map(row => row.id)).size === value.reports.length && new Set(value.held.map(row => row.id)).size === value.held.length;
@@ -222,10 +226,10 @@ const validators = { net: validNet, abuse: validAbuse, sessions: validSessions, 
 
 // Explicit known-new initialization only; caller must establish authority and
 // absence of old writers. Missing state is never treated as permission to init.
-export async function initializeLobbyEffects({ tx, state, now = Date.now() } = {}) {
-    checkTx(tx); ensure(integer(now)); const value = ownedJson(state).value;
+export async function initializeLobbyEffects({ tx, state, now = Date.now(), incidentSources = false } = {}) {
+    checkTx(tx); ensure(integer(now) && typeof incidentSources === 'boolean'); const value = ownedJson(state).value;
     ensure(shape(value, ['net', 'rooms', 'abuse', 'sessions', 'moderationQueue', 'aiReviews', 'modlog']));
-    ensure(await tx.get(LOBBY_EFFECT_MARKER) === undefined);
+    ensure(await tx.get(LOBBY_EFFECT_MARKER) === undefined && await tx.get(LOBBY_INCIDENT_SOURCE_KEY) === undefined);
     for (const key of [...domainKeys, 'rooms']) ensure(await tx.get(key) === undefined);
     for (const prefix of ['community-room:', LOBBY_LOG_PREFIX, 'log:']) ensure((await tx.list({ prefix, limit: 1 })).size === 0);
     ensure(validRooms(value.rooms, now) && list(value.modlog, 2000, row => validLog(row, now)));
@@ -235,10 +239,11 @@ export async function initializeLobbyEffects({ tx, state, now = Date.now() } = {
     await tx.put('room-index', { version: 1, names: [] }); await writeRooms(tx, value.rooms, now);
     await tx.put(LOBBY_LOG_INDEX, { version: 1, next: 0, segments: [] });
     await saveLogs(tx, { index: { version: 1, next: 0, segments: [] }, found: new Map(), entries: [] }, value.modlog, now);
+    if (incidentSources) await initializeLobbyIncidentSources({ tx, queue: value.moderationQueue, now });
     await tx.put(LOBBY_EFFECT_MARKER, MARKER);
 }
-export async function writeLobbyEffects({ tx, effects, costsOnly = false, now = Date.now() } = {}) {
-    checkTx(tx); ensure(integer(now) && typeof costsOnly === 'boolean'); const snapshot = ownedJson(effects);
+export async function writeLobbyEffects({ tx, effects, costsOnly = false, now = Date.now(), incidentSources = false } = {}) {
+    checkTx(tx); ensure(integer(now) && typeof costsOnly === 'boolean' && typeof incidentSources === 'boolean'); const snapshot = ownedJson(effects);
     ensure(Array.isArray(snapshot.value) && snapshot.value.length <= 128); await requireMarker(tx);
     const logs = [];
     for (const effect of snapshot.value) {
@@ -251,6 +256,10 @@ export async function writeLobbyEffects({ tx, effects, costsOnly = false, now = 
             ensure(validators[kind](value, now)); const previous = await tx.get(kind);
             ensure(previous !== undefined && validators[kind](ownedJson(previous).value, now));
             await tx.put(kind, value);
+            if (kind === 'moderation-queue') {
+                if (incidentSources) await reconcileLobbyIncidentSources({ tx, previous: ownedJson(previous).value, current: value, now });
+                else ensure(await tx.get(LOBBY_INCIDENT_SOURCE_KEY) === undefined);
+            }
         }
     }
     if (logs.length) await saveLogs(tx, await readLogs(tx, now), logs, now);
@@ -261,12 +270,14 @@ export async function pruneLobbyEffectLogs({ tx, now = Date.now() } = {}) {
     checkTx(tx); ensure(integer(now)); await requireMarker(tx);
     await saveLogs(tx, await readLogs(tx, now), [], now);
 }
-export async function readLobbyState({ tx, now = Date.now() } = {}) {
-    checkTx(tx); ensure(integer(now)); await requireMarker(tx); const result = {};
+export async function readLobbyState({ tx, now = Date.now(), incidentSources = false } = {}) {
+    checkTx(tx); ensure(integer(now) && typeof incidentSources === 'boolean'); await requireMarker(tx); const result = {};
     for (const [key, validate] of Object.entries(validators)) {
         const raw = await tx.get(key); ensure(raw !== undefined); const value = ownedJson(raw).value;
         ensure(validate(value, now)); result[key] = value;
     }
+    if (incidentSources) await validateLobbyIncidentSources({ tx, queue: result['moderation-queue'], now });
+    else ensure(await tx.get(LOBBY_INCIDENT_SOURCE_KEY) === undefined);
     const index = await tx.get('room-index'); ensure(validIndex(index) && await tx.get('rooms') === undefined);
     const rooms = [];
     for (const name of index.names) { const room = await tx.get(`community-room:${name}`); ensure(room && room.name === name && validRoomRecord(room, now)); rooms.push(room); }
@@ -283,4 +294,12 @@ export async function readLobbyState({ tx, now = Date.now() } = {}) {
     const logs = await readLogs(tx, now);
     return { net: result.net, rooms: { version: 1, rooms }, abuse: result.abuse, sessions: result.sessions,
         moderationQueue: result['moderation-queue'], aiReviews: result['ai-reviews'], modlog: logs.entries.filter(row => now - row.entry.at < LOG_TTL).map(row => row.entry) };
+}
+// I1 loadEvidence adapter. It reads only the current owned queue in I1's own
+// supplied transaction; no cached report/admin state or replacement quote.
+export async function loadLobbyIncidentEvidence({ tx, sourceId, now = Date.now() } = {}) {
+    checkTx(tx); ensure(integer(now)); await requireMarker(tx);
+    const queue = ownedJson(await tx.get('moderation-queue')).value;
+    ensure(validModeration(queue, now));
+    return loadLobbyIncidentSource({ tx, queue, sourceId, now });
 }

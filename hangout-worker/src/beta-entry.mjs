@@ -8,6 +8,7 @@ import { registryRequest } from './beta-session-client.mjs';
 import { betaHealth } from './beta-ops.mjs';
 import { entrySitesFromConfig } from '../../r/45662413410ed051/entry-sites.mjs';
 import { lobbyParticipationMode, participationConfigurationValid } from './lobby-participation.mjs';
+import { incidentSourceConfigurationValid } from './lobby-incident-sources.mjs';
 export { BetaSessions } from './beta-sessions.mjs';
 export { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget };
 
@@ -20,7 +21,7 @@ const json = (body, status = 200, extra = {}) => reply(JSON.stringify(body), sta
 const redirect = (where, extra = {}) => reply(null, 303, 'text/plain', { Location: where, ...extra });
 const sameOrigin = (request) => request.headers.get('Origin') === new URL(request.url).origin;
 export function betaConfigured(env) {
-    return participationConfigurationValid(env) && env.HANGOUT_BETA_MODE === 'protected' && hmacKeyOk(env.HANGOUT_HMAC_KEY) && hmacKeyOk(env.HANGOUT_BETA_INVITE_KEY) &&
+    return participationConfigurationValid(env) && incidentSourceConfigurationValid(env) && env.HANGOUT_BETA_MODE === 'protected' && hmacKeyOk(env.HANGOUT_HMAC_KEY) && hmacKeyOk(env.HANGOUT_BETA_INVITE_KEY) &&
         previewKeyOk(env.HANGOUT_PREVIEW_KEY, env.HANGOUT_PREVIEW_KEY) && env.ASSETS && env.LOBBY && env.QUOTA && env.ROOMS
         && (!env.HANGOUT_SESSION_AUTHORITY ? env.BETA_SESSIONS : env.HANGOUT_SESSION_AUTHORITY === 'lobby-v1');
 }

@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname, basename } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
+import { assertNativeLobbySourceCatalogue } from './source-catalogue.mjs';
 const FILE = fileURLToPath(import.meta.url), HERE = dirname(FILE);
 const TOOLS = fileURLToPath(new URL('../durable-records/', import.meta.url));
 const APP = fileURLToPath(new URL('../../../', import.meta.url));
@@ -23,7 +24,8 @@ function rolldownBindingPackage() {
 const hash = path => createHash('sha256').update(readFileSync(path)).digest('hex');
 const sources = () => Object.fromEntries([
     ['fixture/runner.mjs', FILE], ['fixture/worker.mjs', join(HERE, 'worker.mjs')],
-    ...['lobby-core.mjs', 'lobby-effect-records.mjs', 'durable-record-storage.mjs', 'community-state.mjs', 'filter.mjs', 'lobby-act.mjs', 'message-receipts.mjs', 'transport-budget.mjs', 'participation-checkpoint.mjs'].map(name => [`application/${name}`, join(APP, 'hangout-worker/src', name)]),
+    ['fixture/source-catalogue.mjs', join(HERE, 'source-catalogue.mjs')],
+    ...['lobby-core.mjs', 'lobby-effect-records.mjs', 'durable-record-storage.mjs', 'community-state.mjs', 'filter.mjs', 'lobby-act.mjs', 'message-receipts.mjs', 'transport-budget.mjs', 'participation-checkpoint.mjs', 'lobby-incident-sources.mjs', 'incident-cases.mjs'].map(name => [`application/${name}`, join(APP, 'hangout-worker/src', name)]),
     ...['r/45662413410ed051/sync-core.js', 'r/45662413410ed051/entry-sites.mjs', 'package.json', 'package-lock.json', 'hangout-worker/wrangler.beta.toml', 'node_modules/rolldown/package.json', 'node_modules/obscenity/package.json'].map(name => [`application/${name}`, join(APP, name)]),
     ...['package.json', 'package-lock.json'].map(name => [`tools/${name}`, join(TOOLS, name)])
 ].map(([name, path]) => [name, hash(path)]));
@@ -68,9 +70,10 @@ async function child(state, nonce) {
     assert.ok(generated.output[0].imports.includes('node:crypto'));
     assert.ok(generated.output[0].imports.every(name => name === 'node:crypto'));
     const bundleCode = generated.output[0].code, bundleSha256 = createHash('sha256').update(bundleCode).digest('hex');
-    assert.equal(Object.keys(bundleInputs).length, 42, 'unexpected native fixture source graph');
-    assert.ok(Object.keys(bundleInputs).some(path => path.endsWith('/sync-core.js')));
-    assert.ok(Object.keys(bundleInputs).some(path => path.includes('/obscenity/')));
+    const sourceCatalogue = assertNativeLobbySourceCatalogue(Object.keys(bundleInputs), {
+        fixtureWorker: realpathSync(join(HERE, 'worker.mjs')), applicationRoot: realpathSync(APP),
+        obscenityRoot: realpathSync(join(APP, 'node_modules/obscenity'))
+    });
     for (const [path, sha256] of Object.entries(bundleInputs)) assert.equal(hash(path), sha256);
     let outboundCalls = 0, runtimeRestarts = 0, proof;
     const options = convertV4MiniflareOptions({
@@ -116,7 +119,7 @@ async function child(state, nonce) {
         assert.equal(hash(bindingFile), rolldownBindingSha256);
         const checks = [...qualified.main.checks, ...qualified.logs.checks, { name: 'fresh-workerd-process-recovers-exact-domain-digests', pass: true }];
         proof = { versions, binarySha256, compatibilityDate: '2026-10-01', compatibilityFlags: [], qualified, recovered, checks,
-            rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs, firstWorkerdPids, secondWorkerdPids, admissionDenials: 3,
+            rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs, sourceCatalogue, firstWorkerdPids, secondWorkerdPids, admissionDenials: 3,
             sources: before, outboundCalls, runtimeRestarts, node: process.version, platform: process.platform, architecture: process.arch,
             scope: 'Actual source-engine effect generation and domain mapper/codec on local SQLite workerd at the beta date/empty flags; two fresh native processes and deliberate post-write faults. Pure engine capture is not C3 output staging or trusted session/guardian authority. Only the executing supported platform is qualified; no Windows/hosted limits/cost/recovery/deployment qualification.' };
         const acknowledged = new Promise((resolve, reject) => process.once('message', message => {
@@ -170,4 +173,11 @@ async function parent() {
     console.log(JSON.stringify({ ...receipt, temporaryStateRemoved: true }, null, 2));
 }
 try { if (process.argv[2] === '--isolated' && process.argv.length === 5) await child(process.argv[3], process.argv[4]); else await parent(); }
-catch (error) { console.error(error.stack || error); process.exitCode = 1; }
+catch (error) {
+    // Bundling/catalogue failures happen before Miniflare's try/finally. Report
+    // them through the same bounded IPC failure path instead of leaving the
+    // parent to discover an idle child at its unchanged45s deadline.
+    if (process.argv[2] === '--isolated' && process.connected) await new Promise(resolve =>
+        process.send({ type: 'failure', nonce: process.argv[4], error: String(error.stack || error).slice(0, 16384) }, resolve));
+    console.error(error.stack || error); process.exitCode = 1;
+}

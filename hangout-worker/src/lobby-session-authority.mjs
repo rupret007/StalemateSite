@@ -6,7 +6,8 @@ import { validRoomId } from './core.mjs';
 import { BETA_TTL, betaVersion } from './beta-session-client.mjs';
 import { validBetaRecord } from './beta-session-state.mjs';
 import { createDurableRecordStorage } from './durable-record-storage.mjs';
-import { initializeLobbyEffects, readLobbyState, writeLobbyEffects, pruneLobbyEffectLogs } from './lobby-effect-records.mjs';
+import { initializeLobbyEffects, readLobbyState, writeLobbyEffects, pruneLobbyEffectLogs, loadLobbyIncidentEvidence } from './lobby-effect-records.mjs';
+import { lobbyIncidentSourceMode } from './lobby-incident-sources.mjs';
 import { validPrivateReportState } from './private-reports.mjs';
 import { createLobby } from './lobby-core.mjs';
 
@@ -99,20 +100,20 @@ async function initialized(tx) { await marker(tx); await index(tx); await connec
 // Explicitly invoked only for a known-new, owner-drained application domain.
 // Missing state in ordinary startup NEVER invokes either initializer.
 export async function initializeLobbySessionAuthority({ storage, env, state, privateReports = { v: 1, reports: [], receipts: [] }, now = Date.now() } = {}) {
-    const records = createLobbyAuthorityStorage(storage);
+    const records = createLobbyAuthorityStorage(storage), incidentSources = !!lobbyIncidentSourceMode(env);
     return records.transaction(async (tx, raw) => {
         ensure(integer(now) && await tx.get(LOBBY_AUTHORITY_MARKER) === undefined);
         // Refuse an old initialized Lobby: migration must read and validate it.
         for (const key of ['net', 'room-index', 'rooms', 'abuse', 'sessions', 'moderation-queue', 'ai-reviews', 'beta-initialized', 'private-reports-v1', 'ai-usage', 'mint-rates']) ensure(await raw.get(key) === undefined);
         for (const prefix of ['community-room:', 'log:']) ensure((await raw.list({ prefix, limit: 1 })).size === 0);
-        await seed(tx, state, privateReports, now, betaVersion(env)); await raw.setAlarm(now + INTERVAL);
+        await seed(tx, state, privateReports, now, betaVersion(env), {}, incidentSources); await raw.setAlarm(now + INTERVAL);
     });
 }
-async function seed(tx, state, privateReports, now, inviteVersion, mintRates = {}) {
+async function seed(tx, state, privateReports, now, inviteVersion, mintRates = {}, incidentSources = false) {
     ensure(version(inviteVersion));
     for (const key of [LOBBY_AUTHORITY_MARKER, SESSION_INDEX, CONNECTION_INDEX, RATES, 'private-reports-v1']) ensure(await tx.get(key) === undefined);
     for (const prefix of [SESSION, CONNECTION]) ensure((await tx.list({ prefix, limit: 1 })).size === 0);
-    await initializeLobbyEffects({ tx, state, now });
+    await initializeLobbyEffects({ tx, state, now, incidentSources });
     ensure(await validPrivateReportState(privateReports, now));
     await tx.put('private-reports-v1', privateReports);
     await tx.put(SESSION_INDEX, { version: 1, entries: [] }); await tx.put(CONNECTION_INDEX, { version: 1, ids: [] }); await tx.put(RATES, mintRates); await rates(tx);
@@ -122,7 +123,7 @@ async function seed(tx, state, privateReports, now, inviteVersion, mintRates = {
 // generations before invoking this bound-only migration. No request boolean
 // establishes that operational precondition. Original raw rows are retained.
 export async function migrateLobbySessionAuthority({ storage, env, registrySnapshot, now = Date.now() } = {}) {
-    const records = createLobbyAuthorityStorage(storage);
+    const records = createLobbyAuthorityStorage(storage), incidentSources = !!lobbyIncidentSourceMode(env);
     return records.transaction(async (tx, raw) => {
         ensure(integer(now) && await tx.get(LOBBY_AUTHORITY_MARKER) === undefined && await raw.get('beta-initialized') === true);
         ensure(exact(registrySnapshot, ['v', 'sessions', 'mintRates']) && registrySnapshot.v === 1 && Array.isArray(registrySnapshot.sessions)
@@ -156,13 +157,14 @@ export async function migrateLobbySessionAuthority({ storage, env, registrySnaps
             if (page.size < 4) break;
         } while (true);
         const privateReports = await optional('private-reports-v1', { v: 1, reports: [], receipts: [] });
-        await seed(tx, { net, abuse, sessions, rooms, moderationQueue, aiReviews, modlog: [...logRows.values()] }, privateReports, now, betaVersion(env), registrySnapshot.mintRates);
+        await seed(tx, { net, abuse, sessions, rooms, moderationQueue, aiReviews, modlog: [...logRows.values()] }, privateReports, now, betaVersion(env), registrySnapshot.mintRates, incidentSources);
         await raw.setAlarm(now + INTERVAL);
     });
 }
 
 export function createLobbySessionAuthority({ storage, env, now = () => Date.now(), writeEffects = writeLobbyEffects } = {}) {
-    const records = createLobbyAuthorityStorage(storage), contexts = new WeakMap();
+    const records = createLobbyAuthorityStorage(storage), contexts = new WeakMap(), incidentSources = !!lobbyIncidentSourceMode(env);
+    const commitEffects = input => writeEffects({ ...input, now: now(), incidentSources });
     let roleSignature, roleMap;
     async function currentRoles() {
         const signature = JSON.stringify([env.HANGOUT_HMAC_KEY, env.HANGOUT_OWNER_EMAIL, env.HANGOUT_BAND_EMAILS, env.HANGOUT_MODERATOR_EMAILS]);
@@ -225,13 +227,14 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
                 return Object.keys(current).every(key => current[key] === identity[key]);
             } catch { return false; }
         },
-        writeParticipationEffects: input => writeEffects({ ...input, now: now() }),
+        writeParticipationEffects: commitEffects,
+        loadIncidentEvidence: input => { ensure(incidentSources); return loadLobbyIncidentEvidence({ ...input, now: now() }); },
         // TRUSTED CALLER-GATED recovery: the actual Lobby holds its event gate
         // for this entire read, so no app mutator or output may interleave. A
         // snapshot/flag alone does not establish that exclusion. Every native
         // read transaction remains bounded; semantic writes still use ONE tx.
         async load() {
-            const config = () => JSON.stringify([betaVersion(env), env.HANGOUT_HMAC_KEY, env.HANGOUT_OWNER_EMAIL, env.HANGOUT_BAND_EMAILS, env.HANGOUT_MODERATOR_EMAILS]);
+            const config = () => JSON.stringify([betaVersion(env), env.HANGOUT_HMAC_KEY, env.HANGOUT_OWNER_EMAIL, env.HANGOUT_BAND_EMAILS, env.HANGOUT_MODERATOR_EMAILS, env.HANGOUT_INCIDENT_SOURCE_BRIDGE]);
             const configBefore = config(), at = now();
             const capture = () => transact(async tx => ({ marker: await marker(tx), sessions: await index(tx), connections: await connections(tx), rates: await rates(tx) }));
             const before = await capture(), serialized = JSON.stringify(before);
@@ -269,7 +272,7 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
                 put: () => { throw Error('read-only-recovery'); }, delete: () => { throw Error('read-only-recovery'); }
             });
             ensure(await validPrivateReportState(await reader.get('private-reports-v1'), at));
-            const state = await readLobbyState({ tx: reader, now: at }), bindings = [];
+            const state = await readLobbyState({ tx: reader, now: at, incidentSources }), bindings = [];
             const ids = [...savedBindings.keys()];
             for (let offset = 0; offset < ids.length; offset += BATCH) {
                 const batch = await records.transaction(async tx => {
@@ -415,7 +418,7 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
                         const result = await participation.adapter.commit(participation.context, effects, { costsOnly, transaction: guarded });
                         ensure(result?.ok && guardedCompleted); return result;
                     }
-                    await guarded(tx => writeEffects({ tx, effects, costsOnly, now: now() })); return { ok: true };
+                    await guarded(tx => commitEffects({ tx, effects, costsOnly })); return { ok: true };
                 } catch { return { ok: false, reason: 'session-unavailable' }; }
             }
         })
