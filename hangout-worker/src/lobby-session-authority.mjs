@@ -10,7 +10,7 @@ import { initializeLobbyEffects, readLobbyState, writeLobbyEffects, pruneLobbyEf
 import { lobbyIncidentSourceMode } from './lobby-incident-sources.mjs';
 import { validPrivateReportState } from './private-reports.mjs';
 import { createLobby } from './lobby-core.mjs';
-import { accessPartitionedParticipationSelf, PARTICIPATION_POLICY_KEY } from './participation-partitions.mjs';
+import { accessPartitionedParticipationSelf, maintainPartitionedParticipation, PARTICIPATION_PARTITION_BOUNDS, PARTICIPATION_POLICY_KEY } from './participation-partitions.mjs';
 
 export const LOBBY_AUTHORITY_MODE = 'lobby-v1';
 export const LOBBY_AUTHORITY_MARKER = 'lobby-session-authority:v1';
@@ -440,6 +440,21 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
             await schedule(tx, raw, now()); return finish({ status: 200, reason: 'rotated' });
         }),
         maintenance: () => transact(async tx => { await pruneLobbyEffectLogs({ tx, now: now() }); }),
+        async maintainParticipation() {
+            const configured = () => env.HANGOUT_BETA_MODE === 'protected' && lobbyAuthorityMode(env) && env.HANGOUT_PARTICIPATION_AUTHORITY === 'c3-v1';
+            ensure(configured());
+            const page = { ok: true, examined: 0, deleted: 0, wrapped: false };
+            for (let i = 0; i < PARTICIPATION_PARTITION_BOUNDS.maintenancePage; i++) {
+                const result = await transact(async tx => {
+                    ensure(configured()); const current = await configuredMarker(tx);
+                    ensure(current.participationMode === 'c3-v1');
+                    return maintainPartitionedParticipation({ tx, now: now(), communityRef: current.communityRef });
+                });
+                page.examined += result.examined; page.deleted += result.deleted; page.wrapped = result.wrapped;
+                if (result.wrapped) break;
+            }
+            return Object.freeze(page);
+        },
         // Queue writes are fenced in this same domain; the queue commits its
         // memory only after this promise resolves. No unrelated transaction.
         privateStorage: (actor = () => null) => ({

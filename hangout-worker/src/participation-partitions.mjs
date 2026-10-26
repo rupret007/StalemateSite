@@ -1,10 +1,11 @@
 // Server-only C2 record partitions in ONE serializable rollback transaction
 // domain. No production route, migration, remote guardian or provider adapter.
 import { createParticipationConsents, PARTICIPATION_LEDGER_KEY, readParticipationPrincipals,
-    validParticipationLedgerState, alignParticipationLedgerPolicy, accessParticipationSelf } from './participation-consents.mjs';
+    validParticipationLedgerState, alignParticipationLedgerPolicy, expireParticipationLedgerState, accessParticipationSelf } from './participation-consents.mjs';
 
 export const PARTICIPATION_PARTITION_PREFIX = 'participation-records:v1:';
 export const PARTICIPATION_POLICY_KEY = `${PARTICIPATION_PARTITION_PREFIX}policy`;
+export const PARTICIPATION_MAINTENANCE_CURSOR_KEY = 'authority-participation-maintenance:v1';
 export const PARTICIPATION_RECORD_LIMITS = Object.freeze({ subjects: 1, guardians: 8, receipts: 16, pending: 16, operations: 32, bytes: 65536 });
 export const PARTICIPATION_PARTITION_BOUNDS = Object.freeze({ identities: 256, maintenancePage: 4, recordReadCalls: 160, recordWriteCalls: 160 });
 const PARTS = `${PARTICIPATION_PARTITION_PREFIX}record:`, ANCHORS = `${PARTICIPATION_PARTITION_PREFIX}anchor:`;
@@ -41,6 +42,7 @@ function boundedRecordTransaction(tx) {
     let reads = 0, writes = 0;
     return {
         get: key => { if (++reads > PARTICIPATION_PARTITION_BOUNDS.recordReadCalls) fail('partition-read-capacity'); return tx.get(key); },
+        list: options => { if (++reads > PARTICIPATION_PARTITION_BOUNDS.recordReadCalls) fail('partition-read-capacity'); return tx.list(options); },
         put: (key, value) => { if (++writes > PARTICIPATION_PARTITION_BOUNDS.recordWriteCalls) fail('partition-write-capacity'); return tx.put(key, value); },
         delete: key => { if (++writes > PARTICIPATION_PARTITION_BOUNDS.recordWriteCalls) fail('partition-write-capacity'); return tx.delete(key); }
     };
@@ -98,6 +100,90 @@ async function loadPartition(tx, route, policy, at) {
         }
     }
     return { state, anchor };
+}
+
+async function validateOperationReferences(tx, state, route, now) {
+    for (const old of state?.operations || []) if (old.deleteAt > now()) {
+        const saved = await tx.get(await indexKey(OPERATIONS, old.operationRef));
+        if (!validOperation(saved) || saved.operationRef !== old.operationRef || saved.kind !== old.kind
+            || saved.deleteAt !== old.deleteAt || !matchesRoute(saved, route)) fail('storage-corrupt');
+    }
+}
+
+// The factory and internal retention share route/deadline-protected reference,
+// subject-index and partition reconciliation in their supplied transaction.
+async function writePartition({ tx, loaded, value, route, now, admitSubject = null, releaseSubject = null, operation = null, operationKey = null, authorization = null }) {
+    if (JSON.stringify(value) === JSON.stringify(loaded.state)) {
+        await syncReferences(tx, loaded.state, value, route, now()); return false;
+    }
+    const subject = value.subjects[0]?.record, oldSubject = loaded.state?.subjects[0]?.record;
+    if (subject && (subject.principalRef !== route.principalRef || subject.communityRef !== route.communityRef)) fail('storage-corrupt');
+    if (!loaded.state && kinds.some(kind => value[kind].length)) {
+        if (!subject || !admitSubject || await admitSubject({ tx, principalRef: route.principalRef, communityRef: route.communityRef, partitionKey: route.partitionKey, at: now() }) !== true) fail('allocation-refused');
+    }
+    await syncReferences(tx, loaded.state, value, route, now());
+    if (oldSubject && oldSubject.subjectRef !== subject?.subjectRef) {
+        const key = await indexKey(SUBJECTS, oldSubject.subjectRef), previous = await tx.get(key);
+        if (!validAnchor(previous, route) || previous.subjectRef !== oldSubject.subjectRef) fail('storage-corrupt'); await tx.delete(key);
+    }
+    if (subject) {
+        const key = await indexKey(SUBJECTS, subject.subjectRef), previous = await tx.get(key);
+        if (previous !== undefined && (!validAnchor(previous, route) || previous.subjectRef !== subject.subjectRef)) fail('reference-conflict');
+        const anchor = { version: 1, principalRef: route.principalRef, communityRef: route.communityRef, partitionKey: route.partitionKey, subjectRef: subject.subjectRef };
+        await tx.put(key, anchor); await tx.put(route.anchorKey, anchor);
+    }
+    for (const old of loaded.state?.operations || []) if (!value.operations.some(item => item.operationRef === old.operationRef)) {
+        const key = await indexKey(OPERATIONS, old.operationRef), previous = await tx.get(key);
+        if (previous === undefined) { if (old.deleteAt > now()) fail('storage-corrupt'); continue; }
+        if (!validOperation(previous) || previous.operationRef !== old.operationRef) fail('storage-corrupt');
+        if (matchesRoute(previous, route) && previous.deleteAt === old.deleteAt) await tx.delete(key);
+        else if (old.deleteAt > now()) fail('storage-corrupt'); // Expired refs may legitimately have been reused elsewhere.
+    }
+    if (operation) {
+        const receipt = value.operations.find(item => item.operationRef === authorization.operationRef);
+        if (receipt) await tx.put(operationKey, { version: 1, operationRef: receipt.operationRef, kind: receipt.kind,
+            principalRef: route.principalRef, communityRef: route.communityRef, partitionKey: route.partitionKey, deleteAt: receipt.deleteAt });
+    }
+    if (kinds.every(kind => !value[kind].length)) {
+        if (loaded.state && releaseSubject && await releaseSubject({ tx, principalRef: route.principalRef, communityRef: route.communityRef,
+            partitionKey: route.partitionKey, at: now() }) !== true) fail('allocation-release-refused');
+        await tx.delete(route.partitionKey); await tx.delete(route.anchorKey); return true;
+    }
+    await tx.put(route.partitionKey, value); return false;
+}
+
+// Internal housekeeping, not participant/guardian authorization. The caller
+// supplies its validated authority community and ONE native transaction.
+// A missing advisory cursor starts an idempotent rescan; invalid state never
+// resets. Partition, index, reference and cursor writes commit together.
+export async function maintainPartitionedParticipation({ tx, now, communityRef } = {}) {
+    if (!integer(now) || !ref(communityRef) || ['get', 'list', 'put', 'delete'].some(name => typeof tx?.[name] !== 'function')) fail('maintenance-unavailable');
+    const bounded = boundedRecordTransaction(tx), policy = await root(bounded);
+    if (policy.config.policy.communityRef !== communityRef) fail('not-authorized');
+    const saved = await bounded.get(PARTICIPATION_MAINTENANCE_CURSOR_KEY);
+    if (saved !== undefined && (!exact(saved, ['version', 'communityRef', 'after']) || saved.version !== 1
+        || saved.communityRef !== communityRef || saved.after !== '' && !validPartitionKey(saved.after))) fail('invalid-cursor');
+    const after = saved?.after || '', page = await bounded.list({ prefix: PARTS, ...(after ? { startAfter: after } : {}), limit: 1 });
+    if (!(page instanceof Map) || page.size > 1) fail('maintenance-unavailable');
+    if (!page.size) {
+        await bounded.put(PARTICIPATION_MAINTENANCE_CURSOR_KEY, { version: 1, communityRef, after: '' });
+        return Object.freeze({ ok: true, examined: 0, deleted: 0, wrapped: true });
+    }
+    const [[key, state]] = page;
+    if (!validPartitionKey(key) || key <= after || !validParticipationLedgerState(state, PARTICIPATION_RECORD_LIMITS)) fail('storage-corrupt');
+    const principal = state.subjects[0]?.record.principalRef;
+    const anchor = principal ? null : await bounded.get(`${ANCHORS}${key.slice(PARTS.length)}`);
+    const route = await routeFor(principal || anchor?.principalRef, communityRef);
+    if (route.partitionKey !== key) fail('storage-corrupt');
+    const loaded = await loadPartition(bounded, route, policy, now);
+    if (!loaded.state) fail('storage-corrupt');
+    await validateOperationReferences(bounded, loaded.state, route, () => now);
+    const value = expireParticipationLedgerState(alignParticipationLedgerPolicy(loaded.state, policy.config, now, PARTICIPATION_RECORD_LIMITS), now, PARTICIPATION_RECORD_LIMITS);
+    // No production allocator is installed here. Expired row deletion is not
+    // an invented quota release or a new policy/guardian decision.
+    const deleted = await writePartition({ tx: bounded, loaded, value, route, now: () => now });
+    await bounded.put(PARTICIPATION_MAINTENANCE_CURSOR_KEY, { version: 1, communityRef, after: key });
+    return Object.freeze({ ok: true, examined: 1, deleted: deleted ? 1 : 0, wrapped: false });
 }
 
 // Caller-only controls composed inside the actual native authority transaction.
@@ -201,11 +287,7 @@ export function createPartitionedParticipationConsents({ storage, adapters, admi
                 if (!validAnchor(index, route) || index.subjectRef !== authorization.subjectRef) fail('storage-corrupt');
             }
             let value = alignParticipationLedgerPolicy(loaded.state, policy.config, now(), PARTICIPATION_RECORD_LIMITS);
-            for (const old of loaded.state?.operations || []) if (old.deleteAt > now()) {
-                const saved = await tx.get(await indexKey(OPERATIONS, old.operationRef));
-                if (!validOperation(saved) || saved.operationRef !== old.operationRef || saved.kind !== old.kind
-                    || saved.deleteAt !== old.deleteAt || !matchesRoute(saved, route)) fail('storage-corrupt');
-            }
+            await validateOperationReferences(tx, loaded.state, route, now);
             const operationKey = operation && await indexKey(OPERATIONS, authorization.operationRef);
             if (operation) {
                 const existing = await tx.get(operationKey);
@@ -234,41 +316,7 @@ export function createPartitionedParticipationConsents({ storage, adapters, admi
                 if (value.subjects.some(item => ['pending', 'authorized'].includes(item.record.state) && item.record.expiresAt <= now())) fail('subject-not-active');
             };
             currentTime();
-            const changed = JSON.stringify(value) !== JSON.stringify(loaded.state);
-            if (!changed) { await syncReferences(tx, loaded.state, value, route, now()); currentTime(); return result; }
-            const subject = value.subjects[0]?.record, oldSubject = loaded.state?.subjects[0]?.record;
-            if (subject && (subject.principalRef !== route.principalRef || subject.communityRef !== route.communityRef)) fail('storage-corrupt');
-            if (!loaded.state && kinds.some(kind => value[kind].length)) {
-                if (!subject || await admitSubject({ tx, principalRef: route.principalRef, communityRef: route.communityRef, partitionKey: route.partitionKey, at: now() }) !== true) fail('allocation-refused');
-            }
-            await syncReferences(tx, loaded.state, value, route, now());
-            if (oldSubject && oldSubject.subjectRef !== subject?.subjectRef) {
-                const key = await indexKey(SUBJECTS, oldSubject.subjectRef), previous = await tx.get(key);
-                if (!validAnchor(previous, route) || previous.subjectRef !== oldSubject.subjectRef) fail('storage-corrupt'); await tx.delete(key);
-            }
-            if (subject) {
-                const key = await indexKey(SUBJECTS, subject.subjectRef), previous = await tx.get(key);
-                if (previous !== undefined && (!validAnchor(previous, route) || previous.subjectRef !== subject.subjectRef)) fail('reference-conflict');
-                const anchor = { version: 1, principalRef: route.principalRef, communityRef: route.communityRef, partitionKey: route.partitionKey, subjectRef: subject.subjectRef };
-                await tx.put(key, anchor); await tx.put(route.anchorKey, anchor);
-            }
-            for (const old of loaded.state?.operations || []) if (!value.operations.some(item => item.operationRef === old.operationRef)) {
-                const key = await indexKey(OPERATIONS, old.operationRef), previous = await tx.get(key);
-                if (previous === undefined) { if (old.deleteAt > now()) fail('storage-corrupt'); continue; }
-                if (!validOperation(previous) || previous.operationRef !== old.operationRef) fail('storage-corrupt');
-                if (matchesRoute(previous, route) && previous.deleteAt === old.deleteAt) await tx.delete(key);
-                else if (old.deleteAt > now()) fail('storage-corrupt'); // Expired refs may legitimately have been reused elsewhere.
-            }
-            if (operation) {
-                const receipt = value.operations.find(item => item.operationRef === authorization.operationRef);
-                if (receipt) await tx.put(operationKey, { version: 1, operationRef: receipt.operationRef, kind: receipt.kind,
-                    principalRef: route.principalRef, communityRef: route.communityRef, partitionKey: route.partitionKey, deleteAt: receipt.deleteAt });
-            }
-            if (kinds.every(kind => !value[kind].length)) {
-                if (loaded.state && releaseSubject && await releaseSubject({ tx, principalRef: route.principalRef, communityRef: route.communityRef,
-                    partitionKey: route.partitionKey, at: now() }) !== true) fail('allocation-release-refused');
-                await tx.delete(route.partitionKey); await tx.delete(route.anchorKey);
-            } else await tx.put(route.partitionKey, value);
+            await writePartition({ tx, loaded, value, route, now, admitSubject, releaseSubject, operation, operationKey, authorization });
             currentTime(); return result;
         }) };
         const cached = { ...adapters, [['begin', 'lookup', 'selfWithdraw'].includes(authMethod) ? 'authenticateParticipant' : authMethod === 'complete' ? 'verifyConsent' : 'authenticateGuardian']: async () => clone(authorization) };

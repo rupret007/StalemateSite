@@ -15,6 +15,8 @@ import { createParticipationEnforcement } from '../../hangout-worker/src/partici
 import { writeLobbyEffects } from '../../hangout-worker/src/lobby-effect-records.mjs';
 import { createLobbyParticipation, lobbyParticipationMode } from '../../hangout-worker/src/lobby-participation.mjs';
 import { createPartitionedParticipationConsents, PARTICIPATION_POLICY_KEY } from '../../hangout-worker/src/participation-partitions.mjs';
+import * as partitionMaintenance from '../../hangout-worker/src/participation-partitions.mjs';
+import { validParticipationLedgerState } from '../../hangout-worker/src/participation-consents.mjs';
 import { PARTICIPATION_PURPOSES } from '../../hangout-worker/src/participation-policy.mjs';
 import { initializeLobbySessionAuthority, migrateLobbySessionAuthority, createLobbySessionAuthority,
     LOBBY_AUTHORITY_MARKER, LOBBY_AUTHORITY_COMMUNITY } from '../../hangout-worker/src/lobby-session-authority.mjs';
@@ -164,6 +166,167 @@ describe('explicit collocated lobby authority initialization and migration', () 
         const before = fingerprint(f.driver);
         await expect(migrateLobbySessionAuthority({ storage: f.storage, env: f.env, registrySnapshot: old.registrySnapshot, now: NOW })).rejects.toThrow();
         expect(fingerprint(f.driver)).toBe(before);
+    });
+});
+
+async function retentionEntries(authority) {
+    return authority.records.transaction(async tx => {
+        const rows = new Map(); let startAfter;
+        while (true) {
+            const page = await tx.list({ prefix: 'participation-records:v1:', limit: 4, ...(startAfter ? { startAfter } : {}) });
+            for (const [key, value] of page) { rows.set(key, value); startAfter = key; }
+            if (page.size < 4) return rows;
+        }
+    });
+}
+async function shortRetentionSubjects(f, count) {
+    const grants = await participationLedger(f);
+    for (let index = 0; index < count; index++) {
+        const person = await f.enroll('retention-' + index); await grants.grant(person.binding, { expiresIn: 100 });
+    }
+    f.advance(11001); return grants;
+}
+const retentionRecordKeys = rows => [...rows.keys()].filter(key => key.startsWith('participation-records:v1:record:'));
+
+describe('production retention on the actual authority codec and SQLite', () => {
+    it('expires a valid maximum-cardinality stored partition within unchanged logical and native transaction budgets', async () => {
+        const f = await fixture({ participation: true }), grants = await participationLedger(f), person = await f.enroll('max-retention');
+        await grants.grant(person.binding, { expiresIn: 100 });
+        const initial = await retentionEntries(f.authority), [key, template] = [...initial].find(([name]) => name.startsWith('participation-records:v1:record:'));
+        const value = clone(template), reference = (kind, index) => 'synthetic_max_' + kind + '_' + String(index).padStart(2, '0');
+        // Stored schema boundary only: this does not claim that one enrollment
+        // naturally produces this whole historical shape. All rows still pass
+        // the real validator, codec, route/index checks and retention guards.
+        value.guardians = Array.from({ length: 8 }, (_, index) => ({ ...clone(template.guardians[0]),
+            guardianRef: index ? reference('guardian', index) : template.guardians[0].guardianRef,
+            decisionRef: index ? reference('decision', index) : template.guardians[0].decisionRef }));
+        value.receipts = Array.from({ length: 16 }, (_, index) => ({ ...clone(template.receipts[0]),
+            consentRef: index ? reference('consent', index) : template.receipts[0].consentRef,
+            guardianRef: value.guardians[index % 8].guardianRef, decisionRef: index ? reference('decision', index) : template.receipts[0].decisionRef,
+            state: index ? 'superseded' : template.receipts[0].state }));
+        value.pending = Array.from({ length: 16 }, (_, index) => ({ ...clone(template.pending[0]),
+            pendingRef: index ? reference('pending', index) : template.pending[0].pendingRef }));
+        value.operations = Array.from({ length: 32 }, (_, index) => {
+            const operation = clone(template.operations[index % 2]);
+            if (index >= 2) operation.operationRef = reference('operation', index);
+            const signature = JSON.parse(operation.signature);
+            if (operation.kind === 'complete') { signature.operationRef = operation.operationRef; signature.pendingRef = value.pending[index % 16].pendingRef;
+                signature.decisionRef = value.receipts[index % 16].decisionRef; }
+            else operation.result.pendingRef = value.pending[index % 16].pendingRef;
+            operation.signature = JSON.stringify(signature); return operation;
+        });
+        const counts = ['subjects', 'guardians', 'receipts', 'pending', 'operations'].map(kind => value[kind].length);
+        expect(counts).toEqual([1, 8, 16, 16, 32]);
+        const recordBytes = Buffer.byteLength(JSON.stringify(value));
+        expect(recordBytes).toBeLessThanOrEqual(65536);
+        expect(validParticipationLedgerState(value, partitionMaintenance.PARTICIPATION_RECORD_LIMITS)).toBe(true);
+        const prefix = 'participation-records:v1:', digest = text => createHash('sha256').update(text).digest('hex'), writes = new Map();
+        const unique = (space, reference, deleteAt) => {
+            const stored = [...initial.values()].find(row => row?.partitionKey === key && row.space === space); expect(stored).toBeTruthy();
+            writes.set(prefix + 'unique:' + space + ':' + digest(reference), { ...clone(stored), reference, deleteAt });
+        };
+        for (const row of value.pending) unique('pending', row.pendingRef, row.deleteAt);
+        for (const row of value.guardians) unique('guardian', row.guardianRef, row.deleteAt);
+        for (const row of value.receipts) { unique('consent', row.consentRef, row.deleteAt); unique('decision', row.verifierRef + '\0' + row.decisionRef, row.deleteAt); }
+        for (const row of value.operations) {
+            const stored = [...initial.values()].find(item => item?.partitionKey === key && item.kind === row.kind && item.operationRef); expect(stored).toBeTruthy();
+            writes.set(prefix + 'operation:' + digest(row.operationRef), { ...clone(stored), operationRef: row.operationRef, kind: row.kind, deleteAt: row.deleteAt });
+        }
+        writes.set(key, value); expect(writes.size).toBe(89); expect(writes.size).toBeLessThanOrEqual(160);
+        await f.authority.records.transaction(async tx => { for (const [name, row] of writes) await tx.put(name, row); });
+        f.advance(10000); const healthy = await f.enroll('max-healthy'); await grants.grant(healthy.binding); f.advance(1001);
+        const before = await retentionEntries(f.authority), owned = [...before].filter(([name, row]) => name === key || row?.partitionKey === key);
+        const other = new Map([...before].filter(([name, row]) => name !== key && (name.startsWith(prefix + 'record:') || row?.principalRef === 's_' + healthy.request.sid)));
+        expect(owned).toHaveLength(91);
+        expect(partitionMaintenance.PARTICIPATION_PARTITION_BOUNDS).toMatchObject({ recordReadCalls: 160, recordWriteCalls: 160 });
+        const native = f.storage.transaction, samples = [], size = row => row === undefined ? 0 : row instanceof Uint8Array ? row.byteLength : Buffer.byteLength(JSON.stringify(row));
+        f.storage.transaction = operation => native(async raw => {
+            const start = f.driver.stats.operations.length, measured = { ...raw }; let calls = 0, readBytes = 0, writeBytes = 0;
+            // Observe actual native-handle return values; no guessed preimage
+            // bytes or new observer in production code. Errors still reject.
+            for (const name of ['get', 'list', 'put', 'delete', 'getAlarm', 'setAlarm', 'deleteAlarm']) measured[name] = async (...args) => {
+                calls++; if (name === 'put') writeBytes += size(args[1]);
+                const result = await raw[name](...args);
+                if (name === 'get') readBytes += size(result);
+                if (name === 'list') readBytes += [...result.values()].reduce((sum, row) => sum + size(row), 0);
+                return result;
+            };
+            const result = await operation(measured), events = f.driver.stats.operations.slice(start);
+            samples.push({ calls, readBytes, writeBytes, events }); return result;
+        });
+        let result;
+        try { result = await f.authority.maintainParticipation(); } finally { f.storage.transaction = native; }
+        expect(result).toEqual({ ok: true, examined: 2, deleted: 1, wrapped: true });
+        expect(samples.length).toBeLessThanOrEqual(4);
+        for (const sample of samples) { expect(sample.calls).toBe(sample.events.length); expect(sample.calls).toBeLessThanOrEqual(4096); expect(sample.readBytes).toBeLessThanOrEqual(32 * 1024 * 1024); expect(sample.writeBytes).toBeLessThanOrEqual(16 * 1024 * 1024); }
+        const after = await retentionEntries(f.authority);
+        for (const [name] of owned) expect(after.has(name)).toBe(false);
+        expect(new Map([...after].filter(([name, row]) => name.startsWith(prefix + 'record:') || row?.principalRef === 's_' + healthy.request.sid))).toEqual(other);
+        const cursorKey = partitionMaintenance.PARTICIPATION_MAINTENANCE_CURSOR_KEY;
+        expect((await f.authority.records.transaction(tx => tx.get(cursorKey))).after).toBe('');
+        const logical = event => event.key?.includes(':manifest:') ? Buffer.from(event.key.split(':manifest:')[1], 'hex').toString('ascii') : '';
+        const cleanup = samples.find(sample => sample.events.some(event => event.name === 'delete' && logical(event) === key)); expect(cleanup).toBeTruthy();
+        expect(cleanup.events.findIndex(event => event.name === 'put' && logical(event) === cursorKey)).toBeGreaterThan(cleanup.events.findIndex(event => event.name === 'delete' && logical(event) === key));
+        console.info('Stored maximum C2 retention boundary', JSON.stringify({ counts, recordBytes, ownedRowsDeleted: owned.length,
+            nativeTransactions: samples.map(({ calls, readBytes, writeBytes }) => ({ calls, readBytes, writeBytes })), logicalReadLimit: 160, logicalWriteLimit: 160 }));
+    });
+
+    it('bounds a page to four and resumes after cold reopen, wrapping before a newly inserted earlier record', async () => {
+        const f = await fixture({ participation: true }), grants = await shortRetentionSubjects(f, 5);
+        const keys = retentionRecordKeys(await retentionEntries(f.authority)); expect(keys).toHaveLength(5);
+        expect(await f.authority.maintainParticipation()).toEqual({ ok: true, examined: 4, deleted: 4, wrapped: false });
+        const cursorKey = partitionMaintenance.PARTICIPATION_MAINTENANCE_CURSOR_KEY;
+        const cursor = await f.authority.records.transaction(tx => tx.get(cursorKey)); expect(cursor.after).toBe(keys[3]);
+        // Select a deterministic fixture principal whose real resulting key
+        // sorts behind the persisted cursor. This is setup, not an auth claim.
+        let name;
+        for (let index = 0; index < 256; index++) {
+            const candidate = 'late-retention-' + index, principal = 's_' + f.registration(candidate).sid;
+            const key = 'participation-records:v1:record:' + createHash('sha256').update(LOBBY_AUTHORITY_COMMUNITY + '\0' + principal).digest('hex');
+            if (key < cursor.after) { name = candidate; break; }
+        }
+        expect(name).toBeTruthy(); const late = await f.enroll(name); await grants.grant(late.binding, { expiresIn: 100 }); f.advance(11001);
+        const lateKey = retentionRecordKeys(await retentionEntries(f.authority)).find(key => key !== keys[4]); expect(lateKey < cursor.after).toBe(true);
+        const disk = await f.reopen();
+        expect(await disk.authority.maintainParticipation()).toEqual({ ok: true, examined: 1, deleted: 1, wrapped: true });
+        expect(retentionRecordKeys(await retentionEntries(disk.authority))).toEqual([lateKey]);
+        expect((await disk.authority.maintainParticipation()).deleted).toBe(1);
+        expect(retentionRecordKeys(await retentionEntries(disk.authority))).toEqual([]);
+        expect((await disk.authority.records.transaction(tx => tx.get(cursorKey))).after).toBe('');
+    });
+
+    it.each(['partition delete', 'cursor manifest'])('rolls back an actual second-partition %s fault without losing prior committed progress', async fault => {
+        const f = await fixture({ participation: true }); await shortRetentionSubjects(f, 2);
+        const before = await retentionEntries(f.authority), keys = retentionRecordKeys(before), target = keys[1];
+        const owned = new Map([...before].filter(([key, value]) => key === target || value?.partitionKey === target));
+        const cursorKey = partitionMaintenance.PARTICIPATION_MAINTENANCE_CURSOR_KEY, rollbackCount = f.driver.stats.rollbacks;
+        let deletedTarget = false, injected = false;
+        f.hooks.after = event => {
+            const logical = event.key?.includes(':manifest:') ? Buffer.from(event.key.split(':manifest:')[1], 'hex').toString('ascii') : '';
+            if (event.name === 'delete' && logical === target) deletedTarget = true;
+            if (!injected && deletedTarget && (fault === 'partition delete' ? event.name === 'delete' && logical === target : event.name === 'put' && logical === cursorKey)) {
+                injected = true; throw Error('Synthetic post-native retention fault');
+            }
+        };
+        await expect(f.authority.maintainParticipation()).rejects.toThrow();
+        expect(injected).toBe(true); expect(deletedTarget).toBe(true); expect(f.driver.stats.rollbacks - rollbackCount).toBe(1);
+        delete f.hooks.after;
+        const after = await retentionEntries(f.authority);
+        expect(after.has(keys[0])).toBe(false);
+        expect(new Map([...after].filter(([key, value]) => key === target || value?.partitionKey === target))).toEqual(owned);
+        expect((await f.authority.records.transaction(tx => tx.get(cursorKey))).after).toBe(keys[0]);
+        expect(await f.authority.maintainParticipation()).toEqual({ ok: true, examined: 1, deleted: 1, wrapped: true });
+        expect(retentionRecordKeys(await retentionEntries(f.authority))).toEqual([]);
+    });
+
+    it.each(['ordinary mode', 'removed C3', 'missing policy', 'corrupt policy'])('refuses %s without creating housekeeping or changing state', async damage => {
+        const f = await fixture({ participation: damage !== 'ordinary mode' });
+        if (damage !== 'ordinary mode' && damage !== 'missing policy') await participationLedger(f);
+        if (damage === 'removed C3') delete f.env.HANGOUT_PARTICIPATION_AUTHORITY;
+        if (damage === 'corrupt policy') await f.authority.records.transaction(tx => tx.put(PARTICIPATION_POLICY_KEY, { corrupt: true }));
+        const before = fingerprint(f.driver);
+        await expect(f.authority.maintainParticipation()).rejects.toThrow(); expect(fingerprint(f.driver)).toBe(before);
+        expect(await f.authority.records.transaction(tx => tx.get(partitionMaintenance.PARTICIPATION_MAINTENANCE_CURSOR_KEY))).toBeUndefined();
     });
 });
 
