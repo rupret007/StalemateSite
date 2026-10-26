@@ -63,7 +63,7 @@ jobs:
             tests/runtime/beta-sessions/runner.mjs tests/runtime/beta-sessions/worker.mjs \
             hangout-worker/src/beta-sessions.mjs hangout-worker/src/beta-session-state.mjs hangout-worker/src/core.mjs hangout-worker/src/beta-session-client.mjs \
             hangout-worker/src/beta-ops.mjs hangout-worker/src/beta-auth.mjs hangout-worker/src/ai-eligibility.mjs hangout-worker/src/auth.mjs \
-            package-lock.json tests/runtime/lobby-effects/runner.mjs tests/runtime/lobby-effects/worker.mjs \
+            package-lock.json tests/runtime/lobby-effects/runner.mjs tests/runtime/lobby-effects/worker.mjs tests/runtime/lobby-effects/source-catalogue.mjs \
             hangout-worker/wrangler.beta.toml hangout-worker/src/lobby-effect-records.mjs hangout-worker/src/lobby-core.mjs \
             hangout-worker/src/community-state.mjs hangout-worker/src/filter.mjs hangout-worker/src/lobby-act.mjs hangout-worker/src/message-receipts.mjs \
             hangout-worker/src/transport-budget.mjs hangout-worker/src/participation-checkpoint.mjs r/45662413410ed051/sync-core.js r/45662413410ed051/entry-sites.mjs \

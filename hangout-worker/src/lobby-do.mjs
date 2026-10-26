@@ -374,7 +374,8 @@ export class HangoutLobby {
     }
     async authorityRequest(request, operation) {
         const reply = (status, reason, extra = {}) => Response.json({ reason, ...extra }, { status, headers: { 'Cache-Control': 'no-store' } });
-        if (!participationConfigurationValid(this.env) || !incidentSourceConfigurationValid(this.env)) return reply(503, 'application authority unavailable');
+        if (!participationConfigurationValid(this.env)) return reply(503, 'participation authority unavailable');
+        if (!incidentSourceConfigurationValid(this.env)) return reply(503, 'incident source authority unavailable');
         if (!this.authorityMode || this.env.HANGOUT_BETA_MODE !== 'protected') return reply(404, 'not found');
         if (operation === 'health' && request.method === 'GET') {
             if (this.authorityUnavailable) return healthJson({ storage: 'unavailable' }, 503);
