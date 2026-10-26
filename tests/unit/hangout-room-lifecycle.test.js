@@ -50,6 +50,16 @@ function fixture() {
     return { room, app, window, canvas, peers, sent, timers, join, mouse, flush, incoming, state: window.__lobbyRoom.state };
 }
 
+async function negotiateIncomingPeer(f) {
+    f.incoming({ ice: { candidate: 'synthetic-handshake-ice' } });
+    const pc = f.state.pcs.get('peer').pc;
+    f.incoming({ sdp: { type: 'offer', sdp: 'synthetic-handshake-offer' } });
+    await vi.waitFor(() => expect(f.state.pcs.get('peer').remoteOfferJobs).toBe(0));
+    expect(pc.signalingState).toBe('stable'); expect(pc.localDescription.type).toBe('answer');
+    f.sent.length = 0; pc.setLocalDescription.mockClear(); // Only handshake setup history.
+    return pc;
+}
+
 describe('activity work belongs to its original room lifetime', () => {
     it('discards a pending brush update when the active drawing room is replaced', () => {
         const f = fixture(); f.mouse('mousedown'); f.mouse('mousemove', 120, 72);
@@ -88,7 +98,7 @@ describe('activity work belongs to its original room lifetime', () => {
     });
 
     it('closes the old pair and drops publication of a native local description that finishes after changing rooms', async () => {
-        const f = fixture(); f.incoming({ ice: { candidate: 'synthetic' } }); const pc = f.peers[0], held = deferred();
+        const f = fixture(), pc = await negotiateIncomingPeer(f), held = deferred();
         pc.setLocalDescription.mockImplementation(() => held.promise); const work = pc.onnegotiationneeded();
         f.join('#art-second'); held.resolve({ type: 'offer', sdp: 'old-room' }); await work;
         expect(pc.setLocalDescription).toHaveBeenCalledOnce(); expect(pc.close).toHaveBeenCalledOnce(); expect(f.sent).toEqual([]);
@@ -102,7 +112,7 @@ describe('activity work belongs to its original room lifetime', () => {
     });
 
     it('does not signal a local description which finishes after teardown', async () => {
-        const f = fixture(); f.incoming({ ice: { candidate: 'synthetic' } }); const pc = f.peers[0], held = deferred();
+        const f = fixture(), pc = await negotiateIncomingPeer(f), held = deferred();
         pc.setLocalDescription.mockImplementation(async value => { await held.promise; pc.localDescription = { toJSON: () => value }; });
         const work = pc.onnegotiationneeded(); await vi.waitFor(() => expect(pc.setLocalDescription).toHaveBeenCalledOnce());
         f.room.onLeave(); held.resolve(); await work; expect(f.sent).toEqual([]);
@@ -115,6 +125,7 @@ describe('activity work belongs to its original room lifetime', () => {
         f.incoming({ ice: { candidate: 'replacement-peer' } }); const replacement = f.peers[1]; expect(replacement).toBeDefined();
         held.resolve({ type: 'answer', sdp: 'old-answer' }); await new Promise(done => setTimeout(done, 0));
         expect(old.setLocalDescription).toHaveBeenCalledOnce(); expect(old.close).toHaveBeenCalledOnce(); expect(f.sent).toEqual([]);
+        expect(await negotiateIncomingPeer(f)).toBe(replacement);
         await replacement.onnegotiationneeded(); expect(f.sent[0]).toMatchObject({ ch: '#art-first', kind: 'rtc', to: 'peer' });
     });
 
@@ -133,9 +144,9 @@ describe('activity work belongs to its original room lifetime', () => {
     });
 
     it('allows current-room painting and camera signaling without changing their wire payloads', async () => {
-        const f = fixture(); f.mouse('mousedown'); f.mouse('mousemove', 120, 72); f.flush(); f.mouse('mouseup');
+        const f = fixture(), pc = await negotiateIncomingPeer(f); f.mouse('mousedown'); f.mouse('mousemove', 120, 72); f.flush(); f.mouse('mouseup');
         expect(f.sent[0]).toMatchObject({ t: 'act', ch: '#art-first', kind: 'stroke', stroke: { pts: [[0.1, 0.1], [0.2, 0.2]] } });
-        f.incoming({ ice: { candidate: 'synthetic' } }); const pc = f.peers[0]; await pc.onnegotiationneeded();
+        await pc.onnegotiationneeded();
         expect(f.sent[1]).toEqual({ t: 'act', ch: '#art-first', kind: 'rtc', to: 'peer', sdp: { type: 'offer', sdp: 'synthetic-offer' } });
         pc.onicecandidate({ candidate: { toJSON: () => ({ candidate: 'current-room' }) } });
         expect(f.sent[2]).toEqual({ t: 'act', ch: '#art-first', kind: 'rtc', to: 'peer', ice: { candidate: 'current-room' } });

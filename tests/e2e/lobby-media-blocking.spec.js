@@ -32,12 +32,19 @@ async function scenario(browser, baseURL, width, { heldCaptureFor = null } = {})
                 if (!navigator.mediaDevices) return; // about:blank has no capture API.
                 const nativeCapture = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
                 let releaseCapture, releaseOffer, releaseRemote;
+                const earlyRtc = []; let earlyRtcBytes = 0;
                 const captureGate = heldCapture ? new Promise(resolve => { releaseCapture = resolve; }) : Promise.resolve();
                 window.__holdMedia = false;
                 window.__releaseHeldOffer = () => releaseOffer?.();
                 window.__releaseHeldCapture = () => releaseCapture?.();
                 window.__releaseHeldRemoteOffer = () => releaseRemote?.();
                 window.__releaseHeldMedia = () => { releaseOffer?.(); releaseCapture?.(); releaseRemote?.(); };
+                window.__armHeldOfferForGlare = holdIce => {
+                    releaseOffer = null; earlyRtc.length = 0; earlyRtcBytes = 0;
+                    window.__heldOfferFrom = null; window.__heldOfferReleased = false;
+                    window.__holdOffer = true; window.__holdEarlyRtc = holdIce;
+                    window.__glarePhase = (window.__glarePhase || 0) + 1;
+                };
                 navigator.mediaDevices.getUserMedia = constraints => {
                     window.__captureCalls += 1;
                     const capture = nativeCapture(constraints);
@@ -62,7 +69,7 @@ async function scenario(browser, baseURL, width, { heldCaptureFor = null } = {})
                     candidateFragmentMatchesSelected: candidate?.usernameFragment ? selectorValid && attr(selected, 'ice-ufrag') === candidate.usernameFragment : null };
                 };
                 window.__mediaDiagnostics = []; window.__mediaControlTotals = {}; let sequence = 0;
-                const record = entry => { window.__mediaDiagnostics.push({ atMs: Math.round(performance.now()), ...entry }); if (window.__mediaDiagnostics.length > 200) window.__mediaDiagnostics.shift(); };
+                const record = entry => { window.__mediaDiagnostics.push({ atMs: Math.round(performance.now()), phase: window.__glarePhase || 0, ...entry }); if (window.__mediaDiagnostics.length > 200) window.__mediaDiagnostics.shift(); };
                 const frame = (direction, raw) => {
                     try {
                         const item = JSON.parse(raw);
@@ -81,13 +88,20 @@ async function scenario(browser, baseURL, width, { heldCaptureFor = null } = {})
                     constructor(...args) {
                         super(...args);
                         this.addEventListener('message', event => {
-                            if (heldCapture && window.__holdMedia && !releaseOffer) {
+                            if (heldCapture && (window.__holdMedia || window.__holdOffer)) {
                                 let item; try { item = JSON.parse(event.data); } catch { /* Not application JSON. */ }
-                                if (item?.t === 'act' && item.kind === 'rtc' && item.sdp?.type === 'offer') {
+                                if (!window.__heldOfferReleased && window.__holdEarlyRtc && item?.t === 'act' && item.kind === 'rtc' && item.ice) {
+                                    event.stopImmediatePropagation();
+                                    if (earlyRtc.length >= 64 || earlyRtcBytes + event.data.length > 65536) throw new Error('bounded native fixture early-ICE overflow');
+                                    earlyRtc.push(event.data); earlyRtcBytes += event.data.length; return;
+                                }
+                                if (!releaseOffer && item?.t === 'act' && item.kind === 'rtc' && item.sdp?.type === 'offer') {
                                     event.stopImmediatePropagation();
                                     releaseOffer = () => {
                                         if (window.__heldOfferReleased) return;
                                         window.__heldOfferReleased = true; this.dispatchEvent(new MessageEvent('message', { data: event.data }));
+                                        for (const data of earlyRtc.splice(0)) this.dispatchEvent(new MessageEvent('message', { data }));
+                                        earlyRtcBytes = 0;
                                     };
                                     window.__heldOfferFrom = item.from; return;
                                 }
@@ -100,7 +114,7 @@ async function scenario(browser, baseURL, width, { heldCaptureFor = null } = {})
                 const NativePC = window.RTCPeerConnection;
                 window.RTCPeerConnection = class extends NativePC {
                     constructor(...args) {
-                        super(...args); this.__probeId = ++sequence; this.__nativeIce = 0; this.__localStarts = 0; this.__nativeNegotiations = 0;
+                        super(...args); this.__probeId = ++sequence; this.__nativeIce = 0; this.__localStarts = 0; this.__nativeNegotiations = 0; this.__trackAdds = 0;
                         this.addEventListener('negotiationneeded', () => {
                             this.__nativeNegotiations += 1; record({ pc: this.__probeId, op: 'native-negotiation', state: this.signalingState });
                         });
@@ -115,12 +129,17 @@ async function scenario(browser, baseURL, width, { heldCaptureFor = null } = {})
                         this.addEventListener('icegatheringstatechange', () => record({ pc: this.__probeId, op: 'gathering', state: this.iceGatheringState }));
                     }
                     addTransceiver(...args) { record({ pc: this.__probeId, op: 'manual-transceiver' }); return super.addTransceiver(...args); }
+                    addTrack(...args) { this.__trackAdds += 1; record({ pc: this.__probeId, op: 'track-add', state: this.signalingState, hasRemote: !!this.remoteDescription }); return super.addTrack(...args); }
+                    close() { record({ pc: this.__probeId, op: 'close', state: this.signalingState, hasCurrentRemote: !!this.currentRemoteDescription }); return super.close(); }
                     async setLocalDescription(description) {
                         this.__localStarts += 1;
-                        record({ pc: this.__probeId, op: 'local-start', argument: description?.type || 'auto', state: this.signalingState });
+                        record({ pc: this.__probeId, op: 'local-start', argument: description?.type || 'auto', state: this.signalingState, hasCurrentRemote: !!this.currentRemoteDescription });
                         try {
                             const native = super.setLocalDescription(description);
-                            if (window.__releaseOfferAtLocalStart && !window.__heldOfferReleased) window.__releaseHeldOffer();
+                            if (window.__releaseOfferAtLocalStart && !window.__heldOfferReleased) {
+                                window.__glareOldPc = this; window.__glareStartedEstablished = !!this.currentRemoteDescription;
+                                window.__releaseHeldOffer();
+                            }
                             await native;
                             this.__localSnapshot = this.localDescription?.toJSON(); record({ pc: this.__probeId, op: 'local', argument: description?.type || 'auto', type: this.localDescription?.type, state: this.signalingState });
                         }
@@ -186,7 +205,7 @@ const diagnosticState = page => page.evaluate(async () => ({
         });
         return { id, probe: entry.pc.__probeId, generatedIce: entry.pc.__nativeIce, signaling: entry.pc.signalingState,
             gathering: entry.pc.iceGatheringState, ice: entry.pc.iceConnectionState, connected: entry.pc.connectionState,
-            localPresent: !!entry.pc.localDescription, localType: entry.pc.localDescription?.type,
+            localPresent: !!entry.pc.localDescription, localType: entry.pc.localDescription?.type, hasCurrentRemote: !!entry.pc.currentRemoteDescription, hasPendingRemote: !!entry.pc.pendingRemoteDescription,
             candidateLines: (entry.pc.localDescription?.sdp.match(/^a=candidate:/gm) || []).length, localCandidates: local, remoteCandidates: remote, pairStates, decoded,
             localShape: window.__safeMediaSdp(entry.pc.localDescription), remoteShape: window.__safeMediaSdp(entry.pc.remoteDescription) };
     }))
@@ -261,15 +280,14 @@ for (const width of [375, 390]) test(`pending incoming offer fences native negot
         await expect.poll(() => receiver.evaluate(() => !!window.__heldOfferFrom && window.__lobbyRoom.state.pcs.has(window.__heldOfferFrom))).toBe(true);
         await receiver.evaluate(() => window.__releaseHeldOffer());
         await expect.poll(() => receiver.evaluate(() => !!window.__pendingNativeOffer)).toBe(true);
-        // The application has accepted the real incoming offer and invoked SRD;
-        // its wrapper holds the native effect. Completing opted-in capture now
-        // adds a real track and dispatches native negotiationneeded in that gap.
+        // Capture resolving while accepted SRD is held keeps a passive PC
+        // trackless until the native receiver exists under the offer fence.
         await receiver.evaluate(() => window.__releaseHeldCapture());
-        await expect.poll(() => receiver.evaluate(() => [...window.__lobbyRoom.state.pcs.values()][0]?.pc.__nativeNegotiations > 0)).toBe(true);
+        await expect.poll(() => receiver.evaluate(() => !!window.__lobbyRoom.state.stream)).toBe(true);
         const pending = await receiver.evaluate(() => {
             const entry = [...window.__lobbyRoom.state.pcs.values()][0];
             return { polite: entry.polite, capture: window.__captureCalls, hasStream: !!window.__lobbyRoom.state.stream,
-                localStarts: entry.pc.__localStarts, nativeNegotiations: entry.pc.__nativeNegotiations,
+                localStarts: entry.pc.__localStarts, nativeNegotiations: entry.pc.__nativeNegotiations, trackAdds: entry.pc.__trackAdds,
                 localType: entry.pc.localDescription?.type || null, remoteType: entry.pc.remoteDescription?.type || null };
         });
         console.log('Pending native remote-offer invocation window', JSON.stringify({ width, ...pending }));
@@ -301,6 +319,7 @@ for (const width of [375, 390]) test(`pending incoming offer fences native negot
         console.log('Pending remote-offer functional outcome', JSON.stringify({ width, decoded: !functionalError, laterRenegotiated: later,
             participants: await Promise.all([alpha, bravo].map(diagnosticState)) }));
         expect(pending.localStarts).toBe(0); expect(pending.localType).toBeNull(); expect(pending.remoteType).toBeNull();
+        expect(pending.trackAdds).toBe(0); expect(pending.nativeNegotiations).toBe(0);
         if (functionalError) throw functionalError;
         expect(later).toBe(true); expect(app.errors).toEqual([]);
         for (const page of [alpha, bravo]) expect(await page.evaluate(() => window.__captureCalls)).toBe(1);
@@ -312,7 +331,7 @@ for (const width of [375, 390]) test(`pending incoming offer fences native negot
 
 for (const width of [375, 390]) test(`an already-invoked native offer survives polite glare and later renegotiation at ${width}px`, async ({ browser, baseURL }) => {
     const app = await scenario(browser, baseURL, width, { heldCaptureFor: '*' });
-    let receiver, alpha, bravo, decoded = false, later = false;
+    let receiver, alpha, bravo, decoded = false, later = false, establishedGlare = false, initialProof = null, establishedProof = null;
     try {
         alpha = await app.guest('stalemate', 'GlareAlpha'); bravo = await app.guest('rad-dad', 'GlareBravo');
         await alpha.click('nav [data-show="rooms"]'); await alpha.click('[data-start="art"]');
@@ -321,19 +340,39 @@ for (const width of [375, 390]) test(`an already-invoked native offer survives p
         const ids = await Promise.all([alpha, bravo].map(page => page.evaluate(() => window.__lobbyRoom.state.myId)));
         for (const id of ids) expect(id).toMatch(/^c[a-f0-9]{32}$/);
         const sender = ids[0] < ids[1] ? alpha : bravo; receiver = sender === alpha ? bravo : alpha;
-        await receiver.evaluate(() => { window.__holdMedia = true; window.__releaseOfferAtLocalStart = true; });
+        await receiver.evaluate(() => {
+            window.__holdMedia = true; window.__armHeldOfferForGlare(true); window.__releaseOfferAtLocalStart = true;
+        });
         await camera(sender); await requestCamera(receiver);
-        await expect.poll(() => receiver.evaluate(() => !!window.__heldOfferFrom && window.__lobbyRoom.state.pcs.has(window.__heldOfferFrom))).toBe(true);
-        // Completing actual capture invokes native SLD through negotiationneeded.
-        // Its probe dispatches the genuine held peer offer synchronously AFTER
-        // calling native SLD, BEFORE awaiting completion/ICE tasks. The incoming
-        // offer fence cannot retroactively prevent that already-started call.
+        // Hold the genuine offer AND its early ICE until capture creates an
+        // active outgoing PC. Incoming early-ICE PCs are now correctly passive.
+        await expect.poll(() => receiver.evaluate(() => !!window.__heldOfferFrom && window.__lobbyRoom.state.pcs.size === 0)).toBe(true);
         await receiver.evaluate(() => window.__releaseHeldCapture());
+        // The native SLD probe still dispatches the genuine held peer offer
+        // synchronously AFTER native SLD invocation, BEFORE awaiting completion.
         await expect.poll(() => receiver.evaluate(() => !!window.__heldOfferReleased)).toBe(true);
         for (const page of [alpha, bravo]) await expect.poll(async () => {
             const peers = await peerState(page); return peers.length === 1 && peers[0].connected === 'connected' && peers[0].decoded > 0;
         }).toBe(true);
         decoded = true;
+        initialProof = await receiver.evaluate(() => {
+            const old = window.__glareOldPc, entry = [...window.__lobbyRoom.state.pcs.values()][0], events = window.__mediaDiagnostics.filter(event => event.phase === 1);
+            const oldDone = events.findIndex(event => event.pc === old.__probeId && event.op === 'local' && event.type === 'offer');
+            const retired = events.findIndex(event => event.pc === old.__probeId && event.op === 'close');
+            const remoteDone = events.findIndex(event => event.pc === entry.pc.__probeId && event.op === 'remote' && event.type === 'offer');
+            const tracks = events.findIndex(event => event.pc === entry.pc.__probeId && event.op === 'track-add');
+            const answer = events.findIndex(event => event.pc === entry.pc.__probeId && event.op === 'local-start');
+            return { oldProbe: old.__probeId, freshProbe: entry.pc.__probeId, startedEstablished: window.__glareStartedEstablished,
+                retired: old !== entry.pc && old.signalingState === 'closed', passiveAnswer: oldDone >= 0 && retired > oldDone && remoteDone > retired && tracks > remoteDone && answer > tracks,
+                oldRolledBack: events.some(event => event.pc === old.__probeId && event.op === 'local-start' && event.argument === 'rollback'),
+                trackAdds: entry.pc.__trackAdds, localSections: (entry.pc.localDescription.sdp.match(/^m=/gm) || []).length,
+                sharedCaptureLive: window.__lobbyRoom.state.stream.getTracks().every(track => track.readyState === 'live'),
+                hasCurrentRemote: !!entry.pc.currentRemoteDescription };
+        });
+        expect(initialProof).toMatchObject({ startedEstablished: false, retired: true, passiveAnswer: true, oldRolledBack: false, trackAdds: 1, localSections: 1, sharedCaptureLive: true, hasCurrentRemote: true });
+        expect(initialProof.freshProbe).not.toBe(initialProof.oldProbe);
+
+        // Preserve the existing ordinary later renegotiation requirement.
         const before = await Promise.all([alpha, bravo].map(peerState));
         const localBefore = await receiver.evaluate(() => {
             const pc = [...window.__lobbyRoom.state.pcs.values()][0].pc, count = pc.__localStarts;
@@ -348,17 +387,48 @@ for (const width of [375, 390]) test(`an already-invoked native offer survives p
             const peer = (await peerState(page))[0]; return peer.connected === 'connected' && peer.decoded > before[index][0].decoded;
         }).toBe(true);
         later = true;
-        const nativeOrder = await receiver.evaluate(() => window.__mediaDiagnostics.filter(event => event.pc === 1));
-        const ownStart = nativeOrder.findIndex(event => event.op === 'local-start' && event.argument === 'auto');
-        const ownDone = nativeOrder.findIndex(event => event.op === 'local' && event.argument === 'auto' && event.type === 'offer');
-        const rollbackStart = nativeOrder.findIndex(event => event.op === 'local-start' && event.argument === 'rollback');
-        const rollbackDone = nativeOrder.findIndex(event => event.op === 'local' && event.argument === 'rollback');
-        const remoteStart = nativeOrder.findIndex(event => event.op === 'remote-start' && event.type === 'offer');
-        expect(ownStart >= 0 && ownDone > ownStart && rollbackStart > ownDone && rollbackDone > rollbackStart && remoteStart > rollbackDone).toBe(true);
-        expect(app.errors).toEqual([]);
+
+        // Now collide two genuine offers on the ESTABLISHED transport. Change
+        // only the unused second transceiver's direction: no capture, ICE
+        // restart or additional media section is needed for this control.
+        await receiver.evaluate(() => {
+            window.__establishedGlarePc = [...window.__lobbyRoom.state.pcs.values()][0].pc;
+            window.__armHeldOfferForGlare(true);
+        });
+        const establishedBefore = await Promise.all([alpha, bravo].map(peerState));
+        const requestDirectionChange = page => page.evaluate(() => {
+            const pc = [...window.__lobbyRoom.state.pcs.values()][0].pc, transceiver = pc.getTransceivers()[1];
+            if (!transceiver) return false;
+            transceiver.direction = transceiver.direction === 'sendrecv' ? 'sendonly' : 'sendrecv'; return true;
+        });
+        expect(await requestDirectionChange(sender)).toBe(true);
+        await expect.poll(() => receiver.evaluate(() => !!window.__heldOfferFrom)).toBe(true);
+        expect(await requestDirectionChange(receiver)).toBe(true);
+        await expect.poll(() => receiver.evaluate(() => !!window.__heldOfferReleased)).toBe(true);
+        for (const [index, page] of [alpha, bravo].entries()) await expect.poll(async () => {
+            const peer = (await peerState(page))[0];
+            return peer.signaling === 'stable' && peer.connected === 'connected' && peer.decoded > establishedBefore[index][0].decoded;
+        }).toBe(true);
+        establishedProof = await receiver.evaluate(() => {
+            const entry = [...window.__lobbyRoom.state.pcs.values()][0], events = window.__mediaDiagnostics.filter(event => event.phase === 2 && event.pc === entry.pc.__probeId);
+            const ownStart = events.findIndex(event => event.op === 'local-start' && event.argument === 'auto');
+            const ownDone = events.findIndex(event => event.op === 'local' && event.argument === 'auto' && event.type === 'offer');
+            const rollbackStart = events.findIndex(event => event.op === 'local-start' && event.argument === 'rollback');
+            const rollbackDone = events.findIndex(event => event.op === 'local' && event.argument === 'rollback');
+            const remoteStart = events.findIndex(event => event.op === 'remote-start' && event.type === 'offer');
+            return { samePc: entry.pc === window.__establishedGlarePc && entry.pc === window.__glareOldPc,
+                probe: entry.pc.__probeId, startedEstablished: window.__glareStartedEstablished,
+                orderedRollback: ownStart >= 0 && events[ownStart].hasCurrentRemote && ownDone > ownStart && rollbackStart > ownDone && rollbackDone > rollbackStart && remoteStart > rollbackDone,
+                closed: events.some(event => event.op === 'close'), trackAdds: entry.pc.__trackAdds,
+                localSections: (entry.pc.localDescription.sdp.match(/^m=/gm) || []).length,
+                hasCurrentRemote: !!entry.pc.currentRemoteDescription };
+        });
+        expect(establishedProof).toMatchObject({ samePc: true, startedEstablished: true, orderedRollback: true, closed: false, trackAdds: 1, localSections: 2, hasCurrentRemote: true });
+        expect(establishedProof.probe).toBe(initialProof.freshProbe);
+        establishedGlare = true; expect(app.errors).toEqual([]);
         for (const page of [alpha, bravo]) expect(await page.evaluate(() => window.__captureCalls)).toBe(1);
     } finally {
-        if (alpha && bravo) console.log('Already-invoked native glare outcome', JSON.stringify({ width, decoded, laterRenegotiated: later,
+        if (alpha && bravo) console.log('Already-invoked native glare outcome', JSON.stringify({ width, decoded, laterRenegotiated: later, establishedGlare, initialProof, establishedProof,
             participants: await Promise.all([alpha, bravo].map(diagnosticState)),
             events: await Promise.all([alpha, bravo].map(page => page.evaluate(() => window.__mediaDiagnostics))) }));
         if (receiver && !receiver.isClosed()) await receiver.evaluate(() => window.__releaseHeldMedia());

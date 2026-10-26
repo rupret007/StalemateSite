@@ -569,9 +569,7 @@
                 // Signaling can create a receive-only pair while the browser
                 // permission/capture promise is pending. Add our opted-in
                 // tracks to those current pairs too, without another capture.
-                for (const entry of state.pcs.values()) if (entry.current()) {
-                    for (const track of got.getTracks()) if (!entry.pc.getSenders().some(sender => sender.track === track)) entry.pc.addTrack(track, got);
-                }
+                for (const entry of state.pcs.values()) entry.attachLocalTracks();
                 for (const id of state.peers) if (!state.pcs.has(id)) openPc(id);
                 layoutTiles();
             } catch (e) { /* denied */ }
@@ -603,13 +601,17 @@
             return state.names.has(id) && !(Array.isArray(c?.mediaBlocked) && c.mediaBlocked.includes(id));
         }
 
-        function openPc(id) {
+        function openPc(id, { passive = false } = {}) {
             if (!state.ch || state.ch !== app.active || state.pcs.has(id) || id === state.myId || !mediaPeerAllowed(id)) return;
             const channel = state.ch, generation = roomGeneration;
             const pc = new RTCPeerConnection({ iceServers: state.ice || STUN });
             const polite = (state.myId || '') > id;
-            const entry = { pc, polite, makingOffer: false, offerNeeded: false, remoteOfferJobs: 0, localOperation: null, settingRemoteAnswer: false, ignoreOffer: false, descriptionEpoch: 0, pendingIce: [], stream: new MediaStream() };
+            const entry = { pc, polite, remoteReady: !passive, makingOffer: false, offerNeeded: false, remoteOfferJobs: 0, localOperation: null, settingRemoteAnswer: false, ignoreOffer: false, descriptionEpoch: 0, pendingIce: [], stream: new MediaStream() };
             entry.current = () => generation === roomGeneration && state.ch === channel && app.active === channel && state.pcs.get(id) === entry && mediaPeerAllowed(id);
+            entry.attachLocalTracks = () => {
+                if (!entry.current() || !entry.remoteReady || !state.stream) return;
+                for (const track of state.stream.getTracks()) if (!pc.getSenders().some(sender => sender.track === track)) pc.addTrack(track, state.stream);
+            };
             entry.writeLocalDescription = async description => {
                 // Publish ownership before native invocation: native wrappers can
                 // synchronously deliver a peer offer before returning a promise.
@@ -640,7 +642,7 @@
                 // Accepted remote offers own SRD through answer publication.
                 // A paced answer must get its raw send attempt before another
                 // local description invalidates its queued SDP identity/epoch.
-                if (!entry.current() || !entry.offerNeeded || entry.makingOffer || entry.remoteOfferJobs || pc.signalingState !== 'stable'
+                if (!entry.current() || !entry.remoteReady || !entry.offerNeeded || entry.makingOffer || entry.remoteOfferJobs || pc.signalingState !== 'stable'
                     || activity.queue.some(item => item.entry === entry && item.sdp?.type === 'answer')) return;
                 entry.offerNeeded = false;
                 entry.makingOffer = true;
@@ -664,26 +666,30 @@
                 entry.offerNeeded = true;
                 return entry.pumpOffer();
             };
-            if (state.stream) state.stream.getTracks().forEach((t) => pc.addTrack(t, state.stream));
+            entry.attachLocalTracks();
             // An incoming offer creates its receiver through native SRD. An
             // empty PC created by early ICE must not invent a competing offer
             // while the visitor's opted-in camera capture is still pending.
+            return entry;
         }
 
         async function onRtc(from, msg) {
             if (!mediaPeerAllowed(from)) return;
-            if (!state.pcs.has(from)) openPc(from);
-            const entry = state.pcs.get(from);
+            const operationChannel = state.ch, operationGeneration = roomGeneration;
+            if (!state.pcs.has(from)) openPc(from, { passive: true });
+            let entry = state.pcs.get(from);
             if (!entry?.current()) return;
-            const pc = entry.pc;
+            let pc = entry.pc;
             try {
                 if (msg.sdp) {
+                    if (msg.sdp.type === 'answer' && !entry.remoteReady) { closePc(from, entry); return; }
                     const readyForOffer = !entry.makingOffer && (pc.signalingState === 'stable' || entry.settingRemoteAnswer);
                     const collision = msg.sdp.type === 'offer' && !readyForOffer;
                     entry.ignoreOffer = collision && !entry.polite;
                     if (entry.ignoreOffer) return;
                     const offer = msg.sdp.type === 'offer';
                     if (offer) { entry.descriptionEpoch += 1; entry.remoteOfferJobs += 1; }
+                    let offerOwner = offer ? entry : null;
                     const answer = msg.sdp.type === 'answer';
                     let completed = false;
                     try {
@@ -692,14 +698,32 @@
                             if (localOperation) await localOperation.done;
                             if (!entry.current()) return;
                             if (pc.signalingState === 'have-local-offer' && !entry.settingRemoteAnswer) {
-                                await entry.writeLocalDescription({ type: 'rollback' });
-                                if (!entry.current()) return;
+                                if (collision && entry.polite && !pc.currentRemoteDescription && !pc.remoteDescription) {
+                                    // Initial polite glare has no negotiated remote
+                                    // transport to preserve. Retire only this pair;
+                                    // its fresh answerer waits for SRD before tracks.
+                                    const retired = entry, earlyIce = retired.pendingIce.slice(0, 64);
+                                    if (!closePc(from, retired)) return;
+                                    if (operationGeneration !== roomGeneration || operationChannel !== state.ch || app.active !== operationChannel || !mediaPeerAllowed(from)) return;
+                                    const fresh = openPc(from, { passive: true });
+                                    if (!fresh?.current()) { if (fresh) closePc(from, fresh); return; }
+                                    // Transfer this handler's counter only after
+                                    // allocation succeeds; old callbacks own theirs.
+                                    offerOwner.remoteOfferJobs -= 1;
+                                    entry = fresh; pc = fresh.pc; offerOwner = fresh;
+                                    entry.remoteOfferJobs += 1; entry.descriptionEpoch += 1;
+                                    entry.pendingIce.push(...earlyIce);
+                                } else {
+                                    await entry.writeLocalDescription({ type: 'rollback' });
+                                    if (!entry.current()) return;
+                                }
                             }
                         }
                         if (answer) entry.settingRemoteAnswer = true;
                         try { await pc.setRemoteDescription(msg.sdp); }
                         finally { if (answer) entry.settingRemoteAnswer = false; }
                         if (!entry.current()) return;
+                        entry.remoteReady = true; entry.attachLocalTracks();
                         for (const ice of entry.pendingIce.splice(0)) {
                             try { await pc.addIceCandidate(ice); } catch (_) { /* stale negotiation */ }
                             if (!entry.current()) return;
@@ -714,7 +738,7 @@
                         }
                         completed = true;
                     } finally {
-                        if (offer) entry.remoteOfferJobs -= 1;
+                        if (offerOwner) offerOwner.remoteOfferJobs -= 1;
                         if (completed) entry.pumpOffer();
                     }
                 } else if (msg.ice) {
@@ -724,8 +748,9 @@
             } catch (e) { /* */ }
         }
 
-        function closePc(id) {
+        function closePc(id, expected = null) {
             const e = state.pcs.get(id);
+            if (expected && e !== expected) return false;
             state.pcs.delete(id);
             if (e) {
                 e.offerNeeded = false;
@@ -738,6 +763,7 @@
                 e.pc.close();
             }
             layoutTiles();
+            return true;
         }
 
         function layoutTiles() {

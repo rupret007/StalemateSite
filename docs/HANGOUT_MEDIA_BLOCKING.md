@@ -41,19 +41,26 @@ bookkeeping. Updated clients retire only the affected peer connection and
 received tracks, remove its tile and invalidate queued negotiation. Unrelated
 participants and shared local capture continue. Pending capture attaches its
 tracks once to still-allowed existing receive-only peers when it completes.
-Early ICE may create an empty peer connection while capture is pending. The
-incoming offer creates its receiving transceiver through the native browser;
-the client does not invent a competing receive-only offer during that wait.
+Incoming signaling creates a passive peer connection. Its local-track attachment
+and offer generation wait until a genuine incoming offer has been applied,
+including when capture finishes during that native operation. The incoming
+offer creates its receiving transceiver through the browser; attaching the
+already opted-in track then reuses the eligible sender without another capture.
 Accepted incoming offers also hold a per-peer operation fence through native
 answer creation. Later negotiation work is retained and starts when that fence
 clears and the answer has received its raw send attempt. This is not a server
 acknowledgement. Block, room exit and transport failure prevent stale work from
 resuming; a native failure does not start a retry loop.
-If a polite peer accepts an offer after its own native local-description call
-has begun, it waits for that owned operation and explicitly rolls back a pending
-local offer before applying the remote offer. Ownership is recorded before the
-native call; close releases waiting work, and each later phase checks that the
-peer is still current. Rollback remains native-only, never a new wire message.
+If a polite peer accepts a simultaneous offer after its own native local-
+description call has begun, it first waits for that owned operation. Only an
+initial pending local offer with no current or pending remote description may
+retire that unestablished connection and use a fresh passive answerer. This
+preserves shared capture and bounded early incoming ICE, purges the retired
+entry's output and rechecks room/Block/current-entry authority. Established
+peers keep their connection and explicitly await native rollback before applying
+the remote offer. Ownership is recorded before the native call; close releases
+waiting work, and each later phase checks that the peer is still current.
+Rollback and initial transport retirement introduce no new wire message.
 An already-pending remote answer keeps its existing native answer-then-offer order.
 
 Policy outputs use the existing effect-commit boundary. A failed commit must
@@ -108,8 +115,11 @@ Verify the [demo journey](HANGOUT_DEMO_GUIDE.md) at 375/390px with actual decode
 camera frames before Block, pair teardown, continuing third-peer frames,
 parallel-device/nickname/entry changes and mutual unblock.
 Run the separate pending-capture/early-ICE startup regression at both widths too.
-Cover a pending remote-description operation, deferred camera changes and
-completed later renegotiation. After mutual unblock, require all four visitors'
+Cover an initial simultaneous offer, a pending remote-description operation,
+capture finishing during that operation, retirement during Block/leave, and
+genuine established-peer glare with the same connection retained. Ordinary
+later renegotiation does not prove established glare. After mutual unblock,
+require all four visitors'
 twelve directed video paths to be stable, connected and decoding.
 Synthetic RTC in the local SQLite authority proof verifies signaling and storage,
 not camera capture,

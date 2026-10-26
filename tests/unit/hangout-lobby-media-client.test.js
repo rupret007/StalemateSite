@@ -13,7 +13,7 @@ const windows = [];
 afterEach(() => { for (const dom of windows.splice(0)) dom.window.close(); });
 const deferred = () => { let resolve; return { promise: new Promise(done => { resolve = done; }), resolve: value => resolve(value) }; };
 
-async function fixture({ inboundBeforeCapture = false, receiveOnly = false, clock = null, onSend = null } = {}) {
+async function fixture({ inboundBeforeCapture = false, holdCapture = false, receiveOnly = false, clock = null, onSend = null, onCreate = null } = {}) {
     const dom = new JSDOM(html, { url: 'http://127.0.0.1:4320/', runScripts: 'outside-only' }); windows.push(dom);
     const { window } = dom, peers = [], sent = [];
     const timers = new Map(); let timerId = 0;
@@ -30,23 +30,29 @@ async function fixture({ inboundBeforeCapture = false, receiveOnly = false, cloc
     window.BobRoss = { EPISODES: [], label: () => '' };
     window.MediaStream = class { tracks = []; addTrack(track) { this.tracks.push(track); } getTracks() { return this.tracks; } getVideoTracks() { return this.tracks; } };
     const localTrack = { stop: vi.fn(), kind: 'video' }, stream = new window.MediaStream(); stream.addTrack(localTrack);
-    const heldCapture = deferred(), capture = vi.fn(async () => { if (inboundBeforeCapture) await heldCapture.promise; return stream; });
+    const heldCapture = deferred(), capture = vi.fn(async () => { if (inboundBeforeCapture || holdCapture) await heldCapture.promise; return stream; });
     Object.defineProperty(window.navigator, 'mediaDevices', { value: { getUserMedia: capture } });
     window.RTCPeerConnection = class {
-        signalingState = 'stable'; remoteDescription = null; senders = [];
+        signalingState = 'stable'; remoteDescription = null; currentRemoteDescription = null; senders = [];
         // A synthetic outgoing ICE event belongs to a known native description,
         // just as the real browser fixture's gathered candidates do.
         localDescription = { type: 'offer', sdp: 'native-current-description', toJSON: () => ({ type: 'offer', sdp: 'native-current-description' }) };
-        constructor() { peers.push(this); }
+        constructor() { peers.push(this); onCreate?.(this, peers.length); }
         createOffer = vi.fn(async () => ({ type: 'offer', sdp: 'synthetic-offer' }));
         createAnswer = vi.fn(async () => ({ type: 'answer', sdp: 'synthetic-answer' }));
         setLocalDescription = vi.fn(async value => {
-            if (value?.type === 'rollback') { this.localDescription = null; this.signalingState = 'stable'; return; }
+            if (value?.type === 'rollback') { this.localDescription = null; this.remoteDescription = this.currentRemoteDescription; this.signalingState = 'stable'; return; }
             const chosen = value || { type: this.signalingState === 'have-remote-offer' ? 'answer' : 'offer', sdp: 'native-current-description' };
             this.localDescription = { ...chosen, toJSON: () => chosen }; this.signalingState = chosen.type === 'answer' ? 'stable' : 'have-local-offer';
+            if (chosen.type === 'answer') this.currentRemoteDescription = this.remoteDescription;
         });
-        setRemoteDescription = vi.fn(async value => { this.remoteDescription = value; this.signalingState = value.type === 'offer' ? 'have-remote-offer' : 'stable'; });
-        addIceCandidate = vi.fn(async () => {}); addTransceiver = vi.fn(); addTrack = vi.fn(track => { this.senders.push({ track }); }); getSenders = () => this.senders; close = vi.fn();
+        setRemoteDescription = vi.fn(async value => {
+            if (value.type === 'answer' && this.signalingState !== 'have-local-offer') throw new Error('synthetic unsolicited native answer');
+            this.remoteDescription = value; this.signalingState = value.type === 'offer' ? 'have-remote-offer' : 'stable';
+            if (value.type === 'answer') this.currentRemoteDescription = value;
+        });
+        addIceCandidate = vi.fn(async () => {}); addTransceiver = vi.fn(); addTrack = vi.fn(track => { this.senders.push({ track }); }); getSenders = () => this.senders;
+        close = vi.fn(() => { this.signalingState = 'closed'; });
     };
     window.eval(core); window.eval(client);
     const channel = { name: '#art-safety', kind: 'art', myCam: true, mediaBlocked: [], names: [
@@ -59,10 +65,15 @@ async function fixture({ inboundBeforeCapture = false, receiveOnly = false, cloc
         await vi.waitFor(() => expect(capture).toHaveBeenCalledOnce());
         room.onAct({ ch: channel.name, kind: 'rtc', from: 'peer', ice: { candidate: 'before-capture' } }); heldCapture.resolve();
     }
-    await vi.waitFor(() => expect(window.__lobbyRoom.state.stream).toBe(stream));
+    if (holdCapture) await vi.waitFor(() => expect(capture).toHaveBeenCalledOnce());
+    else await vi.waitFor(() => expect(window.__lobbyRoom.state.stream).toBe(stream));
     const state = window.__lobbyRoom.state;
     const policy = ids => { channel.mediaBlocked = ids; room.onChan(channel); };
     const incoming = extra => room.onAct({ ch: channel.name, kind: 'rtc', from: 'peer', ...extra });
+    if (inboundBeforeCapture) {
+        incoming({ sdp: { type: 'offer', sdp: 'genuine-inbound-offer-after-capture' } });
+        await vi.waitFor(() => expect(state.pcs.get('peer').pc.getSenders().some(sender => sender.track === localTrack)).toBe(true));
+    }
     const advance = ms => {
         clock.at += ms;
         for (const [id, timer] of [...timers]) if (timer.at <= clock.at) { timers.delete(id); timer.fn(); }
@@ -72,7 +83,12 @@ async function fixture({ inboundBeforeCapture = false, receiveOnly = false, cloc
         for (const [type, clientX] of [['mousedown', x], ['mousemove', x + 2], ['mouseup', x + 2]])
             canvas.dispatchEvent(new window.MouseEvent(type, { button: 0, clientX, clientY: 100, bubbles: true }));
     };
-    sent.length = 0; return { window, room, state, peers, sent, capture, localTrack, channel, app, policy, incoming, advance, draw, selectVideo };
+    sent.length = 0; return { window, room, state, peers, sent, capture, localTrack, stream, releaseCapture: heldCapture.resolve, channel, app, policy, incoming, advance, draw, selectVideo };
+}
+
+function established(pc) {
+    pc.currentRemoteDescription = pc.remoteDescription = { type: 'answer', sdp: 'previously-negotiated-native-answer' };
+    pc.connectionState = 'new'; // A negotiated transport need not be connected yet.
 }
 
 // ICE credentials are deliberately synthetic. These tests exercise only the
@@ -107,6 +123,113 @@ function actualEngine(clock) {
 }
 
 describe('public-room Block retires only the affected pair', () => {
+    it('answers initial polite glare on one fresh passive pair, preserving bounded remote ICE and global pacing', async () => {
+        const heldRemote = deferred();
+        const f = await fixture({ clock: { at: 1800000000000 }, onCreate: (pc, index) => {
+            if (index === 3) { const native = pc.setRemoteDescription.getMockImplementation(); pc.setRemoteDescription.mockImplementation(async value => { await heldRemote.promise; return native(value); }); }
+        } });
+        const old = f.state.pcs.get('peer'), third = f.state.pcs.get('third'), oldIce = old.pc.onicecandidate, oldNegotiation = old.pc.onnegotiationneeded;
+        for (let i = 0; i < 12; i++) oldIce({ candidate: { toJSON: () => ({ candidate: `old-local-${i}` }) } });
+        await oldNegotiation(); expect(f.sent).toHaveLength(8);
+        const incomingIce = Array.from({ length: 64 }, (_, index) => ({ candidate: `remote-before-fresh-${index}` }));
+        old.pendingIce.push(...incomingIce);
+        f.incoming({ sdp: { type: 'offer', sdp: 'genuine-initial-glare-offer' } });
+        try {
+            await vi.waitFor(() => expect(f.state.pcs.get('peer')).not.toBe(old));
+            const fresh = f.state.pcs.get('peer');
+            expect(fresh).toBeDefined(); expect(f.peers).toHaveLength(3); expect(old.pc.close).toHaveBeenCalledOnce();
+            expect(old.pendingIce).toEqual([]); expect(old.remoteOfferJobs).toBe(0); expect(fresh.remoteOfferJobs).toBe(1);
+            expect(fresh.pendingIce).toEqual(incomingIce); expect(fresh.pc.addTrack).not.toHaveBeenCalled();
+            f.incoming({ ice: { candidate: 'remote-beyond-the-existing-cap' } }); expect(fresh.pendingIce).toHaveLength(64);
+            oldIce({ candidate: { toJSON: () => ({ candidate: 'retired-local-callback' }) } }); await oldNegotiation();
+            expect(old.pc.setLocalDescription).toHaveBeenCalledOnce();
+            heldRemote.resolve(); await vi.waitFor(() => expect(fresh.pc.localDescription.type).toBe('answer'));
+            expect(fresh.pc.addTrack).toHaveBeenCalledExactlyOnceWith(f.localTrack, f.stream);
+            expect(fresh.pc.addIceCandidate.mock.calls.map(([ice]) => ice)).toEqual(incomingIce);
+            expect(fresh.remoteOfferJobs).toBe(0); expect(f.state.pcs.get('third')).toBe(third); expect(f.state.stream).toBe(f.stream);
+            expect(f.sent).toHaveLength(8); // Replacement does not refill the shared activity bucket.
+            for (let i = 0; i < 32; i++) f.advance(125);
+            expect(f.sent.filter(frame => frame.sdp).map(frame => frame.sdp.type)).toEqual(['answer']);
+            expect(f.sent.filter(frame => frame.ice).map(frame => frame.ice.candidate)).toEqual(Array.from({ length: 8 }, (_, i) => `old-local-${i}`));
+            expect(f.capture).toHaveBeenCalledOnce(); expect(f.localTrack.stop).not.toHaveBeenCalled();
+        } finally { heldRemote.resolve(); await new Promise(resolve => setTimeout(resolve, 0)); }
+    });
+
+    it.each(['block', 'leave/rejoin'])('does not insert a fresh initial pair when %s occurs during retirement', async action => {
+        const f = await fixture(), old = f.state.pcs.get('peer'), third = f.state.pcs.get('third');
+        await old.pc.onnegotiationneeded(); f.sent.length = 0;
+        old.pc.close.mockImplementationOnce(() => {
+            old.pc.signalingState = 'closed';
+            if (action === 'block') f.policy(['peer']);
+            else { f.room.onLeave(); f.channel.myCam = false; f.room.onJoin(f.channel, { strokes: [] }); }
+        });
+        f.incoming({ sdp: { type: 'offer', sdp: 'initial-offer-crossing-retirement' } });
+        await vi.waitFor(() => expect(old.pc.close).toHaveBeenCalledOnce());
+        await new Promise(resolve => setTimeout(resolve, 0));
+        expect(f.state.pcs.has('peer')).toBe(false); expect(f.peers).toHaveLength(2); expect(old.remoteOfferJobs).toBe(0);
+        expect(f.sent.filter(frame => frame.sdp)).toEqual([]); expect(f.capture).toHaveBeenCalledOnce();
+        if (action === 'block') { expect(f.state.pcs.get('third')).toBe(third); expect(f.localTrack.stop).not.toHaveBeenCalled(); }
+        else expect(f.localTrack.stop).toHaveBeenCalledOnce();
+    });
+
+    it('releases the old accepted-offer counter if fresh native allocation fails', async () => {
+        const f = await fixture({ onCreate: (_pc, index) => { if (index === 3) throw new Error('synthetic fresh native allocation failure'); } });
+        const old = f.state.pcs.get('peer'), third = f.state.pcs.get('third');
+        await old.pc.onnegotiationneeded(); f.sent.length = 0;
+        f.incoming({ sdp: { type: 'offer', sdp: 'initial-offer-before-allocation-failure' } });
+        await vi.waitFor(() => expect(old.pc.close).toHaveBeenCalledOnce()); await new Promise(resolve => setTimeout(resolve, 0));
+        expect(f.state.pcs.has('peer')).toBe(false); expect(old.remoteOfferJobs).toBe(0);
+        expect(f.state.pcs.get('third')).toBe(third); expect(f.sent.filter(frame => frame.sdp)).toEqual([]);
+        expect(f.capture).toHaveBeenCalledOnce(); expect(f.localTrack.stop).not.toHaveBeenCalled();
+    });
+
+    it('keeps an early-ICE passive pair trackless until its genuine incoming offer has been applied', async () => {
+        const f = await fixture({ holdCapture: true });
+        f.incoming({ ice: { candidate: 'genuine-early-remote-ice' } }); const pc = f.state.pcs.get('peer').pc;
+        f.releaseCapture(); await vi.waitFor(() => expect(f.state.stream).toBe(f.stream));
+        await pc.onnegotiationneeded();
+        expect(pc.addTrack).not.toHaveBeenCalled(); expect(pc.setLocalDescription).not.toHaveBeenCalled();
+        f.incoming({ sdp: { type: 'offer', sdp: 'genuine-offer-after-passive-capture' } });
+        await vi.waitFor(() => expect(pc.localDescription.type).toBe('answer'));
+        expect(pc.addTrack).toHaveBeenCalledExactlyOnceWith(f.localTrack, f.stream); expect(f.capture).toHaveBeenCalledOnce();
+    });
+
+    it.each(['answer', 'block', 'leave'])('defers pending capture attachment through held incoming SRD until %s', async action => {
+        const heldRemote = deferred();
+        const f = await fixture({ holdCapture: true, onCreate: (pc, index) => {
+            if (index === 1) { const native = pc.setRemoteDescription.getMockImplementation(); pc.setRemoteDescription.mockImplementation(async value => { await heldRemote.promise; return native(value); }); }
+        } });
+        f.incoming({ sdp: { type: 'offer', sdp: 'held-passive-remote-offer' } }); const entry = f.state.pcs.get('peer'), pc = entry.pc;
+        try {
+            await vi.waitFor(() => expect(pc.setRemoteDescription).toHaveBeenCalledOnce());
+            f.releaseCapture(); await vi.waitFor(() => expect(f.state.stream).toBe(f.stream));
+            const third = f.state.pcs.get('third');
+            expect(pc.addTrack).not.toHaveBeenCalled(); expect(pc.setLocalDescription).not.toHaveBeenCalled();
+            if (action === 'block') f.policy(['peer']);
+            if (action === 'leave') f.room.onLeave();
+            heldRemote.resolve(); await new Promise(resolve => setTimeout(resolve, 0));
+            if (action === 'answer') {
+                await vi.waitFor(() => expect(pc.localDescription.type).toBe('answer'));
+                expect(pc.addTrack).toHaveBeenCalledExactlyOnceWith(f.localTrack, f.stream);
+            } else {
+                expect(pc.addTrack).not.toHaveBeenCalled(); expect(pc.setLocalDescription).not.toHaveBeenCalled(); expect(f.state.pcs.has('peer')).toBe(false);
+                if (action === 'block') { expect(f.state.pcs.get('third')).toBe(third); expect(f.localTrack.stop).not.toHaveBeenCalled(); }
+                else expect(f.localTrack.stop).toHaveBeenCalledOnce();
+            }
+            expect(f.capture).toHaveBeenCalledOnce();
+        } finally { heldRemote.resolve(); f.releaseCapture(); await new Promise(resolve => setTimeout(resolve, 0)); }
+    });
+
+    it('does not invent a local offer or attach capture for an unsolicited answer on a new passive pair', async () => {
+        const f = await fixture({ holdCapture: true });
+        f.incoming({ sdp: { type: 'answer', sdp: 'unsolicited-initial-answer' } });
+        await new Promise(resolve => setTimeout(resolve, 0));
+        const pc = f.peers[0]; expect(pc.setLocalDescription).not.toHaveBeenCalled(); expect(pc.addTrack).not.toHaveBeenCalled();
+        expect(f.sent.filter(frame => frame.sdp)).toEqual([]);
+        f.releaseCapture(); await vi.waitFor(() => expect(f.state.stream).toBe(f.stream));
+        expect(pc.addTrack).not.toHaveBeenCalled(); expect(f.capture).toHaveBeenCalledOnce();
+    });
+
     it('delivers an SDP offer after a native ICE burst through the actual engine without exhausting its activity allowance', async () => {
         const clock = { at: 1800000000000 }, { engine, received } = actualEngine(clock);
         const f = await fixture({ clock, onSend: frame => engine.message('self', JSON.stringify(frame)) }); received.length = 0;
@@ -390,6 +513,7 @@ describe('public-room Block retires only the affected pair', () => {
 
     it('invalidates queued SDP before an incoming offer performs its native rollback', async () => {
         const f = await fixture({ clock: { at: 1800000000000 } }), pc = f.state.pcs.get('peer').pc, held = deferred();
+        established(pc);
         for (let i = 0; i < 8; i++) pc.onicecandidate({ candidate: { toJSON: () => ({ candidate: `initial-${i}` }) } });
         await pc.onnegotiationneeded();
         pc.setRemoteDescription.mockImplementation(async description => { await held.promise; pc.remoteDescription = description; pc.signalingState = 'have-remote-offer'; });
@@ -551,6 +675,7 @@ describe('public-room Block retires only the affected pair', () => {
 
     it('waits for reentrant local completion and explicit rollback before applying the accepted peer offer', async () => {
         const f = await fixture(), pc = f.state.pcs.get('peer').pc, heldLocal = deferred(), heldRollback = deferred(), order = [];
+        established(pc);
         const nativeLocal = pc.setLocalDescription.getMockImplementation(), nativeRemote = pc.setRemoteDescription.getMockImplementation();
         pc.setRemoteDescription.mockImplementation(async value => { order.push('remote'); return nativeRemote(value); });
         pc.setLocalDescription.mockImplementation(async value => {
@@ -578,6 +703,7 @@ describe('public-room Block retires only the affected pair', () => {
 
     it('rechecks queued rollback eligibility and keeps overlapping accepted offers fenced', async () => {
         const f = await fixture(), entry = f.state.pcs.get('peer'), pc = entry.pc;
+        established(pc);
         const heldLocal = deferred(), heldRollback = deferred(), heldRemote = deferred(), rollbackStates = [];
         const nativeLocal = pc.setLocalDescription.getMockImplementation(), nativeRemote = pc.setRemoteDescription.getMockImplementation();
         pc.setLocalDescription.mockImplementation(async value => {
@@ -612,6 +738,7 @@ describe('public-room Block retires only the affected pair', () => {
 
     it.each(['local completion', 'explicit rollback'])('does not resume retired incoming signaling after Block during %s', async phase => {
         const f = await fixture(), entry = f.state.pcs.get('peer'), third = f.state.pcs.get('third'), pc = entry.pc;
+        established(pc);
         const heldLocal = deferred(), heldRollback = deferred(), nativeLocal = pc.setLocalDescription.getMockImplementation();
         let localCompleted = false;
         pc.setLocalDescription.mockImplementation(async value => {
@@ -646,6 +773,7 @@ describe('public-room Block retires only the affected pair', () => {
 
     it('does not publish an obsolete generated offer while a newer peer offer waits for its local completion', async () => {
         const f = await fixture(), entry = f.state.pcs.get('peer'), pc = entry.pc, held = deferred();
+        established(pc);
         const nativeLocalEffect = pc.setLocalDescription.getMockImplementation();
         let firstCompleted = false;
         pc.setLocalDescription.mockImplementationOnce(async value => {
