@@ -448,7 +448,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     channels.set(LOBBY, mkChannel(LOBBY, 'lobby', 'The lobby', null));
 
     // ---------- helpers ----------
-    const safetyFrames = new Set(['sharing-stopped', 'notice', 'report-status', 'pm-setting', 'entry-source']);
+    const safetyFrames = new Set(['sharing-stopped', 'notice', 'report-status', 'pm-setting', 'entry-source', 'message-result']);
     const out = (c, msg) => {
         if (c.safetyOnly && !safetyFrames.has(msg.t)) return;
         try { if (outputBatch) outputBatch.push([c.id, msg]); else send(c.id, msg); } catch (e) { /* gone */ }
@@ -763,7 +763,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             cams: new Set(), since: now(), lastNick: 0, tokens: L.burst, last: now(), frames: 0, lastSaid: {}, actTokens: L.actBurst, actLast: now() };
         conns.set(id, c);
         if (band) { net.lastBand = now(); if (net.shieldAuto || net.lockAuto) bot(c, 'A saved safety state needs review: fans can read but not talk while the lobby is read-only. Check the band panel; /lobby unlock and /shieldoff when you are ready.'); saveNet(); }
-        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, roomKeep: 1 } });
+        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, roomKeep: 1, messageResults: 1 } });
         return { ok: true };
     }
 
@@ -841,6 +841,21 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const maxBytes = f.t === 'act' || jamEnvelope ? L.actFrameBytes : L.frameBytes;
         if (raw.length > maxBytes) return kill(c, 4400, 'bad frame');
         if (c.frames > L.framesPerConnection) return kill(c, 4429, 'frame cap');
+        // Per-request opt-in after the numeric hello capability. This token
+        // lives only on the call stack and the caller's staged result, never
+        // on published lines, receipts, queues or persistent connections.
+        const ordinaryText = value => typeof value === 'string' && value.trim()
+            && (!value.startsWith('/') || value.startsWith('//'));
+        const ordinarySay = f.t === 'say' && ordinaryText(f.text) && typeof f.ch === 'string'
+            && (/^#[a-z0-9-]{2,30}$/i.test(f.ch) || isPrivateContext(f.ch) && moderationNick(f.ch.slice(3)));
+        const ordinaryPm = f.t === 'cmd' && f.name === 'msg' && Array.isArray(f.args) && f.args.length === 2
+            && moderationNick(f.args[0]) && typeof f.args[1] === 'string' && f.args[1].trim()
+            && typeof f.ch === 'string' && lc(f.ch) === `pm:${lc(f.args[0])}`;
+        const feedback = Object.hasOwn(f, 'clientMessageId') && typeof f.clientMessageId === 'string'
+            && /^[a-f0-9]{32}$/.test(f.clientMessageId) && (ordinarySay || ordinaryPm)
+            ? { id: f.clientMessageId, status: 'rejected' } : null;
+        const result = feedback ? status => { feedback.status = status; } : undefined;
+        try {
         if (c.safetyOnly) return safetyOnlyMessage(c, f);
         if (!c.nick && f.t !== 'hello') return bot(c, 'Pick a nickname first.', 'error');
         if (f.t === 'entry-source') {
@@ -863,20 +878,25 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         case 'say': {
             const text = typeof f.text === 'string' ? f.text : '';
             if (text.startsWith('/') && !text.startsWith('//')) return runLine(c, f.ch, text);
-            if (isPrivateContext(f.ch)) return privmsg(c, f.ch.slice(3), text.replace(/^\/\//, '/'));
-            return say(c, f.ch, text.replace(/^\/\//, '/'), false);
+            if (isPrivateContext(f.ch)) return privmsg(c, f.ch.slice(3), text.replace(/^\/\//, '/'), false, result);
+            return say(c, f.ch, text.replace(/^\/\//, '/'), false, result);
         }
         case 'cmd': {
             const name = lc(f.name);
             const args = jamEnvelope ? ['invitation', typeof f.args[1] === 'string' ? f.args[1] : '']
                 : Array.isArray(f.args) ? f.args.slice(0, 8).map((a) => String(a).slice(0, 300)) : [];
-            return command(c, f.ch, name, args, Object.hasOwn(f, 'roomInstance') ? f.roomInstance : undefined);
+            return command(c, f.ch, name, args, Object.hasOwn(f, 'roomInstance') ? f.roomInstance : undefined, result);
         }
         case 'report': return report(c, String(f.id || ''), f.text);
         case 'cam': return cam(c, f.ch, !!f.on, f.adult18 === true);
         case 'act': return roomAct(c, f);
         case 'admin-refresh': if (isStaff(c) && c.admin) out(c, { t: 'admin', state: { ...adminState(), capabilities: capabilities(c) } }); return undefined;
         default: return kill(c, 4400, 'bad frame');
+        }
+        } finally {
+            // Existing durable/controlled output staging also withholds this
+            // result. A failed transaction discards it with the actual output.
+            if (feedback) out(c, { t: 'message-result', id: feedback.id, status: feedback.status });
         }
     }
 
@@ -943,7 +963,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         return false;
     }
 
-    function command(c, where, name, args, roomInstance) {
+    function command(c, where, name, args, roomInstance, messageResult) {
         if (!limited(c, 'command', 10, 1, true)) return;
         if (roomsBroken && !['help', 'list', 'names', 'whois', 'part', 'quit', 'lobby', 'log'].includes(name)) return bot(c, 'Storage needs administrator recovery before changes can continue.', 'error');
         const alias = { j: 'join', leave: 'part', m: 'msg', q: 'query', w: 'whois', who: 'names', exit: 'quit', bye: 'quit', h: 'help', '?': 'help', deny: 'decline', approveheld: 'approve' };
@@ -981,7 +1001,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             || name === 'mode' && String(args[0] || '').startsWith('+'));
         if (growsRoom && !roomCapacity()) return bot(c, 'Room storage is full. Clear an idle canvas or remove unused room grants before adding more.', 'error');
         const fn = handlers[name];
-        return fn(c, chan, args, roomInstance);
+        return fn(c, chan, args, roomInstance, messageResult);
     }
 
     const target = (c, nick) => {
@@ -1329,10 +1349,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (!t) return bot(c, `No such nick: ${String(n || '').slice(0, 20)}`, 'error');
             return say(c, chan.name, `slaps ${t.nick} around a bit with a large trout`, true);
         },
-        msg(c, chan, [to, ...words]) {
+        msg(c, chan, [to, ...words], _roomInstance, messageResult) {
             if (/^#/.test(to || '')) { const room = ch(to); if (!room || !room.members.has(c.id)) return bot(c, `You're not in ${String(to).slice(0, 30)}.`, 'error'); return say(c, room.name, words.join(' '), false); }
             if (lc(to) === lc(BOT)) return handlers.help(c);
-            return privmsg(c, to, words.join(' '));
+            return privmsg(c, to, words.join(' '), false, messageResult);
         },
         query(c, _chan, [to]) { return privmsg(c, to, ''); },
         accept(c, _chan, [n]) {
@@ -1827,7 +1847,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         return undefined;
     }
 
-    function say(c, where, rawText, action) {
+    function say(c, where, rawText, action, messageResult) {
         if (!limited(c, 'chat', L.burst, L.perSecond)) return;
         const chan = ch(where);
         if (!chan || !chan.members.has(c.id)) return bot(c, 'You are not in that room.', 'error');
@@ -1864,9 +1884,12 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             saveModerationQueue();
             bot(c, 'Your message is waiting for a moderator to OK it.');
             log(BOT, 'filter-hold', c.nick, v.reason, chan.name);
+            messageResult?.('held');
             return undefined;
         }
-        return publish(chan, line, c.dev, true);
+        const published = publish(chan, line, c.dev, true);
+        messageResult?.('published');
+        return published;
     }
 
     function publish(chan, line, dev, reviewNewPublicLine = false) {
@@ -1993,7 +2016,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
     }
 
-    function privmsg(c, to, rawText, action = false) {
+    function privmsg(c, to, rawText, action = false, messageResult) {
         prunePendingPm();
         const t = byNick(to);
         if (!t || t === c) return bot(c, `No such nick: ${String(to || '').slice(0, 20)}`, 'error');
@@ -2004,7 +2027,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         requireParticipation(c, 'requestDirectContact', t);
         if (p && p.state === 'open') {
             if (!rawText) return out(c, { t: 'pm-open', with: t.nick });
-            return deliverPm(c, t, rawText, action);
+            return deliverPm(c, t, rawText, action, messageResult);
         }
         if (!pendingPmAllowed(c, t)) return bot(c, `${t.nick} isn't taking PMs.`, 'error');
         if ([...pm.values()].filter((x) => x.state === 'pending').length >= SESSION_PM_PENDING) return bot(c, 'Private request allowance is full. Try again later.', 'error');
@@ -2022,10 +2045,12 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (p && p.state === 'pending') return bot(c, `Still waiting for ${t.nick} to accept.`);
         pm.set(k, { state: 'pending', from: c.dev, fromId: c.id, toId: t.id, first, firstMe: !!action, at: now() });
         out(t, { t: 'pm-request', from: c.nick, band: isBand(c) });
-        return bot(c, `PM request sent to ${t.nick}. It opens if they accept.`);
+        bot(c, `PM request sent to ${t.nick}. It opens if they accept.`);
+        messageResult?.('pending');
+        return undefined;
     }
 
-    function deliverPm(from, to, rawText, action = false) {
+    function deliverPm(from, to, rawText, action = false, messageResult) {
         if (!limited(from, 'chat', L.burst, L.perSecond)) return;
         if (!isBand(from) && !consumeDaily(from)) return;
         if (!isBand(from) && (net.lock === 'readonly' || budgetLevel() !== 'ok')) return bot(from, 'The lobby is read-only right now, PMs too.', 'error');
@@ -2042,6 +2067,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         rememberDelivery({ ...msg, ch: `pm:${from.nick}>${to.nick}` }, { authorDev: from.dev, recipients });
         out(from, msg);
         if (!to.ignores.has(lc(from.nick))) out(to, msg);
+        messageResult?.('published');
         return undefined;
     }
 

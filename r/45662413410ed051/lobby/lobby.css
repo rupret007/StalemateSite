@@ -156,6 +156,15 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .conversation-starters button { padding: 6px 9px; min-height: 32px; color: #c4d8ac; background: transparent; border: 1px solid #46593a; font: 10px var(--mono); }
 .conversation-starters button:hover { background: #2b3921; }
 .network-note { flex: none; margin: 0; padding: 10px 20px; color: var(--amber); font-size: 12px; background: #2b2519; border-bottom: 1px solid #5f5030; }
+.message-recovery { flex: none; min-height: 0; max-height: min(180px, 27dvh); overflow: auto; padding: 8px 12px; border-top: 1px solid #65725d; color: var(--amber); background: #211f17; font-size: 12px; overflow-wrap: anywhere; }
+.chat.has-saved-messages .lobby-welcome { display: none; }
+.chat.has-saved-messages .buffer { min-height: 48px; }
+.message-recovery p { margin: 0 0 5px; }
+.message-recovery ul { list-style: none; margin: 0; padding: 0; }
+.message-recovery li + li { border-top: 1px solid #4f4b38; margin-top: 7px; padding-top: 7px; }
+.message-recovery .saved-message-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.message-recovery .saved-message-text { white-space: pre-wrap; color: var(--cream); }
+[data-message-copy-text] { width: 100%; min-width: 0; max-width: 100%; font: 16px/1.5 var(--mono); }
 .buffer { flex: 1; min-height: 100px; margin: 0; padding: 14px 24px; list-style: none; overflow-y: auto; color: #e1e4d9; font: 12px/1.85 var(--mono); overflow-wrap: anywhere; scrollbar-width: thin; scrollbar-color: #465144 transparent; }
 .buffer li { padding: 2px 5px; border-left: 2px solid transparent; }
 .buffer li:hover { background: #ffffff03; }

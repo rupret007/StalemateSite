@@ -58,6 +58,159 @@ import { createEntrySharing } from './entry-sharing.mjs';
     const slug = () => `${pick(WORDS)}-${pick(THINGS)}`.replace(/[^a-z0-9-]/g, '');
 
     const app = window.__lobby = { ws: null, me: '', role: 'fan', band: false, chans: new Map(), pms: new Map(), active: '#stalemate', rooms: [], ignores: new Set(), pending: null };
+    // Copies are tab memory only. Weak context IDs do not retain a departed
+    // room's transcript, and no copy or nonce enters browser storage/analytics.
+    const savedMessages = new Map();
+    const recoveryContexts = new WeakMap(), recoveryDrafts = new WeakMap();
+    let nextRecoveryContext = 0, recoveryBytes = 2, messageEpoch = 0, recoveryLifecycle = 0;
+    let messageResultsSupported = false, copyingMessage = null;
+    function recoveryContext() {
+        const view = store(app.active);
+        if (!view) return null;
+        if (!recoveryContexts.has(view)) recoveryContexts.set(view, ++nextRecoveryContext);
+        return { key: app.active, context: recoveryContexts.get(view), revision: recoveryDrafts.get(view) || 0 };
+    }
+    function recoveryDraftChanged() {
+        const view = store(app.active);
+        if (view) recoveryDrafts.set(view, (recoveryDrafts.get(view) || 0) + 1);
+        drawMessageRecovery();
+    }
+    function canRestoreMessage(record) {
+        const current = recoveryContext();
+        return connectionState === 'connected' && !sessionEnded && !app.localMediaPaused && !app.sharingStopped
+            && record.status !== 'waiting' && record.epoch === messageEpoch && current
+            && current.key === record.key && current.context === record.context && current.revision === record.revision
+            && !$('[data-text]').value;
+    }
+    function forgetSavedMessage(record) {
+        if (savedMessages.get(record.id) !== record) return;
+        clearTimeout(record.timer); savedMessages.delete(record.id); recoveryBytes -= record.bytes;
+        if (copyingMessage === record.id) closeMessageCopy();
+        drawMessageRecovery();
+    }
+    function closeMessageCopy() {
+        const dialog = $('[data-message-copy]'), id = copyingMessage;
+        const restore = dialog.contains(document.activeElement) || id && document.activeElement === document.body;
+        copyingMessage = null; $('[data-message-copy-text]').value = ''; $('[data-message-copy-label]').textContent = '';
+        if (dialog.open) dialog.close();
+        if (restore) {
+            const row = [...$('[data-message-recovery-list]').children].find(node => node.dataset.messageId === id);
+            const copy = savedMessages.has(id) && row?.querySelector('[data-message-action="copy"]');
+            const target = [copy, $('[data-text]'), $('[data-reconnect]'), $('[data-sharing-leave]')]
+                .find(node => node && !node.disabled && !node.closest('[hidden]') && getComputedStyle(node).display !== 'none');
+            target?.focus({ preventScroll: true });
+        }
+    }
+    function clearMessageRecovery() {
+        recoveryLifecycle++; messageEpoch++;
+        for (const record of savedMessages.values()) clearTimeout(record.timer);
+        savedMessages.clear(); recoveryBytes = 2; closeMessageCopy(); drawMessageRecovery();
+    }
+    function messageTarget(record) { return record.key.startsWith('pm:') ? `PM with ${record.key.slice(3)}` : record.key; }
+    async function copySavedMessage(record) {
+        if (savedMessages.get(record.id) !== record) return;
+        const lifecycle = recoveryLifecycle;
+        try {
+            if (!navigator.clipboard?.writeText) throw Error('manual-copy');
+            await navigator.clipboard.writeText(record.text);
+            if (lifecycle === recoveryLifecycle && savedMessages.get(record.id) === record) toast('Saved text copied. Nothing was sent again.');
+        } catch {
+            // An auth/session change during clipboard work must not revive its
+            // private fallback text in a later visitor's admitted session.
+            if (lifecycle !== recoveryLifecycle || savedMessages.get(record.id) !== record) return;
+            copyingMessage = record.id;
+            $('[data-message-copy-label]').textContent = `Saved locally for ${messageTarget(record)}. It may already have arrived.`;
+            $('[data-message-copy-text]').value = record.text;
+            $('[data-message-copy]').showModal(); $('[data-message-copy-text]').focus(); $('[data-message-copy-text]').select();
+        }
+    }
+    function drawMessageRecovery() {
+        const region = $('[data-message-recovery]'), list = $('[data-message-recovery-list]');
+        const focused = region.contains(document.activeElement) ? {
+            id: document.activeElement.closest('[data-message-id]')?.dataset.messageId,
+            action: document.activeElement.dataset.messageAction
+        } : null;
+        region.hidden = savedMessages.size === 0; $('.chat').classList.toggle('has-saved-messages', savedMessages.size > 0); list.replaceChildren();
+        const counts = ['waiting', 'rejected', 'held', 'pending', 'uncertain'].flatMap(status => {
+            const count = [...savedMessages.values()].filter(record => record.status === status).length;
+            return count ? [`${count} ${{ waiting: 'awaiting result', rejected: 'not sent', held: 'held for review', pending: 'PM request pending', uncertain: 'unconfirmed' }[status]}`] : [];
+        });
+        const summary = savedMessages.size ? `${savedMessages.size} saved message ${savedMessages.size === 1 ? 'copy' : 'copies'}: ${counts.join(', ')}. `
+            + (connectionState === 'offline' ? 'A message may have arrived. Copy or discard it before choosing Try again; reconnecting clears these copies.' : 'Only in this tab. Restore never sends automatically.') : '';
+        if ($('[data-message-recovery-status]').textContent !== summary) $('[data-message-recovery-status]').textContent = summary;
+        const context = recoveryContext();
+        for (const record of savedMessages.values()) {
+            const row = document.createElement('li'); row.dataset.messageId = record.id;
+            const label = document.createElement('p');
+            const status = { waiting: 'Waiting for the server result.', rejected: 'Message was not sent.', held: 'Held for moderator review instead of publishing. It may be approved later.',
+                pending: 'PM request queued instead of delivering. It may arrive after acceptance.', uncertain: record.legacy ? 'This server cannot confirm this send. It may have arrived.' : 'Send result is unconfirmed. It may have arrived.' }[record.status];
+            label.textContent = `${messageTarget(record)} — ${status}`; row.append(label);
+            if (record.epoch === messageEpoch && context?.key === record.key && context.context === record.context) {
+                const text = document.createElement('p'); text.className = 'saved-message-text'; text.textContent = record.text; row.append(text);
+            }
+            const actions = document.createElement('div'); actions.className = 'saved-message-actions';
+            const button = (label, action, fn) => {
+                const control = document.createElement('button'); control.type = 'button'; control.className = 'btn btn--small';
+                control.dataset.messageAction = action; control.textContent = label; control.addEventListener('click', fn); actions.append(control); return control;
+            };
+            button('Restore draft', 'restore', () => {
+                if (!canRestoreMessage(record)) return;
+                if (record.status !== 'rejected' && !confirm('This message may still arrive or be published. Restoring can create a duplicate if you send it again, and does not cancel the original. Restore the draft?')) return;
+                $('[data-text]').value = record.text; drafts.set(record.key, record.text);
+                recoveryDraftChanged(); forgetSavedMessage(record); $('[data-text]').focus({ preventScroll: true });
+            }).disabled = !canRestoreMessage(record);
+            button('Copy', 'copy', () => copySavedMessage(record)).setAttribute('aria-label', 'Copy saved text');
+            button('Discard', 'discard', () => forgetSavedMessage(record)).setAttribute('aria-label', 'Discard saved copy');
+            row.append(actions); list.append(row);
+        }
+        if (focused) {
+            const row = [...list.children].find(node => node.dataset.messageId === focused.id);
+            const target = row?.querySelector(`[data-message-action="${focused.action}"]`);
+            if (target && !target.disabled) target.focus({ preventScroll: true });
+            else {
+                const fallback = [$('[data-text]'), $('[data-reconnect]'), $('[data-sharing-leave]')]
+                    .find(node => node && !node.disabled && !node.closest('[hidden]') && getComputedStyle(node).display !== 'none');
+                fallback?.focus({ preventScroll: true });
+            }
+        }
+    }
+    function rememberMessage(text) {
+        const context = recoveryContext();
+        if (!context || text.length > 300) { toast('Keep this draft under 300 characters and choose its conversation first.'); return null; }
+        const token = [...crypto.getRandomValues(new Uint8Array(16))].map(byte => byte.toString(16).padStart(2, '0')).join('');
+        const record = { id: token, text, ...context, epoch: messageEpoch, legacy: !messageResultsSupported, status: messageResultsSupported ? 'waiting' : 'uncertain' };
+        // Conservative metadata/status/timer allowance plus exact UTF-8 text.
+        record.bytes = new Blob([JSON.stringify(record)]).size + 64;
+        if (savedMessages.size >= 8 || recoveryBytes + record.bytes > 12 * 1024) {
+            toast('Saved message copies are full. Copy or discard an earlier one first. Your current draft stays here.'); return null;
+        }
+        savedMessages.set(token, record); recoveryBytes += record.bytes;
+        if (!record.legacy) record.timer = setTimeout(() => {
+            if (savedMessages.get(token) === record && record.status === 'waiting') { record.status = 'uncertain'; drawMessageRecovery(); }
+        }, 10000);
+        drawMessageRecovery(); return record;
+    }
+    function messageResult(frame) {
+        if (!messageResultsSupported || !['published', 'held', 'pending', 'rejected'].includes(frame.status)
+            || Object.keys(frame).some(key => !['t', 'id', 'status', 'transportSeq'].includes(key))) return;
+        const record = savedMessages.get(frame.id);
+        if (!record || record.epoch !== messageEpoch || record.status !== 'waiting' || record.legacy) return;
+        clearTimeout(record.timer);
+        if (frame.status === 'published') forgetSavedMessage(record);
+        else { record.status = frame.status; drawMessageRecovery(); }
+    }
+    function uncertainMessages() {
+        for (const record of savedMessages.values()) if (record.status === 'waiting') { clearTimeout(record.timer); record.status = 'uncertain'; }
+        drawMessageRecovery();
+    }
+    $('[data-text]').addEventListener('input', recoveryDraftChanged);
+    $('[data-message-copy-close]').addEventListener('click', closeMessageCopy);
+    $('[data-message-copy]').addEventListener('close', () => {
+        // A native close event can be queued until after another copy opens.
+        // An old event must not close/clear that newer dialog.
+        if (!$('[data-message-copy]').open) closeMessageCopy();
+    });
+    window.addEventListener('pagehide', clearMessageRecovery);
     const sharingControls = betaShell && window.HangoutParticipationControls === true;
     let sharingState = null, sharingBusy = false, sharingCleanup = 'unknown', sharingConfirmation = 0;
     const sharingRegion = $('[data-sharing-region]');
@@ -129,6 +282,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         $('[data-private]').hidden = true;
         if ($('[data-cam-gate]').open) $('[data-cam-gate]').close();
         $('[data-adult]').checked = false;
+        drawMessageRecovery();
     }
     function leaveSharingChat() {
         if (sessionEnded || !app.ws) return;
@@ -175,6 +329,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             sessionStorage.setItem(ENTRY_HANDOFF_KEY, entryHandoff(entrySource, shareEntry, Date.now(), entrySites));
             if (intent) sessionStorage.setItem(KEEP_ROOM_INTENT_KEY, intent);
         } catch { toast('This tab cannot save your sign-in return. You can keep chatting; allow tab storage before trying again.'); return false; }
+        clearMessageRecovery();
         return true;
     }
     function clearKeep(message = '') {
@@ -358,11 +513,13 @@ import { createEntrySharing } from './entry-sharing.mjs';
             app.pendingChannel = '';
             $('[data-channel-error]').textContent = 'Connection lost. Reconnect and try this channel again.';
         }
-        drawCommunity(); drawRooms();
+        drawCommunity(); drawRooms(); drawMessageRecovery();
     }
     let cancelTransportAck = () => {};
     async function connect(nick) {
         if (sessionEnded && betaShell) return;
+        if (savedMessages.size && !confirm('A saved message may already have arrived. Reconnecting clears every saved copy in this tab. Copy any text you need first. Reconnect and clear the copies?')) return;
+        clearMessageRecovery(); messageResultsSupported = false;
         sessionEnded = false; $('[data-session-ended]').hidden = true; $('[data-text]').readOnly = false;
         const attempt = ++connectionAttempt;
         cancelTransportAck();
@@ -416,6 +573,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             entrySharing.disconnect();
             privateMessageContextSupported = false;
             resetPendingReports();
+            uncertainMessages();
             setConnection('offline');
             if (roomApi) roomApi.onLeave();
             if (e.code === 4401) return endSession();
@@ -426,6 +584,11 @@ import { createEntrySharing } from './entry-sharing.mjs';
                 return gateStatus('Email sign-in is unavailable or expired. Sign in again to manage your rooms, or continue as a guest.');
             }
             if (!opened) return gateStatus('Couldn’t get in. Maybe it’s full, locked, or you got the boot. Try again in a bit.');
+            if (savedMessages.size) {
+                clearTimeout(retryTimer);
+                gateStatus('A message may have arrived. Copy or discard saved text, then choose Try again. Reconnecting clears saved copies.');
+                return;
+            }
             if ([1009, 4400, 4413, 4429].includes(e.code)) {
                 clearTimeout(retryTimer);
                 const message = 'Connection paused to protect community capacity. Choose Try again when ready; reload if this keeps happening.';
@@ -441,6 +604,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     }
     function endSession(reason = 'expired') {
         const wasVerified = ownerSession || app.verified;
+        clearMessageRecovery(); messageResultsSupported = false;
         sessionEnded = true; connectionAttempt++;
         clearTimeout(retryTimer); cancelTransportAck();
         // Keep the unsent text under its original channel/PM key. Never move a
@@ -502,7 +666,13 @@ import { createEntrySharing } from './entry-sharing.mjs';
             app.ws.close(4413, 'outgoing connection fell behind');
             return false;
         }
-        try { app.ws.send(payload); return true; } catch { return false; }
+        try {
+            app.ws.send(payload);
+            const name = obj.t === 'cmd' ? String(obj.name || '').toLowerCase()
+                : obj.t === 'say' && /^\/(?!\/)/.test(obj.text || '') ? String(obj.text).slice(1).split(/\s/, 1)[0].toLowerCase() : '';
+            if (['quit', 'exit', 'bye'].includes(name)) clearMessageRecovery();
+            return true;
+        } catch { return false; }
     };
     const cmd = (name, args = [], ch = app.active, roomInstance) => send({ t: 'cmd', name, args, ch, ...(roomInstance === undefined ? {} : { roomInstance }) });
     app.cmd = cmd;
@@ -516,6 +686,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             else toast(m.text);
             break;
         case 'report-status': if (m.submitted === true) finishReport(m.id, true); break;
+        case 'message-result': messageResult(m); break;
         case 'ownership': { const c = store(m.ch); if (c) c.cohosts = m.cohosts; break; }
         case 'owner-offer': toast(`${m.by} offered you ownership of ${m.ch}`, [['Accept ownership', () => { if (confirm(`Accept ownership of ${m.ch}?`)) cmd('acceptowner', [], m.ch); }]]); break;
         case 'sharing-stopped':
@@ -525,6 +696,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             break;
         case 'device': localStorage.setItem('hangout-dev', m.token); break;
         case 'hello':
+            messageResultsSupported = m.features?.messageResults === 1;
             entrySourcesSupported = m.features?.entrySources === 1;
             privateMessageContextSupported = m.features?.privateMessageContext === 1;
             entrySharing.setSupported(entrySourcesSupported); drawEntryChoice();
@@ -544,6 +716,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         case 'entry-source': entrySharing.acknowledge(m); break;
         case 'nick-error': setConnection('offline'); gateStatus(m.text); $('[data-gate]').hidden = false; $('[data-app]').hidden = true; break;
         case 'welcome': {
+            if (!app.me || app.resetSession || app.verified !== (m.verified === true)) clearMessageRecovery();
             if (sharingControls) { $('.chat').insertBefore($('[data-sharing-controls]'), $('[data-lobby-welcome]')); $('[data-sharing-leave]').disabled = false; }
             const wasIn = !!app.me;
             if (!wasIn) count('lobby-join');
@@ -641,7 +814,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         case 'pm-request': pmRequest(m.from, m.band); break;
         case 'pm-request-ended': clearPmRequest(m.from); if (m.reason) toast(m.reason); break;
         case 'pm-open': openPm(m.with, true); break;
-        case 'pm-closed': clearPmRequest(m.with); toast(`PM with ${m.with} closed.`); break;
+        case 'pm-closed': { const previous = app.pms.get(m.with); if (previous) recoveryContexts.delete(previous); clearPmRequest(m.with); drawMessageRecovery(); toast(`PM with ${m.with} closed.`); break; }
         case 'pm': { const other = m.from === app.me ? m.to : m.from; openPm(other, false); pushLine(`pm:${other}`, { ...m, ch: `pm:${other}` }); break; }
         case 'pm-setting': $('[data-pm-off]').checked = m.off; toast(m.text); break;
         case 'invite': toast(`${m.by} invited you to ${m.ch}`, [['Join', () => cmd('join', [m.ch])]]); break;
@@ -771,7 +944,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             (c ? c.lines : []).forEach(appendLine);
         });
         replaying = false;
-        drawTabs(); drawChan();
+        drawTabs(); drawChan(); drawMessageRecovery();
         drawCommunity(); drawRooms();
         show('chat');
         const buf = $('[data-buffer]'); buf.scrollTop = buf.scrollHeight;
@@ -943,9 +1116,9 @@ import { createEntrySharing } from './entry-sharing.mjs';
         if (pendingKeep && !cmd('register', [], pendingKeep.room, pendingKeep.ref)) clearKeep('The Keep request was not confirmed. Check Host tools before trying again.');
     });
     $('[data-gate-guest]').hidden = !ownerSession;
-    $('[data-gate-guest]').addEventListener('click', () => { ownerSession = false; removeTab('hangout-owner'); $('[data-gate-guest]').hidden = true; connect(app.me || nickInput.value); });
+    $('[data-gate-guest]').addEventListener('click', () => { clearMessageRecovery(); ownerSession = false; removeTab('hangout-owner'); $('[data-gate-guest]').hidden = true; connect(app.me || nickInput.value); });
     $('[data-owner-signout]').addEventListener('click', () => {
-        ownerSession = false; removeTab('hangout-owner'); connect(app.me || nickInput.value);
+        clearMessageRecovery(); ownerSession = false; removeTab('hangout-owner'); connect(app.me || nickInput.value);
     });
     function drawCommunity() {
         const lobby = app.chans.get('#stalemate');
@@ -1156,10 +1329,16 @@ import { createEntrySharing } from './entry-sharing.mjs';
             switchTo(joined[1].toLowerCase());
             return;
         }
-        const sent = app.active.startsWith('pm:') && (!text.startsWith('/') || text.startsWith('//'))
-            ? cmd('msg', [app.active.slice(3), text.replace(/^\/\//, '/')])
-            : send({ t: 'say', ch: app.active, text });
-        if (sent) { input.value = ''; drafts.delete(app.active); }
+        const ordinary = !text.startsWith('/') || text.startsWith('//');
+        const record = ordinary ? rememberMessage(text) : null;
+        if (ordinary && !record) return;
+        const frame = app.active.startsWith('pm:') && ordinary
+            ? { t: 'cmd', name: 'msg', args: [app.active.slice(3), text.replace(/^\/\//, '/')], ch: app.active }
+            : { t: 'say', ch: app.active, text };
+        if (record && !record.legacy) frame.clientMessageId = record.id;
+        const sent = send(frame);
+        if (sent) { input.value = ''; drafts.delete(app.active); drawMessageRecovery(); }
+        else if (record) forgetSavedMessage(record);
     });
     $$('[data-quick-line]').forEach((b) => b.addEventListener('click', () => send({ t: 'say', ch: app.active, text: b.dataset.quickLine })));
     $$('[data-quick-me]').forEach((b) => b.addEventListener('click', () => cmd('me', [b.dataset.quickMe])));

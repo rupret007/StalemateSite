@@ -178,6 +178,10 @@
                 <button type="button" data-quick-cmd="away">💤 away</button>
                 <button type="button" data-quick-cmd="help">? help</button>
             </div>
+            <section class="message-recovery" data-message-recovery hidden aria-label="Saved message copies">
+                <p data-message-recovery-status role="status"></p>
+                <ul data-message-recovery-list></ul>
+            </section>
             <form class="say" data-say>
                 <button class="slash" type="button" data-palette-open aria-label="Commands">/</button>
                 <input data-text maxlength="300" autocomplete="off" placeholder="Say something (or /help)" aria-label="Message">
@@ -217,6 +221,13 @@
             <div class="sheet-buttons"><button class="btn" type="submit">Join / create</button><button class="btn btn--ghost" type="button" data-channel-cancel>Cancel</button></div>
         </form>
         <p class="small">Give another member @ with /op nick before you leave. Rooms close after 10 minutes empty.</p>
+    </dialog>
+    <dialog class="sheet" data-message-copy aria-labelledby="message-copy-title">
+        <h2 id="message-copy-title">Copy saved text</h2>
+        <p class="small" data-message-copy-label></p>
+        <textarea data-message-copy-text readonly aria-label="Saved message text" rows="5"></textarea>
+        <p class="small">Select and copy this text yourself. Nothing is sent again.</p>
+        <button class="btn" type="button" data-message-copy-close>Done</button>
     </dialog>
     <dialog class="sheet" data-sheet aria-labelledby="person-dialog-title">
         <h3 id="person-dialog-title" data-sheet-title></h3>

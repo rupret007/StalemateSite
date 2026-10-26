@@ -48,11 +48,11 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }) {
 
 describe('browser client privacy and bounded delivery wiring', () => {
     it('waits for confirmation of the latest privacy choice before any post-welcome user message', async () => {
-        const { window, ws, welcome } = await visitor('rad-dad');
+        const { window, ws, welcome, join } = await visitor('rad-dad');
         expect(ws.sent[0]).toMatchObject({ t: 'hello', entrySource: 'rad-dad', transport: 1 });
         window.document.querySelector('[data-entry-share]').click();
         expect(ws.sent).toHaveLength(1);
-        welcome();
+        welcome(); join();
         window.document.querySelector('[data-text]').value = 'A new message';
         window.document.querySelector('[data-say]').dispatchEvent(new window.Event('submit', { cancelable: true }));
         expect(ws.sent.slice(1)).toEqual([{ t: 'entry-source', source: '' }]);
@@ -64,7 +64,7 @@ describe('browser client privacy and bounded delivery wiring', () => {
         expect([...window.document.querySelectorAll('[data-entry-share]')].every((input) => !input.checked)).toBe(true);
     });
     it('keeps messages and quick actions unsent after a rejected hide while reports remain usable', async () => {
-        const { window, ws, welcome } = await visitor(); welcome();
+        const { window, ws, welcome, join } = await visitor(); welcome(); join();
         window.document.querySelector('[data-entry-share]').click();
         ws.receive({ t: 'entry-source', source: 'stalemate', accepted: false });
         expect(window.document.querySelector('[data-entry-status]').textContent).toContain('still shared');
@@ -85,7 +85,7 @@ describe('browser client privacy and bounded delivery wiring', () => {
         expect(ws.sent.at(-1)).toMatchObject({ t: 'say', text: 'Keep this private choice' });
     });
     it('waits for a later clear when sharing is enabled and then hidden before the first update returns', async () => {
-        const { window, ws, welcome } = await visitor(); welcome();
+        const { window, ws, welcome, join } = await visitor(); welcome(); join();
         const choice = window.document.querySelector('[data-entry-share]');
         choice.click(); ws.receive({ t: 'entry-source', source: '', accepted: true });
         choice.click(); choice.click();
@@ -104,7 +104,7 @@ describe('browser client privacy and bounded delivery wiring', () => {
         expect(ws.sent.at(-1)).toMatchObject({ t: 'say', text: 'Wait for my hidden badge' });
     });
     it('keeps a rollback server usable without unsupported sharing frames or a false badge promise', async () => {
-        const { window, ws, welcome, flush } = await visitor('rad-dad', null);
+        const { window, ws, welcome, flush, join } = await visitor('rad-dad', null);
         const choice = window.document.querySelector('[data-entry-share]');
         expect(choice.disabled).toBe(true);
         expect([...window.document.querySelectorAll('[data-entry-context]')].every((element) => element.hidden)).toBe(true);
@@ -113,7 +113,7 @@ describe('browser client privacy and bounded delivery wiring', () => {
         // A pending/programmatic change must remain harmless even if a legacy
         // server is selected between the initial form choice and welcome.
         choice.checked = false; choice.dispatchEvent(new window.Event('change'));
-        welcome(ws, null); flush(50);
+        welcome(ws, null); join(); flush(50);
         window.document.querySelector('[data-text]').value = 'Still connected';
         window.document.querySelector('[data-say]').dispatchEvent(new window.Event('submit', { cancelable: true }));
         expect(ws.sent.filter((frame) => frame.t === 'entry-source' || frame.t === 'transport-ack')).toEqual([]);
