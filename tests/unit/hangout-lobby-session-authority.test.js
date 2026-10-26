@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { openDurableRecordSqlite } from '../support/durable-record-sqlite.mjs';
 import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
+import { createTransportControlBudget } from '../../hangout-worker/src/transport-budget.mjs';
 import { HangoutLobby } from '../../hangout-worker/src/lobby-do.mjs';
 import { accountId } from '../../hangout-worker/src/auth.mjs';
 import { createParticipationEnforcement } from '../../hangout-worker/src/participation-enforcement.mjs';
@@ -972,5 +973,148 @@ describe('read-only preparation cohort on the actual SQLite authority', () => {
         }, 0);
         expect(readBytes).toBeLessThanOrEqual(32 * 1024 * 1024); expect(fingerprint(f.driver)).toBe(before);
         await expect(f.authority.resolveParticipationConnections([...descriptors, descriptors[0]])).rejects.toThrow();
+    });
+});
+
+describe('actor-only control preparation on the actual SQLite authority', () => {
+    const partitionPrefix = 'participation-records:v1:record:';
+    const controlsFor = (f, app) => {
+        const grants = new WeakMap(), socket = {};
+        const budget = createTransportControlBudget({ now: f.now,
+            available: id => app.engine.transportControlReady(id), reserve: id => app.engine.reserveTransportControl(id),
+            readState: ws => grants.get(ws), writeState: (ws, value) => grants.set(ws, clone(value)) });
+        return { budget, grants, socket };
+    };
+    const admit = async (f, ledger, app, id, nick) => {
+        const person = await f.enroll(id); await ledger.grant(person.binding);
+        expect((await app.engine.connect(person.binding)).ok).toBe(true);
+        expect((await app.message(id, { t: 'hello', nick, age13: true }))?.ok).not.toBe(false);
+        return person;
+    };
+
+    it('keeps real reservation reads independent of unrelated admitted peers and still prepays 21 controls in two blocks', async () => {
+        const f = await fixture({ participation: true }), ledger = await participationLedger(f);
+        const app = f.makeEngine({ participation: productionParticipation(f) });
+        const actor = await admit(f, ledger, app, 'credit-actor', 'ControlActor');
+        f.driver.resetOperations();
+        expect(await app.engine.reserveTransportControl(actor.binding.id)).toMatchObject({ ok: true, controls: 20 });
+        const soloReads = f.driver.stats.operations.filter(event => ['get', 'list'].includes(event.name)).length;
+        const peers = [];
+        for (let i = 0; i < 3; i++) peers.push(await admit(f, ledger, app, `credit-peer${i}`, `ControlPeer${i}`));
+        const records = await f.authority.records.transaction(tx => tx.list({ prefix: partitionPrefix, limit: 4 }));
+        const peerKeys = peers.flatMap(peer => ['authority-session:' + peer.request.sid, 'authority-connection:' + peer.binding.id,
+            [...records].find(([, state]) => state.subjects[0].record.principalRef === `s_${peer.request.sid}`)[0]]);
+        const requests = app.engine.snapshot().budget.requests;
+        f.driver.resetOperations();
+        expect(await app.engine.reserveTransportControl(actor.binding.id)).toMatchObject({ ok: true, controls: 20 });
+        const events = [...f.driver.stats.operations], wideReads = events.filter(event => ['get', 'list'].includes(event.name)).length;
+        expect(soloReads).toBeGreaterThan(0); expect(wideReads).toBeLessThanOrEqual(soloReads);
+        expect(events.some(event => logicalKey(event) === 'net')).toBe(true);
+        for (const key of peerKeys) {
+            const encoded = ':' + Buffer.from(key, 'ascii').toString('hex');
+            expect(events.some(event => typeof event.key === 'string' && event.key.includes(encoded))).toBe(false);
+        }
+        expect(app.engine.snapshot().budget.requests).toBe(requests + 1);
+        expect((await f.authority.records.transaction(tx => tx.get('net'))).budget.requests).toBe(requests + 1);
+        const { budget, grants, socket } = controlsFor(f, app), prepaidAt = app.engine.snapshot().budget.requests;
+        for (let i = 0; i < 21; i++) expect(await budget.take(socket, actor.binding.id)).toBe(true);
+        expect(budget.snapshot()).toEqual({ reservations: 2, prepaidControls: 40, consumedControls: 21, refused: 0 });
+        expect(grants.get(socket)).toEqual({ v: 1, day: new Date(f.now()).toISOString().slice(0, 10), remaining: 19 });
+        expect(app.engine.snapshot().budget.requests).toBe(prepaidAt + 2);
+        expect((await f.authority.records.transaction(tx => tx.get('net'))).budget.requests).toBe(prepaidAt + 2);
+        expect(app.persist).not.toHaveBeenCalled();
+    });
+
+    it('does not mint missing-actor credit or turn a withdrawn actor control into a new sharing grant', async () => {
+        const f = await fixture({ participation: true }), ledger = await participationLedger(f);
+        const app = f.makeEngine({ participation: productionParticipation(f) });
+        const actor = await admit(f, ledger, app, 'credit-withdrawn', 'ControlWithdrawn');
+        const beforeMissing = app.engine.snapshot().budget.requests;
+        expect((await app.engine.reserveTransportControl('missing-actor')).ok).toBe(false);
+        expect(app.engine.snapshot().budget.requests).toBe(beforeMissing);
+        expect((await ledger.withdraw(actor.binding)).state).toBe('withdrawn');
+        expect((await app.engine.refreshParticipation())?.ok).not.toBe(false);
+        const before = await f.authority.records.transaction(tx => tx.list({ prefix: partitionPrefix, limit: 4 }));
+        const { budget, socket } = controlsFor(f, app);
+        expect(await budget.take(socket, actor.binding.id)).toBe(true);
+        expect(budget.snapshot()).toEqual({ reservations: 1, prepaidControls: 20, consumedControls: 1, refused: 0 });
+        expect(await f.authority.validate(actor.binding)).toBe(true);
+        expect(app.engine._debug.conns.get(actor.binding.id).safetyOnly).toBe(true);
+        app.frames.length = 0;
+        await app.message(actor.binding.id, { t: 'say', ch: '#stalemate', text: 'Control credit must not restore sharing' });
+        expect(app.frames.some(frame => frame.t === 'line')).toBe(false);
+        expect(await f.authority.records.transaction(tx => tx.list({ prefix: partitionPrefix, limit: 4 }))).toEqual(before);
+    });
+
+    it('keeps the actual peer purpose check on PM commands after a successful actor-only reservation', async () => {
+        const f = await fixture({ participation: true }), ledger = await participationLedger(f);
+        const app = f.makeEngine({ participation: productionParticipation(f) });
+        const actor = await admit(f, ledger, app, 'credit-pmactor', 'ControlPmActor');
+        const peer = await admit(f, ledger, app, 'credit-pmpeer', 'ControlPmPeer');
+        expect((await app.engine.reserveTransportControl(actor.binding.id)).ok).toBe(true);
+        await app.message(actor.binding.id, { t: 'cmd', ch: '#stalemate', name: 'query', args: ['ControlPmPeer'] });
+        expect(app.frames.some(frame => frame.t === 'pm-request' && frame.recipient === peer.binding.id)).toBe(true);
+        expect((await ledger.withdraw(peer.binding)).state).toBe('withdrawn');
+        expect((await app.engine.reserveTransportControl(actor.binding.id)).ok).toBe(true);
+        app.frames.length = 0;
+        expect((await app.message(actor.binding.id, { t: 'cmd', ch: '#stalemate', name: 'query', args: ['ControlPmPeer'] })).ok).toBe(false);
+        expect(app.frames.some(frame => ['pm-request', 'pm-open', 'pm-line'].includes(frame.t))).toBe(false);
+        expect(await f.authority.validate(peer.binding)).toBe(true);
+    });
+
+    it.each(['revocation', 'session expiry', 'profile expiry', 'role removal'].flatMap(change =>
+        ['before', 'after'].map(phase => [change, phase])))('keeps control credit unminted when %s occurs %s the actual effect write', async (change, phase) => {
+        const f = await fixture({ participation: true }), ledger = await participationLedger(f);
+        let actor;
+        if (change === 'session expiry') {
+            const request = f.registration('credit-fenced', { exp: NOW + 1000 });
+            expect((await f.authority.register(request)).status).toBe(200);
+            const binding = { id: 'credit-fenced', betaSid: request.sid, betaInviteVersion: request.version, dev: 'device_credit-fenced', iph: request.iph,
+                account: '', role: 'fan', admin: false, expiresAt: request.exp, authorityRef: 'credit-fenced', authorityRevision: 1 };
+            expect(await f.authority.bind(binding)).toEqual(binding); actor = { request, binding };
+        } else actor = await f.enroll('credit-fenced', { kind: 'staff', account: await accountId('reviewer@example.invalid', f.env.HANGOUT_HMAC_KEY),
+            role: 'moderator', admin: true, expiresAt: NOW + (change === 'profile expiry' ? 1000 : 90000) });
+        await ledger.grant(actor.binding);
+        let armed = false, reached = false, physicalAfterRollback;
+        const mutate = async tx => {
+            reached = true;
+            if (change.endsWith('expiry')) f.advance(1001);
+            else if (change === 'role removal') f.env.HANGOUT_MODERATOR_EMAILS = '';
+            else if (tx) {
+                const key = 'authority-session:' + actor.request.sid, row = await tx.get(key);
+                await tx.put(key, { ...row, revoked: true });
+            } else await f.authority.revoke(actor.request);
+        };
+        const fence = { prepare: (...args) => f.authority.effectCommit.prepare(...args), commit: async (...args) => {
+            if (phase === 'before' && armed && !args[2]?.costsOnly) { armed = false; await mutate(); }
+            return f.authority.effectCommit.commit(...args);
+        } };
+        const app = f.makeEngine({ participation: productionParticipation(f), effectCommit: fence });
+        expect((await app.engine.connect(actor.binding)).ok).toBe(true);
+        await app.message(actor.binding.id, { t: 'hello', nick: 'ControlFenced', age13: true });
+        const healthy = await admit(f, ledger, app, 'credit-healthy', 'ControlHealthy');
+        const original = fingerprint(f.driver), rollbacks = f.driver.stats.rollbacks;
+        f.controls.afterEffects = async ({ tx, effects, costsOnly }) => {
+            if (phase !== 'after' || !armed || costsOnly) return;
+            armed = false; expect(effects.some(([kind]) => kind === 'net')).toBe(true); await mutate(tx);
+        };
+        if (phase === 'after') f.hooks.before = () => {
+            // Observe native rollback before the permitted conservative-cost
+            // recovery write. This injected revocation is not an external commit.
+            if (physicalAfterRollback === undefined && f.driver.stats.rollbacks > rollbacks) physicalAfterRollback = fingerprint(f.driver);
+        };
+        const { budget, grants, socket } = controlsFor(f, app); armed = true;
+        expect(await budget.take(socket, actor.binding.id)).toBe(false);
+        expect(reached).toBe(true); expect(grants.has(socket)).toBe(false);
+        expect(budget.snapshot()).toEqual({ reservations: 0, prepaidControls: 0, consumedControls: 0, refused: 1 });
+        if (phase === 'after') expect(physicalAfterRollback).toBe(original);
+        if (change === 'revocation') {
+            const saved = await f.authority.records.transaction(tx => tx.get('authority-session:' + actor.request.sid));
+            expect(saved.revoked).toBe(phase === 'before');
+        }
+        delete f.hooks.before; delete f.controls.afterEffects;
+        expect(await f.authority.validate(healthy.binding)).toBe(true);
+        expect((await app.engine.reserveTransportControl(healthy.binding.id)).ok).toBe(true);
+        expect(app.persist).not.toHaveBeenCalled();
     });
 });
