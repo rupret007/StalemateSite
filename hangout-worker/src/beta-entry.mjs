@@ -9,6 +9,7 @@ import { betaHealth } from './beta-ops.mjs';
 import { entrySitesFromConfig } from '../../r/45662413410ed051/entry-sites.mjs';
 import { lobbyParticipationMode, participationConfigurationValid } from './lobby-participation.mjs';
 import { incidentSourceConfigurationValid } from './lobby-incident-sources.mjs';
+import { publicBetaHelp } from './beta-public-help.mjs';
 export { BetaSessions } from './beta-sessions.mjs';
 export { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget };
 
@@ -91,6 +92,8 @@ async function checkTurnstile(request, env, url, deps) {
 
 async function betaRequest(request, env, deps = {}) {
     const url = new URL(request.url);
+    const help = await publicBetaHelp(request, env);
+    if (help) return help;
     let assetPath;
     try { assetPath = new URL(url.origin + decodeURIComponent(url.pathname)).pathname; }
     catch { return reply('Invalid path.', 400); }
@@ -143,7 +146,6 @@ async function betaRequest(request, env, deps = {}) {
         const result = await registryRequest(env, 'participation', { sid: session.access.sid, version: session.access.version, exp: session.access.exp });
         return json(await result.json(), result.status);
     }
-    if (url.pathname === '/beta/privacy') return redirect(`${ROOT}terms/`);
     if (url.pathname === '/beta/state') return json({ kind: session.identity?.kind || 'guest', role: session.identity?.role || 'fan', emailConfigured: betaAccessConfigured(env), staffConfigured: betaAccessConfigured(env) });
     if (url.pathname === '/beta/bootstrap.js') return reply(`sessionStorage.setItem('hangout-preview',${JSON.stringify(env.HANGOUT_PREVIEW_KEY)});sessionStorage.setItem('hangout-owner',${JSON.stringify(session.identity?.kind === 'owner' ? '1' : '0')});window.HangoutEntrySites=${JSON.stringify(Object.values(entrySitesFromConfig(env.HANGOUT_ENTRY_SITES)))};${lobbyParticipationMode(env) ? 'window.HangoutParticipationControls=true;' : ''}`, 200, 'text/javascript');
     if (url.pathname === '/lobby-owner/login' || url.pathname === '/lobby-admin/login') {

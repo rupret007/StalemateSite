@@ -255,16 +255,19 @@ describe('beta product bootstrapping', () => {
         expect((await betaFetch(req, config, { ...deps, fetch: async () => Response.json({ success: true, hostname: 'beta.example' }) })).status).toBe(200);
         expect((await betaFetch(request(`/lobby?preview=${preview}`, { cookie, upgrade: true }), config, deps)).status).toBe(403);
     });
-    it('keeps privacy authenticated and renders only a validated moderation address', async () => {
+    it('makes privacy read-only and public while rendering only a validated moderation address', async () => {
         const config = env(), cookie = await unlock(config);
         config.ASSETS.fetch = async () => new Response('<head></head><body><b data-contact>[CONTACT EMAIL]</b></body>', { headers: { 'Content-Type': 'text/html' } });
-        expect((await betaFetch(request('/beta/privacy'), config, deps)).status).toBe(401);
+        expect((await betaFetch(request('/beta/privacy'), config, deps)).status).toBe(303);
         const redirect = await betaFetch(request('/beta/privacy', { cookie }), config, deps);
         expect(redirect.status).toBe(303); expect(redirect.headers.get('Location')).toContain('/terms/');
         const page = await betaFetch(request('/r/45662413410ed051/terms/', { cookie }), { ...config, HANGOUT_MODERATION_CONTACT: 'moderation@example.test' }, deps);
-        expect(await page.text()).toContain('href="mailto:moderation@example.test"');
+        const publicHtml = await page.text();
+        expect(publicHtml).toContain('href="mailto:moderation@example.test"');
+        expect(publicHtml).not.toContain('/beta/bootstrap.js');
+        expect(page.headers.get('Set-Cookie')).toBeNull();
         const invalid = await betaFetch(request('/r/45662413410ed051/terms/', { cookie }), { ...config, HANGOUT_MODERATION_CONTACT: 'bad" onclick="alert(1)' }, deps);
-        const html = await invalid.text(); expect(html).toContain('not configured yet'); expect(html).not.toContain('onclick=');
+        const html = await invalid.text(); expect(html).toContain('Moderation contact is not configured.'); expect(html).not.toContain('onclick=');
     });
     it('ships a separate guarded beta configuration with no provider secrets or synthetic identity controls', () => {
         const config = readFileSync(new URL('../wrangler.beta.toml', import.meta.url), 'utf8');
