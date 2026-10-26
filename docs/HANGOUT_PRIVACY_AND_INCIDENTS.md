@@ -58,7 +58,7 @@ An ordinary report expires or is dismissed according to its published policy. A 
 
 ## All-ages consent and capability implementation design
 
-1. Determine the legal operator, intended markets, actual child audience and feature-specific data flows with qualified advice. Do not treat a terms checkbox as this assessment.
+1. Carry forward [the confirmed personal Texas operating arrangement](HANGOUT_ALL_AGES_CAPABILITIES.md), including that no existing organization is being used. With qualified review, assign responsibility for notices, parental-rights requests, incident handling and retention, and resolve legal status, intended markets, actual audience and feature-specific data flows. Do not treat a terms checkbox or this factual record as that assessment.
 2. Define a minimal server-owned permission state: policy version, consent/eligibility status, permitted capabilities and expiry/revocation. Store a reference to the authorized process rather than a public birth date, identification document or publicly visible age badge. Unknown status is not parental consent.
 3. Establish the real parental-consent and rights process where needed, including public disclosure, processors and safe verification. No process or vendor purchase is selected here. Keep parental identity and child linkage restricted and purpose-limited.
 4. Derive capabilities on the server for posting/discovery, direct contact, cameras/microphones, external providers and optional AI. Define age-appropriate permissions from qualified requirements rather than inventing a universal adult-only rule. Hosts, sites and clients cannot widen them.
