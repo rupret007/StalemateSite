@@ -96,6 +96,34 @@ password, including session-level inheritance. MID and media-index selectors
 must agree. Changing another section does not invalidate that candidate;
 changing the selected credentials does. No BUNDLE transport is guessed.
 
+## Camera display and mobile layout
+
+Camera tiles appear above the shared canvas or watch activity in their own
+bounded horizontal row. The count covers rendered tiles, including your muted
+preview. A remote tile is shown only while that camera is advertised in the
+room. Full nicknames wrap below each tile;
+frames fit inside the display slot without changing capture constraints. The
+activity panel can still scroll vertically, while chat input and Send remain
+outside it.
+
+When the row overflows, it becomes keyboard focusable and exposes scroll help;
+Left/Right, Home and End move only that row. The region references its visible
+count. With no overflow, the extra keyboard stop and scroll instructions are
+removed. Existing videos and streams are reused through roster updates.
+
+A participant's camera-off update removes that displayed tile and clears its
+detached video source/cache entry, even when the allowed receive-only peer
+connection is retained. Other camera tiles and local capture continue. Turning
+off the last local camera or leaving clears presentation counts, visibility and
+saved scrolling. If the row held focus, cleanup returns focus to an available
+visible control, preferring the command button, without clicking that control.
+
+The regression covers decoded frames at 375/390px widths and 667/812px heights,
+contained page/composer geometry, wrapping names, scrolling, collapse/resize,
+camera-off, Block and last-tile/room cleanup. These are Chromium viewport and
+synthetic-camera checks; physical iPhone, virtual-keyboard and assistive-
+technology acceptance remain separate.
+
 ## Privacy and rollout boundaries
 
 The activity queue stays in tab memory. SDP/ICE can contain network information;

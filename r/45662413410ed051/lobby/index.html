@@ -119,8 +119,13 @@
                 </form>
             </div>
             <details class="activity" data-activity hidden open>
-                <summary class="activity-heading"><span data-activity-title>Shared activity</span><span class="activity-toggle" aria-hidden="true"></span></summary>
+                <summary class="activity-heading"><span class="activity-label"><span data-activity-title>Shared activity</span><span class="activity-camera-count" data-act-camera-summary hidden></span></span><span class="activity-toggle" aria-hidden="true"></span></summary>
                 <div class="act-stage" data-act-stage hidden>
+                    <div class="act-camera-strip" data-act-camera-strip hidden>
+                        <p class="camera-heading"><b id="lobby-camera-count" data-act-camera-count>Cameras (0)</b><span class="camera-scroll-hint" data-act-camera-hint aria-hidden="true" hidden>Swipe / ← →</span></p>
+                        <p class="sr-only" id="lobby-camera-scroll-help" hidden>More cameras: swipe or focus this row and use Left and Right arrows. Home and End reach either end.</p>
+                        <div class="act-cams" data-act-tiles role="region" aria-label="Room cameras" aria-describedby="lobby-camera-count" tabindex="-1"></div>
+                    </div>
                     <div class="act-video" data-act-video hidden>
                         <div class="yt-wrap"><div data-act-yt id="lobby-yt-player"></div></div>
                         <p class="small" data-act-video-status role="status" hidden></p>
@@ -138,7 +143,6 @@
                             <button class="btn btn--small op-only" type="button" data-act-clear>Clear canvas</button>
                         </div>
                     </div>
-                    <div class="act-cams" data-act-tiles aria-label="Room cameras"></div>
                     <p class="small" data-act-relay-status role="status"></p>
                 </div>
             </details>

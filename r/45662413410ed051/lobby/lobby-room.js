@@ -197,10 +197,10 @@
             if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
             state.stream = null;
             state.camOn = false;
+            resetCameraPresentation();
             ui.stage.hidden = true;
             ui.paint.hidden = true;
             ui.video.hidden = true;
-            ui.tiles.replaceChildren();
             youtube.cancel(); player.yt = null;
             player.key = ''; player.readyKey = ''; player.failedKey = ''; player.loading = null; player.autoplayBlocked = false;
             player.seenPlaying = false; player.playPending = false;
@@ -766,25 +766,106 @@
             return true;
         }
 
+        function retireCameraFocus(activity) {
+            const candidates = [$('[data-palette-open]'), $('[data-text]'), document.querySelector('.phonetabs [aria-current="true"]'), activity?.querySelector('summary')];
+            const fallback = candidates.find(element => element && !element.disabled && !element.closest('[hidden], [inert]')
+                && element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden');
+            fallback?.focus({ preventScroll: true });
+        }
+
+        function resetCameraPresentation() {
+            const activity = ui.tiles.closest('[data-activity]');
+            const strip = ui.tiles.closest('[data-act-camera-strip]');
+            const wasFocused = ui.tiles.contains(document.activeElement);
+            const view = layoutTiles.view;
+            if (view) {
+                for (const row of view.rows.values()) { row.video.srcObject = null; row.figure.remove(); }
+                view.rows.clear(); view.scrollLeft = 0;
+            }
+            ui.tiles.replaceChildren(); ui.tiles.scrollLeft = 0; ui.tiles.tabIndex = -1;
+            ui.tiles.setAttribute('aria-describedby', 'lobby-camera-count');
+            if (strip) {
+                strip.hidden = true;
+                const count = strip.querySelector('[data-act-camera-count]'); if (count) count.textContent = 'Cameras (0)';
+                const hint = strip.querySelector('[data-act-camera-hint]'); if (hint) hint.hidden = true;
+                const help = strip.querySelector('#lobby-camera-scroll-help'); if (help) help.hidden = true;
+            }
+            const summary = $('[data-act-camera-summary]'); if (summary) { summary.hidden = true; summary.textContent = ''; }
+            if (activity) activity.scrollTop = 0;
+            if (wasFocused) retireCameraFocus(activity);
+        }
+
         function layoutTiles() {
-            ui.tiles.replaceChildren();
-            if (state.stream && state.camOn) {
-                const v = document.createElement('video');
-                v.autoplay = true;
-                v.muted = true;
-                v.playsInline = true;
-                v.srcObject = state.stream;
-                ui.tiles.append(v);
+            const strip = ui.tiles.closest('[data-act-camera-strip]');
+            const activity = ui.tiles.closest('[data-activity]');
+            const countLabel = strip?.querySelector('[data-act-camera-count]');
+            const hint = strip?.querySelector('[data-act-camera-hint]');
+            const help = strip?.querySelector('#lobby-camera-scroll-help');
+            const summaryCount = $('[data-act-camera-summary]');
+            const view = layoutTiles.view ||= { rows: new Map(), nextLabel: 0, scrollLeft: 0 };
+            const wasFocused = ui.tiles.contains(document.activeElement);
+            if (ui.tiles.clientWidth) view.scrollLeft = ui.tiles.scrollLeft;
+            const activityTop = activity?.scrollTop || 0;
+            const metrics = () => {
+                const measurable = ui.tiles.clientWidth > 0;
+                const max = Math.max(0, ui.tiles.scrollWidth - ui.tiles.clientWidth);
+                const overflowing = measurable && max > 1;
+                ui.tiles.tabIndex = overflowing ? 0 : -1;
+                if (hint) hint.hidden = !overflowing;
+                if (help) help.hidden = !overflowing;
+                ui.tiles.setAttribute('aria-describedby', overflowing ? 'lobby-camera-count lobby-camera-scroll-help' : 'lobby-camera-count');
+                if (measurable) {
+                    ui.tiles.scrollLeft = Math.min(view.scrollLeft, max);
+                    view.scrollLeft = ui.tiles.scrollLeft;
+                }
+            };
+            if (!view.ready) {
+                view.ready = true;
+                ui.tiles.addEventListener('scroll', () => { if (ui.tiles.clientWidth) view.scrollLeft = ui.tiles.scrollLeft; }, { passive: true });
+                ui.tiles.addEventListener('keydown', event => {
+                    if (event.target !== ui.tiles || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+                    const max = Math.max(0, ui.tiles.scrollWidth - ui.tiles.clientWidth);
+                    if (max <= 1 || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                    const step = Math.max(1, ui.tiles.clientWidth - 32);
+                    const next = event.key === 'Home' ? 0 : event.key === 'End' ? max : ui.tiles.scrollLeft + (event.key === 'ArrowRight' ? step : -step);
+                    event.preventDefault(); ui.tiles.scrollLeft = Math.max(0, Math.min(next, max)); view.scrollLeft = ui.tiles.scrollLeft;
+                });
+                activity?.addEventListener('toggle', metrics);
+                window.addEventListener('resize', metrics);
+                if (window.ResizeObserver) { view.observer = new window.ResizeObserver(metrics); view.observer.observe(ui.tiles); }
             }
+            const cameras = [];
+            if (state.stream && state.camOn) cameras.push({ key: 'self', stream: state.stream, self: true, name: 'You · preview' });
             for (const [id, entry] of state.pcs) {
-                if (!entry.stream.getVideoTracks().length) continue;
-                const v = document.createElement('video');
-                v.autoplay = true;
-                v.playsInline = true;
-                v.srcObject = entry.stream;
-                v.title = nickOf(id);
-                ui.tiles.append(v);
+                if (state.peers.has(id) && entry.stream.getVideoTracks().length) cameras.push({ key: id, stream: entry.stream, self: false, name: nickOf(id) });
             }
+            const wanted = new Set(cameras.map(camera => camera.key));
+            for (const [key, row] of view.rows) if (!wanted.has(key)) {
+                row.video.srcObject = null; row.figure.remove(); view.rows.delete(key);
+            }
+            cameras.forEach((camera, index) => {
+                let row = view.rows.get(camera.key);
+                if (!row) {
+                    const figure = document.createElement('figure'), video = document.createElement('video'), caption = document.createElement('figcaption');
+                    figure.className = 'camera-tile'; figure.dataset.cameraKey = camera.key;
+                    caption.id = `lobby-camera-caption-${++view.nextLabel}`; figure.setAttribute('aria-labelledby', caption.id);
+                    video.autoplay = true; video.playsInline = true;
+                    figure.append(video, caption); row = { figure, video, caption }; view.rows.set(camera.key, row);
+                }
+                row.video.muted = camera.self;
+                if (row.video.srcObject !== camera.stream) row.video.srcObject = camera.stream;
+                row.video.title = camera.name;
+                row.video.setAttribute('aria-label', camera.self ? 'Your muted camera preview' : `Camera from ${camera.name}`);
+                if (row.caption.textContent !== camera.name) row.caption.textContent = camera.name;
+                if (ui.tiles.children[index] !== row.figure) ui.tiles.insertBefore(row.figure, ui.tiles.children[index] || null);
+            });
+            if (!cameras.length) { view.scrollLeft = 0; ui.tiles.scrollLeft = 0; }
+            if (strip) strip.hidden = cameras.length === 0;
+            if (countLabel) countLabel.textContent = `Cameras (${cameras.length})`;
+            if (summaryCount) { summaryCount.hidden = cameras.length === 0; summaryCount.textContent = cameras.length ? `${cameras.length} camera${cameras.length === 1 ? '' : 's'}` : ''; }
+            metrics();
+            if (activity?.clientHeight) activity.scrollTop = Math.min(activityTop, Math.max(0, activity.scrollHeight - activity.clientHeight));
+            if (wasFocused && !cameras.length) retireCameraFocus(activity);
         }
 
         return { onJoin, onChan, onCam, onAct, onLeave: teardown };
