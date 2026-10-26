@@ -341,6 +341,35 @@ async function runtime(phase, state, nonce) {
     try {
         assert.equal((await mf.ready).hostname, '127.0.0.1');
         if (FANOUT_50) {
+            const storageMethods = ['get', 'put', 'delete', 'list', 'getAlarm', 'setAlarm', 'deleteAlarm'];
+            const storageFamilies = ['authorityMarker', 'sessionIndex', 'connectionIndex', 'mintRates', 'authoritySession', 'authorityConnection',
+                'participationPolicy', 'participationRecord', 'participationAnchor', 'participationSubject', 'participationOperation', 'net', 'sessions', 'room', 'authorityOther', 'alarm', 'other'];
+            const checkStorageCounters = observed => {
+                const value = observed.nativeStorageCounters;
+                assert.deepEqual(Object.keys(value).sort(), ['v', 'families', 'methods', 'transactions', 'overflow', 'resolverTelemetry'].sort());
+                assert.equal(value.v, 1); assert.equal(value.overflow, false);
+                assert.deepEqual(value.resolverTelemetry, { available: false, reason: 'frozen-captured-authority' });
+                assert.deepEqual(Object.keys(value.families).sort(), [...storageFamilies].sort());
+                assert.deepEqual(Object.keys(value.methods).sort(), [...storageMethods].sort());
+                const count = number => assert.ok(Number.isSafeInteger(number) && number >= 0, 'fanout native counter must be a nonnegative safe integer');
+                for (const family of storageFamilies) {
+                    assert.deepEqual(Object.keys(value.families[family]).sort(), [...storageMethods].sort());
+                    for (const method of storageMethods) count(value.families[family][method]);
+                }
+                let total = 0;
+                for (const method of storageMethods) {
+                    const row = value.methods[method];
+                    assert.deepEqual(Object.keys(row).sort(), ['attempted', 'returned', 'threw']);
+                    for (const number of Object.values(row)) count(number);
+                    assert.ok(row.returned + row.threw <= row.attempted);
+                    assert.equal(storageFamilies.reduce((sum, family) => sum + value.families[family][method], 0), row.attempted);
+                    total += row.attempted;
+                }
+                count(observed.nativeStorageMethodCalls); assert.equal(total, observed.nativeStorageMethodCalls);
+                assert.deepEqual(Object.keys(value.transactions).sort(), ['started', 'committed', 'rejected'].sort());
+                for (const number of Object.values(value.transactions)) count(number);
+                assert.ok(value.transactions.committed + value.transactions.rejected <= value.transactions.started);
+            };
             const metrics = () => control('fanout-metrics'), summary = () => control('fanout-summary');
             const completeScan = async () => {
                 let token = '', last; const pages = [];
@@ -362,6 +391,7 @@ async function runtime(phase, state, nonce) {
                 for (;;) {
                     for (const peer of all) if (peer.failure) throw peer.failure;
                     const observed = await metrics();
+                    checkStorageCounters(observed);
                     assert.equal(observed.sockets.length, 50); assert.equal(observed.engineCount, expectedLive); assert.equal(observed.liveBindingCount, expectedLive);
                     if (observed.sockets.every((socket, slot) => socket.slot === slot && socket.controls === all[slot].ack.sent
                         && (!socket.live || all[slot].closed === null && all[slot].ack.pending === 0

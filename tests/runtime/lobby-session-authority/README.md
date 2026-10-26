@@ -439,6 +439,32 @@ recovery collect no new timing spans. Node/Miniflare bridging, response parsing,
 queueing and scheduling are included; these spans cannot isolate workerd CPU,
 SQLite time, hosted latency or billing.
 
+The fifty-guest mode's existing before/after/final metrics also carry passive
+native storage counters. Seventeen fixed family labels classify known authority,
+participation and room-record prefixes; alarm operations have their own label,
+and unknown namespaces or batch shapes use fixed `other` buckets. Classification
+compares encoded prefixes without decoding or returning dynamic keys or IDs.
+Each actual get/put/delete/list/alarm call records a family/method attempt and its
+returned or thrown result; native transaction calls record started/committed/
+rejected outcomes. These are API-call observations: a returned write can still
+be rolled back by its enclosing transaction. They are not accepted publications,
+kernel operations, billable requests or CPU measurements.
+
+The counters use only the existing pass-through storage proxy and metrics calls.
+No SQL read, RPC, key, body, timer, projection or permission decision is added.
+Snapshot cardinality is fixed, counters are nonnegative safe integers, and an
+overflow is reported rather than silently losing counts. Family/method totals
+must reconcile to the existing native-method counter; returned and thrown calls
+may not exceed attempts. Only this FANOUT50 mode allocates or exports them.
+Instrumentation has observation cost that remains in the original workload.
+
+Exact resolver invocations, prepared-roster totals and cohort sizes are explicitly
+unavailable. The production authority is frozen and captured by its adapters;
+this fixture does not replace that authority with an observing permission facade
+or infer resolver counts from read patterns. The same passive counters can bind
+an unchanged-production baseline and a later reviewed optimization, but neither
+family totals nor the paired spans alone establish latency attribution.
+
 Real logout closes one guest with close code 4401 and denies its cookie state/upgrade replay. The
 other 49 remain native members and ACK a real ordered names response. Their
 actual durable/session/binding convergence must reach 49 before the checkpoint.

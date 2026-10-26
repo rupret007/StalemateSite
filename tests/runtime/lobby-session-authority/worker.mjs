@@ -19,6 +19,50 @@ const PRESSURE_PREFIX = 'Pressure probe ephemeral marker ';
 const FANOUT_PREFIX = 'Fanout fifty ephemeral marker ';
 const TRAFFIC_LABELS = ['NativeAlpha', 'NativeBravo', 'NativeCharlie'];
 const ordinaryNeedles = ['Native Stalemate ephemeral greeting', 'Native Rad Dad ephemeral greeting', 'Native remaining visitor greeting', 'native-media-control-no-body-persistence'];
+const NATIVE_METHODS = ['get', 'put', 'delete', 'list', 'getAlarm', 'setAlarm', 'deleteAlarm'];
+const NATIVE_FAMILIES = ['authorityMarker', 'sessionIndex', 'connectionIndex', 'mintRates', 'authoritySession', 'authorityConnection',
+    'participationPolicy', 'participationRecord', 'participationAnchor', 'participationSubject', 'participationOperation', 'net', 'sessions', 'room', 'authorityOther', 'alarm', 'other'];
+const FAMILY_ROUTES = [
+    ['authorityMarker', 'lobby-session-authority:v1', true], ['sessionIndex', 'authority-session-index:v1', true],
+    ['connectionIndex', 'authority-connection-index:v1', true], ['mintRates', 'authority-mint-rates:v1', true],
+    ['authoritySession', 'authority-session:', false], ['authorityConnection', 'authority-connection:', false],
+    ['participationPolicy', 'participation-records:v1:policy', true], ['participationRecord', 'participation-records:v1:record:', false],
+    ['participationAnchor', 'participation-records:v1:anchor:', false], ['participationSubject', 'participation-records:v1:subject:', false],
+    ['participationOperation', 'participation-records:v1:operation:', false], ['net', 'net', true], ['sessions', 'sessions', true], ['room', 'community-room:', false]
+].map(([family, prefix, exact]) => ({ family, hex: [...prefix].map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join(''), exact }));
+function nativeFamily(method, args) {
+    if (method.endsWith('Alarm')) return 'alarm';
+    try {
+        const key = method === 'list' ? Object.getOwnPropertyDescriptor(args[0], 'prefix')?.value : args[0];
+        if (typeof key !== 'string' || !key.startsWith('durable-record:v1:lobby-authority-v1:')) return 'other';
+        const tail = key.slice('durable-record:v1:lobby-authority-v1:'.length), part = tail.startsWith('part:');
+        const route = part ? tail.slice(5) : tail.startsWith('manifest:') ? tail.slice(9) : '';
+        // Compare only fixed encoded prefixes. Never decode or retain the
+        // dynamic record suffix, and never export a key or key fragment.
+        return FAMILY_ROUTES.find(rule => route.startsWith(rule.hex) && (!rule.exact
+            || route.length === rule.hex.length || part && route[rule.hex.length] === ':'))?.family || 'authorityOther';
+    } catch { return 'other'; } // Classification cannot alter a native call.
+}
+function nativeCounters() {
+    return { families: Object.fromEntries(NATIVE_FAMILIES.map(family => [family, Object.fromEntries(NATIVE_METHODS.map(method => [method, 0]))])),
+        methods: Object.fromEntries(NATIVE_METHODS.map(method => [method, { attempted: 0, returned: 0, threw: 0 }])),
+        transactions: { started: 0, committed: 0, rejected: 0 }, overflow: false };
+}
+function bumpNative(meter, object, key) {
+    if (object[key] === Number.MAX_SAFE_INTEGER) meter.overflow = true;
+    else object[key]++;
+}
+function beginNative(meter, method, args) {
+    if (!meter) return null;
+    bumpNative(meter, meter.families[nativeFamily(method, args)], method);
+    const counts = meter.methods[method]; bumpNative(meter, counts, 'attempted'); return counts;
+}
+function snapshotNative(meter) {
+    return { v: 1, families: Object.fromEntries(NATIVE_FAMILIES.map(family => [family, { ...meter.families[family] }])),
+        methods: Object.fromEntries(NATIVE_METHODS.map(method => [method, { ...meter.methods[method] }])),
+        transactions: { ...meter.transactions }, overflow: meter.overflow,
+        resolverTelemetry: { available: false, reason: 'frozen-captured-authority' } };
+}
 const ensure = (condition, label) => { if (!condition) throw Error(label); };
 const denied = () => new Response('local fixture admission denied', { status: 403 });
 const sha = async value => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)))].map(byte => byte.toString(16).padStart(2, '0')).join('');
@@ -44,10 +88,13 @@ export class FixtureLobby extends HangoutLobby {
         const control = { faultKey: '', tripped: false, nativeWriteCompleted: false, nativeCalls: 0, nativeMutations: 0, history: [], rollbackWitnesses: [],
             traffic: env.FIXTURE_TRAFFIC_ACKS === 'ack-v1' ? { slots: new Map(), transactionsStarted: 0, transactionsCommitted: 0, transactionsRejected: 0 } : null,
             pressure: env.FIXTURE_PRESSURE_ONLY === 'pressure-v1' ? { slots: new Map(), probeSocket: null, helpAttempts: [], overflow: false, witness: null, nativeSendCalls: 0, nativeSendReturned: 0, initialSequence: 0 } : null,
-            fanout: env.FIXTURE_FANOUT_50 === 'fanout-v1' ? { slots: new Map(), scan: null, scanStarted: false } : null };
+            fanout: env.FIXTURE_FANOUT_50 === 'fanout-v1' ? { slots: new Map(), scan: null, scanStarted: false, storageCounters: nativeCounters() } : null };
         const manifestDigest = async (storage, key) => {
             control.nativeCalls++;
-            const value = await storage.get(key);
+            const meter = control.fanout?.storageCounters, counts = beginNative(meter, 'get', [key]);
+            let value;
+            try { value = await storage.get(key); if (counts) bumpNative(meter, counts, 'returned'); }
+            catch (error) { if (counts) bumpNative(meter, counts, 'threw'); throw error; }
             ensure(value !== undefined, 'fixture-manifest-observation-missing');
             const encoded = JSON.stringify(value);
             ensure(typeof encoded === 'string' && new TextEncoder().encode(encoded).byteLength <= 65536, 'fixture-manifest-observation-cap');
@@ -63,12 +110,16 @@ export class FixtureLobby extends HangoutLobby {
                 ensure(transactionWitness === null, 'fixture-nested-native-transaction');
                 const witness = { fault: null };
                 if (control.traffic) control.traffic.transactionsStarted++;
+                const meter = control.fanout?.storageCounters;
+                if (meter) bumpNative(meter, meter.transactions, 'started');
                 try {
                     const result = await method.call(raw, tx => operation(wrap(tx, witness)));
                     if (control.traffic) control.traffic.transactionsCommitted++;
+                    if (meter) bumpNative(meter, meter.transactions, 'committed');
                     return result;
                 } catch (error) {
                     if (control.traffic) control.traffic.transactionsRejected++;
+                    if (meter) bumpNative(meter, meter.transactions, 'rejected');
                     if (witness.fault) {
                         const { physicalKey, ...observation } = witness.fault;
                         observation.restoredSha256 = await manifestDigest(raw, physicalKey);
@@ -92,7 +143,10 @@ export class FixtureLobby extends HangoutLobby {
                     originalSha256 = await manifestDigest(raw, args[0]);
                 }
                 control.nativeCalls++;
-                const result = await method.apply(raw, args);
+                const meter = control.fanout?.storageCounters, counts = beginNative(meter, key, args);
+                let result;
+                try { result = await method.apply(raw, args); if (counts) bumpNative(meter, counts, 'returned'); }
+                catch (error) { if (counts) bumpNative(meter, counts, 'threw'); throw error; }
                 if (['put', 'delete', 'setAlarm', 'deleteAlarm'].includes(key)) control.nativeMutations++;
                 // Fault only after the actual native SQLite write resolved.
                 if (armed) {
@@ -303,7 +357,7 @@ export class FixtureLobby extends HangoutLobby {
         }).sort((a, b) => a.slot - b.slot);
         return { sockets, engineCount: current.length, liveBindingCount: this.liveBindings.size,
             delivery: this.delivery.snapshot(), controlBudget: this.controlBudget.snapshot(), nativeStorageMethodCalls: this.fixtureControl.nativeCalls,
-            nativeMutations: this.fixtureControl.nativeMutations };
+            nativeMutations: this.fixtureControl.nativeMutations, nativeStorageCounters: snapshotNative(meter.storageCounters) };
     }
     async fixtureFanoutSummary() {
         this.fixtureFanoutMode(); const saved = await this.authority.load(), current = this.engine.sessionSnapshot().connections;
