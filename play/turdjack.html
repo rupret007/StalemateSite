@@ -5291,7 +5291,7 @@
         .catch(() => {});
 
       if (!window.__TURDJACK_SKIP_KIT__) {
-        import('./games/turdjack-page-kit.js')
+        import('./games/turdjack-page-kit.js?v=d36643080fe94fbc')
           .then((m) => {
             turdjackKit = m.installTurdjackKit(window);
             updateHud();

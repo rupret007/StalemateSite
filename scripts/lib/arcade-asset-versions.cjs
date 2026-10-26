@@ -16,6 +16,7 @@ const TARGETS = new Set([
     'stalemate/stalemate-overlay.js'
 ]);
 function versionArcadeAssets(stage) {
+    const targets = new Set(TARGETS);
     const exists = file => fs.existsSync(path.join(stage, file));
     const version = file => createHash('sha256').update(fs.readFileSync(path.join(stage, file))).digest('hex').slice(0, 16);
     const pathname = reference => reference.split(/[?#]/, 1)[0];
@@ -29,16 +30,44 @@ function versionArcadeAssets(stage) {
         query.set('v', stamp);
         return file + '?' + (html ? query.toString().replaceAll('&', '&amp;') : query.toString()) + fragment;
     }
-    function resolve(file, reference) {
+    function localTarget(file, reference) {
         const clean = pathname(reference);
         if (/^(?:[a-z][a-z\d+.-]*:|\/)/i.test(clean)) return null;
         const target = path.posix.normalize(path.posix.join(path.posix.dirname(file), clean));
-        return TARGETS.has(target) && exists(target) ? target : null;
+        return exists(target) ? target : null;
     }
+    function resolve(file, reference) {
+        const target = localTarget(file, reference);
+        return targets.has(target) ? target : null;
+    }
+    const importPattern = /(\bfrom\s*|\bimport\s*\(\s*|\bsuiteImport\s*\(\s*|\bimport\s*)(['"])([^'"\r\n]+)\2/g;
+    function scripts(directory) {
+        return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+            const file = path.join(directory, entry.name);
+            return entry.isDirectory() ? scripts(file) : file.endsWith('.js') ? [file] : [];
+        });
+    }
+    const graph = scripts(stage).map(file => {
+        const name = path.relative(stage, file).split(path.sep).join('/');
+        const text = fs.readFileSync(file, 'utf8');
+        return { name, dependencies: Array.from(text.matchAll(importPattern), match => localTarget(name, match[3])) };
+    });
+    // A new or previously unlisted parent must be invalidated too. Find the
+    // complete ancestor closure rather than relying on a handwritten list.
+    let discovered;
+    do {
+        discovered = false;
+        for (const file of graph) {
+            if (!targets.has(file.name) && file.dependencies.some(dependency => targets.has(dependency))) {
+                targets.add(file.name);
+                discovered = true;
+            }
+        }
+    } while (discovered);
     // Include static, side-effect, dynamic and SDK-wrapped imports. Version the
     // child's final bytes first so a changed leaf invalidates every cached parent.
     function rewriteImports(text, file, visit) {
-        return text.replace(/(\bfrom\s*|\bimport\s*\(\s*|\bsuiteImport\s*\(\s*|\bimport\s*)(['"])([^'"\r\n]+)\2/g, (all, prefix, quote, reference) => {
+        return text.replace(importPattern, (all, prefix, quote, reference) => {
             const target = resolve(file, reference);
             return target ? prefix + quote + withVersion(reference, visit(target)) + quote : all;
         });
@@ -58,7 +87,7 @@ function versionArcadeAssets(stage) {
         stamps.set(file, stamp);
         return stamp;
     }
-    for (const file of TARGETS) if (exists(file)) visit(file);
+    for (const file of targets) if (exists(file)) visit(file);
     for (const file of fs.readdirSync(stage).filter(file => file.endsWith('.html'))) {
         const original = fs.readFileSync(path.join(stage, file), 'utf8');
         let next = original.replace(/<(?:script|link)\b[^>]*>/gi, tag => tag.replace(/(\b(?:src|href)\s*=\s*)(['"])([^'"]+)\2/g, (all, prefix, quote, reference) => {

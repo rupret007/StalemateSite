@@ -95,4 +95,23 @@ describe('content-versioned arcade delivery', () => {
         f.write('assets/suite-sound.js', "import './suite-audio.js';");
         expect(() => versionArcadeAssets(f.root)).toThrow('Cyclic versioned arcade import');
     });
+    it('discovers every previously unlisted parent of a changed audio bank', () => {
+        const f = fixture();
+        f.write('games/turdjack-audio.js', 'export const sound = 1;');
+        f.write('games/turdjack-page-kit.js', "import { sound } from './turdjack-audio.js';");
+        f.write('games/table-entry.js', "import './turdjack-page-kit.js';");
+        f.write('table.html', '<script type="module">import("games/table-entry.js");</script>');
+        versionArcadeAssets(f.root);
+        expect(f.read('games/turdjack-page-kit.js')).toContain('./turdjack-audio.js?v=' + f.hash('games/turdjack-audio.js'));
+        expect(f.read('games/table-entry.js')).toContain('./turdjack-page-kit.js?v=' + f.hash('games/turdjack-page-kit.js'));
+        expect(f.read('table.html')).toContain('games/table-entry.js?v=' + f.hash('games/table-entry.js'));
+        const files = ['games/turdjack-page-kit.js', 'games/table-entry.js', 'table.html'];
+        const before = files.map(f.read);
+        f.write('games/turdjack-audio.js', 'export const sound = 2;');
+        versionArcadeAssets(f.root);
+        const after = files.map(f.read);
+        after.forEach((text, index) => expect(text).not.toBe(before[index]));
+        versionArcadeAssets(f.root);
+        expect(files.map(f.read)).toEqual(after);
+    });
 });
