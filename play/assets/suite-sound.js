@@ -154,7 +154,12 @@ export function createStudioAudio(deps) {
     try { audio = deps.getContext(); } catch { unavailable = true; counts.dropped++; return false; }
     if (!audio) { unavailable = true; counts.dropped++; return false; }
     if (audio.state !== 'running') { counts.dropped++; return false; }
-    if (context && audio !== context) { stop(); output?.disconnect(); }
+    if (context && audio !== context) {
+      stop(); output?.disconnect();
+      // Closed contexts may never deliver their sources' onended callbacks.
+      // Those dead voices must not consume the replacement context's slots.
+      voices.clear();
+    }
     if (audio !== context) {
       try { output = createStudioOutput(audio); context = audio; unavailable = false; }
       catch { unavailable = true; counts.dropped++; return false; }
