@@ -148,11 +148,81 @@ export async function admitLobby(request, env, url) {
 
 // One DO = one network. Uses the WebSocket Hibernation API; durable bits (bans, filters, lock, shield, mod log)
 // go to SQLite storage when they change. Optional AI quota reservations are stored before each check.
+// Pending retirement entries come only from already-admitted bindings/members.
+// A failed semantic removal must retain its durable lifecycle fence for recovery.
+const CLOSED_RETIREMENT_BATCH = 16;
+const retirementDegraded = lobby => { try { lobby.storageFailed?.(); } catch { /* keep cleanup retryable */ } };
+function rememberRetirement(lobby, id, sid = '') {
+    lobby.pendingClosed ||= new Map();
+    if (lobby.pendingClosed.has(id)) return lobby.pendingClosed.get(id);
+    const binding = lobby.liveBindings?.get(id);
+    const member = binding ? null : lobby.engine?.sessionSnapshot?.().connections.find(value => value.id === id);
+    if (!binding && !member) return null;
+    const entry = { id, sid: binding?.betaSid || member?.betaSid || sid, disconnected: false, retryUsed: false, needsRetry: false, running: false };
+    lobby.pendingClosed.set(id, entry); return entry;
+}
+function closeTransport(lobby, ws, code, reason = '', extra = {}) {
+    lobby.closedSockets ||= new WeakSet(); lobby.closedSockets.add(ws);
+    let attachment = {}; try { attachment = ws.deserializeAttachment?.() || {}; } catch { /* WeakSet still fences queued frames */ }
+    let id = attachment.id; if (!id) try { id = lobby.state.getTags(ws)[0]; } catch { /* no new untrusted retirement entry */ }
+    const entry = rememberRetirement(lobby, id, attachment.betaSid || '');
+    try { ws.serializeAttachment({ ...attachment, ...extra, sessionEnded: true }); } catch { /* WeakSet is the local fail-closed fallback */ }
+    lobby.liveBindings?.delete(id); lobby.delivery.forget(ws);
+    let acknowledged = true;
+    try { if (ws.readyState !== 3) { if (reason) ws.close(code, reason); else ws.close(code); } } catch { acknowledged = false; }
+    return { entry, acknowledged };
+}
+async function retireClosed(lobby, entry, gate, retry = false) {
+    if (!entry) return true;
+    if (entry.running || entry.needsRetry && !retry) return false;
+    entry.running = true;
+    try {
+        if (!entry.disconnected) {
+            const result = await lobby.engine.disconnect(entry.id);
+            if (result?.ok === false) { entry.needsRetry = true; entry.retryAfter = gate; retirementDegraded(lobby); return false; }
+            entry.disconnected = true; // undefined is the existing successful return.
+        }
+        if (lobby.authorityMode && (await lobby.authority.unbind(entry.id))?.ok === false) { entry.needsRetry = true; entry.retryAfter = gate; retirementDegraded(lobby); return false; }
+        lobby.pendingClosed.delete(entry.id); return true;
+    } catch (error) { entry.needsRetry = true; entry.retryAfter = gate; if (error?.overloaded === true) entry.retryUsed = true; retirementDegraded(lobby); return false; }
+    finally { entry.running = false; }
+}
+function pendingSid(lobby, sid) { return [...(lobby.pendingClosed?.values() || [])].some(entry => entry.sid === sid); }
+function queueRetirementRetry(lobby) {
+    if (lobby.retirementRetryScheduled || lobby.authorityUnavailable) return;
+    const selected = [...(lobby.pendingClosed?.values() || [])].filter(entry => entry.needsRetry && !entry.retryUsed && !entry.running && entry.retryAfter?.settled !== false).slice(0, CLOSED_RETIREMENT_BATCH);
+    if (!selected.length) return;
+    // Consume the one background attempt before dispatch. No completion handler
+    // recursively schedules another attempt; the ordinary alarm is the fallback.
+    for (const entry of selected) entry.retryUsed = true;
+    lobby.retirementRetryScheduled = true;
+    let task;
+    try { task = retirementGate(lobby, async gate => {
+        for (const entry of selected) if (lobby.pendingClosed.get(entry.id) === entry) await retireClosed(lobby, entry, gate, true);
+    }, false); } catch { lobby.retirementRetryScheduled = false; retirementDegraded(lobby); return; }
+    const finished = Promise.resolve(task).catch(() => retirementDegraded(lobby)).finally(() => { lobby.retirementRetryScheduled = false; });
+    lobby.state.waitUntil?.(finished);
+}
+function retirementGate(lobby, operation, retry = true) {
+    // Publish the owner token before invoking even a synchronous/reentrant gate.
+    // Another completed event cannot retry this entry until its failed owner
+    // promise has settled. Never await a new cleanup gate from inside that owner.
+    const gate = { settled: false };
+    let task;
+    try { task = lobby.state.blockConcurrencyWhile(() => operation(gate)); }
+    catch (error) { gate.settled = true; throw error; }
+    const settled = Promise.resolve(task).then(() => { gate.settled = true; if (retry) queueRetirementRetry(lobby); },
+        () => { gate.settled = true; if (retry) queueRetirementRetry(lobby); });
+    lobby.state.waitUntil?.(settled); return task;
+}
 export class HangoutLobby {
     constructor(state, env) {
         this.state = state;
         this.env = env;
         this.pendingAdmission = new Map();
+        this.closedSockets = new WeakSet();
+        this.pendingClosed = new Map();
+        this.retirementRetryScheduled = false;
         this.presence = createPresenceProjections({
             flush: batch => this.engine.flushPresence(batch),
             serialize: async fn => { await this.ready; return this.state.blockConcurrencyWhile(async () => fn()); }
@@ -250,11 +320,11 @@ export class HangoutLobby {
             send: (id, msg) => {
                 const ws = this.byId(id);
                 if (ws) {
+                    if (this.closedSockets.has(ws)) return;
                     const a = ws.deserializeAttachment() || {};
                     if (socketIdentityInvalid(a, env) || this.authorityMode && !this.bindingLive(a)) {
                         if (!a.sessionEnded) {
-                            ws.serializeAttachment({ ...a, sessionEnded: true });
-                            ws.close(4401, 'sign in again');
+                            closeTransport(this, ws, 4401, 'sign in again');
                             const ended = Promise.resolve().then(() => this.webSocketClose(ws)).catch(() => this.storageFailed());
                             this.state.waitUntil?.(ended);
                         }
@@ -303,7 +373,7 @@ export class HangoutLobby {
         for (const ws of state.getWebSockets()) {
             const a = ws.deserializeAttachment() || {};
             if (!a.id) { ws.close(4401, 'session unavailable'); continue; }
-            if (socketIdentityInvalid(a, env) || this.authorityMode && !this.bindingLive(a)) { ws.close(4401, 'sign in again'); continue; }
+            if (this.closedSockets.has(ws) || socketIdentityInvalid(a, env) || this.authorityMode && !this.bindingLive(a)) { ws.close(4401, 'sign in again'); continue; }
             if (env.HANGOUT_BETA_MODE === 'protected') {
                 if (!betaChecks.has(this.authorityMode ? a.id : a.betaSid)) betaChecks.set(this.authorityMode ? a.id : a.betaSid, this.sessionActive(a));
                 if (!await betaChecks.get(this.authorityMode ? a.id : a.betaSid)) { ws.close(4401, 'beta session ended'); continue; }
@@ -318,19 +388,19 @@ export class HangoutLobby {
             const ws = sockets.get(rejected.id);
             if (ws) { this.delivery.forget(ws); ws.close(4401, rejected.reason); }
         }
-        if (recovered) {
-            const resumed = new Set(restored.resumed);
-            // A binding is not evidence that a browser survived hibernation or
-            // process replacement. Retire cold/failed/rejected admissions.
-            for (const { binding } of recovered.bindings) if (!resumed.has(binding.id)) {
-                this.liveBindings.delete(binding.id); await this.authority.unbind(binding.id);
-            }
-        }
         if (this.participationMode) await confirmRestore(this.engine.refreshParticipation());
         const currentRooms = this.engine.roomSnapshot();
         if (JSON.stringify(currentRooms) !== roomsBeforeResume) await this.persistRequired('rooms', currentRooms);
         const currentSessions = this.engine.sessionSnapshot();
         if (JSON.stringify(savedSessions) !== JSON.stringify(currentSessions)) await this.persistRequired('sessions', currentSessions);
+        if (recovered) {
+            const resumed = new Set(restored.resumed);
+            // Confirm the pruned durable session snapshot BEFORE retiring the
+            // bindings that authorize its removal. A failed write retains them.
+            for (const { binding } of recovered.bindings) if (!resumed.has(binding.id)) {
+                this.liveBindings.delete(binding.id); await this.authority.unbind(binding.id); this.pendingClosed.delete(binding.id);
+            }
+        }
         await confirmRestore(this.engine.tick());
         await this.pruneLogs();
         if (recovered) this.engine.restoreLog(recovered.state.modlog);
@@ -350,21 +420,26 @@ export class HangoutLobby {
         try {
             if (value.id) return await this.authority.validate(value);
             return !!await this.authority.check({ sid: value.betaSid, version: value.betaInviteVersion, exp: value.expiresAt });
-        } catch { return false; }
+        } catch {
+            // An unavailable/corrupt strict authority is different from an
+            // ordinary validation denial or a controlled retirement refusal.
+            this.authorityUnavailable = true; this.storageFailed(); return false;
+        }
     }
-    async closeLocalSession(sid) {
-        for (const [id, binding] of this.liveBindings) if (binding.betaSid === sid) this.liveBindings.delete(id);
+    async closeLocalSession(sid, gate, attempted) {
+        for (const [id, binding] of this.liveBindings) if (binding.betaSid === sid) {
+            rememberRetirement(this, id, sid); this.liveBindings.delete(id);
+        }
         let closed = true;
         for (const ws of this.state.getWebSockets()) {
-            const a = ws.deserializeAttachment() || {};
-            if (a.betaSid !== sid) continue;
-            this.delivery.forget(ws);
-            try { ws.serializeAttachment({ ...a, betaEnded: true }); ws.close(4401, 'beta session ended'); }
-            catch { closed = false; }
-            try { const result = await this.engine.disconnect(a.id); if (result?.ok === false) closed = false; await this.authority.unbind(a.id); }
-            catch { closed = false; }
+            const attachment = ws.deserializeAttachment() || {};
+            if (attachment.betaSid !== sid) continue;
+            if (!closeTransport(this, ws, 4401, 'beta session ended', { betaEnded: true }).acknowledged) closed = false;
         }
-        return closed;
+        const selected = [...(this.pendingClosed?.values() || [])].filter(entry => entry.sid === sid && !attempted?.has(entry.id))
+            .slice(0, Math.max(0, CLOSED_RETIREMENT_BATCH - (attempted?.size || 0)));
+        for (const entry of selected) { attempted?.add(entry.id); if (!await retireClosed(this, entry, gate, !!attempted)) closed = false; }
+        return closed && !pendingSid(this, sid);
     }
     async closeAuthoritySession(record, localClosed) {
         // Called only AFTER the authority gate has returned. No self-RPC and no
@@ -377,9 +452,9 @@ export class HangoutLobby {
         const deadline = new Promise(resolve => { timer = setTimeout(() => { resolve(false); controller.abort(); }, 8000); });
         let closed;
         try { closed = await Promise.race([completed, deadline]); } finally { clearTimeout(timer); }
-        if (!closed) return false;
+        if (!closed || pendingSid(this, record.sid)) return false;
         await this.state.blockConcurrencyWhile(async () => {
-            try { await this.authority.confirmClosed(record); } catch { closed = false; }
+            try { if (pendingSid(this, record.sid)) { closed = false; return; } await this.authority.confirmClosed(record); } catch { closed = false; }
         });
         return closed;
     }
@@ -438,7 +513,7 @@ export class HangoutLobby {
         }
         if (this.authorityUnavailable) return reply(503, 'authority unavailable');
         let closing, localClosed;
-        const response = await this.state.blockConcurrencyWhile(async () => {
+        const response = await retirementGate(this, async gate => {
             try {
                 if (operation === 'participation' || operation === 'participation-stop') {
                     if (!this.participationMode) return reply(404, 'not found');
@@ -462,8 +537,8 @@ export class HangoutLobby {
                     closing = await this.authority.revoke(body); if (!closing) return reply(403, 'expired or revoked');
                     // Tombstone is already committed. Subsequent scheduling or
                     // close failure must not resurrect this SID.
-                    for (const [id, binding] of this.liveBindings) if (binding.betaSid === closing.sid) this.liveBindings.delete(id);
-                    await this.authority.schedule(); localClosed = await this.closeLocalSession(closing.sid); return null;
+                    for (const [id, binding] of this.liveBindings) if (binding.betaSid === closing.sid) { rememberRetirement(this, id, closing.sid); this.liveBindings.delete(id); }
+                    await this.authority.schedule(); localClosed = await this.closeLocalSession(closing.sid, gate); return null;
                 }
                 return reply(404, 'not found');
             } catch { return reply(503, 'authority unavailable'); }
@@ -474,6 +549,7 @@ export class HangoutLobby {
     }
 
     sendPrivateAdmin(ws, id, msg) {
+        if (this.closedSockets.has(ws)) return;
         const original = ws.deserializeAttachment() || {};
         if (this.engine?.privateAdminReady?.(id) !== true) return;
         if (!original.admin || !['owner', 'band', 'moderator'].includes(original.role)
@@ -485,7 +561,7 @@ export class HangoutLobby {
             // behind this Lobby event. Local socket metadata alone is not proof
             // that private evidence may still be delivered.
             const active = await this.sessionActive(original);
-            if (this.privateAdminDispatch.get(ws) !== generation || this.byId(id) !== ws
+            if (this.closedSockets.has(ws) || this.privateAdminDispatch.get(ws) !== generation || this.byId(id) !== ws
                 || this.engine?.privateAdminReady?.(id) !== true) return;
             const current = ws.deserializeAttachment() || {};
             if (socketIdentityInvalid(current, this.env) || !current.admin
@@ -495,8 +571,7 @@ export class HangoutLobby {
                     .some(key => current[key] !== original[key])
                 || ws.readyState !== undefined && ws.readyState !== 1) return;
             if (!active) {
-                ws.serializeAttachment({ ...current, sessionEnded: true });
-                ws.close(4401, 'sign in again');
+                closeTransport(this, ws, 4401, 'sign in again');
                 const ended = Promise.resolve().then(() => this.webSocketClose(ws)).catch(() => this.storageFailed());
                 this.state.waitUntil?.(ended);
                 return;
@@ -605,20 +680,36 @@ export class HangoutLobby {
     async alarm() {
         await this.ready;
         if (this.authorityMode) {
-            let due = [];
+            let due = []; const attempted = new Set();
             const retryAlarm = async () => {
-                try { await this.state.storage.setAlarm(Date.now() + 60000); }
-                catch { this.authorityUnavailable = true; }
-            };
-            await this.state.blockConcurrencyWhile(async () => {
                 try {
-                    if (this.authorityUnavailable) { await this.state.storage.setAlarm(Date.now() + 60000); return; }
+                    const now = Date.now(), at = now + 60000, earlier = await this.state.storage.getAlarm();
+                    // Reaffirm the alarm even when its earlier future deadline
+                    // wins: an actual scheduling failure must remain visible.
+                    await this.state.storage.setAlarm(Number.isFinite(earlier) && earlier > now ? Math.min(earlier, at) : at);
+                } catch { this.authorityUnavailable = true; this.storageFailed(); }
+            };
+            const schedule = async () => {
+                const earlier = this.pendingClosed.size ? await this.state.storage.getAlarm() : null;
+                await this.authority.schedule();
+                if (Number.isFinite(earlier) && earlier > Date.now()) {
+                    const next = await this.state.storage.getAlarm();
+                    if (next === null || next === undefined || next > earlier) await this.state.storage.setAlarm(earlier);
+                }
+            };
+            await retirementGate(this, async gate => {
+                try {
+                    if (this.authorityUnavailable) { await retryAlarm(); return; }
+                    for (const entry of [...this.pendingClosed.values()].slice(0, CLOSED_RETIREMENT_BATCH)) {
+                        entry.retryUsed = true; attempted.add(entry.id); await retireClosed(this, entry, gate, true);
+                    }
                     for (const ws of this.state.getWebSockets()) {
                         const a = ws.deserializeAttachment() || {};
-                        if (socketIdentityInvalid(a, this.env) || !await this.sessionActive(a)) {
-                            this.liveBindings.delete(a.id); this.delivery.forget(ws);
-                            ws.serializeAttachment({ ...a, betaEnded: true }); ws.close(4401, 'sign in again');
-                            await this.engine.disconnect(a.id); await this.authority.unbind(a.id);
+                        if (this.closedSockets.has(ws) || socketIdentityInvalid(a, this.env) || !await this.sessionActive(a)) {
+                            const { entry } = closeTransport(this, ws, 4401, 'sign in again', { betaEnded: true });
+                            if (entry && !attempted.has(entry.id) && attempted.size < CLOSED_RETIREMENT_BATCH) {
+                                attempted.add(entry.id); await retireClosed(this, entry, gate);
+                            }
                         }
                     }
                     if (this.participationMode && (await this.engine.refreshParticipation())?.ok === false) throw Error('participation refresh unavailable');
@@ -627,23 +718,24 @@ export class HangoutLobby {
                     await this.pruneLogs();
                     this.privateQueueActor = { kind: 'maintenance' };
                     try { await this.refreshPrivateReports(); } finally { this.privateQueueActor = null; }
-                    due = await this.authority.due(); await this.authority.schedule();
+                    due = await this.authority.due(); await schedule();
                 } catch { this.storageFailed(); await retryAlarm(); }
             });
             for (const record of due) {
                 let attempt, closed;
-                await this.state.blockConcurrencyWhile(async () => {
-                    try { attempt = await this.authority.retry(record.sid); if (attempt) closed = await this.closeLocalSession(record.sid); }
+                await retirementGate(this, async gate => {
+                    try { attempt = await this.authority.retry(record.sid); if (attempt) closed = await this.closeLocalSession(record.sid, gate, attempted); }
                     catch { /* Durable pending state remains retryable. */ }
                 });
                 if (attempt) await this.closeAuthoritySession(attempt, closed).catch(() => false);
             }
             await this.state.blockConcurrencyWhile(async () => {
-                try { await this.authority.schedule(); } catch { await retryAlarm(); }
+                try { await schedule(); } catch { await retryAlarm(); }
             });
+            queueRetirementRetry(this);
             return;
         }
-        return this.state.blockConcurrencyWhile(async () => {
+        return retirementGate(this, async gate => {
             const betaChecks = new Map();
             for (const ws of this.state.getWebSockets()) {
                 const a = ws.deserializeAttachment() || {};
@@ -652,7 +744,7 @@ export class HangoutLobby {
                     if (!betaChecks.has(a.betaSid)) betaChecks.set(a.betaSid, activeBetaSession(this.env, a));
                     ended = !await betaChecks.get(a.betaSid);
                 }
-                if (ended) { this.delivery.forget(ws); ws.close(4401, 'sign in again'); await this.engine.disconnect(a.id); }
+                if (this.closedSockets.has(ws) || ended) { const { entry } = closeTransport(this, ws, 4401, 'sign in again'); await retireClosed(this, entry, gate); }
             }
             await this.engine.tick(); await this.pruneLogs();
             await this.refreshPrivateReports();
@@ -703,7 +795,7 @@ export class HangoutLobby {
                 return new Response('ok');
             });
         }
-        return this.state.blockConcurrencyWhile(async () => {
+        return retirementGate(this, async gate => {
         if (!identity || !identity.dev) return new Response('no', { status: 400 });
         if (socketIdentityInvalid(identity, this.env)) return new Response('session required', { status: 403 });
         if (this.env.HANGOUT_BETA_MODE === 'protected' && !await this.sessionActive(identity)) return new Response('beta session required', { status: 403 });
@@ -746,21 +838,24 @@ export class HangoutLobby {
         }
         return new Response(null, { status: 101, webSocket: pair[0] });
         } catch {
-            if (pair?.[1]) { this.delivery.forget(pair[1]); try { pair[1].close(1011, 'admission unavailable'); } catch { /* gone */ } }
+            const entry = rememberRetirement(this, id, trusted.betaSid || '');
+            if (pair?.[1]) closeTransport(this, pair[1], 1011, 'admission unavailable');
             this.liveBindings.delete(id);
-            try { await this.engine.disconnect(id); if (this.authorityMode) await this.authority.unbind(id); }
-            catch { if (this.authorityMode) this.authorityUnavailable = true; this.storageFailed(); }
+            await retireClosed(this, entry, gate);
             return new Response('community admission unavailable', { status: 503 });
         }
         });
     }
     async webSocketMessage(ws, raw) {
+        if (this.closedSockets?.has(ws)) return;
         await this.ready;
+        if (this.closedSockets?.has(ws)) return;
         if (this.authorityUnavailable) { ws.close(1011, 'community authority unavailable'); return; }
-        return this.state.blockConcurrencyWhile(async () => {
+        return retirementGate(this, async gate => {
             try {
             const a = ws.deserializeAttachment() || {};
-            if (socketIdentityInvalid(a, this.env) || this.authorityMode && !await this.sessionActive(a)) { this.liveBindings.delete(a.id); this.delivery.forget(ws); ws.close(4401, 'sign in again'); await this.engine.disconnect(a.id); if (this.authorityMode) await this.authority.unbind(a.id); return; }
+            if (this.closedSockets?.has(ws) || socketIdentityInvalid(a, this.env) || this.authorityMode && !await this.sessionActive(a)) { const { entry } = closeTransport(this, ws, 4401, 'sign in again'); await retireClosed(this, entry, gate); return; }
+            if (this.closedSockets?.has(ws)) return;
             // Transport control prepays request units from the same daily budget,
             // but never spends a person's chat allowance or mutates room authority.
             if (typeof raw === 'string' && raw.length <= LOBBY_LIMITS.actFrameBytes) {
@@ -768,8 +863,8 @@ export class HangoutLobby {
                 try { control = JSON.parse(raw); } catch { /* The engine refuses malformed application frames. */ }
                 if (control?.t === 'transport-ack') {
                     if (!await this.controlBudget.take(ws, a.id)) {
-                        this.delivery.forget(ws); ws.close(4413, 'community control allowance unavailable');
-                        return await this.engine.disconnect(a.id);
+                        const { entry } = closeTransport(this, ws, 4413, 'community control allowance unavailable');
+                        return await retireClosed(this, entry, gate);
                     }
                     return this.delivery.acknowledge(ws, control.seq);
                 }
@@ -791,18 +886,14 @@ export class HangoutLobby {
         });
     }
     async webSocketClose(ws, code) {
-        // A peer-initiated close can remain half-closed on older runtimes and
-        // bridges. Acknowledge before storage work; never reflect its reason.
         const replyCode = Number.isInteger(code) && (code >= 1000 && code <= 1014 && ![1004, 1005, 1006].includes(code)
             || code >= 3000 && code <= 4999) ? code : 1000;
-        try { if (ws.readyState !== 3) ws.close(replyCode); } catch { /* Cleanup still retires the binding if acknowledgement fails. */ }
-        this.delivery.forget(ws); await this.ready;
+        // The attachment and WeakSet fence queued frames before any await;
+        // acknowledgement/credit release do not claim semantic retirement.
+        const { entry } = closeTransport(this, ws, replyCode);
+        await this.ready;
         if (this.authorityUnavailable) return;
-        return this.state.blockConcurrencyWhile(async () => {
-            const id = this.state.getTags(ws)[0]; this.liveBindings.delete(id);
-            try { await this.engine.disconnect(id); if (this.authorityMode) await this.authority.unbind(id); }
-            catch { this.storageFailed(); }
-        });
+        return retirementGate(this, gate => retireClosed(this, entry, gate));
     }
     async webSocketError(ws) { return this.webSocketClose(ws); }
 }
