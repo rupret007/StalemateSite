@@ -631,7 +631,7 @@ describe('C3 retention through the actual Lobby alarm and disk SQLite', () => {
             headers: { 'X-Hangout-Authority': 'maintenance', 'X-Hangout-Role': 'owner' } }), f.h.env);
         expect(response.status).toBe(404); expect(await f.rows()).toEqual(before);
         expect(await f.records.transaction(tx => tx.get(partitionMaintenance.PARTICIPATION_MAINTENANCE_CURSOR_KEY))).toBeUndefined();
-        const ordinary = await harness(); await ordinary.visitor('OrdinaryRetentionControl'); await ordinary.lobby().alarm(); await ordinary.settle();
+        const ordinary = await harness(); await ordinary.visitor('OrdinaryRetainCtrl'); await ordinary.lobby().alarm(); await ordinary.settle();
         expect(await ordinary.lobby().authority.records.transaction(tx => tx.get(partitionMaintenance.PARTICIPATION_MAINTENANCE_CURSOR_KEY))).toBeUndefined();
         expect(ordinary.lobby().engine._debug.conns.size).toBe(1);
     });
