@@ -243,6 +243,10 @@ sharing journeys. It requires C3 and refuses an incident-mode combination; the
 four existing commands retain their existing workload when the flag is absent.
 It changes only this local fixture, not application limits, authority, TTLs,
 provider state or deployment configuration. It installs nothing.
+CI runs this mode separately as `npm run --silent test:lobby-session-runtime --
+--participation --traffic-acks`, retaining `lobby-traffic-acks-runtime.stdout.log`,
+`.stderr.log` and `.exit-code.txt` in the existing runtime diagnostic artifact.
+The existing job and runner deadlines remain unchanged.
 
 Alpha, Bravo and Charlie negotiate `transport:1` on their actual cookie-bound
 WebSockets. Their raw incoming envelopes must carry contiguous sequences from
