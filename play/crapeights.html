@@ -2072,8 +2072,18 @@
           updateDifficulty();
         });
       }
-      if (window.ResizeObserver) new ResizeObserver(() => renderPlayerHand()).observe(ui.playerHand);
-      else window.addEventListener('resize', renderPlayerHand);
+      // Rendering the observed hand synchronously can resize it again during
+      // WebKit's observer delivery. Coalesce presentation work on the next frame.
+      let handResizeFrame = 0;
+      const scheduleHandResize = () => {
+        if (handResizeFrame) return;
+        handResizeFrame = requestAnimationFrame(() => {
+          handResizeFrame = 0;
+          renderPlayerHand();
+        });
+      };
+      if (window.ResizeObserver) new ResizeObserver(scheduleHandResize).observe(ui.playerHand);
+      else window.addEventListener('resize', scheduleHandResize);
 
       if (ui.playBtn) ui.playBtn.addEventListener('click', playSelectedCard);
       if (ui.drawBtn) ui.drawBtn.addEventListener('click', drawForHuman);
