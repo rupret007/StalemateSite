@@ -21,6 +21,16 @@ Use hostname/path Access applications, not the Worker-level Access switch. Guest
 
 Set `HANGOUT_MODERATION_CONTACT` to a confirmed, monitored email address. The beta adapter renders it in the existing house-rules page. Missing or invalid contact configuration is shown explicitly; no fallback address is invented.
 
+The existing draft rules, privacy information and contact are readable before an
+invitation, after logout and when the session service is unavailable. Exact
+GET/HEAD requests to `/beta/privacy` lead to `/r/45662413410ed051/terms/`;
+the latter and its `index.html` alias use only `/beta/help.css`, with no scripts,
+analytics, session bootstrap, cookie issuance or community-service lookup.
+Other product assets remain protected. A missing policy asset returns an honest
+503 page with the configured public contact, if available; an owner email is
+never substituted. This access fix does not approve the draft policy, change
+the existing 13+/18+ safeguards or provide a new report-collection service.
+
 ## Admission and session boundaries
 
 Private invitations use `/beta/#invite=<private-code>`. The fragment is removed from browser history before it is submitted in a same-origin JSON POST. Do not put invitations in public PR descriptions, screenshots, logs or public navigation.

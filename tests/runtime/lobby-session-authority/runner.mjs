@@ -140,7 +140,7 @@ async function runtime(phase, state, nonce) {
     assert.ok(generated.output[0].imports.includes('node:crypto'), 'actual native node:crypto import required');
     assert.ok(generated.output[0].imports.every(name => name === 'node:crypto'));
     const bundleCode = generated.output[0].code, bundleSha256 = createHash('sha256').update(bundleCode).digest('hex');
-    for (const suffix of ['/beta-entry.mjs', '/lobby-do.mjs', '/lobby-session-authority.mjs', '/lobby-core.mjs', '/lobby-effect-records.mjs', '/durable-record-storage.mjs'])
+    for (const suffix of ['/beta-entry.mjs', '/beta-public-help.mjs', '/lobby-do.mjs', '/lobby-session-authority.mjs', '/lobby-core.mjs', '/lobby-effect-records.mjs', '/durable-record-storage.mjs'])
         assert.ok(Object.keys(bundleInputs).some(path => path.endsWith(suffix)), 'missing actual source ' + suffix);
     if (PARTICIPATION) for (const suffix of ['/lobby-participation.mjs', '/participation-enforcement.mjs', '/participation-partitions.mjs', '/participation-policy.mjs'])
         assert.ok(Object.keys(bundleInputs).some(path => path.endsWith(suffix)), 'missing actual participation source ' + suffix);
