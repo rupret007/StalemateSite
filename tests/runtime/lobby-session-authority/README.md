@@ -417,6 +417,28 @@ socket's actual ACK consumption, reservations and serialized prepaid remainder.
 Latencies report native-local Node/Miniflare bridge observations with sample
 counts, not isolated workerd latency, a public SLO or invoice cost.
 
+Only the fifty-guest visitor phase also emits fifty ordinal-only paired admission
+rows. The original full `admission` samples still start before unlock and end after
+the authoritative join; the same unrounded total is retained in each row. Existing
+operations are timed separately through parsed unlock HTTP response, parsed
+synthetic C2 grant HTTP response, native upgrade response 101, observed server
+hello, and client hello send through authoritative join. The remaining runner
+gaps are added as a nonnegative residual. Ordered monotonic timestamps and finite,
+nonnegative component bounds are checked, and their sum must reconcile to that
+row's unchanged total within floating-point precision; values are not clamped or
+rounded to remove cost. There are no component percentiles to add together.
+Pair rows by ordinal when locating the components of a slow full admission.
+
+This is measurement, not an admission fix: the existing full-admission p95 target
+of less than 1,000 ms remains, and the prior observed admission misses are not
+reclassified by separating synthetic consent cost. Fifty compact numeric rows are
+bounded to 32 KiB before pretty-printing, with no names, cookies, IDs, IPs or bodies.
+No worker controls/RPCs, pregrants, parallel admission, inspections, ACK changes,
+timer resets or altered workload/targets are introduced. Other modes and cold
+recovery collect no new timing spans. Node/Miniflare bridging, response parsing,
+queueing and scheduling are included; these spans cannot isolate workerd CPU,
+SQLite time, hosted latency or billing.
+
 Real logout closes one guest with close code 4401 and denies its cookie state/upgrade replay. The
 other 49 remain native members and ACK a real ordered names response. Their
 actual durable/session/binding convergence must reach 49 before the checkpoint.

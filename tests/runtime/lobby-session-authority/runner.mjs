@@ -236,22 +236,36 @@ async function runtime(phase, state, nonce) {
         const response = await mf.dispatchFetch(ORIGIN + '/_fixture/' + operation, { method: 'POST', headers: { 'X-Fixture-Nonce': nonce, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         assert.equal(response.status, 200, 'fixture control ' + operation + ' refused'); return response.json();
     };
-    const unlock = async (ip, { grant = true } = {}) => {
+    const unlock = async (ip, { grant = true, admissionProfile = null } = {}) => {
+        if (FANOUT_50 && admissionProfile) admissionProfile.unlockStart = performance.now();
         const response = await call('/beta/unlock', '', { key: INVITE }, ip); assert.equal(response.status, 200, 'real guest unlock refused');
-        assert.deepEqual(await response.json(), { ok: true });
+        const body = await response.json();
+        if (FANOUT_50 && admissionProfile) admissionProfile.unlockParsed = performance.now();
+        assert.deepEqual(body, { ok: true });
         const value = response.headers.get('Set-Cookie'); assert.equal(typeof value, 'string', 'missing real signed cookie');
         assert.ok(/^__Host-hangout-beta=[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}; Path=\/; HttpOnly; Secure; SameSite=Lax; Max-Age=[1-9][0-9]*$/.test(value), 'signed guest cookie policy was not satisfied');
         const cookie = value.split(';', 1)[0];
-        if (PARTICIPATION && grant) assert.deepEqual(await control('participation-grant', { cookie }), { authorizedSyntheticGrant: true });
+        if (PARTICIPATION && grant) {
+            if (FANOUT_50 && admissionProfile) admissionProfile.grantStart = performance.now();
+            const result = await control('participation-grant', { cookie });
+            if (FANOUT_50 && admissionProfile) admissionProfile.grantParsed = performance.now();
+            assert.deepEqual(result, { authorizedSyntheticGrant: true });
+        }
         return cookie;
     };
-    const connect = async (cookie, label, source, ip, transport = false, acknowledge = true) => {
+    const connect = async (cookie, label, source, ip, transport = false, acknowledge = true, admissionProfile = null) => {
+        if (FANOUT_50 && admissionProfile) admissionProfile.upgradeStart = performance.now();
         const response = await mf.dispatchFetch(ORIGIN + '/lobby?preview=' + PREVIEW, { headers: { ...headers(cookie, ip), Upgrade: 'websocket' } });
+        if (FANOUT_50 && admissionProfile) admissionProfile.upgrade101 = performance.now();
         assert.equal(response.status, 101, label + ': actual gateway upgrade refused'); assert.ok(response.webSocket, label + ': missing WebSocket');
         const visitor = new Visitor(response.webSocket, label, transport, acknowledge); visitors.push(visitor);
-        const hello = await visitor.wait(f => f.t === 'hello', 'actual hello'); assert.deepEqual(hello.features, { entrySources: 1, privateMessageContext: 1, roomKeep: 1, messageResults: 1 }); assert.equal(hello.role, 'fan');
+        const hello = await visitor.wait(f => f.t === 'hello', 'actual hello');
+        if (FANOUT_50 && admissionProfile) admissionProfile.serverHello = performance.now();
+        assert.deepEqual(hello.features, { entrySources: 1, privateMessageContext: 1, roomKeep: 1, messageResults: 1 }); assert.equal(hello.role, 'fan');
+        if (FANOUT_50 && admissionProfile) admissionProfile.clientHello = performance.now();
         visitor.send({ t: 'hello', nick: label, age13: true, entrySource: source, ...(transport ? { transport: 1 } : {}) });
         await visitor.wait(f => f.t === 'join' && f.ch.name === '#stalemate', 'lobby membership');
+        if (FANOUT_50 && admissionProfile) admissionProfile.joined = performance.now();
         return visitor;
     };
     const joinRoom = (visitor, room) => visitor.command('join', [room], '#stalemate', f => f.t === 'join' && f.ch.name === room, 'join ' + room);
@@ -380,13 +394,34 @@ async function runtime(phase, state, nonce) {
                 assert.equal((await control('initialize')).reason, 'initialize complete');
                 assert.deepEqual(await control('participation-policy'), { installed: true });
                 assert.deepEqual(await control('egress-probe'), { status: 503, denied: true });
+                const admissionProfiles = Array.from({ length: 50 }, () => ({}));
                 const peers = [], cookies = [], admissionMs = [], started = performance.now();
                 for (let index = 0; index < 50; index++) {
-                    const at = performance.now(), ip = `192.0.2.${index + 1}`, cookie = await unlock(ip);
+                    const profile = admissionProfiles[index];
+                    const at = performance.now(), ip = `192.0.2.${index + 1}`, cookie = await unlock(ip, { admissionProfile: profile });
                     assert.ok(!cookies.includes(cookie), 'fanout gateway reused an issued SID cookie'); cookies.push(cookie);
-                    peers.push(await connect(cookie, `NativeFan${String(index).padStart(2, '0')}`, index % 2 ? 'rad-dad' : 'stalemate', ip, true));
-                    admissionMs.push(performance.now() - at);
+                    peers.push(await connect(cookie, `NativeFan${String(index).padStart(2, '0')}`, index % 2 ? 'rad-dad' : 'stalemate', ip, true, true, profile));
+                    const endedAt = performance.now(); admissionMs.push(endedAt - at);
+                    profile.outerStart = at; profile.outerEnd = endedAt;
                 }
+                const admissionPhases = admissionProfiles.map((profile, index) => {
+                    const points = [profile.outerStart, profile.unlockStart, profile.unlockParsed, profile.grantStart, profile.grantParsed,
+                        profile.upgradeStart, profile.upgrade101, profile.serverHello, profile.clientHello, profile.joined, profile.outerEnd];
+                    assert.ok(points.every((value, at) => Number.isFinite(value) && value >= 0 && (!at || value >= points[at - 1])), 'fanout admission phase order');
+                    const row = { ordinal: index + 1, totalMs: admissionMs[index], unlockHttpMs: points[2] - points[1], c2GrantHttpMs: points[4] - points[3],
+                        upgrade101Ms: points[6] - points[5], serverHelloMs: points[7] - points[6], helloJoinMs: points[9] - points[8],
+                        // Add actual non-overlapping runner gaps; never clamp a
+                        // negative total-minus-components difference to zero.
+                        residualMs: (points[1] - points[0]) + (points[3] - points[2]) + (points[5] - points[4]) + (points[8] - points[7]) + (points[10] - points[9]) };
+                    assert.equal(row.totalMs, profile.outerEnd - profile.outerStart);
+                    const spans = [row.unlockHttpMs, row.c2GrantHttpMs, row.upgrade101Ms, row.serverHelloMs, row.helloJoinMs, row.residualMs];
+                    const tolerance = Number.EPSILON * Math.max(1, ...points) * 16;
+                    assert.ok(spans.every(value => Number.isFinite(value) && value >= 0 && value <= row.totalMs + tolerance), 'fanout admission phase bound');
+                    assert.ok(Math.abs(spans.reduce((sum, value) => sum + value, 0) - row.totalMs) <= tolerance, 'fanout admission total reconciliation');
+                    return row;
+                });
+                assert.equal(admissionPhases.length, 50);
+                assert.ok(Buffer.byteLength(JSON.stringify(admissionPhases)) <= 32768, 'fanout admission metadata bound');
                 assert.equal(peers.length, 50); assert.ok(peers.every(peer => peer.closed === null));
                 const admitted = await waitSummary(50); await delay(200);
                 const beforeMetrics = await drain(peers, 50), deliveryMs = [], resultMs = [], latenessMs = [], gapMs = [];
@@ -430,7 +465,7 @@ async function runtime(phase, state, nonce) {
                 for (let slot = 0; slot < 50; slot++) for (let index = 0; index < 12; index++) assert.equal(peers[slot].frames.filter(frame => frame.t === 'line' && frame.text === FANOUT_PREFIX + String(index).padStart(2, '0')).length, 1);
                 proof = { checks: ['fifty-real-cookie-SID-granted-native-WebSocket-members', 'twelve-publications-exactly-six-hundred-native-deliveries', 'fifty-raw-streams-and-real-paced-ACK-prepayment-accounting', 'real-logout-replay-denial-with49-current-members', 'complete-prekill-logical-raw-no-ordinary-archive'],
                     fanout: { realGuests: 50, syntheticConsentSubjects: 50, nativeSockets: 50, publications: 12, deliveredCopies: 600, senderResults: 12, uniqueServerMessageIds: serverMessageIds.size,
-                        admission: latencySummary(admissionMs), publicDelivery: latencySummary(deliveryMs), senderDisposition: latencySummary(resultMs),
+                        admission: latencySummary(admissionMs), admissionPhases, publicDelivery: latencySummary(deliveryMs), senderDisposition: latencySummary(resultMs),
                         aggregateSendGap: latencySummary(gapMs), scheduleLateness: latencySummary(latenessMs), trafficDurationMs: lastAt - trafficAt,
                         totalFirstPhaseWorkMs: performance.now() - started, admitted, beforeMetrics, afterMetrics, finalMetrics, raw,
                         nativeStorageMethodCallDelta: afterMetrics.nativeStorageMethodCalls - beforeMetrics.nativeStorageMethodCalls,
