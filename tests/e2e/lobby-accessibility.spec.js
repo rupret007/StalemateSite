@@ -279,3 +279,88 @@ test('reduced-motion settings and user-controlled announcements survive keyboard
         expect(visitor.errors).toEqual([]);
     } finally { await visitor.close(); }
 });
+
+test('People roster: live joins preserve focused connection identity', async ({ browser, baseURL }) => {
+    const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
+    const viewport = { width: 1280, height: 900 };
+    const visitor = await guest(browser, baseURL, 'RosterNavigator', viewport, relay);
+    let peer, arrival;
+    try {
+        peer = await guest(browser, baseURL, 'RosterPeer', viewport, relay);
+        const person = visitor.page.locator('[data-nicks]').getByRole('button', { name: 'RosterPeer', exact: true });
+        await expect(person).toBeVisible();
+        const connectionId = await visitor.page.evaluate(() =>
+            window.__lobby.chans.get('#stalemate').names.find(member => member.nick === 'RosterPeer').id);
+        expect(connectionId).toMatch(/^c[0-9a-f]{32}$/);
+        await tabTo(visitor.page, person);
+
+        // A genuine third admission produces the active channel's new roster.
+        // The selected peer remains the same server-issued connection.
+        arrival = await guest(browser, baseURL, 'RosterNewcomer', viewport, relay);
+        await expect.poll(() => visitor.page.evaluate(() =>
+            window.__lobby.chans.get('#stalemate').names.some(member => member.nick === 'RosterNewcomer'))).toBe(true);
+        expect(await visitor.page.evaluate(id =>
+            window.__lobby.chans.get('#stalemate').names.find(member => member.id === id)?.nick, connectionId)).toBe('RosterPeer');
+        await expect(person).toBeFocused();
+        await visitor.page.keyboard.press('Enter');
+        await expect(visitor.page.locator('dialog[data-sheet]')).toHaveAccessibleName('RosterPeer');
+        await visitor.page.keyboard.press('Escape');
+        await expect(person).toBeFocused();
+
+        expect(visitor.errors).toEqual([]); expect(peer.errors).toEqual([]); expect(arrival.errors).toEqual([]);
+    } finally { await arrival?.close(); await peer?.close(); await visitor.close(); }
+});
+
+test('People roster: presence updates never steal the composer or its draft', async ({ browser, baseURL }) => {
+    const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
+    const viewport = { width: 1280, height: 900 };
+    const visitor = await guest(browser, baseURL, 'RosterWriter', viewport, relay);
+    let peer, arrival;
+    try {
+        peer = await guest(browser, baseURL, 'RosterOther', viewport, relay);
+        const composer = visitor.page.getByRole('textbox', { name: 'Message', exact: true });
+        await tabTo(visitor.page, composer);
+        await visitor.page.keyboard.type('An unsent draft while people come and go');
+        arrival = await guest(browser, baseURL, 'RosterPassing', viewport, relay);
+        await expect.poll(() => visitor.page.evaluate(() =>
+            window.__lobby.chans.get('#stalemate').names.some(member => member.nick === 'RosterPassing'))).toBe(true);
+        await expect(composer).toBeFocused();
+        await expect(composer).toHaveValue('An unsent draft while people come and go');
+        await arrival.close(); arrival = null;
+        await expect.poll(() => visitor.page.evaluate(() =>
+            window.__lobby.chans.get('#stalemate').names.some(member => member.nick === 'RosterPassing'))).toBe(false);
+        await expect(composer).toBeFocused();
+        await expect(composer).toHaveValue('An unsent draft while people come and go');
+        expect(visitor.errors).toEqual([]); expect(peer.errors).toEqual([]);
+    } finally { await arrival?.close(); await peer?.close(); await visitor.close(); }
+});
+
+test('People roster: a departed focused member falls back to the People heading', async ({ browser, baseURL }) => {
+    const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
+    const viewport = { width: 1280, height: 900 };
+    const visitor = await guest(browser, baseURL, 'RosterRemaining', viewport, relay);
+    let peer, survivor;
+    try {
+        peer = await guest(browser, baseURL, 'RosterLeaving', viewport, relay);
+        survivor = await guest(browser, baseURL, 'RosterStillHere', viewport, relay);
+        const person = visitor.page.locator('[data-nicks]').getByRole('button', { name: 'RosterLeaving', exact: true });
+        await tabTo(visitor.page, person);
+        const connectionId = await visitor.page.evaluate(() =>
+            window.__lobby.chans.get('#stalemate').names.find(member => member.nick === 'RosterLeaving').id);
+        await peer.close(); peer = null;
+        await expect.poll(() => visitor.page.evaluate(id =>
+            window.__lobby.chans.get('#stalemate').names.some(member => member.id === id), connectionId)).toBe(false);
+        await expect(person).toHaveCount(0);
+        const heading = visitor.page.locator('[data-people-title]');
+        await expect(heading).toBeFocused();
+        await expect(heading).toBeInViewport();
+        const outline = await heading.evaluate(element => ({ width: getComputedStyle(element).outlineWidth,
+            style: getComputedStyle(element).outlineStyle, color: getComputedStyle(element).outlineColor }));
+        expect(parseFloat(outline.width)).toBeGreaterThanOrEqual(2);
+        expect(outline.style).toBe('solid');
+        expect(outline.color).not.toBe('rgba(0, 0, 0, 0)');
+        await expect(visitor.page.locator('[data-nicks]').getByRole('button', { name: 'RosterStillHere', exact: true })).toBeVisible();
+        await expect(visitor.page.locator('dialog[data-sheet]')).toBeHidden();
+        expect(visitor.errors).toEqual([]); expect(survivor.errors).toEqual([]);
+    } finally { await survivor?.close(); await peer?.close(); await visitor.close(); }
+});
