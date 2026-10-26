@@ -12,6 +12,12 @@ jobs:
     name: test
     runs-on: ubuntu-24.04
     timeout-minutes: 35
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:d65108d1a8095d8b0c4a5e32bf1807a40a5ce90ff0c78473e1116b1c243235e8
+      options: --user 1001
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Check out exact workflow commit
@@ -28,9 +34,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Chromium and WebKit
+      - name: Verify pinned Chromium and WebKit
         timeout-minutes: 10
-        run: npx playwright install --with-deps chromium webkit
+        run: |
+          node <<'NODE'
+          const assert = require('node:assert/strict');
+          const fs = require('node:fs');
+          assert.equal(require('playwright/package.json').version, '1.64.1');
+          const { chromium, webkit } = require('playwright');
+          for (const browser of [chromium, webkit]) {
+            fs.accessSync(browser.executablePath(), fs.constants.X_OK);
+            console.log(`Baked ${browser.name()} executable is available`);
+          }
+          NODE
 
       - name: Run automated tests
         run: npm test
