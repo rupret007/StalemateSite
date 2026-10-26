@@ -103,6 +103,52 @@ function retireReceipts(state, subjectRef, status, now, shorten = false) {
         if (shorten) receipt.deleteAt = Math.min(receipt.deleteAt, at(now, state.config.rules.receiptTailMs));
     }
 }
+// A participant may only reduce their own existing sharing. Guardian identity,
+// relationship and the originally approved purpose list are never rewritten.
+function selfWithdrawState(state, identity, request, time) {
+    if (!record(request, ['expectedRevision']) || !integer(request.expectedRevision)) fail('invalid-request');
+    if (identity.expiresAt <= time || identity.communityRef !== state.config.policy.communityRef) fail('not-authorized');
+    const wrapper = state.subjects.find(item => item.record.principalRef === identity.principalRef);
+    if (!wrapper || wrapper.deleteAt <= time) fail('not-found');
+    const subject = wrapper.record;
+    if (subject.state === 'withdrawn' && request.expectedRevision <= subject.revision)
+        return { ok: true, subjectRef: subject.subjectRef, revision: subject.revision, state: 'withdrawn', pendingRef: '' };
+    if (subject.revision !== request.expectedRevision) fail('revision-conflict');
+    subject.revision = next(subject.revision); subject.state = 'withdrawn'; subject.purposes = []; subject.consentRefs = [];
+    wrapper.deleteAt = Math.min(wrapper.deleteAt, at(time, state.config.rules.subjectTailMs));
+    invalidatePending(state, subject.subjectRef, 'cancelled'); retireReceipts(state, subject.subjectRef, 'withdrawn', time, true);
+    return { ok: true, subjectRef: subject.subjectRef, revision: subject.revision, state: 'withdrawn', pendingRef: '' };
+}
+function ownProjection(state, identity, time) {
+    const wrapper = state?.subjects.find(item => item.record.principalRef === identity.principalRef && item.deleteAt > time);
+    if (!wrapper) return { ok: true, state: 'unknown', available: false, purposes: [], revision: 0, canStop: false };
+    const subject = wrapper.record; let policyActive = false;
+    try { currentPolicy(state, time); policyActive = true; } catch { /* Reducing access is still available. */ }
+    const available = policyActive && activeGrant(state, subject, time);
+    const status = subject.state === 'withdrawn' ? 'withdrawn' : subject.expiresAt <= time ? 'expired'
+        : !policyActive ? 'policy-unavailable' : subject.state === 'authorized' && !available ? 'unavailable' : subject.state;
+    return { ok: true, state: status, available, purposes: available ? [...subject.purposes].sort() : [], revision: subject.revision, canStop: true };
+}
+
+// Trusted transaction composition only: the caller authenticates/rechecks the
+// issued SID/profile in this same tx. This does not select or mint a subject.
+export async function accessParticipationSelf({ tx, identity, now, request, limits = PARTICIPATION_LEDGER_LIMITS } = {}) {
+    if (!record(identity, ['principalRef', 'communityRef', 'expiresAt']) || !ref(identity.principalRef) || !ref(identity.communityRef)
+        || !integer(identity.expiresAt) || !integer(now) || identity.expiresAt <= now) fail('not-authorized');
+    const stored = await tx.get(PARTICIPATION_LEDGER_KEY);
+    if (stored === undefined) return { ok: true, state: 'unknown', available: false, purposes: [], revision: 0, canStop: false };
+    if (!validState(stored, limits) || stored.config.policy.communityRef !== identity.communityRef) fail('storage-corrupt');
+    const state = clone(stored);
+    if (request !== undefined) {
+        selfWithdrawState(state, identity, request, now);
+        if (JSON.stringify(state) !== JSON.stringify(stored)) {
+            state.revision = next(state.revision); if (!validState(state, limits)) fail('capacity-or-invalid-state');
+            await tx.put(PARTICIPATION_LEDGER_KEY, state);
+        }
+    }
+    return ownProjection(state, identity, now);
+}
+
 function replay(state, operationRef, kind, signature, now) {
     const existing = state.operations.find(item => item.operationRef === operationRef);
     if (!existing) return null;
@@ -156,7 +202,7 @@ export function createParticipationConsents({ storage, adapters, now = () => Dat
     const identifier = () => { const value = randomRef(); if (!ref(value)) fail('invalid-reference'); return value; };
     // The adapter must resolve only after atomic durable commit. A rejected or
     // ambiguous transaction is never acknowledged as success here.
-    const transact = async (operation, initialize = false, reducing = false) => {
+    const transact = async (operation, initialize = false, reducing = false, expireStored = true) => {
         try {
             const result = await storage.transaction(async tx => {
                 const stored = await tx.get(PARTICIPATION_LEDGER_KEY);
@@ -165,7 +211,7 @@ export function createParticipationConsents({ storage, adapters, now = () => Dat
                 const state = stored === undefined ? null : clone(stored), time = now();
                 if (!integer(time)) fail('invalid-time');
                 const before = state && JSON.stringify(state);
-                if (state) expire(state, time);
+                if (state && expireStored) expire(state, time);
                 const { result, updated = state } = await operation(state, time);
                 if (updated && JSON.stringify(updated) !== before) {
                     updated.revision = updated.revision ? next(updated.revision) : 1;
@@ -286,6 +332,12 @@ export function createParticipationConsents({ storage, adapters, now = () => Dat
                 }
                 return { result: { ok: true, subjectRef: subject.subjectRef, revision: subject.revision, state: subject.state, pendingRef: '' } };
             }, false, true);
+        }),
+        selfWithdraw: guarded(async (proof, request) => {
+            if (!record(request, ['expectedRevision']) || !integer(request.expectedRevision)) fail('invalid-request');
+            const identity = await authenticate('authenticateParticipant', { proof, purpose: 'self-withdraw', request }, value => record(value, ['principalRef', 'communityRef', 'expiresAt'])
+                && ['principalRef', 'communityRef'].every(key => ref(value[key])) && integer(value.expiresAt));
+            return transact((state, time) => ({ result: selfWithdrawState(state, identity, request, time) }), false, true, false);
         }),
         lookup: guarded(async proof => {
             const identity = await authenticate('authenticateParticipant', { proof, purpose: 'lookup' }, value => record(value, ['principalRef', 'communityRef', 'expiresAt'])

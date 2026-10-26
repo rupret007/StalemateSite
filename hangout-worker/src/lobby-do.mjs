@@ -13,8 +13,9 @@ import { createSocketDelivery } from './socket-delivery.mjs';
 import { createTransportControlBudget } from './transport-budget.mjs';
 import { createPresenceProjections } from './presence-projections.mjs';
 import { entrySitesFromConfig } from '../../r/45662413410ed051/entry-sites.mjs';
-import { lobbyAuthorityMode, createLobbySessionAuthority, initializeLobbySessionAuthority, migrateLobbySessionAuthority, LOBBY_AUTHORITY_PATH } from './lobby-session-authority.mjs';
+import { lobbyAuthorityMode, createLobbySessionAuthority, createLobbyAuthorityStorage, initializeLobbySessionAuthority, migrateLobbySessionAuthority, LOBBY_AUTHORITY_MARKER, LOBBY_AUTHORITY_PATH } from './lobby-session-authority.mjs';
 import { createLobbyParticipation, lobbyParticipationMode, participationConfigurationValid } from './lobby-participation.mjs';
+import { PARTICIPATION_POLICY_KEY } from './participation-partitions.mjs';
 import { lobbyIncidentSourceMode, incidentSourceConfigurationValid } from './lobby-incident-sources.mjs';
 
 const privateReportResponse = (value) => new Response(JSON.stringify(value), {
@@ -195,6 +196,16 @@ export class HangoutLobby {
             recovered = await this.authority.load();
             this.liveBindings.clear();
             for (const { binding, active } of recovered.bindings) if (active) this.liveBindings.set(binding.id, binding);
+        }
+
+        // Fence mode removal before ANY legacy fallback, including beta-mode removal. Any strict
+        // authority marker (including domains without C2) forbids legacy fallback. Read the
+        // same physical authority namespace before any legacy initialization.
+        if (!this.participationMode && !this.authorityMode) {
+            try {
+                const records = createLobbyAuthorityStorage(state.storage);
+                if (await records.transaction(async tx => await tx.get(LOBBY_AUTHORITY_MARKER) !== undefined || await tx.get(PARTICIPATION_POLICY_KEY) !== undefined)) { this.authorityUnavailable = true; return; }
+            } catch { this.authorityUnavailable = true; return; }
         }
 
         // Only the separate authenticated pilot can initialize its first empty network.
@@ -429,6 +440,21 @@ export class HangoutLobby {
         let closing, localClosed;
         const response = await this.state.blockConcurrencyWhile(async () => {
             try {
+                if (operation === 'participation' || operation === 'participation-stop') {
+                    if (!this.participationMode) return reply(404, 'not found');
+                    const keys = operation === 'participation' ? ['sid', 'version', 'exp'] : ['sid', 'version', 'exp', 'request'];
+                    if (Object.keys(body).length !== keys.length || keys.some(key => !Object.hasOwn(body, key))) return reply(400, 'request');
+                    const result = await this.authority.ownParticipation(body);
+                    if (operation === 'participation-stop' && result.state === 'withdrawn') {
+                        // Reduction is already durably committed. Failed local
+                        // cleanup cannot restore a grant or become a false ack.
+                        let cleanup = 'confirmed';
+                        try { const refreshed = await this.engine.refreshParticipation(); if (refreshed?.ok === false) cleanup = 'unconfirmed'; }
+                        catch { cleanup = 'unconfirmed'; }
+                        return reply(200, 'sharing withdrawn', { ...result, cleanup });
+                    }
+                    return reply(200, 'own sharing', result);
+                }
                 if (operation === 'register') { const result = await this.authority.register(body); return reply(result.status, result.reason); }
                 if (operation === 'check') { const result = await this.authority.check(body); return result ? reply(200, result.reason, { profile: result.profile }) : reply(403, 'expired or revoked'); }
                 if (operation === 'room') { const result = await this.authority.room(body); return reply(result.status, result.reason); }
@@ -449,6 +475,7 @@ export class HangoutLobby {
 
     sendPrivateAdmin(ws, id, msg) {
         const original = ws.deserializeAttachment() || {};
+        if (this.engine?.privateAdminReady?.(id) !== true) return;
         if (!original.admin || !['owner', 'band', 'moderator'].includes(original.role)
             || socketIdentityInvalid(original, this.env)) return;
         const generation = (this.privateAdminDispatch.get(ws) || 0) + 1;
@@ -458,7 +485,8 @@ export class HangoutLobby {
             // behind this Lobby event. Local socket metadata alone is not proof
             // that private evidence may still be delivered.
             const active = await this.sessionActive(original);
-            if (this.privateAdminDispatch.get(ws) !== generation || this.byId(id) !== ws) return;
+            if (this.privateAdminDispatch.get(ws) !== generation || this.byId(id) !== ws
+                || this.engine?.privateAdminReady?.(id) !== true) return;
             const current = ws.deserializeAttachment() || {};
             if (socketIdentityInvalid(current, this.env) || !current.admin
                 || this.authorityMode && !this.bindingLive(current)
@@ -762,7 +790,12 @@ export class HangoutLobby {
             }
         });
     }
-    async webSocketClose(ws) {
+    async webSocketClose(ws, code) {
+        // A peer-initiated close can remain half-closed on older runtimes and
+        // bridges. Acknowledge before storage work; never reflect its reason.
+        const replyCode = Number.isInteger(code) && (code >= 1000 && code <= 1014 && ![1004, 1005, 1006].includes(code)
+            || code >= 3000 && code <= 4999) ? code : 1000;
+        try { if (ws.readyState !== 3) ws.close(replyCode); } catch { /* Cleanup still retires the binding if acknowledgement fails. */ }
         this.delivery.forget(ws); await this.ready;
         if (this.authorityUnavailable) return;
         return this.state.blockConcurrencyWhile(async () => {

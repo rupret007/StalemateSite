@@ -321,3 +321,36 @@ describe('inactive durable participation ledger', () => {
         expect(await f.ledger.lookup({ principalRef: 'synthetic_child_principal' })).toEqual({ ok: false, reason: 'not-authorized' });
     });
 });
+
+
+describe('participant-only Stop my sharing', () => {
+    it('withdraws its own existing grant, preserves guardian approval, and repeats without allocating records', async () => {
+        const f = setup(); await f.initialize(); const person = await f.enroll();
+        const before = f.storage.snapshot();
+        expect(await f.ledger.selfWithdraw(person.proof, { expectedRevision: person.result.revision })).toMatchObject({ ok: true, state: 'withdrawn', revision: 3 });
+        const after = f.storage.snapshot();
+        expect(after.guardians).toEqual(before.guardians);
+        expect(after.receipts[0]).toMatchObject({ state: 'withdrawn', purposes: before.receipts[0].purposes });
+        expect(after.subjects[0].record).toMatchObject({ purposes: [], consentRefs: [] });
+        expect(after.operations).toEqual(before.operations);
+        expect(await f.instance().selfWithdraw(person.proof, { expectedRevision: 2 })).toMatchObject({ ok: true, state: 'withdrawn', revision: 3 });
+        expect(f.storage.snapshot()).toEqual(after);
+    });
+    it('does not create absent subjects or accept target/principal/guardian fields', async () => {
+        const f = setup(); await f.initialize(); const person = await f.enroll(), stranger = f.participant('synthetic_stranger_principal');
+        const before = f.storage.snapshot();
+        expect(await f.ledger.selfWithdraw(stranger, { expectedRevision: person.result.revision })).toEqual({ ok: false, reason: 'not-found' });
+        expect(await f.ledger.selfWithdraw(person.proof, { expectedRevision: person.result.revision, principalRef: 'synthetic_stranger_principal' })).toEqual({ ok: false, reason: 'invalid-request' });
+        expect(f.storage.snapshot()).toEqual(before);
+    });
+    it('cancels pending completion and permits reduction after policy expiry without changing guardian decisions', async () => {
+        const f = setup(); await f.initialize(); const proof = f.participant();
+        const pending = await f.ledger.begin(proof, { expectedRevision: 0, purposes: ['public-text'] }), callback = f.verifier(pending);
+        expect(await f.ledger.selfWithdraw(proof, { expectedRevision: 1 })).toMatchObject({ ok: true, state: 'withdrawn' });
+        expect((await f.ledger.complete(callback)).ok).toBe(false);
+        const g = setup(); g.config.policy.expiresAt = g.now() + 100; g.config.policy.maxSessionMs = 100; await g.initialize(); const person = await g.enroll(); g.advance(101);
+        // Extend only the synthetic participant proof; policy and grant are expired.
+        g.participants.get(person.proof).expiresAt = g.now() + 10000;
+        expect(await g.ledger.selfWithdraw(person.proof, { expectedRevision: person.result.revision })).toMatchObject({ ok: true, state: 'withdrawn' });
+    });
+});

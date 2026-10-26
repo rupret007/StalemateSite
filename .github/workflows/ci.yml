@@ -11,6 +11,7 @@ jobs:
   test:
     name: test
     runs-on: ubuntu-24.04
+    timeout-minutes: 35
 
     steps:
       - name: Check out exact workflow commit
@@ -28,6 +29,7 @@ jobs:
         run: npm ci
 
       - name: Install Chromium and WebKit
+        timeout-minutes: 10
         run: npx playwright install --with-deps chromium webkit
 
       - name: Run automated tests

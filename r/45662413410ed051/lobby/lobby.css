@@ -432,3 +432,13 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
 }
+
+/* Private C3 controls stay within their pane and leave the composer visible. */
+[data-sharing-controls] { min-width: 0; max-width: 100%; max-height: min(28vh, 180px); overflow-y: auto; overflow-wrap: anywhere; }
+[data-sharing-controls] summary { cursor: pointer; }
+[data-sharing-region] p { margin: 7px 0; }
+[data-sharing-region] button { max-width: 100%; margin: 3px 4px 3px 0; white-space: normal; }
+[data-sharing-confirm] { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+[data-sharing-confirm][hidden] { display: none; }
+.chat:has([data-sharing-controls][open]) .lobby-welcome { display: none; }
+.chat:has([data-sharing-controls][open]) .buffer { min-height: 48px; }

@@ -232,3 +232,25 @@ describe('optional room-instance metadata in indexed state', () => {
         expect(restored._debug.channels.get('#legacy-reference').keepRef).not.toBe(prior);
     });
 });
+
+describe('strict restricted-safety session records', () => {
+    it('accepts multiple empty-nick safety witnesses but refuses public state or false/unknown flags atomically', async () => {
+        const f = await fixture(), engine = createLobby({ now: () => NOW });
+        for (const [id, nick] of [['one', 'OneGuest'], ['two', 'TwoGuest']]) {
+            expect(engine.connect({ id, dev: `dev_${id}`, iph: `ip_${id}` }).ok).toBe(true);
+            await engine.message(id, JSON.stringify({ t: 'hello', nick, age13: true }));
+        }
+        const saved = engine.sessionSnapshot();
+        for (const row of saved.connections) Object.assign(row, { safetyOnly: true, nick: '', entrySource: '', channels: [], away: '', cams: [], pmOff: true, lastSaid: {} });
+        await f.write([['sessions', saved]]); expect((await f.read()).sessions).toEqual(saved);
+        for (const kind of ['pm', 'pendingPm']) {
+            const broken = structuredClone(saved), [from, to] = broken.connections;
+            broken[kind] = [{ key: [from.id, to.id].sort().join('|'), from: from.dev, fromId: from.id, toId: to.id, ...(kind === 'pm' ? { state: 'open' } : { at: NOW, hadFirst: false }) }];
+            const before = hashRows(f.driver); await expect(f.write([['sessions', broken]])).rejects.toThrow(); expect(hashRows(f.driver)).toBe(before);
+        }
+        for (const change of [{ safetyOnly: false }, { nick: 'PublicAgain' }, { channels: ['#stalemate'] }, { cams: ['#art-room'] }, { pmOff: false }, { unknownAuthority: true }]) {
+            const broken = structuredClone(saved); Object.assign(broken.connections[0], change); const before = hashRows(f.driver);
+            await expect(f.write([['sessions', broken]])).rejects.toThrow(); expect(hashRows(f.driver)).toBe(before);
+        }
+    });
+});

@@ -395,6 +395,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
     function refreshParticipationState() {
         for (const c of [...conns.values()]) {
+            if (c.safetyOnly) continue;
+            if (participationReady && typeof participation.isWithdrawn === 'function'
+                && participation.isWithdrawn(controlled.context, c.id)) { restrictSharing(c); continue; }
             const required = participationMedia.get(c.id);
             if (required && [...required].some(action => !participationAllows(c, action, null, false))) kill(c, 4401, 'participation media permissions changed; rejoin');
         }
@@ -413,6 +416,28 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         for (const [id, entry] of aiPending) if (!conns.has(entry.actorId) || !participationAllows(conns.get(entry.actorId), 'aiPublicReview', null, false)) aiPending.delete(id);
     }
 
+    // Keep the admitted connection's bounded delivery witness for reporting.
+    // This is never a new nickname, membership, consent grant or staff role.
+    function restrictSharing(c) {
+        if (c.safetyOnly) return;
+        c.safetyOnly = true;
+        for (const name of [...c.channels]) leave(c, ch(name), 'Sharing stopped', true);
+        for (const [key, entry] of pm) if (entry.fromId === c.id || entry.toId === c.id) {
+            if (entry.state === 'pending') endPendingPm(key, entry, 'Sharing stopped.');
+            else {
+                const other = conns.get(entry.fromId === c.id ? entry.toId : entry.fromId);
+                if (other) out(other, { t: 'pm-closed', with: c.nick });
+                pm.delete(key);
+            }
+        }
+        c.cams.clear(); participationMedia.delete(c.id);
+        c.nick = ''; c.entrySource = ''; c.away = ''; c.pmOff = true; c.lastSaid = {};
+        // One caller-only control tells the UI to stop capture/activity and keep
+        // only its already-received bounded lines available for selected flags.
+        out(c, { t: 'sharing-stopped' });
+        pushAdmin();
+    }
+
     const mkChannel = (name, kind, title, founder) => ({
         name, kind, title, founder, keepRef: crypto.randomUUID().replace(/-/g, ''), generation: ++channelGeneration, created: now(), topic: kind === 'lobby' ? 'Welcome to #stalemate. Pull up a nick, say hello, make something together. /help for commands.' : '',
         modes: { m: false, i: false, k: '', l: kind === 'lobby' ? L.lobbyMax : L.roomMax, t: true, S: kind === 'lobby' ? L.defaultSlow : 0, C: kind !== 'lobby' && kind !== 'chat', Q: false, locked: false },
@@ -423,18 +448,22 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     channels.set(LOBBY, mkChannel(LOBBY, 'lobby', 'The lobby', null));
 
     // ---------- helpers ----------
-    const out = (c, msg) => { try { if (outputBatch) outputBatch.push([c.id, msg]); else send(c.id, msg); } catch (e) { /* gone */ } };
+    const safetyFrames = new Set(['sharing-stopped', 'notice', 'report-status', 'pm-setting', 'entry-source']);
+    const out = (c, msg) => {
+        if (c.safetyOnly && !safetyFrames.has(msg.t)) return;
+        try { if (outputBatch) outputBatch.push([c.id, msg]); else send(c.id, msg); } catch (e) { /* gone */ }
+    };
     const queuePresence = marker => {
         // Mark only after the durable command commits. No prepared projection,
         // transcript, room key or account identity enters the scheduler.
         if (outputBatch) outputBatch.push([null, null, marker]);
         else deferPresence(marker);
     };
-    const isBand = (c) => c && (c.role === 'band' || c.role === 'owner');
-    const isStaff = (c) => isBand(c) || c?.role === 'moderator';
+    const isBand = (c) => c && !c.safetyOnly && (c.role === 'band' || c.role === 'owner');
+    const isStaff = (c) => !!c && !c.safetyOnly && (isBand(c) || c.role === 'moderator');
     const owns = (c, room) => !!c?.account && room?.owner === c.account;
     const hosts = (c, room) => !!room && (owns(c, room) || room.ops.has(c.dev) || !!c.account && room.cohosts.has(c.account));
-    const capabilities = (c) => ({ moderate: isStaff(c), configure: isBand(c), register: !!c.account });
+    const capabilities = (c) => ({ moderate: !c.safetyOnly && isStaff(c), configure: !c.safetyOnly && isBand(c), register: !c.safetyOnly && !!c.account });
     const ch = (name) => channels.get(lc(name));
     const byNick = (nick) => [...conns.values()].find((c) => c.nick && lc(c.nick) === lc(String(nick || '').replace(/^[@+]/, '')));
     const isOp = (c, chan) => isStaff(c) || hosts(c, chan);
@@ -544,7 +573,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             adminDirty = false;
             if (pendingCommits) { deferredAdmin = true; return; }
             const state = adminState();
-            for (const c of conns.values()) if (isStaff(c) && c.admin) out(c, { t: 'admin', state: { ...state, capabilities: capabilities(c) } });
+            for (const c of conns.values()) if (!c.safetyOnly && isStaff(c) && c.admin) out(c, { t: 'admin', state: { ...state, capabilities: capabilities(c) } });
         });
     }
 
@@ -812,6 +841,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const maxBytes = f.t === 'act' || jamEnvelope ? L.actFrameBytes : L.frameBytes;
         if (raw.length > maxBytes) return kill(c, 4400, 'bad frame');
         if (c.frames > L.framesPerConnection) return kill(c, 4429, 'frame cap');
+        if (c.safetyOnly) return safetyOnlyMessage(c, f);
         if (!c.nick && f.t !== 'hello') return bot(c, 'Pick a nickname first.', 'error');
         if (f.t === 'entry-source') {
             const source = normalizeEntrySource(f.source, entrySites);
@@ -848,6 +878,33 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         case 'admin-refresh': if (isStaff(c) && c.admin) out(c, { t: 'admin', state: { ...adminState(), capabilities: capabilities(c) } }); return undefined;
         default: return kill(c, 4400, 'bad frame');
         }
+    }
+
+    function safetyOnlyMessage(c, frame) {
+        if (!limited(c, 'command', 10, 1, true)) return;
+        if (frame.t === 'report') return report(c, String(frame.id || ''), frame.text);
+        if (frame.t === 'cam' && frame.on === false) return bot(c, 'Your camera and sharing are off.');
+        if (frame.t === 'entry-source' && frame.source === '') return out(c, { t: 'entry-source', source: '', accepted: true });
+        let name, args;
+        if (frame.t === 'cmd' && typeof frame.name === 'string' && Array.isArray(frame.args)) {
+            name = lc(frame.name); args = frame.args.slice(0, 8).map(value => String(value).slice(0, 300));
+        } else if (frame.t === 'say' && typeof frame.text === 'string' && frame.text.startsWith('/') && !frame.text.startsWith('//')) {
+            args = normalize(frame.text, 400).slice(1).split(' '); name = lc(args.shift());
+        }
+        name = ({ h: 'help', '?': 'help', exit: 'quit', bye: 'quit', leave: 'part', deny: 'decline' })[name] || name;
+        if (name === 'quit') return kill(c, 1000, 'Sharing session ended');
+        if (name === 'help') return bot(c, 'Sharing is stopped. You can report messages already delivered here, /block nick, /ignore nick, or /quit. Leave this beta to end your session.');
+        if (name === 'part' || name === 'decline') return bot(c, 'You have left the rooms and private conversations. Reporting remains available here.');
+        if (name === 'pm' && lc(args[0]) === 'off') return out(c, { t: 'pm-setting', off: true, text: 'PMs are off.' });
+        if (name === 'ignore') return handlers.ignore(c, null, args);
+        if (name === 'block') {
+            const person = target(c, args[0]); if (!person) return;
+            if ((!c.blocks.has(person.dev) && c.blocks.size >= SESSION_PREFERENCES)
+                || (!c.ignores.has(lc(person.nick)) && c.ignores.size >= SESSION_PREFERENCES)) return bot(c, 'Your block or ignore list is full (50 each).', 'error');
+            c.blocks.add(person.dev); c.ignores.add(lc(person.nick));
+            return bot(c, `Blocked ${person.nick}. Sharing and private conversations remain off.`);
+        }
+        return bot(c, 'Sharing is stopped. Reporting, blocking and leaving remain available.', 'error');
     }
 
     function kill(c, code, reason) { if (closeBatch) closeBatch.push([c.id, code, reason]); else close(c.id, code, reason); disconnect(c.id, reason); }
@@ -980,13 +1037,14 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     // Metadata belongs to an already admitted WebSocket, never to a returning nickname.
     // The adapter supplies the exact live socket identities again after hibernation.
     function sessionMetadata() {
-        const live = [...conns.values()].filter((c) => c.nick);
+        const live = [...conns.values()].filter((c) => c.nick || c.safetyOnly);
         return { version: 1, connections: live.map((c) => ({
             id: c.id, dev: c.dev, iph: c.iph, account: c.account || '', role: c.role, admin: c.admin,
             nick: c.nick, entrySource: c.entrySource, channels: [...c.channels], away: c.away, ignores: [...c.ignores], blocks: [...c.blocks], pmOff: c.pmOff,
             cams: [...c.cams], since: c.since, lastNick: c.lastNick, tokens: c.tokens, last: c.last, frames: c.frames,
             lastSaid: Object.fromEntries(Object.entries(c.lastSaid).filter(([name]) => c.channels.has(name))),
-            actTokens: c.actTokens, actLast: c.actLast, camReports: c.camReports || 0
+            actTokens: c.actTokens, actLast: c.actLast, camReports: c.camReports || 0,
+            ...(c.safetyOnly ? { safetyOnly: true } : {})
         })), pm: [...pm].filter(([, p]) => p.state === 'open' && conns.has(p.fromId) && conns.has(p.toId))
             .map(([key, p]) => ({ key, from: p.from, fromId: p.fromId, toId: p.toId, state: 'open' })),
         pendingPm: [...pm].filter(([, p]) => p.state === 'pending' && conns.has(p.fromId) && conns.has(p.toId))
@@ -1007,10 +1065,12 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const numeric = (v, max) => Number.isFinite(v) && v >= 0 && v <= max;
         const valid = (s) => obj(s) && ['id', 'dev', 'iph'].every((k) => moderationIdentity(s[k]))
             && (s.account === '' || moderationIdentity(s.account)) && ['fan', 'moderator', 'band', 'owner'].includes(s.role)
-            && typeof s.admin === 'boolean' && nick(s.nick) && namesList(s.channels, 31, chanName)
+            && typeof s.admin === 'boolean' && (!Object.hasOwn(s, 'safetyOnly') || s.safetyOnly === true)
+            && (s.safetyOnly ? s.nick === '' : nick(s.nick)) && namesList(s.channels, 31, chanName)
             && typeof s.away === 'string' && s.away.length <= 80
             && namesList(s.ignores, SESSION_PREFERENCES, nick) && namesList(s.blocks, SESSION_PREFERENCES, moderationIdentity)
             && typeof s.pmOff === 'boolean' && namesList(s.cams, 30, chanName) && s.cams.every((name) => s.channels.includes(name))
+            && (!s.safetyOnly || !s.channels.length && !s.cams.length && s.entrySource === '' && s.away === '' && s.pmOff)
             && time(s.since) && time(s.lastNick) && time(s.last) && time(s.actLast)
             && numeric(s.tokens, L.burst) && numeric(s.actTokens, L.actBurst)
             && Number.isInteger(s.frames) && numeric(s.frames, L.framesPerConnection)
@@ -1020,7 +1080,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (conns.size || saved.version !== 1 || !Array.isArray(saved.connections) || saved.connections.length > SESSION_CONNECTIONS
                 || encoder.encode(JSON.stringify(saved)).byteLength > SESSION_STATE_BYTES || saved.connections.some((s) => !valid(s))
                 || new Set(saved.connections.map((s) => s.id)).size !== saved.connections.length
-                || new Set(saved.connections.map((s) => lc(s.nick))).size !== saved.connections.length
+                || new Set(saved.connections.filter(s => !s.safetyOnly).map((s) => lc(s.nick))).size !== saved.connections.filter(s => !s.safetyOnly).length
                 || !Array.isArray(saved.pm) || saved.pm.length > SESSION_PM_PAIRS || saved.pm.some((p) => !obj(p) || p.state !== 'open' || typeof p.key !== 'string'
                     || p.key.split('|').length !== 2 || !p.key.split('|').every(moderationIdentity) || pairKey(...p.key.split('|')) !== p.key
                     || !moderationIdentity(p.from) || (p.fromId === undefined && p.toId === undefined ? !p.key.split('|').includes(p.from)
@@ -1033,7 +1093,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (!s || s.dev !== identity.dev || s.iph !== identity.iph || s.account !== (identity.account || '')
                 || s.role !== (identity.role || 'fan') || s.admin !== !!identity.admin) { deny('session-identity'); continue; }
             if (identity.expiresAt !== undefined && (!Number.isFinite(identity.expiresAt) || identity.expiresAt <= now())) { deny('session-expired'); continue; }
-            if (!checkNick(s.nick, net.lists, { band: isBand(identity) }).ok) { deny('session-nickname'); continue; }
+            if (!s.safetyOnly && !checkNick(s.nick, net.lists, { band: isBand(identity) }).ok) { deny('session-nickname'); continue; }
             if (!isStaff(identity) && (net.lock === 'closed' || budgetLevel() === 'closed' || banned(net.bans, s) || (net.kicks[s.dev] || 0) > now())) { deny('session-admission'); continue; }
             if (s.channels.some((name) => {
                 const room = ch(name);
@@ -1052,12 +1112,13 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
         for (const p of saved.pm) {
             const from = conns.get(p.fromId), to = conns.get(p.toId);
-            if (from && to && from.dev === p.from && !from.blocks.has(to.dev) && !to.blocks.has(from.dev)) pm.set(p.key, { state: 'open', from: p.from, fromId: p.fromId, toId: p.toId });
+            if (from && to && !from.safetyOnly && !to.safetyOnly && from.dev === p.from && !from.blocks.has(to.dev) && !to.blocks.has(from.dev)) pm.set(p.key, { state: 'open', from: p.from, fromId: p.fromId, toId: p.toId });
         }
         restorePendingPm(saved.pendingPm, records);
         restoreReceipts(saved.receipts);
         for (const id of resumed) {
             const c = conns.get(id), s = records.get(id);
+            if (c.safetyOnly) { out(c, { t: 'sharing-stopped' }); continue; }
             for (const name of s.cams) if (!c.cams.has(name)) out(c, { t: 'cam', ch: name, on: false, by: BOT });
             if (participationConfigured && [...c.channels].some(name => ch(name)?.act.video || membersOf(ch(name)).some(member => member.cams.has(name))))
                 noteParticipationMedia(c, 'restored-media-rejoin-required');
@@ -1851,7 +1912,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         for (const [id, r] of receipts) {
             if (!r.recipients.length || time - r.ts >= DAY) { deleteReceipt(id); continue; }
             if (pruneWitnesses) {
-                const recipients = r.recipients.filter((recipient) => conns.get(recipient)?.nick);
+                const recipients = r.recipients.filter((recipient) => { const current = conns.get(recipient); return current && (current.nick || current.safetyOnly); });
                 if (!recipients.length) deleteReceipt(id);
                 else if (recipients.length !== r.recipients.length) setReceipt(id, { ...r, recipients });
             }
@@ -2183,5 +2244,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         restoreAiReviews: (...args) => commitConfigured ? controlledRun(restoreAiReviews, args, true) : restoreAiReviews(...args),
         applyAiReview: (...args) => commitConfigured ? controlledRun(applyAiReview, args, true) : applyAiReview(...args),
         refreshParticipation: () => commitConfigured ? controlledRun(refreshParticipationState, [], true) : undefined,
+        // The DO's separately awaited private-queue delivery must check current
+        // engine readiness too; a stored staff role alone is not this fence.
+        privateAdminReady: id => { const c = conns.get(id); return !!c && !c.safetyOnly && isStaff(c) && c.admin === true; },
         notifyAiStatus: pushAdmin, adminState, budgetLevel, spend, get modlog() { return net.modlog.slice(); }, _debug: { conns, channels, net, pm, reports, held, lines } };
 }

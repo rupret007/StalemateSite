@@ -195,7 +195,9 @@ export class FixtureLobby extends HangoutLobby {
             rules: { version: 1, verifierRef: 'synthetic_fixture_verifier', pendingMs: 10000, grantMs: 3600000,
                 subjectTailMs: 10000, guardianTailMs: 10000, receiptTailMs: 10000, callbackMs: 10000, operationMs: 10000 } };
         const ledger = createPartitionedParticipationConsents({ storage: this.authority.records,
-            admitSubject: async ({ tx }) => { const n = await tx.get('fixture-participation-allocation') || 0; if (n >= 4) return false; await tx.put('fixture-participation-allocation', n + 1); return true; },
+            // Five lifetime synthetic subjects A/B/C/D/E for the new real
+            // self-withdrawal journey; no production capacity is changed.
+            admitSubject: async ({ tx }) => { const n = await tx.get('fixture-participation-allocation') || 0; if (n >= 5) return false; await tx.put('fixture-participation-allocation', n + 1); return true; },
             adapters: {
                 qualifyPolicy: async () => ({ config, expiresAt: Date.now() + 10000 }),
                 authenticateParticipant: async ({ proof, purpose }) => {
@@ -235,16 +237,23 @@ export class FixtureLobby extends HangoutLobby {
     }
     async fixtureInspect() {
         const saved = await this.authority.load();
-        let commandReadyAt;
+        let commandReadyAt, sharingStates, incidentSources;
         if (this.participationMode) {
             const current = this.engine.sessionSnapshot().connections, buckets = new Map(this.engine.abuseSnapshot().buckets), at = Date.now();
             ensure(current.length <= 4 && current.every(person => !person.account), 'fixture-command-guest-bound');
             // Read the actual unchanged 10-token/1-per-second command budget.
             // Export deadlines only, never device/account keys or raw buckets.
+            sharingStates = current.map(person => ({ nick: person.nick, safetyOnly: person.safetyOnly === true,
+                channels: person.channels.length, cameras: person.cams.length })).sort((a, b) => a.nick.localeCompare(b.nick));
             commandReadyAt = current.map(person => {
                 const bucket = buckets.get('command:dev:' + person.dev);
                 return { nick: person.nick, at: bucket ? Math.max(at, bucket.at + Math.ceil(Math.max(0, 1 - bucket.tokens) * 1000)) : at };
             });
+        }
+        if (this.incidentSourceMode) {
+            const sourceState = await this.authority.records.transaction(tx => tx.get(LOBBY_INCIDENT_SOURCE_KEY));
+            ensure(sourceState && sourceState.entries.length <= 100, 'fixture-source-summary-cap');
+            incidentSources = { nextGeneration: sourceState.nextGeneration, entries: sourceState.entries.map(({ id, revision, digest, originDigest, expiresAt }) => ({ id, revision, digest, originDigest, expiresAt })) };
         }
         const rooms = saved.state.rooms.rooms.map(room => ({ name: room.name, kind: room.kind, title: room.title, topic: room.topic, act: room.act }));
         const reportSummaries = await Promise.all(saved.state.moderationQueue.reports.map(async report => ({
@@ -290,7 +299,8 @@ export class FixtureLobby extends HangoutLobby {
         ensure(rows > 0 && bytes > 0, 'raw-scan-empty');
         return { objectId: this.state.id.toString(), sqlite: [...this.state.storage.sql.exec('SELECT 1 AS fixture_sql')][0]?.fixture_sql === 1,
             authorityUnavailable: !!this.authorityUnavailable, bindingCount: saved.bindings.length, liveBindingCount: this.liveBindings.size,
-            ...(this.participationMode ? { participationRequired: true, participationPolicyPresent: await this.authority.records.transaction(async tx => (await tx.get(PARTICIPATION_POLICY_KEY)) !== undefined), commandReadyAt } : {}),
+            ...(this.participationMode ? { participationRequired: true, participationPolicyPresent: await this.authority.records.transaction(async tx => (await tx.get(PARTICIPATION_POLICY_KEY)) !== undefined), commandReadyAt, sharingStates } : {}),
+            ...(this.incidentSourceMode ? { incidentSources } : {}),
             durableSessionNicks: saved.state.sessions.connections.map(person => person.nick).sort(),
             engineSessionNicks: this.engine.sessionSnapshot().connections.map(person => person.nick).sort(),
             durableBlockCounts: saved.state.sessions.connections.map(person => ({ nick: person.nick, blocks: person.blocks.length })).sort((a, b) => a.nick.localeCompare(b.nick)),
@@ -348,7 +358,7 @@ export default { async fetch(request, env) {
         }
         return denied();
     }
-    if (!['/beta/unlock', '/beta/logout', '/beta/state', '/lobby', '/room', '/turn'].includes(url.pathname)) return denied();
+    if (!['/beta/unlock', '/beta/logout', '/beta/state', '/beta/participation', '/beta/participation/stop', '/lobby', '/room', '/turn'].includes(url.pathname)) return denied();
     if (request.headers.get('Origin') !== ORIGIN) return denied();
     const appEnv = { ...env, ASSETS: { fetch: () => new Response('no fixture page requested', { status: 404 }) } };
     return betaFetch(request, appEnv);

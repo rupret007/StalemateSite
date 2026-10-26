@@ -92,9 +92,9 @@ function validAbuse(value, now) {
 function validSessions(value, now) {
     const names = (rows, max, check) => unique(rows, max, check);
     const connection = row => shape(row, ['id', 'dev', 'iph', 'account', 'role', 'admin', 'nick', 'entrySource', 'channels', 'away', 'ignores', 'blocks',
-        'pmOff', 'cams', 'since', 'lastNick', 'tokens', 'last', 'frames', 'lastSaid', 'actTokens', 'actLast', 'camReports'])
+        'pmOff', 'cams', 'since', 'lastNick', 'tokens', 'last', 'frames', 'lastSaid', 'actTokens', 'actLast', 'camReports'], ['safetyOnly'])
         && [row.id, row.dev, row.iph].every(id) && (row.account === '' || id(row.account)) && ['fan', 'moderator', 'band', 'owner'].includes(row.role)
-        && typeof row.admin === 'boolean' && nick(row.nick) && (row.entrySource === '' || typeof row.entrySource === 'string' && /^[a-z][a-z0-9-]{0,31}$/.test(row.entrySource))
+        && typeof row.admin === 'boolean' && (row.safetyOnly === true ? row.nick === '' && Array.isArray(row.channels) && row.channels.length === 0 && Array.isArray(row.cams) && row.cams.length === 0 && row.away === '' && row.entrySource === '' && row.pmOff === true : !Object.hasOwn(row, 'safetyOnly') && nick(row.nick)) && (row.entrySource === '' || typeof row.entrySource === 'string' && /^[a-z][a-z0-9-]{0,31}$/.test(row.entrySource))
         && names(row.channels, 31, channel) && text(row.away, 80) && names(row.ignores, 50, nick) && names(row.blocks, 50, id) && typeof row.pmOff === 'boolean'
         && names(row.cams, 30, channel) && row.cams.every(name => row.channels.includes(name))
         && [row.since, row.lastNick, row.last, row.actLast].every(at => time(at, now)) && number(row.tokens) && row.tokens <= 5
@@ -102,10 +102,11 @@ function validSessions(value, now) {
         && object(row.lastSaid) && Object.keys(row.lastSaid).length <= 31 && Object.entries(row.lastSaid).every(([name, at]) => row.channels.includes(name) && time(at, now));
     if (!shape(value, ['version', 'connections', 'pm', 'pendingPm', 'receipts']) || value.version !== 1 || !list(value.connections, 200, connection)
         || new Set(value.connections.map(row => row.id)).size !== value.connections.length
-        || new Set(value.connections.map(row => row.nick.toLowerCase())).size !== value.connections.length || bytes(value) > 2 * MIB) return false;
+        || new Set(value.connections.filter(row => !row.safetyOnly).map(row => row.nick.toLowerCase())).size !== value.connections.filter(row => !row.safetyOnly).length || bytes(value) > 2 * MIB) return false;
     const connections = new Map(value.connections.map(row => [row.id, row]));
     const endpoints = row => id(row.from) && id(row.fromId) && id(row.toId) && row.fromId !== row.toId
-        && row.key === [row.fromId, row.toId].sort().join('|') && connections.get(row.fromId)?.dev === row.from && connections.has(row.toId);
+        && row.key === [row.fromId, row.toId].sort().join('|') && connections.get(row.fromId)?.dev === row.from && connections.has(row.toId)
+        && !connections.get(row.fromId).safetyOnly && !connections.get(row.toId).safetyOnly;
     const receipt = row => shape(row, ['t', 'id', 'ch', 'from', 'to', 'prefix', 'band', 'moderator', 'me', 'ts', 'authorDev', 'digest', 'recipients'], ['publicOrigin'])
         && nick(row.from) && id(row.authorDev) && /^[a-f0-9]{64}$/.test(row.digest) && time(row.ts, now) && ['', '@', '+'].includes(row.prefix)
         && ['band', 'moderator', 'me'].every(key => typeof row[key] === 'boolean')

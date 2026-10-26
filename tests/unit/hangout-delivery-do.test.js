@@ -10,7 +10,7 @@ function runtime() {
         storage: {
             get: async key => values.get(key), put: async (key, value) => { values.set(key, structuredClone(value)); },
             list: async () => new Map(), delete: async key => { values.delete(key); }, getAlarm: async () => 1,
-            transaction: async fn => fn({ get: async key => values.get(key), put: async (key, value) => { values.set(key, structuredClone(value)); }, delete: async key => { values.delete(key); } })
+            transaction: async fn => fn({ list: async ({ prefix = '', startAfter = '', limit = Infinity } = {}) => new Map([...values].filter(([key]) => key.startsWith(prefix) && key > startAfter).sort(([a], [b]) => a.localeCompare(b)).slice(0, limit)), get: async key => values.get(key), put: async (key, value) => { values.set(key, structuredClone(value)); }, delete: async key => { values.delete(key); } })
         },
         blockConcurrencyWhile: fn => fn(), waitUntil: task => background.push(task),
         getWebSockets: id => [...sockets.values()].filter(ws => ws.readyState === 1 && (!id || ws.id === id)),
