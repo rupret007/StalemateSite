@@ -20,6 +20,29 @@ From the repository root, with both existing dependency packages installed:
 npm run test:lobby-session-runtime
 ```
 
+The separate, explicit production participation composition proof is:
+
+```sh
+npm run test:lobby-session-runtime -- --participation
+```
+
+That mode selects `c3-v1` in the actual `HangoutLobby`, without replacing its
+production principal/session/partition/effect adapters. It first proves that a
+real signed guest without a policy receives no nickname/publication, and that
+ordinary traffic does not initialize policy. Nonce-only test controls then
+install explicitly synthetic operator/guardian decisions through the real C2
+ledger for current signed guest SIDs. No real guardian is qualified.
+
+The unchanged baseline journeys, physical post-write rollback witnesses and
+process-loss/recovery checks run under that composition. Additional checks deny
+unfenced private-room/TURN admission, commit a synthetic media-purpose reduction
+then invoke the actual production alarm, keep other visitors active, and deny a
+new SID that reuses a genuine signed device token/IP/old nickname after restart.
+No test clock, storage/frame cap or default baseline requirement is relaxed.
+The command without the flag retains the original beta baseline; source-bound
+receipts distinguish the two modes and do not qualify public enrollment, real
+guardian rights, provider dispatch or hosted rollout.
+
 For a fresh checkout:
 
 ```sh

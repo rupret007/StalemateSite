@@ -1,7 +1,10 @@
 // Test-only, nonce-protected Worker. This file is not an application route,
-// production bootstrap, staff appointment, or C2 consent grant.
+// production bootstrap, staff appointment, or real guardian consent grant.
 import { betaFetch, HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget } from '../../../hangout-worker/src/beta-entry.mjs';
-import { LOBBY_AUTHORITY_PATH } from '../../../hangout-worker/src/lobby-session-authority.mjs';
+import { LOBBY_AUTHORITY_PATH, LOBBY_AUTHORITY_COMMUNITY } from '../../../hangout-worker/src/lobby-session-authority.mjs';
+import { readBeta } from '../../../hangout-worker/src/beta-auth.mjs';
+import { createPartitionedParticipationConsents, PARTICIPATION_POLICY_KEY } from '../../../hangout-worker/src/participation-partitions.mjs';
+import { PARTICIPATION_PURPOSES } from '../../../hangout-worker/src/participation-policy.mjs';
 export { HangoutRoom, HangoutQuota, HangoutTurnBudget };
 
 const ORIGIN = 'https://local-fixture.invalid';
@@ -97,6 +100,63 @@ export class FixtureLobby extends HangoutLobby {
         super(wrappedState, env);
         this.fixtureControl = control;
     }
+    async fixtureParticipant(cookie) {
+        ensure(typeof cookie === 'string' && cookie.startsWith('__Host-hangout-beta=') && cookie.length <= 2048, 'fixture-cookie-shape');
+        const claims = await readBeta('access', cookie.slice('__Host-hangout-beta='.length), this.env.HANGOUT_HMAC_KEY);
+        ensure(claims?.scope === 'guest' && claims.version === String(this.env.HANGOUT_BETA_INVITE_VERSION || '1'), 'fixture-cookie-invalid');
+        const checked = await this.authority.check({ sid: claims.sid, version: claims.version, exp: claims.exp });
+        ensure(checked?.reason === 'active' && checked.profile === null, 'fixture-session-not-current-guest');
+        return { principalRef: `s_${claims.sid}`, communityRef: LOBBY_AUTHORITY_COMMUNITY, expiresAt: claims.exp };
+    }
+    fixtureConsentLedger() {
+        if (this.fixtureLedger) return this.fixtureLedger;
+        const proofs = new Map(), decisions = new Map(), guardians = new Map(), now = Date.now();
+        // Explicit, synthetic operator/guardian decisions only. Session identity
+        // and the production C3 bridge are not overridden by this fixture.
+        const config = { policy: { version: 1, policyVersion: 'synthetic-native-composition-v1', revision: 1,
+            communityRef: LOBBY_AUTHORITY_COMMUNITY, noticeDigest: 'c'.repeat(64), decisionRef: 'synthetic_fixture_operator', state: 'qualified',
+            purposes: [...PARTICIPATION_PURPOSES], issuedAt: now, effectiveAt: now, expiresAt: now + 3600000, maxSessionMs: 300000 },
+            rules: { version: 1, verifierRef: 'synthetic_fixture_verifier', pendingMs: 10000, grantMs: 3600000,
+                subjectTailMs: 10000, guardianTailMs: 10000, receiptTailMs: 10000, callbackMs: 10000, operationMs: 10000 } };
+        const ledger = createPartitionedParticipationConsents({ storage: this.authority.records,
+            admitSubject: async ({ tx }) => { const n = await tx.get('fixture-participation-allocation') || 0; if (n >= 4) return false; await tx.put('fixture-participation-allocation', n + 1); return true; },
+            adapters: {
+                qualifyPolicy: async () => ({ config, expiresAt: Date.now() + 10000 }),
+                authenticateParticipant: async ({ proof, purpose }) => {
+                    const p = proofs.get(proof); return !p ? null : purpose === 'begin' ? p : { principalRef: p.principalRef, communityRef: p.communityRef, expiresAt: p.expiresAt };
+                },
+                verifyConsent: async ({ proof }) => decisions.get(proof), authenticateGuardian: async ({ proof }) => guardians.get(proof),
+                authorizeMaintenance: async () => null
+            } });
+        return this.fixtureLedger = { ledger, proofs, decisions, guardians, config };
+    }
+    async fixtureParticipation(operation, body) {
+        ensure(this.participationMode === true, 'fixture-participation-mode-required');
+        const f = this.fixtureConsentLedger();
+        if (operation === 'participation-policy' && Object.keys(body).length === 0) {
+            const result = await f.ledger.installPolicy('synthetic-operator'); ensure(result.ok, 'fixture-policy-install'); return { installed: true };
+        }
+        ensure(Object.keys(body).join(',') === 'cookie', 'fixture-participation-request');
+        const identity = await this.fixtureParticipant(body.cookie);
+        if (operation === 'participation-grant') {
+            const proof = crypto.randomUUID(); f.proofs.set(proof, { ...identity, operationRef: crypto.randomUUID() });
+            const pending = await f.ledger.begin(proof, { expectedRevision: 0, purposes: [...PARTICIPATION_PURPOSES] }); f.proofs.delete(proof);
+            ensure(pending.ok, 'fixture-pending-refused'); const decision = crypto.randomUUID();
+            f.decisions.set(decision, { operationRef: crypto.randomUUID(), pendingRef: pending.pendingRef, subjectRef: pending.subjectRef,
+                principalRef: identity.principalRef, guardianPrincipalRef: 'synthetic_fixture_guardian', decisionRef: crypto.randomUUID(),
+                verifierRef: f.config.rules.verifierRef, status: 'approved', purposes: [...PARTICIPATION_PURPOSES], verifiedAt: Date.now(), expiresAt: Date.now() + 3600000 });
+            const result = await f.ledger.complete(decision); f.decisions.delete(decision); ensure(result.state === 'authorized', 'fixture-grant-refused');
+            return { authorizedSyntheticGrant: true };
+        }
+        ensure(operation === 'participation-reduce', 'fixture-participation-operation');
+        const rows = await this.authority.records.transaction(tx => tx.list({ prefix: 'participation-records:v1:record:', limit: 4 }));
+        const state = [...rows.values()].find(row => row.subjects[0].record.principalRef === identity.principalRef);
+        ensure(state, 'fixture-subject-missing'); const subject = state.subjects[0].record, guardian = state.guardians.find(row => row.subjectRef === subject.subjectRef), proof = crypto.randomUUID();
+        f.guardians.set(proof, { operationRef: crypto.randomUUID(), subjectRef: subject.subjectRef, principalRef: guardian.principalRef,
+            guardianRef: guardian.guardianRef, guardianRevision: guardian.revision, expiresAt: Date.now() + 10000 });
+        const result = await f.ledger.change(proof, { expectedRevision: subject.revision, purposes: subject.purposes.filter(purpose => purpose !== 'camera') });
+        f.guardians.delete(proof); ensure(result.state === 'authorized', 'fixture-reduction-refused'); return { reduced: true };
+    }
     async fixtureInspect() {
         const saved = await this.authority.load();
         const rooms = saved.state.rooms.rooms.map(room => ({ name: room.name, kind: room.kind, title: room.title, topic: room.topic, act: room.act }));
@@ -143,6 +203,7 @@ export class FixtureLobby extends HangoutLobby {
         ensure(rows > 0 && bytes > 0, 'raw-scan-empty');
         return { objectId: this.state.id.toString(), sqlite: [...this.state.storage.sql.exec('SELECT 1 AS fixture_sql')][0]?.fixture_sql === 1,
             authorityUnavailable: !!this.authorityUnavailable, bindingCount: saved.bindings.length, liveBindingCount: this.liveBindings.size,
+            ...(this.participationMode ? { participationRequired: true, participationPolicyPresent: await this.authority.records.transaction(async tx => (await tx.get(PARTICIPATION_POLICY_KEY)) !== undefined) } : {}),
             durableSessionNicks: saved.state.sessions.connections.map(person => person.nick).sort(),
             engineSessionNicks: this.engine.sessionSnapshot().connections.map(person => person.nick).sort(),
             durableBlockCounts: saved.state.sessions.connections.map(person => ({ nick: person.nick, blocks: person.blocks.length })).sort((a, b) => a.nick.localeCompare(b.nick)),
@@ -159,8 +220,12 @@ export class FixtureLobby extends HangoutLobby {
         if (!admitted(request, this.env)) return denied();
         const body = await readControl(request); if (!body) return denied();
         await this.ready;
+        if (path === PREFIX + 'participation-alarm' && this.participationMode && Object.keys(body).length === 0) {
+            await this.alarm(); return Response.json({ completed: true });
+        }
         return this.state.blockConcurrencyWhile(async () => {
             try {
+                if (['participation-policy', 'participation-grant', 'participation-reduce'].includes(path.slice(PREFIX.length))) return Response.json(await this.fixtureParticipation(path.slice(PREFIX.length), body));
                 if (path === PREFIX + 'inspect' && Object.keys(body).length === 0) return Response.json(await this.fixtureInspect());
                 if (path === PREFIX + 'fault' && (Object.keys(body).join(',') === 'room' && body.room === '#art-native-canvas'
                     || Object.keys(body).join(',') === 'record' && body.record === 'sessions')) {
@@ -186,7 +251,7 @@ export default { async fetch(request, env) {
             // Explicit fixture lifecycle action; betaFetch never forwards it.
             return stub.fetch(new Request(ORIGIN + LOBBY_AUTHORITY_PATH + 'initialize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }));
         }
-        if (['inspect', 'fault'].includes(url.pathname.slice(PREFIX.length))) return stub.fetch(new Request(request.url, {
+        if (['inspect', 'fault', 'participation-policy', 'participation-grant', 'participation-reduce', 'participation-alarm'].includes(url.pathname.slice(PREFIX.length))) return stub.fetch(new Request(request.url, {
             method: 'POST', headers: request.headers, body: JSON.stringify(body)
         }));
         if (url.pathname === PREFIX + 'egress-probe' && Object.keys(body).length === 0) {
@@ -195,7 +260,7 @@ export default { async fetch(request, env) {
         }
         return denied();
     }
-    if (!['/beta/unlock', '/beta/logout', '/beta/state', '/lobby'].includes(url.pathname)) return denied();
+    if (!['/beta/unlock', '/beta/logout', '/beta/state', '/lobby', '/room', '/turn'].includes(url.pathname)) return denied();
     if (request.headers.get('Origin') !== ORIGIN) return denied();
     const appEnv = { ...env, ASSETS: { fetch: () => new Response('no fixture page requested', { status: 404 }) } };
     return betaFetch(request, appEnv);

@@ -7,6 +7,7 @@ import { BETA_TTL, BETA_COOKIE, BETA_IDENTITY_COOKIE, BetaSessionUnavailable, eq
 import { registryRequest } from './beta-session-client.mjs';
 import { betaHealth } from './beta-ops.mjs';
 import { entrySitesFromConfig } from '../../r/45662413410ed051/entry-sites.mjs';
+import { lobbyParticipationMode, participationConfigurationValid } from './lobby-participation.mjs';
 export { BetaSessions } from './beta-sessions.mjs';
 export { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget };
 
@@ -19,7 +20,7 @@ const json = (body, status = 200, extra = {}) => reply(JSON.stringify(body), sta
 const redirect = (where, extra = {}) => reply(null, 303, 'text/plain', { Location: where, ...extra });
 const sameOrigin = (request) => request.headers.get('Origin') === new URL(request.url).origin;
 export function betaConfigured(env) {
-    return env.HANGOUT_BETA_MODE === 'protected' && hmacKeyOk(env.HANGOUT_HMAC_KEY) && hmacKeyOk(env.HANGOUT_BETA_INVITE_KEY) &&
+    return participationConfigurationValid(env) && env.HANGOUT_BETA_MODE === 'protected' && hmacKeyOk(env.HANGOUT_HMAC_KEY) && hmacKeyOk(env.HANGOUT_BETA_INVITE_KEY) &&
         previewKeyOk(env.HANGOUT_PREVIEW_KEY, env.HANGOUT_PREVIEW_KEY) && env.ASSETS && env.LOBBY && env.QUOTA && env.ROOMS
         && (!env.HANGOUT_SESSION_AUTHORITY ? env.BETA_SESSIONS : env.HANGOUT_SESSION_AUTHORITY === 'lobby-v1');
 }
@@ -175,6 +176,7 @@ async function betaRequest(request, env, deps = {}) {
     }
     if (url.pathname === '/room' || url.pathname === '/turn') {
         if (!sameOrigin(request)) return reply('Admission denied.', 403);
+        if (lobbyParticipationMode(env)) return reply('This media path is unavailable under the current participation permissions.', 503);
         if (env.HANGOUT_OPEN === '0') return reply('The community is temporarily paused.', 503);
         // No current non-retrying session/start fence spans this external
         // credential issuer. Keep it unavailable in the new authority mode.
@@ -188,6 +190,7 @@ async function betaRequest(request, env, deps = {}) {
         return worker.fetch(next, { ...env, HANGOUT_EXTRA_ORIGINS: url.origin });
     }
     if ((assetPath === `${ROOT}admin` || assetPath.startsWith(`${ROOT}admin/`)) && session.identity?.kind !== 'staff') return reply('Restricted moderator sign-in required.', 403);
+    if (lobbyParticipationMode(env) && (assetPath === '/join' || assetPath.startsWith('/join/'))) return reply('This audio path is unavailable under the current participation permissions.', 503);
     if (!['GET', 'HEAD'].includes(request.method)) return reply('Method not allowed.', 405);
     const asset = await env.ASSETS.fetch(request);
     if (assetPath === '/join' || assetPath.startsWith('/join/')) {

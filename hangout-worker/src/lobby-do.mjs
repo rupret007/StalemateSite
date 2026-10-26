@@ -15,6 +15,7 @@ import { createPresenceProjections } from './presence-projections.mjs';
 import { entrySitesFromConfig } from '../../r/45662413410ed051/entry-sites.mjs';
 import { lobbyAuthorityMode, createLobbySessionAuthority, initializeLobbySessionAuthority, migrateLobbySessionAuthority, LOBBY_AUTHORITY_PATH } from './lobby-session-authority.mjs';
 import { writeLobbyEffects } from './lobby-effect-records.mjs';
+import { createLobbyParticipation, lobbyParticipationMode, participationConfigurationValid } from './lobby-participation.mjs';
 
 const privateReportResponse = (value) => new Response(JSON.stringify(value), {
     status: value.ok ? 200 : Number.isInteger(value.status) ? value.status : 503,
@@ -41,7 +42,7 @@ async function legacyRegistrySnapshot(env) {
 }
 
 export function lobbyConfigured(env = {}) {
-    return !!(env.LOBBY && env.QUOTA && hmacKeyOk(env.HANGOUT_HMAC_KEY) && typeof env.HANGOUT_PREVIEW_KEY === 'string' && env.HANGOUT_TURNSTILE_SECRET);
+    return !!(participationConfigurationValid(env) && env.LOBBY && env.QUOTA && hmacKeyOk(env.HANGOUT_HMAC_KEY) && typeof env.HANGOUT_PREVIEW_KEY === 'string' && env.HANGOUT_TURNSTILE_SECRET);
 }
 
 async function turnstileOk(token, ip, secret, fetchImpl = fetch) {
@@ -183,6 +184,8 @@ export class HangoutLobby {
     }
     async start() {
         const state = this.state, env = this.env;
+        try { this.participationMode = lobbyParticipationMode(env); }
+        catch { this.authorityUnavailable = true; return; }
         if (env.HANGOUT_SESSION_AUTHORITY && !this.authorityMode) { this.authorityUnavailable = true; return; }
         if (this.authorityMode && env.HANGOUT_BETA_MODE !== 'protected') { this.authorityUnavailable = true; return; }
         this.authorityUnavailable = false;
@@ -222,6 +225,7 @@ export class HangoutLobby {
         });
         this.engine = createLobby({
             ...(this.authorityMode ? { effectCommit: this.authority.effectCommit } : {}),
+            ...(this.participationMode ? { participation: createLobbyParticipation({ env, authority: this.authority }) } : {}),
             deferPresence: marker => this.presence.mark(marker),
             aiModerationStatus: () => ({ ...this.aiModerator.status(), requested: eligibility.requested,
                 ...(eligibility.requested && !eligibility.allowed ? { state: 'not-qualified' } : {}),
@@ -310,6 +314,7 @@ export class HangoutLobby {
                 this.liveBindings.delete(binding.id); await this.authority.unbind(binding.id);
             }
         }
+        if (this.participationMode) await confirmRestore(this.engine.refreshParticipation());
         const currentRooms = this.engine.roomSnapshot();
         if (JSON.stringify(currentRooms) !== roomsBeforeResume) await this.persistRequired('rooms', currentRooms);
         const currentSessions = this.engine.sessionSnapshot();
@@ -368,6 +373,7 @@ export class HangoutLobby {
     }
     async authorityRequest(request, operation) {
         const reply = (status, reason, extra = {}) => Response.json({ reason, ...extra }, { status, headers: { 'Cache-Control': 'no-store' } });
+        if (!participationConfigurationValid(this.env)) return reply(503, 'participation authority unavailable');
         if (!this.authorityMode || this.env.HANGOUT_BETA_MODE !== 'protected') return reply(404, 'not found');
         if (operation === 'health' && request.method === 'GET') {
             if (this.authorityUnavailable) return healthJson({ storage: 'unavailable' }, 503);
@@ -404,7 +410,9 @@ export class HangoutLobby {
                             moderationQueue: { reports: [], held: [] }, aiReviews: [], modlog: []
                         } });
                     } else await migrateLobbySessionAuthority({ storage: this.state.storage, env: this.env, registrySnapshot });
-                    restoring = true; await this.start(); return reply(200, operation + ' complete');
+                    restoring = true; await this.start();
+                    if (this.authorityUnavailable || !this.engine) return reply(503, 'authority restore unavailable');
+                    return reply(200, operation + ' complete');
                 } catch {
                     // A duplicate/refused owner control is not evidence that
                     // an already healthy domain became corrupt. Verify durable
@@ -583,7 +591,10 @@ export class HangoutLobby {
                             await this.engine.disconnect(a.id); await this.authority.unbind(a.id);
                         }
                     }
-                    await this.engine.tick(); await this.pruneLogs();
+                    if (this.participationMode && (await this.engine.refreshParticipation())?.ok === false) throw Error('participation refresh unavailable');
+                    const ticked = await this.engine.tick();
+                    if (this.participationMode && ticked?.ok === false) throw Error('participation tick unavailable');
+                    await this.pruneLogs();
                     this.privateQueueActor = { kind: 'maintenance' };
                     try { await this.refreshPrivateReports(); } finally { this.privateQueueActor = null; }
                     due = await this.authority.due(); await this.authority.schedule();

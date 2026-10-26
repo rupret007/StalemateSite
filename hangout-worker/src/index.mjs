@@ -8,12 +8,15 @@ import { activeBetaSession, registryRequest, validBetaSession } from './beta-ses
 import { INTERNAL_HEALTH_PATH, healthJson } from './beta-ops.mjs';
 import { hmacKeyOk } from './auth.mjs';
 import { privateReportRef, validatePrivateReportControl } from './private-reports.mjs';
+import { lobbyParticipationMode, participationConfigurationValid } from './lobby-participation.mjs';
 
 export { HangoutLobby, HangoutTurnBudget };
 
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
+        if (!participationConfigurationValid(env)) return new Response('participation authority unavailable', { status: 503 });
+        if (lobbyParticipationMode(env) && ['/room', '/turn'].includes(url.pathname)) return new Response('media participation unavailable', { status: 503 });
         if (url.pathname === '/turn') return admitTurn(request, env, url);
         if (url.pathname === '/lobby-owner/login' || url.pathname === '/lobby-admin/login') {
             const owner = url.pathname === '/lobby-owner/login';
@@ -104,6 +107,7 @@ export class HangoutRoom {
                 await this.schedule();
                 return new Response('closed');
             }
+            if (this.env.HANGOUT_PARTICIPATION_AUTHORITY !== undefined) return new Response('media participation unavailable', { status: 503 });
             let beta;
             if (this.env.HANGOUT_BETA_MODE === 'protected') {
                 try { beta = JSON.parse(request.headers.get('X-Hangout-Beta-Session')); } catch { /* refused below */ }
@@ -130,7 +134,7 @@ export class HangoutRoom {
 
     attachment(ws) { try { return ws.deserializeAttachment() || {}; } catch { return {}; } }
     validAttachment(a) {
-        return a?.v === 1 && typeof a.id === 'string' && a.id.length <= 64 && !a.ended && a.bucket &&
+        return this.env.HANGOUT_PARTICIPATION_AUTHORITY === undefined && a?.v === 1 && typeof a.id === 'string' && a.id.length <= 64 && !a.ended && a.bucket &&
             (this.env.HANGOUT_BETA_MODE !== 'protected' || validBetaSession(a, this.env));
     }
     liveSockets() {

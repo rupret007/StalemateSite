@@ -9,11 +9,15 @@ import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { openDurableRecordSqlite } from '../support/durable-record-sqlite.mjs';
 import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
+import { HangoutLobby } from '../../hangout-worker/src/lobby-do.mjs';
 import { accountId } from '../../hangout-worker/src/auth.mjs';
 import { createParticipationEnforcement } from '../../hangout-worker/src/participation-enforcement.mjs';
 import { writeLobbyEffects } from '../../hangout-worker/src/lobby-effect-records.mjs';
+import { createLobbyParticipation, lobbyParticipationMode } from '../../hangout-worker/src/lobby-participation.mjs';
+import { createPartitionedParticipationConsents, PARTICIPATION_POLICY_KEY } from '../../hangout-worker/src/participation-partitions.mjs';
+import { PARTICIPATION_PURPOSES } from '../../hangout-worker/src/participation-policy.mjs';
 import { initializeLobbySessionAuthority, migrateLobbySessionAuthority, createLobbySessionAuthority,
-    LOBBY_AUTHORITY_MARKER } from '../../hangout-worker/src/lobby-session-authority.mjs';
+    LOBBY_AUTHORITY_MARKER, LOBBY_AUTHORITY_COMMUNITY } from '../../hangout-worker/src/lobby-session-authority.mjs';
 
 const NOW = 1800000000000, ALARM = '__test_native_alarm__', cleanups = [];
 const SESSION_INDEX = 'authority-session-index:v1', CONNECTION_INDEX = 'authority-connection-index:v1';
@@ -382,5 +386,204 @@ describe('tick contributor authority fences', () => {
         expect((await app.engine.tick())?.ok).not.toBe(false);
         expect(app.engine.roomSnapshot().rooms).toEqual([]); expect((await f.authority.load()).state.rooms.rooms).toEqual([]);
         expect(app.persist).not.toHaveBeenCalled();
+    });
+});
+
+// Only operator/guardian decisions are synthetic here. Production principal
+// resolution, current binding checks, partition reads and effect writes are real.
+async function participationLedger(f) {
+    const participant = new Map(), decisions = new Map(), guardians = new Map();
+    const config = { policy: { version: 1, policyVersion: 'synthetic-production-composition-v1', revision: 1,
+        communityRef: LOBBY_AUTHORITY_COMMUNITY, noticeDigest: 'b'.repeat(64), decisionRef: 'synthetic_operator_decision', state: 'qualified',
+        purposes: [...PARTICIPATION_PURPOSES], issuedAt: NOW - 1, effectiveAt: NOW - 1, expiresAt: NOW + 900000, maxSessionMs: 60000 },
+        rules: { version: 1, verifierRef: 'synthetic_guardian_verifier', pendingMs: 10000, grantMs: 100000,
+            subjectTailMs: 1000, guardianTailMs: 1000, receiptTailMs: 1000, callbackMs: 1000, operationMs: 10000 } };
+    const ledger = createPartitionedParticipationConsents({ storage: f.authority.records, now: f.now,
+        admitSubject: async ({ tx }) => { const n = await tx.get('synthetic-allocation-count') || 0; if (n >= 8) return false; await tx.put('synthetic-allocation-count', n + 1); return true; },
+        adapters: {
+            qualifyPolicy: async () => ({ config, expiresAt: f.now() + 1000 }),
+            authenticateParticipant: async ({ proof, purpose }) => {
+                const identity = participant.get(proof); if (!identity) return null;
+                return purpose === 'begin' ? identity : Object.fromEntries(Object.entries(identity).filter(([key]) => key !== 'operationRef'));
+            },
+            verifyConsent: async ({ proof }) => decisions.get(proof), authenticateGuardian: async ({ proof }) => guardians.get(proof),
+            authorizeMaintenance: async () => ({ communityRef: LOBBY_AUTHORITY_COMMUNITY, expiresAt: f.now() + 1000 })
+        } });
+    expect((await ledger.installPolicy('synthetic-operator')).ok).toBe(true);
+    return { ledger, async grant(binding) {
+        const identity = await f.authority.resolveParticipationConnection(binding), proof = crypto.randomUUID(); expect(identity).not.toBeNull();
+        participant.set(proof, { ...identity, operationRef: crypto.randomUUID() });
+        const pending = await ledger.begin(proof, { expectedRevision: 0, purposes: [...PARTICIPATION_PURPOSES] }); expect(pending.ok).toBe(true);
+        const decision = crypto.randomUUID(); decisions.set(decision, { operationRef: crypto.randomUUID(), pendingRef: pending.pendingRef,
+            subjectRef: pending.subjectRef, principalRef: identity.principalRef, guardianPrincipalRef: 'synthetic_guardian_principal',
+            decisionRef: crypto.randomUUID(), verifierRef: config.rules.verifierRef, status: 'approved', purposes: [...PARTICIPATION_PURPOSES],
+            verifiedAt: f.now(), expiresAt: f.now() + 100000 });
+        const result = await ledger.complete(decision); expect(result.state).toBe('authorized'); return { ...pending, identity };
+    }, async withdraw(binding, purposes = []) {
+        const identity = await f.authority.resolveParticipationConnection(binding);
+        const rows = await f.authority.records.transaction(tx => tx.list({ prefix: 'participation-records:v1:record:', limit: 4 }));
+        const state = [...rows.values()].find(row => row.subjects[0].record.principalRef === identity.principalRef);
+        const subject = state.subjects[0].record, guardian = state.guardians.find(row => row.subjectRef === subject.subjectRef), proof = crypto.randomUUID();
+        guardians.set(proof, { operationRef: crypto.randomUUID(), subjectRef: subject.subjectRef, principalRef: guardian.principalRef,
+            guardianRef: guardian.guardianRef, guardianRevision: guardian.revision, expiresAt: f.now() + 1000 });
+        return ledger.change(proof, { expectedRevision: subject.revision, purposes });
+    } };
+}
+const productionParticipation = f => createLobbyParticipation({ env: { ...f.env, HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1' }, authority: f.authority, now: f.now });
+
+describe('production participation session/partition/effect composition', () => {
+    it('requires one explicit compatible opt-in and never constructs a default grant adapter', async () => {
+        expect(lobbyParticipationMode({})).toBe(false); expect(createLobbyParticipation({ env: {} })).toBeNull();
+        for (const extra of [{ HANGOUT_PARTICIPATION_AUTHORITY: '' }, { HANGOUT_PARTICIPATION_AUTHORITY: 'future' },
+            { HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1' }, { HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1', HANGOUT_BETA_MODE: 'protected' }]) expect(() => lobbyParticipationMode(extra)).toThrow();
+        const f = await fixture(); expect(lobbyParticipationMode({ ...f.env, HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1' })).toBe(true);
+    });
+    it.each(['missing', 'corrupt'])('denies publishing with a %s partition policy, without provisioning it', async condition => {
+        const f = await fixture(), person = await f.enroll('c3missing');
+        if (condition === 'corrupt') await f.authority.records.transaction(tx => tx.put(PARTICIPATION_POLICY_KEY, { forged: true }));
+        const before = await f.authority.records.transaction(tx => tx.get(PARTICIPATION_POLICY_KEY));
+        const app = f.makeEngine({ participation: productionParticipation(f) }); expect((await app.engine.connect(person.binding)).ok).toBe(true);
+        expect((await app.message(person.binding.id, { t: 'hello', nick: 'MissingGrant', age13: true, subjectRef: 'forged_subject', principalRef: 'forged_principal' })).ok).toBe(false);
+        expect(app.frames.some(frame => frame.t === 'welcome' || frame.t === 'join')).toBe(false);
+        expect(await f.authority.records.transaction(tx => tx.get(PARTICIPATION_POLICY_KEY))).toEqual(before); expect(app.persist).not.toHaveBeenCalled();
+    });
+    it('binds guest principals to the saved SID and refuses copied device/account/identity fields', async () => {
+        const f = await fixture(), a = await f.enroll('guestalpha'), b = await f.enroll('guestbravo');
+        const identity = await f.authority.resolveParticipationConnection(a.binding);
+        expect(identity.principalRef).toBe(`s_${a.request.sid}`); expect(identity.communityRef).toBe(LOBBY_AUTHORITY_COMMUNITY);
+        for (const changes of [{ betaSid: b.request.sid }, { account: 'a_' + 'q'.repeat(43) }, { role: 'moderator', admin: true }, { dev: b.binding.dev }, { expiresAt: a.binding.expiresAt + 1 }]) {
+            expect(await f.authority.resolveParticipationConnection({ ...a.binding, ...changes })).toBeNull();
+            expect(await f.authority.records.transaction(tx => f.authority.validateParticipationConnection({ tx, connection: { ...a.binding, ...changes }, identity }))).toBe(false);
+        }
+        const c = await f.enroll('same-device');
+        await f.authority.records.transaction(async tx => {
+            const row = await tx.get('authority-connection:' + c.binding.id); c.binding.dev = a.binding.dev; c.binding.iph = a.binding.iph;
+            await tx.put('authority-connection:' + c.binding.id, { ...row, dev: c.binding.dev, iph: c.binding.iph });
+        });
+        expect((await f.authority.resolveParticipationConnection(c.binding)).principalRef).not.toBe(identity.principalRef);
+    });
+    it('uses verified account identity without transferring an earlier guest grant', async () => {
+        const f = await fixture(), guest = await f.enroll('guestowner'), ledger = await participationLedger(f); await ledger.grant(guest.binding);
+        const profile = { kind: 'owner', account: await accountId('holder@example.invalid', f.env.HANGOUT_HMAC_KEY), role: 'fan', admin: false, expiresAt: NOW + 90000 };
+        const owner = await f.enroll('verifiedowner', profile); expect((await f.authority.resolveParticipationConnection(owner.binding)).principalRef).toBe(profile.account);
+        const app = f.makeEngine({ participation: productionParticipation(f) }); expect((await app.engine.connect(owner.binding)).ok).toBe(true);
+        expect((await app.message(owner.binding.id, { t: 'hello', nick: 'NoInheritedGrant', age13: true })).ok).toBe(false);
+        expect(app.frames.some(frame => frame.t === 'welcome')).toBe(false);
+    });
+    it('publishes only after the actual partition and session/effect transaction and reloads that grant on disk reopen', async () => {
+        const f = await fixture(), person = await f.enroll('realcompose'); await (await participationLedger(f)).grant(person.binding);
+        const app = f.makeEngine({ participation: productionParticipation(f) }); expect((await app.engine.connect(person.binding)).ok).toBe(true);
+        expect((await app.message(person.binding.id, { t: 'hello', nick: 'RealCompose', age13: true }))?.ok).not.toBe(false);
+        expect(app.frames.some(frame => frame.t === 'welcome')).toBe(true);
+        await app.message(person.binding.id, { t: 'cmd', ch: '#stalemate', name: 'join', args: ['#art-composed'] });
+        expect((await f.authority.load()).state.rooms.rooms.map(room => room.name)).toContain('#art-composed');
+        const reopened = await f.reopen(), identity = await reopened.authority.resolveParticipationConnection(person.binding); expect(identity).not.toBeNull();
+        const fresh = createLobbyParticipation({ env: { ...f.env, HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1' }, authority: reopened.authority, now: f.now });
+        const context = await fresh.prepare([person.binding]); expect(fresh.allows(context, { actorId: person.binding.id, action: 'publicText' })).toBe(true);
+        expect(fresh.allows(context, { actorId: person.binding.id, action: 'aiPublicReview', providerReady: true, publicTextEligible: true })).toBe(false);
+    });
+    it.each(['expiry', 'revocation', 'role removal'])('rolls back real room effects when %s occurs after the native effect writes', async change => {
+        const f = await fixture(), profile = { kind: 'staff', account: await accountId('reviewer@example.invalid', f.env.HANGOUT_HMAC_KEY), role: 'moderator', admin: true, expiresAt: NOW + 90000 };
+        const person = await f.enroll('latecheck', profile); await (await participationLedger(f)).grant(person.binding);
+        const app = f.makeEngine({ participation: productionParticipation(f) }); await app.engine.connect(person.binding); await app.message(person.binding.id, { t: 'hello', nick: 'LateCheck', age13: true }); app.frames.length = 0;
+        let reached = false; f.controls.afterEffects = async ({ tx, costsOnly }) => {
+            if (costsOnly || reached) return; reached = true;
+            if (change === 'expiry') f.advance(100001);
+            else if (change === 'role removal') f.env.HANGOUT_MODERATOR_EMAILS = '';
+            else { const key = 'authority-session:' + person.request.sid, row = await tx.get(key); await tx.put(key, { ...row, revoked: true }); }
+        };
+        expect((await app.message(person.binding.id, { t: 'cmd', ch: '#stalemate', name: 'join', args: ['#late-denied'] })).ok).toBe(false);
+        expect(reached).toBe(true); expect(app.engine.roomSnapshot().rooms.some(room => room.name === '#late-denied')).toBe(false);
+        expect(app.frames.some(frame => frame.t === 'join' && frame.ch.name === '#late-denied')).toBe(false);
+        expect(await f.authority.records.transaction(tx => tx.get('community-room:#late-denied'))).toBeUndefined(); expect(f.driver.stats.rollbacks).toBeGreaterThan(0);
+    });
+    it('retains a separately committed C2 withdrawal and denies queued room publication while the real session remains valid', async () => {
+        const f = await fixture(), person = await f.enroll('withdrawn'), ledger = await participationLedger(f); await ledger.grant(person.binding);
+        let reduceBeforeCommit = false;
+        const fence = { prepare: (...args) => f.authority.effectCommit.prepare(...args), commit: async (...args) => {
+            if (reduceBeforeCommit && !args[2]?.costsOnly) { reduceBeforeCommit = false; expect((await ledger.withdraw(person.binding)).state).toBe('withdrawn'); }
+            return f.authority.effectCommit.commit(...args);
+        } };
+        const app = f.makeEngine({ participation: productionParticipation(f), effectCommit: fence });
+        await app.engine.connect(person.binding); await app.message(person.binding.id, { t: 'hello', nick: 'Withdrawn', age13: true }); app.frames.length = 0;
+        reduceBeforeCommit = true;
+        expect((await app.message(person.binding.id, { t: 'cmd', ch: '#stalemate', name: 'join', args: ['#withdraw-denied'] })).ok).toBe(false);
+        expect(await f.authority.validate(person.binding)).toBe(true); expect(app.engine.roomSnapshot().rooms).toEqual([]);
+        expect(app.frames.some(frame => frame.t === 'join' && frame.ch.name === '#withdraw-denied')).toBe(false);
+        const fresh = productionParticipation(f), context = await fresh.prepare([person.binding]);
+        expect(fresh.allows(context, { actorId: person.binding.id, action: 'publicArtifact' })).toBe(false);
+        expect((await app.message(person.binding.id, { t: 'cmd', ch: '#stalemate', name: 'block', args: ['MissingNick'] }))?.ok).not.toBe(false);
+        const rows = await f.authority.records.transaction(tx => tx.list({ prefix: 'participation-records:v1:record:', limit: 4 }));
+        expect([...rows.values()][0].subjects[0].record.state).toBe('withdrawn');
+    });
+});
+
+async function productionDo(f) {
+    const sockets = [], background = [], originalResponse = globalThis.Response;
+    class Socket {
+        frames = []; readyState = 1;
+        send(raw) { this.frames.push(JSON.parse(raw)); }
+        close(code, reason) { this.readyState = 3; this.closed = { code, reason }; }
+        serializeAttachment(value) { this.attachment = value; }
+        deserializeAttachment() { return this.attachment; }
+    }
+    vi.stubGlobal('WebSocketPair', class { constructor() { this[0] = new Socket(); this[1] = new Socket(); } });
+    vi.stubGlobal('Response', class extends originalResponse {
+        constructor(body, init) { super(body, init?.status === 101 ? { ...init, status: 200 } : init);
+            if (init?.status === 101) Object.defineProperty(this, 'status', { value: 101 }); this.webSocket = init?.webSocket; }
+    });
+    const clock = vi.spyOn(Date, 'now').mockImplementation(f.now);
+    const storage = { ...f.storage,
+        get: key => f.storage.transaction(tx => tx.get(key)), put: (key, value) => f.storage.transaction(tx => tx.put(key, value)),
+        list: options => f.storage.transaction(tx => tx.list(options)), delete: key => f.storage.transaction(tx => tx.delete(key)),
+        getAlarm: () => f.storage.transaction(tx => tx.getAlarm()), setAlarm: value => f.storage.transaction(tx => tx.setAlarm(value)) };
+    const state = { storage, blockConcurrencyWhile: fn => fn(), waitUntil: task => background.push(task),
+        getWebSockets: id => sockets.filter(ws => !id || ws.tags.includes(id)), getTags: ws => ws.tags,
+        acceptWebSocket: (ws, tags) => { ws.tags = tags; sockets.push(ws); } };
+    const lobby = new HangoutLobby(state, { ...f.env, HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1' }); await lobby.ready;
+    expect(lobby.authorityUnavailable).toBe(false);
+    return { lobby, sockets, async connect(person, nick) {
+        // The actual gateway has no connection ID before the DO admits it.
+        // Its previous test binding was correctly retired at cold recovery.
+        const { id, authorityRef, authorityRevision, ...identity } = person.binding;
+        const response = await lobby.fetch(new Request('https://owned/lobby', { headers: { 'X-Hangout-Identity': JSON.stringify(identity) } }));
+        const refusal = response.status === 101 ? '' : await response.text();
+        expect(response.status, refusal).toBe(101); const socket = sockets.at(-1);
+        await lobby.webSocketMessage(socket, JSON.stringify({ t: 'hello', nick, age13: true })); return socket;
+    }, message: (socket, frame) => lobby.webSocketMessage(socket, JSON.stringify(frame)),
+    async dispose() { lobby.presence.dispose(); await Promise.all(background); clock.mockRestore(); vi.unstubAllGlobals(); } };
+}
+
+describe('actual HangoutLobby constructs the required participation bridge', () => {
+    it('does not publish an unknown guest nickname when the actual DO has no C2 policy', async () => {
+        const f = await fixture(), person = await f.enroll('missingpolicy'), app = await productionDo(f);
+        try {
+            const ws = await app.connect(person, 'NotEnrolled');
+            expect(ws.frames.some(frame => frame.t === 'hello')).toBe(true);
+            expect(ws.frames.some(frame => frame.t === 'welcome' || frame.t === 'join')).toBe(false);
+            expect(ws.frames.some(frame => frame.t === 'notice' && frame.kind === 'error')).toBe(true);
+            expect(await app.lobby.authority.records.transaction(tx => tx.get(PARTICIPATION_POLICY_KEY))).toBeUndefined();
+        } finally { await app.dispose(); }
+    });
+    it('uses its actual composed alarm to retire lost media permission while keeping another current peer', async () => {
+        const f = await fixture(), a = await f.enroll('alarmalpha'), b = await f.enroll('alarmbravo'), ledger = await participationLedger(f);
+        await ledger.grant(a.binding); await ledger.grant(b.binding); const app = await productionDo(f);
+        try {
+            const wa = await app.connect(a, 'AlarmAlpha'), wb = await app.connect(b, 'AlarmBravo');
+            for (const ws of [wa, wb]) {
+                await app.message(ws, { t: 'cmd', ch: '#stalemate', name: 'join', args: ['#art-alarm'] });
+                await app.message(ws, { t: 'cam', ch: '#art-alarm', on: true, adult18: true });
+                expect(ws.frames.some(frame => frame.t === 'cam' && frame.on === true)).toBe(true);
+            }
+            // Production session principals survive ordinary reconnect, not new
+            // SID/account claims. This reduction uses synthetic guardian proof.
+            expect((await ledger.withdraw(wa.attachment, PARTICIPATION_PURPOSES.filter(purpose => purpose !== 'camera'))).state).toBe('authorized');
+            expect(wa.closed).toBeUndefined(); await app.lobby.alarm();
+            expect(wa.closed?.code).toBe(4401); expect(wb.closed).toBeUndefined();
+            expect(app.lobby.engine._debug.conns.has(wb.attachment.id)).toBe(true);
+            expect(app.lobby.engine._debug.conns.get(wb.attachment.id).cams.has('#art-alarm')).toBe(true);
+            const subject = await app.lobby.authority.resolveParticipationConnection({ ...a.binding, id: wa.attachment.id, authorityRef: wa.attachment.id });
+            expect(subject?.principalRef).toBe(`s_${a.request.sid}`);
+        } finally { await app.dispose(); }
     });
 });

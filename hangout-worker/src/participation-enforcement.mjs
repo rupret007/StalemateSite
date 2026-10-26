@@ -1,4 +1,4 @@
-// Controlled C3 adapter. Not provisioned by any production route. Effects and
+// C3 adapter, selected only by explicit server composition. Effects and
 // current participation revisions MUST share one serializable transaction.
 import { readParticipationPrincipals } from './participation-consents.mjs';
 import { PARTICIPATION_AUDIENCE, resolveParticipation } from './participation-policy.mjs';
