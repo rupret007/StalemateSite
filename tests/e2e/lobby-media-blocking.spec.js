@@ -31,12 +31,13 @@ async function scenario(browser, baseURL, width, { heldCaptureFor = null } = {})
                 window.__captureCalls = 0;
                 if (!navigator.mediaDevices) return; // about:blank has no capture API.
                 const nativeCapture = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-                let releaseCapture, releaseOffer;
+                let releaseCapture, releaseOffer, releaseRemote;
                 const captureGate = heldCapture ? new Promise(resolve => { releaseCapture = resolve; }) : Promise.resolve();
                 window.__holdMedia = false;
                 window.__releaseHeldOffer = () => releaseOffer?.();
                 window.__releaseHeldCapture = () => releaseCapture?.();
-                window.__releaseHeldMedia = () => { releaseOffer?.(); releaseCapture?.(); };
+                window.__releaseHeldRemoteOffer = () => releaseRemote?.();
+                window.__releaseHeldMedia = () => { releaseOffer?.(); releaseCapture?.(); releaseRemote?.(); };
                 navigator.mediaDevices.getUserMedia = constraints => {
                     window.__captureCalls += 1;
                     const capture = nativeCapture(constraints);
@@ -99,7 +100,10 @@ async function scenario(browser, baseURL, width, { heldCaptureFor = null } = {})
                 const NativePC = window.RTCPeerConnection;
                 window.RTCPeerConnection = class extends NativePC {
                     constructor(...args) {
-                        super(...args); this.__probeId = ++sequence; this.__nativeIce = 0;
+                        super(...args); this.__probeId = ++sequence; this.__nativeIce = 0; this.__localStarts = 0; this.__nativeNegotiations = 0;
+                        this.addEventListener('negotiationneeded', () => {
+                            this.__nativeNegotiations += 1; record({ pc: this.__probeId, op: 'native-negotiation', state: this.signalingState });
+                        });
                         this.addEventListener('icecandidate', event => {
                             if (!event.candidate) return;
                             this.__nativeIce += 1;
@@ -112,10 +116,23 @@ async function scenario(browser, baseURL, width, { heldCaptureFor = null } = {})
                     }
                     addTransceiver(...args) { record({ pc: this.__probeId, op: 'manual-transceiver' }); return super.addTransceiver(...args); }
                     async setLocalDescription(description) {
-                        try { await super.setLocalDescription(description); this.__localSnapshot = this.localDescription?.toJSON(); record({ pc: this.__probeId, op: 'local', type: this.localDescription?.type, state: this.signalingState }); }
+                        this.__localStarts += 1;
+                        record({ pc: this.__probeId, op: 'local-start', argument: description?.type || 'auto', state: this.signalingState });
+                        try {
+                            const native = super.setLocalDescription(description);
+                            if (window.__releaseOfferAtLocalStart && !window.__heldOfferReleased) window.__releaseHeldOffer();
+                            await native;
+                            this.__localSnapshot = this.localDescription?.toJSON(); record({ pc: this.__probeId, op: 'local', type: this.localDescription?.type, state: this.signalingState });
+                        }
                         catch (error) { record({ pc: this.__probeId, op: 'local-error', name: error.name, state: this.signalingState }); throw error; }
                     }
                     async setRemoteDescription(description) {
+                        record({ pc: this.__probeId, op: 'remote-request', type: description.type, state: this.signalingState });
+                        if (window.__holdNativeOffer && description.type === 'offer' && !releaseRemote) {
+                            window.__pendingNativeOffer = { pc: this.__probeId, state: this.signalingState };
+                            await new Promise(resolve => { releaseRemote = resolve; });
+                        }
+                        record({ pc: this.__probeId, op: 'remote-start', type: description.type, state: this.signalingState });
                         try { await super.setRemoteDescription(description); record({ pc: this.__probeId, op: 'remote', type: description.type, state: this.signalingState }); }
                         catch (error) { record({ pc: this.__probeId, op: 'remote-error', type: description.type, name: error.name, state: this.signalingState }); throw error; }
                     }
@@ -227,6 +244,120 @@ for (const width of [375, 390]) test(`pending capture waits for an incoming offe
     } finally { await app.close(); }
 });
 
+for (const width of [375, 390]) test(`pending incoming offer fences native negotiation and permits later renegotiation at ${width}px`, async ({ browser, baseURL }) => {
+    const app = await scenario(browser, baseURL, width, { heldCaptureFor: '*' });
+    let receiver;
+    try {
+        const alpha = await app.guest('stalemate', 'OfferAlpha'), bravo = await app.guest('rad-dad', 'OfferBravo');
+        await alpha.click('nav [data-show="rooms"]'); await alpha.click('[data-start="art"]');
+        await expect(alpha.locator('[data-act-canvas]')).toBeVisible();
+        const room = await alpha.locator('[data-chat-context]').innerText();
+        await command(bravo, `/join ${room}`); await expect(bravo.locator('[data-act-canvas]')).toBeVisible();
+        const ids = await Promise.all([alpha, bravo].map(page => page.evaluate(() => window.__lobbyRoom.state.myId)));
+        for (const id of ids) expect(id).toMatch(/^c[a-f0-9]{32}$/);
+        const sender = ids[0] < ids[1] ? alpha : bravo; receiver = sender === alpha ? bravo : alpha;
+        await receiver.evaluate(() => { window.__holdMedia = true; window.__holdNativeOffer = true; });
+        await camera(sender); await requestCamera(receiver);
+        await expect.poll(() => receiver.evaluate(() => !!window.__heldOfferFrom && window.__lobbyRoom.state.pcs.has(window.__heldOfferFrom))).toBe(true);
+        await receiver.evaluate(() => window.__releaseHeldOffer());
+        await expect.poll(() => receiver.evaluate(() => !!window.__pendingNativeOffer)).toBe(true);
+        // The application has accepted the real incoming offer and invoked SRD;
+        // its wrapper holds the native effect. Completing opted-in capture now
+        // adds a real track and dispatches native negotiationneeded in that gap.
+        await receiver.evaluate(() => window.__releaseHeldCapture());
+        await expect.poll(() => receiver.evaluate(() => [...window.__lobbyRoom.state.pcs.values()][0]?.pc.__nativeNegotiations > 0)).toBe(true);
+        const pending = await receiver.evaluate(() => {
+            const entry = [...window.__lobbyRoom.state.pcs.values()][0];
+            return { polite: entry.polite, capture: window.__captureCalls, hasStream: !!window.__lobbyRoom.state.stream,
+                localStarts: entry.pc.__localStarts, nativeNegotiations: entry.pc.__nativeNegotiations,
+                localType: entry.pc.localDescription?.type || null, remoteType: entry.pc.remoteDescription?.type || null };
+        });
+        console.log('Pending native remote-offer invocation window', JSON.stringify({ width, ...pending }));
+        expect(pending.polite).toBe(true); expect(pending.capture).toBe(1); expect(pending.hasStream).toBe(true);
+        if (pending.localStarts) await expect.poll(() => receiver.evaluate(() => [...window.__lobbyRoom.state.pcs.values()][0]?.pc.localDescription?.type)).toBe('offer');
+        let functionalError, later = false;
+        try {
+            await receiver.evaluate(() => window.__releaseHeldRemoteOffer());
+            for (const page of [alpha, bravo]) await expect.poll(async () => {
+                const peers = await peerState(page); return peers.length === 1 && peers[0].connected === 'connected' && peers[0].decoded > 0;
+            }).toBe(true);
+            const before = await Promise.all([alpha, bravo].map(peerState));
+            const localBefore = await receiver.evaluate(() => {
+                const pc = [...window.__lobbyRoom.state.pcs.values()][0].pc, count = pc.__localStarts;
+                // A deliberate later native media change must still negotiate.
+                // It uses the existing capture and keeps its first video active.
+                pc.addTransceiver('video', { direction: 'recvonly' }); return count;
+            });
+            await expect.poll(() => receiver.evaluate(count => {
+                const pc = [...window.__lobbyRoom.state.pcs.values()][0].pc;
+                return pc.__localStarts > count && pc.signalingState === 'stable' && pc.localDescription?.type === 'offer'
+                    && pc.remoteDescription?.type === 'answer' && (pc.localDescription.sdp.match(/^m=/gm) || []).length === 2;
+            }, localBefore)).toBe(true);
+            for (const [index, page] of [alpha, bravo].entries()) await expect.poll(async () => {
+                const peer = (await peerState(page))[0]; return peer.connected === 'connected' && peer.decoded > before[index][0].decoded;
+            }).toBe(true);
+            later = true;
+        } catch (error) { functionalError = error; }
+        console.log('Pending remote-offer functional outcome', JSON.stringify({ width, decoded: !functionalError, laterRenegotiated: later,
+            participants: await Promise.all([alpha, bravo].map(diagnosticState)) }));
+        expect(pending.localStarts).toBe(0); expect(pending.localType).toBeNull(); expect(pending.remoteType).toBeNull();
+        if (functionalError) throw functionalError;
+        expect(later).toBe(true); expect(app.errors).toEqual([]);
+        for (const page of [alpha, bravo]) expect(await page.evaluate(() => window.__captureCalls)).toBe(1);
+    } finally {
+        if (receiver && !receiver.isClosed()) await receiver.evaluate(() => window.__releaseHeldMedia());
+        await app.close();
+    }
+});
+
+for (const width of [375, 390]) test(`an already-invoked native offer survives polite glare and later renegotiation at ${width}px`, async ({ browser, baseURL }) => {
+    const app = await scenario(browser, baseURL, width, { heldCaptureFor: '*' });
+    let receiver, alpha, bravo, decoded = false, later = false;
+    try {
+        alpha = await app.guest('stalemate', 'GlareAlpha'); bravo = await app.guest('rad-dad', 'GlareBravo');
+        await alpha.click('nav [data-show="rooms"]'); await alpha.click('[data-start="art"]');
+        await expect(alpha.locator('[data-act-canvas]')).toBeVisible(); const room = await alpha.locator('[data-chat-context]').innerText();
+        await command(bravo, `/join ${room}`); await expect(bravo.locator('[data-act-canvas]')).toBeVisible();
+        const ids = await Promise.all([alpha, bravo].map(page => page.evaluate(() => window.__lobbyRoom.state.myId)));
+        for (const id of ids) expect(id).toMatch(/^c[a-f0-9]{32}$/);
+        const sender = ids[0] < ids[1] ? alpha : bravo; receiver = sender === alpha ? bravo : alpha;
+        await receiver.evaluate(() => { window.__holdMedia = true; window.__releaseOfferAtLocalStart = true; });
+        await camera(sender); await requestCamera(receiver);
+        await expect.poll(() => receiver.evaluate(() => !!window.__heldOfferFrom && window.__lobbyRoom.state.pcs.has(window.__heldOfferFrom))).toBe(true);
+        // Completing actual capture invokes native SLD through negotiationneeded.
+        // Its probe dispatches the genuine held peer offer synchronously AFTER
+        // calling native SLD, BEFORE awaiting completion/ICE tasks. The incoming
+        // offer fence cannot retroactively prevent that already-started call.
+        await receiver.evaluate(() => window.__releaseHeldCapture());
+        await expect.poll(() => receiver.evaluate(() => !!window.__heldOfferReleased)).toBe(true);
+        for (const page of [alpha, bravo]) await expect.poll(async () => {
+            const peers = await peerState(page); return peers.length === 1 && peers[0].connected === 'connected' && peers[0].decoded > 0;
+        }).toBe(true);
+        decoded = true;
+        const before = await Promise.all([alpha, bravo].map(peerState));
+        const localBefore = await receiver.evaluate(() => {
+            const pc = [...window.__lobbyRoom.state.pcs.values()][0].pc, count = pc.__localStarts;
+            pc.addTransceiver('video', { direction: 'recvonly' }); return count;
+        });
+        await expect.poll(() => receiver.evaluate(count => {
+            const pc = [...window.__lobbyRoom.state.pcs.values()][0].pc;
+            return pc.__localStarts > count && pc.signalingState === 'stable' && pc.localDescription?.type === 'offer'
+                && pc.remoteDescription?.type === 'answer' && (pc.localDescription.sdp.match(/^m=/gm) || []).length === 2;
+        }, localBefore)).toBe(true);
+        for (const [index, page] of [alpha, bravo].entries()) await expect.poll(async () => {
+            const peer = (await peerState(page))[0]; return peer.connected === 'connected' && peer.decoded > before[index][0].decoded;
+        }).toBe(true);
+        later = true; expect(app.errors).toEqual([]);
+        for (const page of [alpha, bravo]) expect(await page.evaluate(() => window.__captureCalls)).toBe(1);
+    } finally {
+        if (alpha && bravo) console.log('Already-invoked native glare outcome', JSON.stringify({ width, decoded, laterRenegotiated: later,
+            participants: await Promise.all([alpha, bravo].map(diagnosticState)),
+            events: await Promise.all([alpha, bravo].map(page => page.evaluate(() => window.__mediaDiagnostics))) }));
+        if (receiver && !receiver.isClosed()) await receiver.evaluate(() => window.__releaseHeldMedia());
+        await app.close();
+    }
+});
+
 for (const width of [375, 390]) test(`Block retires live camera pairs across entries and same-device tabs at ${width}px`, async ({ browser, baseURL }, testInfo) => {
     const scenarioStarted = Date.now();
     const app = await scenario(browser, baseURL, width);
@@ -314,6 +445,16 @@ for (const width of [375, 390]) test(`Block retires live camera pairs across ent
         for (const page of [alpha, bravo]) {
             const id = await page.evaluate(() => window.__blockedPairProof.id);
             await expect.poll(async () => { const peer = (await peerState(page)).find(item => item.id === id); return peer?.connected === 'connected' && peer.decoded > 0; }).toBe(true);
+        }
+        try {
+            for (const page of [alpha, bravo, witness, parallel]) await expect.poll(async () => {
+                const peers = await peerState(page);
+                return peers.length === 3 && peers.every(peer => peer.signaling === 'stable' && peer.connected === 'connected' && peer.tracks > 0 && peer.decoded > 0);
+            }).toBe(true);
+        } catch (error) {
+            console.log('Final four-peer mesh state', JSON.stringify(await Promise.all([alpha, bravo, witness, parallel].map(diagnosticState))));
+            console.log('Final bounded signaling diagnostics', JSON.stringify(await Promise.all([alpha, bravo, witness, parallel].map(page => page.evaluate(() => window.__mediaDiagnostics)))));
+            throw error;
         }
         for (const page of [alpha, bravo, witness, parallel]) expect(await page.evaluate(() => window.__captureCalls)).toBe(1);
         expect(app.errors).toEqual([]);

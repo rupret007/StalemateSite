@@ -368,12 +368,23 @@ describe('public-room Block retires only the affected pair', () => {
         expect(f.sent).toEqual([]);
     });
 
-    it('invalidates queued SDP before a newer native local-description operation finishes', async () => {
+    it('defers local renegotiation until the prior paced offer has been sent and genuinely answered', async () => {
         const f = await fixture({ clock: { at: 1800000000000 } }), pc = f.state.pcs.get('peer').pc, held = deferred();
         for (let i = 0; i < 8; i++) pc.onicecandidate({ candidate: { toJSON: () => ({ candidate: `initial-${i}` }) } });
         await pc.onnegotiationneeded();
-        pc.setLocalDescription.mockImplementation(async () => { await held.promise; }); const next = pc.onnegotiationneeded(); f.advance(125);
-        expect(f.sent).toHaveLength(8); held.resolve(); await next;
+        const nativeLocalEffect = pc.setLocalDescription.getMockImplementation();
+        pc.setLocalDescription.mockImplementation(async value => { await held.promise; return nativeLocalEffect(value); });
+        try {
+            await pc.onnegotiationneeded();
+            expect(pc.signalingState).toBe('have-local-offer'); expect(pc.setLocalDescription).toHaveBeenCalledOnce();
+            f.advance(125); expect(f.sent.filter(frame => frame.sdp).map(frame => frame.sdp.type)).toEqual(['offer']);
+            f.incoming({ sdp: { type: 'answer', sdp: 'genuine-prior-offer-answer' } });
+            await vi.waitFor(() => expect(pc.setLocalDescription).toHaveBeenCalledTimes(2));
+            expect(pc.signalingState).toBe('stable');
+            expect(f.sent.filter(frame => frame.sdp)).toHaveLength(1);
+        } finally { held.resolve(); await new Promise(resolve => setTimeout(resolve, 0)); }
+        f.advance(125);
+        expect(f.sent.filter(frame => frame.sdp).map(frame => frame.sdp.type)).toEqual(['offer', 'offer']);
     });
 
     it('invalidates queued SDP before an incoming offer performs its native rollback', async () => {
@@ -420,6 +431,116 @@ describe('public-room Block retires only the affected pair', () => {
         const accepted = pc.setRemoteDescription.mock.calls.map(([description]) => description.type);
         held.resolve(); await new Promise(done => setTimeout(done, 0));
         expect(accepted).toEqual(['answer', 'offer']);
+    });
+
+    it.each(['remote description', 'local answer'])('does not create a local offer while an incoming %s is pending', async phase => {
+        const f = await fixture(), pc = f.state.pcs.get('peer').pc, held = deferred();
+        const nativeRemoteEffect = pc.setRemoteDescription.getMockImplementation();
+        const nativeLocalEffect = pc.setLocalDescription.getMockImplementation();
+        if (phase === 'remote description') pc.setRemoteDescription.mockImplementationOnce(async value => {
+            await held.promise; // Native SRD has been invoked, but its effect is pending.
+            return nativeRemoteEffect(value);
+        });
+        else pc.setLocalDescription.mockImplementationOnce(async value => {
+            await nativeLocalEffect(value); // Native answer effect occurs first.
+            await held.promise; // Its completion is still part of handling the offer.
+        });
+        f.incoming({ sdp: { type: 'offer', sdp: 'genuine-peer-offer' } });
+        try {
+            if (phase === 'remote description') {
+                await vi.waitFor(() => expect(pc.setRemoteDescription).toHaveBeenCalledOnce());
+                expect(pc.signalingState).toBe('stable');
+                expect(pc.setLocalDescription).not.toHaveBeenCalled();
+            } else {
+                await vi.waitFor(() => expect(pc.localDescription.type).toBe('answer'));
+                expect(pc.signalingState).toBe('stable');
+                expect(pc.setLocalDescription).toHaveBeenCalledOnce();
+            }
+            const localCalls = pc.setLocalDescription.mock.calls.length;
+            await pc.onnegotiationneeded();
+            expect(pc.setLocalDescription).toHaveBeenCalledTimes(localCalls);
+            expect(f.sent.filter(frame => frame.sdp)).toEqual([]);
+        } finally { held.resolve(); await new Promise(resolve => setTimeout(resolve, 0)); }
+        const afterIncoming = phase === 'local answer' ? ['answer', 'offer'] : ['answer'];
+        await vi.waitFor(() => expect(f.sent.filter(frame => frame.sdp).map(frame => frame.sdp.type)).toEqual(afterIncoming));
+        if (phase === 'remote description') {
+            // Debt raised before answer construction is already represented by
+            // that answer. It must not create a redundant automatic offer.
+            await new Promise(resolve => setTimeout(resolve, 0));
+            expect(f.sent.filter(frame => frame.sdp).map(frame => frame.sdp.type)).toEqual(['answer']);
+            expect(pc.signalingState).toBe('stable');
+            await pc.onnegotiationneeded();
+        } else {
+            // The event after the native answer effect must survive the held
+            // completion and create exactly one offer without another event.
+            expect(pc.setLocalDescription).toHaveBeenCalledTimes(2);
+            expect(pc.signalingState).toBe('have-local-offer');
+        }
+        expect(f.sent.filter(frame => frame.sdp).map(frame => frame.sdp.type)).toEqual(['answer', 'offer']);
+        expect(f.capture).toHaveBeenCalledOnce(); expect(f.localTrack.stop).not.toHaveBeenCalled();
+    });
+
+    it.each(['send', 'block/replacement', 'teardown', 'transport failure'])('keeps a paced answer ahead of deferred negotiation on %s', async action => {
+        let broken = false;
+        const f = await fixture({ clock: { at: 1800000000000 }, onSend: () => !broken });
+        const entry = f.state.pcs.get('peer'), pc = entry.pc, held = deferred();
+        const nativeLocalEffect = pc.setLocalDescription.getMockImplementation();
+        for (let i = 0; i < 8; i++) pc.onicecandidate({ candidate: { toJSON: () => ({ candidate: `answer-budget-${i}` }) } });
+        pc.setLocalDescription.mockImplementationOnce(async value => { await nativeLocalEffect(value); await held.promise; });
+        f.incoming({ sdp: { type: 'offer', sdp: 'genuine-paced-offer' } });
+        try {
+            await vi.waitFor(() => expect(pc.localDescription.type).toBe('answer'));
+            await pc.onnegotiationneeded();
+            expect(pc.setLocalDescription).toHaveBeenCalledOnce();
+        } finally { held.resolve(); await new Promise(resolve => setTimeout(resolve, 0)); }
+        // Completion queues the answer, but does not guarantee server delivery.
+        // Advancing the local description before its raw attempt would silently
+        // invalidate that queued answer's existing SDP epoch/identity guard.
+        expect(pc.setLocalDescription).toHaveBeenCalledOnce();
+        expect(f.sent.filter(frame => frame.sdp)).toEqual([]);
+        if (action === 'block/replacement') { f.policy(['peer']); f.policy([]); expect(f.state.pcs.get('peer')).not.toBe(entry); }
+        if (action === 'teardown') f.room.onLeave();
+        if (action === 'transport failure') broken = true;
+        f.advance(125); await new Promise(resolve => setTimeout(resolve, 0));
+        if (action === 'send') {
+            expect(f.sent.filter(frame => frame.sdp).map(frame => frame.sdp.type)).toEqual(['answer']);
+            expect(pc.setLocalDescription).toHaveBeenCalledTimes(2);
+            f.advance(125);
+            expect(f.sent.filter(frame => frame.sdp).map(frame => frame.sdp.type)).toEqual(['answer', 'offer']);
+            expect(f.capture).toHaveBeenCalledOnce(); expect(f.localTrack.stop).not.toHaveBeenCalled();
+        } else {
+            for (let i = 0; i < 4; i++) f.advance(125);
+            expect(pc.setLocalDescription).toHaveBeenCalledOnce(); expect(pc.close).toHaveBeenCalledOnce();
+            expect(f.sent.filter(frame => frame.sdp).map(frame => frame.sdp.type)).toEqual(action === 'transport failure' ? ['answer'] : []);
+        }
+    });
+
+    it('retains failed local negotiation for a later genuine event without retrying the same failure', async () => {
+        const f = await fixture(), pc = f.state.pcs.get('peer').pc;
+        pc.setLocalDescription.mockRejectedValueOnce(new Error('synthetic native local-description rejection'));
+        await pc.onnegotiationneeded(); await new Promise(resolve => setTimeout(resolve, 0));
+        expect(pc.setLocalDescription).toHaveBeenCalledOnce(); expect(f.sent.filter(frame => frame.sdp)).toEqual([]);
+        await pc.onnegotiationneeded();
+        expect(pc.setLocalDescription).toHaveBeenCalledTimes(2);
+        expect(f.sent.filter(frame => frame.sdp).map(frame => frame.sdp.type)).toEqual(['offer']);
+        expect(f.capture).toHaveBeenCalledOnce(); expect(f.localTrack.stop).not.toHaveBeenCalled();
+    });
+
+    it('keeps retired negotiation debt cleared when native rejection arrives after Block and replacement', async () => {
+        const f = await fixture(), entry = f.state.pcs.get('peer'), third = f.state.pcs.get('third');
+        const pc = entry.pc, held = deferred(), lateNegotiation = pc.onnegotiationneeded;
+        pc.setLocalDescription.mockImplementationOnce(async () => { await held.promise; throw new Error('synthetic obsolete native rejection'); });
+        const work = lateNegotiation();
+        try {
+            expect(pc.setLocalDescription).toHaveBeenCalledOnce();
+            f.policy(['peer']); f.policy([]);
+            expect(f.state.pcs.get('peer')).not.toBe(entry); expect(f.state.pcs.get('third')).toBe(third);
+        } finally { held.resolve(); await work; }
+        expect(entry.offerNeeded).toBe(false);
+        await lateNegotiation();
+        expect(pc.setLocalDescription).toHaveBeenCalledOnce(); expect(pc.close).toHaveBeenCalledOnce();
+        expect(f.sent.filter(frame => frame.sdp)).toEqual([]);
+        expect(f.capture).toHaveBeenCalledOnce(); expect(f.localTrack.stop).not.toHaveBeenCalled();
     });
 
     it('does not publish an obsolete generated offer after a newer remote offer has been answered', async () => {

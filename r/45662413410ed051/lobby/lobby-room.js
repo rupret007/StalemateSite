@@ -608,22 +608,42 @@
             const channel = state.ch, generation = roomGeneration;
             const pc = new RTCPeerConnection({ iceServers: state.ice || STUN });
             const polite = (state.myId || '') > id;
-            const entry = { pc, polite, makingOffer: false, settingRemoteAnswer: false, ignoreOffer: false, descriptionEpoch: 0, pendingIce: [], stream: new MediaStream() };
+            const entry = { pc, polite, makingOffer: false, offerNeeded: false, remoteOfferJobs: 0, settingRemoteAnswer: false, ignoreOffer: false, descriptionEpoch: 0, pendingIce: [], stream: new MediaStream() };
             entry.current = () => generation === roomGeneration && state.ch === channel && app.active === channel && state.pcs.get(id) === entry && mediaPeerAllowed(id);
-            entry.signal = message => { if (entry.current()) send({ t: 'act', ch: channel, kind: 'rtc', to: id, ...message }, entry); };
+            entry.signal = message => {
+                if (entry.current()) send({ t: 'act', ch: channel, kind: 'rtc', to: id, ...message }, entry,
+                    message.sdp?.type === 'answer' ? () => entry.pumpOffer() : null);
+            };
             state.pcs.set(id, entry);
             pc.onicecandidate = (e) => { if (entry.current() && e.candidate) entry.signal({ ice: e.candidate.toJSON() }); };
             pc.ontrack = (e) => { if (!entry.current()) { e.track.stop(); return; } entry.stream.addTrack(e.track); layoutTiles(); };
-            pc.onnegotiationneeded = async () => {
+            entry.pumpOffer = async () => {
+                // Accepted remote offers own SRD through answer publication.
+                // A paced answer must get its raw send attempt before another
+                // local description invalidates its queued SDP identity/epoch.
+                if (!entry.current() || !entry.offerNeeded || entry.makingOffer || entry.remoteOfferJobs || pc.signalingState !== 'stable'
+                    || activity.queue.some(item => item.entry === entry && item.sdp?.type === 'answer')) return;
+                entry.offerNeeded = false;
+                entry.makingOffer = true;
+                let failed = false;
                 try {
-                    if (!entry.current()) return;
-                    entry.makingOffer = true;
                     const epoch = ++entry.descriptionEpoch;
                     // Let the native operation choose its current offer/answer
                     // atomically; a separately awaited offer can already be stale.
                     await pc.setLocalDescription();
                     if (entry.current() && entry.descriptionEpoch === epoch) entry.signal({ sdp: pc.localDescription.toJSON() });
-                } catch (e) { /* */ } finally { entry.makingOffer = false; }
+                } catch (e) { failed = true; entry.offerNeeded = entry.current(); }
+                finally {
+                    entry.makingOffer = false;
+                    // Keep failure debt for a later genuine event, never a
+                    // same-failure retry loop. New work during await is latched.
+                    if (!failed) entry.pumpOffer();
+                }
+            };
+            pc.onnegotiationneeded = () => {
+                if (!entry.current()) return;
+                entry.offerNeeded = true;
+                return entry.pumpOffer();
             };
             if (state.stream) state.stream.getTracks().forEach((t) => pc.addTrack(t, state.stream));
             // An incoming offer creates its receiver through native SRD. An
@@ -643,20 +663,31 @@
                     const collision = msg.sdp.type === 'offer' && !readyForOffer;
                     entry.ignoreOffer = collision && !entry.polite;
                     if (entry.ignoreOffer) return;
-                    if (msg.sdp.type === 'offer') entry.descriptionEpoch += 1;
+                    const offer = msg.sdp.type === 'offer';
+                    if (offer) { entry.descriptionEpoch += 1; entry.remoteOfferJobs += 1; }
                     const answer = msg.sdp.type === 'answer';
-                    if (answer) entry.settingRemoteAnswer = true;
-                    try { await pc.setRemoteDescription(msg.sdp); }
-                    finally { if (answer) entry.settingRemoteAnswer = false; }
-                    if (!entry.current()) return;
-                    for (const ice of entry.pendingIce.splice(0)) {
-                        try { await pc.addIceCandidate(ice); } catch (_) { /* stale negotiation */ }
+                    let completed = false;
+                    try {
+                        if (answer) entry.settingRemoteAnswer = true;
+                        try { await pc.setRemoteDescription(msg.sdp); }
+                        finally { if (answer) entry.settingRemoteAnswer = false; }
                         if (!entry.current()) return;
-                    }
-                    if (msg.sdp.type === 'offer') {
-                        const epoch = ++entry.descriptionEpoch;
-                        await pc.setLocalDescription();
-                        if (entry.current() && entry.descriptionEpoch === epoch) entry.signal({ sdp: pc.localDescription.toJSON() });
+                        for (const ice of entry.pendingIce.splice(0)) {
+                            try { await pc.addIceCandidate(ice); } catch (_) { /* stale negotiation */ }
+                            if (!entry.current()) return;
+                        }
+                        if (offer) {
+                            // Track changes already pending are covered by this
+                            // native answer. Later events retain separate debt.
+                            entry.offerNeeded = false;
+                            const epoch = ++entry.descriptionEpoch;
+                            await pc.setLocalDescription();
+                            if (entry.current() && entry.descriptionEpoch === epoch) entry.signal({ sdp: pc.localDescription.toJSON() });
+                        }
+                        completed = true;
+                    } finally {
+                        if (offer) entry.remoteOfferJobs -= 1;
+                        if (completed) entry.pumpOffer();
                     }
                 } else if (msg.ice) {
                     if (!pc.remoteDescription) { if (entry.pendingIce.length < 64) entry.pendingIce.push(msg.ice); }
@@ -669,6 +700,7 @@
             const e = state.pcs.get(id);
             state.pcs.delete(id);
             if (e) {
+                e.offerNeeded = false;
                 purgeActivity(e);
                 e.pc.onicecandidate = null; e.pc.ontrack = null; e.pc.onnegotiationneeded = null;
                 e.pendingIce.length = 0;

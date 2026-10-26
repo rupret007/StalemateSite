@@ -44,6 +44,11 @@ tracks once to still-allowed existing receive-only peers when it completes.
 Early ICE may create an empty peer connection while capture is pending. The
 incoming offer creates its receiving transceiver through the native browser;
 the client does not invent a competing receive-only offer during that wait.
+Accepted incoming offers also hold a per-peer operation fence through native
+answer creation. Later negotiation work is retained and starts when that fence
+clears and the answer has received its raw send attempt. This is not a server
+acknowledgement. Block, room exit and transport failure prevent stale work from
+resuming; a native failure does not start a retry loop.
 
 Policy outputs use the existing effect-commit boundary. A failed commit must
 not publish a successful Block, PM closure or changed media policy. Duplicate
@@ -97,6 +102,9 @@ Verify the [demo journey](HANGOUT_DEMO_GUIDE.md) at 375/390px with actual decode
 camera frames before Block, pair teardown, continuing third-peer frames,
 parallel-device/nickname/entry changes and mutual unblock.
 Run the separate pending-capture/early-ICE startup regression at both widths too.
+Cover a pending remote-description operation, deferred camera changes and
+completed later renegotiation. After mutual unblock, require all four visitors'
+twelve directed video paths to be stable, connected and decoding.
 Synthetic RTC in the local SQLite authority proof verifies signaling and storage,
 not camera capture,
 physical media, TURN or WAN connectivity. Existing consent/age safeguards remain
