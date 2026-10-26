@@ -67,6 +67,25 @@ function snapshotNative(meter) {
         transactions: { ...meter.transactions }, overflow: meter.overflow,
         resolverTelemetry: { available: false, reason: 'frozen-captured-authority' } };
 }
+// Diagnostic-only, fixed vocabulary. No error message, key or argument is exported.
+const RETENTION_HEALTH_REASONS = new Set(['none', 'other', 'storage-corrupt', 'storage-unavailable', 'record-capacity', 'record-format',
+    'record-key', 'record-list', 'policy-unavailable', 'invalid-policy', 'invalid-cursor', 'partition-read-capacity',
+    'partition-write-capacity', 'not-authorized', 'participation-unavailable', 'participation-capacity', 'session-unavailable',
+    'maintenance-unavailable', 'policy-not-active', 'reference-conflict', 'invalid-storage-key', 'capacity-or-invalid-state',
+    'lobby-authority-unavailable', 'Invalid participation storage']);
+function retentionHealthDenied(value) {
+    try { return !!value && typeof value === 'object' && Object.getOwnPropertyDescriptor(value, 'ok')?.value === false; }
+    catch { return false; } // Observation must not change an original result.
+}
+function retentionHealthReason(value, thrown = false) {
+    try {
+        for (const key of thrown ? ['partitionReason', 'recordReason', 'reason', 'message'] : ['reason']) {
+            const reason = value && typeof value === 'object' ? Object.getOwnPropertyDescriptor(value, key)?.value : undefined;
+            if (typeof reason === 'string' && RETENTION_HEALTH_REASONS.has(reason)) return reason;
+        }
+        return thrown || retentionHealthDenied(value) ? 'other' : 'none';
+    } catch { return 'other'; } // Never replace an original thrown error.
+}
 const ensure = (condition, label) => { if (!condition) throw Error(label); };
 const denied = () => new Response('local fixture admission denied', { status: 403 });
 const sha = async value => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)))].map(byte => byte.toString(16).padStart(2, '0')).join('');
@@ -202,6 +221,74 @@ export class FixtureLobby extends HangoutLobby {
                 return accepted;
             };
         }
+    }
+    fixtureRetentionHealthEvent(stage, outcome, reason = 'none') {
+        try {
+            if (this.env.FIXTURE_RETENTION_PROOF !== 'retention-v1') return;
+            const trace = this.fixtureRetentionHealthTrace ||= { storageFailedCount: 0, overflow: false, events: [] };
+            if (trace.events.length < 128) trace.events.push({ stage, outcome, reason });
+            else trace.overflow = true;
+        } catch { /* Diagnostic recording cannot alter a production call. */ }
+    }
+    fixtureRetentionHealth() {
+        if (this.env.FIXTURE_RETENTION_PROOF !== 'retention-v1') return undefined;
+        const trace = this.fixtureRetentionHealthTrace ||= { storageFailedCount: 0, overflow: false, events: [] };
+        return { evidenceStorage: ['ready', 'degraded'].includes(this.evidenceStorage) ? this.evidenceStorage : 'other',
+            authorityUnavailable: !!this.authorityUnavailable, storageFailedCount: trace.storageFailedCount,
+            overflow: trace.overflow, events: trace.events.map(event => ({ ...event })) };
+    }
+    storageFailed(...args) {
+        try {
+            if (this.env.FIXTURE_RETENTION_PROOF === 'retention-v1') {
+                const trace = this.fixtureRetentionHealthTrace ||= { storageFailedCount: 0, overflow: false, events: [] };
+                if (trace.storageFailedCount < 65535) trace.storageFailedCount++; else trace.overflow = true;
+                this.fixtureRetentionHealthEvent('storage-failed', 'called');
+            }
+        } catch { /* Always delegate even if diagnostic recording fails. */ }
+        return super.storageFailed(...args);
+    }
+    async start(...args) {
+        this.fixtureRetentionHealthEvent('start', 'called');
+        let result;
+        try { result = await super.start(...args); }
+        catch (error) {
+            // Also observe the constructor's known-empty pre-initialize load.
+            // The real constructor catch and every later caller remain intact.
+            this.fixtureRetentionHealthEvent('start', 'threw', retentionHealthReason(error, true));
+            throw error;
+        }
+        if (this.env.FIXTURE_RETENTION_PROOF !== 'retention-v1') return result;
+        const observe = (original, receiver, stage) => async (...values) => {
+            this.fixtureRetentionHealthEvent(stage, 'called');
+            try {
+                const value = await Reflect.apply(original, receiver, values);
+                const denied = retentionHealthDenied(value);
+                this.fixtureRetentionHealthEvent(stage, denied ? 'returned-denied' : 'returned', retentionHealthReason(value));
+                return value;
+            } catch (error) {
+                this.fixtureRetentionHealthEvent(stage, 'threw', retentionHealthReason(error, true));
+                throw error;
+            }
+        };
+        // The real authority is frozen. A new frozen facade preserves every
+        // other own descriptor/prototype/reference; selected originals receive
+        // the ORIGINAL authority receiver, not a proxy or the facade.
+        if (this.authority) {
+            const original = this.authority, descriptors = Object.getOwnPropertyDescriptors(original);
+            for (const [name, stage] of [['maintainParticipation', 'authority-maintain'], ['due', 'authority-due'], ['schedule', 'authority-schedule']]) {
+                ensure(typeof descriptors[name]?.value === 'function', 'fixture-retention-diagnostic-authority-shape');
+                descriptors[name] = { ...descriptors[name], value: observe(descriptors[name].value, original, stage) };
+            }
+            this.authority = Object.freeze(Object.create(Object.getPrototypeOf(original), descriptors));
+        }
+        if (this.engine) for (const [name, stage] of [['refreshParticipation', 'engine-refresh'], ['tick', 'engine-tick']]) {
+            ensure(typeof this.engine[name] === 'function', 'fixture-retention-diagnostic-engine-shape');
+            this.engine[name] = observe(this.engine[name], this.engine, stage);
+        }
+        for (const [name, stage] of [['pruneLogs', 'prune-logs'], ['refreshPrivateReports', 'private-reports']])
+            this[name] = observe(this[name], this, stage);
+        this.fixtureRetentionHealthEvent('start', 'returned');
+        return result;
     }
     async fixtureIncidentActor(cookie) {
         ensure(!!this.incidentSourceMode, 'fixture-incident-mode-required');
@@ -429,7 +516,7 @@ export class FixtureLobby extends HangoutLobby {
             }
             return { targetLogicalKeysAbsent: logicalAbsent, targetRawManifestsAbsent: manifestAbsent, targetRawPartPrefixesEmpty: partsAbsent,
                 cursorValid: true, cursorWrapped: cursor.after === '', healthyActiveSha256, healthyStoredRowValid: true,
-                handlerHealthy: this.evidenceStorage === 'ready' && !this.authorityUnavailable, ...history };
+                handlerHealthy: this.evidenceStorage === 'ready' && !this.authorityUnavailable, retentionHealth: this.fixtureRetentionHealth(), ...history };
         });
         if (baseline) this.fixtureRetentionBaseline = baseline;
         return result;
@@ -729,6 +816,7 @@ export class FixtureLobby extends HangoutLobby {
             authorityUnavailable: !!this.authorityUnavailable, bindingCount: saved.bindings.length, liveBindingCount: this.liveBindings.size,
             ...(this.participationMode ? { participationRequired: true, participationPolicyPresent: await this.authority.records.transaction(async tx => (await tx.get(PARTICIPATION_POLICY_KEY)) !== undefined), commandReadyAt, sharingStates } : {}),
             ...(this.incidentSourceMode ? { incidentSources } : {}),
+            ...(this.env.FIXTURE_RETENTION_PROOF === 'retention-v1' ? { retentionHealth: this.fixtureRetentionHealth() } : {}),
             durableSessionNicks: saved.state.sessions.connections.map(person => person.nick).sort(),
             engineSessionNicks: this.engine.sessionSnapshot().connections.map(person => person.nick).sort(),
             durableBlockCounts: saved.state.sessions.connections.map(person => ({ nick: person.nick, blocks: person.blocks.length })).sort((a, b) => a.nick.localeCompare(b.nick)),

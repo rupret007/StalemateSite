@@ -75,7 +75,26 @@ and cold read must leave both evidence storage and authority healthy; an alarm
 that returns after marking storage degraded cannot pass. The existing owned
 process kill and fresh native-disk reopen must retain deletion, healthy
 permission and cursor state.
-Only counts, digests and booleans enter the added receipt; signed cookies still
+A plain-retention-only diagnostic observes actual production stages without
+clearing degraded state or changing a result, argument or thrown error. Start
+entry, fulfillment and rejection are recorded around the real `super.start`,
+including the constructor's known-empty pre-initialize rejection; the original
+error is rethrown unchanged. After successful `super.start`, a frozen authority
+facade wraps only maintenance/due/schedule
+and preserves all other property references; those calls retain the original
+authority receiver. Engine refresh/tick and Lobby log/private-report calls
+likewise delegate to their original receivers. The existing `storageFailed`
+method is counted before delegating unchanged. No extra RPC or storage read is
+introduced. Up to 128 fixed stage/outcome/reason observations and an overflow
+flag distinguish existing degradation from a newly failed alarm stage. Unknown
+reasons become `other`; no arbitrary error message/stack, key, identity or body
+is returned. Pre-seed health must already be ready, and existing after-alarm and
+cold-read readiness assertions retain safe diagnostic context on failure. This
+follow-up is observational source only until a fresh run qualifies it; the prior
+19cf handler-health failures remain failed evidence.
+
+Only bounded fixed diagnostic enums/counts plus existing counts, digests and
+booleans enter the added receipt; signed cookies still
 travel solely over the existing private IPC channel. This qualifies the actual
 local alarm **handler** only when its source-bound run passes. It does not prove
 hosted alarm delivery, deadline/SLO guarantees, backup erasure, a new native

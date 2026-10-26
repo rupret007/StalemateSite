@@ -41,6 +41,22 @@ function assertNativeRollback(witness, record) {
     assert.equal(witness.restoredSha256, witness.originalSha256);
     for (const key of ['nativeWriteCompleted', 'stagedChanged', 'nativeTransactionRejected', 'restoredBeforeEngineRecovery']) assert.equal(witness[key], true);
 }
+function assertRetentionHealth(value) {
+    assert.deepEqual(Object.keys(value).sort(), ['authorityUnavailable', 'events', 'evidenceStorage', 'overflow', 'storageFailedCount'].sort());
+    assert.ok(['ready', 'degraded', 'other'].includes(value.evidenceStorage));
+    assert.equal(typeof value.authorityUnavailable, 'boolean'); assert.equal(typeof value.overflow, 'boolean');
+    assert.ok(Number.isSafeInteger(value.storageFailedCount) && value.storageFailedCount >= 0 && value.storageFailedCount <= 65535);
+    assert.ok(Array.isArray(value.events) && value.events.length <= 128);
+    for (const event of value.events) {
+        assert.deepEqual(Object.keys(event).sort(), ['outcome', 'reason', 'stage']);
+        assert.ok(['start', 'storage-failed', 'authority-maintain', 'authority-due', 'authority-schedule', 'engine-refresh', 'engine-tick', 'prune-logs', 'private-reports'].includes(event.stage));
+        assert.ok(['called', 'returned', 'returned-denied', 'threw'].includes(event.outcome));
+        assert.ok(['none', 'other', 'storage-corrupt', 'storage-unavailable', 'record-capacity', 'record-format', 'record-key', 'record-list',
+            'policy-unavailable', 'invalid-policy', 'invalid-cursor', 'partition-read-capacity', 'partition-write-capacity', 'not-authorized',
+            'participation-unavailable', 'participation-capacity', 'session-unavailable', 'maintenance-unavailable', 'policy-not-active',
+            'reference-conflict', 'invalid-storage-key', 'capacity-or-invalid-state', 'lobby-authority-unavailable', 'Invalid participation storage'].includes(event.reason));
+    }
+}
 const hash = path => createHash('sha256').update(readFileSync(path)).digest('hex');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const sources = () => Object.fromEntries([
@@ -986,7 +1002,11 @@ async function runtime(phase, state, nonce) {
             if (RETENTION_PROOF) {
                 // Additional stored-boundary proof after every canonical
                 // assertion. No new visitor, clock override, wait cap or mode flag.
-                const original = afterFault, seeded = await control('retention-seed', { cookie: cookieB });
+                const original = afterFault, beforeSeedHealth = original.retentionHealth;
+                assertRetentionHealth(beforeSeedHealth);
+                assert.equal(beforeSeedHealth.evidenceStorage, 'ready', 'pre-seed evidence health: ' + JSON.stringify(beforeSeedHealth));
+                assert.equal(beforeSeedHealth.authorityUnavailable, false, 'pre-seed authority health: ' + JSON.stringify(beforeSeedHealth));
+                const seeded = await control('retention-seed', { cookie: cookieB });
                 assert.deepEqual(Object.keys(seeded).sort(), ['healthyActiveSha256', 'storedSchemaBoundaryOnly', 'targetCounts', 'targetLogicalKeysPresent', 'targetRawManifestsPresent', 'targetRawPartPrefixesPresent', 'targetRecordBytes'].sort());
                 assert.equal(seeded.storedSchemaBoundaryOnly, true); assert.deepEqual(seeded.targetCounts, [1, 1, 1, 1, 2]);
                 assert.equal(seeded.targetLogicalKeysPresent, 9); assert.ok(seeded.targetRecordBytes > 0 && seeded.targetRecordBytes <= 65536); assert.match(seeded.healthyActiveSha256, /^[a-f0-9]{64}$/);
@@ -999,11 +1019,12 @@ async function runtime(phase, state, nonce) {
                     assert.deepEqual(await control('participation-alarm'), { completed: true }); alarms++;
                     observed = await control('retention-read', { cookie: cookieB });
                     assert.deepEqual(Object.keys(observed).sort(), ['alarmElapsedMs', 'alarmHandlerCompleted', 'cursorValid', 'cursorWrapped', 'handlerHealthy',
-                        'healthyActivePermissionPreserved', 'healthyActiveSha256', 'healthyStoredRowValid', 'onlyExpiredAncillaryRowsRemoved',
+                        'healthyActivePermissionPreserved', 'healthyActiveSha256', 'healthyStoredRowValid', 'onlyExpiredAncillaryRowsRemoved', 'retentionHealth',
                         'targetLogicalKeysAbsent', 'targetRawManifestsAbsent', 'targetRawPartPrefixesEmpty'].sort());
                     assert.equal(observed.healthyActiveSha256, seeded.healthyActiveSha256); assert.equal(observed.healthyStoredRowValid, true);
                     assert.equal(observed.healthyActivePermissionPreserved, true); assert.equal(observed.onlyExpiredAncillaryRowsRemoved, true);
-                    assert.equal(observed.handlerHealthy, true, 'alarm handler left evidence storage or authority degraded');
+                    assertRetentionHealth(observed.retentionHealth);
+                    assert.equal(observed.handlerHealthy, true, 'alarm handler left evidence storage or authority degraded: ' + JSON.stringify(observed.retentionHealth));
                     assert.equal(observed.alarmHandlerCompleted, true); assert.ok(Number.isSafeInteger(observed.alarmElapsedMs) && observed.alarmElapsedMs >= 0);
                     assert.equal(observed.cursorValid, true);
                     if (observed.targetLogicalKeysAbsent === 9 && observed.cursorWrapped) break;
@@ -1016,7 +1037,7 @@ async function runtime(phase, state, nonce) {
                 assert.equal(afterFault.bindingCount, 2); assert.equal(afterFault.liveBindingCount, 2); assert.equal(b.closed, null); assert.equal(c.closed, null);
                 assert.equal(afterFault.logicalScan.requiredRecordsPresent, true); assert.ok(Object.values(afterFault.ordinaryBodiesAbsent).every(Boolean));
                 assert.ok(Object.values(afterFault.rawScan.perChunkOrdinaryBodiesAbsent).every(Boolean));
-                retention = { storedSchemaBoundaryOnly: true, actualAlarmInvocations: alarms, seeded, completed: observed,
+                retention = { storedSchemaBoundaryOnly: true, actualAlarmInvocations: alarms, beforeSeedHealth, seeded, completed: observed,
                     healthyPeerBarriersCompleted: true, originalCanonicalStatePreserved: true, completePrivacyScans: true, noNewVisitorOrGrant: true, hostedSchedulerQualified: false };
             }
             secrets = { revokedCookie: cookieA, liveCookie: cookieB, ...(PARTICIPATION ? { safetyCookie } : {}) };
@@ -1057,10 +1078,11 @@ async function runtime(phase, state, nonce) {
             if (RETENTION_PROOF) {
                 assert.ok(received.retention && received.retention.storedSchemaBoundaryOnly === true);
                 const current = await control('retention-read', { cookie: secrets.liveCookie });
-                assert.deepEqual(Object.keys(current).sort(), ['cursorValid', 'cursorWrapped', 'handlerHealthy', 'healthyActiveSha256', 'healthyStoredRowValid', 'targetLogicalKeysAbsent', 'targetRawManifestsAbsent', 'targetRawPartPrefixesEmpty'].sort());
+                assert.deepEqual(Object.keys(current).sort(), ['cursorValid', 'cursorWrapped', 'handlerHealthy', 'healthyActiveSha256', 'healthyStoredRowValid', 'retentionHealth', 'targetLogicalKeysAbsent', 'targetRawManifestsAbsent', 'targetRawPartPrefixesEmpty'].sort());
                 assert.equal(current.targetLogicalKeysAbsent, 9); assert.equal(current.targetRawManifestsAbsent, 9); assert.equal(current.targetRawPartPrefixesEmpty, 9);
                 assert.equal(current.cursorValid, true); assert.equal(current.cursorWrapped, true); assert.equal(current.healthyStoredRowValid, true);
-                assert.equal(current.handlerHealthy, true, 'cold retention read found degraded evidence storage or authority');
+                assertRetentionHealth(current.retentionHealth);
+                assert.equal(current.handlerHealthy, true, 'cold retention read found degraded evidence storage or authority: ' + JSON.stringify(current.retentionHealth));
                 assert.equal(current.healthyActiveSha256, received.retention.seeded.healthyActiveSha256);
                 retention = { persistedTargetLogicalAndRawAbsence: true, healthyActivePermissionPreserved: true, persistedCursorWrapped: true, current,
                     actualFreshProcessAndDiskRead: true, hostedSchedulerQualified: false };
