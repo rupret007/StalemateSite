@@ -287,7 +287,9 @@ test('People roster: live joins preserve focused connection identity', async ({ 
     let peer, arrival;
     try {
         peer = await guest(browser, baseURL, 'RosterPeer', viewport, relay);
-        const person = visitor.page.locator('[data-nicks]').getByRole('button', { name: 'RosterPeer', exact: true });
+        // CSS adds decoration to the accessible name; exact DOM text still
+        // selects one controlled peer within semantic People buttons.
+        const person = visitor.page.locator('[data-nicks]').getByRole('button').filter({ hasText: /^RosterPeer$/ });
         await expect(person).toBeVisible();
         const connectionId = await visitor.page.evaluate(() =>
             window.__lobby.chans.get('#stalemate').names.find(member => member.nick === 'RosterPeer').id);
@@ -343,7 +345,7 @@ test('People roster: a departed focused member falls back to the People heading'
     try {
         peer = await guest(browser, baseURL, 'RosterLeaving', viewport, relay);
         survivor = await guest(browser, baseURL, 'RosterStillHere', viewport, relay);
-        const person = visitor.page.locator('[data-nicks]').getByRole('button', { name: 'RosterLeaving', exact: true });
+        const person = visitor.page.locator('[data-nicks]').getByRole('button').filter({ hasText: /^RosterLeaving$/ });
         await tabTo(visitor.page, person);
         const connectionId = await visitor.page.evaluate(() =>
             window.__lobby.chans.get('#stalemate').names.find(member => member.nick === 'RosterLeaving').id);
@@ -359,7 +361,7 @@ test('People roster: a departed focused member falls back to the People heading'
         expect(parseFloat(outline.width)).toBeGreaterThanOrEqual(2);
         expect(outline.style).toBe('solid');
         expect(outline.color).not.toBe('rgba(0, 0, 0, 0)');
-        await expect(visitor.page.locator('[data-nicks]').getByRole('button', { name: 'RosterStillHere', exact: true })).toBeVisible();
+        await expect(visitor.page.locator('[data-nicks]').getByRole('button').filter({ hasText: /^RosterStillHere$/ })).toBeVisible();
         await expect(visitor.page.locator('dialog[data-sheet]')).toBeHidden();
         expect(visitor.errors).toEqual([]); expect(survivor.errors).toEqual([]);
     } finally { await survivor?.close(); await peer?.close(); await visitor.close(); }
@@ -372,7 +374,7 @@ test('People roster: a live join preserves the open person dialog and its native
     let peer, arrival;
     try {
         peer = await guest(browser, baseURL, 'RosterSheetPeer', viewport, relay);
-        const person = visitor.page.locator('[data-nicks]').getByRole('button', { name: 'RosterSheetPeer', exact: true });
+        const person = visitor.page.locator('[data-nicks]').getByRole('button').filter({ hasText: /^RosterSheetPeer$/ });
         await tabTo(visitor.page, person);
         const opener = await person.elementHandle();
         const connectionId = await visitor.page.evaluate(() =>
@@ -406,7 +408,7 @@ test('People roster: a departed person dialog returns to the visible heading on 
     try {
         peer = await guest(browser, baseURL, 'RosterDeparting', viewport, relay);
         survivor = await guest(browser, baseURL, 'RosterModalOther', viewport, relay);
-        const person = visitor.page.locator('[data-nicks]').getByRole('button', { name: 'RosterDeparting', exact: true });
+        const person = visitor.page.locator('[data-nicks]').getByRole('button').filter({ hasText: /^RosterDeparting$/ });
         await tabTo(visitor.page, person);
         const opener = await person.elementHandle();
         const connectionId = await visitor.page.evaluate(() =>
@@ -433,7 +435,7 @@ test('People roster: a departed person dialog returns to the visible heading on 
         expect(parseFloat(outline.width)).toBeGreaterThanOrEqual(2);
         expect(outline.style).toBe('solid');
         expect(outline.color).not.toBe('rgba(0, 0, 0, 0)');
-        await expect(visitor.page.locator('[data-nicks]').getByRole('button', { name: 'RosterModalOther', exact: true })).toBeVisible();
+        await expect(visitor.page.locator('[data-nicks]').getByRole('button').filter({ hasText: /^RosterModalOther$/ })).toBeVisible();
         expect(visitor.errors).toEqual([]); expect(survivor.errors).toEqual([]);
     } finally { await survivor?.close(); await peer?.close(); await visitor.close(); }
 });
