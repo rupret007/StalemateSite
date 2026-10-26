@@ -4,6 +4,7 @@ import { betaFetch, HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget }
 import { LOBBY_AUTHORITY_PATH, LOBBY_AUTHORITY_COMMUNITY } from '../../../hangout-worker/src/lobby-session-authority.mjs';
 import { readBeta } from '../../../hangout-worker/src/beta-auth.mjs';
 import { createPartitionedParticipationConsents, PARTICIPATION_POLICY_KEY } from '../../../hangout-worker/src/participation-partitions.mjs';
+import { HELP } from '../../../hangout-worker/src/lobby-core.mjs';
 import { PARTICIPATION_PURPOSES } from '../../../hangout-worker/src/participation-policy.mjs';
 import { createIncidentCases, createIncidentEvidenceCipher, incidentEvidenceDigest, initialIncidentCaseState } from '../../../hangout-worker/src/incident-cases.mjs';
 import { LOBBY_INCIDENT_SOURCE_KEY } from '../../../hangout-worker/src/lobby-incident-sources.mjs';
@@ -14,6 +15,7 @@ const PREFIX = '/_fixture/';
 const INCIDENT_CASES = 'restricted-incident-cases-v1', INCIDENT_APPOINTMENT = 'fixture-incident-appointment', INCIDENT_POLICY = 'fixture-incident-policy';
 const SELECTED_REPORT = 'Native selected report greeting';
 const TRAFFIC_PREFIX = 'ACK probe ephemeral marker ';
+const PRESSURE_PREFIX = 'Pressure probe ephemeral marker ';
 const TRAFFIC_LABELS = ['NativeAlpha', 'NativeBravo', 'NativeCharlie'];
 const ordinaryNeedles = ['Native Stalemate ephemeral greeting', 'Native Rad Dad ephemeral greeting', 'Native remaining visitor greeting', 'native-media-control-no-body-persistence'];
 const ensure = (condition, label) => { if (!condition) throw Error(label); };
@@ -39,7 +41,8 @@ async function readControl(request) {
 export class FixtureLobby extends HangoutLobby {
     constructor(state, env) {
         const control = { faultKey: '', tripped: false, nativeWriteCompleted: false, nativeCalls: 0, history: [], rollbackWitnesses: [],
-            traffic: env.FIXTURE_TRAFFIC_ACKS === 'ack-v1' ? { slots: new Map(), transactionsStarted: 0, transactionsCommitted: 0, transactionsRejected: 0 } : null };
+            traffic: env.FIXTURE_TRAFFIC_ACKS === 'ack-v1' ? { slots: new Map(), transactionsStarted: 0, transactionsCommitted: 0, transactionsRejected: 0 } : null,
+            pressure: env.FIXTURE_PRESSURE_ONLY === 'pressure-v1' ? { slots: new Map(), probeSocket: null, helpAttempts: [], overflow: false, witness: null, nativeSendCalls: 0, nativeSendReturned: 0, initialSequence: 0 } : null };
         const manifestDigest = async (storage, key) => {
             control.nativeCalls++;
             const value = await storage.get(key);
@@ -111,6 +114,33 @@ export class FixtureLobby extends HangoutLobby {
         } });
         super(wrappedState, env);
         this.fixtureControl = control;
+        if (control.pressure) {
+            // Observe, then delegate unchanged to the actual production sender.
+            // No injected frames, attachment edits or replacement allowances.
+            const nativeSend = this.delivery.send.bind(this.delivery);
+            this.delivery.send = (socket, payload) => {
+                const meter = control.pressure, selected = socket === meter.probeSocket;
+                const saved = selected ? socket.deserializeAttachment()?.delivery : null;
+                const atCapacity = saved?.enabled === true && saved.sizes.length === 128;
+                const prior = selected ? this.delivery.snapshot() : null, nativeCallsBefore = meter.nativeSendCalls;
+                const accepted = nativeSend(socket, payload);
+                if (selected && payload.t === 'notice') {
+                    if (meter.helpAttempts.length < 151) meter.helpAttempts.push({ index: HELP.indexOf(payload.text), accepted: accepted === true });
+                    else meter.overflow = true;
+                }
+                const after = selected ? this.delivery.snapshot() : null;
+                if (selected && !meter.witness && atCapacity && accepted === false && after.pressureCloses === prior.pressureCloses + 1) {
+                    meter.witness = { sequence: saved.seq, acknowledged: saved.ack, pendingFrames: saved.sizes.length,
+                        pendingBytes: saved.sizes.reduce((sum, bytes) => sum + bytes, 0), controls: saved.control.count,
+                        refusedKind: payload.t, refusedHelpIndex: payload.t === 'notice' ? HELP.indexOf(payload.text) : -1,
+                        pressureClosesBefore: prior.pressureCloses, pressureClosesAfter: after.pressureCloses,
+                        nativeSendCallsBefore: nativeCallsBefore, nativeSendCallsAfter: meter.nativeSendCalls,
+                        pendingFramesBefore: prior.pendingFrames, pendingFramesAfter: after.pendingFrames,
+                        pendingBytesBefore: prior.pendingBytes, pendingBytesAfter: after.pendingBytes };
+                }
+                return accepted;
+            };
+        }
     }
     async fixtureIncidentActor(cookie) {
         ensure(!!this.incidentSourceMode, 'fixture-incident-mode-required');
@@ -243,6 +273,92 @@ export class FixtureLobby extends HangoutLobby {
         const result = await f.ledger.change(proof, { expectedRevision: subject.revision, purposes: subject.purposes.filter(purpose => purpose !== 'camera') });
         f.guardians.delete(proof); ensure(result.state === 'authorized', 'fixture-reduction-refused'); return { reduced: true };
     }
+    async fixturePressureRegister(cookie) {
+        const meter = this.fixtureControl.pressure;
+        ensure(this.env.FIXTURE_PRESSURE_ONLY === 'pressure-v1' && meter && this.participationMode && !this.incidentSourceMode, 'fixture-pressure-mode-required');
+        ensure(!meter.probeSocket && meter.slots.size === 0, 'fixture-pressure-registration-once');
+        const identity = await this.fixtureParticipant(cookie), current = this.engine.sessionSnapshot().connections;
+        ensure(current.length === 3 && current.every(person => !person.account)
+            && TRAFFIC_LABELS.every(label => current.filter(person => person.nick === label).length === 1), 'fixture-pressure-three-guests-required');
+        const candidates = [...this.liveBindings.values()].filter(binding => `s_${binding.betaSid}` === identity.principalRef);
+        ensure(candidates.length === 1 && current.find(person => person.id === candidates[0].id)?.nick === 'NativeCharlie', 'fixture-pressure-probe-current-SID-required');
+        const sockets = this.state.getWebSockets().filter(socket => socket.readyState === 1 && socket.deserializeAttachment()?.id === candidates[0].id);
+        ensure(sockets.length === 1, 'fixture-pressure-probe-one-socket');
+        for (const person of current) meter.slots.set(person.id, TRAFFIC_LABELS.indexOf(person.nick));
+        meter.probeSocket = sockets[0];
+        const nativeSocketSend = meter.probeSocket.send.bind(meter.probeSocket);
+        meter.initialSequence = meter.probeSocket.deserializeAttachment().delivery.seq;
+        const observedSend = raw => { meter.nativeSendCalls++; const result = nativeSocketSend(raw); meter.nativeSendReturned++; return result; };
+        // Exact pass-through observation on this one native socket. A runtime
+        // that refuses this instrumentation must fail, never fake the witness.
+        meter.probeSocket.send = observedSend;
+        ensure(meter.probeSocket.send === observedSend, 'fixture-native-send-observation-unavailable');
+        return { registeredCurrentGuest: true, helpCount: HELP.length, helpDigests: await Promise.all(HELP.map(sha)) };
+    }
+    fixturePressureMetrics() {
+        const meter = this.fixtureControl.pressure;
+        ensure(this.env.FIXTURE_PRESSURE_ONLY === 'pressure-v1' && meter?.probeSocket && meter.slots.size === 3
+            && this.participationMode && !this.incidentSourceMode, 'fixture-pressure-mode-required');
+        const current = this.engine.sessionSnapshot().connections;
+        ensure(current.length <= 3 && current.every(person => !person.account && meter.slots.has(person.id) && this.liveBindings.has(person.id)), 'fixture-pressure-current-guests-required');
+        const sockets = current.map(person => {
+            const selected = this.state.getWebSockets().filter(socket => socket.readyState === 1 && socket.deserializeAttachment()?.id === person.id);
+            ensure(selected.length === 1, 'fixture-pressure-current-socket-required');
+            const { delivery, controlGrant } = selected[0].deserializeAttachment();
+            ensure(delivery?.enabled === true && delivery.negotiated === true && Array.isArray(delivery.sizes), 'fixture-pressure-native-state-required');
+            return { slot: meter.slots.get(person.id), sequence: delivery.seq, acknowledged: delivery.ack, pendingFrames: delivery.sizes.length,
+                pendingBytes: delivery.sizes.reduce((sum, bytes) => sum + bytes, 0), controls: delivery.control.count,
+                remainingControls: controlGrant?.remaining ?? 0 };
+        }).sort((a, b) => a.slot - b.slot);
+        return { sockets, liveBindingCount: this.liveBindings.size, engineConnections: current.length,
+            delivery: this.delivery.snapshot(), controlBudget: this.controlBudget.snapshot(), nativeStorageMethodCalls: this.fixtureControl.nativeCalls,
+            helpAttempts: meter.helpAttempts.map(value => ({ ...value })), overflow: meter.overflow,
+            nativeProbeSends: { initialSequence: meter.initialSequence, calls: meter.nativeSendCalls, returned: meter.nativeSendReturned },
+            witness: meter.witness ? { ...meter.witness } : null };
+    }
+    fixtureInstallCloseDiagnostic() {
+        const meter = this.fixtureControl.traffic;
+        if (this.env.FIXTURE_CLOSE_DIAGNOSTIC !== 'close-v1' || !meter || meter.closeDiagnostic) return;
+        const diagnostic = meter.closeDiagnostic = { ordinal: 0, events: [], overflow: false };
+        const observe = (phase, id, result, threw = false) => {
+            try {
+                const people = this.engine.sessionSnapshot().connections;
+                const known = ['participation-busy', 'participation-capacity', 'participation-denied', 'participation-unavailable', 'session-unavailable'];
+                const event = { ordinal: Math.min(33, diagnostic.ordinal + 1), phase, slot: meter.slots.get(id) ?? -1,
+                    engineCount: people.length, emptyNickCount: people.filter(person => person.nick === '').length,
+                    targetPresent: people.some(person => person.id === id), liveBindingCount: this.liveBindings.size,
+                    targetLive: this.liveBindings.has(id), threw, resultObserved: phase.endsWith('-end') || threw,
+                    returnedUndefined: result === undefined, resultOk: typeof result?.ok === 'boolean' ? result.ok : null,
+                    reason: typeof result?.reason !== 'string' ? 'absent' : known.includes(result.reason) ? result.reason : 'unclassified' };
+                diagnostic.ordinal = event.ordinal;
+                if (diagnostic.events.length < 32) diagnostic.events.push(event); else diagnostic.overflow = true;
+            } catch { diagnostic.overflow = true; } // Observation must never replace actual behavior/results.
+        };
+        const disconnect = this.engine.disconnect.bind(this.engine);
+        this.engine.disconnect = async (...args) => {
+            observe('disconnect-start', args[0]);
+            try { const result = await disconnect(...args); observe('disconnect-end', args[0], result); return result; }
+            catch (error) { observe('disconnect-throw', args[0], undefined, true); throw error; }
+        };
+        const original = this.authority;
+        // The actual authority is frozen: a get-proxy cannot override its
+        // nonconfigurable data methods. This fixture-only facade retains every
+        // original value/closure and delegates the one observed method exactly.
+        this.authority = Object.freeze({ ...original, unbind: async (...args) => {
+            observe('unbind-start', args[0]);
+            try { const result = await original.unbind(...args); observe('unbind-end', args[0], result); return result; }
+            catch (error) { observe('unbind-throw', args[0], undefined, true); throw error; }
+        } });
+    }
+    fixtureCloseDiagnosticMark() {
+        const diagnostic = this.fixtureControl.traffic?.closeDiagnostic;
+        if (!diagnostic || this.env.FIXTURE_CLOSE_DIAGNOSTIC !== 'close-v1') return null;
+        try {
+            const people = this.engine.sessionSnapshot().connections;
+            return { ordinal: diagnostic.ordinal, engineCount: people.length,
+                emptyNickCount: people.filter(person => person.nick === '').length, liveBindingCount: this.liveBindings.size };
+        } catch { return { ordinal: diagnostic.ordinal, observationUnavailable: true }; }
+    }
     fixtureTrafficMetrics() {
         const meter = this.fixtureControl.traffic;
         ensure(this.env.FIXTURE_TRAFFIC_ACKS === 'ack-v1' && meter && this.participationMode && !this.incidentSourceMode, 'fixture-traffic-mode-required');
@@ -256,6 +372,7 @@ export class FixtureLobby extends HangoutLobby {
             for (const person of current) meter.slots.set(person.id, TRAFFIC_LABELS.indexOf(person.nick));
         }
         ensure(meter.slots.size === 3 && current.every(person => meter.slots.has(person.id) && this.liveBindings.has(person.id)), 'fixture-traffic-current-bindings-required');
+        this.fixtureInstallCloseDiagnostic();
         const sockets = current.map(person => {
             const matches = this.state.getWebSockets().filter(socket => socket.readyState === 1 && socket.deserializeAttachment()?.id === person.id);
             ensure(matches.length === 1, 'fixture-traffic-current-socket-required');
@@ -272,8 +389,11 @@ export class FixtureLobby extends HangoutLobby {
             transactions: { started: meter.transactionsStarted, committed: meter.transactionsCommitted, rejected: meter.transactionsRejected } };
     }
     async fixtureInspect() {
-        const needles = [...ordinaryNeedles, ...(this.env.FIXTURE_TRAFFIC_ACKS === 'ack-v1' ? [TRAFFIC_PREFIX] : [])];
+        const needles = [...ordinaryNeedles, ...(this.env.FIXTURE_TRAFFIC_ACKS === 'ack-v1' ? [TRAFFIC_PREFIX] : []),
+            ...(this.env.FIXTURE_PRESSURE_ONLY === 'pressure-v1' ? [PRESSURE_PREFIX] : [])];
+        const beforeLoad = this.fixtureCloseDiagnosticMark();
         const saved = await this.authority.load();
+        const afterLoad = this.fixtureCloseDiagnosticMark();
         let commandReadyAt, sharingStates, incidentSources;
         if (this.participationMode) {
             const current = this.engine.sessionSnapshot().connections, buckets = new Map(this.engine.abuseSnapshot().buckets), at = Date.now();
@@ -346,7 +466,12 @@ export class FixtureLobby extends HangoutLobby {
             logicalScan, rawScan: { rows, bytes, perChunkOrdinaryBodiesAbsent: rawAbsent },
             faultHistory: [...this.fixtureControl.history],
             nativeRollbackWitnesses: this.fixtureControl.rollbackWitnesses.map(item => ({ ...item })),
-            fault: { tripped: this.fixtureControl.tripped, nativeWriteCompleted: this.fixtureControl.nativeWriteCompleted } };
+            fault: { tripped: this.fixtureControl.tripped, nativeWriteCompleted: this.fixtureControl.nativeWriteCompleted },
+            ...(beforeLoad ? { closeDiagnostic: { beforeLoad, afterLoad, beforeReturn: this.fixtureCloseDiagnosticMark(),
+                loadedSessionCount: saved.state.sessions.connections.length,
+                loadedEmptyNickCount: saved.state.sessions.connections.filter(person => person.nick === '').length,
+                loadedBindingCount: saved.bindings.length, overflow: this.fixtureControl.traffic.closeDiagnostic.overflow,
+                events: this.fixtureControl.traffic.closeDiagnostic.events.map(event => ({ ...event })) } } : {}) };
     }
     async fetch(request) {
         const path = new URL(request.url).pathname;
@@ -355,6 +480,7 @@ export class FixtureLobby extends HangoutLobby {
         const body = await readControl(request); if (!body) return denied();
         await this.ready;
         if (path === PREFIX + 'traffic-metrics' && this.env.FIXTURE_TRAFFIC_ACKS !== 'ack-v1') return denied();
+        if (['pressure-register', 'pressure-metrics'].includes(path.slice(PREFIX.length)) && this.env.FIXTURE_PRESSURE_ONLY !== 'pressure-v1') return denied();
         if (path === PREFIX + 'participation-alarm' && this.participationMode && Object.keys(body).length === 0) {
             await this.alarm(); return Response.json({ completed: true });
         }
@@ -363,6 +489,8 @@ export class FixtureLobby extends HangoutLobby {
                 if (['incident-initialize', 'incident-preserve', 'incident-read'].includes(path.slice(PREFIX.length))) return Response.json(await this.fixtureIncident(path.slice(PREFIX.length), body));
                 if (['participation-policy', 'participation-grant', 'participation-reduce'].includes(path.slice(PREFIX.length))) return Response.json(await this.fixtureParticipation(path.slice(PREFIX.length), body));
                 if (path === PREFIX + 'inspect' && Object.keys(body).length === 0) return Response.json(await this.fixtureInspect());
+                if (path === PREFIX + 'pressure-register' && Object.keys(body).join(',') === 'cookie') return Response.json(await this.fixturePressureRegister(body.cookie));
+                if (path === PREFIX + 'pressure-metrics' && Object.keys(body).length === 0) return Response.json(this.fixturePressureMetrics());
                 if (path === PREFIX + 'traffic-metrics' && Object.keys(body).length === 0) return Response.json(this.fixtureTrafficMetrics());
                 if (path === PREFIX + 'fault' && (Object.keys(body).join(',') === 'room' && body.room === '#art-native-canvas'
                     || Object.keys(body).join(',') === 'record' && body.record === 'sessions')) {
@@ -385,11 +513,12 @@ export default { async fetch(request, env) {
     if (url.pathname.startsWith(PREFIX)) {
         const body = await readControl(request); if (!body) return denied();
         if (url.pathname === PREFIX + 'traffic-metrics' && env.FIXTURE_TRAFFIC_ACKS !== 'ack-v1') return denied();
+        if (['pressure-register', 'pressure-metrics'].includes(url.pathname.slice(PREFIX.length)) && env.FIXTURE_PRESSURE_ONLY !== 'pressure-v1') return denied();
         if (url.pathname === PREFIX + 'initialize' && Object.keys(body).length === 0) {
             // Explicit fixture lifecycle action; betaFetch never forwards it.
             return stub.fetch(new Request(ORIGIN + LOBBY_AUTHORITY_PATH + 'initialize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }));
         }
-        if (['traffic-metrics', 'inspect', 'fault', 'participation-policy', 'participation-grant', 'participation-reduce', 'participation-alarm', 'incident-initialize', 'incident-preserve', 'incident-read'].includes(url.pathname.slice(PREFIX.length))) return stub.fetch(new Request(request.url, {
+        if (['pressure-register', 'pressure-metrics', 'traffic-metrics', 'inspect', 'fault', 'participation-policy', 'participation-grant', 'participation-reduce', 'participation-alarm', 'incident-initialize', 'incident-preserve', 'incident-read'].includes(url.pathname.slice(PREFIX.length))) return stub.fetch(new Request(request.url, {
             method: 'POST', headers: request.headers, body: JSON.stringify(body)
         }));
         if (url.pathname === PREFIX + 'egress-probe' && Object.keys(body).length === 0) {

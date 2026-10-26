@@ -194,6 +194,18 @@ jobs:
           printf '%s\n' "$status" > runtime-proof-artifacts/lobby-traffic-acks-runtime.exit-code.txt
           exit "$status"
 
+      - name: Prove native non-ACK pressure isolation and cold recovery
+        shell: bash
+        run: |
+          set +e
+          npm run --silent test:lobby-session-runtime -- --participation --pressure-only > runtime-proof-artifacts/lobby-pressure-runtime.stdout.log 2> runtime-proof-artifacts/lobby-pressure-runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/lobby-pressure-runtime.stdout.log
+          cat runtime-proof-artifacts/lobby-pressure-runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/lobby-pressure-runtime.exit-code.txt
+          exit "$status"
+
       - name: Prove public report source composition with synthetic incident authority
         shell: bash
         run: |

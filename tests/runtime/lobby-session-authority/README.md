@@ -301,3 +301,87 @@ neither isolated workerd CPU/SQLite latency, physical browser/WAN behavior, a
 150-native-client throughput tier, a soak, hosted capacity/cost, nor guardian or
 provider qualification. The source-bound receipt reports no cookies, identities
 or message-body arrays in the probe metrics.
+
+
+## Separate native non-ACK pressure proof
+
+```sh
+npm run test:lobby-session-runtime -- --participation --pressure-only
+```
+
+This optional mode uses a fresh owned namespace and refuses incident/traffic-ACK
+flags. It does **not** claim the original nine-plus-three checks, two faults,
+Delta4401 or Echo reporting/Stop journey; the five existing commands keep those
+unchanged. This mode has its own three real cookie/SID-bound C3 guests and a
+one-binding process-loss checkpoint, all within the existing five lifetime
+synthetic consent-subject/four-current-guest fixture bounds. No production quota,
+TTL, deadline, provider or application source is changed. The existing native
+workflow runs this separate command and retains its exit status, stdout/stderr
+and source-bound diagnostics within the unchanged job deadline.
+
+Two guests negotiate transport v1 and use the existing frontend ACK pacing. A
+third also negotiates v1 and validates/hashes the same contiguous raw envelope
+stream, but never schedules or sends an ACK. Initial unsequenced frames are still
+restricted to device/hello. Setting transport to legacy would test a different
+512-frame allowance and is not used here.
+
+At most fifteen fresh real `/help` commands produce production HELP notices.
+The first nine sends wait at least25ms each, then sends wait at least1,100ms;
+hello's command token and the unchanged ten-command/one-per-second bucket stay
+in force. The runner validates the actual notice digests and fixture-observed
+production HELP indices, including a permitted final prefix at pressure close.
+Refusal/error chatter cannot qualify. It stops sending at the first actual
+close/CLOSING state, with no refused-action retry or manufactured output.
+
+Nonce-only registration derives the probe from its actual HMAC-verified current
+cookie and real binding. The Worker adds a bounded pass-through observer to the
+actual production delivery sender and that one native socket's `send`: unchanged
+payloads still go through their original functions. At the refused129th envelope,
+the real attachment must show sequence128, ACK0,128 pending entries, and bounded
+bytes; the production pressure counter must increase exactly once, native send
+must not be invoked, and aggregate pending credit must fall by the exact probe
+window. The received raw sequence1..128 and actual completed native sends must
+agree. If a runtime does not permit that read-only native-send instrumentation,
+this fixture fails rather than substituting fake evidence. Only indices, counts,
+lengths, numeric slots and digests are reported; no new durable fixture records,
+transcript, cookies, device IDs or principal fields are added.
+
+Healthy guests publish and ACK before/during/after pressure at the real per-author
+slow-mode pace. Only the probe may close4413. Its engine and durable binding must
+actually retire before a later stage, not merely disappear from the client.
+Native control consumption and saved prepaid remainders must reconcile for the
+healthy sockets. Real logout then closes one healthy guest4401 and rejects cookie
+state/upgrade replay; the other continues while both departed sockets receive
+no new frames. Current logical/raw scans require no unselected marker retention
+and no reports are created in this mode.
+
+Exactly one healthy binding remains at the pressure-only checkpoint. The parent
+kills that owned runtime without first disposing the visitors. Fresh-process
+recovery retires the missing socket's old binding, keeps the revoked cookie
+denied and lets the still-current SID establish a **new** C3 binding without old
+chat. It does not claim the old binding survived. Normal close1000, runtime
+disposal, owned-process retirement and temporary-state removal stay required.
+
+All60s child/6s waits,2MiB/2,000-frame Visitor bounds and production128-frame/
+16MiB per-socket and8,192-frame/32MiB global windows remain. The result is local
+Node/Miniflare/native application-ACK credit isolation, not physical slow TCP,
+browser suspension, shared high-fanout capacity, WAN,150-native scale, soak,
+hosted cost/SLO or real guardian/provider qualification. No pressure execution is
+implied by source or syntax checks alone.
+
+
+## Explicit close-order diagnostic (not qualification)
+
+`npm run --silent test:lobby-session-runtime -- --participation --traffic-acks
+--diagnose-close` permits one explicitly selected observational mode. Only after
+engine initialization, its first traffic-metrics call installs pass-through
+observers on the real engine disconnect and authority unbind. They preserve the
+actual returns/throws and add no storage operations. At most32 anonymous numeric/
+allowlisted events and an overflow flag record engine/empty-nickname/live counts,
+result status and ordering. Inspection additionally marks before/after load and
+return. On a checkpoint mismatch, the existing exact assertion includes this
+bounded metadata; its predicate, wait and all limits remain unchanged. No IDs,
+cookies, bodies or raw error stacks enter the observer metadata. A passing run
+means no reproduction in that instrumented run, not a close-retirement fix or
+normal-mode/overall qualification. The canonical six modes do not install these
+observers when the diagnostic flag is absent.
