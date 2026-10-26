@@ -35,7 +35,7 @@
   if (reduce) document.documentElement.classList.add('stalemate-reduced');
 })();
 
-/* Game over: Listen to Manic + Oct 24 show line + Share score (Web Share API, image pre-rendered so iOS keeps the tap). */
+/* Band result links; retain legacy sharing only when the shared result UI is absent. */
 (function () {
   'use strict';
   var end = document.getElementById('endScreen');
@@ -43,9 +43,10 @@
   if (!end || !restart) return;
   var box = document.createElement('div');
   box.className = 'stalemate-end';
+  var sharedResult = !!end.querySelector('.suite-result-share');
   box.innerHTML =
     '<a class="stalemate-end__listen" href="../#home">Listen to Manic</a>' +
-    '<button type="button" class="stalemate-end__share" id="stalemateShare">Share score</button>' +
+    (sharedResult ? '' : '<button type="button" class="stalemate-end__share" id="stalemateShare">Share score</button>') +
     '<p class="stalemate-end__show" data-next-show hidden data-starts-at="2026-10-24T16:45:00-05:00">See Stalemate live: Sat, Oct 24, 4:45 PM, Los Amigo’s, Plano · <a class="stalemate-end__showlink" href="https://rockinoctober.com" target="_blank" rel="noopener noreferrer">Come see us live, Oct 24</a></p>';
   restart.insertAdjacentElement('afterend', box);
   if (window.StalemateCountdown) window.StalemateCountdown.start(document);
@@ -53,6 +54,7 @@
   if (showLink) showLink.addEventListener('click', function () {
     if (typeof window.smTrack === 'function') window.smTrack('gameover-turdanoid-show');
   });
+  if (sharedResult) return;
   var shareBtn = box.querySelector('#stalemateShare');
   var status = document.createElement('p');
   status.className = 'stalemate-end__status';

@@ -13,6 +13,9 @@
   <link rel="stylesheet" href="assets/turdsuite.css">
 <link rel="stylesheet" href="assets/arcade.css">
   <script src="games/table-continue-core.js"></script>
+  <script src="games/suite-progress-core.js"></script>
+  <script src="assets/suite-progress.js"></script>
+  <script src="assets/suite-share.js"></script>
   <script src="games/suite-dialog-focus.js"></script>
   <script src="assets/turdsuite.js"></script>
   <!-- Bot strength follows turdsuite_difficulty_v1 / Suite.difficulty (see turdspades-client.js). -->
@@ -177,7 +180,7 @@
       max-height:0;overflow:hidden;opacity:0;padding-top:0;padding-bottom:0;
       border-bottom-width:0;transition:max-height .28s ease,opacity .2s ease,padding .2s ease;
     }
-    .stats.ts-details-drawer.open{max-height:220px;opacity:1;padding:8px 12px;border-bottom-width:1px}
+    .stats.ts-details-drawer.open{max-height:220px;overflow-y:auto;opacity:1;padding:8px 12px;border-bottom-width:1px}
     /* ---------- HUD stat tiles (glass) ---------- */
     .stats {
       padding: 8px 12px;
@@ -886,7 +889,7 @@
     .ts-score-strip .us, .ts-score-strip .them { display:block; }
     .ts-score-strip .us em, .ts-score-strip .them em { font-size:.64rem; letter-spacing:0; }
     .stats.ts-details-drawer { display:none; }
-    .stats.ts-details-drawer.open { display:grid; position:absolute; z-index:14; top:68px; left:8px; right:8px; max-height:220px; padding:12px; background:#0b221a; border:1px solid var(--edge); border-radius:12px; }
+    .stats.ts-details-drawer.open { overflow-y:auto; display:grid; position:absolute; z-index:14; top:68px; left:8px; right:8px; max-height:220px; padding:12px; background:#0b221a; border:1px solid var(--edge); border-radius:12px; }
     .message { flex:none; height:38px; margin:0; padding:7px 14px; font-size:.74rem; line-height:24px; white-space:nowrap; text-overflow:ellipsis; }
     .message::after { display:none; }
     .table.table-arena { flex:1; min-height:0; margin:6px 10px 8px; padding:10px; display:grid; grid-template-columns:110px minmax(0,1fr) 110px; grid-template-rows:64px minmax(0,1fr) auto; gap:4px; overflow:hidden; }
@@ -1116,6 +1119,7 @@
   </style>
 <link rel="stylesheet" href="assets/mobile-fit.css">
 <script src="assets/mobile-fit.js" defer></script>
+<link rel="stylesheet" href="assets/suite-progress.css">
 </head>
 <body class="suite-ambient suite-no-zoom arcade" data-arcade-game="turdspades" data-suite-no-difficulty="1">
   <div class="guide" id="guide" role="dialog" aria-modal="true" aria-label="Spades rules">
@@ -1169,6 +1173,8 @@
       <div class="stat"><div class="k">West + East</div><div class="v" id="teamBV">0 (bags 0)</div></div>
       <div class="stat"><div class="k">Bids/Tricks</div><div class="v" id="bidTrickV">-</div></div>
       <p id="tsRoundSummary" style="grid-column:1/-1;font-size:.72rem;line-height:1.4"></p>
+      <p id="spadesProgressStatus" class="suite-progress-result" role="status" style="grid-column:1/-1" hidden></p>
+      <div id="spadesResultShare" style="grid-column:1/-1"></div>
     </div>
 
     <div class="message" id="msg" role="status" aria-live="polite">Set your bid to start the hand.</div>
@@ -1501,6 +1507,7 @@
     }
 
     function startMatch() {
+      progressMeta = newCardProgress();
       state.scores = [0, 0];
       state.bags = [0, 0];
       state.round = 0;
@@ -1525,6 +1532,7 @@
       focusSuspendedPlay = false;
       state.round += 1;
       if (state.round > 1) state.dealer = (state.dealer + 1) % 4;
+      beginCardProgressRound();
       resetRoundState();
       state.bidChoice = Number.isInteger(state.bidChoice) ? Math.min(13, Math.max(0, state.bidChoice)) : 4;
       const deck = makeDeck();
@@ -1690,6 +1698,7 @@
     }
 
     function scoreRound(lastTrick) {
+      trackCardProgressDifficulty();
       clearAiTimer();
       const line = [];
       const deltas = [0, 0];
@@ -1730,6 +1739,19 @@
         ? `Match complete. ${winner}`
         : (tiedAtOrAboveTarget ? 'Scores tied above target. Play a tiebreaker round.' : 'Round complete. Press Next Round.');
       setMessage(status, `${line.join(' ')} Last trick: ${lastTrick}`);
+      if (progressMeta?.roundId) {
+        const common = { game: 'turdspades', mode: 'match-250', difficulty: progressMeta.difficulty,
+          target: TARGET, rounds: state.round, team: 'you-north' };
+        progressMeta.pending = [{ ...common, id: progressMeta.roundId, kind: 'round', history: false,
+          outcome: deltas[0] > deltas[1] ? 'win' : deltas[0] < deltas[1] ? 'loss' : 'draw', roundWon: deltas[0] > deltas[1],
+          bid: TEAM[0].reduce((sum, player) => sum + (state.bids[player] || 0), 0),
+          tricks: TEAM[0].reduce((sum, player) => sum + state.tricks[player], 0) }];
+        if (state.phase === 'matchEnd') progressMeta.pending.push({ ...common, id: progressMeta.id, kind: 'match',
+          outcome: state.scores[0] > state.scores[1] ? 'win' : 'loss', matchWon: state.scores[0] > state.scores[1],
+          playerScore: state.scores[0], opponentScore: state.scores[1] });
+        persistTable();
+        publishCardProgress();
+      }
       tsEvent('round-scored', {
         lines: line,
         deltaUs: deltas[0],
@@ -1898,10 +1920,64 @@
       el.sortRank.disabled = state.phase === 'matchEnd';
     }
 
+    // Optional progress is independent of the legacy game/stat save keys.
+    let progressMeta = null;
+    const cardResultShare = window.SuiteShare?.create({ host: document.getElementById('spadesResultShare'), game: 'turdspades' });
+    function cardProgressDifficulty() { return window.Suite?.difficulty?.get?.() || 'normal'; }
+    function newCardProgress(legacy = false) {
+      const id = window.SuiteProgress?.newRunId('turdspades');
+      return id ? { v: 1, id, difficulty: legacy ? 'unknown' : cardProgressDifficulty(), pending: [] } : null;
+    }
+    function trackCardProgressDifficulty() {
+      if (!progressMeta || !(state.phase !== 'matchEnd') || ['mixed', 'unknown'].includes(progressMeta.difficulty)) return;
+      if (progressMeta.difficulty !== cardProgressDifficulty()) progressMeta.difficulty = 'mixed';
+    }
+    function clearCardProgressResult() {
+      cardResultShare?.setResult(null);
+      const status = document.getElementById('spadesProgressStatus');
+      status.textContent = ''; status.hidden = true;
+    }
+    function restoreCardProgress(meta, live) {
+      progressMeta = meta && meta.v === 1 && typeof meta.id === 'string'
+        ? JSON.parse(JSON.stringify(meta)) : (live ? newCardProgress(true) : null);
+      if (progressMeta && live && !progressMeta.roundId) {
+        progressMeta.roundId = window.SuiteProgress?.newRunId('turdspades');
+      }
+    }
+    function beginCardProgressRound() {
+      if (!progressMeta) progressMeta = newCardProgress();
+      trackCardProgressDifficulty();
+      if (progressMeta) {
+        progressMeta.roundId = window.SuiteProgress?.newRunId('turdspades');
+        progressMeta.pending = [];
+      }
+      clearCardProgressResult();
+    }
+    function publishCardProgress() {
+      const pending = progressMeta?.pending || [];
+      const earned = [];
+      let storageUnavailable = false;
+      for (const event of pending) {
+        const receipt = window.SuiteProgress?.record(event);
+        if (receipt?.newlyEarned) earned.push(...receipt.newlyEarned);
+        if (receipt?.storageAvailable === false) storageUnavailable = true;
+      }
+      cardResultShare?.setResult(pending.find(event => event.history !== false) || null);
+      const status = document.getElementById('spadesProgressStatus');
+      if (earned.length) {
+        status.textContent = 'Goal complete: ' + earned.map(goal => goal.title).join(' · ');
+        status.hidden = false;
+      } else if (storageUnavailable) {
+        status.textContent = 'Progress could not be saved on this device.';
+        status.hidden = false;
+      }
+    }
+
     function persistTable() {
       if (!window.Suite || !Suite.table) return;
       Suite.table.remember('turdspades.html', {
         kind: 'turdspades',
+        ...(progressMeta ? { progressMeta } : {}),
         v: 1,
         round: state.round,
         dealer: state.dealer,
@@ -1958,6 +2034,7 @@
       state.msg = String(snap.msg || '');
       state.summary = String(snap.summary || '');
       state.lastRoundTone = snap.lastRoundTone || 'neutral';
+      restoreCardProgress(snap.progressMeta, snap.phase !== 'matchEnd');
       state.playedThisRound = Array.isArray(snap.playedThisRound)
         ? snap.playedThisRound.map((c) => ({ id: c.id, suit: c.suit, rank: c.rank }))
         : [];
@@ -1973,6 +2050,7 @@
       }
       focusSuspendedPlay = false;
       render();
+      if (progressMeta?.pending?.length) publishCardProgress();
       if (state.phase === 'bidding' && state.bidTurn !== 0) runBidFlow();
       if (state.phase === 'play' && state.currentPlayer !== 0) scheduleAiIfNeeded(220);
       try { Suite.toast('Picked up where you left off.'); } catch (e) {}
@@ -1980,6 +2058,7 @@
     }
 
     function render() {
+      trackCardProgressDifficulty();
       renderBack(el.northBack, state.hands[2].length);
       renderBack(el.westBack, state.hands[1].length);
       renderBack(el.eastBack, state.hands[3].length);
@@ -2010,6 +2089,11 @@
 
     function bind() {
       const menu = document.getElementById('tsTableMenu');
+      window.Suite?.difficulty?.onChange?.(() => {
+        const previousProgressDifficulty = progressMeta?.difficulty;
+        trackCardProgressDifficulty();
+        if (progressMeta?.difficulty !== previousProgressDifficulty) persistTable();
+      });
       menu.addEventListener('click', (event) => {
         if (event.target.closest('button, a')) menu.open = false;
       });

@@ -13,6 +13,9 @@
   <link rel="stylesheet" href="assets/turdsuite.css">
 <link rel="stylesheet" href="assets/arcade.css">
   <script src="games/table-continue-core.js"></script>
+  <script src="games/suite-progress-core.js"></script>
+  <script src="assets/suite-progress.js"></script>
+  <script src="assets/suite-share.js"></script>
   <script src="assets/turdsuite.js"></script>
   <title>Crappy Eights</title>
   <style>
@@ -565,6 +568,9 @@
     @keyframes ceIdleBob{0%,100%{translate:0 0}50%{translate:0 -3px}}@keyframes ceBlink{0%,44%,48%,100%{transform:scaleY(1)}46%{transform:scaleY(.08)}}@keyframes ceCardTease{0%,100%{translate:0 -2px}50%{translate:0 -10px}}@keyframes ceReact{0%,100%{rotate:0deg}30%{rotate:-9deg}70%{rotate:7deg}}
     .round-trophy{height:88px;margin:4px auto 12px;width:110px;display:none;filter:drop-shadow(0 6px 14px #eeca7966)}.round-trophy.show{display:block}.round-trophy svg{width:100%;height:100%}
     #roundReceipt{margin-top:15px;text-align:left}#roundOverlay .overlay-card{width:min(640px,100%)}#roundOverlay .overlay-flavor{font-size:11px}#roundScoreboard{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;font-size:11px}.round-score{padding:8px 4px;background:#ffffff08;border-radius:7px;text-align:center}.round-score b{display:block;font-size:17px;color:#eeca79;margin-top:5px}
+    /* Result actions remain inside the visible scroll surface above the music strip. */
+    #roundOverlay{bottom:var(--mobile-footer,0px)}
+    #roundOverlay .overlay-card{max-height:calc(100dvh - 40px - var(--mobile-footer,0px));overscroll-behavior:contain}
     #suitChooser[style*="flex"] .suit-grid{animation:ceWheelBloom .4s cubic-bezier(.2,.8,.3,1)}@keyframes ceWheelBloom{from{transform:scale(.78) rotate(-12deg);opacity:.2}to{transform:none;opacity:1}}
     @media(min-width:761px){body{padding:16px 20px;min-height:100dvh}.shell{min-height:calc(100dvh - 32px);display:flex;flex-direction:column}.table{min-height:calc(100dvh - 174px)}.arena{flex:1;min-height:240px;height:auto;max-height:560px}.pile-row{top:48%}.table-stamp{top:47%;width:420px;height:230px}.turn-banner{min-height:40px}.hand-wrap{padding-top:5px}.topbar{margin-bottom:12px}.status{margin-top:2px}#oppCard1,#oppCard3{top:22%}.table-event{top:35%}}
     @media(max-width:760px){.arena{height:255px}.pile-row{top:109px}.table-stamp{top:164px}.opp-card{width:92px}.ce-avatar{width:43px;height:43px}.opp-score{display:none}.opp-cards{height:33px;margin-top:2px}#oppCard1,#oppCard3{top:8px}.opp-card.active::after{font-size:7px;top:-8px;padding:2px 5px}.table-event{top:93px}.topbar{margin-bottom:8px}.topbar p{margin-top:3px}.hud{padding:6px 0;margin-bottom:8px}.table{padding-top:9px;gap:6px}.hand-wrap{padding-top:3px}.hand-head #handRisk{font-size:9px}.hand-head .btn{font-size:9px}.turn-banner{min-height:36px}.turn-banner strong{font-size:14px}.turn-banner span#turnHint{font-size:9px}.drawer-launch{font-size:9px;padding:4px 7px}.turn-banner>div:first-child{min-width:0}.flow-badge{width:28px;height:28px;font-size:22px;line-height:24px}.sidebar{display:flex}.drawer-card{padding:16px}.panel summary span{display:none}.round-trophy{height:65px;margin-bottom:5px}.overlay-card{padding:18px}#roundScoreboard{gap:4px;font-size:10px}.hand-rail.opponent-threat{box-shadow:none}}
@@ -619,6 +625,7 @@
   </style>
 <link rel="stylesheet" href="assets/mobile-fit.css">
 <script src="assets/mobile-fit.js" defer></script>
+<link rel="stylesheet" href="assets/suite-progress.css">
 </head>
 <body class="suite-ambient arcade" data-arcade-game="crapeights">
   <a class="ce-skip" href="#playTable">Skip to card table</a>
@@ -655,6 +662,8 @@
         <h3><span class="h-ico">&#x1F4CA;</span>Scoreboard</h3>
         <div id="roundScoreboard">-</div>
       </div>
+      <p id="eightsProgressStatus" class="suite-progress-result" role="status" hidden></p>
+      <div id="eightsResultShare"></div>
       <div class="overlay-actions">
         <button class="btn hot" id="nextRoundBtn">Next Round</button>
         <button class="btn" id="newMatchOverlayBtn">New Match</button>
@@ -1288,10 +1297,64 @@
       return { id: card.id, suit: card.suit, rank: card.rank };
     }
 
+    // Optional progress is independent of the legacy game/stat save keys.
+    let progressMeta = null;
+    const cardResultShare = window.SuiteShare?.create({ host: document.getElementById('eightsResultShare'), game: 'crapeights' });
+    function cardProgressDifficulty() { return aiDifficulty === 'sharp' ? 'hard' : aiDifficulty; }
+    function newCardProgress(legacy = false) {
+      const id = window.SuiteProgress?.newRunId('crapeights');
+      return id ? { v: 1, id, difficulty: legacy ? 'unknown' : cardProgressDifficulty(), pending: [] } : null;
+    }
+    function trackCardProgressDifficulty() {
+      if (!progressMeta || !(roundActive) || ['mixed', 'unknown'].includes(progressMeta.difficulty)) return;
+      if (progressMeta.difficulty !== cardProgressDifficulty()) progressMeta.difficulty = 'mixed';
+    }
+    function clearCardProgressResult() {
+      cardResultShare?.setResult(null);
+      const status = document.getElementById('eightsProgressStatus');
+      status.textContent = ''; status.hidden = true;
+    }
+    function restoreCardProgress(meta, live) {
+      progressMeta = meta && meta.v === 1 && typeof meta.id === 'string'
+        ? JSON.parse(JSON.stringify(meta)) : (live ? newCardProgress(true) : null);
+      if (progressMeta && live && !progressMeta.roundId) {
+        progressMeta.roundId = window.SuiteProgress?.newRunId('crapeights');
+      }
+    }
+    function beginCardProgressRound() {
+      if (!progressMeta) progressMeta = newCardProgress();
+      trackCardProgressDifficulty();
+      if (progressMeta) {
+        progressMeta.roundId = window.SuiteProgress?.newRunId('crapeights');
+        progressMeta.pending = [];
+      }
+      clearCardProgressResult();
+    }
+    function publishCardProgress() {
+      const pending = progressMeta?.pending || [];
+      const earned = [];
+      let storageUnavailable = false;
+      for (const event of pending) {
+        const receipt = window.SuiteProgress?.record(event);
+        if (receipt?.newlyEarned) earned.push(...receipt.newlyEarned);
+        if (receipt?.storageAvailable === false) storageUnavailable = true;
+      }
+      cardResultShare?.setResult(pending.find(event => event.history !== false) || null);
+      const status = document.getElementById('eightsProgressStatus');
+      if (earned.length) {
+        status.textContent = 'Goal complete: ' + earned.map(goal => goal.title).join(' · ');
+        status.hidden = false;
+      } else if (storageUnavailable) {
+        status.textContent = 'Progress could not be saved on this device.';
+        status.hidden = false;
+      }
+    }
+
     function persistTable() {
       if (!window.Suite || !Suite.table || !players.length) return;
       Suite.table.remember('crapeights.html', {
         kind: 'crapeights',
+        ...(progressMeta ? { progressMeta } : {}),
         v: 1,
         players: players.map((player) => ({
           name: player.name,
@@ -1343,6 +1406,7 @@
       historyLog = Array.isArray(snap.historyLog) ? snap.historyLog.slice(0, 12) : [];
       nextCardId = snap.nextCardId;
       lastOverlay = snap.overlay || null;
+      restoreCardProgress(snap.progressMeta, !snap.overlay?.matchFinished);
       return true;
     }
 
@@ -1368,6 +1432,7 @@
         );
       }
       updateAll();
+      if (!roundActive && progressMeta?.pending?.length) publishCardProgress();
       if (!lastOverlay) {
         applyPendingEffectsAtTurnStart();
         scheduleTurnIfNeeded();
@@ -1377,6 +1442,7 @@
     }
 
     function updateAll() {
+      trackCardProgressDifficulty();
       updateHud();
       renderDiscard();
       renderPlayerHand();
@@ -1540,6 +1606,7 @@
       if (ui.roundOverlay) ui.roundOverlay.style.display = 'flex';
       syncDialogFocus(ui.roundOverlay);
       persistTable();
+      publishCardProgress();
     }
 
     function hideRoundOverlay() {
@@ -1611,6 +1678,7 @@
     }
 
     function endRound(winnerIndex) {
+      trackCardProgressDifficulty();
       roundActive = false;
       focusSuspendedRound = false;
       resumeHumanAutoPassAfterFocus = false;
@@ -1632,6 +1700,15 @@
         summary = `${winner.name} reached ${winner.score}. Match complete in round ${roundNumber}.`;
         stats.matchesPlayed += 1;
         if (winnerIndex === 0) stats.matchesWon += 1;
+      }
+      if (progressMeta?.roundId) {
+        trackCardProgressDifficulty();
+        const common = { game: 'crapeights', mode: 'match-200', difficulty: progressMeta.difficulty, target: MATCH_TARGET, rounds: roundNumber };
+        progressMeta.pending = [{ ...common, id: progressMeta.roundId, kind: 'round', history: false,
+          outcome: winnerIndex === 0 ? 'win' : 'loss', roundWon: winnerIndex === 0, score: winnerIndex === 0 ? points : 0 }];
+        if (matchFinished) progressMeta.pending.push({ ...common, id: progressMeta.id, kind: 'match',
+          outcome: winnerIndex === 0 ? 'win' : 'loss', matchWon: winnerIndex === 0,
+          score: players[0].score, playerScore: players[0].score, opponentScore: Math.max(...players.slice(1).map(player => player.score)) });
       }
       saveStats();
       if (window.CrapeightsEffects) {
@@ -1801,6 +1878,7 @@
       document.getElementById('tableEvent').classList.remove('show');
       CrapeightsPresentation.clearEffects();
       tableEffects?.clear();
+      beginCardProgressRound();
       deck = buildDeck();
       discard = [];
       activeSuit = 'C';
@@ -1828,6 +1906,7 @@
     }
 
     function startFreshMatch() {
+      progressMeta = newCardProgress();
       clearAiTimer();
       clearHumanAutoPassTimer();
       focusSuspendedRound = false;
@@ -1940,6 +2019,9 @@
       scheduleTurnIfNeeded();
     }
     function updateDifficulty() {
+      const previousProgressDifficulty = progressMeta?.difficulty;
+      trackCardProgressDifficulty();
+      if (progressMeta?.difficulty !== previousProgressDifficulty) persistTable();
       document.getElementById('aiDifficulty').value = aiDifficulty;
       document.getElementById('difficultyHint').textContent = {
         easy: 'Easy · relaxed rivals who play simple matches. Great for learning dirty tricks.',

@@ -35,6 +35,9 @@ let confirmAction = null;
 let claimChoices = [];
 let statsSaved = true;
 let opened = false;
+let progressReceipt = null;
+let progressReceiptId = null;
+const resultShare = globalThis.SuiteShare?.create({ host: $('chess-result-share'), game: 'chess' });
 const squares = new Map();
 let boardView;
 
@@ -45,10 +48,30 @@ function cancelSearch(keepWarm = false) {
   busy = false;
 }
 function announce(message) { feedback = message; $('status').textContent = message; }
+function progressEvent() {
+  if (!game?.result || !game.chess.history().length) {return null;}
+  const local = game.mode === 'local';
+  return { id: game.progressId, game: 'chess', mode: game.mode, difficulty: local ? 'unknown' : game.level,
+    kind: 'match', completed: true, outcome: !game.result.winner ? 'draw' : local ? 'complete' : game.result.winner === game.side ? 'win' : 'loss',
+    moves: game.chess.history().length, local, assisted: game.hints > 0 || game.undos > 0,
+    hints: game.hints, undos: game.undos, winner: game.result.winner, reason: game.result.reason };
+}
 function persist() {
   if (!game) { return; }
+  // Old unfinished games adopt an identity before the next move. Old completed
+  // games remain reviewable/shareable without fabricated historical results.
+  if (!game.result && !game.progressId) {game.progressId = globalThis.SuiteProgress?.newRunId('chess');}
   saveOk = saveGame(storage, game);
-  if (game.result) { statsSaved = recordResult(storage, game); }
+  if (game.result) {
+    statsSaved = recordResult(storage, game);
+    const event = progressEvent();
+    if (event?.id && globalThis.SuiteProgress) {
+      const receipt = globalThis.SuiteProgress.record(event);
+      if (progressReceiptId !== event.id || receipt.newlyEarned?.length || receipt.improvement) {
+        progressReceiptId = event.id; progressReceipt = receipt;
+      }
+    }
+  }
 }
 function syncMute() {
   const muted = suite?.isMuted?.() || false;
@@ -197,7 +220,12 @@ function render() {
   $('engine-recovery').hidden = !failure || !!ended || suspended;
   $('resume-playing').hidden = !suspended || !!ended;
   $('result').hidden = !ended;
-  $('result-details').textContent = ended ? `${game.mode === 'local' ? 'Local two-player game' : `Computer practice · ${LEVELS[game.level].label}`}. ${game.chess.history().length} half-moves. ${game.hints} hints, ${game.undos} takebacks. ${ended.winner ? ended.winner === game.side && !local ? 'Nice work! Ready for another?' : 'Every game teaches you something.' : 'Want a rematch?'}` : '';
+  const resultEvent = progressEvent();
+  resultShare?.setResult(resultEvent);
+  $('progress-result').textContent = !ended ? '' : progressReceipt?.storageAvailable === false
+    ? 'Progress cannot be saved in this browser. Your game is still playable.'
+    : progressReceipt?.newlyEarned?.length ? `Goal earned: ${progressReceipt.newlyEarned.map(goal => goal.title).join(' · ')}.` : '';
+  $('result-details').textContent = ended ? `${game.mode === 'local' ? 'Local two-player game' : `Computer practice · ${LEVELS[game.level].label}`}. ${game.chess.history().length} half-move${game.chess.history().length === 1 ? '' : 's'}. ${game.hints} hints, ${game.undos} takebacks. ${ended.winner ? ended.winner === game.side && !local ? 'Nice work! Ready for another?' : 'Every game teaches you something.' : 'Want a rematch?'}` : '';
   $('mode-help').textContent = local ? 'Two players, one device. Undo takes back one move; both players should agree. Use Flip board when passing the device. Resign concedes for the side whose turn it is. Takebacks are available until the game ends.' : 'Untimed practice. Undo takes back your last turn (your move and the computer reply, if played). Hints suggest a move without playing it. Hints and takebacks are counted in your result. Resign concedes your game, even during the computer’s turn. Takebacks are available until the game ends.';
   const stats = readResults(storage);
   $('records').textContent = `On this device: computer ${stats.wins} wins · ${stats.losses} losses · ${stats.draws} draws. Local games: ${stats.local}. Completed games with hints/takebacks: ${stats.assisted}.`;
@@ -422,6 +450,11 @@ $('piece-reference').innerHTML = Object.entries(PIECE_GUIDE).map(([type, info]) 
 $('setup-art').innerHTML = `<div class="setup-mini-board">${Array.from({ length: 16 }, (_, index) => `<span>${index === 5 ? pieceSvg('n', 'w') : index === 10 ? pieceSvg('k', 'b') : ''}</span>`).join('')}</div>`;
 document.querySelector('[data-mode-art="computer"]').innerHTML = pieceSvg('n', 'w');
 document.querySelector('[data-mode-art="local"]').innerHTML = pieceSvg('k', 'w') + pieceSvg('k', 'b');
+// Shared results link to fresh setup choices only, never a FEN or saved game.
+const incomingSetup = new globalThis.URLSearchParams(globalThis.location.search);
+const incomingMode = incomingSetup.get('mode');
+if (['local', 'computer'].includes(incomingMode)) {document.querySelector(`input[name="mode"][value="${incomingMode}"]`).checked = true;}
+if (Object.hasOwn(LEVELS, incomingSetup.get('level'))) {$('level').value = incomingSetup.get('level');}
 settings(); syncMute(); openSetup();
 const playButton = $('new-game').querySelector('button[type=submit]');
 playButton.disabled = false;

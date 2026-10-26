@@ -99,10 +99,10 @@ test('no page calls any game "Turbo"', async ({ page }) => {
     }
 });
 
-test('Games nav goes straight to all eight game cards in one click', async ({ page }) => {
+test('Arcade nav goes straight to all eight game cards in one click', async ({ page }) => {
     for (const [start, nav] of [['/', 'Primary navigation'], ['/qr/', null]]) {
         await page.goto(start);
-        const link = nav ? page.getByRole('navigation', { name: nav, exact: true }).getByRole('link', { name: 'Games', exact: true }) : page.locator('header').getByRole('link', { name: 'Games', exact: true });
+        const link = nav ? page.getByRole('navigation', { name: nav, exact: true }).getByRole('link', { name: 'Arcade', exact: true }) : page.locator('header').getByRole('link', { name: 'Arcade', exact: true });
         await link.click();
         await expect(page).toHaveURL(/\/play\/#hub-games$/);
         const cards = page.locator('#hub-games a.game-card');

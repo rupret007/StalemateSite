@@ -13,6 +13,9 @@
   <link rel="stylesheet" href="assets/turdsuite.css">
 <link rel="stylesheet" href="assets/arcade.css">
   <script src="games/table-continue-core.js"></script>
+  <script src="games/suite-progress-core.js"></script>
+  <script src="assets/suite-progress.js"></script>
+  <script src="assets/suite-share.js"></script>
   <script src="games/suite-dialog-focus.js"></script>
   <script src="assets/turdsuite.js"></script>
   <!-- Bot strength follows turdsuite_difficulty_v1 / Suite.difficulty (turdrummy-ai-core.js). -->
@@ -2344,6 +2347,7 @@
   </style>
 <link rel="stylesheet" href="assets/mobile-fit.css">
 <script src="assets/mobile-fit.js" defer></script>
+<link rel="stylesheet" href="assets/suite-progress.css">
 </head>
 <body class="suite-ambient suite-no-zoom arcade" data-arcade-game="turdrummy">
   <div class="app">
@@ -2423,6 +2427,7 @@
         <div class="tr-drawer-body" tabindex="0" role="region" aria-label="Melds and match log">
           <div class="melds" id="meldPreview"></div>
           <ol class="round-log" id="roundLog" aria-label="Recent table events"></ol>
+          <p id="rummyProgressStatus" class="suite-progress-result" role="status" hidden></p>
           <dl class="drawer-stats" id="drawerStats" aria-label="Your match stats on this device"></dl>
         </div>
       </details>
@@ -2475,6 +2480,8 @@
         <h2 id="trophyHeadline">Match Over</h2>
         <p class="trophy-scores" id="trophyScores"></p>
         <dl id="trophyStats" aria-label="Match stats saved on this device"></dl>
+        <p id="rummyTrophyProgressStatus" class="suite-progress-result" role="status" hidden></p>
+        <div id="rummyResultShare"></div>
         <div class="overlay-actions">
           <button class="btn primary" id="trophyRematchBtn" type="button">Rematch</button>
           <button class="btn" id="trophyKeepBtn" type="button">Keep Table</button>
@@ -2850,6 +2857,9 @@
       aiLevel = next;
       if (AIApi) { AIApi.saveDifficulty(rummyStorage, aiLevel); }
       updateDifficultyLabel();
+      const previousProgressDifficulty = progressMeta?.difficulty;
+      trackCardProgressDifficulty();
+      if (progressMeta?.difficulty !== previousProgressDifficulty) persistTable();
       try {
         if (window.Suite && Suite.difficulty) {
           const suiteId = aiLevel === "sharp" ? "hard" : aiLevel === "easy" ? "easy" : "normal";
@@ -3145,6 +3155,63 @@
       }
     }
 
+    // Optional progress is independent of the legacy game/stat save keys.
+    let progressMeta = null;
+    const cardResultShare = window.SuiteShare?.create({ host: document.getElementById('rummyResultShare'), game: 'turdrummy' });
+    function cardProgressDifficulty() { return aiLevel === 'sharp' ? 'hard' : aiLevel; }
+    function newCardProgress(legacy = false) {
+      const id = window.SuiteProgress?.newRunId('turdrummy');
+      return id ? { v: 1, id, difficulty: legacy ? 'unknown' : cardProgressDifficulty(), pending: [] } : null;
+    }
+    function trackCardProgressDifficulty() {
+      if (!progressMeta || !(state.initialized && !state.matchOver) || ['mixed', 'unknown'].includes(progressMeta.difficulty)) return;
+      if (progressMeta.difficulty !== cardProgressDifficulty()) progressMeta.difficulty = 'mixed';
+    }
+    function clearCardProgressResult() {
+      cardResultShare?.setResult(null);
+      const status = document.getElementById('rummyProgressStatus');
+      status.textContent = ''; status.hidden = true;
+      const trophyStatus = document.getElementById('rummyTrophyProgressStatus');
+      trophyStatus.textContent = ''; trophyStatus.hidden = true;
+    }
+    function restoreCardProgress(meta, live) {
+      progressMeta = meta && meta.v === 1 && typeof meta.id === 'string'
+        ? JSON.parse(JSON.stringify(meta)) : (live ? newCardProgress(true) : null);
+      if (progressMeta && live && !progressMeta.roundId) {
+        progressMeta.roundId = window.SuiteProgress?.newRunId('turdrummy');
+      }
+    }
+    function beginCardProgressRound() {
+      if (!progressMeta) progressMeta = newCardProgress();
+      trackCardProgressDifficulty();
+      if (progressMeta) {
+        progressMeta.roundId = window.SuiteProgress?.newRunId('turdrummy');
+        progressMeta.pending = [];
+      }
+      clearCardProgressResult();
+    }
+    function publishCardProgress() {
+      const pending = progressMeta?.pending || [];
+      const earned = [];
+      let storageUnavailable = false;
+      for (const event of pending) {
+        const receipt = window.SuiteProgress?.record(event);
+        if (receipt?.newlyEarned) earned.push(...receipt.newlyEarned);
+        if (receipt?.storageAvailable === false) storageUnavailable = true;
+      }
+      cardResultShare?.setResult(pending.find(event => event.history !== false) || null);
+      const status = document.getElementById('rummyProgressStatus');
+      if (earned.length) {
+        status.textContent = 'Goal complete: ' + earned.map(goal => goal.title).join(' · ');
+        status.hidden = false;
+      } else if (storageUnavailable) {
+        status.textContent = 'Progress could not be saved on this device.';
+        status.hidden = false;
+      }
+      const trophyStatus = document.getElementById('rummyTrophyProgressStatus');
+      trophyStatus.textContent = status.textContent; trophyStatus.hidden = status.hidden;
+    }
+
     function persistTable() {
       if (!window.Suite || !Suite.table) return;
       if (!state.initialized) {
@@ -3153,6 +3220,7 @@
       }
       Suite.table.remember("turdrummy.html", {
         kind: "turdrummy",
+        ...(progressMeta ? { progressMeta } : {}),
         v: 1,
         round: state.round,
         dealer: state.dealer,
@@ -3204,6 +3272,7 @@
       state.humanDiscardTakes = [];
       state.aiTurns = 0;
       state.initialized = true;
+      restoreCardProgress(snap.progressMeta, !snap.matchOver);
       return true;
     }
 
@@ -3216,6 +3285,8 @@
       }
       focusPausedAiTurn = false;
       renderAll();
+      if (progressMeta?.pending?.length) publishCardProgress();
+      if (state.matchOver && progressMeta?.pending?.some(event => event.kind === "match")) showTrophy();
       if (!state.roundOver && state.turn === "ai") queueAiTurn(180);
       try { Suite.toast("Picked up where you left off."); } catch (e) {}
       return true;
@@ -3796,6 +3867,7 @@
     }
 
     function renderAll() {
+      trackCardProgressDifficulty();
       renderStatus();
       renderOpponentCards();
       renderPiles();
@@ -3824,7 +3896,20 @@
       return state.stock.pop() || null;
     }
 
+    function completeRummyProgress({ outcome, gin = false, points = 0 }) {
+      if (!progressMeta?.roundId) return;
+      const common = { game: 'turdrummy', mode: 'match-100', difficulty: progressMeta.difficulty,
+        target: TURDRUMMY_BALANCE.matchTarget, rounds: state.round };
+      progressMeta.pending = [{ ...common, id: progressMeta.roundId, kind: 'round', history: false, outcome, gin,
+        roundWon: outcome === 'win', score: outcome === 'win' ? points : 0 }];
+      if (state.matchOver) progressMeta.pending.push({ ...common, id: progressMeta.id, kind: 'match',
+        outcome: state.playerScore > state.aiScore ? 'win' : state.playerScore < state.aiScore ? 'loss' : 'draw',
+        matchWon: state.playerScore > state.aiScore, score: state.playerScore,
+        playerScore: state.playerScore, opponentScore: state.aiScore });
+    }
+
     function resolveStockStall(reasonText) {
+      trackCardProgressDifficulty();
       if (state.roundOver) return;
       clearAiTurnTimeout();
       focusPausedAiTurn = false;
@@ -3839,8 +3924,10 @@
       state.matchOver = false;
       state.message = reasonText || "Stock exhausted.";
       state.roundSummary = "No legal draw remained. Round is a draw (0 points).";
+      completeRummyProgress({ outcome: "draw" });
       saveStats();
       renderAll();
+      publishCardProgress();
     }
 
     function selectCard(cardId) {
@@ -3854,6 +3941,7 @@
       clearAiTurnTimeout();
       clearPresentation();
       focusPausedAiTurn = false;
+      beginCardProgressRound();
       state.round += 1;
       state.humanDiscardTakes = [];
       state.aiTurns = 0;
@@ -4257,6 +4345,7 @@
     }
 
     function finishRound(knocker, isGin, knockerDeadwood, knockerMelds) {
+      trackCardProgressDifficulty();
       clearAiTurnTimeout();
       focusPausedAiTurn = false;
       state.roundOver = true;
@@ -4323,8 +4412,10 @@
       state.drawnCardSource = null;
       state.message = state.lastAiAction || "Round complete.";
       state.roundSummary = summary + " Knocker deadwood: " + knockerDeadwood + ", defender deadwood: " + defenderDeadwood + ".";
+      completeRummyProgress({ outcome: awardedTo === "player" ? "win" : "loss", gin: knocker === "player" && isGin, points });
       saveStats();
       renderAll();
+      publishCardProgress();
       // Big-moment presentation runs after the state is final; the score above never waits on it.
       pushLog(summary);
       armPresentation({ showTrophyAfter: state.matchOver });
@@ -4413,6 +4504,8 @@
     }
 
     function resetMatch() {
+      progressMeta = null;
+      clearCardProgressResult();
       clearAiTurnTimeout();
       clearPresentation();
       hideTrophy();

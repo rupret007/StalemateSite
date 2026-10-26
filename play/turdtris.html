@@ -4,6 +4,8 @@
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <script src="assets/suite-loading.js"></script>
+<script src="games/suite-progress-core.js"></script>
+<script src="assets/suite-progress.js"></script>
   <script src="assets/suite-share.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -13,6 +15,7 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="assets/turdsuite.css">
 <link rel="stylesheet" href="assets/arcade.css">
+<link rel="stylesheet" href="assets/suite-progress.css">
 <script src="games/table-continue-core.js"></script>
 <script src="assets/turdsuite.js"></script>
 <title>Turdtris</title>
@@ -1541,6 +1544,7 @@ body.desktop-cabinet .status {
             <div class="overlay-stat"><div class="k">Time / PPS</div><div class="v" id="finalPace">0:00 / 0.00</div></div>
           </div>
           <p class="overlay-flavor">Space or Enter runs it back.</p>
+          <p class="suite-progress-result" id="progressResult" role="status" hidden></p>
           <button class="btn" onclick="restartGame()">Play Again</button>
         </div>
       </div>
@@ -1675,6 +1679,17 @@ let softDrop = false;
 let paused = false;
 let gameOver = false;
 const resultShare = window.SuiteShare?.create({ host: document.getElementById('endOverlayCard'), game: 'turdtris' });
+let progressRunId = null;
+let progressRunResult = null;
+let progressRunDifficulty = 'normal';
+let progressCurrentDifficulty = 'normal';
+try {
+  window.Suite?.difficulty?.onChange?.(value => {
+    if (value === progressCurrentDifficulty) return;
+    if (progressRunId && !progressRunResult && hasStartedRun && !gameOver) progressRunDifficulty = 'mixed';
+    progressCurrentDifficulty = value;
+  });
+} catch { /* Difficulty metadata is optional. */ }
 let statusText = 'Guideline-inspired run: SRS, bag randomizer, and escalating garbage.';
 let activeMutator = 'Warmup Flow';
 let sceneShake = 0;
@@ -3399,7 +3414,23 @@ function showGameOver(won) {
   }
 
   playSfx(isWin ? 'victory' : 'gameover');
-  resultShare?.setResult({ mode: runMode, score, lines: linesCleared, elapsedMs: runStats.elapsedMs, completed: isWin });
+  if (progressRunId && hasStartedRun && !progressRunResult) {
+    progressRunResult = {
+      id: progressRunId, game: 'turdtris', mode: runMode, difficulty: progressRunDifficulty, kind: 'run',
+      outcome: isWin ? (runMode === 'classic' ? 'win' : 'complete') : 'loss',
+      score, lines: linesCleared, elapsedMs: Math.max(0, Math.floor(runStats.elapsedMs)), completed: isWin,
+      levelsCleared: runMode === 'classic' ? Math.max(0, level - 1) : 0, maxCombo: runStats.maxCombo
+    };
+    try {
+      const recorded = window.SuiteProgress?.record(progressRunResult);
+      if (recorded?.improvement) progressRunResult.improvement = recorded.improvement;
+      const goals = recorded?.newlyEarned?.map(goal => goal.title) || [];
+      const feedback = [goals.length ? `Goal earned: ${goals.join(' · ')}` : '', recorded?.improvement || '', recorded && !recorded.storageAvailable ? 'Your browser could not save progress on this device.' : ''].filter(Boolean).join(' ');
+      document.getElementById('progressResult').textContent = feedback;
+      document.getElementById('progressResult').hidden = !feedback;
+    } catch { /* Optional progress never interrupts the completed game. */ }
+  }
+  resultShare?.setResult(progressRunResult || { mode: runMode, score, lines: linesCleared, elapsedMs: runStats.elapsedMs, completed: isWin });
   updateScore();
 }
 
@@ -3425,6 +3456,12 @@ function togglePause() {
 
 function restartGame() {
   resultShare?.setResult(null);
+  progressRunId = window.SuiteProgress?.newRunId('turdtris') || null;
+  progressRunResult = null;
+  document.getElementById('progressResult').hidden = true;
+  document.getElementById('progressResult').textContent = '';
+  try { progressRunDifficulty = window.Suite?.difficulty?.get() || 'normal'; } catch { progressRunDifficulty = 'normal'; }
+  progressCurrentDifficulty = progressRunDifficulty;
   const menu = document.querySelector('.mobile-menu details');
   if (menu) menu.open = false;
   clearHeldInput();

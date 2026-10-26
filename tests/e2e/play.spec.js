@@ -106,7 +106,7 @@ test('homepage Games links reach the hub, with individual games excluded from se
     await page.goto('/');
     const nav = page.getByRole('navigation', { name: 'Primary navigation', exact: true });
     const navLinks = nav.getByRole('link');
-    await expect(navLinks.last()).toHaveText('Games');
+    await expect(navLinks.last()).toHaveText('Arcade');
     await expect(navLinks.last()).toHaveAttribute('href', 'play/#hub-games');
     const games = page.locator('#games');
     await expect(games.locator('.board-square')).toHaveText('Stalemate Arcade');
@@ -167,7 +167,9 @@ test('game over offers Listen to Manic, the Oct 24 show and Share score next to 
     await expect(extra.getByRole('link', { name: 'Listen to Manic' })).toHaveAttribute('href', '../#home');
     await expect(extra).toContainText('Oct 24');
     await expect(extra.getByRole('link', { name: 'Come see us live, Oct 24' })).toHaveAttribute('href', 'https://rockinoctober.com');
-    const share = extra.getByRole('button', { name: 'Share score' });
+    const share = end.locator('.suite-result-share').getByRole('button', { name: 'Share score' });
+    await expect(end.getByRole('button', { name: 'Share score' })).toHaveCount(1);
+    await expect(extra.locator('#stalemateShare')).toHaveCount(0);
     await expect(share).toBeVisible();
     const h = await share.boundingBox();
     expect(h.height).toBeGreaterThanOrEqual(44);
@@ -181,7 +183,9 @@ test('game over offers Listen to Manic, the Oct 24 show and Share score next to 
     });
     await share.click();
     const shared = await page.evaluate(() => window.__shared);
-    expect(shared.text).toMatch(/^I scored \d+ in Turdanoid/);
+    expect(shared.text).toMatch(/^Turdanoid · Classic: [\d,]+ points\./);
+    expect(shared.title).toBe('Turdanoid · Stalemate Arcade');
+    expect(shared.url).toBe(new URL('/play/TurdAnoid.html?mode=classic', page.url()).href);
     await page.clock.setFixedTime(new Date('2026-10-24T16:45:00-05:00'));
     await expect(extra.locator('[data-next-show]')).toBeHidden();
     await page.reload();

@@ -12,6 +12,9 @@
   <link rel="stylesheet" href="assets/turdsuite.css">
   <link rel="stylesheet" href="assets/arcade.css">
   <link rel="stylesheet" href="assets/arcade-hub.css">
+  <link rel="stylesheet" href="assets/suite-progress.css">
+  <script src="games/suite-progress-core.js"></script>
+  <script src="assets/suite-progress.js"></script>
   <script src="games/table-continue-core.js"></script>
   <script src="assets/turdsuite.js"></script>
   <title>Stalemate Arcade — Eight Free Games</title>
@@ -1015,11 +1018,12 @@
         <div class="body"><div class="game-info"><div class="title-row"><span class="emoji" aria-hidden="true">♟</span><h2>Royal Flush Chess</h2></div><p>Play the computer or 2 players on one device.</p></div><span class="play">Play <i>→</i></span></div>
       </a>
     </section>
+    <div id="suite-progress-hub"></div>
     <p class="footer-note">Eight games • one sewer • Stalemate punk rock on every table — <a href="#hub-games">back to the grid</a></p>
   </div>
   <script type="module">
     import { injectSkipLink, createAnnouncer } from './assets/suite-a11y.js';
-    import { decorateHubStatBadges } from './assets/suite-hub-stats.js';
+    import { decorateHubStatBadges, readHubStatBadge } from './assets/suite-hub-stats.js';
     import { wireHubCoverIdleMotion, wireHubAttractHeader } from './assets/suite-hub-attract.js';
 
     function bootHubModules() {
@@ -1027,6 +1031,13 @@
       let storage = null;
       try { storage = window.localStorage; } catch { /* device storage unavailable */ }
       decorateHubStatBadges(document, storage || { getItem: () => null });
+      window.SuiteProgress?.mountHub({
+        host: document.getElementById('suite-progress-hub'),
+        recordFor: game => {
+          const page = window.SuiteProgress.games.find(item => item.id === game)?.href;
+          return readHubStatBadge(key => { try { return storage?.getItem(key); } catch { return null; } }, page)?.text;
+        }
+      });
       wireHubCoverIdleMotion(document);
       wireHubAttractHeader(document);
       if (window.Suite) {

@@ -4,6 +4,8 @@
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <script src="assets/suite-loading.js"></script>
+<script src="games/suite-progress-core.js"></script>
+<script src="assets/suite-progress.js"></script>
 <script src="assets/suite-share.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -12,6 +14,7 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="assets/turdsuite.css">
 <link rel="stylesheet" href="assets/arcade.css">
+<link rel="stylesheet" href="assets/suite-progress.css">
 <script src="games/table-continue-core.js"></script>
 <script src="assets/turdsuite.js"></script>
 <title>Turdomania</title>
@@ -163,6 +166,7 @@ body.tm-hint-space .tm-start-hint[hidden] { display:block!important; visibility:
     <div>
       <h2 id="overTitle">Clogged!</h2>
       <p id="overText"></p>
+      <p class="suite-progress-result" id="progressResult" role="status" hidden></p>
       <div class="row">
         <button type="button" id="againBtn">Flush &amp; Again</button>
         <button type="button" id="overUndoBtn">Undo last pop</button>
@@ -277,6 +281,9 @@ function announce(msg) {
 }
 
 let state = null;
+let progressRunId = null;
+let progressRunResult = null;
+let progressStartedAt = 0;
 let cursor = { c: 0, r: 0 };
 let cell = 32;
 const tileEls = new Map();
@@ -301,6 +308,11 @@ function resetView() {
 }
 
 function start(levelKey, seed) {
+  progressRunId = window.SuiteProgress?.newRunId('turdomania') || null;
+  progressRunResult = null;
+  progressStartedAt = Date.now();
+  document.getElementById('progressResult').hidden = true;
+  document.getElementById('progressResult').textContent = '';
   // First board reuses the size reserved before paint; later boards re-measure.
   const init = window.TM_INIT && window.TM_INIT.level === levelKey ? window.TM_INIT : null;
   window.TM_INIT = null;
@@ -488,6 +500,10 @@ function doUndo() {
   const prev = state && Core.undo(state);
   if (!prev) return;
   state = prev;
+  // Undo reopens this attempt; its next finish updates the same history entry.
+  progressRunResult = null;
+  document.getElementById('progressResult').hidden = true;
+  document.getElementById('progressResult').textContent = '';
   resultShare?.setResult(null);
   overlay.classList.remove('show');
   // Rebuild tiles: undone tiles come back with their old ids.
@@ -504,7 +520,23 @@ function showOver() {
     ? `Board flushed. +${Core.CLEAR_BONUS} bonus. Final ${state.score}.${state.score >= best ? ' New best!' : ''}`
     : `No more matches. ${left} turd${left === 1 ? '' : 's'} left behind. Final ${state.score}.${state.score >= best && state.score > 0 ? ' New best!' : ''}`;
   overlay.classList.add('show');
-  resultShare?.setResult({ level: state.level, score: state.score, left, cleared: state.cleared });
+  if (progressRunId && state.moves > 0 && !progressRunResult) {
+    progressRunResult = {
+      id: progressRunId, game: 'turdomania', mode: state.level, difficulty: state.level, level: state.level, kind: 'run',
+      outcome: state.cleared ? 'win' : 'loss', score: state.score, left, cleared: state.cleared,
+      cols: state.cols, rows: state.rows,
+      elapsedMs: Math.max(0, Date.now() - progressStartedAt)
+    };
+    try {
+      const recorded = window.SuiteProgress?.record(progressRunResult);
+      if (recorded?.improvement) progressRunResult.improvement = recorded.improvement;
+      const goals = recorded?.newlyEarned?.map(goal => goal.title) || [];
+      const feedback = [goals.length ? `Goal earned: ${goals.join(' · ')}` : '', recorded?.improvement || '', recorded && !recorded.storageAvailable ? 'Your browser could not save progress on this device.' : ''].filter(Boolean).join(' ');
+      document.getElementById('progressResult').textContent = feedback;
+      document.getElementById('progressResult').hidden = !feedback;
+    } catch { /* Optional progress never interrupts the completed game. */ }
+  }
+  resultShare?.setResult(state.moves > 0 ? progressRunResult || { level: state.level, score: state.score, left, cleared: state.cleared } : null);
   sfx(state.cleared ? 'win' : 'lose');
   announce(els.overTitle.textContent + ' ' + els.overText.textContent);
   setTimeout(() => els.again.focus({ preventScroll: true }), 30);
