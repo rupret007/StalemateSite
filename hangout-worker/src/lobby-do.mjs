@@ -790,7 +790,12 @@ export class HangoutLobby {
             }
         });
     }
-    async webSocketClose(ws) {
+    async webSocketClose(ws, code) {
+        // A peer-initiated close can remain half-closed on older runtimes and
+        // bridges. Acknowledge before storage work; never reflect its reason.
+        const replyCode = Number.isInteger(code) && (code >= 1000 && code <= 1014 && ![1004, 1005, 1006].includes(code)
+            || code >= 3000 && code <= 4999) ? code : 1000;
+        try { if (ws.readyState !== 3) ws.close(replyCode); } catch { /* Cleanup still retires the binding if acknowledgement fails. */ }
         this.delivery.forget(ws); await this.ready;
         if (this.authorityUnavailable) return;
         return this.state.blockConcurrencyWhile(async () => {

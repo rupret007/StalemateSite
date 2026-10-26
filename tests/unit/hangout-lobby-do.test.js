@@ -143,6 +143,65 @@ describe('HangoutLobby AI review integration', () => {
 
 afterEach(() => vi.unstubAllGlobals());
 
+describe('HangoutLobby peer close acknowledgement', () => {
+    it('acknowledges a half-closed socket before readiness and retires only its admitted member', async () => {
+        const pairs = installUpgradeRuntime(), state = stateWith(), lobby = new HangoutLobby(state, {});
+        await lobby.fetch(request()); await lobby.fetch(request({ ...identity, dev: 'healthy-device', iph: 'healthy-ip' }));
+        const leaving = pairs[0][1], healthy = pairs[1][1];
+        await lobby.webSocketMessage(leaving, JSON.stringify({ t: 'hello', nick: 'LeavingGuest', age13: true }));
+        await lobby.webSocketMessage(healthy, JSON.stringify({ t: 'hello', nick: 'HealthyGuest', age13: true }));
+        const id = leaving.attachment.id, healthyId = healthy.attachment.id;
+        let release; lobby.ready = new Promise(resolve => { release = resolve; });
+        leaving.readyState = 2; const close = vi.spyOn(leaving, 'close');
+        const pending = lobby.webSocketClose(leaving, 1000, 'untrusted peer reason');
+        expect(close).toHaveBeenCalledExactlyOnceWith(1000);
+        expect(lobby.engine._debug.conns.has(id)).toBe(true);
+        expect(lobby.engine._debug.conns.has(healthyId)).toBe(true);
+        release(); await pending;
+        expect(lobby.engine._debug.conns.has(id)).toBe(false);
+        expect(lobby.engine._debug.conns.has(healthyId)).toBe(true);
+        expect(healthy.closed).toBeUndefined();
+    });
+
+    it.each([undefined, 1005, 1006, 1015, 2999, 5000, '1000'])(
+        'uses a legal normal acknowledgement for no-status/reserved code %s', async code => {
+            const ws = { readyState: 2, close: vi.fn() }, forget = vi.fn(), disconnect = vi.fn(), unbind = vi.fn();
+            const receiver = { ready: Promise.resolve(), delivery: { forget }, authorityUnavailable: false, authorityMode: true,
+                liveBindings: new Map([['leaving', {}], ['healthy', {}]]), engine: { disconnect }, authority: { unbind },
+                state: { getTags: () => ['leaving'], blockConcurrencyWhile: fn => fn() } };
+            await HangoutLobby.prototype.webSocketClose.call(receiver, ws, code, 'never echo this');
+            expect(ws.close).toHaveBeenCalledExactlyOnceWith(1000);
+            expect(forget).toHaveBeenCalledExactlyOnceWith(ws);
+            expect(disconnect).toHaveBeenCalledExactlyOnceWith('leaving');
+            expect(unbind).toHaveBeenCalledExactlyOnceWith('leaving');
+            expect([...receiver.liveBindings.keys()]).toEqual(['healthy']);
+        });
+
+    it('preserves an application close code and retires authority state even when acknowledgement throws', async () => {
+        const ws = { readyState: 2, close: vi.fn(() => { throw Error('transport already gone'); }) };
+        const disconnect = vi.fn(), unbind = vi.fn();
+        const receiver = { ready: Promise.resolve(), delivery: { forget: vi.fn() }, authorityUnavailable: false, authorityMode: true,
+            liveBindings: new Map([['leaving', {}]]), engine: { disconnect }, authority: { unbind },
+            state: { getTags: () => ['leaving'], blockConcurrencyWhile: fn => fn() } };
+        await HangoutLobby.prototype.webSocketClose.call(receiver, ws, 4401, 'private runtime reason');
+        expect(ws.close).toHaveBeenCalledExactlyOnceWith(4401);
+        expect(disconnect).toHaveBeenCalledExactlyOnceWith('leaving');
+        expect(unbind).toHaveBeenCalledExactlyOnceWith('leaving');
+        expect(receiver.liveBindings.size).toBe(0);
+    });
+
+    it('does not repeat a completed automatic acknowledgement but still retires its binding', async () => {
+        const ws = { readyState: 3, close: vi.fn() }, disconnect = vi.fn();
+        const receiver = { ready: Promise.resolve(), delivery: { forget: vi.fn() }, authorityUnavailable: false, authorityMode: false,
+            liveBindings: new Map([['leaving', {}]]), engine: { disconnect },
+            state: { getTags: () => ['leaving'], blockConcurrencyWhile: fn => fn() } };
+        await HangoutLobby.prototype.webSocketClose.call(receiver, ws, 1000);
+        expect(ws.close).not.toHaveBeenCalled();
+        expect(disconnect).toHaveBeenCalledExactlyOnceWith('leaving');
+        expect(receiver.liveBindings.size).toBe(0);
+    });
+});
+
 describe('HangoutLobby WebSocket admission', () => {
     it.each([null, 'signed-test-device'])('delivers hello after accepting a guest, with device token %s', async (devToken) => {
         const pairs = installUpgradeRuntime();
