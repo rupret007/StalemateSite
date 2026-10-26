@@ -4,6 +4,9 @@
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <script src="assets/suite-loading.js"></script>
+<script src="games/suite-progress-core.js?v=26280b3adb2d8c25"></script>
+<script src="assets/suite-progress.js?v=5fdc02c46aa62534"></script>
+<script src="assets/suite-share.js?v=85ff7f9230484519"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -13,6 +16,7 @@
 <title>Turdanoid — Bricks. Busted.</title>
 <link rel="stylesheet" href="assets/turdsuite.css">
 <link rel="stylesheet" href="assets/arcade.css">
+<link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
 <style>
   body{
     --bg-a:var(--ta-ink, #0a1820); --bg-b:var(--ta-ink-mid, #123040); --bg-c:#1a3a34;
@@ -174,6 +178,13 @@
   #endScreen.is-loss{background:linear-gradient(180deg,rgba(255,90,72,.3) 0%,rgba(28,8,12,.92) 48%,rgba(4,10,12,.97) 100%)}
   #endScreen.is-loss .result-kicker{color:var(--hot)}
   #endScreen.is-win .result-kicker{color:var(--gold)}
+  /* Completed progress and sharing remain reachable on shorter screens. */
+  #endScreen{overflow-y:auto;overscroll-behavior:contain;justify-content:flex-start;scroll-padding-top:60px}
+  #endScreen > *{flex-shrink:0}
+  #endScreen > :first-child{margin-top:auto}
+  #endScreen > :last-child{margin-bottom:auto}
+  #endScreen .suite-result-share-actions :is(button,a){margin:0;min-height:44px;padding:8px 12px;font-size:14px;line-height:1.2;letter-spacing:0}
+  @media(max-width:980px){#endScreen{padding-top:60px}}
   .how-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:min(420px,92vw);margin:8px 0 4px;text-align:left}
   .how-card{padding:12px 12px 10px;border-radius:14px;background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02)),var(--panel);border:1px solid var(--panel-border);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 10px 22px rgba(0,0,0,.3)}
   .how-card h3{margin:0 0 4px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold)}
@@ -365,6 +376,7 @@
         <div class="stat"><span class="l">Max combo</span><span class="v" id="endCombo">0</span></div>
         <div class="stat"><span class="l">Time</span><span class="v" id="endTime">0:00</span></div>
       </div>
+      <p class="suite-progress-result" id="progressResult" role="status" hidden></p>
       <button id="btnRestart">PLAY AGAIN</button>
       <div class="menu-secondary">
         <button id="btnEndQuit">MAIN MENU</button>
@@ -384,7 +396,7 @@
 </div>
 
 <!-- Keep classic dependencies ordered, after the title markup so it can paint during loading. -->
-<script src="games/table-continue-core.js"></script>
+<script src="games/table-continue-core.js?v=30dfab772a1ae911"></script>
 <script src="games/turdanoid-theme-core.js"></script>
 <script src="games/turdanoid-fx-core.js"></script>
 <script src="games/turdanoid-brick-core.js"></script>
@@ -622,8 +634,21 @@ try {
 } catch (e) {}
 let ambientOn = !!prefs.ambientOn;
 let hapticOn = prefs.hapticOn !== false;
+const titleMode = new URLSearchParams(location.search).get('mode') === 'boss' ? 'boss' : 'classic';
 let gameMode = 'classic';
 let runStats = { bricks: 0, maxCombo: 0, startedAt: 0 };
+let progressRunId = null;
+let progressRunResult = null;
+let progressRunDifficulty = 'normal';
+let progressCurrentDifficulty = 'normal';
+const resultShare = window.SuiteShare?.create({ host: document.getElementById('endScreen'), game: 'turdanoid' });
+try {
+  window.Suite?.difficulty?.onChange?.(value => {
+    if(value === progressCurrentDifficulty) return;
+    if(progressRunId && !progressRunResult && (state === 'playing' || state === 'paused')) progressRunDifficulty = 'mixed';
+    progressCurrentDifficulty = value;
+  });
+} catch { /* Difficulty metadata is optional. */ }
 let levelStats = { bricks: 0, maxCombo: 0, startedAt: 0 };
 let clearTally = null;
 
@@ -1613,14 +1638,21 @@ function updatePowers(){
 
 /* ---- Flow ---- */
 function startGame(){
-  gameMode = 'classic';
+  gameMode = titleMode;
   beginRun();
 }
 function startBossGame(){
-  gameMode = 'boss';
+  gameMode = titleMode === 'boss' ? 'classic' : 'boss';
   beginRun();
 }
 function beginRun(){
+  resultShare?.setResult(null);
+  progressRunId = window.SuiteProgress?.newRunId('turdanoid') || null;
+  progressRunResult = null;
+  $('progressResult').hidden = true;
+  $('progressResult').textContent = '';
+  try { progressRunDifficulty = window.Suite?.difficulty?.get() || 'normal'; } catch { progressRunDifficulty = 'normal'; }
+  progressCurrentDifficulty = progressRunDifficulty;
   resize();
   paddle = newPaddle();
   score=0; level=1; lives=suiteStartingLives(3); comboHits=0; comboTimer=0; stink=0; flash=0; shake=0; hitStop=0; lifeGrace=0;
@@ -1631,6 +1663,7 @@ function beginRun(){
   newLevel();
   state='playing'; running=true; paused=false;
   hideOverlay(tTitle); hideOverlay(tEnd); hideOverlay(tPause); hideOverlay(tHow); hideOverlay(tClearTally);
+  tEnd.scrollTop = 0;
   clearTally = null;
   updateHud(); updatePowers();
   audio();
@@ -1792,6 +1825,28 @@ function gameOver(won){
   $('endBricks').textContent = String(runStats.bricks || 0);
   $('endCombo').textContent = String(runStats.maxCombo || 0);
   $('endTime').textContent = formatRunTime(Date.now() - (runStats.startedAt || Date.now()));
+  if(progressRunId && !progressRunResult){
+    progressRunResult = {
+      id: progressRunId, game: 'turdanoid', mode: gameMode, difficulty: progressRunDifficulty, kind: 'run',
+      outcome: won ? 'win' : 'loss', score, completed: !!won,
+      elapsedMs: Math.max(0, Date.now() - runStats.startedAt),
+      levelsCleared: gameMode === 'classic' ? Math.max(0, Math.min(30, level - 1)) : 0,
+      maxCombo: runStats.maxCombo || 0
+    };
+    try {
+      const recorded = window.SuiteProgress?.record(progressRunResult);
+      if(recorded?.improvement) progressRunResult.improvement = recorded.improvement;
+      const goals = recorded?.newlyEarned?.map(goal => goal.title) || [];
+      const feedback = [goals.length ? `Goal earned: ${goals.join(' · ')}` : '', recorded?.improvement || '', recorded && !recorded.storageAvailable ? 'Your browser could not save progress on this device.' : ''].filter(Boolean).join(' ');
+      $('progressResult').textContent = feedback;
+      $('progressResult').hidden = !feedback;
+    } catch { /* Optional progress never interrupts the completed game. */ }
+  }
+  resultShare?.setResult(runStats.startedAt ? progressRunResult || {
+    mode: gameMode, outcome: won ? 'win' : 'loss', score, completed: !!won,
+    levelsCleared: gameMode === 'classic' ? Math.max(0, Math.min(30, level - 1)) : 0,
+    maxCombo: runStats.maxCombo || 0
+  } : null);
   showOverlay(tEnd);
   won ? sfx.win() : sfx.death();
 }
@@ -3653,7 +3708,8 @@ pickTitleQuip();
 updateSideStats();
 lastTime = performance.now();
 requestAnimationFrame(loop);
-$('btnStart').textContent = 'START FLUSHING';
+$('btnStart').textContent = titleMode === 'boss' ? 'BOSS FLUSH' : 'START FLUSHING';
+$('btnBoss').textContent = titleMode === 'boss' ? 'Classic Flush' : 'Boss Flush';
 for (const id of ['btnStart', 'btnBoss', 'btnHowTo']) $(id).disabled = false;
 window.SuiteLoading?.ready();
 
@@ -3667,8 +3723,11 @@ document.addEventListener('touchend', e=>{
   lastTouch = now;
 }, {passive:false});
 
-// One-finger drags never scroll the page; two-finger pinch is left to the browser for zoom.
-document.body.addEventListener('touchmove', e=>{ if(e.touches.length < 2) e.preventDefault(); }, {passive:false});
+// Keep gameplay drags fixed; completed results can scroll. Two-finger pinch still zooms.
+document.body.addEventListener('touchmove', e=>{
+  if(e.target.closest?.('#endScreen.show')) return;
+  if(e.touches.length < 2) e.preventDefault();
+}, {passive:false});
 
 /* ---- Test hook ----
    Local/dev only. The public GitHub Pages host must not ship a
@@ -3732,7 +3791,7 @@ document.body.addEventListener('touchmove', e=>{ if(e.touches.length < 2) e.prev
 
 </script>
 <script src="../countdown.js"></script>
-<script src="stalemate/stalemate-overlay.js"></script>
+<script src="stalemate/stalemate-overlay.js?v=18718f93eca89896"></script>
 <script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>
 <script src="../js/track.js" defer></script>
 <script src="stalemate/play-track.js" defer></script>

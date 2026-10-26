@@ -12,7 +12,10 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="assets/turdsuite.css">
 <link rel="stylesheet" href="assets/arcade.css">
-  <script src="games/table-continue-core.js"></script>
+  <script src="games/table-continue-core.js?v=30dfab772a1ae911"></script>
+  <script src="games/suite-progress-core.js?v=26280b3adb2d8c25"></script>
+  <script src="assets/suite-progress.js?v=5fdc02c46aa62534"></script>
+  <script src="assets/suite-share.js?v=85ff7f9230484519"></script>
   <script src="games/suite-dialog-focus.js"></script>
   <script src="assets/turdsuite.js"></script>
   <title>Crapjack 21</title>
@@ -2762,6 +2765,7 @@
   </style>
 <link rel="stylesheet" href="assets/mobile-fit.css">
 <script src="assets/mobile-fit.js" defer></script>
+<link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
 </head>
 <body class="suite-ambient suite-no-zoom arcade" data-arcade-game="crapjack">
   <div id="jackLiveRegion" class="sr-live" aria-live="polite" aria-atomic="true"></div>
@@ -3012,6 +3016,8 @@
         <div>
           <h3 data-icon="📜">Hand History</h3>
           <div class="status history-log" id="historyText">No resolved hands yet.</div>
+          <p id="jackProgressStatus" class="suite-progress-result" role="status" hidden></p>
+          <div id="jackResultShare"></div>
         </div>
 
         <div>
@@ -3561,6 +3567,61 @@
       return { rank: card.rank, suit: card.suit };
     }
 
+    // Optional progress is independent of the legacy game/stat save keys.
+    let progressMeta = null;
+    const cardResultShare = window.SuiteShare?.create({ host: document.getElementById('jackResultShare'), game: 'turdjack' });
+    function cardProgressDifficulty() { return 'house'; }
+    function newCardProgress(legacy = false) {
+      const id = window.SuiteProgress?.newRunId('turdjack');
+      return id ? { v: 1, id, difficulty: legacy ? 'unknown' : cardProgressDifficulty(), pending: [] } : null;
+    }
+    function trackCardProgressDifficulty() {
+      if (!progressMeta || !(roundActive) || ['mixed', 'unknown'].includes(progressMeta.difficulty)) return;
+      if (progressMeta.difficulty !== cardProgressDifficulty()) progressMeta.difficulty = 'mixed';
+    }
+    function clearCardProgressResult() {
+      cardResultShare?.setResult(null);
+      const status = document.getElementById('jackProgressStatus');
+      status.textContent = ''; status.hidden = true;
+    }
+    function restoreCardProgress(meta, live) {
+      progressMeta = meta && meta.v === 1 && typeof meta.id === 'string'
+        ? JSON.parse(JSON.stringify(meta)) : (live ? newCardProgress(true) : null);
+    }
+    function completeJackProgress({ wins = 0, losses = 0, pushes = 0, natural = false, surrender = false, hands = 1, wager = currentBet }) {
+      if (!progressMeta) return;
+      const net = Number.isFinite(progressMeta.startBankroll) ? bankroll - progressMeta.startBankroll : null;
+      const event = { id: progressMeta.id, game: 'turdjack', mode: 'house-rules', difficulty: progressMeta.difficulty,
+        kind: 'hand', outcome: net === null ? 'complete' : net > 0 ? 'win' : net < 0 ? 'loss' : 'draw',
+        ...(net === null ? {} : { net, wager }), natural, surrender, hands, wins, losses, pushes, decks: rules.decks,
+        rules: [rules.dealerHitsSoft17 ? 'H17' : 'S17', blackjackPayoutLabel(),
+          rules.allowDoubleAfterSplit ? 'DAS' : 'no DAS', rules.allowSurrender ? 'surrender' : 'no surrender',
+          rules.allowInsurance ? 'insurance' : 'no insurance', rules.allowHitSplitAces ? 'hit split aces' : 'stand split aces'].join(' · ') };
+      progressMeta.pending = [event];
+      // Record before the ordinary settled-hand HUD clears its Continue entry.
+      publishCardProgress();
+    }
+
+    function publishCardProgress() {
+      const pending = progressMeta?.pending || [];
+      const earned = [];
+      let storageUnavailable = false;
+      for (const event of pending) {
+        const receipt = window.SuiteProgress?.record(event);
+        if (receipt?.newlyEarned) earned.push(...receipt.newlyEarned);
+        if (receipt?.storageAvailable === false) storageUnavailable = true;
+      }
+      cardResultShare?.setResult(pending.find(event => event.history !== false) || null);
+      const status = document.getElementById('jackProgressStatus');
+      if (earned.length) {
+        status.textContent = 'Goal complete: ' + earned.map(goal => goal.title).join(' · ');
+        status.hidden = false;
+      } else if (storageUnavailable) {
+        status.textContent = 'Progress could not be saved on this device.';
+        status.hidden = false;
+      }
+    }
+
     function persistTable() {
       if (!window.Suite || !Suite.table) return;
       if (!roundActive) {
@@ -3569,6 +3630,7 @@
       }
       Suite.table.remember('turdjack.html', {
         kind: 'turdjack',
+        ...(progressMeta ? { progressMeta } : {}),
         v: 1,
         bankroll,
         currentBet,
@@ -3652,6 +3714,7 @@
       decisionStreak = snap.decisionStreak || 0;
       hotStreak = snap.hotStreak || 0;
       coldStreak = snap.coldStreak || 0;
+      restoreCardProgress(snap.progressMeta, true);
       return true;
     }
 
@@ -4398,6 +4461,9 @@
         discard.push(...playerHand, ...dealerHand, ...splitHand);
       }
 
+      progressMeta = newCardProgress();
+      if (progressMeta) progressMeta.startBankroll = bankroll;
+      clearCardProgressResult();
       lastBet = currentBet;
       bankroll -= currentBet;
       roundActive = true;
@@ -4469,6 +4535,7 @@
             firstDecisionOpen = false;
             setStatus(`Even money locked. You bank $${currentBet * 2} and skip the sweat.`);
             logHistory(`Even money cashed for $${currentBet * 2}.`);
+            completeJackProgress({ wins: 1, natural: true });
             playSfx('win');
             renderCards();
             updateHud();
@@ -4516,6 +4583,7 @@
       }
 
       if (pBJ || dBJ) {
+        const settlementWager = currentBet + insuranceBet;
         revealDealerHole();
         renderCards();
 
@@ -4553,6 +4621,8 @@
 
         roundActive = false;
         firstDecisionOpen = false;
+        completeJackProgress({ wins: pBJ && !dBJ ? 1 : 0, losses: dBJ && !pBJ ? 1 : 0,
+          pushes: pBJ && dBJ ? 1 : 0, natural: pBJ, wager: settlementWager });
       } else {
         const roundIntro = insuranceBet > 0
           ? `No dealer blackjack. Insurance burned for $${insuranceBet}.`
@@ -4695,6 +4765,7 @@
       roundActive = false;
       activeHandIndex = 0;
 
+      const settlementWager = Number.isFinite(progressMeta?.startBankroll) ? progressMeta.startBankroll - bankroll : currentBet;
       const refund = Math.floor(currentBet / 2);
       bankroll += refund;
       stats.losses = (stats.losses || 0) + 1;
@@ -4702,6 +4773,7 @@
       recordMomentum(0, 1, 0);
       setStatus(`Surrender accepted. You recover $${refund} and keep your dignity.`);
       logHistory(`Surrender. Recovered $${refund} from $${currentBet}.`);
+      completeJackProgress({ losses: 1, surrender: true, wager: settlementWager });
       playSfx('surrender');
       renderCards();
       updateHud();
@@ -4802,6 +4874,8 @@
 
       const resolveRound = () => {
       if (!dealerResolving || !roundActive) return;
+      const settlementWager = Number.isFinite(progressMeta?.startBankroll)
+        ? progressMeta.startBankroll - bankroll : hands.reduce((sum, entry) => sum + entry.bet, 0);
       const dealer = handValue(dealerHand);
       const notes = [];
       let roundWins = 0;
@@ -4851,6 +4925,8 @@
       }
 
       recordMomentum(roundWins, roundLosses, roundPushes);
+      completeJackProgress({ wins: roundWins, losses: roundLosses, pushes: roundPushes,
+        hands: hands.length, wager: settlementWager });
       if (hotStreak >= 3) notes.push(`Heater x${hotStreak}.`);
       if (coldStreak >= 3) notes.push(`Cold streak x${coldStreak}.`);
 
@@ -4933,6 +5009,8 @@
         declineLabel: 'No — keep stats'
       });
       if (!ok) return;
+      progressMeta = null;
+      clearCardProgressResult();
       bankroll = INITIAL_BANKROLL;
       currentBet = 0;
       lastBet = MIN_BET;

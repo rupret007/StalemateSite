@@ -7,8 +7,9 @@ const script = readFileSync(new URL('../../scripts/stalemate-overlay/stalemate-o
 const windows = [];
 afterEach(() => { for (const window of windows.splice(0)) window.close(); });
 
-function resultPage(prefix = '') {
-    const dom = new JSDOM('<div id="endScreen" inert><span id="endScore">42</span><button id="btnRestart">Play again</button></div>', {
+function resultPage(prefix = '', sharedResult = false) {
+    const dom = new JSDOM('<div id="endScreen" inert><span id="endScore">42</span><button id="btnRestart">Play again</button>' +
+        (sharedResult ? '<div class="suite-result-share"><button>Share score</button></div>' : '') + '</div>', {
         url: `https://example.test${prefix}/play/TurdAnoid.html?irrelevant=1#old`,
         runScripts: 'outside-only'
     });
@@ -30,6 +31,16 @@ function resultPage(prefix = '') {
 }
 
 describe('Stalemate result overlay', () => {
+    it('keeps band links and one sharing action when the shared result UI already exists', () => {
+        const p = resultPage('', true);
+        expect(p.w.document.querySelector('#stalemateShare')).toBeNull();
+        expect(p.w.document.querySelectorAll('.suite-result-share button')).toHaveLength(1);
+        expect(p.w.document.querySelector('.stalemate-end__listen').getAttribute('href')).toBe('../#home');
+        expect(p.w.document.querySelector('.stalemate-end__showlink').getAttribute('href')).toBe('https://rockinoctober.com');
+        expect(p.w.document.querySelector('.stalemate-end__status')).toBeNull();
+        expect(p.w.Audio).not.toHaveBeenCalled();
+    });
+
     it.each(['', '/StalemateSite'])('shares result text and exact game link under %s without starting a second player', async (prefix) => {
         const p = resultPage(prefix);
         p.w.navigator.share = vi.fn().mockResolvedValue(undefined);

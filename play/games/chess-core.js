@@ -110,7 +110,8 @@ export function undoTurn(game) {
 export function snapshot(game) {
   return { version: 1, id: game.id, mode: game.mode, side: game.side, level: game.level,
     start: game.start, moves: game.chess.history({ verbose: true }).map(move => move.lan),
-    flipped: game.flipped, hints: game.hints, undos: game.undos, result: game.result, updated: game.updated };
+    flipped: game.flipped, hints: game.hints, undos: game.undos, result: game.result, updated: game.updated,
+    ...(game.progressId ? { progressId: game.progressId } : {}) };
 }
 
 export function restore(raw) {
@@ -125,6 +126,11 @@ export function restore(raw) {
         ![data.hints, data.undos].every(n => Number.isSafeInteger(n) && n >= 0 && n <= 100000)) { return null; }
     const game = createGame(data);
     game.id = data.id;
+    // Optional metadata leaves the existing version-one save contract intact.
+    // A malformed progress identifier is ignored, never a reason to lose moves.
+    if (typeof data.progressId === 'string' && data.progressId.length <= 200 &&
+        /^p1\.[a-z0-9-]{8,80}\.chess\.[1-9][0-9]{0,15}$/.test(data.progressId) &&
+        Number.isSafeInteger(Number(data.progressId.split('.').at(-1)))) {game.progressId = data.progressId;}
     for (const move of data.moves) { playMove(game, move); }
     game.flipped = data.flipped; game.hints = data.hints; game.undos = data.undos; game.updated = data.updated;
     if (data.result) {

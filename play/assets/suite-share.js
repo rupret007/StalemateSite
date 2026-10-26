@@ -3,13 +3,19 @@
   'use strict';
   const integer = value => Number.isFinite(Number(value)) ? Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.floor(Number(value)))) : 0;
   const points = value => integer(value).toLocaleString('en-US') + ' points';
+  const units = (value, single, multiple = single + 's') => `${integer(value).toLocaleString('en-US')} ${integer(value) === 1 ? single : multiple}`;
+  const SHARE_ACCENT = '#ed2765';
+  const signed = value => (Number.isFinite(value) ? Math.max(-1e9, Math.min(1e9, value)) : 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
+  const strength = value => ({ easy: 'Easy', normal: 'Normal', hard: 'Hard', mixed: 'Mixed strength', unknown: 'Strength not recorded', house: 'House rules', friendly: 'Friendly', casual: 'Casual', club: 'Club', sharp: 'Sharp' })[value] || 'Strength not recorded';
   function time(value) {
     const ms = integer(value);
     return `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}.${String(Math.floor(ms / 10) % 100).padStart(2, '0')}`;
   }
   function describe(game, run, href) {
-    if (!['turdtris', 'turdomania'].includes(game)) throw new Error('Unsupported result');
-    const url = new URL(game + '.html', href);
+    const names = { turdanoid: 'Turdanoid', turdtris: 'Turdtris', turdomania: 'Turdomania', turdjack: 'Crapjack 21', crapeights: 'Crappy Eights', turdrummy: 'TurdRummy', turdspades: 'TurdSpades', chess: 'Royal Flush Chess' };
+    if (!Object.hasOwn(names, game) || !run || typeof run !== 'object') throw new Error('Unsupported result');
+    if (!['turdtris', 'turdomania'].includes(game) && !['win', 'loss', 'draw', 'complete'].includes(run.outcome)) throw new Error('A completed result is required');
+    const url = new URL(game === 'turdanoid' ? 'TurdAnoid.html' : game + '.html', href);
     let mode, metric = points(run.score), detail, outcome;
     if (game === 'turdtris') {
       const id = ['classic', 'sprint', 'ultra'].includes(run.mode) ? run.mode : 'classic';
@@ -21,16 +27,48 @@
         outcome = run.completed ? '40 lines cleared' : 'Sprint unfinished';
         if (run.completed) { metric = time(run.elapsedMs); detail = points(run.score); }
       } else if (id === 'ultra') outcome = run.completed ? 'Two minutes complete' : 'Ultra ended early';
-    } else {
-      const id = ['easy', 'normal', 'hard'].includes(run.level) ? run.level : 'normal';
+    } else if (game === 'turdomania') {
+      const id = ['easy', 'normal', 'hard'].includes(run.level || run.mode) ? run.level || run.mode : 'normal';
       url.searchParams.set('level', id);
       mode = { easy: 'Easy', normal: 'Normal', hard: 'Hard' }[id];
       outcome = run.cleared ? 'Board cleared' : 'No moves left';
       detail = `${integer(run.left)} tiles left`;
+      if (Number.isSafeInteger(run.cols) && run.cols > 0 && Number.isSafeInteger(run.rows) && run.rows > 0) detail += ` · ${run.cols}×${run.rows} board`;
+    } else if (game === 'turdanoid') {
+      const id = run.mode === 'boss' ? 'boss' : 'classic';
+      url.searchParams.set('mode', id);
+      mode = id === 'boss' ? 'Boss Flush' : 'Classic';
+      outcome = run.outcome === 'win' ? 'Victory' : 'Run complete';
+      detail = `${units(run.levelsCleared, 'stage')} cleared · Best combo ${integer(run.maxCombo)}`;
+    } else if (game === 'turdjack') {
+      mode = 'House rules';
+      const net = Number.isFinite(run.net) ? run.net : null;
+      metric = net === null ? 'Deal complete' : `Net ${net < 0 ? '-' : '+'}$${signed(Math.abs(net))}`;
+      outcome = run.natural && run.outcome === 'win' ? 'Natural blackjack' : 'Deal settled';
+      const rules = typeof run.rules === 'string' ? run.rules.replace(/[<>\r\n]/g, '').slice(0, 70) : '';
+      detail = `${net === null ? 'Net not recorded · ' : ''}${units(run.wins, 'win')} · ${units(run.losses, 'loss', 'losses')} · ${units(run.pushes, 'push', 'pushes')}${rules ? ' · ' + rules : ''}`;
+    } else if (game === 'chess') {
+      const local = run.local === true || run.mode === 'local';
+      url.searchParams.set('mode', local ? 'local' : 'computer');
+      const level = ['friendly', 'casual', 'club', 'sharp'].includes(run.difficulty || run.level) ? run.difficulty || run.level : 'friendly';
+      if (!local) url.searchParams.set('level', level);
+      mode = local ? 'Two players · Untimed' : `${strength(level)} computer · ${run.assisted ? 'Assisted' : 'No aids used'}`;
+      metric = local ? run.winner === 'w' ? 'White wins' : run.winner === 'b' ? 'Black wins' : 'Draw' : { win: 'You won', loss: 'Computer won', draw: 'Draw', complete: 'Game complete' }[run.outcome];
+      outcome = local ? 'Local two-player game' : 'Casual computer practice';
+      detail = `${units(run.moves, 'half-move')} · ${units(run.hints, 'hint')} · ${units(run.undos, 'takeback')}`;
+    } else {
+      const unit = run.kind === 'round' ? 'Round' : 'Match';
+      mode = `${game === 'turdspades' ? 'Team ' : ''}${unit.toLowerCase()} · ${strength(run.difficulty)}`;
+      metric = { win: `${unit} won`, loss: `${unit} lost`, draw: `${unit} drawn`, complete: `${unit} complete` }[run.outcome];
+      outcome = game === 'crapeights' ? `First to ${integer(run.target) || 200} points` : game === 'turdrummy' ? 'Gin Rummy' : 'Partner Spades';
+      detail = game === 'turdspades' ? `Your team ${signed(run.playerScore ?? run.score)} · Opponents ${signed(run.opponentScore)}` : `Your score ${signed(run.playerScore ?? run.score)}`;
+      if (Number.isFinite(run.target)) detail += ` · Target ${integer(run.target)}`;
+      if (Number.isFinite(run.rounds)) detail += ` · ${integer(run.rounds)} rounds`;
     }
-    const name = game === 'turdtris' ? 'Turdtris' : 'Turdomania';
-    const text = `${name} · ${mode}: ${metric}. ${outcome}. ${detail}. Stalemate Arcade.`;
-    return Object.freeze({ game, name, mode, metric, detail, outcome, text, url: url.href });
+    const name = names[game];
+    const improvement = typeof run.improvement === 'string' && run.improvement.length <= 160 ? run.improvement : '';
+    const text = `${name} · ${mode}: ${metric}. ${outcome}. ${detail}.${improvement ? ' ' + improvement + '.' : ''} Stalemate Arcade.`;
+    return Object.freeze({ game, name, mode, metric, detail, outcome, text, url: url.href, improvement });
   }
   function drawCard(result, document) {
     const canvas = document.createElement('canvas');
@@ -49,12 +87,19 @@
       ctx.fillText(text, 540, y, 880);
     }
     line('STALEMATE ARCADE', 245, 54, '#b5dc08');
-    line(result.name.toUpperCase(), 365, 108, '#ed2765');
-    line(result.mode, 440, 52, '#f4f0e6');
-    line(result.metric, 575, 112, '#f4f0e6');
+    line(result.name.toUpperCase(), 365, result.name.length > 14 ? 76 : 108, SHARE_ACCENT);
+    line(result.mode, 440, result.mode.length > 30 ? 36 : 52, '#f4f0e6');
+    line(result.metric, 575, result.metric.length > 16 ? 78 : 112, '#f4f0e6');
     line(result.outcome, 665, 48, '#b5dc08');
-    line(result.detail, 740, 36, '#f4f0e6');
+    const words = result.detail.split(' '), details = [''];
+    for (const word of words) {
+      const last = details.length - 1;
+      if ((details[last] + ' ' + word).trim().length > 50) details.push(word);
+      else details[last] = (details[last] + ' ' + word).trim();
+    }
+    details.slice(0, 3).forEach((text, index) => line(text, 730 + index * 35, 30, '#f4f0e6'));
     line(result.url.replace(/^https?:\/\//, ''), 840, 27, '#f4f0e6');
+    if (result.improvement) line(result.improvement, 895, 28, '#b5dc08');
     return canvas;
   }
   function create({ host, game }) {
@@ -65,7 +110,7 @@
     const actions = document.createElement('div');
     actions.className = 'suite-result-share-actions';
     const button = document.createElement('button');
-    button.type = 'button'; button.textContent = 'Share score';
+    button.type = 'button'; button.textContent = ['turdtris', 'turdomania', 'turdanoid'].includes(game) ? 'Share score' : 'Share result';
     const save = document.createElement('a');
     save.textContent = 'Save image'; save.hidden = true;
     save.download = game + '-score.png';

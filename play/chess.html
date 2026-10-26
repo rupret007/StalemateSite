@@ -15,9 +15,13 @@
 <link rel="stylesheet" href="assets/chess/chess.css">
 <link rel="stylesheet" href="assets/chess/chessground.base.css" data-game-required>
 <link rel="stylesheet" href="assets/chess/chess-board.css" data-game-required>
-<script src="games/table-continue-core.js"></script>
+<script src="games/table-continue-core.js?v=30dfab772a1ae911"></script>
 <script src="assets/turdsuite.js"></script>
-<script type="module" src="games/chess-ui.js" data-game-required></script>
+<link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
+<script src="games/suite-progress-core.js?v=26280b3adb2d8c25"></script>
+<script src="assets/suite-progress.js?v=5fdc02c46aa62534"></script>
+<script src="assets/suite-share.js?v=85ff7f9230484519"></script>
+<script type="module" src="games/chess-ui.js?v=d72d79d9a33ddc9a" data-game-required></script>
 </head>
 <!-- New chess page and source modules: GPL-3.0-or-later. See assets/chess/credits.html. -->
 <body class="arcade chess-page" data-arcade-game="chess" data-suite-no-difficulty="1" data-suite-no-back="1" data-suite-no-bg="1">
@@ -52,7 +56,7 @@
 <div class="chess-card turn-card"><p id="game-label" class="chess-kicker"></p><h2 id="turn">White to move</h2><p id="status" role="status" aria-live="polite" aria-atomic="true"></p><p id="save-status" class="subtle"></p>
 <div class="chess-actions"><button id="hint" type="button">Hint</button><button id="undo" type="button">Undo turn</button><button id="flip" type="button">Flip board</button><button id="claim" type="button">Claim draw</button></div>
 <div id="engine-recovery" hidden><p>The computer is unavailable. Your position is safe while this page stays open.</p><button id="retry" type="button">Retry computer</button><button id="switch-local" type="button">Continue with a friend</button></div>
-<div id="result" hidden><p id="result-details"></p><button id="rematch" type="button" class="primary">Play again →</button></div>
+<div id="result" hidden><p id="result-details"></p><button id="rematch" type="button" class="primary">Play again →</button><p id="progress-result" class="suite-progress-result" role="status"></p><div id="chess-result-share"></div></div>
 </div>
 <details id="moves-panel" class="chess-card" open><summary>Moves &amp; review <span id="move-count"></span></summary><div class="review-controls"><button id="previous" type="button" aria-label="Review previous move">←</button><button id="live" type="button">Live board</button><button id="next" type="button" aria-label="Review next move">→</button></div><ol id="moves" class="chess-moves" aria-label="Move history"></ol><p id="no-moves" class="subtle">Your story starts with the first move.</p><div class="capture-review" role="group" aria-label="Captured pieces"><p id="white-captured-review"></p><p id="black-captured-review"></p></div></details>
 <details id="game-options" class="chess-card"><summary>Game options &amp; help</summary><p id="mode-help"></p><div class="chess-actions"><button id="new" type="button">New game</button><button id="resign" type="button">Resign</button><button id="export" type="button">Download PGN</button><button id="help" type="button">How to play</button></div><div id="suite-arcade-a11y-mount" class="chess-contrast-control"></div><p id="records" class="subtle"></p><p class="subtle">Computer strength depends on your device. These are search settings, not Elo ratings. Your results are casual practice.</p></details>

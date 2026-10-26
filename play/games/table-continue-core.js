@@ -791,6 +791,55 @@
     };
   }
 
+  // Optional progress is independent of the playable save. A damaged progress
+  // extension must not discard an otherwise valid pre-existing game.
+  function cleanProgressMeta(value, game) {
+    if (!isPlainObject(value) || hasDangerousKey(value) || value.v !== 1) {return null;}
+    const validId = id => typeof id === 'string' && id.length <= 200 &&
+      new RegExp(`^p1\\.[a-z0-9-]{8,80}\\.${game}\\.[1-9][0-9]{0,15}$`).test(id) &&
+      Number.isSafeInteger(Number(id.split('.').at(-1)));
+    if (!validId(value.id) || (value.roundId !== undefined && !validId(value.roundId))) {return null;}
+    if (!['easy', 'normal', 'hard', 'mixed', 'unknown', 'house'].includes(value.difficulty)) {return null;}
+    const result = { v: 1, id: value.id, difficulty: value.difficulty };
+    if (value.roundId !== undefined) {result.roundId = value.roundId;}
+    if (value.startBankroll !== undefined) {
+      if (typeof value.startBankroll !== 'number' || !Number.isFinite(value.startBankroll) || Math.abs(value.startBankroll) > 1e9) {return null;}
+      result.startBankroll = value.startBankroll;
+    }
+    if (value.pending !== undefined) {
+      if (!Array.isArray(value.pending) || value.pending.length > 2) {return null;}
+      const numbers = new Set(['score', 'net', 'bid', 'tricks', 'target', 'rounds', 'playerScore', 'opponentScore', 'wager', 'hands', 'wins', 'losses', 'pushes', 'decks']);
+      const booleans = new Set(['history', 'natural', 'roundWon', 'matchWon', 'gin', 'surrender']);
+      result.pending = [];
+      for (const event of value.pending) {
+        if (!isPlainObject(event) || hasDangerousKey(event) || !validId(event.id) || event.game !== game ||
+            ![value.id, value.roundId].includes(event.id) ||
+            !['hand', 'round', 'match'].includes(event.kind) ||
+            !['win', 'loss', 'draw', 'complete'].includes(event.outcome) ||
+            typeof event.mode !== 'string' || !/^[a-z][a-z0-9-]{0,31}$/.test(event.mode) ||
+            !['easy', 'normal', 'hard', 'mixed', 'unknown', 'house'].includes(event.difficulty)) {return null;}
+        const clean = { id: event.id, game, mode: event.mode, difficulty: event.difficulty, kind: event.kind, outcome: event.outcome };
+        for (const [key, field] of Object.entries(event)) {
+          if (numbers.has(key)) {
+            if (typeof field !== 'number' || !Number.isFinite(field) || Math.abs(field) > 1e9) {return null;}
+            clean[key] = field;
+          } else if (booleans.has(key)) {
+            if (typeof field !== 'boolean') {return null;}
+            clean[key] = field;
+          } else if (key === 'rules') {
+            if (typeof field !== 'string' || cleanString(field, 240) === null) {return null;}
+            clean.rules = field;
+          } else if (key === 'team') {
+            if (typeof field !== 'string' || !/^[a-z][a-z0-9-]{0,31}$/.test(field)) {return null;}
+            clean.team = field;
+          }
+        }
+        result.pending.push(clean);
+      }
+    }
+    return result;
+  }
+
   function validateSnapshot(page, snapshot) {
     if (!TABLE_CONTINUE_GAMES.includes(page)) {
       return null;
@@ -798,16 +847,14 @@
     if (!isPlainObject(snapshot) || snapshot.kind !== kindForPage(page)) {
       return null;
     }
-    if (page === 'turdspades.html') {
-      return validateSpadesSnapshot(snapshot);
+    const validators = { 'turdspades.html': validateSpadesSnapshot, 'turdrummy.html': validateRummySnapshot,
+      'crapeights.html': validateEightsSnapshot, 'turdjack.html': validateJackSnapshot };
+    const clean = validators[page](snapshot);
+    if (clean && snapshot.progressMeta !== undefined) {
+      const progress = cleanProgressMeta(snapshot.progressMeta, kindForPage(page));
+      if (progress) {clean.progressMeta = progress;}
     }
-    if (page === 'turdrummy.html') {
-      return validateRummySnapshot(snapshot);
-    }
-    if (page === 'crapeights.html') {
-      return validateEightsSnapshot(snapshot);
-    }
-    return validateJackSnapshot(snapshot);
+    return clean;
   }
 
   function emptyStore() {
