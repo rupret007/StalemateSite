@@ -139,6 +139,240 @@ describe('opt-in session authority through the actual beta gateway and Lobby', (
         expect(who.socket.closed.code).toBe(4401); expect(h.lobby().authorityUnavailable).toBe(true);
     });
 
+    it('does not retire a durable binding when the real disconnect commit is refused', async () => {
+        const h = await harness(), leaving = await h.visitor('LeavingGuest'), healthy = await h.visitor('HealthyGuest');
+        const lobby = h.lobby(), leavingId = leaving.socket.deserializeAttachment().id, healthyId = healthy.socket.deserializeAttachment().id;
+        const before = await lobby.authority.load(), beforeRollbacks = h.driver.stats.rollbacks;
+        const beforeCommits = h.driver.stats.commits, originalTransaction = h.state.storage.transaction;
+        const sessionsHex = Buffer.from('sessions').toString('hex');
+        let tripped = false, sessionsManifestWrites = 0, attempts = 0, queued;
+        const retry = deferred(), realDisconnect = lobby.engine.disconnect;
+        // This observes the real method/result. It does not replace the engine
+        // or manufacture the controlledRun refusal that this regression needs.
+        const disconnect = vi.spyOn(lobby.engine, 'disconnect').mockImplementation((...args) => {
+            // Hold only the retry before it enters the real engine/transaction.
+            // The first result and every eventual retry result remain genuine.
+            if (++attempts === 2) return retry.promise.then(() => realDisconnect(...args));
+            return realDisconnect(...args);
+        });
+        h.state.storage.transaction = operation => originalTransaction(raw => operation({ ...raw, put: async (key, value) => {
+            await raw.put(key, value);
+            if (!key.includes(':manifest:') || !key.endsWith(sessionsHex)) return;
+            sessionsManifestWrites++;
+            if (!tripped) {
+                tripped = true;
+                // The actual SQLite write has happened inside its transaction;
+                // throwing here rolls it back. Later conservative cost/session
+                // persistence remains available and must not be faulted again.
+                throw Error('Synthetic post-write disconnect session failure');
+            }
+        } }));
+        try {
+            await lobby.webSocketClose(leaving.socket, 1000);
+            expect(tripped).toBe(true);
+            expect(h.driver.stats.rollbacks - beforeRollbacks).toBe(1);
+            expect(sessionsManifestWrites).toBeGreaterThanOrEqual(2);
+            expect(h.driver.stats.commits).toBeGreaterThan(beforeCommits);
+            expect(disconnect.mock.calls[0]).toEqual([leavingId]);
+            expect(await disconnect.mock.results[0].value).toMatchObject({ ok: false });
+            expect(leaving.socket.closed.code).toBe(1000);
+            expect(lobby.engine._debug.conns.has(leavingId)).toBe(true);
+            expect(lobby.engine._debug.conns.has(healthyId)).toBe(true);
+            expect(healthy.socket.readyState).toBe(1);
+            expect(healthy.socket.closed).toBeUndefined();
+
+            const after = await lobby.authority.load();
+            expect(after.state.sessions.connections.map(connection => connection.id).sort())
+                .toEqual(before.state.sessions.connections.map(connection => connection.id).sort());
+            // Acknowledging transport closure is not a committed member removal.
+            // The engine and its conservative saved snapshot still contain this
+            // connection, so no separate successful unbind may claim it retired.
+            expect(after.bindings.map(({ binding }) => binding.id).sort())
+                .toEqual(before.bindings.map(({ binding }) => binding.id).sort());
+
+            const marker = 'A queued closed connection must not publish';
+            queued = lobby.webSocketMessage(leaving.socket, JSON.stringify({ t: 'say', ch: '#stalemate', text: marker }));
+            await vi.waitFor(() => expect(disconnect).toHaveBeenCalledTimes(2), { timeout: 1000, interval: 10 });
+            retry.resolve(); await h.settle(); await queued;
+            expect(await disconnect.mock.results[1].value).toBeUndefined();
+            const retired = await lobby.authority.load();
+            expect(retired.bindings.map(({ binding }) => binding.id)).toEqual([healthyId]);
+            expect(retired.state.sessions.connections.map(connection => connection.id)).toEqual([healthyId]);
+            expect(lobby.engine._debug.conns.has(leavingId)).toBe(false);
+            expect(healthy.socket.frames.some(frame => frame.t === 'line' && frame.text === marker)).toBe(false);
+            await h.message(healthy, { t: 'say', ch: '#stalemate', text: 'Healthy peer after committed retirement' });
+            expect(healthy.socket.frames.some(frame => frame.t === 'line' && frame.text === 'Healthy peer after committed retirement')).toBe(true);
+        } finally {
+            retry.resolve(); h.state.storage.transaction = originalTransaction;
+            await queued?.catch(() => {});
+            await h.settle();
+        }
+    });
+
+    it('bounds immediate retirement retries and uses the ordinary alarm after repeated real refusals', async () => {
+        const h = await harness(), leaving = await h.visitor('RetryLeaving'), healthy = await h.visitor('RetryHealthy');
+        const lobby = h.lobby(), leavingId = leaving.socket.deserializeAttachment().id, healthyId = healthy.socket.deserializeAttachment().id;
+        const disconnect = vi.spyOn(lobby.engine, 'disconnect'), originalTransaction = h.state.storage.transaction;
+        const sessionsHex = Buffer.from('sessions').toString('hex'); let failedInvocation = 0;
+        h.state.storage.transaction = operation => originalTransaction(raw => operation({ ...raw, put: async (key, value) => {
+            await raw.put(key, value);
+            if (key.includes(':manifest:') && key.endsWith(sessionsHex) && disconnect.mock.calls.length > failedInvocation) {
+                failedInvocation = disconnect.mock.calls.length;
+                // Exactly one semantic-write fault per actual invocation;
+                // its real conservative follow-up is allowed to commit.
+                throw Error('Synthetic repeated disconnect session failure');
+            }
+        } }));
+        try {
+            await lobby.webSocketClose(leaving.socket, 1000); await h.settle();
+            expect(disconnect).toHaveBeenCalledTimes(2);
+            expect(await disconnect.mock.results[0].value).toMatchObject({ ok: false });
+            expect(await disconnect.mock.results[1].value).toMatchObject({ ok: false });
+            await h.settle(); expect(disconnect).toHaveBeenCalledTimes(2);
+            let saved = await lobby.authority.load();
+            expect(saved.bindings.map(({ binding }) => binding.id).sort()).toEqual([leavingId, healthyId].sort());
+            expect(saved.state.sessions.connections.map(connection => connection.id).sort()).toEqual([leavingId, healthyId].sort());
+            expect(healthy.socket.readyState).toBe(1);
+
+            vi.setSystemTime(NOW + 60000);
+            await lobby.alarm(); await h.settle();
+            expect(disconnect).toHaveBeenCalledTimes(3);
+            expect(await disconnect.mock.results[2].value).toMatchObject({ ok: false });
+            await h.settle(); expect(disconnect).toHaveBeenCalledTimes(3);
+            saved = await lobby.authority.load();
+            expect(saved.bindings.map(({ binding }) => binding.id).sort()).toEqual([leavingId, healthyId].sort());
+            expect(await h.state.storage.getAlarm()).toBeGreaterThan(Date.now());
+            expect(healthy.socket.readyState).toBe(1);
+        } finally { h.state.storage.transaction = originalTransaction; }
+    });
+
+    it('retries a real unbind rollback without restoring committed departed membership', async () => {
+        const h = await harness(), leaving = await h.visitor('UnbindLeaving'), healthy = await h.visitor('UnbindHealthy');
+        const lobby = h.lobby(), leavingId = leaving.socket.deserializeAttachment().id, healthyId = healthy.socket.deserializeAttachment().id;
+        const originalTransaction = h.state.storage.transaction, bindingHex = Buffer.from('authority-connection:' + leavingId).toString('hex');
+        const retry = deferred(), originalAuthority = lobby.authority; let attempts = 0, tripped = false;
+        const disconnect = vi.spyOn(lobby.engine, 'disconnect');
+        // The authority itself is frozen. This frozen facade delays only the
+        // second actual unbind, then passes through its real transaction/result.
+        // An already committed disconnect need not run again just to retry it.
+        const unbind = vi.fn((...args) => ++attempts === 2
+            ? retry.promise.then(() => originalAuthority.unbind(...args)) : originalAuthority.unbind(...args));
+        lobby.authority = Object.freeze({ ...originalAuthority, unbind });
+        h.state.storage.transaction = operation => originalTransaction(raw => operation({ ...raw, delete: async key => {
+            const result = await raw.delete(key);
+            if (!tripped && key.includes(':manifest:') && key.endsWith(bindingHex)) {
+                tripped = true; throw Error('Synthetic post-delete unbind failure');
+            }
+            return result;
+        } }));
+        try {
+            await lobby.webSocketClose(leaving.socket, 1000);
+            expect(tripped).toBe(true);
+            expect(await disconnect.mock.results[0].value).toBeUndefined();
+            const pending = await lobby.authority.load();
+            expect(pending.state.sessions.connections.map(connection => connection.id)).toEqual([healthyId]);
+            expect(lobby.engine._debug.conns.has(leavingId)).toBe(false);
+            expect(pending.bindings.map(({ binding }) => binding.id).sort()).toEqual([leavingId, healthyId].sort());
+            expect(disconnect).toHaveBeenCalledExactlyOnceWith(leavingId);
+            await vi.waitFor(() => expect(unbind).toHaveBeenCalledTimes(2), { timeout: 1000, interval: 10 });
+            retry.resolve(); await h.settle();
+            expect(await unbind.mock.results[1].value).toBeUndefined();
+            expect(disconnect).toHaveBeenCalledExactlyOnceWith(leavingId);
+            const retired = await lobby.authority.load();
+            expect(retired.bindings.map(({ binding }) => binding.id)).toEqual([healthyId]);
+            expect(retired.state.sessions.connections.map(connection => connection.id)).toEqual([healthyId]);
+            expect(healthy.socket.readyState).toBe(1);
+        } finally {
+            retry.resolve(); h.state.storage.transaction = originalTransaction;
+            await h.settle(); lobby.authority = originalAuthority;
+        }
+    });
+
+    it('retains cold bindings until reconstructed sessions commit and then recovers consistently', async () => {
+        const h = await harness(), leaving = await h.visitor('ColdLeaving'), healthy = await h.visitor('ColdHealthy');
+        const leavingId = leaving.socket.deserializeAttachment().id, healthyId = healthy.socket.deserializeAttachment().id;
+        const originalTransaction = h.state.storage.transaction, sessionsHex = Buffer.from('sessions').toString('hex');
+        let tripped = false;
+        // No close event is delivered to the old instance: the new Lobby must
+        // reconcile its durable sessions against actual surviving sockets.
+        leaving.socket.close(1000);
+        h.state.storage.transaction = operation => originalTransaction(raw => operation({ ...raw, put: async (key, value) => {
+            await raw.put(key, value);
+            if (!tripped && key.includes(':manifest:') && key.endsWith(sessionsHex)) {
+                tripped = true; throw Error('Synthetic reconstructed-session write failure');
+            }
+        } }));
+        let failed;
+        try { failed = await h.wake(); }
+        finally { h.state.storage.transaction = originalTransaction; }
+        expect(tripped).toBe(true); expect(failed.authorityUnavailable).toBe(true);
+        const retained = await failed.authority.load();
+        expect(retained.state.sessions.connections.map(connection => connection.id).sort()).toEqual([leavingId, healthyId].sort());
+        expect(retained.bindings.map(({ binding }) => binding.id).sort()).toEqual([leavingId, healthyId].sort());
+
+        const restored = await h.wake();
+        expect(restored.authorityUnavailable).toBe(false);
+        const saved = await restored.authority.load();
+        expect(saved.state.sessions.connections.map(connection => connection.id)).toEqual([healthyId]);
+        expect(saved.bindings.map(({ binding }) => binding.id)).toEqual([healthyId]);
+        expect(restored.engine._debug.conns.has(leavingId)).toBe(false);
+        expect(restored.engine._debug.conns.has(healthyId)).toBe(true);
+        expect(healthy.socket.readyState).toBe(1);
+    });
+
+    it('keeps a revoked SID pending until failed closed-socket retirement really commits', async () => {
+        const h = await harness(), leaving = await h.visitor('LogoutLeaving'), healthy = await h.visitor('LogoutHealthy');
+        const lobby = h.lobby(), leavingId = leaving.socket.deserializeAttachment().id, healthyId = healthy.socket.deserializeAttachment().id;
+        const originalTransaction = h.state.storage.transaction, sessionsHex = Buffer.from('sessions').toString('hex');
+        const retry = deferred(), realDisconnect = lobby.engine.disconnect;
+        let attempts = 0, tripped = false, denied, progress;
+        const disconnect = vi.spyOn(lobby.engine, 'disconnect').mockImplementation((...args) =>
+            ++attempts === 2 ? retry.promise.then(() => realDisconnect(...args)) : realDisconnect(...args));
+        h.state.storage.transaction = operation => originalTransaction(raw => operation({ ...raw, put: async (key, value) => {
+            await raw.put(key, value);
+            if (!tripped && key.includes(':manifest:') && key.endsWith(sessionsHex)) {
+                tripped = true; throw Error('Synthetic revoked-session disconnect failure');
+            }
+        } }));
+        try {
+            const result = await logout(h, leaving);
+            expect(result.status).toBe(503);
+            expect(result.headers.has('Set-Cookie')).toBe(false);
+            expect(tripped).toBe(true);
+            expect(await disconnect.mock.results[0].value).toMatchObject({ ok: false });
+            expect(leaving.socket.closed.code).toBe(4401);
+            expect(h.state.getWebSockets()).not.toContain(leaving.socket);
+            const revoked = await lobby.authority.records.transaction(tx => tx.get(`authority-session:${leaving.access.sid}`));
+            expect(revoked).toMatchObject({ revoked: true, pending: true });
+            const pending = await lobby.authority.load();
+            expect(pending.state.sessions.connections.map(connection => connection.id).sort()).toEqual([leavingId, healthyId].sort());
+            expect(pending.bindings.map(({ binding }) => binding.id).sort()).toEqual([leavingId, healthyId].sort());
+
+            // The held actual cleanup owns the event gate. Queue real requests
+            // without awaiting them inside it; they run after cleanup releases.
+            denied = betaFetch(request('/beta/state', { cookie: leaving.cookie }), h.env);
+            progress = h.message(healthy, { t: 'say', ch: '#stalemate', text: 'Healthy guest after failed logout cleanup' });
+            await vi.waitFor(() => expect(disconnect).toHaveBeenCalledTimes(2), { timeout: 1000, interval: 10 });
+            retry.resolve(); await h.settle();
+            expect((await denied).status).toBe(401); await progress;
+            expect(healthy.socket.frames.some(frame => frame.t === 'line' && frame.text === 'Healthy guest after failed logout cleanup')).toBe(true);
+            expect(healthy.socket.readyState).toBe(1);
+            const retired = await lobby.authority.load();
+            expect(retired.bindings.map(({ binding }) => binding.id)).toEqual([healthyId]);
+            expect(retired.state.sessions.connections.map(connection => connection.id)).toEqual([healthyId]);
+
+            vi.setSystemTime(revoked.retryAt);
+            await lobby.alarm(); await h.settle();
+            expect(await lobby.authority.records.transaction(tx => tx.get(`authority-session:${leaving.access.sid}`)))
+                .toMatchObject({ revoked: true, pending: false });
+            expect((await betaFetch(request('/beta/state', { cookie: leaving.cookie }), h.env)).status).toBe(401);
+            expect(healthy.socket.readyState).toBe(1);
+        } finally {
+            retry.resolve(); h.state.storage.transaction = originalTransaction;
+            await Promise.allSettled([denied, progress]); await h.settle();
+        }
+    });
+
     it('contains a failed fallback alarm write inside the event gate', async () => {
         const h = await harness(); h.state.storage.transaction = async () => { throw Error('Synthetic unavailable native storage'); };
         h.state.storage.setAlarm = async () => { throw Error('Synthetic unavailable fallback alarm'); };
