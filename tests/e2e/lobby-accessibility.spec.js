@@ -364,3 +364,76 @@ test('People roster: a departed focused member falls back to the People heading'
         expect(visitor.errors).toEqual([]); expect(survivor.errors).toEqual([]);
     } finally { await survivor?.close(); await peer?.close(); await visitor.close(); }
 });
+
+test('People roster: a live join preserves the open person dialog and its native return target', async ({ browser, baseURL }) => {
+    const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
+    const viewport = { width: 1280, height: 900 };
+    const visitor = await guest(browser, baseURL, 'RosterDialog', viewport, relay);
+    let peer, arrival;
+    try {
+        peer = await guest(browser, baseURL, 'RosterSheetPeer', viewport, relay);
+        const person = visitor.page.locator('[data-nicks]').getByRole('button', { name: 'RosterSheetPeer', exact: true });
+        await tabTo(visitor.page, person);
+        const opener = await person.elementHandle();
+        const connectionId = await visitor.page.evaluate(() =>
+            window.__lobby.chans.get('#stalemate').names.find(member => member.nick === 'RosterSheetPeer').id);
+        await visitor.page.keyboard.press('Enter');
+        const dialog = visitor.page.locator('dialog[data-sheet]');
+        await expect(dialog).toHaveAccessibleName('RosterSheetPeer');
+        const dialogControl = dialog.locator('button').first();
+        await expect(dialogControl).toBeFocused();
+
+        arrival = await guest(browser, baseURL, 'RosterSheetNew', viewport, relay);
+        await expect.poll(() => visitor.page.evaluate(() =>
+            window.__lobby.chans.get('#stalemate').names.some(member => member.nick === 'RosterSheetNew'))).toBe(true);
+        expect(await visitor.page.evaluate(id =>
+            window.__lobby.chans.get('#stalemate').names.find(member => member.id === id)?.nick, connectionId)).toBe('RosterSheetPeer');
+        await expect(dialog).toBeVisible();
+        await expect(dialogControl).toBeFocused();
+        await visitor.page.keyboard.press('Escape');
+        await expect(dialog).toBeHidden();
+        await expect(person).toBeFocused();
+        expect(await opener.evaluate(element => element === document.activeElement)).toBe(true);
+        expect(visitor.errors).toEqual([]); expect(peer.errors).toEqual([]); expect(arrival.errors).toEqual([]);
+    } finally { await arrival?.close(); await peer?.close(); await visitor.close(); }
+});
+
+test('People roster: a departed person dialog returns to the visible heading on Escape', async ({ browser, baseURL }) => {
+    const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
+    const viewport = { width: 1280, height: 900 };
+    const visitor = await guest(browser, baseURL, 'RosterModal', viewport, relay);
+    let peer, survivor;
+    try {
+        peer = await guest(browser, baseURL, 'RosterDeparting', viewport, relay);
+        survivor = await guest(browser, baseURL, 'RosterModalOther', viewport, relay);
+        const person = visitor.page.locator('[data-nicks]').getByRole('button', { name: 'RosterDeparting', exact: true });
+        await tabTo(visitor.page, person);
+        const opener = await person.elementHandle();
+        const connectionId = await visitor.page.evaluate(() =>
+            window.__lobby.chans.get('#stalemate').names.find(member => member.nick === 'RosterDeparting').id);
+        await visitor.page.keyboard.press('Enter');
+        const dialog = visitor.page.locator('dialog[data-sheet]');
+        await expect(dialog).toHaveAccessibleName('RosterDeparting');
+        const dialogControl = dialog.locator('button').first();
+        await expect(dialogControl).toBeFocused();
+
+        await peer.close(); peer = null;
+        await expect.poll(() => visitor.page.evaluate(id =>
+            window.__lobby.chans.get('#stalemate').names.some(member => member.id === id), connectionId)).toBe(false);
+        expect(await opener.evaluate(element => element.isConnected)).toBe(false);
+        await expect(dialog).toBeVisible();
+        await expect(dialogControl).toBeFocused();
+        await visitor.page.keyboard.press('Escape');
+        await expect(dialog).toBeHidden();
+        const heading = visitor.page.locator('[data-people-title]');
+        await expect(heading).toBeFocused();
+        await expect(heading).toBeInViewport();
+        const outline = await heading.evaluate(element => ({ width: getComputedStyle(element).outlineWidth,
+            style: getComputedStyle(element).outlineStyle, color: getComputedStyle(element).outlineColor }));
+        expect(parseFloat(outline.width)).toBeGreaterThanOrEqual(2);
+        expect(outline.style).toBe('solid');
+        expect(outline.color).not.toBe('rgba(0, 0, 0, 0)');
+        await expect(visitor.page.locator('[data-nicks]').getByRole('button', { name: 'RosterModalOther', exact: true })).toBeVisible();
+        expect(visitor.errors).toEqual([]); expect(survivor.errors).toEqual([]);
+    } finally { await survivor?.close(); await peer?.close(); await visitor.close(); }
+});
