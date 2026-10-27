@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import { betaFetch, betaAccessConfigured } from '../src/beta-entry.mjs';
 import { BETA_COOKIE, BETA_IDENTITY_COOKIE, BETA_TTL, betaSession, readBeta, signBeta } from '../src/beta-auth.mjs';
 import { accountId } from '../src/auth.mjs';
@@ -242,7 +243,24 @@ describe('beta product bootstrapping', () => {
     it('sets only guest admission UI state, rewrites relay/TURN/Turnstile and suppresses indexing', async () => {
         const config = env(), cookie = await unlock(config);
         const boot = await betaFetch(request('/beta/bootstrap.js', { cookie }), config, deps);
-        expect(await boot.text()).toContain("sessionStorage.setItem('hangout-owner',\"0\")");
+        expect(boot.status).toBe(200);
+        const browser = {}, remembered = new Map([['hangout-owner', '1']]);
+        const writeHint = vi.fn((key, value) => {
+            // Current authenticated hints and the display registry must already
+            // be available before any optional browser storage is touched.
+            expect(browser.HangoutBootstrap?.preview).toBe(preview);
+            expect(browser.HangoutBootstrap?.owner).toBe(false);
+            expect(Array.isArray(browser.HangoutEntrySites)).toBe(true);
+            remembered.set(key, String(value));
+        });
+        runInNewContext(await boot.text(), { window: browser, sessionStorage: { setItem: writeHint } }, { timeout: 250 });
+        expect(Object.keys(browser.HangoutBootstrap).sort()).toEqual(['owner', 'preview']);
+        expect(browser.HangoutBootstrap.preview).toBe(preview);
+        expect(browser.HangoutBootstrap.owner).toBe(false);
+        expect(Array.from(browser.HangoutEntrySites, site => site.id)).toEqual(expect.arrayContaining(['stalemate', 'rad-dad']));
+        expect(writeHint).toHaveBeenCalledTimes(2);
+        expect(remembered.get('hangout-preview')).toBe(preview);
+        expect(remembered.get('hangout-owner')).toBe('0');
         const page = await betaFetch(request('/r/45662413410ed051/lobby/', { cookie }), { ...config, HANGOUT_TURN_ENABLED: '1', HANGOUT_TURNSTILE_SITEKEY: 'public-site-key' }, deps);
         const html = await page.text();
         expect(html).toContain('wss://beta.example'); expect(html).toContain('https://beta.example/turn'); expect(html).toContain('public-site-key'); expect(html).toContain('/beta/bootstrap.js');
