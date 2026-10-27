@@ -779,7 +779,11 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         for (const name of [...c.channels]) leave(c, ch(name), why, true);
         for (const [k, v] of pm) if (v.fromId === id || v.toId === id) {
             if (v.state === 'pending') endPendingPm(k, v, 'The other visitor disconnected.');
-            else pm.delete(k);
+            else {
+                pm.delete(k);
+                const other = conns.get(v.fromId === id ? v.toId : v.fromId);
+                if (other) out(other, { t: 'pm-closed', with: c.nick });
+            }
         }
         conns.delete(id); participationMedia.delete(id);
         pruneReceipts(); // A later connection must never inherit a departed socket's delivery witness.
