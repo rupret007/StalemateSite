@@ -539,3 +539,90 @@ for (const width of [375, 390]) {
         } finally { await visitor.close(); await host.close(); }
     });
 }
+
+
+// Actual guest/room/clipboard UI at a short phone viewport. The sole refusal
+// fixture is clipboard.writeText; invitations never launch an app or leave this tab.
+for (const width of [375, 390]) test(`short Jam instructions and manual invite copy keep the composer usable at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+    testInfo.annotations.push({ type: 'scope', description: 'Actual guest, local relay, private Jam room and keyboard UI; explicit clipboard NotAllowedError fixture only. No native app/audio, hosted, physical phone or native clipboard-policy qualification.' });
+    const invitation = `Join beta rehearsal on WebJam:\nKeep this room open.\nOpen WebJam, choose Join, then paste this full invitation.\nwebjam://join?v=3&r=direct-stun&i=opaque_fixture_only\nwebjam-signal:V0pTRQ${'x'.repeat(3000)}`;
+    const topic = `${'Rehearsal notes '.repeat(10).slice(0, 159)}!`;
+    expect(topic).toHaveLength(160);
+    const visitor = await guest(browser, baseURL, `ShortJam${width}`, { width, height: 667 }, undefined, async page => {
+        await page.addInitScript(() => {
+            window.__shortJamClipboardRefusals = 0;
+            Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+                writeText: async () => {
+                    window.__shortJamClipboardRefusals += 1;
+                    throw new DOMException('Clipboard access refused by this fixture', 'NotAllowedError');
+                }
+            } });
+        });
+    });
+    const { page } = visitor;
+    let popups = 0;
+    page.on('popup', popup => { popups += 1; void popup.close(); });
+    try {
+        await section(page, 'rooms');
+        await tabTo(page, page.locator('[data-start="jam"]')); await page.keyboard.press('Enter');
+        await expect(page.locator('[data-jam]')).toBeVisible();
+        await expect(page.locator('[data-modes]')).toContainText('+ti');
+        await expect(page.locator('[data-chat-context]')).toContainText('#jam-');
+        const admittedURL = page.url();
+        await tabTo(page, page.locator('[data-roomtools]')); await page.keyboard.press('Enter');
+        const palette = page.locator('dialog[data-palette]');
+        await expect(palette).toBeVisible();
+        page.once('dialog', async dialog => {
+            expect(dialog.type()).toBe('prompt');
+            await dialog.accept(topic);
+        });
+        await tabTo(page, palette.getByRole('button', { name: '/topic …', exact: true })); await page.keyboard.press('Enter');
+        await expect(palette).toBeHidden(); await expect(page.locator('[data-topic]')).toHaveText(topic);
+
+        // Focus only Jam controls during setup; do not focus/scroll the composer
+        // before observing either layout, since that could mask overflow clipping.
+        const editor = page.locator('[data-jam-link]');
+        await tabTo(page, editor); await page.keyboard.insertText(invitation);
+        await tabTo(page, page.locator('[data-jam-form] button[type="submit"]')); await page.keyboard.press('Space');
+        const copy = page.locator('[data-jam-copy]');
+        await expect(copy).toBeVisible();
+        await expect(page.locator('[data-jam]')).toContainText('Windows and Linux require pasting private invites');
+        await expect(page.locator('[data-jam-web]')).toBeDisabled();
+        await expect(page.locator('[data-jam-desktop]')).toBeHidden();
+        const standard = await composerGeometry(page);
+        await attachGeometry(testInfo, `short-jam-standard-${width}`, standard);
+        await page.screenshot({ path: testInfo.outputPath(`short-jam-standard-${width}.png`), fullPage: true });
+
+        await tabTo(page, copy); await page.keyboard.press('Space');
+        const fallback = page.locator('[data-jam-copy-value]');
+        await expect(fallback).toBeVisible(); await expect(fallback).toBeFocused(); await expect(fallback).toHaveValue(invitation);
+        expect(await fallback.evaluate(input => input.selectionEnd - input.selectionStart)).toBe(invitation.length);
+        expect(await page.evaluate(() => window.__shortJamClipboardRefusals)).toBe(1);
+        const manualCopy = await composerGeometry(page);
+        const beforeNativeTab = await page.locator('[data-jam]').evaluate(panel => ({ scrollTop: panel.scrollTop, scrollHeight: panel.scrollHeight, clientHeight: panel.clientHeight }));
+        await attachGeometry(testInfo, `short-jam-manual-copy-${width}`, { ...manualCopy, jam: beforeNativeTab });
+        await page.screenshot({ path: testInfo.outputPath(`short-jam-manual-copy-${width}.png`), fullPage: true });
+
+        // These first containment checks use the snapshots taken without a
+        // composer focus action, not geometry repaired by focusing Message.
+        contained(standard); contained(manualCopy);
+        expect(standard.fontSize).toBe('16px'); expect(manualCopy.fontSize).toBe('16px');
+        expect(beforeNativeTab.scrollHeight).toBeGreaterThan(beforeNativeTab.clientHeight);
+        await page.keyboard.press('Shift+Tab'); await expect(copy).toBeFocused();
+        const afterNativeTab = await copy.evaluate(button => {
+            const panel = button.closest('[data-jam]'), r = button.getBoundingClientRect(), p = panel.getBoundingClientRect();
+            const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+            return { scrollTop: panel.scrollTop, buttonTop: r.top, buttonBottom: r.bottom, panelTop: p.top + panel.clientTop,
+                panelBottom: p.top + panel.clientTop + panel.clientHeight, uncovered: hit === button || button.contains(hit) };
+        });
+        await attachGeometry(testInfo, `short-jam-native-tab-${width}`, { before: beforeNativeTab, after: afterNativeTab });
+        expect(afterNativeTab.scrollTop).toBeLessThan(beforeNativeTab.scrollTop);
+        expect(afterNativeTab.buttonTop).toBeGreaterThanOrEqual(afterNativeTab.panelTop);
+        expect(afterNativeTab.buttonBottom).toBeLessThanOrEqual(afterNativeTab.panelBottom);
+        expect(afterNativeTab.uncovered).toBe(true);
+        await tabTo(page, page.getByRole('textbox', { name: 'Message', exact: true }));
+        await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeFocused();
+        expect(await page.evaluate(expected => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }).includes(expected), invitation)).toBe(false);
+        await expect(page).toHaveURL(admittedURL); expect(popups).toBe(0); expect(visitor.errors).toEqual([]);
+    } finally { await visitor.close(); }
+});

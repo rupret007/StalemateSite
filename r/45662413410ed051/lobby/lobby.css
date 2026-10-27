@@ -222,7 +222,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .modes { flex: 1 1 150px; color: var(--muted); font: 10px/1.6 var(--mono); }
 .host-status { flex-basis: 100%; color: #8b958c; font-size: 10px; }
 [data-cam][aria-pressed=true] { color: var(--lime); border-color: #637943; background: #242f1c; }
-.jam { flex: none; overflow: auto; max-height: 35dvh; padding: 16px 20px; background: #171e15; border-bottom: 1px solid #43543a; font-size: 12px; }
+.jam { flex: 0 1 auto; min-height: 0; overflow: auto; max-height: 35dvh; padding: 16px 20px; background: #171e15; border-bottom: 1px solid #43543a; font-size: 12px; }
 .jam-actions, .jam-paste { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .jam-paste { margin-top: 10px; }
 .jam-paste textarea, .act-load input { flex: 1; min-width: 0; }
