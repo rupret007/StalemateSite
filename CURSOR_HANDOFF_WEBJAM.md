@@ -12,7 +12,7 @@ pulling. No reset, force-push, push to main, deployment or service restart is
 authorized by this note.
 
 The complete product scope is preserved in
-[all 62 acceptance requirements](docs/HANGOUT_ACCEPTANCE_REQUIREMENTS.md).
+[all 62 acceptance requirements](hangout-internal/HANGOUT_ACCEPTANCE_REQUIREMENTS.md).
 Keep those IDs and outcomes intact. This checkpoint does not reduce the project
 to the current P9 safety slice or claim the other requirements are complete.
 
@@ -70,7 +70,7 @@ this branch. Exact head: `9d6297bc456d162de511ec06ade1eb6221e67a41`.
 That baseline fixes selected-person actions across nickname reuse, identity-only
 Block/Ban, confirmed preferences, exact stored-rule Unban, durable target/room
 checks, permanent-lobby nonce restoration after wake, and historical ban labels.
-Read [the person-action contract](docs/HANGOUT_PERSON_ACTIONS.md). New strict
+Read [the person-action contract](hangout-internal/HANGOUT_PERSON_ACTIONS.md). New strict
 stored fields require matched browser/core/reader/writer rollout, socket/writer
 drain and compatible-state rollback. Do not reset state or assume code-only
 downgrade is safe. Preserve historical failures and warnings; quiet later native
@@ -110,7 +110,7 @@ crash-level exactly-once dispatch.
 `session-start-fence-not-qualified`, and the existing authority-mode moderator
 and provider-callback exclusions. No key/provider has been configured or called.
 Quota/result composition, guardian/child-data/provider/legal readiness remain
-separate requirements. Read [the fence contract](docs/HANGOUT_PROVIDER_START_FENCE.md).
+separate requirements. Read [the fence contract](hangout-internal/HANGOUT_PROVIDER_START_FENCE.md).
 
 ## Tests and the unfinished native review
 
@@ -210,17 +210,17 @@ Only after actual execution can the complete count become8 fresh modes/11 groups
 The portal work remains separate in
 [PR147](https://github.com/rupret007/StalemateSite/pull/147), last source
 `023c91a0e5504b2491a12838b96073902f5c0843`. Its three paths are
-`docs/HANGOUT_BETA_IDENTITY.md`, `hangout-worker/src/beta-entry.mjs` and
+`hangout-internal/HANGOUT_BETA_IDENTITY.md`, `hangout-worker/src/beta-entry.mjs` and
 `tests/unit/hangout-beta-entry-context.test.js`. Revalidate before composing;
 the mechanical9d+portal tree was reconstructed, but combined runtime was not
 qualified. Do not overwrite newer entry code or infer deployment from a merge.
 
-Read [product direction](docs/HANGOUT_PRODUCT_DIRECTION.md),
-[shared community](docs/HANGOUT_SHARED_COMMUNITY.md),
-[website integration](docs/HANGOUT_WEBSITE_INTEGRATION.md),
-[identity](docs/HANGOUT_BETA_IDENTITY.md),
-[production participation](docs/HANGOUT_PRODUCTION_PARTICIPATION.md),
-[safeguards](docs/HANGOUT_SAFEGUARDS_AI.md) and the relevant beta/incident docs.
+Read [product direction](hangout-internal/HANGOUT_PRODUCT_DIRECTION.md),
+[shared community](hangout-internal/HANGOUT_SHARED_COMMUNITY.md),
+[website integration](hangout-internal/HANGOUT_WEBSITE_INTEGRATION.md),
+[identity](hangout-internal/HANGOUT_BETA_IDENTITY.md),
+[production participation](hangout-internal/HANGOUT_PRODUCTION_PARTICIPATION.md),
+[safeguards](hangout-internal/HANGOUT_SAFEGUARDS_AI.md) and the relevant beta/incident docs.
 Older handoffs retain their historical source/count scope.
 
 Private local evidence, if available, is under

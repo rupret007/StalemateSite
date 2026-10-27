@@ -32,6 +32,8 @@ describe('GitHub Pages package', () => {
         expect(script).not.toContain('node_modules');
         expect(script).not.toContain('tests/');
         expect(script).not.toContain('worker/');
+        expect(script).toContain("const UNPUBLISHED = ['docs', 'hangout-internal', 'tests', 'hangout-worker', ['node', 'modules'].join('_')]");
+        expect(script).toContain('Refusing to publish');
     });
 
     it('can package into dist/ from this checkout', () => {
@@ -43,6 +45,9 @@ describe('GitHub Pages package', () => {
         expect(readFileSync(join(repoRoot, 'dist/index.html'), 'utf8')).toContain('Stalemate');
         expect(readFileSync(join(repoRoot, 'dist/.nojekyll'), 'utf8')).toBeDefined();
         expect(existsSync(join(repoRoot, 'dist/epk'))).toBe(false);
+        expect(existsSync(join(repoRoot, 'dist/docs'))).toBe(false);
+        expect(existsSync(join(repoRoot, 'dist/hangout-internal'))).toBe(false);
+        expect(existsSync(join(repoRoot, 'hangout-internal/HANGOUT_ACCEPTANCE_REQUIREMENTS.md'))).toBe(true);
         expect(readFileSync(join(repoRoot, 'dist/qr/index.html'), 'utf8')).toContain('play/stalemate/manic.m4a');
         expect(readFileSync(join(repoRoot, 'dist/tap/index.html'), 'utf8')).toContain('../qr/');
         expect(existsSync(join(repoRoot, 'dist/embed-placeholder.html'))).toBe(false);
