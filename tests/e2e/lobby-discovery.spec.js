@@ -101,6 +101,9 @@ test('IRC conversation leads into an existing room; drafts and mentions survive 
     const visitor = await guest(browser, 'RiffGuest');
     try {
         await expect(visitor.locator('[data-presence-title]')).toContainText('other visitor');
+        await expect(visitor.locator('[data-quiet-prompt]')).toBeHidden();
+        await expect(visitor.locator('[data-creation]')).toBeHidden();
+        await expect(visitor.locator('[data-gathering-activity]')).toContainText('No confirmed gathering was supplied');
         await visitor.click('[data-prompt="Hey everyone, I’m new here. "]');
         await expect(visitor.locator('[data-text]')).toHaveValue('Hey everyone, I’m new here. ');
         await expect(host.locator('[data-buffer]')).not.toContainText('Hey everyone, I’m new here.');
@@ -144,6 +147,12 @@ test('offline sends keep the draft; reconnect clears stale membership and preser
         await page.fill('[data-text]', 'This idea must not disappear');
         await page.evaluate(() => window.__lobby.ws.close(1000));
         await expect(page.locator('[data-connection]')).toHaveText('Offline');
+        await expect(page.locator('[data-presence-title]')).toHaveText('The lobby is offline');
+        await expect(page.locator('[data-presence-detail]')).toContainText('not an empty room');
+        await expect(page.locator('[data-presence-title]')).not.toContainText('quiet');
+        await expect(page.locator('[data-gathering]')).toBeHidden();
+        await expect(page.locator('[data-quiet-prompt]')).toBeHidden();
+        await expect(page.locator('[data-welcome-title]')).toHaveText('Hang Out is not connected.');
         await expect(page.locator('[data-send]')).toBeDisabled();
         await page.locator('[data-say]').evaluate((form) => form.requestSubmit());
         await expect(page.locator('[data-text]')).toHaveValue('This idea must not disappear');
@@ -158,6 +167,23 @@ test('offline sends keep the draft; reconnect clears stale membership and preser
         await room.click();
         await expect(page.locator('[data-text]')).toHaveValue('This idea must not disappear');
         await expect(page.locator('[data-cam]')).toHaveAttribute('aria-pressed', 'false');
+    } finally { await page.context().close(); }
+});
+
+test('a quiet visit shows no invented gathering and drafts a prompt without sending', async ({ browser }) => {
+    const page = await guest(browser, 'QuietGuest');
+    try {
+        await expect(page.locator('[data-presence-title]')).toHaveText('It is quiet in #stalemate');
+        await expect(page.locator('[data-welcome-title]')).toHaveText('First one here? Make yourself at home.');
+        await expect(page.locator('[data-presence-detail]')).toContainText('No confirmed gathering was supplied');
+        await expect(page.locator('[data-presence-detail]')).not.toContainText('band is here');
+        await expect(page.locator('[data-gathering-activity]')).toContainText('does not invent a time');
+        await expect(page.locator('[data-gathering-save]')).toBeHidden();
+        await expect(page.locator('[data-creation-detail]')).toContainText('No approved past creation was supplied');
+        await expect(page.locator('[data-quiet-prompt]')).toBeVisible();
+        await page.click('[data-quiet-prompt]');
+        await expect(page.locator('[data-text]')).toHaveValue('One line is enough, and no gear is needed: what should we make together? ');
+        await expect(page.locator('[data-buffer]')).not.toContainText('no gear is needed');
     } finally { await page.context().close(); }
 });
 

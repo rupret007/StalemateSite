@@ -101,10 +101,24 @@
             </details>
             <section class="lobby-welcome" data-lobby-welcome aria-label="Conversation starters">
                 <div class="welcome-symbol" aria-hidden="true">#</div><div class="welcome-copy"><b data-welcome-title>Make yourself at home.</b><p>Chat starts here, when you join. Say hello or just settle in.</p>
+                <div class="visit-gathering" data-gathering hidden>
+                    <b data-gathering-heading>Confirmed gathering</b>
+                    <span data-gathering-host></span>
+                    <span data-gathering-when></span>
+                    <span data-gathering-activity></span>
+                    <span class="small" data-gathering-note></span>
+                    <button class="quiet-action" type="button" data-gathering-save hidden>Save a reminder on this device</button>
+                </div>
+                <div class="visit-creation" data-creation hidden>
+                    <b data-creation-heading>Past creation</b>
+                    <span data-creation-title></span>
+                    <span data-creation-detail></span>
+                </div>
                 <div class="conversation-starters">
                     <button type="button" data-prompt="Hey everyone, I’m new here. ">Say hello</button>
                     <button type="button" data-prompt="What’s everyone making or working on? ">What are you making?</button>
                     <button type="button" data-prompt="Anyone up for drawing something together? ">Find a collaborator</button>
+                    <button type="button" data-quiet-prompt hidden>Offer a one-line idea</button>
                 </div>
                 </div>
             </section>

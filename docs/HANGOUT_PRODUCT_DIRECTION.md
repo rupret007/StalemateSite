@@ -46,6 +46,8 @@ Guests can now create genuine named text rooms through `/join #name` and Start a
 - The old 24-hour band-absence global read-only/shield trigger is removed. Manual emergency controls, corruption locks and infrastructure caps remain. Guest hosts do not become site moderators merely by creating a room.
 - A recurring gathering is optional; anyone may host spontaneously. No weekly cadence or band hosting commitment has been promised.
 
+The quiet-visit slice renders a confirmed gathering only from a supplied host, a specific time, and an equipment-free activity. Disconnection explains the service instead of calling the room empty. No schedule is seeded, and this slice does not add durable storage. See [quiet visits](HANGOUT_QUIET_VISIT.md).
+
 ### 2. Establish continuity and truthful guest identity
 
 - Enforce live chat from join onward. Channel switching may retain already-received scrollback while membership continues; no new visitor gets earlier messages and no fresh visit restores a transcript.
