@@ -5,6 +5,14 @@ Keep the terminal running. Ctrl+C stops the preview. This command binds only to
 the computer's loopback address and does not publish, deploy, or change Cloudflare.
 The automated `serve:test` server remains separate and starts with fresh memory.
 
+Stopping the preview is one idempotent shutdown, including concurrent close
+requests. It stops new local admissions, retires only this server's HTTP/TCP
+connections (including unfinished control bodies and sockets not yet upgraded),
+and awaits the existing relay's socket and durable-work cleanup. An unfinished
+identity request cannot create a profile after shutdown starts. State already
+committed before shutdown is retained; this is not a rollback or a production
+session-revocation guarantee.
+
 The launcher opens the real community interface with one explicitly selected local
 identity per tab. Browser storage is isolated for each launcher identity, so two
 tabs behave as two people rather than sharing one device token. No visitors or

@@ -60,7 +60,8 @@ export async function startPreview({ port = 4387, statePath = defaultPreviewStat
     const sessions = new Map(store.value.sessions.map((session) => [session.token, session]));
     const csrf = token();
     let origin = '';
-    let relay;
+    let relay, closing = false, closePromise;
+    const ownedSockets = new Set();
     const headers = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex, nofollow, noarchive', 'Content-Security-Policy': CSP };
     const send = (res, status, body = '', extra = {}, head = false) => {
         res.writeHead(status, { ...headers, 'Content-Type': 'text/plain; charset=utf-8', ...extra });
@@ -72,6 +73,7 @@ export async function startPreview({ port = 4387, statePath = defaultPreviewStat
     const activeSession = (id) => { const s = sessions.get(id); return s && Date.now() - s.at < 7 * DAY ? s : null; };
 
     const server = http.createServer(async (req, res) => {
+        if (closing) return send(res, 503, 'Local preview is stopping.', { Connection: 'close' });
         if (!validHost(req)) return send(res, 403, 'Use the exact loopback preview URL.');
         let url;
         try { url = new URL(req.url, origin); } catch { return send(res, 400, 'Invalid URL'); }
@@ -80,6 +82,7 @@ export async function startPreview({ port = 4387, statePath = defaultPreviewStat
             let raw = '';
             try {
                 for await (const chunk of req) { raw += chunk; if (raw.length > 512) { send(res, 413, 'Request too large'); return; } }
+                if (closing) return; // An awaited partial body cannot create a late identity.
                 const { profile } = JSON.parse(raw);
                 if (!Object.hasOwn(PROFILES, profile)) return send(res, 400, 'Unknown preview identity');
                 if (sessions.size >= 1000) return send(res, 429, 'Too many local preview sessions. Existing sessions expire after seven days.');
@@ -88,7 +91,7 @@ export async function startPreview({ port = 4387, statePath = defaultPreviewStat
                 try { store.write(); } catch { sessions.delete(session.token); store.value.sessions.pop(); return send(res, 503, 'Could not save local preview identity.'); }
                 const page = ['moderator', 'administrator'].includes(profile) ? 'admin' : 'lobby';
                 return json(res, 201, { url: `${PREFIX}/session/${session.token}${productPrefix}/${page}/`, label: PROFILES[profile].label });
-            } catch { return send(res, 400, 'Invalid request'); }
+            } catch { if (!closing && !res.destroyed) return send(res, 400, 'Invalid request'); }
         }
         if (!['GET', 'HEAD'].includes(req.method)) return send(res, 405, 'Method not allowed', { Allow: 'GET, HEAD' });
         const head = req.method === 'HEAD';
@@ -121,7 +124,13 @@ export async function startPreview({ port = 4387, statePath = defaultPreviewStat
         }
         return send(res, 200, body, { 'Content-Type': MIME[path.extname(filePath)] }, head);
     });
+    server.on('connection', socket => {
+        ownedSockets.add(socket);
+        socket.once('close', () => ownedSockets.delete(socket));
+        if (closing) socket.destroy();
+    });
     server.on('upgrade', (req, socket, head) => {
+        if (closing) { socket.destroy(); return; }
         const reject = () => socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
         if (!validHost(req) || req.headers.origin !== origin) return reject();
         const url = new URL(req.url, origin);
@@ -132,6 +141,24 @@ export async function startPreview({ port = 4387, statePath = defaultPreviewStat
         if (!['/lobby', '/lobby-owner', '/lobby-admin', '/room'].includes(url.pathname)) return reject();
         relay.handleUpgrade(req, socket, head, url).catch(() => socket.destroy());
     });
+    const close = () => {
+        if (closePromise) return closePromise;
+        closing = true;
+        closePromise = (async () => {
+            // Stop admission and start both owned shutdowns before awaiting either.
+            // Relay cleanup still drains its established socket/persistence work.
+            const relayClosed = relay?.close();
+            const listenerClosed = new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+            server.closeIdleConnections();
+            // Includes active HTTP bodies and not-yet-upgraded sockets, which are
+            // absent from WebSocketServer.clients. Never touch another server.
+            for (const socket of ownedSockets) socket.destroy();
+            const outcomes = await Promise.allSettled([relayClosed, listenerClosed]);
+            const failed = outcomes.find(result => result.status === 'rejected');
+            if (failed) throw failed.reason;
+        })();
+        return closePromise;
+    };
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });
     origin = `http://127.0.0.1:${server.address().port}`;
     try {
@@ -158,10 +185,10 @@ export async function startPreview({ port = 4387, statePath = defaultPreviewStat
         store.value.lobby.net = relay.lobby.snapshot();
         store.value.lobby.modlog = relay.lobby.modlog;
         store.write();
-    } catch (error) { await relay?.close(); await new Promise((resolve) => server.close(resolve)); throw error; }
+    } catch (error) { await close(); throw error; }
     return {
         origin, url: `${origin}${PREFIX}/`, statePath, address: server.address(),
         lobby: relay.lobby,
-        close: async () => { await relay.close(); server.closeIdleConnections(); await new Promise((resolve) => server.close(resolve)); }
+        close
     };
 }
