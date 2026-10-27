@@ -1181,7 +1181,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     // The adapter supplies the exact live socket identities again after hibernation.
     function sessionMetadata() {
         const live = [...conns.values()].filter((c) => c.nick || c.safetyOnly);
-        return { version: 1, connections: live.map((c) => ({
+        return { version: 1, lobbyInstance: ch(LOBBY).keepRef, connections: live.map((c) => ({
             id: c.id, dev: c.dev, iph: c.iph, account: c.account || '', role: c.role, admin: c.admin,
             nick: c.nick, entrySource: c.entrySource, channels: [...c.channels], away: c.away, ignores: [...c.ignores], ...(c.ignoredPeerIds.size ? { ignoredPeerIds: [...c.ignoredPeerIds] } : {}), blocks: [...c.blocks], pmOff: c.pmOff,
             cams: [...c.cams], since: c.since, lastNick: c.lastNick, tokens: c.tokens, last: c.last, frames: c.frames,
@@ -1223,7 +1223,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             && Number.isInteger(s.camReports) && numeric(s.camReports, L.lobbyMax)
             && obj(s.lastSaid) && Object.keys(s.lastSaid).length <= 31 && Object.entries(s.lastSaid).every(([name, at]) => s.channels.includes(name) && time(at));
         try {
-            if (conns.size || saved.version !== 1 || !Array.isArray(saved.connections) || saved.connections.length > SESSION_CONNECTIONS
+            if (conns.size || saved.version !== 1 || Object.hasOwn(saved, 'lobbyInstance') && !validPmRef(saved.lobbyInstance)
+                || !Array.isArray(saved.connections) || saved.connections.length > SESSION_CONNECTIONS
                 || encoder.encode(JSON.stringify(saved)).byteLength > SESSION_STATE_BYTES || saved.connections.some((s) => !valid(s))
                 || new Set(saved.connections.map((s) => s.id)).size !== saved.connections.length
                 || new Set(saved.connections.filter(s => !s.safetyOnly).map((s) => lc(s.nick))).size !== saved.connections.filter(s => !s.safetyOnly).length
@@ -1234,6 +1235,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         } catch { return rejectAll('session-invalid'); }
         const refs = [...saved.pm, ...(Array.isArray(saved.pendingPm) && saved.pendingPm.length <= SESSION_PM_PENDING ? saved.pendingPm : [])].filter(p => p && Object.hasOwn(p, 'ref')).map(p => p.ref);
         if (refs.some(ref => !validPmRef(ref)) || new Set(refs).size !== refs.length) return rejectAll('session-invalid');
+        const legacyLobbyInstance = !Object.hasOwn(saved, 'lobbyInstance');
+        if (!legacyLobbyInstance) ch(LOBBY).keepRef = saved.lobbyInstance;
         const records = new Map(saved.connections.map((s) => [s.id, s]));
         for (const identity of liveIdentities) {
             const s = records.get(identity.id);
@@ -1276,6 +1279,11 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         for (const id of resumed) {
             const c = conns.get(id), s = records.get(id);
             if (c.safetyOnly) { out(c, { t: 'sharing-stopped' }); continue; }
+            // Older snapshots did not retain the permanent lobby's correlation
+            // nonce. Ordinary mode may refresh metadata without replaying text.
+            // C3 restore precedes fresh withdrawal checks: never disclose a
+            // roster from saved participation state on this synchronous path.
+            if (legacyLobbyInstance && !participationConfigured && c.channels.has(LOBBY)) out(c, { t: 'chan', ch: chanView(ch(LOBBY), c) });
             for (const name of s.cams) if (!c.cams.has(name)) out(c, { t: 'cam', ch: name, on: false, by: BOT });
             if (participationConfigured && [...c.channels].some(name => ch(name)?.act.video || membersOf(ch(name)).some(member => member.cams.has(name))))
                 noteParticipationMedia(c, 'restored-media-rejoin-required');
@@ -1630,10 +1638,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (isStaff(t)) return bot(c, 'Site staff access is managed by the owner.', 'error');
             if (owns(t, chan) && !isStaff(c)) return bot(c, 'Only site moderators can act on a registered room owner.', 'error');
             const reason = normalize(why.join(' '), 80) || 'banned';
-            chan.bans.push({ mask: `dev:${t.dev}`, reason, by: c.nick, at: now() });
+            chan.bans.push({ mask: `dev:${t.dev}`, ...(boundPeer ? { displayNick: t.nick } : {}), reason, by: c.nick, at: now() });
             if (!boundPeer) chan.bans.push({ mask: `nick:${lc(t.nick)}`, reason, by: c.nick, at: now() },
                 { mask: `iph:${t.iph}`, nick: t.nick, reason, by: c.nick, at: now(), until: now() + L.ipBan });
-            if (t.account) chan.bans.push({ mask: `account:${t.account}`, reason, by: c.nick, at: now() });
+            if (t.account) chan.bans.push({ mask: `account:${t.account}`, ...(boundPeer ? { displayNick: t.nick } : {}), reason, by: c.nick, at: now() });
             if (chan.bans.length > L.roomBanMax) chan.bans = chan.bans.slice(-L.roomBanMax); // keep the newest
             event(chan, `${c.nick} sets mode +b ${t.nick}`);
             log(c.nick, 'ban', t.nick, reason, chan.name);
@@ -1717,10 +1725,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (isStaff(t)) return bot(c, 'Site staff access must be removed through the staff allowlist and Cloudflare Access.', 'error');
             const reason = normalize(why.join(' '), 80);
             if (!reason) return bot(c, 'A ban needs a reason: /ban nick why', 'error');
-            net.bans.push({ mask: `dev:${t.dev}`, ...(!boundPeer ? { nick: t.nick } : {}), reason, by: c.nick, at: now() });
+            net.bans.push({ mask: `dev:${t.dev}`, ...(!boundPeer ? { nick: t.nick } : { displayNick: t.nick }), reason, by: c.nick, at: now() });
             if (!boundPeer) net.bans.push({ mask: `iph:${t.iph}`, nick: t.nick, reason, by: c.nick, at: now(), until: now() + L.ipBan },
                 { mask: `nick:${lc(t.nick)}`, nick: t.nick, reason, by: c.nick, at: now() });
-            if (t.account) net.bans.push({ mask: `account:${t.account}`, reason, by: c.nick, at: now() });
+            if (t.account) net.bans.push({ mask: `account:${t.account}`, ...(boundPeer ? { displayNick: t.nick } : {}), reason, by: c.nick, at: now() });
             if (net.bans.length > L.banMax) net.bans = net.bans.slice(-L.banMax); // keep the newest
             for (const name of t.channels) event(ch(name), `${t.nick} was banned by ${c.nick} (${reason})`);
             log(c.nick, 'ban', t.nick, reason, 'network');
@@ -2374,7 +2382,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         // Bans: keep only well-formed entries. If any were malformed a ban may be lost, so lock read-only too.
         if (s.bans !== undefined) {
             const okBan = (b) => b && typeof b === 'object' && typeof b.mask === 'string' && /^(?:dev|iph|nick|account):.+/.test(b.mask)
-                && (b.until === undefined || b.until === null || Number.isFinite(b.until));
+                && (b.until === undefined || b.until === null || Number.isFinite(b.until))
+                && (!Object.hasOwn(b, 'displayNick') || moderationNick(b.displayNick));
             const list = Array.isArray(s.bans) ? s.bans : [];
             const good = list.filter(okBan);
             if (!Array.isArray(s.bans) || good.length !== list.length) { s.lock = 'readonly'; s.lockAuto = true; }

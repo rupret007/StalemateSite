@@ -81,9 +81,20 @@ for (const width of [375, 390, 1280]) test(`active lobby text and authored field
         await page.click('[data-enter]'); await expect(page.locator('[data-connection]')).toHaveText('Connected');
         await page.fill('[data-text]', 'Readable local chat in the shared community'); await page.press('[data-text]', 'Enter');
         await expect(page.locator('[data-buffer]')).toContainText('Readable local chat');
+        // Own-author controls are intentionally disabled. Use another real live
+        // endpoint to qualify an active author button and its server correlation.
+        const peer = await context.newPage();
+        await peer.route(/youtube\.com|ytimg|googlevideo|goatcounter/, route => route.abort());
+        await peer.goto(`${ROOT}lobby/?preview=local-preview-key-0001&via=rad-dad&relay=${encodeURIComponent(relay)}`);
+        await peer.fill('[data-nick]', 'ContrastPeer'); await peer.click('[data-enter]');
+        await expect(peer.locator('[data-connection]')).toHaveText('Connected');
+        await peer.fill('[data-text]', 'Readable peer chat has an active author control'); await peer.press('[data-text]', 'Enter');
+        await expect(page.locator('[data-buffer]')).toContainText('Readable peer chat has an active author control');
+        await expect(page.locator('[data-buffer] .who:not(:disabled)')).toHaveText('<ContrastPeer>');
+        await expect(page.locator('[data-buffer] .who:not(:disabled)')).toBeEnabled();
         await page.locator('[data-text]').blur();
         await check(page, testInfo, 'chat', {
-            text: ['[data-topic]', '[data-buffer] .ts', '[data-buffer] .who', '[data-buffer] .entry-badge', '[data-connection]', '[data-send]', '.chat-status'],
+            text: ['[data-topic]', '[data-buffer] .ts', '[data-buffer] .who:not(:disabled)', '[data-buffer] .entry-badge', '[data-connection]', '[data-send]', '.chat-status'],
             fields: ['[data-say]'], placeholders: ['[data-text]']
         });
         await page.screenshot({ path: testInfo.outputPath(`chat-${width}.png`), fullPage: true });
@@ -103,7 +114,9 @@ for (const width of [375, 390, 1280]) test(`active lobby text and authored field
         await expect(page.locator('[data-jam-link]')).toHaveCSS('outline-width', '2px');
         await expect(page.locator('[data-jam-link]')).toHaveCSS('font-size', '16px');
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-        await page.screenshot({ path: testInfo.outputPath(`webjam-${width}.png`), fullPage: true });
+        const successScreenshot = testInfo.outputPath(`webjam-${width}.png`);
+        await page.screenshot({ path: successScreenshot, fullPage: true });
+        if (width === 375 || width === 390) await testInfo.attach(`contrast-success-${width}`, { path: successScreenshot, contentType: 'image/png' });
     } finally { await context.close(); }
 });
 

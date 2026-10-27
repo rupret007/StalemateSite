@@ -218,3 +218,44 @@ describe('selected public person actions', () => {
         await receive(owner, { ...frame, args: ['remove', 'Friend'] }); expect(storedRoom(channel).cohosts).toEqual([successor.account]);
     });
 });
+
+
+describe('selected-person context across a same-WebSocket wake', () => {
+    it('preserves the saved lobby nonce and lets the unchanged original context Unignore its exact live peer without a refresh or contact grant', async () => {
+        const actor = await guest('Actor'), original = await guest('Original'); now += 180000;
+        const originalNonce = room('#stalemate').keepRef;
+        const held = selected(original, 'ignore', '#stalemate', ['Original']);
+        await receive(actor, held);
+        expect(prefs(actor)).toEqual({ names: [], peers: [original.id] });
+        const saved = structuredClone({ net: engine.snapshot(), rooms: engine.roomSnapshot(), abuse: engine.abuseSnapshot(), sessions: engine.sessionSnapshot() });
+        expect(saved.sessions.lobbyInstance).toBe(originalNonce);
+        expect(saved.sessions.pm).toEqual([]); expect(saved.sessions.pendingPm).toEqual([]);
+        const live = [actor, original].map(({ admission, ...identity }) => identity);
+        now += 61000; frames = [];
+        engine = createLobby({ now: () => now, send: (recipient, frame) => frames.push({ recipient, ...structuredClone(frame) }),
+            close: (id, code, reason) => closed.push({ id, code, reason }) });
+        engine.restore(saved.net); await engine.restoreRooms(saved.rooms); engine.restoreAbuse(saved.abuse);
+        expect(engine.restoreSessions(saved.sessions, live)).toEqual({ resumed: [actor.id, original.id], rejected: [] });
+        expect(room('#stalemate').keepRef).toBe(originalNonce);
+        expect(engine.sessionSnapshot().lobbyInstance).toBe(originalNonce);
+        expect(prefs(actor)).toEqual({ names: [], peers: [original.id] });
+        expect(frames.filter(frame => frame.t === 'person-preferences')).toEqual([
+            { recipient: actor.id, t: 'person-preferences', names: [], peers: [original.id] }
+        ]);
+        expect(frames.filter(frame => ['hello', 'welcome', 'join', 'chan', 'line', 'pm'].includes(frame.t))).toEqual([]);
+        // Reuse the exact original command context, changing only its action.
+        // No new room projection, nickname selection, handshake or consent.
+        frames = []; await receive(actor, { ...held, name: 'unignore' });
+        expect(prefs(actor)).toEqual({ names: [], peers: [] });
+        expect(frames.filter(frame => frame.t === 'person-preferences')).toEqual([
+            { recipient: actor.id, t: 'person-preferences', names: [], peers: [] }
+        ]);
+        await chat(original, 'The original peer is heard after confirmed Unignore across wake');
+        expect(frames.some(frame => frame.recipient === actor.id && frame.t === 'line'
+            && frame.personPeer === original.id && frame.roomInstance === originalNonce
+            && frame.text === 'The original peer is heard after confirmed Unignore across wake')).toBe(true);
+        expect(engine.sessionSnapshot().pm).toEqual([]); expect(engine.sessionSnapshot().pendingPm).toEqual([]);
+        expect(frames.filter(frame => ['pm', 'pm-open', 'pm-request'].includes(frame.t))).toEqual([]);
+        expect(closed).toEqual([]);
+    });
+});

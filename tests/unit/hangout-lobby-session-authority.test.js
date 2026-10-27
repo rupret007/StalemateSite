@@ -143,7 +143,13 @@ describe('explicit collocated lobby authority initialization and migration', () 
         const registrySnapshot = { v: 1, sessions: [], mintRates: { ['q'.repeat(22)]: { until: NOW + 10000, count: 7 } } };
         await migrateLobbySessionAuthority({ storage: f.storage, env: f.env, registrySnapshot, now: NOW });
         const loaded = (await f.authority.load()).state;
-        expect(loaded).toEqual({ ...f.state, net });
+        // Missing legacy sessions use the migration's own fresh server state,
+        // whose nonce is independent of this fixture's earlier constructor.
+        const persistedSessions = await f.authority.records.transaction(tx => tx.get('sessions'));
+        const lobbyInstance = persistedSessions.lobbyInstance;
+        expect(lobbyInstance).toMatch(/^[a-f0-9]{32}$/);
+        expect(loaded).toEqual({ ...f.state, net, sessions: { ...f.state.sessions, lobbyInstance } });
+        expect((await f.authority.load()).state).toEqual(loaded);
         expect(await f.rawGet('net')).toEqual(net); expect(await f.rawGet('unrelated')).toEqual({ keep: 'raw legacy state' });
         expect(await f.authority.records.transaction(tx => tx.get(RATES))).toEqual(registrySnapshot.mintRates);
     });

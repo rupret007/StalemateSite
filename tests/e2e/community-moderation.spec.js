@@ -248,6 +248,10 @@ test('visible Ignore and Block protect a visitor across a third site and a chang
         await host.click('nav [data-show="people"]');
         await host.locator('[data-nicks] button').filter({ hasText: /MakerGuest$/ }).click();
         await host.locator('[data-sheet-buttons]').getByRole('button', { name: 'Ignore', exact: true }).click();
+        await expect(host.locator('[data-sheet] [data-person-status]')).toHaveText('Your preference is confirmed.');
+        await expect(host.locator('[data-sheet-buttons]').getByRole('button', { name: 'Unignore', exact: true })).toBeVisible();
+        await host.keyboard.press('Escape');
+        await expect(host.locator('[data-sheet]')).toBeHidden();
         await host.click('nav [data-show="chat"]');
         await expect(host.locator('[data-buffer]')).toContainText('Ignoring MakerGuest.');
 
@@ -306,7 +310,7 @@ test('one fixture-verified account keeps ownership across entries and revokes an
         await owner.getByRole('button', { name: 'Add verified co-host', exact: true }).click();
         await expect(cohost.locator('[data-roomtools]')).toBeVisible();
         await expect(guest.locator('[data-roomtools]')).toBeHidden();
-        await guest.evaluate(ch => window.__lobby.ws.send(JSON.stringify({ t: 'cmd', name: 'cohost', args: ['add', 'UnverifiedMaker'], ch,
+        await guest.evaluate(ch => window.__lobby.ws.send(JSON.stringify({ t: 'cmd', name: 'cohost', args: ['add', 'UnverifiedMaker'], ch, personNamed: true,
             account: 'journey-owner@example.test', verified: true, role: 'owner', entrySource: 'stalemate' })), room);
         await expect(guest.locator('[data-buffer]')).toContainText('Only the registered room owner can do that.');
         expect(await guest.evaluate(() => window.__lobby.verified)).toBe(false);

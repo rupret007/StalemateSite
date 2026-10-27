@@ -67,9 +67,10 @@ function validRoomRecord(room, now) {
         && unique(room.ops, 150, id) && unique(room.voice, 150, id) && unique(room.invites, 150, id) && unique(room.cohosts, 150, id)
         && list(room.opAccounts, room.ops.length, row => pair(row) && row.every(id) && room.ops.includes(row[0]))
         && new Set(room.opAccounts.map(row => row[0])).size === room.opAccounts.length
-        && room.bans.every(ban => shape(ban, ['mask'], ['reason', 'by', 'at', 'nick', 'until'])
+        && room.bans.every(ban => shape(ban, ['mask'], ['reason', 'by', 'at', 'nick', 'until', 'displayNick'])
             && (!Object.hasOwn(ban, 'reason') || text(ban.reason, 80)) && (!Object.hasOwn(ban, 'by') || text(ban.by, 128))
-            && (!Object.hasOwn(ban, 'at') || time(ban.at, now)) && (!Object.hasOwn(ban, 'nick') || nick(ban.nick)))
+            && (!Object.hasOwn(ban, 'at') || time(ban.at, now)) && (!Object.hasOwn(ban, 'nick') || nick(ban.nick))
+            && (!Object.hasOwn(ban, 'displayNick') || nick(ban.displayNick)))
         && shape(room.act, ['strokes', 'video']) && room.act.strokes.every(stroke => shape(stroke, ['id', 'color', 'size', 'pts'])
             && same(H.cleanSnapshotStroke(stroke), stroke))
         && (room.act.video === null || shape(room.act.video, ['source', 'playing', 'pos', 't'])
@@ -130,7 +131,9 @@ function validSessions(value, now) {
         && [row.since, row.lastNick, row.last, row.actLast].every(at => time(at, now)) && number(row.tokens) && row.tokens <= 5
         && number(row.actTokens) && row.actTokens <= 24 && integer(row.frames) && row.frames <= 4000 && integer(row.camReports) && row.camReports <= 150
         && object(row.lastSaid) && Object.keys(row.lastSaid).length <= 31 && Object.entries(row.lastSaid).every(([name, at]) => row.channels.includes(name) && time(at, now));
-    if (!shape(value, ['version', 'connections', 'pm', 'pendingPm', 'receipts']) || value.version !== 1 || !list(value.connections, 200, connection)
+    if (!shape(value, ['version', 'connections', 'pm', 'pendingPm', 'receipts'], ['lobbyInstance']) || value.version !== 1
+        || Object.hasOwn(value, 'lobbyInstance') && (typeof value.lobbyInstance !== 'string' || !/^[a-f0-9]{32}$/.test(value.lobbyInstance))
+        || !list(value.connections, 200, connection)
         || new Set(value.connections.map(row => row.id)).size !== value.connections.length
         || new Set(value.connections.filter(row => !row.safetyOnly).map(row => row.nick.toLowerCase())).size !== value.connections.filter(row => !row.safetyOnly).length || bytes(value) > 2 * MIB) return false;
     const connections = new Map(value.connections.map(row => [row.id, row]));
@@ -155,9 +158,10 @@ function validSessions(value, now) {
 function validNet(value, now) {
     const counts = rows => object(rows) && Object.values(rows).every(number);
     return shape(value, ['bans', 'kicks', 'mutes', 'lock', 'shield', 'shieldAuto', 'lockAuto', 'lists', 'lastBand', 'budget', 'reportsToHide', 'stats'])
-        && list(value.bans, 5000, row => shape(row, ['mask', 'by', 'reason', 'at'], ['nick', 'until']) && text(row.mask, 300, 1)
+        && list(value.bans, 5000, row => shape(row, ['mask', 'by', 'reason', 'at'], ['nick', 'until', 'displayNick']) && text(row.mask, 300, 1)
             && /^(dev|iph|account|nick):/.test(row.mask) && text(row.by, 128) && text(row.reason, 80) && time(row.at, now)
-            && (!Object.hasOwn(row, 'nick') || nick(row.nick)) && (!Object.hasOwn(row, 'until') || row.until === null || number(row.until)))
+            && (!Object.hasOwn(row, 'nick') || nick(row.nick)) && (!Object.hasOwn(row, 'displayNick') || nick(row.displayNick))
+            && (!Object.hasOwn(row, 'until') || row.until === null || number(row.until)))
         && [value.kicks, value.mutes].every(rows => object(rows) && Object.entries(rows).every(([key, until]) => id(key) && number(until)))
         && ['off', 'readonly', 'closed'].includes(value.lock) && ['shield', 'shieldAuto', 'lockAuto'].every(key => typeof value[key] === 'boolean')
         && shape(value.lists, ['block', 'hold', 'allow']) && Object.values(value.lists).every(rows => list(rows, 2000, word => text(word, 40, 1)))

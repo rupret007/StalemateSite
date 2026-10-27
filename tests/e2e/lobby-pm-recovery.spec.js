@@ -44,6 +44,7 @@ async function community(browser, baseURL, { privateContextFeature = 1, privateP
     };
     return {
         guest, inbound, delivered, advertise: feature => { advertisedFeature = feature; },
+        roomInstance: name => engine.adminState().rooms.find(room => room.name === name)?.keepRef,
         hold: predicate => { holdDelivery = predicate; },
         release: () => { holdDelivery = () => false; for (const { id, output } of held.splice(0)) sockets.get(id)?.send(JSON.stringify(output)); },
         releaseNext: predicate => { const index = held.findIndex(({ id, output }) => predicate(id, output)); if (index < 0) return false; const [{ id, output }] = held.splice(index, 1); sockets.get(id)?.send(JSON.stringify(output)); return true; },
@@ -729,7 +730,7 @@ test('a historical public author blocks only its original identity after that la
     } finally { await fixture.close(); }
 });
 
-test('identity Ignore waits for its committed snapshot and survives a same-socket wake without hiding a new label holder', async ({ browser, baseURL }) => {
+test('identity Ignore waits for its committed snapshot and survives a same-socket wake without hiding a new label holder', async ({ browser, baseURL }, testInfo) => {
     const fixture = await community(browser, baseURL);
     try {
         const sender = await fixture.guest('Sender'), original = await fixture.guest('Original'), replacement = await fixture.guest('Third');
@@ -765,10 +766,41 @@ test('identity Ignore waits for its committed snapshot and survives a same-socke
         expect(fixture.delivered.some(frame => frame.t === 'line' && frame.text === hidden && frame.recipient === senderId)).toBe(false);
         fixture.advance(4000); const visible = 'The new name holder is independent of the ignored connection';
         await send(replacement, visible); await expect(received(sender, visible)).toHaveCount(1);
-        fixture.wake();
+        const beforeWake = { server: fixture.roomInstance('#stalemate'), client: await sender.evaluate(() => window.__lobby.chans.get('#stalemate').keepRef) };
+        const restoreStart = fixture.delivered.length, saved = fixture.wake();
+        const afterWake = { server: fixture.roomInstance('#stalemate'), client: await sender.evaluate(() => window.__lobby.chans.get('#stalemate').keepRef), savedLobbyInstance: saved.sessions.lobbyInstance ?? null };
         await sender.locator(`[data-nicks] button[data-connection-id="${originalId}"]`).click();
         await expect(sheet.getByRole('button', { name: 'Unignore', exact: true })).toBeVisible();
+        const unignoreInputStart = fixture.inbound.length, unignoreOutputStart = fixture.delivered.length;
         await sheet.getByRole('button', { name: 'Unignore', exact: true }).click();
+        try {
+            await expect.poll(() => fixture.delivered.slice(unignoreOutputStart).some(frame => frame.recipient === senderId
+                && ['person-preferences', 'notice', 'denied', 'rate-limit'].includes(frame.t))).toBe(true);
+        } finally {
+            const observation = {
+                scope: 'Real production client/core with explicit local identity, WebSocket and clock fixtures; no hosted/native-auth claim',
+                originalId, senderId, beforeWake, afterWake,
+                actualUnignoreInputs: fixture.inbound.slice(unignoreInputStart),
+                actualUnignoreOutputs: fixture.delivered.slice(unignoreOutputStart),
+                actualRestoreOutputs: fixture.delivered.slice(restoreStart, unignoreOutputStart),
+                client: await sender.evaluate(() => ({ nonce: window.__lobby.chans.get('#stalemate')?.keepRef,
+                    ignoredPeers: [...window.__lobby.peerIgnores], namedIgnores: [...window.__lobby.ignores],
+                    status: document.querySelector('[data-person-status]')?.textContent || '' }))
+            };
+            const path = testInfo.outputPath('identity-ignore-wake-unignore.json');
+            await writeFile(path, JSON.stringify(observation, null, 2));
+            await testInfo.attach('identity-ignore-wake-unignore', { path, contentType: 'application/json' });
+            await sender.screenshot({ path: testInfo.outputPath('identity-ignore-wake-unignore.png'), fullPage: true });
+        }
+        // The old context itself must survive; refreshing the caller's room or
+        // releasing an imaginary held ACK would conceal the production gap.
+        expect(beforeWake.server).toBe(beforeWake.client);
+        expect(afterWake.server).toBe(beforeWake.server); expect(afterWake.client).toBe(beforeWake.client);
+        expect(afterWake.savedLobbyInstance).toBe(beforeWake.server);
+        expect(fixture.inbound.slice(unignoreInputStart).find(frame => frame.t === 'cmd' && frame.name === 'unignore'))
+            .toMatchObject({ sender: senderId, personContext: 1, personPeer: originalId, ch: '#stalemate', roomInstance: beforeWake.server });
+        expect(fixture.delivered.slice(unignoreOutputStart).filter(frame => frame.recipient === senderId && frame.t === 'person-preferences'))
+            .toEqual([{ recipient: senderId, t: 'person-preferences', names: ['unknownrule'], peers: [] }]);
         await expect(sheet.getByRole('button', { name: 'Ignore', exact: true })).toBeVisible();
         expect(await sender.evaluate(id => window.__lobby.peerIgnores.has(id), originalId)).toBe(false);
         await sender.keyboard.press('Escape');

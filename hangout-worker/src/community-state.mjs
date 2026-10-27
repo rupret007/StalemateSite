@@ -34,7 +34,8 @@ export function validRoom(r, now) {
         && Number.isInteger(r.modes.l) && r.modes.l >= 1 && r.modes.l <= 8
         && Number.isInteger(r.modes.S) && r.modes.S >= 0 && r.modes.S <= 300
         && ids(r.ops) && ids(r.voice) && ids(r.invites)
-        && Array.isArray(r.bans) && r.bans.length <= 500 && r.bans.every((b) => obj(b) && typeof b.mask === 'string' && /^(dev|iph|nick|account):[A-Za-z0-9_\-\[\]{}^`|]+$/.test(b.mask) && (b.until == null || Number.isFinite(b.until)))
+        && Array.isArray(r.bans) && r.bans.length <= 500 && r.bans.every((b) => obj(b) && typeof b.mask === 'string' && /^(dev|iph|nick|account):[A-Za-z0-9_\-\[\]{}^`|]+$/.test(b.mask) && (b.until == null || Number.isFinite(b.until))
+            && (!Object.hasOwn(b, 'displayNick') || typeof b.displayNick === 'string' && /^[A-Za-z][A-Za-z0-9_\-\[\]{}^`|]{2,19}$/.test(b.displayNick)))
         && obj(r.kicks) && Object.keys(r.kicks).length <= 150 && Object.entries(r.kicks).every(([k, v]) => id(k) && Number.isFinite(v))
         && obj(r.act) && Array.isArray(r.act.strokes) && r.act.strokes.length <= 400
         && JSON.stringify(r.act).length <= 1000000;

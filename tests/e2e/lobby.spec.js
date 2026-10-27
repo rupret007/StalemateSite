@@ -98,7 +98,7 @@ test('three fans + a band op: chat, /me, slap button, filters, PM accept-first, 
     await expect(buffer(b)).toContainText('great set huh');
     await expect(b.locator('[data-tabs]')).toContainText('✉ Sk8rKid');
     // Forged op command from a fan: refused by the server, nobody kicked.
-    await c.evaluate(() => window.__lobby.ws.send(JSON.stringify({ t: 'cmd', name: 'kick', args: ['Sk8rKid'], ch: '#stalemate', role: 'owner' })));
+    await c.evaluate(() => window.__lobby.ws.send(JSON.stringify({ t: 'cmd', name: 'kick', args: ['Sk8rKid'], ch: '#stalemate', personNamed: true, role: 'owner' })));
     await c.evaluate(() => window.__lobby.ws.send(JSON.stringify({ t: 'cmd', name: 'shield', args: [], ch: '#stalemate' })));
     await expect(buffer(c)).toContainText('permission denied');
     await expect(a.locator('[data-app]')).toBeVisible();

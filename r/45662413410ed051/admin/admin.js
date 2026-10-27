@@ -249,7 +249,7 @@
             const type = typeof b.mask === 'string' ? b.mask.split(':', 1)[0] : '';
             const valid = Object.hasOwn(ruleNames, type) && b.mask.length > type.length + 1;
             const li = el('li');
-            li.append(el('b', `${b.nick ? `Historical nickname: ${b.nick}` : 'Stored restriction'} · ${ruleNames[type] || 'Unknown rule'} · by ${b.by} · ${ago(b.at)}`), el('span', b.reason));
+            li.append(el('b', `${b.displayNick || b.nick ? `Historical nickname: ${b.displayNick || b.nick}` : 'Stored restriction'} · ${ruleNames[type] || 'Unknown rule'} · by ${b.by} · ${ago(b.at)}`), el('span', b.reason));
             const origin = s.rooms.find(room => room.name === '#stalemate');
             const instance = origin?.keepRef;
             const remove = btn('Unban this rule', () => {

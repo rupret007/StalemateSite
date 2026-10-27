@@ -72,7 +72,12 @@ ignore is a separate explicit choice; Unignore for one peer must not silently
 remove a nickname rule.
 
 The moderation panel retains exact stored ban rules. A historical nickname is
-an informational label. Removing a rule uses its exact stored mask, never a
+an informational label. New selected device/account rules persist that label
+as optional `displayNick`; it never participates in person lookup, ban matching
+or named Unban grouping. Legacy `nick` rules retain their existing separate
+semantics. Strict readers validate a present label, so this field requires the
+same matched reader/writer rollout and compatible-state rollback described
+below. Removing a rule uses its exact stored mask, never a
 lookup of that nickname's current owner. Public confirmation must not expose a
 private device/account mask. Removing one rule does not imply that every other
 restriction for that visitor has been removed.
@@ -103,6 +108,24 @@ authority and codec through the existing release owner, drain old writers and
 sockets, and qualify rollback against compatible state. A code-only downgrade
 is not a rollback plan. Do not reset durable state or widen caps to make a
 reader accept incompatible data.
+
+The session snapshot also stores the permanent lobby's `lobbyInstance`. New
+snapshots preserve that room reference through a same-WebSocket wake, so an
+otherwise valid selected action is not rejected because the process restarted.
+The nonce is trusted namespace state, not a client-supplied identity or grant.
+A malformed present value is rejected before restoration changes live state.
+It remains inside the existing session byte limit and requires the same matched
+reader/writer rollout and compatible-state rollback discipline.
+
+For a legacy snapshot without this field, ordinary mode can send current lobby
+metadata only to successfully resumed lobby members after roster restoration.
+It replays no chat and does not rewrite a held selection's old reference. With
+participation authority enabled, eager legacy roster metadata is withheld;
+selected controls remain subject to the existing checks until normal authorized
+channel state or a new session supplies their context. No transparent legacy C3
+upgrade is claimed. Required writer/socket drain remains the release path;
+reporting, Quit and existing private-peer safety do not gain a contact-consent
+requirement.
 
 Source tests must separately exercise held menus and historical authors across
 rename/reuse, departed peers, recreated rooms, malformed contexts, identity-only
