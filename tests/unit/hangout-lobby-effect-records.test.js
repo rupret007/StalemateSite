@@ -254,3 +254,51 @@ describe('strict restricted-safety session records', () => {
         }
     });
 });
+
+
+describe('bounded PM peer-reference session metadata through actual SQLite', () => {
+    async function sessionFixture() {
+        const f = await fixture(); let at = NOW; const sent = [];
+        const engine = createLobby({ now: () => at, limits: { defaultSlow: 0 }, send: (recipient, frame) => sent.push({ recipient, ...structuredClone(frame) }) });
+        for (const nick of ['Alice', 'Bravo', 'Charlie']) {
+            const id = `socket_${nick}`;
+            engine.connect({ id, dev: `device_${nick}`, iph: `ip_${nick}`, role: 'fan', admin: false, account: '' });
+            engine.message(id, JSON.stringify({ t: 'hello', nick, age13: true }));
+        }
+        at += 180000; f.advance(180000);
+        const command = (nick, name, args) => engine.message(`socket_${nick}`, JSON.stringify({ t: 'cmd', name, args, ch: '#stalemate' }));
+        command('Alice', 'query', ['Bravo']); command('Bravo', 'accept', ['Alice']);
+        command('Alice', 'query', ['Charlie']);
+        return { f, engine, command, sent };
+    }
+
+    it('commits and reopens real generated pending/open references without persisting an ordinary private body', async () => {
+        const { f, engine, sent } = await sessionFixture();
+        const ref = engine.sessionSnapshot().pm[0].ref, body = 'This genuinely delivered private body stays out of retained session metadata';
+        engine.message('socket_Alice', JSON.stringify({ t: 'say', ch: `pm:${ref}`, pmPeer: 'socket_Bravo', pmRef: ref, text: body }));
+        expect(sent.filter(frame => frame.t === 'pm' && frame.text === body)).toHaveLength(2);
+        const sessions = engine.sessionSnapshot();
+        expect(sessions.receipts).toHaveLength(1);
+        expect(sessions.pm).toHaveLength(1); expect(sessions.pendingPm).toHaveLength(1);
+        expect(sessions.pm[0].ref).toMatch(/^[a-f0-9]{32}$/); expect(sessions.pendingPm[0].ref).toMatch(/^[a-f0-9]{32}$/);
+        expect(sessions.pm[0].ref).not.toBe(sessions.pendingPm[0].ref);
+        await f.write([['sessions', sessions]]);
+        const reopened = await f.reopen();
+        const saved = await reopened.storage.transaction(tx => readLobbyState({ tx, now: NOW + 180000 }));
+        expect(saved.sessions).toEqual(sessions);
+        expect(JSON.stringify(saved.sessions)).not.toContain(body);
+        expect(JSON.stringify(saved.sessions)).not.toContain('text');
+    });
+
+    it.each(['malformed', 'duplicate', 'body'])('rolls back physical records for %s peer metadata without sanitizing or truncating it', async damage => {
+        const { f, engine } = await sessionFixture(), sessions = engine.sessionSnapshot();
+        await f.write([['sessions', sessions]]); const before = hashRows(f.driver);
+        const changed = structuredClone(sessions);
+        if (damage === 'malformed') changed.pendingPm[0].ref = 'not-a-reference';
+        if (damage === 'duplicate') changed.pendingPm[0].ref = changed.pm[0].ref;
+        if (damage === 'body') changed.pendingPm[0].first = 'An ordinary private body must never enter metadata';
+        await expect(f.write([['sessions', changed]])).rejects.toThrow();
+        expect(hashRows(f.driver)).toBe(before);
+        expect((await f.read()).sessions).toEqual(sessions);
+    });
+});

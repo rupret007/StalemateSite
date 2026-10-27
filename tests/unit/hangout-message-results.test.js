@@ -21,7 +21,7 @@ async function fixture() {
         send: (recipient, frame) => frames.push({ recipient, ...copy(frame) }), persist: (kind, value) => persisted.push([kind, copy(value)]) });
     const message = (id, frame) => engine.message(id, JSON.stringify(frame));
     for (const [id, nick] of [['writer', 'Writer'], ['reader', 'Reader']]) {
-        await engine.connect({ id, dev: `device_${id}`, iph: `ip_${id}` }); await message(id, { t: 'hello', nick, age13: true });
+        await engine.connect({ id, dev: `device_${id}`, iph: `ip_${id}` }); await message(id, { t: 'hello', nick, age13: true, pmPeers: 1 });
     }
     frames.length = persisted.length = 0;
     return { engine, frames, persisted, message, advance: ms => { at += ms; } };
@@ -50,7 +50,7 @@ async function sqliteFixture() {
         expect((await authority.register({ sid, version: '1', exp: expiresAt, iph: `mint_${id.padEnd(17, 'x')}`.slice(0, 22) })).status).toBe(200);
         const binding = { id, betaSid: sid, betaInviteVersion: '1', dev: `device_${id}`, iph: `ip_${id}`, account: '', role: 'fan', admin: false,
             expiresAt, authorityRef: id, authorityRevision: 1 };
-        await authority.bind(binding); await engine.connect(binding); await message(id, { t: 'hello', nick, age13: true });
+        await authority.bind(binding); await engine.connect(binding); await message(id, { t: 'hello', nick, age13: true, pmPeers: 1 });
     }
     frames.length = 0;
     return { engine, frames, authority, driver, control, message };
@@ -86,7 +86,7 @@ describe('caller-only negotiated message results', () => {
 
     it('distinguishes a pending first PM request from delivery and preserves the ordinary PM scope', async () => {
         const f = await fixture(); f.advance(120001);
-        await f.message('writer', { t: 'cmd', ch: 'pm:Reader', name: 'msg', args: ['Reader', 'A private first message'], clientMessageId: TOKEN });
+        await f.message('writer', { t: 'cmd', ch: 'pm:Reader', name: 'msg', pmExplicit: true, args: ['Reader', 'A private first message'], clientMessageId: TOKEN });
         expect(f.frames.some(frame => frame.t === 'pm-request' && frame.recipient === 'reader')).toBe(true);
         expect(f.frames.some(frame => frame.t === 'pm')).toBe(false);
         expect(f.frames.filter(frame => frame.t === 'message-result')).toEqual([{ recipient: 'writer', t: 'message-result', id: TOKEN, status: 'pending' }]);
@@ -95,13 +95,14 @@ describe('caller-only negotiated message results', () => {
 
     it('confirms an ordinary open-PM operation only to its sender without tracking the prior pending token', async () => {
         const f = await fixture(); f.advance(120001);
-        await f.message('writer', { t: 'cmd', ch: 'pm:Reader', name: 'msg', args: ['Reader', 'First pending body'], clientMessageId: 'b'.repeat(32) });
+        await f.message('writer', { t: 'cmd', ch: 'pm:Reader', name: 'msg', pmExplicit: true, args: ['Reader', 'First pending body'], clientMessageId: 'b'.repeat(32) });
         f.frames.length = 0;
         await f.message('reader', { t: 'cmd', name: 'accept', args: ['Writer'] });
         expect(f.frames.some(frame => frame.t === 'pm' && frame.recipient === 'reader' && frame.text === 'First pending body')).toBe(true);
         expect(f.frames.some(frame => frame.t === 'message-result')).toBe(false);
+        const { ref } = f.frames.find(frame => frame.t === 'pm-open' && frame.recipient === 'writer');
         f.frames.length = f.persisted.length = 0;
-        await f.message('writer', { t: 'cmd', ch: 'pm:Reader', name: 'msg', args: ['Reader', 'An accepted private reply'], clientMessageId: TOKEN });
+        await f.message('writer', { t: 'say', ch: `pm:${ref}`, pmPeer: 'reader', pmRef: ref, text: 'An accepted private reply', clientMessageId: TOKEN });
         expect(f.frames.some(frame => frame.t === 'pm' && frame.recipient === 'reader' && frame.text === 'An accepted private reply')).toBe(true);
         expect(f.frames.filter(frame => frame.t === 'message-result')).toEqual([{ recipient: 'writer', t: 'message-result', id: TOKEN, status: 'published' }]);
         expect(JSON.stringify(f.frames.filter(frame => frame.t !== 'message-result'))).not.toContain(TOKEN);
@@ -111,7 +112,7 @@ describe('caller-only negotiated message results', () => {
 
     it.each(['A public channel message', 'you are such a loser'])('does not mistake /msg channel routing for an ordinary PM result: %s', async text => {
         const f = await fixture();
-        await f.message('writer', { t: 'cmd', ch: 'pm:#stalemate', name: 'msg', args: ['#stalemate', text], clientMessageId: TOKEN });
+        await f.message('writer', { t: 'cmd', ch: 'pm:#stalemate', name: 'msg', pmExplicit: true, args: ['#stalemate', text], clientMessageId: TOKEN });
         const published = f.frames.some(frame => frame.t === 'line' && frame.text === text);
         expect(published || f.engine.adminState().held.some(line => line.text === text)).toBe(true);
         expect(f.frames.some(frame => frame.t === 'message-result')).toBe(false);

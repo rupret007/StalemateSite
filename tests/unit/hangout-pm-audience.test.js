@@ -8,19 +8,24 @@ function fixture() {
     const boot = () => { engine = createLobby({ now: () => time, limits: { defaultSlow: 0 },
         send: (recipient, frame) => frames.push({ recipient, ...structuredClone(frame) }) }); };
     boot();
-    const command = (id, name, args = [], ch = '#stalemate') => engine.message(id, JSON.stringify({ t: 'cmd', name, args, ch }));
+    const binding = (id, peer) => {
+        const pair = engine.sessionSnapshot().pm.find(pair => pair.key === [id, peer].sort().join('|'));
+        return pair?.ref ? { ch: `pm:${pair.ref}`, pmPeer: peer, pmRef: pair.ref } : {};
+    };
+    const command = (id, name, args = [], ch = '#stalemate') => engine.message(id, JSON.stringify({ t: 'cmd', name, args, ch,
+        ...(ch.startsWith('pm:') && ['me', 'slap'].includes(name) ? binding(id, ch.slice(3)) : {}), ...(name === 'msg' ? { pmExplicit: true } : {}) }));
     const pm = id => frames.filter(frame => frame.recipient === id && frame.t === 'pm');
     function join(id, role = 'fan') {
         const identity = { id, dev: `device-${id}`, iph: `ip-${id}`, role, admin: role === 'owner', account: '' };
         identities.push(identity); expect(engine.connect(identity).ok).toBe(true);
-        engine.message(id, JSON.stringify({ t: 'hello', nick: id, age13: true }));
+        engine.message(id, JSON.stringify({ t: 'hello', nick: id, age13: true, pmPeers: 1 }));
     }
     function establish(role = 'fan') {
         join('Sender', role); join('Recipient'); join('Observer'); time += 180000;
         command('Sender', 'query', ['Recipient']); command('Recipient', 'accept', ['Sender']);
         frames.length = 0;
     }
-    return { get engine() { return engine; }, command, pm, frames, join, establish, later: ms => { time += ms; },
+    return { get engine() { return engine; }, binding, command, pm, frames, join, establish, later: ms => { time += ms; },
         wake() {
             const saved = structuredClone({ net: engine.snapshot(), rooms: engine.roomSnapshot(), sessions: engine.sessionSnapshot() });
             time += 61000; boot(); engine.restore(saved.net); engine.restoreRooms(saved.rooms);
@@ -34,7 +39,7 @@ function fixture() {
 describe('private composer audience and actions', () => {
     it('keeps a literal slash in the accepted private conversation without a channel fallback', () => {
         const f = fixture(); f.establish();
-        f.engine.message('Sender', JSON.stringify({ t: 'say', ch: 'pm:Recipient', text: '//A private literal slash' }));
+        f.engine.message('Sender', JSON.stringify({ t: 'say', ...f.binding('Sender', 'Recipient'), text: '//A private literal slash' }));
         expect(f.pm('Recipient')).toContainEqual(expect.objectContaining({ text: '/A private literal slash', me: false }));
         expect(f.frames.some(frame => frame.t === 'line')).toBe(false);
         expect(f.pm('Observer')).toEqual([]);
@@ -85,6 +90,8 @@ describe('private composer audience and actions', () => {
         f.join('Returned'); f.later(180000); f.frames.length = 0;
         f.command('Returned', 'me', ['A pending private action is not a saved transcript'], 'pm:Recipient');
         expect(f.pm('Recipient')).toEqual([]);
+        expect(f.frames.some(frame => frame.t === 'pm-request')).toBe(false);
+        f.command('Returned', 'msg', ['Recipient', 'A pending private action is not a saved transcript'], 'pm:Recipient');
         expect(f.frames.some(frame => frame.recipient === 'Recipient' && frame.t === 'pm-request' && frame.from === 'Returned')).toBe(true);
         const saved = f.wake(); expect(JSON.stringify(saved)).not.toContain('A pending private action');
         f.command('Recipient', 'accept', ['Returned']);
@@ -105,9 +112,12 @@ describe('private composer audience and actions', () => {
         f.command('Sender', 'slap', ['Recipient'], 'pm:Recipient');
         expect(f.pm('Recipient')).toEqual([]);
         f.command('Recipient', 'unblock', ['Sender']); f.later(4000);
-        f.command('Sender', 'me', ['A new request waits for acceptance'], 'pm:Recipient');
+        f.command('Sender', 'me', ['An old context cannot create a new request'], 'pm:Recipient');
         expect(f.pm('Recipient')).toEqual([]);
+        expect(f.frames.filter(frame => frame.t === 'pm-request')).toEqual([]);
+        f.command('Sender', 'query', ['Recipient']);
         f.command('Recipient', 'accept', ['Sender']);
+        f.command('Sender', 'me', ['A new request waits for acceptance'], 'pm:Recipient');
         expect(f.pm('Recipient')).toContainEqual(expect.objectContaining({ text: 'A new request waits for acceptance', me: true }));
         f.command('Staff', 'mute', ['Sender', '10m']); f.later(4000);
         f.command('Sender', 'me', ['A muted action'], 'pm:Recipient');

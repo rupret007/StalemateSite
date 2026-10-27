@@ -51,6 +51,77 @@ Socket attachments retain only the session metadata and encrypted-relay token bu
 
 To revoke invitations, replace `HANGOUT_BETA_INVITE_KEY` and increment `HANGOUT_BETA_INVITE_VERSION`. Keep `HANGOUT_HMAC_KEY` stable: durable account IDs derive from it, so changing it without migration can orphan ownership. Emergency `HANGOUT_OPEN=0` pauses new visitor lobby, private-room and TURN admission. Cryptographically authenticated staff can still connect to the moderation panel. Existing visitor sockets require the network's emergency controls for immediate closure; this environment switch is an admission pause.
 
+## Private-message peer references
+
+The lobby advertises numeric `hello.features.privateMessagePeers: 1`. It identifies
+a PM counterpart by its original live connection ID and a random 32-hex `ref`
+issued for a genuinely new request. Acceptance, rename and a valid same-socket
+wake preserve that reference; a closed and recreated conversation gets a new
+one. These values correlate one conversation, not an account, device credential,
+registered-room owner or staff role. They do not grant contact permission.
+
+Implicit PM text and actions use `ch: "pm:<ref>"`, `pmPeer` and `pmRef`. The
+server requires the exact actor, current peer and accepted pair/reference before
+delivery, then applies its existing participation, blocking and commit fences.
+Pending Accept/Decline controls instead require the exact pending sender and
+request reference. Missing, malformed or stale fields refuse without falling
+back to a nickname. Deliberately typed `/msg nickname text` and named commands
+still choose the current nickname; only a deliberate menu `/msg` uses
+`pmExplicit: true`. Private `/me` and quick actions remain in their selected
+conversation. A typed `/slap` may name another current person in its text without
+changing the private message's recipient.
+
+Server PM request, open, request-ended, close, rename (`pm-peer`) and body frames
+carry `peer`/`ref` with display labels. Each delivered PM also carries the other
+peer's `with` label and a server-derived `self` boolean. Clients use that metadata,
+not a nickname comparison, to update tabs, authorship, held callbacks and drafts.
+These fields are added to delivery envelopes after the existing receipt is
+created; the receipt digest and selected-report boundary are unchanged. This
+does not add a persistent PM-body log or end-to-end encryption.
+
+A rename or same-socket wake keeps the original conversation's history and draft.
+A new socket clears old received PM lines; only closed views with an unsent
+ordinary draft remain for manual Copy/Discard. A new endpoint/reference never
+inherits that draft or history. Closed or unconfirmed conversations cannot
+restore a saved body into a different conversation. Drafts remain in the tab's
+existing in-memory stores. If the numeric peer capability is absent or has the
+wrong type, implicit sends/actions retain their draft; deliberately named
+commands and ordinary public chat remain available. Old stored pairs without a
+reference cannot authorize a bound reply: a deliberate fresh request needs
+fresh consent and a new server reference.
+
+Safety controls do not require a new contact grant. Bound Block/Ignore actions
+resolve the original live ID rather than a reused label; a valid-shaped reference
+is not consent. Missing, malformed or departed bound targets refuse without
+nickname fallback. Block can target a hidden safety-only connection without
+storing an empty ignore nickname; Ignore may refuse a hidden name. Deliberately
+typed named safety commands keep their explicit meaning. Reporting previously
+delivered messages and quitting remain available independently of PM capability
+or pair state.
+
+### Upgrade and rollback
+
+The strict session codec now accepts an optional `ref` on existing open and
+pending PM records and requires valid, unique references across both sets. This
+extends the record whitelist: the previous strict reader rejects rows containing
+the new field. Record version, capacity/byte limits and deadlines are unchanged.
+
+Deploy matching client assets, lobby core and session codec through the release
+owner's existing maintenance and writer/socket-drain process. Qualify readers and
+saved-state compatibility before activating the writer; do not assume mixed
+versions are safe. A downgrade needs a separately qualified compatible snapshot
+or state-translation procedure, or a reader that still understands these records.
+A code-only rollback or configuration flip is not a qualified recovery procedure.
+This guide supplies no migration API, automatic repair or manual database-field
+deletion recipe.
+
+PM references do not change invitation cookies, verified account linking,
+registered-room ownership, Access audiences or credentials. Partner sites need
+only the canonical Join link described in the [website integration guide](HANGOUT_WEBSITE_INTEGRATION.md);
+they do not implement this internal protocol or receive staff powers. The
+existing c841 entry-only toolkit is unchanged. This source contract does not
+qualify deployment, real provider behavior, guardian consent or physical devices.
+
 ## Verification and remaining evidence
 
 `hangout-worker/tests/beta.test.js` checks invitation-only asset/relay admission; real generated RSA signatures; distinct audiences; expiry; stable ownership across devices; staff allowlists; absence of synthetic role selection; session binding; exact-Origin checks; bounded streamed bodies; quota/provider failures; Turnstile hostname checks; emergency admission pause; and contact injection.

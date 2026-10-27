@@ -28,7 +28,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     const entrySource = params.has('via') ? entrySourceFromParams(params, entrySites) : handoff?.source || '';
     let shareEntry = handoff?.share !== false;
     let entrySourcesSupported = null;
-    let privateMessageContextSupported = false;
+    let privateMessageContextSupported = false, privateMessagePeersSupported = false;
     let keepSupported = false, keepReturnChecked = false, pendingKeep = null, keepTimer;
     // With an older server, only commands with an explicit target or global
     // meaning are safe in a private tab. Its channel fallback cannot route PM
@@ -83,7 +83,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         return connectionState === 'connected' && !sessionEnded && !app.localMediaPaused && !app.sharingStopped
             && record.status !== 'waiting' && record.epoch === messageEpoch && current
             && current.key === record.key && current.context === record.context && current.revision === record.revision
-            && !$('[data-text]').value;
+            && (!record.key.startsWith('pm:') || store(record.key)?.open === true && privateMessagePeersSupported) && !$('[data-text]').value;
     }
     function forgetSavedMessage(record) {
         if (savedMessages.get(record.id) !== record) return;
@@ -109,7 +109,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         for (const record of savedMessages.values()) clearTimeout(record.timer);
         savedMessages.clear(); recoveryBytes = 2; closeMessageCopy(); drawMessageRecovery();
     }
-    function messageTarget(record) { return record.key.startsWith('pm:') ? `PM with ${record.key.slice(3)}` : record.key; }
+    function messageTarget(record) { return record.key.startsWith('pm:') ? `PM with ${store(record.key)?.nick || record.targetLabel || 'this visitor'}` : record.key; }
     async function copySavedMessage(record) {
         if (savedMessages.get(record.id) !== record) return;
         const lifecycle = recoveryLifecycle;
@@ -181,7 +181,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const context = recoveryContext();
         if (!context || text.length > 300) { toast('Keep this draft under 300 characters and choose its conversation first.'); return null; }
         const token = [...crypto.getRandomValues(new Uint8Array(16))].map(byte => byte.toString(16).padStart(2, '0')).join('');
-        const record = { id: token, text, ...context, epoch: messageEpoch, legacy: !messageResultsSupported, status: messageResultsSupported ? 'waiting' : 'uncertain' };
+        const record = { id: token, text, ...context, ...(app.active.startsWith('pm:') ? { targetLabel: store(app.active)?.nick || 'this visitor' } : {}), epoch: messageEpoch, legacy: !messageResultsSupported, status: messageResultsSupported ? 'waiting' : 'uncertain' };
         // Conservative metadata/status/timer allowance plus exact UTF-8 text.
         record.bytes = new Blob([JSON.stringify(record)]).size + 64;
         if (savedMessages.size >= 8 || recoveryBytes + record.bytes > 12 * 1024) {
@@ -419,6 +419,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     const pendingReports = new Map();
     let connectionState = 'offline';
     let sessionEnded = false;
+    let endedPmLabel = null; // Display only; never a view, endpoint or send context.
     let inviteContext = null;
     let replaying = false;
     const announcements = createChatAnnouncements($('[data-buffer]'));
@@ -582,7 +583,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             if (attempt !== connectionAttempt) return;
             cancelTransportAck();
             entrySharing.disconnect();
-            privateMessageContextSupported = false;
+            privateMessageContextSupported = false; privateMessagePeersSupported = false;
             resetPendingReports();
             uncertainMessages();
             setConnection('offline');
@@ -615,6 +616,9 @@ import { createEntrySharing } from './entry-sharing.mjs';
     }
     function endSession(reason = 'expired') {
         const wasVerified = ownerSession || app.verified;
+        const privateView = app.active.startsWith('pm:') ? store(app.active) : null;
+        endedPmLabel = privateView?.nick ? { key: app.active, nick: privateView.nick }
+            : endedPmLabel?.key === app.active ? endedPmLabel : null;
         clearMessageRecovery(); messageResultsSupported = false;
         sessionEnded = true; connectionAttempt++;
         clearTimeout(retryTimer); cancelTransportAck();
@@ -651,23 +655,34 @@ import { createEntrySharing } from './entry-sharing.mjs';
         show('chat'); $('#session-ended-title').focus({ preventScroll: true });
     }
     const send = (obj) => {
+        const commandName = obj.t === 'cmd' ? String(obj.name || '').toLowerCase()
+            : obj.t === 'say' && /^\/(?!\/)/.test(obj.text || '') ? obj.text.slice(1).split(/\s/, 1)[0].toLowerCase() : '';
+        const safeCommand = ['block', 'unblock', 'ignore', 'unignore', 'part', 'leave', 'quit', 'exit', 'bye', 'help', 'h', '?', 'camoff', 'decline', 'deny'].includes(commandName);
         if (app.sharingStopped || app.localMediaPaused) {
-            const safe = obj.t === 'report' || obj.t === 'cmd' && ['block', 'unblock', 'ignore', 'unignore', 'part', 'leave', 'quit', 'exit', 'help', 'camoff'].includes(String(obj.name || '').toLowerCase());
-            if (!safe) return false;
+            if (obj.t !== 'report' && !safeCommand) return false;
         }
         if (!app.ws || app.ws.readyState !== 1) return false;
         if (obj.t !== 'hello' && connectionState !== 'connected') return false;
-        if (!privateMessageContextSupported && typeof obj.ch === 'string' && obj.ch.startsWith('pm:')) {
+        if (typeof obj.ch === 'string' && obj.ch.startsWith('pm:')) {
             const text = typeof obj.text === 'string' ? obj.text : '';
-            if (obj.t === 'say' && (!text.startsWith('/') || text.startsWith('//')))
-                return send({ t: 'cmd', name: 'msg', args: [obj.ch.slice(3), text.replace(/^\/\//, '/')], ch: obj.ch });
-            const name = obj.t === 'cmd' ? String(obj.name || '').toLowerCase() : text.slice(1).split(/\s/, 1)[0].toLowerCase();
-            if (!legacyPrivateCommands.has(name)) {
-                toast('This command is unavailable in private chat on this server. Choose a channel or send a normal PM. Your draft stays here.');
-                return false;
+            const name = obj.t === 'cmd' ? String(obj.name || '').toLowerCase()
+                : /^\/(?!\/)/.test(text) ? text.slice(1).split(/\s/, 1)[0].toLowerCase() : '';
+            const implicit = obj.t === 'say' && (!name || ['me', 'slap'].includes(name))
+                || obj.t === 'cmd' && ['me', 'slap', 'msg', 'm'].includes(name) && obj.pmExplicit !== true;
+            if (implicit) {
+                const view = store(obj.ch);
+                if (!privateMessagePeersSupported || !view?.open || !view.peer || !view.ref) {
+                    pmDraftNotice(view); return false;
+                }
+                if (!privateMessageContextSupported && ['me', 'slap'].includes(name)) {
+                    toast('This command is unavailable in private chat on this server. Your draft stays here.'); return false;
+                }
+                obj = { ...obj, pmPeer: view.peer, pmRef: view.ref };
+            } else if (!privateMessageContextSupported && !legacyPrivateCommands.has(name)) {
+                toast('This command is unavailable in private chat on this server. Your draft stays here.'); return false;
             }
         }
-        const writesMessage = obj.t === 'say' || obj.t === 'cmd' && ['me', 'slap', 'msg', 'm'].includes(String(obj.name || '').toLowerCase());
+        const writesMessage = obj.t === 'say' && !safeCommand || obj.t === 'cmd' && ['me', 'slap', 'msg', 'm'].includes(String(obj.name || '').toLowerCase());
         if (writesMessage && !entrySharing.canSend()) {
             toast('Wait for confirmation that your entrance is hidden, or reconnect. Your draft stays here.');
             return false;
@@ -685,7 +700,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             return true;
         } catch { return false; }
     };
-    const cmd = (name, args = [], ch = app.active, roomInstance) => send({ t: 'cmd', name, args, ch, ...(roomInstance === undefined ? {} : { roomInstance }) });
+    const cmd = (name, args = [], ch = app.active, roomInstance) => send({ t: 'cmd', name, args, ch, ...(['msg', 'm'].includes(name) ? { pmExplicit: true } : {}), ...(roomInstance === undefined ? {} : { roomInstance }) });
     app.cmd = cmd;
 
     function handle(m, nick) {
@@ -707,9 +722,11 @@ import { createEntrySharing } from './entry-sharing.mjs';
             break;
         case 'device': writeRemembered('hangout-dev', m.token); break;
         case 'hello':
+            endedPmLabel = null;
             messageResultsSupported = m.features?.messageResults === 1;
             entrySourcesSupported = m.features?.entrySources === 1;
             privateMessageContextSupported = m.features?.privateMessageContext === 1;
+            privateMessagePeersSupported = m.features?.privateMessagePeers === 1;
             entrySharing.setSupported(entrySourcesSupported); drawEntryChoice();
             keepSupported = m.features?.roomKeep === 1;
             app.role = m.role; app.verified = m.verified === true; app.capabilities = m.capabilities || {}; $('[data-owner-signout]').hidden = !ownerSession; app.netLock = m.lock; app.budget = m.budget;
@@ -717,7 +734,15 @@ import { createEntrySharing } from './entry-sharing.mjs';
                 app.resetSession = true; setConnection('reconnecting');
                 drafts.set(app.active, $('[data-text]').value);
                 if (roomApi) roomApi.onLeave();
-                app.chans.clear(); app.pms.clear(); app.rooms = []; app.active = '#stalemate';
+                app.chans.clear();
+                for (const [ref, view] of app.pms) {
+                    // A new socket starts a fresh received transcript. Only
+                    // an unsent draft keeps a closed, non-rebindable old tab.
+                    if (!drafts.get(`pm:${ref}`)) { app.pms.delete(ref); continue; }
+                    view.open = false; view.lines = []; view.unread = 0; view.mentions = 0;
+                    recoveryContexts.delete(view);
+                }
+                app.rooms = []; app.active = '#stalemate';
                 app.away = false; app.ignores.clear();
                 app.restorePmOff = $('[data-pm-off]').checked;
                 $('[data-pmreqs]').replaceChildren();
@@ -733,7 +758,9 @@ import { createEntrySharing } from './entry-sharing.mjs';
             if (!wasIn) count('lobby-join');
             app.verified = m.verified === true; app.capabilities = m.capabilities || app.capabilities;
             $('[data-room-filter] option[value=mine]').disabled = !app.verified;
-            app.me = m.nick; app.band = m.band; writeRemembered('hangout-nick', m.nick);
+            app.me = m.nick;
+            for (const view of app.pms.values()) updatePmName(view, view.nick);
+            app.band = m.band; writeRemembered('hangout-nick', m.nick);
             $('[data-self-nick]').textContent = m.nick;
             $('[data-self-role]').textContent = app.capabilities.configure ? 'Site administrator' : app.capabilities.moderate ? 'Community moderator' : app.verified ? 'Room owner account' : 'Guest access';
             app.kicked = false; retry = 0; setConnection('connected');
@@ -822,11 +849,24 @@ import { createEntrySharing } from './entry-sharing.mjs';
         case 'denied': if (pendingKeep) clearKeep(); line(app.active, { notice: true, from: 'StaleBot', text: m.text, kind: 'error' }); break;
         case 'list': app.rooms = m.rooms; drawRooms(); if (m.show) show('rooms'); break;
         case 'delete': for (const c of [...app.chans.values(), ...app.pms.values()]) c.lines = c.lines.filter((l) => !m.ids.includes(l.id)); $$('[data-id]').forEach((li) => { if (m.ids.includes(li.dataset.id)) li.remove(); }); break;
-        case 'pm-request': pmRequest(m.from, m.band); break;
-        case 'pm-request-ended': clearPmRequest(m.from); if (m.reason) toast(m.reason); break;
-        case 'pm-open': openPm(m.with, true); break;
-        case 'pm-closed': { const previous = app.pms.get(m.with); if (previous) recoveryContexts.delete(previous); clearPmRequest(m.with); drawMessageRecovery(); toast(`PM with ${m.with} closed.`); break; }
-        case 'pm': { const other = m.from === app.me ? m.to : m.from; openPm(other, false); pushLine(`pm:${other}`, { ...m, ch: `pm:${other}` }); break; }
+        case 'pm-request': pmRequest(m); break;
+        case 'pm-request-ended': clearPmRequest(m); if (m.reason) toast(m.reason); break;
+        case 'pm-open': openPm(m, true); break;
+        case 'pm-peer': {
+            const view = pmFrameView(m);
+            if (view?.open) { updatePmName(view, m.with); drawTabs(); if (store(app.active) === view) drawChan(); drawMessageRecovery(); }
+            break;
+        }
+        case 'pm-closed': {
+            const previous = pmFrameView(m);
+            if (previous) { previous.open = false; recoveryContexts.delete(previous); drawTabs(); if (store(app.active) === previous) { drawChan(); pmDraftNotice(previous); } else toast(`PM with ${previous.nick} closed. Your draft stays in this tab.`); }
+            clearPmRequest(m); drawMessageRecovery(); break;
+        }
+        case 'pm': {
+            const other = privateMessagePeersSupported ? m.with : m.from === app.me ? m.to : m.from;
+            const view = openPm({ ...m, with: other }, false, false);
+            if (view) pushLine(`pm:${view.ref}`, { ...m, ch: `pm:${view.ref}` }); break;
+        }
         case 'pm-setting': $('[data-pm-off]').checked = m.off; toast(m.text); break;
         case 'invite': toast(`${m.by} invited you to ${m.ch}`, [['Join', () => cmd('join', [m.ch])]]); break;
         case 'kicked': {
@@ -902,7 +942,11 @@ import { createEntrySharing } from './entry-sharing.mjs';
             const who = document.createElement('button');
             who.type = 'button'; who.className = 'who'; who.style.color = colorOf(l.from);
             who.textContent = l.me ? `* ${l.prefix || ''}${l.from}` : `<${l.prefix || ''}${l.from}>`;
-            who.addEventListener('click', () => nickSheet(l.from));
+            if (l.t === 'pm') {
+                // Historical display names never select a new live endpoint.
+                who.disabled = l.self !== false || !pmFrameValid(l);
+                if (!who.disabled) who.addEventListener('click', () => nickSheet(l.from, l));
+            } else who.addEventListener('click', () => nickSheet(l.from));
             li.append(who);
             const entryText = entryBadge(l.entrySource, entrySites);
             if (entryText) { const entry = document.createElement('span'); entry.className = 'entry-badge'; entry.textContent = entryText; li.append(' ', entry); }
@@ -983,7 +1027,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             nav.append(b);
         };
         for (const c of app.chans.values()) mk(c.name, `${KIND_ICON[c.kind] === '#' ? '' : `${KIND_ICON[c.kind]} `}${c.name}`, c.unread, c.mentions);
-        for (const [nick, p] of app.pms) mk(`pm:${nick}`, `✉ ${nick}`, p.unread, p.mentions);
+        for (const [ref, p] of app.pms) mk(`pm:${ref}`, `✉ ${p.nick}${p.open ? '' : ' (closed)'}`, p.unread, p.mentions);
         if (focusKey) $$('[role="tab"]', nav).find((b) => b.dataset.channelKey === focusKey)?.focus({ preventScroll: true });
         document.title = `${totalUnread ? `(${totalUnread}) ` : ''}#stalemate · Hang Out`;
     }
@@ -1045,9 +1089,10 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const key = app.active;
         const c = store(key);
         const isPm = key.startsWith('pm:');
+        const pmLabel = c?.nick || (sessionEnded && endedPmLabel?.key === key ? endedPmLabel.nick : 'unconfirmed visitor');
         $('[data-lobby-welcome]').hidden = app.localMediaPaused || key !== '#stalemate';
-        $('[data-chat-context]').textContent = isPm ? `PM · ${key.slice(3)}` : key;
-        $('[data-topic]').textContent = isPm ? `Private chat with ${key.slice(3)} · not end-to-end encrypted · report shares selected text · tap their name to block` : c ? `${c.topic || ''}` : '';
+        $('[data-chat-context]').textContent = isPm ? `PM · ${pmLabel}` : key;
+        $('[data-topic]').textContent = isPm ? `Private chat with ${pmLabel}${c?.open ? '' : ' · replies unconfirmed; draft kept'} · not end-to-end encrypted · report shares selected text · tap their name to block` : c ? `${c.topic || ''}` : '';
         const room = !isPm && c && c.kind !== 'lobby';
         if (inviteContext && (inviteContext !== c || connectionState !== 'connected' || !amOp(c))) closeInviteDialog();
         $('[data-roombar]').hidden = app.sharingStopped || app.localMediaPaused || !room;
@@ -1231,31 +1276,86 @@ import { createEntrySharing } from './entry-sharing.mjs';
     });
     $('[data-private]').addEventListener('click', () => count('room-start-private'));
 
-    function openPm(nick, focus) {
-        if (!app.pms.has(nick)) app.pms.set(nick, { lines: [], unread: 0, names: [{ nick, prefix: '' }, { nick: app.me, prefix: '' }] });
-        drawTabs();
-        if (focus) switchTo(`pm:${nick}`);
+    let legacyPmSequence = 0;
+    const pmFrameValid = m => typeof m?.peer === 'string' && m.peer.length > 0 && m.peer.length <= 160
+        && typeof m.ref === 'string' && /^[a-f0-9]{32}$/.test(m.ref);
+    function pmFrameView(m) {
+        if (!pmFrameValid(m)) return null;
+        const view = app.pms.get(m.ref);
+        return view?.peer === m.peer ? view : null;
     }
-    function pmRequest(from, band) {
-        clearPmRequest(from);
-        const box = $('[data-pmreqs]');
+    function updatePmName(view, nick) {
+        if (typeof nick !== 'string' || !nick || nick.length > 20) return;
+        view.nick = nick;
+        view.names = [{ id: view.peer, nick, prefix: '' }, { nick: app.me, prefix: '' }];
+    }
+    function openPm(m, focus, allowCreate = true) {
+        if (typeof m.with !== 'string' || !m.with || m.with.length > 20) return null;
+        if (privateMessagePeersSupported && !pmFrameValid(m)) return null;
+        const bound = privateMessagePeersSupported && pmFrameValid(m);
+        let view = bound ? pmFrameView(m) : !allowCreate ? [...app.pms.values()].filter(p => p.legacy && p.nick === m.with).at(-1) : null;
+        if (bound && app.pms.has(m.ref) && (!view || !view.open)) return null;
+        if (!view) {
+            if (!allowCreate && bound) return null;
+            const ref = bound ? m.ref : `unconfirmed-${++legacyPmSequence}`;
+            view = { ref, peer: bound ? m.peer : null, open: bound, legacy: !bound, lines: [], unread: 0 };
+            updatePmName(view, m.with); app.pms.set(ref, view);
+        } else updatePmName(view, m.with);
+        drawTabs();
+        if (focus) switchTo(`pm:${view.ref}`);
+        return view;
+    }
+    function pmDraftNotice(view) {
+        const key = app.active, input = $('[data-text]');
+        toast('Private replies are not confirmed. Your draft stays here.', [
+            ['Copy draft', async () => {
+                const lifecycle = recoveryLifecycle;
+                if (app.active !== key || store(key) !== view) return;
+                const current = () => lifecycle === recoveryLifecycle && app.active === key && store(key) === view;
+                try { await navigator.clipboard.writeText(input.value); if (current()) toast('Draft copied. Nothing was sent.'); }
+                catch { if (current()) { input.focus(); input.select(); toast('Select and copy this draft. Nothing was sent.'); } }
+            }],
+            ['Discard draft', () => { if (app.active === key && store(key) === view) { input.value = ''; drafts.delete(key); recoveryDraftChanged(); } }]
+        ]);
+    }
+    function pmRequest(m) {
+        if (typeof m.from !== 'string' || !m.from || m.from.length > 20) return;
+        clearPmRequest(m);
+        const box = $('[data-pmreqs]'), bound = privateMessagePeersSupported && pmFrameValid(m);
         const div = document.createElement('div');
-        div.className = 'req'; div.dataset.pmFrom = from;
-        const p = document.createElement('span'); p.textContent = `✉ ${from}${band ? ' ⭐' : ''} wants to chat`;
+        div.className = 'req'; div.dataset.pmFrom = m.from;
+        if (bound) div.dataset.pmRef = m.ref;
+        const p = document.createElement('span'); p.textContent = `✉ ${m.from}${m.band ? ' ⭐' : ''} wants to chat`;
         div.append(p);
-        for (const [label, fn] of [['Accept', () => cmd('accept', [from])], ['No thanks', () => cmd('decline', [from])], ['Block', () => cmd('block', [from])]]) {
+        for (const [label, name] of [['Accept', 'accept'], ['No thanks', 'decline'], ['Block', 'block']]) {
             const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--small'; b.textContent = label;
-            b.addEventListener('click', () => { if (fn()) div.remove(); else toast('You are offline. Reconnect before answering a PM request.'); });
+            b.addEventListener('click', () => {
+                if (!bound) return toast('This server cannot confirm the request’s original peer. Use an explicit /accept nickname or /decline nickname, or choose a current person.');
+                if (send({ t: 'cmd', name, args: [m.from], ch: app.active, pmPeer: m.peer, pmRef: m.ref })) div.remove();
+                else toast('You are offline. Reconnect before answering a PM request.');
+            });
             div.append(b);
         }
         box.append(div);
     }
-    function clearPmRequest(from) { $$('[data-pm-from]', $('[data-pmreqs]')).forEach((request) => { if (request.dataset.pmFrom === from) request.remove(); }); }
+    function clearPmRequest(m) {
+        $$('[data-pm-from]', $('[data-pmreqs]')).forEach(request => {
+            if (pmFrameValid(m) ? request.dataset.pmRef === m.ref : !request.dataset.pmRef && request.dataset.pmFrom === m.from) request.remove();
+        });
+    }
 
     let personSheetReturn = null;
-    function nickSheet(nick) {
-        if (!nick || nick === app.me) return;
+    function nickSheet(nick, context) {
         const c = store(app.active);
+        const pmView = context ? pmFrameView(context) : app.active.startsWith('pm:') && c?.nick === nick ? c : null;
+        if (context && !pmView) return toast('That private peer is no longer confirmed. Choose a current person for a new request.');
+        nick = pmView?.nick || nick;
+        if (!nick || !pmView && nick === app.me) return;
+        const peerCommand = (name, args = []) => {
+            if (!pmView) return cmd(name, args);
+            if (!privateMessagePeersSupported || !pmView.peer || !pmView.ref || !pmView.open && !['block', 'ignore', 'unignore', 'whois'].includes(name)) { pmDraftNotice(pmView); return false; }
+            return send({ t: 'cmd', name, args, ch: `pm:${pmView.ref}`, pmPeer: pmView.peer, pmRef: pmView.ref });
+        };
         const sheet = $('[data-sheet]');
         const opener = document.activeElement;
         personSheetReturn = $('[data-nicks]').contains(opener) && opener.matches('button.nick') ? { opener, channel: app.active } : null;
@@ -1264,17 +1364,17 @@ import { createEntrySharing } from './entry-sharing.mjs';
         box.replaceChildren();
         const act = (label, fn, cls = '') => { const b = document.createElement('button'); b.type = 'button'; b.className = `btn ${cls}`; b.textContent = label; b.addEventListener('click', () => { fn(); sheet.close(); }); box.append(b); };
         if (app.localMediaPaused || app.sharingStopped) {
-            act('Ignore', () => { app.ignores.add(nick); cmd('ignore', [nick]); });
-            act('Block', () => cmd('block', [nick]), 'btn--ghost');
+            act('Ignore', () => { const label = pmView?.nick || nick; if (peerCommand('ignore', [label])) app.ignores.add(label); });
+            act('Block', () => peerCommand('block', [nick]), 'btn--ghost');
             sheet.showModal(); return;
         }
-        act('✉ PM', () => cmd('query', [nick]));
-        act('🐟 Slap', () => cmd('slap', [nick]));
-        act('Who?', () => cmd('whois', [nick]));
-        act(app.ignores.has(nick) ? 'Unignore' : 'Ignore', () => { if (app.ignores.has(nick)) { app.ignores.delete(nick); cmd('unignore', [nick]); } else { app.ignores.add(nick); cmd('ignore', [nick]); } });
-        act('Block', () => cmd('block', [nick]), 'btn--ghost');
-        act('🚩 Report', () => cmd('report', [nick]), 'btn--ghost');
-        if (amOp(c)) {
+        act('✉ PM', () => peerCommand('query', [nick]));
+        act('🐟 Slap', () => pmView ? peerCommand('slap', [pmView.nick]) : cmd('slap', [nick]));
+        act('Who?', () => peerCommand('whois', [nick]));
+        act(app.ignores.has(nick) ? 'Unignore' : 'Ignore', () => { const label = pmView?.nick || nick; const ignored = app.ignores.has(label); if (peerCommand(ignored ? 'unignore' : 'ignore', [label])) { if (ignored) app.ignores.delete(label); else app.ignores.add(label); } });
+        act('Block', () => peerCommand('block', [nick]), 'btn--ghost');
+        act('🚩 Report', () => pmView ? toast('Use the report flag beside the exact private message you want to share.') : cmd('report', [nick]), 'btn--ghost');
+        if (!pmView && amOp(c)) {
             act('Kick', () => cmd('kick', [nick, 'take a breather']), 'btn--danger');
             act('Ban', () => { const why = prompt(`Ban ${nick}. Reason?`) || ''; if (why) cmd('ban', [nick, ...why.split(' ')]); }, 'btn--danger');
             if (c && c.kind !== 'lobby') { act('Make @', () => cmd('op', [nick])); act('Give voice', () => cmd('voice', [nick])); act('Invite here', () => cmd('invite', [nick, c.name])); }
@@ -1404,9 +1504,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const ordinary = !text.startsWith('/') || text.startsWith('//');
         const record = ordinary ? rememberMessage(text) : null;
         if (ordinary && !record) return;
-        const frame = app.active.startsWith('pm:') && ordinary
-            ? { t: 'cmd', name: 'msg', args: [app.active.slice(3), text.replace(/^\/\//, '/')], ch: app.active }
-            : { t: 'say', ch: app.active, text };
+        const frame = { t: 'say', ch: app.active, text };
         if (record && !record.legacy) frame.clientMessageId = record.id;
         const sent = send(frame);
         if (sent) { input.value = ''; drafts.delete(app.active); drawMessageRecovery(); }
