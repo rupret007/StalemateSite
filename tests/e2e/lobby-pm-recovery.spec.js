@@ -284,3 +284,53 @@ test('the command menu keeps complete PM text and actions private behind recipie
         for (const text of [body, action]) await expect(observer.locator('[data-buffer]')).not.toContainText(text);
     } finally { await fixture.close(); }
 });
+
+
+test('a real accepted peer disconnect disables saved PM restore while Copy and Discard remain usable', async ({ browser, baseURL }) => {
+    const fixture = await community(browser, baseURL);
+    try {
+        const sender = await fixture.guest('Sender'); const recipient = await fixture.guest('Recipient');
+        await sender.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+        fixture.advance(180000); await accept(sender, recipient);
+        // The existing fixture clock stays fixed while the real production
+        // chat bucket permits five bodies, then refuses the sixth. No reply
+        // is injected and neither production limits nor its result are changed.
+        for (let index = 0; index < 5; index++) {
+            const text = `A published private body ${index}`;
+            await send(sender, text); await expect(received(recipient, text)).toHaveCount(1);
+        }
+        const unsent = 'Keep this refused private body only in my tab';
+        await send(sender, unsent);
+        await expect(sender.locator('[data-toast]')).toContainText('Please wait');
+        await expect(received(recipient, unsent)).toHaveCount(0);
+        const id = await sender.locator('[data-message-recovery-list] li').filter({ hasText: unsent }).getAttribute('data-message-id');
+        expect(id).toMatch(/^[a-f0-9]{32}$/);
+        const row = sender.locator(`[data-message-id="${id}"]`);
+        await expect(row).toContainText('Message was not sent.');
+        const restore = row.getByRole('button', { name: 'Restore draft', exact: true });
+        const copy = row.getByRole('button', { name: 'Copy saved text', exact: true });
+        const discard = row.getByRole('button', { name: 'Discard saved copy', exact: true });
+        await expect(restore).toBeEnabled();
+        const senderId = fixture.inbound.find(frame => frame.t === 'hello' && frame.nick === 'Sender').sender;
+        expect(fixture.delivered.filter(frame => frame.recipient === senderId && frame.t === 'message-result' && frame.id === id))
+            .toEqual([{ recipient: senderId, t: 'message-result', id, status: 'rejected' }]);
+        expect(fixture.inbound.filter(frame => frame.clientMessageId === id)).toHaveLength(1);
+        // The actual browser /quit reaches the production command and
+        // disconnect path; no close notification is fabricated. Page teardown
+        // alone does not trigger this routed WebSocket fixture's onClose.
+        await send(recipient, '/quit');
+        await expect.poll(() => fixture.delivered.some(frame => frame.recipient === senderId && frame.t === 'event' && frame.ch === '#stalemate' && frame.text.startsWith('Recipient has quit'))).toBe(true);
+        await expect(restore).toBeDisabled();
+        await expect(sender.locator('[data-connection]')).toHaveText('Connected');
+        expect(fixture.delivered.filter(frame => frame.t === 'pm-closed'))
+            .toEqual([{ recipient: senderId, t: 'pm-closed', with: 'Recipient' }]);
+        await expect(copy).toBeEnabled(); await expect(discard).toBeEnabled();
+        await copy.click();
+        await expect.poll(() => sender.evaluate(() => navigator.clipboard.readText())).toBe(unsent);
+        await expect(sender.locator('[data-text]')).toHaveValue('');
+        expect(fixture.inbound.filter(frame => frame.clientMessageId === id)).toHaveLength(1);
+        await discard.click(); await expect(row).toHaveCount(0);
+        expect(fixture.inbound.filter(frame => frame.clientMessageId === id)).toHaveLength(1);
+        expect(fixture.delivered.some(frame => frame.t === 'pm' && frame.text === unsent)).toBe(false);
+    } finally { await fixture.close(); }
+});

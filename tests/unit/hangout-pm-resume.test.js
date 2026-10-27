@@ -149,3 +149,99 @@ describe('pending PM consent across a same-socket wake', () => {
         expect(wake(snapshot).resumed).toHaveLength(2); expect(engine._debug.pm.size).toBe(0);
     });
 });
+
+
+describe('accepted PM endpoint teardown', () => {
+    it.each(['sender', 'recipient'])('notifies only the surviving original endpoint when the %s disconnects', (leaving) => {
+        const { sender, recipient } = request();
+        cmd(recipient, 'accept', ['Sender']);
+        const observer = guest('Observer');
+        expect(engine._debug.pm.size).toBe(1);
+        const departing = leaving === 'sender' ? sender : recipient;
+        const survivor = leaving === 'sender' ? recipient : sender;
+        const departedNick = leaving === 'sender' ? 'Sender' : 'Recipient';
+        frames = [];
+        engine.disconnect(departing);
+        expect(engine._debug.pm.size).toBe(0);
+        expect(frames.filter(frame => frame.t === 'pm-closed')).toEqual([
+            { recipient: survivor, t: 'pm-closed', with: departedNick }
+        ]);
+        expect(frames.some(frame => frame.t === 'pm-closed' && [departing, observer].includes(frame.recipient))).toBe(false);
+        frames = [];
+        engine.disconnect(departing);
+        expect(frames.filter(frame => frame.t === 'pm-closed')).toEqual([]);
+    });
+
+    it.each(['the same signed device', 'a different signed device'])('requires fresh consent after the old nickname is reused by %s', (device) => {
+        const { sender, recipient } = request();
+        cmd(recipient, 'accept', ['Sender']);
+        const observer = guest('Observer');
+        engine.disconnect(sender);
+        const replacement = guest('Sender', { dev: device === 'the same signed device' ? 'dev-Sender' : 'dev-Replacement' });
+        expect(replacement).not.toBe(sender);
+        now += 180000; frames = [];
+        cmd(recipient, 'accept', ['Sender']);
+        expect(frames.some(frame => frame.t === 'pm-open' || frame.t === 'pm')).toBe(false);
+        const text = 'Only this new endpoint asks to send this new body';
+        frames = [];
+        cmd(replacement, 'msg', ['Recipient', text]);
+        expect(frames.filter(frame => frame.t === 'pm-request')).toEqual([
+            { recipient, t: 'pm-request', from: 'Sender', band: false }
+        ]);
+        expect(frames.some(frame => frame.t === 'pm-open' || frame.t === 'pm' || frame.t === 'pm-closed')).toBe(false);
+        frames = [];
+        cmd(recipient, 'accept', ['Sender']);
+        expect(frames.filter(frame => frame.t === 'pm-open').map(frame => frame.recipient).sort()).toEqual([recipient, replacement].sort());
+        expect(frames.filter(frame => frame.t === 'pm').map(frame => [frame.recipient, frame.text]).sort()).toEqual([
+            [recipient, text], [replacement, text]
+        ].sort());
+        expect(frames.some(frame => [sender, observer].includes(frame.recipient) && ['pm', 'pm-open', 'pm-closed'].includes(frame.t))).toBe(false);
+        expect(frames.some(frame => frame.t === 'pm' && /A first message/.test(frame.text))).toBe(false);
+    });
+});
+
+
+describe('accepted PM disconnect commit ordering', () => {
+    it('holds the close notification until sessions commit and discards it when that required write rejects', async () => {
+        // The real legacy durable wrapper stages outbound frames while its
+        // required sessions write is pending. Exercise rejection first so a
+        // missing success notification cannot hide the negative-path oracle.
+        for (const rejected of [true, false]) {
+            const sent = [], heldSessions = [];
+            let hold = false, settle;
+            const lobby = createLobby({ now: () => now, limits: { defaultSlow: 0 },
+                send: (recipient, frame) => sent.push({ recipient, ...frame }),
+                persist: (kind, value) => {
+                    if (!hold || kind !== 'sessions') return;
+                    heldSessions.push(structuredClone(value));
+                    return new Promise((resolve, reject) => { settle = { resolve, reject }; });
+                } });
+            const command = (id, name, args) => lobby.message(id, JSON.stringify({ t: 'cmd', name, args, ch: '#stalemate' }));
+            for (const nick of ['Sender', 'Recipient', 'Observer']) {
+                lobby.connect({ id: nick, dev: `dev-${nick}`, iph: `ip-${nick}`, role: 'fan', account: '', admin: false });
+                await lobby.message(nick, JSON.stringify({ t: 'hello', nick, age13: true }));
+            }
+            now += 180000;
+            await command('Sender', 'query', ['Recipient']);
+            await command('Recipient', 'accept', ['Sender']);
+            expect(lobby._debug.pm.size).toBe(1);
+            sent.length = 0; hold = true;
+            const disconnecting = lobby.disconnect('Sender');
+            expect(typeof disconnecting?.then).toBe('function');
+            expect(heldSessions).toHaveLength(1);
+            expect(heldSessions[0].pm).toEqual([]);
+            expect(heldSessions[0].connections.map(connection => connection.id).sort()).toEqual(['Observer', 'Recipient']);
+            expect(sent.filter(frame => frame.t === 'pm-closed')).toEqual([]);
+            if (rejected) settle.reject(new Error('Actual required sessions write rejected'));
+            else settle.resolve();
+            await disconnecting;
+            expect(sent.filter(frame => frame.t === 'pm-closed')).toEqual(rejected ? [] : [
+                { recipient: 'Recipient', t: 'pm-closed', with: 'Sender' }
+            ]);
+            if (rejected) {
+                expect(lobby.snapshot().lock).toBe('readonly');
+                expect(sent.some(frame => frame.recipient === 'Recipient' && frame.t === 'notice' && /Storage is unavailable/.test(frame.text))).toBe(true);
+            }
+        }
+    });
+});
