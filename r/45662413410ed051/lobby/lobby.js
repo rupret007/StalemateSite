@@ -1110,7 +1110,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const ul = $('[data-roomlist]');
         const focusedRoom = ul.contains(document.activeElement) && document.activeElement.matches('button.room') ? document.activeElement : null;
         const focusedName = focusedRoom?.dataset.room;
-        const previous = new Map([...ul.children].filter(li => li.dataset.room).map(li => [li.dataset.room, li]));
+        const previous = new Map([...ul.children].filter(li => li.dataset.roomKey).map(li => [li.dataset.roomKey, li]));
         const query = $('[data-room-search]').value.trim().toLowerCase();
         const filter = $('[data-room-filter]').value;
         const rooms = Discovery.describeRooms(app.rooms.filter((r) =>
@@ -1120,7 +1120,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         $('[data-rooms-empty]').hidden = rooms.length > 0;
         const rows = rooms.map(r => {
             const li = previous.get(r.name) || document.createElement('li');
-            li.dataset.room = r.name;
+            li.dataset.roomKey = r.name;
             const b = li.querySelector('button.room') || document.createElement('button');
             b.type = 'button'; b.className = 'room';
             b.dataset.room = r.name;
@@ -1140,7 +1140,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         });
         ul.replaceChildren(...rows);
         if (focusedRoom) {
-            const current = rows.find(li => li.dataset.room === focusedName)?.querySelector('button.room');
+            const current = rows.find(li => li.dataset.roomKey === focusedName)?.querySelector('button.room');
             const target = current && !current.disabled ? current : $('[data-room-filter]');
             if (target?.isConnected && target.getClientRects().length && document.activeElement !== target) {
                 target.focus({ preventScroll: target === current });
