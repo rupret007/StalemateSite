@@ -607,9 +607,18 @@ inside an old one:
     exit "$status"
 ```
 
-The existing artifact upload already covers those three files. Until an admitted
-local or owner-run native execution passes, this addition is source-only and
-unqualified.
+The existing artifact upload already covers those three files. One admitted
+local macOS ARM64 run passed after the health witness and process-group
+cleanup in this file: Node v26.12.0, load1 4.83, swap 79.91 percent, 16 GiB
+free. The receipt showed ready evidence storage, available authority, three
+captured owners whose failure token still matched, and a cold-phase fresh
+owner baseline. Callback-close marked the synchronous fence before denial, and
+`close-await-after-dispatch` followed `dispatch-settled`. In that same receipt
+`retirement-resolved` was the close promise settling after that await. It does
+not measure when `retireClosed` begins relative to owner-gate exit. The run is
+local Worker/SQLite only. It does not qualify provider activation, the other
+seven modes, Windows, Intel Mac, hosted capacity, or audio. GitHub's existing
+workflow still does not execute this flag.
 
 The new mode deliberately omits the plain-retention diagnostic facade. It uses
 the original authority and frozen owner actually created by `HangoutLobby.start`.
