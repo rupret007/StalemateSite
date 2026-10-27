@@ -12,6 +12,12 @@ import { createEntrySharing } from './entry-sharing.mjs';
     const readTab = key => { try { return sessionStorage.getItem(key); } catch { return null; } };
     const writeTab = (key, value) => { try { sessionStorage.setItem(key, value); } catch { /* Tab storage is optional for ordinary chat. */ } };
     const removeTab = key => { try { sessionStorage.removeItem(key); } catch { /* A failed Keep read is handled separately. */ } };
+    const readRemembered = key => { try { return localStorage.getItem(key); } catch { return null; } };
+    const writeRemembered = (key, value) => { try { localStorage.setItem(key, value); } catch { /* Remembering this device is optional. */ } };
+    // Only the protected shell adds this marker. Its current display/admission
+    // hints also live in memory, independent of optional tab storage.
+    const betaShell = !!$('script[src="/beta/bootstrap.js"]');
+    const betaBootstrap = betaShell && window.HangoutBootstrap;
 
     const entrySites = createEntrySiteRegistry(window.HangoutEntrySites);
     let handoff = null;
@@ -31,21 +37,18 @@ import { createEntrySharing } from './entry-sharing.mjs';
         'away', 'ignore', 'unignore', 'list', 'help', 'h', '?', 'accept', 'decline', 'deny', 'block', 'unblock', 'pm',
         'mute', 'gban', 'purge', 'shield', 'shieldoff', 'lobby', 'filter', 'slow', 'approve', 'approveheld',
         'dismiss', 'aidismiss', 'privatereport', 'log', 'delete']);
-    let ownerSession = params.get('owner') === '1' || readTab('hangout-owner') === '1';
+    let ownerSession = params.get('owner') === '1' || (betaBootstrap ? betaBootstrap.owner === true : readTab('hangout-owner') === '1');
     if (ownerSession) writeTab('hangout-owner', '1');
     const isLocal = /^(127\.0\.0\.1|localhost)$/.test(location.hostname);
     // Read the preview key once, then drop the query from the address bar (keeps it out of history,
     // screenshots and page analytics).
-    const previewKey = params.get('preview') || readTab('hangout-preview') || '';
+    const previewKey = params.get('preview') || (typeof betaBootstrap?.preview === 'string' ? betaBootstrap.preview : '') || readTab('hangout-preview') || '';
     if (params.get('preview')) writeTab('hangout-preview', params.get('preview'));
     const relayBase = ((isLocal && (params.get('relay') || readTab('hangout-relay'))) || $('meta[name="hangout-relay"]').content || '').replace(/\/$/, '');
     const turnUrl = ((isLocal && params.get('turn')) || $('meta[name="hangout-turn"]').content || '').trim();
     if (isLocal && params.get('relay')) writeTab('hangout-relay', params.get('relay'));
     if (location.search) history.replaceState(null, '', location.pathname + location.hash);
     const siteKey = $('meta[name="hangout-turnstile"]').content || '';
-    // Only the actual beta shell adds this marker. A local preview has its own
-    // admission flow and must never be sent to an invented beta endpoint.
-    const betaShell = !!$('script[src="/beta/bootstrap.js"]');
 
     // GoatCounter: fixed, privacy-safe event names only (no nicks, no room names, no query string).
     const count = (event) => { try { if (window.goatcounter && window.goatcounter.count) window.goatcounter.count({ path: `hangout-${event}`, title: 'Hang Out', event: true, referrer: '' }); } catch (e) { /* analytics never breaks chat */ } };
@@ -423,15 +426,23 @@ import { createEntrySharing } from './entry-sharing.mjs';
     let belowFold = 0;
     let roomApi = null;
     let jamContext = null;
+    function stopLocalCamera(channel) {
+        const c = app.chans.get(channel);
+        if (!c) return false;
+        c.myCam = false;
+        roomApi?.onCam(channel, false);
+        if (app.active === channel) drawChan();
+        return send({ t: 'cam', ch: channel, on: false });
+    }
     function room() {
         if (app.sharingStopped || app.localMediaPaused) return null;
         if (!roomApi && window.LobbyRoom) {
-            roomApi = window.LobbyRoom.attach({ app, send, $, previewKey, turnUrl, isLocal, params });
+            roomApi = window.LobbyRoom.attach({ app, send, $, previewKey, turnUrl, isLocal, params, onCameraFailure: stopLocalCamera });
         }
         return roomApi;
     }
     const nickInput = $('[data-nick]');
-    nickInput.value = nickInput.value || localStorage.getItem('hangout-nick') || ''; // blank by default; remembered on this device
+    nickInput.value = nickInput.value || readRemembered('hangout-nick') || ''; // blank by default; remembered on this device
     $('[data-reroll]').addEventListener('click', (e) => {
         const r = window.StaleNames.roll();
         nickInput.value = r.name;
@@ -532,7 +543,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         if (attempt !== connectionAttempt) return;
         if (!ownerSession && siteKey && !tsToken) { setConnection('offline'); return gateStatus('The guest check couldn’t finish. Please try again.'); }
         const q = new URLSearchParams({ preview: previewKey });
-        const dev = localStorage.getItem('hangout-dev');
+        const dev = readRemembered('hangout-dev');
         if (dev) q.set('dev', dev);
         if (tsToken) q.set('ts', tsToken);
         if (app.ws) { app.ws.onclose = null; app.ws.onmessage = null; app.ws.close(1000); }
@@ -694,7 +705,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             stopLocalSharing();
             if (sharingControls) { drawSharing({ ok: true, state: 'withdrawn', available: false, purposes: [], revision: sharingState?.revision || 0, canStop: true, cleanup: 'confirmed' }); }
             break;
-        case 'device': localStorage.setItem('hangout-dev', m.token); break;
+        case 'device': writeRemembered('hangout-dev', m.token); break;
         case 'hello':
             messageResultsSupported = m.features?.messageResults === 1;
             entrySourcesSupported = m.features?.entrySources === 1;
@@ -722,7 +733,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             if (!wasIn) count('lobby-join');
             app.verified = m.verified === true; app.capabilities = m.capabilities || app.capabilities;
             $('[data-room-filter] option[value=mine]').disabled = !app.verified;
-            app.me = m.nick; app.band = m.band; localStorage.setItem('hangout-nick', m.nick);
+            app.me = m.nick; app.band = m.band; writeRemembered('hangout-nick', m.nick);
             $('[data-self-nick]').textContent = m.nick;
             $('[data-self-role]').textContent = app.capabilities.configure ? 'Site administrator' : app.capabilities.moderate ? 'Community moderator' : app.verified ? 'Room owner account' : 'Guest access';
             app.kicked = false; retry = 0; setConnection('connected');
@@ -1097,7 +1108,9 @@ import { createEntrySharing } from './entry-sharing.mjs';
 
     function drawRooms() {
         const ul = $('[data-roomlist]');
-        ul.replaceChildren();
+        const focusedRoom = ul.contains(document.activeElement) && document.activeElement.matches('button.room') ? document.activeElement : null;
+        const focusedName = focusedRoom?.dataset.room;
+        const previous = new Map([...ul.children].filter(li => li.dataset.roomKey).map(li => [li.dataset.roomKey, li]));
         const query = $('[data-room-search]').value.trim().toLowerCase();
         const filter = $('[data-room-filter]').value;
         const rooms = Discovery.describeRooms(app.rooms.filter((r) =>
@@ -1105,9 +1118,10 @@ import { createEntrySharing } from './entry-sharing.mjs';
             && (!query || `${r.name} ${r.title}`.toLowerCase().includes(query))), [...app.chans.keys()]);
         $('[data-room-count]').textContent = String(rooms.length);
         $('[data-rooms-empty]').hidden = rooms.length > 0;
-        for (const r of rooms) {
-            const li = document.createElement('li');
-            const b = document.createElement('button');
+        const rows = rooms.map(r => {
+            const li = previous.get(r.name) || document.createElement('li');
+            li.dataset.roomKey = r.name;
+            const b = li.querySelector('button.room') || document.createElement('button');
             b.type = 'button'; b.className = 'room';
             b.dataset.room = r.name;
             b.dataset.state = r.state;
@@ -1115,13 +1129,22 @@ import { createEntrySharing } from './entry-sharing.mjs';
             const t = document.createElement('b'); t.textContent = `${KIND_ICON[r.kind]} ${r.title}`;
             const s = document.createElement('span'); s.textContent = `${r.name} · ${r.count}/${r.max} here · ${r.persistent ? 'Registered' : 'Temporary'} · ${r.hostPresent ? 'Host here' : 'Host away'}`;
             const action = document.createElement('span'); action.className = 'room-action'; action.textContent = `${r.statusLabel} · ${r.actionLabel}`;
-            b.append(t, s, action);
-            b.addEventListener('click', () => {
+            b.replaceChildren(t, s, action);
+            b.onclick = () => {
                 if (app.chans.has(r.name)) return switchTo(r.name);
                 if (r.key) { const k = prompt(`${r.name} has a key. Type it:`) || ''; return cmd('join', [r.name, k]); }
                 return cmd('join', [r.name]);
-            });
-            li.append(b); ul.append(li);
+            };
+            if (!b.parentElement) li.append(b);
+            return li;
+        });
+        ul.replaceChildren(...rows);
+        if (focusedRoom) {
+            const current = rows.find(li => li.dataset.roomKey === focusedName)?.querySelector('button.room');
+            const target = current && !current.disabled ? current : $('[data-room-filter]');
+            if (target?.isConnected && target.getClientRects().length && document.activeElement !== target) {
+                target.focus({ preventScroll: target === current });
+            }
         }
     }
 
@@ -1392,7 +1415,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         if (app.localMediaPaused) return toast('Local media stays off while this Stop request is unresolved.');
         const c = store(app.active);
         if (!c) return;
-        if (c.myCam) return send({ t: 'cam', ch: c.name, on: false });
+        if (c.myCam) return stopLocalCamera(c.name);
         $('[data-adult]').checked = false;
         return $('[data-cam-gate]').showModal();
     });

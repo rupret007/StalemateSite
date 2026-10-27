@@ -439,3 +439,103 @@ test('People roster: a departed person dialog returns to the visible heading on 
         expect(visitor.errors).toEqual([]); expect(survivor.errors).toEqual([]);
     } finally { await survivor?.close(); await peer?.close(); await visitor.close(); }
 });
+
+for (const failure of ['getter', 'getItem', 'setItem']) {
+    test(`guest chat survives optional localStorage ${failure} failure`, async ({ browser, baseURL }) => {
+        const visitor = await guest(browser, baseURL, 'StorageVisitor', { width: 375, height: 667 }, undefined, async page => {
+            await page.addInitScript(mode => {
+                window.__rememberFailures = 0;
+                const fail = () => { window.__rememberFailures++; throw new DOMException('Optional browser storage unavailable', mode === 'setItem' ? 'QuotaExceededError' : 'SecurityError'); };
+                if (mode === 'getter') Object.defineProperty(window, 'localStorage', { configurable: true, get: fail });
+                else {
+                    const store = window.localStorage, original = Storage.prototype[mode];
+                    Storage.prototype[mode] = function (...args) {
+                        if (this === store) return fail();
+                        return original.apply(this, args);
+                    };
+                }
+            }, failure);
+        });
+        try {
+            await expect(visitor.page.locator('[data-app]')).toBeVisible();
+            await expect(visitor.page.locator('[data-self-nick]')).toHaveText('StorageVisitor');
+            await send(visitor.page, 'A real message without optional remembered storage');
+            await expect(visitor.page.locator('[data-buffer]')).toContainText('A real message without optional remembered storage');
+            expect(await visitor.page.evaluate(() => window.__rememberFailures)).toBeGreaterThan(0);
+            contained(await composerGeometry(visitor.page));
+            expect(visitor.errors).toEqual([]);
+        } finally { await visitor.close(); }
+    });
+}
+
+for (const width of [375, 390]) {
+    test(`room directory preserves keyboard identity and current capacity through live updates at ${width}px`, async ({ browser, baseURL }) => {
+        const relay = hangoutRelayWsBase(baseURL, `directory-${randomUUID()}`), viewport = { width, height: 667 };
+        const host = await guest(browser, baseURL, 'DirectoryHost', viewport, relay);
+        const visitor = await guest(browser, baseURL, 'DirectoryReader', viewport, relay);
+        let arrival;
+        try {
+            await send(host.page, '/join #directory-room');
+            await expect(host.page.locator('[data-chat-context]')).toHaveText('#directory-room');
+            await section(visitor.page, 'rooms');
+            const button = visitor.page.locator('[data-roomlist] button[data-room="#directory-room"]');
+            const publicRoom = visitor.page.locator('[data-room="#directory-room"]');
+            await expect(publicRoom).toHaveCount(1); await expect(publicRoom).toHaveJSProperty('tagName', 'BUTTON');
+            await tabTo(visitor.page, button);
+            const original = await button.elementHandle();
+            arrival = await guest(browser, baseURL, 'DirectoryArrival', viewport, relay);
+            await send(arrival.page, '/join #directory-room');
+            await expect(button).toContainText('2/');
+            await expect(publicRoom).toHaveCount(1); await expect(publicRoom).toHaveJSProperty('tagName', 'BUTTON');
+            await expect(button).toBeFocused();
+            expect(await button.evaluate((element, before) => element === before, original)).toBe(true);
+            await send(host.page, '/mode +l 4');
+            await expect(button).toContainText('2/4');
+            await expect(publicRoom).toHaveCount(1); await expect(publicRoom).toHaveJSProperty('tagName', 'BUTTON');
+            await expect(button).toBeFocused();
+            expect(await button.evaluate((element, before) => element === before, original)).toBe(true);
+            await visitor.page.keyboard.press('Enter');
+            await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#directory-room');
+            const composer = visitor.page.getByRole('textbox', { name: 'Message', exact: true });
+            await tabTo(visitor.page, composer); await visitor.page.keyboard.type('A draft while room metadata changes');
+            await send(host.page, '/mode +l 5');
+            await expect.poll(() => visitor.page.evaluate(() => window.__lobby.rooms.find(room => room.name === '#directory-room')?.max)).toBe(5);
+            await expect(publicRoom).toHaveCount(1); await expect(publicRoom).toHaveJSProperty('tagName', 'BUTTON');
+            await expect(composer).toBeFocused(); await expect(composer).toHaveValue('A draft while room metadata changes');
+            contained(await composerGeometry(visitor.page));
+            expect(visitor.errors).toEqual([]); expect(host.errors).toEqual([]); expect(arrival.errors).toEqual([]);
+        } finally { await arrival?.close(); await visitor.close(); await host.close(); }
+    });
+
+    test(`a removed focused room returns to the visible directory filter at ${width}px`, async ({ browser, baseURL }) => {
+        const relay = hangoutRelayWsBase(baseURL, `directory-removal-${randomUUID()}`), viewport = { width, height: 667 };
+        const host = await guest(browser, baseURL, 'ClosingHost', viewport, relay);
+        const visitor = await guest(browser, baseURL, 'DirectoryGuest', viewport, relay);
+        try {
+            await send(host.page, '/join #vanishing-room');
+            await expect(host.page.locator('[data-chat-context]')).toHaveText('#vanishing-room');
+            await section(visitor.page, 'rooms');
+            const button = visitor.page.locator('[data-roomlist] button[data-room="#vanishing-room"]');
+            const publicRoom = visitor.page.locator('[data-room="#vanishing-room"]');
+            await expect(publicRoom).toHaveCount(1); await expect(publicRoom).toHaveJSProperty('tagName', 'BUTTON');
+            await tabTo(visitor.page, button);
+            await send(host.page, '/mode +l 1');
+            await expect(button).toBeDisabled();
+            await expect(publicRoom).toHaveCount(1); await expect(publicRoom).toHaveJSProperty('tagName', 'BUTTON');
+            const fallback = visitor.page.getByRole('combobox', { name: 'Room directory', exact: true });
+            await expect(fallback).toBeFocused();
+            await send(host.page, '/mode +l 2');
+            await expect(button).toBeEnabled(); await expect(fallback).toBeFocused();
+            await expect(publicRoom).toHaveCount(1); await expect(publicRoom).toHaveJSProperty('tagName', 'BUTTON');
+            await tabTo(visitor.page, button);
+            await send(host.page, '/close');
+            await expect(button).toHaveCount(0);
+            await expect(publicRoom).toHaveCount(0);
+            await expect(fallback).toBeFocused(); await expect(fallback).toBeInViewport();
+            await expect(fallback).toHaveValue('active');
+            await expect(visitor.page.locator('dialog[open]')).toHaveCount(0);
+            await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#stalemate');
+            expect(visitor.errors).toEqual([]); expect(host.errors).toEqual([]);
+        } finally { await visitor.close(); await host.close(); }
+    });
+}
