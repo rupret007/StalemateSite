@@ -18,17 +18,43 @@ Retain newer Stalemate and Rad Dad pages, navigation, media consent and the
 permanent Rad Dad `/tap/` to `/qr/` path. Do not replace either site with a stale
 application checkout.
 
-## Prepare the two entrance links
+## Prepare entrance links
 
-1. The release owner selects one approved canonical community address and one
-   authoritative backend/namespace. Both band sites and future integrations
-   must reach it. Two independent Worker namespaces create two communities.
-2. Prepare a nonsecret registry using
+The release owner selects one approved canonical community address and one
+authoritative backend/namespace. Both band sites and future links reach that
+same service. Two independent Worker namespaces create two communities.
+
+### A. Simple neutral Join link
+
+Any website can add an ordinary link to that approved address without registering
+its site, obtaining site credentials or running the package builder. Use top-level
+navigation with no `via` value. For example, **replace this example.test address**
+with the receiving owner's approved community entry URL:
+
+```html
+<a href="https://community.example.test/beta/" referrerpolicy="no-referrer">Hang Out</a>
+```
+
+This entrance is neutral: it attaches no site badge or registered return contract.
+The community's existing invitation, sign-in and admission rules still apply;
+linking grants no access or staff permissions. No band-site account, shared cookie
+or cross-site SSO setup is required for the link itself. Adding a future basic
+link does not create another community or require enabling a new integration.
+
+### B. Optional reviewed badge and return navigation
+
+Use the versioned integration contract when an entrance should offer a recognized
+site badge and approved return link. This registration is optional for ordinary
+linking. Badges remain visitor-controlled display context, never authentication.
+
+1. Prepare a nonsecret registry using
    [`community-integration.example.json`](community-integration.example.json).
-   Approve each site's domain control, exact origins, permitted return URL,
-   display label and scopes. Example fixtures do not prove real domain control.
-   Keep unapproved entries disabled; an integration receives no staff powers.
-3. From the application repository root or extracted toolkit root, generate the
+   Approve each registered site's domain control, exact origins, permitted return
+   URL, display label and `link`, `badge`, `return` scopes. Domain verification is
+   the operator's recorded assertion; the builder does not perform it. Example
+   fixtures do not prove real domain control. Keep unapproved entries disabled;
+   an integration receives no staff powers.
+2. From the application repository root or extracted toolkit root, generate the
    snippets with an installed Node runtime. Choose a new output directory whose
    parent already exists; the builder refuses to replace an existing directory.
 
@@ -36,20 +62,26 @@ application checkout.
    node scripts/package-community-entry.mjs --config /path/to/approved-sites.json --out /path/to/generated-links
    ```
 
-4. For additional badge sites, the release owner also sets the canonical
+3. For additional badge sites, the release owner also sets the canonical
    Worker's public `HANGOUT_ENTRY_SITES` JSON array to the reviewed generated
    `manifest.json` → `entrySites` value. The built-in band entries stay built in.
    The Worker supplies the sanitized registry to both client and engine. A
    custom link without this matching configuration joins with a neutral badge;
    the link builder itself does not configure the Worker or verify domains.
-5. Add each generated Hang Out link to the relevant site's existing navigation.
+4. Add each generated Hang Out link to the relevant site's existing navigation.
    Use the same community address with its registered entry identifier. Never
    put a private invitation, email code, cookie or credential in the link.
 
-Visitors share channels, room IDs, moderation and first-party community sessions.
-The optional “via Stalemate” or “via Rad Dad” badge describes this entrance only.
-It grants no identity or permissions; direct entry stays neutral. Do not copy
-cookies across band domains or assume an existing site-account SSO service.
+Disabling a registered site prevents new approved-link generation. A custom
+source is neutral when it is absent from the runtime registry in use; existing
+delivered labels stay with their messages. This does not invalidate copied
+ordinary links, ban visitors or remove their accounts/rooms.
+
+Both options share channels, room IDs, moderation and first-party community
+sessions. The optional “via Stalemate” or “via Rad Dad” badge describes this
+entrance only. Visitors can hide it. It grants no identity or permissions; direct
+entry stays neutral. Do not copy cookies across band domains or assume an existing
+site-account SSO service.
 
 ## Release the matching application and state
 
@@ -60,6 +92,22 @@ Independently establish old-writer, socket and in-flight drain; a mode flag or
 export is not drain proof. The opt-in Lobby authority mode is not activated by
 the entry archive. A flag reversal is not sufficient rollback between different
 authorities. Qualify recoverable state and matched assets/backend before use.
+
+Before activation or rollback, check the actual saved fields and connected-client
+versions against these compatibility contracts. Preserve compatible readers and
+matched clients/backend; reversing a source patch or mode flag does not migrate
+stored state or establish a verified drain.
+
+| State or protocol | Contract | Receiving-owner compatibility condition |
+| --- | --- | --- |
+| Room `keepRef` | [Keep-room state and rollback](HANGOUT_KEEP_ROOM_SIGNIN.md#compatibility-and-rollback-boundary) | Preserve a reader that accepts the room-instance reference and preflight snapshot/indexed-record sizes within unchanged caps. Older indexed readers can refuse the field; qualify a compatible reader or the documented drained rollback conditions before use. |
+| Restricted `safetyOnly` sessions and `sharing-stopped` | [Own-sharing integration](HANGOUT_OWN_SHARING_CONTROLS.md#integration-and-rollback-boundary) | Keep compatible stored-session readers and current clients. An older client can ignore media teardown; qualify current assets/cache delivery and drain older sockets. Do not remove the restriction to resume sharing. |
+| Required C3 `participationMode` marker | [Required-mode and rollback rules](HANGOUT_OWN_SHARING_CONTROLS.md#integration-and-rollback-boundary) | Preserve the latch and matching reviewed configuration. Old unlatched domains need separately qualified drained mode admission; deleting policy/latch state or removing flags is not recovery. |
+| `publicOrigin` receipts/reports and incident-source index | [Incident-source activation boundary](HANGOUT_INCIDENT_SOURCES.md#configuration-and-activation-boundary) | Preserve compatible stamp/index readers and generation under the required mode. An initialized source namespace has no supplied downgrade path; do not erase stamps/index or flip the flag to make an older reader load. |
+
+These contracts supply no new migration API or live state-repair procedure.
+Actual writer/socket drain, recoverable backup and matched rollback qualification
+remain with the receiving deployment owner.
 
 Publish only intended site/application assets. Local role selectors, incident
 fixtures, synthetic bootstrap Workers, raw evidence and operational files are
