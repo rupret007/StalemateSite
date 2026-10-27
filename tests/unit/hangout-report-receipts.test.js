@@ -194,7 +194,7 @@ describe('durable report acknowledgement', () => {
         }
         const engineSource = readFileSync(new URL('../../hangout-worker/src/lobby-core.mjs', import.meta.url), 'utf8');
         const client = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby.js', import.meta.url), 'utf8');
-        const coverage = readFileSync(new URL('../../docs/HANGOUT_REPORT_COVERAGE.md', import.meta.url), 'utf8');
+        const coverage = readFileSync(new URL('../../hangout-internal/HANGOUT_REPORT_COVERAGE.md', import.meta.url), 'utf8');
         expect(engineSource).not.toContain('Reported to the moderators');
         expect(engineSource).not.toContain('Already reported. Thanks.');
         expect(client).toContain(`const REPORT_QUEUED_LABEL = '${REPORT_QUEUED_LABEL}'`);
@@ -209,6 +209,7 @@ describe('durable report acknowledgement', () => {
         boot((kind) => kind === 'moderation-queue' ? new Promise((resolve) => { finish = resolve; }) : undefined);
         const sender = guest('Sender'); const witness = guest('Witness'); const line = say(sender, 'Evidence needs reliable storage');
         frames = []; const pending = report(witness, line);
+        expect(frames.some((f) => /Reported to/.test(f.text || ''))).toBe(false);
         expect(frames.some((f) => f.text === REPORT_QUEUED_NOTICE || f.text === REPORT_ALREADY_QUEUED_NOTICE)).toBe(false);
         finish(); await pending;
         expect(frames).toContainEqual({ recipient: witness, t: 'report-status', id: line.id, submitted: true });
@@ -220,6 +221,7 @@ describe('durable report acknowledgement', () => {
         boot((kind) => kind === 'moderation-queue' ? Promise.reject(new Error('storage fixture unavailable')) : undefined);
         const sender = guest('Sender'); const witness = guest('Witness'); const line = say(sender, 'Evidence storage failure case');
         frames = []; await report(witness, line);
+        expect(frames.some((f) => /Reported to/.test(f.text || ''))).toBe(false);
         expect(frames.some((f) => f.text === REPORT_QUEUED_NOTICE || f.text === REPORT_ALREADY_QUEUED_NOTICE)).toBe(false);
         expect(frames.some((f) => f.t === 'report-status')).toBe(false);
         expect(frames.some((f) => f.recipient === witness && f.kind === 'error' && /Storage is unavailable/.test(f.text))).toBe(true);
