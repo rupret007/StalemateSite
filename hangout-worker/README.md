@@ -1,8 +1,8 @@
 # Hang Out relay and private environments
 
 The real visitor beta uses **`stalemate-hangout-beta`** and
-`wrangler.beta.toml`. Start with [the beta handoff](../docs/HANGOUT_BETA_HANDOFF.md)
-and [current assessment](../docs/HANGOUT_BETA_READINESS.md). It has real guest
+`wrangler.beta.toml`. Start with [the beta handoff](../hangout-internal/HANGOUT_BETA_HANDOFF.md)
+and [current assessment](../hangout-internal/HANGOUT_BETA_READINESS.md). It has real guest
 sessions and no synthetic role selector; real email/staff acceptance remains a
 separate requirement. The older pilot below is a demonstration environment.
 
@@ -16,8 +16,8 @@ See the [hosted boundary checks](../pr-assets/beta-collaboration/hosted-ops.json
 The new **`stalemate-hangout-pilot`** Worker is deployed at
 [the protected pilot entrance](https://stalemate-hangout-pilot.jeffstory007.workers.dev/pilot/).
 The existing **`stalemate-hangout`** Worker and public Stalemate site are untouched.
-See [private access and test flows](../docs/HANGOUT_PRIVATE_PILOT.md) and
-[deployment reconciliation and production setup](../docs/HANGOUT_DEPLOY.md).
+See [private access and test flows](../hangout-internal/HANGOUT_PRIVATE_PILOT.md) and
+[deployment reconciliation and production setup](../hangout-internal/HANGOUT_DEPLOY.md).
 
 ## Private pilot
 
@@ -55,7 +55,7 @@ Camera/audio media stays between browsers; it is not sent to the AI text classif
   and lobby admission. Unavailable accounting fails closed.
 - Per encrypted socket: 8,000 messages, burst 30, refill eight per second, frames up to 1 MB.
 - Public commands, reports and PMs have additional shared limits; see the
-  [community configuration and retention design](../docs/HANGOUT_COMMUNITY_IMPROVEMENTS.md).
+  [community configuration and retention design](../hangout-internal/HANGOUT_COMMUNITY_IMPROVEMENTS.md).
 
 TURN issuance is disabled in the pilot. The prepared endpoint checks signed devices,
 serializes durable room/device/global reservations and consults account-wide usage before
@@ -78,7 +78,7 @@ allowlists, the separate owner email application, approved Turnstile hosts and s
 all reachable Worker hostnames. The account's Access application API returned 403 under the
 available OAuth credential: those settings are **unverified, not absent**. The pilot's synthetic
 role gateway does not establish production email delivery or authentication readiness.
-The [production checklist](../docs/HANGOUT_DEPLOY.md) preserves the existing Cloudflare/WebJam
+The [production checklist](../hangout-internal/HANGOUT_DEPLOY.md) preserves the existing Cloudflare/WebJam
 setup and identifies only additions that need verification.
 
 ## Community operation and AI
@@ -95,7 +95,7 @@ not parental consent or legal certification. Without them, status is `not-qualif
 no text is submitted. Qualified review adds bounded classification of new eligible public
 text. It never grants automatic punishment powers. AI flags, human
 reports and held-message evidence use separate bounded 24-hour queues and never become
-visitor chat history. See [AI data scope and activation](../docs/HANGOUT_SAFEGUARDS_AI.md).
+visitor chat history. See [AI data scope and activation](../hangout-internal/HANGOUT_SAFEGUARDS_AI.md).
 
 Room-owner registration and co-host controls are implemented; production public email login
 still needs live verification. WebJam owns its musical audio/signaling infrastructure; jam

@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { ACTIVITY, QUIET_PROMPT, describeRooms, summarizeLobby, isMention, describeVisit, visitView, calendarReminder } = require('../../r/45662413410ed051/lobby/discovery-core.js');
+const { ACTIVITY, QUIET_PROMPT, describeRooms, summarizeLobby, isMention, describeVisit, visitView, calendarReminder, icsText } = require('../../r/45662413410ed051/lobby/discovery-core.js');
 const room = (name, overrides = {}) => ({ name, kind: 'art', title: 'Drawing room', count: 1, max: 8, locked: false, key: false, cams: true, ...overrides });
 const visitor = (nick, overrides = {}) => ({ nick, away: false, band: false, ...overrides });
 
@@ -265,6 +265,8 @@ describe('quiet visits and confirmed gatherings', () => {
         expect(logical).toContain('DESCRIPTION:Local reminder only.');
         expect(logical).toContain('This file is not an RSVP and does not record attendance.');
         expect(logical).toContain('A camera\\, microphone');
+        expect(logical).toContain('SUMMARY:Hang Out with QuietHost: text chat');
+        expect(logical).not.toContain('\\:');
         expect(logical).not.toContain('ATTENDEE');
         expect(logical).not.toContain('RRULE');
         expect(logical).not.toContain('ORGANIZER');
@@ -280,5 +282,21 @@ describe('quiet visits and confirmed gatherings', () => {
         expect(assumed.gathering.timeZoneAssumed).toBe(true);
         expect(assumed.gathering.localStart).toBe(formatAt(START, 'UTC'));
         expect(visitView(assumed).gatheringWhen).toContain('shown in UTC');
+    });
+
+    it('escapes RFC 5545 TEXT and leaves a colon literal', () => {
+        expect(icsText('a\\b')).toBe('a\\\\b');
+        expect(icsText('room;one')).toBe('room\\;one');
+        expect(icsText('a,b')).toBe('a\\,b');
+        expect(icsText('a\nb')).toBe('a\\nb');
+        expect(icsText('a\rb')).toBe('a\\nb');
+        expect(icsText('a\r\nb')).toBe('a\\nb');
+        expect(icsText('a\r\n\nb')).toBe('a\\n\\nb');
+        expect(icsText('Meet: 1')).toBe('Meet: 1');
+        expect(icsText('\\:colon')).toBe('\\\\:colon');
+        expect(icsText('a\\,;:\r\n')).toBe('a\\\\\\,\\;:\\n');
+        const mixed = icsText('x\r\ny,z;w\\q: colon');
+        expect(mixed).toBe('x\\ny\\,z\\;w\\\\q: colon');
+        expect(mixed).not.toMatch(/[\r\n]/);
     });
 });
