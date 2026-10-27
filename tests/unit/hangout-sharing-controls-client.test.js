@@ -9,6 +9,7 @@ import { createChatAnnouncements } from '../../r/45662413410ed051/lobby/chat-ann
 const html = readFileSync(new URL('../../r/45662413410ed051/lobby/index.html', import.meta.url), 'utf8');
 const client = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby.js', import.meta.url), 'utf8');
 const discovery = readFileSync(new URL('../../r/45662413410ed051/lobby/discovery-core.js', import.meta.url), 'utf8');
+const activity = readFileSync(new URL('../../r/45662413410ed051/sync-core.js', import.meta.url), 'utf8');
 const windows = [];
 afterEach(() => { for (const dom of windows.splice(0)) dom.window.close(); });
 
@@ -33,6 +34,7 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, { shar
     window.HangoutClientTestModules = { ...entryFunctions, createEntrySharing,
         createChatAnnouncements: (log) => createChatAnnouncements(log, { frame: (fn) => window.setTimeout(fn, 16), cancel: (id) => window.clearTimeout(id) }) };
     window.eval(discovery);
+    window.eval(activity);
     // Execute the actual browser client, replacing only module loading, which
     // jsdom cannot perform. Real Chromium journeys cover native ESM loading.
     const imports = [...client.matchAll(/^import \{([^}]+)\} from '[^']+';/gm)].map((match) => match[1]).join(',');
@@ -174,11 +176,15 @@ describe('private caller sharing controls in the actual browser client', () => {
         window.LobbyRoom = { attach: () => ({ onJoin: () => calls.join++, onChan: () => calls.chan++, onAct: () => calls.act++, onCam: () => calls.cam++, onLeave: () => calls.leave++ }) };
         const channel = { name: '#art-paused', kind: 'art', title: 'Art', topic: '', count: 1, modes: { C: true }, names: [{ nick: 'Viewer', prefix: '@' }] };
         ws.receive({ t: 'join', ch: channel }); ws.receive({ t: 'line', id: 'mpaused', ch: channel.name, from: 'Friend', text: 'Still reportable while Stop is pending', ts: 1 });
+        expect(calls.join).toBe(1);
+        const beforeActivity = structuredClone(window.__lobby.chans.get(channel.name).actSnap);
         const get = selector => window.document.querySelector(selector);
         await vi.waitFor(() => expect(get('[data-sharing-stop]').disabled).toBe(false)); get('[data-sharing-stop]').click(); get('[data-sharing-accept]').click();
         expect(calls.leave).toBe(1); expect(window.__lobby.localMediaPaused).toBe(true); expect(window.__lobby.sharingStopped).not.toBe(true);
         const before = { ...calls };
         ws.receive({ t: 'chan', ch: channel }); ws.receive({ t: 'cam', ch: channel.name, on: true }); ws.receive({ t: 'act', ch: channel.name, kind: 'rtc', sdp: { type: 'offer', sdp: 'synthetic' } }); ws.receive({ t: 'cam-gate' });
+        ws.receive({ t: 'act', ch: channel.name, kind: 'stroke', stroke: { id: 'late-after-stop', color: '#009ee8', size: 4, pts: [[0.2, 0.3]] }, ts: 2 });
+        expect(window.__lobby.chans.get(channel.name).actSnap).toEqual(beforeActivity);
         expect(calls).toEqual(before); expect(get('[data-cam-gate]').open).not.toBe(true); expect(get('[data-activity]').hidden).toBe(true);
         get('[data-buffer] .flag').click(); expect(ws.sent.some(frame => frame.t === 'report' && frame.id === 'mpaused')).toBe(true);
         reject(Error('Synthetic Stop HTTP failure')); await vi.waitFor(() => expect(get('[data-sharing-check]').disabled).toBe(false));

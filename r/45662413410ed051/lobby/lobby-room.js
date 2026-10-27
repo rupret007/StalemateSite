@@ -262,11 +262,15 @@
             refreshAv();
         }
 
+        function observeTimestamp(ts) {
+            if (Number.isFinite(ts)) state.clock.sample(ts);
+        }
+
         function onAct(m) {
             // A late frame cannot re-establish a room which was left, revoked
             // or torn down while navigation/session state was changing.
             if (!m.ch || m.ch !== app.active || m.ch !== state.ch) return;
-            if (Number.isFinite(m.ts)) state.clock.sample(m.ts);
+            observeTimestamp(m.ts);
             if (m.kind === 'stroke' && m.from !== state.myId && H.apply(state.room, { type: 'stroke', stroke: m.stroke }) === 'draw') {
                 const s = state.room.strokes.find((x) => x.id === m.stroke.id);
                 drawStroke(s);
@@ -887,7 +891,7 @@
             if (wasFocused && !cameras.length) retireCameraFocus(activity);
         }
 
-        return { onJoin, onChan, onCam, onAct, onLeave: teardown };
+        return { onJoin, onChan, onCam, onAct, observeTimestamp, onLeave: teardown };
     }
 
     window.LobbyRoom = { attach };

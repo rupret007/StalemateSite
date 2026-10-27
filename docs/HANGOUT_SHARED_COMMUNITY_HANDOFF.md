@@ -86,6 +86,8 @@ At an earlier October 25 snapshot, the integration candidate was
 It retained PR 93's application parent and composed the following additional
 source. Reused commits have different hashes from their original PR heads;
 their presence does not merge those PRs or transfer an old verdict to a new head.
+The table records only that historical source snapshot: its “not yet created”
+and “disconnected” entries do not describe the current composition below.
 
 | Candidate layer, in dependency order | Exact local source | Review and receiving-owner boundary |
 | --- | --- | --- |
@@ -117,24 +119,35 @@ exact failure/evidence to that owner rather than repairing it in this branch.
 
 ## Default beta, controlled C3 and local I2 are separate modes
 
-The production `lobby-do.mjs` constructor does not supply
-`createLobby({participation})`. With that option absent, the candidate retains
-the beta's existing synchronous engine/durability paths, invitation and verified
-role checks, 13+ admission and 18+ camera guards. That is the protected-beta
-path to qualify on its actual hosted revision; it is not a qualified public
-all-ages consent system. AI readiness gates and provider-off requirements still
-apply independently. Adding the new modules does not activate their fixtures.
+Current `lobby-do.mjs` startup is mode-dependent. When
+`HANGOUT_PARTICIPATION_AUTHORITY` is absent, it supplies no participation adapter;
+`HANGOUT_SESSION_AUTHORITY=lobby-v1` can still select the separate transactional
+session/effect composition. The ordinary legacy path is available only when its
+mode and stored-state checks permit it.
 
-[C3](HANGOUT_PARTICIPATION_ENFORCEMENT.md) is an optional, controlled server
-integration, tested with the real C1/C2 models and actual engine handlers. A
-configured invalid/unavailable adapter refuses grants and cannot fall back to
-ordinary persistence. Production activation still needs trusted identity and
-commit-side current session/role validation, atomic C2/session/effect storage,
-bounded withdrawal notifications and a non-retrying provider start fence. The
-owner must await effectful restoration and participation refresh. Neither a
-browser badge nor an opaque `allowed: true` result satisfies these contracts.
-An already-started external request or independent native/P2P session cannot be
-recalled by the local model.
+With `HANGOUT_PARTICIPATION_AUTHORITY=c3-v1`, startup conditionally passes
+`createLobbyParticipation({env, authority})` to `createLobby`. This strict mode
+requires `HANGOUT_BETA_MODE=protected` and
+`HANGOUT_SESSION_AUTHORITY=lobby-v1`. The authority validates the stored marker
+and matching participation mode; missing/corrupt state or a mode mismatch refuses
+normal startup/actions. Removing flags does not permit legacy fallback over an
+existing authority marker or participation policy. Do not erase either to change
+modes. Revalidate the actual delivered source, configured mode and stored marker
+through the existing release owner before drawing conclusions about a deployment.
+
+[C3](HANGOUT_PARTICIPATION_ENFORCEMENT.md) uses the authority's current
+connection/session-role checks and transaction wiring; this does not establish
+real enrollment, guardian verification or a qualified public all-ages policy.
+The production composition still sets `providerQualified` to false and supplies
+no external `dispatchStart` fence. Authority-mode AI review remains disabled.
+Neither a badge, email sign-in nor an opaque `allowed: true` result replaces
+those missing qualifications. Keep existing 13+ beta admission and 18+ camera
+guards until a qualified replacement is implemented. An already-started external
+request or independent native/P2P session cannot be recalled by the local model.
+
+The [browser activity lifecycle](HANGOUT_ACTIVITY_LIFECYCLE.md) separately explains
+joined-room received caches, selected rendering and background-media boundaries;
+it does not activate any authority or provider mode.
 
 [I2](HANGOUT_INCIDENT_REVIEW.md) is the separate loopback-only launcher
 `scripts/preview-incident-review.mjs`, fixture and `scripts/incident-review-ui/`.
