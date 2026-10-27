@@ -828,3 +828,70 @@ test('camera off removes its tile while the receive-only pair and third camera r
         expect(app.errors).toEqual([]);
     } finally { await app.close(); }
 });
+
+
+// Actual module/relay/native fake-camera coverage. Only the first gUM promise
+// and one cam-off send are deliberately rejected; this is not hardware/permission
+// or hosted transport qualification, and a rejected off send is not a server ACK.
+for (const width of [375, 390]) test(`camera rejection needs explicit retry and Camera off is local before rejected send at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+    const app = await scenario(browser, baseURL, width);
+    try {
+        const owner = await app.guest('stalemate', 'CameraRecovery'), witness = await app.guest('rad-dad', 'CameraWitness');
+        await owner.click('nav [data-show="rooms"]'); await owner.click('[data-start="art"]');
+        await expect(owner.locator('[data-act-canvas]')).toBeVisible();
+        const room = await owner.locator('[data-chat-context]').innerText(); await command(witness, `/join ${room}`);
+        await expect(witness.locator('[data-act-canvas]')).toBeVisible();
+        await owner.evaluate(() => {
+            const capture = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+            window.__cameraRecoveryAttempts = 0; window.__cameraOffAttempts = 0; window.__cameraOffSendRejected = 0; window.__throwCameraOff = false;
+            navigator.mediaDevices.getUserMedia = constraints => {
+                window.__cameraRecoveryAttempts++;
+                if (window.__cameraRecoveryAttempts === 1) return Promise.reject(new DOMException('SYNTHETIC_PRIVATE_DEVICE_DETAIL', 'NotAllowedError'));
+                return capture(constraints);
+            };
+            const socket = window.__lobby.ws, nativeSend = socket.send.bind(socket);
+            socket.send = raw => {
+                let frame; try { frame = JSON.parse(raw); } catch { /* The original sender still receives unchanged bytes. */ }
+                if (frame?.t === 'cam' && frame.on === false) {
+                    window.__cameraOffAttempts++;
+                    if (window.__throwCameraOff) { window.__cameraOffSendRejected++; throw Error('SYNTHETIC_CAM_OFF_SEND_FAILURE'); }
+                }
+                return nativeSend(raw);
+            };
+        });
+        await requestCamera(owner);
+        await expect(owner.locator('[data-cam]')).toHaveAttribute('aria-pressed', 'false');
+        await expect(owner.locator('[data-act-relay-status]')).toHaveText('Camera could not start. It is off in this tab. Check camera permissions or device availability, then choose the camera button to try again.');
+        const denied = await owner.evaluate(() => ({ attempts: window.__cameraRecoveryAttempts, nativeCaptures: window.__captureCalls, off: window.__cameraOffAttempts,
+            camOn: window.__lobbyRoom.state.camOn, stream: !!window.__lobbyRoom.state.stream, myCam: window.__lobby.chans.get(window.__lobby.active).myCam }));
+        expect(denied).toEqual({ attempts: 1, nativeCaptures: 0, off: 1, camOn: false, stream: false, myCam: false });
+        await owner.screenshot({ path: testInfo.outputPath(`camera-start-rejected-${width}.png`), fullPage: true });
+        await command(witness, 'Camera denial did not disconnect chat');
+        await expect(owner.locator('[data-buffer]')).toContainText('Camera denial did not disconnect chat');
+        expect(await owner.evaluate(() => window.__cameraRecoveryAttempts)).toBe(1);
+        // A new visible18+ confirmation is the only retry. The second request
+        // reaches the existing instrumented real native fake-camera API.
+        await camera(owner); await expect(owner.locator('[data-cam]')).toHaveAttribute('aria-pressed', 'true');
+        await expect(owner.locator('[data-cam]')).toBeVisible(); await expect(owner.locator('[data-cam]')).toBeEnabled();
+        const immediate = await owner.evaluate(() => {
+            const state = window.__lobbyRoom.state, tracks = state.stream.getTracks();
+            if (!tracks.length || tracks.some(track => track.readyState !== 'live')) throw Error('Real fake-camera tracks were not live before off');
+            window.__throwCameraOff = true;
+            document.querySelector('[data-cam]').click();
+            return { trackStates: tracks.map(track => track.readyState), stream: !!state.stream, camOn: state.camOn,
+                myCam: window.__lobby.chans.get(window.__lobby.active).myCam,
+                pressed: document.querySelector('[data-cam]').getAttribute('aria-pressed'),
+                captureAttempts: window.__cameraRecoveryAttempts, nativeCaptures: window.__captureCalls,
+                offAttempts: window.__cameraOffAttempts, rejectedOffSends: window.__cameraOffSendRejected,
+                socketOpen: window.__lobby.ws.readyState === WebSocket.OPEN };
+        });
+        expect(immediate.trackStates.length).toBeGreaterThan(0); expect(immediate.trackStates.every(state => state === 'ended')).toBe(true);
+        expect(immediate).toMatchObject({ stream: false, camOn: false, myCam: false, pressed: 'false', captureAttempts: 2, nativeCaptures: 1, offAttempts: 2, rejectedOffSends: 1, socketOpen: true });
+        await testInfo.attach(`camera-local-off-before-send-${width}`, { body: JSON.stringify({ width, ...immediate, localOffOnlyNotServerAcknowledgement: true }, null, 2), contentType: 'application/json' });
+        await command(owner, 'Local camera is off and ordinary chat continues');
+        await expect(witness.locator('[data-buffer]')).toContainText('Local camera is off and ordinary chat continues');
+        expect(await owner.evaluate(() => window.__cameraRecoveryAttempts)).toBe(2); expect(await owner.evaluate(() => window.__captureCalls)).toBe(1);
+        await owner.screenshot({ path: testInfo.outputPath(`camera-local-off-send-rejected-${width}.png`), fullPage: true });
+        expect(app.errors).toEqual([]);
+    } finally { await app.close(); }
+});

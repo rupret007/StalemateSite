@@ -11,9 +11,9 @@ const core = readFileSync(new URL(`${root}sync-core.js`, import.meta.url), 'utf8
 const client = readFileSync(new URL(`${root}lobby/lobby-room.js`, import.meta.url), 'utf8');
 const windows = [];
 afterEach(() => { for (const dom of windows.splice(0)) dom.window.close(); });
-const deferred = () => { let resolve; return { promise: new Promise(done => { resolve = done; }), resolve: value => resolve(value) }; };
+const deferred = () => { let resolve, reject; return { promise: new Promise((done, fail) => { resolve = done; reject = fail; }), resolve: value => resolve(value), reject: error => reject(error) }; };
 
-async function fixture({ inboundBeforeCapture = false, holdCapture = false, receiveOnly = false, clock = null, onSend = null, onCreate = null } = {}) {
+async function fixture({ inboundBeforeCapture = false, holdCapture = false, receiveOnly = false, clock = null, onSend = null, onCreate = null, holdFirstCaptureOnly = false, captureUnavailable = null, holdIce = false, onCameraFailure = null } = {}) {
     const dom = new JSDOM(html, { url: 'http://127.0.0.1:4320/', runScripts: 'outside-only' }); windows.push(dom);
     const { window } = dom, peers = [], sent = [];
     const timers = new Map(); let timerId = 0;
@@ -30,8 +30,14 @@ async function fixture({ inboundBeforeCapture = false, holdCapture = false, rece
     window.BobRoss = { EPISODES: [], label: () => '' };
     window.MediaStream = class { tracks = []; addTrack(track) { this.tracks.push(track); } getTracks() { return this.tracks; } getVideoTracks() { return this.tracks; } };
     const localTrack = { stop: vi.fn(), kind: 'video' }, stream = new window.MediaStream(); stream.addTrack(localTrack);
-    const heldCapture = deferred(), capture = vi.fn(async () => { if (inboundBeforeCapture || holdCapture) await heldCapture.promise; return stream; });
-    Object.defineProperty(window.navigator, 'mediaDevices', { value: { getUserMedia: capture } });
+    const heldCapture = deferred(), heldIce = deferred(); let captureAttempts = 0, iceAttempts = 0;
+    const capture = vi.fn(async () => { captureAttempts++; if ((inboundBeforeCapture || holdCapture) && (!holdFirstCaptureOnly || captureAttempts === 1)) await heldCapture.promise; return stream; });
+    Object.defineProperty(window.navigator, 'mediaDevices', { value: captureUnavailable === 'devices' ? undefined : captureUnavailable === 'method' ? {} : { getUserMedia: capture } });
+    const turnGet = vi.fn(async () => { if (++iceAttempts === 1) await heldIce.promise; return []; });
+    if (holdIce) {
+        Object.defineProperty(window, 'crypto', { configurable: true, value: globalThis.crypto }); window.TextEncoder = TextEncoder;
+        window.HangoutTurn = { createTurnClient: () => ({ get: turnGet, stop: vi.fn() }) };
+    }
     window.RTCPeerConnection = class {
         signalingState = 'stable'; remoteDescription = null; currentRemoteDescription = null; senders = [];
         // A synthetic outgoing ICE event belongs to a known native description,
@@ -59,13 +65,15 @@ async function fixture({ inboundBeforeCapture = false, holdCapture = false, rece
         { id: 'self', nick: 'Alpha', prefix: '@', cam: true }, { id: 'peer', nick: 'Bravo', cam: !receiveOnly }, { id: 'third', nick: 'Witness', cam: true }
     ] };
     const app = { me: 'Alpha', active: channel.name, band: false, chans: new Map([[channel.name, channel]]) };
-    const room = window.LobbyRoom.attach({ app, send: frame => { sent.push(structuredClone(frame)); return onSend?.(frame) !== false; }, $: selector => window.document.querySelector(selector), turnUrl: '' });
+    const room = window.LobbyRoom.attach({ app, send: frame => { sent.push(structuredClone(frame)); return onSend?.(frame) !== false; }, $: selector => window.document.querySelector(selector), turnUrl: holdIce ? '/synthetic-turn-fixture' : '', ...(onCameraFailure ? { onCameraFailure } : {}) });
     room.onJoin(channel, { strokes: [] }); room.onCam(channel.name, true);
     if (inboundBeforeCapture) {
         await vi.waitFor(() => expect(capture).toHaveBeenCalledOnce());
         room.onAct({ ch: channel.name, kind: 'rtc', from: 'peer', ice: { candidate: 'before-capture' } }); heldCapture.resolve();
     }
-    if (holdCapture) await vi.waitFor(() => expect(capture).toHaveBeenCalledOnce());
+    if (holdIce) await vi.waitFor(() => expect(turnGet).toHaveBeenCalledOnce());
+    else if (captureUnavailable) await vi.waitFor(() => expect(window.__lobbyRoom.state.camOn).toBe(false));
+    else if (holdCapture) await vi.waitFor(() => expect(capture).toHaveBeenCalledOnce());
     else await vi.waitFor(() => expect(window.__lobbyRoom.state.stream).toBe(stream));
     const state = window.__lobbyRoom.state;
     const policy = ids => { channel.mediaBlocked = ids; room.onChan(channel); };
@@ -83,7 +91,7 @@ async function fixture({ inboundBeforeCapture = false, holdCapture = false, rece
         for (const [type, clientX] of [['mousedown', x], ['mousemove', x + 2], ['mouseup', x + 2]])
             canvas.dispatchEvent(new window.MouseEvent(type, { button: 0, clientX, clientY: 100, bubbles: true }));
     };
-    sent.length = 0; return { window, room, state, peers, sent, capture, localTrack, stream, releaseCapture: heldCapture.resolve, channel, app, policy, incoming, advance, draw, selectVideo };
+    if (!captureUnavailable) sent.length = 0; return { window, room, state, peers, sent, capture, localTrack, stream, releaseCapture: heldCapture.resolve, rejectCapture: heldCapture.reject, rejectIce: heldIce.reject, turnGet, channel, app, policy, incoming, advance, draw, selectVideo };
 }
 
 function established(pc) {
@@ -861,5 +869,90 @@ describe('public-room Block retires only the affected pair', () => {
         await next.pc.onnegotiationneeded(); expect(f.sent[0]).toMatchObject({ to: 'peer', kind: 'rtc' });
         f.room.onCam(f.channel.name, false); f.channel.myCam = false; f.policy(['peer']); f.policy([]);
         expect(f.capture).toHaveBeenCalledOnce(); expect(f.state.stream).toBeNull();
+    });
+});
+
+
+const CAMERA_START_FAILURE = 'Camera could not start. It is off in this tab. Check camera permissions or device availability, then choose the camera button to try again.';
+const cameraOffFrames = f => f.sent.filter(frame => frame.t === 'cam' && frame.on === false);
+const nextCameraTick = () => new Promise(resolve => setTimeout(resolve, 0));
+
+describe('current camera failure retires locally without retrying stale capture', () => {
+    it.each(['NotAllowedError', 'NotFoundError', 'NotReadableError'])('turns a current %s rejection off with one non-sensitive notification', async name => {
+        const f = await fixture({ holdCapture: true });
+        f.incoming({ ice: { candidate: 'genuine-early-remote-ice-before-current-denial' } });
+        const pairs = [...f.state.pcs.values()], receivedTrack = { kind: 'video', stop: vi.fn() };
+        expect(pairs).toHaveLength(1); pairs[0].pc.ontrack({ track: receivedTrack });
+        f.rejectCapture(new f.window.DOMException('SYNTHETIC_PRIVATE_DEVICE_DETAIL', name));
+        await vi.waitFor(() => expect(f.state.camOn).toBe(false));
+        expect(f.channel.myCam).toBe(false); expect(f.state.stream).toBeNull(); expect(f.state.pcs.size).toBe(0);
+        for (const pair of pairs) expect(pair.pc.close).toHaveBeenCalledOnce();
+        expect(receivedTrack.stop).toHaveBeenCalledOnce();
+        expect(cameraOffFrames(f)).toEqual([{ t: 'cam', ch: f.channel.name, on: false }]);
+        expect(f.window.document.querySelector('[data-act-relay-status]').textContent).toBe(CAMERA_START_FAILURE);
+        await nextCameraTick(); expect(f.capture).toHaveBeenCalledOnce(); expect(cameraOffFrames(f)).toHaveLength(1);
+        expect(f.localTrack.stop).not.toHaveBeenCalled(); // Rejected capture supplied no track.
+    });
+    it.each(['devices', 'method'])('handles an unavailable capture %s API without leaving Camera on', async captureUnavailable => {
+        const f = await fixture({ captureUnavailable });
+        expect(f.capture).not.toHaveBeenCalled(); expect(f.channel.myCam).toBe(false); expect(f.state.camOn).toBe(false);
+        expect(f.state.stream).toBeNull(); expect(f.state.pcs.size).toBe(0); expect(cameraOffFrames(f)).toHaveLength(1);
+        expect(f.window.document.querySelector('[data-act-relay-status]').textContent).toBe(CAMERA_START_FAILURE);
+        await nextCameraTick(); expect(f.capture).not.toHaveBeenCalled(); expect(cameraOffFrames(f)).toHaveLength(1);
+    });
+    it('retires current ICE setup rejection before capture and permits a later explicit retry', async () => {
+        const f = await fixture({ holdIce: true });
+        f.rejectIce(new Error('SYNTHETIC_PRIVATE_ICE_DETAIL'));
+        await vi.waitFor(() => expect(f.state.camOn).toBe(false));
+        expect(f.capture).not.toHaveBeenCalled(); expect(f.channel.myCam).toBe(false); expect(f.state.pcs.size).toBe(0);
+        expect(cameraOffFrames(f)).toHaveLength(1); expect(f.window.document.querySelector('[data-act-relay-status]').textContent).toBe(CAMERA_START_FAILURE);
+        await nextCameraTick(); expect(f.turnGet).toHaveBeenCalledOnce();
+        f.channel.myCam = true; f.room.onCam(f.channel.name, true);
+        await vi.waitFor(() => expect(f.state.stream).toBe(f.stream));
+        expect(f.turnGet).toHaveBeenCalledTimes(2); expect(f.capture).toHaveBeenCalledOnce(); expect(f.state.camOn).toBe(true);
+        expect(f.window.document.querySelector('[data-act-relay-status]').textContent).toBe('');
+    });
+    it.each(['callback', 'send', 'send-false'])('keeps local camera off when its best-effort %s notification fails', async kind => {
+        const callback = vi.fn(() => { throw Error('SYNTHETIC_NOTIFICATION_FAILURE'); });
+        const f = await fixture({ holdCapture: true, ...(kind === 'callback' ? { onCameraFailure: callback } : { onSend: frame => {
+            if (frame.t === 'cam' && frame.on === false) { if (kind === 'send-false') return false; throw Error('SYNTHETIC_NOTIFICATION_FAILURE'); }
+        } }) });
+        f.rejectCapture(new Error('SYNTHETIC_CAPTURE_FAILURE'));
+        await vi.waitFor(() => expect(f.state.camOn).toBe(false));
+        expect(f.channel.myCam).toBe(false); expect(f.state.stream).toBeNull(); expect(f.state.pcs.size).toBe(0);
+        expect(f.window.document.querySelector('[data-act-relay-status]').textContent).toBe(CAMERA_START_FAILURE);
+        if (kind === 'callback') { expect(callback).toHaveBeenCalledExactlyOnceWith(f.channel.name); expect(cameraOffFrames(f)).toEqual([]); }
+        else expect(cameraOffFrames(f)).toHaveLength(1);
+        await nextCameraTick(); expect(f.capture).toHaveBeenCalledOnce();
+    });
+    it('waits for a new explicit camera request after rejection and clears only its failure notice', async () => {
+        const f = await fixture({ holdCapture: true, holdFirstCaptureOnly: true });
+        f.rejectCapture(new f.window.DOMException('SYNTHETIC_DENIAL', 'NotAllowedError'));
+        await vi.waitFor(() => expect(f.state.camOn).toBe(false));
+        await nextCameraTick(); expect(f.capture).toHaveBeenCalledOnce();
+        f.channel.myCam = true; f.room.onCam(f.channel.name, true);
+        await vi.waitFor(() => expect(f.state.stream).toBe(f.stream));
+        expect(f.capture).toHaveBeenCalledTimes(2); expect(f.channel.myCam).toBe(true); expect(f.state.camOn).toBe(true);
+        expect(f.window.document.querySelector('[data-act-relay-status]').textContent).toBe(''); expect(cameraOffFrames(f)).toHaveLength(1);
+    });
+    it.each(['leave', 'opt-out'])('ignores a capture rejection that arrives after %s', async action => {
+        const callback = vi.fn(), f = await fixture({ holdCapture: true, onCameraFailure: callback });
+        if (action === 'leave') f.room.onLeave(); else { f.channel.myCam = false; f.room.onCam(f.channel.name, false); }
+        const status = f.window.document.querySelector('[data-act-relay-status]'); status.textContent = 'A different current status';
+        f.rejectCapture(new Error('SYNTHETIC_OLD_CAPTURE_REJECTION')); await nextCameraTick();
+        expect(callback).not.toHaveBeenCalled(); expect(cameraOffFrames(f)).toEqual([]); expect(status.textContent).toBe('A different current status');
+        expect(f.state.stream).toBeNull(); expect(f.capture).toHaveBeenCalledOnce();
+    });
+    it('does not retire a newer successful capture when the old permission promise rejects', async () => {
+        const callback = vi.fn(), f = await fixture({ holdCapture: true, holdFirstCaptureOnly: true, onCameraFailure: callback });
+        f.channel.myCam = false; f.room.onCam(f.channel.name, false);
+        f.channel.myCam = true; f.room.onCam(f.channel.name, true);
+        await vi.waitFor(() => expect(f.state.stream).toBe(f.stream));
+        const current = new Map(f.state.pcs), status = f.window.document.querySelector('[data-act-relay-status]'); status.textContent = 'New capture remains current';
+        f.rejectCapture(new Error('SYNTHETIC_STALE_PERMISSION_ERROR')); await nextCameraTick();
+        expect(f.state.stream).toBe(f.stream); expect(f.state.camOn).toBe(true); expect(f.channel.myCam).toBe(true);
+        expect(f.state.pcs).toEqual(current); expect(f.localTrack.stop).not.toHaveBeenCalled();
+        expect(callback).not.toHaveBeenCalled(); expect(cameraOffFrames(f)).toEqual([]); expect(status.textContent).toBe('New capture remains current');
+        expect(f.capture).toHaveBeenCalledTimes(2);
     });
 });
