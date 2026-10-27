@@ -287,8 +287,16 @@
         return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}T${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}Z`;
     }
 
+    // RFC 5545 §3.3.11 TEXT. Escape a backslash first, then CR, LF, and CRLF
+    // as the two-character sequence \n, then comma and semicolon. A colon
+    // stays literal: that section says a COLON in a TEXT value SHALL NOT be
+    // escaped. DQUOTE is also unescaped in the TEXT grammar.
     function icsText(value) {
-        return String(value).replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
+        return String(value)
+            .replace(/\\/g, '\\\\')
+            .replace(/\r\n|\r|\n/g, '\\n')
+            .replace(/,/g, '\\,')
+            .replace(/;/g, '\\;');
     }
 
     function foldLine(line) {
@@ -353,7 +361,7 @@
     }
 
     const api = Object.freeze({
-        ACTIVITY, EQUIPMENT_FREE, QUIET_PROMPT, describeRooms, summarizeLobby, isMention, describeVisit, visitView, calendarReminder
+        ACTIVITY, EQUIPMENT_FREE, QUIET_PROMPT, describeRooms, summarizeLobby, isMention, describeVisit, visitView, calendarReminder, icsText
     });
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) root.HangoutDiscovery = api;
