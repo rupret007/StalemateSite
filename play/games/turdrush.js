@@ -1,5 +1,5 @@
 import { createRun, startRun, pauseRun, resumeRun, act, advance } from './turdrush-core.js?v=6120b7f3c87dd2c2';
-import { TurdRushRenderer } from './turdrush-renderer.js?v=f6277b1d944495d2';
+import { TurdRushRenderer } from './turdrush-renderer.js?v=3f4caf204b692b96';
 
 const $ = id => document.getElementById(id);
 const suite = globalThis.Suite;
@@ -12,7 +12,8 @@ let state = createRun(seed()), renderer = null, previousTime = 0, raf = 0;
 let runId = null, recorded = false, overAt = 0, available = false, gesture = null, soundGeneration = 0;
 let lastOrientation = globalThis.innerWidth > globalThis.innerHeight;
 let feedback = '', feedbackUntil = 0, lastLesson = '', lastHud = '', result = null;
-let best = readBest(), lastContrast = null;
+let best = readBest(), lastContrast = null, contrastReady = null;
+let renderDirty = true, lastDrawTime = 0;
 
 function seed() {
   try { return globalThis.crypto.getRandomValues(new Uint32Array(1))[0]; }
@@ -35,8 +36,9 @@ function sound(event) {
   if (suite?.isStudioAudio?.()) { suite.playSound?.(studio[event] || 'shared.beep'); }
   else {
     const cueState = state, cueGeneration = soundGeneration;
+    const allowOnResults = state.phase === 'over' && ['hit', 'over'].includes(event);
     suite?.audio?.().then(audio => {
-      if (state !== cueState || cueGeneration !== soundGeneration || !available || document.hidden || $('rush-guide').open || ['paused', 'ready'].includes(state.phase)) {return;}
+      if (state !== cueState || cueGeneration !== soundGeneration || !available || document.hidden || $('rush-guide').open || (state.phase !== 'running' && !allowOnResults)) {return;}
       audio?.playPreset(classic[event] || 'tick');
     }).catch(() => {});
   }
@@ -48,6 +50,7 @@ function gates() {
   $('rush-pause').disabled = !running;
   for (const button of controls) {button.disabled = !running;}
   document.body.dataset.rushPhase = state.phase;
+  renderDirty = true;
 }
 function muteLabel() {
   const muted = suite?.isMuted?.() || false;
@@ -57,10 +60,11 @@ function muteLabel() {
 }
 function hud() {
   const highContrast = !!suite?.isColorblindMode?.();
-  $('rush-contrast').disabled = typeof suite?.setColorblindMode !== 'function';
+  const ready = typeof suite?.setColorblindMode === 'function';
+  if (ready !== contrastReady) { contrastReady = ready; $('rush-contrast').disabled = !ready; }
   if (highContrast !== lastContrast) {
     lastContrast = highContrast;
-    if (renderer) {renderer.highContrast = highContrast;}
+    if (renderer) { renderer.highContrast = highContrast; renderDirty = true; }
     $('rush-contrast').textContent = highContrast ? 'High contrast on' : 'High contrast off';
     $('rush-contrast').setAttribute('aria-pressed', String(highContrast));
   }
@@ -112,6 +116,7 @@ function begin() {
   if (state.phase === 'over' && globalThis.performance.now() - overAt < 550) {return;}
   soundGeneration++;
   state = createRun(seed());
+  renderer.resetRun();
   startRun(state);
   runId = globalThis.SuiteProgress?.newRunId('turdrush') || null;
   recorded = false; result = null; previousTime = 0; gesture = null;
@@ -175,22 +180,30 @@ function resize() {
   if (reserved) {document.body.style.setProperty('--rush-music-inset', `${Math.ceil(reserved + 7)}px`);}
   const landscape = globalThis.innerWidth > globalThis.innerHeight;
   if (landscape !== lastOrientation) { lastOrientation = landscape; pause('Your screen turned. Tap Keep running when you are ready.'); }
-  renderer?.resize();
+  if (renderer?.resize()) {renderDirty = true;}
 }
 function frame(time) {
   raf = globalThis.requestAnimationFrame(frame);
   const dt = previousTime ? Math.max(0, (time - previousTime) / 1000) : 0;
   previousTime = time;
   if (!available) {return;}
-  // The fixed-step core caps catch-up after slow frames; visibility loss pauses
-  // explicitly, while a shader warm-up never interrupts a just-started run.
-  const events = advance(state, Math.min(dt, 0.12));
-  consume(events); renderer.render(state, dt, events);
+  // Only active play consumes simulation time. A still pause/result or a
+  // reduced-motion title needs no repeated GPU work while controls stay live.
+  const wasRunning = state.phase === 'running';
+  const events = wasRunning ? advance(state, Math.min(dt, 0.12)) : [];
+  consume(events);
   if (state.phase === 'over') {
     finish();
     if ($('rush-again').disabled && time - overAt >= 550) { $('rush-again').disabled = false; $('rush-again').focus({ preventScroll: true }); }
   }
-  hud();
+  const settingsChanged = contrastReady !== (typeof suite?.setColorblindMode === 'function') || lastContrast !== !!suite?.isColorblindMode?.();
+  if (wasRunning || renderDirty || settingsChanged) {hud();}
+  const preview = state.phase === 'ready' && !motion.matches && !$('rush-guide').open;
+  if (wasRunning || renderDirty || (preview && time - lastDrawTime >= 1000 / 15)) {
+    const visualDelta = wasRunning ? dt : preview ? Math.min(0.1, (time - lastDrawTime) / 1000) : 0;
+    renderer.render(state, visualDelta, events);
+    renderDirty = false; lastDrawTime = time;
+  }
 }
 
 $('rush-start').addEventListener('click', begin);
@@ -249,8 +262,8 @@ globalThis.addEventListener('blur', () => pause('You stepped away. Tap Keep runn
 document.addEventListener('visibilitychange', () => { if (document.hidden) {pause('Welcome back. Tap Keep running when you are ready.');} });
 globalThis.addEventListener('orientationchange', () => pause('Your screen turned. Tap Keep running when you are ready.'));
 globalThis.addEventListener('resize', resize);
-globalThis.visualViewport?.addEventListener('resize', () => renderer?.resize());
-motion.addEventListener('change', () => { if (renderer) {renderer.reducedMotion = motion.matches;} });
+globalThis.visualViewport?.addEventListener('resize', resize);
+motion.addEventListener('change', () => { if (renderer) { renderer.reducedMotion = motion.matches; renderDirty = true; } });
 globalThis.addEventListener('pagehide', event => {
   pause(); suite?.stopSounds?.(); gesture = null;
   if (!event.persisted) { globalThis.cancelAnimationFrame(raf); renderer?.dispose(); }
@@ -272,6 +285,6 @@ try {
 }
 globalThis.__turdrush = {
   get state() { return JSON.parse(JSON.stringify(state)); },
-  get diagnostics() { return { available, reducedMotion: motion.matches, highContrast: renderer?.highContrast || false, drawCalls: renderer?.renderer.info.render.calls || 0, triangles: renderer?.renderer.info.render.triangles || 0, geometries: renderer?.renderer.info.memory.geometries || 0, pixelRatio: renderer?.pixelRatio || 0 }; }
+  get diagnostics() { return { available, reducedMotion: motion.matches, highContrast: renderer?.highContrast || false, drawCalls: renderer?.renderer.info.render.calls || 0, triangles: renderer?.renderer.info.render.triangles || 0, geometries: renderer?.renderer.info.memory.geometries || 0, renderedFrames: renderer?.renderedFrames || 0, pixelRatio: renderer?.pixelRatio || 0 }; }
 };
 globalThis.SuiteLoading?.ready();

@@ -110,12 +110,12 @@ test('homepage Games links reach the hub, with individual games excluded from se
     await expect(navLinks.last()).toHaveAttribute('href', 'play/#hub-games');
     const games = page.locator('#games');
     await expect(games.locator('.board-square')).toHaveText('Stalemate Arcade');
-    await expect(games).toContainText('Eight free games and optional Stalemate songs.');
+    await expect(games).toContainText('Nine free games and optional Stalemate songs.');
     await expect(games).toContainText('Pick another round.');
     await expect(games.locator('.games-card__thumb')).toBeVisible();
     const play = games.getByRole('link', { name: 'Open Stalemate Arcade' });
     await expect(play).toHaveAttribute('href', 'play/');
-    await expect(games.getByRole('heading', { level: 2 })).toHaveText('Eight free arcade games. Zero dignity.');
+    await expect(games.getByRole('heading', { level: 2 })).toHaveText('Nine free arcade games. Zero dignity.');
     await expect(games.getByRole('link', { name: 'Play Turdanoid' })).toHaveAttribute('href', 'play/TurdAnoid.html');
     for (const img of await games.locator('.games-shot img').all()) {
         await img.scrollIntoViewIfNeeded();

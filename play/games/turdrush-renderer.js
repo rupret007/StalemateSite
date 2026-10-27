@@ -250,17 +250,22 @@ export class TurdRushRenderer {
     this.bubbleRing.position.y = 1; this.runner.group.add(this.bubbleRing); this.bubbleRing.visible = false;
     this.sparkMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 6, 4), new THREE.MeshBasicMaterial({ color: COLORS.gold }), 36);
     this.sparkMesh.count = 0; this.scene.add(this.sparkMesh); this.sparks = []; this.sparkTransform = new THREE.Object3D();
-    this.pool = new Map(); this.elapsed = 0; this.pixelRatio = Math.min(globalThis.devicePixelRatio || 1, 1.65); this.slowFrames = 0;
+    this.pool = new Map(); this.elapsed = 0; this.pixelRatio = Math.min(globalThis.devicePixelRatio || 1, 1.65); this.slowSeconds = 0; this.slowSamples = 0; this.renderedFrames = 0;
     this.contextLost = event => { event.preventDefault(); this.onLost(); };
     canvas.addEventListener('webglcontextlost', this.contextLost);
     this.resize();
   }
   resize() {
     const rect = this.canvas.getBoundingClientRect(), width = Math.max(1, Math.round(rect.width)), height = Math.max(1, Math.round(rect.height));
+    const sizeKey = `${width}:${height}:${this.pixelRatio}`;
+    if (sizeKey === this.sizeKey) {return false;}
+    this.sizeKey = sizeKey;
+    this.minimumPixelRatio = width * height > 700000 ? 0.6 : 0.85;
     this.renderer.setPixelRatio(this.pixelRatio); this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
     this.camera.fov = this.camera.aspect < 0.7 ? 65 : this.camera.aspect > 1.6 ? 49 : 58;
     this.camera.updateProjectionMatrix();
+    return true;
   }
   model(kind, slot) {
     if (!this.pool.has(kind)) {this.pool.set(kind, []);}
@@ -282,8 +287,18 @@ export class TurdRushRenderer {
   render(state, dt = 0, events = []) {
     this.elapsed += Math.min(dt, 0.1);
     if (this.floorMaterial.map !== (this.highContrast ? null : this.floorMap)) { this.floorMaterial.map = this.highContrast ? null : this.floorMap; this.floorMaterial.color.setHex(this.highContrast ? 0x296a76 : 0xffffff); this.floorMaterial.needsUpdate = true; }
-    if (dt > 0.025 && state.phase === 'running') {this.slowFrames++;} else {this.slowFrames = Math.max(0, this.slowFrames - 0.25);}
-    if (this.slowFrames > 100 && this.pixelRatio > 1) { this.pixelRatio = Math.max(1, this.pixelRatio - 0.25); this.slowFrames = 0; this.resize(); }
+    // Sample elapsed slow time, not100 frames: at2fps a frame-count gate
+    // takes50s to help. Three slow samples ignore a lone shader warm-up spike.
+    if (state.phase === 'running' && dt > 0.028) {
+      this.slowSeconds += Math.min(dt, 0.5); this.slowSamples++;
+    } else {
+      this.slowSeconds = Math.max(0, this.slowSeconds - dt * 2);
+      this.slowSamples = Math.max(0, this.slowSamples - 1);
+    }
+    if (this.slowSeconds >= 1 && this.slowSamples >= 3 && this.pixelRatio > this.minimumPixelRatio) {
+      this.pixelRatio = Math.max(this.minimumPixelRatio, this.pixelRatio * 0.75);
+      this.slowSeconds = 0; this.slowSamples = 0; this.resize();
+    }
     const distance = state.distance, running = state.phase === 'running';
     if (!this.reducedMotion) {for (const event of events) {
       if (event.type !== 'pickup') {continue;}
@@ -334,9 +349,21 @@ export class TurdRushRenderer {
     this.shake = Math.max(0, (this.shake || 0) - dt);
     const shake = this.shake && !this.reducedMotion ? Math.sin(this.elapsed * 70) * this.shake : 0;
     const landscape = this.camera.aspect > 1.6;
-    this.camera.position.set((this.reducedMotion ? 0 : player.x * 0.15) + shake, landscape ? 5.7 : 4.6, landscape ? 10.3 : 8.8);
+    // Stay below the vaulted supports even when an arch passes the camera.
+    this.camera.position.set((this.reducedMotion ? 0 : player.x * 0.15) + shake, 4.6, landscape ? 10.3 : 8.8);
     this.camera.lookAt(this.reducedMotion ? 0 : player.x * 0.08, landscape ? 0.4 : 0.5, landscape ? -12 : -11);
     this.renderer.render(this.scene, this.camera);
+    this.renderedFrames++;
+  }
+  resetRun() {
+    // A fresh attempt inherits rendering quality, never the previous crash's
+    // frozen shake/particles or its cosmetic clock.
+    this.sparks.length = 0;
+    this.sparkMesh.count = 0;
+    this.shake = 0;
+    this.elapsed = 0;
+    this.slowSeconds = 0;
+    this.slowSamples = 0;
   }
   dispose() {
     this.canvas.removeEventListener('webglcontextlost', this.contextLost);
