@@ -6,6 +6,7 @@ import { readBeta } from '../../../hangout-worker/src/beta-auth.mjs';
 import { createPartitionedParticipationConsents, PARTICIPATION_POLICY_KEY, PARTICIPATION_RECORD_LIMITS, PARTICIPATION_MAINTENANCE_CURSOR_KEY } from '../../../hangout-worker/src/participation-partitions.mjs';
 import { validParticipationLedgerState } from '../../../hangout-worker/src/participation-consents.mjs';
 import { HELP } from '../../../hangout-worker/src/lobby-core.mjs';
+import { createControlCreditObservation } from './control-credit-observation.mjs';
 import { PARTICIPATION_PURPOSES } from '../../../hangout-worker/src/participation-policy.mjs';
 import { createIncidentCases, createIncidentEvidenceCipher, incidentEvidenceDigest, initialIncidentCaseState } from '../../../hangout-worker/src/incident-cases.mjs';
 import { LOBBY_INCIDENT_SOURCE_KEY } from '../../../hangout-worker/src/lobby-incident-sources.mjs';
@@ -111,7 +112,7 @@ export class FixtureLobby extends HangoutLobby {
         const control = { faultKey: '', tripped: false, nativeWriteCompleted: false, nativeCalls: 0, nativeMutations: 0, history: [], rollbackWitnesses: [],
             traffic: env.FIXTURE_TRAFFIC_ACKS === 'ack-v1' ? { slots: new Map(), transactionsStarted: 0, transactionsCommitted: 0, transactionsRejected: 0 } : null,
             pressure: env.FIXTURE_PRESSURE_ONLY === 'pressure-v1' ? { slots: new Map(), probeSocket: null, helpAttempts: [], overflow: false, witness: null, nativeSendCalls: 0, nativeSendReturned: 0, initialSequence: 0 } : null,
-            fanout: env.FIXTURE_FANOUT_50 === 'fanout-v1' ? { slots: new Map(), scan: null, scanStarted: false, storageCounters: nativeCounters() } : null };
+            fanout: env.FIXTURE_FANOUT_50 === 'fanout-v1' ? { slots: new Map(), scan: null, scanStarted: false, storageCounters: nativeCounters(), controlCredits: createControlCreditObservation() } : null };
         const manifestDigest = async (storage, key) => {
             control.nativeCalls++;
             const meter = control.fanout?.storageCounters, counts = beginNative(meter, 'get', [key]);
@@ -257,6 +258,7 @@ export class FixtureLobby extends HangoutLobby {
             this.fixtureRetentionHealthEvent('start', 'threw', retentionHealthReason(error, true));
             throw error;
         }
+        if (this.env.FIXTURE_FANOUT_50 === 'fanout-v1') this.fixtureObserveControlCredits();
         if (this.env.FIXTURE_RETENTION_PROOF !== 'retention-v1') return result;
         const observe = (original, receiver, stage) => async (...values) => {
             this.fixtureRetentionHealthEvent(stage, 'called');
@@ -548,6 +550,30 @@ export class FixtureLobby extends HangoutLobby {
         const result = await f.ledger.change(proof, { expectedRevision: subject.revision, purposes: subject.purposes.filter(purpose => purpose !== 'camera') });
         f.guardians.delete(proof); ensure(result.state === 'authorized', 'fixture-reduction-refused'); return { reduced: true };
     }
+    fixtureObserveControlCredits() {
+        const meter = this.fixtureControl?.fanout; if (!meter || !this.engine) return;
+        if (meter.creditEngine !== this.engine) {
+            const engine = this.engine, reserve = engine.reserveTransportControl;
+            engine.reserveTransportControl = async (...args) => {
+                const result = await Reflect.apply(reserve, engine, args);
+                try { meter.controlCredits.reservation(args[0], result); } catch { /* Preserve actual result. */ }
+                return result;
+            };
+            meter.creditEngine = engine;
+        }
+        if (!meter.creditTakeWrapped) {
+            const budget = this.controlBudget, take = budget.take;
+            const grant = socket => { try { return socket.deserializeAttachment()?.controlGrant; } catch { return null; } };
+            budget.take = async (...args) => {
+                const before = grant(args[0]);
+                const result = await Reflect.apply(take, budget, args);
+                const after = grant(args[0]);
+                try { meter.controlCredits.consumption(args[1], before, after, result); } catch { /* Preserve actual result. */ }
+                return result;
+            };
+            meter.creditTakeWrapped = true;
+        }
+    }
     fixtureFanoutMode() {
         ensure(this.env.FIXTURE_FANOUT_50 === 'fanout-v1' && this.fixtureControl.fanout && this.participationMode && !this.incidentSourceMode,
             'fixture-fanout-mode-required'); return this.fixtureControl.fanout;
@@ -571,7 +597,7 @@ export class FixtureLobby extends HangoutLobby {
             ensure(delivery?.enabled === true && delivery.negotiated === true && Array.isArray(delivery.sizes), 'fixture-fanout-native-transport-required');
             return { slot: entry.slot, live: current.some(person => person.id === id) && this.liveBindings.has(id) && entry.socket.readyState === 1,
                 sequence: delivery.seq, acknowledged: delivery.ack, controls: delivery.control.count, pendingFrames: delivery.sizes.length,
-                remainingControls: controlGrant?.remaining ?? 0 };
+                remainingControls: controlGrant?.remaining ?? 0, controlCredits: meter.controlCredits.snapshot(id, controlGrant) };
         }).sort((a, b) => a.slot - b.slot);
         return { sockets, engineCount: current.length, liveBindingCount: this.liveBindings.size,
             delivery: this.delivery.snapshot(), controlBudget: this.controlBudget.snapshot(), nativeStorageMethodCalls: this.fixtureControl.nativeCalls,

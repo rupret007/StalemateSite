@@ -61,6 +61,7 @@ const hash = path => createHash('sha256').update(readFileSync(path)).digest('hex
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const sources = () => Object.fromEntries([
     ['fixture/runner.mjs', FILE], ['fixture/worker.mjs', join(HERE, 'worker.mjs')], ['fixture/README.md', join(HERE, 'README.md')],
+    ['fixture/control-credit-observation.mjs', join(HERE, 'control-credit-observation.mjs')],
     ...readdirSync(join(APP, 'hangout-worker/src')).filter(name => name.endsWith('.mjs')).sort().map(name => [`application/src/${name}`, join(APP, 'hangout-worker/src', name)]),
     ...['r/45662413410ed051/sync-core.js', 'r/45662413410ed051/entry-sites.mjs', 'package.json', 'package-lock.json', '.github/workflows/durable-record-runtime.yml', 'hangout-worker/wrangler.beta.toml', 'node_modules/rolldown/package.json', 'node_modules/obscenity/package.json'].map(name => [`application/${name}`, join(APP, name)]),
     ...['package.json', 'package-lock.json'].map(name => [`tools/${name}`, join(TOOLS, name)])
@@ -417,9 +418,37 @@ async function runtime(phase, state, nonce) {
                         assert.equal(observed.sockets.filter(socket => socket.live).length, expectedLive);
                         assert.equal(observed.controlBudget.consumedControls, all.reduce((sum, peer) => sum + peer.ack.sent, 0));
                         assert.equal(observed.delivery.controlFrames, observed.controlBudget.consumedControls);
-                        assert.equal(observed.controlBudget.reservations, observed.sockets.reduce((sum, socket) => sum + Math.ceil(socket.controls / 20), 0));
+                        let reservations = 0, discardedControls = 0, remainingControls = 0;
+                        for (const socket of observed.sockets) {
+                            const credit = socket.controlCredits;
+                            assert.deepEqual(Object.keys(credit).sort(), ['days', 'invalid', 'overflow']);
+                            assert.equal(credit.invalid, false); assert.equal(credit.overflow, false);
+                            assert.ok(Array.isArray(credit.days) && credit.days.length >= 1 && credit.days.length <= 2);
+                            assert.deepEqual(credit.days.map(row => row.day), [...new Set(credit.days.map(row => row.day))].sort());
+                            let controls = 0, remaining = 0;
+                            for (const row of credit.days) {
+                                assert.deepEqual(Object.keys(row).sort(), ['controls', 'day', 'discardedControls', 'openingControls', 'remainingControls', 'reservations', 'unassignedControls']);
+                                assert.match(row.day, /^\d{4}-\d{2}-\d{2}$/);
+                                assert.equal(new Date(row.day + 'T00:00:00Z').toISOString().slice(0, 10), row.day);
+                                for (const field of ['controls', 'discardedControls', 'openingControls', 'remainingControls', 'reservations', 'unassignedControls']) assert.ok(Number.isSafeInteger(row[field]) && row[field] >= 0);
+                                assert.equal(row.openingControls, 0, 'fresh fifty must not import paid credit');
+                                assert.equal(row.unassignedControls, 0, 'every actual reservation must reconcile to a real grant');
+                                assert.equal(row.reservations, Math.ceil(row.controls / 20));
+                                assert.equal(20 * row.reservations, row.controls + row.discardedControls + row.remainingControls);
+                                controls += row.controls; remaining += row.remainingControls; reservations += row.reservations;
+                                discardedControls += row.discardedControls;
+                            }
+                            assert.equal(controls, socket.controls); assert.equal(remaining, socket.remainingControls); remainingControls += remaining;
+                        }
+                        assert.equal(observed.controlBudget.reservations, reservations);
                         assert.equal(observed.controlBudget.prepaidControls, observed.controlBudget.reservations * 20);
-                        for (const socket of observed.sockets) assert.equal(socket.remainingControls, 20 * Math.ceil(socket.controls / 20) - socket.controls);
+                        assert.equal(observed.controlBudget.prepaidControls, observed.controlBudget.consumedControls + discardedControls + remainingControls);
+                        // Keep the original stronger lifetime oracle whenever no
+                        // socket actually crossed a UTC grant day.
+                        if (observed.sockets.every(socket => socket.controlCredits.days.length === 1)) {
+                            assert.equal(observed.controlBudget.reservations, observed.sockets.reduce((sum, socket) => sum + Math.ceil(socket.controls / 20), 0));
+                            for (const socket of observed.sockets) assert.equal(socket.remainingControls, 20 * Math.ceil(socket.controls / 20) - socket.controls);
+                        }
                         for (const field of ['pressureCloses', 'failures', 'legacyCloses', 'controlCloses']) assert.equal(observed.delivery[field], 0);
                         assert.equal(observed.controlBudget.refused, 0); assert.equal(observed.delivery.pendingFrames, 0); assert.equal(observed.delivery.pendingBytes, 0);
                         for (const peer of all) assert.ok(peer.ack.minSpacingMs === null || peer.ack.minSpacingMs >= 50);
