@@ -328,10 +328,26 @@ export class FixtureLobby extends HangoutLobby {
         ensure(owner && Object.isFrozen(owner) && owner.authority === this.authority && owner.engine === this.engine, 'fixture-provider-original-owner');
         return this.fixtureControl.provider;
     }
+    fixtureProviderHealth() {
+        // storageFailed() replaces the opaque token and marks evidence degraded
+        // without necessarily setting authorityUnavailable. Export neither token.
+        const meter = this.fixtureProviderMode();
+        const owner = this.participationStartOwner;
+        const evidenceStorage = this.evidenceStorage === 'ready' || this.evidenceStorage === 'degraded' ? this.evidenceStorage : 'other';
+        const authorityUnavailable = this.authorityUnavailable !== false;
+        const captured = [...meter.slots.values()];
+        const pinsCurrent = !!(owner && Object.isFrozen(owner) && owner.engine === this.engine
+            && owner.authority === this.authority && owner.failureToken === this.storageFailureToken);
+        const failureTokenMatchesCapturedOwners = captured.length > 0 && captured.length <= 3
+            && captured.every(entry => entry.owner === owner && pinsCurrent);
+        return { evidenceStorage, authorityUnavailable, capturedOwnerCount: captured.length, failureTokenMatchesCapturedOwners,
+            freshOwnerBaseline: captured.length === 0 && pinsCurrent && evidenceStorage === 'ready' && authorityUnavailable === false };
+    }
     fixtureProviderState() {
         const meter = this.fixtureProviderMode();
         return { overflow: meter.overflow, observationFailed: meter.observationFailed, activeNativeCallbacks: meter.active.size,
             pendingResponses: [...meter.cases.values()].filter(row => row.pendingResponse).length,
+            health: this.fixtureProviderHealth(),
             cases: [...meter.cases.values()].map(row => ({ slot: row.slot, scenario: row.scenario, runCount: row.runCount,
                 validateCalls: row.validateCalls, startCalls: row.startCalls, completed: row.completed, denied: row.denied,
                 reason: row.reason, pendingResponse: row.pendingResponse, readonlyTx: row.readonlyTx,
@@ -399,8 +415,10 @@ export class FixtureLobby extends HangoutLobby {
                 providerEvent(meter, row, 'validate-called');
                 const result = await Reflect.apply(original.validate, original, [tx]);
                 if (result === true && scenario === 'callback-close') {
-                    // A real self-initiated transport reduction, before await.
-                    // Its owner retirement is awaited only AFTER dispatch exits.
+                    // Real self-initiated transport reduction, before await.
+                    // The synchronous close fence is the start refusal. This promise
+                    // is awaited only after dispatchParticipationStart settles; that
+                    // fixture order is not the semantic retirement-start point.
                     row.closeTask = this.webSocketClose(entry.socket, 1000);
                     row.closeTask.then(() => providerEvent(meter, row, 'retirement-resolved'), () => providerEvent(meter, row, 'retirement-rejected'));
                     const attachment = entry.socket.deserializeAttachment() || {};
@@ -425,7 +443,10 @@ export class FixtureLobby extends HangoutLobby {
             const reason = error?.message;
             row.denied = true; row.reason = ['participation-denied', 'participation-unavailable'].includes(reason) ? reason : 'other';
             providerEvent(meter, row, 'dispatch-denied');
-        }).finally(() => { if (meter.current === row) { meter.current = null; meter.watch = false; } });
+        }).finally(() => {
+            providerEvent(meter, row, 'dispatch-settled');
+            if (meter.current === row) { meter.current = null; meter.watch = false; }
+        });
         row.task = task;
         if (scenario === 'hold') {
             await Promise.race([started, task.then(() => { ensure(row.startCalls === 1 && row.pendingResponse, 'fixture-provider-held-start-required'); })]);
@@ -433,6 +454,7 @@ export class FixtureLobby extends HangoutLobby {
         }
         await task;
         if (row.closeTask) {
+            providerEvent(meter, row, 'close-await-after-dispatch');
             await row.closeTask;
             const saved = await this.authority.load();
             row.closeRetired = !this.liveBindings.has(entry.binding.id)

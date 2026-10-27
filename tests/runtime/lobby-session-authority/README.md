@@ -588,8 +588,28 @@ this mode does not requalify their canonical nine-plus-three or two physical
 rollback witnesses. The existing workflow currently runs only those seven
 modes/ten groups. Adding this command as an eleventh group requires the existing
 CI owner's separate change; a green ten-group workflow does not execute or
-qualify the new flag. Until an admitted local or owner-run native execution
-passes, this addition is source-only and unqualified.
+qualify the new flag. This workstream does not edit that workflow. The proposed
+step, for StoryPool 10-21-26 only, follows the existing capture pattern and
+does not raise the ten-minute job limit, remove an old step, or hide this mode
+inside an old one:
+
+```yaml
+- name: Prove native permission ordering for moderation start
+  shell: bash
+  run: |
+    set +e
+    npm run --silent test:lobby-session-runtime -- --participation --provider-start > runtime-proof-artifacts/lobby-provider-start-runtime.stdout.log 2> runtime-proof-artifacts/lobby-provider-start-runtime.stderr.log
+    status=$?
+    set -e
+    cat runtime-proof-artifacts/lobby-provider-start-runtime.stdout.log
+    cat runtime-proof-artifacts/lobby-provider-start-runtime.stderr.log >&2
+    printf '%s\n' "$status" > runtime-proof-artifacts/lobby-provider-start-runtime.exit-code.txt
+    exit "$status"
+```
+
+The existing artifact upload already covers those three files. Until an admitted
+local or owner-run native execution passes, this addition is source-only and
+unqualified.
 
 The new mode deliberately omits the plain-retention diagnostic facade. It uses
 the original authority and frozen owner actually created by `HangoutLobby.start`.
@@ -614,14 +634,28 @@ without starting. These are actual writer-wins checks, not a claim that a queued
 revocation recalls an already invoked request.
 
 During another real validation callback the fixture initiates the production
-`webSocketClose` handler without awaiting its retirement gate there. The actual
-synchronous transport-close/attachment/live-binding fence must prevent start;
-the actual engine and authority retirement is awaited after dispatch exits.
-A reset, poisoned transaction, unexpected failure or deadlock is a failed proof,
-not an alternative passing outcome. Fixed-stage observations distinguish native
-callback completion, whole transaction resolution, close initiation and the real
-retirement promise; the fixture does not clone a dispatcher or install a FIFO
-mutex to emulate workerd scheduling.
+`webSocketClose` handler without awaiting that promise inside the callback.
+The synchronous transport fence (closed socket, `sessionEnded` attachment, and
+live-binding removal) must prevent start. After `dispatchParticipationStart`
+settles, the fixture records `close-await-after-dispatch` and then awaits the
+same close promise. That event order is fixture control flow. It does not
+establish when `retireClosed` begins relative to owner-gate exit, so this mode
+does not claim a semantic retirement-start point. A reset, poisoned transaction,
+unexpected failure or deadlock is a failed proof, not an alternative passing
+outcome. Fixed-stage observations distinguish native callback completion, whole
+transaction resolution, close initiation, dispatch settlement, and the later
+close-promise await. `retirement-resolved` only means the close promise settled.
+The fixture does not clone a dispatcher or install a FIFO mutex to emulate
+workerd scheduling.
+
+The provider-state payload includes a bounded `health` witness. `storageFailed()`
+can mark evidence storage degraded without setting `authorityUnavailable`, so
+`authorityUnavailable: false` alone is not the final health claim. After the
+visitor scenarios the witness must show ready evidence, available authority,
+three captured owners, and those owners' failure token still equal to the
+current token. The cold phase has no carried request and must show a fresh
+owner baseline with the same ready evidence and available authority. The witness
+exports no token value.
 
 All controls use the existing nonce/origin/content-type restrictions. At most
 128 fixed events, bounded ordinals, slot numbers, counts and booleans are returned;

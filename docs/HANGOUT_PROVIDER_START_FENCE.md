@@ -79,6 +79,12 @@ The new native fixture mode must retain the real production authority identity
 and invoke the real dispatcher, without an extra fixture gate masking its
 behavior. It supplements the existing native modes; none of their assertions,
 limits, source checks or deadlines may be removed to manufacture a pass.
+A passing receipt has to show ready evidence storage, available authority, and
+the captured owner's failure token still equal to the current token. The cold
+phase has to show a fresh owner baseline and no carried request. Callback-close
+shows the synchronous close fence and that the fixture awaited the close promise
+after dispatch settled. That is not a witness of when semantic retirement starts
+relative to owner-gate exit.
 
 The linearization point is the application's synchronous start invocation.
 Output gating may delay an outbound request, and a crash may occur after a

@@ -373,10 +373,16 @@ async function runtime(phase, state, nonce) {
             const scenarios = ['positive', 'hold', 'after-stop', 'after-revoke', 'callback-close'];
             const stages = ['native-tx-callback-enter', 'native-tx-callback-exit', 'native-tx-promise-resolved', 'native-tx-rejected',
                 'validate-called', 'validate-returned', 'start-invoked', 'response-held', 'response-released', 'callback-close-marked',
-                'dispatch-denied', 'retirement-resolved', 'retirement-rejected', 'retirement-observed'];
+                'dispatch-denied', 'dispatch-settled', 'close-await-after-dispatch', 'retirement-resolved', 'retirement-rejected', 'retirement-observed'];
             const checkState = value => {
-                assert.deepEqual(Object.keys(value).sort(), ['overflow', 'observationFailed', 'activeNativeCallbacks', 'pendingResponses', 'cases', 'events'].sort());
+                assert.deepEqual(Object.keys(value).sort(), ['overflow', 'observationFailed', 'activeNativeCallbacks', 'pendingResponses', 'health', 'cases', 'events'].sort());
                 assert.equal(value.overflow, false); assert.equal(value.observationFailed, false);
+                assert.deepEqual(Object.keys(value.health).sort(), ['authorityUnavailable', 'capturedOwnerCount', 'evidenceStorage', 'failureTokenMatchesCapturedOwners', 'freshOwnerBaseline']);
+                assert.ok(['ready', 'degraded', 'other'].includes(value.health.evidenceStorage));
+                assert.equal(typeof value.health.authorityUnavailable, 'boolean');
+                assert.ok(Number.isInteger(value.health.capturedOwnerCount) && value.health.capturedOwnerCount >= 0 && value.health.capturedOwnerCount <= 3);
+                assert.equal(typeof value.health.failureTokenMatchesCapturedOwners, 'boolean');
+                assert.equal(typeof value.health.freshOwnerBaseline, 'boolean');
                 assert.equal(value.activeNativeCallbacks, 0); assert.ok(Number.isSafeInteger(value.pendingResponses) && value.pendingResponses >= 0 && value.pendingResponses <= 1);
                 assert.ok(Array.isArray(value.cases) && value.cases.length <= 5); assert.ok(value.events.length <= 128);
                 for (const row of value.cases) {
@@ -404,6 +410,17 @@ async function runtime(phase, state, nonce) {
                 const events = value.events.filter(item => item.scenario === scenario), at = stage => events.find(item => item.stage === stage)?.ordinal;
                 assert.ok(at('validate-called') < at('native-tx-promise-resolved') && at('native-tx-promise-resolved') < at('start-invoked'));
                 return result;
+            };
+            const assertProviderHealth = (value, capturedOwners) => {
+                // privacy() only sees authorityUnavailable. storageFailed() can
+                // degrade evidence while leaving that flag false, so the final
+                // provider-state witness has to name both and the owner token.
+                const health = value.health;
+                assert.equal(health.evidenceStorage, 'ready');
+                assert.equal(health.authorityUnavailable, false);
+                assert.equal(health.capturedOwnerCount, capturedOwners);
+                assert.equal(health.failureTokenMatchesCapturedOwners, capturedOwners > 0);
+                assert.equal(health.freshOwnerBaseline, capturedOwners === 0);
             };
             const privacy = observed => {
                 assert.equal(observed.authorityUnavailable, false); assert.equal(observed.sqlite, true);
@@ -481,16 +498,18 @@ async function runtime(phase, state, nonce) {
                 assert.equal((await c.wait(() => false, 'actual callback-initiatedC close', 0, true)).code, 1000);
                 const callbackEvents = observed.events.filter(item => item.scenario === 'callback-close'), firstAt = stage => callbackEvents.find(item => item.stage === stage)?.ordinal;
                 assert.ok(firstAt('callback-close-marked') < firstAt('native-tx-promise-resolved') && firstAt('native-tx-promise-resolved') < firstAt('dispatch-denied'));
-                assert.ok(firstAt('retirement-resolved') > firstAt('callback-close-marked')); // observed actual promise, not an assumed queue order
+                assert.ok(firstAt('retirement-resolved') > firstAt('callback-close-marked')); // promise observation, not retirement-start vs gate exit
+                assert.ok(firstAt('close-await-after-dispatch') > firstAt('dispatch-settled')); // fixture awaits the close promise after dispatch settles
                 assert.equal(d.closed, null); await waitCommandBudget(d); await d.barrier();
                 a.socket.close(1000, 'owned withdrawn start fixture complete');
                 assert.equal((await a.wait(() => false, 'withdrawnA normal close', 0, true)).code, 1000);
                 const checkpoint = await oneLive(1); assert.deepEqual(checkpoint.durableSessionNicks, ['NativeStartD']); privacy(checkpoint);
-                observed = checkState(await state()); assert.equal(observed.pendingResponses, 0); assert.equal(observed.cases.reduce((sum, item) => sum + item.startCalls, 0), 2);
+                observed = checkState(await state()); assertProviderHealth(observed, 3);
+                assert.equal(observed.pendingResponses, 0); assert.equal(observed.cases.reduce((sum, item) => sum + item.startCalls, 0), 2);
                 assert.deepEqual(checkpoint.nativeRollbackWitnesses, []);
                 proof = { checks: ['actual-original-owner-and-readonly-native-TX-before-once-start', 'same-request-identity-cannot-start-twice',
                     'held-response-releases-owner-for-realStop-and-healthy-publication', 'committedStop-and-revoke-prevent-captured-start',
-                    'native-callback-close-fences-start-before-semantic-retirement', 'complete-private-state-scan-and-one-live-owned-loss-checkpoint'],
+                    'native-callback-close-sync-fence-prevents-start-and-close-promise-is-awaited-after-dispatch', 'complete-private-state-scan-and-one-live-owned-loss-checkpoint'],
                     admissionDenials, providerStart: { observed, realCookieGuests: 4, zeroNetworkStartCallbacks: 2, originalOwner: true,
                         currentProductionProviderOff: true, healthyProgressWhileHeld: true, stopRevision: 3, realRevokeReplayDenied: true },
                     checkpoint, sources: before, versions, binarySha256, rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs,
@@ -509,11 +528,12 @@ async function runtime(phase, state, nonce) {
                 const recovered = await control('inspect'); privacy(recovered);
                 assert.equal(recovered.objectId, received.checkpoint.objectId); assert.deepEqual(recovered.rooms, received.checkpoint.rooms); assert.deepEqual(recovered.reports, received.checkpoint.reports);
                 assert.equal(recovered.bindingCount, 0); assert.equal(recovered.liveBindingCount, 0); assert.deepEqual(recovered.durableSessionNicks, []); assert.deepEqual(recovered.engineSessionNicks, []);
-                const empty = checkState(await state()); assert.deepEqual(empty.cases, []); assert.deepEqual(empty.events, []); assert.equal(empty.pendingResponses, 0);
+                const empty = checkState(await state()); assertProviderHealth(empty, 0);
+                assert.deepEqual(empty.cases, []); assert.deepEqual(empty.events, []); assert.equal(empty.pendingResponses, 0);
                 const returning = await connect(secrets.liveCookie, 'NativeStartReturn', 'rad-dad', '192.0.2.24');
                 await returning.barrier(); assert.ok(returning.frames.every(frame => frame.t !== 'line'), 'provider-start cold newcomer received old text');
-                proof = { checks: ['cold-owned-process-loss-prunes-the-real-remaining-binding', 'revocation-and-withdrawal-persist-with-healthy-grant', 'no-old-start-request-or-response-is-replayed'],
-                    providerStart: { freshFixtureRequestsEmpty: true, zeroReplay: true, currentProductionProviderOff: true }, recovered,
+                proof = { checks: ['cold-owned-process-loss-prunes-the-real-remaining-binding', 'revocation-and-withdrawal-persist-with-healthy-grant', 'no-old-start-request-or-response-is-replayed', 'cold-phase-fresh-owner-baseline'],
+                    providerStart: { freshFixtureRequestsEmpty: true, zeroReplay: true, currentProductionProviderOff: true, freshOwnerBaseline: empty.health }, recovered,
                     sources: before, versions, binarySha256, rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs, outboundCalls, runtimeRestarts,
                     workerdPids: group(process.pid).filter(item => item.command.includes('workerd')).map(item => item.pid) };
                 returning.socket.close(1000, 'owned provider-start proof complete'); assert.equal((await returning.wait(() => false, 'provider-start recovery normal close', 0, true)).code, 1000);
