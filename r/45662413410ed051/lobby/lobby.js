@@ -442,6 +442,23 @@ import { createEntrySharing } from './entry-sharing.mjs';
         }
         return roomApi;
     }
+    const activityRoom = c => c && ['art', 'bobross', 'watch'].includes(c.kind)
+        && connectionState === 'connected' && !sessionEnded && !app.localMediaPaused && !app.sharingStopped && !c.readOnly;
+    function activitySnapshot(snapshot) {
+        const state = window.HangoutCore.emptyState();
+        // The shared decoder copies nested strokes/video. The renderer's
+        // optimistic local state must never become a joined room's cache.
+        window.HangoutCore.apply(state, { type: 'snapshot', state: snapshot });
+        return { strokes: state.strokes.slice(-400), video: state.video };
+    }
+    function cacheActivity(c, m) {
+        if (!c.actSnap) c.actSnap = activitySnapshot();
+        if (m.kind === 'stroke') window.HangoutCore.apply(c.actSnap, { type: 'stroke', stroke: m.stroke });
+        if (m.kind === 'clear') window.HangoutCore.apply(c.actSnap, { type: 'clear' });
+        if (m.kind === 'video' && m.video) window.HangoutCore.apply(c.actSnap,
+            { type: 'video', source: m.video.source, playing: m.video.playing, pos: m.video.pos }, { t: m.video.t });
+        if (c.actSnap.strokes.length > 400) c.actSnap.strokes.splice(0, c.actSnap.strokes.length - 400);
+    }
     const nickInput = $('[data-nick]');
     nickInput.value = nickInput.value || readRemembered('hangout-nick') || ''; // blank by default; remembered on this device
     $('[data-reroll]').addEventListener('click', (e) => {
@@ -786,10 +803,8 @@ import { createEntrySharing } from './entry-sharing.mjs';
                 else clearKeep('That room changed while you signed in. Nothing was kept.');
             }
             // Classic IRC: joining begins a fresh buffer; never render pre-join backlog.
-            if (m.act) c.actSnap = m.act;
-            switchTo(m.ch.name);
-            const r = room();
-            if (r) r.onJoin(c, m.act);
+            if (activityRoom(c)) c.actSnap = activitySnapshot(m.act);
+            switchTo(m.ch.name, { freshJoin: true });
             break;
         }
         case 'media-policy': {
@@ -818,12 +833,13 @@ import { createEntrySharing } from './entry-sharing.mjs';
             break;
         }
         case 'act': {
-            const r = room();
-            if (r) r.onAct(m);
-            const ch = app.chans.get(m.ch);
-            if (ch && !app.localMediaPaused && window.__lobbyRoom?.state.room) {
-                ch.actSnap = { strokes: window.__lobbyRoom.state.room.strokes.slice(-400), video: window.__lobbyRoom.state.room.video };
-            }
+            const c = app.chans.get(m.ch);
+            if (!activityRoom(c)) break;
+            cacheActivity(c, m);
+            if (m.ch === app.active) room()?.onAct(m);
+            // Observe relay time when received, never when a cached playing
+            // video is selected later. Background activity creates no renderer.
+            else roomApi?.observeTimestamp?.(m.ts);
             break;
         }
         case 'part': case 'closed': {
@@ -987,7 +1003,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         if (buf.scrollHeight - buf.scrollTop - buf.clientHeight < 60) { belowFold = 0; drawNewMessages(); }
     });
 
-    function switchTo(key) {
+    function switchTo(key, { freshJoin = false } = {}) {
         const prev = app.active;
         if (prev !== key) { drafts.set(prev, $('[data-text]').value); $('[data-text]').value = drafts.get(key) || ''; }
         app.active = key;
@@ -1005,7 +1021,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const buf = $('[data-buffer]'); buf.scrollTop = buf.scrollHeight;
         const r = room();
         if (r) {
-            if (prev !== key && c && c.kind !== 'lobby' && c.kind !== 'jam') r.onJoin(c, c.actSnap);
+            if ((prev !== key || freshJoin) && c && c.kind !== 'lobby' && c.kind !== 'jam') r.onJoin(c, c.actSnap);
             else if (!c || c.kind === 'lobby' || c.kind === 'jam') r.onLeave();
         }
     }
