@@ -7,6 +7,14 @@ const enc = new TextEncoder(), clone = value => structuredClone(value);
 const validIdentity = value => value && Object.keys(value).length === 3 && ['principalRef', 'communityRef', 'expiresAt'].every(key => Object.hasOwn(value, key))
     && [value.principalRef, value.communityRef].every(id => typeof id === 'string' && /^[A-Za-z0-9_-]{16,128}$/.test(id)) && Number.isSafeInteger(value.expiresAt);
 const limits = Object.freeze({ connections: 256, checks: 2048, writes: 128, bytes: 16 * 1024 * 1024 });
+function selectedProviderRequest(request) {
+    const value = { actorId: request?.actorId, action: request?.action,
+        providerReady: request?.providerReady, publicTextEligible: request?.publicTextEligible };
+    // This bridge supports eligible public-text moderation only. An ordinary
+    // chat purpose must never bypass the provider-qualified purpose check.
+    return typeof value.actorId === 'string' && value.action === 'aiPublicReview'
+        && value.providerReady === true && value.publicTextEligible === true ? Object.freeze(value) : null;
+}
 export function createParticipationEnforcement({ storage, resolveConnection, resolveConnections, validateConnection, writeEffects, readPrincipals = readParticipationPrincipals, readWithdrawn = null, readPreparation = null, dispatchStart = null, beforeCommit = async () => {}, providerQualified = () => false, now = () => Date.now() } = {}) {
     if (typeof storage?.transaction !== 'function' || [resolveConnection, validateConnection, writeEffects, readPrincipals, beforeCommit, providerQualified, now].some(fn => typeof fn !== 'function')
         || resolveConnections !== undefined && typeof resolveConnections !== 'function'
@@ -142,32 +150,38 @@ export function createParticipationEnforcement({ storage, resolveConnection, res
         },
         async providerAllowed(context, request) {
             try {
-                const state = contexts.get(context); if (!state) return false;
-                const index = state.connections.findIndex(c => c.id === request.actorId); if (index < 0) return false;
+                const state = contexts.get(context), selected = selectedProviderRequest(request); if (!state || !selected) return false;
+                const index = state.connections.findIndex(c => c.id === selected.actorId); if (index < 0) return false;
                 const identity = await resolveConnection(clone(state.connections[index]));
                 if (!validIdentity(identity) || identity.expiresAt <= now() || identity.principalRef !== state.identities[index]?.principalRef || identity.communityRef !== state.identities[index]?.communityRef) return false;
                 const current = await storage.transaction(tx => read(tx, state.identities));
-                return check(state, request, current);
+                return check(state, selected, current);
             } catch { return false; }
         },
         async startProvider(context, request, start) {
             const state = contexts.get(context);
             if (!state || typeof dispatchStart !== 'function' || typeof start !== 'function') throw Error('participation-denied');
+            const selected = selectedProviderRequest(request); if (!selected) throw Error('participation-denied');
+            const index = state.connections.findIndex(connection => connection.id === selected.actorId);
+            if (index < 0 || !state.identities[index]) throw Error('participation-denied');
+            // Derive the descriptor from the trusted prepared slot. Never
+            // reread a caller-owned request after validation has awaited I/O.
+            const actorId = state.connections[index].id;
             let started = false, validated = null;
             // This MUST be a non-retrying start fence sharing withdrawal/session
             // ordering. Never run irreversible HTTP in a retryable transaction.
             return dispatchStart({
+                actorId,
                 validate: async tx => {
-                    const index = state.connections.findIndex(c => c.id === request.actorId);
                     const current = await read(tx, state.identities);
-                    if (index < 0 || !state.identities[index] || state.identities[index].expiresAt <= now()
+                    if (state.identities[index].expiresAt <= now()
                         || await validateConnection({ tx, connection: clone(state.connections[index]), identity: clone(state.identities[index]), at: now() }) !== true
-                        || !check(state, request, current)) throw Error('participation-denied');
+                        || !check(state, selected, current)) throw Error('participation-denied');
                     validated = { current, identity: state.identities[index] };
                     return true;
                 },
                 start: () => {
-                    if (started || !validated || validated.identity.expiresAt <= now() || !check(state, request, validated.current)) throw Error('participation-denied');
+                    if (started || !validated || validated.identity.expiresAt <= now() || !check(state, selected, validated.current)) throw Error('participation-denied');
                     started = true; return start();
                 }
             });

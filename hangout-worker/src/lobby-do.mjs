@@ -247,6 +247,8 @@ export class HangoutLobby {
         this.storageFailureToken = {}; // Opaque identity; never wraps or enters durable state.
         this.privateReportState = { storage: 'disabled', reports: [] };
         this.privateAdminDispatch = new WeakMap();
+        this.usedParticipationStarts = new WeakSet();
+        this.participationStartOwner = null;
         this.authorityMode = lobbyAuthorityMode(env);
         this.liveBindings = new Map();
         this.ready = state.blockConcurrencyWhile(async () => {
@@ -255,6 +257,7 @@ export class HangoutLobby {
         });
     }
     async start() {
+        this.participationStartOwner = null;
         const state = this.state, env = this.env;
         try { this.participationMode = lobbyParticipationMode(env); this.incidentSourceMode = lobbyIncidentSourceMode(env); }
         catch { this.authorityUnavailable = true; return; }
@@ -305,10 +308,14 @@ export class HangoutLobby {
             },
             onChange: () => this.engine?.notifyAiStatus()
         });
+        const participationStartOwner = this.participationMode ? {
+            engine: null, authority: this.authority, failureToken: this.storageFailureToken
+        } : null;
         this.engine = createLobby({
             incidentSources: !!this.incidentSourceMode,
             ...(this.authorityMode ? { effectCommit: this.authority.effectCommit } : {}),
-            ...(this.participationMode ? { participation: createLobbyParticipation({ env, authority: this.authority }) } : {}),
+            ...(this.participationMode ? { participation: createLobbyParticipation({ env, authority: this.authority,
+                dispatchStart: request => this.dispatchParticipationStart(request, participationStartOwner) }) } : {}),
             deferPresence: marker => this.presence.mark(marker),
             aiModerationStatus: () => ({ ...this.aiModerator.status(), requested: eligibility.requested,
                 ...(eligibility.requested && !eligibility.allowed ? { state: 'not-qualified' } : {}),
@@ -347,6 +354,10 @@ export class HangoutLobby {
             },
             limits: { webJoinOrigins: String(env.WEBJAM_WEB_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean), entrySites: entrySitesFromConfig(env.HANGOUT_ENTRY_SITES) }
         });
+        if (participationStartOwner) {
+            participationStartOwner.engine = this.engine;
+            this.participationStartOwner = Object.freeze(participationStartOwner);
+        }
         this.engine.restore(recovered ? recovered.state.net : (await state.storage.get('net')) || {});
         const confirmRestore = async task => { const result = await task; if (this.authorityMode && result?.ok === false) throw Error('authority restore unavailable'); return result; };
         await confirmRestore(this.engine.restoreAiReviews(recovered ? recovered.state.aiReviews : (await state.storage.get('ai-reviews')) || []));
@@ -426,6 +437,57 @@ export class HangoutLobby {
             // ordinary validation denial or a controlled retirement refusal.
             this.authorityUnavailable = true; this.storageFailed(); return false;
         }
+    }
+    async dispatchParticipationStart(request, owner) {
+        // This is a private in-process capability, never a browser/RPC payload.
+        // Consume it before waiting: a denial, read failure or thrown start
+        // must not make the same request available for a second attempt.
+        const denied = () => Error('participation-denied');
+        if (!request || typeof request !== 'object' || this.usedParticipationStarts.has(request)) throw denied();
+        this.usedParticipationStarts.add(request);
+        const fields = Object.getOwnPropertyDescriptors(request), keys = ['actorId', 'validate', 'start'];
+        if (Object.keys(fields).length !== keys.length || keys.some(key => !Object.hasOwn(fields[key] || {}, 'value'))) throw denied();
+        const actorId = fields.actorId.value, validate = fields.validate.value, start = fields.start.value;
+        if (typeof actorId !== 'string' || !actorId || actorId.length > 128 || typeof validate !== 'function' || typeof start !== 'function') throw denied();
+        await this.ready;
+        const socket = this.byId(actorId), binding = this.liveBindings.get(actorId);
+        const current = () => {
+            try {
+                if (!owner || owner !== this.participationStartOwner || owner.engine !== this.engine || owner.authority !== this.authority
+                    || owner.failureToken !== this.storageFailureToken || !this.authorityMode || !this.participationMode
+                    || !lobbyAuthorityMode(this.env) || !lobbyParticipationMode(this.env) || this.authorityUnavailable !== false
+                    || this.evidenceStorage !== 'ready' || !socket || !binding || this.byId(actorId) !== socket
+                    || this.liveBindings.get(actorId) !== binding || this.closedSockets.has(socket)
+                    || socket.readyState !== undefined && socket.readyState !== 1) return false;
+                const attachment = socket.deserializeAttachment() || {};
+                return attachment.id === actorId && !socketIdentityInvalid(attachment, this.env) && this.bindingLive(attachment);
+            } catch { return false; }
+        };
+        if (!current()) throw denied();
+        const box = fields => Object.freeze(Object.assign(Object.create(null), fields));
+        const refuse = reason => box({ ok: false, reason });
+        const unavailable = () => { try { this.storageFailed(); } catch { /* The refusal must remain contained. */ } };
+        let result;
+        try {
+            result = await this.state.blockConcurrencyWhile(async () => {
+                // No exception may escape this callback: Cloudflare can reset
+                // an object when a blockConcurrencyWhile callback throws.
+                try {
+                    if (!current()) return refuse('participation-denied');
+                    let approved;
+                    try { approved = await owner.authority.validateParticipationStart(validate); }
+                    catch { unavailable(); return refuse('participation-unavailable'); }
+                    if (approved !== true || !current()) return refuse('participation-denied');
+                    // No await between the final live-owner check and start.
+                    // A null-prototype box prevents response assimilation from
+                    // holding this safety gate across provider latency.
+                    try { return box({ ok: true, response: start() }); }
+                    catch { return refuse('participation-unavailable'); }
+                } catch { unavailable(); return refuse('participation-unavailable'); }
+            });
+        } catch { unavailable(); throw Error('participation-unavailable'); }
+        if (result?.ok !== true) throw Error(result?.reason || 'participation-unavailable');
+        return await result.response; // The owner gate has already completed.
     }
     async closeLocalSession(sid, gate, attempted) {
         for (const [id, binding] of this.liveBindings) if (binding.betaSid === sid) {

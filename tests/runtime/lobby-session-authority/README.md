@@ -577,3 +577,65 @@ workload shortened or production accounting changed. Original canonical modes,
 20-unit blocks, fifty guests,600 deliveries, ACK spacing/refused-zero checks,
 pressure/privacy/recovery proof and existing60-second/6-second bounds remain.
 Fresh source-qualified execution is required for the new observer and oracle.
+
+## Separate native owner-start invocation proof
+
+`npm run --silent test:lobby-session-runtime -- --participation --provider-start`
+selects a separate eighth session mode in this existing framework. It rejects
+incident, traffic, pressure, fanout and diagnostic combinations. The seven
+original modes retain their original journeys, assertions, limits and timers;
+this mode does not requalify their canonical nine-plus-three or two physical
+rollback witnesses. The existing workflow currently runs only those seven
+modes/ten groups. Adding this command as an eleventh group requires the existing
+CI owner's separate change; a green ten-group workflow does not execute or
+qualify the new flag. Until an admitted local or owner-run native execution
+passes, this addition is source-only and unqualified.
+
+The new mode deliberately omits the plain-retention diagnostic facade. It uses
+the original authority and frozen owner actually created by `HangoutLobby.start`.
+Three exact nonce-only test controls bypass the fixture's blanket outer gate;
+the real `dispatchParticipationStart` method owns the concurrency boundary.
+A test-only qualified composition uses the actual participation enforcement,
+partition readers, session validators and native SQLite codec. Real provider
+readiness is not supplied: production participation still denies provider work,
+authority-mode moderation stays disabled, and the session-fence eligibility
+blocker remains. The start callback returns an inert value or controlled promise
+and never performs network I/O. No provider key, production route or activation
+flag is added.
+
+Four actual signed-cookie/native-WebSocket guests remain within the existing
+five-subject synthetic fixture allocation. A genuine request captured from the
+real enforcer must validate in the real read-only native transaction; its whole
+transaction promise must resolve before exactly one synchronous start invocation,
+with no native callback active. Reusing that same request cannot start it twice.
+A second response is deliberately held while actual Stop and healthy peer text
+complete. A pre-Stop request and a pre-logout request then receive ordinary denial
+without starting. These are actual writer-wins checks, not a claim that a queued
+revocation recalls an already invoked request.
+
+During another real validation callback the fixture initiates the production
+`webSocketClose` handler without awaiting its retirement gate there. The actual
+synchronous transport-close/attachment/live-binding fence must prevent start;
+the actual engine and authority retirement is awaited after dispatch exits.
+A reset, poisoned transaction, unexpected failure or deadlock is a failed proof,
+not an alternative passing outcome. Fixed-stage observations distinguish native
+callback completion, whole transaction resolution, close initiation and the real
+retirement promise; the fixture does not clone a dispatcher or install a FIFO
+mutex to emulate workerd scheduling.
+
+All controls use the existing nonce/origin/content-type restrictions. At most
+128 fixed events, bounded ordinals, slot numbers, counts and booleans are returned;
+request objects, cookies, identities, raw errors and ordinary bodies are not
+exported or persisted. The existing privacy scans run before owned process loss
+and after native disk reopen. One healthy guest remains connected at checkpoint;
+revocation and withdrawal must persist, missing-socket bindings must retire, and
+no old start request is restored or replayed. The deliberate egress-denial probe
+is the only allowed outbound attempt. Existing six-second waits, sixty-second
+phase limits, source/bundle/binary pins and owned-process cleanup remain.
+
+This proves only start **invocation** ordering in its actual executing native
+fixture when it passes. Output gates can delay physical network delivery. It does
+not prove provider activation, remote receipt timing, recall, crash-level
+exactly-once delivery, PITR, legal/guardian readiness, hosted scale/SLO, physical
+media, or native installation/audio support. All provider-off gates and paused
+TURN/vault boundaries remain unchanged.

@@ -3,9 +3,12 @@
 import { betaFetch, HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget } from '../../../hangout-worker/src/beta-entry.mjs';
 import { LOBBY_AUTHORITY_PATH, LOBBY_AUTHORITY_COMMUNITY } from '../../../hangout-worker/src/lobby-session-authority.mjs';
 import { readBeta } from '../../../hangout-worker/src/beta-auth.mjs';
-import { createPartitionedParticipationConsents, PARTICIPATION_POLICY_KEY, PARTICIPATION_RECORD_LIMITS, PARTICIPATION_MAINTENANCE_CURSOR_KEY } from '../../../hangout-worker/src/participation-partitions.mjs';
+import { createPartitionedParticipationConsents, PARTICIPATION_POLICY_KEY, PARTICIPATION_RECORD_LIMITS, PARTICIPATION_MAINTENANCE_CURSOR_KEY, readPartitionedParticipationPrincipals, readPartitionedParticipationWithdrawals, readPartitionedParticipationPreparation } from '../../../hangout-worker/src/participation-partitions.mjs';
 import { validParticipationLedgerState } from '../../../hangout-worker/src/participation-consents.mjs';
 import { HELP } from '../../../hangout-worker/src/lobby-core.mjs';
+import { createParticipationEnforcement } from '../../../hangout-worker/src/participation-enforcement.mjs';
+import { createLobbyParticipation } from '../../../hangout-worker/src/lobby-participation.mjs';
+import { aiEligibility } from '../../../hangout-worker/src/ai-eligibility.mjs';
 import { createControlCreditObservation } from './control-credit-observation.mjs';
 import { PARTICIPATION_PURPOSES } from '../../../hangout-worker/src/participation-policy.mjs';
 import { createIncidentCases, createIncidentEvidenceCipher, incidentEvidenceDigest, initialIncidentCaseState } from '../../../hangout-worker/src/incident-cases.mjs';
@@ -107,9 +110,18 @@ async function readControl(request) {
     catch { return null; }
 }
 
+function providerEvent(meter, row, stage) {
+    if (!meter || !row) return;
+    try {
+        if (meter.events.length >= 128) { meter.overflow = true; return; }
+        meter.events.push({ ordinal: meter.events.length + 1, slot: row.slot, scenario: row.scenario, stage });
+    } catch { meter.observationFailed = true; }
+}
+
 export class FixtureLobby extends HangoutLobby {
     constructor(state, env) {
         const control = { faultKey: '', tripped: false, nativeWriteCompleted: false, nativeCalls: 0, nativeMutations: 0, history: [], rollbackWitnesses: [],
+            provider: env.FIXTURE_PROVIDER_START_PROOF === 'start-v1' ? { slots: new Map(), cases: new Map(), current: null, watch: false, nextTransaction: 0, active: new Set(), committed: new Set(), events: [], overflow: false, observationFailed: false } : null,
             traffic: env.FIXTURE_TRAFFIC_ACKS === 'ack-v1' ? { slots: new Map(), transactionsStarted: 0, transactionsCommitted: 0, transactionsRejected: 0 } : null,
             pressure: env.FIXTURE_PRESSURE_ONLY === 'pressure-v1' ? { slots: new Map(), probeSocket: null, helpAttempts: [], overflow: false, witness: null, nativeSendCalls: 0, nativeSendReturned: 0, initialSequence: 0 } : null,
             fanout: env.FIXTURE_FANOUT_50 === 'fanout-v1' ? { slots: new Map(), scan: null, scanStarted: false, storageCounters: nativeCounters(), controlCredits: createControlCreditObservation() } : null };
@@ -133,15 +145,31 @@ export class FixtureLobby extends HangoutLobby {
                 // Unexpected nesting must fail rather than replace a witness.
                 ensure(transactionWitness === null, 'fixture-nested-native-transaction');
                 const witness = { fault: null };
+                const provider = control.provider, providerCase = provider?.watch ? provider.current : null;
+                let providerTransaction = null;
+                if (providerCase) {
+                    if (provider.nextTransaction >= 64) provider.overflow = true;
+                    else providerTransaction = ++provider.nextTransaction;
+                }
                 if (control.traffic) control.traffic.transactionsStarted++;
                 const meter = control.fanout?.storageCounters;
                 if (meter) bumpNative(meter, meter.transactions, 'started');
                 try {
-                    const result = await method.call(raw, tx => operation(wrap(tx, witness)));
+                    let result;
+                    if (providerTransaction === null) result = await method.call(raw, tx => operation(wrap(tx, witness)));
+                    else {
+                        result = await method.call(raw, async tx => {
+                            provider.active.add(providerTransaction); providerEvent(provider, providerCase, 'native-tx-callback-enter');
+                            try { return await operation(wrap(tx, witness)); }
+                            finally { provider.active.delete(providerTransaction); providerEvent(provider, providerCase, 'native-tx-callback-exit'); }
+                        });
+                        provider.committed.add(providerTransaction); providerEvent(provider, providerCase, 'native-tx-promise-resolved');
+                    }
                     if (control.traffic) control.traffic.transactionsCommitted++;
                     if (meter) bumpNative(meter, meter.transactions, 'committed');
                     return result;
                 } catch (error) {
+                    if (providerTransaction !== null) providerEvent(provider, providerCase, 'native-tx-rejected');
                     if (control.traffic) control.traffic.transactionsRejected++;
                     if (meter) bumpNative(meter, meter.transactions, 'rejected');
                     if (witness.fault) {
@@ -292,6 +320,142 @@ export class FixtureLobby extends HangoutLobby {
         this.fixtureRetentionHealthEvent('start', 'returned');
         return result;
     }
+    fixtureProviderMode() {
+        ensure(this.env.FIXTURE_PROVIDER_START_PROOF === 'start-v1' && this.participationMode && !this.incidentSourceMode
+            && this.env.FIXTURE_RETENTION_PROOF === undefined && this.env.FIXTURE_TRAFFIC_ACKS === undefined
+            && this.env.FIXTURE_PRESSURE_ONLY === undefined && this.env.FIXTURE_FANOUT_50 === undefined, 'fixture-provider-start-mode');
+        const owner = this.participationStartOwner;
+        ensure(owner && Object.isFrozen(owner) && owner.authority === this.authority && owner.engine === this.engine, 'fixture-provider-original-owner');
+        return this.fixtureControl.provider;
+    }
+    fixtureProviderState() {
+        const meter = this.fixtureProviderMode();
+        return { overflow: meter.overflow, observationFailed: meter.observationFailed, activeNativeCallbacks: meter.active.size,
+            pendingResponses: [...meter.cases.values()].filter(row => row.pendingResponse).length,
+            cases: [...meter.cases.values()].map(row => ({ slot: row.slot, scenario: row.scenario, runCount: row.runCount,
+                validateCalls: row.validateCalls, startCalls: row.startCalls, completed: row.completed, denied: row.denied,
+                reason: row.reason, pendingResponse: row.pendingResponse, readonlyTx: row.readonlyTx,
+                validationTransactionObserved: row.validationTransaction !== null,
+                transactionCompletedBeforeStart: row.transactionCompletedBeforeStart, startOutsideNativeCallback: row.startOutsideNativeCallback,
+                callbackCloseMarked: row.callbackCloseMarked, closeRetired: row.closeRetired })),
+            events: meter.events.map(row => ({ ...row })) };
+    }
+    async fixtureProviderPrepare(slot, cookie) {
+        const meter = this.fixtureProviderMode();
+        ensure(Number.isInteger(slot) && slot >= 0 && slot <= 2 && !meter.slots.has(slot), 'fixture-provider-slot');
+        const identity = await this.fixtureParticipant(cookie), bindings = [...this.liveBindings.values()]
+            .filter(binding => !binding.account && `s_${binding.betaSid}` === identity.principalRef);
+        ensure(bindings.length === 1, 'fixture-provider-one-real-binding');
+        const binding = bindings[0], socket = this.byId(binding.id), owner = this.participationStartOwner;
+        ensure(socket && socket.readyState === 1 && !this.closedSockets.has(socket), 'fixture-provider-real-socket');
+        const request = { actorId: binding.id, action: 'aiPublicReview', providerReady: true, publicTextEligible: true };
+        const actualProduction = createLobbyParticipation({ env: this.env, authority: this.authority,
+            dispatchStart: value => this.dispatchParticipationStart(value, owner) });
+        const offContext = await actualProduction.prepare([binding]);
+        ensure(actualProduction.allows(offContext, request, false) === false && this.aiModerator.status().enabled === false
+            && aiEligibility({ ...this.env, HANGOUT_AI_MODERATION: 'review' }).reasons.includes('session-start-fence-not-qualified'), 'fixture-provider-production-must-stay-off');
+        const entry = { binding, socket, owner }, captured = Object.freeze({ capturedOnly: true });
+        meter.slots.set(slot, entry);
+        let current;
+        // Only the external-readiness decision and inert start are synthetic.
+        // Sessions, C2 reads, validators and the DO dispatcher are production.
+        const adapter = createParticipationEnforcement({ storage: this.authority.records,
+            resolveConnection: value => this.authority.resolveParticipationConnection(value),
+            validateConnection: value => this.authority.validateParticipationConnection(value),
+            readPrincipals: readPartitionedParticipationPrincipals, readWithdrawn: readPartitionedParticipationWithdrawals,
+            readPreparation: readPartitionedParticipationPreparation, writeEffects: value => this.authority.writeParticipationEffects(value),
+            providerQualified: () => true, dispatchStart: value => { current.request = value; return captured; } });
+        const context = await adapter.prepare([binding]);
+        ensure(adapter.allows(context, request, false) === true, 'fixture-provider-real-current-C2-precondition');
+        for (const scenario of slot === 0 ? ['positive', 'hold', 'after-stop'] : slot === 1 ? ['after-revoke'] : ['callback-close']) {
+            const row = { slot, scenario, runCount: 0, validateCalls: 0, startCalls: 0, completed: false, denied: false,
+                reason: 'none', pendingResponse: false, readonlyTx: false, validationTransaction: null,
+                transactionCompletedBeforeStart: false, startOutsideNativeCallback: false, callbackCloseMarked: false, closeRetired: false };
+            current = row; meter.cases.set(`${slot}:${scenario}`, row);
+            const result = await adapter.startProvider(context, request, () => {
+                row.startCalls++; row.transactionCompletedBeforeStart = row.validationTransaction !== null && meter.committed.has(row.validationTransaction);
+                row.startOutsideNativeCallback = meter.active.size === 0; meter.watch = false;
+                providerEvent(meter, row, 'start-invoked');
+                if (scenario !== 'hold') return Object.freeze({ inertStart: true });
+                row.pendingResponse = true; providerEvent(meter, row, 'response-held');
+                row.started();
+                return row.response;
+            });
+            ensure(result === captured && row.request && row.startCalls === 0, 'fixture-provider-captured-no-start');
+        }
+        return { slot, prepared: true, realCookieBindingAndC2: true, originalOwner: true, productionProviderOff: true };
+    }
+    async fixtureProviderRun(slot, scenario) {
+        const meter = this.fixtureProviderMode(), entry = meter.slots.get(slot), replay = scenario === 'replay';
+        const row = meter.cases.get(`${slot}:${replay ? 'positive' : scenario}`);
+        ensure(entry && row && (replay ? slot === 0 && row.runCount === 1 && row.startCalls === 1 && row.completed : row.runCount === 0), 'fixture-provider-scenario-once');
+        row.runCount++;
+        if (!replay) {
+            const original = row.request;
+            row.request = { actorId: original.actorId, validate: async tx => {
+                row.validateCalls++; row.readonlyTx = Object.keys(tx).sort().join(',') === 'get,list';
+                const ids = [...meter.active];
+                if (ids.length === 1) row.validationTransaction = ids[0]; else meter.observationFailed = true;
+                providerEvent(meter, row, 'validate-called');
+                const result = await Reflect.apply(original.validate, original, [tx]);
+                if (result === true && scenario === 'callback-close') {
+                    // A real self-initiated transport reduction, before await.
+                    // Its owner retirement is awaited only AFTER dispatch exits.
+                    row.closeTask = this.webSocketClose(entry.socket, 1000);
+                    row.closeTask.then(() => providerEvent(meter, row, 'retirement-resolved'), () => providerEvent(meter, row, 'retirement-rejected'));
+                    const attachment = entry.socket.deserializeAttachment() || {};
+                    row.callbackCloseMarked = this.closedSockets.has(entry.socket) && !this.liveBindings.has(entry.binding.id)
+                        && attachment.sessionEnded === true;
+                    providerEvent(meter, row, 'callback-close-marked');
+                }
+                providerEvent(meter, row, 'validate-returned');
+                return result;
+            }, start: () => Reflect.apply(original.start, original, []) };
+        }
+        let started;
+        if (scenario === 'hold') {
+            started = new Promise(resolve => { row.started = resolve; });
+            row.response = new Promise(resolve => { row.release = resolve; });
+        }
+        meter.current = row; meter.watch = true;
+        const task = this.dispatchParticipationStart(row.request, entry.owner).then(value => {
+            ensure(value?.inertStart === true, 'fixture-provider-inert-result'); row.completed = true;
+            if (scenario === 'hold') row.pendingResponse = false;
+        }, error => {
+            const reason = error?.message;
+            row.denied = true; row.reason = ['participation-denied', 'participation-unavailable'].includes(reason) ? reason : 'other';
+            providerEvent(meter, row, 'dispatch-denied');
+        }).finally(() => { if (meter.current === row) { meter.current = null; meter.watch = false; } });
+        row.task = task;
+        if (scenario === 'hold') {
+            await Promise.race([started, task.then(() => { ensure(row.startCalls === 1 && row.pendingResponse, 'fixture-provider-held-start-required'); })]);
+            return { slot, scenario, started: row.startCalls === 1, responsePending: row.pendingResponse };
+        }
+        await task;
+        if (row.closeTask) {
+            await row.closeTask;
+            const saved = await this.authority.load();
+            row.closeRetired = !this.liveBindings.has(entry.binding.id)
+                && !this.engine.sessionSnapshot().connections.some(value => value.id === entry.binding.id)
+                && !saved.bindings.some(value => value.binding.id === entry.binding.id);
+            providerEvent(meter, row, 'retirement-observed');
+        }
+        return this.fixtureProviderState();
+    }
+    async fixtureProviderControl(body) {
+        this.fixtureProviderMode();
+        if (Object.keys(body).sort().join(',') === 'action,cookie,slot' && body.action === 'prepare') return this.fixtureProviderPrepare(body.slot, body.cookie);
+        if (Object.keys(body).sort().join(',') === 'action,scenario,slot' && body.action === 'run'
+            && ['positive', 'hold', 'after-stop', 'after-revoke', 'callback-close', 'replay'].includes(body.scenario)) return this.fixtureProviderRun(body.slot, body.scenario);
+        throw Error('fixture-provider-control-shape');
+    }
+    async fixtureProviderRelease() {
+        const meter = this.fixtureProviderMode(), row = meter.cases.get('0:hold');
+        ensure(row?.pendingResponse && typeof row.release === 'function', 'fixture-provider-no-held-response');
+        providerEvent(meter, row, 'response-released'); row.release(Object.freeze({ inertStart: true })); await row.task;
+        return this.fixtureProviderState();
+    }
+
     async fixtureIncidentActor(cookie) {
         ensure(!!this.incidentSourceMode, 'fixture-incident-mode-required');
         const identity = await this.fixtureParticipant(cookie);
@@ -868,6 +1032,15 @@ export class FixtureLobby extends HangoutLobby {
         if (path === PREFIX + 'traffic-metrics' && this.env.FIXTURE_TRAFFIC_ACKS !== 'ack-v1') return denied();
         if (path.startsWith(PREFIX + 'retention-') && this.env.FIXTURE_RETENTION_PROOF !== 'retention-v1') return denied();
         if (['pressure-register', 'pressure-metrics'].includes(path.slice(PREFIX.length)) && this.env.FIXTURE_PRESSURE_ONLY !== 'pressure-v1') return denied();
+        if (['provider-start-proof', 'provider-start-state', 'provider-start-release'].includes(path.slice(PREFIX.length))) {
+            if (this.env.FIXTURE_PROVIDER_START_PROOF !== 'start-v1') return denied();
+            try {
+                // No fixture outer gate: the real production dispatcher owns it.
+                if (path === PREFIX + 'provider-start-proof') return Response.json(await this.fixtureProviderControl(body));
+                if (Object.keys(body).length !== 0) return denied();
+                return Response.json(path === PREFIX + 'provider-start-release' ? await this.fixtureProviderRelease() : this.fixtureProviderState());
+            } catch { return Response.json({ error: 'fixture-provider-proof-refused' }, { status: 500 }); }
+        }
         if (path === PREFIX + 'participation-alarm' && this.participationMode && Object.keys(body).length === 0) {
             const startedAt = Date.now(); await this.alarm();
             if (this.fixtureRetentionBaseline) this.fixtureRetentionAlarm = { startedAt: this.fixtureRetentionAlarm?.startedAt ?? startedAt, completedAt: Date.now() };
@@ -908,12 +1081,13 @@ export default { async fetch(request, env) {
         if (url.pathname.startsWith(PREFIX + 'fanout-') && env.FIXTURE_FANOUT_50 !== 'fanout-v1') return denied();
         if (url.pathname === PREFIX + 'traffic-metrics' && env.FIXTURE_TRAFFIC_ACKS !== 'ack-v1') return denied();
         if (url.pathname.startsWith(PREFIX + 'retention-') && env.FIXTURE_RETENTION_PROOF !== 'retention-v1') return denied();
+        if (url.pathname.startsWith(PREFIX + 'provider-start-') && env.FIXTURE_PROVIDER_START_PROOF !== 'start-v1') return denied();
         if (['pressure-register', 'pressure-metrics'].includes(url.pathname.slice(PREFIX.length)) && env.FIXTURE_PRESSURE_ONLY !== 'pressure-v1') return denied();
         if (url.pathname === PREFIX + 'initialize' && Object.keys(body).length === 0) {
             // Explicit fixture lifecycle action; betaFetch never forwards it.
             return stub.fetch(new Request(ORIGIN + LOBBY_AUTHORITY_PATH + 'initialize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }));
         }
-        if (['fanout-metrics', 'fanout-summary', 'fanout-scan', 'pressure-register', 'pressure-metrics', 'traffic-metrics', 'inspect', 'fault', 'participation-policy', 'participation-grant', 'participation-reduce', 'participation-alarm', 'retention-seed', 'retention-read', 'incident-initialize', 'incident-preserve', 'incident-read'].includes(url.pathname.slice(PREFIX.length))) return stub.fetch(new Request(request.url, {
+        if (['fanout-metrics', 'fanout-summary', 'fanout-scan', 'pressure-register', 'pressure-metrics', 'traffic-metrics', 'inspect', 'fault', 'participation-policy', 'participation-grant', 'participation-reduce', 'participation-alarm', 'retention-seed', 'retention-read', 'provider-start-proof', 'provider-start-state', 'provider-start-release', 'incident-initialize', 'incident-preserve', 'incident-read'].includes(url.pathname.slice(PREFIX.length))) return stub.fetch(new Request(request.url, {
             method: 'POST', headers: request.headers, body: JSON.stringify(body)
         }));
         if (url.pathname === PREFIX + 'egress-probe' && Object.keys(body).length === 0) {
