@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createLobby, LOBBY } from '../../hangout-worker/src/lobby-core.mjs';
+import { createLobby, LOBBY, REPORT_ALREADY_QUEUED_NOTICE, REPORT_QUEUED_NOTICE } from '../../hangout-worker/src/lobby-core.mjs';
 
 const DAY = 24 * 60 * 60 * 1000;
 let clock; let engine; let frames; let writes; let seq;
@@ -143,6 +143,7 @@ describe('human moderation evidence and recipient authorization', () => {
         await report(witness, rejected);
         expect(got(witness)).toContainEqual(expect.objectContaining({ t: 'notice', kind: 'error',
             text: 'The report queue is full. Try again later or use the moderation contact in House rules.' }));
+        expect(got(witness).some(frame => frame.text === REPORT_QUEUED_NOTICE || frame.text === REPORT_ALREADY_QUEUED_NOTICE)).toBe(false);
         expect(got(witness).some(frame => frame.t === 'report-status' && frame.id === rejected && frame.submitted)).toBe(false);
         expect(engine.adminState().reports.map(entry => entry.id)).toEqual(accepted);
         expect(saved().reports.map(entry => entry.id)).toEqual(accepted);
@@ -151,6 +152,8 @@ describe('human moderation evidence and recipient authorization', () => {
         clock += 12000; frames.set(witness.id, []);
         await report(witness, accepted[0]);
         expect(got(witness)).toContainEqual({ t: 'report-status', id: accepted[0], submitted: true });
+        expect(got(witness)).toContainEqual(expect.objectContaining({ t: 'notice', kind: 'info', text: REPORT_ALREADY_QUEUED_NOTICE }));
+        expect(got(witness).some(frame => frame.text === REPORT_QUEUED_NOTICE)).toBe(false);
         expect(engine.adminState().reports[0].count).toBe(1);
         await report(other, accepted[0]);
         expect(engine.adminState().reports[0].count).toBe(2);

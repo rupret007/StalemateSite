@@ -36,9 +36,18 @@ test('reports send exact received text and confirm only on server acknowledgemen
     await flag.click(); await expect(flag).toHaveText('…'); await expect(flag).toBeDisabled();
     await expect.poll(() => fixture.reports).toEqual([{ t: 'report', id: LINE.id, text: LINE.text }]);
     fixture.publish({ t: 'report-status', id: LINE.id, submitted: true });
+    fixture.publish({ t: 'notice', from: 'StaleBot', kind: 'info',
+        text: 'Queued for review when a moderator is available. This is not a promise that someone is reading it now. Appeals are in House rules.' });
     await expect(flag).toHaveText('✓'); await expect(flag).toBeDisabled();
+    await expect(flag).toHaveAttribute('title', 'Queued for review when a moderator is available');
+    await expect(flag).toHaveAttribute('aria-label', 'Queued for review when a moderator is available');
+    await expect(page.locator('[data-buffer]')).toContainText('not a promise that someone is reading it now');
+    await expect(page.locator('[data-buffer]')).not.toContainText('Reported to the moderators');
+    await expect(page.locator('[data-buffer]')).not.toContainText('submitted to moderators');
     await page.locator('[data-tabs] [data-channel-key="#stalemate"]').click();
     await expect(flag).toHaveText('✓'); await expect(flag).toBeDisabled();
+    await expect(flag).toHaveAttribute('title', 'Queued for review when a moderator is available');
+    await expect(flag).toHaveAttribute('aria-label', 'Queued for review when a moderator is available');
 });
 
 test('storage errors and report limits restore the report button for a truthful retry', async ({ page, baseURL }) => {

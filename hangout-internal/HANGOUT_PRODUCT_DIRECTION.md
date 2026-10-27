@@ -81,6 +81,7 @@ The quiet-visit slice renders a confirmed gathering only from a supplied host, a
 - Start event reminders with a calendar download. Email/push require a clear opt-in, an off switch, and truthful delivery behavior.
 - A local saved event is not a server RSVP. A connected tab is not proof of an attentive person. Never use either to imply fake attendance or concurrency.
 - Keep Ignore, Report, and Leave discoverable; define who receives reports and when a human is available.
+- A saved lobby report is acknowledged as queued for review when a moderator is available. That notice does not say a person received it or is reading now. House rules remain the appeal route, and the contact shown there stays the configured placeholder until a monitored address is published. Queue limits are unchanged. See [report coverage](HANGOUT_REPORT_COVERAGE.md).
 - See [open-community safeguards and AI review](HANGOUT_SAFEGUARDS_AI.md): review-only public-text classification, bounded evidence queues, visible degraded/off/capped status, and explicit human decisions. AI is configured off until a server-side credential and enable setting are supplied.
 
 ## Lean pilot
