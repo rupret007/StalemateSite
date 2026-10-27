@@ -278,3 +278,80 @@ describe('beta product bootstrapping', () => {
         expect(config).not.toMatch(/^\s*(PILOT_OPERATOR_KEY|HANGOUT_BETA_INVITE_KEY|HANGOUT_HMAC_KEY|HANGOUT_PREVIEW_KEY|OPENAI_API_KEY)\s*=/m);
     });
 });
+
+// Apply actual gateway response cookies in a fixed-origin host-cookie jar.
+// RSA verification and the BetaSessions registry are real application code;
+// the existing binding/storage adapters are fixtures, not a browser or SQLite.
+describe('verified beta logout removes browser identity data', () => {
+    const identities = [
+        { path: '/lobby-owner/login', email: 'visitor@example.test', audience: ownerAudience, kind: 'owner', role: 'fan' },
+        { path: '/lobby-admin/login', email: 'mod@example.test', audience: staffAudience, kind: 'staff', role: 'moderator' }
+    ];
+    function hostCookieJar() {
+        const values = new Map();
+        return {
+            apply(response) {
+                for (const header of response.headers.getSetCookie()) {
+                    const [cookie, ...attributes] = header.split(';');
+                    const equals = cookie.indexOf('='), name = cookie.slice(0, equals);
+                    if (attributes.some(attribute => /^Max-Age=0$/i.test(attribute.trim()))) values.delete(name);
+                    else values.set(name, cookie.slice(equals + 1));
+                }
+            },
+            header: () => [...values].map(([name, value]) => `${name}=${value}`).join('; '),
+            names: () => [...values.keys()].sort()
+        };
+    }
+    async function signIn(config, identity) {
+        const jar = hostCookieJar();
+        const invited = await betaFetch(request('/beta/unlock', { method: 'POST', body: { key: invite } }), config, deps);
+        expect(invited.status).toBe(200); jar.apply(invited);
+        const login = await betaFetch(request(identity.path, { cookie: jar.header(), token: await jwt(identity.email, identity.audience) }), config, deps);
+        expect(login.status).toBe(303); jar.apply(login);
+        expect(jar.names()).toEqual([BETA_COOKIE, BETA_IDENTITY_COOKIE].sort());
+        expect((await betaSession(request('/beta/state', { cookie: jar.header() }), config)).identity)
+            .toMatchObject({ kind: identity.kind, role: identity.role, email: identity.email });
+        return jar;
+    }
+    function expectBothCookieDeletions(response) {
+        const cookies = response.headers.getSetCookie();
+        expect(cookies).toHaveLength(2);
+        expect(cookies.map(cookie => cookie.slice(0, cookie.indexOf('='))).sort()).toEqual([BETA_COOKIE, BETA_IDENTITY_COOKIE].sort());
+        for (const cookie of cookies) {
+            expect(cookie.split(';')[0]).toMatch(/^[^=]+=$/);
+            const attributes = cookie.split(';').slice(1).map(value => value.trim().toLowerCase());
+            expect(attributes).toEqual(expect.arrayContaining(['path=/', 'httponly', 'secure', 'samesite=lax', 'max-age=0']));
+            expect(attributes.some(attribute => attribute.startsWith('domain='))).toBe(false);
+        }
+    }
+    it.each(identities)('clears both cookies for $kind logout and keeps a new invitation unprivileged', async identity => {
+        const config = env(), jar = await signIn(config, identity), signedIn = jar.header();
+        const oldIdentity = signedIn.split('; ').find(cookie => cookie.startsWith(`${BETA_IDENTITY_COOKIE}=`));
+        const result = await betaFetch(request('/beta/logout', { cookie: signedIn, method: 'POST', body: {} }), config, deps);
+        expect(result.status).toBe(200); expectBothCookieDeletions(result); jar.apply(result);
+        expect(jar.names()).toEqual([]);
+        expect((await betaFetch(request('/beta/state', { cookie: jar.header() }), config, deps)).status).toBe(401);
+        expect((await betaFetch(request('/beta/state', { cookie: signedIn }), config, deps)).status).toBe(401);
+
+        const fresh = await betaFetch(request('/beta/unlock', { cookie: jar.header(), method: 'POST', body: { key: invite } }), config, deps);
+        expect(fresh.status).toBe(200); jar.apply(fresh); expect(jar.names()).toEqual([BETA_COOKIE]);
+        const replay = `${jar.header()}; ${oldIdentity}`;
+        expect((await betaSession(request('/beta/state', { cookie: replay }), config)).identity).toBeNull();
+        expect(await (await betaFetch(request('/beta/state', { cookie: replay }), config, deps)).json()).toMatchObject({ kind: 'guest', role: 'fan' });
+        expect((await betaFetch(request('/r/45662413410ed051/admin/', { cookie: replay }), config, deps)).status).toBe(403);
+    });
+    it.each(identities)('preserves $kind cookies for closure retry and clears them only after it succeeds', async identity => {
+        const config = env(), jar = await signIn(config, identity), signedIn = jar.header();
+        config.LOBBY.get = () => ({ fetch: async () => new Response('unavailable', { status: 503 }) });
+        const failed = await betaFetch(request('/beta/logout', { cookie: signedIn, method: 'POST', body: {} }), config, deps);
+        expect(failed.status).toBe(503); expect(failed.headers.getSetCookie()).toEqual([]); jar.apply(failed);
+        expect(jar.header()).toBe(signedIn); expect(jar.names()).toEqual([BETA_COOKIE, BETA_IDENTITY_COOKIE].sort());
+        // Revocation was recorded even though closure still needs a retry.
+        expect((await betaFetch(request('/beta/state', { cookie: jar.header() }), config, deps)).status).toBe(401);
+
+        config.LOBBY.get = () => ({ fetch: async () => new Response('closed') });
+        const retried = await betaFetch(request('/beta/logout', { cookie: jar.header(), method: 'POST', body: {} }), config, deps);
+        expect(retried.status).toBe(200); expectBothCookieDeletions(retried); jar.apply(retried);
+        expect(jar.names()).toEqual([]);
+    });
+});

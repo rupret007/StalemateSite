@@ -134,7 +134,9 @@ async function betaRequest(request, env, deps = {}) {
         }
         if (url.pathname === '/beta/logout') {
             await disconnect(env, session);
-            return json({ ok: true }, 200, { 'Set-Cookie': betaCookie(BETA_COOKIE, '', 0) });
+            const result = json({ ok: true }, 200, { 'Set-Cookie': betaCookie(BETA_COOKIE, '', 0) });
+            result.headers.append('Set-Cookie', betaCookie(BETA_IDENTITY_COOKIE, '', 0));
+            return result;
         }
         return json({ error: 'Unknown request.' }, 404);
     }
