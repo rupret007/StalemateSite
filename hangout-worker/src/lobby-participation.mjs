@@ -14,11 +14,12 @@ export function participationConfigurationValid(env) {
     try { lobbyParticipationMode(env); return true; } catch { return false; }
 }
 
-export function createLobbyParticipation({ env, authority, now = () => Date.now() } = {}) {
+export function createLobbyParticipation({ env, authority, dispatchStart = null, now = () => Date.now() } = {}) {
     if (!lobbyParticipationMode(env)) return null;
     if (!authority || typeof authority.records?.transaction !== 'function'
         || ['resolveParticipationConnection', 'validateParticipationConnection', 'writeParticipationEffects'].some(name => typeof authority[name] !== 'function')
-        || authority.resolveParticipationConnections !== undefined && typeof authority.resolveParticipationConnections !== 'function') throw Error('participation-authority-unavailable');
+        || authority.resolveParticipationConnections !== undefined && typeof authority.resolveParticipationConnections !== 'function'
+        || dispatchStart !== null && typeof dispatchStart !== 'function') throw Error('participation-authority-unavailable');
     return createParticipationEnforcement({
         storage: authority.records,
         resolveConnection: connection => authority.resolveParticipationConnection(connection),
@@ -28,7 +29,9 @@ export function createLobbyParticipation({ env, authority, now = () => Date.now(
         readWithdrawn: readPartitionedParticipationWithdrawals,
         readPreparation: readPartitionedParticipationPreparation,
         writeEffects: input => authority.writeParticipationEffects(input),
-        // No external start fence has been qualified. Never supply one here.
+        ...(dispatchStart === null ? {} : { dispatchStart }),
+        // Supplying an owner fence does not qualify provider, quota, result or
+        // child-data integration. Production provider admission stays off.
         providerQualified: () => false,
         now
     });

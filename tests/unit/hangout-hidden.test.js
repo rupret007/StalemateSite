@@ -31,7 +31,7 @@ describe('hidden hangout room', () => {
             const rel = relative(repoRoot, file);
             if (rel === 'robots.txt' || rel === 'scripts/package-pages.cjs' || rel === 'scripts/hangout-relay-dev.mjs') continue;
             // Local preview instructions/runner are developer files, excluded from the Pages package.
-            if (rel === 'scripts/preview-hangout.cjs' || rel === 'docs/HANGOUT_IRC_PREVIEW.md') continue;
+            if (rel === 'scripts/preview-hangout.cjs' || rel === 'hangout-internal/HANGOUT_IRC_PREVIEW.md') continue;
             const text = readFileSync(file, 'utf8');
             expect(text, rel).not.toContain(SLUG);
             expect(text, rel).not.toMatch(/href=["'][^"']*\/?r\/[0-9a-f]{8,}/i);

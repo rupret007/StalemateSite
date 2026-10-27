@@ -71,8 +71,8 @@ jobs:
             hangout-worker/src/lobby-session-authority.mjs hangout-worker/src/beta-entry.mjs hangout-worker/src/beta-public-help.mjs hangout-worker/src/index.mjs \
             hangout-worker/src/private-reports.mjs hangout-worker/src/participation-enforcement.mjs hangout-worker/src/lobby-do.mjs \
             hangout-worker/src/lobby-participation.mjs hangout-worker/src/participation-policy.mjs hangout-worker/src/participation-consents.mjs \
-            hangout-worker/src/participation-partitions.mjs docs/HANGOUT_PRODUCTION_PARTICIPATION.md \
-            hangout-worker/src/lobby-incident-sources.mjs hangout-worker/src/incident-cases.mjs docs/HANGOUT_INCIDENT_SOURCES.md > runtime-proof-artifacts/source-sha256.txt
+            hangout-worker/src/participation-partitions.mjs hangout-internal/HANGOUT_PRODUCTION_PARTICIPATION.md \
+            hangout-worker/src/lobby-incident-sources.mjs hangout-worker/src/incident-cases.mjs hangout-internal/HANGOUT_INCIDENT_SOURCES.md > runtime-proof-artifacts/source-sha256.txt
 
       - name: Install only the isolated locked runtime tools
         shell: bash

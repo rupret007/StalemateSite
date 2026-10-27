@@ -1124,3 +1124,438 @@ describe('actor-only control preparation on the actual SQLite authority', () => 
         expect(app.persist).not.toHaveBeenCalled();
     });
 });
+
+
+// Unit-only owner scheduling probe. All storage below remains the actual
+// disk-backed fixture/codec; this does not qualify a native Cloudflare barrier.
+function p9SerializedOwner(lobby) {
+    const original = lobby.state.blockConcurrencyWhile, events = [];
+    let tail = Promise.resolve(), active = null, sequence = 0;
+    lobby.state.blockConcurrencyWhile = operation => {
+        const ticket = ++sequence;
+        const task = tail.then(async () => {
+            expect(active).toBeNull(); active = ticket; events.push({ kind: 'entered', ticket });
+            try {
+                const value = await operation();
+                events.push({ kind: 'returned', ticket, nullPrototype: !!value && Object.getPrototypeOf(value) === null,
+                    thenable: !!value && typeof value.then === 'function' });
+                return value;
+            } catch (error) { events.push({ kind: 'callback-threw', ticket }); throw error; }
+            finally { active = null; events.push({ kind: 'exited', ticket }); }
+        });
+        tail = task.then(() => {}, () => {}); return task;
+    };
+    return { events, active: () => active, restore: () => { lobby.state.blockConcurrencyWhile = original; } };
+}
+
+describe('offline production owner-gated participation start boundary', () => {
+    it('starts once after real readonly validation commits inside the same owner gate while a pending response releases that gate', async () => {
+        const f = await fixture({ participation: true }), person = await f.enroll('p9-start');
+        await (await participationLedger(f)).grant(person.binding);
+        const outbound = vi.spyOn(globalThis, 'fetch').mockRejectedValue(Error('Offline provider fence test forbids network'));
+        let app, ownerQueue, finishResponse, pending;
+        try {
+            app = await productionDo(f); ownerQueue = p9SerializedOwner(app.lobby);
+            const socket = await app.connect(person, 'FenceGuest'), attachment = socket.deserializeAttachment();
+            const connection = app.lobby.liveBindings.get(attachment.id);
+            expect(connection?.id).toBe(attachment.id); expect(connection.id).not.toBe(person.binding.id);
+            expect(socket.readyState).toBe(1); expect(app.lobby.byId(connection.id)).toBe(socket);
+            expect(app.lobby.evidenceStorage).toBe('ready'); expect(app.lobby.authorityUnavailable).toBe(false);
+            // Capture the actual composition owner BEFORE preparing this job.
+            const owner = app.lobby.participationStartOwner, authority = app.lobby.authority;
+            const request = { actorId: connection.id, action: 'aiPublicReview', providerReady: true, publicTextEligible: true };
+            let payload, validationCalls = 0, validationCommitCount, validationGate, validationMethods, observedStart;
+            const isolated = createParticipationEnforcement({ storage: authority.records, now: f.now,
+                resolveConnection: value => authority.resolveParticipationConnection(value),
+                resolveConnections: values => authority.resolveParticipationConnections(values),
+                validateConnection: value => authority.validateParticipationConnection(value),
+                readPrincipals: partitionMaintenance.readPartitionedParticipationPrincipals,
+                readWithdrawn: partitionMaintenance.readPartitionedParticipationWithdrawals,
+                readPreparation: partitionMaintenance.readPartitionedParticipationPreparation,
+                writeEffects: input => authority.writeParticipationEffects(input),
+                // Only this isolated zero-network composition qualifies a
+                // synthetic provider purpose; the production bridge stays off.
+                providerQualified: action => action === 'aiPublicReview',
+                dispatchStart: capability => {
+                    expect(capability.actorId).toBe(connection.id);
+                    payload = { actorId: capability.actorId, validate: async tx => {
+                        validationCalls += 1; validationGate = ownerQueue.active();
+                        validationMethods = Object.fromEntries(['get', 'list', 'put', 'delete', 'setAlarm', 'deleteAlarm', 'transaction'].map(key => [key, typeof tx[key]]));
+                        const approved = await capability.validate(tx);
+                        validationCommitCount = f.driver.stats.commits; return approved;
+                    }, start: () => {
+                        observedStart = { gate: ownerQueue.active(), commits: f.driver.stats.commits };
+                        return capability.start();
+                    } };
+                    return app.lobby.dispatchParticipationStart(payload, owner);
+                } });
+            const context = await isolated.prepare([connection]);
+            expect(isolated.allows(context, request)).toBe(true);
+            // On pristine9d this is the meaningful RED: real admission and C2
+            // permission succeeded, but the production owner boundary is absent.
+            expect(typeof app.lobby.dispatchParticipationStart).toBe('function');
+            expect(owner && typeof owner).toBe('object'); expect(Object.isFrozen(owner)).toBe(true);
+            const productionStart = vi.fn(() => { throw Error('Production provider qualification must remain off'); });
+            const production = createLobbyParticipation({ env: f.env, authority, now: f.now,
+                dispatchStart: capability => app.lobby.dispatchParticipationStart(capability, owner) });
+            const productionContext = await production.prepare([connection]);
+            expect(production.allows(productionContext, request)).toBe(false);
+            await expect(production.startProvider(productionContext, request, productionStart)).rejects.toThrow('participation-denied');
+            expect(productionStart).not.toHaveBeenCalled();
+            const response = new Promise(resolve => { finishResponse = resolve; });
+            let markStarted; const started = new Promise(resolve => { markStarted = resolve; });
+            const start = vi.fn(() => { markStarted(); return response; });
+            let settled = false;
+            pending = isolated.startProvider(context, request, start).then(value => { settled = true; return value; });
+            pending.catch(() => {});
+            await Promise.race([started, pending.then(() => { throw Error('Response settled before start witness'); })]);
+            let followingGate = false;
+            await app.lobby.state.blockConcurrencyWhile(async () => { followingGate = true; });
+            expect(followingGate).toBe(true); expect(settled).toBe(false);
+            expect(start).toHaveBeenCalledTimes(1); expect(validationCalls).toBe(1);
+            expect(validationMethods).toEqual({ get: 'function', list: 'function', put: 'undefined', delete: 'undefined',
+                setAlarm: 'undefined', deleteAlarm: 'undefined', transaction: 'undefined' });
+            expect(validationGate).not.toBeNull();
+            expect(observedStart.gate).toBe(validationGate); expect(observedStart.commits).toBeGreaterThan(validationCommitCount);
+            expect(ownerQueue.events.find(event => event.kind === 'returned' && event.ticket === validationGate))
+                .toMatchObject({ nullPrototype: true, thenable: false });
+            await expect(app.lobby.dispatchParticipationStart(payload, owner)).rejects.toThrow('participation-denied');
+            expect(validationCalls).toBe(1); expect(start).toHaveBeenCalledTimes(1);
+            expect(ownerQueue.events.filter(event => event.kind === 'callback-threw')).toEqual([]);
+            finishResponse('synthetic-response-complete');
+            await expect(pending).resolves.toBe('synthetic-response-complete');
+            expect(outbound).not.toHaveBeenCalled();
+        } finally {
+            finishResponse?.('test-cleanup'); if (pending) await pending.catch(() => {});
+            ownerQueue?.restore(); if (app) await app.dispose(); outbound.mockRestore();
+        }
+    });
+});
+
+
+async function p9Prepared({ staff = false, healthy = false, grantMs = 100000 } = {}) {
+    const f = await fixture({ participation: true });
+    const staffEmail = 'reviewer@example.invalid';
+    const profile = staff ? { kind: 'staff', account: await accountId(staffEmail, f.env.HANGOUT_HMAC_KEY),
+        role: 'moderator', admin: true, expiresAt: NOW + 90000 } : null;
+    const enrolled = await f.enroll('p9-matrix', profile), ledger = await participationLedger(f);
+    expect(enrolled.binding).not.toHaveProperty('email');
+    const person = staff ? { ...enrolled, binding: { ...enrolled.binding, email: staffEmail } } : enrolled;
+    if (staff) expect(person.binding.email).toBe(staffEmail);
+    await ledger.grant(person.binding, { expiresIn: grantMs });
+    const other = healthy ? await f.enroll('p9-healthy') : null;
+    if (other) await ledger.grant(other.binding);
+    const outbound = vi.spyOn(globalThis, 'fetch').mockRejectedValue(Error('Offline provider fence test forbids network'));
+    let app;
+    try {
+        app = await productionDo(f);
+        const queue = p9SerializedOwner(app.lobby), socket = await app.connect(person, 'MatrixGuest');
+        const connection = app.lobby.liveBindings.get(socket.deserializeAttachment().id);
+        const otherSocket = other ? await app.connect(other, 'HealthyGuest') : null;
+        expect(connection?.id).toBe(socket.deserializeAttachment().id);
+        expect(connection.id).not.toBe(person.binding.id);
+        const owner = app.lobby.participationStartOwner, authority = app.lobby.authority, engine = app.lobby.engine;
+        expect(owner && typeof owner).toBe('object'); expect(Object.isFrozen(owner)).toBe(true);
+        const h = { f, person, ledger, app, queue, socket, connection, owner, authority, engine, other, otherSocket,
+            hooks: {}, tasks: [], releases: [], outbound, validationCalls: 0, payload: null };
+        h.enforcement = createParticipationEnforcement({ storage: authority.records, now: f.now,
+            resolveConnection: value => authority.resolveParticipationConnection(value),
+            resolveConnections: values => authority.resolveParticipationConnections(values),
+            validateConnection: value => authority.validateParticipationConnection(value),
+            readPrincipals: partitionMaintenance.readPartitionedParticipationPrincipals,
+            readWithdrawn: partitionMaintenance.readPartitionedParticipationWithdrawals,
+            readPreparation: partitionMaintenance.readPartitionedParticipationPreparation,
+            writeEffects: input => authority.writeParticipationEffects(input), providerQualified: action => action === 'aiPublicReview',
+            dispatchStart: capability => {
+                expect(capability.actorId).toBe(connection.id);
+                const payload = { actorId: capability.actorId, validate: async tx => {
+                    h.validationCalls += 1;
+                    await h.hooks.beforeValidate?.(tx);
+                    const approved = await capability.validate(tx);
+                    await h.hooks.afterValidate?.(tx);
+                    return Object.hasOwn(h.hooks, 'outcome') ? h.hooks.outcome : approved;
+                }, start: () => capability.start() };
+                h.payload = payload; return app.lobby.dispatchParticipationStart(payload, owner);
+            } });
+        h.request = { actorId: connection.id, action: 'aiPublicReview', providerReady: true, publicTextEligible: true };
+        h.context = await h.enforcement.prepare([connection]);
+        expect(h.enforcement.allows(h.context, h.request)).toBe(true);
+        h.run = (start, request = h.request) => {
+            const task = h.enforcement.startProvider(h.context, request, start); task.catch(() => {}); h.tasks.push(task); return task;
+        };
+        h.control = (operation, extra = {}) => app.lobby.fetch(new Request(`https://owned/__beta/authority/${operation}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sid: person.request.sid, version: person.request.version, exp: person.request.exp, ...extra }) }));
+        h.stop = async () => {
+            const status = await h.control('participation'); expect(status.status).toBe(200);
+            const current = await status.json(); expect(current.state).toBe('authorized');
+            const stopped = await h.control('participation-stop', { request: { expectedRevision: current.revision } });
+            expect(stopped.status).toBe(200); expect((await stopped.json()).state).toBe('withdrawn');
+        };
+        h.dispose = async () => {
+            for (const release of h.releases) release();
+            delete f.hooks.before; delete f.hooks.after;
+            await Promise.allSettled(h.tasks);
+            // Restore controlled reference substitutions only for disposal;
+            // no behavioral assertion follows this fixture cleanup.
+            app.lobby.engine = engine; app.lobby.authority = authority;
+            queue.restore(); await app.dispose(); outbound.mockRestore();
+        };
+        return h;
+    } catch (error) { if (app) await app.dispose(); outbound.mockRestore(); throw error; }
+}
+const p9NoGateThrow = h => expect(h.queue.events.filter(event => event.kind === 'callback-threw')).toEqual([]);
+
+
+describe('offline prepared provider-start reductions and stale owners', () => {
+    it.each(['self Stop', 'SID revoke', 'session expiry', 'subject expiry', 'profile expiry', 'role removal', 'profile change', 'policy revision', 'subject revision'])(
+        'refuses prepared work after actual %s without a provider start or storage quarantine', async change => {
+            const h = await p9Prepared({ staff: ['profile expiry', 'role removal', 'profile change'].includes(change), grantMs: change === 'subject expiry' ? 1000 : 100000 });
+            const start = vi.fn();
+            try {
+                if (change === 'self Stop') await h.stop();
+                else if (change === 'SID revoke') expect((await h.control('revoke')).status).toBe(200);
+                else if (change === 'session expiry') h.f.advance(100001);
+                else if (change === 'subject expiry') h.f.advance(1001);
+                else if (change === 'profile expiry') h.f.advance(90001);
+                else if (change === 'role removal') h.f.env.HANGOUT_MODERATOR_EMAILS = '';
+                else await h.app.lobby.state.blockConcurrencyWhile(() => h.authority.records.transaction(async tx => {
+                    if (change === 'profile change') {
+                        const key = 'authority-session:' + h.person.request.sid, row = await tx.get(key);
+                        await tx.put(key, { ...row, profile: { ...row.profile, expiresAt: NOW + 80000 } });
+                    } else if (change === 'policy revision') {
+                        const row = await tx.get(PARTICIPATION_POLICY_KEY);
+                        row.config.policy = { ...row.config.policy, revision: row.config.policy.revision + 1,
+                            policyVersion: 'synthetic-p9-revision-two', noticeDigest: 'd'.repeat(64), decisionRef: 'synthetic_p9_update' };
+                        await tx.put(PARTICIPATION_POLICY_KEY, row);
+                    } else {
+                        const rows = await tx.list({ prefix: 'participation-records:v1:record:', limit: 4 });
+                        expect(rows.size).toBe(1); const [key, row] = [...rows][0]; row.subjects[0].record.revision += 1;
+                        expect(validParticipationLedgerState(row, partitionMaintenance.PARTICIPATION_RECORD_LIMITS)).toBe(true);
+                        await tx.put(key, row);
+                    }
+                }));
+                await expect(h.run(start)).rejects.toThrow('participation-denied');
+                expect(start).not.toHaveBeenCalled(); expect(h.outbound).not.toHaveBeenCalled();
+                expect(h.app.lobby.evidenceStorage).toBe('ready'); p9NoGateThrow(h);
+            } finally { await h.dispose(); }
+        });
+
+    it.each(['false', 'undefined', 'object', 'deliberate denial'])(
+        'requires exact true and consumes a %s validation outcome without throwing inside the owner callback', async outcome => {
+            const h = await p9Prepared(), start = vi.fn();
+            try {
+                if (outcome === 'deliberate denial') h.hooks.afterValidate = () => { throw Error('participation-denied'); };
+                else h.hooks.outcome = outcome === 'false' ? false : outcome === 'undefined' ? undefined : { allowed: true };
+                await expect(h.run(start)).rejects.toThrow('participation-denied');
+                expect(h.validationCalls).toBe(1); expect(start).not.toHaveBeenCalled();
+                await expect(h.app.lobby.dispatchParticipationStart(h.payload, h.owner)).rejects.toThrow('participation-denied');
+                expect(h.validationCalls).toBe(1); expect(start).not.toHaveBeenCalled();
+                expect(h.app.lobby.evidenceStorage).toBe('ready'); p9NoGateThrow(h);
+            } finally { await h.dispose(); }
+        });
+
+    it.each(['engine', 'authority', 'failure token', 'storage failure'])(
+        'refuses %s supersession while the actual validation transaction is awaited', async changed => {
+            const h = await p9Prepared(), start = vi.fn();
+            try {
+                h.hooks.afterValidate = async () => {
+                    await Promise.resolve();
+                    if (changed === 'engine') h.app.lobby.engine = createLobby({ now: h.f.now });
+                    if (changed === 'authority') h.app.lobby.authority = createLobbySessionAuthority({ storage: h.app.lobby.state.storage, env: h.f.env, now: h.f.now });
+                    if (changed === 'failure token') h.app.lobby.storageFailureToken = {};
+                    if (changed === 'storage failure') h.app.lobby.storageFailed();
+                };
+                await expect(h.run(start)).rejects.toThrow('participation-denied');
+                expect(h.validationCalls).toBe(1); expect(start).not.toHaveBeenCalled(); p9NoGateThrow(h);
+                if (changed === 'storage failure') expect(h.app.lobby.evidenceStorage).toBe('degraded');
+            } finally { await h.dispose(); }
+        });
+
+    it('refuses the original owner captured before a genuine restore creates the next composition', async () => {
+        const h = await p9Prepared(), start = vi.fn();
+        try {
+            await h.app.lobby.state.blockConcurrencyWhile(() => h.app.lobby.start());
+            expect(h.app.lobby.participationStartOwner).not.toBe(h.owner);
+            expect(h.app.lobby.engine).not.toBe(h.engine); expect(h.app.lobby.authority).not.toBe(h.authority);
+            await expect(h.run(start)).rejects.toThrow('participation-denied');
+            expect(h.validationCalls).toBe(0); expect(start).not.toHaveBeenCalled(); p9NoGateThrow(h);
+        } finally { await h.dispose(); }
+    });
+
+    it.each(['before invocation', 'inside awaited validation'])('refuses the actual actor closing %s before queued retirement completes', async phase => {
+        const h = await p9Prepared(), start = vi.fn();
+        try {
+            const close = () => {
+                h.socket.close(1000, 'unit actor closed');
+                const task = h.app.lobby.webSocketClose(h.socket); task.catch(() => {}); h.tasks.push(task); return task;
+            };
+            if (phase === 'before invocation') await close();
+            else h.hooks.afterValidate = () => { close(); };
+            await expect(h.run(start)).rejects.toThrow('participation-denied');
+            expect(start).not.toHaveBeenCalled(); expect(h.app.lobby.closedSockets.has(h.socket)).toBe(true);
+            expect(h.app.lobby.liveBindings.has(h.connection.id)).toBe(false); p9NoGateThrow(h);
+        } finally { await h.dispose(); }
+    });
+});
+
+
+describe('offline native read failures and provider-response isolation', () => {
+    it.each(['native rejection', 'denial-shaped native rejection', 'caught native poison', 'caught denial-shaped poison', 'physical codec corruption'])(
+        'keeps %s distinct from an ordinary denial and never starts', async fault => {
+            const h = await p9Prepared(), start = vi.fn();
+            try {
+                const marker = ':manifest:' + Buffer.from('net').toString('hex');
+                if (fault === 'physical codec corruption') {
+                    const keys = [...h.f.driver.rows().keys()].filter(key => key.endsWith(marker)); expect(keys).toHaveLength(1);
+                    const value = h.f.driver.rows().get(keys[0]);
+                    await h.f.driver.transaction(tx => tx.put(keys[0], { ...value, v: 999 }));
+                } else {
+                    let armed = true;
+                    h.f.hooks.before = event => {
+                        if (armed && event.name === 'get' && event.key.endsWith(marker)) {
+                            armed = false; throw Error(fault.includes('denial-shaped') ? 'participation-denied' : 'injected native read refusal');
+                        }
+                    };
+                }
+                let caught = false, readAttempted = false;
+                h.hooks.afterValidate = async tx => {
+                    readAttempted = true;
+                    if (fault.startsWith('caught')) { try { await tx.get('net'); } catch { caught = true; } }
+                    else await tx.get('net');
+                };
+                const token = h.app.lobby.storageFailureToken;
+                await expect(h.run(start)).rejects.toThrow('participation-unavailable');
+                expect(readAttempted).toBe(true); expect(h.validationCalls).toBe(1);
+                if (fault.startsWith('caught')) expect(caught).toBe(true);
+                expect(start).not.toHaveBeenCalled(); expect(h.app.lobby.evidenceStorage).toBe('degraded');
+                expect(h.app.lobby.storageFailureToken).not.toBe(token); expect(h.f.driver.stats.rollbacks).toBeGreaterThan(0); p9NoGateThrow(h);
+            } finally { await h.dispose(); }
+        });
+
+    it('denies a read capability any put while retaining genuine validated read-only success', async () => {
+        const h = await p9Prepared(), start = vi.fn(() => 'offline-complete'); let rejectedWrite = false;
+        try {
+            h.hooks.afterValidate = async tx => {
+                try { await tx.put('p9-unexpected-provider-write', { mustNotExist: true }); } catch (error) { rejectedWrite = error instanceof TypeError; }
+            };
+            h.f.driver.resetOperations();
+            await expect(h.run(start)).resolves.toBe('offline-complete');
+            expect(rejectedWrite).toBe(true); expect(start).toHaveBeenCalledTimes(1);
+            expect(h.f.driver.stats.operations.some(event => ['put', 'delete'].includes(event.name))).toBe(false); p9NoGateThrow(h);
+        } finally { await h.dispose(); }
+    });
+
+    it.each(['replayed callback', 'rejected outer completion'])(
+        'keeps start outside a real SQLite %s', async behavior => {
+            const h = await p9Prepared(), start = vi.fn(() => 'offline-complete'), original = h.f.driver.transaction;
+            try {
+                let armed = true;
+                h.f.driver.transaction = function (callback) {
+                    if (!armed) return original.call(this, callback);
+                    armed = false;
+                    return (async () => {
+                        await original.call(this, callback);
+                        if (behavior === 'rejected outer completion') throw Error('injected outer transaction completion refusal');
+                        return await original.call(this, callback);
+                    })();
+                };
+                if (behavior === 'replayed callback') {
+                    await expect(h.run(start)).resolves.toBe('offline-complete');
+                    expect(h.validationCalls).toBe(2); expect(start).toHaveBeenCalledTimes(1);
+                } else {
+                    await expect(h.run(start)).rejects.toThrow('participation-unavailable');
+                    expect(h.validationCalls).toBe(1); expect(start).not.toHaveBeenCalled();
+                    expect(h.app.lobby.evidenceStorage).toBe('degraded');
+                }
+                p9NoGateThrow(h);
+            } finally { h.f.driver.transaction = original; await h.dispose(); }
+        });
+
+    it('keeps the originally prepared actor and action when the caller mutates its request after dispatch', async () => {
+        const h = await p9Prepared({ healthy: true }), start = vi.fn(() => 'original-actor-complete');
+        try {
+            h.hooks.beforeValidate = () => {
+                h.request.actorId = h.otherSocket.deserializeAttachment().id;
+                h.request.action = 'publicText'; h.request.providerReady = false; h.request.publicTextEligible = false;
+            };
+            await expect(h.run(start)).resolves.toBe('original-actor-complete');
+            expect(h.payload.actorId).toBe(h.connection.id); expect(start).toHaveBeenCalledTimes(1); p9NoGateThrow(h);
+        } finally { await h.dispose(); }
+    });
+
+    it('rejects unqualified provider flags before dispatch even if the caller immediately changes them', async () => {
+        const h = await p9Prepared(), start = vi.fn(), request = { ...h.request, providerReady: false };
+        try {
+            expect(h.enforcement.allows(h.context, request)).toBe(false);
+            const pending = h.run(start, request); request.providerReady = true;
+            await expect(pending).rejects.toThrow('participation-denied');
+            expect(h.validationCalls).toBe(0); expect(h.payload).toBeNull(); expect(start).not.toHaveBeenCalled();
+            expect(h.app.lobby.evidenceStorage).toBe('ready'); p9NoGateThrow(h);
+        } finally { await h.dispose(); }
+    });
+
+    it('lets actual self-Stop, logout and healthy chat complete while one synthetic provider response is pending', async () => {
+        const h = await p9Prepared({ healthy: true }); let finish, markStarted;
+        const response = new Promise(resolve => { finish = resolve; }); h.releases.push(() => finish('cleanup'));
+        const started = new Promise(resolve => { markStarted = resolve; });
+        const start = vi.fn(() => { markStarted(); return response; });
+        try {
+            let settled = false; const pending = h.run(start).then(value => { settled = true; return value; }); pending.catch(() => {});
+            await Promise.race([started, pending.then(() => { throw Error('Response settled before start witness'); })]);
+            await h.stop(); expect(settled).toBe(false);
+            expect(h.socket.frames.some(frame => frame.t === 'sharing-stopped')).toBe(true);
+            expect((await h.control('revoke')).status).toBe(200); expect(settled).toBe(false);
+            const saved = await h.authority.records.transaction(tx => tx.get('authority-session:' + h.person.request.sid));
+            expect(saved.revoked).toBe(true); expect(h.app.lobby.liveBindings.has(h.connection.id)).toBe(false);
+            const text = 'Healthy conversation continues while the synthetic response waits';
+            await h.app.message(h.otherSocket, { t: 'say', ch: '#stalemate', text });
+            expect(h.otherSocket.frames.filter(frame => frame.t === 'line' && frame.text === text)).toHaveLength(1);
+            expect(h.socket.frames.filter(frame => frame.t === 'line' && frame.text === text)).toHaveLength(0);
+            expect(settled).toBe(false); expect(start).toHaveBeenCalledTimes(1); expect(h.outbound).not.toHaveBeenCalled(); p9NoGateThrow(h);
+            finish('response-completed-after-reductions'); await expect(pending).resolves.toBe('response-completed-after-reductions');
+        } finally { await h.dispose(); }
+    });
+
+    it.each(['synchronous start throw', 'asynchronous response rejection'])(
+        'contains a %s without callback reset, storage quarantine or retry', async failure => {
+            const h = await p9Prepared();
+            const start = vi.fn(() => {
+                if (failure === 'synchronous start throw') throw Error('synthetic provider start failure');
+                return Promise.reject(Error('synthetic provider response failure'));
+            });
+            try {
+                await expect(h.run(start)).rejects.toThrow(failure === 'synchronous start throw' ? 'participation-unavailable' : 'synthetic provider response failure');
+                expect(start).toHaveBeenCalledTimes(1); expect(h.app.lobby.evidenceStorage).toBe('ready'); p9NoGateThrow(h);
+                await expect(h.app.lobby.dispatchParticipationStart(h.payload, h.owner)).rejects.toThrow('participation-denied');
+                expect(start).toHaveBeenCalledTimes(1);
+                let available = false; await h.app.lobby.state.blockConcurrencyWhile(async () => { available = true; }); expect(available).toBe(true);
+            } finally { await h.dispose(); }
+        });
+
+    it.each(['publicText', 'externalProvider'])(
+        'keeps the production provider bridge closed to %s without dispatching a capability', async action => {
+            const h = await p9Prepared(), dispatch = vi.fn(capability => h.app.lobby.dispatchParticipationStart(capability, h.owner)), start = vi.fn();
+            try {
+                const production = createLobbyParticipation({ env: h.f.env, authority: h.authority, now: h.f.now, dispatchStart: dispatch });
+                const context = await production.prepare([h.connection]), request = { ...h.request, action };
+                if (action === 'publicText') expect(production.allows(context, request)).toBe(true);
+                expect(await production.providerAllowed(context, request)).toBe(false);
+                await expect(production.startProvider(context, request, start)).rejects.toThrow('participation-denied');
+                expect(dispatch).not.toHaveBeenCalled(); expect(start).not.toHaveBeenCalled(); expect(h.outbound).not.toHaveBeenCalled(); p9NoGateThrow(h);
+            } finally { await h.dispose(); }
+        });
+});
+
+
+describe('offline validation-to-start time boundary', () => {
+    it.each(['session expiry', 'profile expiry'])('refuses %s after genuine validation but before synchronous start', async change => {
+        const h = await p9Prepared({ staff: change === 'profile expiry' }), start = vi.fn();
+        try {
+            h.hooks.afterValidate = () => { h.f.advance(change === 'profile expiry' ? 90001 : 100001); };
+            await expect(h.run(start)).rejects.toThrow('participation-denied');
+            expect(h.validationCalls).toBe(1); expect(start).not.toHaveBeenCalled();
+            expect(h.app.lobby.evidenceStorage).toBe('ready'); p9NoGateThrow(h);
+        } finally { await h.dispose(); }
+    });
+});

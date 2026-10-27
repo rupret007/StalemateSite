@@ -15,13 +15,14 @@ const APP = fileURLToPath(new URL('../../../', import.meta.url));
 const TOOLS = fileURLToPath(new URL('../durable-records/', import.meta.url));
 const ORIGIN = 'https://local-fixture.invalid', INVITE = 'owned-fixture-invite-not-a-production-credential-2026', PREVIEW = 'owned-fixture-preview-token-20261025';
 const ENV = ['PATH', 'TMPDIR', 'TEMP', 'TMP', 'SystemRoot', 'SYSTEMROOT', 'WINDIR'];
-const PARTICIPATION = process.argv.includes('--participation'), INCIDENT = process.argv.includes('--incident-sources'), TRAFFIC_ACKS = process.argv.includes('--traffic-acks'), PRESSURE_ONLY = process.argv.includes('--pressure-only'), DIAGNOSE_CLOSE = process.argv.includes('--diagnose-close'), FANOUT_50 = process.argv.includes('--fanout-50');
-const MODE = [...(PARTICIPATION ? ['--participation'] : []), ...(INCIDENT ? ['--incident-sources'] : []), ...(TRAFFIC_ACKS ? ['--traffic-acks'] : []), ...(PRESSURE_ONLY ? ['--pressure-only'] : []), ...(DIAGNOSE_CLOSE ? ['--diagnose-close'] : []), ...(FANOUT_50 ? ['--fanout-50'] : [])];
-const RETENTION_PROOF = PARTICIPATION && !INCIDENT && !TRAFFIC_ACKS && !PRESSURE_ONLY && !DIAGNOSE_CLOSE && !FANOUT_50;
+const PARTICIPATION = process.argv.includes('--participation'), INCIDENT = process.argv.includes('--incident-sources'), TRAFFIC_ACKS = process.argv.includes('--traffic-acks'), PRESSURE_ONLY = process.argv.includes('--pressure-only'), DIAGNOSE_CLOSE = process.argv.includes('--diagnose-close'), FANOUT_50 = process.argv.includes('--fanout-50'), PROVIDER_START = process.argv.includes('--provider-start');
+const MODE = [...(PARTICIPATION ? ['--participation'] : []), ...(INCIDENT ? ['--incident-sources'] : []), ...(TRAFFIC_ACKS ? ['--traffic-acks'] : []), ...(PRESSURE_ONLY ? ['--pressure-only'] : []), ...(DIAGNOSE_CLOSE ? ['--diagnose-close'] : []), ...(FANOUT_50 ? ['--fanout-50'] : []), ...(PROVIDER_START ? ['--provider-start'] : [])];
+const RETENTION_PROOF = PARTICIPATION && !INCIDENT && !TRAFFIC_ACKS && !PRESSURE_ONLY && !DIAGNOSE_CLOSE && !FANOUT_50 && !PROVIDER_START;
 assert.ok(!TRAFFIC_ACKS || PARTICIPATION && !INCIDENT, '--traffic-acks requires --participation and does not select incident mode');
 assert.ok(!PRESSURE_ONLY || PARTICIPATION && !INCIDENT && !TRAFFIC_ACKS, '--pressure-only requires --participation and refuses incident/traffic flags');
 assert.ok(!DIAGNOSE_CLOSE || PARTICIPATION && TRAFFIC_ACKS && !INCIDENT && !PRESSURE_ONLY, '--diagnose-close is an explicit traffic-ACK-only diagnostic');
 assert.ok(!FANOUT_50 || PARTICIPATION && !INCIDENT && !TRAFFIC_ACKS && !PRESSURE_ONLY && !DIAGNOSE_CLOSE, '--fanout-50 requires only --participation');
+assert.ok(!PROVIDER_START || PARTICIPATION && !INCIDENT && !TRAFFIC_ACKS && !PRESSURE_ONLY && !DIAGNOSE_CLOSE && !FANOUT_50, '--provider-start requires only --participation');
 const FANOUT_PREFIX = 'Fanout fifty ephemeral marker ';
 const PRESSURE_PREFIX = 'Pressure probe ephemeral marker ';
 const TRAFFIC_PREFIX = 'ACK probe ephemeral marker ';
@@ -78,7 +79,16 @@ const group = pid => execFileSync('/bin/ps', ['-axo', 'pid=,ppid=,pgid=,stat=,co
     const m = line.trim().match(/^(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.+)$/);
     return m && { pid: +m[1], ppid: +m[2], pgid: +m[3], state: m[4], command: basename(m[5]) };
 }).filter(row => row && row.pgid === pid && !row.state.startsWith('Z'));
-const kill = pid => { if (Number.isInteger(pid) && pid > 1) try { process.kill(-pid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; } };
+const kill = pid => {
+    if (!(Number.isInteger(pid) && pid > 1)) return;
+    try { process.kill(-pid, 'SIGKILL'); }
+    catch (error) {
+        // macOS can return EPERM for a process group that has already exited.
+        // A still-listed member must remain a cleanup failure.
+        if (error.code === 'ESRCH' || error.code === 'EPERM' && !group(pid).length) return;
+        throw error;
+    }
+};
 async function stopped(pid) { for (let n = 0; n < 80; n++) { if (!group(pid).length) return; await delay(25); } assert.fail('owned group still live'); }
 const ipc = message => new Promise((resolve, reject) => process.send(message, error => error ? reject(error) : resolve()));
 function receive(expected, nonce) {
@@ -236,6 +246,7 @@ async function runtime(phase, state, nonce) {
         bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected',
             ...(PARTICIPATION ? { HANGOUT_PARTICIPATION_AUTHORITY: 'c3-v1' } : {}),
             ...(RETENTION_PROOF ? { FIXTURE_RETENTION_PROOF: 'retention-v1' } : {}),
+            ...(PROVIDER_START ? { FIXTURE_PROVIDER_START_PROOF: 'start-v1' } : {}),
             ...(TRAFFIC_ACKS ? { FIXTURE_TRAFFIC_ACKS: 'ack-v1' } : {}),
             ...(PRESSURE_ONLY ? { FIXTURE_PRESSURE_ONLY: 'pressure-v1' } : {}),
             ...(DIAGNOSE_CLOSE ? { FIXTURE_CLOSE_DIAGNOSTIC: 'close-v1' } : {}),
@@ -359,7 +370,187 @@ async function runtime(phase, state, nonce) {
     };
     try {
         assert.equal((await mf.ready).hostname, '127.0.0.1');
-        if (FANOUT_50) {
+        if (PROVIDER_START) {
+            const within = async (task, label) => {
+                let timer;
+                try { return await Promise.race([task, new Promise((_, reject) => { timer = setTimeout(() => reject(Error(label + ': existing6s wait exceeded')), 6000); })]); }
+                finally { clearTimeout(timer); }
+            };
+            const provider = (action, slot, scenario, cookie) => within(control('provider-start-proof', action === 'prepare'
+                ? { action, slot, cookie } : { action, slot, scenario }), 'provider-start ' + action + ' ' + (scenario || slot));
+            const state = () => within(control('provider-start-state'), 'provider-start state');
+            const scenarios = ['positive', 'hold', 'after-stop', 'after-revoke', 'callback-close'];
+            const stages = ['native-tx-callback-enter', 'native-tx-callback-exit', 'native-tx-promise-resolved', 'native-tx-rejected',
+                'validate-called', 'validate-returned', 'start-invoked', 'response-held', 'response-released', 'callback-close-marked',
+                'dispatch-denied', 'dispatch-settled', 'close-await-after-dispatch', 'retirement-resolved', 'retirement-rejected', 'retirement-observed'];
+            const checkState = value => {
+                assert.deepEqual(Object.keys(value).sort(), ['overflow', 'observationFailed', 'activeNativeCallbacks', 'pendingResponses', 'health', 'cases', 'events'].sort());
+                assert.equal(value.overflow, false); assert.equal(value.observationFailed, false);
+                assert.deepEqual(Object.keys(value.health).sort(), ['authorityUnavailable', 'capturedOwnerCount', 'evidenceStorage', 'failureTokenMatchesCapturedOwners', 'freshOwnerBaseline']);
+                assert.ok(['ready', 'degraded', 'other'].includes(value.health.evidenceStorage));
+                assert.equal(typeof value.health.authorityUnavailable, 'boolean');
+                assert.ok(Number.isInteger(value.health.capturedOwnerCount) && value.health.capturedOwnerCount >= 0 && value.health.capturedOwnerCount <= 3);
+                assert.equal(typeof value.health.failureTokenMatchesCapturedOwners, 'boolean');
+                assert.equal(typeof value.health.freshOwnerBaseline, 'boolean');
+                assert.equal(value.activeNativeCallbacks, 0); assert.ok(Number.isSafeInteger(value.pendingResponses) && value.pendingResponses >= 0 && value.pendingResponses <= 1);
+                assert.ok(Array.isArray(value.cases) && value.cases.length <= 5); assert.ok(value.events.length <= 128);
+                for (const row of value.cases) {
+                    assert.deepEqual(Object.keys(row).sort(), ['slot', 'scenario', 'runCount', 'validateCalls', 'startCalls', 'completed', 'denied', 'reason',
+                        'pendingResponse', 'readonlyTx', 'validationTransactionObserved', 'transactionCompletedBeforeStart', 'startOutsideNativeCallback',
+                        'callbackCloseMarked', 'closeRetired'].sort());
+                    assert.ok(Number.isInteger(row.slot) && row.slot >= 0 && row.slot <= 2 && scenarios.includes(row.scenario));
+                    for (const name of ['runCount', 'validateCalls', 'startCalls']) assert.ok(Number.isSafeInteger(row[name]) && row[name] >= 0 && row[name] <= 64);
+                    assert.ok(row.startCalls <= 1); assert.ok(['none', 'participation-denied', 'participation-unavailable', 'other'].includes(row.reason));
+                    for (const name of ['completed', 'denied', 'pendingResponse', 'readonlyTx', 'validationTransactionObserved', 'transactionCompletedBeforeStart',
+                        'startOutsideNativeCallback', 'callbackCloseMarked', 'closeRetired']) assert.equal(typeof row[name], 'boolean');
+                }
+                for (const [index, event] of value.events.entries()) {
+                    assert.deepEqual(Object.keys(event).sort(), ['ordinal', 'slot', 'scenario', 'stage'].sort());
+                    assert.equal(event.ordinal, index + 1); assert.ok(event.slot >= 0 && event.slot <= 2 && scenarios.includes(event.scenario) && stages.includes(event.stage));
+                }
+                return value;
+            };
+            const row = (value, scenario) => { const rows = value.cases.filter(item => item.scenario === scenario); assert.equal(rows.length, 1); return rows[0]; };
+            const positive = (value, scenario) => {
+                const result = row(value, scenario);
+                assert.equal(result.startCalls, 1); assert.ok(result.validateCalls >= 1); assert.equal(result.readonlyTx, true);
+                assert.equal(result.validationTransactionObserved, true); assert.equal(result.transactionCompletedBeforeStart, true);
+                assert.equal(result.startOutsideNativeCallback, true);
+                const events = value.events.filter(item => item.scenario === scenario), at = stage => events.find(item => item.stage === stage)?.ordinal;
+                assert.ok(at('validate-called') < at('native-tx-promise-resolved') && at('native-tx-promise-resolved') < at('start-invoked'));
+                return result;
+            };
+            const assertProviderHealth = (value, capturedOwners) => {
+                // privacy() only sees authorityUnavailable. storageFailed() can
+                // degrade evidence while leaving that flag false, so the final
+                // provider-state witness has to name both and the owner token.
+                const health = value.health;
+                assert.equal(health.evidenceStorage, 'ready');
+                assert.equal(health.authorityUnavailable, false);
+                assert.equal(health.capturedOwnerCount, capturedOwners);
+                assert.equal(health.failureTokenMatchesCapturedOwners, capturedOwners > 0);
+                assert.equal(health.freshOwnerBaseline, capturedOwners === 0);
+            };
+            const privacy = observed => {
+                assert.equal(observed.authorityUnavailable, false); assert.equal(observed.sqlite, true);
+                assert.deepEqual(Object.keys(observed.ordinaryBodiesAbsent).sort(), EPHEMERAL_BODY_MARKERS);
+                assert.deepEqual(Object.keys(observed.rawScan.perChunkOrdinaryBodiesAbsent).sort(), EPHEMERAL_BODY_MARKERS);
+                assert.ok(Object.values(observed.ordinaryBodiesAbsent).every(Boolean));
+                assert.ok(Object.values(observed.rawScan.perChunkOrdinaryBodiesAbsent).every(Boolean));
+                assert.equal(observed.logicalScan.requiredRecordsPresent, true); assert.ok(observed.rawScan.rows > 0 && observed.rawScan.bytes > 0);
+            };
+            const oneLive = async expected => {
+                const deadline = Date.now() + 6000;
+                for (;;) {
+                    const observed = await within(control('inspect'), 'provider-start binding inspection');
+                    if (observed.bindingCount === expected && observed.liveBindingCount === expected
+                        && observed.durableSessionNicks.length === expected && observed.engineSessionNicks.length === expected) return observed;
+                    assert.ok(Date.now() < deadline, 'provider-start actual binding retirement exceeded existing6s wait'); await delay(25);
+                }
+            };
+            if (phase === 'visitors') {
+                let admissionDenials = 0;
+                for (const requestHeaders of [{ 'Content-Type': 'application/json' }, { 'X-Fixture-Nonce': nonce + 'x', 'Content-Type': 'application/json' },
+                    { 'X-Fixture-Nonce': nonce, 'Content-Type': 'application/json', Origin: 'https://hostile.invalid' },
+                    { 'X-Fixture-Nonce': nonce, 'Content-Type': 'text/plain' }]) {
+                    const response = await mf.dispatchFetch(ORIGIN + '/_fixture/provider-start-state', { method: 'POST', headers: requestHeaders, body: '{}' });
+                    assert.equal(response.status, 403); await response.body?.cancel(); admissionDenials++;
+                }
+                const wrongMethod = await mf.dispatchFetch(ORIGIN + '/_fixture/provider-start-state', { method: 'GET', headers: { 'X-Fixture-Nonce': nonce, 'Content-Type': 'application/json' } });
+                assert.equal(wrongMethod.status, 403); await wrongMethod.body?.cancel(); admissionDenials++;
+                const missing = await call('/beta/unlock', '', { key: INVITE }); assert.equal(missing.status, 503); await missing.body?.cancel();
+                assert.equal((await control('initialize')).reason, 'initialize complete');
+                assert.deepEqual(await control('participation-policy'), { installed: true });
+                assert.deepEqual(await control('egress-probe'), { status: 503, denied: true });
+                const cookies = [], peers = [];
+                for (let index = 0; index < 4; index++) {
+                    const cookie = await unlock(`192.0.2.${21 + index}`); cookies.push(cookie);
+                    peers.push(await connect(cookie, `NativeStart${'ABCD'[index]}`, index % 2 ? 'rad-dad' : 'stalemate', `192.0.2.${21 + index}`));
+                }
+                assert.equal(new Set(cookies).size, 4);
+                const [a, b, c, d] = peers;
+                for (let slot = 0; slot < 3; slot++) assert.deepEqual(await provider('prepare', slot, undefined, cookies[slot]),
+                    { slot, prepared: true, realCookieBindingAndC2: true, originalOwner: true, productionProviderOff: true });
+                let observed = checkState(await provider('run', 0, 'positive'));
+                assert.equal(positive(observed, 'positive').completed, true);
+                const initialValidations = row(observed, 'positive').validateCalls;
+                observed = checkState(await provider('run', 0, 'replay'));
+                assert.equal(row(observed, 'positive').startCalls, 1); assert.equal(row(observed, 'positive').validateCalls, initialValidations);
+                assert.equal(row(observed, 'positive').runCount, 2); assert.equal(row(observed, 'positive').reason, 'participation-denied');
+                assert.deepEqual(await provider('run', 0, 'hold'), { slot: 0, scenario: 'hold', started: true, responsePending: true });
+                observed = checkState(await state()); assert.equal(observed.pendingResponses, 1); positive(observed, 'hold');
+                const own = await within(ownSharing(cookies[0]), 'provider-start pre-Stop status'); assert.equal(own.revision, 2);
+                const stopAt = a.frames.length, stopped = await within(call('/beta/participation/stop', cookies[0], { expectedRevision: own.revision }), 'provider-start realStop while response held');
+                assert.equal(stopped.status, 200); assert.deepEqual(await stopped.json(), { reason: 'sharing withdrawn', ok: true, state: 'withdrawn',
+                    available: false, purposes: [], revision: 3, canStop: true, cleanup: 'confirmed' });
+                await a.wait(frame => frame.t === 'sharing-stopped', 'actualStop during held start response', stopAt); assert.equal(a.closed, null);
+                const text = 'Native remaining visitor greeting', cAt = c.frames.length, dAt = d.frames.length;
+                d.send({ t: 'say', ch: '#stalemate', text });
+                await Promise.all([c.wait(frame => frame.t === 'line' && frame.text === text, 'healthy peer while response held', cAt),
+                    d.wait(frame => frame.t === 'line' && frame.text === text, 'healthy author while response held', dAt)]);
+                observed = checkState(await state()); assert.equal(observed.pendingResponses, 1);
+                observed = checkState(await provider('run', 0, 'after-stop'));
+                assert.equal(row(observed, 'after-stop').startCalls, 0); assert.equal(row(observed, 'after-stop').reason, 'participation-denied');
+                assert.ok(row(observed, 'after-stop').validateCalls >= 1);
+                observed = checkState(await within(control('provider-start-release'), 'provider-start explicit response release'));
+                assert.equal(observed.pendingResponses, 0); assert.equal(row(observed, 'hold').completed, true); positive(observed, 'hold');
+                const loggedOut = await within(call('/beta/logout', cookies[1], {}), 'provider-start real logout');
+                assert.equal(loggedOut.status, 200); assert.deepEqual(await loggedOut.json(), { ok: true });
+                assert.equal((await b.wait(() => false, 'actual revokedB close', 0, true)).code, 4401);
+                const copied = await call('/beta/state', cookies[1]); assert.equal(copied.status, 401); await copied.body?.cancel();
+                observed = checkState(await provider('run', 1, 'after-revoke'));
+                assert.equal(row(observed, 'after-revoke').startCalls, 0); assert.equal(row(observed, 'after-revoke').reason, 'participation-denied');
+                observed = checkState(await provider('run', 2, 'callback-close'));
+                const callback = row(observed, 'callback-close'); assert.ok(callback.validateCalls >= 1);
+                assert.equal(callback.callbackCloseMarked, true); assert.equal(callback.validationTransactionObserved, true);
+                assert.equal(callback.startCalls, 0); assert.equal(callback.reason, 'participation-denied'); assert.equal(callback.closeRetired, true);
+                assert.equal((await c.wait(() => false, 'actual callback-initiatedC close', 0, true)).code, 1000);
+                const callbackEvents = observed.events.filter(item => item.scenario === 'callback-close'), firstAt = stage => callbackEvents.find(item => item.stage === stage)?.ordinal;
+                assert.ok(firstAt('callback-close-marked') < firstAt('native-tx-promise-resolved') && firstAt('native-tx-promise-resolved') < firstAt('dispatch-denied'));
+                assert.ok(firstAt('retirement-resolved') > firstAt('callback-close-marked')); // promise observation, not retirement-start vs gate exit
+                assert.ok(firstAt('close-await-after-dispatch') > firstAt('dispatch-settled')); // fixture awaits the close promise after dispatch settles
+                assert.equal(d.closed, null); await waitCommandBudget(d); await d.barrier();
+                a.socket.close(1000, 'owned withdrawn start fixture complete');
+                assert.equal((await a.wait(() => false, 'withdrawnA normal close', 0, true)).code, 1000);
+                const checkpoint = await oneLive(1); assert.deepEqual(checkpoint.durableSessionNicks, ['NativeStartD']); privacy(checkpoint);
+                observed = checkState(await state()); assertProviderHealth(observed, 3);
+                assert.equal(observed.pendingResponses, 0); assert.equal(observed.cases.reduce((sum, item) => sum + item.startCalls, 0), 2);
+                assert.deepEqual(checkpoint.nativeRollbackWitnesses, []);
+                proof = { checks: ['actual-original-owner-and-readonly-native-TX-before-once-start', 'same-request-identity-cannot-start-twice',
+                    'held-response-releases-owner-for-realStop-and-healthy-publication', 'committedStop-and-revoke-prevent-captured-start',
+                    'native-callback-close-sync-fence-prevents-start-and-close-promise-is-awaited-after-dispatch', 'complete-private-state-scan-and-one-live-owned-loss-checkpoint'],
+                    admissionDenials, providerStart: { observed, realCookieGuests: 4, zeroNetworkStartCallbacks: 2, originalOwner: true,
+                        currentProductionProviderOff: true, healthyProgressWhileHeld: true, stopRevision: 3, realRevokeReplayDenied: true },
+                    checkpoint, sources: before, versions, binarySha256, rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs,
+                    outboundCalls, runtimeRestarts, workerdPids: group(process.pid).filter(item => item.command.includes('workerd')).map(item => item.pid) };
+                secrets = { revokedCookie: cookies[1], withdrawnCookie: cookies[0], liveCookie: cookies[3] };
+                assert.equal(outboundCalls, 1); assert.equal(runtimeRestarts, 0); assert.deepEqual(sources(), before);
+                for (const [path, digest] of Object.entries(bundleInputs)) assert.equal(hash(path), digest);
+                await ipc({ type: 'checkpoint', phase, nonce, proof, secrets }); await new Promise(() => {});
+            } else {
+                const received = recoveryInput || await recoveryMessage; secrets = received.secrets;
+                assert.ok(received.providerStart?.currentProductionProviderOff && secrets.revokedCookie && secrets.withdrawnCookie && secrets.liveCookie);
+                const revoked = await call('/beta/state', secrets.revokedCookie); assert.equal(revoked.status, 401); await revoked.body?.cancel();
+                const active = await call('/beta/state', secrets.liveCookie); assert.equal(active.status, 200); assert.equal((await active.json()).kind, 'guest');
+                const withdrawn = await ownSharing(secrets.withdrawnCookie);
+                assert.deepEqual(withdrawn, { reason: 'own sharing', ok: true, state: 'withdrawn', available: false, purposes: [], revision: 3, canStop: true });
+                const recovered = await control('inspect'); privacy(recovered);
+                assert.equal(recovered.objectId, received.checkpoint.objectId); assert.deepEqual(recovered.rooms, received.checkpoint.rooms); assert.deepEqual(recovered.reports, received.checkpoint.reports);
+                assert.equal(recovered.bindingCount, 0); assert.equal(recovered.liveBindingCount, 0); assert.deepEqual(recovered.durableSessionNicks, []); assert.deepEqual(recovered.engineSessionNicks, []);
+                const empty = checkState(await state()); assertProviderHealth(empty, 0);
+                assert.deepEqual(empty.cases, []); assert.deepEqual(empty.events, []); assert.equal(empty.pendingResponses, 0);
+                const returning = await connect(secrets.liveCookie, 'NativeStartReturn', 'rad-dad', '192.0.2.24');
+                await returning.barrier(); assert.ok(returning.frames.every(frame => frame.t !== 'line'), 'provider-start cold newcomer received old text');
+                proof = { checks: ['cold-owned-process-loss-prunes-the-real-remaining-binding', 'revocation-and-withdrawal-persist-with-healthy-grant', 'no-old-start-request-or-response-is-replayed', 'cold-phase-fresh-owner-baseline'],
+                    providerStart: { freshFixtureRequestsEmpty: true, zeroReplay: true, currentProductionProviderOff: true, freshOwnerBaseline: empty.health }, recovered,
+                    sources: before, versions, binarySha256, rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs, outboundCalls, runtimeRestarts,
+                    workerdPids: group(process.pid).filter(item => item.command.includes('workerd')).map(item => item.pid) };
+                returning.socket.close(1000, 'owned provider-start proof complete'); assert.equal((await returning.wait(() => false, 'provider-start recovery normal close', 0, true)).code, 1000);
+                assert.equal(outboundCalls, 0); assert.equal(runtimeRestarts, 0); assert.deepEqual(sources(), before);
+                for (const [path, digest] of Object.entries(bundleInputs)) assert.equal(hash(path), digest);
+                await mf.dispose(); await ipc({ type: 'result', phase, nonce, proof, miniflareDisposed: true });
+            }
+        } else if (FANOUT_50) {
             const storageMethods = ['get', 'put', 'delete', 'list', 'getAlarm', 'setAlarm', 'deleteAlarm'];
             const storageFamilies = ['authorityMarker', 'sessionIndex', 'connectionIndex', 'mintRates', 'authoritySession', 'authorityConnection',
                 'participationPolicy', 'participationRecord', 'participationAnchor', 'participationSubject', 'participationOperation', 'net', 'sessions', 'room', 'authorityOther', 'alarm', 'other'];
@@ -1192,7 +1383,8 @@ async function parent() {
         if (phase === 'recover') proc.send({ type: 'recovery', nonce, checkpoint: recovery.proof.checkpoint, secrets: recovery.secrets,
             ...(INCIDENT ? { fixtureIncidentKey, incidentSource: recovery.proof.incidentSource } : {}),
             ...(RETENTION_PROOF ? { retention: recovery.proof.retention } : {}),
-            ...(PARTICIPATION ? { sharing: recovery.proof.sharing } : {}) }, error => { if (error) fail(error); });
+            ...(PARTICIPATION && !PROVIDER_START ? { sharing: recovery.proof.sharing } : {}),
+            ...(PROVIDER_START ? { providerStart: recovery.proof.providerStart } : {}) }, error => { if (error) fail(error); });
         proc.on('message', message => { try {
             assert.equal(message?.nonce, nonce); assert.equal(message.phase, phase); if (message.type === 'failure') throw Error(message.error);
             assert.deepEqual(message.proof?.sources, before);
@@ -1236,13 +1428,14 @@ async function parent() {
     console.log(JSON.stringify({ localGatewayWebSocketSessionAuthorityQualified: !DIAGNOSE_CLOSE,
         ...(DIAGNOSE_CLOSE ? { diagnosticCloseObservationOnly: true, diagnosticPassMeansNoReproductionOnly: true } : {}), ...(PARTICIPATION ? { productionParticipationCompositionQualified: !DIAGNOSE_CLOSE, guardianDecisionsQualified: false } : {}),
         ...(INCIDENT ? { productionIncidentSourceCompositionQualified: true, incidentAuthorityAndKeyQualified: false } : {}),
-        ...(PARTICIPATION && !PRESSURE_ONLY && !FANOUT_50 ? { productionOwnSharingCompositionQualified: !DIAGNOSE_CLOSE } : {}),
+        ...(PARTICIPATION && !PRESSURE_ONLY && !FANOUT_50 && !PROVIDER_START ? { productionOwnSharingCompositionQualified: !DIAGNOSE_CLOSE } : {}),
         ...(FANOUT_50 ? { nativeLocalFiftyGuestFanoutQualified: true, originalNinePlusThreeQualifiedByThisMode: false, hostedScaleQualified: false } : {}),
         ...(PRESSURE_ONLY ? { nativeLocalNonAckPressureQualified: true, originalNinePlusThreeQualifiedByThisMode: false, hostedScaleQualified: false } : {}),
+        ...(PROVIDER_START ? { nativeOwnerStartInvocationBoundaryQualified: true, zeroNetworkCallbackOnly: true, originalNinePlusThreeQualifiedByThisMode: false, providerActivationQualified: false } : {}),
         ...(TRAFFIC_ACKS ? { nativeLocalHealthyAckProbeQualified: !DIAGNOSE_CLOSE, hostedScaleQualified: false } : {}),
         ...(RETENTION_PROOF ? { nativeC2RetentionHandlerQualified: true, hostedAlarmSchedulerQualified: false } : {}),
         ...(PARTICIPATION && INCIDENT ? { combinedParticipationIncidentSourceCompositionQualified: true } : {}), first, recovered, node: process.version, platform: process.platform, architecture: process.arch,
-        temporaryStateRemoved: true, scope: DIAGNOSE_CLOSE ? 'Explicit pass-through close-order diagnostic only. A passing instrumented run means no reproduction in that run, not a retirement fix, ordinary mode qualification, hosted readiness or overall completion. All original assertions/waits remain. No production behavior is replaced.' : FANOUT_50 ? 'Separate50-real-guest native C3 fanout proof:12publications/600actualdeliveries,50pacedACKstreams,actualrevocation49livebindings thenwholeprocessloss/coldpruning/nohistory. Syntheticpolicy/grants only. Native-local Node/Miniflare bridge observations,notbrowser/WAN/150tier/reconnectstorm/many-room/soak/hostedcapacityorSLO. Doesnotrequalifycanonical9+3/fault/Stop/reportmodes.' : PRESSURE_ONLY ? 'Separate three-current-SID C3 application-ACK credit pressure proof in actual local workerd/SQLite. Real HELP output, zero-ACK probe4413 with128-frame/native-send/credit witness, healthy ACK/publication and real revocation isolation, one-binding owned-process-loss recovery and no text replay. Synthetic consent only. Does not requalify original9+3/Delta/Echo modes, physical slow TCP/browser/WAN/shared-fanout capacity/150-native/soak or hosted limits/cost.' : 'Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. ' + (PARTICIPATION ? 'Required production C3 bridge selected; actual caller-only HTTP status/Stop narrows the existing synthetic ledger, keeps the same socket for a delivered-message report, then persists withdrawal across process loss before real logout. Only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. ' : '') + (INCIDENT ? 'Required production I3a source bridge and existing I1 over actual records transactions; separate incident appointment/policy and privately retained test key are synthetic only. This does not qualify real incident authority, purpose-key provisioning or key recovery. ' : '') + (TRAFFIC_ACKS ? 'Optional three-visitor paced native-local ACK workload; raw envelopes validated before semantic normalization and actual serialized control grants reconciled. Latencies include Node/Miniflare native bridge; no throughput tier or public SLO claim. ' : '') + 'No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.' }, null, 2));
+        temporaryStateRemoved: true, scope: PROVIDER_START ? 'Separate four-real-guest native C3 original-owner/read-only-TX/start-invocation proof with zero-network callbacks. Actual Stop/revoke, callback-initiated close, held-response healthy progress and owned-process-loss cleanup. Explicit synthetic consent/provider readiness only; production AI remains off. Not canonical9+3/fault requalification, external provider activation, physical wire/crash exactly-once, hostedPITR/scale/SLO, legal/guardian or nativeaudio proof.' : DIAGNOSE_CLOSE ? 'Explicit pass-through close-order diagnostic only. A passing instrumented run means no reproduction in that run, not a retirement fix, ordinary mode qualification, hosted readiness or overall completion. All original assertions/waits remain. No production behavior is replaced.' : FANOUT_50 ? 'Separate50-real-guest native C3 fanout proof:12publications/600actualdeliveries,50pacedACKstreams,actualrevocation49livebindings thenwholeprocessloss/coldpruning/nohistory. Syntheticpolicy/grants only. Native-local Node/Miniflare bridge observations,notbrowser/WAN/150tier/reconnectstorm/many-room/soak/hostedcapacityorSLO. Doesnotrequalifycanonical9+3/fault/Stop/reportmodes.' : PRESSURE_ONLY ? 'Separate three-current-SID C3 application-ACK credit pressure proof in actual local workerd/SQLite. Real HELP output, zero-ACK probe4413 with128-frame/native-send/credit witness, healthy ACK/publication and real revocation isolation, one-binding owned-process-loss recovery and no text replay. Synthetic consent only. Does not requalify original9+3/Delta/Echo modes, physical slow TCP/browser/WAN/shared-fanout capacity/150-native/soak or hosted limits/cost.' : 'Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. ' + (PARTICIPATION ? 'Required production C3 bridge selected; actual caller-only HTTP status/Stop narrows the existing synthetic ledger, keeps the same socket for a delivered-message report, then persists withdrawal across process loss before real logout. Only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. ' : '') + (INCIDENT ? 'Required production I3a source bridge and existing I1 over actual records transactions; separate incident appointment/policy and privately retained test key are synthetic only. This does not qualify real incident authority, purpose-key provisioning or key recovery. ' : '') + (TRAFFIC_ACKS ? 'Optional three-visitor paced native-local ACK workload; raw envelopes validated before semantic normalization and actual serialized control grants reconciled. Latencies include Node/Miniflare native bridge; no throughput tier or public SLO claim. ' : '') + 'No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.' }, null, 2));
 }
 try { if (process.argv[2] === '--isolated' && process.argv.length === (6 + MODE.length)) await runtime(process.argv[3], process.argv[4], process.argv[5]); else await parent(); }
 catch (error) { console.error(error.stack || error); process.exitCode = 1; }

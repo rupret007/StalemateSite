@@ -280,6 +280,24 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
             } catch { return false; }
         },
         writeParticipationEffects: commitEffects,
+        validateParticipationStart(validate) {
+            ensure(typeof validate === 'function');
+            // Reuse the initialized/configured, bounded codec transaction.
+            // Its full completion (including a poisoned read) precedes any
+            // irreversible start; this callback has no write capability.
+            return transact(async tx => {
+                try { return await validate(Object.freeze({
+                    get: key => tx.get(key), list: options => tx.list(options)
+                })) === true; }
+                catch (error) {
+                    // Normalize only the validator's domain refusal here.
+                    // Native/codec poison still escapes outer finalization,
+                    // even when its original error has this same message.
+                    if (error?.message === 'participation-denied') return false;
+                    throw error;
+                }
+            });
+        },
         loadIncidentEvidence: input => { ensure(incidentSources); return loadLobbyIncidentEvidence({ ...input, now: now() }); },
         ownParticipation: value => transact(async tx => {
             ensure(env.HANGOUT_PARTICIPATION_AUTHORITY === 'c3-v1' && exact(value, value.request === undefined ? ['sid', 'version', 'exp'] : ['sid', 'version', 'exp', 'request']));
