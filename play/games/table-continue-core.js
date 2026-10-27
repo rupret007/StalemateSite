@@ -460,7 +460,9 @@
       return null;
     }
     const allCards = players.flatMap((player) => player.hand).concat(deck, discard);
-    if (allCards.length > 52 || allCards.length < 1) {
+    // Eights never removes cards from the table, including at round end.
+    // A missing discard leaves every card unplayable after Continue.
+    if (allCards.length !== 52 || discard.length === 0) {
       return null;
     }
     if (!uniqueCardKeys(allCards, (card) => `${card.suit}:${card.rank}`)) {
@@ -501,7 +503,10 @@
     let pendingWildCard = null;
     if (snapshot.pendingWildCard !== null && snapshot.pendingWildCard !== undefined) {
       pendingWildCard = cleanEightsCard(snapshot.pendingWildCard);
-      if (!pendingWildCard) {
+      const heldWild = players[0].hand.find((card) => card.id === pendingWildCard?.id);
+      if (!pendingWildCard || pendingWildCard.rank !== '8' ||
+        !snapshot.roundActive || currentPlayer !== 0 || snapshot.overlay ||
+        !heldWild || heldWild.rank !== '8' || heldWild.suit !== pendingWildCard.suit) {
         return null;
       }
     }
