@@ -252,6 +252,26 @@ describe('quiet visits and confirmed gatherings', () => {
         expect(describeVisit({ connection: 'connected', channel: { names: [visitor('MeHere')] }, me: 'MeHere', gathering: confirmed(), timeZone: 'UTC' }).gatheringStatus).toBe('unavailable');
     });
 
+    it('counts the channel only after the people list is known', () => {
+        const waiting = describeVisit({ connection: 'connected', me: 'MeHere', now: NOW, timeZone: 'UTC' });
+        expect(waiting.known).toBe(false);
+        expect(waiting.selfPresent).toBe(true);
+        expect(waiting.others).toBe(0);
+        expect(visitView(waiting).lobbyCount).toBe('Main conversation');
+        expect(visitView(visit()).lobbyCount).toBe('1 here · chat');
+        expect(visitView(visit({ channel: { names: [visitor('MeHere'), visitor('Alpha')] } })).lobbyCount).toBe('2 here · chat');
+        const unnamed = describeVisit({ connection: 'connected', channel: { names: [visitor('Alpha')] }, now: NOW, timeZone: 'UTC' });
+        expect(unnamed.selfPresent).toBe(false);
+        expect(visitView(unnamed).lobbyCount).toBe('1 here · chat');
+        expect(visitView(describeVisit({ connection: 'offline', me: 'MeHere', channel: { names: [] } })).lobbyCount).toBe('Main conversation');
+        expect(visitView(describeVisit({ connection: 'reconnecting', me: 'MeHere', channel: { names: [visitor('MeHere')] } })).lobbyCount).toBe('Main conversation');
+        expect(visitView({ connection: 'connected', known: true, others: 1.5, selfPresent: true }).lobbyCount).toBe('Main conversation');
+        expect(visitView({ connection: 'connected', known: true, others: 0, selfPresent: false }).lobbyCount).toBe('0 here · chat');
+        const client = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby.js', import.meta.url), 'utf8');
+        expect(client).toContain("$('[data-lobby-count]').textContent = view.lobbyCount;");
+        expect(client).not.toContain('here · chat');
+    });
+
     it('writes a local calendar reminder without an RSVP, recurrence, or attendee', () => {
         const shown = visit({ gathering: confirmed({ activity: 'chat', note: 'ATTENDEE:mailto:person@example.invalid' }) }).gathering;
         const ics = calendarReminder(shown, NOW);
