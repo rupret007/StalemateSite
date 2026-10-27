@@ -20,7 +20,7 @@ async function shell(address, config = env(), prepare) {
     const client = await (await betaFetch(request('/beta/client.js'), config)).text();
     const dom = new JSDOM(html, { url: address, runScripts: 'outside-only' });
     dom.window.entryFunctions = entryFunctions;
-    dom.window.fetch = vi.fn(async () => new Response(JSON.stringify({ kind: 'guest', emailConfigured: true, staffConfigured: true }), { headers: { 'Content-Type': 'application/json' } }));
+    dom.window.fetch = vi.fn(async (path, options = {}) => new Response(JSON.stringify(options.method === 'POST' ? { ok: true } : { kind: 'guest', emailConfigured: true, staffConfigured: true }), { headers: { 'Content-Type': 'application/json' } }));
     if (prepare) prepare(dom.window);
     // jsdom does not execute ES modules. Supply the actual shared module exports
     // while executing the served shell client unchanged below its import line.
@@ -102,7 +102,8 @@ describe('optional storage in the actual private beta client', () => {
                     ? new Response('{"ok":true}', { headers: { 'Content-Type': 'application/json' } })
                     : new Response('{"error":"Private invitation required."}', { status: 401, headers: { 'Content-Type': 'application/json' } }));
                 dom.window.document.querySelector('#logout').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
-                await vi.waitFor(() => expect(dom.window.document.querySelector('#inside').hidden).toBe(true));
+                await vi.waitFor(() => expect(dom.window.document.querySelector('#status').textContent).toBe('A private invitation is required.'));
+                expect(dom.window.document.querySelector('#inside').hidden).toBe(true);
                 expect(dom.window.fetch.mock.calls.map(call => call[0])).toEqual(['/beta/logout', '/beta/state']);
                 expect(dom.window.document.querySelector('#status').textContent).toBe('A private invitation is required.');
                 expect(attempts.length).toBeGreaterThan(0); expect(errors).toEqual([]);
@@ -186,4 +187,213 @@ describe('optional storage in the actual private beta client', () => {
             } finally { dom.window.close(); }
         });
     }
+});
+
+
+describe('truthful invitation and service state in the actual private beta shell', () => {
+    it('distinguishes a real registry service failure from a genuinely missing invitation without posting or minting', async () => {
+        const config = env(), values = new Map();
+        const storage = {
+            get: async key => structuredClone(values.get(key)),
+            put: async (key, value) => values.set(key, structuredClone(value)),
+            delete: async keys => { for (const key of Array.isArray(keys) ? keys : [keys]) values.delete(key); },
+            list: async ({ prefix = '', limit = 1000 } = {}) => new Map([...values]
+                .filter(([key]) => key.startsWith(prefix)).sort(([a], [b]) => a.localeCompare(b)).slice(0, limit)),
+            setAlarm: async () => {}, deleteAlarm: async () => {}
+        };
+        // Real production signature/registry requests over a success-only memory
+        // adapter; this is neither native storage nor hosted browser-cookie proof.
+        storage.transaction = callback => callback(storage);
+        const registry = new BetaSessions({ storage, blockConcurrencyWhile: callback => callback() }, config);
+        config.BETA_SESSIONS = { idFromName: name => name, get: () => registry };
+        const unlocked = await betaFetch(new Request('https://beta.example/beta/unlock', {
+            method: 'POST', headers: { Origin: 'https://beta.example', 'Content-Type': 'application/json', 'CF-Connecting-IP': '192.0.2.44' },
+            body: JSON.stringify({ key: config.HANGOUT_BETA_INVITE_KEY })
+        }), config);
+        expect(unlocked.status).toBe(200);
+        const cookie = unlocked.headers.get('Set-Cookie').split(';')[0];
+        const html = await (await betaFetch(new Request('https://beta.example/'), config)).text();
+        const client = await (await betaFetch(new Request('https://beta.example/beta/client.js'), config)).text();
+        const createPortal = async cookieHeader => {
+            const dom = new JSDOM(html, { url: 'https://beta.example/', runScripts: 'outside-only' });
+            const calls = [];
+            dom.window.entryFunctions = entryFunctions;
+            dom.window.fetch = vi.fn(async (path, options = {}) => {
+                const method = options.method || 'GET';
+                const response = await betaFetch(new Request(new URL(path, 'https://beta.example'), {
+                    method, headers: { Origin: 'https://beta.example', ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+                        ...(options.headers || {}) }, ...(options.body ? { body: options.body } : {})
+                }), config);
+                calls.push({ path, method, status: response.status, setsCookie: response.headers.has('Set-Cookie') });
+                return response;
+            });
+            dom.window.eval(client.replace(/^import \{([^}]+)\} from '[^']+';/, 'const {$1} = entryFunctions;'));
+            await vi.waitFor(() => expect(dom.window.document.querySelector('#code').disabled).toBe(false));
+            return { dom, calls };
+        };
+        const missing = await createPortal('');
+        try {
+            expect(missing.calls).toEqual([{ path: '/beta/state', method: 'GET', status: 401, setsCookie: false }]);
+            expect(missing.dom.window.document.querySelector('#status').textContent).toBe('A private invitation is required.');
+            expect(missing.dom.window.document.querySelector('#login').hidden).toBe(false);
+            expect(missing.dom.window.document.querySelector('#inside').hidden).toBe(true);
+        } finally { missing.dom.window.close(); }
+        const beforeFailure = structuredClone([...values]);
+        config.BETA_SESSIONS.get = () => { throw Error('private synthetic registry detail must not reach portal'); };
+        const unavailable = await createPortal(cookie);
+        try {
+            // Establish actual gateway503 and lack of mutation BEFORE the UI
+            // oracle; no test-selected503Response substitutes for the gateway.
+            expect(unavailable.calls).toEqual([{ path: '/beta/state', method: 'GET', status: 503, setsCookie: false }]);
+            expect([...values]).toEqual(beforeFailure);
+            const doc = unavailable.dom.window.document;
+            expect(doc.querySelector('#inside').hidden).toBe(true);
+            expect(doc.querySelector('a[href="/beta/privacy"]')).not.toBeNull();
+            expect(doc.querySelector('#status').textContent).not.toContain('private synthetic registry detail');
+            expect(doc.querySelector('#status').textContent).not.toBe('A private invitation is required.');
+            expect(doc.querySelector('#status').textContent).toMatch(/temporarily unavailable/i);
+            expect(doc.querySelector('#login').hidden).toBe(true);
+            expect(unavailable.calls.every(call => call.method === 'GET')).toBe(true);
+            config.BETA_SESSIONS.get = () => registry;
+            const retry = doc.querySelector('#retry');
+            expect(retry.hidden).toBe(false);
+            retry.click(); retry.click(); // The second native click is disabled.
+            expect(retry.disabled).toBe(true);
+            await vi.waitFor(() => expect(doc.querySelector('#inside').hidden).toBe(false));
+            expect(doc.querySelector('#status').textContent).toBe('Invitation accepted.');
+            expect(unavailable.calls).toEqual([
+                { path: '/beta/state', method: 'GET', status: 503, setsCookie: false },
+                { path: '/beta/state', method: 'GET', status: 200, setsCookie: false }
+            ]);
+            expect([...values]).toEqual(beforeFailure); // Same actual SID/expiry; no mint.
+        } finally { unavailable.dom.window.close(); }
+    });
+});
+
+
+describe('explicit recovery and lifecycle fencing in the served invitation portal', () => {
+    async function portal(responder, prepare) {
+        const config = env();
+        const html = await (await betaFetch(new Request('https://beta.example/'), config)).text();
+        const client = await (await betaFetch(new Request('https://beta.example/beta/client.js'), config)).text();
+        const dom = new JSDOM(html, { url: 'https://beta.example/', runScripts: 'outside-only' });
+        dom.window.entryFunctions = entryFunctions;
+        const calls = [];
+        // Explicit HTTP/network seams around the actual served client. These
+        // cases do not claim a real browser cookie jar or actual server revoke.
+        dom.window.fetch = vi.fn(async (path, options = {}) => {
+            calls.push({ path, method: options.method || 'GET' });
+            return responder(path, options, calls.length);
+        });
+        if (prepare) prepare(dom.window);
+        dom.window.eval(client.replace(/^import \{([^}]+)\} from '[^']+';/, 'const {$1} = entryFunctions;'));
+        return { dom, calls };
+    }
+    const state = () => Response.json({ kind: 'guest', role: 'fan', emailConfigured: true, staffConfigured: true });
+
+    it('recovers only on explicit GET after network or malformed state without discarding an invitation draft', async () => {
+        const replies = [
+            () => { throw Error('private network fixture detail'); },
+            () => new Response('private non-json fixture detail', { headers: { 'Content-Type': 'application/json' } }),
+            () => Response.json({ kind: 'staff', role: 'private-invalid-role', emailConfigured: true, staffConfigured: true }),
+            () => Response.json({ error: 'Private invitation required.' }, { status: 401 })
+        ];
+        const h = await portal((path, options) => {
+            expect(path).toBe('/beta/state'); expect(options.method || 'GET').toBe('GET');
+            return replies.shift()();
+        }, window => { window.document.querySelector('#code').value = 'unsent invitation draft'; });
+        try {
+            const doc = h.dom.window.document, retry = doc.querySelector('#retry');
+            for (let failedReads = 1; failedReads <= 3; failedReads += 1) {
+                await vi.waitFor(() => expect(doc.querySelector('#status').textContent).toMatch(/temporarily unavailable/i));
+                expect(h.calls).toHaveLength(failedReads);
+                expect(doc.querySelector('#login').hidden).toBe(true);
+                expect(doc.querySelector('#inside').hidden).toBe(true);
+                expect(doc.querySelector('#code').value).toBe('unsent invitation draft');
+                expect(doc.body.textContent).not.toMatch(/private network fixture detail|private non-json fixture detail|private-invalid-role/);
+                expect(doc.querySelector('a[href="/beta/privacy"]')).not.toBeNull();
+                expect(retry.hidden).toBe(false); expect(retry.disabled).toBe(false);
+                retry.click(); retry.click();
+                expect(retry.disabled).toBe(true);
+            }
+            await vi.waitFor(() => expect(doc.querySelector('#login').hidden).toBe(false));
+            expect(doc.querySelector('#status').textContent).toBe('A private invitation is required.');
+            expect(doc.querySelector('#code').value).toBe('unsent invitation draft');
+            expect(retry.hidden).toBe(true);
+            expect(h.calls).toEqual(Array.from({ length: 4 }, () => ({ path: '/beta/state', method: 'GET' })));
+        } finally { h.dom.window.close(); }
+    });
+
+    it('presents a refusal as denied access rather than missing credentials and retries only when chosen', async () => {
+        let release;
+        const later = new Promise(resolve => { release = resolve; });
+        const h = await portal((path, options, count) => count === 1
+            ? Response.json({ error: 'private refusal fixture detail' }, { status: 403 }) : later);
+        try {
+            const doc = h.dom.window.document, retry = doc.querySelector('#retry');
+            await vi.waitFor(() => expect(doc.querySelector('#status').textContent).toMatch(/Access was denied/));
+            expect(doc.querySelector('#status').textContent).not.toContain('invitation is required');
+            expect(doc.querySelector('#status').textContent).not.toContain('private refusal fixture detail');
+            expect(doc.querySelector('#login').hidden).toBe(true);
+            expect(doc.querySelector('#inside').hidden).toBe(true);
+            expect(doc.querySelector('a[href="/beta/privacy"]')).not.toBeNull();
+            expect(h.calls).toEqual([{ path: '/beta/state', method: 'GET' }]);
+            retry.click(); retry.click();
+            expect(retry.disabled).toBe(true);
+            expect(doc.querySelector('#code').disabled).toBe(true);
+            expect(h.calls).toHaveLength(2);
+            release(state());
+            await vi.waitFor(() => expect(doc.querySelector('#inside').hidden).toBe(false));
+            expect(doc.querySelector('#status').textContent).toBe('Invitation accepted.');
+            expect(h.calls.every(call => call.method === 'GET')).toBe(true);
+        } finally { release(state()); h.dom.window.close(); }
+    });
+
+    it('keeps failed leaving unconfirmed and ignores a held older identity read after confirmed retry', async () => {
+        let releaseRead, releaseLeave, posts = 0, reads = 0;
+        const olderRead = new Promise(resolve => { releaseRead = resolve; });
+        const confirmedLeave = new Promise(resolve => { releaseLeave = resolve; });
+        const hintKeys = ['hangout-owner', 'hangout-preview', entryFunctions.ENTRY_HANDOFF_KEY];
+        const h = await portal((path, options) => {
+            if (path === '/beta/state') return ++reads === 1 ? olderRead : Response.json({ error: 'Private invitation required.' }, { status: 401 });
+            expect(path).toBe('/beta/logout'); expect(options.method).toBe('POST');
+            return ++posts === 1 ? Response.json({ error: 'private closing fixture detail' }, { status: 503 }) : confirmedLeave;
+        }, window => { for (const key of hintKeys) window.sessionStorage.setItem(key, 'existing optional hint'); });
+        try {
+            const { window } = h.dom, doc = window.document;
+            expect(doc.querySelector('#code').disabled).toBe(true);
+            // Model a queued form activation while the preceding read is held.
+            // The served client must fence it even if aborting fetch is ineffective.
+            doc.querySelector('#logout').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+            await vi.waitFor(() => expect(doc.querySelector('#retry-leave').hidden).toBe(false));
+            expect(doc.querySelector('#status').textContent).toMatch(/Leaving was not confirmed/);
+            expect(doc.querySelector('#status').textContent).not.toContain('private closing fixture detail');
+            expect(doc.querySelector('#login').hidden).toBe(true);
+            expect(doc.querySelector('#inside').hidden).toBe(true);
+            expect(doc.querySelector('#retry').hidden).toBe(true);
+            for (const key of hintKeys) expect(window.sessionStorage.getItem(key)).toBe('existing optional hint');
+            expect(h.calls).toEqual([{ path: '/beta/state', method: 'GET' }, { path: '/beta/logout', method: 'POST' }]);
+            doc.querySelector('#retry-leave').click(); doc.querySelector('#retry-leave').click();
+            doc.querySelector('#logout').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+            expect(posts).toBe(2); expect(doc.querySelector('#retry-leave').disabled).toBe(true);
+            for (const key of hintKeys) expect(window.sessionStorage.getItem(key)).toBe('existing optional hint');
+            releaseLeave(Response.json({ ok: true }));
+            await vi.waitFor(() => expect(doc.querySelector('#status').textContent).toBe('A private invitation is required.'));
+            for (const key of hintKeys) expect(window.sessionStorage.getItem(key)).toBeNull();
+            releaseRead(Response.json({ kind: 'staff', role: 'owner', emailConfigured: true, staffConfigured: true }));
+            await window.fetch.mock.results[0].value;
+            await new Promise(resolve => window.setTimeout(resolve, 0)); // One event turn, no fake clock or wait-cap change.
+            expect(doc.querySelector('#status').textContent).toBe('A private invitation is required.');
+            expect(doc.querySelector('#inside').hidden).toBe(true);
+            expect(doc.querySelector('#moderation').hidden).toBe(true);
+            expect(h.calls).toEqual([
+                { path: '/beta/state', method: 'GET' }, { path: '/beta/logout', method: 'POST' },
+                { path: '/beta/logout', method: 'POST' }, { path: '/beta/state', method: 'GET' }
+            ]);
+        } finally {
+            releaseRead(Response.json({ error: 'Private invitation required.' }, { status: 401 }));
+            releaseLeave(Response.json({ ok: true }));
+            h.dom.window.close();
+        }
+    });
 });
