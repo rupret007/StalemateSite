@@ -1,5 +1,5 @@
 import { createRun, startRun, pauseRun, resumeRun, act, advance } from './turdrush-core.js?v=6120b7f3c87dd2c2';
-import { TurdRushRenderer } from './turdrush-renderer.js?v=f4762493ef575803';
+import { TurdRushRenderer } from './turdrush-renderer.js?v=f6277b1d944495d2';
 
 const $ = id => document.getElementById(id);
 const suite = globalThis.Suite;

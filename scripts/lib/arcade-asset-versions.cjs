@@ -6,6 +6,7 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 const TARGETS = new Set([
     'assets/suite-progress.js', 'assets/suite-progress.css', 'assets/suite-share.js',
+    'assets/arcade-hub.css', 'assets/suite-hub-stats.js',
     'assets/turdsuite.js', 'assets/suite-audio.js', 'assets/suite-sound.js',
     'games/turdtris-audio.js', 'games/turdjack-audio.js',
     'games/turdrummy-audio.js', 'games/turdrummy-audio-core.js',

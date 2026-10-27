@@ -152,9 +152,12 @@ function hazard(kind) {
     for (const x of [-0.6, 0, 0.6]) { const ring = cylinder(group, COLORS.ink, x, 1.53, 0, 0.24, 0.14); ring.rotation.z = Math.PI / 2; }
     sign(group, 'SLIDE', 0, 1.92, 0.12, 1.7, '#fff5da', '#763b55');
   } else if (kind === 'pick') {
-    const shape = new THREE.Shape(); shape.moveTo(0, -0.31); shape.bezierCurveTo(-0.75, 0.35, -0.21, 0.54, 0, 0.34); shape.bezierCurveTo(0.21, 0.54, 0.75, 0.35, 0, -0.31);
+    const shape = new THREE.Shape(); shape.moveTo(0, -0.36);
+    shape.bezierCurveTo(-0.1, -0.31, -0.42, 0.12, -0.36, 0.31);
+    shape.bezierCurveTo(-0.28, 0.47, 0.28, 0.47, 0.36, 0.31);
+    shape.bezierCurveTo(0.42, 0.12, 0.1, -0.31, 0, -0.36);
     const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.08, bevelEnabled: true, bevelThickness: 0.035, bevelSize: 0.03, bevelSegments: 2, steps: 1 }), material(COLORS.gold, { metalness: 0.32, emissive: 0x6b3b09, emissiveIntensity: 0.24 }));
-    mesh.rotation.z = Math.PI; group.add(mesh); ball(group, 0xfff3a7, -0.1, 0.2, 0.09, 0.065, 0.1, 0.025);
+    group.add(mesh); ball(group, 0xfff3a7, -0.1, 0.2, 0.09, 0.065, 0.1, 0.025);
   } else if (kind === 'shield') {
     ball(group, COLORS.mint, 0, 0, 0, 0.45, 0.55, 0.16, { emissive: 0x226c60, emissiveIntensity: 0.5 });
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.57, 0.065, 7, 24), material(COLORS.paper)); group.add(ring);

@@ -24,6 +24,22 @@ function fixture() {
     return { root, write, read, hash };
 }
 describe('content-versioned arcade delivery', () => {
+    it('versions the expanded hub styling and record catalog for returning players', () => {
+        const f = fixture();
+        f.write('assets/arcade-hub.css', '.game-card:last-child { grid-column: 1 / -1; }');
+        f.write('assets/suite-hub-stats.js', 'export const pages = 9;');
+        f.write('index.html', '<link rel="stylesheet" href="assets/arcade-hub.css"><script type="module">import { pages } from "./assets/suite-hub-stats.js";</script>');
+        versionArcadeAssets(f.root);
+        expect(f.read('index.html')).toContain('assets/arcade-hub.css?v=' + f.hash('assets/arcade-hub.css'));
+        expect(f.read('index.html')).toContain('./assets/suite-hub-stats.js?v=' + f.hash('assets/suite-hub-stats.js'));
+        const before = f.read('index.html');
+        f.write('assets/arcade-hub.css', '.game-card { min-height: 44px; }');
+        f.write('assets/suite-hub-stats.js', 'export const pages = 10;');
+        versionArcadeAssets(f.root);
+        expect(f.read('index.html')).not.toBe(before);
+        expect(f.read('index.html')).toContain('assets/arcade-hub.css?v=' + f.hash('assets/arcade-hub.css'));
+        expect(f.read('index.html')).toContain('./assets/suite-hub-stats.js?v=' + f.hash('assets/suite-hub-stats.js'));
+    });
     it('invalidates the runner renderer and entry when the self-hosted3D core changes', () => {
         const f = fixture();
         f.write('assets/vendor/three/three.core.js', 'export const revision = 1;');
