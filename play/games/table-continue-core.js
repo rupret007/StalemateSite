@@ -252,6 +252,23 @@
       }
       trick.push({ player, card });
     }
+    // Live Spades snapshots are taken between atomic card plays. Every seat
+    // has 13 minus completed tricks, and one fewer after playing this trick.
+    // Won cards may be absent from legacy history, but these counts still hold.
+    const completedTricks = tricks.reduce((sum, count) => sum + count, 0);
+    if (phase === 'bidding' && (completedTricks !== 0 || trick.length !== 0 ||
+      hands.some((hand) => hand.length !== 13))) {
+      return null;
+    }
+    if (phase === 'play') {
+      if (completedTricks >= 13 || trick.length > 3 || bids.includes(null) ||
+        currentPlayer !== (leader + trick.length) % 4 ||
+        trick.some((entry, index) => entry.player !== (leader + index) % 4) ||
+        hands.some((hand, player) => hand.length !== 13 - completedTricks -
+          (trick.some((entry) => entry.player === player) ? 1 : 0))) {
+        return null;
+      }
+    }
     const allCards = hands.flat().concat(trick.map((entry) => entry.card));
     if (allCards.length > 52) {
       return null;
@@ -393,6 +410,17 @@
       return null;
     }
     if (typeof snapshot.initialized !== 'boolean' || !snapshot.initialized) {
+      return null;
+    }
+    // A live Gin hand has ten cards, or eleven while the human chooses a
+    // discard. A shorter hand can otherwise claim a bogus gin after Continue.
+    const humanDiscard = turn === 'player' && phase === 'discard';
+    if (snapshot.matchOver && !snapshot.roundOver) {
+      return null;
+    }
+    if (!snapshot.roundOver && (playerHand.length !== (humanDiscard ? 11 : 10) ||
+      aiHand.length !== 10 || (humanDiscard && (!drawnCardId || !drawnCardSource ||
+        !playerHand.some((card) => card.id === drawnCardId))))) {
       return null;
     }
     return {
