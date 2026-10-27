@@ -55,12 +55,14 @@ async function fixture({ initialize = true, participation = false } = {}) {
     const rawGet = key => storage.transaction(tx => tx.get(key));
     const registration = (id, extra = {}) => ({ sid: `session-${id.padEnd(12, 'x')}`, version: env.HANGOUT_BETA_INVITE_VERSION,
         exp: at + 100000, iph: `mint-${id.padEnd(17, 'x')}`.slice(0, 22), ...extra });
-    const enroll = async (id, profile = null) => {
+    const enroll = async (id, profile = null, { email } = {}) => {
         const request = registration(id, { profile }); expect((await authority.register(request)).status).toBe(200);
         const binding = { id, betaSid: request.sid, betaInviteVersion: request.version, dev: `device_${id}`, iph: request.iph,
             account: profile?.account || '', role: profile?.role || 'fan', admin: profile?.admin || false,
             expiresAt: Math.min(request.exp, profile?.expiresAt || request.exp), authorityRef: id, authorityRevision: 1 };
-        expect(await authority.bind(binding)).toEqual(binding); return { request, binding };
+        const stored = await authority.bind(binding);
+        expect(stored).toEqual(binding);
+        return { request, binding: { ...binding, ...(profile?.admin && email ? { email } : {}) } };
     };
     const makeEngine = (extra = {}) => {
         const frames = [], persist = vi.fn(), engine = createLobby({ now: () => at, effectCommit: authority.effectCommit,
@@ -1235,9 +1237,10 @@ describe('offline production owner-gated participation start boundary', () => {
 
 async function p9Prepared({ staff = false, healthy = false, grantMs = 100000 } = {}) {
     const f = await fixture({ participation: true });
-    const profile = staff ? { kind: 'staff', account: await accountId('reviewer@example.invalid', f.env.HANGOUT_HMAC_KEY),
+    const staffEmail = 'reviewer@example.invalid';
+    const profile = staff ? { kind: 'staff', account: await accountId(staffEmail, f.env.HANGOUT_HMAC_KEY),
         role: 'moderator', admin: true, expiresAt: NOW + 90000 } : null;
-    const person = await f.enroll('p9-matrix', profile), ledger = await participationLedger(f);
+    const person = await f.enroll('p9-matrix', profile, { email: staff ? staffEmail : undefined }), ledger = await participationLedger(f);
     await ledger.grant(person.binding, { expiresIn: grantMs });
     const other = healthy ? await f.enroll('p9-healthy') : null;
     if (other) await ledger.grant(other.binding);
