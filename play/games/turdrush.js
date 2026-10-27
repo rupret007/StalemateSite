@@ -241,6 +241,7 @@ function frame(time) {
 $('rush-start').addEventListener('click', begin);
 $('rush-again').addEventListener('click', begin);
 $('rush-restart-paused').addEventListener('click', begin);
+$('rush-pause').addEventListener('pointerdown', () => { gesture = null; pendingSwipe = null; });
 $('rush-pause').addEventListener('click', () => pause());
 $('rush-resume').addEventListener('click', resume);
 $('rush-reload').addEventListener('click', () => globalThis.location.reload());
