@@ -79,7 +79,16 @@ const group = pid => execFileSync('/bin/ps', ['-axo', 'pid=,ppid=,pgid=,stat=,co
     const m = line.trim().match(/^(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.+)$/);
     return m && { pid: +m[1], ppid: +m[2], pgid: +m[3], state: m[4], command: basename(m[5]) };
 }).filter(row => row && row.pgid === pid && !row.state.startsWith('Z'));
-const kill = pid => { if (Number.isInteger(pid) && pid > 1) try { process.kill(-pid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; } };
+const kill = pid => {
+    if (!(Number.isInteger(pid) && pid > 1)) return;
+    try { process.kill(-pid, 'SIGKILL'); }
+    catch (error) {
+        // macOS can return EPERM for a process group that has already exited.
+        // A still-listed member must remain a cleanup failure.
+        if (error.code === 'ESRCH' || error.code === 'EPERM' && !group(pid).length) return;
+        throw error;
+    }
+};
 async function stopped(pid) { for (let n = 0; n < 80; n++) { if (!group(pid).length) return; await delay(25); } assert.fail('owned group still live'); }
 const ipc = message => new Promise((resolve, reject) => process.send(message, error => error ? reject(error) : resolve()));
 function receive(expected, nonce) {
