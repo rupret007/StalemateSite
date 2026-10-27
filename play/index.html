@@ -11,13 +11,13 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="assets/turdsuite.css">
   <link rel="stylesheet" href="assets/arcade.css">
-  <link rel="stylesheet" href="assets/arcade-hub.css">
+  <link rel="stylesheet" href="assets/arcade-hub.css?v=11e436f0a0024e1f">
   <link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
-  <script src="games/suite-progress-core.js?v=26280b3adb2d8c25"></script>
-  <script src="assets/suite-progress.js?v=5fdc02c46aa62534"></script>
-  <script src="games/table-continue-core.js?v=20eb7896c75cf7a4"></script>
-  <script src="assets/turdsuite.js?v=6f50c545b34761d8"></script>
-  <title>Stalemate Arcade — Eight Free Games</title>
+  <script src="games/suite-progress-core.js?v=3c92de426327c7d1"></script>
+  <script src="assets/suite-progress.js?v=cf46f758fae8dff1"></script>
+  <script src="games/table-continue-core.js?v=bc5fab705a134ab5"></script>
+  <script src="assets/turdsuite.js?v=3a5cafdb70bf7654"></script>
+  <title>Stalemate Arcade — Nine Free Games</title>
   <style>
     :root {
       --bg-a: #10192d;
@@ -337,7 +337,7 @@
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    .cover svg {
+    .cover svg, .cover img {
       position: absolute;
       inset: 0;
       width: 100%;
@@ -627,7 +627,7 @@
       .play { min-width: 58px; padding: 7px 8px; font-size: 0.6rem; }
     }
 
-    /* Squat phone landscape: two compact columns so eight ≥44px rows stay
+    /* Squat phone landscape: two compact columns so nine ≥44px rows stay
        reachable without horizontal overflow. Vertical scroll is allowed.
        Width can exceed 600px (844×390), so this block restates the phone-row
        chrome instead of depending on the portrait 600px query. */
@@ -697,12 +697,12 @@
     }
   </style>
 <link rel="canonical" href="https://stalemate.band/play/">
-<meta name="description" content="Play eight free browser games at Stalemate Arcade: chess, brick breaking, block stacking, matching puzzles and card games, with optional music by punk rock band Stalemate.">
+<meta name="description" content="Play nine free browser games at Stalemate Arcade: chess, brick breaking, block stacking, matching puzzles and card games, with optional music by punk rock band Stalemate.">
 <meta property="og:url" content="https://stalemate.band/play/">
 <meta property="og:type" content="website">
 <link rel="stylesheet" href="stalemate-strip.css">
 <meta property="og:title" content="Stalemate Arcade">
-<meta property="og:description" content="Eight free browser games, including chess. Music by Stalemate.">
+<meta property="og:description" content="Nine free browser games, including chess. Music by Stalemate.">
 <meta property="og:image" content="https://stalemate.band/play/stalemate/og-play.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -714,14 +714,14 @@
     <div class="masthead">
       <p class="arcade-kicker">Punk rock. Bathroom humor. One more round.</p>
       <h1>Stalemate Arcade</h1>
-      <p class="subtitle">Eight games. Pick your next round.</p>
+      <p class="subtitle">Nine games. Pick your next round.</p>
       <div class="meta-row">
         <p class="hero-badge">No sign-in • works on phone and desktop</p>
         <button type="button" class="suite-hub-mute" id="suite-hub-mute" aria-pressed="false" aria-label="Sound on, tap to mute suite sounds">🔊 Sound on</button>
       </div>
     </div>
 
-    <div class="arcade-grid-heading"><h2>Eight games. Zero dignity.</h2><p>Your records stay on this device.</p></div>
+    <div class="arcade-grid-heading"><h2>Nine games. Zero dignity.</h2><p>Your records stay on this device.</p></div>
     <p class="arcade-mode-shortcut"><a href="turdtris.html?mode=ultra">Turdtris · 2-minute Ultra →</a></p>
     <section class="games" id="hub-games" aria-label="Choose a game">
       <a href="TurdAnoid.html" class="game-card" data-vibe="Bricks. Busted. Flushed." style="--c:#9effc8;--c2:#7ae6ff">
@@ -1017,13 +1017,17 @@
         </div>
         <div class="body"><div class="game-info"><div class="title-row"><span class="emoji" aria-hidden="true">♟</span><h2>Royal Flush Chess</h2></div><p>Play the computer or 2 players on one device.</p></div><span class="play">Play <i>→</i></span></div>
       </a>
+      <a href="turdrush.html" class="game-card" data-vibe="Make a clean getaway." style="--c:#ffcb87;--c2:#78ffd5">
+        <div class="cover" aria-hidden="true"><img src="assets/turdrush-cover.svg?v=f9e006843c69ccc3" width="320" height="150" alt="" loading="lazy"></div>
+        <div class="body"><div class="game-info"><div class="title-row"><span class="emoji" aria-hidden="true">↗</span><h2>Turd Rush</h2></div><p>Dash, jump and slide through the sewer.</p></div><span class="play">Play <i>→</i></span></div>
+      </a>
     </section>
     <div id="suite-progress-hub"></div>
-    <p class="footer-note">Eight games • one sewer • Stalemate punk rock on every table — <a href="#hub-games">back to the grid</a></p>
+    <p class="footer-note">Nine games • one sewer • Stalemate punk rock on every table — <a href="#hub-games">back to the grid</a></p>
   </div>
   <script type="module">
     import { injectSkipLink, createAnnouncer } from './assets/suite-a11y.js';
-    import { decorateHubStatBadges, readHubStatBadge } from './assets/suite-hub-stats.js';
+    import { decorateHubStatBadges, readHubStatBadge } from './assets/suite-hub-stats.js?v=2573f9a9a5304d0a';
     import { wireHubCoverIdleMotion, wireHubAttractHeader } from './assets/suite-hub-attract.js';
 
     function bootHubModules() {

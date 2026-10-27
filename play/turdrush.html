@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en" data-mobile-game="turdrush">
+<head>
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#123e4b">
+<title>Turd Rush — Arcade</title>
+<meta name="description" content="A little punk. A big hurry. Dash through a bright backstage sewer, dodge speakers and collect guitar picks in this original three-lane runner.">
+<link rel="icon" href="favicon.svg">
+<script src="assets/suite-loading.js"></script>
+<link rel="stylesheet" href="assets/turdsuite.css">
+<link rel="stylesheet" href="assets/arcade.css">
+<link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
+<link rel="stylesheet" href="assets/turdrush.css?v=b47de4aa923e506d" data-game-required>
+<script src="assets/turdsuite.js?v=3a5cafdb70bf7654"></script>
+<script src="games/suite-progress-core.js?v=3c92de426327c7d1"></script>
+<script src="assets/suite-progress.js?v=cf46f758fae8dff1"></script>
+<script src="assets/suite-share.js?v=ad4aecc45730b022"></script>
+<script type="module" src="games/turdrush.js?v=420d45f0944f4b24" data-game-required></script>
+</head>
+<body class="arcade runner-page" data-arcade-game="turdrush" data-suite-no-back="1" data-suite-no-difficulty="1" data-suite-no-bg="1">
+<a class="rush-skip" href="#rush-canvas">Skip to game</a>
+<main class="rush-shell">
+<header class="rush-header">
+<a class="rush-hub suite-back-pill" href="./" aria-label="Back to game hub"><span aria-hidden="true">←</span><span>Arcade</span></a>
+<div class="rush-wordmark"><span>GO LOUD. GO LONG.</span><h1>Turd <b>Rush</b></h1></div>
+<div class="rush-tools"><span data-suite-music-slot></span><button type="button" id="rush-mute" data-sound-toggle aria-pressed="false">Sound on</button><button type="button" id="rush-help" aria-label="How to play Turd Rush">?</button><button type="button" id="rush-pause" aria-label="Pause run" disabled>Ⅱ</button></div>
+</header>
+<div class="rush-hud" aria-label="Run statistics">
+<div><span>SCORE</span><strong id="rush-score">0</strong></div><div><span>DISTANCE</span><strong id="rush-distance">0 <small>m</small></strong></div><div><span>PICKS</span><strong id="rush-picks">0</strong></div><div class="rush-best"><span>PERSONAL BEST</span><strong id="rush-best">—</strong></div>
+</div>
+<section id="rush-arena" class="rush-arena" aria-label="Three-lane runner game">
+<canvas id="rush-canvas" tabindex="0" aria-label="Turd Rush. Swipe or use arrow keys: left and right dodge, up jumps, down slides. P or Escape pauses." aria-describedby="rush-control-hint"></canvas>
+<div class="rush-scene-label" aria-hidden="true"><span>BACKSTAGE SEWERS</span><i></i><span>ENDLESS RUN</span></div>
+<p id="rush-lesson" class="rush-lesson" aria-live="polite">A little punk. A big hurry.</p>
+<div id="rush-powers" class="rush-powers" aria-live="polite"></div>
+<section id="rush-intro" class="rush-panel rush-intro" aria-labelledby="rush-intro-title">
+<p class="rush-eyebrow">YOU'RE ON IN FIVE.</p><h2 id="rush-intro-title">Make a<br><em>clean getaway.</em></h2>
+<p>Dodge the gear. Grab the picks.<br>Keep the encore going.</p>
+<button type="button" class="rush-primary" id="rush-start" disabled>Loading the run…</button>
+<p class="rush-mini">Swipe to move · ↑ jump · ↓ slide<br> <span>Arrows / WASD work too.</span></p>
+</section>
+<section id="rush-paused" class="rush-panel" aria-labelledby="rush-paused-title" hidden><p class="rush-eyebrow">CATCH YOUR BREATH</p><h2 id="rush-paused-title">Run paused.</h2><p id="rush-pause-reason">Your run is right where you left it.</p><button type="button" id="rush-resume" class="rush-primary">Keep running →</button><button type="button" id="rush-restart-paused" class="rush-secondary">Start a new run</button></section>
+<section id="rush-results" class="rush-panel rush-results" aria-labelledby="rush-result-title" hidden><p class="rush-eyebrow" id="rush-result-kicker">THAT WAS A RUN.</p><h2 id="rush-result-title">One more<br><em>encore?</em></h2><p id="rush-result-reason"></p><div class="rush-result-stats"><div><strong id="rush-final-score">0</strong><span>POINTS</span></div><div><strong id="rush-final-distance">0 m</strong><span>DISTANCE</span></div><div><strong id="rush-final-picks">0</strong><span>PICKS</span></div></div><p id="rush-progress-result" class="rush-mini"></p><button type="button" id="rush-again" class="rush-primary" disabled>Run again →</button><div id="rush-share"></div></section>
+<section id="rush-unavailable" class="rush-panel" aria-labelledby="rush-unavailable-title" hidden><p class="rush-eyebrow">LET'S GET YOU BACK IN</p><h2 id="rush-unavailable-title">A little stage fright.</h2><p id="rush-unavailable-text">This browser couldn't start the 3D game. Your arcade records are safe.</p><button type="button" id="rush-reload" class="rush-primary">Try again</button><a href="./" class="rush-secondary">Back to arcade</a></section>
+<noscript><div class="rush-panel"><h2>JavaScript is needed to run.</h2><a href="./">Back to arcade</a></div></noscript>
+</section>
+<footer class="rush-controls"><p id="rush-control-hint">SWIPE THE TRACK <span>or use these buttons</span></p><div class="rush-pad" role="group" aria-label="Runner controls"><button type="button" data-rush-action="left" aria-label="Dodge left" disabled><span aria-hidden="true">←</span><b>LEFT</b></button><button type="button" data-rush-action="right" aria-label="Dodge right" disabled><span aria-hidden="true">→</span><b>RIGHT</b></button><button type="button" data-rush-action="jump" aria-label="Jump" disabled><span aria-hidden="true">↑</span><b>JUMP</b></button><button type="button" data-rush-action="slide" aria-label="Slide" disabled><span aria-hidden="true">↓</span><b>SLIDE</b></button></div></footer>
+</main>
+<dialog id="rush-guide" aria-labelledby="rush-guide-title"><div class="rush-guide-header"><h2 id="rush-guide-title">Find your flow.</h2><button type="button" id="rush-close-help" aria-label="Close how to play">Close</button></div><p>Run through three lanes. Swipe left/right to dodge, up to jump and down to slide. You can switch lanes in the air. The first few seconds give you room to learn.</p><dl class="rush-guide-list"><dt>Speakers</dt><dd>Tall stacks: switch lanes.</dd><dt>Paper crates</dt><dd>Jump them or take another lane.</dd><dt>Low pipes</dt><dd>Slide underneath or dodge.</dd><dt>Golden picks</dt><dd>Collect for bonus points. Distance also scores.</dd><dt>Mint shield</dt><dd>Absorbs one crash while its timer lasts.</dd><dt>Pink magnet</dt><dd>Draws nearby picks toward you while active.</dd></dl><p><button type="button" id="rush-contrast" aria-pressed="false" disabled>High contrast off</button></p><p>Obstacle shapes and their DODGE / JUMP / SLIDE labels always identify the action. High contrast adds bright hazard frames and a simpler lane surface.</p><p><strong>Keyboard:</strong> arrows or WASD; Up/W jumps, Down/S slides. Space jumps. P or Escape pauses. Buttons work with Tab and Enter.</p><p>The course gets faster gradually. Follow open lanes between speakers. When crates fill all three lanes, jump; when a low pipe spans the track, slide. Pause any time; returning from another app or rotating your phone waits for your explicit Resume.</p><p>Best scores and earned goals live on this device when browser storage is available. Runs stay on this page; a refresh starts a fresh run.</p><p class="rush-credits">Original game and procedural character/scenery artwork. Rendered with Three.js 0.186.1 · <a href="assets/vendor/three/LICENSE">MIT license</a>.</p></dialog>
+<script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>
+<script src="../js/track.js" defer></script>
+<script src="stalemate/play-track.js" defer></script>
+</body>
+</html>

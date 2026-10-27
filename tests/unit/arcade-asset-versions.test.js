@@ -24,6 +24,46 @@ function fixture() {
     return { root, write, read, hash };
 }
 describe('content-versioned arcade delivery', () => {
+    it('versions the expanded hub styling and record catalog for returning players', () => {
+        const f = fixture();
+        f.write('assets/arcade-hub.css', '.game-card:last-child { grid-column: 1 / -1; }');
+        f.write('assets/suite-hub-stats.js', 'export const pages = 9;');
+        f.write('index.html', '<link rel="stylesheet" href="assets/arcade-hub.css"><script type="module">import { pages } from "./assets/suite-hub-stats.js";</script>');
+        versionArcadeAssets(f.root);
+        expect(f.read('index.html')).toContain('assets/arcade-hub.css?v=' + f.hash('assets/arcade-hub.css'));
+        expect(f.read('index.html')).toContain('./assets/suite-hub-stats.js?v=' + f.hash('assets/suite-hub-stats.js'));
+        const before = f.read('index.html');
+        f.write('assets/arcade-hub.css', '.game-card { min-height: 44px; }');
+        f.write('assets/suite-hub-stats.js', 'export const pages = 10;');
+        versionArcadeAssets(f.root);
+        expect(f.read('index.html')).not.toBe(before);
+        expect(f.read('index.html')).toContain('assets/arcade-hub.css?v=' + f.hash('assets/arcade-hub.css'));
+        expect(f.read('index.html')).toContain('./assets/suite-hub-stats.js?v=' + f.hash('assets/suite-hub-stats.js'));
+    });
+    it('invalidates the runner renderer and entry when the self-hosted3D core changes', () => {
+        const f = fixture();
+        f.write('assets/vendor/three/three.core.js', 'export const revision = 1;');
+        f.write('assets/vendor/three/three.module.js', "export { revision } from './three.core.js';");
+        f.write('games/turdrush-core.js', 'export const physics = 1;');
+        f.write('games/turdrush-renderer.js', "import { revision } from '../assets/vendor/three/three.module.js';");
+        f.write('games/turdrush.js', "import './turdrush-renderer.js'; import './turdrush-core.js';");
+        f.write('assets/turdrush.css', '.runner { touch-action: none; }');
+        f.write('assets/turdrush-cover.svg', '<svg/>');
+        f.write('turdrush.html', '<script type="module" src="games/turdrush.js"></script><link rel="stylesheet" href="assets/turdrush.css"><img src="assets/turdrush-cover.svg">');
+        versionArcadeAssets(f.root);
+        expect(f.read('assets/vendor/three/three.module.js')).toContain('./three.core.js?v=' + f.hash('assets/vendor/three/three.core.js'));
+        expect(f.read('games/turdrush-renderer.js')).toContain('../assets/vendor/three/three.module.js?v=' + f.hash('assets/vendor/three/three.module.js'));
+        expect(f.read('turdrush.html')).toContain('assets/turdrush.css?v=' + f.hash('assets/turdrush.css'));
+        expect(f.read('turdrush.html')).toContain('assets/turdrush-cover.svg?v=' + f.hash('assets/turdrush-cover.svg'));
+        const files = ['assets/vendor/three/three.module.js', 'games/turdrush-renderer.js', 'games/turdrush.js', 'turdrush.html'];
+        const before = files.map(f.read);
+        f.write('assets/vendor/three/three.core.js', 'export const revision = 2;');
+        versionArcadeAssets(f.root);
+        const after = files.map(f.read);
+        after.forEach((text, index) => expect(text).not.toBe(before[index]));
+        versionArcadeAssets(f.root);
+        expect(files.map(f.read)).toEqual(after);
+    });
     it('versions the changed board styling, board module and classic sprite script', () => {
         const f = fixture();
         f.write('games/chess-board.js', 'export const animationMs = 160;');

@@ -1523,7 +1523,7 @@ textarea:focus-visible {
 .listen-games-link { margin: 0.5rem 0; font-size: 0.95rem; }
 .listen-games-link a { display: inline-flex; align-items: center; min-height: 44px; color: var(--lime); }
 @media (max-width: 760px) {
-    .games-section .games-card { grid-template-columns: 1fr; padding: 14px; gap: 18px; box-shadow: 5px 5px 0 var(--pink); }
+    .games-section .games-card { grid-template-columns: 1fr; padding: 14px; gap: 10px; box-shadow: 5px 5px 0 var(--pink); }
     .games-card__shots { order: -1; }
     .games-card__shots .games-card__thumb { width: 48px; right: -8px; top: -8px; }
 }

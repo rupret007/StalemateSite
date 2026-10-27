@@ -1,7 +1,7 @@
 const { test, expect } = require('../helpers/media-diagnostics');
 const { rummyWithoutStorage, qrDownloadRetry } = require('../helpers/recovery-flows');
 
-const games = ['TurdAnoid', 'turdomania', 'turdtris', 'turdjack', 'crapeights', 'turdrummy', 'turdspades', 'chess'];
+const games = ['TurdAnoid', 'turdomania', 'turdtris', 'turdjack', 'crapeights', 'turdrummy', 'turdspades', 'chess', 'turdrush'];
 const target = (base, relative) => new URL(relative, base).href;
 
 test.beforeEach(async ({ context, page, baseURL }, info) => {
@@ -48,13 +48,13 @@ async function assertAdvancing(page) {
     await expect(page.locator('.suite-music-title')).toContainText('Now playing:');
 }
 
-test('homepage and hub expose eight playable same-origin games', async ({ page, baseURL }) => {
+test('homepage and hub expose nine playable same-origin games', async ({ page, baseURL }) => {
     await page.goto(baseURL);
     await expect(page.locator('.booking-contact a')).toHaveAttribute('href', 'mailto:stalemate.punk@gmail.com');
     await expect(page.locator('#games a[href="play/"]')).toBeVisible();
     await page.goto(target(baseURL, 'play/'));
     const links = page.locator('.game-card');
-    await expect(links).toHaveCount(8);
+    await expect(links).toHaveCount(9);
     const paths = await links.evaluateAll(elements => elements.map(el => new URL(el.href).pathname.split('/').pop()));
     expect(paths.sort()).toEqual(games.map(game => game + '.html').sort());
     for (const href of await links.evaluateAll(elements => elements.map(el => el.href))) {

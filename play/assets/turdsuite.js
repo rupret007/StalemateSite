@@ -469,7 +469,7 @@
   // ---------- Last-played + honest table continue ----------
   const TableContinue = globalThis.TurdSuiteTableContinue || null;
   const LIVE_HUB_GAMES = (TableContinue && TableContinue.LIVE_HUB_GAMES) || [
-    'TurdAnoid.html', 'turdtris.html', 'turdjack.html', 'crapeights.html', 'turdrummy.html', 'turdspades.html', 'turdomania.html', 'chess.html'
+    'TurdAnoid.html', 'turdtris.html', 'turdjack.html', 'crapeights.html', 'turdrummy.html', 'turdspades.html', 'turdomania.html', 'chess.html', 'turdrush.html'
   ];
   const LAST_GAME_KEY = 'turdsuite_last_game';
   const CONTINUE_KEY = (TableContinue && TableContinue.CONTINUE_KEY) || 'turdsuite_continue_v1';
