@@ -13,7 +13,9 @@ describe('CI and Pages workflow', () => {
 
         expect(yaml).toContain('node-version: 24');
         expect(yaml).toContain('npm test');
-        expect(yaml).toContain('npx playwright install --with-deps chromium webkit');
+        expect(yaml).toContain('mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea');
+        expect(yaml).toContain('node scripts/verify-ci-browsers.cjs');
+        expect(yaml).toContain('node --test tests/ci/browser-runtime.test.cjs');
 
         const playwright = await readFile(join(repoRoot, 'playwright.config.js'), 'utf8');
         expect(playwright).toContain('webkit-iphone-se');
