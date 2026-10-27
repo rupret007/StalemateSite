@@ -12,7 +12,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="assets/turdsuite.css">
 <link rel="stylesheet" href="assets/arcade.css">
-  <script src="games/table-continue-core.js?v=30dfab772a1ae911"></script>
+  <script src="games/table-continue-core.js?v=325d7dbdbe1ca3fa"></script>
   <script src="games/suite-progress-core.js?v=26280b3adb2d8c25"></script>
   <script src="assets/suite-progress.js?v=5fdc02c46aa62534"></script>
   <script src="assets/suite-share.js?v=85ff7f9230484519"></script>
@@ -3486,10 +3486,10 @@
         hotStreak = 0;
         return;
       }
-      if (roundPushes > 0) {
-        hotStreak = 0;
-        coldStreak = 0;
-      }
+      // A neutral split (one win and one loss) breaks the streak just like a
+      // push. Retaining a milestone would pay its bonus again on every tie.
+      hotStreak = 0;
+      coldStreak = 0;
     }
 
     function getTableFlavor() {
