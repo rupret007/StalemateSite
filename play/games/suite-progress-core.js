@@ -13,7 +13,8 @@
     { id: 'turdrummy', title: 'TurdRummy', href: 'turdrummy.html' },
     { id: 'turdspades', title: 'TurdSpades', href: 'turdspades.html' },
     { id: 'turdomania', title: 'Turdomania', href: 'turdomania.html' },
-    { id: 'chess', title: 'Royal Flush Chess', href: 'chess.html' }
+    { id: 'chess', title: 'Royal Flush Chess', href: 'chess.html' },
+    { id: 'turdrush', title: 'Turd Rush', href: 'turdrush.html' }
   ].map(Object.freeze));
   const GOALS = Object.freeze([
     { id: 'ta-stage', game: 'turdanoid', title: 'Wall breaker', description: 'Clear a stage in Classic Turdanoid.', icon: 'wall', target: 1, progressLabel: 'Classic stage clears' },
@@ -27,11 +28,13 @@
     { id: 'rummy-gin', game: 'turdrummy', title: 'Gin it to win it', description: 'Go gin in TurdRummy.', icon: 'fan' },
     { id: 'spades-contract', game: 'turdspades', title: 'Promise kept', description: 'You + North make a positive team bid in a round.', icon: 'spade' },
     { id: 'mania-clear', game: 'turdomania', title: 'Clean sweep', description: 'Clear a Turdomania board on any difficulty.', icon: 'tiles' },
-    { id: 'chess-finish', game: 'chess', title: 'Final move', description: 'Complete a chess game after at least one move.', icon: 'king' }
+    { id: 'chess-finish', game: 'chess', title: 'Final move', description: 'Complete a chess game after at least one move.', icon: 'king' },
+    { id: 'rush-distance', game: 'turdrush', title: 'Sewer sprinter', description: 'Travel 500 metres in one Turd Rush run.', icon: 'rush', target: 500, progressLabel: 'Best run distance' },
+    { id: 'rush-picks', game: 'turdrush', title: 'Pick collector', description: 'Collect 50 guitar picks in one Turd Rush run.', icon: 'pick', target: 50, progressLabel: 'Most picks in a run' }
   ].map(Object.freeze));
   const gameIds = new Set(GAMES.map(game => game.id));
   const goalIds = new Set(GOALS.map(goal => goal.id));
-  const numberFields = ['score', 'elapsedMs', 'lines', 'left', 'levelsCleared', 'maxCombo', 'net', 'bid', 'tricks', 'moves', 'hints', 'undos', 'cols', 'rows'];
+  const numberFields = ['score', 'elapsedMs', 'lines', 'left', 'levelsCleared', 'maxCombo', 'net', 'bid', 'tricks', 'moves', 'hints', 'undos', 'cols', 'rows', 'distance', 'picks'];
   const extraNumbers = ['target', 'rounds', 'playerScore', 'opponentScore', 'wager', 'hands', 'wins', 'losses', 'pushes', 'decks'];
   const booleanFields = ['completed', 'cleared', 'natural', 'roundWon', 'matchWon', 'gin', 'local', 'assisted', 'surrender'];
   const slugFields = ['mode', 'difficulty', 'team'];
@@ -65,7 +68,7 @@
       if (value[key] === undefined) {continue;}
       if (key === 'net' || (key === 'score' && value.game === 'turdjack')) {
         if (!Number.isFinite(value[key]) || Math.abs(value[key]) > 1e9) {return null;}
-      } else if (!Number.isSafeInteger(value[key]) || (key !== 'score' && value[key] < 0)) {return null;}
+      } else if (!Number.isSafeInteger(value[key]) || ((key !== 'score' || value.game === 'turdrush') && value[key] < 0)) {return null;}
       if (['cols', 'rows'].includes(key) && (value[key] < 1 || value[key] > 64)) {return null;}
       event[key] = value[key];
     }
@@ -152,7 +155,7 @@
       for (const [scope, bests] of Object.entries(value.bests)) {
         const parts = scope.split('|');
         const [game, mode, difficulty, dimensions] = parts;
-        if (parts.length !== (game === 'turdomania' ? 4 : 3) || !['turdanoid', 'turdtris', 'turdomania'].includes(game) ||
+        if (parts.length !== (game === 'turdomania' ? 4 : 3) || !['turdanoid', 'turdtris', 'turdomania', 'turdrush'].includes(game) ||
             !/^[a-z][a-z0-9-]{0,31}$/.test(mode || '') || !/^[a-z][a-z0-9-]{0,31}$/.test(difficulty || '') ||
             !Array.isArray(bests) || bests.length < 1 || bests.length > 2 || new Set(bests.map(best => best.id)).size !== bests.length) {return null;}
         if (game === 'turdomania' && (!/^[1-9][0-9]?x[1-9][0-9]?$/.test(dimensions || '') || !dimensions.split('x').every(size => Number(size) <= 64))) {return null;}
@@ -201,12 +204,14 @@
     case 'spades-contract': return event.kind === 'round' && event.bid > 0 && event.tricks >= event.bid;
     case 'mania-clear': return event.cleared === true;
     case 'chess-finish': return event.completed === true && event.moves > 0;
+    case 'rush-distance': return event.kind === 'run' && event.distance >= 500;
+    case 'rush-picks': return event.kind === 'run' && event.picks >= 50;
     default: return false;
     }
   }
 
   function compareCompleted(next, entry) {
-    if (entry.kind !== 'run' || !['turdanoid', 'turdtris', 'turdomania'].includes(entry.game)) {return null;}
+    if (entry.kind !== 'run' || !['turdanoid', 'turdtris', 'turdomania', 'turdrush'].includes(entry.game)) {return null;}
     if (!entry.difficulty || ['mixed', 'unknown'].includes(entry.difficulty)) {return null;}
     if (entry.game === 'turdomania' && !(entry.cols > 0 && entry.rows > 0)) {return null;}
     const sprint = entry.game === 'turdtris' && entry.mode === 'sprint';
@@ -232,7 +237,9 @@
       'ta-stage': entry.game === 'turdanoid' && entry.mode === 'classic' ? entry.levelsCleared : undefined,
       'ta-combo': entry.game === 'turdanoid' ? entry.maxCombo : undefined,
       'tt-lines': entry.game === 'turdtris' && entry.mode === 'classic' ? entry.lines : undefined,
-      'tt-sprint': entry.game === 'turdtris' && entry.mode === 'sprint' ? entry.lines : undefined
+      'tt-sprint': entry.game === 'turdtris' && entry.mode === 'sprint' ? entry.lines : undefined,
+      'rush-distance': entry.game === 'turdrush' && entry.kind === 'run' ? entry.distance : undefined,
+      'rush-picks': entry.game === 'turdrush' && entry.kind === 'run' ? entry.picks : undefined
     };
     for (const [id, amount] of Object.entries(metrics)) {
       if (!integer(amount)) {continue;}

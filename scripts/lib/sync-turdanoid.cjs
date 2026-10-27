@@ -8,10 +8,10 @@ const { versionArcadeAssets } = require('./arcade-asset-versions.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const UPSTREAM = 'https://github.com/rupret007/Turdanoid.git';
-const PIN = '01be21c06320550a57a41cdb299dac744890e3c0';
+const PIN = '8b20ebeb2bef0f18009b7ce4877af2f683f7927b';
 const FILES = [
     'index.html', 'TurdAnoid.html', 'turdtris.html', 'turdjack.html', 'crapeights.html',
-    'turdrummy.html', 'turdspades.html', 'turdomania.html', 'chess.html', 'neon-arkanoid.html',
+    'turdrummy.html', 'turdspades.html', 'turdomania.html', 'chess.html', 'turdrush.html', 'neon-arkanoid.html',
     'hub.html', 'game.js', 'favicon.svg', 'assets', 'games'
 ];
 const SONGS = ['manic.m4a', 'andrea.m4a', 'only-been-18.m4a', 'wham-bam.m4a', 'planet-of-the-flakes.m4a'];
@@ -99,7 +99,7 @@ function transform(stage) {
                 .replace(/<meta\b[^>]*\bname=["']description["'][^>]*>\s*/gi, '');
             html = insert(html, '</head>', [
                 '<link rel="canonical" href="https://stalemate.band/play/">',
-                '<meta name="description" content="Play eight free browser games at Stalemate Arcade: chess, brick breaking, block stacking, matching puzzles and card games, with optional music by punk rock band Stalemate.">',
+                '<meta name="description" content="Play nine free browser games at Stalemate Arcade: chess, brick breaking, block stacking, matching puzzles and card games, with optional music by punk rock band Stalemate.">',
                 '<meta property="og:url" content="https://stalemate.band/play/">',
                 '<meta property="og:type" content="website">'
             ].join('\n'), filename);
@@ -117,7 +117,7 @@ function transform(stage) {
         if (filename === 'index.html' || filename === 'TurdAnoid.html') {
             html = insert(html, '</head>', [
                 '<meta property="og:title" content="Stalemate Arcade">',
-                '<meta property="og:description" content="Eight free browser games, including chess. Music by Stalemate.">',
+                '<meta property="og:description" content="Nine free browser games, including chess. Music by Stalemate.">',
                 '<meta property="og:image" content="https://stalemate.band/play/stalemate/og-play.png">',
                 '<meta property="og:image:width" content="1200">',
                 '<meta property="og:image:height" content="630">',

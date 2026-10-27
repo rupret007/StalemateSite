@@ -78,9 +78,9 @@ describe('vendored /play/ copy', () => {
     expect(music).toContain("'It\\u2019s Only Been 18'");
     expect(music).not.toMatch(/Over 18|Been Only/);
   });
-  it('hub links eight games including chess and Turdomania', () => {
+  it('hub links nine games including chess and Turdomania', () => {
     const hub = readFileSync(join(dir, 'index.html'), 'utf8');
-    expect(hub).toMatch(/Eight games/i);
+    expect(hub).toMatch(/Nine games/i);
     expect(hub).toContain('href="turdomania.html"');
     expect(readdirSync(dir)).toContain('turdomania.html');
     expect(hub).toContain('href="chess.html"');

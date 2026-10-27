@@ -15,6 +15,9 @@ const TARGETS = new Set([
     'games/chess-core.js', 'games/chess-engine.js', 'games/chess-ui.js',
     'games/chess-board.js', 'assets/chess/chess-board.css',
     'games/turdanoid-sprites-core.js',
+    'games/turdrush-core.js', 'games/turdrush.js', 'games/turdrush-renderer.js',
+    'assets/turdrush.css', 'assets/turdrush-cover.svg',
+    'assets/vendor/three/three.module.js', 'assets/vendor/three/three.core.js',
     'stalemate/stalemate-overlay.js'
 ]);
 function versionArcadeAssets(stage) {
@@ -92,7 +95,7 @@ function versionArcadeAssets(stage) {
     for (const file of targets) if (exists(file)) visit(file);
     for (const file of fs.readdirSync(stage).filter(file => file.endsWith('.html'))) {
         const original = fs.readFileSync(path.join(stage, file), 'utf8');
-        let next = original.replace(/<(?:script|link)\b[^>]*>/gi, tag => tag.replace(/(\b(?:src|href)\s*=\s*)(['"])([^'"]+)\2/g, (all, prefix, quote, reference) => {
+        let next = original.replace(/<(?:script|link|img|source)\b[^>]*>/gi, tag => tag.replace(/(\b(?:src|href)\s*=\s*)(['"])([^'"]+)\2/g, (all, prefix, quote, reference) => {
             const target = resolve(file, reference);
             return target ? prefix + quote + withVersion(reference, visit(target), true) + quote : all;
         }));

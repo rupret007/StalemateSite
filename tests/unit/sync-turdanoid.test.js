@@ -27,7 +27,7 @@ function fixture() {
     mkdirSync(join(upstream, 'assets'), { recursive: true });
     mkdirSync(join(upstream, 'games'), { recursive: true });
     const html = '<!doctype html><html><head><meta name="robots" content="index"><meta http-equiv="Content-Security-Policy" content="default-src *"></head><body><h1>First revision</h1></body></html>';
-    for (const page of ['index', 'TurdAnoid', 'turdtris', 'turdjack', 'crapeights', 'turdrummy', 'turdspades', 'turdomania', 'chess', 'neon-arkanoid', 'hub']) writeFileSync(join(upstream, `${page}.html`), html);
+    for (const page of ['index', 'TurdAnoid', 'turdtris', 'turdjack', 'crapeights', 'turdrummy', 'turdspades', 'turdomania', 'chess', 'turdrush', 'neon-arkanoid', 'hub']) writeFileSync(join(upstream, `${page}.html`), html);
     writeFileSync(join(upstream, 'index.html'), html.replace('</body>', '<details class="changelog"><summary>Latest Changelog</summary>Private dev notes</details></body>'));
     writeFileSync(join(upstream, 'game.js'), '/* upstream game */');
     writeFileSync(join(upstream, 'favicon.svg'), '<svg/>');

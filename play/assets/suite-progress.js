@@ -94,6 +94,13 @@
         const seconds = (event.elapsedMs || 0) / 1000;
         parts.push(`${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(2).padStart(5, '0')}`);
       }
+    } else if (event.game === 'turdrush') {
+      parts.push('Endless run');
+      parts.push(`${integer(event.distance)} metres · ${integer(event.picks)} guitar picks`);
+      if (event.elapsedMs !== undefined) {
+        const seconds = Math.floor(event.elapsedMs / 1000);
+        parts.push(`${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`);
+      }
     } else if (event.game === 'turdanoid') {
       parts.push(event.mode === 'boss' ? 'Boss run' : 'Arcade run');
       if (event.levelsCleared !== undefined) parts.push(`${integer(event.levelsCleared)} stages cleared`);
@@ -117,7 +124,9 @@
     fan: ['m12 23 20-10 20 10-9 29H21z M32 13v39 M12 23l20 29 20-29 M21 18l11 34 11-34'],
     spade: ['M32 12c-5 9-19 15-19 26 0 11 13 14 19 5 6 9 19 6 19-5 0-11-14-17-19-26z M32 43l-5 10h10z'],
     tiles: ['M12 13h17v17H12z M35 13h17v17H35z M12 36h17v17H12z', 'm35 44 6 6 12-15'],
-    king: ['M32 9v15 M26 15h12 M18 29l8 6 6-9 6 9 8-6-4 17H22z M21 52h22']
+    king: ['M32 9v15 M26 15h12 M18 29l8 6 6-9 6 9 8-6-4 17H22z M21 52h22'],
+    rush: ['m13 52 13-38h12l13 38 M22 36h20 M32 15v9 M32 30v8 M32 44v8'],
+    pick: ['M32 11c-18 0-24 8-20 18 5 12 15 24 20 24s15-12 20-24c4-10-2-18-20-18z M24 23h16 M27 30h10']
   };
   function badge(goal, earned) {
     const ns = 'http://www.w3.org/2000/svg';

@@ -24,7 +24,7 @@ body.arcade .changelog { margin-top:20px; }
 }
 /* Compact phone lobby: keep every game reachable immediately. */
 @media(max-width:600px) {
-  body.arcade .masthead { padding-top:38px; margin:0 0 8px; }
+  body.arcade .masthead { padding-top:30px; margin:0 0 8px; }
   body.arcade .masthead h1 { font-size:1.6rem; line-height:1.05; margin:0 0 6px; }
   .arcade-kicker { display:none; }
   body.arcade .hero-badge { font-size:.62rem; padding:5px 7px; }
@@ -34,8 +34,10 @@ body.arcade .changelog { margin-top:20px; }
   .arcade-grid-heading h2 { font-size:1.3rem; line-height:1.1; }
   .arcade-grid-heading p { font-size:.7rem; margin:2px 0 0; }
   body.arcade .games { grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; }
-  body.arcade .game-card .body { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; padding:4px 8px; min-height:48px; gap:2px; }
+  body.arcade .game-card .body { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; padding:3px 8px; min-height:48px; gap:1px; }
   body.arcade .game-card .game-info { display:contents; }
+  body.arcade .game-card[href="turdrush.html"] { grid-column:1/-1; }
+  body.arcade .changelog { margin-top:16px; padding:6px 10px; }
   body.arcade .game-card .title-row { grid-column:1/-1; grid-row:1; min-width:0; }
   body.arcade .game-card h2 { font-size:1rem; line-height:1.1; overflow-wrap:anywhere; }
   body.arcade .game-card p { grid-column:1/-1; grid-row:2; font-size:.68rem; white-space:normal; overflow:visible; line-height:1.2; margin:0; }

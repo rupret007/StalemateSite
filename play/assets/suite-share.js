@@ -12,7 +12,7 @@
     return `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}.${String(Math.floor(ms / 10) % 100).padStart(2, '0')}`;
   }
   function describe(game, run, href) {
-    const names = { turdanoid: 'Turdanoid', turdtris: 'Turdtris', turdomania: 'Turdomania', turdjack: 'Crapjack 21', crapeights: 'Crappy Eights', turdrummy: 'TurdRummy', turdspades: 'TurdSpades', chess: 'Royal Flush Chess' };
+    const names = { turdanoid: 'Turdanoid', turdtris: 'Turdtris', turdomania: 'Turdomania', turdjack: 'Crapjack 21', crapeights: 'Crappy Eights', turdrummy: 'TurdRummy', turdspades: 'TurdSpades', chess: 'Royal Flush Chess', turdrush: 'Turd Rush' };
     if (!Object.hasOwn(names, game) || !run || typeof run !== 'object') throw new Error('Unsupported result');
     if (!['turdtris', 'turdomania'].includes(game) && !['win', 'loss', 'draw', 'complete'].includes(run.outcome)) throw new Error('A completed result is required');
     const url = new URL(game === 'turdanoid' ? 'TurdAnoid.html' : game + '.html', href);
@@ -34,6 +34,10 @@
       outcome = run.cleared ? 'Board cleared' : 'No moves left';
       detail = `${integer(run.left)} tiles left`;
       if (Number.isSafeInteger(run.cols) && run.cols > 0 && Number.isSafeInteger(run.rows) && run.rows > 0) detail += ` · ${run.cols}×${run.rows} board`;
+    } else if (game === 'turdrush') {
+      mode = 'Endless run';
+      outcome = 'Run complete';
+      detail = `${units(run.distance, 'metre')} · ${units(run.picks, 'guitar pick')} · ${time(run.elapsedMs)}`;
     } else if (game === 'turdanoid') {
       const id = run.mode === 'boss' ? 'boss' : 'classic';
       url.searchParams.set('mode', id);
@@ -110,7 +114,7 @@
     const actions = document.createElement('div');
     actions.className = 'suite-result-share-actions';
     const button = document.createElement('button');
-    button.type = 'button'; button.textContent = ['turdtris', 'turdomania', 'turdanoid'].includes(game) ? 'Share score' : 'Share result';
+    button.type = 'button'; button.textContent = ['turdtris', 'turdomania', 'turdanoid', 'turdrush'].includes(game) ? 'Share score' : 'Share result';
     const save = document.createElement('a');
     save.textContent = 'Save image'; save.hidden = true;
     save.download = game + '-score.png';

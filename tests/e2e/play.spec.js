@@ -131,7 +131,7 @@ test('homepage Games links reach the hub, with individual games excluded from se
     expect(box.height).toBeLessThan((page.viewportSize().width <= 760) ? 740 : 480);
     // Countdown, show and Manic hero stay first; Games follows, then Listen and the band.
     expect(await page.locator('main > section').evaluateAll((s) => s.map((e) => e.id))).toEqual(['home', 'games', 'listen', 'about']);
-    expect(await page.locator('a[href*="play"]').evaluateAll((a) => a.map((e) => e.getAttribute('href')))).toEqual(['play/#hub-games', 'play/TurdAnoid.html', 'play/turdomania.html', 'play/turdtris.html', 'play/turdjack.html', 'play/turdrummy.html', 'play/turdspades.html', 'play/crapeights.html', 'play/chess.html', 'play/', 'play/TurdAnoid.html', 'play/TurdAnoid.html', 'play/turdomania.html']);
+    expect(await page.locator('a[href*="play"]').evaluateAll((a) => a.map((e) => e.getAttribute('href')))).toEqual(['play/#hub-games', 'play/TurdAnoid.html', 'play/turdomania.html', 'play/turdtris.html', 'play/turdjack.html', 'play/turdrummy.html', 'play/turdspades.html', 'play/crapeights.html', 'play/chess.html', 'play/turdrush.html', 'play/', 'play/TurdAnoid.html', 'play/TurdAnoid.html', 'play/turdomania.html']);
     await expect(page.locator('#home a[href="#games"]')).toHaveCount(0);
     await expect(page.locator('#listen .listen-games-link a')).toHaveAttribute('href', '#games');
     const pkg = fs.readFileSync(path.join(ROOT, 'scripts/package-pages.cjs'), 'utf8');
