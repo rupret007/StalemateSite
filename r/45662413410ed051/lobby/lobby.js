@@ -419,6 +419,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     const pendingReports = new Map();
     let connectionState = 'offline';
     let sessionEnded = false;
+    let endedPmLabel = null; // Display only; never a view, endpoint or send context.
     let inviteContext = null;
     let replaying = false;
     const announcements = createChatAnnouncements($('[data-buffer]'));
@@ -615,6 +616,9 @@ import { createEntrySharing } from './entry-sharing.mjs';
     }
     function endSession(reason = 'expired') {
         const wasVerified = ownerSession || app.verified;
+        const privateView = app.active.startsWith('pm:') ? store(app.active) : null;
+        endedPmLabel = privateView?.nick ? { key: app.active, nick: privateView.nick }
+            : endedPmLabel?.key === app.active ? endedPmLabel : null;
         clearMessageRecovery(); messageResultsSupported = false;
         sessionEnded = true; connectionAttempt++;
         clearTimeout(retryTimer); cancelTransportAck();
@@ -718,6 +722,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             break;
         case 'device': writeRemembered('hangout-dev', m.token); break;
         case 'hello':
+            endedPmLabel = null;
             messageResultsSupported = m.features?.messageResults === 1;
             entrySourcesSupported = m.features?.entrySources === 1;
             privateMessageContextSupported = m.features?.privateMessageContext === 1;
@@ -1084,9 +1089,10 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const key = app.active;
         const c = store(key);
         const isPm = key.startsWith('pm:');
+        const pmLabel = c?.nick || (sessionEnded && endedPmLabel?.key === key ? endedPmLabel.nick : 'unconfirmed visitor');
         $('[data-lobby-welcome]').hidden = app.localMediaPaused || key !== '#stalemate';
-        $('[data-chat-context]').textContent = isPm ? `PM · ${c?.nick || 'unconfirmed visitor'}` : key;
-        $('[data-topic]').textContent = isPm ? `Private chat with ${c?.nick || 'unconfirmed visitor'}${c?.open ? '' : ' · replies unconfirmed; draft kept'} · not end-to-end encrypted · report shares selected text · tap their name to block` : c ? `${c.topic || ''}` : '';
+        $('[data-chat-context]').textContent = isPm ? `PM · ${pmLabel}` : key;
+        $('[data-topic]').textContent = isPm ? `Private chat with ${pmLabel}${c?.open ? '' : ' · replies unconfirmed; draft kept'} · not end-to-end encrypted · report shares selected text · tap their name to block` : c ? `${c.topic || ''}` : '';
         const room = !isPm && c && c.kind !== 'lobby';
         if (inviteContext && (inviteContext !== c || connectionState !== 'connected' || !amOp(c))) closeInviteDialog();
         $('[data-roombar]').hidden = app.sharingStopped || app.localMediaPaused || !room;
