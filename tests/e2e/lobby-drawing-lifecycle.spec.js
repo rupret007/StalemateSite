@@ -216,8 +216,32 @@ test('a background playing video advances relay time while a private tab stays a
         // Only the observer's browser clock is offset. The real relay's video
         // timestamp and all command/permission checks remain unchanged.
         await observer.clock.install({ time: Date.now() - 120000 });
+        // Use the existing provider facade's explicit ready hold. A created
+        // provider is not yet the current, usable application player.
+        await host.evaluate(() => { window.__ytAutoplayControl = { deferReady: true }; });
         await host.fill('[data-act-url]', 'https://youtu.be/oh5p5f5_-7A'); await host.press('[data-act-url]', 'Enter');
+        const initialSource = frame => frame.ch === watch && frame.kind === 'video' && frame.video.playing
+            && frame.video.source.kind === 'yt' && frame.video.source.id === 'oh5p5f5_-7A';
+        await expect.poll(() => received.get(host).some(initialSource)).toBe(true);
+        await expect.poll(() => received.get(observer).some(initialSource)).toBe(true);
         await expect.poll(() => host.evaluate(() => window.__ytLog?.length || 0)).toBe(1);
+        const beforeReady = await host.evaluate(() => ({
+            providerCount: __ytLog.length, modulePlayerPresent: __lobbyRoom.player.yt !== null,
+            readyKey: __lobbyRoom.player.readyKey, readyEvents: __ytAutoplayControl.readyEvents || 0
+        }));
+        expect(beforeReady).toEqual({ providerCount: 1, modulePlayerPresent: false, readyKey: '', readyEvents: 0 });
+        await host.evaluate(() => __ytAutoplayControl.players[0].finishReady());
+        await expect.poll(() => host.evaluate(() => {
+            const { player, state } = __lobbyRoom, source = state.room.video?.source;
+            return source?.kind === 'yt' && source.id === 'oh5p5f5_-7A'
+                && player.yt === __ytLog[0] && player.readyKey === `${source.kind}:${source.id}`
+                && player.yt.getPlayerState() === 1;
+        })).toBe(true);
+        const readyForControl = await host.evaluate(() => ({
+            currentTarget: __lobbyRoom.player.yt === __ytLog[0], readyKey: __lobbyRoom.player.readyKey,
+            playing: __lobbyRoom.player.yt.getPlayerState() === 1, readyEvents: __ytAutoplayControl.readyEvents
+        }));
+        await activityEvidence(testInfo, 'background-video-readiness', { beforeReady, readyForControl });
         await host.evaluate(() => { __ytLog[0].pauseVideo(); __ytLog[0].seekTo(37); __ytLog[0].playVideo(); });
         await expect.poll(() => received.get(observer).some(frame => frame.ch === watch && frame.kind === 'video' && frame.video.playing && frame.video.pos >= 37)).toBe(true);
         const before = await observer.evaluate(name => ({
@@ -252,7 +276,7 @@ test('a background playing video advances relay time while a private tab stays a
             actual: __lobbyRoom.player.yt.getCurrentTime(), captures: window.__activityCaptureCalls,
             stream: __lobbyRoom.state.stream !== null, connections: __lobbyRoom.state.pcs.size
         }));
-        await activityEvidence(testInfo, 'background-playing-clock', { pmEligibility, before, expectedBefore, afterWait, selected, state: await state(observer), providerRequestsBeforeSelection: 0 });
+        await activityEvidence(testInfo, 'background-playing-clock', { pmEligibility, beforeReady, readyForControl, before, expectedBefore, afterWait, selected, state: await state(observer), providerRequestsBeforeSelection: 0 });
         expect(selected.video).toEqual(before.video);
         expect(selected.expected).toBeGreaterThanOrEqual(before.video.pos + 5);
         expect(Math.abs(selected.actual - selected.expected)).toBeLessThan(1);
