@@ -259,7 +259,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .camera-tile video { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: contain; background: #000; border: 1px solid var(--line); border-radius: 3px; }
 .camera-tile figcaption { white-space: normal; overflow-wrap: anywhere; color: var(--cream); font: 12px/1.25 var(--mono); }
 .act-cams:empty, [data-act-relay-status]:empty { display: none; }
-[data-act-relay-status] { margin: 0; font-size: 10px; }
+[data-act-relay-status] { flex: none; min-width: 0; max-width: 100%; margin: 0; padding: 8px 12px; font: 12px/1.5 var(--mono); overflow-wrap: anywhere; }
 .op-only { display: none; }
 .am-op .op-only { display: inline-flex; }
 .am-op form.op-only { display: flex; }
@@ -282,7 +282,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .guest-check p { margin: 0 0 10px; font-size: 12px; }
 @media (min-width: 1200px) {
   .act-stage:has(.act-video:not([hidden])):has(.act-paint:not([hidden])) { grid-template-columns: 1fr 1fr; }
-  .act-camera-strip, [data-act-relay-status] { grid-column: 1 / -1; }
+  .act-camera-strip { grid-column: 1 / -1; }
 }
 @media (max-width: 1150px) and (min-width: 901px) {
   .irc { grid-template-columns: 250px minmax(0, 1fr) 180px; }

@@ -1,6 +1,7 @@
 // Visible controls, real loopback relay/engine and real Chromium WebRTC with
 // synthetic camera devices. This does not qualify TURN/WAN or hosted identity.
 const http = require('node:http');
+const { writeFile } = require('node:fs/promises');
 const { randomUUID, createHash } = require('node:crypto');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
@@ -830,6 +831,62 @@ test('camera off removes its tile while the receive-only pair and third camera r
 });
 
 
+// Measure text itself: Playwright visibility/text checks alone allow overflow clipping.
+async function cameraRecoveryGeometry(page) {
+    return page.evaluate(() => {
+        const status = document.querySelector('[data-act-relay-status]'), activity = document.querySelector('[data-activity]');
+        const rect = element => {
+            const { left, right, top, bottom, width, height } = element.getBoundingClientRect();
+            return { left, right, top, bottom, width, height };
+        };
+        const viewport = { width: innerWidth, height: innerHeight };
+        const clip = { left: 0, top: 0, right: innerWidth, bottom: innerHeight }, ancestors = [];
+        for (let element = status.parentElement; element; element = element.parentElement) {
+            const style = getComputedStyle(element), bounds = element.getBoundingClientRect();
+            const x = /^(auto|scroll|hidden|clip)$/.test(style.overflowX), y = /^(auto|scroll|hidden|clip)$/.test(style.overflowY);
+            if (!x && !y) continue;
+            const client = { left: bounds.left + element.clientLeft, top: bounds.top + element.clientTop };
+            client.right = client.left + element.clientWidth; client.bottom = client.top + element.clientHeight;
+            if (x) { clip.left = Math.max(clip.left, client.left); clip.right = Math.min(clip.right, client.right); }
+            if (y) { clip.top = Math.max(clip.top, client.top); clip.bottom = Math.min(clip.bottom, client.bottom); }
+            ancestors.push({ tag: element.tagName, overflowX: style.overflowX, overflowY: style.overflowY, client });
+        }
+        const range = document.createRange(); range.selectNodeContents(status);
+        const text = Array.from(range.getClientRects()).filter(bounds => bounds.width > 0 && bounds.height > 0).map(bounds => ({
+            left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom,
+            uncovered: document.elementsFromPoint((bounds.left + bounds.right) / 2, (bounds.top + bounds.bottom) / 2)[0] === status
+        }));
+        const input = document.querySelector('[data-text]'), send = document.querySelector('[data-send]');
+        const uncovered = element => {
+            const bounds = element.getBoundingClientRect(), hit = document.elementsFromPoint((bounds.left + bounds.right) / 2, (bounds.top + bounds.bottom) / 2)[0];
+            return hit === element || element.contains(hit);
+        };
+        return { viewport, pageWidth: document.documentElement.scrollWidth, status: rect(status), text, clip, ancestors,
+            statusInstances: document.querySelectorAll('[data-act-relay-status]').length, role: status.getAttribute('role'),
+            inActivity: activity.contains(status), activityOpen: activity.open, activityScrollTop: activity.scrollTop,
+            form: rect(document.querySelector('[data-say]')), input: rect(input), send: rect(send),
+            inputUncovered: uncovered(input), sendUncovered: uncovered(send), inputFontSize: getComputedStyle(input).fontSize };
+    });
+}
+function completeCameraRecoveryText(geometry, activityOpen) {
+    expect(geometry.statusInstances).toBe(1); expect(geometry.role).toBe('status'); expect(geometry.inActivity).toBe(false);
+    expect(geometry.activityOpen).toBe(activityOpen); expect(geometry.text.length).toBeGreaterThan(0);
+    expect(geometry.pageWidth).toBeLessThanOrEqual(geometry.viewport.width);
+    expect(geometry.clip.right).toBeGreaterThan(geometry.clip.left); expect(geometry.clip.bottom).toBeGreaterThan(geometry.clip.top);
+    for (const line of geometry.text) {
+        expect(line.left).toBeGreaterThanOrEqual(geometry.clip.left - 0.5); expect(line.right).toBeLessThanOrEqual(geometry.clip.right + 0.5);
+        expect(line.top).toBeGreaterThanOrEqual(geometry.clip.top - 0.5); expect(line.bottom).toBeLessThanOrEqual(geometry.clip.bottom + 0.5);
+        expect(line.uncovered).toBe(true);
+    }
+    for (const item of [geometry.form, geometry.input, geometry.send]) {
+        expect(item.width).toBeGreaterThan(0); expect(item.height).toBeGreaterThan(0);
+        expect(item.left).toBeGreaterThanOrEqual(0); expect(item.right).toBeLessThanOrEqual(geometry.viewport.width);
+        expect(item.top).toBeGreaterThanOrEqual(0); expect(item.bottom).toBeLessThanOrEqual(geometry.viewport.height);
+    }
+    expect(geometry.status.bottom).toBeLessThanOrEqual(geometry.form.top);
+    expect(geometry.inputUncovered).toBe(true); expect(geometry.sendUncovered).toBe(true); expect(geometry.inputFontSize).toBe('16px');
+}
+
 // Actual module/relay/native fake-camera coverage. Only the first gUM promise
 // and one cam-off send are deliberately rejected; this is not hardware/permission
 // or hosted transport qualification, and a rejected off send is not a server ACK.
@@ -865,6 +922,15 @@ for (const width of [375, 390]) test(`camera rejection needs explicit retry and 
         const denied = await owner.evaluate(() => ({ attempts: window.__cameraRecoveryAttempts, nativeCaptures: window.__captureCalls, off: window.__cameraOffAttempts,
             camOn: window.__lobbyRoom.state.camOn, stream: !!window.__lobbyRoom.state.stream, myCam: window.__lobby.chans.get(window.__lobby.active).myCam }));
         expect(denied).toEqual({ attempts: 1, nativeCaptures: 0, off: 1, camOn: false, stream: false, myCam: false });
+        const openStatus = await cameraRecoveryGeometry(owner); completeCameraRecoveryText(openStatus, true);
+        const activity = owner.locator('[data-activity]'), summary = activity.locator('summary');
+        await summary.click(); await expect(activity).toHaveJSProperty('open', false);
+        const collapsedStatus = await cameraRecoveryGeometry(owner); completeCameraRecoveryText(collapsedStatus, false);
+        await summary.click(); await expect(activity).toHaveJSProperty('open', true);
+        const restoredStatus = await cameraRecoveryGeometry(owner); completeCameraRecoveryText(restoredStatus, true);
+        const geometryPath = testInfo.outputPath(`camera-recovery-status-${width}.json`);
+        await writeFile(geometryPath, JSON.stringify({ open: openStatus, collapsed: collapsedStatus, restored: restoredStatus }, null, 2));
+        await testInfo.attach(`camera-recovery-status-${width}`, { path: geometryPath, contentType: 'application/json' });
         await owner.screenshot({ path: testInfo.outputPath(`camera-start-rejected-${width}.png`), fullPage: true });
         await command(witness, 'Camera denial did not disconnect chat');
         await expect(owner.locator('[data-buffer]')).toContainText('Camera denial did not disconnect chat');
