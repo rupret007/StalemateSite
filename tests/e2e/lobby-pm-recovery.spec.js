@@ -163,6 +163,8 @@ for (const [label, feature] of [['missing', null], ['a string', '1'], ['a boolea
             await expect(sender.locator('[data-text]')).toHaveValue(draft);
             await expect(sender.locator('[data-toast]')).toContainText('unavailable in private chat');
             await sender.click('[data-quick-me]'); await sender.click('[data-quick-cmd="slap"]');
+            await palettePrompt(sender, '/me', 'A menu action must respect the same private-context capability');
+            await expect(sender.locator('[data-text]')).toHaveValue(draft);
             expect(fixture.inbound).toHaveLength(before);
             expect(fixture.delivered.some(frame => frame.t === 'line')).toBe(false);
             const normal = 'A complete ordinary private sentence remains usable on the older server';
@@ -194,5 +196,91 @@ test('reconnecting renegotiates private actions instead of reusing an earlier se
         await expect(observer.locator('[data-buffer]')).not.toContainText('old connection');
         fixture.advance(4000); const normal = 'A newly accepted ordinary PM works after reconnecting to the older capability';
         await send(sender, normal); await expect(received(recipient, normal)).toHaveCount(1);
+    } finally { await fixture.close(); }
+});
+
+async function palettePrompt(page, label, answer) {
+    await page.locator('[data-palette-open]').click();
+    const palette = page.locator('dialog[data-palette]');
+    await expect(palette).toBeVisible();
+    const response = page.waitForEvent('dialog').then(async dialog => {
+        expect(dialog.type()).toBe('prompt');
+        if (answer === null) await dialog.dismiss();
+        else await dialog.accept(answer);
+    });
+    await palette.getByRole('button', { name: label, exact: true }).click();
+    await response; await expect(palette).toBeHidden();
+}
+
+test('the command menu delivers a complete public action within the existing 300-character limit', async ({ browser, baseURL }) => {
+    const fixture = await community(browser, baseURL);
+    try {
+        const sender = await fixture.guest('Sender'); const recipient = await fixture.guest('Recipient');
+        fixture.advance(180000);
+        const action = 'builds a warm riff with friends while the drums find a new rhythm '.repeat(5).slice(0, 299) + '.';
+        expect(action).toHaveLength(300);
+        await palettePrompt(sender, '/me', action);
+        await expect(received(recipient, action)).toContainText('* Sender');
+        await expect(received(sender, action)).toHaveCount(1);
+        const lines = fixture.delivered.filter(frame => frame.t === 'line' && frame.me);
+        expect(lines).toHaveLength(2); expect(lines.every(frame => frame.text === action)).toBe(true);
+        const before = fixture.inbound.length;
+        await palettePrompt(sender, '/me', null);
+        expect(fixture.inbound).toHaveLength(before);
+        fixture.advance(4000); await palettePrompt(sender, '/me', '   ');
+        await expect.poll(() => fixture.inbound.filter(frame => frame.sender.startsWith('socket-Sender-') && frame.name === 'me').at(-1)?.args).toEqual([]);
+        expect(fixture.delivered.filter(frame => frame.t === 'line' && frame.me)).toHaveLength(2);
+    } finally { await fixture.close(); }
+});
+
+test('the command menu preserves a complete away reason and supports cancel and blank-to-return', async ({ browser, baseURL }) => {
+    const fixture = await community(browser, baseURL);
+    try {
+        const sender = await fixture.guest('Sender'); const recipient = await fixture.guest('Recipient');
+        fixture.advance(180000);
+        const reason = 'taking a short break then coming back to play a new song with friends '.repeat(2).slice(0, 79) + '.';
+        expect(reason).toHaveLength(80);
+        await palettePrompt(sender, '/away', reason);
+        await expect(sender.locator('[data-buffer]')).toContainText(`You're marked away: ${reason}`);
+        await send(recipient, '/whois Sender');
+        await expect(recipient.locator('[data-buffer]')).toContainText(`away: ${reason}`);
+        const before = fixture.inbound.length;
+        await palettePrompt(sender, '/away', null);
+        expect(fixture.inbound).toHaveLength(before);
+        fixture.advance(4000); await palettePrompt(sender, '/away', '   ');
+        await expect(sender.locator('[data-buffer]')).toContainText('Welcome back.');
+        expect(fixture.inbound.filter(frame => frame.sender.startsWith('socket-Sender-') && frame.name === 'away').at(-1).args).toEqual([]);
+        const beforeWhois = fixture.delivered.filter(frame => frame.recipient.startsWith('socket-Recipient-') && frame.t === 'notice').length;
+        await send(recipient, '/whois Sender');
+        await expect.poll(() => fixture.delivered.filter(frame => frame.recipient.startsWith('socket-Recipient-') && frame.t === 'notice').length).toBe(beforeWhois + 1);
+        const notices = fixture.delivered.filter(frame => frame.recipient.startsWith('socket-Recipient-') && frame.t === 'notice');
+        expect(notices.at(-1).text).not.toContain('away:');
+    } finally { await fixture.close(); }
+});
+
+test('the command menu keeps complete PM text and actions private behind recipient acceptance', async ({ browser, baseURL }) => {
+    const fixture = await community(browser, baseURL);
+    try {
+        const sender = await fixture.guest('Sender'); const recipient = await fixture.guest('Recipient');
+        const observer = await fixture.guest('Observer'); fixture.advance(180000);
+        const body = 'A private note about the song we can finish together after practice '.repeat(5).slice(0, 299) + '.';
+        expect(body).toHaveLength(300);
+        await palettePrompt(sender, '/msg', `Recipient ${body}`);
+        await expect(recipient.locator('[data-pmreqs]').getByRole('button', { name: 'Accept', exact: true })).toBeVisible();
+        expect(fixture.delivered.filter(frame => frame.t === 'pm')).toEqual([]);
+        await expect(recipient.locator('[data-buffer]')).not.toContainText(body);
+        await recipient.locator('[data-pmreqs]').getByRole('button', { name: 'Accept', exact: true }).click();
+        await expect(sender.locator('[data-chat-context]')).toHaveText('PM · Recipient');
+        await expect(recipient.locator('[data-chat-context]')).toHaveText('PM · Sender');
+        await expect(received(recipient, body)).toHaveCount(1); await expect(received(sender, body)).toHaveCount(1);
+        fixture.advance(4000);
+        const action = 'keeps every word of this private action between the two accepted participants '.repeat(4).slice(0, 299) + '.';
+        expect(action).toHaveLength(300);
+        await palettePrompt(sender, '/me', action);
+        await expect(received(recipient, action)).toContainText('* Sender');
+        await expect(received(sender, action)).toHaveCount(1);
+        expect(fixture.delivered.filter(frame => frame.t === 'line')).toEqual([]);
+        expect(fixture.delivered.filter(frame => frame.recipient.startsWith('socket-Observer-') && frame.t === 'pm')).toEqual([]);
+        for (const text of [body, action]) await expect(observer.locator('[data-buffer]')).not.toContainText(text);
     } finally { await fixture.close(); }
 });

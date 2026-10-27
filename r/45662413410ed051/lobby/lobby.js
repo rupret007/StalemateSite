@@ -1306,6 +1306,17 @@ import { createEntrySharing } from './entry-sharing.mjs';
     ];
     const OP_PALETTE = [['Invite guest', 'invite-guest'], ['/mode +m', 'mode', null, ['+m']], ['/mode -m', 'mode', null, ['-m']], ['/mode +i', 'mode', null, ['+i']], ['/mode -i', 'mode', null, ['-i']], ['Slow 10s', 'mode', null, ['+S', '10']], ['Slow off', 'mode', null, ['-S']],
         ['Cams off', 'mode', null, ['-C']], ['Cams allowed', 'mode', null, ['+C']], ['/topic …', 'topic', 'new topic'], ['🔒 Lock', 'lock'], ['🔓 Unlock', 'lock', null, ['off']], ['Add guest co-host', 'op', 'nickname'], ['Remove guest co-host', 'deop', 'nickname'], ['Keep this room', 'register'], ['Add verified co-host', 'cohost', 'add nickname'], ['Remove verified co-host', 'cohost', 'remove nickname'], ['Transfer ownership', 'transfer', 'verified co-host nickname'], ['Delete registration', 'unregister'], ['Close room', 'close']];
+    function paletteArgs(name, value) {
+        const text = value.trim();
+        if (!text) return [];
+        // Text bodies occupy one bounded argument; word count is not an argument count.
+        if (['me', 'away', 'topic'].includes(name)) return [text];
+        if (name === 'msg') {
+            const separator = text.search(/\s/);
+            return separator < 0 ? [text] : [text.slice(0, separator), text.slice(separator).trimStart()];
+        }
+        return text.split(' ');
+    }
     function openPalette(ops) {
         const box = $('[data-palette-buttons]');
         const current = store(app.active);
@@ -1325,7 +1336,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
                 if (name === 'register' && current?.keepRef) return cmd(name, [], app.active, current.keepRef);
                 if (name === 'cohost') { const who = prompt(`${label}: nickname`); if (!who) return; if (label.startsWith('Remove') && !confirm(`Remove ${who} as co-host?`)) return; return cmd(name, [label.startsWith('Remove') ? 'remove' : 'add', who.trim()]); }
                 if (fixed) return cmd(name, fixed);
-                if (ask) { const v = prompt(`${label}: ${ask}`); if (v === null) return undefined; return cmd(name, v.trim() ? (name === 'topic' ? [v.trim()] : v.trim().split(' ')) : []); }
+                if (ask) { const v = prompt(`${label}: ${ask}`); if (v === null) return undefined; return cmd(name, paletteArgs(name, v)); }
                 return cmd(name, []);
             });
             box.append(b);
