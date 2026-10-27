@@ -5,6 +5,7 @@ import { ROOM_TTL, LOG_TTL, OWNER_TRANSFER_TTL, roomRecord, validRoom, createRat
 import { checkNick, checkText, defaultLists, normalize } from './filter.mjs';
 import { actSnapshot, applyClear, applyStroke, applyVideo, cleanRtc, parseActFrame, PAINT_KINDS, VIDEO_KINDS } from './lobby-act.mjs';
 import { messageReceipt, receiptDigest } from './message-receipts.mjs';
+import { personRoomProjection } from './lobby-effect-records.mjs';
 import { TRANSPORT_CONTROL_BLOCK } from './transport-budget.mjs';
 import { ENTRY_SITES, normalizeEntrySource } from '../../r/45662413410ed051/entry-sites.mjs';
 import { createParticipationCheckpoint } from './participation-checkpoint.mjs';
@@ -132,6 +133,10 @@ const CONTEXT_INDEPENDENT_COMMANDS = new Set([
 ]);
 const isPrivateContext = where => typeof where === 'string' && /^pm:/i.test(where);
 const validPmRef = value => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);
+const PERSON_COMMANDS = new Set(['msg', 'query', 'whois', 'ignore', 'unignore', 'block', 'unblock', 'slap',
+    'kick', 'ban', 'invite', 'op', 'deop', 'voice', 'devoice', 'cohost', 'transfer', 'mute', 'gban', 'purge']);
+const NAMED_PERSON_COMMANDS = new Set([...PERSON_COMMANDS, 'accept', 'decline', 'report', 'mode']);
+const PERSON_ROOM_COMMANDS = new Set(['slap', 'kick', 'ban', 'invite', 'op', 'deop', 'voice', 'devoice', 'cohost', 'transfer']);
 
 export function createLobby({ now = () => Date.now(), send: sendImpl = () => {}, close: closeImpl = () => {}, persist: persistImpl = () => {}, deferPresence: deferPresenceImpl = null, participation = null, effectCommit = null, incidentSources = false, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
     if (typeof incidentSources !== 'boolean') throw Error('incident-source-configuration');
@@ -308,7 +313,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (effectCommitConfigured) {
                 if (!effectCommitReady || participationConfigured && !participationReady) return { ok: false, reason: 'participation-unavailable' };
                 return await effectCommit.commit(stage.effectContext, effects, { costsOnly,
-                    participation: participationConfigured ? { adapter: participation, context: stage.context } : null });
+                    participation: participationConfigured ? { adapter: participation, context: stage.context } : null,
+                    personDependencies: stage.personPeerIds?.size || stage.personRoom ? { peerIds: [...stage.personPeerIds],
+                        ...(stage.personRoom ? { room: { name: stage.personRoom.room.name, keepRef: stage.personRoom.room.keepRef,
+                            before: stage.personRoom.before, after: personRoomProjection(stage.personRoom.room) } } : {}) } : null });
             }
             return participationReady ? await participation.commit(stage.context, effects, { costsOnly }) : { ok: false, reason: 'participation-unavailable' };
         } catch { return { ok: false, reason: 'participation-unavailable' }; }
@@ -332,7 +340,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             const connections = participationConnections(fn, args);
             const context = participationReady ? await participation.prepare(connections) : null;
             const effectContext = effectCommitReady ? await effectCommit.prepare(effectOperation(fn, args, connections)) : null;
-            stage = controlled = { context, effectContext, effects: [], frames: [], closes: [], presence: [], providers: [], bytes: 0, effectBytes: 0, capacity: false };
+            stage = controlled = { context, effectContext, effects: [], frames: [], closes: [], presence: [], providers: [], bytes: 0, effectBytes: 0, capacity: false, personPeerIds: new Set() };
             result = await durable(fn, args);
             if (stage.capacity) throw Object.assign(new Error('participation-denied'), { participationDenied: true, reason: 'participation-capacity' });
             // Configured-but-broken adapters refuse grants, including commit;
@@ -372,7 +380,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             for (const provider of stage.providers) provider();
         } else {
             const actor = conns.get(typeof args[0] === 'string' ? args[0] : args[0]?.id);
-            if (actor) bot(actor, failure === 'participation-unavailable'
+            if (actor) bot(actor, failure === 'person-target-stale' ? 'That selected visitor or room changed. Choose a current person; nothing was confirmed.' : failure === 'participation-unavailable'
                 ? 'This action could not be confirmed. Try again or use the moderation contact in House rules.'
                 : 'This action is unavailable under the current participation permissions or capacity. Reporting, blocking and leaving remain available.', 'error');
             if (restoreFailed) {
@@ -455,7 +463,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     channels.set(LOBBY, mkChannel(LOBBY, 'lobby', 'The lobby', null));
 
     // ---------- helpers ----------
-    const safetyFrames = new Set(['sharing-stopped', 'notice', 'report-status', 'pm-setting', 'entry-source', 'message-result']);
+    const safetyFrames = new Set(['sharing-stopped', 'notice', 'report-status', 'pm-setting', 'entry-source', 'message-result', 'person-preferences']);
     const out = (c, msg) => {
         if (c.safetyOnly && !safetyFrames.has(msg.t)) return;
         try { if (outputBatch) outputBatch.push([c.id, msg]); else send(c.id, msg); } catch (e) { /* gone */ }
@@ -568,14 +576,46 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         return peer && peer !== c && (peer.nick || allowHidden && peer.safetyOnly) ? peer : null;
     }
     const stalePm = c => bot(c, 'This private conversation is no longer confirmed. Choose a current person to request a new PM. Your draft stays here.', 'error');
+    const stalePerson = c => bot(c, 'That selected visitor or room is no longer confirmed. Choose a current person, or type a deliberate nickname command.', 'error');
+    const personPreferences = c => out(c, { t: 'person-preferences', names: [...c.ignores], peers: [...c.ignoredPeerIds] });
+    const ignoredBy = (recipient, peer) => recipient.ignores.has(lc(peer.nick)) || recipient.ignoredPeerIds.has(peer.id);
+    function personDependency(peer, room) {
+        if (!controlled) return;
+        if (peer) controlled.personPeerIds.add(peer.id);
+        if (room && room.kind !== 'lobby' && !controlled.personRoom) controlled.personRoom = { room, before: personRoomProjection(room) };
+    }
+    function selectedPerson(c, frame, allowHidden = false) {
+        const peer = conns.get(frame.personPeer);
+        return peer && peer !== c && (peer.nick || allowHidden && peer.safetyOnly) ? peer : null;
+    }
+    function personEnvelope(c, frame, name) {
+        const bound = Object.hasOwn(frame, 'personContext') || Object.hasOwn(frame, 'personPeer');
+        const named = Object.hasOwn(frame, 'personNamed');
+        const pmBound = Object.hasOwn(frame, 'pmPeer') || Object.hasOwn(frame, 'pmRef');
+        const account = Object.hasOwn(frame, 'cohostAccount');
+        if (Object.hasOwn(frame, 'pmExplicit') && (frame.pmExplicit !== true || name !== 'msg')) return false;
+        if (pmBound && (!moderationIdentity(frame.pmPeer) || !validPmRef(frame.pmRef)
+            || !['msg', 'me', 'slap', 'query', 'accept', 'decline', 'block', 'whois', 'ignore', 'unignore'].includes(name))) return false;
+        if (bound && (frame.t !== 'cmd' || frame.personContext !== 1 || !moderationIdentity(frame.personPeer)
+            || !PERSON_COMMANDS.has(name) || named || pmBound || account || Object.hasOwn(frame, 'pmExplicit')
+            || typeof frame.ch !== 'string' || !/^#[a-z0-9-]{2,30}$/.test(frame.ch)
+            || !validPmRef(frame.roomInstance) || ch(frame.ch)?.keepRef !== frame.roomInstance)) return false;
+        if (named && (frame.t !== 'cmd' || frame.personNamed !== true || !NAMED_PERSON_COMMANDS.has(name)
+            || bound || pmBound || account || Object.hasOwn(frame, 'pmExplicit'))) return false;
+        if (account && (frame.t !== 'cmd' || frame.cohostAccount !== true || name !== 'cohost'
+            || !Array.isArray(frame.args) || frame.args.length !== 2 || frame.args[0] !== 'remove' || !moderationIdentity(frame.args[1])
+            || bound || named || pmBound || Object.hasOwn(frame, 'pmExplicit')
+            || !validPmRef(frame.roomInstance) || typeof frame.ch !== 'string' || ch(frame.ch)?.keepRef !== frame.roomInstance)) return false;
+        return { bound, named: frame.t === 'say' || named, pmBound, account };
+    }
 
     function adminState() {
         return {
             lock: net.lock, shield: net.shield, shieldAuto: net.shieldAuto, lockAuto: net.lockAuto, lastBand: net.lastBand,
             slow: ch(LOBBY).modes.S, lists: net.lists, reportsToHide: net.reportsToHide,
             budget: { ...net.budget, cap: L.requestBudget, level: budgetLevel() },
-            users: [...conns.values()].filter((c) => c.nick).map((c) => ({ nick: c.nick, role: c.role, dev: c.dev.slice(0, 6), away: !!c.away, muted: Math.max(net.mutes[c.dev] || 0, net.mutes[c.account] || 0) > now(), channels: [...c.channels] })),
-            rooms: [...channels.values()].map((c) => ({ name: c.name, kind: c.kind, title: c.title, count: c.members.size, modes: { ...c.modes, k: !!c.modes.k } })),
+            users: [...conns.values()].filter((c) => c.nick).map((c) => ({ id: c.id, nick: c.nick, role: c.role, dev: c.dev.slice(0, 6), away: !!c.away, muted: Math.max(net.mutes[c.dev] || 0, net.mutes[c.account] || 0) > now(), channels: [...c.channels] })),
+            rooms: [...channels.values()].map((c) => ({ name: c.name, keepRef: c.keepRef, kind: c.kind, title: c.title, count: c.members.size, modes: { ...c.modes, k: !!c.modes.k } })),
             reports: [...reports.entries()].filter(([, r]) => !r.done && now() - r.at < MODERATION_QUEUE_TTL).map(([id, r]) => ({ id, ch: r.ch, from: r.from, text: r.text, count: r.devs.size, hidden: r.hidden, context: [...r.context] })),
             held: [...held.values()].filter((h) => now() - h.ts < MODERATION_QUEUE_TTL).map((h) => ({ id: h.id, ch: h.ch, from: h.from, text: h.text, reason: h.reason })),
             aiReviews: aiReviewList(),
@@ -617,7 +657,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     function pruneModerationQueue() {
         let changed = false;
         for (const [id, r] of reports) if (now() - r.at >= MODERATION_QUEUE_TTL) { reports.delete(id); changed = true; }
-        for (const [id, h] of held) if (now() - h.ts >= MODERATION_QUEUE_TTL) { held.delete(id); heldChannels.delete(id); changed = true; }
+        for (const [id, h] of held) if (now() - h.ts >= MODERATION_QUEUE_TTL) { held.delete(id); heldChannels.delete(id); if (!lines.has(id)) lineMeta.delete(id); changed = true; }
         if (changed) return saveModerationQueue();
     }
     const moderationId = (id) => typeof id === 'string' && /^[mp][a-z0-9]{1,80}$/i.test(id);
@@ -628,6 +668,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     const moderationChannel = (name) => typeof name === 'string' && (/^#[a-z0-9-]{2,30}$/.test(name)
         || (name.startsWith('pm:') && name.slice(3).split('>').length === 2 && name.slice(3).split('>').every(moderationNick)));
     function restoreModerationQueue(stored = {}) {
+        for (const id of held.keys()) if (!lines.has(id)) lineMeta.delete(id);
         reports.clear(); held.clear(); heldChannels.clear();
         const entries = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
         const common = (item) => item && typeof item === 'object' && !Array.isArray(item)
@@ -779,11 +820,11 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             const inLobby = [...conns.values()].filter((c) => !isBand(c)).length;
             if (inLobby >= L.lobbyMax) return { ok: false, status: 429, reason: 'full' };
         }
-        const c = { id, dev, iph, role, email, account, admin: band && admin, ...connectionBinding(binding), nick: '', entrySource: '', channels: new Set(), away: '', ignores: new Set(), blocks: new Set(), pmOff: false,
+        const c = { id, dev, iph, role, email, account, admin: band && admin, ...connectionBinding(binding), nick: '', entrySource: '', channels: new Set(), away: '', ignores: new Set(), ignoredPeerIds: new Set(), blocks: new Set(), pmOff: false,
             cams: new Set(), since: now(), lastNick: 0, tokens: L.burst, last: now(), frames: 0, lastSaid: {}, actTokens: L.actBurst, actLast: now() };
         conns.set(id, c);
         if (band) { net.lastBand = now(); if (net.shieldAuto || net.lockAuto) bot(c, 'A saved safety state needs review: fans can read but not talk while the lobby is read-only. Check the band panel; /lobby unlock and /shieldoff when you are ready.'); saveNet(); }
-        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, roomKeep: 1, messageResults: 1 } });
+        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1 } });
         return { ok: true };
     }
 
@@ -800,6 +841,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             }
         }
         conns.delete(id); participationMedia.delete(id);
+        for (const peer of conns.values()) if (peer.ignoredPeerIds.delete(id)) personPreferences(peer);
         pruneReceipts(); // A later connection must never inherit a departed socket's delivery witness.
         if (isBand(c)) { net.lastBand = now(); saveNet(); }
         pushAdmin();
@@ -880,6 +922,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             ? { id: f.clientMessageId, status: 'rejected' } : null;
         const result = feedback ? status => { feedback.status = status; } : undefined;
         try {
+        if (f.t !== 'cmd' && ['personContext', 'personPeer', 'personNamed', 'cohostAccount'].some(key => Object.hasOwn(f, key))) return stalePerson(c);
         if (c.safetyOnly) return safetyOnlyMessage(c, f);
         if (!c.nick && f.t !== 'hello') return bot(c, 'Pick a nickname first.', 'error');
         if (f.t === 'entry-source') {
@@ -940,26 +983,32 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             args = normalize(frame.text, 400).slice(1).split(' '); name = lc(args.shift());
         }
         name = ({ h: 'help', '?': 'help', exit: 'quit', bye: 'quit', leave: 'part', deny: 'decline' })[name] || name;
+        const intent = personEnvelope(c, frame, name);
+        if (!intent) return stalePerson(c);
+        if (frame.t === 'cmd' && ['block', 'ignore', 'unignore'].includes(name) && !intent.bound && !intent.pmBound && !intent.named) return stalePerson(c);
         if (frame.t === 'cmd' && isPrivateContext(frame.ch) && ['block', 'ignore', 'unignore'].includes(name)
-            && !Object.hasOwn(frame, 'pmPeer') && !Object.hasOwn(frame, 'pmRef')) return stalePm(c);
+            && !intent.named && !Object.hasOwn(frame, 'pmPeer') && !Object.hasOwn(frame, 'pmRef')) return stalePm(c);
         if (name === 'quit') return kill(c, 1000, 'Sharing session ended');
         if (name === 'help') return bot(c, 'Sharing is stopped. You can report messages already delivered here, /block nick, /ignore nick, or /quit. Leave this beta to end your session.');
         if (name === 'part' || name === 'decline') return bot(c, 'You have left the rooms and private conversations. Reporting remains available here.');
         if (name === 'pm' && lc(args[0]) === 'off') return out(c, { t: 'pm-setting', off: true, text: 'PMs are off.' });
         if (name === 'ignore' || name === 'unignore') {
-            const bound = Object.hasOwn(frame, 'pmPeer') || Object.hasOwn(frame, 'pmRef');
-            const peer = bound ? boundSafetyPeer(c, frame) : null;
+            const bound = intent.bound || intent.pmBound;
+            const peer = intent.bound ? selectedPerson(c, frame) : intent.pmBound ? boundSafetyPeer(c, frame) : null;
             if (bound && !peer) return stalePm(c);
-            return handlers[name](c, null, peer ? [peer.nick] : args);
+            if (peer) personDependency(peer, intent.bound ? ch(frame.ch) : null);
+            return handlers[name](c, null, args, undefined, undefined, peer);
         }
         if (name === 'block') {
-            const bound = Object.hasOwn(frame, 'pmPeer') || Object.hasOwn(frame, 'pmRef');
-            const person = bound ? boundSafetyPeer(c, frame, true) : target(c, args[0]);
+            const bound = intent.bound || intent.pmBound;
+            const person = intent.bound ? selectedPerson(c, frame, true) : intent.pmBound ? boundSafetyPeer(c, frame, true) : target(c, args[0]);
             if (bound && !person) return stalePm(c); if (!person) return;
+            if (bound) personDependency(person, intent.bound ? ch(frame.ch) : null);
             if ((!c.blocks.has(person.dev) && c.blocks.size >= SESSION_PREFERENCES)
-                || (person.nick && !c.ignores.has(lc(person.nick)) && c.ignores.size >= SESSION_PREFERENCES)) return bot(c, 'Your block or ignore list is full (50 each).', 'error');
-            c.blocks.add(person.dev); if (person.nick) c.ignores.add(lc(person.nick));
-            return bot(c, `Blocked ${person.nick || 'this visitor'}. Sharing and private conversations remain off.`);
+                || (!bound && person.nick && !c.ignores.has(lc(person.nick)) && c.ignores.size + c.ignoredPeerIds.size >= SESSION_PREFERENCES)) return bot(c, 'Your block or ignore list is full (50 each).', 'error');
+            c.blocks.add(person.dev); if (!bound && person.nick) c.ignores.add(lc(person.nick));
+            bot(c, `Blocked ${person.nick || 'this visitor'}. Sharing and private conversations remain off.`);
+            return personPreferences(c);
         }
         return bot(c, 'Sharing is stopped. Reporting, blocking and leaving remain available.', 'error');
     }
@@ -978,7 +1027,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         c.entrySource = normalizeEntrySource(f.entrySource, entrySites);
         c.lastNick = now();
         statHour().joins += 1; statPeak();
-        out(c, { t: 'welcome', nick: c.nick, role: c.role, band: isBand(c), moderator: c.role === 'moderator', verified: !!c.account, capabilities: capabilities(c) });
+        out(c, { t: 'welcome', id: c.id, nick: c.nick, role: c.role, band: isBand(c), moderator: c.role === 'moderator', verified: !!c.account, capabilities: capabilities(c) });
+        personPreferences(c);
         out(c, { t: 'list', rooms: directory(c) });
         enter(c, ch(LOBBY));
         if (c.admin) out(c, { t: 'admin', state: { ...adminState(), capabilities: capabilities(c) } });
@@ -989,7 +1039,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     function runLine(c, where, text, frame) {
         const parts = normalize(text, 400).slice(1).split(' ');
         const name = lc(parts.shift());
-        return command(c, where, name, parts, undefined, undefined, { ...frame, pmExplicit: true },
+        const ruleRoom = name === 'unban' && /^(dev|account|iph|nick):/i.test(parts[0] || '') ? ch(where)?.keepRef : undefined;
+        return command(c, where, name, parts, ruleRoom, undefined, { ...frame, ...(['msg', 'm'].includes(name) ? { pmExplicit: true } : {}) },
             isPrivateContext(where) && name === 'slap' && parts[0] ? parts[0] : undefined);
     }
 
@@ -1008,11 +1059,22 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         name = alias[name] || name;
         const scope = COMMANDS[name];
         if (!scope) return bot(c, `Unknown command /${String(name).slice(0, 20)}. Try /help.`, 'error');
+        frame ||= {};
+        const intent = personEnvelope(c, frame, name);
+        if (!intent) return stalePerson(c);
+        const rankMode = name === 'mode' && /[ov]/.test(String(/^#/.test(args[0] || '') ? args[1] || '' : args[0] || ''));
+        if (frame.t === 'cmd' && name !== 'mode' && NAMED_PERSON_COMMANDS.has(name) && !intent.bound && !intent.pmBound && !intent.named && !intent.account
+            && !(name === 'msg' && frame.pmExplicit === true)) return stalePerson(c);
+        if (frame.t === 'cmd' && name === 'mode' && (rankMode ? !intent.named : Object.hasOwn(frame, 'personNamed'))) return stalePerson(c);
         if (frame?.t === 'cmd' && isPrivateContext(where) && ['block', 'ignore', 'unignore', 'whois', 'query', 'accept', 'decline'].includes(name)
-            && !Object.hasOwn(frame, 'pmPeer') && !Object.hasOwn(frame, 'pmRef')) return stalePm(c);
+            && !intent.named && !Object.hasOwn(frame, 'pmPeer') && !Object.hasOwn(frame, 'pmRef')) return stalePm(c);
         if ((Object.hasOwn(frame || {}, 'pmPeer') || Object.hasOwn(frame || {}, 'pmRef'))
             && ['msg', 'me', 'slap'].includes(name) && !isPrivateContext(where) && !(name === 'msg' && frame?.pmExplicit === true)) return stalePm(c);
         let boundPeer;
+        if (intent.bound) {
+            boundPeer = selectedPerson(c, frame, ['block', 'unblock'].includes(name));
+            if (!boundPeer) return stalePerson(c);
+        }
         if (['accept', 'decline', 'block', 'whois', 'ignore', 'unignore', 'query'].includes(name) && (Object.hasOwn(frame || {}, 'pmPeer') || Object.hasOwn(frame || {}, 'pmRef'))) {
             boundPeer = ['block', 'whois', 'ignore', 'unignore'].includes(name) ? boundSafetyPeer(c, frame, name === 'block')
                 : boundPm(c, frame, 'pending') || (name === 'query' ? boundPm(c, frame) : null);
@@ -1035,9 +1097,15 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
         if (name === 'invite' && args[1] && ch(args[1])) chan = ch(args[1]);
         if (['part', 'names'].includes(name) && args[0] && ch(args[0])) chan = ch(args[0]);
+        if (intent.bound && PERSON_ROOM_COMMANDS.has(name)
+            && (!chan || chan.name !== where || frame.roomInstance !== chan.keepRef || !c.channels.has(chan.name) && !isStaff(c))) return stalePerson(c);
+        if (roomInstance !== undefined && !['join', 'register'].includes(name)
+            && (typeof roomInstance !== 'string' || !validPmRef(roomInstance) || chan?.keepRef !== roomInstance)) return stalePerson(c);
         if (!chan && where && !CONTEXT_INDEPENDENT_COMMANDS.has(name))
             return bot(c, 'Choose a channel before using this command. Your private conversation is not the lobby.', 'error');
         chan ||= ch(LOBBY);
+        const exactRule = name === 'unban' && /^(dev|account|iph|nick):/i.test(args[0] || '');
+        if (exactRule && (!validPmRef(roomInstance) || chan.keepRef !== roomInstance)) return stalePerson(c);
         if (!allowed(c, scope, chan)) {
             log(nickOf(c), 'denied', `/${name}`, 'not permitted', chan ? chan.name : '');
             return out(c, { t: 'denied', cmd: name, text: `* /${name}: permission denied. ${scope === 'band' ? 'Band administrators only.' : scope === 'moderator' ? 'Site moderators only.' : `You need @ in ${chan ? chan.name : 'that room'}.`}` });
@@ -1052,8 +1120,11 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             || name === 'cohost' && args[0] === 'add'
             || name === 'mode' && String(args[0] || '').startsWith('+'));
         if (growsRoom && !roomCapacity()) return bot(c, 'Room storage is full. Clear an idle canvas or remove unused room grants before adding more.', 'error');
+        if (boundPeer) personDependency(boundPeer, intent.bound ? ch(frame.ch) : null);
+        if (intent.account) personDependency(null, chan);
+        if (exactRule) personDependency(null, chan);
         const fn = handlers[name];
-        return fn(c, chan, boundPeer && ['ignore', 'unignore'].includes(name) ? [boundPeer.nick] : args, roomInstance, messageResult, boundPeer);
+        return fn(c, chan, args, roomInstance, messageResult, boundPeer, intent.account);
     }
 
     const target = (c, nick) => {
@@ -1112,7 +1183,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const live = [...conns.values()].filter((c) => c.nick || c.safetyOnly);
         return { version: 1, connections: live.map((c) => ({
             id: c.id, dev: c.dev, iph: c.iph, account: c.account || '', role: c.role, admin: c.admin,
-            nick: c.nick, entrySource: c.entrySource, channels: [...c.channels], away: c.away, ignores: [...c.ignores], blocks: [...c.blocks], pmOff: c.pmOff,
+            nick: c.nick, entrySource: c.entrySource, channels: [...c.channels], away: c.away, ignores: [...c.ignores], ...(c.ignoredPeerIds.size ? { ignoredPeerIds: [...c.ignoredPeerIds] } : {}), blocks: [...c.blocks], pmOff: c.pmOff,
             cams: [...c.cams], since: c.since, lastNick: c.lastNick, tokens: c.tokens, last: c.last, frames: c.frames,
             lastSaid: Object.fromEntries(Object.entries(c.lastSaid).filter(([name]) => c.channels.has(name))),
             actTokens: c.actTokens, actLast: c.actLast, camReports: c.camReports || 0,
@@ -1140,7 +1211,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             && typeof s.admin === 'boolean' && (!Object.hasOwn(s, 'safetyOnly') || s.safetyOnly === true)
             && (s.safetyOnly ? s.nick === '' : nick(s.nick)) && namesList(s.channels, 31, chanName)
             && typeof s.away === 'string' && s.away.length <= 80
-            && namesList(s.ignores, SESSION_PREFERENCES, nick) && namesList(s.blocks, SESSION_PREFERENCES, moderationIdentity)
+            && namesList(s.ignores, SESSION_PREFERENCES, nick)
+            && (!Object.hasOwn(s, 'ignoredPeerIds') || namesList(s.ignoredPeerIds, SESSION_PREFERENCES, moderationIdentity))
+            && !(s.ignoredPeerIds || []).includes(s.id) && s.ignores.length + (s.ignoredPeerIds?.length || 0) <= SESSION_PREFERENCES
+            && namesList(s.blocks, SESSION_PREFERENCES, moderationIdentity)
             && typeof s.pmOff === 'boolean' && namesList(s.cams, 30, chanName) && s.cams.every((name) => s.channels.includes(name))
             && (!s.safetyOnly || !s.channels.length && !s.cams.length && s.entrySource === '' && s.away === '' && s.pmOff)
             && time(s.since) && time(s.lastNick) && time(s.last) && time(s.actLast)
@@ -1176,7 +1250,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             const active = new Set([...channels.values()].filter((room) => room.kind !== 'lobby' && room.members.size).map((room) => room.name));
             for (const name of s.channels) if (name !== LOBBY) active.add(name);
             if (active.size > L.roomsListed) { deny('session-capacity'); continue; }
-            const c = { ...s, entrySource: normalizeEntrySource(s.entrySource, entrySites), email: identity.email || '', channels: new Set(s.channels), ignores: new Set(s.ignores), blocks: new Set(s.blocks),
+            const c = { ...s, entrySource: normalizeEntrySource(s.entrySource, entrySites), email: identity.email || '', channels: new Set(s.channels), ignores: new Set(s.ignores), ignoredPeerIds: new Set(s.ignoredPeerIds || []), blocks: new Set(s.blocks),
                 cams: new Set(s.cams.filter((name) => !net.shield && ch(name)?.modes.C)), lastSaid: { ...s.lastSaid } };
             for (const key of bindingFields) delete c[key];
             Object.assign(c, connectionBinding(identity));
@@ -1194,6 +1268,11 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
         restorePendingPm(saved.pendingPm, records);
         restoreReceipts(saved.receipts);
+        for (const c of conns.values()) {
+            const hadPeers = c.ignoredPeerIds.size > 0;
+            for (const id of c.ignoredPeerIds) if (!conns.has(id)) c.ignoredPeerIds.delete(id);
+            if (hadPeers || c.ignores.size) personPreferences(c);
+        }
         for (const id of resumed) {
             const c = conns.get(id), s = records.get(id);
             if (c.safetyOnly) { out(c, { t: 'sharing-stopped' }); continue; }
@@ -1327,23 +1406,24 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             log(c.nick, 'room-register', room.name); sendChan(room); pushList();
             bot(c, 'Room registered. Ownership expires after 90 days without an owner or verified co-host visit.');
         },
-        cohost(c, room, [action, nick]) {
+        cohost(c, room, [action, nick], _roomInstance, _messageResult, boundPeer, exactAccount) {
             if (!ownerOnly(c, room)) return;
             if (!['add', 'remove'].includes(action)) return bot(c, '/cohost add|remove nick', 'error');
-            if (action === 'remove' && room.cohosts.has(nick)) {
+            if (exactAccount && !room.cohosts.has(nick)) return bot(c, 'That exact co-host grant is no longer present. Nothing was removed.', 'error');
+            if (!boundPeer && action === 'remove' && room.cohosts.has(nick)) {
                 removeCohost(room, nick);
                 log(c.nick, 'cohost-remove', 'verified co-host', '', room.name); sendChan(room); pushList(); return;
             }
-            const t = target(c, nick); if (!t || !t.account || !room.members.has(t.id)) return bot(c, 'Choose an email-verified member of this room.', 'error');
+            const t = boundPeer || target(c, nick); if (!t || !t.account || !room.members.has(t.id)) return bot(c, 'Choose an email-verified member of this room.', 'error');
             if (owns(t, room)) return bot(c, 'The owner already has host access.', 'error');
             if (action === 'add' && room.cohosts.size >= 20) return bot(c, 'This room already has 20 verified co-hosts.', 'error');
             if (action === 'add') { room.cohosts.add(t.account); room.cohostLabels[t.account] = t.nick; } else removeCohost(room, t.account);
             if (room.transfer?.to === t.account) room.transfer = null;
             log(c.nick, `cohost-${action}`, t.nick, '', room.name); sendChan(room); pushList();
         },
-        transfer(c, room, [nick]) {
+        transfer(c, room, [nick], _roomInstance, _messageResult, boundPeer) {
             if (!ownerOnly(c, room)) return;
-            const t = target(c, nick); if (!t?.account || !room.cohosts.has(t.account) || !room.members.has(t.id)) return bot(c, 'Choose a verified co-host in this room.', 'error');
+            const t = boundPeer || target(c, nick); if (!t?.account || !room.cohosts.has(t.account) || !room.members.has(t.id)) return bot(c, 'Choose a verified co-host in this room.', 'error');
             room.transfer = { from: c.account, to: t.account, until: now() + OWNER_TRANSFER_TTL };
             out(t, { t: 'owner-offer', ch: room.name, by: c.nick });
             bot(c, 'Ownership offered for 10 minutes. The co-host must accept.');
@@ -1401,20 +1481,21 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 const other = conns.get(p.fromId === c.id ? p.toId : p.fromId);
                 if (other && p.ref) out(other, { t: 'pm-peer', with: c.nick, ...pmMetadata(p, c) });
             }
-            out(c, { t: 'welcome', nick: c.nick, role: c.role, band: isBand(c), moderator: c.role === 'moderator', verified: !!c.account, capabilities: capabilities(c) });
+            out(c, { t: 'welcome', id: c.id, nick: c.nick, role: c.role, band: isBand(c), moderator: c.role === 'moderator', verified: !!c.account, capabilities: capabilities(c) });
             for (const name of c.channels) { const chn = ch(name); event(chn, `${old} is now known as ${c.nick}`); sendChan(chn); }
             return pushAdmin();
         },
         me(c, chan, args) { return say(c, chan.name, args.join(' '), true); },
-        slap(c, chan, [n]) {
-            const t = byNick(n);
+        slap(c, chan, [n], _roomInstance, _messageResult, boundPeer) {
+            const t = boundPeer || byNick(n);
             if (!t) return bot(c, `No such nick: ${String(n || '').slice(0, 20)}`, 'error');
             return say(c, chan.name, `slaps ${t.nick} around a bit with a large trout`, true);
         },
-        msg(c, chan, [to, ...words], _roomInstance, messageResult) {
+        msg(c, chan, [to, ...words], _roomInstance, messageResult, boundPeer) {
+            if (boundPeer) return privmsg(c, boundPeer.nick, words.join(' '), false, messageResult, boundPeer);
             if (/^#/.test(to || '')) { const room = ch(to); if (!room || !room.members.has(c.id)) return bot(c, `You're not in ${String(to).slice(0, 30)}.`, 'error'); return say(c, room.name, words.join(' '), false); }
             if (lc(to) === lc(BOT)) return handlers.help(c);
-            return privmsg(c, to, words.join(' '), false, messageResult);
+            return privmsg(c, to, words.join(' '), false, messageResult, boundPeer);
         },
         query(c, _chan, [to], _roomInstance, _messageResult, boundPeer) { return privmsg(c, to, '', false, undefined, boundPeer); },
         accept(c, _chan, [n], _roomInstance, _messageResult, boundPeer) {
@@ -1456,9 +1537,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         },
         block(c, _chan, [n], _roomInstance, _messageResult, boundPeer) {
             const t = boundPeer || target(c, n); if (!t) return undefined;
-            if ((!c.blocks.has(t.dev) && c.blocks.size >= SESSION_PREFERENCES) || (t.nick && !c.ignores.has(lc(t.nick)) && c.ignores.size >= SESSION_PREFERENCES)) return bot(c, 'Your block or ignore list is full (50 each). Remove an entry before adding another.', 'error');
+            if ((!c.blocks.has(t.dev) && c.blocks.size >= SESSION_PREFERENCES) || (!boundPeer && t.nick && !c.ignores.has(lc(t.nick)) && c.ignores.size + c.ignoredPeerIds.size >= SESSION_PREFERENCES)) return bot(c, 'Your block or ignore list is full (50 each). Remove an entry before adding another.', 'error');
             const mediaChanged = !c.blocks.has(t.dev);
-            c.blocks.add(t.dev); if (t.nick) c.ignores.add(lc(t.nick));
+            c.blocks.add(t.dev); if (!boundPeer && t.nick) c.ignores.add(lc(t.nick));
             const closing = pm.get(pairKey(c.id, t.id));
             for (const [key, pending] of pm) if ((pending.fromId === c.id && conns.get(pending.toId)?.dev === t.dev)
                 || (pending.toId === c.id && conns.get(pending.fromId)?.dev === t.dev)) {
@@ -1471,9 +1552,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             }
             if (!closing) { out(t, { t: 'pm-closed', with: c.nick }); out(c, { t: 'pm-closed', with: t.nick }); }
             if (mediaChanged) refreshBlockedMedia(c, t.dev);
-            return bot(c, `Blocked ${t.nick || 'this visitor'}. They can't PM you and you won't see them.`);
+            bot(c, `Blocked ${t.nick || 'this visitor'}. They can't PM you and you won't see them.`);
+            return personPreferences(c);
         },
-        unblock(c, _chan, [n]) { const t = byNick(n); if (t) { const mediaChanged = c.blocks.delete(t.dev); c.ignores.delete(lc(t.nick)); if (mediaChanged) refreshBlockedMedia(c, t.dev); } return bot(c, `Unblocked ${String(n || '').slice(0, 20)}.`); },
+        unblock(c, _chan, [n], _roomInstance, _messageResult, boundPeer) { const t = boundPeer || byNick(n); if (t) { const mediaChanged = c.blocks.delete(t.dev); if (!boundPeer) c.ignores.delete(lc(t.nick)); if (mediaChanged) refreshBlockedMedia(c, t.dev); } bot(c, `Unblocked ${String(t?.nick || n || 'this visitor').slice(0, 20)}.`); return personPreferences(c); },
         pm(c, _chan, [v]) { c.pmOff = lc(v) === 'off'; if (c.pmOff) for (const [k, p] of pm) if ((p.fromId === c.id || p.toId === c.id) && p.state === 'pending') endPendingPm(k, p, 'PM requests were turned off.'); return out(c, { t: 'pm-setting', off: c.pmOff, text: c.pmOff ? 'PMs are off. Nobody can send you requests.' : 'PMs are on (accept-first).' }); },
         whois(c, _chan, [n], _roomInstance, _messageResult, boundPeer) {
             const t = boundPeer || target(c, n); if (!t) return undefined;
@@ -1488,14 +1570,18 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             for (const name of c.channels) sendChan(ch(name));
             return bot(c, c.away ? `You're marked away: ${c.away}` : 'Welcome back.');
         },
-        ignore(c, _chan, [n]) {
+        ignore(c, _chan, [n], _roomInstance, _messageResult, boundPeer) {
+            if (boundPeer) {
+                if (!c.ignoredPeerIds.has(boundPeer.id) && c.ignores.size + c.ignoredPeerIds.size >= SESSION_PREFERENCES) return bot(c, 'Your ignore list is full (50). Remove an entry before adding another.', 'error');
+                c.ignoredPeerIds.add(boundPeer.id); bot(c, `Ignoring ${boundPeer.nick}.`); return personPreferences(c);
+            }
             if (!n) return bot(c, `Ignoring: ${[...c.ignores].join(', ') || 'nobody'}`);
             const value = lc(n);
             if (!/^[a-z][a-z0-9_\-[\]{}^`|]{2,19}$/.test(value)) return bot(c, 'Use a nickname to ignore someone.', 'error');
-            if (!c.ignores.has(value) && c.ignores.size >= SESSION_PREFERENCES) return bot(c, 'Your ignore list is full (50). Remove an entry before adding another.', 'error');
-            c.ignores.add(value); return bot(c, `Ignoring ${String(n).slice(0, 20)}.`);
+            if (!c.ignores.has(value) && c.ignores.size + c.ignoredPeerIds.size >= SESSION_PREFERENCES) return bot(c, 'Your ignore list is full (50). Remove an entry before adding another.', 'error');
+            c.ignores.add(value); bot(c, `Ignoring ${String(n).slice(0, 20)}.`); return personPreferences(c);
         },
-        unignore(c, _chan, [n]) { c.ignores.delete(lc(n)); return bot(c, `Unignored ${String(n || '').slice(0, 20)}.`); },
+        unignore(c, _chan, [n], _roomInstance, _messageResult, boundPeer) { if (boundPeer) c.ignoredPeerIds.delete(boundPeer.id); else c.ignores.delete(lc(n)); bot(c, `Unignored ${String(boundPeer?.nick || n || '').slice(0, 20)}.`); return personPreferences(c); },
         list(c) { return out(c, { t: 'list', rooms: directory(c), show: true }); },
         names(c, chan, [maybe]) { const room = maybe && ch(maybe) ? ch(maybe) : chan; if (!visibleRoom(c, room)) return bot(c, 'That room is unavailable.', 'error'); return bot(c, `${room.name}: ${names(room).map((n) => `${n.prefix}${n.nick}`).join(' ')}`); },
         topic(c, chan, args) {
@@ -1517,8 +1603,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         },
         cam(c, chan, [v, adult]) { return cam(c, chan.name, lc(v) === 'on', adult === '18+'); },
         // ---- room @ ----
-        kick(c, chan, [n, ...why]) {
-            const t = target(c, n); if (!t) return undefined;
+        kick(c, chan, [n, ...why], _roomInstance, _messageResult, boundPeer) {
+            const t = boundPeer || target(c, n); if (!t) return undefined;
             if (isStaff(t) && !isBand(c)) return bot(c, 'Only band administrators can act on site staff.', 'error');
             if (owns(t, chan) && !isStaff(c)) return bot(c, 'Only site moderators can remove a registered room owner.', 'error');
             if (!chan.members.has(t.id)) return bot(c, `${t.nick} isn't in ${chan.name}.`, 'error');
@@ -1538,46 +1624,49 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             log(c.nick, 'kick', t.nick, reason, chan.name);
             return leave(t, chan, 'kicked');
         },
-        ban(c, chan, [n, ...why]) {
-            if (chan.kind === 'lobby') return handlers.gban(c, chan, [n, ...why]);
-            const t = target(c, n); if (!t) return undefined;
+        ban(c, chan, [n, ...why], _roomInstance, _messageResult, boundPeer) {
+            if (chan.kind === 'lobby') return handlers.gban(c, chan, [n, ...why], undefined, undefined, boundPeer);
+            const t = boundPeer || target(c, n); if (!t) return undefined;
             if (isStaff(t)) return bot(c, 'Site staff access is managed by the owner.', 'error');
             if (owns(t, chan) && !isStaff(c)) return bot(c, 'Only site moderators can act on a registered room owner.', 'error');
             const reason = normalize(why.join(' '), 80) || 'banned';
-            chan.bans.push({ mask: `dev:${t.dev}`, reason, by: c.nick, at: now() }, { mask: `nick:${lc(t.nick)}`, reason, by: c.nick, at: now() },
-                { mask: `iph:${t.iph}`, nick: t.nick, reason, by: c.nick, at: now(), until: now() + L.ipBan }); // a private window can't dodge it
+            chan.bans.push({ mask: `dev:${t.dev}`, reason, by: c.nick, at: now() });
+            if (!boundPeer) chan.bans.push({ mask: `nick:${lc(t.nick)}`, reason, by: c.nick, at: now() },
+                { mask: `iph:${t.iph}`, nick: t.nick, reason, by: c.nick, at: now(), until: now() + L.ipBan });
             if (t.account) chan.bans.push({ mask: `account:${t.account}`, reason, by: c.nick, at: now() });
             if (chan.bans.length > L.roomBanMax) chan.bans = chan.bans.slice(-L.roomBanMax); // keep the newest
             event(chan, `${c.nick} sets mode +b ${t.nick}`);
             log(c.nick, 'ban', t.nick, reason, chan.name);
             for (const person of membersOf(chan)) if (!isStaff(person) && !owns(person, chan) && banned(chan.bans, person)) {
+                if (boundPeer) personDependency(person, chan);
                 out(person, { t: 'kicked', ch: chan.name, by: c.nick, reason }); leave(person, chan, 'banned');
             }
             return undefined;
         },
         unban(c, chan, [mask]) {
-            const m = lc(mask);
+            const exactRule = /^(dev|account|iph|nick):/i.test(String(mask || ''));
+            const m = exactRule ? String(mask) : lc(mask);
             const list = chan.kind === 'lobby' ? net.bans : chan.bans;
             const before = list.length;
-            const keep = list.filter((b) => !(b.mask === m || b.mask === `nick:${m}` || b.nick && lc(b.nick) === m));
+            const keep = list.filter((b) => exactRule ? b.mask !== m : !(b.mask === m || b.mask === `nick:${m}` || b.nick && lc(b.nick) === m));
             if (keep.length === before) return bot(c, `No ban matching ${String(mask || '').slice(0, 30)}.`, 'error');
             if (chan.kind === 'lobby') { net.bans = keep; saveNet(); } else { chan.bans = keep; }
-            event(chan, `${c.nick} sets mode -b ${mask}`);
+            event(chan, exactRule ? `${c.nick} removes a ban rule` : `${c.nick} sets mode -b ${mask}`);
             log(c.nick, 'unban', mask, '', chan.name);
             return undefined;
         },
-        invite(c, chan, [n]) {
-            const t = target(c, n); if (!t) return undefined;
+        invite(c, chan, [n], _roomInstance, _messageResult, boundPeer) {
+            const t = boundPeer || target(c, n); if (!t) return undefined;
             if (chan.kind === 'lobby') return bot(c, '/invite nick #room', 'error');
             if (chan.invites.size >= 150 && !chan.invites.has(t.dev)) return bot(c, 'Room invitation list is full.', 'error');
             chan.invites.add(t.dev);
             out(t, { t: 'invite', ch: chan.name, by: c.nick });
             return bot(c, `Invited ${t.nick} to ${chan.name}.`);
         },
-        op(c, chan, [n]) { return setRank(c, chan, n, 'ops', true, '+o'); },
-        deop(c, chan, [n]) { return setRank(c, chan, n, 'ops', false, '-o'); },
-        voice(c, chan, [n]) { return setRank(c, chan, n, 'voice', true, '+v'); },
-        devoice(c, chan, [n]) { return setRank(c, chan, n, 'voice', false, '-v'); },
+        op(c, chan, [n], _r, _m, peer) { return setRank(c, chan, n, 'ops', true, '+o', peer); },
+        deop(c, chan, [n], _r, _m, peer) { return setRank(c, chan, n, 'ops', false, '-o', peer); },
+        voice(c, chan, [n], _r, _m, peer) { return setRank(c, chan, n, 'voice', true, '+v', peer); },
+        devoice(c, chan, [n], _r, _m, peer) { return setRank(c, chan, n, 'voice', false, '-v', peer); },
         mode(c, chan, [flag, arg]) {
             const m = /^([+-])([miklSCQ])$/.exec(String(flag || ''));
             if (!m) return bot(c, `${chan.name} modes: ${modeString(chan)}. Usage: /mode +m|+i|+k key|+l N|+S secs|+C|+Q`);
@@ -1623,13 +1712,13 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return closeRoom(chan, c.nick, isBand(c) ? 'closed by the band' : 'closed by the host');
         },
         // ---- band @ ----
-        gban(c, chan, [n, ...why]) {
-            const t = target(c, n); if (!t) return undefined;
+        gban(c, chan, [n, ...why], _roomInstance, _messageResult, boundPeer) {
+            const t = boundPeer || target(c, n); if (!t) return undefined;
             if (isStaff(t)) return bot(c, 'Site staff access must be removed through the staff allowlist and Cloudflare Access.', 'error');
             const reason = normalize(why.join(' '), 80);
             if (!reason) return bot(c, 'A ban needs a reason: /ban nick why', 'error');
-            net.bans.push({ mask: `dev:${t.dev}`, nick: t.nick, reason, by: c.nick, at: now() },
-                { mask: `iph:${t.iph}`, nick: t.nick, reason, by: c.nick, at: now(), until: now() + L.ipBan },
+            net.bans.push({ mask: `dev:${t.dev}`, ...(!boundPeer ? { nick: t.nick } : {}), reason, by: c.nick, at: now() });
+            if (!boundPeer) net.bans.push({ mask: `iph:${t.iph}`, nick: t.nick, reason, by: c.nick, at: now(), until: now() + L.ipBan },
                 { mask: `nick:${lc(t.nick)}`, nick: t.nick, reason, by: c.nick, at: now() });
             if (t.account) net.bans.push({ mask: `account:${t.account}`, reason, by: c.nick, at: now() });
             if (net.bans.length > L.banMax) net.bans = net.bans.slice(-L.banMax); // keep the newest
@@ -1637,13 +1726,14 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             log(c.nick, 'ban', t.nick, reason, 'network');
             saveNet();
             for (const person of [...conns.values()]) if (!isStaff(person) && banned(net.bans, person)) {
+                if (boundPeer) personDependency(person);
                 out(person, { t: 'kicked', ch: LOBBY, by: c.nick, reason, banned: true });
                 kill(person, 4003, 'banned');
             }
             return undefined;
         },
-        mute(c, chan, [n, dur]) {
-            const t = target(c, n); if (!t) return undefined;
+        mute(c, chan, [n, dur], _roomInstance, _messageResult, boundPeer) {
+            const t = boundPeer || target(c, n); if (!t) return undefined;
             if (isStaff(t) && !isBand(c)) return bot(c, 'Staff privileges are managed by the owner.', 'error');
             const ms = Math.min(parseDuration(dur, 10 * MIN), DAY);
             net.mutes[t.dev] = now() + ms;
@@ -1652,8 +1742,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             log(c.nick, 'mute', t.nick, `${Math.round(ms / MIN)}m`, chan.name);
             return saveNet();
         },
-        purge(c, chan, [what]) {
-            const t = byNick(what);
+        purge(c, chan, [what], _roomInstance, _messageResult, boundPeer) {
+            const t = boundPeer || byNick(what);
             if (t && isStaff(t) && !isBand(c)) return bot(c, 'Staff actions require a band administrator.', 'error');
             const window = /^\d+[smh]$/.test(what || '') ? parseDuration(what, 5 * MIN) : 0;
             const ids = [...new Set([...lines.keys(), ...receipts.keys()])].filter((id) => {
@@ -1714,7 +1804,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return log(c.nick, 'approve', h.from, h.reason, h.ch);
         },
         dismiss(c, _chan, [id]) {
-            if (held.delete(id)) { heldChannels.delete(id); saveModerationQueue(); return log(c.nick, 'reject-held', id); }
+            if (held.delete(id)) { heldChannels.delete(id); if (!lines.has(id)) lineMeta.delete(id); saveModerationQueue(); return log(c.nick, 'reject-held', id); }
             const r = reports.get(id);
             if (!r) return bot(c, 'No such report.', 'error');
             r.done = true;
@@ -1753,9 +1843,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         return bot(c, `Private report ${result.status}. No chat was deleted or participant punished.`);
     }
 
-    function setRank(c, chan, n, set, on, flag) {
+    function setRank(c, chan, n, set, on, flag, boundPeer) {
         if (chan.kind === 'lobby') return bot(c, 'In #stalemate authenticated site staff are the ops. Use this inside a room.', 'error');
-        const t = target(c, n); if (!t) return undefined;
+        const t = boundPeer || target(c, n); if (!t) return undefined;
         if (!chan.members.has(t.id)) return bot(c, `${t.nick} isn't in ${chan.name}.`, 'error');
         if (chan.owner && set === 'ops' && !owns(c, chan) && !isBand(c)) return bot(c, 'Only the owner manages co-hosts.', 'error');
         if (!on && owns(t, chan)) return bot(c, 'The room owner keeps host access.', 'error');
@@ -1948,10 +2038,13 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return undefined;
         }
         requireParticipation(c, 'publicText');
+        // Kept only alongside the already-bounded live/held line metadata.
+        // Restored moderation rows deliberately have no reconstructed author.
+        lineMeta.set(line.id, { authorDev: c.dev, authorPeer: c.id, roomInstance: chan.keepRef, recipients: new Set() });
         if (v.verdict === 'hold' && !isBand(c)) {
             held.set(line.id, { ...line, reason: v.reason, dev: c.dev });
             heldChannels.set(line.id, chan);
-            while (held.size > MODERATION_QUEUE_MAX) { const oldest = held.keys().next().value; held.delete(oldest); heldChannels.delete(oldest); }
+            while (held.size > MODERATION_QUEUE_MAX) { const oldest = held.keys().next().value; held.delete(oldest); heldChannels.delete(oldest); if (!lines.has(oldest)) lineMeta.delete(oldest); }
             saveModerationQueue();
             bot(c, 'Your message is waiting for a moderator to OK it.');
             log(BOT, 'filter-hold', c.nick, v.reason, chan.name);
@@ -1964,18 +2057,27 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
 
     function publish(chan, line, dev, reviewNewPublicLine = false) {
+        const original = lineMeta.get(line.id), originalId = original?.authorPeer;
+        const currentAuthor = conns.get(originalId);
+        const author = currentAuthor?.dev === dev && original.roomInstance === chan.keepRef ? currentAuthor : null;
         if (participationConfigured) {
-            const author = byNick(line.from);
-            if (!author || author.dev !== dev) throw Object.assign(new Error('participation-denied'), { participationDenied: true });
+            if (!author) throw Object.assign(new Error('participation-denied'), { participationDenied: true });
             requireParticipation(author, 'publicText');
         }
         statHour().lines += 1;
-        const recipients = membersOf(chan).filter((m) => !m.ignores.has(lc(line.from)) && !(dev && m.blocks.has(dev)));
-        rememberLine(line, { authorDev: dev, recipients: new Set(recipients.map((m) => m.id)),
+        if (!author) for (const member of membersOf(chan)) if (member.ignoredPeerIds.size && !member.unprovenHeldNotified) {
+            member.unprovenHeldNotified = true;
+            bot(member, 'A queued message could not be shown under your identity-ignore settings.');
+        }
+        const recipients = membersOf(chan).filter((m) => !m.ignores.has(lc(line.from)) && !(dev && m.blocks.has(dev))
+            && (author ? !m.ignoredPeerIds.has(author.id) : m.ignoredPeerIds.size === 0));
+        rememberLine(line, { authorDev: dev, ...(author ? { authorPeer: author.id, roomInstance: original.roomInstance } : {}), recipients: new Set(recipients.map((m) => m.id)),
             ...(incidentSources && publicChannel(chan) ? { publicOrigin: { v: 1, at: now() } } : {}) });
         chan.moderationContext.push(line);
         if (chan.moderationContext.length > L.moderationContext) chan.moderationContext.shift();
-        for (const member of recipients) out(member, line);
+        // Correlation is wire-only, after the unchanged receipt/digest is made.
+        for (const member of recipients) out(member, { ...line,
+            ...(author ? { personPeer: author.id, personSelf: member.id === author.id, roomInstance: original.roomInstance } : {}) });
         if (reviewNewPublicLine) requestAiReview(chan, line);
     }
 
@@ -2053,7 +2155,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     function pendingPmAllowed(from, to) {
         return !!from && !!to && !!from.nick && !!to.nick && !to.pmOff
             && !from.blocks.has(to.dev) && !to.blocks.has(from.dev)
-            && !from.ignores.has(lc(to.nick)) && !to.ignores.has(lc(from.nick));
+            && !ignoredBy(from, to) && !ignoredBy(to, from);
     }
     function endPendingPm(key, pending, reason) {
         pm.delete(key);
@@ -2142,13 +2244,13 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         requireParticipation(from, 'requestDirectContact', to);
         const msg = { t: 'pm', id: `p${now().toString(36)}${(seq += 1).toString(36)}`, from: from.nick, entrySource: from.entrySource, to: to.nick, text, me: !!action, band: isBand(from), ts: now() };
         const recipients = new Set([from.id]);
-        if (!to.ignores.has(lc(from.nick))) recipients.add(to.id);
+        if (!ignoredBy(to, from)) recipients.add(to.id);
         // Keep bounded delivery metadata/digest, not a recent private-body log.
         // Staff receive the exact selected text only when a participant reports it.
         rememberDelivery({ ...msg, ch: `pm:${from.nick}>${to.nick}` }, { authorDev: from.dev, recipients });
         const pair = pm.get(pairKey(from.id, to.id));
         out(from, { ...msg, ...pmMetadata(pair, to), ...(pair?.ref ? { with: to.nick, self: true } : {}) });
-        if (!to.ignores.has(lc(from.nick))) out(to, { ...msg, ...pmMetadata(pair, from), ...(pair?.ref ? { with: from.nick, self: false } : {}) });
+        if (!ignoredBy(to, from)) out(to, { ...msg, ...pmMetadata(pair, from), ...(pair?.ref ? { with: from.nick, self: false } : {}) });
         messageResult?.('published');
         return undefined;
     }

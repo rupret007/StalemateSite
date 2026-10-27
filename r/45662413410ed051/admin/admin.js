@@ -20,11 +20,12 @@
     if (!previewKey) status('Not open yet.');
 
     const app = window.__admin = { ws: null, state: null };
-    const send = (o) => { if (app.ws && app.ws.readyState === 1) app.ws.send(JSON.stringify(o)); };
+    let personTargetsSupported = false;
+    const send = (o) => { if (!app.ws || app.ws.readyState !== 1) return false; try { app.ws.send(JSON.stringify(o)); return true; } catch { return false; } };
     const cmd = (name, args = []) => { if (app.state) send({ t: 'cmd', name, args, ch: '#stalemate' }); };
 
     function clearPanel() {
-        app.state = null;
+        app.state = null; personTargetsSupported = false;
         // Hide and erase received evidence when its authenticated connection
         // ends. A hidden panel must not retain private report text or actions.
         for (const selector of ['[data-reports]', '[data-held]', '[data-ai-reviews]', '[data-private-reports]',
@@ -71,7 +72,7 @@
             if (app.ws !== ws || ws.readyState !== 1) return;
             let m; try { m = JSON.parse(e.data); } catch (err) { return; }
             if (m.t === 'device') localStorage.setItem('hangout-dev', m.token);
-            if (m.t === 'hello') send({ t: 'hello', nick: $('[data-nick]').value.trim() || 'Helper', age13: true });
+            if (m.t === 'hello') { personTargetsSupported = m.features?.personTargets === 1; send({ t: 'hello', nick: $('[data-nick]').value.trim() || 'Helper', age13: true }); }
             if (m.t === 'nick-error') status(m.text);
             if (m.t === 'welcome') status('Loading the review queue…');
             if (m.t === 'admin') { app.state = m.state; draw(); clearTimeout(deadline); status('Connected.'); $('[data-gate]').hidden = true; $('[data-panel]').hidden = false; }
@@ -87,6 +88,20 @@
     const btn = (label, fn, cls = 'btn btn--small') => { const b = el('button', label, cls); b.type = 'button'; b.addEventListener('click', fn); return b; };
     const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`; };
     const askReason = (what) => { const r = prompt(`${what}: reason? (required, goes in the mod log)`); return r && r.trim() ? r.trim().split(' ') : null; };
+
+    const personId = value => typeof value === 'string' && value.length > 0 && value.length <= 160 && !/\s|[\u0000-\u001f\u007f]/.test(value);
+    const roomNonce = value => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);
+    function personCommand(name, selected, args, origin) {
+        const current = app.state?.users?.find(user => user.id === selected.id);
+        const room = app.state?.rooms?.find(room => room.name === origin?.name);
+        if (!personTargetsSupported || !personId(selected.id) || !current || !roomNonce(origin?.keepRef) || room?.keepRef !== origin.keepRef) {
+            toast('That person or room is no longer confirmed. Refresh the panel and choose again.'); return false;
+        }
+        const values = [...args]; if (values.length) values[0] = current.nick;
+        const sent = send({ t: 'cmd', name, args: values, ch: origin.name, roomInstance: origin.keepRef, personContext: 1, personPeer: selected.id });
+        if (!sent) toast('The action was not sent. Reconnect to load current people.');
+        return sent;
+    }
 
     function drawAiReview(s) {
         const ai = s.aiModeration || {};
@@ -217,27 +232,45 @@
             const li = el('li'); li.append(el('b', `${u.role === 'moderator' ? 'MOD ' : u.role !== 'fan' ? '⭐ ' : ''}${u.nick}${u.muted ? ' (muted)' : ''}${u.away ? ' 💤' : ''}`), el('span', u.channels.join(' '), 'small'));
             if (u.role === 'fan') {
                 const acts = el('div', undefined, 'acts');
-                acts.append(btn('Mute 10m', () => cmd('mute', [u.nick, '10m'])), btn('Mute 24h', () => cmd('mute', [u.nick, '24h'])), btn('Kick', () => cmd('kick', [u.nick, 'take a breather'])),
-                    btn('Ban', () => { const why = askReason(`Ban ${u.nick}`); if (why) cmd('gban', [u.nick, ...why]); }, 'btn btn--small btn--danger'), btn('Purge lines', () => cmd('purge', [u.nick]), 'btn btn--small btn--ghost'));
+                const lobby = s.rooms.find(room => room.name === '#stalemate');
+                const origin = lobby && { name: lobby.name, keepRef: lobby.keepRef };
+                acts.append(btn('Mute 10m', () => personCommand('mute', u, [u.nick, '10m'], origin)), btn('Mute 24h', () => personCommand('mute', u, [u.nick, '24h'], origin)), btn('Kick', () => personCommand('kick', u, [u.nick, 'take a breather'], origin)),
+                    btn('Ban', () => { const why = askReason(`Ban ${u.nick}`); if (why) personCommand('gban', u, [u.nick, ...why], origin); }, 'btn btn--small btn--danger'), btn('Purge lines', () => personCommand('purge', u, [u.nick], origin), 'btn btn--small btn--ghost'));
+                if (!personTargetsSupported || !personId(u.id) || !roomNonce(origin?.keepRef)) for (const button of acts.querySelectorAll('button')) {
+                    button.disabled = true; button.title = 'Person actions require a current server-confirmed connection.';
+                }
                 li.append(acts);
             }
             users.append(li);
         }
         const bans = $('[data-bans]'); bans.replaceChildren();
-        const seen = new Set();
+        const ruleNames = { dev: 'Device rule', iph: 'Network rule', nick: 'Named rule', account: 'Account rule' };
         for (const b of s.bans) {
-            if (!b.mask.startsWith('nick:') && seen.has(b.nick)) continue;
-            if (!b.mask.startsWith('nick:')) continue;
-            seen.add(b.nick);
-            const li = el('li'); li.append(el('b', `${b.nick || b.mask} · by ${b.by} · ${ago(b.at)}`), el('span', b.reason));
-            li.append(btn('Unban', () => cmd('unban', [b.nick || b.mask.slice(5)]), 'btn btn--small btn--ghost')); bans.append(li);
+            const type = typeof b.mask === 'string' ? b.mask.split(':', 1)[0] : '';
+            const valid = Object.hasOwn(ruleNames, type) && b.mask.length > type.length + 1;
+            const li = el('li');
+            li.append(el('b', `${b.nick ? `Historical nickname: ${b.nick}` : 'Stored restriction'} · ${ruleNames[type] || 'Unknown rule'} · by ${b.by} · ${ago(b.at)}`), el('span', b.reason));
+            const origin = s.rooms.find(room => room.name === '#stalemate');
+            const instance = origin?.keepRef;
+            const remove = btn('Unban this rule', () => {
+                if (!personTargetsSupported || !valid || !roomNonce(instance) || app.state?.rooms?.find(room => room.name === '#stalemate')?.keepRef !== instance || !app.state?.bans?.some(rule => rule.mask === b.mask)) return toast('That stored rule is no longer confirmed. Refresh the panel.');
+                return send({ t: 'cmd', name: 'unban', args: [b.mask], ch: '#stalemate', roomInstance: instance });
+            }, 'btn btn--small btn--ghost');
+            remove.disabled = !personTargetsSupported || !valid || !roomNonce(instance);
+            li.append(remove); bans.append(li);
         }
         const rooms = $('[data-rooms]'); rooms.replaceChildren();
         for (const r of s.rooms.filter((x) => x.kind !== 'lobby')) {
             const li = el('li'); li.append(el('b', `${r.title} · ${r.name}`), el('span', `${r.count}/${r.modes.l} · ${r.modes.locked ? 'locked' : 'open'} · cams ${r.modes.C ? 'allowed' : 'off'}`, 'small'));
             const acts = el('div', undefined, 'acts');
-            acts.append(btn(r.modes.locked ? 'Unlock' : 'Lock', () => send({ t: 'cmd', name: 'lock', args: [r.name, r.modes.locked ? 'off' : 'on'], ch: r.name })),
-                btn('Cams off', () => send({ t: 'cmd', name: 'mode', args: [r.name, '-C'], ch: r.name })), btn('Close', () => send({ t: 'cmd', name: 'close', args: [r.name], ch: r.name }), 'btn btn--small btn--danger'));
+            const roomCommand = (name, args) => {
+                const current = app.state?.rooms?.find(room => room.name === r.name);
+                if (!roomNonce(r.keepRef) || current?.keepRef !== r.keepRef) return toast('That room changed. Refresh the panel and choose again.');
+                return send({ t: 'cmd', name, args, ch: r.name, roomInstance: r.keepRef });
+            };
+            acts.append(btn(r.modes.locked ? 'Unlock' : 'Lock', () => roomCommand('lock', [r.name, r.modes.locked ? 'off' : 'on'])),
+                btn('Cams off', () => roomCommand('mode', [r.name, '-C'])), btn('Close', () => roomCommand('close', [r.name]), 'btn btn--small btn--danger'));
+            if (!personTargetsSupported || !roomNonce(r.keepRef)) for (const button of acts.querySelectorAll('button')) button.disabled = true;
             li.append(acts); rooms.append(li);
         }
         drawStats(s.stats);

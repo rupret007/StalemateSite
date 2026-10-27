@@ -626,3 +626,50 @@ describe('PM endpoint references', () => {
         expect(frames.filter(frame => frame.t === 'pm-closed' || frame.t === 'pm')).toEqual([]);
     });
 });
+
+describe('bound PM Block across later nickname reuse', () => {
+    it('keeps the original device blocked without hiding a different live visitor who reclaims its old nickname', () => {
+        const observer = peerGuest('Observer'), original = peerGuest('Original'), third = peerGuest('Third');
+        now += 180000;
+        const ref = openPeerPair(observer, original, 'Observer', 'Original');
+        frames = [];
+        boundPeerSend(original, observer, ref, 'A confirmed private reply before the deliberate block');
+        expect(frames.filter(frame => frame.recipient === observer && frame.t === 'pm'))
+            .toEqual([expect.objectContaining({ peer: original, ref, self: false, text: 'A confirmed private reply before the deliberate block' })]);
+        now += 4000; frames = [];
+        engine.message(observer, JSON.stringify({ t: 'cmd', name: 'block', args: ['Original'], ch: `pm:${ref}`, pmPeer: original, pmRef: ref }));
+        const preference = engine.sessionSnapshot().connections.find(connection => connection.id === observer);
+        expect(preference.blocks).toEqual(['dev-Original']);
+        expect(preference.blocks).not.toContain('dev-Third');
+        expect(frames.filter(frame => frame.t === 'pm-closed')).toEqual([
+            expect.objectContaining({ recipient: observer, peer: original, ref }),
+            expect.objectContaining({ recipient: original, peer: observer, ref })
+        ]);
+        expect(engine.sessionSnapshot().pm).toEqual([]);
+        now += 61000;
+        cmd(original, 'nick', ['RenamedOriginal']); cmd(third, 'nick', ['Original']);
+        const connections = engine.sessionSnapshot().connections;
+        expect(connections.find(connection => connection.id === original).nick).toBe('RenamedOriginal');
+        expect(connections.find(connection => connection.id === third).nick).toBe('Original');
+        frames = [];
+        const blockedText = 'The original visitor is still blocked after a nickname change';
+        engine.message(original, JSON.stringify({ t: 'say', ch: '#stalemate', text: blockedText }));
+        expect(frames.filter(frame => frame.recipient === third && frame.t === 'line' && frame.text === blockedText))
+            .toEqual([expect.objectContaining({ from: 'RenamedOriginal', ch: '#stalemate' })]);
+        expect(frames.filter(frame => frame.recipient === observer && frame.t === 'line' && frame.text === blockedText)).toEqual([]);
+        // Typed named intent remains deliberate, but the original device's
+        // real block must still refuse a fresh PM request after the old pair ended.
+        now += 4000; frames = [];
+        engine.message(original, JSON.stringify({ t: 'say', ch: '#stalemate', text: '/msg Observer A new private request from the blocked original visitor' }));
+        expect(frames.filter(frame => frame.t === 'pm-request' || frame.t === 'pm')).toEqual([]);
+        frames = [];
+        const replacementText = 'The distinct visitor should remain visible under the reclaimed nickname';
+        engine.message(third, JSON.stringify({ t: 'say', ch: '#stalemate', text: replacementText }));
+        expect(frames.filter(frame => frame.recipient === third && frame.t === 'line' && frame.text === replacementText))
+            .toEqual([expect.objectContaining({ from: 'Original', ch: '#stalemate' })]);
+        // Check real publication before this audience assertion: a refused
+        // or filtered sender cannot masquerade as the alias-retargeting failure.
+        expect(frames.filter(frame => frame.recipient === observer && frame.t === 'line' && frame.text === replacementText))
+            .toEqual([expect.objectContaining({ from: 'Original', ch: '#stalemate' })]);
+    });
+});

@@ -302,3 +302,48 @@ describe('bounded PM peer-reference session metadata through actual SQLite', () 
         expect((await f.read()).sessions).toEqual(sessions);
     });
 });
+
+describe('identity-bound ignore preferences in the strict session codec', () => {
+    function currentPreferences() {
+        const frames = [], identities = ['Alice', 'Bravo', 'Charlie'].map(nick => ({ id: `ignore_${nick}`, dev: `device_${nick}`,
+            iph: `ip_${nick}`, role: 'fan', account: '', admin: false }));
+        const app = createLobby({ now: () => NOW, send: (recipient, frame) => frames.push({ recipient, ...frame }) });
+        for (const [index, identity] of identities.entries()) {
+            app.connect(identity); app.message(identity.id, JSON.stringify({ t: 'hello', nick: ['Alice', 'Bravo', 'Charlie'][index], age13: true }));
+        }
+        const room = frames.find(frame => frame.recipient === identities[0].id && frame.t === 'join').ch;
+        const target = room.names.find(person => person.nick === 'Bravo').id;
+        app.message(identities[0].id, JSON.stringify({ t: 'cmd', name: 'ignore', args: ['Bravo'], ch: room.name,
+            roomInstance: room.keepRef, personContext: 1, personPeer: target }));
+        return { app, identities, target };
+    }
+
+    it('reopens actual bound preference metadata and resumes only the same live endpoint while legacy absence stays empty', async () => {
+        const f = await fixture(), { app, identities, target } = currentPreferences(), sessions = app.sessionSnapshot();
+        expect(sessions.connections[0]).toMatchObject({ ignores: [], ignoredPeerIds: [target] });
+        expect(sessions.connections[1]).not.toHaveProperty('ignoredPeerIds');
+        await f.write([['sessions', sessions]]);
+        const reopened = await f.reopen();
+        const restored = await reopened.storage.transaction(tx => readLobbyState({ tx, now: NOW }));
+        expect(restored.sessions).toEqual(sessions);
+        const next = createLobby({ now: () => NOW });
+        next.restore(restored.net); next.restoreRooms(restored.rooms);
+        expect(next.restoreSessions(restored.sessions, identities).resumed).toEqual(identities.map(identity => identity.id));
+        expect(next.sessionSnapshot().connections[0]).toMatchObject({ ignores: [], ignoredPeerIds: [target] });
+    });
+
+    it.each(['null', 'duplicate', 'self', 'over-peer-limit', 'over-combined-limit'])('rolls back earlier real writes for %s identity preferences', async damage => {
+        const f = await fixture(), { app } = currentPreferences(), sessions = app.sessionSnapshot();
+        await f.write([['sessions', sessions]]);
+        const changed = structuredClone(sessions), row = changed.connections[0];
+        if (damage === 'null') row.ignoredPeerIds = null;
+        if (damage === 'duplicate') row.ignoredPeerIds.push(row.ignoredPeerIds[0]);
+        if (damage === 'self') row.ignoredPeerIds = [row.id];
+        if (damage === 'over-peer-limit') row.ignoredPeerIds = Array.from({ length: 51 }, (_, index) => `endpoint_${index}`);
+        if (damage === 'over-combined-limit') row.ignores = Array.from({ length: 50 }, (_, index) => `Named${index}`);
+        const before = hashRows(f.driver);
+        await expect(f.write([['net', { ...f.initial.net, lock: 'readonly' }], ['sessions', changed]])).rejects.toThrow('lobby-effects-unavailable');
+        expect(hashRows(f.driver)).toBe(before);
+        expect((await f.read()).sessions).toEqual(sessions);
+    });
+});

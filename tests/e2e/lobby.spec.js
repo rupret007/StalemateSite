@@ -123,16 +123,38 @@ test('three fans + a band op: chat, /me, slap button, filters, PM accept-first, 
     await expect(admin.locator('[data-kpis]')).toContainText('visits');
     await admin.click('[data-tab="log"]');
     await expect(admin.locator('[data-modlog]')).toContainText('ban GoatLord');
-    // Everyone here shares 127.0.0.1, so the IP-hash ban now blocks new devices too (ban-dodge check)...
+    // A selected-person ban is identity-only. A new device sharing this
+    // loopback address must not acquire the original visitor's restriction.
     const dodger = await (await browser.newContext()).newPage();
     await dodger.goto(lobbyUrl());
     await dodger.fill('[data-nick]', 'TotallyNew');
     await dodger.click('[data-enter]');
-    await expect(dodger.locator('[data-gate-status]')).toContainText('Couldn’t get in');
-    // ...until the band unbans from the panel.
+    await expect(dodger.locator('[data-connection]')).toHaveText('Connected');
+    const blockedRetry = await c.context().newPage();
+    await blockedRetry.goto(lobbyUrl());
+    await blockedRetry.fill('[data-nick]', 'OriginalRetry');
+    await blockedRetry.click('[data-enter]');
+    await expect(blockedRetry.locator('[data-gate-status]')).toContainText('Couldn’t get in');
+    // Keep a distinct restriction while removing only the original's stored
+    // rule; the panel must neither unban by a reused label nor clear all bans.
     await admin.click('[data-tab="people"]');
-    await admin.locator('[data-bans] li', { hasText: 'GoatLord' }).locator('text=Unban').click();
+    admin.once('dialog', dialog => dialog.accept('An independent selected-person restriction'));
+    await admin.locator('[data-users] li', { hasText: 'TotallyNew' }).getByRole('button', { name: 'Ban', exact: true }).click();
+    await expect(dodger.locator('[data-gate-status]')).toContainText('boot');
+    const selectedRules = admin.locator('[data-bans] > li').filter({ hasText: 'Historical nickname: GoatLord' });
+    await expect(selectedRules).toHaveCount(1);
+    await selectedRules.getByRole('button', { name: 'Unban this rule', exact: true }).click();
     await expect(admin.locator('[data-bans]')).not.toContainText('GoatLord');
+    await expect(admin.locator('[data-bans]')).toContainText('TotallyNew');
+    await blockedRetry.goto(lobbyUrl());
+    await blockedRetry.fill('[data-nick]', 'OriginalReturned');
+    await blockedRetry.click('[data-enter]');
+    await expect(blockedRetry.locator('[data-connection]')).toHaveText('Connected');
+    const unrelatedRetry = await dodger.context().newPage();
+    await unrelatedRetry.goto(lobbyUrl());
+    await unrelatedRetry.fill('[data-nick]', 'OtherRetry');
+    await unrelatedRetry.click('[data-enter]');
+    await expect(unrelatedRetry.locator('[data-gate-status]')).toContainText('Couldn’t get in');
     for (const p of [a, b]) expect(p.errors).toEqual([]);
 });
 
@@ -142,25 +164,41 @@ test('a wrong dev-admin key is refused; fans cannot reach the admin socket', asy
     await expect(page.locator('[data-status]')).toContainText('Not signed in as a site moderator');
 });
 
-test('open rooms: camera off by default with an 18+ gate; jam hands off to WebJam', async ({ browser }) => {
-    const host = await fan(browser, 'ArtHost');
-    await host.click('[data-start="art"]');
-    await expect(host.locator('[data-cam]')).toHaveText('📷 Camera (18+)');
-    await host.click('[data-cam]');
-    await host.click('[data-cam-yes]');
-    await expect(host.locator('[data-toast]')).toContainText('18+');
-    await host.check('[data-adult]');
-    await host.click('[data-cam-yes]');
-    await expect(host.locator('[data-cam]')).toHaveText('📷 Camera on');
-    const jammer = await fan(browser, 'JamHost');
-    await jammer.click('[data-start="jam"]');
-    await expect(jammer.locator('[data-jam]')).toContainText('using Jamulus');
-    await expect(jammer.locator('[data-jam]')).toContainText('Ethernet is recommended');
-    await expect(jammer.locator('[data-jam]')).toContainText('actual delay and dropouts depend on the devices and network');
-    await expect(jammer.locator('[data-jam-web]')).toBeDisabled();
-    await jammer.fill('[data-jam-link]', 'webjam://join?v=1#k=abcdef0123');
-    await jammer.locator('[data-jam-form] button[type="submit"]').click();
-    await expect(jammer.locator('[data-jam-desktop]')).toHaveAttribute('href', 'webjam://join?v=1#k=abcdef0123');
+test('open rooms: camera off by default with an 18+ gate; jam hands off to WebJam', async ({ playwright }, testInfo) => {
+    // This journey qualifies a native synthetic camera, not physical hardware.
+    // Scope the owned browser to this test rather than changing other guests.
+    const browser = await playwright.chromium.launch({
+        ...(testInfo.project.use.channel ? { channel: testInfo.project.use.channel } : {}),
+        args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--disable-features=WebRtcHideLocalIpsWithMdns']
+    });
+    let host, jammer;
+    try {
+        host = await fan(browser, 'ArtHost');
+        await host.context().grantPermissions(['camera']);
+        await host.click('[data-start="art"]');
+        await expect(host.locator('[data-cam]')).toHaveText('📷 Camera (18+)');
+        await host.click('[data-cam]');
+        await host.click('[data-cam-yes]');
+        await expect(host.locator('[data-toast]')).toContainText('18+');
+        await host.check('[data-adult]');
+        await host.click('[data-cam-yes]');
+        await expect.poll(() => host.evaluate(() => !!window.__lobbyRoom?.state.stream?.getVideoTracks().some(track => track.readyState === 'live'))).toBe(true);
+        expect(await host.evaluate(() => window.__lobbyRoom.state.stream.getVideoTracks().every(track => track.readyState === 'live'))).toBe(true);
+        await expect(host.locator('[data-act-relay-status]')).not.toContainText('Camera could not start');
+        await expect(host.locator('[data-cam]')).toHaveText('📷 Camera on');
+        jammer = await fan(browser, 'JamHost');
+        await jammer.click('[data-start="jam"]');
+        await expect(jammer.locator('[data-jam]')).toContainText('using Jamulus');
+        await expect(jammer.locator('[data-jam]')).toContainText('Ethernet is recommended');
+        await expect(jammer.locator('[data-jam]')).toContainText('actual delay and dropouts depend on the devices and network');
+        await expect(jammer.locator('[data-jam-web]')).toBeDisabled();
+        await jammer.fill('[data-jam-link]', 'webjam://join?v=1#k=abcdef0123');
+        await jammer.locator('[data-jam-form] button[type="submit"]').click();
+        await expect(jammer.locator('[data-jam-desktop]')).toHaveAttribute('href', 'webjam://join?v=1#k=abcdef0123');
+    } finally {
+        try { await Promise.all([host, jammer].filter(Boolean).map(page => page.context().close())); }
+        finally { await browser.close(); }
+    }
 });
 
 test('GoatCounter gets fixed event names only: no preview key, nick or room name', async ({ browser }) => {

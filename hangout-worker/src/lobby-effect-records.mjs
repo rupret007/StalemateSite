@@ -76,6 +76,34 @@ function validRoomRecord(room, now) {
             && shape(room.act.video.source, ['kind', 'id']) && same(H.cleanSource(room.act.video.source), room.act.video.source)
             && typeof room.act.video.playing === 'boolean' && number(room.act.video.pos) && room.act.video.pos <= DAY / 1000 && time(room.act.video.t, now));
 }
+
+// Trusted engine/transaction comparison only. These are existing private room
+// permission references, never a browser-supplied role or a new authority.
+export function personRoomProjection(room) {
+    return { owner: room.owner || '', ops: [...room.ops].sort(),
+        opAccounts: [...room.opAccounts].map(pair => [...pair]).sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
+        cohosts: [...room.cohosts].sort(), voice: [...room.voice].sort(),
+        modes: Object.fromEntries(['m', 'i', 't', 'C', 'Q', 'locked', 'k', 'l', 'S'].map(key => [key, room.modes[key]])) };
+}
+export function validPersonRoomProjection(value) {
+    return shape(value, ['owner', 'ops', 'opAccounts', 'cohosts', 'voice', 'modes']) && (value.owner === '' || id(value.owner))
+        && unique(value.ops, 150, id) && unique(value.cohosts, 150, id)
+        && unique(value.voice, 150, id) && shape(value.modes, ['m', 'i', 't', 'C', 'Q', 'locked', 'k', 'l', 'S'])
+        && ['m', 'i', 't', 'C', 'Q', 'locked'].every(key => typeof value.modes[key] === 'boolean')
+        && typeof value.modes.k === 'string' && (value.modes.k === '' || /^[A-Za-z0-9]{3,20}$/.test(value.modes.k))
+        && integer(value.modes.l) && value.modes.l >= 1 && value.modes.l <= 8
+        && integer(value.modes.S) && value.modes.S <= 300
+        && list(value.opAccounts, value.ops.length, pair => Array.isArray(pair) && pair.length === 2 && pair.every(id) && value.ops.includes(pair[0]))
+        && new Set(value.opAccounts.map(pair => pair[0])).size === value.opAccounts.length;
+}
+export async function readPersonRoomProjection({ tx, name, keepRef, now }) {
+    const index = await tx.get('room-index'); ensure(validIndex(index));
+    const room = await tx.get(`community-room:${name}`);
+    if (!index.names.includes(name)) { ensure(room === undefined); return null; }
+    ensure(room && room.name === name && validRoomRecord(room, now));
+    ensure(!Object.hasOwn(room, 'keepRef') || typeof room.keepRef === 'string' && /^[a-f0-9]{32}$/.test(room.keepRef));
+    return room.keepRef === keepRef ? personRoomProjection(room) : null;
+}
 function validRooms(value, now) {
     return shape(value, ['version', 'rooms']) && value.version === 1 && list(value.rooms, 1030, room => validRoomRecord(room, now))
         && new Set(value.rooms.map(room => room.name)).size === value.rooms.length && bytes(value) <= 8 * MIB;
@@ -92,10 +120,12 @@ function validAbuse(value, now) {
 function validSessions(value, now) {
     const names = (rows, max, check) => unique(rows, max, check);
     const connection = row => shape(row, ['id', 'dev', 'iph', 'account', 'role', 'admin', 'nick', 'entrySource', 'channels', 'away', 'ignores', 'blocks',
-        'pmOff', 'cams', 'since', 'lastNick', 'tokens', 'last', 'frames', 'lastSaid', 'actTokens', 'actLast', 'camReports'], ['safetyOnly'])
+        'pmOff', 'cams', 'since', 'lastNick', 'tokens', 'last', 'frames', 'lastSaid', 'actTokens', 'actLast', 'camReports'], ['safetyOnly', 'ignoredPeerIds'])
         && [row.id, row.dev, row.iph].every(id) && (row.account === '' || id(row.account)) && ['fan', 'moderator', 'band', 'owner'].includes(row.role)
         && typeof row.admin === 'boolean' && (row.safetyOnly === true ? row.nick === '' && Array.isArray(row.channels) && row.channels.length === 0 && Array.isArray(row.cams) && row.cams.length === 0 && row.away === '' && row.entrySource === '' && row.pmOff === true : !Object.hasOwn(row, 'safetyOnly') && nick(row.nick)) && (row.entrySource === '' || typeof row.entrySource === 'string' && /^[a-z][a-z0-9-]{0,31}$/.test(row.entrySource))
-        && names(row.channels, 31, channel) && text(row.away, 80) && names(row.ignores, 50, nick) && names(row.blocks, 50, id) && typeof row.pmOff === 'boolean'
+        && names(row.channels, 31, channel) && text(row.away, 80) && names(row.ignores, 50, nick)
+        && (!Object.hasOwn(row, 'ignoredPeerIds') || names(row.ignoredPeerIds, 50, id))
+        && !(row.ignoredPeerIds || []).includes(row.id) && row.ignores.length + (row.ignoredPeerIds?.length || 0) <= 50 && names(row.blocks, 50, id) && typeof row.pmOff === 'boolean'
         && names(row.cams, 30, channel) && row.cams.every(name => row.channels.includes(name))
         && [row.since, row.lastNick, row.last, row.actLast].every(at => time(at, now)) && number(row.tokens) && row.tokens <= 5
         && number(row.actTokens) && row.actTokens <= 24 && integer(row.frames) && row.frames <= 4000 && integer(row.camReports) && row.camReports <= 150
