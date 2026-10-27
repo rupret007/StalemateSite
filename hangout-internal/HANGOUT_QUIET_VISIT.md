@@ -51,6 +51,11 @@ the service. They do not reuse the quiet headline, a stale people count, a
 previously supplied gathering, or a past creation. A missing people list while
 connected stays "Waiting for the lobby" rather than "first one here."
 
+The #stalemate button says "Main conversation" until that people list is known.
+It does not turn the local nickname into a headcount. After the list is known,
+the button counts recognized visitors and includes the local nickname when one
+is set.
+
 "Save a reminder on this device" downloads an iCalendar file for a gathering
 that is already on screen. The file has no attendees, organizer, or recurrence.
 Its description says it is not an RSVP and does not record attendance. Email
