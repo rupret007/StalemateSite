@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { ACTIVITY, describeRooms, summarizeLobby, isMention } = require('../../r/45662413410ed051/lobby/discovery-core.js');
+const { ACTIVITY, QUIET_PROMPT, describeRooms, summarizeLobby, isMention, describeVisit, visitView, calendarReminder, icsText } = require('../../r/45662413410ed051/lobby/discovery-core.js');
 const room = (name, overrides = {}) => ({ name, kind: 'art', title: 'Drawing room', count: 1, max: 8, locked: false, key: false, cams: true, ...overrides });
 const visitor = (nick, overrides = {}) => ({ nick, away: false, band: false, ...overrides });
 
@@ -115,9 +115,188 @@ describe('IRC nickname mentions', () => {
 
 it('loads as a standalone browser script without CommonJS or browser side effects', () => {
     const source = readFileSync(new URL('../../r/45662413410ed051/lobby/discovery-core.js', import.meta.url), 'utf8');
-    const sandbox = { window: {} };
+    expect(source).not.toMatch(/Date\.now|localStorage|fetch\(|WebSocket|document\./);
+    const sandbox = { window: {}, Intl };
     vm.runInNewContext(source, sandbox);
     expect(Object.keys(sandbox.window)).toEqual(['HangoutDiscovery']);
     expect(sandbox.window.HangoutDiscovery.isMention('hello Alpha!', 'Alpha')).toBe(true);
     expect(sandbox.window.HangoutDiscovery.describeRooms([])).toEqual([]);
+    const offline = sandbox.window.HangoutDiscovery.describeVisit({ connection: 'offline', channel: { names: [] }, gathering: { confirmed: true } });
+    expect(offline.headline).not.toMatch(/quiet/);
+    expect(offline.gathering).toBeNull();
+});
+
+const NOW = 1800000000000;
+const START = NOW + 60 * 60 * 1000;
+const END = START + 60 * 60 * 1000;
+const formatAt = (instant, timeZone) => new Intl.DateTimeFormat('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short', timeZone
+}).format(new Date(instant));
+const confirmed = (overrides = {}) => Object.freeze({
+    confirmed: true, host: 'QuietHost', startsAt: START, endsAt: END, activity: 'write', recurrence: false, ...overrides
+});
+const visit = (overrides = {}) => describeVisit({
+    connection: 'connected', channel: { names: [visitor('MeHere')] }, me: 'MeHere', now: NOW, timeZone: 'UTC', ...overrides
+});
+
+describe('quiet visits and confirmed gatherings', () => {
+    it('shows a supplied host, local time, and equipment-free activity without attendance or authority', () => {
+        const source = confirmed({ email: 'host@example.invalid', moderator: true, attendees: 8, band: true, rsvp: true });
+        const result = visit({ gathering: source, channel: { count: 40, names: [visitor('MeHere'), visitor('QuietHost', { band: true })] } });
+        expect(result.gatheringStatus).toBe('confirmed');
+        expect(result.quiet).toBe(false);
+        expect(result.quietPrompt).toBeNull();
+        expect(result.creation).toBeNull();
+        expect(result.gathering).toMatchObject({
+            host: 'QuietHost', activity: 'write', timing: 'Upcoming', timeZone: 'UTC', timeZoneAssumed: false,
+            localStart: formatAt(START, 'UTC'), localEnd: formatAt(END, 'UTC')
+        });
+        expect(result.gathering.localStart).not.toBe(formatAt(START, 'Pacific/Kiritimati'));
+        expect(result.gathering).not.toHaveProperty('moderator');
+        expect(result.gathering).not.toHaveProperty('attendees');
+        expect(result.gathering).not.toHaveProperty('hostPresent');
+        expect(result.gathering.note).toMatch(/does not make QuietHost a site moderator/);
+        expect(result.gathering.note).toMatch(/not proof that person is in the room/);
+        expect(result.gathering.note).toMatch(/not an RSVP/);
+        expect(result.gathering.note).toMatch(/not a weekly commitment/);
+        expect(result.gathering.note).not.toMatch(/is here|host is online|band member present/);
+        expect(source).not.toHaveProperty('state');
+        const view = visitView(result);
+        expect(view).toMatchObject({
+            showGathering: true, showSave: true, showQuietPrompt: false, showCreation: false,
+            gatheringHeading: 'Next confirmed gathering', gatheringHost: 'Host: QuietHost'
+        });
+        expect(view.gatheringWhen).toContain(result.gathering.localStart);
+        expect(view.gatheringWhen).not.toContain('shown in UTC');
+        expect(view.gatheringActivity).toMatch(/Nothing to install/);
+    });
+
+    it('keeps an in-progress gathering and rejects incomplete, band-gated, recurring, equipped, or unbounded records', () => {
+        expect(visit({ gathering: confirmed({ startsAt: NOW - 60 * 1000, endsAt: NOW - 60 * 1000 + 15 * 60 * 1000 }) }).gathering.timing).toBe('Happening now');
+        const rejected = [
+            null, 'Friday at 8', [], confirmed({ confirmed: 'true' }), confirmed({ host: 'no' }),
+            confirmed({ activity: 'jam' }), confirmed({ requiresBand: true }), confirmed({ recurrence: 'weekly' }),
+            confirmed({ recurrence: { freq: 'WEEKLY' } }), confirmed({ startsAt: NOW - 60 * 1000, endsAt: NOW }),
+            confirmed({ endsAt: START + 15 * 60 * 1000 - 1 }), confirmed({ endsAt: START + 4 * 60 * 60 * 1000 + 1 }),
+            confirmed({ startsAt: NOW + 14 * 24 * 60 * 60 * 1000 + 1, endsAt: NOW + 14 * 24 * 60 * 60 * 1000 + 1 + 15 * 60 * 1000 }),
+            confirmed({ startsAt: 1.5, endsAt: END })
+        ];
+        for (const gathering of rejected) {
+            const result = visit({ gathering });
+            expect(result.gatheringStatus, JSON.stringify(gathering)).toBe('none');
+            expect(result.gathering).toBeNull();
+        }
+        const earliest = visit({
+            gathering: [
+                confirmed({ host: 'LaterOne', startsAt: START + 2 * 60 * 60 * 1000, endsAt: START + 3 * 60 * 60 * 1000 }),
+                confirmed({ confirmed: false, startsAt: START - 60 * 60 * 1000, endsAt: START }),
+                confirmed({ host: 'HostB' }),
+                confirmed({ host: 'hosta' })
+            ]
+        });
+        expect(earliest.gathering.host).toBe('hosta');
+        const edge = visit({ gathering: confirmed({ startsAt: NOW + 14 * 24 * 60 * 60 * 1000, endsAt: NOW + 14 * 24 * 60 * 60 * 1000 + 15 * 60 * 1000 }) });
+        expect(edge.gatheringStatus).toBe('confirmed');
+    });
+
+    it('offers a quiet prompt and an approved past creation only when the room is actually quiet', () => {
+        const past = Object.freeze({ approved: true, title: 'Paper birds <ink>', detail: 'A shared drawing.', room: '#art-birds', url: 'https://example.invalid/secret' });
+        const quiet = visit({ creation: past });
+        expect(quiet.quiet).toBe(true);
+        expect(quiet.headline).toMatch(/quiet/);
+        expect(quiet.welcomeTitle).toMatch(/First one here/);
+        expect(quiet.detail).toMatch(/start a room/);
+        expect(quiet.detail).toMatch(/No confirmed gathering was supplied/);
+        expect(quiet.detail).not.toMatch(/active|talking now|band is here/);
+        expect(quiet.quietPrompt).toEqual(QUIET_PROMPT);
+        expect(quiet.creation).toEqual({ title: 'Paper birds <ink>', detail: 'A shared drawing.', room: '#art-birds' });
+        expect(quiet.creation).not.toHaveProperty('url');
+        const view = visitView(quiet);
+        expect(view.showQuietPrompt).toBe(true);
+        expect(view.quietPromptDraft).toBe(QUIET_PROMPT.draft);
+        expect(view.creationTitle).toBe('Paper birds <ink>');
+        expect(view.creationDetail).toBe('A shared drawing. It was made in #art-birds.');
+        expect(view.gatheringActivity).toMatch(/does not invent a time/);
+        expect(view.gatheringActivity).toMatch(/does not require a band member/);
+        expect(visit({ creation: { approved: false, title: 'Nope', detail: 'Hidden.' } }).creation).toBeNull();
+        expect(visit({ creation: { approved: true, title: 'Bad\nline', detail: 'Hidden.' } }).creation).toBeNull();
+        expect(visit({ creation: { approved: true, title: 'Named', detail: 'Hidden.', room: 'art' } }).creation).toBeNull();
+        expect(visitView(visit({ creation: null })).creationMissing).toMatch(/No approved past creation was supplied/);
+        const busy = visit({ channel: { names: [visitor('MeHere'), visitor('Alpha')] }, creation: past, gathering: confirmed() });
+        expect(busy.quiet).toBe(false);
+        expect(busy.creation).toBeNull();
+        expect(busy.quietPrompt).toBeNull();
+        expect(busy.gathering.host).toBe('QuietHost');
+        expect(visitView(busy).showCreation).toBe(false);
+    });
+
+    it('explains a disconnected service instead of calling the room empty or stale-confirming a gathering', () => {
+        const gathering = confirmed();
+        const creation = { approved: true, title: 'Paper birds', detail: 'A shared drawing.' };
+        for (const connection of ['offline', 'reconnecting', 'connecting', 'ended', 'weird']) {
+            const result = describeVisit({ connection, channel: { names: [] }, me: 'MeHere', gathering, creation, now: NOW, timeZone: 'UTC' });
+            expect(result.quiet, connection).toBe(false);
+            expect(result.headline, connection).not.toMatch(/quiet|First one here/);
+            expect(result.gatheringStatus, connection).toBe('unavailable');
+            expect(result.gathering, connection).toBeNull();
+            expect(result.creation, connection).toBeNull();
+            expect(result.quietPrompt, connection).toBeNull();
+            expect(result.detail, connection).not.toMatch(/No confirmed gathering was supplied/);
+            expect(visitView(result).showGathering, connection).toBe(false);
+        }
+        expect(describeVisit({ connection: 'offline' }).detail).toMatch(/not an empty room/);
+        expect(describeVisit({ connection: 'reconnecting' }).detail).toMatch(/not proof the room is empty/);
+        expect(describeVisit({ connection: 'connecting' }).detail).toMatch(/has not answered/);
+        expect(describeVisit({ connection: 'ended' }).headline).toMatch(/session has ended/);
+        expect(describeVisit({ connection: 'connected', now: NOW, timeZone: 'UTC' }).welcomeTitle).toBe('Waiting for the lobby');
+        expect(describeVisit({ connection: 'connected', channel: { names: [visitor('MeHere')] }, me: 'MeHere', gathering: confirmed(), timeZone: 'UTC' }).gatheringStatus).toBe('unavailable');
+    });
+
+    it('writes a local calendar reminder without an RSVP, recurrence, or attendee', () => {
+        const shown = visit({ gathering: confirmed({ activity: 'chat', note: 'ATTENDEE:mailto:person@example.invalid' }) }).gathering;
+        const ics = calendarReminder(shown, NOW);
+        expect(new Date(START).toISOString()).toBe('2027-01-15T09:00:00.000Z');
+        expect(ics).toContain('DTSTART:20270115T090000Z');
+        expect(ics).toContain('DTEND:20270115T100000Z');
+        expect(ics).toContain('DTSTAMP:20270115T080000Z');
+        expect(ics).toContain('UID:hangout-quiethost-');
+        expect(ics).toContain('@hangout.invalid');
+        const logical = ics.replace(/\r\n[ \t]/g, '');
+        expect(logical).toContain('DESCRIPTION:Local reminder only.');
+        expect(logical).toContain('This file is not an RSVP and does not record attendance.');
+        expect(logical).toContain('A camera\\, microphone');
+        expect(logical).toContain('SUMMARY:Hang Out with QuietHost: text chat');
+        expect(logical).not.toContain('\\:');
+        expect(logical).not.toContain('ATTENDEE');
+        expect(logical).not.toContain('RRULE');
+        expect(logical).not.toContain('ORGANIZER');
+        expect(ics.replace(/\r\n/g, '')).not.toContain('\n');
+        for (const line of ics.split('\r\n')) {
+            if (!line) continue;
+            expect(line.length).toBeLessThanOrEqual(75);
+            expect(line.endsWith('\\')).toBe(false);
+        }
+        expect(calendarReminder({ ...shown, activityLabel: 'Bring a microphone' }, NOW)).toBe('');
+        expect(calendarReminder({ ...shown, endsAt: shown.startsAt + 1000 }, NOW)).toBe('');
+        const assumed = visit({ gathering: confirmed(), timeZone: 'Not/AZone' });
+        expect(assumed.gathering.timeZoneAssumed).toBe(true);
+        expect(assumed.gathering.localStart).toBe(formatAt(START, 'UTC'));
+        expect(visitView(assumed).gatheringWhen).toContain('shown in UTC');
+    });
+
+    it('escapes RFC 5545 TEXT and leaves a colon literal', () => {
+        expect(icsText('a\\b')).toBe('a\\\\b');
+        expect(icsText('room;one')).toBe('room\\;one');
+        expect(icsText('a,b')).toBe('a\\,b');
+        expect(icsText('a\nb')).toBe('a\\nb');
+        expect(icsText('a\rb')).toBe('a\\nb');
+        expect(icsText('a\r\nb')).toBe('a\\nb');
+        expect(icsText('a\r\n\nb')).toBe('a\\n\\nb');
+        expect(icsText('Meet: 1')).toBe('Meet: 1');
+        expect(icsText('\\:colon')).toBe('\\\\:colon');
+        expect(icsText('a\\,;:\r\n')).toBe('a\\\\\\,\\;:\\n');
+        const mixed = icsText('x\r\ny,z;w\\q: colon');
+        expect(mixed).toBe('x\\ny\\,z\\;w\\\\q: colon');
+        expect(mixed).not.toMatch(/[\r\n]/);
+    });
 });

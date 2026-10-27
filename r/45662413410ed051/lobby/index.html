@@ -58,6 +58,19 @@
             <section class="presence" aria-label="Lobby presence">
                 <h2 data-presence-title>Getting connected</h2>
                 <p data-presence-detail>Everyone starts in the same conversation.</p>
+                <div class="visit-gathering" data-gathering hidden>
+                    <b data-gathering-heading>Confirmed gathering</b>
+                    <span data-gathering-host></span>
+                    <span data-gathering-when></span>
+                    <span data-gathering-activity></span>
+                    <span class="small" data-gathering-note></span>
+                    <button class="quiet-action" type="button" data-gathering-save hidden>Save a reminder on this device</button>
+                </div>
+                <div class="visit-creation" data-creation hidden>
+                    <b data-creation-heading>Past creation</b>
+                    <span data-creation-title></span>
+                    <span data-creation-detail></span>
+                </div>
             </section>
             <h2>Room directory <span class="count" data-room-count>0</span></h2>
             <p class="small directory-hint">Find a conversation. Make something together.</p>
@@ -105,6 +118,7 @@
                     <button type="button" data-prompt="Hey everyone, I’m new here. ">Say hello</button>
                     <button type="button" data-prompt="What’s everyone making or working on? ">What are you making?</button>
                     <button type="button" data-prompt="Anyone up for drawing something together? ">Find a collaborator</button>
+                    <button type="button" data-quiet-prompt hidden>Offer a one-line idea</button>
                 </div>
                 </div>
             </section>

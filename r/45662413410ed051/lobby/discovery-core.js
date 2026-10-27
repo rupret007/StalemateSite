@@ -1,4 +1,5 @@
 /* Public lobby discovery. Presence describes the server's current member list, never speaking activity.
+ * A confirmed gathering or approved past creation is shown only from a supplied record.
  * This helper has no DOM, storage or network access; callers render its strings with textContent. */
 (function (root) {
     'use strict';
@@ -89,6 +90,262 @@
         return { others, available, band, headline, detail };
     }
 
+    // Equipment-free on purpose. A jam needs a WebJam host, so it cannot be the
+    // activity shown for a gathering someone can join with nothing to bring.
+    const EQUIPMENT_FREE = Object.freeze({
+        chat: 'Talk in #stalemate. A camera, microphone, and instrument are optional and stay off unless you choose them.',
+        draw: 'Draw on the shared canvas or on paper. A camera is not required.',
+        write: 'Write one line together in chat. Nothing to install.',
+        listen: 'Read along, or listen if you want. Headphones are optional.',
+        watch: 'Watch a shared video together. A camera is not required.'
+    });
+    const ACTIVITY_SUMMARY = Object.freeze({
+        chat: 'text chat', draw: 'drawing', write: 'one-line writing', listen: 'reading together', watch: 'a shared video'
+    });
+    const QUIET_PROMPT = Object.freeze({
+        label: 'Offer a one-line idea',
+        draft: 'One line is enough, and no gear is needed: what should we make together? '
+    });
+    const MIN_GATHERING_MS = 15 * 60 * 1000;
+    const MAX_GATHERING_MS = 4 * 60 * 60 * 1000;
+    const MAX_LEAD_MS = 14 * 24 * 60 * 60 * 1000;
+    const TIME_FORMAT = Object.freeze({ weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+
+    function serviceCopy(connection) {
+        if (connection === 'reconnecting') {
+            return {
+                headline: 'Reconnecting to the lobby',
+                detail: 'The people list from before the drop is not proof the room is empty. Your unsent draft stays in this tab.',
+                welcomeTitle: 'Reconnecting. This is not an empty room.'
+            };
+        }
+        if (connection === 'connecting') {
+            return {
+                headline: 'Connecting to the lobby',
+                detail: 'People, rooms, and gatherings appear after the connection is up. Nothing shown yet means the lobby has not answered.',
+                welcomeTitle: 'Connecting. The lobby has not answered yet.'
+            };
+        }
+        if (connection === 'offline') {
+            return {
+                headline: 'The lobby is offline',
+                detail: 'Hang Out cannot show who is here or whether a gathering is confirmed until you reconnect. Your unsent draft stays in this tab. This is not an empty room.',
+                welcomeTitle: 'Hang Out is not connected.'
+            };
+        }
+        if (connection === 'ended') {
+            return {
+                headline: 'This session has ended',
+                detail: 'Hang Out cannot show who is here or whether a gathering is confirmed in a closed session. Your unsent draft stays in this tab. This is not an empty room.',
+                welcomeTitle: 'This session is closed. Your draft can be copied.'
+            };
+        }
+        return {
+            headline: 'The lobby connection is not available',
+            detail: 'Hang Out will not describe the room as empty until a connection says who is here. Your unsent draft stays in this tab.',
+            welcomeTitle: 'Hang Out is not connected.'
+        };
+    }
+
+    function formatLocal(instant, timeZone) {
+        const format = (name) => new Intl.DateTimeFormat('en-US', { ...TIME_FORMAT, timeZone: name }).format(new Date(instant));
+        const zone = typeof timeZone === 'string' && timeZone ? timeZone : '';
+        if (!zone) return { text: format('UTC'), timeZone: 'UTC', assumed: true };
+        try { return { text: format(zone), timeZone: zone, assumed: false }; }
+        catch { return { text: format('UTC'), timeZone: 'UTC', assumed: true }; }
+    }
+
+    function gatheringOf(source, now) {
+        if (!object(source) || source.confirmed !== true || source.requiresBand === true) return null;
+        if (source.recurrence != null && source.recurrence !== false) return null;
+        if (typeof source.host !== 'string' || !NICK.test(source.host)) return null;
+        if (!Number.isSafeInteger(source.startsAt) || !Number.isSafeInteger(source.endsAt) || !Number.isSafeInteger(now)) return null;
+        const duration = source.endsAt - source.startsAt;
+        if (duration < MIN_GATHERING_MS || duration > MAX_GATHERING_MS || source.endsAt <= now) return null;
+        if (source.startsAt > now && source.startsAt - now > MAX_LEAD_MS) return null;
+        if (typeof source.activity !== 'string' || !Object.prototype.hasOwnProperty.call(EQUIPMENT_FREE, source.activity)) return null;
+        return {
+            host: source.host, startsAt: source.startsAt, endsAt: source.endsAt,
+            activity: source.activity, activityLabel: EQUIPMENT_FREE[source.activity]
+        };
+    }
+
+    function nextGathering(source, now) {
+        const list = Array.isArray(source) ? source : source == null ? [] : [source];
+        const valid = [];
+        for (const item of list) {
+            const gathering = gatheringOf(item, now);
+            if (gathering) valid.push(gathering);
+        }
+        valid.sort((a, b) => a.startsAt - b.startsAt || (fold(a.host) < fold(b.host) ? -1 : fold(a.host) > fold(b.host) ? 1 : 0) || (a.activity < b.activity ? -1 : a.activity > b.activity ? 1 : 0));
+        return valid[0] || null;
+    }
+
+    function creationOf(source) {
+        if (!object(source) || source.approved !== true) return null;
+        if (typeof source.title !== 'string' || typeof source.detail !== 'string') return null;
+        const title = source.title.trim();
+        const detail = source.detail.trim();
+        if (!title || title.length > 80 || !detail || detail.length > 240) return null;
+        if (/[\u0000-\u001f\u007f]/.test(title) || /[\u0000-\u001f\u007f]/.test(detail)) return null;
+        let room = null;
+        if (source.room != null) {
+            if (typeof source.room !== 'string' || !ROOM_NAME.test(source.room)) return null;
+            room = source.room;
+        }
+        return Object.freeze({ title, detail, room });
+    }
+
+    function presentGathering(next, now, timeZone) {
+        const start = formatLocal(next.startsAt, timeZone);
+        const end = formatLocal(next.endsAt, timeZone);
+        return Object.freeze({
+            host: next.host,
+            startsAt: next.startsAt,
+            endsAt: next.endsAt,
+            activity: next.activity,
+            activityLabel: next.activityLabel,
+            localStart: start.text,
+            localEnd: end.text,
+            timeZone: start.assumed || end.assumed ? 'UTC' : start.timeZone,
+            timeZoneAssumed: start.assumed || end.assumed,
+            timing: next.startsAt <= now ? 'Happening now' : 'Upcoming',
+            note: `Hosting this gathering does not make ${next.host} a site moderator. The host name is a label for who offered to host, not proof that person is in the room. This is one confirmed time, not a weekly commitment. Saving a reminder on this device is not an RSVP, and a connected tab is not attendance.`
+        });
+    }
+
+    function describeVisit({ connection, channel, me, gathering, creation, now, timeZone } = {}) {
+        const state = ['connected', 'connecting', 'reconnecting', 'offline', 'ended'].includes(connection) ? connection : 'unavailable';
+        if (state !== 'connected') {
+            const service = serviceCopy(state);
+            return Object.freeze({
+                connection: state, quiet: false, known: false, others: 0, available: 0, band: 0,
+                headline: service.headline, detail: service.detail, welcomeTitle: service.welcomeTitle,
+                gatheringStatus: 'unavailable', gathering: null, creation: null, quietPrompt: null
+            });
+        }
+        const summary = summarizeLobby(channel, me);
+        const known = object(channel) && Array.isArray(channel.names);
+        const clock = Number.isSafeInteger(now) ? now : null;
+        const next = clock === null ? null : nextGathering(gathering, clock);
+        const shown = next ? presentGathering(next, clock, timeZone) : null;
+        const quiet = known && summary.others === 0;
+        const detail = shown
+            ? `${summary.detail} Next confirmed gathering: ${shown.host}, ${shown.timing.toLowerCase()}, ${shown.localStart} to ${shown.localEnd}. ${shown.activityLabel}`
+            : quiet
+                ? `${summary.detail} No confirmed gathering was supplied. Anyone visiting can host one.`
+                : summary.detail;
+        return Object.freeze({
+            connection: 'connected',
+            quiet,
+            known,
+            others: summary.others,
+            available: summary.available,
+            band: summary.band,
+            headline: summary.headline,
+            detail,
+            welcomeTitle: known ? (quiet ? 'First one here? Make yourself at home.' : 'A good conversation starts with a hello.') : 'Waiting for the lobby',
+            gatheringStatus: shown ? 'confirmed' : known && clock !== null ? 'none' : 'unavailable',
+            gathering: shown,
+            creation: quiet ? creationOf(creation) : null,
+            quietPrompt: quiet ? QUIET_PROMPT : null
+        });
+    }
+
+    function visitView(visit) {
+        const confirmed = !!(visit && visit.gatheringStatus === 'confirmed' && visit.gathering);
+        const none = !!(visit && visit.gatheringStatus === 'none');
+        const quiet = !!(visit && visit.quiet);
+        const past = quiet ? visit.creation : null;
+        return Object.freeze({
+            presenceTitle: visit && typeof visit.headline === 'string' ? visit.headline : 'Waiting for the lobby',
+            presenceDetail: visit && typeof visit.detail === 'string' ? visit.detail : '',
+            welcomeTitle: visit && typeof visit.welcomeTitle === 'string' ? visit.welcomeTitle : 'Waiting for the lobby',
+            showGathering: confirmed || none,
+            gatheringHeading: confirmed ? 'Next confirmed gathering' : 'Confirmed gathering',
+            gatheringHost: confirmed ? `Host: ${visit.gathering.host}` : '',
+            gatheringWhen: confirmed ? `${visit.gathering.timing}: ${visit.gathering.localStart} to ${visit.gathering.localEnd}${visit.gathering.timeZoneAssumed ? ' (shown in UTC)' : ''}` : '',
+            gatheringActivity: confirmed
+                ? visit.gathering.activityLabel
+                : none ? 'No confirmed gathering was supplied. Anyone visiting can host one. This screen does not invent a time or a weekly cadence, and it does not require a band member to be present.' : '',
+            gatheringNote: confirmed ? visit.gathering.note : '',
+            showSave: confirmed,
+            showCreation: quiet,
+            creationHeading: past ? 'Approved past creation' : 'Past creation',
+            creationTitle: past ? past.title : '',
+            creationDetail: past ? (past.room ? `${past.detail} It was made in ${past.room}.` : past.detail) : '',
+            creationMissing: quiet && !past ? 'No approved past creation was supplied for this quiet visit.' : '',
+            showQuietPrompt: !!(visit && visit.quietPrompt),
+            quietPromptLabel: visit && visit.quietPrompt ? visit.quietPrompt.label : '',
+            quietPromptDraft: visit && visit.quietPrompt ? visit.quietPrompt.draft : ''
+        });
+    }
+
+    function icsStamp(ms) {
+        const d = new Date(ms);
+        const p = (n) => String(n).padStart(2, '0');
+        return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}T${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}Z`;
+    }
+
+    // RFC 5545 §3.3.11 TEXT. Escape a backslash first, then CR, LF, and CRLF
+    // as the two-character sequence \n, then comma and semicolon. A colon
+    // stays literal: that section says a COLON in a TEXT value SHALL NOT be
+    // escaped. DQUOTE is also unescaped in the TEXT grammar.
+    function icsText(value) {
+        return String(value)
+            .replace(/\\/g, '\\\\')
+            .replace(/\r\n|\r|\n/g, '\\n')
+            .replace(/,/g, '\\,')
+            .replace(/;/g, '\\;');
+    }
+
+    function foldLine(line) {
+        const units = [];
+        for (let i = 0; i < line.length; i++) {
+            if (line[i] === '\\' && i + 1 < line.length) { units.push(line.slice(i, i + 2)); i += 1; }
+            else units.push(line[i]);
+        }
+        const lines = [];
+        let current = '';
+        let limit = 75;
+        for (const unit of units) {
+            if (current.length + unit.length > limit) {
+                lines.push(current);
+                current = unit;
+                limit = 74;
+            } else current += unit;
+        }
+        if (current) lines.push(current);
+        return lines.map((part, index) => (index ? ` ${part}` : part)).join('\r\n');
+    }
+
+    function calendarReminder(gathering, now) {
+        if (!object(gathering) || typeof gathering.host !== 'string' || !NICK.test(gathering.host)) return '';
+        if (!Number.isSafeInteger(gathering.startsAt) || !Number.isSafeInteger(gathering.endsAt) || !Number.isSafeInteger(now)) return '';
+        if (typeof gathering.activity !== 'string' || !Object.prototype.hasOwnProperty.call(EQUIPMENT_FREE, gathering.activity)) return '';
+        if (gathering.activityLabel !== EQUIPMENT_FREE[gathering.activity]) return '';
+        if (!Object.prototype.hasOwnProperty.call(ACTIVITY_SUMMARY, gathering.activity)) return '';
+        const duration = gathering.endsAt - gathering.startsAt;
+        if (duration < MIN_GATHERING_MS || duration > MAX_GATHERING_MS) return '';
+        const description = `Local reminder only. This file is not an RSVP and does not record attendance. ${gathering.activityLabel} Host ${gathering.host} is not a site moderator because of this gathering. One confirmed time and not a weekly commitment.`;
+        const lines = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//Stalemate Hang Out//Quiet Visit//EN',
+            'CALSCALE:GREGORIAN',
+            'BEGIN:VEVENT',
+            `UID:hangout-${fold(gathering.host)}-${gathering.startsAt}-${gathering.activity}@hangout.invalid`,
+            `DTSTAMP:${icsStamp(now)}`,
+            `DTSTART:${icsStamp(gathering.startsAt)}`,
+            `DTEND:${icsStamp(gathering.endsAt)}`,
+            `SUMMARY:${icsText(`Hang Out with ${gathering.host}: ${ACTIVITY_SUMMARY[gathering.activity]}`)}`,
+            `DESCRIPTION:${icsText(description)}`,
+            'END:VEVENT',
+            'END:VCALENDAR'
+        ];
+        return `${lines.map(foldLine).join('\r\n')}\r\n`;
+    }
+
     function isMention(text, nick) {
         if (typeof text !== 'string' || typeof nick !== 'string' || !NICK.test(nick)) return false;
         const message = fold(text);
@@ -103,7 +360,9 @@
         return false;
     }
 
-    const api = Object.freeze({ ACTIVITY, describeRooms, summarizeLobby, isMention });
+    const api = Object.freeze({
+        ACTIVITY, EQUIPMENT_FREE, QUIET_PROMPT, describeRooms, summarizeLobby, isMention, describeVisit, visitView, calendarReminder, icsText
+    });
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) root.HangoutDiscovery = api;
 }(typeof window !== 'undefined' ? window : typeof globalThis !== 'undefined' ? globalThis : this));

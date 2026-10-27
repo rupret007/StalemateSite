@@ -153,8 +153,13 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .lobby-welcome p { margin: 5px 0 13px; font-size: 12px; color: var(--muted); }
 .conversation-starters { display: flex; flex-wrap: wrap; gap: 6px; }
 .conversation-starters { min-width: 0; max-width: 100%; }
-.conversation-starters button { padding: 6px 9px; min-height: 32px; color: #c4d8ac; background: transparent; border: 1px solid #46593a; font: 10px var(--mono); }
-.conversation-starters button:hover { background: #2b3921; }
+.conversation-starters button, .quiet-action { padding: 6px 9px; min-height: 32px; color: #c4d8ac; background: transparent; border: 1px solid #46593a; font: 10px var(--mono); }
+.conversation-starters button:hover, .quiet-action:hover { background: #2b3921; }
+.visit-gathering, .visit-creation { display: grid; gap: 3px; margin: 8px 0 0; min-width: 0; max-width: 100%; color: var(--muted); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.visit-gathering b, .visit-creation b { color: var(--cream); font-size: 12px; font-weight: 550; }
+.visit-gathering[hidden], .visit-creation[hidden], .conversation-starters button[hidden], .quiet-action[hidden], .visit-gathering span:empty, .visit-creation span:empty { display: none; }
+.visit-gathering span, .visit-creation span { min-width: 0; overflow-wrap: anywhere; }
+.quiet-action { justify-self: start; margin-top: 4px; }
 .network-note { flex: none; margin: 0; padding: 10px 20px; color: var(--amber); font-size: 12px; background: #2b2519; border-bottom: 1px solid #5f5030; }
 .message-recovery { flex: none; min-height: 0; max-height: min(180px, 27dvh); overflow: auto; padding: 8px 12px; border-top: 1px solid #65725d; color: var(--amber); background: #211f17; font-size: 12px; overflow-wrap: anywhere; }
 .chat.has-saved-messages .lobby-welcome { display: none; }
@@ -320,7 +325,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .lobby-welcome b { font-size: 13px; }
   .lobby-welcome p { font-size: 11px; line-height: 1.5; margin: 4px 0 10px; }
   .conversation-starters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-  .conversation-starters button { flex: none; min-height: 36px; font-size: 9px; padding: 5px 8px; }
+  .conversation-starters button, .quiet-action { flex: none; min-height: 36px; font-size: 9px; padding: 5px 8px; }
   .buffer { padding: 10px 12px; font-size: 12px; line-height: 1.75; }
   .buffer li { padding-inline: 0; }
   .who { font-size: 12px; }
@@ -392,7 +397,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .ev { font-size: 12px; }
   .lobby-welcome b, .lobby-welcome p { font-size: 14px; }
   .topic { font-size: 12px; }
-  .conversation-starters button { font-size: 11px; }
+  .conversation-starters button, .quiet-action { font-size: 11px; }
   .quick button { font-size: 12px; }
 }
 /* Small phones and landscape windows keep the composer ahead of welcome copy. */
@@ -404,6 +409,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .topic { max-height: 55px; overflow-y: auto; }
   .lobby-welcome { margin: 10px 12px 3px; padding: 10px; }
   .lobby-welcome p, .welcome-symbol { display: none; }
+  .visit-gathering, .visit-creation { margin-bottom: 6px; font-size: 11px; }
   .conversation-starters { margin-top: 8px; }
   .conversation-starters button { min-height: 32px; }
   .quick { padding-top: 5px; }

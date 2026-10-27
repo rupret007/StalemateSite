@@ -60,7 +60,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     const pick = (a) => a[Math.floor(Math.random() * a.length)];
     const slug = () => `${pick(WORDS)}-${pick(THINGS)}`.replace(/[^a-z0-9-]/g, '');
 
-    const app = window.__lobby = { ws: null, me: '', role: 'fan', band: false, chans: new Map(), pms: new Map(), active: '#stalemate', rooms: [], ignores: new Set(), peerIgnores: new Set(), selfId: '', pending: null };
+    const app = window.__lobby = { ws: null, me: '', role: 'fan', band: false, chans: new Map(), pms: new Map(), active: '#stalemate', rooms: [], ignores: new Set(), peerIgnores: new Set(), selfId: '', pending: null, confirmedGathering: null, approvedCreation: null };
     // Copies are tab memory only. Weak context IDs do not retain a departed
     // room's transcript, and no copy or nonce enters browser storage/analytics.
     const savedMessages = new Map();
@@ -1298,28 +1298,81 @@ import { createEntrySharing } from './entry-sharing.mjs';
     $('[data-owner-signout]').addEventListener('click', () => {
         clearMessageRecovery(); ownerSession = false; removeTab('hangout-owner'); connect(app.me || nickInput.value);
     });
+    let gatheringReminder = null;
+    function resolvedTimeZone() {
+        try {
+            const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            if (typeof zone === 'string' && zone) return zone;
+        } catch { /* A missing time zone is shown in UTC by describeVisit. */ }
+        return '';
+    }
     function drawCommunity() {
         const lobby = app.chans.get('#stalemate');
-        const summary = Discovery.summarizeLobby(lobby, app.me);
         const connected = connectionState === 'connected';
+        // confirmedGathering and approvedCreation stay null until a later slice
+        // supplies a real record. This visit does not invent either one.
+        const visit = Discovery.describeVisit({
+            connection: connectionState, channel: lobby, me: app.me,
+            gathering: app.confirmedGathering, creation: app.approvedCreation,
+            now: Date.now(), timeZone: resolvedTimeZone()
+        });
+        const view = Discovery.visitView(visit);
         $('[data-owner-signin]').hidden = sessionEnded;
-        $('[data-lobby-count]').textContent = connected ? `${summary.others + (app.me ? 1 : 0)} here · chat` : 'Main conversation';
-        $('[data-presence-title]').textContent = connected ? summary.headline : 'Connection paused';
-        $('[data-presence-detail]').textContent = connected ? summary.detail : 'Room counts may be out of date. Your unsent words stay in this tab.';
-        $('[data-welcome-title]').textContent = summary.others ? 'A good conversation starts with a hello.' : 'First one here? Make yourself at home.';
+        $('[data-lobby-count]').textContent = connected ? `${visit.others + (app.me ? 1 : 0)} here · chat` : 'Main conversation';
+        $('[data-presence-title]').textContent = view.presenceTitle;
+        $('[data-presence-detail]').textContent = view.presenceDetail;
+        $('[data-welcome-title]').textContent = view.welcomeTitle;
+        const gathering = $('[data-gathering]');
+        gathering.hidden = !view.showGathering;
+        $('[data-gathering-heading]').textContent = view.gatheringHeading;
+        $('[data-gathering-host]').textContent = view.gatheringHost;
+        $('[data-gathering-when]').textContent = view.gatheringWhen;
+        $('[data-gathering-activity]').textContent = view.gatheringActivity;
+        $('[data-gathering-note]').textContent = view.gatheringNote;
+        $('[data-gathering-save]').hidden = !view.showSave;
+        gatheringReminder = view.showSave ? visit.gathering : null;
+        const creation = $('[data-creation]');
+        creation.hidden = !view.showCreation;
+        $('[data-creation-heading]').textContent = view.creationHeading;
+        $('[data-creation-title]').textContent = view.creationTitle;
+        $('[data-creation-detail]').textContent = view.creationDetail || view.creationMissing;
+        const prompt = $('[data-quiet-prompt]');
+        prompt.hidden = !view.showQuietPrompt;
+        prompt.textContent = view.showQuietPrompt ? view.quietPromptLabel : 'Offer a one-line idea';
+        if (view.showQuietPrompt) prompt.dataset.prompt = view.quietPromptDraft;
+        else delete prompt.dataset.prompt;
         const paused = !app.band && (app.netLock === 'readonly' || app.budget === 'readonly');
         const note = $('[data-network-note]');
         note.hidden = !paused && connected;
         note.textContent = sessionEnded ? 'This session is closed. Your unsent message is available to copy.'
             : !connected ? 'You’re offline. Your draft stays here until you reconnect.' : 'Chat is read-only for now. Your unsent draft stays here.';
     }
+    $('[data-gathering-save]').addEventListener('click', () => {
+        if (!gatheringReminder) return;
+        const ics = Discovery.calendarReminder(gatheringReminder, Date.now());
+        if (!ics) return toast('This reminder could not be saved.');
+        const blob = new Blob([ics], { type: 'text/calendar' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'hangout-gathering.ics';
+        link.rel = 'noopener';
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+    });
     $('[data-lobby-home]').addEventListener('click', () => { if (app.chans.has('#stalemate')) switchTo('#stalemate'); });
     $('[data-reconnect]').addEventListener('click', () => connect(app.me || nickInput.value.trim()));
-    $$('[data-prompt]').forEach((b) => b.addEventListener('click', () => {
+    $('.conversation-starters').addEventListener('click', (event) => {
+        const button = event.target.closest('button');
+        if (!button || !$('.conversation-starters').contains(button)) return;
+        const draft = button.dataset.prompt;
+        if (!draft) return;
         const input = $('[data-text]');
         if (input.value.trim()) return toast('You already have a draft. Send it or clear it first.');
-        input.value = b.dataset.prompt; input.focus();
-    }));
+        input.value = draft; input.focus();
+    });
 
     // Activity tiles pick a name; plain chat lets guests name their own channel.
     $$('[data-start]').forEach((b) => b.addEventListener('click', () => {
