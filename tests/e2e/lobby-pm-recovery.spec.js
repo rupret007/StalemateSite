@@ -1,23 +1,28 @@
 // Two real clients use the production engine via an explicit WebSocket fixture.
 // Recreating that engine simulates a wake with the same exact live socket identities.
 const { test, expect } = require('@playwright/test');
+const { writeFile } = require('node:fs/promises');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
 test.skip(({ browserName }) => browserName !== 'chromium', 'PM recovery fixture uses Chromium.');
 
-async function community(browser, baseURL, { privateContextFeature = 1 } = {}) {
+async function community(browser, baseURL, { privateContextFeature = 1, privatePeerFeature = 1 } = {}) {
     const { createLobby } = await import('../../hangout-worker/src/lobby-core.mjs');
     let now = 1800000000000, engine, sequence = 0, advertisedFeature = privateContextFeature;
-    const sockets = new Map(), identities = new Map(), contexts = [], inbound = [], delivered = [];
+    const sockets = new Map(), identities = new Map(), contexts = [], inbound = [], delivered = [], held = [];
+    let holdDelivery = () => false;
     const boot = () => { engine = createLobby({ now: () => now, send: (id, frame) => {
         const output = structuredClone(frame);
         if (output.t === 'hello') {
             output.features = { ...output.features };
             if (advertisedFeature === undefined) delete output.features.privateMessageContext;
             else output.features.privateMessageContext = advertisedFeature;
+            if (privatePeerFeature === null) delete output.features.privateMessagePeers;
+            else output.features.privateMessagePeers = privatePeerFeature;
         }
         delivered.push({ recipient: id, ...output });
-        sockets.get(id)?.send(JSON.stringify(output));
+        if (holdDelivery(id, output)) held.push({ id, output });
+        else sockets.get(id)?.send(JSON.stringify(output));
     }, limits: { defaultSlow: 0 } }); };
     boot();
     const guest = async (nick, options = {}) => {
@@ -37,6 +42,8 @@ async function community(browser, baseURL, { privateContextFeature = 1 } = {}) {
     };
     return {
         guest, inbound, delivered, advertise: feature => { advertisedFeature = feature; },
+        hold: predicate => { holdDelivery = predicate; },
+        release: () => { holdDelivery = () => false; for (const { id, output } of held.splice(0)) sockets.get(id)?.send(JSON.stringify(output)); },
         advance: (ms) => { now += ms; }, tick: () => engine.tick(),
         disconnect: (nick, code = 1012) => {
             const identity = [...identities.values()].find(item => item.dev === `device-${nick}`);
@@ -176,6 +183,53 @@ for (const [label, feature] of [['missing', null], ['a string', '1'], ['a boolea
             await expect(sender.locator('[data-buffer]')).toContainText('Everyone: /join');
         } finally { await fixture.close(); }
     });
+
+test('a PM person sheet kept open across nickname reuse blocks the original live peer only', async ({ browser, baseURL }) => {
+    const fixture = await community(browser, baseURL);
+    try {
+        const sender = await fixture.guest('Sender'); const recipient = await fixture.guest('Recipient');
+        const third = await fixture.guest('Third'); fixture.advance(180000); await accept(sender, recipient);
+        const original = fixture.delivered.find(frame => frame.t === 'pm-open' && frame.recipient.startsWith('socket-Sender-'));
+        const history = 'An earlier incoming message keeps its historical author label';
+        await send(recipient, history); await expect(received(sender, history)).toHaveCount(1);
+        await send(sender, '/query Third');
+        await third.locator('[data-pmreqs]').getByRole('button', { name: 'Accept', exact: true }).click();
+        await expect(sender.locator('[data-chat-context]')).toHaveText('PM · Third');
+        const other = fixture.delivered.filter(frame => frame.t === 'pm-open' && frame.recipient === original.recipient).at(-1);
+        await sender.getByRole('tab', { name: '✉ Recipient', exact: true }).click();
+        await sender.locator('[data-nicks] button.nick').filter({ hasText: /^Recipient$/ }).click();
+        const sheet = sender.locator('dialog[data-sheet]'); await expect(sheet).toBeVisible();
+        await send(recipient, '/nick RenamedRecipient');
+        await third.getByRole('tab', { name: '#stalemate', exact: true }).click();
+        await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^RenamedRecipient$/ })).toHaveCount(1);
+        await send(third, '/nick Recipient');
+        await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^Recipient$/ })).toHaveCount(1);
+        const noticesBefore = fixture.delivered.filter(frame => frame.recipient === original.recipient && frame.t === 'notice').length;
+        await sheet.getByRole('button', { name: 'Who?', exact: true }).click();
+        await expect.poll(() => fixture.delivered.filter(frame => frame.recipient === original.recipient && frame.t === 'notice').length).toBe(noticesBefore + 1);
+        expect(fixture.delivered.filter(frame => frame.recipient === original.recipient && frame.t === 'notice').at(-1).text).toContain('RenamedRecipient');
+        expect(fixture.inbound.filter(frame => frame.name === 'whois').at(-1)).toMatchObject({ pmPeer: original.peer, pmRef: original.ref });
+        // A historical transcript label is not a fresh nickname selection.
+        await received(sender, history).getByRole('button', { name: '<Recipient>', exact: true }).click();
+        await expect(sheet).toBeVisible(); await expect(sheet.locator('[data-sheet-title]')).toHaveText('RenamedRecipient');
+        const before = fixture.delivered.length;
+        const beforeBlockNotices = fixture.delivered.filter(frame => frame.recipient === original.recipient && frame.t === 'notice').length;
+        await sheet.getByRole('button', { name: 'Block', exact: true }).click();
+        await expect.poll(() => fixture.delivered.filter(frame => frame.recipient === original.recipient && frame.t === 'notice').length).toBe(beforeBlockNotices + 1);
+        const blockNotice = fixture.delivered.filter(frame => frame.recipient === original.recipient && frame.t === 'notice').at(-1);
+        expect(blockNotice).toMatchObject({ kind: 'info', text: "Blocked RenamedRecipient. They can't PM you and you won't see them." });
+        await expect(sender.locator('[data-buffer]')).toContainText(blockNotice.text);
+        expect(fixture.inbound.filter(frame => frame.name === 'block').at(-1)).toMatchObject({ pmPeer: original.peer, pmRef: original.ref });
+        const closing = fixture.delivered.slice(before).filter(frame => frame.t === 'pm-closed');
+        expect(closing).toHaveLength(2); expect(closing.every(frame => frame.ref === original.ref)).toBe(true);
+        expect(closing.some(frame => frame.ref === other.ref)).toBe(false);
+        await sender.getByRole('tab', { name: '✉ Recipient', exact: true }).click();
+        await third.getByRole('tab', { name: '✉ Sender', exact: true }).click();
+        fixture.advance(4000); const text = 'The other accepted peer still receives a fresh deliberate reply';
+        await send(sender, text); await expect(received(third, text)).toHaveCount(1);
+        expect(fixture.delivered.some(frame => frame.recipient === original.peer && frame.t === 'pm' && frame.text === text)).toBe(false);
+    } finally { await fixture.close(); }
+});
 
 test('reconnecting renegotiates private actions instead of reusing an earlier server capability', async ({ browser, baseURL }) => {
     const fixture = await community(browser, baseURL);
@@ -322,8 +376,9 @@ test('a real accepted peer disconnect disables saved PM restore while Copy and D
         await expect.poll(() => fixture.delivered.some(frame => frame.recipient === senderId && frame.t === 'event' && frame.ch === '#stalemate' && frame.text.startsWith('Recipient has quit'))).toBe(true);
         await expect(restore).toBeDisabled();
         await expect(sender.locator('[data-connection]')).toHaveText('Connected');
+        const opened = fixture.delivered.find(frame => frame.recipient === senderId && frame.t === 'pm-open');
         expect(fixture.delivered.filter(frame => frame.t === 'pm-closed'))
-            .toEqual([{ recipient: senderId, t: 'pm-closed', with: 'Recipient' }]);
+            .toEqual([{ recipient: senderId, t: 'pm-closed', with: 'Recipient', peer: opened.peer, ref: opened.ref }]);
         await expect(copy).toBeEnabled(); await expect(discard).toBeEnabled();
         await copy.click();
         await expect.poll(() => sender.evaluate(() => navigator.clipboard.readText())).toBe(unsent);
@@ -334,3 +389,224 @@ test('a real accepted peer disconnect disables saved PM restore while Copy and D
         expect(fixture.delivered.some(frame => frame.t === 'pm' && frame.text === unsent)).toBe(false);
     } finally { await fixture.close(); }
 });
+
+test('an accepted PM keeps its original peer and unsent draft when another accepted peer reuses that nickname', async ({ browser, baseURL }, testInfo) => {
+    const fixture = await community(browser, baseURL);
+    try {
+        const sender = await fixture.guest('Sender'); const recipient = await fixture.guest('Recipient');
+        const third = await fixture.guest('Third'); fixture.advance(180000);
+        await accept(sender, recipient);
+        const history = 'This private history belongs to the original Recipient endpoint';
+        await send(sender, history); await expect(received(recipient, history)).toHaveCount(1);
+        await expect(received(sender, history)).toHaveCount(1);
+        const historyId = await received(sender, history).getAttribute('data-id');
+        expect(historyId).toMatch(/^p[a-z0-9]+$/);
+        fixture.advance(4000);
+        // Establish the second pair through the real request and acceptance UI.
+        // Existing consent with this peer must not redirect the first PM view.
+        await send(sender, '/query Third');
+        await third.locator('[data-pmreqs]').getByRole('button', { name: 'Accept', exact: true }).click();
+        await expect(sender.locator('[data-chat-context]')).toHaveText('PM · Third');
+        await expect(third.locator('[data-chat-context]')).toHaveText('PM · Sender');
+        await sender.getByRole('tab', { name: '✉ Recipient', exact: true }).click();
+        await expect(sender.locator('[data-chat-context]')).toHaveText('PM · Recipient');
+        await expect(received(sender, history)).toHaveAttribute('data-id', historyId);
+        const draft = 'This unsent draft is for the original Recipient and must never move to Third';
+        await sender.fill('[data-text]', draft);
+        const senderId = fixture.inbound.find(frame => frame.t === 'hello' && frame.nick === 'Sender').sender;
+        const recipientId = fixture.inbound.find(frame => frame.t === 'hello' && frame.nick === 'Recipient').sender;
+        const thirdId = fixture.inbound.find(frame => frame.t === 'hello' && frame.nick === 'Third').sender;
+        expect(new Set([senderId, recipientId, thirdId]).size).toBe(3);
+        // Both original connections remain live. Their real /nick commands
+        // and the public roster witness precede Send; Sender never switches
+        // away from the original PM to choose a replacement target.
+        await send(recipient, '/nick RenamedRecipient');
+        await third.locator('[data-tabs] [data-channel-key="#stalemate"]').click();
+        await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^RenamedRecipient$/ })).toHaveCount(1);
+        await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^Recipient$/ })).toHaveCount(0);
+        await send(third, '/nick Recipient');
+        await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^Recipient$/ })).toHaveCount(1);
+        await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^RenamedRecipient$/ })).toHaveCount(1);
+        await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^Third$/ })).toHaveCount(0);
+        await expect(sender.locator('[data-text]')).toHaveValue(draft);
+        await expect(received(sender, history)).toHaveAttribute('data-id', historyId);
+        fixture.advance(4000); await sender.press('[data-text]', 'Enter');
+        const copies = () => fixture.delivered.filter(frame => frame.t === 'pm' && frame.text === draft);
+        await expect.poll(() => copies().length).toBe(2);
+        const delivery = {
+            senderCopies: copies().filter(frame => frame.recipient === senderId).length,
+            originalPeerCopies: copies().filter(frame => frame.recipient === recipientId).length,
+            replacementPeerCopies: copies().filter(frame => frame.recipient === thirdId).length
+        };
+        await testInfo.attach('pm-peer-binding-delivery', { body: JSON.stringify(delivery), contentType: 'application/json' });
+        // Check actual endpoint delivery before the desired updated heading,
+        // so the baseline can expose wrong delivery rather than a label gap.
+        expect(delivery.replacementPeerCopies).toBe(0);
+        expect(delivery.originalPeerCopies).toBe(1); expect(delivery.senderCopies).toBe(1);
+        await expect(received(recipient, draft)).toHaveCount(1);
+        await expect(sender.locator('[data-chat-context]')).toHaveText('PM · RenamedRecipient');
+        await expect(received(sender, history)).toHaveAttribute('data-id', historyId);
+        await expect(received(sender, draft)).toHaveCount(1);
+        await expect(sender.locator('[data-text]')).toHaveValue('');
+        fixture.advance(4000);
+        await send(sender, '/me keeps this action with the original renamed peer');
+        await expect(received(recipient, 'keeps this action with the original renamed peer')).toContainText('* Sender');
+        expect(fixture.delivered.some(frame => frame.recipient === thirdId && frame.t === 'pm' && frame.text === 'keeps this action with the original renamed peer')).toBe(false);
+        fixture.advance(4000); await send(sender, '/slap Recipient');
+        const mention = 'slaps Recipient around a bit with a large trout';
+        await expect(received(recipient, mention)).toHaveCount(1);
+        expect(fixture.delivered.some(frame => frame.recipient === thirdId && frame.t === 'pm' && frame.text === mention)).toBe(false);
+        expect(fixture.delivered.filter(frame => frame.t === 'line' && [history, draft].includes(frame.text))).toEqual([]);
+    } finally { await fixture.close(); }
+});
+
+test('a disconnected PM keeps its ordinary draft separate from a newly accepted visitor using the old nickname', async ({ browser, baseURL }, testInfo) => {
+    const fixture = await community(browser, baseURL);
+    try {
+        const sender = await fixture.guest('Sender', { viewport: { width: 375, height: 667 } }); const recipient = await fixture.guest('Recipient');
+        await sender.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+        fixture.advance(180000); await accept(sender, recipient);
+        const original = fixture.delivered.find(frame => frame.t === 'pm-open' && frame.recipient.startsWith('socket-Sender-'));
+        const history = 'Only the departed original peer shares this earlier private history';
+        await send(sender, history); await expect(received(recipient, history)).toHaveCount(1);
+        const draft = 'Keep this ordinary unsent draft with the departed original peer';
+        await sender.fill('[data-text]', draft); await send(recipient, '/quit');
+        await expect.poll(() => fixture.delivered.some(frame => frame.recipient === original.recipient && frame.t === 'event' && frame.text.startsWith('Recipient has quit'))).toBe(true);
+        await expect(sender.getByRole('tab', { name: '✉ Recipient (closed)', exact: true })).toBeVisible();
+        await expect(sender.getByRole('button', { name: 'Copy draft', exact: true })).toBeVisible();
+        await expect(sender.getByRole('button', { name: 'Discard draft', exact: true })).toBeVisible();
+        // Observe the untouched closed-view layout before an action's native
+        // scrolling/focus can conceal a clipped composer or recovery control.
+        const geometry = await sender.evaluate(() => {
+            const rect = element => { const r = element.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height }; };
+            const buttons = [...document.querySelectorAll('[data-toast] button')];
+            const controls = {
+                input: document.querySelector('[data-text]'), send: document.querySelector('[data-send]'),
+                copy: buttons.find(button => button.textContent === 'Copy draft'),
+                discard: buttons.find(button => button.textContent === 'Discard draft')
+            };
+            const observe = element => {
+                const box = rect(element), style = getComputedStyle(element);
+                const points = [[box.left + 2, box.top + 2], [box.right - 2, box.top + 2],
+                    [box.left + 2, box.bottom - 2], [box.right - 2, box.bottom - 2],
+                    [box.left + box.width / 2, box.top + box.height / 2]];
+                let clipsContain = true;
+                for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+                    const clipping = getComputedStyle(parent), bounds = parent.getBoundingClientRect();
+                    if (/hidden|clip|auto|scroll/.test(clipping.overflowX) && (box.left < bounds.left || box.right > bounds.right)) clipsContain = false;
+                    if (/hidden|clip|auto|scroll/.test(clipping.overflowY) && (box.top < bounds.top || box.bottom > bounds.bottom)) clipsContain = false;
+                }
+                return { ...box, disabled: element.disabled, displayed: style.display !== 'none' && style.visibility === 'visible',
+                    clipsContain, uncovered: points.every(([x, y]) => element.contains(document.elementFromPoint(x, y))) };
+            };
+            return { viewport: { width: innerWidth, height: innerHeight }, pageWidth: document.documentElement.scrollWidth,
+                controls: Object.fromEntries(Object.entries(controls).map(([name, element]) => [name, observe(element)])),
+                inputFontSize: getComputedStyle(controls.input).fontSize };
+        });
+        const geometryPath = testInfo.outputPath('closed-pm-draft-controls-375.json');
+        await writeFile(geometryPath, JSON.stringify(geometry, null, 2));
+        await testInfo.attach('closed-pm-draft-controls-375', { path: geometryPath, contentType: 'application/json' });
+        await sender.screenshot({ path: testInfo.outputPath('closed-pm-draft-controls-375.png'), fullPage: true });
+        expect(geometry.viewport).toEqual({ width: 375, height: 667 });
+        expect(geometry.pageWidth).toBeLessThanOrEqual(375); expect(geometry.inputFontSize).toBe('16px');
+        for (const control of Object.values(geometry.controls)) {
+            expect(control.width).toBeGreaterThan(0); expect(control.height).toBeGreaterThan(0);
+            expect(control.left).toBeGreaterThanOrEqual(0); expect(control.right).toBeLessThanOrEqual(375);
+            expect(control.top).toBeGreaterThanOrEqual(0); expect(control.bottom).toBeLessThanOrEqual(667);
+            expect(control.displayed).toBe(true); expect(control.clipsContain).toBe(true); expect(control.uncovered).toBe(true);
+        }
+        // Send remains enabled for deliberate named commands. Its ordinary
+        // closed-PM body guard is exercised below without emitting a frame.
+        expect(geometry.controls.input.disabled).toBe(false); expect(geometry.controls.send.disabled).toBe(false);
+        const replacement = await fixture.guest('Recipient'); fixture.advance(180000);
+        const replacementId = fixture.inbound.filter(frame => frame.t === 'hello' && frame.nick === 'Recipient').at(-1).sender;
+        expect(replacementId).not.toBe(original.peer);
+        const beforeBlockedSend = fixture.inbound.length;
+        await sender.press('[data-text]', 'Enter');
+        await expect(sender.locator('[data-toast]')).toContainText('Private replies are not confirmed');
+        expect(fixture.inbound).toHaveLength(beforeBlockedSend);
+        await expect(sender.locator('[data-text]')).toHaveValue(draft);
+        expect(fixture.delivered.some(frame => frame.recipient === replacementId && ['pm', 'pm-request'].includes(frame.t))).toBe(false);
+        await sender.getByRole('button', { name: 'Copy draft', exact: true }).click();
+        await expect.poll(() => sender.evaluate(() => navigator.clipboard.readText())).toBe(draft);
+        await sender.press('[data-text]', 'Enter');
+        await sender.getByRole('button', { name: 'Discard draft', exact: true }).click();
+        await expect(sender.locator('[data-text]')).toHaveValue('');
+        // An explicit new request is a separate deliberate choice, not an
+        // automatic replay or transfer of the old draft/history.
+        await send(sender, '/query Recipient');
+        await replacement.locator('[data-pmreqs]').getByRole('button', { name: 'Accept', exact: true }).click();
+        await expect(sender.locator('[data-chat-context]')).toHaveText('PM · Recipient');
+        const reopened = fixture.delivered.filter(frame => frame.t === 'pm-open' && frame.recipient === original.recipient).at(-1);
+        expect(reopened.peer).toBe(replacementId); expect(reopened.ref).not.toBe(original.ref);
+        await expect(sender.locator('[data-text]')).toHaveValue('');
+        await expect(sender.locator('[data-buffer]')).not.toContainText(draft);
+        await expect(sender.locator('[data-buffer]')).not.toContainText(history);
+        const fresh = 'A consciously new message after the new visitor accepted';
+        await send(sender, fresh); await expect(received(replacement, fresh)).toHaveCount(1);
+        expect(fixture.delivered.some(frame => frame.t === 'pm' && frame.text === draft)).toBe(false);
+    } finally { await fixture.close(); }
+});
+
+test('a delayed genuine close cannot retire a new PM or move an older unsent draft into it', async ({ browser, baseURL }) => {
+    const fixture = await community(browser, baseURL);
+    try {
+        const sender = await fixture.guest('Sender'); const recipient = await fixture.guest('Recipient');
+        fixture.advance(180000); await accept(sender, recipient);
+        const original = fixture.delivered.find(frame => frame.t === 'pm-open' && frame.recipient.startsWith('socket-Sender-'));
+        const draft = 'An older draft stays only in its original closed conversation';
+        await sender.fill('[data-text]', draft);
+        fixture.hold((id, frame) => id === original.recipient && frame.t === 'pm-closed');
+        await send(recipient, '/quit');
+        await expect.poll(() => fixture.delivered.some(frame => frame.recipient === original.recipient && frame.t === 'pm-closed' && frame.ref === original.ref)).toBe(true);
+        const replacement = await fixture.guest('Recipient'); fixture.advance(180000);
+        await sender.getByRole('tab', { name: '#stalemate', exact: true }).click();
+        await send(sender, '/query Recipient');
+        await replacement.locator('[data-pmreqs]').getByRole('button', { name: 'Accept', exact: true }).click();
+        await expect(sender.locator('[data-chat-context]')).toHaveText('PM · Recipient');
+        const opened = fixture.delivered.filter(frame => frame.t === 'pm-open' && frame.recipient === original.recipient).at(-1);
+        expect(opened.ref).not.toBe(original.ref); expect(opened.peer).not.toBe(original.peer);
+        await expect(sender.locator(`[data-tabs] [data-channel-key="pm:${original.ref}"]`)).toHaveText('✉ Recipient');
+        fixture.release();
+        await expect(sender.getByRole('tab', { name: '✉ Recipient (closed)', exact: true })).toBeVisible();
+        await expect(sender.locator('[data-chat-context]')).toHaveText('PM · Recipient');
+        await expect(sender.locator('[data-text]')).toHaveValue('');
+        const fresh = 'The current peer still receives a deliberate fresh reply after the old close';
+        await send(sender, fresh); await expect(received(replacement, fresh)).toHaveCount(1);
+        await sender.getByRole('tab', { name: '✉ Recipient (closed)', exact: true }).click();
+        await expect(sender.locator('[data-text]')).toHaveValue(draft);
+        await sender.press('[data-text]', 'Enter');
+        await expect(sender.locator('[data-text]')).toHaveValue(draft);
+        expect(fixture.delivered.some(frame => frame.t === 'pm' && frame.text === draft)).toBe(false);
+    } finally { await fixture.close(); }
+});
+
+for (const [label, feature] of [['missing', null], ['a string', '1'], ['a boolean', true]])
+    test(`without numeric peer binding (${label}), implicit PM sends retain drafts while explicit nickname commands remain usable`, async ({ browser, baseURL }) => {
+        const fixture = await community(browser, baseURL, { privatePeerFeature: feature });
+        try {
+            const sender = await fixture.guest('Sender'); const recipient = await fixture.guest('Recipient'); fixture.advance(180000);
+            await send(sender, '/query Recipient');
+            // The old-server request widget lacks an authoritative endpoint;
+            // a consciously typed named acceptance is still a named command.
+            await send(recipient, '/accept Sender');
+            await expect(sender.locator('[data-chat-context]')).toHaveText('PM · Recipient');
+            const draft = 'This implicit private draft must not use an unconfirmed nickname';
+            const before = fixture.inbound.length;
+            await send(sender, draft);
+            await expect(sender.locator('[data-text]')).toHaveValue(draft);
+            await expect(sender.locator('[data-toast]')).toContainText('Private replies are not confirmed');
+            expect(fixture.inbound).toHaveLength(before);
+            await send(sender, '/me an unconfirmed private action stays here');
+            await expect(sender.locator('[data-text]')).toHaveValue('/me an unconfirmed private action stays here');
+            expect(fixture.inbound).toHaveLength(before);
+            const explicit = 'This message deliberately names the currently accepted Recipient';
+            await send(sender, `/msg Recipient ${explicit}`);
+            await expect(received(recipient, explicit)).toHaveCount(1);
+            expect(fixture.delivered.some(frame => frame.t === 'pm' && frame.text === draft)).toBe(false);
+            await sender.getByRole('tab', { name: '#stalemate', exact: true }).click(); fixture.advance(4000);
+            await send(sender, 'Public chat still works when private peer binding is unavailable');
+            await recipient.locator('[data-tabs] [data-channel-key="#stalemate"]').click();
+            await expect(received(recipient, 'Public chat still works when private peer binding is unavailable')).toHaveCount(1);
+        } finally { await fixture.close(); }
+    });

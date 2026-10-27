@@ -12,7 +12,7 @@ const discovery = readFileSync(new URL('../../r/45662413410ed051/lobby/discovery
 const windows = [];
 afterEach(() => { for (const dom of windows.splice(0)) dom.window.close(); });
 
-async function visitor(features = { messageResults: 1, privateMessageContext: 1 }) {
+async function visitor(features = { messageResults: 1, privateMessageContext: 1, privateMessagePeers: 1 }) {
     const dom = new JSDOM(html, { url: 'http://127.0.0.1:4320/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=ws%3A%2F%2F127.0.0.1%3A4320%2Frelay', runScripts: 'outside-only' });
     windows.push(dom);
     const { window } = dom, timers = new Map(), sockets = []; let timerId = 0;
@@ -89,10 +89,10 @@ describe('bounded tab-only composer recovery', () => {
         f.join('#other-room'); expect(f.action('restore').disabled).toBe(true);
         expect(f.rows()[0].querySelector('.saved-message-text')).toBeNull();
         f.join('#stalemate'); expect(f.action('restore').disabled).toBe(true); // New membership object with the same name.
-        f.action('discard').click(); f.ws.receive({ t: 'pm-open', with: 'Friend' });
-        const pm = f.submit('Private exact body'); expect(pm).toMatchObject({ t: 'cmd', name: 'msg', ch: 'pm:Friend', args: ['Friend', 'Private exact body'] });
+        f.action('discard').click(); const ref = 'c'.repeat(32); f.ws.receive({ t: 'pm-open', with: 'Friend', peer: 'friend-connection', ref });
+        const pm = f.submit('Private exact body'); expect(pm).toMatchObject({ t: 'say', ch: `pm:${ref}`, pmPeer: 'friend-connection', pmRef: ref, text: 'Private exact body' });
         f.result('rejected', pm); expect(f.action('restore').disabled).toBe(false);
-        f.ws.receive({ t: 'pm-closed', with: 'Friend' }); expect(f.action('restore').disabled).toBe(true);
+        f.ws.receive({ t: 'pm-closed', with: 'Friend', peer: 'friend-connection', ref }); expect(f.action('restore').disabled).toBe(true);
     });
 
     it.each([undefined, true, '1', 2])('uses honest legacy uncertainty for capability %s without putting a token on the wire', async feature => {
@@ -185,4 +185,73 @@ describe('bounded tab-only composer recovery', () => {
         f.ws.send = () => { throw Error('synthetic closed transport'); };
         f.submit('Keep this unsent draft'); expect(f.rows()).toHaveLength(0); expect(f.$('[data-text]').value).toBe('Keep this unsent draft');
     });
+});
+
+
+describe('reference-bound PM view and draft lifetime', () => {
+    it('updates a live peer label without replacing its draft or routing delayed own echoes by a previous self nickname', async () => {
+        const f = await visitor(), ref = 'd'.repeat(32), peer = 'original-peer';
+        f.ws.receive({ t: 'pm-open', with: 'Friend', peer, ref });
+        f.input('An ordinary unsent draft for this exact peer');
+        f.ws.receive({ t: 'welcome', nick: 'RenamedViewer', band: false });
+        f.ws.receive({ t: 'pm', id: 'pdelayed', with: 'Friend', peer, ref, from: 'Viewer', to: 'Friend', text: 'An earlier own echo keeps its historical author' });
+        f.ws.receive({ t: 'pm-peer', with: 'RenamedFriend', peer, ref });
+        expect([...f.window.__lobby.pms.keys()]).toEqual([ref]);
+        expect(f.$('[data-chat-context]').textContent).toBe('PM · RenamedFriend');
+        expect(f.$('[data-buffer]').textContent).toContain('An earlier own echo keeps its historical author');
+        expect(f.$('[data-text]').value).toBe('An ordinary unsent draft for this exact peer');
+        const sent = f.submit();
+        expect(sent).toMatchObject({ t: 'say', ch: `pm:${ref}`, pmPeer: peer, pmRef: ref, text: 'An ordinary unsent draft for this exact peer' });
+    });
+
+    it('keeps a closed ordinary draft separate from a replacement peer and ignores a delayed old close for the new view', async () => {
+        const f = await visitor(), oldRef = 'd'.repeat(32), newRef = 'e'.repeat(32);
+        f.ws.receive({ t: 'pm-open', with: 'Friend', peer: 'old-peer', ref: oldRef });
+        f.input('An ordinary draft for only the original endpoint');
+        f.ws.receive({ t: 'pm-closed', with: 'Friend', peer: 'old-peer', ref: oldRef });
+        let before = f.ws.sent.length; f.submit();
+        expect(f.ws.sent).toHaveLength(before); expect(f.$('[data-text]').value).toBe('An ordinary draft for only the original endpoint');
+        f.ws.receive({ t: 'pm-open', with: 'Friend', peer: 'new-peer', ref: newRef });
+        expect(f.$('[data-text]').value).toBe('');
+        f.ws.receive({ t: 'pm-closed', with: 'Friend', peer: 'old-peer', ref: oldRef });
+        expect(f.window.__lobby.active).toBe(`pm:${newRef}`);
+        expect(f.window.__lobby.pms.get(newRef).open).toBe(true);
+        expect(f.submit('A deliberately fresh reply')).toMatchObject({ pmPeer: 'new-peer', pmRef: newRef });
+        f.$(`[data-channel-key="pm:${oldRef}"]`).click();
+        expect(f.$('[data-text]').value).toBe('An ordinary draft for only the original endpoint');
+        before = f.ws.sent.length; f.submit(); expect(f.ws.sent).toHaveLength(before);
+    });
+
+    it('keeps request controls on their original endpoint across a label update and refuses unbound request widgets', async () => {
+        const f = await visitor(), ref = 'd'.repeat(32);
+        f.ws.receive({ t: 'pm-request', from: 'Friend', band: false, peer: 'original-peer', ref });
+        f.ws.receive({ t: 'pm-request-ended', from: 'Friend', peer: 'original-peer', ref });
+        f.ws.receive({ t: 'pm-request', from: 'RenamedFriend', band: false, peer: 'original-peer', ref });
+        const request = f.$('[data-pmreqs] .req'); expect(request.textContent).toContain('RenamedFriend');
+        request.querySelector('button').click();
+        expect(f.ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'accept', args: ['RenamedFriend'], pmPeer: 'original-peer', pmRef: ref });
+        f.ws.receive({ t: 'pm-request', from: 'UnboundFriend', band: false });
+        const before = f.ws.sent.length; f.$('[data-pmreqs] .req button').click();
+        expect(f.ws.sent).toHaveLength(before);
+        expect(f.$('[data-toast]').textContent).toContain('cannot confirm the request');
+    });
+});
+
+
+it('starts a fresh received PM transcript on a new socket while preserving only a closed original unsent draft', async () => {
+    const f = await visitor(), ref = 'd'.repeat(32), nextRef = 'e'.repeat(32);
+    f.ws.receive({ t: 'pm-open', with: 'Friend', peer: 'old-peer', ref });
+    f.ws.receive({ t: 'pm', id: 'preconnect', with: 'Friend', peer: 'old-peer', ref, from: 'Friend', to: 'Viewer', text: 'An old received private transcript' });
+    f.input('An ordinary unsent draft survives only in its closed original view');
+    f.ws.close(1006); f.$('[data-reconnect]').click();
+    await vi.waitFor(() => expect(f.sockets).toHaveLength(2));
+    const replacement = f.sockets[1]; replacement.open(); f.welcome(replacement);
+    replacement.receive({ t: 'join', ch: { name: '#stalemate', kind: 'lobby', title: '#stalemate', topic: '', modes: {}, names: [{ nick: 'Viewer', prefix: '' }] } });
+    const old = f.window.__lobby.pms.get(ref); expect(old.open).toBe(false); expect(old.lines).toEqual([]);
+    f.$(`[data-channel-key="pm:${ref}"]`).click();
+    expect(f.$('[data-text]').value).toBe('An ordinary unsent draft survives only in its closed original view');
+    const before = replacement.sent.length; f.$('[data-say]').dispatchEvent(new f.window.Event('submit', { cancelable: true }));
+    expect(replacement.sent).toHaveLength(before);
+    replacement.receive({ t: 'pm-open', with: 'Friend', peer: 'new-peer', ref: nextRef });
+    expect(f.$('[data-text]').value).toBe(''); expect(f.$('[data-buffer]').textContent).not.toContain('An old received private transcript');
 });
