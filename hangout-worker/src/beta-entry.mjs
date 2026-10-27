@@ -36,7 +36,7 @@ const CLIENT = `import { createEntrySiteRegistry, entrySourceFromParams, ENTRY_H
 const entrySites = createEntrySiteRegistry(__ENTRY_SITES__);
 const source = entrySourceFromParams(new URLSearchParams(location.search), entrySites);
 const $ = s => document.querySelector(s);
-const rememberEntry = () => sessionStorage.setItem(ENTRY_HANDOFF_KEY, entryHandoff(source, true, Date.now(), entrySites));
+const rememberEntry = () => { try { sessionStorage.setItem(ENTRY_HANDOFF_KEY, entryHandoff(source, true, Date.now(), entrySites)); } catch { /* Entrance memory is optional. */ } };
 $('#inside .button').href = '${ROOT}lobby/?entry-return=1';
 $('#owner').href = '/lobby-owner/login?entry-return=1';
 $('#inside .button').addEventListener('click', rememberEntry);
@@ -57,7 +57,7 @@ async function draw() {
     $('#staff').hidden = !s.staffConfigured; $('#moderation').hidden = s.kind !== 'staff'; $('#owner').hidden = !s.emailConfigured || s.kind === 'owner';
 }
 $('#unlock').addEventListener('submit', async e => { e.preventDefault(); try { await post('/beta/unlock', { key: $('#code').value }); $('#code').value = ''; await draw(); } catch (e) { error(e); } });
-$('#logout').addEventListener('submit', async e => { e.preventDefault(); try { await post('/beta/logout', {}); sessionStorage.removeItem('hangout-owner'); sessionStorage.removeItem('hangout-preview'); sessionStorage.removeItem(ENTRY_HANDOFF_KEY); await draw(); } catch (e) { error(e); } });
+$('#logout').addEventListener('submit', async e => { e.preventDefault(); try { await post('/beta/logout', {}); for (const key of ['hangout-owner', 'hangout-preview', ENTRY_HANDOFF_KEY]) { try { sessionStorage.removeItem(key); } catch { /* Server logout does not depend on optional hints. */ } } await draw(); } catch (e) { error(e); } });
 const key = new URLSearchParams(location.hash.slice(1)).get('invite');
 if (location.hash || location.search) history.replaceState(null, '', location.pathname);
 (async () => { try { if (key) await post('/beta/unlock', { key }); await draw(); } catch (e) { error(e); $('#login').hidden = false; } })();`;
@@ -149,7 +149,7 @@ async function betaRequest(request, env, deps = {}) {
         return json(await result.json(), result.status);
     }
     if (url.pathname === '/beta/state') return json({ kind: session.identity?.kind || 'guest', role: session.identity?.role || 'fan', emailConfigured: betaAccessConfigured(env), staffConfigured: betaAccessConfigured(env) });
-    if (url.pathname === '/beta/bootstrap.js') return reply(`sessionStorage.setItem('hangout-preview',${JSON.stringify(env.HANGOUT_PREVIEW_KEY)});sessionStorage.setItem('hangout-owner',${JSON.stringify(session.identity?.kind === 'owner' ? '1' : '0')});window.HangoutEntrySites=${JSON.stringify(Object.values(entrySitesFromConfig(env.HANGOUT_ENTRY_SITES)))};${lobbyParticipationMode(env) ? 'window.HangoutParticipationControls=true;' : ''}`, 200, 'text/javascript');
+    if (url.pathname === '/beta/bootstrap.js') return reply(`window.HangoutBootstrap=${JSON.stringify({ preview: env.HANGOUT_PREVIEW_KEY, owner: session.identity?.kind === 'owner' })};window.HangoutEntrySites=${JSON.stringify(Object.values(entrySitesFromConfig(env.HANGOUT_ENTRY_SITES)))};${lobbyParticipationMode(env) ? 'window.HangoutParticipationControls=true;' : ''}try{sessionStorage.setItem('hangout-preview',window.HangoutBootstrap.preview);sessionStorage.setItem('hangout-owner',window.HangoutBootstrap.owner?'1':'0');}catch{}`, 200, 'text/javascript');
     if (url.pathname === '/lobby-owner/login' || url.pathname === '/lobby-admin/login') {
         if (request.method !== 'GET') return reply('GET required.', 405);
         if (!betaAccessConfigured(env)) return reply('Email verification is not configured. Guest chat is still available from your invitation.', 503);
