@@ -16,6 +16,8 @@ function guest(nick, extra = {}) {
     return id;
 }
 const cmd = (id, name, args = [], ch = lobby) => engine.message(id, JSON.stringify({ t: 'cmd', name, args, ch }));
+// Explicit nickname-intent fixtures only; generic/selected/malformed commands stay separate.
+const namedCmd = (id, name, args = [], ch = lobby) => engine.message(id, JSON.stringify({ t: 'cmd', name, args, ch, personNamed: true }));
 const room = (name = '#friends') => engine._debug.channels.get(name);
 const own = () => { const a = guest('Alice', { account: 'account-a' }); cmd(a, 'join', ['#friends']); cmd(a, 'register', [], '#friends'); return a; };
 beforeEach(() => { now = 1800000000000; boot(); });
@@ -63,7 +65,7 @@ describe('registered rooms', () => {
     });
     it('requires verified co-host acceptance, and rejects reused offers', () => {
         const a = own(); const b = guest('Bravo', { account: 'account-b' }); cmd(b, 'join', ['#friends']);
-        cmd(a, 'cohost', ['add', 'Bravo'], '#friends'); cmd(a, 'transfer', ['Bravo'], '#friends');
+        namedCmd(a, 'cohost', ['add', 'Bravo'], '#friends'); namedCmd(a, 'transfer', ['Bravo'], '#friends');
         cmd(b, 'acceptowner', [], '#friends'); expect(room().owner).toBe('account-b');
         cmd(a, 'acceptowner', [], '#friends'); expect(room().owner).toBe('account-b');
         cmd(a, 'unregister', [], '#friends'); expect(room()).toBeDefined();
@@ -94,7 +96,7 @@ describe('registered rooms', () => {
 describe('moderation and flooding', () => {
     it('allows a MOD to review and mute, without BAND status or configuration power', async () => {
         const m = guest('Helper', { role: 'moderator', admin: true }); const a = guest('Alice');
-        cmd(m, 'mute', ['Alice']); expect(engine._debug.net.mutes['dev-Alice']).toBeGreaterThan(now);
+        namedCmd(m, 'mute', ['Alice']); expect(engine._debug.net.mutes['dev-Alice']).toBeGreaterThan(now);
         for (const name of ['filter', 'shield', 'lobby', 'slow']) cmd(m, name, ['unlock']);
         expect(frames.filter((f) => f.id === m && f.t === 'denied')).toHaveLength(4);
         expect(frames.find((f) => f.id === m && f.t === 'welcome')).toMatchObject({ band: false, moderator: true });
@@ -103,7 +105,7 @@ describe('moderation and flooding', () => {
     });
     it('protects staff from moderator mute and indirect lobby mode changes', () => {
         const m = guest('Helper', { role: 'moderator', admin: true }); guest('Drummer', { role: 'band' });
-        cmd(m, 'mute', ['Drummer']); cmd(m, 'mode', ['+S', '200']); cmd(m, 'lock');
+        namedCmd(m, 'mute', ['Drummer']); cmd(m, 'mode', ['+S', '200']); cmd(m, 'lock');
         expect(engine._debug.net.mutes['dev-Drummer']).toBeUndefined(); expect(engine.adminState().lock).toBe('off'); expect(engine.adminState().slow).toBe(0);
     });
     it('shares command limits across tabs and restores them after restart', () => {
@@ -141,9 +143,9 @@ describe('room lifecycle and abuse regressions', () => {
     });
     it('expires ownership offers and allows revocation after a co-host leaves', () => {
         const a = own(); const b = guest('Bravo', { account: 'account-b' }); cmd(b, 'join', ['#friends']);
-        cmd(a, 'cohost', ['add', 'Bravo'], '#friends'); cmd(a, 'transfer', ['Bravo'], '#friends');
+        namedCmd(a, 'cohost', ['add', 'Bravo'], '#friends'); namedCmd(a, 'transfer', ['Bravo'], '#friends');
         now += 11 * 60000; cmd(b, 'acceptowner', [], '#friends'); expect(room().owner).toBe('account-a');
-        engine.disconnect(b); cmd(a, 'cohost', ['remove', 'account-b'], '#friends'); expect(room().cohosts.size).toBe(0);
+        engine.disconnect(b); engine.message(a, JSON.stringify({ t: 'cmd', name: 'cohost', args: ['remove', 'account-b'], ch: '#friends', roomInstance: room().keepRef, cohostAccount: true })); expect(room().cohosts.size).toBe(0);
     });
     it('retains drawing state but never camera activation across restart, then clears idle activity', () => {
         const a = guest('Painter', { account: 'account-a' }); cmd(a, 'join', ['#art-friends']); cmd(a, 'register', [], '#art-friends');
@@ -157,16 +159,16 @@ describe('room lifecycle and abuse regressions', () => {
     });
     it('shares public and private message allowances across tabs', () => {
         const a = guest('Alice', { account: 'account-a' }); const b = guest('Bravo'); const other = guest('AnotherTab', { account: 'account-a', dev: 'other-device' }); now += 3 * 60000;
-        cmd(a, 'query', ['Bravo']); cmd(b, 'accept', ['Alice']);
+        namedCmd(a, 'query', ['Bravo']); namedCmd(b, 'accept', ['Alice']);
         for (let i = 0; i < 5; i++) engine.message(a, JSON.stringify({ t: 'say', ch: lobby, text: `public words ${i}` }));
         // Even a new device with the same verified account cannot refill the chat bucket.
-        cmd(other, 'msg', ['Bravo', 'queued words']); cmd(b, 'accept', ['AnotherTab']);
+        namedCmd(other, 'msg', ['Bravo', 'queued words']); namedCmd(b, 'accept', ['AnotherTab']);
         expect(frames.some((f) => f.t === 'pm' && f.text === 'queued words')).toBe(false);
         expect(frames.some((f) => f.id === other && f.t === 'rate-limit' && f.scope === 'chat')).toBe(true);
     });
     it('retains account bans across device changes', () => {
         const a = guest('Alice', { account: 'account-a' }); const mod = guest('Helper', { role: 'moderator' });
-        cmd(mod, 'gban', ['Alice', 'Repeated abuse']);
+        namedCmd(mod, 'gban', ['Alice', 'Repeated abuse']);
         expect(engine.connect({ id: 'new', dev: 'fresh-device', iph: 'fresh-ip', account: 'account-a' })).toMatchObject({ ok: false, reason: 'banned' });
     });
 });

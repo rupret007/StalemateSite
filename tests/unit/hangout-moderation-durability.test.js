@@ -11,7 +11,9 @@ function fixture(persist) {
         return engine.message(id, JSON.stringify({ t: 'hello', nick, age13: true }));
     };
     const cmd = (id, name, args = [], ch = '#stalemate') => engine.message(id, JSON.stringify({ t: 'cmd', name, args, ch }));
-    return { engine, frames, closed, join, cmd };
+    // Explicit nickname-intent fixtures only; generic/selected/malformed commands stay separate.
+    const namedCmd = (id, name, args = [], ch = '#stalemate') => engine.message(id, JSON.stringify({ t: 'cmd', name, args, ch, personNamed: true }));
+    return { engine, frames, closed, join, cmd, namedCmd };
 }
 
 describe('durable emergency and abuse controls', () => {
@@ -43,7 +45,7 @@ describe('durable emergency and abuse controls', () => {
         let failed = false;
         const f = fixture((kind) => kind === 'net' && failed ? Promise.reject(new Error('network write failed')) : undefined);
         f.join('staff', 'Staff', 'owner'); f.join('guest', 'Visitor'); await Promise.resolve(); f.frames.length = 0;
-        failed = true; await f.cmd('staff', 'gban', ['Visitor', 'synthetic reason']);
+        failed = true; await f.namedCmd('staff', 'gban', ['Visitor', 'synthetic reason']);
         expect(f.frames.some((frame) => frame.t === 'event' && /was banned/.test(frame.text))).toBe(false);
         expect(f.frames.some((frame) => frame.t === 'kicked')).toBe(false);
         expect(f.frames.some((frame) => frame.recipient === 'guest' && frame.kind === 'error' && /Storage is unavailable/.test(frame.text))).toBe(true);

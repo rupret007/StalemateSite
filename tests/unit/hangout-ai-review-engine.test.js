@@ -19,6 +19,8 @@ function guest(nick, role = 'fan') {
 }
 const got = (user) => frames.get(user.id) || [];
 const cmd = (user, name, args = [], ch = LOBBY) => engine.message(user.id, JSON.stringify({ t: 'cmd', name, args, ch }));
+// Explicit nickname-intent fixtures only; generic/selected/malformed commands stay separate.
+const namedCmd = (user, name, args = [], ch = LOBBY) => engine.message(user.id, JSON.stringify({ t: 'cmd', name, args, ch, personNamed: true }));
 const say = (user, text, ch = LOBBY) => { clock += 4000; engine.message(user.id, JSON.stringify({ t: 'say', ch, text })); };
 const latest = () => requests.at(-1);
 beforeEach(() => boot());
@@ -38,7 +40,7 @@ describe('public text AI review boundary', () => {
         cmd(host, 'lock', ['off'], '#art-open');
         engine.message(host.id, JSON.stringify({ t: 'act', ch: '#art-open', kind: 'clear' }));
         cmd(host, 'topic', ['A public topic'], '#art-open');
-        cmd(host, 'msg', ['Pal', 'private words']); cmd(pal, 'accept', ['Host']);
+        namedCmd(host, 'msg', ['Pal', 'private words']); namedCmd(pal, 'accept', ['Host']);
         expect(got(pal).some((frame) => frame.t === 'act' && frame.kind === 'clear')).toBe(true);
         expect(got(pal).some((frame) => frame.t === 'pm' && frame.text === 'private words')).toBe(true);
         guest('Late');

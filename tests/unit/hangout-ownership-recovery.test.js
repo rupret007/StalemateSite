@@ -16,7 +16,7 @@ async function boot(rooms, sessions, live = []) {
     if (sessions) return engine.restoreSessions(sessions, live);
 }
 function message(id, frame) { clock += 2000; return engine.message(id, JSON.stringify(frame)); }
-const cmd = (id, name, args = []) => message(id, { t: 'cmd', name, args, ch: channel });
+const cmd = (id, name, args = [], intent = {}) => message(id, { t: 'cmd', name, args, ch: channel, ...intent });
 const room = () => engine._debug.channels.get(channel);
 async function visitor(nick, account, dev = `device-${nick}`) {
     const identity = { id: `connection-${++sequence}`, dev, iph: `ip-${nick}`, account, role: 'fan', admin: false };
@@ -29,8 +29,8 @@ async function offer() {
     const owner = await visitor('Owner', 'account-owner');
     await cmd(owner, 'join', [channel]); await cmd(owner, 'register');
     const cohost = await visitor('Cohost', 'account-cohost');
-    await cmd(cohost, 'join', [channel]); await cmd(owner, 'cohost', ['add', 'Cohost']);
-    await cmd(owner, 'transfer', ['Cohost']);
+    await cmd(cohost, 'join', [channel]); await cmd(owner, 'cohost', ['add', 'Cohost'], { personNamed: true });
+    await cmd(owner, 'transfer', ['Cohost'], { personNamed: true });
     return { owner, cohost };
 }
 function snapshot() {
@@ -108,7 +108,7 @@ describe('durable ownership offers', () => {
 
     it('persists cancellation when the offered co-host grant is revoked', async () => {
         const { owner, cohost } = await offer();
-        await cmd(owner, 'cohost', ['remove', 'Cohost']);
+        await cmd(owner, 'cohost', ['remove', 'Cohost'], { personNamed: true });
         const saved = snapshot();
         expect(saved.rooms.rooms[0]).not.toHaveProperty('transfer');
         await boot(saved.rooms, saved.sessions, saved.live);
@@ -122,7 +122,7 @@ describe('durable ownership offers', () => {
         let commit;
         persistHook = (kind) => kind === 'rooms' ? new Promise((resolve) => { commit = resolve; }) : undefined;
         clock += 10000; frames = [];
-        const pending = cmd(owner, 'transfer', ['Cohost']);
+        const pending = cmd(owner, 'transfer', ['Cohost'], { personNamed: true });
         expect(commit).toBeTypeOf('function');
         expect(frames.some((f) => f.t === 'owner-offer')).toBe(false);
         commit(); await pending;
@@ -133,7 +133,7 @@ describe('durable ownership offers', () => {
         const { owner } = await offer();
         persistHook = (kind) => kind === 'rooms' ? Promise.reject(new Error('storage unavailable')) : undefined;
         clock += 10000; frames = [];
-        await cmd(owner, 'transfer', ['Cohost']);
+        await cmd(owner, 'transfer', ['Cohost'], { personNamed: true });
         expect(frames.some((f) => f.t === 'owner-offer')).toBe(false);
         expect(engine.adminState().lock).toBe('readonly');
     });

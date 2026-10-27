@@ -24,6 +24,8 @@ function join(nick, { role = 'fan', iph = 'ip1', dev, admin } = {}) {
 }
 const say = (u, text, ch = LOBBY) => L.message(u.id, JSON.stringify({ t: 'say', ch, text }));
 const cmd = (u, name, args = [], ch = LOBBY) => L.message(u.id, JSON.stringify({ t: 'cmd', name, args, ch }));
+// Explicit nickname-intent fixtures only; generic/selected/malformed commands stay separate.
+const namedCmd = (u, name, args = [], ch = LOBBY) => L.message(u.id, JSON.stringify({ t: 'cmd', name, args, ch, personNamed: true }));
 const got = (u) => inbox.get(u.id) || [];
 const lines = (u) => got(u).filter((m) => m.t === 'line').map((m) => m.text);
 const notices = (u) => got(u).filter((m) => m.t === 'notice' || m.t === 'denied').map((m) => m.text).join('\n');
@@ -114,14 +116,14 @@ describe('classic IRC commands', () => {
         cmd(a, 'me', ['moshes']);
         expect(got(b).find((m) => m.t === 'line' && m.me).text).toBe('moshes');
         later(4000);
-        cmd(a, 'slap', ['Bravo']);
+        namedCmd(a, 'slap', ['Bravo']);
         expect(lines(b)).toContain('slaps Bravo around a bit with a large trout');
         later(61000);
         cmd(a, 'nick', ['Alfa']);
         expect(got(b).some((m) => m.t === 'event' && /Alpha is now known as Alfa/.test(m.text))).toBe(true);
         cmd(a, 'nick', ['Alfa2']);
         expect(notices(a)).toMatch(/One nick change per minute/);
-        cmd(b, 'whois', ['Alfa']);
+        namedCmd(b, 'whois', ['Alfa']);
         cmd(b, 'away', ['getting', 'tacos']);
         cmd(b, 'names');
         cmd(b, 'topic');
@@ -151,7 +153,7 @@ describe('classic IRC commands', () => {
     it('/ignore hides someone locally; /quit leaves', () => {
         const a = join('Alpha');
         const b = join('Bravo');
-        cmd(b, 'ignore', ['Alpha']);
+        namedCmd(b, 'ignore', ['Alpha']);
         say(a, 'hello there');
         expect(lines(b)).not.toContain('hello there');
         cmd(a, 'quit', ['bye']);
@@ -267,7 +269,11 @@ describe('permissions are enforced on the server (forged commands)', () => {
     it('a plain fan is denied every op and band command, and each attempt is logged', () => {
         const fan = join('Fan');
         join('Victim');
-        for (const name of [...chanop, ...band]) { later(1000); cmd(fan, name, ['Victim', 'x']); }
+        for (const name of [...chanop, ...band]) {
+            later(1000);
+            if (['kick', 'ban', 'invite', 'op', 'deop', 'voice', 'devoice', 'cohost', 'transfer'].includes(name)) namedCmd(fan, name, ['Victim', 'x']);
+            else cmd(fan, name, ['Victim', 'x']);
+        }
         const denied = got(fan).filter((m) => m.t === 'denied').map((m) => m.cmd);
         expect(denied.sort()).toEqual([...chanop, ...band].sort());
         expect(L.modlog.filter((e) => e.action === 'denied').length).toBe(chanop.length + band.length);
@@ -277,7 +283,7 @@ describe('permissions are enforced on the server (forged commands)', () => {
         const fan = join('Fan');
         const v = join('Victim');
         say(fan, '/kick Victim lol');
-        L.message(fan.id, JSON.stringify({ t: 'cmd', name: 'mode', args: ['+o', 'Fan'], ch: LOBBY }));
+        L.message(fan.id, JSON.stringify({ t: 'cmd', name: 'mode', args: ['+o', 'Fan'], ch: LOBBY, personNamed: true }));
         expect(got(fan).filter((m) => m.t === 'denied').length).toBe(2);
         expect(L._debug.conns.has(v.id)).toBe(true);
     });
@@ -289,10 +295,10 @@ describe('permissions are enforced on the server (forged commands)', () => {
         later(11 * 60 * 1000);
         cmd(b, 'join', ['#watch-b'], LOBBY);
         cmd(c, 'join', ['#watch-b']);
-        cmd(a, 'kick', ['Charlie'], '#watch-b');
-        cmd(a, 'kick', ['Charlie'], LOBBY);
+        namedCmd(a, 'kick', ['Charlie'], '#watch-b');
+        namedCmd(a, 'kick', ['Charlie'], LOBBY);
         expect(got(a).filter((m) => m.t === 'denied').length).toBe(2);
-        cmd(b, 'kick', ['Charlie', 'bye'], '#watch-b');
+        namedCmd(b, 'kick', ['Charlie', 'bye'], '#watch-b');
         expect(L._debug.channels.get('#watch-b').members.has(c.id)).toBe(false);
     });
     it('frames with spoofed role fields or bad JSON do not grant anything', () => {
@@ -308,7 +314,7 @@ describe('permissions are enforced on the server (forged commands)', () => {
         cmd(a, 'join', ['#art-ban']);
         cmd(t, 'join', ['#art-ban']);
         const room = L._debug.channels.get('#art-ban');
-        cmd(a, 'ban', ['Troll', 'rude'], '#art-ban');
+        namedCmd(a, 'ban', ['Troll', 'rude'], '#art-ban');
         expect(room.members.has(t.id)).toBe(false);
         expect(room.bans.map((b) => b.mask)).toEqual(expect.arrayContaining(['dev:dev-Troll', 'nick:troll', 'iph:trollnet']));
         const dodge = join('FreshFace', { iph: 'trollnet', dev: 'private-window' });
@@ -333,11 +339,11 @@ describe('permissions are enforced on the server (forged commands)', () => {
         cmd(a, 'mode', ['+m'], '#art-sketch');
         say(b, 'can I talk', '#art-sketch');
         expect(notices(b)).toMatch(/\+m/);
-        cmd(a, 'voice', ['Bravo'], '#art-sketch');
+        namedCmd(a, 'voice', ['Bravo'], '#art-sketch');
         later(4000);
         say(b, 'now I can', '#art-sketch');
         expect(lines(a)).toContain('now I can');
-        cmd(a, 'op', ['Bravo'], '#art-sketch');
+        namedCmd(a, 'op', ['Bravo'], '#art-sketch');
         expect(room.ops.has('dev-Bravo')).toBe(true);
         cmd(a, 'mode', ['+k', 'secret1'], '#art-sketch');
         cmd(a, 'mode', ['+l', '99'], '#art-sketch');
@@ -357,7 +363,7 @@ describe('permissions are enforced on the server (forged commands)', () => {
         cmd(a, 'mode', ['+i'], '#watch-x');
         cmd(b, 'join', ['#watch-x']);
         expect(notices(b)).toMatch(/invite-only/);
-        cmd(a, 'invite', ['Bravo'], '#watch-x');
+        namedCmd(a, 'invite', ['Bravo'], '#watch-x');
         expect(got(b).some((m) => m.t === 'invite')).toBe(true);
         cmd(b, 'join', ['#watch-x']);
         expect(L._debug.channels.get('#watch-x').members.has(b.id)).toBe(true);
@@ -368,19 +374,19 @@ describe('PMs are accept-first, blockable, switchable and need lobby time', () =
     it('full flow', () => {
         const a = join('Alpha');
         const b = join('Bravo');
-        cmd(a, 'msg', ['Bravo', 'hey']);
+        namedCmd(a, 'msg', ['Bravo', 'hey']);
         expect(notices(a)).toMatch(/Hang in the lobby/);
         later(2 * 60 * 1000 + 1);
-        cmd(a, 'msg', ['Bravo', 'hey', 'great', 'set']);
+        namedCmd(a, 'msg', ['Bravo', 'hey', 'great', 'set']);
         expect(got(b).some((m) => m.t === 'pm-request' && m.from === 'Alpha')).toBe(true);
         expect(got(b).some((m) => m.t === 'pm')).toBe(false); // nothing delivered before accept
-        cmd(b, 'accept', ['Alpha']);
+        namedCmd(b, 'accept', ['Alpha']);
         expect(got(b).find((m) => m.t === 'pm').text).toBe('hey great set');
-        cmd(a, 'msg', ['Bravo', 'Private', 'contact', 'choice:', 'person@example.test']);
+        namedCmd(a, 'msg', ['Bravo', 'Private', 'contact', 'choice:', 'person@example.test']);
         expect(got(b).filter((m) => m.t === 'pm').length).toBe(2);
         expect(got(b).filter((m) => m.t === 'pm').at(-1).text).toBe('Private contact choice: person@example.test');
-        cmd(b, 'block', ['Alpha']);
-        cmd(a, 'msg', ['Bravo', 'yo']);
+        namedCmd(b, 'block', ['Alpha']);
+        namedCmd(a, 'msg', ['Bravo', 'yo']);
         expect(got(b).filter((m) => m.t === 'pm').length).toBe(2);
     });
     it('/pm off refuses requests; decline clears', () => {
@@ -388,12 +394,12 @@ describe('PMs are accept-first, blockable, switchable and need lobby time', () =
         const b = join('Bravo');
         later(3 * 60 * 1000);
         cmd(b, 'pm', ['off']);
-        cmd(a, 'query', ['Bravo']);
+        namedCmd(a, 'query', ['Bravo']);
         expect(notices(a)).toMatch(/isn't taking PMs/);
         cmd(b, 'pm', ['on']);
-        cmd(a, 'query', ['Bravo']);
-        cmd(b, 'decline', ['Alpha']);
-        cmd(a, 'msg', ['Bravo', 'pls']);
+        namedCmd(a, 'query', ['Bravo']);
+        namedCmd(b, 'decline', ['Alpha']);
+        namedCmd(a, 'msg', ['Bravo', 'pls']);
         expect(got(b).filter((m) => m.t === 'pm-request').length).toBe(2);
         expect(got(b).some((m) => m.t === 'pm')).toBe(false);
     });
@@ -401,7 +407,7 @@ describe('PMs are accept-first, blockable, switchable and need lobby time', () =
         const a = join('Alpha');
         for (const x of ['Bb1', 'Bb2', 'Bb3', 'Bb4', 'Bb5', 'Bb6']) join(x);
         later(3 * 60 * 1000);
-        for (const x of ['Bb1', 'Bb2', 'Bb3', 'Bb4', 'Bb5', 'Bb6']) { later(21000); cmd(a, 'query', [x]); }
+        for (const x of ['Bb1', 'Bb2', 'Bb3', 'Bb4', 'Bb5', 'Bb6']) { later(21000); namedCmd(a, 'query', [x]); }
         expect(notices(a)).toMatch(/Too many PM requests/);
     });
 });
@@ -472,14 +478,14 @@ describe('band moderation', () => {
     it('kick has a 10 minute cooldown; ban covers device AND IP hash (ban-dodge test)', () => {
         const band = join('Drummer', { role: 'band' });
         const t = join('Troll', { iph: 'trollnet' });
-        cmd(band, 'kick', ['Troll', 'chill']);
+        namedCmd(band, 'kick', ['Troll', 'chill']);
         expect(closed.some(([id]) => id === t.id)).toBe(true);
         expect(join('Troll', { iph: 'trollnet' }).refused.reason).toBe('kicked');
         later(11 * 60 * 1000);
         const t2 = join('Troll', { iph: 'trollnet' });
-        cmd(band, 'ban', ['Troll']);
+        namedCmd(band, 'ban', ['Troll']);
         expect(notices(band)).toMatch(/needs a reason/);
-        cmd(band, 'ban', ['Troll', 'slurs']);
+        namedCmd(band, 'ban', ['Troll', 'slurs']);
         expect(closed.some(([id]) => id === t2.id)).toBe(true);
         expect(join('NewFace', { iph: 'trollnet', dev: 'brand-new-device' }).refused.reason).toBe('banned');
         expect(join('Troll', { iph: 'other', dev: 'dev-Troll' }).refused.reason).toBe('banned');
@@ -493,11 +499,11 @@ describe('band moderation', () => {
         const band = join('Drummer', { role: 'band' });
         const f = join('Fan');
         say(f, 'first line');
-        cmd(band, 'mute', ['Fan', '5m']);
+        namedCmd(band, 'mute', ['Fan', '5m']);
         later(4000);
         say(f, 'muted line');
         expect(notices(f)).toMatch(/muted/);
-        cmd(band, 'purge', ['Fan']);
+        namedCmd(band, 'purge', ['Fan']);
         expect(got(f).some((m) => m.t === 'delete')).toBe(true);
         cmd(band, 'shield');
         expect(L._debug.net.shield).toBe(true);
@@ -536,7 +542,7 @@ describe('band moderation', () => {
     it('mod log is append-only (no command removes entries)', () => {
         const band = join('Drummer', { role: 'band' });
         join('Fan');
-        cmd(band, 'kick', ['Fan', 'x']);
+        namedCmd(band, 'kick', ['Fan', 'x']);
         const before = L.modlog.length;
         for (const name of Object.keys(COMMANDS)) cmd(band, name, ['log', 'x']);
         expect(L.modlog.length).toBeGreaterThanOrEqual(before);
@@ -605,9 +611,9 @@ describe('open community and explicit safety recovery', () => {
         const a = join('Alpha');
         const b = join('Bravo');
         later(2 * 60 * 1000 + 1);
-        cmd(a, 'msg', ['Bravo', 'hey']);
-        cmd(b, 'accept', ['Alpha']);
-        cmd(a, 'msg', ['Bravo', 'still', 'open']);
+        namedCmd(a, 'msg', ['Bravo', 'hey']);
+        namedCmd(b, 'accept', ['Alpha']);
+        namedCmd(a, 'msg', ['Bravo', 'still', 'open']);
         expect(got(b).filter((m) => m.t === 'pm').map((m) => m.text)).toContain('still open');
         const band = join('Drummer', { role: 'band' });
         cmd(band, 'lobby', ['readonly']);
@@ -616,12 +622,12 @@ describe('open community and explicit safety recovery', () => {
         L.tick();
         expect(L._debug.net.lock).toBe('readonly');
         inbox.clear();
-        cmd(a, 'msg', ['Bravo', 'after', 'lock']);
-        cmd(a, 'query', ['Bravo', 'after', 'lock']);
+        namedCmd(a, 'msg', ['Bravo', 'after', 'lock']);
+        namedCmd(a, 'query', ['Bravo', 'after', 'lock']);
         expect(got(b).some((m) => m.t === 'pm')).toBe(false);
         expect(notices(a)).toMatch(/read-only/);
         const band2 = join('Singer', { role: 'band' });
-        cmd(band2, 'msg', ['Bravo', 'band', 'here']);
+        namedCmd(band2, 'msg', ['Bravo', 'band', 'here']);
         expect(got(b).some((m) => m.t === 'pm-request' && m.from === 'Singer' && m.band)).toBe(true);
     });
     it('fails closed on malformed bans and budget in storage', () => {
@@ -719,7 +725,7 @@ describe('open community and explicit safety recovery', () => {
         const band = join('Drummer', { role: 'band', iph: 'bandnet' });
         L._debug.net.bans.push(...Array.from({ length: 5000 }, (_, i) => ({ mask: `dev:old${i}`, reason: 'x', by: 'B', at: i })));
         const t = join('Troll', { iph: 'trollnet' });
-        cmd(band, 'gban', ['Troll', 'spam']); // pushes 3 more: 5003 -> 5000
+        namedCmd(band, 'gban', ['Troll', 'spam']); // pushes 3 more: 5003 -> 5000
         const net = L._debug.net.bans;
         expect(net.length).toBe(5000);
         expect(net.slice(-3).map((b) => b.mask)).toEqual(['dev:dev-Troll', 'iph:trollnet', 'nick:troll']);
@@ -734,7 +740,7 @@ describe('open community and explicit safety recovery', () => {
         room.bans.push(...Array.from({ length: 500 }, (_, i) => ({ mask: `dev:r${i}`, reason: 'x', by: 'Alpha', at: i })));
         const v = join('Vandal', { iph: 'vnet' });
         cmd(v, 'join', ['#art-cap']);
-        cmd(a, 'ban', ['Vandal', 'rude'], '#art-cap');
+        namedCmd(a, 'ban', ['Vandal', 'rude'], '#art-cap');
         expect(room.bans.length).toBe(500);
         expect(room.bans.slice(-3).map((b) => b.mask)).toEqual(['dev:dev-Vandal', 'nick:vandal', 'iph:vnet']);
         expect(room.bans[0].mask).toBe('dev:r3');
@@ -851,7 +857,7 @@ describe('stats are aggregate only', () => {
         const band = join('Drummer', { role: 'band' });
         cmd(a, 'join', ['#bobross-x']);
         say(a, 'send nudes');
-        cmd(band, 'kick', ['Alpha', 'x']);
+        namedCmd(band, 'kick', ['Alpha', 'x']);
         const s = L.adminState().stats;
         expect(Object.values(s.days)[0].joins).toBe(2);
         expect(s.kinds.bobross).toBe(1);

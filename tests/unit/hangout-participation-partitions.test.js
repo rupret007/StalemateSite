@@ -120,7 +120,7 @@ async function fixture({ short = false, capacity = 128, reviewPublicText = null,
 describe('fresh author dependencies for ordinary public text', () => {
     it('uses 23 point reads regardless of an unrelated peer while preserving PM, held text and active media', async () => {
         const f = await fixture(), alice = await f.enroll('alice'), bravo = await f.enroll('bravo'); await f.connect(alice); await f.connect(bravo); f.advance(120001);
-        await f.cmd(bravo, 'msg', [alice.nick, 'Synthetic pending contact']);
+        await f.message(bravo, { t: 'cmd', ch: '#stalemate', name: 'msg', args: [alice.nick, 'Synthetic pending contact'], personNamed: true });
         await f.cmd(bravo, 'join', ['#watch-scope']); await f.cmd(alice, 'join', ['#watch-scope']);
         await f.message(bravo, { t: 'cam', ch: '#watch-scope', on: true, adult18: true });
         await f.message(bravo, { t: 'act', kind: 'video', ch: '#watch-scope', source: { kind: 'yt', id: 'dQw4w9WgXcQ' }, playing: false, pos: 0 });
@@ -140,7 +140,7 @@ describe('fresh author dependencies for ordinary public text', () => {
     });
     it.each(['pm-context', 'slash-command', 'rtc'])('keeps full peer preparation for %s and denies a withdrawn peer', async kind => {
         const f = await fixture(), alice = await f.enroll('alice'), bravo = await f.enroll('bravo'); await f.connect(alice); await f.connect(bravo); f.advance(120001);
-        await f.cmd(alice, 'msg', [bravo.nick, 'Synthetic initial contact']); await f.cmd(bravo, 'accept', [alice.nick]);
+        await f.message(alice, { t: 'cmd', ch: '#stalemate', name: 'msg', args: [bravo.nick, 'Synthetic initial contact'], personNamed: true }); await f.message(bravo, { t: 'cmd', ch: '#stalemate', name: 'accept', args: [alice.nick], personNamed: true });
         const opened = f.frames.find(frame => frame.t === 'pm-open' && frame.recipient === alice.id);
         expect(opened).toMatchObject({ peer: bravo.id, ref: expect.stringMatching(/^[a-f0-9]{32}$/) });
         if (kind === 'rtc') {
@@ -342,10 +342,10 @@ describe('bounded per-principal C2 partitions', () => {
     });
     it('blocks a queued peer PM when withdrawal commits in a different partition', async () => {
         const f = await fixture(), alice = await f.enroll('alice'), bravo = await f.enroll('bravo'); await f.connect(alice); await f.connect(bravo); f.advance(120001);
-        await f.cmd(alice, 'msg', [bravo.nick, 'Benign pending private message']); await f.cmd(bravo, 'accept', [alice.nick]);
+        await f.message(alice, { t: 'cmd', ch: '#stalemate', name: 'msg', args: [bravo.nick, 'Benign pending private message'], personNamed: true }); await f.message(bravo, { t: 'cmd', ch: '#stalemate', name: 'accept', args: [alice.nick], personNamed: true });
         expect(f.frames.some(frame => frame.t === 'pm' && frame.text === 'Benign pending private message')).toBe(true);
         f.frames.length = 0; const gate = held(); f.controls.beforeCommit = gate;
-        const pending = f.cmd(alice, 'msg', [bravo.nick, 'Withdrawn peer never receives this']); await gate.entered;
+        const pending = f.message(alice, { t: 'cmd', ch: '#stalemate', name: 'msg', args: [bravo.nick, 'Withdrawn peer never receives this'], personNamed: true }); await gate.entered;
         expect((await f.withdraw(bravo)).state).toBe('withdrawn'); gate.release(); expect((await pending).ok).toBe(false);
         expect(f.frames.some(frame => frame.t === 'pm')).toBe(false); expect(JSON.stringify([...f.storage.snapshot()])).not.toContain('Withdrawn peer never receives this');
         await f.engine.refreshParticipation(); expect(f.engine._debug.pm.size).toBe(0);

@@ -711,7 +711,7 @@ describe('production participation session/partition/effect composition', () => 
         expect(app.frames.some(frame => frame.t === 'join' && frame.ch.name === '#withdraw-denied')).toBe(false);
         const fresh = productionParticipation(f), context = await fresh.prepare([person.binding]);
         expect(fresh.allows(context, { actorId: person.binding.id, action: 'publicArtifact' })).toBe(false);
-        expect((await app.message(person.binding.id, { t: 'cmd', ch: '#stalemate', name: 'block', args: ['MissingNick'] }))?.ok).not.toBe(false);
+        expect((await app.message(person.binding.id, { t: 'cmd', ch: '#stalemate', name: 'block', args: ['MissingNick'], personNamed: true }))?.ok).not.toBe(false);
         const rows = await f.authority.records.transaction(tx => tx.list({ prefix: 'participation-records:v1:record:', limit: 4 }));
         expect([...rows.values()][0].subjects[0].record.state).toBe('withdrawn');
     });
@@ -1052,12 +1052,12 @@ describe('actor-only control preparation on the actual SQLite authority', () => 
         const actor = await admit(f, ledger, app, 'credit-pmactor', 'ControlPmActor');
         const peer = await admit(f, ledger, app, 'credit-pmpeer', 'ControlPmPeer');
         expect((await app.engine.reserveTransportControl(actor.binding.id)).ok).toBe(true);
-        await app.message(actor.binding.id, { t: 'cmd', ch: '#stalemate', name: 'query', args: ['ControlPmPeer'] });
+        await app.message(actor.binding.id, { t: 'cmd', ch: '#stalemate', name: 'query', args: ['ControlPmPeer'], personNamed: true });
         expect(app.frames.some(frame => frame.t === 'pm-request' && frame.recipient === peer.binding.id)).toBe(true);
         expect((await ledger.withdraw(peer.binding)).state).toBe('withdrawn');
         expect((await app.engine.reserveTransportControl(actor.binding.id)).ok).toBe(true);
         app.frames.length = 0;
-        expect((await app.message(actor.binding.id, { t: 'cmd', ch: '#stalemate', name: 'query', args: ['ControlPmPeer'] })).ok).toBe(false);
+        expect((await app.message(actor.binding.id, { t: 'cmd', ch: '#stalemate', name: 'query', args: ['ControlPmPeer'], personNamed: true })).ok).toBe(false);
         expect(app.frames.some(frame => ['pm-request', 'pm-open', 'pm-line'].includes(frame.t))).toBe(false);
         expect(await f.authority.validate(peer.binding)).toBe(true);
     });

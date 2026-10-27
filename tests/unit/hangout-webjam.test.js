@@ -11,7 +11,7 @@ function harness() {
         lobby.connect({ id, dev: `dev-${id}`, iph: `ip-${id}`, role: 'fan' });
         lobby.message(id, JSON.stringify({ t: 'hello', nick, age13: true }));
     }
-    command('host', 'join', ['#jam-fixture']); command('host', 'invite', ['JamGuest']); command('guest', 'join', ['#jam-fixture']);
+    command('host', 'join', ['#jam-fixture']); lobby.message('host', JSON.stringify({ t: 'cmd', name: 'invite', args: ['JamGuest'], ch: '#jam-fixture', personNamed: true })); command('guest', 'join', ['#jam-fixture']);
     return { lobby, command, messages, writes, ai };
 }
 

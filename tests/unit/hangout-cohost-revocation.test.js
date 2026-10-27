@@ -10,7 +10,7 @@ function boot() {
         persist: (kind, value) => writes.push({ kind, value: structuredClone(value) }), limits: { defaultSlow: 0 } });
 }
 function message(id, frame) { clock += 2000; return engine.message(id, JSON.stringify(frame)); }
-const cmd = (id, name, args = [], ch = channel) => message(id, { t: 'cmd', name, args, ch });
+const cmd = (id, name, args = [], ch = channel, intent = {}) => message(id, { t: 'cmd', name, args, ch, ...intent });
 function visitor(nick, account = '', dev = `device-${nick}`) {
     const identity = { id: `connection-${++sequence}`, dev, iph: `ip-${nick}`, account, role: 'fan', admin: false };
     expect(engine.connect(identity).ok).toBe(true);
@@ -28,7 +28,7 @@ function registeredRoom() {
 }
 function overlappingCohost(owner, nick = 'Bravo', dev = `device-${nick}`) {
     const id = visitor(nick, 'account-bravo', dev);
-    cmd(id, 'join', [channel]); cmd(owner, 'op', [nick]); cmd(owner, 'cohost', ['add', nick]);
+    cmd(id, 'join', [channel]); cmd(owner, 'op', [nick], channel, { personNamed: true }); cmd(owner, 'cohost', ['add', nick], channel, { personNamed: true });
     return id;
 }
 function cannotSetTopic(id) {
@@ -44,13 +44,14 @@ describe('verified co-host revocation', () => {
         const owner = registeredRoom();
         const first = overlappingCohost(owner);
         const second = visitor('BravoOther', 'account-bravo', 'device-bravo-other');
-        cmd(second, 'join', [channel]); cmd(owner, 'op', ['BravoOther']);
+        cmd(second, 'join', [channel]); cmd(owner, 'op', ['BravoOther'], channel, { personNamed: true });
         const other = visitor('Charlie', 'account-charlie');
-        cmd(other, 'join', [channel]); cmd(owner, 'op', ['Charlie']); cmd(owner, 'cohost', ['add', 'Charlie']);
-        const guest = visitor('Guest'); cmd(guest, 'join', [channel]); cmd(owner, 'op', ['Guest']);
-        cmd(owner, 'transfer', ['Bravo']);
+        cmd(other, 'join', [channel]); cmd(owner, 'op', ['Charlie'], channel, { personNamed: true }); cmd(owner, 'cohost', ['add', 'Charlie'], channel, { personNamed: true });
+        const guest = visitor('Guest'); cmd(guest, 'join', [channel]); cmd(owner, 'op', ['Guest'], channel, { personNamed: true });
+        cmd(owner, 'transfer', ['Bravo'], channel, { personNamed: true });
 
-        cmd(owner, 'cohost', ['remove', removeBy]);
+        cmd(owner, 'cohost', ['remove', removeBy], channel, removeBy === 'account-bravo'
+            ? { cohostAccount: true, roomInstance: room().keepRef } : { personNamed: true });
 
         expect(room().cohosts.has('account-bravo')).toBe(false);
         expect(room().cohostLabels['account-bravo']).toBeUndefined();
@@ -78,11 +79,11 @@ describe('verified co-host revocation', () => {
         const original = overlappingCohost(owner, 'Bravo', 'original-device');
         disconnect(original);
         const unrelated = visitor('Bravo', 'account-unrelated', 'unrelated-device');
-        cmd(unrelated, 'join', [channel]); cmd(owner, 'op', ['Bravo']);
+        cmd(unrelated, 'join', [channel]); cmd(owner, 'op', ['Bravo'], channel, { personNamed: true });
         const returned = visitor('Returned', 'account-bravo', 'original-device');
         cmd(returned, 'join', [channel]);
 
-        cmd(owner, 'cohost', ['remove', 'account-bravo']);
+        cmd(owner, 'cohost', ['remove', 'account-bravo'], channel, { cohostAccount: true, roomInstance: room().keepRef });
 
         expect(room().ops.has('original-device')).toBe(false);
         expect(room().ops.has('unrelated-device')).toBe(true);
@@ -96,7 +97,7 @@ describe('verified co-host revocation', () => {
         const cohost = overlappingCohost(owner);
         cmd(cohost, 'part');
         expect(room().members.has(cohost)).toBe(false);
-        cmd(owner, 'cohost', ['remove', 'account-bravo']);
+        cmd(owner, 'cohost', ['remove', 'account-bravo'], channel, { cohostAccount: true, roomInstance: room().keepRef });
         expect(room().ops.has('device-Bravo')).toBe(false);
         cmd(cohost, 'join', [channel]); cannotSetTopic(cohost);
     });
@@ -105,14 +106,14 @@ describe('verified co-host revocation', () => {
         const owner = registeredRoom();
         const first = overlappingCohost(owner);
         const second = visitor('BravoOther', 'account-bravo', 'device-bravo-other');
-        cmd(second, 'join', [channel]); cmd(owner, 'op', ['BravoOther']);
+        cmd(second, 'join', [channel]); cmd(owner, 'op', ['BravoOther'], channel, { personNamed: true });
         const savedRooms = engine.roomSnapshot(), savedSessions = engine.sessionSnapshot(), live = [...identities.values()];
         boot(); engine.restoreRooms(savedRooms);
         const restored = engine.restoreSessions(savedSessions, live);
         expect(restored.rejected).toEqual([]);
         expect(restored.resumed).toHaveLength(3);
 
-        cmd(owner, 'cohost', ['remove', 'account-bravo']);
+        cmd(owner, 'cohost', ['remove', 'account-bravo'], channel, { cohostAccount: true, roomInstance: room().keepRef });
 
         cannotSetTopic(first); cannotSetTopic(second);
         expect(room().ops.size).toBe(0);
@@ -122,8 +123,8 @@ describe('verified co-host revocation', () => {
     it('preserves an unrelated transfer offer and other verified grants', () => {
         const owner = registeredRoom(); overlappingCohost(owner);
         const other = visitor('Charlie', 'account-charlie');
-        cmd(other, 'join', [channel]); cmd(owner, 'cohost', ['add', 'Charlie']); cmd(owner, 'transfer', ['Charlie']);
-        cmd(owner, 'cohost', ['remove', 'account-bravo']);
+        cmd(other, 'join', [channel]); cmd(owner, 'cohost', ['add', 'Charlie'], channel, { personNamed: true }); cmd(owner, 'transfer', ['Charlie'], channel, { personNamed: true });
+        cmd(owner, 'cohost', ['remove', 'account-bravo'], channel, { cohostAccount: true, roomInstance: room().keepRef });
         expect(room().transfer?.to).toBe('account-charlie');
         cmd(other, 'acceptowner');
         expect(room().owner).toBe('account-charlie');
@@ -134,8 +135,8 @@ describe('verified co-host revocation', () => {
         let owner = registeredRoom();
         const first = overlappingCohost(owner);
         const second = visitor('BravoOther', 'account-bravo', 'device-bravo-other');
-        cmd(second, 'join', [channel]); cmd(owner, 'op', ['BravoOther']);
-        const guest = visitor('Guest'); cmd(guest, 'join', [channel]); cmd(owner, 'op', ['Guest']);
+        cmd(second, 'join', [channel]); cmd(owner, 'op', ['BravoOther'], channel, { personNamed: true });
+        const guest = visitor('Guest'); cmd(guest, 'join', [channel]); cmd(owner, 'op', ['Guest'], channel, { personNamed: true });
         disconnect(first); disconnect(second); disconnect(guest); disconnect(owner);
         const saved = engine.roomSnapshot();
         expect(saved.rooms[0].opAccounts).toEqual(expect.arrayContaining([
@@ -146,7 +147,7 @@ describe('verified co-host revocation', () => {
         boot(); engine.restoreRooms(saved);
         owner = visitor('OwnerBack', 'account-owner', 'new-owner-device'); cmd(owner, 'join', [channel]);
 
-        cmd(owner, 'cohost', ['remove', 'account-bravo']);
+        cmd(owner, 'cohost', ['remove', 'account-bravo'], channel, { cohostAccount: true, roomInstance: room().keepRef });
 
         expect(room().opAccounts.size).toBe(0);
         expect(room().ops.has('device-Guest')).toBe(true);
@@ -168,7 +169,7 @@ describe('verified co-host revocation', () => {
         expect(room().opAccounts.size).toBe(0);
         const cohost = overlappingCohost(owner);
         expect(room().opAccounts.get('device-Bravo')).toBe('account-bravo');
-        cmd(owner, 'deop', ['Bravo']);
+        cmd(owner, 'deop', ['Bravo'], channel, { personNamed: true });
         expect(room().opAccounts.has('device-Bravo')).toBe(false);
         expect(engine.roomSnapshot().rooms[0].opAccounts).toEqual([]);
         // Removing the independent device grant does not remove the verified
@@ -182,9 +183,9 @@ describe('verified co-host revocation', () => {
         const owner = registeredRoom();
         const original = overlappingCohost(owner, 'Bravo', 'shared-device'); disconnect(original);
         const other = visitor('Charlie', 'account-charlie', 'shared-device');
-        cmd(other, 'join', [channel]); cmd(owner, 'op', ['Charlie']);
+        cmd(other, 'join', [channel]); cmd(owner, 'op', ['Charlie'], channel, { personNamed: true });
         expect(room().opAccounts.get('shared-device')).toBe('account-charlie');
-        cmd(owner, 'cohost', ['remove', 'account-bravo']);
+        cmd(owner, 'cohost', ['remove', 'account-bravo'], channel, { cohostAccount: true, roomInstance: room().keepRef });
         expect(room().ops.has('shared-device')).toBe(true);
         expect(room().opAccounts.get('shared-device')).toBe('account-charlie');
         cmd(other, 'topic', ['New grant belongs to another verified account']);
@@ -198,9 +199,9 @@ describe('verified co-host revocation', () => {
         delete saved.rooms[0].opAccounts; // Existing durable rows predate proved grant associations.
         boot(); engine.restoreRooms(saved); engine.restoreSessions(sessions, live);
         const unrelated = visitor('Bravo', 'account-unrelated', 'different-device');
-        cmd(unrelated, 'join', [channel]); cmd(owner, 'op', ['Bravo']);
+        cmd(unrelated, 'join', [channel]); cmd(owner, 'op', ['Bravo'], channel, { personNamed: true });
 
-        cmd(owner, 'cohost', ['remove', 'account-bravo']);
+        cmd(owner, 'cohost', ['remove', 'account-bravo'], channel, { cohostAccount: true, roomInstance: room().keepRef });
 
         expect(room().cohosts.has('account-bravo')).toBe(false);
         // Legacy records have no historical proof. Unknown grants cannot be

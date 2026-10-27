@@ -4,6 +4,9 @@ import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 
 let now, engine, frames, writes, count, identities;
 const cmd = (id, name, args = [], ch = '#stalemate') => engine.message(id, JSON.stringify({ t: 'cmd', name, args, ch }));
+// Deliberate nickname intent at these explicit call sites; selected/negative frames stay unmarked.
+const namedCmd = (id, name, args = [], ch = '#stalemate') => engine.message(id, JSON.stringify({ t: 'cmd', name, args, ch,
+    ...(name === 'msg' || name === 'm' ? { pmExplicit: true } : { personNamed: true }) }));
 function boot() {
     frames = []; writes = [];
     engine = createLobby({ now: () => now, send: (recipient, frame) => frames.push({ recipient, ...frame }),
@@ -26,7 +29,7 @@ describe('same-WebSocket hibernation continuity', () => {
     it('keeps nicknames, membership, preferences and current cam consent without a fresh handshake or history', () => {
         const a = guest('Painter', { account: 'account-painter' }); const b = guest('Viewer');
         cmd(a, 'join', ['#art-friends']); cmd(a, 'register', [], '#art-friends'); cmd(b, 'join', ['#art-friends']);
-        cmd(a, 'away', ['making coffee']); cmd(a, 'ignore', ['Someone']); cmd(a, 'block', ['Viewer']); cmd(a, 'pm', ['off']);
+        cmd(a, 'away', ['making coffee']); namedCmd(a, 'ignore', ['Someone']); namedCmd(a, 'block', ['Viewer']); cmd(a, 'pm', ['off']);
         engine.message(a, JSON.stringify({ t: 'cam', ch: '#art-friends', on: true, adult18: true }));
         engine.message(b, JSON.stringify({ t: 'say', ch: '#art-friends', text: 'Ephemeral public sentence' }));
         const saved = state(); now += 61000;
@@ -35,7 +38,8 @@ describe('same-WebSocket hibernation continuity', () => {
         expect(resumed).toMatchObject({ nick: 'Painter', away: 'making coffee', pmOff: true, since: saved.sessions.connections[0].since });
         expect([...resumed.channels]).toEqual(['#stalemate', '#art-friends']); expect([...resumed.ignores]).toContain('someone');
         expect([...resumed.blocks]).toContain('dev-Viewer'); expect([...resumed.cams]).toEqual(['#art-friends']);
-        expect([...engine._debug.channels.get('#art-friends').members]).toEqual([a, b]); expect(frames).toEqual([]);
+        expect([...engine._debug.channels.get('#art-friends').members]).toEqual([a, b]);
+        expect(frames).toEqual([{ recipient: a, t: 'person-preferences', names: ['someone', 'viewer'], peers: [] }]);
         engine.message(b, JSON.stringify({ t: 'say', ch: '#art-friends', text: 'After the idle wake' }));
         expect(frames.some((f) => f.t === 'line' && f.text === 'After the idle wake')).toBe(true);
         expect(frames.some((f) => ['hello', 'welcome', 'join'].includes(f.t))).toBe(false);
@@ -43,14 +47,14 @@ describe('same-WebSocket hibernation continuity', () => {
     });
     it('preserves accepted PM consent but stores no pending first messages or PM bodies', () => {
         const a = guest('Alice'); const b = guest('Bravo'); const c = guest('Charlie'); now += 3 * 60000;
-        cmd(a, 'msg', ['Bravo', 'Private accepted words']); cmd(b, 'accept', ['Alice']);
-        cmd(a, 'msg', ['Charlie', 'Pending private secret']);
+        namedCmd(a, 'msg', ['Bravo', 'Private accepted words']); namedCmd(b, 'accept', ['Alice']);
+        namedCmd(a, 'msg', ['Charlie', 'Pending private secret']);
         const saved = state();
         expect(saved.sessions.pm).toHaveLength(1); expect(JSON.stringify(saved.sessions)).not.toContain('Private accepted words');
         expect(JSON.stringify(saved.sessions)).not.toContain('Pending private secret');
         expect(saved.sessions.pendingPm).toHaveLength(1);
         expect(wake(saved).resumed).toHaveLength(3); expect(engine._debug.pm.size).toBe(2);
-        cmd(a, 'msg', ['Bravo', 'New private sentence']);
+        namedCmd(a, 'msg', ['Bravo', 'New private sentence']);
         expect(frames.some((f) => f.recipient === b && f.t === 'pm' && f.text === 'New private sentence')).toBe(true);
         expect(frames.some((f) => f.t === 'pm-request')).toBe(false);
         expect(engine._debug.conns.get(c).nick).toBe('Charlie');
@@ -86,7 +90,7 @@ describe('same-WebSocket hibernation continuity', () => {
     });
     it('does not restore disconnected devices, camera activation or PM consent into new connections', () => {
         const a = guest('Alice'); const b = guest('Bravo'); now += 3 * 60000;
-        cmd(a, 'query', ['Bravo']); cmd(b, 'accept', ['Alice']); engine.disconnect(a);
+        namedCmd(a, 'query', ['Bravo']); namedCmd(b, 'accept', ['Alice']); engine.disconnect(a);
         const saved = state(); expect(saved.sessions.connections.map((s) => s.id)).toEqual([b]); expect(saved.sessions.pm).toEqual([]);
         expect(wake(saved, [identities[1]]).resumed).toEqual([b]);
         const fresh = guest('AliceAgain', { dev: 'dev-Alice' }); expect(engine._debug.conns.get(fresh).cams.size).toBe(0); expect(engine._debug.pm.size).toBe(0);
@@ -100,7 +104,7 @@ describe('same-WebSocket hibernation continuity', () => {
     });
     it('awaits session persistence before acknowledging a nickname and caps ignores without dropping existing preferences', async () => {
         const a = guest('Alice', { role: 'owner' });
-        for (let i = 0; i < 51; i++) cmd(a, 'ignore', [`Visitor${i}`]);
+        for (let i = 0; i < 51; i++) namedCmd(a, 'ignore', [`Visitor${i}`]);
         expect(engine._debug.conns.get(a).ignores.size).toBe(50); expect(engine._debug.conns.get(a).ignores.has('visitor0')).toBe(true);
         expect(engine._debug.conns.get(a).ignores.has('visitor50')).toBe(false);
         expect(new TextEncoder().encode(JSON.stringify(engine.sessionSnapshot())).byteLength).toBeLessThan(2 * 1024 * 1024);

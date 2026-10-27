@@ -43,7 +43,7 @@ function application(persist = () => {}) {
     const { queue } = scheduler(batch => engine.flushPresence(batch));
     engine = createLobby({ now: () => now, persist, deferPresence: marker => queue.mark(marker), send: (id, frame) => frames.push({ recipient: id, ...frame }), limits: { defaultSlow: 0 } });
     const frame = (id, value) => engine.message(id, JSON.stringify(value));
-    const command = (id, name, args = [], ch = '#stalemate') => frame(id, { t: 'cmd', name, args, ch });
+    const command = (id, name, args = [], ch = '#stalemate', intent = {}) => frame(id, { t: 'cmd', name, args, ch, ...intent });
     const guest = async (nick, extra = {}) => {
         const id = `socket${++count}`;
         engine.connect({ id, dev: `dev-${nick}`, iph: `ip-${nick}`, ...extra });
@@ -86,13 +86,13 @@ describe('authorized latest presence projections', () => {
         const { queue, frames, guest, command, frame } = application();
         const a = await guest('Alice'), b = await guest('Bravo');
         await command(a, 'join', ['#art-night']); await command(b, 'join', ['#art-night']);
-        await command(a, 'op', ['Bravo'], '#art-night');
+        await command(a, 'op', ['Bravo'], '#art-night', { personNamed: true });
         expect(frames.filter(f => f.t === 'chan' && f.ch.name === '#art-night').at(-1).ch.names.find(n => n.nick === 'Bravo').prefix).toBe('@');
         await frame(b, { t: 'cam', ch: '#art-night', on: true, adult18: true }); frames.length = 0;
         await command(a, 'mode', ['-C'], '#art-night');
         expect(frames.some(f => f.t === 'cam' && f.on === false)).toBe(true);
         expect(frames.filter(f => f.t === 'chan' && f.ch.name === '#art-night').at(-1).ch.modes.C).toBe(false);
-        await command(a, 'deop', ['Bravo'], '#art-night');
+        await command(a, 'deop', ['Bravo'], '#art-night', { personNamed: true });
         expect(frames.filter(f => f.t === 'chan' && f.ch.name === '#art-night').at(-1).ch.names.find(n => n.nick === 'Bravo').prefix).toBe('');
         await frame(b, { t: 'entry-source', source: '' });
         expect(frames.at(-1)).toMatchObject({ t: 'entry-source', source: '' });
@@ -113,9 +113,9 @@ describe('authorized latest presence projections', () => {
         const { queue, frames, guest, command } = application();
         const a = await guest('Alice', { account: 'a'.repeat(64) }), b = await guest('Bravo', { account: 'b'.repeat(64) });
         await command(a, 'join', ['#owned-room']); await command(a, 'register', [], '#owned-room');
-        await command(b, 'join', ['#owned-room']); await command(a, 'cohost', ['add', 'Bravo'], '#owned-room');
-        await command(a, 'transfer', ['Bravo'], '#owned-room'); await command(b, 'acceptowner', [], '#owned-room');
-        await command(b, 'cohost', ['remove', 'Alice'], '#owned-room');
+        await command(b, 'join', ['#owned-room']); await command(a, 'cohost', ['add', 'Bravo'], '#owned-room', { personNamed: true });
+        await command(a, 'transfer', ['Bravo'], '#owned-room', { personNamed: true }); await command(b, 'acceptowner', [], '#owned-room');
+        await command(b, 'cohost', ['remove', 'Alice'], '#owned-room', { personNamed: true });
         expect(frames.filter(f => f.t === 'ownership' && f.recipient === b).at(-1).cohosts).toEqual([]);
         frames.length = 0; await queue.flush();
         expect(frames.filter(f => f.t === 'ownership').map(f => f.recipient)).toEqual([b]);

@@ -123,7 +123,12 @@ describe('actual authority selected-person identity checks on both sides of nati
             expect(f.driver.stats.rollbacks - rollbacks).toBe(1); expect(hashRows(f.driver)).toBe(before);
             expect(writtenTx !== undefined).toBe(phase === 'after');
             delete f.controls.afterEffects;
-            expect((await f.authority.load()).state.net.shield).toBe(false);
+            expect((await f.authority.records.transaction(tx => tx.get('net'))).shield).toBe(false);
+            // The before-write generation fault deliberately remains committed: the
+            // session no longer agrees with the authority marker, so cold recovery
+            // must refuse it even though the selected effect was rolled back.
+            if (change === 'SID generation' && phase === 'before') await expect(f.authority.load()).rejects.toThrow('lobby-authority-unavailable');
+            else expect((await f.authority.load()).state.net.shield).toBe(false);
         });
 
     it('keeps a selected binding with malformed stored shape a real storage failure', async () => {
@@ -380,7 +385,7 @@ describe('real C3 contact withdrawal and independent safety through selected-per
         const delivered = app.frames.find(frame => frame.recipient === actor.binding.id && frame.t === 'line' && frame.text === 'A real delivered safety witness');
         expect(delivered).toBeDefined();
         await (await consent.withdrawal(actor))(); await (await consent.withdrawal(peer))();
-        await app.engine.refreshParticipationState();
+        await app.engine.refreshParticipation();
         expect(app.engine._debug.conns.get(actor.binding.id).safetyOnly).toBe(true); app.frames.length = 0;
         await app.message(actor.binding.id, { t: 'report', id: delivered.id, text: delivered.text });
         expect(app.frames.some(frame => frame.recipient === actor.binding.id && frame.t === 'report-status' && frame.id === delivered.id && frame.submitted === true)).toBe(true);

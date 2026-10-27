@@ -266,9 +266,9 @@ describe('bounded PM peer-reference session metadata through actual SQLite', () 
             engine.message(id, JSON.stringify({ t: 'hello', nick, age13: true }));
         }
         at += 180000; f.advance(180000);
-        const command = (nick, name, args) => engine.message(`socket_${nick}`, JSON.stringify({ t: 'cmd', name, args, ch: '#stalemate' }));
-        command('Alice', 'query', ['Bravo']); command('Bravo', 'accept', ['Alice']);
-        command('Alice', 'query', ['Charlie']);
+        const command = (nick, name, args, intent = {}) => engine.message(`socket_${nick}`, JSON.stringify({ t: 'cmd', name, args, ch: '#stalemate', ...intent }));
+        command('Alice', 'query', ['Bravo'], { personNamed: true }); command('Bravo', 'accept', ['Alice'], { personNamed: true });
+        command('Alice', 'query', ['Charlie'], { personNamed: true });
         return { f, engine, command, sent };
     }
 
@@ -311,10 +311,16 @@ describe('identity-bound ignore preferences in the strict session codec', () => 
         for (const [index, identity] of identities.entries()) {
             app.connect(identity); app.message(identity.id, JSON.stringify({ t: 'hello', nick: ['Alice', 'Bravo', 'Charlie'][index], age13: true }));
         }
-        const room = frames.find(frame => frame.recipient === identities[0].id && frame.t === 'join').ch;
-        const target = room.names.find(person => person.nick === 'Bravo').id;
+        const room = frames.filter(frame => frame.recipient === identities[0].id && ['join', 'chan'].includes(frame.t)
+            && frame.ch.name === '#stalemate').at(-1)?.ch;
+        expect(room?.keepRef).toMatch(/^[a-f0-9]{32}$/);
+        const target = room.names.find(person => person.nick === 'Bravo')?.id;
+        expect(target).toBe(identities[1].id);
+        const beforeIgnore = frames.length;
         app.message(identities[0].id, JSON.stringify({ t: 'cmd', name: 'ignore', args: ['Bravo'], ch: room.name,
             roomInstance: room.keepRef, personContext: 1, personPeer: target }));
+        expect(frames.slice(beforeIgnore).filter(frame => frame.t === 'person-preferences'))
+            .toEqual([{ recipient: identities[0].id, t: 'person-preferences', names: [], peers: [target] }]);
         return { app, identities, target };
     }
 
