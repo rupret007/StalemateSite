@@ -551,3 +551,29 @@ if time is tight. Its first-phase and recovery groups are separate from original
 9+3, injected-fault, Stop/report and pressure proofs. Sixteen-client reconnect
 storms, many-room/30-room recovery, 150-native load, longer soak, physical browser/
 WAN, hosted capacity/cost and real guardian/provider qualification remain open.
+
+## Test-only UTC control-credit observations
+
+The fifty-guest mode observes successful actual twenty-control reservation
+receipts and actual before/after socket grants around the unchanged budget
+`take` call. Its fixed per-slot UTC-day rows distinguish accepted controls,
+opening imported credit, discarded old-day remainder, current remainder and
+unassigned paid reservations. Fifty connections and two UTC days are fixed
+observation bounds; invalid input or overflow fails qualification. Only days,
+counts and flags are exported, never IDs or bodies. Observers preserve original
+receivers, arguments, results and errors, and add no storage/RPC or clock read.
+
+For the fresh fifty, opening and unassigned credit must both be zero. Each day
+requires exactly ceil(accepted controls/20) actual reservations and conservation
+of paid credit into controls, discarded old-day credit and remaining credit.
+Totals still equal actual budget/delivery/ACK counters; the original lifetime
+ceil/remainder assertions remain when each slot has one observed day. This fixes
+a test oracle that incorrectly treated old UTC-day credit as reusable: a prior
+16737 run crossed midnight and observed reservations174 versus lifetime-ceil150
+before the twelve publications. The old log did not export per-slot days, so it
+does not prove which individual slots rolled over. No earlier failure is
+relabeled, midnight skipped, credit invented, clock overridden, target waived,
+workload shortened or production accounting changed. Original canonical modes,
+20-unit blocks, fifty guests,600 deliveries, ACK spacing/refused-zero checks,
+pressure/privacy/recovery proof and existing60-second/6-second bounds remain.
+Fresh source-qualified execution is required for the new observer and oracle.
