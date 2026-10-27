@@ -122,6 +122,10 @@ function begin() {
   recorded = false; result = null; previousTime = 0; gesture = null;
   feedback = ''; feedbackUntil = 0; lastLesson = ''; share?.setResult(null);
   showPanel(null); gates(); hud();
+  // The SDK's capture-phase unlock sees the ready screen paused. Open/resume
+  // the existing effects context now, inside this real Start gesture, after
+  // running gates are set; do not sacrifice the player's first cue to unlock it.
+  suite?.getSoundContext?.();
   $('rush-canvas').focus({ preventScroll: true });
   announce('Run started. Swipe left or right to dodge, up to jump, down to slide.');
 }
