@@ -170,9 +170,8 @@ calling that proof qualified:
    Preserve actual failures. Fix source/test defects rather than weakening
    negative oracles. The native fixture supports macOS ARM64 and Linux x64 GNU
    libc; that is not Windows or Intel Mac audio qualification.
-5. Coordinate the CI step below with its owner, then inspect actual current-head
-   exact/merge runs. Existing workflow execution covers only7 modes/10 groups;
-   green results from it cannot qualify the additional mode.
+5. Inspect actual current-head exact/merge runs of the eleventh group below.
+   Green results from the earlier ten groups cannot qualify the additional mode.
 6. Create/update a draft PR stacked onPR150, attach current evidence and obtain
    normal exact-head Karen review. Any push invalidates an older signed pass.
    No extra human approval layer was requested, but preserve existing holds and
@@ -181,11 +180,12 @@ calling that proof qualified:
    journeys, accessibility, capacity/recovery, legal/guardian readiness and honest
    platform qualification. A passing P9 slice is not project completion.
 
-## CI-owner dependency — proposed, not applied
+## CI-owner dependency — eleventh group, ten-minute limit unchanged
 
-`.github/workflows/durable-record-runtime.yml` is unchanged, SHA256
+`.github/workflows/durable-record-runtime.yml` runs the command below as its own
+step. `timeout-minutes` stays 10. The parent workflow file hash was
 `5b8cb2382b4e324a0e65635c4e7b819d2702c0e99c979f4c34f9bdd0418b51c1`.
-Its owner can review an additional step following the existing capture pattern:
+A green run of this step is required before the count is 8 fresh modes and 11 groups.
 
 ```yaml
 - name: Prove native permission ordering for moderation start

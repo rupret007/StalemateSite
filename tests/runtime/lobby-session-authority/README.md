@@ -585,13 +585,12 @@ selects a separate eighth session mode in this existing framework. It rejects
 incident, traffic, pressure, fanout and diagnostic combinations. The seven
 original modes retain their original journeys, assertions, limits and timers;
 this mode does not requalify their canonical nine-plus-three or two physical
-rollback witnesses. The existing workflow currently runs only those seven
-modes/ten groups. Adding this command as an eleventh group requires the existing
-CI owner's separate change; a green ten-group workflow does not execute or
-qualify the new flag. This workstream does not edit that workflow. The proposed
-step, for StoryPool 10-21-26 only, follows the existing capture pattern and
-does not raise the ten-minute job limit, remove an old step, or hide this mode
-inside an old one:
+rollback witnesses. The workflow runs this command as its own eleventh group
+beside the original seven session modes and ten groups. `timeout-minutes` stays
+10. This step does not replace an older step or hide the mode inside one. A
+green run of this group is required before the mode counts as CI-qualified. A
+green run of the earlier ten groups does not execute or qualify the new flag.
+The step follows the existing capture pattern:
 
 ```yaml
 - name: Prove native permission ordering for moderation start
@@ -617,8 +616,9 @@ owner baseline. Callback-close marked the synchronous fence before denial, and
 `retirement-resolved` was the close promise settling after that await. It does
 not measure when `retireClosed` begins relative to owner-gate exit. The run is
 local Worker/SQLite only. It does not qualify provider activation, the other
-seven modes, Windows, Intel Mac, hosted capacity, or audio. GitHub's existing
-workflow still does not execute this flag.
+seven modes, Windows, Intel Mac, hosted capacity, or audio. GitHub executes
+this flag only in that separate group, and only a green run of the group
+qualifies it.
 
 The new mode deliberately omits the plain-retention diagnostic facade. It uses
 the original authority and frozen owner actually created by `HangoutLobby.start`.
