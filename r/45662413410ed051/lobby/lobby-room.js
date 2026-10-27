@@ -40,6 +40,7 @@
         let pendingPts = [];
         let flushTimer = 0;
         let roomGeneration = 0, captureVersion = 0, turnClient = null, turnInit = null;
+        let cameraFailureNotice = '';
         // The server keeps one activity allowance (burst 24, refill 10/s).
         // Drawing and camera signaling share this smaller client allowance so
         // an ICE burst queues rather than silently consuming an SDP's budget.
@@ -188,6 +189,7 @@
             clearTimeout(videoPublishTimer);
             turnClient?.stop(); turnClient = null; turnInit = null; state.ice = null;
             ui.relayStatus.textContent = '';
+            cameraFailureNotice = '';
             state.ch = null;
             state.kind = null;
             state.room = H.emptyState();
@@ -558,9 +560,11 @@
 
         async function startCam() {
             const generation = roomGeneration, version = ++captureVersion;
-            await iceServers();
-            if (state.stream || !state.camOn || generation !== roomGeneration || version !== captureVersion) return;
             try {
+                await iceServers();
+                if (state.stream || !state.camOn || generation !== roomGeneration || version !== captureVersion) return;
+                if (cameraFailureNotice && ui.relayStatus.textContent === cameraFailureNotice) activityNotice('');
+                cameraFailureNotice = '';
                 const got = await navigator.mediaDevices.getUserMedia({ video: CAM, audio: false });
                 if (!state.camOn || generation !== roomGeneration || version !== captureVersion) {
                     got.getTracks().forEach((track) => track.stop()); return;
@@ -572,7 +576,22 @@
                 for (const entry of state.pcs.values()) entry.attachLocalTracks();
                 for (const id of state.peers) if (!state.pcs.has(id)) openPc(id);
                 layoutTiles();
-            } catch (e) { /* denied */ }
+            } catch {
+                // An old permission result must not turn off a newer camera or
+                // change another room. Current failure always retires capture
+                // locally, even when its off notification cannot be delivered.
+                if (!state.camOn || generation !== roomGeneration || version !== captureVersion || state.ch !== app.active) return;
+                state.camOn = false;
+                const channel = state.ch, c = app.chans.get(channel);
+                if (c) c.myCam = false;
+                stopCam();
+                try {
+                    if (typeof deps.onCameraFailure === 'function') deps.onCameraFailure(channel);
+                    else send({ t: 'cam', ch: channel, on: false });
+                } catch { /* Capture is already off; no automatic retry. */ }
+                cameraFailureNotice = 'Camera could not start. It is off in this tab. Check camera permissions or device availability, then choose the camera button to try again.';
+                activityNotice(cameraFailureNotice);
+            }
         }
 
         function stopCam() {

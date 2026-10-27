@@ -426,10 +426,18 @@ import { createEntrySharing } from './entry-sharing.mjs';
     let belowFold = 0;
     let roomApi = null;
     let jamContext = null;
+    function stopLocalCamera(channel) {
+        const c = app.chans.get(channel);
+        if (!c) return false;
+        c.myCam = false;
+        roomApi?.onCam(channel, false);
+        if (app.active === channel) drawChan();
+        return send({ t: 'cam', ch: channel, on: false });
+    }
     function room() {
         if (app.sharingStopped || app.localMediaPaused) return null;
         if (!roomApi && window.LobbyRoom) {
-            roomApi = window.LobbyRoom.attach({ app, send, $, previewKey, turnUrl, isLocal, params });
+            roomApi = window.LobbyRoom.attach({ app, send, $, previewKey, turnUrl, isLocal, params, onCameraFailure: stopLocalCamera });
         }
         return roomApi;
     }
@@ -1407,7 +1415,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         if (app.localMediaPaused) return toast('Local media stays off while this Stop request is unresolved.');
         const c = store(app.active);
         if (!c) return;
-        if (c.myCam) return send({ t: 'cam', ch: c.name, on: false });
+        if (c.myCam) return stopLocalCamera(c.name);
         $('[data-adult]').checked = false;
         return $('[data-cam-gate]').showModal();
     });
