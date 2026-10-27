@@ -19,8 +19,10 @@ A confirmed gathering is rendered only when one supplied record has all of:
 - an equipment-free activity: text chat, drawing, one-line writing, reading, or
   watching a shared video
 
-The screen shows that host, the time in the requested time zone, and what
-someone can do without bringing equipment. A camera, microphone, or instrument
+The room presence panel shows that host, the time in the requested time zone,
+and what someone can do without bringing equipment. Those lines stay out of the
+chat column so the composer remains on screen. The quiet prompt stays with the
+other draft buttons. A camera, microphone, or instrument
 is never required. A jam is not an equipment-free activity. `requiresBand: true`
 or a recurrence value other than an explicit `false` drops the record. The
 earliest valid record is the next one. Invalid siblings are skipped, not

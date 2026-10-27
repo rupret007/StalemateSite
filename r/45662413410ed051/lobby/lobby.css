@@ -155,10 +155,11 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .conversation-starters { min-width: 0; max-width: 100%; }
 .conversation-starters button, .quiet-action { padding: 6px 9px; min-height: 32px; color: #c4d8ac; background: transparent; border: 1px solid #46593a; font: 10px var(--mono); }
 .conversation-starters button:hover, .quiet-action:hover { background: #2b3921; }
-.visit-gathering, .visit-creation { display: grid; gap: 3px; margin: 0 0 12px; min-width: 0; max-width: 100%; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
-.visit-gathering[hidden], .visit-creation[hidden], .conversation-starters button[hidden], .quiet-action[hidden] { display: none; }
+.visit-gathering, .visit-creation { display: grid; gap: 3px; margin: 8px 0 0; min-width: 0; max-width: 100%; color: var(--muted); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.visit-gathering b, .visit-creation b { color: var(--cream); font-size: 12px; font-weight: 550; }
+.visit-gathering[hidden], .visit-creation[hidden], .conversation-starters button[hidden], .quiet-action[hidden], .visit-gathering span:empty, .visit-creation span:empty { display: none; }
 .visit-gathering span, .visit-creation span { min-width: 0; overflow-wrap: anywhere; }
-.quiet-action { justify-self: start; }
+.quiet-action { justify-self: start; margin-top: 4px; }
 .network-note { flex: none; margin: 0; padding: 10px 20px; color: var(--amber); font-size: 12px; background: #2b2519; border-bottom: 1px solid #5f5030; }
 .message-recovery { flex: none; min-height: 0; max-height: min(180px, 27dvh); overflow: auto; padding: 8px 12px; border-top: 1px solid #65725d; color: var(--amber); background: #211f17; font-size: 12px; overflow-wrap: anywhere; }
 .chat.has-saved-messages .lobby-welcome { display: none; }
