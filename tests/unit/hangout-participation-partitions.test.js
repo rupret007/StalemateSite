@@ -141,12 +141,14 @@ describe('fresh author dependencies for ordinary public text', () => {
     it.each(['pm-context', 'slash-command', 'rtc'])('keeps full peer preparation for %s and denies a withdrawn peer', async kind => {
         const f = await fixture(), alice = await f.enroll('alice'), bravo = await f.enroll('bravo'); await f.connect(alice); await f.connect(bravo); f.advance(120001);
         await f.cmd(alice, 'msg', [bravo.nick, 'Synthetic initial contact']); await f.cmd(bravo, 'accept', [alice.nick]);
+        const opened = f.frames.find(frame => frame.t === 'pm-open' && frame.recipient === alice.id);
+        expect(opened).toMatchObject({ peer: bravo.id, ref: expect.stringMatching(/^[a-f0-9]{32}$/) });
         if (kind === 'rtc') {
             await f.cmd(alice, 'join', ['#art-scope']); await f.cmd(bravo, 'join', ['#art-scope']);
             await f.message(alice, { t: 'cam', ch: '#art-scope', on: true, adult18: true });
         }
         expect((await f.withdraw(bravo)).state).toBe('withdrawn'); f.reader.mockClear(); f.frames.length = 0;
-        const frame = kind === 'pm-context' ? { t: 'say', ch: `pm:${bravo.nick}`, text: 'Withdrawn peer cannot receive this' }
+        const frame = kind === 'pm-context' ? { t: 'say', ch: `pm:${opened.ref}`, pmPeer: opened.peer, pmRef: opened.ref, text: 'Withdrawn peer cannot receive this' }
             : kind === 'slash-command' ? { t: 'say', ch: '#stalemate', text: `/msg ${bravo.nick} Withdrawn peer cannot receive this` }
                 : { t: 'act', kind: 'rtc', ch: '#art-scope', to: bravo.id, sdp: { type: 'offer', sdp: 'v=0\r\nm=video 9 RTP/AVP 96\r\n' } };
         expect((await f.message(alice, frame)).ok).toBe(false);
