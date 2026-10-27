@@ -1325,7 +1325,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
                 if (name === 'register' && current?.keepRef) return cmd(name, [], app.active, current.keepRef);
                 if (name === 'cohost') { const who = prompt(`${label}: nickname`); if (!who) return; if (label.startsWith('Remove') && !confirm(`Remove ${who} as co-host?`)) return; return cmd(name, [label.startsWith('Remove') ? 'remove' : 'add', who.trim()]); }
                 if (fixed) return cmd(name, fixed);
-                if (ask) { const v = prompt(`${label}: ${ask}`); if (v === null) return undefined; return cmd(name, v.trim() ? v.trim().split(' ') : []); }
+                if (ask) { const v = prompt(`${label}: ${ask}`); if (v === null) return undefined; return cmd(name, v.trim() ? (name === 'topic' ? [v.trim()] : v.trim().split(' ')) : []); }
                 return cmd(name, []);
             });
             box.append(b);
