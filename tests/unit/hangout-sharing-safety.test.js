@@ -67,6 +67,8 @@ async function fixture({ staff = false } = {}) {
         limits: { defaultSlow: 0, pmMinLobbyMs: 0 } });
     const engine = make(), message = async (id, frame, target = engine) => { at += 1000; return target.message(id, JSON.stringify(frame)); };
     const cmd = (id, name, args = [], ch = '#stalemate', target = engine) => message(id, { t: 'cmd', name, args, ch }, target);
+    const namedCmd = (id, name, args = [], ch = '#stalemate', target = engine) => message(id, { t: 'cmd', name, args, ch,
+        ...(name === 'msg' ? { pmExplicit: true } : { personNamed: true }) }, target);
     for (const id of ['alpha', 'bravo', 'third']) {
         const role = id === 'bravo' && staff ? 'owner' : 'fan', identity = { id, dev: `dev-${id}`, iph: `ip-${id}`, role, admin: role === 'owner', account: `account_${id}` };
         live.set(id, identity); expect((await engine.connect(identity)).ok).toBe(true);
@@ -83,7 +85,7 @@ async function fixture({ staff = false } = {}) {
         const before = frames.length; await message('alpha', { t: 'say', ch: '#stalemate', text });
         const sent = frames.slice(before).find(frame => frame.recipient === 'bravo' && frame.t === 'line'); expect(sent).toBeDefined(); return sent;
     }
-    return { engine, participation, storage, controls, frames, closed, live, make, message, cmd, withdraw, line,
+    return { engine, participation, storage, controls, frames, closed, live, make, message, cmd, namedCmd, withdraw, line,
         advance: ms => { at += ms; } };
 }
 
@@ -92,7 +94,7 @@ describe('withdrawn sharing keeps a bounded same-connection safety path', () => 
         const f = await fixture(), selected = await f.line();
         await f.cmd('alpha', 'join', ['#art-safety']); await f.cmd('bravo', 'join', ['#art-safety']); await f.cmd('third', 'join', ['#art-safety']);
         for (const id of ['alpha', 'bravo', 'third']) await f.message(id, { t: 'cam', ch: '#art-safety', on: true, adult18: true });
-        await f.cmd('alpha', 'msg', ['Bravo', 'Benign accepted private safety message']); await f.cmd('bravo', 'accept', ['Alpha']);
+        await f.namedCmd('alpha', 'msg', ['Bravo', 'Benign accepted private safety message']); await f.namedCmd('bravo', 'accept', ['Alpha']);
         const privateLine = f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'pm'); expect(privateLine).toBeDefined();
         expect((await f.withdraw()).state).toBe('withdrawn'); const offset = f.frames.length;
         expect((await f.engine.refreshParticipation())?.ok).not.toBe(false);
@@ -136,7 +138,7 @@ describe('withdrawn sharing keeps a bounded same-connection safety path', () => 
 
     it('allows private block/ignore/help/quit cleanup, denies fabricated reports and retires the witness on actual disconnect', async () => {
         const f = await fixture(), selected = await f.line(); await f.withdraw(); await f.engine.refreshParticipation();
-        await f.cmd('bravo', 'ignore', ['Alpha']); await f.cmd('bravo', 'block', ['Alpha']); await f.cmd('bravo', 'help');
+        await f.namedCmd('bravo', 'ignore', ['Alpha']); await f.namedCmd('bravo', 'block', ['Alpha']); await f.cmd('bravo', 'help');
         const own = f.engine.sessionSnapshot().connections.find(row => row.id === 'bravo');
         expect(own.ignores).toContain('alpha'); expect(own.blocks).toContain('dev-alpha');
         const before = f.engine.adminState().reports.length;

@@ -280,7 +280,7 @@ async function runtime(phase, state, nonce) {
         const visitor = new Visitor(response.webSocket, label, transport, acknowledge); visitors.push(visitor);
         const hello = await visitor.wait(f => f.t === 'hello', 'actual hello');
         if (FANOUT_50 && admissionProfile) admissionProfile.serverHello = performance.now();
-        assert.deepEqual(hello.features, { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, roomKeep: 1, messageResults: 1 }); assert.equal(hello.role, 'fan');
+        assert.deepEqual(hello.features, { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1 }); assert.equal(hello.role, 'fan');
         if (FANOUT_50 && admissionProfile) admissionProfile.clientHello = performance.now();
         visitor.send({ t: 'hello', nick: label, age13: true, entrySource: source, ...(transport ? { transport: 1 } : {}) });
         await visitor.wait(f => f.t === 'join' && f.ch.name === '#stalemate', 'lobby membership');
@@ -877,8 +877,21 @@ async function runtime(phase, state, nonce) {
             const beforeRtc = c.frames.length;
             b.send({ t: 'act', ch: mediaRoom, kind: 'rtc', to: ids.NativeCharlie, ...rtc });
             assert.deepEqual((await c.wait(frame => frame.t === 'act' && frame.kind === 'rtc' && frame.from === ids.NativeBravo, 'unblocked synthetic RTC', beforeRtc)).sdp, rtc.sdp);
+            const selectedRoom = visitor => {
+                const frame = visitor.frames.findLast(frame => ['join', 'chan'].includes(frame.t) && frame.ch?.name === mediaRoom);
+                assert.ok(frame, visitor.label + ': missing actual room selection metadata');
+                assert.match(frame.ch.keepRef, /^[a-f0-9]{32}$/);
+                return frame.ch;
+            };
+            const selectionB = selectedRoom(b), selectionC = selectedRoom(c);
+            const selectedCharlie = selectionB.names.find(person => person.nick === 'NativeCharlie')?.id;
+            const selectedBravo = selectionC.names.find(person => person.nick === 'NativeBravo')?.id;
+            assert.equal(selectedCharlie, ids.NativeCharlie); assert.equal(selectedBravo, ids.NativeBravo);
+            assert.match(selectedCharlie, /^c[a-f0-9]{32}$/); assert.match(selectedBravo, /^c[a-f0-9]{32}$/);
             const blockAtB = b.frames.length, blockAtC = c.frames.length;
-            await b.command('block', ['NativeCharlie'], mediaRoom, frame => frame.t === 'notice' && frame.text.startsWith('Blocked '), 'native device block committed');
+            b.send({ t: 'cmd', ch: mediaRoom, name: 'block', args: ['NativeCharlie'], personContext: 1,
+                personPeer: selectedCharlie, roomInstance: selectionB.keepRef });
+            await b.wait(frame => frame.t === 'notice' && frame.text.startsWith('Blocked '), 'native device block committed', blockAtB);
             assert.deepEqual((await b.wait(frame => frame.t === 'media-policy' && frame.ch === mediaRoom, 'blocker pair policy', blockAtB)).changes, [{ id: ids.NativeCharlie, blocked: true }]);
             assert.deepEqual((await c.wait(frame => frame.t === 'media-policy' && frame.ch === mediaRoom, 'target pair policy', blockAtC)).changes, [{ id: ids.NativeBravo, blocked: true }]);
             const blockedAtB = b.frames.length, blockedAtC = c.frames.length;
@@ -892,7 +905,8 @@ async function runtime(phase, state, nonce) {
             assert.deepEqual(committedBlock.engineBlockCounts, committedBlock.durableBlockCounts);
             await control('fault', { record: 'sessions' });
             const rejectedAtB = b.frames.length, rejectedAtC = c.frames.length;
-            c.send({ t: 'cmd', ch: mediaRoom, name: 'block', args: ['NativeBravo'] });
+            c.send({ t: 'cmd', ch: mediaRoom, name: 'block', args: ['NativeBravo'], personContext: 1,
+                personPeer: selectedBravo, roomInstance: selectionC.keepRef });
             await c.wait(frame => frame.t === 'notice' && frame.kind === 'error', 'native failed-block refusal', rejectedAtC);
             const rejectedBlock = await control('inspect');
             assert.deepEqual(rejectedBlock.durableBlockCounts, committedBlock.durableBlockCounts);

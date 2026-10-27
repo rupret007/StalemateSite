@@ -266,9 +266,9 @@ describe('bounded PM peer-reference session metadata through actual SQLite', () 
             engine.message(id, JSON.stringify({ t: 'hello', nick, age13: true }));
         }
         at += 180000; f.advance(180000);
-        const command = (nick, name, args) => engine.message(`socket_${nick}`, JSON.stringify({ t: 'cmd', name, args, ch: '#stalemate' }));
-        command('Alice', 'query', ['Bravo']); command('Bravo', 'accept', ['Alice']);
-        command('Alice', 'query', ['Charlie']);
+        const command = (nick, name, args, intent = {}) => engine.message(`socket_${nick}`, JSON.stringify({ t: 'cmd', name, args, ch: '#stalemate', ...intent }));
+        command('Alice', 'query', ['Bravo'], { personNamed: true }); command('Bravo', 'accept', ['Alice'], { personNamed: true });
+        command('Alice', 'query', ['Charlie'], { personNamed: true });
         return { f, engine, command, sent };
     }
 
@@ -301,4 +301,257 @@ describe('bounded PM peer-reference session metadata through actual SQLite', () 
         expect(hashRows(f.driver)).toBe(before);
         expect((await f.read()).sessions).toEqual(sessions);
     });
+});
+
+describe('identity-bound ignore preferences in the strict session codec', () => {
+    function currentPreferences() {
+        const frames = [], identities = ['Alice', 'Bravo', 'Charlie'].map(nick => ({ id: `ignore_${nick}`, dev: `device_${nick}`,
+            iph: `ip_${nick}`, role: 'fan', account: '', admin: false }));
+        const app = createLobby({ now: () => NOW, send: (recipient, frame) => frames.push({ recipient, ...frame }) });
+        for (const [index, identity] of identities.entries()) {
+            app.connect(identity); app.message(identity.id, JSON.stringify({ t: 'hello', nick: ['Alice', 'Bravo', 'Charlie'][index], age13: true }));
+        }
+        const room = frames.filter(frame => frame.recipient === identities[0].id && ['join', 'chan'].includes(frame.t)
+            && frame.ch.name === '#stalemate').at(-1)?.ch;
+        expect(room?.keepRef).toMatch(/^[a-f0-9]{32}$/);
+        const target = room.names.find(person => person.nick === 'Bravo')?.id;
+        expect(target).toBe(identities[1].id);
+        const beforeIgnore = frames.length;
+        app.message(identities[0].id, JSON.stringify({ t: 'cmd', name: 'ignore', args: ['Bravo'], ch: room.name,
+            roomInstance: room.keepRef, personContext: 1, personPeer: target }));
+        expect(frames.slice(beforeIgnore).filter(frame => frame.t === 'person-preferences'))
+            .toEqual([{ recipient: identities[0].id, t: 'person-preferences', names: [], peers: [target] }]);
+        return { app, identities, target };
+    }
+
+    it('reopens actual bound preference metadata and resumes only the same live endpoint while legacy absence stays empty', async () => {
+        const f = await fixture(), { app, identities, target } = currentPreferences(), sessions = app.sessionSnapshot();
+        expect(sessions.connections[0]).toMatchObject({ ignores: [], ignoredPeerIds: [target] });
+        expect(sessions.connections[1]).not.toHaveProperty('ignoredPeerIds');
+        await f.write([['sessions', sessions]]);
+        const reopened = await f.reopen();
+        const restored = await reopened.storage.transaction(tx => readLobbyState({ tx, now: NOW }));
+        expect(restored.sessions).toEqual(sessions);
+        const next = createLobby({ now: () => NOW });
+        next.restore(restored.net); next.restoreRooms(restored.rooms);
+        expect(next.restoreSessions(restored.sessions, identities).resumed).toEqual(identities.map(identity => identity.id));
+        expect(next.sessionSnapshot().connections[0]).toMatchObject({ ignores: [], ignoredPeerIds: [target] });
+    });
+
+    it.each(['null', 'duplicate', 'self', 'over-peer-limit', 'over-combined-limit'])('rolls back earlier real writes for %s identity preferences', async damage => {
+        const f = await fixture(), { app } = currentPreferences(), sessions = app.sessionSnapshot();
+        await f.write([['sessions', sessions]]);
+        const changed = structuredClone(sessions), row = changed.connections[0];
+        if (damage === 'null') row.ignoredPeerIds = null;
+        if (damage === 'duplicate') row.ignoredPeerIds.push(row.ignoredPeerIds[0]);
+        if (damage === 'self') row.ignoredPeerIds = [row.id];
+        if (damage === 'over-peer-limit') row.ignoredPeerIds = Array.from({ length: 51 }, (_, index) => `endpoint_${index}`);
+        if (damage === 'over-combined-limit') row.ignores = Array.from({ length: 50 }, (_, index) => `Named${index}`);
+        const before = hashRows(f.driver);
+        await expect(f.write([['net', { ...f.initial.net, lock: 'readonly' }], ['sessions', changed]])).rejects.toThrow('lobby-effects-unavailable');
+        expect(hashRows(f.driver)).toBe(before);
+        expect((await f.read()).sessions).toEqual(sessions);
+    });
+});
+
+
+describe('permanent lobby instance through the real session codec', () => {
+    function ignoredPair() {
+        const frames = [], identities = ['Alice', 'Bravo'].map(nick => ({ id: `wake_${nick}`, dev: `device_${nick}`,
+            iph: `ip_${nick}`, account: '', role: 'fan', admin: false }));
+        const app = createLobby({ now: () => NOW, send: (recipient, frame) => frames.push({ recipient, ...structuredClone(frame) }) });
+        for (const [index, identity] of identities.entries()) {
+            expect(app.connect(identity).ok).toBe(true);
+            app.message(identity.id, JSON.stringify({ t: 'hello', nick: ['Alice', 'Bravo'][index], age13: true }));
+        }
+        const room = frames.filter(frame => frame.recipient === identities[0].id && ['join', 'chan'].includes(frame.t)
+            && frame.ch.name === '#stalemate').at(-1)?.ch;
+        expect(room?.keepRef).toMatch(/^[a-f0-9]{32}$/);
+        expect(room.names.find(person => person.id === identities[1].id)?.nick).toBe('Bravo');
+        const command = (engine, name, instance) => engine.message(identities[0].id, JSON.stringify({ t: 'cmd', name,
+            args: ['Bravo'], ch: '#stalemate', personContext: 1, personPeer: identities[1].id, roomInstance: instance }));
+        const beforeIgnore = frames.length;
+        command(app, 'ignore', room.keepRef);
+        expect(frames.slice(beforeIgnore).filter(frame => frame.t === 'person-preferences')).toEqual([
+            { recipient: identities[0].id, t: 'person-preferences', names: [], peers: [identities[1].id] }
+        ]);
+        const text = 'A received lobby line stays only in this connected conversation';
+        app.message(identities[0].id, JSON.stringify({ t: 'say', ch: '#stalemate', text }));
+        expect(frames.filter(frame => frame.t === 'line' && frame.text === text), JSON.stringify({
+            notices: frames.filter(frame => frame.t === 'notice').slice(-8).map(frame => ({ kind: frame.kind, text: frame.text.slice(0, 300) }))
+        })).toHaveLength(2);
+        return { app, identities, room, command, text };
+    }
+
+    it('reopens the server nonce and accepts the original live selected Unignore without a new channel lookup', async () => {
+        const f = await fixture(), { app, identities, room, command, text } = ignoredPair(), sessions = app.sessionSnapshot();
+        expect(sessions.lobbyInstance).toBe(room.keepRef);
+        await f.write([['sessions', sessions]]);
+        const reopened = await f.reopen(), saved = await reopened.storage.transaction(tx => readLobbyState({ tx, now: NOW }));
+        expect(saved.sessions).toEqual(sessions); expect(JSON.stringify(saved.sessions)).not.toContain(text);
+        const frames = [], next = createLobby({ now: () => NOW, send: (recipient, frame) => frames.push({ recipient, ...frame }) });
+        next.restore(saved.net); await next.restoreRooms(saved.rooms);
+        expect(next.restoreSessions(saved.sessions, identities)).toEqual({ resumed: identities.map(identity => identity.id), rejected: [] });
+        expect(next.sessionSnapshot().lobbyInstance).toBe(room.keepRef);
+        expect(frames.some(frame => ['chan', 'line', 'pm'].includes(frame.t))).toBe(false);
+        const beforeUnignore = frames.length;
+        command(next, 'unignore', room.keepRef);
+        expect(frames.slice(beforeUnignore).filter(frame => frame.t === 'person-preferences')).toEqual([
+            { recipient: identities[0].id, t: 'person-preferences', names: [], peers: [] }
+        ]);
+        expect(next.sessionSnapshot().connections[0]).not.toHaveProperty('ignoredPeerIds');
+        expect(next._debug.conns.get(identities[0].id)).toMatchObject({ role: 'fan', admin: false });
+    });
+
+    it('reads legacy absence and announces only current lobby metadata before an explicitly reselected action', async () => {
+        const f = await fixture(), { app, identities, room, command, text } = ignoredPair(), sessions = app.sessionSnapshot();
+        delete sessions.lobbyInstance;
+        await f.write([['sessions', sessions]]);
+        const reopened = await f.reopen(), saved = await reopened.storage.transaction(tx => readLobbyState({ tx, now: NOW }));
+        expect(saved.sessions).not.toHaveProperty('lobbyInstance');
+        const frames = [], next = createLobby({ now: () => NOW, send: (recipient, frame) => frames.push({ recipient, ...frame }) });
+        const currentInstance = next.sessionSnapshot().lobbyInstance;
+        expect(currentInstance).toMatch(/^[a-f0-9]{32}$/); expect(currentInstance).not.toBe(room.keepRef);
+        next.restore(saved.net); await next.restoreRooms(saved.rooms);
+        expect(next.restoreSessions(saved.sessions, identities)).toEqual({ resumed: identities.map(identity => identity.id), rejected: [] });
+        const views = frames.filter(frame => frame.t === 'chan');
+        expect(views.map(frame => [frame.recipient, frame.ch.name, frame.ch.keepRef])).toEqual(
+            identities.map(identity => [identity.id, '#stalemate', currentInstance]));
+        expect(views.every(frame => frame.ch.names.map(person => person.id).join('|') === identities.map(identity => identity.id).join('|'))).toBe(true);
+        expect(frames.every(frame => ['chan', 'person-preferences'].includes(frame.t))).toBe(true);
+        expect(JSON.stringify(frames)).not.toContain(text);
+        const beforeOldSelection = frames.length;
+        command(next, 'unignore', room.keepRef);
+        expect(frames.slice(beforeOldSelection).some(frame => frame.text?.includes('no longer confirmed'))).toBe(true);
+        expect(next.sessionSnapshot().connections[0].ignoredPeerIds).toEqual([identities[1].id]);
+        const beforeReselection = frames.length;
+        command(next, 'unignore', views[0].ch.keepRef);
+        expect(frames.slice(beforeReselection).filter(frame => frame.t === 'person-preferences')).toEqual([
+            { recipient: identities[0].id, t: 'person-preferences', names: [], peers: [] }
+        ]);
+    });
+
+    it('withholds a legacy C3 lobby roster when current participation authority is unavailable', async () => {
+        const f = await fixture(), { app, identities } = ignoredPair(), sessions = app.sessionSnapshot();
+        delete sessions.lobbyInstance;
+        await f.write([['sessions', sessions]]);
+        const reopened = await f.reopen(), saved = await reopened.storage.transaction(tx => readLobbyState({ tx, now: NOW }));
+        const frames = [], next = createLobby({ now: () => NOW, participation: Object.freeze({}),
+            send: (recipient, frame) => frames.push({ recipient, ...frame }) });
+        // Explicitly broken configured authority is a denial input, never an
+        // always-allow adapter or a saved-consent claim. No roster may escape
+        // before the actual controlled refresh discovers it is unavailable.
+        next.restore(saved.net); await next.restoreRooms(saved.rooms);
+        expect(next.restoreSessions(saved.sessions, identities)).toEqual({ resumed: identities.map(identity => identity.id), rejected: [] });
+        expect(frames.some(frame => ['chan', 'join', 'line', 'pm'].includes(frame.t))).toBe(false);
+        expect((await next.refreshParticipation()).ok).toBe(false);
+        expect(frames.some(frame => ['chan', 'join', 'line', 'pm'].includes(frame.t))).toBe(false);
+    });
+
+    it.each([null, 1, 'A'.repeat(32), 'a'.repeat(31), 'a'.repeat(33), {}])(
+        'rejects malformed present lobbyInstance %j and rolls back every physical row', async lobbyInstance => {
+            const f = await fixture(), { app, identities } = ignoredPair(), sessions = app.sessionSnapshot();
+            await f.write([['sessions', sessions]]); const before = hashRows(f.driver);
+            const changed = { ...structuredClone(sessions), lobbyInstance };
+            await expect(f.write([['net', { ...f.initial.net, shield: true }], ['sessions', changed]])).rejects.toThrow('lobby-effects-unavailable');
+            expect(hashRows(f.driver)).toBe(before); expect((await f.read()).sessions).toEqual(sessions);
+            const frames = [], next = createLobby({ now: () => NOW, send: (_recipient, frame) => frames.push(frame) });
+            const originalInstance = next.sessionSnapshot().lobbyInstance;
+            expect(next.restoreSessions(changed, identities)).toEqual({ resumed: [], rejected: identities.map(identity => ({ id: identity.id, reason: 'session-invalid' })) });
+            expect(next.sessionSnapshot().lobbyInstance).toBe(originalInstance);
+            expect(next._debug.conns.size).toBe(0); expect(frames).toEqual([]);
+        });
+});
+
+
+describe('selected identity bans retain display-only historical labels', () => {
+    function selectedBan(scope) {
+        const frames = [], app = createLobby({ now: () => NOW, send: (recipient, frame) => frames.push({ recipient, ...structuredClone(frame) }) });
+        const identities = [
+            { id: 'label_staff', dev: 'device_staff', iph: 'ip_staff', account: 'account_staff', role: 'owner', admin: true },
+            { id: 'label_original', dev: 'device_original', iph: 'ip_original', account: 'account_original', role: 'fan', admin: false },
+            { id: 'label_observer', dev: 'device_observer', iph: 'ip_observer', account: '', role: 'fan', admin: false }
+        ];
+        for (const [index, identity] of identities.entries()) {
+            expect(app.connect(identity).ok).toBe(true);
+            app.message(identity.id, JSON.stringify({ t: 'hello', nick: ['Helper', 'GoatLord', 'Witness'][index], age13: true }));
+            if (scope !== '#stalemate') app.message(identity.id, JSON.stringify({ t: 'cmd', name: 'join', args: [scope], ch: '#stalemate' }));
+        }
+        const view = frames.filter(frame => frame.recipient === identities[0].id && ['join', 'chan'].includes(frame.t)
+            && frame.ch.name === scope).at(-1)?.ch;
+        expect(view?.keepRef).toMatch(/^[a-f0-9]{32}$/);
+        expect(view.names.find(person => person.id === identities[1].id)?.nick).toBe('GoatLord');
+        const beforeBan = frames.length;
+        app.message(identities[0].id, JSON.stringify({ t: 'cmd', name: scope === '#stalemate' ? 'gban' : 'ban', args: ['GoatLord', 'Repeated disruption'],
+            ch: scope, roomInstance: view.keepRef, personContext: 1, personPeer: identities[1].id }));
+        const rules = scope === '#stalemate' ? app.snapshot().bans : app.roomSnapshot().rooms.find(room => room.name === scope).bans;
+        expect(rules.map(rule => rule.mask)).toEqual(['dev:device_original', 'account:account_original']);
+        expect(rules.every(rule => rule.displayNick === 'GoatLord' && !Object.hasOwn(rule, 'nick'))).toBe(true);
+        const publicOutput = JSON.stringify(frames.slice(beforeBan).filter(frame => frame.recipient === identities[2].id));
+        for (const rule of rules) expect(publicOutput).not.toContain(rule.mask);
+        return { app, identities, rules };
+    }
+
+    it.each(['#stalemate', '#label-room'])('reopens %s display labels without named-Unban authority or nickname-reuse punishment', async scope => {
+        const f = await fixture(), { app, identities, rules } = selectedBan(scope);
+        await f.write([['net', app.snapshot()], ['rooms', app.roomSnapshot()]]);
+        const reopened = await f.reopen(), saved = await reopened.storage.transaction(tx => readLobbyState({ tx, now: NOW }));
+        const savedRules = scope === '#stalemate' ? saved.net.bans : saved.rooms.rooms.find(room => room.name === scope).bans;
+        expect(savedRules).toEqual(rules);
+        const frames = [], next = createLobby({ now: () => NOW, send: (recipient, frame) => frames.push({ recipient, ...structuredClone(frame) }) });
+        next.restore(saved.net); await next.restoreRooms(saved.rooms);
+        const staff = { ...identities[0], id: 'reopened_staff' };
+        const successor = { id: 'unrelated_successor', dev: 'device_successor', iph: identities[1].iph, account: 'account_successor', role: 'fan', admin: false };
+        for (const [identity, nick] of [[staff, 'Helper'], [successor, 'GoatLord']]) {
+            expect(next.connect(identity).ok).toBe(true);
+            next.message(identity.id, JSON.stringify({ t: 'hello', nick, age13: true }));
+            if (scope !== '#stalemate') next.message(identity.id, JSON.stringify({ t: 'cmd', name: 'join', args: [scope], ch: '#stalemate' }));
+            expect(next._debug.channels.get(scope).members.has(identity.id)).toBe(true);
+        }
+        const oldIdentity = { ...identities[1], id: 'original_return' };
+        if (scope === '#stalemate') expect(next.connect(oldIdentity).ok).toBe(false);
+        else {
+            expect(next.connect(oldIdentity).ok).toBe(true);
+            next.message(oldIdentity.id, JSON.stringify({ t: 'hello', nick: 'OriginalAgain', age13: true }));
+            next.message(oldIdentity.id, JSON.stringify({ t: 'cmd', name: 'join', args: [scope], ch: '#stalemate' }));
+            expect(next._debug.channels.get(scope).members.has(oldIdentity.id)).toBe(false);
+        }
+        const ruleList = () => scope === '#stalemate' ? next.snapshot().bans : next.roomSnapshot().rooms.find(room => room.name === scope).bans;
+        next.message(staff.id, JSON.stringify({ t: 'say', ch: scope, text: '/unban GoatLord' }));
+        expect(ruleList()).toEqual(rules);
+        expect(frames.some(frame => frame.recipient === staff.id && frame.text === 'No ban matching GoatLord.')).toBe(true);
+        const text = 'Fresh visitor joins the conversation';
+        next.message(successor.id, JSON.stringify({ t: 'say', ch: scope, text }));
+        expect(frames.filter(frame => frame.t === 'line' && frame.text === text).map(frame => frame.recipient).sort()).toEqual([staff.id, successor.id].sort());
+        const room = frames.filter(frame => frame.recipient === staff.id && ['join', 'chan'].includes(frame.t)
+            && frame.ch.name === scope).at(-1).ch;
+        const beforeRemoval = frames.length;
+        next.message(staff.id, JSON.stringify({ t: 'cmd', name: 'unban', args: [rules[0].mask], ch: scope, roomInstance: room.keepRef }));
+        expect(ruleList()).toEqual([rules[1]]);
+        const publicRemoval = JSON.stringify(frames.slice(beforeRemoval).filter(frame => frame.recipient === successor.id));
+        expect(publicRemoval).toContain('removes a ban rule');
+        for (const rule of rules) expect(publicRemoval).not.toContain(rule.mask);
+    });
+
+    it.each(['#stalemate', '#label-room'].flatMap(scope => [null, 'not a nickname', 'X'.repeat(21)].map(displayNick => ({ scope, displayNick }))))(
+        'rejects malformed $scope displayNick $displayNick with physical rollback and conservative direct restore', async ({ scope, displayNick }) => {
+            const f = await fixture(), { app } = selectedBan(scope), net = app.snapshot(), rooms = app.roomSnapshot();
+            await f.write([['net', net], ['rooms', rooms]]); const before = hashRows(f.driver);
+            const changedNet = structuredClone(net), changedRooms = structuredClone(rooms);
+            if (scope === '#stalemate') changedNet.bans[0].displayNick = displayNick;
+            else changedRooms.rooms.find(room => room.name === scope).bans[0].displayNick = displayNick;
+            const effects = scope === '#stalemate' ? [['sessions', app.sessionSnapshot()], ['net', changedNet]]
+                : [['net', { ...net, shield: true }], ['rooms', changedRooms]];
+            await expect(f.write(effects)).rejects.toThrow('lobby-effects-unavailable');
+            expect(hashRows(f.driver)).toBe(before); expect((await f.read()).net).toEqual(net); expect((await f.read()).rooms).toEqual(rooms);
+            const next = createLobby({ now: () => NOW });
+            if (scope === '#stalemate') {
+                next.restore(changedNet);
+                expect(next.adminState().lock).toBe('readonly');
+                expect(next.snapshot().bans).toEqual([net.bans[1]]);
+            } else {
+                await next.restoreRooms(changedRooms);
+                expect(next.adminState().lock).toBe('readonly'); expect(next._debug.channels.has(scope)).toBe(false);
+            }
+        });
 });

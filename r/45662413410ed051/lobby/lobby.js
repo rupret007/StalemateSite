@@ -28,7 +28,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     const entrySource = params.has('via') ? entrySourceFromParams(params, entrySites) : handoff?.source || '';
     let shareEntry = handoff?.share !== false;
     let entrySourcesSupported = null;
-    let privateMessageContextSupported = false, privateMessagePeersSupported = false;
+    let privateMessageContextSupported = false, privateMessagePeersSupported = false, personTargetsSupported = false;
     let keepSupported = false, keepReturnChecked = false, pendingKeep = null, keepTimer;
     // With an older server, only commands with an explicit target or global
     // meaning are safe in a private tab. Its channel fallback cannot route PM
@@ -60,7 +60,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     const pick = (a) => a[Math.floor(Math.random() * a.length)];
     const slug = () => `${pick(WORDS)}-${pick(THINGS)}`.replace(/[^a-z0-9-]/g, '');
 
-    const app = window.__lobby = { ws: null, me: '', role: 'fan', band: false, chans: new Map(), pms: new Map(), active: '#stalemate', rooms: [], ignores: new Set(), pending: null };
+    const app = window.__lobby = { ws: null, me: '', role: 'fan', band: false, chans: new Map(), pms: new Map(), active: '#stalemate', rooms: [], ignores: new Set(), peerIgnores: new Set(), selfId: '', pending: null };
     // Copies are tab memory only. Weak context IDs do not retain a departed
     // room's transcript, and no copy or nonce enters browser storage/analytics.
     const savedMessages = new Map();
@@ -600,7 +600,8 @@ import { createEntrySharing } from './entry-sharing.mjs';
             if (attempt !== connectionAttempt) return;
             cancelTransportAck();
             entrySharing.disconnect();
-            privateMessageContextSupported = false; privateMessagePeersSupported = false;
+            privateMessageContextSupported = false; privateMessagePeersSupported = false; personTargetsSupported = false; app.selfId = '';
+            personPreferencePending = null;
             resetPendingReports();
             uncertainMessages();
             setConnection('offline');
@@ -649,7 +650,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         $('[data-self-role]').textContent = 'Session ended';
         $('[data-room-filter] option[value=mine]').disabled = true;
         if ($('[data-room-filter]').value === 'mine') $('[data-room-filter]').value = 'active';
-        app.ignores.clear(); $('[data-pmreqs]').replaceChildren();
+        app.ignores.clear(); app.peerIgnores.clear(); app.selfId = ''; personPreferencePending = null; $('[data-pmreqs]').replaceChildren();
         clearTimeout(toastTimer); toastRegion.replaceChildren(); toastRegion.hidden = true;
         for (const dialog of $$('dialog')) if (dialog.open) dialog.close();
         inviteContext = null; $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
@@ -718,11 +719,68 @@ import { createEntrySharing } from './entry-sharing.mjs';
         } catch { return false; }
     };
     const cmd = (name, args = [], ch = app.active, roomInstance) => send({ t: 'cmd', name, args, ch, ...(['msg', 'm'].includes(name) ? { pmExplicit: true } : {}), ...(roomInstance === undefined ? {} : { roomInstance }) });
-    app.cmd = cmd;
+    // Named intent is explicit at prompt/API call sites, never added by the
+    // generic command wrapper used by selected-person controls.
+    const namedPersonCommands = new Set(['query', 'q', 'whois', 'w', 'ignore', 'unignore', 'block', 'unblock', 'accept', 'decline', 'deny', 'slap', 'invite', 'kick', 'ban', 'gban', 'mute', 'purge', 'op', 'deop', 'voice', 'devoice', 'cohost', 'transfer', 'report']);
+    const namedCmd = (name, args = [], ch = app.active, roomInstance) => {
+        const command = String(name).toLowerCase();
+        if (ch.startsWith('pm:') && command === 'slap') return send({ t: 'say', ch, text: `/slap ${args.join(' ')}` });
+        const rankMode = command === 'mode' && /[ov]/.test(String(/^#/.test(args[0] || '') ? args[1] || '' : args[0] || ''));
+        return namedPersonCommands.has(command) || rankMode
+            ? send({ t: 'cmd', name, args, ch, personNamed: true, ...(roomInstance === undefined ? {} : { roomInstance }) })
+            : cmd(name, args, ch, roomInstance);
+    };
+    app.cmd = namedCmd;
+    const personId = value => typeof value === 'string' && value.length > 0 && value.length <= 160 && !/\s|[\u0000-\u001f\u007f]/.test(value);
+    const roomNonce = value => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);
+    let personPreferencePending = null, personSheetSelection = null;
+    const findPerson = id => { for (const channel of app.chans.values()) { const person = channel.names?.find(row => row.id === id); if (person) return person; } return null; };
+    const personLabel = context => findPerson(context.peer)?.nick || context.label || 'this visitor';
+    function personContext(peer, channel, instance, label) { return { peer, channel, instance, label }; }
+    function personContextValid(context) {
+        return personTargetsSupported && personId(context?.peer) && !!app.selfId && context.peer !== app.selfId
+            && typeof context.channel === 'string' && context.channel.startsWith('#') && roomNonce(context.instance);
+    }
+    function personCommand(context, name, args = []) {
+        const current = context && app.chans.get(context.channel);
+        const safety = ['block', 'ignore', 'unignore'].includes(name);
+        if (!personContextValid(context) || connectionState !== 'connected' || !current || current.keepRef !== context.instance
+            || !safety && !findPerson(context.peer)) {
+            personSheetStatus('That person or room is no longer confirmed. Choose a current person.'); return false;
+        }
+        const values = [...args]; if (values.length) values[0] = personLabel(context);
+        const sent = send({ t: 'cmd', name, args: values, ch: context.channel, roomInstance: context.instance, personContext: 1, personPeer: context.peer });
+        if (!sent) personSheetStatus('The action was not sent. Reconnect before trying again.');
+        return sent;
+    }
+    function personSheetStatus(text) {
+        const sheet = $('[data-sheet]');
+        let status = sheet.querySelector('[data-person-status]');
+        if (sheet.open) {
+            if (!status) { status = document.createElement('p'); status.dataset.personStatus = ''; status.className = 'status'; status.setAttribute('role', 'status'); sheet.append(status); }
+            status.textContent = text;
+        } else toast(text);
+    }
+    function acknowledgePersonPreferences(frame) {
+        const names = frame.names, peers = frame.peers;
+        if (!personTargetsSupported || !Array.isArray(names) || !Array.isArray(peers) || names.length + peers.length > 50
+            || new Set(names).size !== names.length || new Set(peers).size !== peers.length
+            || !names.every(name => typeof name === 'string' && /^[a-z][a-z0-9_\-\[\]{}^`|]{2,19}$/.test(name)) || !peers.every(personId)) return;
+        app.ignores = new Set(names); app.peerIgnores = new Set(peers);
+        if (personPreferencePending) {
+            const pending = personPreferencePending;
+            const matched = pending.named ? pending.name === 'unignore' && !app.ignores.has(pending.named)
+                : pending.name === 'ignore' ? app.peerIgnores.has(pending.peer) : pending.name === 'unignore' && !app.peerIgnores.has(pending.peer);
+            if (matched) { personPreferencePending = null; personSheetStatus('Your preference is confirmed.'); }
+        }
+        const ignore = $('[data-sheet] [data-person-ignore]');
+        if (ignore && personSheetSelection) ignore.textContent = app.peerIgnores.has(personSheetSelection.peer) ? 'Unignore' : 'Ignore';
+    }
 
     function handle(m, nick) {
         switch (m.t) {
         case 'rate-limit':
+            if (personPreferencePending) { personPreferencePending = null; personSheetStatus('That preference was not confirmed. Try again when the connection is ready.'); }
             if (pendingKeep) clearKeep('The Keep request was not confirmed. Choose the current room and try again later.');
             resetPendingReports();
             if (connectionState !== 'connected') { setConnection('offline'); gateStatus(m.text); app.ws?.close(1000); }
@@ -744,6 +802,8 @@ import { createEntrySharing } from './entry-sharing.mjs';
             entrySourcesSupported = m.features?.entrySources === 1;
             privateMessageContextSupported = m.features?.privateMessageContext === 1;
             privateMessagePeersSupported = m.features?.privateMessagePeers === 1;
+            personTargetsSupported = m.features?.personTargets === 1; app.selfId = ''; personPreferencePending = null;
+            app.ignores.clear(); app.peerIgnores.clear();
             entrySharing.setSupported(entrySourcesSupported); drawEntryChoice();
             keepSupported = m.features?.roomKeep === 1;
             app.role = m.role; app.verified = m.verified === true; app.capabilities = m.capabilities || {}; $('[data-owner-signout]').hidden = !ownerSession; app.netLock = m.lock; app.budget = m.budget;
@@ -760,12 +820,13 @@ import { createEntrySharing } from './entry-sharing.mjs';
                     recoveryContexts.delete(view);
                 }
                 app.rooms = []; app.active = '#stalemate';
-                app.away = false; app.ignores.clear();
+                app.away = false; app.ignores.clear(); app.peerIgnores.clear();
                 app.restorePmOff = $('[data-pm-off]').checked;
                 $('[data-pmreqs]').replaceChildren();
                 $('[data-text]').value = drafts.get('#stalemate') || '';
             }
             send({ t: 'hello', nick, age13: true, entrySource: entrySharing.helloSource(), transport: 1 }); break;
+        case 'person-preferences': acknowledgePersonPreferences(m); break;
         case 'entry-source': entrySharing.acknowledge(m); break;
         case 'nick-error': setConnection('offline'); gateStatus(m.text); $('[data-gate]').hidden = false; $('[data-app]').hidden = true; break;
         case 'welcome': {
@@ -775,7 +836,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             if (!wasIn) count('lobby-join');
             app.verified = m.verified === true; app.capabilities = m.capabilities || app.capabilities;
             $('[data-room-filter] option[value=mine]').disabled = !app.verified;
-            app.me = m.nick;
+            app.me = m.nick; app.selfId = personId(m.id) ? m.id : '';
             for (const view of app.pms.values()) updatePmName(view, view.nick);
             app.band = m.band; writeRemembered('hangout-nick', m.nick);
             $('[data-self-nick]').textContent = m.nick;
@@ -854,6 +915,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         case 'notice':
             line(app.active, { notice: true, from: m.from, text: m.text, kind: m.kind });
             if (m.kind === 'error') {
+                if (personPreferencePending) { personPreferencePending = null; personSheetStatus('That preference was not confirmed. Check the current person and try again.'); }
                 if (pendingKeep) clearKeep();
                 resetPendingReports();
                 if (app.pendingChannel && $('[data-channel-dialog]').open) {
@@ -862,7 +924,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
                 } else toast(m.text);
             }
             break;
-        case 'denied': if (pendingKeep) clearKeep(); line(app.active, { notice: true, from: 'StaleBot', text: m.text, kind: 'error' }); break;
+        case 'denied': if (personPreferencePending) { personPreferencePending = null; personSheetStatus('That preference was not confirmed. Check the current person and try again.'); } if (pendingKeep) clearKeep(); line(app.active, { notice: true, from: 'StaleBot', text: m.text, kind: 'error' }); break;
         case 'list': app.rooms = m.rooms; drawRooms(); if (m.show) show('rooms'); break;
         case 'delete': for (const c of [...app.chans.values(), ...app.pms.values()]) c.lines = c.lines.filter((l) => !m.ids.includes(l.id)); $$('[data-id]').forEach((li) => { if (m.ids.includes(li.dataset.id)) li.remove(); }); break;
         case 'pm-request': pmRequest(m); break;
@@ -962,14 +1024,18 @@ import { createEntrySharing } from './entry-sharing.mjs';
                 // Historical display names never select a new live endpoint.
                 who.disabled = l.self !== false || !pmFrameValid(l);
                 if (!who.disabled) who.addEventListener('click', () => nickSheet(l.from, l));
-            } else who.addEventListener('click', () => nickSheet(l.from));
+            } else {
+                const context = personContext(l.personPeer, l.ch, l.roomInstance, l.from);
+                who.disabled = l.personSelf !== false || !personContextValid(context);
+                if (!who.disabled) who.addEventListener('click', () => nickSheet(l.from, { ...context, message: l }));
+            }
             li.append(who);
             const entryText = entryBadge(l.entrySource, entrySites);
             if (entryText) { const entry = document.createElement('span'); entry.className = 'entry-badge'; entry.textContent = entryText; li.append(' ', entry); }
             if (l.moderator) { const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = 'MOD'; li.append(' ', badge); }
             if (l.band) { const s = document.createElement('span'); s.className = 'badge'; s.textContent = '⭐ BAND'; li.append(' ', s); }
             li.append(' ', l.text);
-            if (l.from !== app.me && l.id) {
+            if (l.id && (l.t === 'pm' ? l.self !== true : l.personSelf !== true)) {
                 const r = document.createElement('button'); r.type = 'button'; r.className = 'flag'; r.textContent = '🚩'; r.setAttribute('aria-label', `Report this message from ${l.from}`);
                 if (l.reported) { r.disabled = true; r.textContent = '✓'; r.title = 'Report submitted to moderators'; }
                 else if (pendingReports.has(l.id)) { r.disabled = true; r.textContent = '…'; pendingReports.get(l.id).button = r; }
@@ -1144,9 +1210,16 @@ import { createEntrySharing } from './entry-sharing.mjs';
             const b = li.querySelector('button.nick') || document.createElement('button');
             if (id) { li.dataset.connectionId = id; b.dataset.connectionId = id; }
             b.type = 'button'; b.className = 'nick'; b.style.color = colorOf(n.nick);
-            b.dataset.self = String(n.nick === app.me);
+            b.dataset.self = String(!!app.selfId && n.id === app.selfId);
             b.textContent = `${n.prefix}${n.nick}${n.band ? ' ⭐' : n.moderator ? ' MOD' : ''}${n.cam ? ' 📷' : ''}${n.away ? ' 💤' : ''}`;
-            b.onclick = () => nickSheet(n.nick);
+            if (isPm) {
+                b.disabled = !privateMessagePeersSupported || !pmFrameValid({ peer: c.peer, ref: c.ref }) || id !== c.peer;
+                b.onclick = () => nickSheet(c.nick);
+            } else {
+                const context = personContext(id, c.name, c.keepRef, n.nick);
+                b.disabled = !personContextValid(context);
+                b.onclick = () => nickSheet(n.nick, context);
+            }
             if (!b.parentElement) li.append(b);
             const entryText = entryBadge(n.entrySource, entrySites);
             const entry = li.querySelector('.entry-badge');
@@ -1347,6 +1420,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--small'; b.textContent = label;
             b.addEventListener('click', () => {
                 if (!bound) return toast('This server cannot confirm the request’s original peer. Use an explicit /accept nickname or /decline nickname, or choose a current person.');
+                if (name === 'block' && !personTargetsSupported) return toast('Identity-safe blocking is unavailable on this server. You can deliberately type /block nickname, report an exact message, or leave.');
                 if (send({ t: 'cmd', name, args: [m.from], ch: app.active, pmPeer: m.peer, pmRef: m.ref })) div.remove();
                 else toast('You are offline. Reconnect before answering a PM request.');
             });
@@ -1363,38 +1437,66 @@ import { createEntrySharing } from './entry-sharing.mjs';
     let personSheetReturn = null;
     function nickSheet(nick, context) {
         const c = store(app.active);
-        const pmView = context ? pmFrameView(context) : app.active.startsWith('pm:') && c?.nick === nick ? c : null;
-        if (context && !pmView) return toast('That private peer is no longer confirmed. Choose a current person for a new request.');
-        nick = pmView?.nick || nick;
-        if (!nick || !pmView && nick === app.me) return;
+        const pmContext = context?.t === 'pm';
+        const pmView = pmContext ? pmFrameView(context) : !context && app.active.startsWith('pm:') && c?.nick === nick ? c : null;
+        if (pmContext && !pmView) return toast('That private peer is no longer confirmed. Choose a current person for a new request.');
+        const selected = pmView ? { peer: pmView.peer } : context;
+        if (!pmView && !personContextValid(selected)) return toast('Person actions are unavailable here. Use a deliberately typed nickname command or report an exact message.');
+        nick = pmView?.nick || personLabel(selected);
+        if (!nick) return;
         const peerCommand = (name, args = []) => {
-            if (!pmView) return cmd(name, args);
+            if (!pmView) return personCommand(selected, name, args);
             if (!privateMessagePeersSupported || !pmView.peer || !pmView.ref || !pmView.open && !['block', 'ignore', 'unignore', 'whois'].includes(name)) { pmDraftNotice(pmView); return false; }
-            return send({ t: 'cmd', name, args, ch: `pm:${pmView.ref}`, pmPeer: pmView.peer, pmRef: pmView.ref });
+            if (name === 'block' && !personTargetsSupported) { personSheetStatus('Identity-safe blocking is unavailable on this server. You can deliberately type /block nickname, report an exact message, or leave.'); return false; }
+            const sent = send({ t: 'cmd', name, args, ch: `pm:${pmView.ref}`, pmPeer: pmView.peer, pmRef: pmView.ref });
+            if (!sent) personSheetStatus('The action was not sent. Reconnect before trying again.');
+            return sent;
         };
         const sheet = $('[data-sheet]');
         const opener = document.activeElement;
         personSheetReturn = $('[data-nicks]').contains(opener) && opener.matches('button.nick') ? { opener, channel: app.active } : null;
+        personSheetSelection = selected;
         $('[data-sheet-title]').textContent = nick;
-        const box = $('[data-sheet-buttons]');
-        box.replaceChildren();
-        const act = (label, fn, cls = '') => { const b = document.createElement('button'); b.type = 'button'; b.className = `btn ${cls}`; b.textContent = label; b.addEventListener('click', () => { fn(); sheet.close(); }); box.append(b); };
+        sheet.querySelector('[data-person-status]')?.remove();
+        const box = $('[data-sheet-buttons]'); box.replaceChildren();
+        const act = (label, fn, cls = '', keepOpen = false) => {
+            const b = document.createElement('button'); b.type = 'button'; b.className = `btn ${cls}`; b.textContent = label;
+            b.addEventListener('click', () => { if (fn() !== false && !keepOpen) sheet.close(); }); box.append(b); return b;
+        };
+        const ignore = act(app.peerIgnores.has(selected.peer) ? 'Unignore' : 'Ignore', () => {
+            const name = app.peerIgnores.has(selected.peer) ? 'unignore' : 'ignore';
+            if (!peerCommand(name, [pmView?.nick || personLabel(selected)])) return false;
+            personPreferencePending = { peer: selected.peer, name };
+            personSheetStatus('Sent. Waiting for the server to confirm your preference.'); return true;
+        }, '', true);
+        ignore.dataset.personIgnore = '';
+        if (!personTargetsSupported) { ignore.disabled = true; ignore.title = 'Confirmed identity preferences are unavailable on this server.'; }
+        const named = nick.toLowerCase();
+        if (app.ignores.has(named)) act(`Remove named ignore: ${nick}`, () => {
+            if (!namedCmd('unignore', [named])) return false;
+            personPreferencePending = { name: 'unignore', named };
+            personSheetStatus('Sent. Waiting for the server to confirm removal of the named rule.'); return true;
+        }, 'btn--ghost', true);
         if (app.localMediaPaused || app.sharingStopped) {
-            act('Ignore', () => { const label = pmView?.nick || nick; if (peerCommand('ignore', [label])) app.ignores.add(label); });
-            act('Block', () => peerCommand('block', [nick]), 'btn--ghost');
-            sheet.showModal(); return;
+            act('Block', () => peerCommand('block', [nick]), 'btn--ghost'); sheet.showModal(); return;
         }
         act('✉ PM', () => peerCommand('query', [nick]));
-        act('🐟 Slap', () => pmView ? peerCommand('slap', [pmView.nick]) : cmd('slap', [nick]));
+        act('🐟 Slap', () => peerCommand('slap', [nick]));
         act('Who?', () => peerCommand('whois', [nick]));
-        act(app.ignores.has(nick) ? 'Unignore' : 'Ignore', () => { const label = pmView?.nick || nick; const ignored = app.ignores.has(label); if (peerCommand(ignored ? 'unignore' : 'ignore', [label])) { if (ignored) app.ignores.delete(label); else app.ignores.add(label); } });
         act('Block', () => peerCommand('block', [nick]), 'btn--ghost');
-        act('🚩 Report', () => pmView ? toast('Use the report flag beside the exact private message you want to share.') : cmd('report', [nick]), 'btn--ghost');
-        if (!pmView && amOp(c)) {
-            act('Kick', () => cmd('kick', [nick, 'take a breather']), 'btn--danger');
-            act('Ban', () => { const why = prompt(`Ban ${nick}. Reason?`) || ''; if (why) cmd('ban', [nick, ...why.split(' ')]); }, 'btn--danger');
-            if (c && c.kind !== 'lobby') { act('Make @', () => cmd('op', [nick])); act('Give voice', () => cmd('voice', [nick])); act('Invite here', () => cmd('invite', [nick, c.name])); }
-            if (app.band) act('Mute 10m', () => cmd('mute', [nick, '10m']), 'btn--danger');
+        act('🚩 Report', () => {
+            const message = !pmView && context?.message;
+            if (!message?.id || typeof message.text !== 'string') { personSheetStatus('Use the report flag beside the exact message you want to share.'); return false; }
+            const flag = $$('[data-buffer] li').find(row => row.dataset.id === message.id)?.querySelector('.flag');
+            if (flag && !flag.disabled) { flag.click(); return true; }
+            personSheetStatus('Use the report flag beside that exact message. Its confirmation may already be pending.'); return false;
+        }, 'btn--ghost');
+        const origin = !pmView && app.chans.get(selected.channel);
+        if (origin && amOp(origin)) {
+            act('Kick', () => peerCommand('kick', [nick, 'take a breather']), 'btn--danger');
+            act('Ban', () => { const why = prompt(`Ban ${personLabel(selected)}. Reason?`); return why?.trim() ? peerCommand('ban', [nick, ...why.trim().split(' ')]) : false; }, 'btn--danger');
+            if (origin.kind !== 'lobby') { act('Make @', () => peerCommand('op', [nick])); act('Give voice', () => peerCommand('voice', [nick])); act('Invite here', () => peerCommand('invite', [nick, origin.name])); }
+            if (app.band) act('Mute 10m', () => peerCommand('mute', [nick, '10m']), 'btn--danger');
         }
         sheet.showModal();
     }
@@ -1436,6 +1538,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     function openPalette(ops) {
         const box = $('[data-palette-buttons]');
         const current = store(app.active);
+        const origin = { channel: app.active, instance: current?.keepRef };
         const owner = current?.names?.find((n) => n.nick === app.me)?.owner;
         box.replaceChildren();
         for (const [label, name, ask, fixed] of (ops ? OP_PALETTE : PALETTE)) {
@@ -1446,20 +1549,28 @@ import { createEntrySharing } from './entry-sharing.mjs';
             const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--small'; b.textContent = label;
             b.addEventListener('click', () => {
                 $('[data-palette]').close();
+                if (ops && (!roomNonce(origin.instance) || app.chans.get(origin.channel)?.keepRef !== origin.instance)) return toast('That room changed. Choose current Host tools before trying again.');
+                const channel = ops ? origin.channel : app.active, instance = ops ? origin.instance : undefined;
                 if (name === 'invite-guest') return openInviteDialog();
                 if (['deop', 'unregister', 'transfer', 'close'].includes(name) && !confirm(current?.persistent && ['close', 'unregister'].includes(name) ? `Permanently delete ${app.active} and release its registered name?` : `${label} in ${app.active}?`)) return;
                 if (name === 'register' && !app.verified) { if (prepareOwnerSignin(current)) location.assign($('[data-owner-signin]').href); return; }
-                if (name === 'register' && current?.keepRef) return cmd(name, [], app.active, current.keepRef);
-                if (name === 'cohost') { const who = prompt(`${label}: nickname`); if (!who) return; if (label.startsWith('Remove') && !confirm(`Remove ${who} as co-host?`)) return; return cmd(name, [label.startsWith('Remove') ? 'remove' : 'add', who.trim()]); }
-                if (fixed) return cmd(name, fixed);
-                if (ask) { const v = prompt(`${label}: ${ask}`); if (v === null) return undefined; return cmd(name, paletteArgs(name, v)); }
-                return cmd(name, []);
+                if (name === 'register' && current?.keepRef) return cmd(name, [], origin.channel, origin.instance);
+                if (name === 'cohost') { const who = prompt(`${label}: nickname`); if (!who) return; if (label.startsWith('Remove') && !confirm(`Remove ${who} as co-host?`)) return; return namedCmd(name, [label.startsWith('Remove') ? 'remove' : 'add', who.trim()], channel, instance); }
+                if (fixed) return cmd(name, fixed, channel, instance);
+                if (ask) { const v = prompt(`${label}: ${ask}`); if (v === null) return undefined; return namedCmd(name, paletteArgs(name, v), channel, instance); }
+                return cmd(name, [], channel, instance);
             });
             box.append(b);
         }
         if (ops && owner) for (const host of current.cohosts || []) {
             const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--small'; b.textContent = `Remove verified co-host: ${host.label}`;
-            b.addEventListener('click', () => { if (confirm(`Remove ${host.label} as a verified co-host?`)) { cmd('cohost', ['remove', host.id]); $('[data-palette]').close(); } }); box.append(b);
+            b.disabled = !personTargetsSupported || !roomNonce(origin.instance);
+            b.addEventListener('click', () => {
+                if (!confirm(`Remove ${host.label} as a verified co-host?`)) return;
+                if (!personTargetsSupported || !roomNonce(origin.instance) || app.chans.get(origin.channel)?.keepRef !== origin.instance) return toast('That room changed. Choose current Host tools before trying again.');
+                if (send({ t: 'cmd', name: 'cohost', args: ['remove', host.id], ch: origin.channel, roomInstance: origin.instance, cohostAccount: true })) $('[data-palette]').close();
+                else toast('Co-host removal was not sent. Reconnect before trying again.');
+            }); box.append(b);
         }
         $('[data-palette]').showModal();
     }
@@ -1467,19 +1578,25 @@ import { createEntrySharing } from './entry-sharing.mjs';
     $('[data-roomtools]').addEventListener('click', () => openPalette(true));
     $('[data-palette-close]').addEventListener('click', () => $('[data-palette]').close());
 
+    let inviteInstance = '', invitePeople = new Map();
     function closeInviteDialog() {
+        inviteInstance = ''; invitePeople.clear();
         inviteContext = null; $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
         if ($('[data-invite-dialog]').open) $('[data-invite-dialog]').close();
     }
     function openInviteDialog() {
         const current = store(app.active);
         if (connectionState !== 'connected' || !current || current.kind === 'lobby' || !amOp(current)) return;
-        inviteContext = current; $('[data-invite-room]').textContent = current.name; $('[data-invite-error]').textContent = '';
+        inviteContext = current; inviteInstance = current.keepRef; invitePeople.clear(); $('[data-invite-room]').textContent = current.name; $('[data-invite-error]').textContent = '';
         $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
+        const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose a current person'; $('[data-invite-options]').append(placeholder);
         for (const person of app.chans.get('#stalemate')?.names || []) {
-            if (person.nick === app.me || current.names.some(member => member.nick === person.nick)) continue;
-            const option = document.createElement('option'); option.value = person.nick; $('[data-invite-options]').append(option);
+            if (!personId(person.id) || person.id === app.selfId || current.names.some(member => member.id === person.id)) continue;
+            const context = personContext(person.id, current.name, inviteInstance, person.nick);
+            invitePeople.set(person.id, context);
+            const option = document.createElement('option'); option.value = person.id; option.textContent = person.nick; $('[data-invite-options]').append(option);
         }
+        $('[data-invite-person-send]').disabled = !personTargetsSupported || !roomNonce(inviteInstance);
         $('[data-invite-dialog]').showModal(); $('[data-invite-nick]').focus();
     }
     $('[data-invite-cancel]').addEventListener('click', closeInviteDialog);
@@ -1488,17 +1605,29 @@ import { createEntrySharing } from './entry-sharing.mjs';
         closeInviteDialog();
         if (connectionState === 'connected') $(amOp(store(app.active)) ? '[data-roomtools]' : '[data-text]').focus({ preventScroll: true });
     });
+    $('[data-invite-person-send]').addEventListener('click', () => {
+        const current = store(app.active), context = invitePeople.get($('[data-invite-options]').value);
+        if (!inviteContext || inviteContext !== current || current.keepRef !== inviteInstance || !amOp(current) || !context) {
+            $('[data-invite-error]').textContent = 'Choose a current person in the original room.'; return;
+        }
+        // Invitation target may be outside this room, but must remain the
+        // original live connection in the shared lobby's current roster.
+        const person = findPerson(context.peer);
+        if (!person || !personContextValid(context)) { $('[data-invite-error]').textContent = 'That person is no longer confirmed.'; return; }
+        if (send({ t: 'cmd', name: 'invite', args: [person.nick, current.name], ch: context.channel, roomInstance: context.instance, personContext: 1, personPeer: context.peer })) closeInviteDialog();
+        else $('[data-invite-error]').textContent = 'The invitation was not sent. Reconnect before trying again.';
+    });
     $('[data-invite-form]').addEventListener('submit', event => {
         event.preventDefault();
         const current = store(app.active), nick = $('[data-invite-nick]').value.trim();
-        if (!inviteContext || inviteContext !== current || connectionState !== 'connected' || !amOp(current)) return closeInviteDialog();
+        if (!inviteContext || inviteContext !== current || current.keepRef !== inviteInstance || connectionState !== 'connected' || !amOp(current)) return closeInviteDialog();
         if (!/^[A-Za-z][A-Za-z0-9_\-[\]{}^`|]{2,19}$/.test(nick)) {
             $('[data-invite-error]').textContent = 'Use their current nickname: 3–20 letters, numbers or IRC nickname symbols.';
             $('[data-invite-nick]').focus(); return;
         }
         // This is only an affordance. The server checks the current host,
         // recipient and room before granting an invitation.
-        if (cmd('invite', [nick], current.name)) closeInviteDialog();
+        if (namedCmd('invite', [nick], current.name, inviteInstance)) closeInviteDialog();
         else $('[data-invite-error]').textContent = 'Reconnect before sending an invitation.';
     });
 
@@ -1530,7 +1659,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     $$('[data-quick-me]').forEach((b) => b.addEventListener('click', () => cmd('me', [b.dataset.quickMe])));
     $$('[data-quick-cmd]').forEach((b) => b.addEventListener('click', () => {
         const name = b.dataset.quickCmd;
-        if (name === 'slap') { const c = store(app.active); const others = (c && c.names || []).filter((n) => n.nick !== app.me); const who = others.length ? pick(others).nick : ''; return who ? cmd('slap', [who]) : toast('Nobody here to slap. Yet.'); }
+        if (name === 'slap') { if (app.active.startsWith('pm:')) return cmd('slap'); const c = store(app.active); const others = (c && c.names || []).filter((n) => n.nick !== app.me); const who = others.length ? pick(others) : null; return who ? personCommand(personContext(who.id, c.name, c.keepRef, who.nick), 'slap', [who.nick]) : toast('Nobody here to slap. Yet.'); }
         if (name === 'away') { app.away = !app.away; return cmd('away', app.away ? ['grabbing', 'a', 'snack'] : []); }
         return cmd(name, []);
     }));

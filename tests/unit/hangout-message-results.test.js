@@ -96,8 +96,10 @@ describe('caller-only negotiated message results', () => {
     it('confirms an ordinary open-PM operation only to its sender without tracking the prior pending token', async () => {
         const f = await fixture(); f.advance(120001);
         await f.message('writer', { t: 'cmd', ch: 'pm:Reader', name: 'msg', pmExplicit: true, args: ['Reader', 'First pending body'], clientMessageId: 'b'.repeat(32) });
+        const pending = f.frames.find(frame => frame.t === 'pm-request' && frame.recipient === 'reader');
+        expect(pending).toMatchObject({ peer: 'writer', ref: expect.stringMatching(/^[a-f0-9]{32}$/) });
         f.frames.length = 0;
-        await f.message('reader', { t: 'cmd', name: 'accept', args: ['Writer'] });
+        await f.message('reader', { t: 'cmd', name: 'accept', args: ['Writer'], ch: '#stalemate', pmPeer: pending.peer, pmRef: pending.ref });
         expect(f.frames.some(frame => frame.t === 'pm' && frame.recipient === 'reader' && frame.text === 'First pending body')).toBe(true);
         expect(f.frames.some(frame => frame.t === 'message-result')).toBe(false);
         const { ref } = f.frames.find(frame => frame.t === 'pm-open' && frame.recipient === 'writer');

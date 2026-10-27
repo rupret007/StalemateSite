@@ -140,15 +140,15 @@ describe('controlled C3 engine integration', () => {
     });
     it('requires both peer states for actual direct contact and clears consented PM/camera grants after withdrawal', async () => {
         const f = await setup(); await f.connect('alice'); await f.connect('bravo');
-        await f.cmd('alice', 'msg', ['Bravo', 'Synthetic first message']); await f.cmd('bravo', 'accept', ['Alice']);
+        await f.message('alice', { t: 'cmd', ch: '#stalemate', name: 'msg', args: ['Bravo', 'Synthetic first message'], personNamed: true }); await f.message('bravo', { t: 'cmd', ch: '#stalemate', name: 'accept', args: ['Alice'], personNamed: true });
         expect(f.frames.some(frame => frame.t === 'pm' && frame.text === 'Synthetic first message')).toBe(true);
         await f.cmd('alice', 'join', ['#art-camera']); await f.cmd('bravo', 'join', ['#art-camera']);
         await f.message('alice', { t: 'cam', ch: '#art-camera', on: true, adult18: true }); expect(f.engine._debug.conns.get('alice').cams.size).toBe(1);
         await f.withdraw('bravo'); f.frames.length = 0;
-        expect((await f.cmd('alice', 'msg', ['Bravo', 'Must not reach a withdrawn peer'])).ok).toBe(false);
+        expect((await f.message('alice', { t: 'cmd', ch: '#stalemate', name: 'msg', args: ['Bravo', 'Must not reach a withdrawn peer'], personNamed: true })).ok).toBe(false);
         await f.engine.refreshParticipation();
         expect(f.frames.some(frame => frame.t === 'pm')).toBe(false); expect(f.engine._debug.pm.size).toBe(0);
-        await f.cmd('alice', 'block', ['Bravo']); await f.withdraw('alice'); await f.engine.refreshParticipation();
+        await f.message('alice', { t: 'cmd', ch: '#stalemate', name: 'block', args: ['Bravo'], personNamed: true }); await f.withdraw('alice'); await f.engine.refreshParticipation();
         expect(f.engine._debug.conns.has('alice')).toBe(false); expect(f.closed.some(row => row[0] === 'alice')).toBe(true);
     });
     it('does not grant a new device or restored session stale participation permission', async () => {
@@ -206,7 +206,7 @@ describe('controlled C3 engine integration', () => {
         await f.storage.transaction(tx => tx.put(PARTICIPATION_LEDGER_KEY, { corrupt: true }));
         await f.message('alice', { t: 'report', id: line.id }); expect(f.engine.adminState().reports).toHaveLength(1);
         expect((await f.message('alice', { t: 'say', ch: '#stalemate', text: 'No policy fallback' })).ok).toBe(false);
-        await f.cmd('alice', 'block', ['Bravo']); expect(f.engine._debug.conns.get('alice').blocks.has('dev-bravo')).toBe(true);
+        await f.message('alice', { t: 'cmd', ch: '#stalemate', name: 'block', args: ['Bravo'], personNamed: true }); expect(f.engine._debug.conns.get('alice').blocks.has('dev-bravo')).toBe(true);
         await f.cmd('alice', 'quit'); expect(f.engine._debug.conns.has('alice')).toBe(false);
     });
     it('keeps safety actions usable when valid creative state exceeds the full checkpoint traversal ceiling', async () => {
@@ -224,7 +224,7 @@ describe('controlled C3 engine integration', () => {
         expect(await f.message('alice', { t: 'say', ch: '#stalemate', text: 'Cannot pay full capture cost' })).toMatchObject({ ok: false, reason: 'participation-capacity' });
         expect(f.engine._debug.conns.get('alice').frames).toBe(before + 1);
         await f.message('alice', { t: 'report', id: line.id }); expect(f.engine.adminState().reports).toHaveLength(1);
-        await f.cmd('alice', 'block', ['Bravo']); expect(f.engine._debug.conns.get('alice').blocks.has('dev-bravo')).toBe(true);
+        await f.message('alice', { t: 'cmd', ch: '#stalemate', name: 'block', args: ['Bravo'], personNamed: true }); expect(f.engine._debug.conns.get('alice').blocks.has('dev-bravo')).toBe(true);
         await f.cmd('alice', 'quit', ['Unqualified arbitrary quit text']); expect(f.engine._debug.conns.has('alice')).toBe(false);
         expect(f.frames.some(frame => frame.t === 'event' && frame.text.includes('Unqualified arbitrary quit text'))).toBe(false);
         expect(f.legacyPersist).not.toHaveBeenCalled();
@@ -241,7 +241,7 @@ describe('controlled C3 engine integration', () => {
         const f = await setup(); await f.connect('alice'); await f.connect('bravo'); await f.message('alice', { t: 'say', ch: '#stalemate', text: 'Benign earlier report target' });
         const target = f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'line'), held = gate(); f.controls.commitGate = held;
         const pending = f.message('alice', { t: 'say', ch: '#stalemate', text: 'Uncommitted quarantine body' }); await held.entered;
-        const reporting = f.message('bravo', { t: 'report', id: target.id }), blocking = f.cmd('bravo', 'block', ['Alice']);
+        const reporting = f.message('bravo', { t: 'report', id: target.id }), blocking = f.message('bravo', { t: 'cmd', ch: '#stalemate', name: 'block', args: ['Alice'], personNamed: true });
         Object.freeze(f.engine._debug.channels.get('#stalemate')); await f.withdraw(); held.release();
         for (const result of await Promise.all([pending, reporting, blocking])) expect(result).toMatchObject({ ok: false, reason: 'participation-unavailable' });
         expect(f.engine._debug.conns.size).toBe(0); expect(f.closed.filter(row => row[1] === 1011)).toHaveLength(2);

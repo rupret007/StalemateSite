@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 
 let engine, frames, closes, now, seq;
-const cmd = (id, name, args = [], ch = '#stalemate') => engine.message(id, JSON.stringify({ t: 'cmd', name, args, ch }));
+const cmd = (id, name, args = [], ch = '#stalemate', intent = {}) => engine.message(id, JSON.stringify({ t: 'cmd', name, args, ch, ...intent }));
 function guest(nick, extra = {}) {
     const id = `c${++seq}`;
     engine.connect({ id, dev: `dev-${nick}`, iph: `ip-${nick}`, ...extra });
@@ -24,7 +24,7 @@ describe('restricted room privacy', () => {
         if (restriction === 'locked') cmd(owner, 'lock', [], '#secret');
         else cmd(owner, 'mode', [restriction, 'secretkey'], '#secret');
         const outsider = guest('Outsider'); frames.length = 0;
-        cmd(outsider, 'names', ['#secret']); cmd(outsider, 'topic', [], '#secret'); cmd(outsider, 'whois', ['Owner']);
+        cmd(outsider, 'names', ['#secret']); cmd(outsider, 'topic', [], '#secret'); cmd(outsider, 'whois', ['Owner'], '#stalemate', { personNamed: true });
         const notices = frames.filter((f) => f.recipient === outsider).map((f) => f.text).join('\n');
         expect(notices).not.toContain('#secret'); expect(notices).not.toContain('Private rehearsal'); expect(notices).not.toContain('@Owner');
         cmd(owner, 'names', ['#secret']); cmd(owner, 'topic', [], '#secret');
@@ -43,7 +43,7 @@ describe('identity-wide bans and owner protection', () => {
         const sameAccount = guest('OtherDevice', { account: 'account-alice' });
         const sameDevice = guest('AnotherTab', { dev: 'dev-Alice' });
         const bystander = guest('Bystander'); const mod = guest('Helper', { role: 'moderator' });
-        cmd(mod, 'gban', ['Alice', 'Repeated abuse']);
+        cmd(mod, 'gban', ['Alice', 'Repeated abuse'], '#stalemate', { personNamed: true });
         for (const id of [target, sameAccount, sameDevice]) expect(engine._debug.conns.has(id)).toBe(false);
         expect(engine._debug.conns.has(bystander)).toBe(true);
         frames.length = 0;
@@ -53,8 +53,8 @@ describe('identity-wide bans and owner protection', () => {
     });
     it('protects a registered owner from guest and verified co-host kick/ban', () => {
         const owner = guest('Owner', { account: 'account-owner' }); cmd(owner, 'join', ['#friends']); cmd(owner, 'register', [], '#friends');
-        const host = guest('Cohost', { account: 'account-host' }); cmd(host, 'join', ['#friends']); cmd(owner, 'cohost', ['add', 'Cohost'], '#friends');
-        cmd(host, 'kick', ['Owner'], '#friends'); cmd(host, 'ban', ['Owner', 'Cannot remove owner'], '#friends');
+        const host = guest('Cohost', { account: 'account-host' }); cmd(host, 'join', ['#friends']); cmd(owner, 'cohost', ['add', 'Cohost'], '#friends', { personNamed: true });
+        cmd(host, 'kick', ['Owner'], '#friends', { personNamed: true }); cmd(host, 'ban', ['Owner', 'Cannot remove owner'], '#friends', { personNamed: true });
         const room = engine._debug.channels.get('#friends');
         expect(room.members.has(owner)).toBe(true); expect(room.bans).toEqual([]); expect(room.kicks['dev-Owner']).toBeUndefined();
     });
@@ -66,7 +66,7 @@ describe('identity-wide bans and owner protection', () => {
     it('removes existing alternate devices when a room account ban is applied', () => {
         const owner = guest('Owner'); cmd(owner, 'join', ['#friends']);
         const target = guest('Alice', { account: 'account-alice' }); const other = guest('OtherDevice', { account: 'account-alice' });
-        cmd(target, 'join', ['#friends']); cmd(other, 'join', ['#friends']); cmd(owner, 'ban', ['Alice', 'Repeated abuse'], '#friends');
+        cmd(target, 'join', ['#friends']); cmd(other, 'join', ['#friends']); cmd(owner, 'ban', ['Alice', 'Repeated abuse'], '#friends', { personNamed: true });
         const room = engine._debug.channels.get('#friends');
         expect(room.members.has(target)).toBe(false); expect(room.members.has(other)).toBe(false);
         expect(engine._debug.conns.has(other)).toBe(true);

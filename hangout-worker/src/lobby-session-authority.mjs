@@ -6,7 +6,8 @@ import { validRoomId } from './core.mjs';
 import { BETA_TTL, betaVersion } from './beta-session-client.mjs';
 import { validBetaRecord } from './beta-session-state.mjs';
 import { createDurableRecordStorage } from './durable-record-storage.mjs';
-import { initializeLobbyEffects, readLobbyState, writeLobbyEffects, pruneLobbyEffectLogs, loadLobbyIncidentEvidence } from './lobby-effect-records.mjs';
+import { initializeLobbyEffects, readLobbyState, writeLobbyEffects, pruneLobbyEffectLogs, loadLobbyIncidentEvidence,
+    personRoomProjection, validPersonRoomProjection, readPersonRoomProjection } from './lobby-effect-records.mjs';
 import { lobbyIncidentSourceMode } from './lobby-incident-sources.mjs';
 import { validPrivateReportState } from './private-reports.mjs';
 import { createLobby } from './lobby-core.mjs';
@@ -471,13 +472,28 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
         }),
         effectCommit: Object.freeze({
             async prepare(operation) { const context = Object.freeze({}); contexts.set(context, clone(operation)); return context; },
-            async commit(context, effects, { costsOnly = false, participation = null } = {}) {
+            async commit(context, effects, { costsOnly = false, participation = null, personDependencies = null } = {}) {
+                let personTargetStale = false;
                 try {
                     const operation = contexts.get(context); ensure(operation && typeof operation.kind === 'string');
+                    const dependencies = personDependencies === null ? null : clone(personDependencies);
+                    if (dependencies) {
+                        ensure(exact(dependencies, Object.hasOwn(dependencies, 'room') ? ['peerIds', 'room'] : ['peerIds'])
+                            && Array.isArray(dependencies.peerIds) && dependencies.peerIds.length <= CONNECTION_LIMIT
+                            && dependencies.peerIds.every(id => typeof id === 'string' && id.length > 0 && id.length <= 160)
+                            && new Set(dependencies.peerIds).size === dependencies.peerIds.length);
+                        if (dependencies.room) ensure(exact(dependencies.room, ['name', 'keepRef', 'before', 'after'])
+                            && /^#[a-z0-9-]{2,30}$/.test(dependencies.room.name) && dependencies.room.name !== '#stalemate'
+                            && /^[a-f0-9]{32}$/.test(dependencies.room.keepRef)
+                            && validPersonRoomProjection(dependencies.room.before) && validPersonRoomProjection(dependencies.room.after));
+                    }
+                    const confirmTarget = value => {
+                        if (!value) { personTargetStale = true; throw Error('person-target-stale'); }
+                    };
                     let guardedCompleted = false;
                     const guarded = async work => {
                         const result = await transact(async tx => {
-                        const authorize = async () => {
+                        const authorize = async phase => {
                             const client = ['connect', 'message', 'control', 'private-report-complete'].includes(operation.kind);
                             if (client && !costsOnly) {
                                 const actor = operation.connections.find(value => value.id === operation.actorId);
@@ -489,8 +505,19 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
                                 // by the engine independently of C2 purposes.
                                 if (operation.kind === 'tick' && !costsOnly) for (const contributor of operation.connections) ensure(await validateBinding(tx, bindingFrom(contributor)));
                             }
+                            if (dependencies && !costsOnly) {
+                                for (const id of dependencies.peerIds) {
+                                    const selected = operation.connections.find(value => value.id === id);
+                                    confirmTarget(selected && await validateBinding(tx, bindingFrom(selected)));
+                                }
+                                if (dependencies.room) {
+                                    const room = dependencies.room;
+                                    const current = await readPersonRoomProjection({ tx, name: room.name, keepRef: room.keepRef, now: now() });
+                                    confirmTarget(current && JSON.stringify(current) === JSON.stringify(personRoomProjection(room[phase])));
+                                }
+                            }
                         };
-                        await authorize(); const result = await work(tx); await authorize(); return result;
+                        await authorize('before'); const result = await work(tx); await authorize('after'); return result;
                         });
                         guardedCompleted = true; return result;
                     };
@@ -499,7 +526,7 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
                         ensure(result?.ok && guardedCompleted); return result;
                     }
                     await guarded(tx => commitEffects({ tx, effects, costsOnly })); return { ok: true };
-                } catch { return { ok: false, reason: 'session-unavailable' }; }
+                } catch { return { ok: false, reason: personTargetStale ? 'person-target-stale' : 'session-unavailable' }; }
             }
         })
     });

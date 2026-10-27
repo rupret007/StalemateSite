@@ -15,6 +15,9 @@ function guest(nick, role = 'fan', dev = `dev-${nick}`) {
     return identity.id;
 }
 const cmd = (id, name, args = [], ch = '#stalemate') => engine.message(id, JSON.stringify({ t: 'cmd', name, args, ch }));
+// Deliberate nickname intent at these explicit call sites; selected/negative frames stay unmarked.
+const namedCmd = (id, name, args = [], ch = '#stalemate') => engine.message(id, JSON.stringify({ t: 'cmd', name, args, ch,
+    ...(name === 'msg' || name === 'm' ? { pmExplicit: true } : { personNamed: true }) }));
 function say(id, text, ch = '#stalemate') {
     now += 4000; engine.message(id, JSON.stringify({ t: 'say', text, ch }));
     return frames.filter((f) => f.recipient === id && f.t === 'line').at(-1);
@@ -56,7 +59,7 @@ describe('durable delivery receipts without a saved chat backlog', () => {
     it('denies outsiders, ignored visitors, reconnects and the author while preserving an actual witness after part', () => {
         const sender = guest('Sender'); const witness = guest('Witness'); const ignored = guest('Ignored'); const outside = guest('Outside');
         cmd(sender, 'join', ['#sealed']); cmd(sender, 'mode', ['+k', 'secret'], '#sealed');
-        cmd(witness, 'join', ['#sealed', 'secret']); cmd(ignored, 'join', ['#sealed', 'secret']); cmd(ignored, 'ignore', ['Sender']);
+        cmd(witness, 'join', ['#sealed', 'secret']); cmd(ignored, 'join', ['#sealed', 'secret']); namedCmd(ignored, 'ignore', ['Sender']);
         const line = say(sender, 'Only the actual witnesses may report this', '#sealed'); cmd(witness, 'part', [], '#sealed');
         const saved = snapshot(); wake(saved);
         report(outside, line); report(ignored, line); report(sender, line);
@@ -67,7 +70,7 @@ describe('durable delivery receipts without a saved chat backlog', () => {
 
     it('restores report eligibility for accepted PMs without storing a PM body or disclosing it to other visitors', () => {
         const sender = guest('Sender'); const witness = guest('Witness'); const outsider = guest('Outside'); now += 180000;
-        cmd(sender, 'msg', ['Witness', 'Consented private sentence']); cmd(witness, 'accept', ['Sender']);
+        namedCmd(sender, 'msg', ['Witness', 'Consented private sentence']); namedCmd(witness, 'accept', ['Sender']);
         const line = frames.filter((f) => f.recipient === witness && f.t === 'pm').at(-1);
         const saved = snapshot(); expect(JSON.stringify(saved.sessions)).not.toContain(line.text);
         wake(saved); report(outsider, line); expect(engine.adminState().reports).toEqual([]);
@@ -104,7 +107,7 @@ describe('durable delivery receipts without a saved chat backlog', () => {
         wake(snapshot()); expect(engine._debug.lines.size).toBe(0);
         cmd(staff, 'delete', [first.id]);
         expect(frames.some((f) => f.t === 'delete' && f.ids.includes(first.id))).toBe(true);
-        cmd(staff, 'purge', ['Sender']);
+        namedCmd(staff, 'purge', ['Sender']);
         expect(frames.some((f) => f.t === 'delete' && f.ids.includes(second.id))).toBe(true);
         expect(engine.sessionSnapshot().receipts.map((r) => r.id)).toEqual([third.id]);
         expect(frames.filter((f) => f.t === 'line')).toEqual([]);
@@ -160,10 +163,10 @@ describe('durable delivery receipts without a saved chat backlog', () => {
 
     it('retains no delivery receipt for a line received by nobody', () => {
         const sender = guest('Sender', 'owner');
-        cmd(sender, 'ignore', ['Sender']);
+        namedCmd(sender, 'ignore', ['Sender']);
         say(sender, 'No one receives this line');
         expect(engine.sessionSnapshot().receipts).toEqual([]);
-        cmd(sender, 'unignore', ['Sender']);
+        namedCmd(sender, 'unignore', ['Sender']);
         say(sender, 'This line has an actual recipient');
         expect(engine.sessionSnapshot().receipts).toHaveLength(1);
     });

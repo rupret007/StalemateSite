@@ -13,7 +13,7 @@ const snapshot = (changes = {}) => ({
     aiModeration: aiStatus(), aiReviews: [], ...changes
 });
 
-async function openFixture(page, baseURL, initial) {
+async function openFixture(page, baseURL, initial, { personTargetFeature = 1 } = {}) {
     let socket;
     const commands = [];
     const providerRequests = [];
@@ -27,7 +27,7 @@ async function openFixture(page, baseURL, initial) {
                 ws.send(JSON.stringify({ t: 'admin', state: initial }));
             } else commands.push(frame);
         });
-        ws.send(JSON.stringify({ t: 'hello', role: 'band' }));
+        ws.send(JSON.stringify({ t: 'hello', role: 'band', features: personTargetFeature === null ? {} : { personTargets: personTargetFeature } }));
     });
     const relay = hangoutRelayWsBase(baseURL, 'ai-admin-fixture');
     await page.goto(`${ROOT}admin/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
@@ -152,4 +152,58 @@ test('community moderators see review actions without band configuration control
     await expect(page.locator('[data-users]')).not.toContainText('⭐ Helper');
     await page.click('[data-tab="queue"]');
     await expect(page.locator('[data-ai-state]')).toBeVisible();
+});
+
+
+test('selected admin people and individual ban rules use exact identities and the original room instance', async ({ page, baseURL }) => {
+    const nonce = 'a'.repeat(32), firstMask = 'dev:ExactCaseOriginal', secondMask = 'dev:ExactCaseOther';
+    const state = snapshot({ users: [{ id: 'original-connection', nick: 'Original', role: 'fan', channels: ['#stalemate'] }],
+        rooms: [{ name: '#stalemate', kind: 'lobby', keepRef: nonce, modes: {} }],
+        bans: [{ mask: firstMask, nick: 'EarlierOriginal', by: 'Reviewer', at: 1800000000000, reason: 'First exact restriction' },
+            { mask: secondMask, nick: 'OtherVisitor', by: 'Reviewer', at: 1800000000000, reason: 'Independent restriction' }] });
+    const fixture = await openFixture(page, baseURL, state);
+    await page.click('[data-tab="people"]');
+    const originalRow = page.locator('[data-users] > li').filter({ hasText: /^Original/ });
+    // A native reason prompt holds this selected row's action while a new
+    // roster snapshot is queued. The endpoint must remain the original ID.
+    page.once('dialog', async dialog => {
+        fixture.publish({ ...state, users: [
+            { id: 'original-connection', nick: 'RenamedOriginal', role: 'fan', channels: ['#stalemate'] },
+            { id: 'replacement-connection', nick: 'Original', role: 'fan', channels: ['#stalemate'] }
+        ] });
+        await dialog.accept('A reason for the selected original connection');
+    });
+    await originalRow.getByRole('button', { name: 'Ban', exact: true }).click();
+    await expect.poll(() => fixture.commands.length).toBe(1);
+    expect(fixture.commands[0]).toMatchObject({ t: 'cmd', name: 'gban', ch: '#stalemate', roomInstance: nonce, personContext: 1, personPeer: 'original-connection' });
+    expect(fixture.commands[0]).not.toHaveProperty('personNamed');
+    await expect(page.locator('[data-users]')).toContainText('RenamedOriginal');
+    await page.locator('[data-users] > li').filter({ hasText: /^RenamedOriginal/ }).getByRole('button', { name: 'Purge lines', exact: true }).click();
+    await expect.poll(() => fixture.commands.length).toBe(2);
+    expect(fixture.commands[1]).toMatchObject({ name: 'purge', personPeer: 'original-connection', roomInstance: nonce });
+    expect(await page.locator('[data-bans] > li').count()).toBe(2);
+    await page.locator('[data-bans] > li').filter({ hasText: 'EarlierOriginal' }).getByRole('button', { name: 'Unban this rule', exact: true }).click();
+    await expect.poll(() => fixture.commands.length).toBe(3);
+    expect(fixture.commands[2]).toEqual({ t: 'cmd', name: 'unban', args: [firstMask], ch: '#stalemate', roomInstance: nonce });
+    expect(fixture.commands[2]).not.toHaveProperty('personPeer');
+    await expect(page.locator('[data-bans]')).toContainText('OtherVisitor');
+    // Rule masks are staff-only action values, not public nickname identity or
+    // newly displayed device/account identifiers.
+    await expect(page.locator('[data-bans]')).not.toContainText(firstMask);
+    expect(fixture.providerRequests).toEqual([]);
+});
+
+test('older admin capabilities disable ambiguous person controls while exact evidence actions stay usable', async ({ page, baseURL }) => {
+    const state = snapshot({ users: [{ id: 'original-connection', nick: 'Original', role: 'fan', channels: ['#stalemate'] }],
+        rooms: [{ name: '#stalemate', kind: 'lobby', keepRef: 'a'.repeat(32), modes: {} }],
+        reports: [{ id: 'exact-message', from: 'HistoricalName', ch: '#stalemate', count: 1, text: 'Retained exact evidence', context: [] }],
+        bans: [{ mask: 'dev:StoredExactRule', nick: 'HistoricalName', by: 'Reviewer', at: 1800000000000, reason: 'Stored rule' }] });
+    const fixture = await openFixture(page, baseURL, state, { personTargetFeature: '1' });
+    await page.click('[data-tab="people"]');
+    for (const label of ['Mute 10m', 'Mute 24h', 'Kick', 'Ban', 'Purge lines'])
+        await expect(page.locator('[data-users]').getByRole('button', { name: label, exact: true })).toBeDisabled();
+    await expect(page.locator('[data-bans]').getByRole('button', { name: 'Unban this rule', exact: true })).toBeDisabled();
+    await page.click('[data-tab="queue"]');
+    await page.locator('[data-reports]').getByRole('button', { name: 'Delete', exact: true }).click();
+    await expect.poll(() => fixture.commands).toEqual([{ t: 'cmd', name: 'delete', args: ['exact-message'], ch: '#stalemate' }]);
 });

@@ -67,14 +67,43 @@ function validRoomRecord(room, now) {
         && unique(room.ops, 150, id) && unique(room.voice, 150, id) && unique(room.invites, 150, id) && unique(room.cohosts, 150, id)
         && list(room.opAccounts, room.ops.length, row => pair(row) && row.every(id) && room.ops.includes(row[0]))
         && new Set(room.opAccounts.map(row => row[0])).size === room.opAccounts.length
-        && room.bans.every(ban => shape(ban, ['mask'], ['reason', 'by', 'at', 'nick', 'until'])
+        && room.bans.every(ban => shape(ban, ['mask'], ['reason', 'by', 'at', 'nick', 'until', 'displayNick'])
             && (!Object.hasOwn(ban, 'reason') || text(ban.reason, 80)) && (!Object.hasOwn(ban, 'by') || text(ban.by, 128))
-            && (!Object.hasOwn(ban, 'at') || time(ban.at, now)) && (!Object.hasOwn(ban, 'nick') || nick(ban.nick)))
+            && (!Object.hasOwn(ban, 'at') || time(ban.at, now)) && (!Object.hasOwn(ban, 'nick') || nick(ban.nick))
+            && (!Object.hasOwn(ban, 'displayNick') || nick(ban.displayNick)))
         && shape(room.act, ['strokes', 'video']) && room.act.strokes.every(stroke => shape(stroke, ['id', 'color', 'size', 'pts'])
             && same(H.cleanSnapshotStroke(stroke), stroke))
         && (room.act.video === null || shape(room.act.video, ['source', 'playing', 'pos', 't'])
             && shape(room.act.video.source, ['kind', 'id']) && same(H.cleanSource(room.act.video.source), room.act.video.source)
             && typeof room.act.video.playing === 'boolean' && number(room.act.video.pos) && room.act.video.pos <= DAY / 1000 && time(room.act.video.t, now));
+}
+
+// Trusted engine/transaction comparison only. These are existing private room
+// permission references, never a browser-supplied role or a new authority.
+export function personRoomProjection(room) {
+    return { owner: room.owner || '', ops: [...room.ops].sort(),
+        opAccounts: [...room.opAccounts].map(pair => [...pair]).sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
+        cohosts: [...room.cohosts].sort(), voice: [...room.voice].sort(),
+        modes: Object.fromEntries(['m', 'i', 't', 'C', 'Q', 'locked', 'k', 'l', 'S'].map(key => [key, room.modes[key]])) };
+}
+export function validPersonRoomProjection(value) {
+    return shape(value, ['owner', 'ops', 'opAccounts', 'cohosts', 'voice', 'modes']) && (value.owner === '' || id(value.owner))
+        && unique(value.ops, 150, id) && unique(value.cohosts, 150, id)
+        && unique(value.voice, 150, id) && shape(value.modes, ['m', 'i', 't', 'C', 'Q', 'locked', 'k', 'l', 'S'])
+        && ['m', 'i', 't', 'C', 'Q', 'locked'].every(key => typeof value.modes[key] === 'boolean')
+        && typeof value.modes.k === 'string' && (value.modes.k === '' || /^[A-Za-z0-9]{3,20}$/.test(value.modes.k))
+        && integer(value.modes.l) && value.modes.l >= 1 && value.modes.l <= 8
+        && integer(value.modes.S) && value.modes.S <= 300
+        && list(value.opAccounts, value.ops.length, pair => Array.isArray(pair) && pair.length === 2 && pair.every(id) && value.ops.includes(pair[0]))
+        && new Set(value.opAccounts.map(pair => pair[0])).size === value.opAccounts.length;
+}
+export async function readPersonRoomProjection({ tx, name, keepRef, now }) {
+    const index = await tx.get('room-index'); ensure(validIndex(index));
+    const room = await tx.get(`community-room:${name}`);
+    if (!index.names.includes(name)) { ensure(room === undefined); return null; }
+    ensure(room && room.name === name && validRoomRecord(room, now));
+    ensure(!Object.hasOwn(room, 'keepRef') || typeof room.keepRef === 'string' && /^[a-f0-9]{32}$/.test(room.keepRef));
+    return room.keepRef === keepRef ? personRoomProjection(room) : null;
 }
 function validRooms(value, now) {
     return shape(value, ['version', 'rooms']) && value.version === 1 && list(value.rooms, 1030, room => validRoomRecord(room, now))
@@ -92,15 +121,19 @@ function validAbuse(value, now) {
 function validSessions(value, now) {
     const names = (rows, max, check) => unique(rows, max, check);
     const connection = row => shape(row, ['id', 'dev', 'iph', 'account', 'role', 'admin', 'nick', 'entrySource', 'channels', 'away', 'ignores', 'blocks',
-        'pmOff', 'cams', 'since', 'lastNick', 'tokens', 'last', 'frames', 'lastSaid', 'actTokens', 'actLast', 'camReports'], ['safetyOnly'])
+        'pmOff', 'cams', 'since', 'lastNick', 'tokens', 'last', 'frames', 'lastSaid', 'actTokens', 'actLast', 'camReports'], ['safetyOnly', 'ignoredPeerIds'])
         && [row.id, row.dev, row.iph].every(id) && (row.account === '' || id(row.account)) && ['fan', 'moderator', 'band', 'owner'].includes(row.role)
         && typeof row.admin === 'boolean' && (row.safetyOnly === true ? row.nick === '' && Array.isArray(row.channels) && row.channels.length === 0 && Array.isArray(row.cams) && row.cams.length === 0 && row.away === '' && row.entrySource === '' && row.pmOff === true : !Object.hasOwn(row, 'safetyOnly') && nick(row.nick)) && (row.entrySource === '' || typeof row.entrySource === 'string' && /^[a-z][a-z0-9-]{0,31}$/.test(row.entrySource))
-        && names(row.channels, 31, channel) && text(row.away, 80) && names(row.ignores, 50, nick) && names(row.blocks, 50, id) && typeof row.pmOff === 'boolean'
+        && names(row.channels, 31, channel) && text(row.away, 80) && names(row.ignores, 50, nick)
+        && (!Object.hasOwn(row, 'ignoredPeerIds') || names(row.ignoredPeerIds, 50, id))
+        && !(row.ignoredPeerIds || []).includes(row.id) && row.ignores.length + (row.ignoredPeerIds?.length || 0) <= 50 && names(row.blocks, 50, id) && typeof row.pmOff === 'boolean'
         && names(row.cams, 30, channel) && row.cams.every(name => row.channels.includes(name))
         && [row.since, row.lastNick, row.last, row.actLast].every(at => time(at, now)) && number(row.tokens) && row.tokens <= 5
         && number(row.actTokens) && row.actTokens <= 24 && integer(row.frames) && row.frames <= 4000 && integer(row.camReports) && row.camReports <= 150
         && object(row.lastSaid) && Object.keys(row.lastSaid).length <= 31 && Object.entries(row.lastSaid).every(([name, at]) => row.channels.includes(name) && time(at, now));
-    if (!shape(value, ['version', 'connections', 'pm', 'pendingPm', 'receipts']) || value.version !== 1 || !list(value.connections, 200, connection)
+    if (!shape(value, ['version', 'connections', 'pm', 'pendingPm', 'receipts'], ['lobbyInstance']) || value.version !== 1
+        || Object.hasOwn(value, 'lobbyInstance') && (typeof value.lobbyInstance !== 'string' || !/^[a-f0-9]{32}$/.test(value.lobbyInstance))
+        || !list(value.connections, 200, connection)
         || new Set(value.connections.map(row => row.id)).size !== value.connections.length
         || new Set(value.connections.filter(row => !row.safetyOnly).map(row => row.nick.toLowerCase())).size !== value.connections.filter(row => !row.safetyOnly).length || bytes(value) > 2 * MIB) return false;
     const connections = new Map(value.connections.map(row => [row.id, row]));
@@ -125,9 +158,10 @@ function validSessions(value, now) {
 function validNet(value, now) {
     const counts = rows => object(rows) && Object.values(rows).every(number);
     return shape(value, ['bans', 'kicks', 'mutes', 'lock', 'shield', 'shieldAuto', 'lockAuto', 'lists', 'lastBand', 'budget', 'reportsToHide', 'stats'])
-        && list(value.bans, 5000, row => shape(row, ['mask', 'by', 'reason', 'at'], ['nick', 'until']) && text(row.mask, 300, 1)
+        && list(value.bans, 5000, row => shape(row, ['mask', 'by', 'reason', 'at'], ['nick', 'until', 'displayNick']) && text(row.mask, 300, 1)
             && /^(dev|iph|account|nick):/.test(row.mask) && text(row.by, 128) && text(row.reason, 80) && time(row.at, now)
-            && (!Object.hasOwn(row, 'nick') || nick(row.nick)) && (!Object.hasOwn(row, 'until') || row.until === null || number(row.until)))
+            && (!Object.hasOwn(row, 'nick') || nick(row.nick)) && (!Object.hasOwn(row, 'displayNick') || nick(row.displayNick))
+            && (!Object.hasOwn(row, 'until') || row.until === null || number(row.until)))
         && [value.kicks, value.mutes].every(rows => object(rows) && Object.entries(rows).every(([key, until]) => id(key) && number(until)))
         && ['off', 'readonly', 'closed'].includes(value.lock) && ['shield', 'shieldAuto', 'lockAuto'].every(key => typeof value[key] === 'boolean')
         && shape(value.lists, ['block', 'hold', 'allow']) && Object.values(value.lists).every(rows => list(rows, 2000, word => text(word, 40, 1)))

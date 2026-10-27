@@ -10,6 +10,9 @@ function fixture() {
         persist: (kind, value) => { writes.push([kind, structuredClone(value)]); },
         reviewPublicText: (...args) => providerCalls.push(args) });
     const cmd = (id, name, args = []) => engine.message(id, JSON.stringify({ t: 'cmd', name, args, ch: '#stalemate' }));
+    // Deliberate nickname intent at these explicit call sites; selected/negative frames stay unmarked.
+    const namedCmd = (id, name, args = []) => engine.message(id, JSON.stringify({ t: 'cmd', name, args, ch: '#stalemate',
+        ...(name === 'msg' || name === 'm' ? { pmExplicit: true } : { personNamed: true }) }));
     function join(id, role = 'fan') {
         expect(engine.connect({ id, dev: `device-${id}`, iph: `ip-${id}`, role, admin: role === 'owner' }).ok).toBe(true);
         engine.message(id, JSON.stringify({ t: 'hello', nick: id, age13: true }));
@@ -18,13 +21,13 @@ function fixture() {
     const pm = id => frames.filter(frame => frame.recipient === id && frame.t === 'pm');
     function establish(text = 'Synthetic selected private sentence') {
         join('Sender'); join('Recipient'); join('Observer'); join('Staff', 'owner'); time += 180000;
-        cmd('Sender', 'msg', ['Recipient', text]);
+        namedCmd('Sender', 'msg', ['Recipient', text]);
         expect(pm('Recipient')).toEqual([]);
-        cmd('Recipient', 'accept', ['Sender']);
+        namedCmd('Recipient', 'accept', ['Sender']);
         expect(pm('Recipient')).toHaveLength(1);
         return pm('Recipient')[0];
     }
-    return { engine, cmd, join, pm, establish, frames, writes, providerCalls, later: ms => { time += ms; } };
+    return { engine, cmd, namedCmd, join, pm, establish, frames, writes, providerCalls, later: ms => { time += ms; } };
 }
 
 describe('private messages use consent and participant reports without automatic content classification', () => {
@@ -33,12 +36,12 @@ describe('private messages use consent and participant reports without automatic
         f.join('Sender'); f.join('Recipient'); f.join('Observer'); f.join('Staff', 'owner'); f.later(180000);
         f.cmd('Staff', 'filter', ['block', 'syntheticmarker']);
         const text = 'syntheticmarker person@example.test';
-        f.cmd('Sender', 'msg', ['Recipient', text]);
+        f.namedCmd('Sender', 'msg', ['Recipient', text]);
         expect(f.frames.filter(frame => frame.recipient === 'Recipient' && frame.t === 'pm-request')).toHaveLength(1);
         expect(f.pm('Recipient')).toEqual([]);
-        f.cmd('Recipient', 'accept', ['Sender']);
+        f.namedCmd('Recipient', 'accept', ['Sender']);
         expect(f.pm('Recipient').map(frame => frame.text)).toEqual([text]);
-        f.later(4000); f.cmd('Sender', 'msg', ['Recipient', 'Another contact choice: second@example.test']);
+        f.later(4000); f.namedCmd('Sender', 'msg', ['Recipient', 'Another contact choice: second@example.test']);
         expect(f.pm('Recipient')).toHaveLength(2);
         expect(f.pm('Observer')).toEqual([]); expect(f.pm('Staff')).toEqual([]);
         expect(f.providerCalls).toEqual([]);
@@ -66,14 +69,14 @@ describe('private messages use consent and participant reports without automatic
         expect(line.text).toMatch(/^p+$/);
         expect(line.text.length).toBeGreaterThan(250);
         expect(line.text.length).toBeLessThanOrEqual(300);
-        f.later(4000); f.cmd('Sender', 'msg', ['Recipient', '\u202e\u0001  ']);
+        f.later(4000); f.namedCmd('Sender', 'msg', ['Recipient', '\u202e\u0001  ']);
         expect(f.pm('Recipient')).toHaveLength(1);
         expect(f.engine._debug.lines.has(line.id)).toBe(false);
     });
 
     it('accepts only an exact participant-selected report, without adjacent private messages', () => {
         const f = fixture(), first = f.establish('Private adjacent sentence excluded from the report');
-        f.later(4000); f.cmd('Sender', 'msg', ['Recipient', 'Only this selected synthetic sentence goes to staff']);
+        f.later(4000); f.namedCmd('Sender', 'msg', ['Recipient', 'Only this selected synthetic sentence goes to staff']);
         const selected = f.pm('Recipient').at(-1);
         const report = (who, text) => f.engine.message(who, JSON.stringify({ t: 'report', id: selected.id, text }));
         report('Observer', selected.text); report('Sender', selected.text); report('Recipient', 'Changed quote');
@@ -89,19 +92,19 @@ describe('private messages use consent and participant reports without automatic
 
     it('preserves PM consent, blocking, muting and read-only checks without classifying private content', () => {
         const f = fixture(); f.establish();
-        f.cmd('Recipient', 'block', ['Sender']);
-        f.later(4000); f.cmd('Sender', 'msg', ['Recipient', 'A blocked message']);
+        f.namedCmd('Recipient', 'block', ['Sender']);
+        f.later(4000); f.namedCmd('Sender', 'msg', ['Recipient', 'A blocked message']);
         expect(f.pm('Recipient')).toHaveLength(1);
-        f.cmd('Recipient', 'unblock', ['Sender']);
-        f.cmd('Sender', 'msg', ['Recipient', 'A new request needs fresh acceptance']);
+        f.namedCmd('Recipient', 'unblock', ['Sender']);
+        f.namedCmd('Sender', 'msg', ['Recipient', 'A new request needs fresh acceptance']);
         expect(f.pm('Recipient')).toHaveLength(1);
-        f.cmd('Recipient', 'accept', ['Sender']);
+        f.namedCmd('Recipient', 'accept', ['Sender']);
         expect(f.pm('Recipient')).toHaveLength(2);
-        f.cmd('Staff', 'mute', ['Sender', '10']); f.later(4000);
-        f.cmd('Sender', 'msg', ['Recipient', 'A muted message']);
+        f.namedCmd('Staff', 'mute', ['Sender', '10']); f.later(4000);
+        f.namedCmd('Sender', 'msg', ['Recipient', 'A muted message']);
         expect(f.pm('Recipient')).toHaveLength(2);
         f.cmd('Staff', 'lobby', ['readonly']); f.later(4000);
-        f.cmd('Recipient', 'msg', ['Sender', 'A read-only message']);
+        f.namedCmd('Recipient', 'msg', ['Sender', 'A read-only message']);
         expect(f.pm('Sender')).toHaveLength(2);
         expect(f.providerCalls).toEqual([]);
     });
@@ -109,10 +112,10 @@ describe('private messages use consent and participant reports without automatic
     it('expires pending first-message bodies without exposing them to a late acceptance', () => {
         const f = fixture(); f.join('Sender'); f.join('Recipient'); f.later(180000);
         const text = 'Pending private text is not a moderation record';
-        f.cmd('Sender', 'msg', ['Recipient', text]);
+        f.namedCmd('Sender', 'msg', ['Recipient', text]);
         expect(JSON.stringify(f.engine.sessionSnapshot())).not.toContain(text);
         expect(JSON.stringify(f.writes)).not.toContain(text);
-        f.later(600001); f.engine.tick(); f.cmd('Recipient', 'accept', ['Sender']);
+        f.later(600001); f.engine.tick(); f.namedCmd('Recipient', 'accept', ['Sender']);
         expect(f.engine._debug.pm.size).toBe(0); expect(f.pm('Recipient')).toEqual([]);
         expect(f.engine._debug.lines.size).toBe(0);
     });

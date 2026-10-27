@@ -44,8 +44,8 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, { shar
     await vi.waitFor(() => expect(sockets.length).toBe(1));
     const ws = sockets[0]; ws.open();
     ws.receive({ t: 'hello', role: 'fan', lock: 'off', budget: 'ok', features });
-    const welcome = (socket = ws, seq = 1) => socket.receive({ t: 'welcome', nick: 'Viewer', role: 'fan', band: false, verified: false, capabilities: {}, transportSeq: seq });
-    const join = (name = '#stalemate') => ws.receive({ t: 'join', ch: { name, kind: name === '#stalemate' ? 'lobby' : 'chat', title: 'Shared chat', topic: '', count: 1, modes: {}, names: [{ nick: 'Viewer', prefix: '', entrySource: via }] } });
+    const welcome = (socket = ws, seq = 1, metadata = {}) => socket.receive({ t: 'welcome', nick: 'Viewer', role: 'fan', band: false, verified: false, capabilities: {}, transportSeq: seq, ...metadata });
+    const join = (name = '#stalemate', metadata = {}) => ws.receive({ t: 'join', ch: { name, kind: name === '#stalemate' ? 'lobby' : 'chat', title: 'Shared chat', topic: '', count: 1, modes: {}, names: [{ nick: 'Viewer', prefix: '', entrySource: via }], ...metadata } });
     return { dom, window, ws, sockets, welcome, join, timers, paint, flush, advance: (ms) => { elapsed += ms; } };
 }
 
@@ -194,10 +194,10 @@ describe('private caller sharing controls in the actual browser client', () => {
 
     it('makes safety actions reachable during pending Stop and leaves the actual socket once without logout or reconnect', async () => {
         let release; const pending = new Promise(resolve => release = resolve);
-        const { window, ws, sockets, welcome, join, flush } = await visitor('stalemate', { entrySources: 1 }, { sharing: true, fetcher: async url => url.endsWith('/stop') ? pending
-            : Response.json({ ok: true, state: 'authorized', available: true, purposes: ['camera', 'public-text'], revision: 2, canStop: true }) }); welcome(); join();
+        const { window, ws, sockets, welcome, join, flush } = await visitor('stalemate', { entrySources: 1, personTargets: 1 }, { sharing: true, fetcher: async url => url.endsWith('/stop') ? pending
+            : Response.json({ ok: true, state: 'authorized', available: true, purposes: ['camera', 'public-text'], revision: 2, canStop: true }) }); welcome(ws, 1, { id: 'viewer-socket' }); join('#stalemate', { keepRef: 'a'.repeat(32), names: [{ id: 'viewer-socket', nick: 'Viewer', prefix: '' }, { id: 'friend-socket', nick: 'Friend', prefix: '' }] });
         window.HTMLDialogElement.prototype.showModal = function () { this.open = true; }; window.HTMLDialogElement.prototype.close = function () { this.open = false; };
-        ws.receive({ t: 'line', id: 'mleave', ch: '#stalemate', from: 'Friend', text: 'Received line for safety', ts: 1 });
+        ws.receive({ t: 'line', id: 'mleave', ch: '#stalemate', from: 'Friend', text: 'Received line for safety', ts: 1, personPeer: 'friend-socket', personSelf: false, roomInstance: 'a'.repeat(32) });
         const close = ws.close.bind(ws), closes = []; ws.close = (...args) => { closes.push(args); close(...args); };
         const get = selector => window.document.querySelector(selector);
         await vi.waitFor(() => expect(get('[data-sharing-stop]').disabled).toBe(false)); get('[data-sharing-stop]').click(); get('[data-sharing-accept]').click();
@@ -207,7 +207,7 @@ describe('private caller sharing controls in the actual browser client', () => {
         get('[data-buffer] .flag').click(); expect(ws.sent.some(frame => frame.t === 'report' && frame.id === 'mleave')).toBe(true);
         get('[data-buffer] .who').click(); expect([...window.document.querySelectorAll('[data-sheet-buttons] button')].map(button => button.textContent)).toEqual(['Ignore', 'Block']);
         [...window.document.querySelectorAll('[data-sheet-buttons] button')].find(button => button.textContent === 'Block').click();
-        expect(ws.sent.some(frame => frame.t === 'cmd' && frame.name === 'block')).toBe(true);
+        expect(ws.sent.filter(frame => frame.t === 'cmd' && frame.name === 'block')).toEqual([{ t: 'cmd', name: 'block', args: ['Friend'], ch: '#stalemate', roomInstance: 'a'.repeat(32), personContext: 1, personPeer: 'friend-socket' }]);
         get('[data-sharing-leave]').click(); get('[data-sharing-leave]').click();
         expect(closes).toEqual([[1000, 'Left chat']]); expect(ws.onclose).toBeNull(); expect(ws.onmessage).toBeNull();
         expect(window.__lobby.chans.size).toBe(0); expect(window.__lobby.pms.size).toBe(0); expect(get('[data-buffer]').children).toHaveLength(0);

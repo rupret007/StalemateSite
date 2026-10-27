@@ -238,10 +238,13 @@
         <h3 id="invite-dialog-title">Invite a guest</h3>
         <p>Invite someone to <b data-invite-room></b>. They choose whether to join.</p>
         <form data-invite-form>
+            <label class="channel-label" for="invite-person">Choose a current person</label>
+            <select id="invite-person" data-invite-options aria-describedby="invite-person-hint"></select>
+            <p class="small" id="invite-person-hint">This choice stays with that connection if their nickname changes.</p>
+            <button class="btn" type="button" data-invite-person-send>Invite selected person</button>
             <label class="channel-label" for="invite-nickname">Guest nickname</label>
-            <input id="invite-nickname" data-invite-nick list="invite-nickname-options" maxlength="20" autocomplete="off" spellcheck="false" aria-describedby="invite-nickname-hint invite-nickname-error" required>
-            <datalist id="invite-nickname-options" data-invite-options></datalist>
-            <p class="small" id="invite-nickname-hint">Use their current nickname from #stalemate. An invitation does not give host controls.</p>
+            <input id="invite-nickname" data-invite-nick maxlength="20" autocomplete="off" spellcheck="false" aria-describedby="invite-nickname-hint invite-nickname-error" required>
+            <p class="small" id="invite-nickname-hint">Typing a nickname selects whoever uses it when the invitation is sent. An invitation does not give host controls.</p>
             <p class="status" id="invite-nickname-error" data-invite-error role="status"></p>
             <div class="sheet-buttons"><button class="btn" type="submit">Send invitation</button><button class="btn btn--ghost" type="button" data-invite-cancel>Cancel</button></div>
         </form>

@@ -143,7 +143,13 @@ describe('explicit collocated lobby authority initialization and migration', () 
         const registrySnapshot = { v: 1, sessions: [], mintRates: { ['q'.repeat(22)]: { until: NOW + 10000, count: 7 } } };
         await migrateLobbySessionAuthority({ storage: f.storage, env: f.env, registrySnapshot, now: NOW });
         const loaded = (await f.authority.load()).state;
-        expect(loaded).toEqual({ ...f.state, net });
+        // Missing legacy sessions use the migration's own fresh server state,
+        // whose nonce is independent of this fixture's earlier constructor.
+        const persistedSessions = await f.authority.records.transaction(tx => tx.get('sessions'));
+        const lobbyInstance = persistedSessions.lobbyInstance;
+        expect(lobbyInstance).toMatch(/^[a-f0-9]{32}$/);
+        expect(loaded).toEqual({ ...f.state, net, sessions: { ...f.state.sessions, lobbyInstance } });
+        expect((await f.authority.load()).state).toEqual(loaded);
         expect(await f.rawGet('net')).toEqual(net); expect(await f.rawGet('unrelated')).toEqual({ keep: 'raw legacy state' });
         expect(await f.authority.records.transaction(tx => tx.get(RATES))).toEqual(registrySnapshot.mintRates);
     });
@@ -711,7 +717,7 @@ describe('production participation session/partition/effect composition', () => 
         expect(app.frames.some(frame => frame.t === 'join' && frame.ch.name === '#withdraw-denied')).toBe(false);
         const fresh = productionParticipation(f), context = await fresh.prepare([person.binding]);
         expect(fresh.allows(context, { actorId: person.binding.id, action: 'publicArtifact' })).toBe(false);
-        expect((await app.message(person.binding.id, { t: 'cmd', ch: '#stalemate', name: 'block', args: ['MissingNick'] }))?.ok).not.toBe(false);
+        expect((await app.message(person.binding.id, { t: 'cmd', ch: '#stalemate', name: 'block', args: ['MissingNick'], personNamed: true }))?.ok).not.toBe(false);
         const rows = await f.authority.records.transaction(tx => tx.list({ prefix: 'participation-records:v1:record:', limit: 4 }));
         expect([...rows.values()][0].subjects[0].record.state).toBe('withdrawn');
     });
@@ -1052,12 +1058,12 @@ describe('actor-only control preparation on the actual SQLite authority', () => 
         const actor = await admit(f, ledger, app, 'credit-pmactor', 'ControlPmActor');
         const peer = await admit(f, ledger, app, 'credit-pmpeer', 'ControlPmPeer');
         expect((await app.engine.reserveTransportControl(actor.binding.id)).ok).toBe(true);
-        await app.message(actor.binding.id, { t: 'cmd', ch: '#stalemate', name: 'query', args: ['ControlPmPeer'] });
+        await app.message(actor.binding.id, { t: 'cmd', ch: '#stalemate', name: 'query', args: ['ControlPmPeer'], personNamed: true });
         expect(app.frames.some(frame => frame.t === 'pm-request' && frame.recipient === peer.binding.id)).toBe(true);
         expect((await ledger.withdraw(peer.binding)).state).toBe('withdrawn');
         expect((await app.engine.reserveTransportControl(actor.binding.id)).ok).toBe(true);
         app.frames.length = 0;
-        expect((await app.message(actor.binding.id, { t: 'cmd', ch: '#stalemate', name: 'query', args: ['ControlPmPeer'] })).ok).toBe(false);
+        expect((await app.message(actor.binding.id, { t: 'cmd', ch: '#stalemate', name: 'query', args: ['ControlPmPeer'], personNamed: true })).ok).toBe(false);
         expect(app.frames.some(frame => ['pm-request', 'pm-open', 'pm-line'].includes(frame.t))).toBe(false);
         expect(await f.authority.validate(peer.binding)).toBe(true);
     });

@@ -4,6 +4,9 @@ import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 
 let now, engine, frames, identities, sequence;
 const cmd = (id, name, args = []) => engine.message(id, JSON.stringify({ t: 'cmd', name, args, ch: '#stalemate' }));
+// Deliberate nickname intent at these explicit call sites; selected/negative frames stay unmarked.
+const namedCmd = (id, name, args = []) => engine.message(id, JSON.stringify({ t: 'cmd', name, args, ch: '#stalemate',
+    ...(name === 'msg' || name === 'm' ? { pmExplicit: true } : { personNamed: true }) }));
 function boot() { frames = []; engine = createLobby({ now: () => now, send: (recipient, f) => frames.push({ recipient, ...f }), limits: { defaultSlow: 0 } }); }
 function guest(nick, extra = {}) {
     const identity = { id: `socket${++sequence}`, dev: `dev-${nick}`, iph: `ip-${sequence}`, role: 'fan', account: '', admin: false, ...extra };
@@ -16,7 +19,7 @@ function wake(snapshot, live = identities, sleep = 61000) {
 }
 function request() {
     const sender = guest('Sender'); const recipient = guest('Recipient'); now += 180000;
-    cmd(sender, 'msg', ['Recipient', 'A first message that must never be saved']);
+    namedCmd(sender, 'msg', ['Recipient', 'A first message that must never be saved']);
     return { sender, recipient, snapshot: saved() };
 }
 beforeEach(() => { now = 1800000000000; identities = []; sequence = 0; boot(); });
@@ -30,21 +33,21 @@ describe('pending PM consent across a same-socket wake', () => {
             fromId: sender, toId: recipient, at: now, hadFirst: true, ref }]);
         expect(JSON.stringify(snapshot.sessions)).not.toContain('A first message');
         expect(wake(snapshot).resumed).toEqual([sender, recipient]); expect(frames).toEqual([]);
-        cmd(recipient, 'accept', ['Sender']);
+        engine.message(recipient, JSON.stringify({ t: 'cmd', name: 'accept', args: ['Sender'], ch: '#stalemate', pmPeer: sender, pmRef: ref }));
         expect(frames.filter((f) => f.t === 'pm-open')).toHaveLength(2);
         expect(frames.filter((f) => f.t === 'pm')).toEqual([]);
         for (const id of [sender, recipient]) expect(frames.some((f) => f.recipient === id && /first message was not retained/.test(f.text || ''))).toBe(true);
-        cmd(sender, 'msg', ['Recipient', 'The explicitly resent first message']);
+        namedCmd(sender, 'msg', ['Recipient', 'The explicitly resent first message']);
         expect(frames.some((f) => f.recipient === recipient && f.t === 'pm' && f.text === 'The explicitly resent first message')).toBe(true);
         expect(engine.sessionSnapshot().pendingPm).toEqual([]);
     });
 
     it('keeps normal delivery before wake and does not invent lost text for a query-only request', () => {
-        const { sender, recipient } = request(); cmd(recipient, 'accept', ['Sender']);
+        const { sender, recipient } = request(); namedCmd(recipient, 'accept', ['Sender']);
         expect(frames.some((f) => f.recipient === recipient && f.t === 'pm' && f.text.startsWith('A first message'))).toBe(true);
-        const other = guest('Other'); cmd(sender, 'query', ['Other']);
+        const other = guest('Other'); namedCmd(sender, 'query', ['Other']);
         const snapshot = saved(); expect(snapshot.sessions.pendingPm[0].hadFirst).toBe(false);
-        wake(snapshot); cmd(other, 'accept', ['Sender']);
+        wake(snapshot); namedCmd(other, 'accept', ['Sender']);
         expect(frames.filter((f) => f.t === 'pm-open')).toHaveLength(2);
         expect(frames.some((f) => /not retained/.test(f.text || ''))).toBe(false);
     });
@@ -52,7 +55,7 @@ describe('pending PM consent across a same-socket wake', () => {
     it('retains the original expiry and lost-first marker over repeated wakes', () => {
         const { recipient, snapshot } = request(); const at = snapshot.sessions.pendingPm[0].at;
         wake(snapshot); const second = saved(); expect(second.sessions.pendingPm[0]).toMatchObject({ at, hadFirst: true });
-        wake(second); cmd(recipient, 'accept', ['Sender']);
+        wake(second); namedCmd(recipient, 'accept', ['Sender']);
         expect(frames.some((f) => /first message was not retained/.test(f.text || ''))).toBe(true);
     });
 
@@ -60,7 +63,7 @@ describe('pending PM consent across a same-socket wake', () => {
         const { sender, recipient } = request(); now += 61000; cmd(sender, 'nick', ['Renamed']);
         expect(frames.some((f) => f.recipient === recipient && f.t === 'pm-request-ended' && f.from === 'Sender')).toBe(true);
         expect(frames.some((f) => f.recipient === recipient && f.t === 'pm-request' && f.from === 'Renamed')).toBe(true);
-        wake(saved()); cmd(recipient, 'accept', ['Renamed']);
+        wake(saved()); namedCmd(recipient, 'accept', ['Renamed']);
         expect(frames.filter((f) => f.t === 'pm-open')).toHaveLength(2);
     });
 
@@ -69,16 +72,16 @@ describe('pending PM consent across a same-socket wake', () => {
         if (policy === 'blocked') target.blocks.push('dev-Sender');
         if (policy === 'ignored') target.ignores.push('sender');
         if (policy === 'PMs off') target.pmOff = true;
-        wake(snapshot); cmd(recipient, 'accept', ['Sender']);
+        wake(snapshot); namedCmd(recipient, 'accept', ['Sender']);
         expect(engine._debug.pm.size).toBe(0); expect(frames.some((f) => f.t === 'pm-open' || f.t === 'pm')).toBe(false);
         expect(frames.some((f) => f.recipient === recipient && f.t === 'pm-request-ended')).toBe(true);
     });
 
     it('rechecks ignore/block/preferences at acceptance rather than relying on the earlier request', () => {
         const { sender, recipient, snapshot } = request(); wake(snapshot);
-        cmd(recipient, 'ignore', ['Sender']); cmd(recipient, 'accept', ['Sender']);
+        namedCmd(recipient, 'ignore', ['Sender']); namedCmd(recipient, 'accept', ['Sender']);
         expect(engine._debug.pm.size).toBe(0); expect(frames.some((f) => f.t === 'pm-open')).toBe(false);
-        cmd(recipient, 'unignore', ['Sender']); cmd(sender, 'query', ['Recipient']);
+        namedCmd(recipient, 'unignore', ['Sender']); namedCmd(sender, 'query', ['Recipient']);
         cmd(recipient, 'pm', ['off']);
         expect(frames.some((f) => f.t === 'pm-request-ended' && /turned off/.test(f.reason || ''))).toBe(true);
     });
@@ -87,21 +90,21 @@ describe('pending PM consent across a same-socket wake', () => {
         const { recipient, snapshot } = request(); wake(snapshot, identities, 10 * 60000);
         expect(engine._debug.pm.size).toBe(0);
         expect(frames.some((f) => f.recipient === recipient && f.t === 'pm-request-ended')).toBe(true);
-        cmd(recipient, 'accept', ['Sender']); expect(frames.some((f) => f.t === 'pm-open')).toBe(false);
+        namedCmd(recipient, 'accept', ['Sender']); expect(frames.some((f) => f.t === 'pm-open')).toBe(false);
     });
 
     it('removes expired pending text in an active process and permits a fresh request', () => {
         const { sender, recipient } = request(); now += 10 * 60000; engine.tick();
         expect(engine._debug.pm.size).toBe(0);
         expect(frames.some((f) => f.recipient === recipient && f.t === 'pm-request-ended')).toBe(true);
-        cmd(sender, 'query', ['Recipient']); expect(engine._debug.pm.size).toBe(1);
+        namedCmd(sender, 'query', ['Recipient']); expect(engine._debug.pm.size).toBe(1);
     });
 
     it('does not let a different connection on the same signed device accept the request', () => {
         const { recipient, snapshot } = request(); wake(snapshot);
-        const other = guest('SameDevice', { dev: 'dev-Recipient' }); cmd(other, 'accept', ['Sender']);
+        const other = guest('SameDevice', { dev: 'dev-Recipient' }); namedCmd(other, 'accept', ['Sender']);
         expect(frames.some((f) => f.t === 'pm-open')).toBe(false);
-        cmd(recipient, 'accept', ['Sender']); expect(frames.filter((f) => f.t === 'pm-open')).toHaveLength(2);
+        namedCmd(recipient, 'accept', ['Sender']); expect(frames.filter((f) => f.t === 'pm-open')).toHaveLength(2);
     });
 
     it('does not transfer a pending request to a reconnect using the old device and nickname', () => {
@@ -109,31 +112,31 @@ describe('pending PM consent across a same-socket wake', () => {
         expect(wake(snapshot, identities.filter((c) => c.id !== sender)).resumed).toEqual([recipient]);
         expect(engine._debug.pm.size).toBe(0);
         expect(frames.some((f) => f.recipient === recipient && f.t === 'pm-request-ended')).toBe(true);
-        guest('Sender', { dev: 'dev-Sender' }); cmd(recipient, 'accept', ['Sender']);
+        guest('Sender', { dev: 'dev-Sender' }); namedCmd(recipient, 'accept', ['Sender']);
         expect(frames.some((f) => f.t === 'pm-open')).toBe(false);
     });
 
     it('clears accepted consent on a real disconnect, while a later reconnect must ask again', () => {
-        const { sender, recipient } = request(); cmd(recipient, 'accept', ['Sender']);
+        const { sender, recipient } = request(); namedCmd(recipient, 'accept', ['Sender']);
         engine.disconnect(sender); expect(engine._debug.pm.size).toBe(0);
         frames = []; const returning = guest('Sender', { dev: 'dev-Sender' }); now += 180000;
-        cmd(returning, 'query', ['Recipient']);
+        namedCmd(returning, 'query', ['Recipient']);
         expect(frames.some((f) => f.recipient === recipient && f.t === 'pm-request')).toBe(true);
         expect(frames.some((f) => f.t === 'pm-open')).toBe(false);
     });
 
     it('does not give another simultaneous tab on the same signed device accepted PM consent', () => {
-        const { sender, recipient } = request(); cmd(recipient, 'accept', ['Sender']);
+        const { sender, recipient } = request(); namedCmd(recipient, 'accept', ['Sender']);
         const other = guest('AnotherTab', { dev: 'dev-Sender' }); now += 180000; frames = [];
-        cmd(other, 'msg', ['Recipient', 'This requires independent consent']);
+        namedCmd(other, 'msg', ['Recipient', 'This requires independent consent']);
         expect(frames.some((f) => f.t === 'pm')).toBe(false);
         expect(frames.some((f) => f.recipient === recipient && f.t === 'pm-request' && f.from === 'AnotherTab')).toBe(true);
-        cmd(sender, 'msg', ['Recipient', 'The original connection still has consent']);
+        namedCmd(sender, 'msg', ['Recipient', 'The original connection still has consent']);
         expect(frames.some((f) => f.recipient === recipient && f.t === 'pm' && /original connection/.test(f.text))).toBe(true);
     });
 
     it('does not resurrect legacy device-pair consent when exact endpoint metadata is missing', () => {
-        const { sender, recipient } = request(); cmd(recipient, 'accept', ['Sender']); const snapshot = saved();
+        const { sender, recipient } = request(); namedCmd(recipient, 'accept', ['Sender']); const snapshot = saved();
         snapshot.sessions.pm = [{ key: 'dev-Recipient|dev-Sender', from: 'dev-Sender', state: 'open' }];
         expect(wake(snapshot).resumed).toHaveLength(2); expect(engine._debug.pm.size).toBe(0);
     });
@@ -156,7 +159,7 @@ describe('pending PM consent across a same-socket wake', () => {
 describe('accepted PM endpoint teardown', () => {
     it.each(['sender', 'recipient'])('notifies only the surviving original endpoint when the %s disconnects', (leaving) => {
         const { sender, recipient } = request();
-        cmd(recipient, 'accept', ['Sender']);
+        namedCmd(recipient, 'accept', ['Sender']);
         const observer = guest('Observer');
         expect(engine._debug.pm.size).toBe(1);
         const departing = leaving === 'sender' ? sender : recipient;
@@ -178,17 +181,17 @@ describe('accepted PM endpoint teardown', () => {
 
     it.each(['the same signed device', 'a different signed device'])('requires fresh consent after the old nickname is reused by %s', (device) => {
         const { sender, recipient } = request();
-        cmd(recipient, 'accept', ['Sender']);
+        namedCmd(recipient, 'accept', ['Sender']);
         const observer = guest('Observer');
         engine.disconnect(sender);
         const replacement = guest('Sender', { dev: device === 'the same signed device' ? 'dev-Sender' : 'dev-Replacement' });
         expect(replacement).not.toBe(sender);
         now += 180000; frames = [];
-        cmd(recipient, 'accept', ['Sender']);
+        namedCmd(recipient, 'accept', ['Sender']);
         expect(frames.some(frame => frame.t === 'pm-open' || frame.t === 'pm')).toBe(false);
         const text = 'Only this new endpoint asks to send this new body';
         frames = [];
-        cmd(replacement, 'msg', ['Recipient', text]);
+        namedCmd(replacement, 'msg', ['Recipient', text]);
         const freshRequest = frames.find(frame => frame.recipient === recipient && frame.t === 'pm-request');
         expect(freshRequest.ref).toMatch(/^[a-f0-9]{32}$/);
         expect(frames.filter(frame => frame.t === 'pm-request')).toEqual([
@@ -196,7 +199,7 @@ describe('accepted PM endpoint teardown', () => {
         ]);
         expect(frames.some(frame => frame.t === 'pm-open' || frame.t === 'pm' || frame.t === 'pm-closed')).toBe(false);
         frames = [];
-        cmd(recipient, 'accept', ['Sender']);
+        namedCmd(recipient, 'accept', ['Sender']);
         expect(frames.filter(frame => frame.t === 'pm-open').map(frame => frame.recipient).sort()).toEqual([recipient, replacement].sort());
         expect(frames.filter(frame => frame.t === 'pm').map(frame => [frame.recipient, frame.text]).sort()).toEqual([
             [recipient, text], [replacement, text]
@@ -228,8 +231,8 @@ describe('accepted PM disconnect commit ordering', () => {
                 await lobby.message(nick, JSON.stringify({ t: 'hello', nick, age13: true }));
             }
             now += 180000;
-            await command('Sender', 'query', ['Recipient']);
-            await command('Recipient', 'accept', ['Sender']);
+            await lobby.message('Sender', JSON.stringify({ t: 'cmd', name: 'query', args: ['Recipient'], ch: '#stalemate', personNamed: true }));
+            await lobby.message('Recipient', JSON.stringify({ t: 'cmd', name: 'accept', args: ['Sender'], ch: '#stalemate', personNamed: true }));
             expect(lobby._debug.pm.size).toBe(1);
             const ref = sent.find(frame => frame.recipient === 'Recipient' && frame.t === 'pm-open').ref;
             expect(ref).toMatch(/^[a-f0-9]{32}$/);
@@ -266,11 +269,11 @@ function peerGuest(nick, extra = {}) {
     return identity.id;
 }
 function openPeerPair(from, to, fromNick, toNick) {
-    frames = []; cmd(from, 'query', [toNick]);
+    frames = []; namedCmd(from, 'query', [toNick]);
     const request = frames.find(frame => frame.recipient === to && frame.t === 'pm-request');
     expect(request).toMatchObject({ peer: from, from: fromNick });
     expect(request.ref).toMatch(/^[a-f0-9]{32}$/);
-    cmd(to, 'accept', [fromNick]);
+    engine.message(to, JSON.stringify({ t: 'cmd', name: 'accept', args: [fromNick], ch: '#stalemate', pmPeer: request.peer, pmRef: request.ref }));
     const opened = frames.find(frame => frame.recipient === from && frame.t === 'pm-open');
     expect(opened).toMatchObject({ with: toNick, peer: to, ref: request.ref });
     expect(frames.find(frame => frame.recipient === to && frame.t === 'pm-open'))
@@ -360,7 +363,7 @@ describe('PM endpoint references', () => {
 
     it('keeps pending acceptance tied to the original sender and cannot publish an unaccepted bound body', () => {
         const sender = peerGuest('Sender'), recipient = peerGuest('Recipient'), other = peerGuest('Other');
-        now += 180000; frames = []; cmd(sender, 'query', ['Recipient']);
+        now += 180000; frames = []; namedCmd(sender, 'query', ['Recipient']);
         const pending = frames.find(frame => frame.recipient === recipient && frame.t === 'pm-request');
         expect(pending).toMatchObject({ peer: sender }); expect(pending.ref).toMatch(/^[a-f0-9]{32}$/);
         frames = []; boundPeerSend(sender, recipient, pending.ref, 'This body requires actual acceptance', { clientMessageId: '4'.repeat(32) });
@@ -428,7 +431,7 @@ describe('PM endpoint references', () => {
         expect(frames.filter(frame => frame.t === 'pm-request')).toHaveLength(1);
         const request = frames.find(frame => frame.t === 'pm-request');
         expect(request).toMatchObject({ recipient: other, from: 'Sender', peer: sender }); expect(request.ref).not.toBe(ref);
-        frames = []; cmd(other, 'accept', ['Sender']);
+        frames = []; namedCmd(other, 'accept', ['Sender']);
         expect(frames.filter(frame => frame.t === 'pm').map(frame => frame.recipient)).toEqual([sender, other]);
         expect(frames.filter(frame => frame.t === 'pm').every(frame => frame.text === text)).toBe(true);
         expect(frames.some(frame => frame.recipient === recipient && ['pm', 'pm-open'].includes(frame.t))).toBe(false);
@@ -437,7 +440,7 @@ describe('PM endpoint references', () => {
     it('does not reuse a bound conversation after the current peer blocks the sender', () => {
         const sender = peerGuest('Sender'), recipient = peerGuest('Recipient'); now += 180000;
         const ref = openPeerPair(sender, recipient, 'Sender', 'Recipient');
-        frames = []; cmd(recipient, 'block', ['Sender']);
+        frames = []; namedCmd(recipient, 'block', ['Sender']);
         expect(frames.some(frame => frame.recipient === sender && frame.t === 'pm-closed' && frame.peer === recipient && frame.ref === ref)).toBe(true);
         frames = []; boundPeerSend(sender, recipient, ref, 'A previously accepted reference cannot bypass a current block', { clientMessageId: '6'.repeat(32) });
         expect(frames.filter(frame => ['pm', 'pm-open', 'pm-request'].includes(frame.t))).toEqual([]);
@@ -449,7 +452,7 @@ describe('PM endpoint references', () => {
 
     it.each(['decline'])('binds pending %s to the original sender after its old nickname is reclaimed', (name) => {
         const sender = peerGuest('Sender'), recipient = peerGuest('Recipient'), other = peerGuest('Other');
-        now += 180000; frames = []; cmd(sender, 'query', ['Recipient']);
+        now += 180000; frames = []; namedCmd(sender, 'query', ['Recipient']);
         const request = frames.find(frame => frame.recipient === recipient && frame.t === 'pm-request');
         expect(request).toMatchObject({ peer: sender }); expect(request.ref).toMatch(/^[a-f0-9]{32}$/);
         now += 61000; cmd(sender, 'nick', ['Renamed']); cmd(other, 'nick', ['Sender']);
@@ -465,7 +468,7 @@ describe('PM endpoint references', () => {
         const state = engine.sessionSnapshot().connections.find(connection => connection.id === recipient);
         expect(state.blocks).toEqual(name === 'block' ? ['dev-Sender'] : []);
         expect(state.blocks).not.toContain('dev-Other');
-        now += 4000; frames = []; cmd(other, 'query', ['Recipient']);
+        now += 4000; frames = []; namedCmd(other, 'query', ['Recipient']);
         expect(frames.find(frame => frame.recipient === recipient && frame.t === 'pm-request')).toMatchObject({ from: 'Sender', peer: other });
     });
 
@@ -532,15 +535,18 @@ describe('PM endpoint references', () => {
         for (const damage of [{ pmPeer: undefined }, { pmRef: undefined }, { pmPeer: undefined, pmRef: undefined }, { pmRef: '' }, { pmPeer: ['invalid'] }]) {
             now += 4000; frames = []; safety('block', damage); safety('ignore', damage);
             expect(state().blocks).toEqual([]); expect(state().ignores).toEqual([]);
+            expect(state().ignoredPeerIds || []).toEqual([]);
             expect(frames.filter(frame => ['pm', 'pm-open', 'pm-request'].includes(frame.t))).toEqual([]);
         }
         now += 4000; frames = []; safety('block'); safety('ignore');
-        expect(state().blocks).toEqual(['dev-Recipient']); expect(state().ignores).toEqual(['renamed']);
+        expect(state().blocks).toEqual(['dev-Recipient']); expect(state().ignores).toEqual([]);
+        expect(state().ignoredPeerIds || []).toEqual([target]);
         expect(state().blocks).not.toContain('dev-Other'); expect(state().ignores).not.toContain('recipient');
         expect(engine._debug.pm.size).toBe(0);
         expect(frames.some(frame => frame.recipient === other && ['pm-closed', 'pm-open', 'pm-request', 'pm'].includes(frame.t))).toBe(false);
         engine.disconnect(target); now += 4000; frames = []; safety('block'); safety('ignore');
-        expect(state().blocks).toEqual(['dev-Recipient']); expect(state().ignores).toEqual(['renamed']);
+        expect(state().blocks).toEqual(['dev-Recipient']); expect(state().ignores).toEqual([]);
+        expect(state().ignoredPeerIds || []).toEqual([]);
         expect(frames.some(frame => frame.recipient === other && ['pm-closed', 'pm-open', 'pm-request', 'pm'].includes(frame.t))).toBe(false);
         now += 4000; frames = [];
         engine.message(actor, JSON.stringify({ t: 'report', id: selected.id, text: selected.text }));
@@ -551,7 +557,8 @@ describe('PM endpoint references', () => {
         engine.message(actor, JSON.stringify({ t: 'say', ch: `pm:${ref}`, text: '/ignore Recipient' }));
         engine.message(actor, JSON.stringify({ t: 'say', ch: `pm:${ref}`, text: '/block Recipient' }));
         expect(state().blocks).toEqual(['dev-Recipient', 'dev-Other']);
-        expect(state().ignores).toEqual(['renamed', 'recipient']);
+        expect(state().ignores).toEqual(['recipient']);
+        expect(state().ignoredPeerIds || []).toEqual([]);
         expect(frames.filter(frame => ['pm', 'pm-open', 'pm-request'].includes(frame.t))).toEqual([]);
         cmd(actor, 'quit');
         expect(engine.sessionSnapshot().connections.some(connection => connection.id === actor)).toBe(false);
@@ -608,21 +615,68 @@ describe('PM endpoint references', () => {
     it('closes an explicitly declined open pair and clears a later pending prompt with its own reference', () => {
         const sender = peerGuest('Sender'), recipient = peerGuest('Recipient'); now += 180000;
         const ref = openPeerPair(sender, recipient, 'Sender', 'Recipient'); frames = [];
-        cmd(sender, 'decline', ['Recipient']);
+        namedCmd(sender, 'decline', ['Recipient']);
         expect(engine._debug.pm.size).toBe(0);
         expect(frames.filter(frame => frame.t === 'pm-closed')).toEqual([
             { recipient, t: 'pm-closed', with: 'Sender', peer: sender, ref },
             { recipient: sender, t: 'pm-closed', with: 'Recipient', peer: recipient, ref }
         ]);
-        frames = []; cmd(sender, 'decline', ['Recipient']);
+        frames = []; namedCmd(sender, 'decline', ['Recipient']);
         expect(frames.filter(frame => frame.t === 'pm-closed')).toEqual([]);
-        now += 4000; frames = []; cmd(sender, 'query', ['Recipient']);
+        now += 4000; frames = []; namedCmd(sender, 'query', ['Recipient']);
         const pending = frames.find(frame => frame.recipient === recipient && frame.t === 'pm-request');
         expect(pending.ref).toMatch(/^[a-f0-9]{32}$/); expect(pending.ref).not.toBe(ref); frames = [];
-        cmd(recipient, 'decline', ['Sender']);
+        namedCmd(recipient, 'decline', ['Sender']);
         expect(engine._debug.pm.size).toBe(0);
         expect(frames.find(frame => frame.recipient === recipient && frame.t === 'pm-request-ended'))
             .toMatchObject({ from: 'Sender', peer: sender, ref: pending.ref });
         expect(frames.filter(frame => frame.t === 'pm-closed' || frame.t === 'pm')).toEqual([]);
+    });
+});
+
+describe('bound PM Block across later nickname reuse', () => {
+    it('keeps the original device blocked without hiding a different live visitor who reclaims its old nickname', () => {
+        const observer = peerGuest('Observer'), original = peerGuest('Original'), third = peerGuest('Third');
+        now += 180000;
+        const ref = openPeerPair(observer, original, 'Observer', 'Original');
+        frames = [];
+        boundPeerSend(original, observer, ref, 'A confirmed private reply before the deliberate block');
+        expect(frames.filter(frame => frame.recipient === observer && frame.t === 'pm'))
+            .toEqual([expect.objectContaining({ peer: original, ref, self: false, text: 'A confirmed private reply before the deliberate block' })]);
+        now += 4000; frames = [];
+        engine.message(observer, JSON.stringify({ t: 'cmd', name: 'block', args: ['Original'], ch: `pm:${ref}`, pmPeer: original, pmRef: ref }));
+        const preference = engine.sessionSnapshot().connections.find(connection => connection.id === observer);
+        expect(preference.blocks).toEqual(['dev-Original']);
+        expect(preference.blocks).not.toContain('dev-Third');
+        expect(frames.filter(frame => frame.t === 'pm-closed')).toEqual([
+            expect.objectContaining({ recipient: observer, peer: original, ref }),
+            expect.objectContaining({ recipient: original, peer: observer, ref })
+        ]);
+        expect(engine.sessionSnapshot().pm).toEqual([]);
+        now += 61000;
+        cmd(original, 'nick', ['RenamedOriginal']); cmd(third, 'nick', ['Original']);
+        const connections = engine.sessionSnapshot().connections;
+        expect(connections.find(connection => connection.id === original).nick).toBe('RenamedOriginal');
+        expect(connections.find(connection => connection.id === third).nick).toBe('Original');
+        frames = [];
+        const blockedText = 'The original visitor is still blocked after a nickname change';
+        engine.message(original, JSON.stringify({ t: 'say', ch: '#stalemate', text: blockedText }));
+        expect(frames.filter(frame => frame.recipient === third && frame.t === 'line' && frame.text === blockedText))
+            .toEqual([expect.objectContaining({ from: 'RenamedOriginal', ch: '#stalemate' })]);
+        expect(frames.filter(frame => frame.recipient === observer && frame.t === 'line' && frame.text === blockedText)).toEqual([]);
+        // Typed named intent remains deliberate, but the original device's
+        // real block must still refuse a fresh PM request after the old pair ended.
+        now += 4000; frames = [];
+        engine.message(original, JSON.stringify({ t: 'say', ch: '#stalemate', text: '/msg Observer A new private request from the blocked original visitor' }));
+        expect(frames.filter(frame => frame.t === 'pm-request' || frame.t === 'pm')).toEqual([]);
+        frames = [];
+        const replacementText = 'The distinct visitor should remain visible under the reclaimed nickname';
+        engine.message(third, JSON.stringify({ t: 'say', ch: '#stalemate', text: replacementText }));
+        expect(frames.filter(frame => frame.recipient === third && frame.t === 'line' && frame.text === replacementText))
+            .toEqual([expect.objectContaining({ from: 'Original', ch: '#stalemate' })]);
+        // Check real publication before this audience assertion: a refused
+        // or filtered sender cannot masquerade as the alias-retargeting failure.
+        expect(frames.filter(frame => frame.recipient === observer && frame.t === 'line' && frame.text === replacementText))
+            .toEqual([expect.objectContaining({ from: 'Original', ch: '#stalemate' })]);
     });
 });

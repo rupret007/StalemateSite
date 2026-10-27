@@ -19,6 +19,8 @@ function guest(nick, role = 'fan', dev = `dev-${nick}`) {
 }
 const got = (person) => frames.get(person.id) || [];
 const cmd = (person, name, args = [], ch = LOBBY) => engine.message(person.id, JSON.stringify({ t: 'cmd', name, args, ch }));
+// Explicit nickname-intent fixtures only; generic/selected/malformed commands stay separate.
+const namedCmd = (person, name, args = [], ch = LOBBY) => engine.message(person.id, JSON.stringify({ t: 'cmd', name, args, ch, personNamed: true }));
 const report = (person, id) => engine.message(person.id, JSON.stringify({ t: 'report', id }));
 const say = (person, text, ch = LOBBY) => {
     clock += 4000;
@@ -36,7 +38,7 @@ describe('human moderation evidence and recipient authorization', () => {
         const outsiders = [guest('OutsideA'), guest('OutsideB'), guest('OutsideC')];
         cmd(host, 'join', ['#sealed']); cmd(host, 'mode', ['+k', 'secret'], '#sealed');
         cmd(witness, 'join', ['#sealed', 'secret']); cmd(ignored, 'join', ['#sealed', 'secret']);
-        cmd(ignored, 'ignore', ['Host']);
+        namedCmd(ignored, 'ignore', ['Host']);
         const id = say(host, 'private room evidence', '#sealed');
         for (const outsider of [...outsiders, ignored]) report(outsider, id);
         expect(engine.adminState().reports).toEqual([]);
@@ -64,11 +66,11 @@ describe('human moderation evidence and recipient authorization', () => {
         expect(engine._debug.conns.get(author.id).camReports).toBe(2);
         expect(engine._debug.conns.get(newcomer.id).cams.has('#art-later')).toBe(true);
         expect(engine._debug.conns.get(newcomer.id).camReports || 0).toBe(0);
-        cmd(band, 'mute', ['SameNick', '1m']);
+        namedCmd(band, 'mute', ['SameNick', '1m']);
         expect(engine.adminState().reports).toHaveLength(1);
-        cmd(band, 'purge', ['SameNick']);
+        namedCmd(band, 'purge', ['SameNick']);
         expect(engine._debug.lines.has(id)).toBe(true);
-        cmd(band, 'mute', ['Renamed', '1m']);
+        namedCmd(band, 'mute', ['Renamed', '1m']);
         expect(engine.adminState().reports).toEqual([]);
     });
 

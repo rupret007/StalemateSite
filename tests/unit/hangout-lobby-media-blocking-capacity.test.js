@@ -89,7 +89,11 @@ describe('Block remains available at accepted shared-room membership', () => {
             total + Buffer.byteLength(JSON.stringify({ t: 'chan', ch: view })) * view.count, 0);
         const semanticBefore = f.commits.semantic;
         f.monitoring = true;
-        const result = await f.engine.message(blocker.id, JSON.stringify({ t: 'cmd', ch: '#stalemate', name: 'block', args: [target.nick] }));
+        const selectedRoom = f.views.get(ROOMS[0]);
+        expect(selectedRoom.keepRef).toMatch(/^[a-f0-9]{32}$/);
+        expect(selectedRoom.names.find(person => person.id === target.id)?.nick).toBe(target.nick);
+        const result = await f.engine.message(blocker.id, JSON.stringify({ t: 'cmd', ch: selectedRoom.name, name: 'block', args: [target.nick],
+            personContext: 1, personPeer: target.id, roomInstance: selectedRoom.keepRef }));
         const policyFrames = f.published.filter(frame => frame.t === 'media-policy');
         const publishedBytes = f.published.reduce((total, { recipient: _recipient, ...frame }) =>
             total + Buffer.byteLength(JSON.stringify(frame)), 0);
@@ -104,7 +108,12 @@ describe('Block remains available at accepted shared-room membership', () => {
         expect(f.engine._debug.conns.get(blocker.id).blocks.has(target.dev)).toBe(true);
         expect(f.commits.semantic).toBe(semanticBefore + 1);
         expect(f.published.some(frame => frame.text?.startsWith('Blocked '))).toBe(true);
-        expect(f.published).toHaveLength(2 * ROOMS.length + 3);
+        // The new preference ACK is additional to the original Block outputs;
+        // raw output byte/frame budgets below continue to include every frame.
+        expect(f.published.filter(frame => frame.t === 'person-preferences'))
+            .toEqual([{ recipient: blocker.id, t: 'person-preferences', names: [], peers: [] }]);
+        expect(f.published.filter(frame => frame.t !== 'person-preferences')).toHaveLength(2 * ROOMS.length + 3);
+        expect(f.published).toHaveLength(2 * ROOMS.length + 4);
         expect(f.published.length).toBeLessThanOrEqual(8192);
         expect(publishedBytes).toBeLessThanOrEqual(16 * 1024 * 1024);
         expect(policyFrames).toHaveLength(2 * ROOMS.length);

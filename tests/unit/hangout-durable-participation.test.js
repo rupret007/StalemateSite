@@ -139,8 +139,8 @@ describe('actual durable C2/C3 participation domain', () => {
         await f.message(bravo, { t: 'say', ch: '#stalemate', text: 'Selected durable report target' });
         const target = f.frames.find(frame => frame.t === 'line' && frame.text === 'Selected durable report target');
         await f.message(alice, { t: 'report', id: target.id });
-        await f.cmd(alice, 'block', [bravo.nick]);
-        await f.cmd(alice, 'gban', [charlie.nick, 'Synthetic moderation acceptance check']);
+        await f.message(alice, { t: 'cmd', ch: '#stalemate', name: 'block', args: [bravo.nick], personNamed: true });
+        await f.message(alice, { t: 'cmd', ch: '#stalemate', name: 'gban', args: [charlie.nick, 'Synthetic moderation acceptance check'], personNamed: true });
         await f.message(alice, { t: 'say', ch: '#stalemate', text: 'Ordinary unselected text after the report stays ephemeral' });
         expect(f.engine.adminState().reports).toHaveLength(1); expect(f.engine._debug.conns.has(charlie.id)).toBe(false);
         const recovered = await f.reopen(), saved = await recovered.storage.transaction(tx => readLobbyState({ tx, now: f.now() }));
@@ -212,7 +212,7 @@ describe('actual durable C2/C3 participation domain', () => {
         expect((await f.message(alice, { t: 'say', ch: '#stalemate', text: 'Withdrawn guest cannot publish' })).ok).toBe(false);
         expect(f.frames.some(frame => frame.text === 'Withdrawn guest cannot publish')).toBe(false);
         expect([...f.engine._debug.lines.values()].some(line => line.text === 'Withdrawn guest cannot publish')).toBe(false);
-        await f.cmd(alice, 'block', [bravo.nick]);
+        await f.message(alice, { t: 'cmd', ch: '#stalemate', name: 'block', args: [bravo.nick], personNamed: true });
         expect(f.engine._debug.conns.get(alice.id).blocks.has(bravo.dev)).toBe(true);
         await f.cmd(alice, 'quit'); expect(f.engine._debug.conns.has(alice.id)).toBe(false);
         expect(f.engine._debug.conns.has(bravo.id)).toBe(true); expect(f.legacyPersist).not.toHaveBeenCalled();

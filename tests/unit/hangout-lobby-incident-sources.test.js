@@ -201,7 +201,8 @@ describe('production selected public incident source composition', () => {
         const f = await fixture(); await people(f); await f.enroll('Reviewer', true); const line = await report(f), selection = await f.source(line.id), c = await f.cases();
         const accepted = await c.preserve(selection); expect(accepted.ok).toBe(true);
         if (action === 'tick') { f.advance(DAY); expect((await f.engine.tick())?.ok).not.toBe(false); }
-        else await f.command('Reviewer', action, [action === 'purge' ? 'Alpha' : line.id]);
+        else if (action === 'purge') await f.message('Reviewer', { t: 'cmd', ch: '#stalemate', name: 'purge', args: ['Alpha'], personNamed: true });
+        else await f.command('Reviewer', action, [line.id]);
         expect(await f.source(line.id)).toBeNull(); expect((await f.index()).entries).toEqual([]);
         expect((await f.get(CASES)).cases[0].evidence.state).toBe('present');
         if (action !== 'tick') expect(await c.preserve(selection)).toEqual({ ok: false, error: 'source-unavailable' });
