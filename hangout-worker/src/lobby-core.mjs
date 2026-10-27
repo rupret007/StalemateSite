@@ -13,6 +13,11 @@ import { validPublicReportOrigin } from './lobby-incident-sources.mjs';
 
 export const BOT = 'StaleBot';
 export const LOBBY = '#stalemate';
+// A stored report is queued evidence. These strings must not say a moderator
+// received it, is present, or is reading it now.
+export const REPORT_QUEUED_LABEL = 'Queued for review when a moderator is available';
+export const REPORT_QUEUED_NOTICE = `${REPORT_QUEUED_LABEL}. This is not a promise that someone is reading it now. Appeals are in House rules.`;
+export const REPORT_ALREADY_QUEUED_NOTICE = 'Already in the report queue. That is not proof a moderator has read it.';
 export const KINDS = Object.freeze({ chat: '💬 Chat', bobross: '🎨 Bob Ross paint-along', watch: '📺 Watch together', art: '🖌️ Draw together', jam: '🎸 Jam' });
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
@@ -2304,7 +2309,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             // acknowledged only after storing the evidence again, without a vote.
             saveModerationQueue();
             out(c, { t: 'report-status', id, submitted: true });
-            return bot(c, 'Already reported. Thanks.');
+            return bot(c, REPORT_ALREADY_QUEUED_NOTICE);
         }
         r.devs.add(c.dev); r.iphs.add(c.iph);
         net.stats.reports.made += 1;
@@ -2323,7 +2328,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         saveModerationQueue();
         pushAdmin();
         out(c, { t: 'report-status', id, submitted: true });
-        return bot(c, 'Reported to the moderators. Thanks for looking out.');
+        return bot(c, REPORT_QUEUED_NOTICE);
     }
 
     function shield(on, by) {

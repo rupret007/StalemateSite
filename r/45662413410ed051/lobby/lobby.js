@@ -61,6 +61,9 @@ import { createEntrySharing } from './entry-sharing.mjs';
     const slug = () => `${pick(WORDS)}-${pick(THINGS)}`.replace(/[^a-z0-9-]/g, '');
 
     const app = window.__lobby = { ws: null, me: '', role: 'fan', band: false, chans: new Map(), pms: new Map(), active: '#stalemate', rooms: [], ignores: new Set(), peerIgnores: new Set(), selfId: '', pending: null, confirmedGathering: null, approvedCreation: null };
+    // Same words as REPORT_QUEUED_LABEL in the lobby engine. This page does not
+    // import that engine. A queued flag is not proof a moderator is reading it.
+    const REPORT_QUEUED_LABEL = 'Queued for review when a moderator is available';
     // Copies are tab memory only. Weak context IDs do not retain a departed
     // room's transcript, and no copy or nonce enters browser storage/analytics.
     const savedMessages = new Map();
@@ -1004,7 +1007,8 @@ import { createEntrySharing } from './entry-sharing.mjs';
         if (button) {
             button.disabled = submitted;
             button.textContent = submitted ? '✓' : '🚩';
-            button.title = submitted ? 'Report submitted to moderators' : 'Report this message';
+            button.title = submitted ? REPORT_QUEUED_LABEL : 'Report this message';
+            if (submitted) button.setAttribute('aria-label', REPORT_QUEUED_LABEL);
         }
     }
     function resetPendingReports() { for (const id of [...pendingReports.keys()]) finishReport(id, false); }
@@ -1037,7 +1041,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             li.append(' ', l.text);
             if (l.id && (l.t === 'pm' ? l.self !== true : l.personSelf !== true)) {
                 const r = document.createElement('button'); r.type = 'button'; r.className = 'flag'; r.textContent = '🚩'; r.setAttribute('aria-label', `Report this message from ${l.from}`);
-                if (l.reported) { r.disabled = true; r.textContent = '✓'; r.title = 'Report submitted to moderators'; }
+                if (l.reported) { r.disabled = true; r.textContent = '✓'; r.title = REPORT_QUEUED_LABEL; r.setAttribute('aria-label', REPORT_QUEUED_LABEL); }
                 else if (pendingReports.has(l.id)) { r.disabled = true; r.textContent = '…'; pendingReports.get(l.id).button = r; }
                 r.addEventListener('click', () => {
                     if (!send({ t: 'report', id: l.id, text: l.text })) return toast('You are offline. Reconnect before reporting this message.');

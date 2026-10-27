@@ -31,7 +31,7 @@ Provider child-data requirements and endpoint retention must be rechecked before
 
 ## Everyday review
 
-1. Let a recipient report a delivered message. Retain only necessary evidence and limited context; confirm success only after its required write. Private-room quotes are consented allegations, not verified transcripts.
+1. Let a recipient report a delivered message. Retain only necessary evidence and limited context; confirm success only after its required write. The success notice says the report is queued for review when a moderator is available, and that this is not a promise someone is reading it now. Private-room quotes are consented allegations, not verified transcripts.
 2. Human moderators assess context and use exact-message actions. A nickname may have been reused; it is not authority to punish the current holder for an old report. Host powers stay room-scoped; staff review does not transfer room ownership.
 3. Explain consequential human actions and provide an appeal route. Do not place private evidence in public GitHub issues, screenshots, analytics or another site's chat. Contact/inbox records need their own retention and access policy.
 4. When intake is unavailable or full, show an honest error and the configured contact. Do not promise continuous coverage. Existing queue limits must not silently become indefinite archives.

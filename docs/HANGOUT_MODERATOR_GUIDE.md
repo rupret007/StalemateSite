@@ -8,7 +8,9 @@ Jeff confirmed `jeffstory007@gmail.com` as the moderation contact and himself as
 the sole initial reviewer; the hosted house-rules contact link is verified.
 Before inviting visitors, agree review hours and an incident handoff, then
 recheck the displayed contact after deployment. Do not advertise immediate
-response or 24-hour coverage.
+response or 24-hour coverage. A saved lobby report tells the reporter it is
+queued for later review. That acknowledgement is not proof a moderator is
+present or has read it.
 
 Use your private beta invitation in the same browser first, then choose
 **Moderator sign-in** and enter the emailed code. An accepted sign-in returns

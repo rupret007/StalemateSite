@@ -1,6 +1,7 @@
 // @vitest-environment node
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
+import { createLobby, REPORT_ALREADY_QUEUED_NOTICE, REPORT_QUEUED_LABEL, REPORT_QUEUED_NOTICE } from '../../hangout-worker/src/lobby-core.mjs';
 
 let now, engine, frames, writes, identities, sequence;
 function boot(persist) {
@@ -184,21 +185,42 @@ describe('durable delivery receipts without a saved chat backlog', () => {
 });
 
 describe('durable report acknowledgement', () => {
+    it('names a queued report without claiming a moderator is present or reading it', () => {
+        expect(REPORT_QUEUED_NOTICE).toBe(`${REPORT_QUEUED_LABEL}. This is not a promise that someone is reading it now. Appeals are in House rules.`);
+        expect(REPORT_ALREADY_QUEUED_NOTICE).toBe('Already in the report queue. That is not proof a moderator has read it.');
+        for (const text of [REPORT_QUEUED_LABEL, REPORT_QUEUED_NOTICE, REPORT_ALREADY_QUEUED_NOTICE]) {
+            expect(text).not.toMatch(/reported to the moderators/i);
+            expect(text).not.toMatch(/@/);
+        }
+        const engineSource = readFileSync(new URL('../../hangout-worker/src/lobby-core.mjs', import.meta.url), 'utf8');
+        const client = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby.js', import.meta.url), 'utf8');
+        const coverage = readFileSync(new URL('../../docs/HANGOUT_REPORT_COVERAGE.md', import.meta.url), 'utf8');
+        expect(engineSource).not.toContain('Reported to the moderators');
+        expect(engineSource).not.toContain('Already reported. Thanks.');
+        expect(client).toContain(`const REPORT_QUEUED_LABEL = '${REPORT_QUEUED_LABEL}'`);
+        expect(client).not.toContain('Report submitted to moderators');
+        expect(client).not.toContain('hangout-worker/src/lobby-core.mjs');
+        expect(coverage).toContain(REPORT_QUEUED_NOTICE);
+        expect(coverage).toContain(REPORT_ALREADY_QUEUED_NOTICE);
+    });
+
     it('holds the success acknowledgement until evidence is stored', async () => {
         let finish;
         boot((kind) => kind === 'moderation-queue' ? new Promise((resolve) => { finish = resolve; }) : undefined);
         const sender = guest('Sender'); const witness = guest('Witness'); const line = say(sender, 'Evidence needs reliable storage');
         frames = []; const pending = report(witness, line);
-        expect(frames.some((f) => /Reported to/.test(f.text || ''))).toBe(false);
+        expect(frames.some((f) => f.text === REPORT_QUEUED_NOTICE || f.text === REPORT_ALREADY_QUEUED_NOTICE)).toBe(false);
         finish(); await pending;
-        expect(frames.some((f) => f.recipient === witness && /Reported to/.test(f.text || ''))).toBe(true);
+        expect(frames).toContainEqual({ recipient: witness, t: 'report-status', id: line.id, submitted: true });
+        expect(frames).toContainEqual(expect.objectContaining({ recipient: witness, t: 'notice', from: 'StaleBot', kind: 'info', text: REPORT_QUEUED_NOTICE }));
+        expect(frames.some((f) => f.text === REPORT_ALREADY_QUEUED_NOTICE)).toBe(false);
     });
 
     it('does not claim success when evidence storage rejects and informs the visitor', async () => {
         boot((kind) => kind === 'moderation-queue' ? Promise.reject(new Error('storage fixture unavailable')) : undefined);
         const sender = guest('Sender'); const witness = guest('Witness'); const line = say(sender, 'Evidence storage failure case');
         frames = []; await report(witness, line);
-        expect(frames.some((f) => /Reported to/.test(f.text || ''))).toBe(false);
+        expect(frames.some((f) => f.text === REPORT_QUEUED_NOTICE || f.text === REPORT_ALREADY_QUEUED_NOTICE)).toBe(false);
         expect(frames.some((f) => f.t === 'report-status')).toBe(false);
         expect(frames.some((f) => f.recipient === witness && f.kind === 'error' && /Storage is unavailable/.test(f.text))).toBe(true);
         expect(engine.snapshot()).toMatchObject({ lock: 'readonly', lockAuto: true });
@@ -216,6 +238,7 @@ describe('durable report acknowledgement', () => {
         available = true; frames = []; await report(witness, line);
         expect(attempts).toBe(2); expect(engine.adminState().reports[0].count).toBe(1);
         expect(frames).toContainEqual({ recipient: witness, t: 'report-status', id: line.id, submitted: true });
-        expect(frames.some((f) => /Already reported/.test(f.text || ''))).toBe(true);
+        expect(frames).toContainEqual(expect.objectContaining({ recipient: witness, t: 'notice', from: 'StaleBot', kind: 'info', text: REPORT_ALREADY_QUEUED_NOTICE }));
+        expect(frames.some((f) => f.text === REPORT_QUEUED_NOTICE)).toBe(false);
     });
 });
