@@ -12,6 +12,11 @@ jobs:
     name: test
     runs-on: ubuntu-24.04
     timeout-minutes: 35
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
+      options: --user 1001
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
 
     steps:
       - name: Check out exact workflow commit
@@ -28,9 +33,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Chromium and WebKit
+      - name: Verify Chromium and WebKit
         timeout-minutes: 10
-        run: npx playwright install --with-deps chromium webkit
+        run: |
+          node --test tests/ci/browser-runtime.test.cjs
+          node scripts/verify-ci-browsers.cjs
 
       - name: Run automated tests
         run: npm test
