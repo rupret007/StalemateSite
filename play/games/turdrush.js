@@ -9,7 +9,7 @@ const motion = globalThis.matchMedia('(prefers-reduced-motion: reduce)');
 const share = globalThis.SuiteShare?.create({ host: $('rush-share'), game: 'turdrush' });
 const format = value => Math.max(0, Math.floor(value)).toLocaleString('en-US');
 let state = createRun(seed()), renderer = null, previousTime = 0, raf = 0;
-let runId = null, recorded = false, overAt = 0, available = false, gesture = null, soundGeneration = 0;
+let runId = null, recorded = false, overAt = 0, available = false, gesture = null, pendingSwipe = null, soundGeneration = 0;
 let lastOrientation = globalThis.innerWidth > globalThis.innerHeight;
 let feedback = '', feedbackUntil = 0, lastLesson = '', lastHud = '', result = null;
 let best = readBest(), lastContrast = null, contrastReady = null;
@@ -119,7 +119,7 @@ function begin() {
   renderer.resetRun();
   startRun(state);
   runId = globalThis.SuiteProgress?.newRunId('turdrush') || null;
-  recorded = false; result = null; previousTime = 0; gesture = null;
+  recorded = false; result = null; previousTime = 0; gesture = null; pendingSwipe = null;
   feedback = ''; feedbackUntil = 0; lastLesson = ''; share?.setResult(null);
   showPanel(null); gates(); hud();
   // The SDK's capture-phase unlock sees the ready screen paused. Open/resume
@@ -130,7 +130,7 @@ function begin() {
   announce('Run started. Swipe left or right to dodge, up to jump, down to slide.');
 }
 function pause(reason = 'Your run is right where you left it.') {
-  gesture = null;
+  gesture = null; pendingSwipe = null;
   if (!available || state.phase !== 'running') {return;}
   soundGeneration++;
   pauseRun(state); previousTime = 0;
@@ -140,11 +140,12 @@ function pause(reason = 'Your run is right where you left it.') {
 }
 function resume() {
   if (!available || state.phase !== 'paused' || document.hidden || $('rush-guide').open) {return;}
-  resumeRun(state); previousTime = 0; gesture = null;
+  resumeRun(state); previousTime = 0; gesture = null; pendingSwipe = null;
   showPanel(null); gates(); $('rush-canvas').focus({ preventScroll: true });
 }
 function finish() {
   if (recorded || state.phase !== 'over') {return;}
+  gesture = null; pendingSwipe = null;
   recorded = true; overAt = globalThis.performance.now();
   result = { id: runId, game: 'turdrush', kind: 'run', mode: 'endless', difficulty: 'standard',
     outcome: 'complete', completed: true, score: Math.floor(state.score),
@@ -166,13 +167,39 @@ function finish() {
   showPanel('rush-results'); gates(); hud();
   announce(`Run finished. ${result.score} points, ${result.distance} metres and ${result.picks} picks.`);
 }
-function input(action) {
-  if (!available || state.phase !== 'running' || $('rush-guide').open) {return;}
+function tryInput(action) {
+  if (!available || state.phase !== 'running' || $('rush-guide').open) {return false;}
   const events = act(state, action); consume(events); hud();
+  return events.length > 0;
+}
+function input(action) {
+  if (action === 'left' || action === 'right') {pendingSwipe = null;}
+  return tryInput(action);
+}
+function flushSwipe() {
+  if (!pendingSwipe) {return;}
+  if (state.phase !== 'running' || !available || $('rush-guide').open || state.elapsed > pendingSwipe.until) {
+    pendingSwipe = null; return;
+  }
+  if (pendingSwipe.lane === state.player.lane) {pendingSwipe = null; return;}
+  tryInput(pendingSwipe.lane < state.player.lane ? 'left' : 'right');
+  if (pendingSwipe.lane === state.player.lane) {pendingSwipe = null;}
+}
+function swipeInput(action, owner) {
+  if (action !== 'left' && action !== 'right') {input(action); return;}
+  // Distinct fast flicks can arrive during the core's100ms cooldown. Keep one
+  // bounded destination, so opposite corrections cancel instead of disappearing
+  // or replaying an extra direction later. Edge swipes accrue no movement debt.
+  const live = pendingSwipe && state.elapsed <= pendingSwipe.until;
+  const from = live ? pendingSwipe.lane : state.player.lane;
+  const lane = Math.max(0, Math.min(2, from + (action === 'left' ? -1 : 1)));
+  if (live && lane === from) {return;}
+  pendingSwipe = lane === state.player.lane ? null : { lane, owner, until: state.elapsed + .25 };
+  flushSwipe();
 }
 function unavailable(message) {
   if (state.phase === 'running') {pauseRun(state);}
-  soundGeneration++; available = false; gesture = null;
+  soundGeneration++; available = false; gesture = null; pendingSwipe = null;
   $('rush-unavailable-text').textContent = message;
   showPanel('rush-unavailable'); gates();
   globalThis.SuiteLoading?.ready();
@@ -196,6 +223,7 @@ function frame(time) {
   const wasRunning = state.phase === 'running';
   const events = wasRunning ? advance(state, Math.min(dt, 0.12)) : [];
   consume(events);
+  flushSwipe();
   if (state.phase === 'over') {
     finish();
     if ($('rush-again').disabled && time - overAt >= 550) { $('rush-again').disabled = false; $('rush-again').focus({ preventScroll: true }); }
@@ -240,14 +268,14 @@ globalThis.addEventListener('keydown', event => {
 });
 for (const button of controls) {
   button.addEventListener('pointerdown', event => {
-    if (event.button !== 0 || button.disabled) {return;}
+    if (event.button !== 0 || event.isPrimary === false || button.disabled) {return;}
     event.preventDefault(); input(button.dataset.rushAction);
   });
   button.addEventListener('click', event => { if (event.detail === 0) {input(button.dataset.rushAction);} });
 }
 const canvas = $('rush-canvas');
 canvas.addEventListener('pointerdown', event => {
-  if (state.phase !== 'running' || gesture || event.button !== 0) {return;}
+  if (state.phase !== 'running' || gesture || event.button !== 0 || event.isPrimary === false) {return;}
   event.preventDefault(); gesture = { id: event.pointerId, x: event.clientX, y: event.clientY, consumed: false };
   canvas.setPointerCapture?.(event.pointerId);
 });
@@ -255,13 +283,19 @@ function swipe(event) {
   if (!gesture || gesture.id !== event.pointerId || gesture.consumed || state.phase !== 'running') {return;}
   const x = event.clientX - gesture.x, y = event.clientY - gesture.y;
   if (Math.max(Math.abs(x), Math.abs(y)) < 18) {return;}
-  if (Math.abs(x) > Math.abs(y) * 1.12) { input(x > 0 ? 'right' : 'left'); gesture.consumed = true; }
-  else if (Math.abs(y) > Math.abs(x) * 1.12) { input(y > 0 ? 'slide' : 'jump'); gesture.consumed = true; }
+  if (Math.abs(x) > Math.abs(y) * 1.12) { swipeInput(x > 0 ? 'right' : 'left', gesture); gesture.consumed = true; }
+  else if (Math.abs(y) > Math.abs(x) * 1.12) { swipeInput(y > 0 ? 'slide' : 'jump', gesture); gesture.consumed = true; }
 }
 canvas.addEventListener('pointermove', swipe);
 canvas.addEventListener('pointerup', event => { swipe(event); if (gesture?.id === event.pointerId) {gesture = null;} });
-canvas.addEventListener('pointercancel', () => { gesture = null; });
-canvas.addEventListener('lostpointercapture', () => { gesture = null; });
+function cancelSwipe(event) {
+  if (gesture?.id !== event.pointerId) {return;}
+  const owner = gesture;
+  gesture = null;
+  if (pendingSwipe?.owner === owner) {pendingSwipe = null;}
+}
+canvas.addEventListener('pointercancel', cancelSwipe);
+canvas.addEventListener('lostpointercapture', cancelSwipe);
 globalThis.addEventListener('blur', () => pause('You stepped away. Tap Keep running when you are ready.'));
 document.addEventListener('visibilitychange', () => { if (document.hidden) {pause('Welcome back. Tap Keep running when you are ready.');} });
 globalThis.addEventListener('orientationchange', () => pause('Your screen turned. Tap Keep running when you are ready.'));
