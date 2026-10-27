@@ -948,10 +948,19 @@ describe('current camera failure retires locally without retrying stale capture'
         f.channel.myCam = false; f.room.onCam(f.channel.name, false);
         f.channel.myCam = true; f.room.onCam(f.channel.name, true);
         await vi.waitFor(() => expect(f.state.stream).toBe(f.stream));
-        const current = new Map(f.state.pcs), status = f.window.document.querySelector('[data-act-relay-status]'); status.textContent = 'New capture remains current';
+        const current = f.state.pcs, keys = Array.from(current.keys());
+        const pairs = Array.from(current, ([id, entry]) => ({ id, entry, pc: entry.pc }));
+        expect(keys).toEqual(['peer', 'third']);
+        const status = f.window.document.querySelector('[data-act-relay-status]'); status.textContent = 'New capture remains current';
         f.rejectCapture(new Error('SYNTHETIC_STALE_PERMISSION_ERROR')); await nextCameraTick();
         expect(f.state.stream).toBe(f.stream); expect(f.state.camOn).toBe(true); expect(f.channel.myCam).toBe(true);
-        expect(f.state.pcs).toEqual(current); expect(f.localTrack.stop).not.toHaveBeenCalled();
+        expect(f.state.pcs).toBe(current); expect(f.state.pcs.size).toBe(keys.length);
+        expect(Array.from(f.state.pcs.keys())).toEqual(keys);
+        for (const { id, entry, pc } of pairs) {
+            expect(f.state.pcs.get(id)).toBe(entry); expect(f.state.pcs.get(id).pc).toBe(pc);
+            expect(pc.close).not.toHaveBeenCalled();
+        }
+        expect(f.localTrack.stop).not.toHaveBeenCalled();
         expect(callback).not.toHaveBeenCalled(); expect(cameraOffFrames(f)).toEqual([]); expect(status.textContent).toBe('New capture remains current');
         expect(f.capture).toHaveBeenCalledTimes(2);
     });
