@@ -75,11 +75,26 @@ function finish(attempt, phase, message, identity) {
     operation = '';
     render(phase, message, identity);
 }
+async function accessRequest(path, options = {}) {
+    const controller = new AbortController();
+    let timer;
+    const timeout = new Promise((resolve, reject) => {
+        timer = setTimeout(() => { reject(new Error('community-request-timeout')); controller.abort(); }, 10000);
+    });
+    try {
+        // Bound headers AND body consumption. The race also fences a late
+        // response if a transport does not settle when its signal is aborted.
+        return await Promise.race([(async () => {
+            const response = await fetch(path, { ...options, signal: controller.signal });
+            let value;
+            if (response.ok) { try { value = await response.json(); } catch { /* Invalid JSON cannot confirm access or leaving. */ } }
+            return { ok: response.ok, status: response.status, value };
+        })(), timeout]);
+    } finally { clearTimeout(timer); }
+}
 async function post(path, body) {
-    const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    let value;
-    try { value = await response.json(); } catch { return { ok: false, status: response.status }; }
-    return { ok: response.ok && value?.ok === true, status: response.status };
+    const response = await accessRequest(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    return { ok: response.ok && response.value?.ok === true, status: response.status };
 }
 function validState(value) {
     return value && !Array.isArray(value) && ['guest', 'owner', 'staff'].includes(value.kind)
@@ -91,12 +106,12 @@ async function draw() {
     const attempt = begin('check');
     if (!attempt) return;
     try {
-        const response = await fetch('/beta/state');
+        const response = await accessRequest('/beta/state');
         if (attempt !== currentAttempt) return;
         if (response.status === 401) return finish(attempt, 'invitation', 'A private invitation is required.');
         if (response.status === 403) return finish(attempt, 'denied', 'Access was denied. Check the house rules or contact the community owner.');
         if (!response.ok) return finish(attempt, 'unavailable', unavailable);
-        const identity = await response.json();
+        const identity = response.value;
         if (attempt !== currentAttempt) return;
         if (!validState(identity)) return finish(attempt, 'unavailable', unavailable);
         finish(attempt, 'ready', 'Invitation accepted.', identity);

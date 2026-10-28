@@ -33,6 +33,24 @@ the existing 13+/18+ safeguards or provide a new report-collection service.
 
 ## Invitation portal recovery
 
+Access reads, invitation unlock and leaving each have a ten-second client
+deadline covering both response headers and JSON-body consumption. A stalled
+read or unlock becomes temporarily unavailable with **Try again**; that action
+checks access with a GET and never automatically resubmits the invitation.
+The unsent invitation draft stays in the current page. A stalled leave remains
+unconfirmed with **Retry leaving**, and optional identity hints are cleared only
+after a successful server acknowledgement. Duplicate activations remain fenced.
+
+The deadline requests transport cancellation and ignores late results, even if
+the transport does not honor abort. It does not prove that a server-side unlock
+or revocation stopped, or that another tab signed out. Only explicit recovery
+checks determine the next displayed state. A timer can also be delayed while a
+browser suspends the page; ten seconds is the active-page request deadline,
+not a background-tab scheduling guarantee. Served-client unit tests cover
+stalled headers/body for all three operations and late results after recovery;
+their deterministic timer/transport seams are not hosted or physical-device
+evidence.
+
 The portal distinguishes its access check from authentication. A 401 response
 from the existing state endpoint means a valid invitation is needed. A 403 is
 shown as denied access, not an instruction to supply different credentials.
