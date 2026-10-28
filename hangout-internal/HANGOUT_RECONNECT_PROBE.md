@@ -3,7 +3,10 @@
 Requirement S7 includes reconnect storms. The browser probe in
 `tests/e2e/lobby-reconnect-burst.spec.js` adds one bounded functional tier: five
 independent Chromium profiles lose their actual TCP connections together while
-the existing loopback relay remains available. It is authored pending execution;
+the existing loopback relay remains available. A real application-ACK drain
+first establishes an idle baseline: a visible line alone does not prove that
+its message result arrived. Uncertain delivery correctly requires explicit
+recovery and is a separate path. It is authored pending execution;
 do not treat this contract as a passing run.
 
 The test uses the production client retry logic, unchanged admission/control

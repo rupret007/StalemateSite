@@ -75,6 +75,11 @@ test('five visitors recover together from TCP loss without replay, duplicate lin
         await Promise.all(pages.map(page => expect.poll(() => receivedNames(page)).toEqual([...names].sort())));
         await send(pages[0], beforeText);
         await Promise.all(pages.map(page => expect(page.locator('[data-buffer]')).toContainText(beforeText)));
+        // An in-flight message result intentionally pauses automatic reconnect.
+        // Establish an idle, acknowledged baseline before testing this path.
+        await fixture.settled();
+        await expect.poll(() => fixture.metrics().delivery.pendingFrames).toBe(0);
+        await fixture.settled();
         await pages[1].fill('[data-text]', draft);
         const oldIds = await Promise.all(pages.map(page => page.evaluate(() => __lobby.selfId)));
         expect(oldIds.every(Boolean)).toBe(true); expect(new Set(oldIds).size).toBe(5);
