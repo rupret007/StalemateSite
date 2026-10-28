@@ -65,7 +65,8 @@ async function browserRoom(browser, baseURL, configured, viewport) {
     const contexts = [], external = [];
     const relay = hangoutRelayWsBase(baseURL, `${configured ? 'webjam-browser-' : 'webjam-off-'}${randomUUID()}`);
     const join = async (nick, controls = false) => {
-        const context = await browser.newContext({ viewport, ...(controls ? { permissions: ['local-network-access'] } : {}) }); contexts.push(context);
+        const context = await browser.newContext({ viewport,
+            ...(controls && browser.browserType().name() === 'chromium' ? { permissions: ['local-network-access'] } : {}) }); contexts.push(context);
         await context.route('**/*', route => {
             if (new URL(route.request().url()).origin === new URL(baseURL).origin) return route.continue();
             external.push(route.request().url()); return route.abort();
