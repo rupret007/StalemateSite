@@ -97,7 +97,9 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
     const f = await browserRoom(browser, baseURL, true, { width, height: 844 });
     try {
         const host = await f.join('BrowserHost'), guest = await f.join('BrowserGuest');
+        await host.click('[data-show="rooms"]');
         await host.click('[data-start="jam"]');
+        await expect(host.locator('[data-jam]')).toBeVisible();
         const channel = await host.evaluate(() => __lobby.active);
         await host.evaluate(() => __lobby.cmd('invite', ['BrowserGuest']));
         await guest.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
