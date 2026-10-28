@@ -7,6 +7,13 @@ not a release approval or evidence that a live website contains the candidate.
 
 ## Select one tested candidate
 
+The current application assembly is `codex/che-demo-candidate`; see the
+[checkpoint](HANGOUT_DEMO_CHECKPOINT.md#current-assembly-one-source-for-the-receiving-website-session)
+for its exact inputs and unresolved gates. Obtain the actual reviewed current
+commit, not just an input PR or branch name. This assembly includes both the
+music-invitation fixes and the reconnect probe; older input results do not
+qualify the merged tree.
+
 Use the delivered source commit and its matching CI/review receipts. The entry
 toolkit's `SOURCE-MANIFEST.json` names the commit used to build that archive; it
 contains link tooling and documentation, not the whole application. Obtain the

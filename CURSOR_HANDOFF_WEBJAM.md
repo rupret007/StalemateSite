@@ -9,10 +9,16 @@ below describe the earlier checkpoint, not the current source.
 
 ## Start here
 
-The current combined candidate is **`codex/webjam-demo-readiness`**. It combines
-PR155's application head with PR157's lobby-count fix and PR147's beta entry
-recovery. Combined runtime, review and deployment remain unqualified. Preserve
-the separate source branches; use the checkpoint to locate their exact commits.
+The current application assembly is **`codex/che-demo-candidate`**. It combines
+PR162's visible browser-invitation/Stop fixes with PR160's bounded reconnect
+probe, inheriting PR159's access-request recovery and PR161's required music
+acceptance. Read the checkpoint's current-assembly section for exact input
+revisions and evidence limits. Combined CI, current-head Karen, matching
+deployment and actual music remain to qualify.
+
+The earlier **`codex/webjam-demo-readiness`** / PR158 assembly combines PR155,
+PR157 and PR147. It remains in this candidate's history. Preserve all separate
+source branches; do not select an older branch solely because its checks passed.
 
 The original handoff used **`codex/lobby-provider-start-fence`**. Its WIP was
 saved in `38b8d88b068133a727d8044d120f51bdfc6b4e5a`; subsequent commits add this
