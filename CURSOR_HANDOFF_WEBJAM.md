@@ -1,11 +1,20 @@
 # WebJam / Hang Out — Cursor continuation
 
-Updated October 27, 2026. Jeff requested a pause to conserve Codex usage, a
-repository handoff for Cursor, and publication of the saved work to GitHub.
+Resumed October 28, 2026. The October 27 pause checkpoint is retained below
+as history. Read the current [demo checkpoint](hangout-internal/HANGOUT_DEMO_CHECKPOINT.md)
+first: Cursor has since fixed the native health witness, recorded a local
+provider-start run, and moved internal documents from `docs/` to
+`hangout-internal/`. The original P9 runtime and unfinished-review statements
+below describe the earlier checkpoint, not the current source.
 
 ## Start here
 
-Continue branch **`codex/lobby-provider-start-fence`**. The application WIP was
+The current combined candidate is **`codex/webjam-demo-readiness`**. It combines
+PR155's application head with PR157's lobby-count fix and PR147's beta entry
+recovery. Combined runtime, review and deployment remain unqualified. Preserve
+the separate source branches; use the checkpoint to locate their exact commits.
+
+The original handoff used **`codex/lobby-provider-start-fence`**. Its WIP was
 saved in `38b8d88b068133a727d8044d120f51bdfc6b4e5a`; subsequent commits add this
 handoff. Preserve existing work and inspect `git status` before switching or
 pulling. No reset, force-push, push to main, deployment or service restart is

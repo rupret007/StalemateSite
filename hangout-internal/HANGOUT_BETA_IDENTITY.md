@@ -31,6 +31,35 @@ Other product assets remain protected. A missing policy asset returns an honest
 never substituted. This access fix does not approve the draft policy, change
 the existing 13+/18+ safeguards or provide a new report-collection service.
 
+## Invitation portal recovery
+
+The portal distinguishes its access check from authentication. A 401 response
+from the existing state endpoint means a valid invitation is needed. A 403 is
+shown as denied access, not an instruction to supply different credentials.
+A service error, network failure or malformed state response is shown as
+temporarily unavailable, with the invitation form hidden. **Try again** performs
+an explicit GET check using the current cookies; recovery never automatically
+posts an invitation, mints a session or requests an email code. Deliberately
+opening an invitation fragment retains its existing unlock and address
+scrubbing behavior.
+
+Controls are disabled while their request is pending. Failed requests retain an
+unsubmitted invitation in its password field. Only a valid current response can
+reopen the admitted links; an older held check cannot restore an identity after
+logout or a newer attempt. Status messages use fixed wording rather than private
+backend exceptions. House rules, privacy information and the configured contact
+remain reachable throughout recovery.
+
+A failed logout stays **Leaving was not confirmed**, with **Retry leaving**
+available. Revocation may already have committed while connection cleanup is
+pending; this state promises neither an active session nor successful departure.
+The page clears its optional tab hints only after the server confirms logout.
+An explicit retry repeats that reducing operation without granting access.
+
+This UI contract changes no admission, account/staff permission, cookie or
+revocation authority. Source changes alone do not qualify hosted sign-in,
+physical-device accessibility, provider delivery or deployment.
+
 ## Admission and session boundaries
 
 Private invitations use `/beta/#invite=<private-code>`. The fragment is removed from browser history before it is submitted in a same-origin JSON POST. Do not put invitations in public PR descriptions, screenshots, logs or public navigation.

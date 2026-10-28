@@ -1322,7 +1322,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         });
         const view = Discovery.visitView(visit);
         $('[data-owner-signin]').hidden = sessionEnded;
-        $('[data-lobby-count]').textContent = connected ? `${visit.others + (app.me ? 1 : 0)} here · chat` : 'Main conversation';
+        $('[data-lobby-count]').textContent = view.lobbyCount;
         $('[data-presence-title]').textContent = view.presenceTitle;
         $('[data-presence-detail]').textContent = view.presenceDetail;
         $('[data-welcome-title]').textContent = view.welcomeTitle;

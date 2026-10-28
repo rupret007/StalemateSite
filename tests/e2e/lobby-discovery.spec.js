@@ -148,6 +148,7 @@ test('offline sends keep the draft; reconnect clears stale membership and preser
         await page.evaluate(() => window.__lobby.ws.close(1000));
         await expect(page.locator('[data-connection]')).toHaveText('Offline');
         await expect(page.locator('[data-presence-title]')).toHaveText('The lobby is offline');
+        await expect(page.locator('[data-lobby-count]')).toHaveText('Main conversation');
         await expect(page.locator('[data-presence-detail]')).toContainText('not an empty room');
         await expect(page.locator('[data-presence-title]')).not.toContainText('quiet');
         await expect(page.locator('[data-gathering]')).toBeHidden();
@@ -159,6 +160,7 @@ test('offline sends keep the draft; reconnect clears stale membership and preser
         await page.click('[data-reconnect]');
         await expect(page.locator('[data-connection]')).toHaveText('Connected');
         await expect(page.locator('[data-nicks]')).toContainText('ReturnGuest');
+        await expect(page.locator('[data-lobby-count]')).toHaveText('1 here · chat');
         await expect(page.locator('[data-tabs] button')).toHaveCount(1);
         await expect(page.locator('[data-pm-off]')).toBeChecked();
         await expect(page.locator('[data-toast]')).toContainText('off');
@@ -174,6 +176,7 @@ test('a quiet visit shows no invented gathering and drafts a prompt without send
     const page = await guest(browser, 'QuietGuest');
     try {
         await expect(page.locator('[data-presence-title]')).toHaveText('It is quiet in #stalemate');
+        await expect(page.locator('[data-lobby-count]')).toHaveText('1 here · chat');
         await expect(page.locator('[data-welcome-title]')).toHaveText('First one here? Make yourself at home.');
         await expect(page.locator('[data-presence-detail]')).toContainText('No confirmed gathering was supplied');
         await expect(page.locator('[data-presence-detail]')).not.toContainText('band is here');
