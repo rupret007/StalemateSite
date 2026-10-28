@@ -230,6 +230,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .jam { flex: 0 1 auto; min-height: 0; overflow: auto; max-height: 35dvh; padding: 16px 20px; background: #171e15; border-bottom: 1px solid #43543a; font-size: 12px; }
 .jam-actions, .jam-paste { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .jam-paste { margin-top: 10px; }
+.jam-paste .small { flex-basis: 100%; margin: 0; }
 .jam-paste textarea, .act-load input { flex: 1; min-width: 0; }
 .jam textarea { box-sizing: border-box; width: 100%; max-width: 100%; font: inherit; font-size: 16px; resize: vertical; }
 .activity { flex: 0 1 auto; min-height: 0; max-height: 49dvh; overflow: auto; background: #141a14; border-bottom: 1px solid #43543a; scrollbar-width: thin; }

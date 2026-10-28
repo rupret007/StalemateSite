@@ -1161,9 +1161,10 @@ import { createEntrySharing } from './entry-sharing.mjs';
         desktop.hidden = !next.desktop;
         if (/^webjam:\/\//.test(next.desktop)) desktop.setAttribute('href', next.desktop);
         else desktop.removeAttribute('href');
-        $('[data-jam-wait]').hidden = !!next.invitation; $('[data-jam-copy]').hidden = !next.invitation;
+        $('[data-jam-wait]').hidden = !!(next.invitation || next.webReady); $('[data-jam-copy]').hidden = !next.invitation;
         const web = $('[data-jam-web]'); web.disabled = !next.webReady;
         web.textContent = web.disabled ? 'Browser join unavailable' : 'Join in browser (higher delay)';
+        web.title = web.disabled ? 'The host has not shared an approved browser invitation' : 'Open the host’s browser invitation; headphones and audio consent are required there';
         const context = jamContext;
         web.onclick = () => {
             if (jamContext === context && currentJam() === context.room && context.webReady && /^https:\/\//.test(context.web))
@@ -1736,7 +1737,11 @@ import { createEntrySharing } from './entry-sharing.mjs';
         e.preventDefault();
         const c = currentJam(), input = $('[data-jam-link]');
         if (!c || jamContext?.room !== c || !jamContext.host || !amOp(c)) { input.value = ''; return; }
-        if (input.value && cmd('jamlink', ['invitation', input.value], c.name)) input.value = '';
+        // Copy web invite produces one HTTPS URL. Only route that explicit
+        // paste to the existing server-gated browser hook; keep complete
+        // desktop invitations, including sealed replies, byte-for-byte.
+        const value = input.value, web = /^https:\/\//i.test(value.trim());
+        if (value && cmd('jamlink', [web ? 'web' : 'invitation', web ? value.trim() : value], c.name)) input.value = '';
     });
     $('[data-jam-copy]').addEventListener('click', async () => {
         const c = currentJam(), context = jamContext;
