@@ -279,6 +279,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     // onLeave invalidates capture/room generations as well as live tracks/PCs.
     function pauseLocalMedia() {
         app.localMediaPaused = true;
+        clearJamInvitations();
         if (roomApi) roomApi.onLeave();
         $('[data-activity]').hidden = true; $('[data-jam]').hidden = true; $('[data-cam]').hidden = true;
         $('[data-quick]').hidden = true; $('[data-lobby-welcome]').hidden = true;
@@ -1144,7 +1145,8 @@ import { createEntrySharing } from './entry-sharing.mjs';
     }
     function currentJam() {
         const c = app.chans.get(app.active);
-        return connectionState === 'connected' && c?.kind === 'jam' && c.names?.some(n => n.nick === app.me) ? c : null;
+        return connectionState === 'connected' && !app.localMediaPaused && !app.sharingStopped
+            && c?.kind === 'jam' && c.names?.some(n => n.nick === app.me) ? c : null;
     }
     function drawJam() {
         if (app.sharingStopped || app.localMediaPaused) { resetJamControls(); $('[data-jam]').hidden = true; return; }

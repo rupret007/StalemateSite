@@ -19,6 +19,10 @@ or end its session for that.
 
 Invitations remain room-scoped bearer capabilities. Existing room-switch,
 disconnect, host-power-loss and delayed-action fences remain in place. The
+local Stop action immediately retires room invitation controls, and cached
+Join/copy actions require active local sharing even while server withdrawal
+is unconfirmed. This does not recall an invitation already copied elsewhere.
+The
 browser link is not put in local/session storage or a room chat line. The
 existing event records only that the host shared a browser invitation and
 directs members to the correct browser button.
@@ -26,12 +30,14 @@ directs members to the correct browser button.
 ## Verification scope
 
 `tests/e2e/lobby-webjam.spec.js` adds two real-relay browser journeys at 375/390px
-and a disabled/unapproved-origin journey. They check the visible Share form,
+and disabled/unapproved-origin and unconfirmed-Stop journeys. They check the visible Share form,
 desktop-message preservation alongside the browser link, host-only updates,
 explicit opening with `noopener,noreferrer`, stale-action refusal, clearing,
 no storage/capture/external fetch and mobile screenshots. Their reserved
 `https://webjam.example` origin exists only in a loopback test namespace.
 The popup is intercepted; these tests do not contact a Web Join endpoint.
+The Stop case uses synthetic own-status HTTP replies and a failed withdrawal;
+it proves the real client's immediate opt-out, not real server consent ordering.
 
 No production origin, TURN/vault credential, provider or deployment is enabled
 by this change. Passing these journeys proves application handoff, not actual

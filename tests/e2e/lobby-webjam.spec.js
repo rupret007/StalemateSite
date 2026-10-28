@@ -64,12 +64,25 @@ const WEB_INVITE = 'https://webjam.example/join/#k=synthetic_browser_capability&
 async function browserRoom(browser, baseURL, configured, viewport) {
     const contexts = [], external = [];
     const relay = hangoutRelayWsBase(baseURL, `${configured ? 'webjam-browser-' : 'webjam-off-'}${randomUUID()}`);
-    const join = async nick => {
-        const context = await browser.newContext({ viewport }); contexts.push(context);
+    const join = async (nick, controls = false) => {
+        const context = await browser.newContext({ viewport, ...(controls ? { permissions: ['local-network-access'] } : {}) }); contexts.push(context);
         await context.route('**/*', route => {
             if (new URL(route.request().url()).origin === new URL(baseURL).origin) return route.continue();
             external.push(route.request().url()); return route.abort();
         });
+        if (controls) {
+            // Synthetic own-status HTTP only; real consent/identity ordering
+            // belongs to the native gateway suite, not this client fixture.
+            await context.route(url => url.pathname === '/r/45662413410ed051/lobby/', async route => {
+                const response = await route.fetch();
+                await route.fulfill({ response, body: (await response.text()).replace('<head>', '<head><script src="/beta/bootstrap.js"></script>') });
+            });
+            await context.route('**/beta/bootstrap.js', route => route.fulfill({ contentType: 'text/javascript', body: 'window.HangoutParticipationControls=true;' }));
+            await context.route('**/beta/participation', route => route.fulfill({ json: {
+                ok: true, state: 'authorized', available: true, purposes: ['public-text', 'camera'], revision: 2, canStop: true
+            } }));
+            await context.route('**/beta/participation/stop', route => route.fulfill({ status: 503, json: { error: 'Synthetic unconfirmed withdrawal' } }));
+        }
         await context.addInitScript(() => {
             window.browserOpens = []; window.audioRequests = 0; window.copiedInvite = '';
             window.open = (...args) => { window.browserOpens.push(args); return null; };
@@ -83,7 +96,15 @@ async function browserRoom(browser, baseURL, configured, viewport) {
         const page = await context.newPage();
         await page.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
         await page.fill('[data-nick]', nick); await page.click('[data-enter]');
-        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        try { await expect(page.locator('[data-connection]')).toHaveText('Connected'); }
+        catch (error) {
+            console.log('WEBJAM_JOIN_FIXTURE', await page.evaluate(() => ({
+                gate: document.querySelector('[data-gate-status]').textContent,
+                sharing: document.querySelector('[data-sharing-status]').textContent,
+                socketReadyState: window.__lobby.ws?.readyState
+            })));
+            throw error;
+        }
         return page;
     };
     return { join, external, close: () => Promise.all(contexts.map(context => context.close())) };
@@ -159,4 +180,27 @@ test('browser invitations remain unavailable without an exact configured origin'
             expect(f.external).toEqual([]);
         } finally { await f.close(); }
     }
+});
+
+test('a cached browser Join action stays inactive after local Stop when server withdrawal is unconfirmed', async ({ browser, baseURL }) => {
+    const f = await browserRoom(browser, baseURL, true);
+    try {
+        const host = await f.join('StopBrowserHost', true);
+        await host.click('[data-start="jam"]'); await expect(host.locator('[data-jam]')).toBeVisible();
+        await paste(host, WEB_INVITE); await expect(host.locator('[data-jam-web]')).toBeEnabled();
+        await host.locator('[data-jam-web]').evaluate(button => { window.oldBrowserJoin = button.onclick; });
+        await host.locator('[data-sharing-controls] summary').click();
+        await expect(host.locator('[data-sharing-status]')).toContainText('Sharing is available');
+        await host.click('[data-sharing-stop]'); await host.click('[data-sharing-accept]');
+        await expect(host.locator('[data-text]')).toBeDisabled();
+        await expect(host.locator('[data-sharing-status]')).toContainText('could not be confirmed');
+        expect(await host.evaluate(() => __lobby.localMediaPaused)).toBe(true);
+        expect(await host.evaluate(() => __lobby.sharingStopped)).not.toBe(true);
+        expect(await host.evaluate(() => __lobby.chans.get(__lobby.active).jam)).toBe(null);
+        await expect(host.locator('[data-jam-copy-value]')).toHaveValue('');
+        await host.evaluate(() => window.oldBrowserJoin());
+        expect(await host.evaluate(() => window.browserOpens)).toEqual([]);
+        expect(await host.evaluate(() => window.audioRequests)).toBe(0);
+        expect(f.external).toEqual([]);
+    } finally { await f.close(); }
 });
