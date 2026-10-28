@@ -107,8 +107,13 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         await expect(guest.locator('[data-jam-web]')).toBeDisabled();
         await expect(guest.locator('[data-jam-form]')).toBeHidden();
         await paste(host, INVITE);
+        // Each socket confirms independently. A replacement announcement
+        // clears an old editor; wait for the host's own confirmation before
+        // typing the next invitation, even if the guest received it first.
+        await expect(host.locator('[data-jam-copy]')).toBeVisible();
         await expect(guest.locator('[data-jam-copy]')).toBeVisible();
         await paste(host, ` \n${WEB_INVITE}\n `);
+        await expect(host.locator('[data-jam-web]')).toBeEnabled();
         await expect(guest.locator('[data-jam-web]')).toBeEnabled();
         await expect(guest.locator('[data-jam-web]')).toHaveAttribute('title', /headphones and audio consent/);
         await expect(guest.locator('[data-jam-wait]')).toBeHidden();
