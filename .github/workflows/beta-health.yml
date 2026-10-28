@@ -1,0 +1,38 @@
+name: Private beta health
+
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stalemate-beta-health
+  cancel-in-progress: false
+
+jobs:
+  health:
+    name: Read-only beta health
+    # Disabled until the reviewed workflow, dedicated secret and notification
+    # delivery have been accepted. Dispatching another branch cannot use it.
+    if: ${{ github.ref == 'refs/heads/main' && vars.STALEMATE_BETA_MONITOR_ENABLED == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Check out exact workflow commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+
+      - name: Probe private beta health
+        env:
+          HANGOUT_BETA_OPS_KEY: ${{ secrets.HANGOUT_BETA_OPS_KEY }}
+        run: node scripts/beta-health-ci.cjs
