@@ -27,6 +27,14 @@ to the current P9 safety slice or claim the other requirements are complete.
 
 ## Product and ownership
 
+**October 28 clarification: live WebJam music is required for the finished
+demo.** Verify two-way audio involving the Apple-silicon Mac mini, Intel/x86
+MacBook Pro and Windows PC. Browser chat, drawing and invitation copying are
+partial evidence. Follow the [music demo acceptance](hangout-internal/HANGOUT_MUSIC_DEMO_ACCEPTANCE.md)
+and preserve Linux and all other original requirements. A desktop or browser
+music path is an implementation choice; music itself is not an optional project
+deliverable. Individual visitors still choose whether to enable audio.
+
 Build **one shared community** entered through Stalemate, Rad Dad and future
 sites. Both band sites open one community address; visitors share people,
 channels, rooms, identity and moderation. Entry badges say “via Stalemate” or
