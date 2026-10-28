@@ -4,17 +4,35 @@
 const http = require('node:http');
 const { test, expect } = require('@playwright/test');
 
-async function lossyRelay(origin) {
+async function lossyRelay(baseURL) {
     const { createHangoutRelay } = await import('../../scripts/hangout-relay-dev.mjs');
-    const relay = createHangoutRelay({ origins: origin });
-    const sockets = new Set(), faults = [];
-    let admissions = 0;
-    const server = http.createServer((_request, response) => { response.writeHead(404); response.end(); });
+    const sockets = new Set(), ownedSockets = new Set(), faults = [];
+    let admissions = 0, relay;
+    const server = http.createServer((request, response) => {
+        if (!['GET', 'HEAD'].includes(request.method)) { response.writeHead(405); response.end(); return; }
+        // Preserve the actual page and its same-origin CSP. Only the fixed
+        // existing test server supplies assets; request URLs cannot pick a host.
+        const path = new URL(request.url, 'http://fixture'), target = new URL(baseURL);
+        target.pathname = path.pathname; target.search = path.search;
+        const upstream = http.request(target, { method: request.method, agent: false }, source => {
+            response.writeHead(source.statusCode, source.headers); source.pipe(response);
+        });
+        upstream.on('error', error => {
+            if (response.destroyed || response.writableEnded) return;
+            faults.push(error.message);
+            if (response.headersSent) response.destroy();
+            else { response.writeHead(502); response.end(); }
+        });
+        response.once('close', () => { if (!response.writableEnded) upstream.destroy(); });
+        upstream.end();
+    });
     server.on('connection', socket => {
-        sockets.add(socket); socket.once('close', () => sockets.delete(socket));
+        ownedSockets.add(socket); socket.once('close', () => ownedSockets.delete(socket));
     });
     server.on('upgrade', (request, socket, head) => {
+        sockets.add(socket); socket.once('close', () => sockets.delete(socket));
         admissions++;
+        if (!relay) { socket.destroy(); return; }
         void relay.handleUpgrade(request, socket, head, new URL(request.url, 'http://relay')).catch(error => {
             faults.push(error.message); socket.destroy();
         });
@@ -24,8 +42,15 @@ async function lossyRelay(origin) {
             server.once('error', reject);
             server.listen(0, '127.0.0.1', () => { server.off('error', reject); resolve(); });
         });
-    } catch (error) { await relay.close(); throw error; }
+        relay = createHangoutRelay({ origins: `http://127.0.0.1:${server.address().port}` });
+    } catch (error) {
+        if (relay) await relay.close();
+        for (const socket of ownedSockets) socket.destroy();
+        if (server.listening) await new Promise(resolve => server.close(resolve));
+        throw error;
+    }
     return {
+        origin: `http://127.0.0.1:${server.address().port}`,
         url: `ws://127.0.0.1:${server.address().port}`,
         admissions: () => admissions,
         liveSockets: () => sockets.size,
@@ -43,7 +68,7 @@ async function lossyRelay(origin) {
         async close() {
             try { await relay.close(); }
             finally {
-                for (const socket of sockets) socket.destroy();
+                for (const socket of ownedSockets) socket.destroy();
                 if (server.listening) await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
             }
         }
@@ -51,7 +76,7 @@ async function lossyRelay(origin) {
 }
 
 test('five visitors recover together from TCP loss without replay, duplicate lines or leaked sessions', async ({ browser, baseURL }) => {
-    const fixture = await lossyRelay(new URL(baseURL).origin);
+    const fixture = await lossyRelay(baseURL);
     const contexts = [], pages = [], errors = [];
     const names = ['BurstOne', 'BurstTwo', 'BurstThree', 'BurstFour', 'BurstFive'];
     const beforeText = 'Synthetic line before the shared transport loss';
@@ -63,12 +88,13 @@ test('five visitors recover together from TCP loss without replay, duplicate lin
         for (const name of names) {
             const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
             contexts.push(context);
-            await context.route('**/*', route => new URL(route.request().url()).origin === new URL(baseURL).origin ? route.continue() : route.abort());
+            await context.route('**/*', route => new URL(route.request().url()).origin === fixture.origin ? route.continue() : route.abort());
             const page = await context.newPage(); pages.push(page);
             page.on('pageerror', error => errors.push(error.message));
-            const target = new URL('/r/45662413410ed051/lobby/', baseURL);
+            const target = new URL('/r/45662413410ed051/lobby/', fixture.origin);
             target.searchParams.set('preview', 'local-preview-key-0001'); target.searchParams.set('relay', fixture.url);
             await page.goto(target.href);
+            await expect(page.locator('meta[http-equiv="Content-Security-Policy"]')).toHaveAttribute('content', /connect-src 'self'/);
             await page.fill('[data-nick]', name); await page.click('[data-enter]');
             await expect(page.locator('[data-connection]')).toHaveText('Connected');
         }

@@ -15,6 +15,14 @@ events, mock the WebSocket API, change clocks, force retry randomness, or reset
 capacity counters. Its private HTTP server owns the five transports it destroys;
 there is no new application fault endpoint or service control.
 
+The fixture proxies unchanged assets from the existing test server and serves
+its WebSockets on that same fixture origin. The original page CSP is preserved;
+no cross-origin relay exception is added. Only upgraded WebSocket transports
+are cut, while all owned HTTP and WebSocket sockets are cleaned up at the end.
+An earlier run of `c11e3fa` failed during initial connection because its relay
+used a different origin prohibited by the existing CSP. Preserve that failed
+run; it did not reach the reconnect scenario or qualify any recovery claim.
+
 Success requires five new welcome/session IDs, the correct five-person roster,
 no old chat replay, retention of an unsent tab draft without publication, one
 copy of a new line per client, exactly ten total admissions and five retained
