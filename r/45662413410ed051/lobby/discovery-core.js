@@ -239,6 +239,7 @@
             connection: 'connected',
             quiet,
             known,
+            selfPresent: typeof me === 'string' && me.length > 0,
             others: summary.others,
             available: summary.available,
             band: summary.band,
@@ -252,6 +253,12 @@
         });
     }
 
+    function lobbyCount(visit) {
+        const others = visit && Number.isSafeInteger(visit.others) && visit.others >= 0 ? visit.others : null;
+        if (!visit || visit.connection !== 'connected' || !visit.known || others === null) return 'Main conversation';
+        return `${others + (visit.selfPresent === true ? 1 : 0)} here · chat`;
+    }
+
     function visitView(visit) {
         const confirmed = !!(visit && visit.gatheringStatus === 'confirmed' && visit.gathering);
         const none = !!(visit && visit.gatheringStatus === 'none');
@@ -260,6 +267,7 @@
         return Object.freeze({
             presenceTitle: visit && typeof visit.headline === 'string' ? visit.headline : 'Waiting for the lobby',
             presenceDetail: visit && typeof visit.detail === 'string' ? visit.detail : '',
+            lobbyCount: lobbyCount(visit),
             welcomeTitle: visit && typeof visit.welcomeTitle === 'string' ? visit.welcomeTitle : 'Waiting for the lobby',
             showGathering: confirmed || none,
             gatheringHeading: confirmed ? 'Next confirmed gathering' : 'Confirmed gathering',
