@@ -540,3 +540,291 @@ for (const width of [375, 390]) test(`Block retires live camera pairs across ent
             finalDecoded: await Promise.all([alpha, bravo, witness, parallel].map(peerState)), captureCalls: await Promise.all([alpha, bravo, witness, parallel].map(page => page.evaluate(() => window.__captureCalls))) }));
     } finally { await app.close(); }
 });
+
+
+// Proposed UI follow-up only. Uses this file's existing real native cameras and
+// actual local relay; no fixture DOM videos stand in for decoded media.
+for (const [width, height] of [[375, 667], [390, 667], [375, 812], [390, 812]]) {
+    test(`camera strip stays labelled, visible and contained at ${width}x${height}`, async ({ browser, baseURL }, testInfo) => {
+        const app = await scenario(browser, baseURL, width);
+        try {
+            const names = ['SamePrefixCamera1111', 'SamePrefixCamera2222', 'SamePrefixCamera3333', 'SamePrefixCamera4444'];
+            const pages = [];
+            for (const [index, name] of names.entries()) {
+                const page = await app.guest(index % 2 ? 'rad-dad' : 'stalemate', name);
+                await page.setViewportSize({ width, height }); pages.push(page);
+            }
+            const [owner, bravo] = pages;
+            await owner.click('nav [data-show="rooms"]'); await owner.click('[data-start="art"]');
+            await expect(owner.locator('[data-act-canvas]')).toBeVisible();
+            const room = await owner.locator('[data-chat-context]').innerText();
+            for (const page of pages.slice(1)) { await command(page, `/join ${room}`); await expect(page.locator('[data-act-canvas]')).toBeVisible(); }
+            await expect(owner.locator('[data-act-camera-strip]')).toBeHidden();
+            await expect(owner.locator('[data-act-camera-summary]')).toBeHidden();
+            for (const page of pages) await camera(page);
+            for (const page of pages) await expect.poll(async () => {
+                const peers = await peerState(page);
+                return peers.length === 3 && peers.every(peer => peer.signaling === 'stable' && peer.connected === 'connected' && peer.decoded > 0);
+            }).toBe(true);
+            // This check deliberately uses the existing video container and
+            // physical clipping rectangles, so the baseline RED demonstrates
+            // decoded cameras below the activity viewport rather than merely
+            // the absence of new UI selectors.
+            const cameras = owner.locator('[data-act-tiles] video');
+            await expect(cameras).toHaveCount(4);
+            const videoTimes = await cameras.evaluateAll(videos => videos.map(video => video.currentTime));
+            await expect.poll(() => cameras.evaluateAll((videos, times) => videos.every((video, index) =>
+                video.videoWidth > 0 && video.videoHeight > 0 && video.currentTime > times[index]), videoTimes)).toBe(true);
+            const discoverability = await owner.evaluate(() => {
+                const box = element => { const r = element.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height }; };
+                const activity = document.querySelector('[data-activity]'), a = box(activity);
+                const videos = [...document.querySelectorAll('[data-act-tiles] video')].map(video => ({ ...box(video), pixels: [video.videoWidth, video.videoHeight], time: video.currentTime }));
+                return { viewport: { width: innerWidth, height: innerHeight }, activity: a, activityScroll: activity.scrollTop,
+                    canvas: box(document.querySelector('[data-act-canvas]')), cameraContainer: box(document.querySelector('[data-act-tiles]')), videos,
+                    completeCameras: videos.filter(v => v.height >= 40 && v.left >= a.left - 1 && v.right <= a.right + 1 && v.top >= a.top && v.bottom <= a.bottom + 1 && v.bottom <= innerHeight).length,
+                    pageWidth: document.documentElement.scrollWidth, captureCalls: window.__captureCalls };
+            });
+            console.log('Camera discoverability geometry', JSON.stringify({ width, height, ...discoverability }));
+            await testInfo.attach(`camera-discoverability-${width}x${height}`, { body: JSON.stringify(discoverability, null, 2), contentType: 'application/json' });
+            await owner.screenshot({ path: testInfo.outputPath(`camera-discoverability-${width}x${height}.png`), fullPage: true });
+            expect(discoverability.completeCameras).toBeGreaterThanOrEqual(1);
+            const strip = owner.locator('[data-act-camera-strip]'), region = owner.getByRole('region', { name: 'Room cameras', exact: true });
+            await expect(strip).toBeVisible(); await expect(region.locator('figure')).toHaveCount(4);
+            await expect(strip.locator('[data-act-camera-count]')).toHaveText('Cameras (4)');
+            await expect(owner.locator('[data-act-camera-summary]')).toHaveText('4 cameras');
+            const labels = await region.locator('figcaption').allTextContents();
+            expect(labels[0]).toBe('You · preview'); expect(labels.slice(1).sort()).toEqual(names.slice(1).sort());
+            expect(await owner.evaluate(() => [...document.querySelectorAll('[data-act-tiles] figure')].every(figure => {
+                const key = figure.dataset.cameraKey, video = figure.querySelector('video'), label = figure.querySelector('figcaption').textContent;
+                if (key === 'self') return label === 'You · preview' && video.muted && video.srcObject === window.__lobbyRoom.state.stream;
+                return label === window.__lobbyRoom.state.names.get(key) && video.srcObject === window.__lobbyRoom.state.pcs.get(key)?.stream;
+            }))).toBe(true);
+            await expect(region).toHaveAttribute('aria-describedby', 'lobby-camera-count lobby-camera-scroll-help');
+            expect(await region.locator('figcaption').evaluateAll(captions => captions.every(caption => {
+                const style = getComputedStyle(caption); return style.whiteSpace !== 'nowrap' && style.textOverflow !== 'ellipsis'
+                    && caption.scrollWidth <= caption.clientWidth + 1 && caption.scrollHeight <= caption.clientHeight + 1;
+            }))).toBe(true);
+            const beforeTimes = await region.locator('video').evaluateAll(videos => videos.map(video => video.currentTime));
+            await expect.poll(() => region.locator('video').evaluateAll((videos, times) => videos.every((video, index) =>
+                video.videoWidth > 0 && video.videoHeight > 0 && video.currentTime > times[index]), beforeTimes)).toBe(true);
+            await owner.locator('[data-text]').focus();
+            const geometry = await owner.evaluate(() => {
+                const rect = element => { const r = element.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height }; };
+                const $ = selector => document.querySelector(selector), activity = $('[data-activity]'), row = $('[data-act-tiles]');
+                return {
+                    viewport: { width: innerWidth, height: innerHeight }, pageWidth: document.documentElement.scrollWidth,
+                    activity: rect(activity), strip: rect($('[data-act-camera-strip]')), row: rect(row), canvas: rect($('[data-act-canvas]')),
+                    figures: [...row.querySelectorAll('figure')].map(figure => ({ box: rect(figure), label: figure.querySelector('figcaption').textContent })),
+                    input: rect($('[data-text]')), send: rect($('[data-send]')), navigation: rect($('nav.phonetabs')), conversation: rect($('[data-buffer]')),
+                    inputFont: parseFloat(getComputedStyle($('[data-text]')).fontSize), horizontal: { client: row.clientWidth, scroll: row.scrollWidth },
+                    cameraFirst: $('[data-act-stage]').firstElementChild === $('[data-act-camera-strip]'),
+                    captureCalls: window.__captureCalls
+                };
+            });
+            console.log('Camera strip complete geometry', JSON.stringify({ width, height, ...geometry }));
+            await testInfo.attach(`camera-strip-geometry-${width}x${height}`, { body: JSON.stringify(geometry, null, 2), contentType: 'application/json' });
+            expect(geometry.pageWidth).toBeLessThanOrEqual(width + 1); expect(geometry.cameraFirst).toBe(true);
+            expect(geometry.strip.height).toBeLessThanOrEqual(height === 667 ? 112 : 128);
+            expect(geometry.conversation.height).toBeGreaterThanOrEqual(height === 667 ? 96 : 144);
+            expect(geometry.strip.left).toBeGreaterThanOrEqual(0); expect(geometry.strip.right).toBeLessThanOrEqual(width + 1);
+            expect(geometry.strip.top).toBeLessThan(geometry.canvas.top);
+            for (const tile of geometry.figures.slice(0, 2)) {
+                expect(tile.box.left).toBeGreaterThanOrEqual(geometry.row.left - 1); expect(tile.box.right).toBeLessThanOrEqual(geometry.row.right + 1);
+                expect(tile.box.top).toBeGreaterThanOrEqual(geometry.activity.top); expect(tile.box.bottom).toBeLessThanOrEqual(geometry.activity.bottom + 1);
+                expect(tile.box.height).toBeGreaterThanOrEqual(height === 667 ? 68 : 78); expect(tile.label).not.toBe('');
+            }
+            for (const box of [geometry.input, geometry.send]) {
+                expect(box.left).toBeGreaterThanOrEqual(0); expect(box.right).toBeLessThanOrEqual(width + 1);
+                expect(box.top).toBeGreaterThanOrEqual(0); expect(box.bottom).toBeLessThanOrEqual(geometry.navigation.top + 1);
+            }
+            expect(geometry.input.right).toBeLessThanOrEqual(geometry.send.left + 1); expect(geometry.inputFont).toBeGreaterThanOrEqual(16);
+            expect(geometry.horizontal.scroll).toBeGreaterThan(geometry.horizontal.client); expect(geometry.captureCalls).toBe(1);
+            await owner.screenshot({ path: testInfo.outputPath(`camera-strip-${width}x${height}.png`), fullPage: true });
+            await region.focus(); await owner.keyboard.press('Home');
+            await expect.poll(() => region.evaluate(row => row.scrollLeft <= 1)).toBe(true);
+            await owner.keyboard.press('ArrowRight'); await expect.poll(() => region.evaluate(row => row.scrollLeft > 1)).toBe(true);
+            await owner.keyboard.press('ArrowLeft'); await expect.poll(() => region.evaluate(row => row.scrollLeft <= 1)).toBe(true);
+            await owner.keyboard.press('End');
+            await expect.poll(() => region.evaluate(row => Math.abs(row.scrollLeft - (row.scrollWidth - row.clientWidth)) <= 1)).toBe(true);
+            const disclosure = owner.locator('[data-activity] > summary');
+            await disclosure.click(); await expect(region).toBeHidden(); await expect(owner.locator('[data-act-camera-summary]')).toHaveText('4 cameras');
+            await disclosure.click(); await expect(region).toBeVisible(); await expect(region).toHaveAttribute('tabindex', '0');
+            await owner.setViewportSize({ width: 1600, height: 900 });
+            await expect(region).toHaveAttribute('tabindex', '-1'); await expect(region).toHaveAttribute('aria-describedby', 'lobby-camera-count');
+            await expect(owner.locator('#lobby-camera-scroll-help')).toBeHidden();
+            await owner.setViewportSize({ width, height });
+            await expect(region).toHaveAttribute('tabindex', '0');
+            await expect(region).toHaveAttribute('aria-describedby', 'lobby-camera-count lobby-camera-scroll-help');
+            expect(await owner.evaluate(() => window.__captureCalls)).toBe(1);
+            await region.focus(); await owner.keyboard.press('End');
+            await owner.keyboard.press('Tab'); expect(await region.evaluate(row => document.activeElement === row)).toBe(false);
+            await region.focus(); await owner.keyboard.press('End');
+            await owner.evaluate(blockedName => {
+                const row = document.querySelector('[data-act-tiles]');
+                window.__stripKeep = [...row.querySelectorAll('figure')].filter(figure => figure.querySelector('figcaption').textContent !== blockedName).map(figure => figure.querySelector('video'));
+            }, names[1]);
+            // A different participant changes policy while this row keeps focus.
+            await block(bravo, names[0]);
+            await expect(region.locator('figure')).toHaveCount(3); await expect(strip.locator('[data-act-camera-count]')).toHaveText('Cameras (3)');
+            expect(await region.evaluate(row => document.activeElement === row)).toBe(true);
+            expect(await region.evaluate(row => row.scrollLeft <= Math.max(0, row.scrollWidth - row.clientWidth) + 1)).toBe(true);
+            expect(await owner.evaluate(() => window.__stripKeep.every(video => document.querySelector('[data-act-tiles]').contains(video)))).toBe(true);
+            await command(bravo, `/unblock ${names[0]}`);
+            await expect(region.locator('figure')).toHaveCount(4); await expect(owner.locator('[data-act-camera-summary]')).toHaveText('4 cameras');
+            expect(await region.evaluate(row => document.activeElement === row)).toBe(true);
+            expect(await owner.evaluate(() => window.__stripKeep.every(video => document.querySelector('[data-act-tiles]').contains(video)))).toBe(true);
+            for (const page of pages) await expect.poll(async () => {
+                const peers = await peerState(page); return peers.length === 3 && peers.every(peer => peer.signaling === 'stable' && peer.connected === 'connected' && peer.decoded > 0);
+            }).toBe(true);
+            await region.focus();
+            await owner.evaluate(() => {
+                window.__retiredCameraVideos = [...document.querySelectorAll('[data-act-tiles] video')];
+                window.__retiredCaptureTracks = window.__lobbyRoom.state.stream.getTracks();
+                // Exercise the real Leave handler without moving focus first;
+                // asynchronous room/session retirement can occur while this row is focused.
+                document.querySelector('[data-leave]').click();
+            });
+            await expect(owner.locator('[data-chat-context]')).toHaveText('#stalemate');
+            await expect(strip).toBeHidden(); await expect(owner.locator('[data-act-camera-summary]')).toBeHidden();
+            await expect(strip.locator('[data-act-camera-count]')).toHaveText('Cameras (0)');
+            await expect(region.locator('figure')).toHaveCount(0);
+            expect(await owner.evaluate(() => {
+                const row = document.querySelector('[data-act-tiles]'), active = document.activeElement;
+                return window.__retiredCameraVideos.every(video => video.srcObject === null)
+                    && window.__retiredCaptureTracks.every(track => track.readyState === 'ended')
+                    && row.scrollLeft === 0 && row.tabIndex === -1 && !row.contains(active)
+                    && !active.closest('[hidden], [inert]') && active.getClientRects().length > 0;
+            })).toBe(true);
+            for (const page of pages) expect(await page.evaluate(() => window.__captureCalls)).toBe(1);
+            expect(app.errors).toEqual([]);
+
+        } finally { await app.close(); }
+    });
+}
+
+
+// External v2 only: a last/self tile can disappear without any remote closePc.
+test('camera presentation resets last-tile focus and self-only leave without recapture', async ({ browser, baseURL }) => {
+    const app = await scenario(browser, baseURL, 390);
+    try {
+        const owner = await app.guest('stalemate', 'SelfCameraReset'); await owner.setViewportSize({ width: 390, height: 667 });
+        await owner.click('nav [data-show="rooms"]'); await owner.click('[data-start="art"]');
+        await expect(owner.locator('[data-act-canvas]')).toBeVisible();
+        const room = await owner.locator('[data-chat-context]').innerText();
+        const strip = owner.locator('[data-act-camera-strip]'), region = owner.getByRole('region', { name: 'Room cameras', exact: true });
+        const save = async () => owner.evaluate(() => {
+            window.__retiredCameraVideos = [...document.querySelectorAll('[data-act-tiles] video')];
+            window.__retiredCaptureTracks = window.__lobbyRoom.state.stream.getTracks();
+        });
+        const reset = async calls => {
+            await expect(strip).toBeHidden(); await expect(region.locator('figure')).toHaveCount(0);
+            await expect(strip.locator('[data-act-camera-count]')).toHaveText('Cameras (0)');
+            await expect(owner.locator('[data-act-camera-summary]')).toBeHidden();
+            expect(await owner.evaluate(() => {
+                const row = document.querySelector('[data-act-tiles]'), active = document.activeElement;
+                return window.__retiredCameraVideos.every(video => video.srcObject === null)
+                    && window.__retiredCaptureTracks.every(track => track.readyState === 'ended')
+                    && row.scrollLeft === 0 && row.tabIndex === -1 && !row.contains(active)
+                    && !active.closest('[hidden], [inert]') && active.getClientRects().length > 0;
+            })).toBe(true);
+            expect(await owner.evaluate(() => window.__captureCalls)).toBe(calls);
+        };
+        await camera(owner); await expect(region.locator('figure')).toHaveCount(1);
+        await expect(region).toHaveAttribute('tabindex', '-1'); await expect(region).toHaveAttribute('aria-describedby', 'lobby-camera-count');
+        await expect(owner.locator('#lobby-camera-scroll-help')).toBeHidden();
+        await expect.poll(() => region.locator('video').evaluate(video => video.videoWidth > 0 && video.currentTime > 0)).toBe(true);
+        await region.focus(); await save();
+        await owner.evaluate(() => document.querySelector('[data-cam]').click());
+        await reset(1); // One explicit enable; presentation never recaptured.
+        await camera(owner); await expect(region.locator('figure')).toHaveCount(1);
+        await expect.poll(() => region.locator('video').evaluate(video => video.videoWidth > 0 && video.currentTime > 0)).toBe(true);
+        await region.focus(); await save(); await owner.evaluate(() => document.querySelector('[data-leave]').click());
+        await expect(owner.locator('[data-chat-context]')).toHaveText('#stalemate'); await reset(2); // Second deliberate enable only.
+        await command(owner, `/join ${room}`); await expect(owner.locator('[data-act-canvas]')).toBeVisible();
+        await expect(strip).toBeHidden(); await expect(region.locator('figure')).toHaveCount(0);
+        await expect(strip.locator('[data-act-camera-count]')).toHaveText('Cameras (0)');
+        expect(await owner.evaluate(() => window.__captureCalls)).toBe(2);
+        expect(app.errors).toEqual([]);
+    } finally { await app.close(); }
+});
+
+test('camera off removes its tile while the receive-only pair and third camera remain', async ({ browser, baseURL }, testInfo) => {
+    const app = await scenario(browser, baseURL, 390);
+    try {
+        const observer = await app.guest('stalemate', 'CameraOffObserver');
+        const retiring = await app.guest('rad-dad', 'CameraOffRetiring');
+        const third = await app.guest('stalemate', 'CameraOffThird');
+        const pages = [observer, retiring, third];
+        for (const page of pages) await page.setViewportSize({ width: 390, height: 667 });
+        await observer.click('nav [data-show="rooms"]'); await observer.click('[data-start="art"]');
+        await expect(observer.locator('[data-act-canvas]')).toBeVisible();
+        const room = await observer.locator('[data-chat-context]').innerText();
+        for (const page of pages.slice(1)) {
+            await command(page, `/join ${room}`); await expect(page.locator('[data-act-canvas]')).toBeVisible();
+        }
+        for (const page of pages) await camera(page);
+        for (const page of pages) await expect.poll(async () => {
+            const peers = await peerState(page);
+            return peers.length === 2 && peers.every(peer => peer.signaling === 'stable' && peer.connected === 'connected' && peer.decoded > 0);
+        }).toBe(true);
+        const retiringId = await retiring.evaluate(() => window.__lobbyRoom.state.myId);
+        const thirdId = await third.evaluate(() => window.__lobbyRoom.state.myId);
+        const region = observer.getByRole('region', { name: 'Room cameras', exact: true });
+        await expect(region.locator('figure')).toHaveCount(3);
+        await observer.evaluate(({ retiringId, thirdId }) => {
+            const state = window.__lobbyRoom.state;
+            window.__cameraOff = {
+                retiringId, thirdId, retiringEntry: state.pcs.get(retiringId), thirdEntry: state.pcs.get(thirdId),
+                retiringVideo: document.querySelector(`[data-camera-key="${retiringId}"] video`),
+                thirdVideo: document.querySelector(`[data-camera-key="${thirdId}"] video`),
+                stream: state.stream, tracks: state.stream.getTracks()
+            };
+        }, { retiringId, thirdId });
+        const beforeThird = (await peerState(observer)).find(peer => peer.id === thirdId).decoded;
+        await retiring.getByRole('button', { name: 'Camera on', exact: false }).click();
+        await expect(retiring.locator('[data-cam]')).toHaveAttribute('aria-pressed', 'false');
+        await expect.poll(() => observer.evaluate(id => !window.__lobbyRoom.state.peers.has(id), retiringId)).toBe(true);
+        const presentation = await observer.evaluate(() => {
+            const before = window.__cameraOff, state = window.__lobbyRoom.state;
+            return {
+                cameraAdvertised: state.peers.has(before.retiringId),
+                receiveOnlyPairRetained: state.pcs.get(before.retiringId) === before.retiringEntry && before.retiringEntry.pc.signalingState !== 'closed',
+                thirdPairRetained: state.pcs.get(before.thirdId) === before.thirdEntry,
+                retiringVideoAttached: document.querySelector('[data-act-tiles]').contains(before.retiringVideo),
+                retiringSrcCleared: before.retiringVideo.srcObject === null,
+                labels: [...document.querySelectorAll('[data-act-tiles] figcaption')].map(caption => caption.textContent),
+                count: document.querySelector('[data-act-camera-count]').textContent,
+                summary: document.querySelector('[data-act-camera-summary]').textContent,
+                localCaptureRetained: state.stream === before.stream && before.tracks.every(track => track.readyState === 'live'),
+                captureCalls: window.__captureCalls
+            };
+        });
+        console.log('Camera-off presentation outcome', JSON.stringify(presentation));
+        await testInfo.attach('camera-off-presentation', { body: JSON.stringify(presentation, null, 2), contentType: 'application/json' });
+        await observer.screenshot({ path: testInfo.outputPath('camera-off-observer-390x667.png'), fullPage: true });
+        expect(presentation.cameraAdvertised).toBe(false);
+        expect(presentation.receiveOnlyPairRetained).toBe(true);
+        expect(presentation.thirdPairRetained).toBe(true);
+        expect(presentation.localCaptureRetained).toBe(true);
+        expect(presentation.captureCalls).toBe(1);
+        await expect(region.locator('figure')).toHaveCount(2);
+        expect(presentation.retiringVideoAttached).toBe(false);
+        expect(presentation.retiringSrcCleared).toBe(true);
+        expect(presentation.labels).toEqual(['You · preview', 'CameraOffThird']);
+        expect(presentation.count).toBe('Cameras (2)'); expect(presentation.summary).toBe('2 cameras');
+        expect(await observer.evaluate(() => {
+            const before = window.__cameraOff, state = window.__lobbyRoom.state;
+            return state.pcs.get(before.thirdId) === before.thirdEntry
+                && document.querySelector('[data-act-tiles]').contains(before.thirdVideo)
+                && before.thirdVideo.srcObject === before.thirdEntry.stream;
+        })).toBe(true);
+        await expect.poll(async () => {
+            const peer = (await peerState(observer)).find(peer => peer.id === thirdId);
+            return peer.signaling === 'stable' && peer.connected === 'connected' && peer.decoded > beforeThird;
+        }).toBe(true);
+        const time = await observer.evaluate(() => window.__cameraOff.thirdVideo.currentTime);
+        await expect.poll(() => observer.evaluate(time => window.__cameraOff.thirdVideo.currentTime > time, time)).toBe(true);
+        for (const page of pages) expect(await page.evaluate(() => window.__captureCalls)).toBe(1);
+        expect(app.errors).toEqual([]);
+    } finally { await app.close(); }
+});
