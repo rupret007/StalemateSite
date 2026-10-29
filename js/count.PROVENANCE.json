@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "component": "GoatCounter browser integration script",
+  "repository": "https://github.com/arp242/goatcounter",
+  "upstreamCommit": "c031008a8d28c85b36708824f23b28957e7ed262",
+  "source": "public/count.js",
+  "sourceBlob": "3b5f6bc87a35c67875fd3efe52e75f8317949d85",
+  "shipped": "js/count.js",
+  "sha256": "792b7abd26c1fb6ae62906833e09a301251e2641816e69e4f95aba518f3fe3f0",
+  "upstreamByteIdentical": true,
+  "modifications": [],
+  "license": "ISC",
+  "copyright": "Copyright \u00a9 Martin Tournoij <martin@arp242.net>",
+  "licenseSource": "https://github.com/arp242/goatcounter/blob/c031008a8d28c85b36708824f23b28957e7ed262/LICENSE",
+  "licenseSourceBlob": "d06bcb9c8c0db5bcc049ace1caabe82ee752c68d",
+  "licenseSection": "public/count.js; ISC license, plus the top-level author copyright",
+  "shippedLicense": "js/count.LICENSE",
+  "shippedLicenseSha256": "72d3350473b6cb4b3f02b3e2af59cad2394ea91399c9852832c69e5ef2ab7474",
+  "versionNote": "Pinned to the matching upstream commit; this is not stable count.v5.js, whose bytes differ.",
+  "officialSelfHostDocumentation": "https://www.goatcounter.com/help/countjs-host"
+}
