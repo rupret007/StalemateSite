@@ -8,6 +8,7 @@ export const BETA_SESSION_ROOM_LIMIT = 16;
 export const BETA_RETRY_BATCH = 16;
 export const BETA_MINT_PER_IP_HOUR = 20;
 const INTERVAL = 60 * 1000;
+const CLOSE_TIMEOUT = 8000;
 const MINT_WINDOW = 3600000;
 const SID = /^[a-z0-9-]{16,64}$/;
 const VERSION = /^[A-Za-z0-9._-]{1,64}$/;
@@ -57,12 +58,20 @@ export class BetaSessions {
     }
     async close(record) {
         const identity = JSON.stringify({ betaSid: record.sid });
-        const request = () => new Request('https://session/__beta/disconnect', { method: 'POST', headers: { 'X-Hangout-Identity': identity } });
+        const controller = new AbortController();
+        const request = () => new Request('https://session/__beta/disconnect', { method: 'POST', headers: { 'X-Hangout-Identity': identity }, signal: controller.signal });
         const targets = [() => this.env.LOBBY.get(this.env.LOBBY.idFromName('stalemate')).fetch(request()),
             ...record.rooms.map((room) => () => this.env.ROOMS.get(this.env.ROOMS.idFromName(room)).fetch(request()))];
-        const outcomes = await Promise.allSettled(targets.map((call) => Promise.resolve().then(call)));
-        if (outcomes.some((outcome) => outcome.status === 'rejected' || !outcome.value.ok)) return false;
-        // No registry lock spans the network fanout: target DOs may check revocation while waking.
+        let timer;
+        const deadline = new Promise((resolve) => { timer = setTimeout(() => { resolve(false); controller.abort(); }, CLOSE_TIMEOUT); });
+        // Consume every late target rejection, but never attach registry writes to this continuation.
+        const completed = Promise.allSettled(targets.map((call) => Promise.resolve().then(call)))
+            .then((outcomes) => outcomes.every((outcome) => outcome.status === 'fulfilled' && outcome.value.ok));
+        let closed;
+        try { closed = await Promise.race([deadline, completed]); }
+        finally { clearTimeout(timer); }
+        if (!closed) return false;
+        // No registry lock spans fanout. A timed-out attempt can never reach this outbox confirmation.
         await this.state.blockConcurrencyWhile(async () => {
             const current = await this.state.storage.get(`session:${record.sid}`);
             if (current && validRecord(current, record.sid) && current.revoked) await this.state.storage.put(`session:${record.sid}`, { ...current, pending: false });

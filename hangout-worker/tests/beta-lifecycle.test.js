@@ -117,6 +117,85 @@ describe('beta session revocation across private rooms and lobby', () => {
         expect(ws.closed.code).toBe(4401); expect(h.registryState.values.get(`session:${a.access.sid}`).pending).toBe(false);
         expect((await logout(h, a)).status).toBe(200);
     });
+    it('bounds a stalled logout without clearing the cookie or durable retry and consumes a late rejection', async () => {
+        const h = harness(), a = await guest(h), ws = await join(h, a);
+        let observed, reject, signal, settled = false;
+        const reached = new Promise((resolve) => { observed = resolve; });
+        h.env.ROOMS.get = () => ({ fetch: (r) => { signal = r.signal; observed(); return new Promise((_, fail) => { reject = fail; }); } });
+        const ending = logout(h, a).then((response) => { settled = true; return response; });
+        await reached;
+        expect(signal.aborted).toBe(false);
+        expect(h.registryState.values.get(`session:${a.access.sid}`)).toMatchObject({ revoked: true, pending: true, attempt: 1 });
+        await vi.advanceTimersByTimeAsync(7999); expect(settled).toBe(false);
+        await vi.advanceTimersByTimeAsync(1); expect(settled).toBe(true);
+        const response = await ending;
+        expect(response.status).toBe(503); expect(response.headers.has('Set-Cookie')).toBe(false);
+        expect(signal.aborted).toBe(true); expect(ws.readyState).toBe(1);
+        expect((await betaFetch(request('/beta/state', { cookie: a.cookie }), h.env)).status).toBe(401);
+        reject(Error('late target failure after deadline'));
+        await vi.advanceTimersByTimeAsync(0);
+        expect(h.registryState.values.get(`session:${a.access.sid}`).pending).toBe(true);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+    it('ignores an old timed-out success after a newer pending retry and recovers the outbox in a fresh registry instance', async () => {
+        const h = harness(), a = await guest(h), ws = await join(h, a), nativeRooms = h.env.ROOMS.get;
+        let observed, release, settled = false;
+        const reached = new Promise((resolve) => { observed = resolve; });
+        h.env.ROOMS.get = () => ({ fetch: () => { observed(); return new Promise((resolve) => { release = resolve; }); } });
+        const ending = logout(h, a).then((response) => { settled = true; return response; });
+        await reached; await vi.advanceTimersByTimeAsync(8000);
+        expect(settled).toBe(true); expect((await ending).status).toBe(503);
+        h.env.ROOMS.get = () => ({ fetch: async () => new Response('unavailable', { status: 503 }) });
+        expect((await logout(h, a)).status).toBe(503);
+        const saved = structuredClone(h.registryState.values.get(`session:${a.access.sid}`));
+        expect(saved).toMatchObject({ revoked: true, pending: true, attempt: 2 });
+        release(new Response('late success')); await vi.advanceTimersByTimeAsync(0);
+        expect(h.registryState.values.get(`session:${a.access.sid}`)).toEqual(saved);
+        const reopened = new BetaSessions(h.registryState, h.env);
+        expect((await reopened.records()).get(`session:${a.access.sid}`)).toEqual(saved);
+        h.env.ROOMS.get = nativeRooms;
+        vi.setSystemTime(saved.retryAt); await reopened.alarm();
+        expect(ws.closed.code).toBe(4401);
+        expect(h.registryState.values.get(`session:${a.access.sid}`)).toMatchObject({ revoked: true, pending: false, attempt: 3 });
+        expect(vi.getTimerCount()).toBe(0);
+    });
+    it('handles a binding that honors the deadline abort without clearing the durable retry', async () => {
+        const h = harness(), a = await guest(h);
+        let observed, aborted = false, settled = false;
+        const reached = new Promise((resolve) => { observed = resolve; });
+        h.env.LOBBY.get = () => ({ fetch: (r) => new Promise((_, reject) => {
+            r.signal.addEventListener('abort', () => { aborted = true; reject(Error('cancelled')); }, { once: true });
+            observed();
+        }) });
+        const ending = logout(h, a).then((response) => { settled = true; return response; });
+        await reached; await vi.advanceTimersByTimeAsync(8000);
+        expect(settled).toBe(true); expect((await ending).status).toBe(503); expect(aborted).toBe(true);
+        expect(h.registryState.values.get(`session:${a.access.sid}`)).toMatchObject({ revoked: true, pending: true });
+        expect(vi.getTimerCount()).toBe(0);
+    });
+    it('keeps the retry when storing successful closure confirmation fails', async () => {
+        const h = harness(), a = await guest(h), ws = await join(h, a), nativePut = h.registryState.storage.put;
+        const put = vi.spyOn(h.registryState.storage, 'put').mockImplementation(async (key, value) => {
+            if (value?.revoked && value.pending === false) throw Error('confirmation storage unavailable');
+            return nativePut(key, value);
+        });
+        const response = await logout(h, a);
+        expect(response.status).toBe(503); expect(response.headers.has('Set-Cookie')).toBe(false);
+        expect(ws.closed.code).toBe(4401);
+        const saved = h.registryState.values.get(`session:${a.access.sid}`);
+        expect(saved).toMatchObject({ revoked: true, pending: true });
+        expect(vi.getTimerCount()).toBe(0);
+        put.mockRestore(); vi.setSystemTime(saved.retryAt);
+        await new BetaSessions(h.registryState, h.env).alarm();
+        expect(h.registryState.values.get(`session:${a.access.sid}`)).toMatchObject({ revoked: true, pending: false });
+    });
+    it('clears its deadline immediately when every target closes successfully', async () => {
+        const h = harness(), a = await guest(h); await join(h, a);
+        const response = await logout(h, a);
+        expect(response.status).toBe(200);
+        expect(h.registryState.values.get(`session:${a.access.sid}`).pending).toBe(false);
+        expect(vi.getTimerCount()).toBe(0);
+    });
     it('registers before upgrade and closes an admission that races logout', async () => {
         const h = harness(), a = await guest(h);
         let release, observed, revoked, checkCount = 0;
@@ -266,6 +345,27 @@ describe('bounded beta registry retention', () => {
         await h.registry.alarm(); expect(close).toHaveBeenCalledTimes(BETA_RETRY_BATCH + 4);
         await h.registry.alarm(); expect(close).toHaveBeenCalledTimes(BETA_RETRY_BATCH + 4);
         expect([...h.registryState.values.values()].every((value) => value.pending && value.attempt === 2 && value.retryAt === Date.now() + 120000)).toBe(true);
+    });
+    it('bounds the first stalled alarm fanout so later due sessions and alarm rescheduling still run', async () => {
+        const h = harness(), first = 'session-0000000000000000', second = 'session-0000000000000001', called = [];
+        let observed, stalledSignal, settled = false;
+        const reached = new Promise((resolve) => { observed = resolve; });
+        h.env.LOBBY.get = () => ({ fetch: (r) => {
+            const sid = JSON.parse(r.headers.get('X-Hangout-Identity')).betaSid; called.push(sid);
+            if (sid === first) { stalledSignal = r.signal; observed(); return new Promise(() => {}); }
+            return Promise.resolve(new Response('closed'));
+        } });
+        for (const sid of [first, second]) h.registryState.values.set(`session:${sid}`, { ...record({ access: { sid, exp: Date.now() + BETA_TTL } }), revoked: true, pending: true, attempt: 1, retryAt: Date.now() });
+        const alarm = h.registry.alarm().then(() => { settled = true; });
+        await reached; await vi.advanceTimersByTimeAsync(7999);
+        expect(called).toEqual([first]); expect(settled).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(settled).toBe(true); await alarm;
+        expect(called).toEqual([first, second]); expect(stalledSignal.aborted).toBe(true);
+        expect(h.registryState.values.get(`session:${first}`)).toMatchObject({ revoked: true, pending: true, attempt: 2 });
+        expect(h.registryState.values.get(`session:${second}`)).toMatchObject({ revoked: true, pending: false, attempt: 2 });
+        expect(await h.registryState.storage.getAlarm()).toBe(Date.now() + 60000);
+        expect(vi.getTimerCount()).toBe(0);
     });
     it('reuses a valid invitation session instead of exhausting the registry on repeat unlocks', async () => {
         const h = harness(), a = await guest(h), ws = await join(h, a);
