@@ -127,6 +127,14 @@ delivery limits, not a promise about Cloudflare's physical queue memory:
 | ACK controls | Burst 32, refill 20/second, 4,000/connection, at most eight consecutive duplicates |
 | Local queued application work | 256 tasks and 4 MiB, with a separate bounded 256-task cleanup allowance |
 
+The public-room browser also shares one outgoing activity allowance across
+drawing, watch controls and camera signaling: burst 8 / refill 8 frames per
+second, with a tab-local 128-frame / 256 KiB encoded-payload queue and 16 KiB
+frame limit. Adjacent unsent same-stroke chunks can merge losslessly up to 400
+points; overflow is explicit and stale peer/authority work is discarded. These
+logical client bounds do not change server limits or prove physical memory,
+hosted capacity or successful delivery. See [media and activity controls](HANGOUT_MEDIA_BLOCKING.md).
+
 The new browser negotiates `transport: 1`, coalesces handled-frame ACKs after
 eight frames or a 50 ms timer, and spaces emitted ACKs at least 50 ms apart.
 It cancels pending ACK work on disconnect/replacement.
@@ -275,14 +283,15 @@ source badges. Preserve the current stable HMAC account mapping/key; any future
 issuer/subject identity broker requires an explicit ownership migration and
 authenticated account-linking procedure, never email/nickname-only merging.
 
-Fresh remote reconciliation found website main `b1b947d` contains no Hang Out
-application. This work starts from application candidate `c91c625` (PR82), not
-from the old primary checkout or an unrelated website rewrite. PR77 has merged
-into its application parent with a recorded Karen pass; PR79 is closed without
-`mergedAt`, while PR80–82 remain open. Those facts do not authorize merging the
-stack or prove it is deployed. The release owner must reconcile the closed PR79
-dependency and the current website main through normal review. Native PR399
-still requires its own review/release resolution and platform qualification.
+The initial October 25 reconciliation found website main `b1b947d` had no Hang
+Out application. This application branch started from `c91c625` (PR82), rather
+than that primary checkout or an unrelated website rewrite. At that observation,
+PR77 had merged into its application parent with a recorded Karen pass; PR79 was
+closed without `mergedAt`, while PR80–82 were open. These are historical source
+facts, not current review/merge/deployment status. The release owner must
+reconcile the actual current application dependencies and website main through
+normal review. Native PR399 and its descendants require their own current
+review/release resolution and platform qualification.
 
 ## Evidence and boundaries
 

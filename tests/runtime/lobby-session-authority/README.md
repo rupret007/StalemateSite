@@ -48,9 +48,31 @@ raw physical scan does not substitute for detecting text across chunk edges.
 
 Logout closes the connected visitor, applies the cookie-clearing policy, rejects
 copied-cookie state/upgrade requests and allows the other visitors to continue
-chatting. The revoked visitor must receive no later frames. A fault thrown only
-after an awaited native room-manifest write must leave room/report semantics
-unchanged and release no topic-success frame.
+chatting. The revoked visitor must receive no later frames. The remaining two
+visitors enable synthetic camera permission and relay one synthetic SDP through
+the actual gateway. A device Block must persist in actual SQLite, publish only
+the relevant pair-policy updates and deny subsequent signaling in both
+directions. No actual camera capture or WebRTC media transport is exercised by
+this native storage fixture.
+
+One fault thrown only after an awaited native session-manifest write must roll
+back the other visitor's attempted Block in both durable and engine state and
+release no Block, PM-close or media-policy success. A second, separately armed
+fault after an actual room-manifest write must leave room/report semantics
+unchanged and release no topic-success frame. The nonce-protected fixture allows
+only those two distinct fault keys. Synthetic SDP bodies must remain absent
+from the same bounded logical/raw scans used for ordinary chat.
+
+Final session values alone cannot prove native rollback: the engine also writes
+conservative accounting/session state after a failed event. For each injected
+fault the fixture therefore captures an original physical-manifest digest,
+observes a different staged digest after the awaited native put, then catches
+the original native transaction's rejection and re-reads that manifest before
+letting the error reach engine recovery. The runner requires the original
+digest to be restored at that boundary. Only the allowlisted logical record,
+three digests and bounded boolean observations enter the receipt, never the raw
+manifest or physical key. This is a native-manifest rollback witness alongside
+the end-to-end semantic checks, not a whole-domain storage equality claim.
 
 Two visitors and their durable bindings remain connected at the first
 checkpoint. The parent records and kills that entire owned process group

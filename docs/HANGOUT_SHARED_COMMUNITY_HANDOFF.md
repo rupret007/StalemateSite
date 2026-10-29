@@ -6,9 +6,35 @@ does not execute a deployment, change a hold, choose a public launch date or
 claim legal/platform readiness. Read [the product/integration description](HANGOUT_SHARED_COMMUNITY.md)
 and the existing beta identity, privacy and data-inventory documents together.
 
-## Current source continuation
+## Receiving a composed candidate
 
-The later application stack reaches `97cb762bcea6e939a0b8873601c8c372b055069e`
+Start with [the short website integration guide](HANGOUT_WEBSITE_INTEGRATION.md).
+Use the delivered archive's `SOURCE-MANIFEST.json`, source commit and matching
+test/review receipts. The archive contains entry tooling and documentation, not
+the complete application. Obtain the corresponding source branch or verified
+patch, preserve newer website pages and follow the existing release process.
+
+The composed base of this continuation is
+`282163e9cbcaa7e165bfb05b93d4192106e9cdfc` in
+[PR 111](https://github.com/rupret007/StalemateSite/pull/111), including
+[PR 109](https://github.com/rupret007/StalemateSite/pull/109) session authority and
+[PR 110](https://github.com/rupret007/StalemateSite/pull/110) recovery/invitation UI.
+Its local evidence covers 1,249 units, 336 browser cases and both package builds.
+These counts belong to that base; later application changes require their own
+current-source evidence. Revalidate live CI/Karen and deployment state rather
+than carrying a historical verdict to a newer commit.
+
+The private-beta session authority has an explicit opt-in mode and migration
+contract in [HANGOUT_SESSION_AUTHORITY.md](HANGOUT_SESSION_AUTHORITY.md). It does
+not establish real guardian consent, incident appointments, provider permission
+or a public all-ages enrollment service. Entry badges are display context, never
+identity or staff authority. Actual bindings, matched clients/backend, verified
+writer/socket/in-flight drain, rollback and hosted acceptance belong to the
+receiving release owner.
+
+## Historical source continuations
+
+An earlier application stack reached `97cb762bcea6e939a0b8873601c8c372b055069e`
 through [PR100](https://github.com/rupret007/StalemateSite/pull/100) (final incident
 authority/deadline checks), [PR101](https://github.com/rupret007/StalemateSite/pull/101)
 (bounded public-author reads) and [PR102](https://github.com/rupret007/StalemateSite/pull/102)
@@ -37,7 +63,7 @@ The older dependency tables and API-pause statements below retain their dated
 historical scope. They are a source trail, not a statement that those changes
 are still unpublished or that a shared API pause remains in effect.
 
-## Source and review dependencies
+## Historical source and review dependencies
 
 The shared-community branch started from application candidate `c91c625`, rather
 than website main `b1b947d`, which the initial remote inventory found had no
@@ -55,8 +81,9 @@ listed below. These are dated source/review locations, not a fresh GitHub read:
 | Private-message minimization and shared application journeys | [PR 93](https://github.com/rupret007/StalemateSite/pull/93), head `59ff67ee145f34fc2526b321f838bc285fdf8a81`, based on PR 90 | Keep PMs out of automatic classification and accepted-body moderation buffering, preserve selected-report witnesses and explicit private composer context, and qualify matched clients/server. Server-routed PMs are not end-to-end encrypted. |
 | Lobby field contrast and WebJam focus | [PR 94](https://github.com/rupret007/StalemateSite/pull/94), head `fdf7e9ab9396a313d7af68bb89f6967d7f2df2a5`, based on PR 93 | Preserve the authored field boundaries, placeholder colors and invitation focus treatment in the final composition. Scoped computed-color/browser checks are not full accessibility conformance. |
 
-The integration candidate is `9e0823d7409a31362ae2cd9111b76dfc86ba30f1`.
-It retains PR 93's application parent and composes the following additional
+At an earlier October 25 snapshot, the integration candidate was
+`9e0823d7409a31362ae2cd9111b76dfc86ba30f1`.
+It retained PR 93's application parent and composed the following additional
 source. Reused commits have different hashes from their original PR heads;
 their presence does not merge those PRs or transfer an old verdict to a new head.
 
@@ -67,12 +94,13 @@ their presence does not merge those PRs or transfer an old verdict to a new head
 | Restricted local incident-review flow, I2 | `a32d149d5cd0ee35c26f485288096d1d8e8fb6a8`, parent C3; original isolated source `57bb85d284a92703a1b871d710a8ecfcf8ea3134` | New I2 PR not yet created; stack it on C3. Loopback fixture only, with actual synthetic lobby reports and I1 preservation. Do not expose its role selector or routes as public authentication. |
 | Contrast and invitation lifecycle composition | PR 94 changes reused as `3482e0b5b0b9fce60c20f0dfade38cac160ca40a`, then lifecycle `9e0823d7409a31362ae2cd9111b76dfc86ba30f1`; original lifecycle source `e1b85605ac277ed9f8f619a43f77589dbb547317` | New final-composition PR not yet created; stack it on I2 and reconcile PR 94. Keep invitation drafts bound to the current room/host authority and preserve the focus/contrast changes. |
 
-At this checkpoint the shared GitHub API helper reports requests paused. The
-new C3, I2 and composition PRs are prepared as local source, not published PRs.
-Do not bypass that pause or repair shared API/core controls here. Once the normal
-path resumes, create/reconcile the dependency branches, record exact new heads
-and request normal review after the required CI is green. Every new push needs
-its own current-head evidence; local composition is not review or admission.
+At that earlier checkpoint the shared GitHub API helper reported requests
+paused. The C3, I2 and composition PRs were then prepared as local source, not
+published PRs. That snapshot's next step was normal publication/reconciliation
+after the shared path resumed. It is not an instruction to recreate already
+published work or bypass current API/core controls. Use the current delivered
+source and revalidate exact heads, CI and normal review. Local composition alone
+is not review or admission.
 
 Those heads are source snapshots, not claims that the PRs remain unchanged,
 have passed review or are deployed. The initial October 25 reconciliation also

@@ -1,12 +1,21 @@
 # WebJam packages for the community beta
 
-Checked October 19, 2026 UTC. **Mac, Windows and Linux are all required for this
-beta. Exact-source packages for all four architecture targets are now verified;
-attended installation-and-audio receipts remain pending.** The protected
-website's native handoff, candidate package checks and native CI runs provide
-separate evidence from physical cross-computer audio acceptance.
-Windows native remote Join additionally needs a signed transport executable;
-the ordinary unsigned candidate cannot satisfy its existing runtime policy.
+**Historical package assessment, checked October 19, 2026 UTC:** the results and
+hashes below belong to WebJam source
+`5effbc58db706254f8ca8b52de4a0520c482294a`, build run `39197407138`. All four
+architecture targets were verified for that run. These packages do not qualify
+the newer application or native source, and are not the package selection for a
+new trial. Preserve their original results and hashes as historical evidence.
+
+Mac (Apple Silicon and Intel), Windows and Linux remain required for the music
+beta. Before a new trial, the release owner must identify newly approved
+exact-source packages and record their hashes, embedded build IDs and platform
+trust status. Follow the current [website integration guide](HANGOUT_WEBSITE_INTEGRATION.md)
+and [shared-community handoff](HANGOUT_SHARED_COMMUNITY_HANDOFF.md) for candidate
+selection and release dependencies. A successful build, native handoff or
+diagnostic does not establish attended installation, two-way audio or WAN
+acceptance. Windows native remote Join additionally needs a signed transport
+executable; the ordinary unsigned candidate cannot satisfy its existing policy.
 
 ## What each computer can do
 
@@ -57,7 +66,7 @@ The machine's existing `/Applications/WebJam.app` is 0.27.2 and was left alone.
 Other local DMGs labeled 0.29.0 had different build IDs and hashes; they are not
 the published package or the tested `5eff` candidate.
 
-## Exact-source candidate build
+## Historical exact-source candidate build
 
 The existing `WebJam CI` workflow was dispatched on branch `master` at exact
 commit `5effbc58db706254f8ca8b52de4a0520c482294a`:
@@ -92,7 +101,10 @@ published by this work. Before tester distribution, record the run/attempt,
 artifact ID, exact package SHA-256, embedded build ID and platform. Keep these
 packages separate from the immutable public v0.29.0 assets with similar names.
 
-For example, download each successful target into a distinct empty directory:
+The following commands identify the historical artifacts if still retained.
+They are not instructions to select this old source for a new trial. For a new
+trial, use the release owner's approved run and matching artifact identities.
+Retrieve historical targets into distinct empty directories:
 
 ```sh
 gh run download 39197407138 -R rupret007/webjam -n webjam-macos-arm64 -D candidate/macos-arm64
@@ -104,10 +116,12 @@ gh run download 39197407138 -R rupret007/webjam -n webjam-linux-x64 -D candidate
 Verify the Windows manifest on Windows with `Get-FileHash -Algorithm SHA256`,
 Mac packages with `shasum -a 256`, and Linux with `sha256sum`. An Actions
 artifact ZIP digest and the package digest inside it identify different bytes.
-Record both when available. Require the package's embedded build ID to equal
-the full `5eff` source hash above before testing the invitation flow.
+Record both when available. When checking this historical run, require the
+package's embedded build ID to equal the full `5eff` source hash above. For a new
+trial, require the newly approved full source revision instead and record new
+package identities separately; an unchanged version label does not qualify it.
 
-## Candidate package hashes
+## Historical candidate package hashes
 
 Snapshot refreshed after all four targets completed. These are inner package
 hashes from run `39197407138`, source
@@ -121,7 +135,7 @@ time, ZIP fallback hashes and outer Actions artifact identities.
 | Windows x64 | `WebJam-v0.29.0-windows-x64-UNSIGNED-TEST-ONLY-setup.exe` | `e72fde40f4a70466d21fe57c96404b2b3f686d700435f173d5cb7eea5321ed1c` |
 | Ubuntu 22.04 x64 | `WebJam-linux-x64.zip` | `c0ff84e9ebf1660380a0ccef03987f00c93c85eb7fde00fd4a882dc1bece57da` |
 
-## Checks already executed on the candidate
+## Checks already executed on the historical candidate
 
 - **Apple Silicon Mac:** downloaded Actions ZIP digest, DMG/ZIP hashes and
   embedded source ID passed. The actual DMG was verified and mounted read-only,
@@ -182,7 +196,7 @@ hands a discovered Music room to direct Jamulus startup.
 
 Use only a genuine invitation copied by a LAN host, on the same private
 network. The unchanged public v0.29.0 Mac Host generates the LAN invitation
-under its normal non-lab policy. The current `5eff` Mac package instead selects
+under its normal non-lab policy. The historical `5eff` Mac package instead selects
 v3 when its sidecar is available; no ordinary LAN Music selector was found.
 Do not remove the sidecar, force integration-test flags, strip a remote invite,
 or treat a private-LAN address as a cross-household solution.
@@ -210,20 +224,34 @@ before the transport starts. Parser acceptance alone does not test this gate.
 This conclusion is from the exact source policy; physical Windows execution is
 still pending.
 
-The existing `windows-release-trust` workflow can produce a signed test
-candidate without a public release. It signs both `WebJam.exe` and
-`webjam-fabric.exe`, then regenerates the fabric hash manifest and final
-ZIP/Setup containers. Its `windows-release` environment
-and this personal repository currently expose no secret or variable names. It requires
-`WINDOWS_CODESIGN_PFX`, `WINDOWS_CODESIGN_PASSWORD` and
-`WINDOWS_CODESIGN_SUBJECT`. Provision a real approved signing identity through
-the existing signing workflow, then bind the final signed package's hashes and repeat
-installation and native Join on Windows. Do not disable the signature check or
-describe an unsigned launch pass as remote Join readiness. The ordinary
-four-target build remains useful for package provenance and installation checks.
-Read-only GitHub metadata reports no protection rules or branch policy on this
-environment. Configure the required reviewer protections before supplying
-signing credentials; an environment binding alone does not provide them.
+No Windows signing identity has been supplied for this project; Windows builds
+remain unsigned. Jeff must approve any provider, purchase or paid signup before
+it is used. Choosing a provider does not itself supply a signed working build.
+
+The existing `windows-release-trust` PFX workflow can produce a signed test
+candidate without a public release only when an eligible exportable legacy
+identity, or an internal enterprise identity trusted by the intended machines,
+already exists. It requires `WINDOWS_CODESIGN_PFX`, `WINDOWS_CODESIGN_PASSWORD`
+and `WINDOWS_CODESIGN_SUBJECT`. Newly issued public code-signing keys are
+normally hardware- or service-backed. A managed provider such as Microsoft
+Artifact Signing needs a separately reviewed signing integration; its account
+does not directly satisfy the PFX inputs. See the conditional path in the
+[native release runbook](https://github.com/rupret007/webjam/blob/18499c5808373335bb499ac13cccd0ca08c9cb43/docs/DESKTOP_RELEASE_RUNBOOK.md#L395).
+Do not weaken key or signature requirements to fit that workflow.
+
+The signing path must sign the app and fabric before regenerating the fabric
+hash manifest and final ZIP/Setup containers. Bind the resulting package hashes,
+verify their actual signatures, and repeat installation and native Join/audio
+acceptance on Windows. A signature does not guarantee SmartScreen reputation
+or audio readiness. The ordinary unsigned build remains useful for package
+provenance and installation checks, but cannot qualify native remote Join.
+
+At the October 19 assessment, read-only GitHub metadata exposed no signing
+secret/variable names or environment protection rules/branch policy. That is a
+dated observation, not a current environment audit. Before any future signing,
+the release owner must verify the required protections and approved credentials;
+an environment binding alone does not provide them. No purchase, signing
+activation or change to platform trust is authorized by these instructions.
 
 ## Installation and actual joining still to execute
 

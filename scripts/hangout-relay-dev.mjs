@@ -2,6 +2,7 @@
 // Same admission rules and caps (from hangout-worker/src/core.mjs). Persistence and
 // identity adapters are used only by the explicit loopback preview launcher.
 import http from 'node:http';
+import { randomUUID } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { admit, createBucket, limitsFrom, validFrame, originAllowed, previewKeyOk } from '../hangout-worker/src/core.mjs';
 import { createLobby, LOBBY_LIMITS } from '../hangout-worker/src/lobby-core.mjs';
@@ -60,7 +61,6 @@ export function createHangoutRelay({ previewKey = 'local-preview-key-0001', orig
     lobby.restoreLog(initialState.modlog || []);
     enqueue(async () => { await lobby.restoreRooms(initialState.rooms); lobby.restoreAbuse(initialState.abuse); await lobby.tick(); });
     const ticker = setInterval(() => { enqueue(() => lobby.tick()).catch(() => {}); }, 1000);
-    let lobbySeq = 0;
 
     const handleUpgrade = async (req, socket, head, url) => {
         const reject = (status, reason) => { socket.end(`HTTP/1.1 ${status} ${reason}\r\n\r\n`); };
@@ -85,7 +85,9 @@ export function createHangoutRelay({ previewKey = 'local-preview-key-0001', orig
             let dev = await verifyDevice(url.searchParams.get('dev'), DEV_HMAC);
             const token = dev ? null : await signDevice((dev = newDeviceId()), DEV_HMAC);
             const iph = await ipHash(resolveIdentity ? req.socket.remoteAddress : req.headers['x-test-ip'] || url.searchParams.get('testip') || req.socket.remoteAddress, DEV_HMAC);
-            const id = `c${(lobbySeq += 1)}`;
+            // Match real gateway identifiers so local camera tests cannot hide
+            // recipient truncation or ordering bugs behind short fixture IDs.
+            const id = `c${randomUUID().replaceAll('-', '')}`;
             pendingAdmission.set(id, []);
             let verdict;
             try { verdict = await enqueue(() => lobby.connect({ id, dev, iph, role, account, admin: url.pathname === '/lobby-admin' })); }

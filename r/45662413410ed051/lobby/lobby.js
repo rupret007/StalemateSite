@@ -391,6 +391,20 @@ import { createEntrySharing } from './entry-sharing.mjs';
             if (r) r.onJoin(c, m.act);
             break;
         }
+        case 'media-policy': {
+            const c = app.chans.get(m.ch);
+            if (!c || !Array.isArray(m.changes) || m.changes.length > 200) break;
+            const members = new Set((c.names || []).map(member => member.id));
+            const denied = new Set((Array.isArray(c.mediaBlocked) ? c.mediaBlocked : []).filter(id => members.has(id)));
+            for (const change of m.changes) {
+                if (!change || typeof change.id !== 'string' || typeof change.blocked !== 'boolean' || !members.has(change.id)) continue;
+                if (change.blocked) denied.add(change.id); else denied.delete(change.id);
+            }
+            c.mediaBlocked = [...denied];
+            const r = room();
+            if (r) r.onChan(c);
+            break;
+        }
         case 'chan': {
             const c = app.chans.get(m.ch.name);
             if (c) {

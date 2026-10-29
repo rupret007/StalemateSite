@@ -39,6 +39,16 @@ reader. Raw private-room relay and media traffic have separate limits.
 
 ## Hosted staging handoff
 
+The later public-room camera/blocking candidate adds a separate browser activity
+pacer and compact pair-policy updates, described in [the media contract](HANGOUT_MEDIA_BLOCKING.md).
+Its retained engine fixture admits eight ordinary visitors and 50 synthetic
+trusted staff to 30 rooms using real actions and unchanged limits. The old
+22,997,580-byte refresh rolled back Block at the 16 MiB stage ceiling; the compact
+update commits the same action with 63 frames / 7,260 encoded bytes. This proves
+that regression case only, not the maximum number of staff, hosted capacity,
+throughput or a public SLO. Re-run relevant acceptance checks on the selected
+candidate; do not transfer the earlier load result to changed source silently.
+
 StoryPool 10-21-26 owns the actual isolated deployment and monitoring. Start with
 50 visitors and only attempt the existing 150-visitor ceiling after the lower
 tier passes. The previously proposed 200/1,000 tiers remain future investigation

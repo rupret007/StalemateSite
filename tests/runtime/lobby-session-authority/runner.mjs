@@ -15,6 +15,15 @@ const APP = fileURLToPath(new URL('../../../', import.meta.url));
 const TOOLS = fileURLToPath(new URL('../durable-records/', import.meta.url));
 const ORIGIN = 'https://local-fixture.invalid', INVITE = 'owned-fixture-invite-not-a-production-credential-2026', PREVIEW = 'owned-fixture-preview-token-20261025';
 const ENV = ['PATH', 'TMPDIR', 'TEMP', 'TMP', 'SystemRoot', 'SYSTEMROOT', 'WINDIR'];
+const EPHEMERAL_BODY_MARKERS = ['Native Stalemate ephemeral greeting', 'Native Rad Dad ephemeral greeting', 'Native remaining visitor greeting', 'native-media-control-no-body-persistence'].sort();
+function assertNativeRollback(witness, record) {
+    assert.deepEqual(Object.keys(witness).sort(), ['record', 'originalSha256', 'stagedSha256', 'restoredSha256', 'nativeWriteCompleted', 'stagedChanged', 'nativeTransactionRejected', 'restoredBeforeEngineRecovery'].sort());
+    assert.equal(witness.record, record);
+    for (const key of ['originalSha256', 'stagedSha256', 'restoredSha256']) assert.match(witness[key], /^[a-f0-9]{64}$/);
+    assert.notEqual(witness.stagedSha256, witness.originalSha256);
+    assert.equal(witness.restoredSha256, witness.originalSha256);
+    for (const key of ['nativeWriteCompleted', 'stagedChanged', 'nativeTransactionRejected', 'restoredBeforeEngineRecovery']) assert.equal(witness[key], true);
+}
 const hash = path => createHash('sha256').update(readFileSync(path)).digest('hex');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const sources = () => Object.fromEntries([
@@ -202,21 +211,70 @@ async function runtime(phase, state, nonce) {
             assert.equal((await b.wait(frame => frame.t === 'line' && frame.text === 'Native remaining visitor greeting', 'remaining visitor chat', continuedAt)).entrySource, '');
             await b.barrier(); await c.barrier();
             assert.equal(a.frames.length, closedFrameCount, 'revoked visitor received later frames');
+            const mediaRoom = '#art-native-canvas', ids = Object.fromEntries(canvasC.ch.names.map(person => [person.nick, person.id]));
+            for (const visitor of [b, c]) {
+                const since = visitor.frames.length;
+                visitor.send({ t: 'cam', ch: mediaRoom, on: true, adult18: true });
+                await visitor.wait(frame => frame.t === 'cam' && frame.ch === mediaRoom && frame.on === true, 'synthetic media permission', since);
+            }
+            const rtc = { sdp: { type: 'offer', sdp: 'v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\na=native-media-control-no-body-persistence\r\n' } };
+            const beforeRtc = c.frames.length;
+            b.send({ t: 'act', ch: mediaRoom, kind: 'rtc', to: ids.NativeCharlie, ...rtc });
+            assert.deepEqual((await c.wait(frame => frame.t === 'act' && frame.kind === 'rtc' && frame.from === ids.NativeBravo, 'unblocked synthetic RTC', beforeRtc)).sdp, rtc.sdp);
+            const blockAtB = b.frames.length, blockAtC = c.frames.length;
+            await b.command('block', ['NativeCharlie'], mediaRoom, frame => frame.t === 'notice' && frame.text.startsWith('Blocked '), 'native device block committed');
+            assert.deepEqual((await b.wait(frame => frame.t === 'media-policy' && frame.ch === mediaRoom, 'blocker pair policy', blockAtB)).changes, [{ id: ids.NativeCharlie, blocked: true }]);
+            assert.deepEqual((await c.wait(frame => frame.t === 'media-policy' && frame.ch === mediaRoom, 'target pair policy', blockAtC)).changes, [{ id: ids.NativeBravo, blocked: true }]);
+            const blockedAtB = b.frames.length, blockedAtC = c.frames.length;
+            b.send({ t: 'act', ch: mediaRoom, kind: 'rtc', to: ids.NativeCharlie, ...rtc });
+            c.send({ t: 'act', ch: mediaRoom, kind: 'rtc', to: ids.NativeBravo, ...rtc });
+            await b.barrier(mediaRoom); await c.barrier(mediaRoom);
+            for (const [visitor, since] of [[b, blockedAtB], [c, blockedAtC]])
+                assert.ok(visitor.frames.slice(since).every(frame => frame.kind !== 'rtc'), 'blocked RTC reached an actual socket');
+            const committedBlock = await control('inspect');
+            assert.deepEqual(committedBlock.durableBlockCounts, [{ nick: 'NativeBravo', blocks: 1 }, { nick: 'NativeCharlie', blocks: 0 }]);
+            assert.deepEqual(committedBlock.engineBlockCounts, committedBlock.durableBlockCounts);
+            await control('fault', { record: 'sessions' });
+            const rejectedAtB = b.frames.length, rejectedAtC = c.frames.length;
+            c.send({ t: 'cmd', ch: mediaRoom, name: 'block', args: ['NativeBravo'] });
+            await c.wait(frame => frame.t === 'notice' && frame.kind === 'error', 'native failed-block refusal', rejectedAtC);
+            const rejectedBlock = await control('inspect');
+            assert.deepEqual(rejectedBlock.durableBlockCounts, committedBlock.durableBlockCounts);
+            assert.deepEqual(rejectedBlock.engineBlockCounts, committedBlock.engineBlockCounts);
+            assert.deepEqual(rejectedBlock.fault, { tripped: true, nativeWriteCompleted: true });
+            assert.deepEqual(rejectedBlock.faultHistory, ['sessions']);
+            assert.equal(rejectedBlock.nativeRollbackWitnesses.length, 1);
+            assertNativeRollback(rejectedBlock.nativeRollbackWitnesses[0], 'sessions');
+            await b.barrier(mediaRoom); await c.barrier(mediaRoom);
+            for (const [visitor, since] of [[b, rejectedAtB], [c, rejectedAtC]])
+                assert.ok(visitor.frames.slice(since).every(frame => !['media-policy', 'pm-closed'].includes(frame.t)
+                    && !(frame.t === 'notice' && frame.text.startsWith('Blocked '))), 'failed native block published success');
             const beforeFault = await control('inspect');
             assert.equal(beforeFault.bindingCount, 2); assert.equal(beforeFault.liveBindingCount, 2);
             assert.deepEqual(beforeFault.durableSessionNicks, ['NativeBravo', 'NativeCharlie']); assert.equal(beforeFault.reports.length, 1); assert.equal(beforeFault.reports[0].id, selected.id);
             assert.ok(Object.values(beforeFault.ordinaryBodiesAbsent).every(Boolean), 'ordinary chat persisted outside selected report'); assert.equal(beforeFault.sqlite, true);
+            assert.deepEqual(Object.keys(beforeFault.ordinaryBodiesAbsent).sort(), EPHEMERAL_BODY_MARKERS);
+            assert.deepEqual(Object.keys(beforeFault.rawScan.perChunkOrdinaryBodiesAbsent).sort(), EPHEMERAL_BODY_MARKERS);
+            assert.equal(beforeFault.ordinaryBodiesAbsent['native-media-control-no-body-persistence'], true);
+            assert.equal(beforeFault.logicalScan.requiredRecordsPresent, true);
+            assert.ok(beforeFault.rawScan.rows > 0 && beforeFault.rawScan.bytes > 0);
+            assert.equal(beforeFault.rawScan.perChunkOrdinaryBodiesAbsent['native-media-control-no-body-persistence'], true);
+            assert.ok(Object.values(beforeFault.rawScan.perChunkOrdinaryBodiesAbsent).every(Boolean), 'ephemeral sentinel appeared in a physical chunk');
             await control('fault', { room: '#art-native-canvas' }); const faultAt = b.frames.length, faultAtC = c.frames.length;
             b.send({ t: 'cmd', ch: '#art-native-canvas', name: 'topic', args: ['Uncommitted native topic'] });
             await b.wait(frame => frame.t === 'notice' && frame.kind === 'error', 'actual failed-write refusal', faultAt);
             const afterFault = await control('inspect'); assert.deepEqual(afterFault.rooms, beforeFault.rooms); assert.deepEqual(afterFault.reports, beforeFault.reports);
             assert.deepEqual(afterFault.fault, { tripped: true, nativeWriteCompleted: true });
+            assert.deepEqual(afterFault.faultHistory, ['sessions', 'community-room:#art-native-canvas']);
+            assert.equal(afterFault.nativeRollbackWitnesses.length, 2);
+            assert.deepEqual(afterFault.nativeRollbackWitnesses[0], rejectedBlock.nativeRollbackWitnesses[0]);
+            assertNativeRollback(afterFault.nativeRollbackWitnesses[1], 'community-room:#art-native-canvas');
             for (const [visitor, since] of [[b, faultAt], [c, faultAtC]])
                 assert.ok(visitor.frames.slice(since).every(frame => !(frame.t === 'chan' && frame.ch?.topic === 'Uncommitted native topic') && !(frame.t === 'event' && String(frame.text).includes('Uncommitted native topic'))), 'failed write published success');
             assert.equal(afterFault.bindingCount, 2, 'lost-socket checkpoint needs live durable bindings'); assert.equal(b.closed, null); assert.equal(c.closed, null);
             secrets = { revokedCookie: cookieA, liveCookie: cookieB };
             proof = { admissionDenials, missingMarkerRefused: true, cookiePolicyVerified: true, actualGatewayVisitors: 3,
-                checks: ['actual-beta-unlock-and-WebSocket-admission', 'stalemate-rad-dad-shared-chat-and-canvas', 'direct-newcomer-neutral-without-prejoin-chat', 'actual-report-persisted', 'connected-logout-and-cookie-replay-denied', 'ordinary-chat-excluded-from-durable-records', 'actual-post-native-write-rollback-before-success'],
+                checks: ['actual-beta-unlock-and-WebSocket-admission', 'stalemate-rad-dad-shared-chat-and-canvas', 'direct-newcomer-neutral-without-prejoin-chat', 'actual-report-persisted', 'connected-logout-and-cookie-replay-denied', 'ordinary-chat-excluded-from-durable-records', 'actual-device-block-policy-and-RTC-denial-persisted', 'actual-post-native-session-write-rollback-before-block-success', 'actual-post-native-write-rollback-before-success'],
                 checkpoint: afterFault, sources: before, versions, binarySha256, rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs,
                 outboundCalls, runtimeRestarts, workerdPids: group(process.pid).filter(row => row.command.includes('workerd')).map(row => row.pid) };
             assert.equal(outboundCalls, 1); assert.equal(runtimeRestarts, 0); assert.deepEqual(sources(), before);
@@ -234,7 +292,15 @@ async function runtime(phase, state, nonce) {
             const recovered = await control('inspect');
             assert.equal(recovered.objectId, received.checkpoint.objectId); assert.deepEqual(recovered.rooms, received.checkpoint.rooms); assert.deepEqual(recovered.reports, received.checkpoint.reports);
             assert.equal(recovered.bindingCount, 0); assert.equal(recovered.liveBindingCount, 0); assert.deepEqual(recovered.durableSessionNicks, []); assert.deepEqual(recovered.engineSessionNicks, []);
+            assert.deepEqual(recovered.nativeRollbackWitnesses, []);
             assert.equal(recovered.authorityUnavailable, false); assert.equal(recovered.sqlite, true); assert.ok(Object.values(recovered.ordinaryBodiesAbsent).every(Boolean));
+            assert.deepEqual(Object.keys(recovered.ordinaryBodiesAbsent).sort(), EPHEMERAL_BODY_MARKERS);
+            assert.deepEqual(Object.keys(recovered.rawScan.perChunkOrdinaryBodiesAbsent).sort(), EPHEMERAL_BODY_MARKERS);
+            assert.equal(recovered.ordinaryBodiesAbsent['native-media-control-no-body-persistence'], true);
+            assert.equal(recovered.logicalScan.requiredRecordsPresent, true);
+            assert.ok(recovered.rawScan.rows > 0 && recovered.rawScan.bytes > 0);
+            assert.equal(recovered.rawScan.perChunkOrdinaryBodiesAbsent['native-media-control-no-body-persistence'], true);
+            assert.ok(Object.values(recovered.rawScan.perChunkOrdinaryBodiesAbsent).every(Boolean));
             const returning = await connect(secrets.liveCookie, 'NativeReturn', 'rad-dad', '192.0.2.12');
             const canvas = await joinRoom(returning, '#art-native-canvas'); assert.equal(canvas.ch.count, 1); assert.equal(canvas.act.strokes[0].id, 'native-stroke-1');
             await returning.barrier(); assert.ok(returning.frames.every(frame => frame.t !== 'line'), 'cold newcomer received prior chat');

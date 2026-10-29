@@ -6,7 +6,7 @@ export { HangoutRoom, HangoutQuota, HangoutTurnBudget };
 
 const ORIGIN = 'https://local-fixture.invalid';
 const PREFIX = '/_fixture/';
-const ordinaryNeedles = ['Native Stalemate ephemeral greeting', 'Native Rad Dad ephemeral greeting', 'Native remaining visitor greeting'];
+const ordinaryNeedles = ['Native Stalemate ephemeral greeting', 'Native Rad Dad ephemeral greeting', 'Native remaining visitor greeting', 'native-media-control-no-body-persistence'];
 const ensure = (condition, label) => { if (!condition) throw Error(label); };
 const denied = () => new Response('local fixture admission denied', { status: 403 });
 const sha = async value => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)))].map(byte => byte.toString(16).padStart(2, '0')).join('');
@@ -29,18 +29,61 @@ async function readControl(request) {
 
 export class FixtureLobby extends HangoutLobby {
     constructor(state, env) {
-        const control = { faultKey: '', tripped: false, nativeWriteCompleted: false, nativeCalls: 0 };
-        const wrap = target => new Proxy(target, { get(raw, key) {
+        const control = { faultKey: '', tripped: false, nativeWriteCompleted: false, nativeCalls: 0, history: [], rollbackWitnesses: [] };
+        const manifestDigest = async (storage, key) => {
+            control.nativeCalls++;
+            const value = await storage.get(key);
+            ensure(value !== undefined, 'fixture-manifest-observation-missing');
+            const encoded = JSON.stringify(value);
+            ensure(typeof encoded === 'string' && new TextEncoder().encode(encoded).byteLength <= 65536, 'fixture-manifest-observation-cap');
+            return sha(encoded);
+        };
+        const wrap = (target, transactionWitness = null) => new Proxy(target, { get(raw, key) {
             const method = Reflect.get(raw, key, raw);
             if (typeof method !== 'function') return method;
-            if (key === 'transaction') return operation => method.call(raw, tx => operation(wrap(tx)));
+            if (key === 'transaction') return async operation => {
+                // Only an outer native transaction can establish the point
+                // before engine recovery/conservative accounting writes begin.
+                // Unexpected nesting must fail rather than replace a witness.
+                ensure(transactionWitness === null, 'fixture-nested-native-transaction');
+                const witness = { fault: null };
+                try { return await method.call(raw, tx => operation(wrap(tx, witness))); }
+                catch (error) {
+                    if (witness.fault) {
+                        const { physicalKey, ...observation } = witness.fault;
+                        observation.restoredSha256 = await manifestDigest(raw, physicalKey);
+                        observation.nativeTransactionRejected = true;
+                        observation.restoredBeforeEngineRecovery = observation.restoredSha256 === observation.originalSha256;
+                        ensure(control.rollbackWitnesses.length < 2
+                            && !control.rollbackWitnesses.some(item => item.record === observation.record), 'fixture-rollback-witness-cap');
+                        control.rollbackWitnesses.push(observation);
+                        ensure(observation.stagedChanged && observation.restoredBeforeEngineRecovery, 'fixture-native-rollback-not-observed');
+                    }
+                    throw error;
+                }
+            };
             if (!['get', 'put', 'delete', 'list', 'getAlarm', 'setAlarm', 'deleteAlarm'].includes(key)) return method.bind(raw);
             return async (...args) => {
+                const armed = key === 'put' && control.faultKey && logicalKey(args[0]) === control.faultKey;
+                let originalSha256;
+                if (armed) {
+                    ensure(transactionWitness && !transactionWitness.fault, 'fixture-fault-needs-owned-native-transaction');
+                    ensure(['sessions', 'community-room:#art-native-canvas'].includes(control.faultKey), 'fixture-fault-record-not-allowed');
+                    originalSha256 = await manifestDigest(raw, args[0]);
+                }
                 control.nativeCalls++;
                 const result = await method.apply(raw, args);
                 // Fault only after the actual native SQLite write resolved.
-                if (key === 'put' && control.faultKey && logicalKey(args[0]) === control.faultKey) {
+                if (armed) {
+                    ensure(!transactionWitness.fault, 'fixture-duplicate-native-fault');
+                    const observation = { physicalKey: args[0], record: control.faultKey, originalSha256,
+                        stagedSha256: '', nativeWriteCompleted: true, stagedChanged: false };
+                    transactionWitness.fault = observation;
+                    control.history.push(control.faultKey);
                     control.faultKey = ''; control.tripped = true; control.nativeWriteCompleted = true;
+                    observation.stagedSha256 = await manifestDigest(raw, args[0]);
+                    observation.stagedChanged = observation.stagedSha256 !== originalSha256;
+                    ensure(observation.stagedChanged, 'fixture-native-put-not-observable-change');
                     throw Error('owned-native-post-write-fault');
                 }
                 return result;
@@ -102,8 +145,12 @@ export class FixtureLobby extends HangoutLobby {
             authorityUnavailable: !!this.authorityUnavailable, bindingCount: saved.bindings.length, liveBindingCount: this.liveBindings.size,
             durableSessionNicks: saved.state.sessions.connections.map(person => person.nick).sort(),
             engineSessionNicks: this.engine.sessionSnapshot().connections.map(person => person.nick).sort(),
+            durableBlockCounts: saved.state.sessions.connections.map(person => ({ nick: person.nick, blocks: person.blocks.length })).sort((a, b) => a.nick.localeCompare(b.nick)),
+            engineBlockCounts: this.engine.sessionSnapshot().connections.map(person => ({ nick: person.nick, blocks: person.blocks.length })).sort((a, b) => a.nick.localeCompare(b.nick)),
             rooms, reports: reportSummaries, ordinaryBodiesAbsent: absent,
             logicalScan, rawScan: { rows, bytes, perChunkOrdinaryBodiesAbsent: rawAbsent },
+            faultHistory: [...this.fixtureControl.history],
+            nativeRollbackWitnesses: this.fixtureControl.rollbackWitnesses.map(item => ({ ...item })),
             fault: { tripped: this.fixtureControl.tripped, nativeWriteCompleted: this.fixtureControl.nativeWriteCompleted } };
     }
     async fetch(request) {
@@ -115,9 +162,13 @@ export class FixtureLobby extends HangoutLobby {
         return this.state.blockConcurrencyWhile(async () => {
             try {
                 if (path === PREFIX + 'inspect' && Object.keys(body).length === 0) return Response.json(await this.fixtureInspect());
-                if (path === PREFIX + 'fault' && Object.keys(body).join(',') === 'room' && body.room === '#art-native-canvas') {
-                    ensure(!this.fixtureControl.faultKey && !this.fixtureControl.tripped, 'fault-already-used');
-                    this.fixtureControl.faultKey = 'community-room:' + body.room;
+                if (path === PREFIX + 'fault' && (Object.keys(body).join(',') === 'room' && body.room === '#art-native-canvas'
+                    || Object.keys(body).join(',') === 'record' && body.record === 'sessions')) {
+                    const key = body.record === 'sessions' ? 'sessions' : 'community-room:' + body.room;
+                    ensure(!this.fixtureControl.faultKey && this.fixtureControl.history.length < 2
+                        && !this.fixtureControl.history.includes(key), 'fault-already-used');
+                    this.fixtureControl.tripped = false; this.fixtureControl.nativeWriteCompleted = false;
+                    this.fixtureControl.faultKey = key;
                     return Response.json({ armed: true });
                 }
                 return denied();
