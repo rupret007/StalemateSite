@@ -37,6 +37,13 @@ module.exports = defineConfig({
             testIgnore: /phones\.spec\.js/,
             use: { browserName: 'chromium' }
         },
+        {
+            name: 'webkit-community',
+            // Phone projects select a different file set. Exercise the shared
+            // entrance and invitation/Stop journeys in WebKit explicitly.
+            testMatch: /(?:community-entry|lobby-webjam|lobby-invitation-lifecycle)\.spec\.js$/,
+            use: { browserName: 'webkit' }
+        },
         phoneProject('webkit-iphone-se', {
             ...devices['iPhone SE (3rd gen)'],
             browserName: 'webkit',
