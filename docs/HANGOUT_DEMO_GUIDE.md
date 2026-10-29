@@ -74,6 +74,24 @@ application role behavior, not real email verification or hosted revocation.
 
 ## WebJam music and results
 
+Start a Jam room, then use **Host tools → Invite guest** and enter the other
+visitor's current nickname. They accept with **Join** in their invitation.
+Jam rooms remain invite-only; the invitation gives membership, not host powers.
+Share the complete invitation from WebJam in the room's host box. The other
+visitor chooses **Copy full WebJam invitation**, opens WebJam, selects Join and
+pastes it. This website handoff does not establish a successful native audio
+session.
+
+If a guest or verified owner's session expires or is revoked, **Session ended**
+replaces automatic retries. The beta offers **Return to invitation** through its
+existing admission page; room owners then verify their email again. A refused
+reconnect shows the same reachable recovery with an honest unavailable/possibly
+expired message. The local preview keeps **Try again**, returning a former owner
+as an unverified guest until a new sign-in. Cameras, stale invitation/PM actions
+and displayed owner powers are cleared. The current unsent message remains
+available to copy in its original channel or PM; it is never moved into public
+chat or sent automatically. Leaving the page clears unsent drafts.
+
 Show the invitation/opening flow separately from playing music. Qualify the
 actual native package, installation/trust, join/leave and bidirectional audio on
 each advertised platform. Mac Intel/Apple Silicon, Windows and Linux have
