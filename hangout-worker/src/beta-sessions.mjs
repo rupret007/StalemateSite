@@ -45,6 +45,15 @@ export class BetaSessions {
         return true;
     }
     async fetch(request) {
+        // Bound-only, read-only application migration export. Gateways never
+        // forward this route. It neither drains writers nor proves rollout.
+        if (new URL(request.url).pathname === '/__beta/migration-export') {
+            if (this.env.HANGOUT_BETA_MODE !== 'protected' || request.method !== 'GET') return reply(404, 'not found');
+            return this.state.blockConcurrencyWhile(async () => {
+                try { return Response.json({ v: 1, sessions: [...(await this.records()).values()], mintRates: await this.mintRates() }, { headers: { 'Cache-Control': 'no-store' } }); }
+                catch { return reply(503, 'beta session registry unavailable'); }
+            });
+        }
         if (new URL(request.url).pathname === INTERNAL_HEALTH_PATH) {
             if (this.env.HANGOUT_BETA_MODE !== 'protected' || request.method !== 'GET') return new Response('not found', { status: 404 });
             return this.state.blockConcurrencyWhile(async () => {
@@ -63,13 +72,16 @@ export class BetaSessions {
         } catch { return reply(400, 'request'); }
         if (!body || typeof body !== 'object' || !SID.test(body.sid || '') || !VERSION.test(body.version || '') || !Number.isFinite(body.exp)) return reply(400, 'request');
         const operation = new URL(request.url).pathname;
+        // A configured collocated (or unknown) mode must not leave this old
+        // binding as a second issuer. Reducing closure/drain remains available.
+        if (this.env.HANGOUT_SESSION_AUTHORITY && operation !== '/revoke') return reply(503, 'legacy beta authority is inactive');
         let closing;
         try {
             const result = await this.state.blockConcurrencyWhile(async () => {
                 // Handled failures must not escape this callback and reset the object.
                 try {
                     const now = Date.now();
-                    if (body.exp <= now || body.exp > now + BETA_TTL || body.version !== betaVersion(this.env)) return reply(403, 'expired or revoked');
+                    if (body.exp <= now || body.exp > now + BETA_TTL || operation !== '/revoke' && body.version !== betaVersion(this.env)) return reply(403, 'expired or revoked');
                     if (operation === '/register') {
                         const registered = await this.state.storage.transaction(tx => registerBetaSession(tx, body));
                         return reply(registered.status, registered.reason);

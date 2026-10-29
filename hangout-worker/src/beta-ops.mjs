@@ -35,13 +35,13 @@ export function aiHealth(env, stored, runtime) {
         quota: daily && { ...daily, limit }, currentInstance: observed };
 }
 
-async function internalRead(binding, name) {
+async function internalRead(binding, name, path = INTERNAL_HEALTH_PATH) {
     if (!binding) return null;
     let timer, reader;
     const controller = new AbortController();
     try {
         const request = (async () => {
-            const response = await binding.get(binding.idFromName(name)).fetch(new Request(`https://ops${INTERNAL_HEALTH_PATH}`, { method: 'GET', signal: controller.signal }));
+            const response = await binding.get(binding.idFromName(name)).fetch(new Request(`https://ops${path}`, { method: 'GET', signal: controller.signal }));
             if (!response.ok || !response.body) return null;
             reader = response.body.getReader();
             const decoder = new TextDecoder();
@@ -75,7 +75,8 @@ export async function betaHealth(request, env, { betaConfigured = false, accessC
     }
     if (request.method !== 'GET') { const response = healthJson({ error: 'method-not-allowed' }, 405); response.headers.set('Allow', 'GET'); return response; }
     const [lobby, quota, registry] = await Promise.all([
-        internalRead(env.LOBBY, 'stalemate'), internalRead(env.QUOTA, 'global'), internalRead(env.BETA_SESSIONS, 'global')
+        internalRead(env.LOBBY, 'stalemate'), internalRead(env.QUOTA, 'global'), env.HANGOUT_SESSION_AUTHORITY === 'lobby-v1'
+            ? internalRead(env.LOBBY, 'stalemate', '/__beta/authority/health') : internalRead(env.BETA_SESSIONS, 'global')
     ]);
     const storage = { lobby: lobby?.storage === 'ok' ? 'ok' : 'unavailable', quota: quota?.storage === 'ok' ? 'ok' : 'unavailable', registry: registry?.storage === 'ok' ? 'ok' : 'unavailable' };
     const reasons = [];

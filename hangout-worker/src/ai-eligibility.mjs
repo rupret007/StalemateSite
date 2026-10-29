@@ -10,6 +10,7 @@ export function aiEligibility(env = {}) {
         state: 'off', reasons: Object.freeze([]) });
 
     const reasons = [];
+    if (env?.HANGOUT_SESSION_AUTHORITY === 'lobby-v1') reasons.push('session-start-fence-not-qualified');
     if (!qualified(env?.HANGOUT_AI_PROVIDER_READINESS)) reasons.push('provider-not-qualified');
     if (!qualified(env?.HANGOUT_AI_CHILD_DATA_READINESS)) reasons.push('child-data-not-qualified');
     if (typeof env?.OPENAI_API_KEY !== 'string' || !env.OPENAI_API_KEY.trim()) reasons.push('provider-not-configured');

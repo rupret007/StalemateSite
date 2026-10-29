@@ -20,7 +20,8 @@ const redirect = (where, extra = {}) => reply(null, 303, 'text/plain', { Locatio
 const sameOrigin = (request) => request.headers.get('Origin') === new URL(request.url).origin;
 export function betaConfigured(env) {
     return env.HANGOUT_BETA_MODE === 'protected' && hmacKeyOk(env.HANGOUT_HMAC_KEY) && hmacKeyOk(env.HANGOUT_BETA_INVITE_KEY) &&
-        previewKeyOk(env.HANGOUT_PREVIEW_KEY, env.HANGOUT_PREVIEW_KEY) && env.ASSETS && env.LOBBY && env.QUOTA && env.ROOMS && env.BETA_SESSIONS;
+        previewKeyOk(env.HANGOUT_PREVIEW_KEY, env.HANGOUT_PREVIEW_KEY) && env.ASSETS && env.LOBBY && env.QUOTA && env.ROOMS
+        && (!env.HANGOUT_SESSION_AUTHORITY ? env.BETA_SESSIONS : env.HANGOUT_SESSION_AUTHORITY === 'lobby-v1');
 }
 export function betaAccessConfigured(env) {
     return accessConfigured(env) && accessConfigured({ ...env, HANGOUT_ACCESS_AUD: env.HANGOUT_OWNER_ACCESS_AUD }) && env.HANGOUT_ACCESS_AUD !== env.HANGOUT_OWNER_ACCESS_AUD;
@@ -64,10 +65,11 @@ async function disconnect(env, session) {
     catch { throw new BetaSessionUnavailable('Your current session could not be revoked. Please try again.'); }
     if (!result.ok) throw new BetaSessionUnavailable('Your session is revoked, but some connections could not be closed. A retry is queued; please try again.');
 }
-async function newAccess(env, { exp = Date.now() + BETA_TTL, ip = '0.0.0.0' } = {}) {
+async function newAccess(env, { exp = Date.now() + BETA_TTL, ip = '0.0.0.0', profile = null } = {}) {
     const access = { v: 1, sid: crypto.randomUUID(), exp, scope: 'guest', version: String(env.HANGOUT_BETA_INVITE_VERSION || '1') };
     let result;
-    try { result = await registryRequest(env, 'register', { sid: access.sid, exp: access.exp, version: access.version, iph: await ipHash(ip, env.HANGOUT_HMAC_KEY) }); }
+    try { result = await registryRequest(env, 'register', { sid: access.sid, exp: access.exp, version: access.version, iph: await ipHash(ip, env.HANGOUT_HMAC_KEY),
+        ...(env.HANGOUT_SESSION_AUTHORITY === 'lobby-v1' ? { profile } : {}) }); }
     catch { throw new BetaSessionUnavailable('The community session service is temporarily unavailable.'); }
     if (result.status !== 200) throw new BetaSessionUnavailable(result.status === 429 ? 'The beta session allowance is full. Please try again later.' : 'The community session service is temporarily unavailable.', result.status === 429 ? 429 : 503);
     return { access, cookie: betaCookie(BETA_COOKIE, await signBeta('access', access, env.HANGOUT_HMAC_KEY), exp - Date.now()) };
@@ -140,7 +142,9 @@ async function betaRequest(request, env, deps = {}) {
             return reply(owner ? 'Verified email sign-in required.' : 'Restricted moderator sign-in required.', gate.status);
         }
         await disconnect(env, session);
-        const next = await newAccess(env, { exp: session.access.exp, ip: request.headers.get('CF-Connecting-IP') || '0.0.0.0' });
+        const profile = { kind: owner ? 'owner' : 'staff', account: await accountId(gate.identity.email, env.HANGOUT_HMAC_KEY),
+            role: owner ? 'fan' : gate.identity.role, admin: !owner, expiresAt: Math.min(session.access.exp, gate.identity.expiresAt) };
+        const next = await newAccess(env, { exp: session.access.exp, ip: request.headers.get('CF-Connecting-IP') || '0.0.0.0', profile });
         const identity = { v: 1, sid: next.access.sid, exp: Math.min(next.access.exp, gate.identity.expiresAt), kind: owner ? 'owner' : 'staff', email: gate.identity.email, role: owner ? 'fan' : gate.identity.role };
         const token = await signBeta('identity', identity, env.HANGOUT_HMAC_KEY);
         const result = redirect(owner ? `${ROOT}lobby/?owner=1${url.searchParams.get('entry-return') === '1' ? '&entry-return=1' : ''}` : `${ROOT}admin/?signed-in=1`, { 'Set-Cookie': betaCookie(BETA_IDENTITY_COOKIE, token, identity.exp - Date.now()) });
@@ -172,6 +176,9 @@ async function betaRequest(request, env, deps = {}) {
     if (url.pathname === '/room' || url.pathname === '/turn') {
         if (!sameOrigin(request)) return reply('Admission denied.', 403);
         if (env.HANGOUT_OPEN === '0') return reply('The community is temporarily paused.', 503);
+        // No current non-retrying session/start fence spans this external
+        // credential issuer. Keep it unavailable in the new authority mode.
+        if (url.pathname === '/turn' && env.HANGOUT_SESSION_AUTHORITY === 'lobby-v1') return reply('Relay credentials are temporarily unavailable.', 503);
         let next = request;
         if (url.pathname === '/room') {
             const trusted = new Headers(request.headers);

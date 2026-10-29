@@ -131,7 +131,7 @@ const CONTEXT_INDEPENDENT_COMMANDS = new Set([
 ]);
 const isPrivateContext = where => typeof where === 'string' && /^pm:/i.test(where);
 
-export function createLobby({ now = () => Date.now(), send: sendImpl = () => {}, close: closeImpl = () => {}, persist: persistImpl = () => {}, deferPresence: deferPresenceImpl = null, participation = null, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
+export function createLobby({ now = () => Date.now(), send: sendImpl = () => {}, close: closeImpl = () => {}, persist: persistImpl = () => {}, deferPresence: deferPresenceImpl = null, participation = null, effectCommit = null, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
     const L = { ...LOBBY_LIMITS, ...limits };
     const entrySites = L.entrySites || ENTRY_SITES;
     const roomStateLimit = Math.max(32768, Math.min(ROOM_STATE_MAX_BYTES, Number(L.roomStateBytes) || ROOM_STATE_MAX_BYTES));
@@ -153,6 +153,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     const safetyQueue = [];
     const participationConfigured = participation !== null;
     const participationReady = participation && ['prepare', 'allows', 'commit', 'providerAllowed', 'startProvider', 'revisionFor'].every(name => typeof participation[name] === 'function');
+    const effectCommitConfigured = effectCommit !== null;
+    const effectCommitReady = effectCommit && ['prepare', 'commit'].every(name => typeof effectCommit[name] === 'function');
+    const commitConfigured = participationConfigured || effectCommitConfigured;
     const send = (id, frame) => {
         if (!controlled) return sendImpl(id, frame);
         controlled.bytes += encoder.encode(JSON.stringify(frame)).byteLength;
@@ -167,7 +170,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (controlled.effects.length >= 128 || controlled.effectBytes > 16 * 1024 * 1024) { controlled.capacity = true; return; }
             controlled.effects.push([kind, structuredClone(value)]); return;
         }
-        if (participationConfigured) throw new Error('Participation transaction required');
+        if (commitConfigured) throw new Error('Controlled effect transaction required');
         const required = kind === 'moderation-queue' || kind === 'net';
         let task;
         try { task = persistImpl(kind, value); }
@@ -231,7 +234,11 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     function requireParticipation(c, action, peer = null) {
         if (!participationAllows(c, action, peer)) throw Object.assign(new Error('participation-denied'), { participationDenied: true });
     }
-    const connectionView = c => ({ id: c.id, dev: c.dev, account: c.account, role: c.role, admin: c.admin });
+    // Bindings come from trusted admission/live sockets, never saved metadata or
+    // browser frames. Existing adapters keep absent optional fields absent.
+    const bindingFields = ['iph', 'expiresAt', 'betaSid', 'betaInviteVersion', 'authorityRef', 'authorityRevision'];
+    const connectionBinding = c => Object.fromEntries(bindingFields.filter(key => c[key] !== undefined).map(key => [key, c[key]]));
+    const connectionView = c => ({ id: c.id, dev: c.dev, account: c.account, role: c.role, admin: c.admin, ...connectionBinding(c) });
     const SAFE_COMMANDS = new Set(['help', 'h', '?', 'list', 'names', 'who', 'whois', 'w', 'part', 'leave', 'quit', 'exit', 'bye',
         'ignore', 'unignore', 'block', 'unblock', 'decline', 'deny', 'pm', 'admin-refresh', 'dismiss', 'aidismiss', 'privatereport', 'delete', 'purge', 'mute', 'gban', 'shield', 'shieldoff', 'lobby', 'filter', 'slow', 'camoff', 'log']);
     function safetyMessage(raw) {
@@ -244,6 +251,11 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         } catch { return true; } // Malformed frames retain the existing protocol refusal.
     }
     function participationConnections(fn, args) {
+        if (fn === connect) {
+            const candidate = { account: '', role: 'fan', admin: false, ...args[0] };
+            candidate.admin = ['band', 'owner', 'moderator'].includes(candidate.role) && candidate.admin;
+            return [...conns.values()].map(connectionView).concat(connectionView(candidate));
+        }
         // Only ordinary text in a currently joined public channel depends on
         // the author alone. Commands, PM contexts, media and every other action
         // retain the full roster. This selects dependencies, never permissions:
@@ -258,6 +270,39 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             } catch { /* Invalid/ambiguous frames keep the conservative full path. */ }
         }
         return [...conns.values()].map(connectionView);
+    }
+    function effectOperation(fn, args, connections) {
+        const kind = fn === connect ? 'connect' : fn === message ? 'message' : fn === reserveTransportControl ? 'control'
+            : fn === completePrivateReportAction ? 'private-report-complete' : fn === disconnect ? 'disconnect' : fn === tick ? 'tick'
+                : fn === restoreRooms ? 'restore-rooms' : fn === restoreModerationQueue ? 'restore-moderation' : fn === restoreAiReviews ? 'restore-ai'
+                    : fn === applyAiReview ? 'apply-ai' : fn === refreshParticipationState ? 'refresh' : '';
+        if (!kind) throw Error('Unknown controlled effect operation');
+        if (fn === tick) {
+            // Cleanup needs no active visitor, but renewing a registered room or
+            // recording a band heartbeat depends on these actual contributors.
+            // Keep this separate from C3's conservative prepared roster.
+            const contributors = new Map();
+            for (const c of conns.values()) if (isBand(c)) contributors.set(c.id, c);
+            for (const room of channels.values()) if (room.kind !== 'lobby' && room.owner) {
+                for (const member of membersOf(room)) if (owns(member, room) || member.account && room.cohosts.has(member.account))
+                    contributors.set(member.id, member);
+            }
+            connections = [...contributors.values()].map(connectionView);
+        }
+        return { kind, actorId: kind === 'connect' ? args[0]?.id
+            : ['message', 'control', 'private-report-complete', 'disconnect'].includes(kind) ? args[0] : '', connections };
+    }
+    async function commitEffects(stage, effects, costsOnly = false) {
+        // Lifecycle authority is independent of purpose consent. The optional
+        // fence composes C3 through one transaction; it never invents consent.
+        try {
+            if (effectCommitConfigured) {
+                if (!effectCommitReady || participationConfigured && !participationReady) return { ok: false, reason: 'participation-unavailable' };
+                return await effectCommit.commit(stage.effectContext, effects, { costsOnly,
+                    participation: participationConfigured ? { adapter: participation, context: stage.context } : null });
+            }
+            return participationReady ? await participation.commit(stage.context, effects, { costsOnly }) : { ok: false, reason: 'participation-unavailable' };
+        } catch { return { ok: false, reason: 'participation-unavailable' }; }
     }
     async function controlledRun(fn, args, safe = false) {
         if (participationBroken) return { ok: false, reason: 'participation-unavailable' };
@@ -274,13 +319,16 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         try {
             checkpoint = createParticipationCheckpoint({ conns, channels, pm, devStats, ipRooms, net, reports, held, lines, lineMeta,
                 receipts, receiptSizes, heldChannels, aiPending, aiReviews, participationMedia }, safe ? { opaque: [...channels.values()].map(room => room.act) } : {});
-            const context = participationReady ? await participation.prepare(participationConnections(fn, args)) : null;
-            stage = controlled = { context, effects: [], frames: [], closes: [], presence: [], providers: [], bytes: 0, effectBytes: 0, capacity: false };
+            if (effectCommitConfigured && !effectCommitReady) throw Error('Effect commit fence unavailable');
+            const connections = participationConnections(fn, args);
+            const context = participationReady ? await participation.prepare(connections) : null;
+            const effectContext = effectCommitReady ? await effectCommit.prepare(effectOperation(fn, args, connections)) : null;
+            stage = controlled = { context, effectContext, effects: [], frames: [], closes: [], presence: [], providers: [], bytes: 0, effectBytes: 0, capacity: false };
             result = await durable(fn, args);
             if (stage.capacity) throw Object.assign(new Error('participation-denied'), { participationDenied: true, reason: 'participation-capacity' });
             // Configured-but-broken adapters refuse grants, including commit;
             // they never use ordinary persistImpl as a fallback.
-            const committed = participationReady ? await participation.commit(context, stage.effects) : { ok: false, reason: 'participation-unavailable' };
+            const committed = await commitEffects(stage, stage.effects);
             if (!committed?.ok) throw Object.assign(new Error('participation-denied'), { participationDenied: true, reason: committed?.reason });
         } catch (error) {
             failure = error?.participationDenied ? error.reason || 'participation-denied' : 'participation-unavailable';
@@ -299,10 +347,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 } catch { failure = 'participation-unavailable'; restoreFailed = true; participationBroken = true; roomsBroken = true; }
             }
             if (!stage && !checkpoint) failure = 'participation-capacity';
-            if (participationReady && stage && !restoreFailed) {
+            if ((participationReady || effectCommitReady) && stage && !restoreFailed) {
                 const sessions = sessionSnapshot(), effects = [['abuse', abuseSnapshot()], ['net', snapshot()]];
                 if (encoder.encode(JSON.stringify(sessions)).byteLength <= SESSION_STATE_BYTES) effects.push(['sessions', sessions]);
-                const costs = await participation.commit(stage.context, effects, { costsOnly: true });
+                const costs = await commitEffects(stage, effects, true);
                 if (!costs?.ok) failure = 'participation-unavailable';
             }
         } finally {
@@ -326,7 +374,12 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             } else if (failure === 'participation-unavailable') storageUnavailable();
             result = { ok: false, reason: failure };
         }
-        if (!pendingCommits && deferredAdmin) { deferredAdmin = false; pushAdmin(); }
+        if (!pendingCommits && deferredAdmin) {
+            deferredAdmin = false;
+            // A denied lifecycle fence cannot become a private evidence refresh
+            // through the deferred notification path after staging is removed.
+            if (!failure || !effectCommitConfigured) pushAdmin();
+        }
         if (safetyQueue.length && !safetyDrainScheduled) {
             safetyDrainScheduled = true;
             Promise.resolve().then(() => {
@@ -637,7 +690,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
 
     // ---------- connection lifecycle ----------
-    function connect({ id, dev, iph, role = 'fan', email = '', account = '', admin = false }) {
+    function connect({ id, dev, iph, role = 'fan', email = '', account = '', admin = false, ...binding }) {
         if (conns.size >= SESSION_CONNECTIONS) return { ok: false, status: 429, reason: 'full' };
         spend(1);
         const lvl = budgetLevel();
@@ -650,7 +703,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             const inLobby = [...conns.values()].filter((c) => !isBand(c)).length;
             if (inLobby >= L.lobbyMax) return { ok: false, status: 429, reason: 'full' };
         }
-        const c = { id, dev, iph, role, email, account, admin: band && admin, nick: '', entrySource: '', channels: new Set(), away: '', ignores: new Set(), blocks: new Set(), pmOff: false,
+        const c = { id, dev, iph, role, email, account, admin: band && admin, ...connectionBinding(binding), nick: '', entrySource: '', channels: new Set(), away: '', ignores: new Set(), blocks: new Set(), pmOff: false,
             cams: new Set(), since: now(), lastNick: 0, tokens: L.burst, last: now(), frames: 0, lastSaid: {}, actTokens: L.actBurst, actLast: now() };
         conns.set(id, c);
         if (band) { net.lastBand = now(); if (net.shieldAuto || net.lockAuto) bot(c, 'A saved safety state needs review: fans can read but not talk while the lobby is read-only. Check the band panel; /lobby unlock and /shieldoff when you are ready.'); saveNet(); }
@@ -964,6 +1017,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (active.size > L.roomsListed) { deny('session-capacity'); continue; }
             const c = { ...s, entrySource: normalizeEntrySource(s.entrySource, entrySites), email: identity.email || '', channels: new Set(s.channels), ignores: new Set(s.ignores), blocks: new Set(s.blocks),
                 cams: new Set(s.cams.filter((name) => !net.shield && ch(name)?.modes.C)), lastSaid: { ...s.lastSaid } };
+            for (const key of bindingFields) delete c[key];
+            Object.assign(c, connectionBinding(identity));
             conns.set(c.id, c);
             for (const name of c.channels) { const room = ch(name); room.members.add(c.id); room.emptySince = null; }
             resumed.push(c.id);
@@ -1088,7 +1143,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             c.cams.clear();
             bot(c, 'Storage is unavailable. Changes are not confirmed; reconnect after administrator recovery.', 'error');
         }
-        pushAdmin();
+        // The public failure notices above remain available. A configured
+        // lifecycle fence has not authorized private evidence after this failure.
+        if (!effectCommitConfigured) pushAdmin();
     }
 
     const handlers = {
@@ -1152,7 +1209,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (target_.kind === 'lobby' && !isBand(c)) return bot(c, 'You can’t part #stalemate, but you can /quit.', 'error');
             return leave(c, target_);
         },
-        quit(c, _chan, args) { kill(c, 1000, participationConfigured ? 'Quit' : normalize(args.join(' '), 80) || 'Quit'); },
+        quit(c, _chan, args) { kill(c, 1000, commitConfigured ? 'Quit' : normalize(args.join(' '), 80) || 'Quit'); },
         nick(c, _chan, [n]) {
             if (now() - c.lastNick < L.nickEvery && !isBand(c)) return bot(c, 'One nick change per minute.', 'error');
             const v = checkNick(n, net.lists, { band: isBand(c) });
@@ -2071,21 +2128,21 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
     function restoreLog(entries = []) { net.modlog = entries.filter((e) => Number.isFinite(e.at) && now() - e.at < LOG_TTL).slice(-L.modlogKeep); }
 
-    const execute = (fn, args, safe = false) => participationConfigured ? controlledRun(fn, args, safe) : durable(fn, args);
-    return { connect: (...args) => participationConfigured ? controlledRun(connect, args) : connect(...args),
+    const execute = (fn, args, safe = false) => commitConfigured ? controlledRun(fn, args, safe) : durable(fn, args);
+    return { connect: (...args) => commitConfigured ? controlledRun(connect, args) : connect(...args),
         disconnect: (...args) => execute(disconnect, args, true), message: (...args) => {
-            if (!participationConfigured) return durable(message, args);
+            if (!commitConfigured) return durable(message, args);
             const c = conns.get(args[0]);
             if (c) { c.frames += 1; spend(1 / 20); if (c.frames > L.framesPerConnection) { closeImpl(c.id, 4429, 'frame cap'); return Promise.resolve({ ok: false, reason: 'frame-cap' }); } }
             return controlledRun(message, [...args, true], safetyMessage(args[1]));
         }, flushPresence,
         transportControlReady, reserveTransportControl: (...args) => execute(reserveTransportControl, args, true),
         completePrivateReportAction: (...args) => execute(completePrivateReportAction, args, true), tick: (...args) => execute(tick, args, false),
-        roomSnapshot, restoreRooms: (...args) => participationConfigured ? controlledRun(restoreRooms, args) : restoreRooms(...args),
+        roomSnapshot, restoreRooms: (...args) => commitConfigured ? controlledRun(restoreRooms, args) : restoreRooms(...args),
         sessionSnapshot, restoreSessions, abuseSnapshot, restoreAbuse, snapshot, restore, restoreLog,
-        restoreModerationQueue: (...args) => participationConfigured ? controlledRun(restoreModerationQueue, args, true) : restoreModerationQueue(...args),
-        restoreAiReviews: (...args) => participationConfigured ? controlledRun(restoreAiReviews, args, true) : restoreAiReviews(...args),
-        applyAiReview: (...args) => participationConfigured ? controlledRun(applyAiReview, args, true) : applyAiReview(...args),
-        refreshParticipation: () => participationConfigured ? controlledRun(refreshParticipationState, [], true) : undefined,
+        restoreModerationQueue: (...args) => commitConfigured ? controlledRun(restoreModerationQueue, args, true) : restoreModerationQueue(...args),
+        restoreAiReviews: (...args) => commitConfigured ? controlledRun(restoreAiReviews, args, true) : restoreAiReviews(...args),
+        applyAiReview: (...args) => commitConfigured ? controlledRun(applyAiReview, args, true) : applyAiReview(...args),
+        refreshParticipation: () => commitConfigured ? controlledRun(refreshParticipationState, [], true) : undefined,
         notifyAiStatus: pushAdmin, adminState, budgetLevel, spend, get modlog() { return net.modlog.slice(); }, _debug: { conns, channels, net, pm, reports, held, lines } };
 }

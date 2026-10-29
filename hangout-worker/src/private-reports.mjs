@@ -122,6 +122,12 @@ async function validState(value, now) {
     return [...ids.values()].every(r => r.status === 'pending' ? records.has(r.id) : !records.has(r.id));
 }
 
+// Server-side migration/recovery validation only; this does not authenticate a
+// reporter, establish membership, initialize a queue or disclose its contents.
+export async function validPrivateReportState(value, now = Date.now()) {
+    try { return await validState(value, now); } catch { return false; }
+}
+
 export function createPrivateReportQueue({ storage, now = () => Date.now(), key = 'private-reports-v1' } = {}) {
     if (!storage || typeof storage.get !== 'function' || typeof storage.put !== 'function'
         || typeof now !== 'function' || typeof key !== 'string' || !/^[a-z0-9-]{1,80}$/.test(key)) throw new TypeError('Private report storage is required');
