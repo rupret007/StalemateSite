@@ -100,6 +100,9 @@ async function main() {
             devAdminKey: process.env.HANGOUT_DEV_ADMIN_KEY || 'local-dev-admin-key-0001',
             origins: origin,
             lobbyLimits: { pmMinLobbyMs: 1500,
+                // Synthetic browser-invitation fixture on this loopback server
+                // only. No production origin or Web Join provider is enabled.
+                ...(namespace.startsWith('webjam-browser-') ? { webJoinOrigins: ['https://webjam.example'] } : {}),
                 // Explicit loopback-only partner fixture. Never added to the
                 // production registry or enabled by a visitor query parameter.
                 ...(namespace.startsWith('shared-community-') ? { entrySites: createEntrySiteRegistry([{ id: 'makers', label: 'Makers & Friends' }]) } : {}) }

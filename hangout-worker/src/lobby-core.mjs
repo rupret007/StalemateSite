@@ -1707,7 +1707,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (!v) return bot(c, which === 'web' ? 'Browser joining is not configured for this beta.' : 'Paste the complete message from WebJam’s Copy Invite into the room’s invitation box (maximum 8 KB).', 'error');
             if (which === 'web') chan.jam.web = v;
             else { chan.jam.invitation = v; chan.jam.desktop = validWebjamInvite(v); }
-            event(chan, `${c.nick} shared a WebJam ${which === 'web' ? 'browser' : 'desktop'} invitation. Copy the full invitation into WebJam’s Join screen. Ethernet beats Wi-Fi.`);
+            event(chan, which === 'web'
+                ? `${c.nick} shared a WebJam browser invitation. Use Join in browser; headphones required. Browser audio has higher delay.`
+                : `${c.nick} shared a WebJam desktop invitation. Copy the full invitation into WebJam’s Join screen. Ethernet beats Wi-Fi.`);
             log(c.nick, 'jamlink', chan.name, which === 'web' ? 'web' : 'desktop', chan.name);
             return sendChan(chan);
         },
