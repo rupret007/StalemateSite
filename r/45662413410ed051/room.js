@@ -686,6 +686,7 @@
         youtube.cancel(); player.yt = null;
         ui.file.pause(); ui.file.removeAttribute('src'); ui.file.load();
         player.kind = null; player.currentKey = ''; player.readyKey = ''; player.failedKey = ''; player.autoplayBlocked = false;
+        player.seenPlaying = false; player.playPending = false;
         ui.videoStatus.hidden = true; ui.videoStatus.textContent = '';
         ui.tap.hidden = true;
         ui.log.replaceChildren(); ui.tiles.replaceChildren(); ui.text.value = ''; ui.url.value = '';
@@ -1243,7 +1244,7 @@
     });
 
     /* ---------------- synced video (host drives) ---------------- */
-    const player = { kind: null, yt: null, loading: null, applying: 0, currentKey: '', readyKey: '', failedKey: '', autoplayBlocked: false };
+    const player = { kind: null, yt: null, loading: null, applying: 0, currentKey: '', readyKey: '', failedKey: '', autoplayBlocked: false, seenPlaying: false, playPending: false };
     let videoPublishTimer;
     const youtube = win.HangoutYouTube.create({
         getElement: () => ui.yt, setElement: (element) => { ui.yt = element; },
@@ -1254,6 +1255,7 @@
     function videoFailure(key) {
         if (app.ended || player.currentKey !== key || player.kind !== 'yt') return;
         player.yt = null; player.readyKey = ''; player.failedKey = key; player.autoplayBlocked = false;
+        player.seenPlaying = false; player.playPending = false;
         ui.videoStatus.textContent = 'YouTube couldn’t load. Retry video when you’re ready.';
         ui.videoStatus.hidden = false;
         ui.tap.textContent = 'Retry video'; ui.tap.hidden = false;
@@ -1272,6 +1274,7 @@
         player.currentKey = key;
         player.readyKey = ''; player.failedKey = ''; player.loading = null;
         player.autoplayBlocked = false;
+        player.seenPlaying = false; player.playPending = false;
         ui.tap.hidden = true; ui.tap.textContent = 'Tap to sync in';
         ui.videoStatus.hidden = true; ui.videoStatus.textContent = '';
         player.kind = source.kind;
@@ -1321,11 +1324,11 @@
         hold(() => {
             let p;
             if (player.kind === 'file') p = ui.file.play();
-            else if (player.yt) player.yt.playVideo();
+            else if (player.yt) { player.playPending = true; player.yt.playVideo(); }
             if (p && p.catch) p.catch(() => { ui.tap.hidden = false; });
         });
     }
-    function pauseLocal() { hold(() => { if (player.kind === 'file') ui.file.pause(); else if (player.yt) player.yt.pauseVideo(); }); }
+    function pauseLocal() { hold(() => { player.playPending = false; if (player.kind === 'file') ui.file.pause(); else if (player.yt) player.yt.pauseVideo(); }); }
 
     async function acceptVideo(signed, t) {
         if (app.ended) return;
@@ -1354,7 +1357,7 @@
         if (!app.connected) return;
         if (!app.isHost) return syncToState(false);
         const v = app.state.video;
-        if (!v || !player.kind || player.autoplayBlocked || player.readyKey !== `${v.source.kind}:${v.source.id}` || Date.now() < player.applying) return;
+        if (!v || !player.kind || (player.kind === 'yt' && !player.seenPlaying && v.playing) || player.autoplayBlocked || player.readyKey !== `${v.source.kind}:${v.source.id}` || Date.now() < player.applying) return;
         // Paused YouTube scrubs can omit onStateChange. Host authority still
         // travels through hostPublish's signed, sequenced video message.
         if (localPlaying() !== v.playing || H.needsCorrection(localTime(), H.expectedPosition(v, app.clock.relayNow()))) {
@@ -1393,7 +1396,7 @@
     }
 
     function onLocalChange() {
-        if (!app.connected || !app.isHost || !app.state.video || player.autoplayBlocked) return;
+        if (!app.connected || !app.isHost || !app.state.video || player.autoplayBlocked || (player.kind === 'yt' && !player.seenPlaying && app.state.video.playing)) return;
         const v = app.state.video;
         if (player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
         const playing = localPlaying();
@@ -1406,7 +1409,7 @@
     }
     function onYtAutoplayBlocked() {
         const v = app.state.video;
-        if (app.ended || player.kind !== 'yt' || localPlaying() || !v?.playing || v.source.kind !== 'yt'
+        if (app.ended || player.kind !== 'yt' || !player.playPending || localPlaying() || !v?.playing || v.source.kind !== 'yt'
             || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
         // YouTube playVideo() returns void; policy denial is a separate event.
         // Keep the shared play request until a real user gesture starts playback.
@@ -1414,11 +1417,14 @@
         ui.tap.hidden = false;
     }
     function onYtState(event) {
-        if (app.ended) return;
-        if (event.data === 1 && player.kind === 'yt') { player.autoplayBlocked = false; ui.tap.hidden = true; }
+        if (app.ended || player.kind !== 'yt' || event.target !== player.yt || event.data !== player.yt?.getPlayerState()) return;
+        if (event.data === 1) { player.seenPlaying = true; player.playPending = false; player.autoplayBlocked = false; ui.tap.hidden = true; }
         if (event.data !== 1 && event.data !== 2) return;
         clearTimeout(videoPublishTimer);
-        videoPublishTimer = win.setTimeout(onLocalChange, 100);
+        const instance = player.yt, key = player.readyKey;
+        videoPublishTimer = win.setTimeout(() => {
+            if (!app.ended && player.yt === instance && player.readyKey === key) onLocalChange();
+        }, 100);
     }
     ['play', 'pause', 'seeked'].forEach((e) => ui.file.addEventListener(e, onLocalChange));
     ui.tap.addEventListener('click', () => { if (player.kind !== 'yt') ui.tap.hidden = true; syncToState(true, true); });
