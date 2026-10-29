@@ -24,6 +24,15 @@ async transaction; it does not supply production authority or activate the
 adapter in `lobby-do.mjs`. Its real local SQLite transaction/restart tests are a
 separate scope from Cloudflare runtime, hosted session revocation and migration.
 
+The subsequent [local workerd qualification](../tests/runtime/durable-records/README.md)
+runs that same production-source codec inside a real local SQLite Durable
+Object. Recorded macOS ARM64 results cover native async transactions, eight
+concurrent callers, whole-runtime termination and full multichunk recovery.
+The original oversized-value negative control failed because this local runtime
+accepted 3 MiB; its evidence remains unchanged and hosted size-limit enforcement
+is unqualified. No production adapter, authority, namespace, migration, key,
+deployment or review/release control is activated by this test-only continuation.
+
 The older dependency tables and API-pause statements below retain their dated
 historical scope. They are a source trail, not a statement that those changes
 are still unpublished or that a shared API pause remains in effect.

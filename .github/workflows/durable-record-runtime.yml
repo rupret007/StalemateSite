@@ -1,0 +1,91 @@
+name: Local Durable Object runtime
+
+on:
+  push:
+    paths:
+      - '.github/workflows/durable-record-runtime.yml'
+      - 'hangout-worker/src/durable-record-storage.mjs'
+      - 'tests/runtime/durable-records/**'
+      - 'package.json'
+  pull_request:
+    paths:
+      - '.github/workflows/durable-record-runtime.yml'
+      - 'hangout-worker/src/durable-record-storage.mjs'
+      - 'tests/runtime/durable-records/**'
+      - 'package.json'
+
+permissions:
+  contents: read
+
+jobs:
+  durable-record-runtime:
+    name: Local workerd mapping and crash recovery
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out exact workflow commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: tests/runtime/durable-records/package-lock.json
+
+      - name: Record source and runtime identity
+        shell: bash
+        run: |
+          mkdir -p runtime-proof-artifacts
+          git rev-parse HEAD > runtime-proof-artifacts/commit.txt
+          node --version > runtime-proof-artifacts/node-version.txt
+          sha256sum .github/workflows/durable-record-runtime.yml package.json tests/runtime/durable-records/package.json tests/runtime/durable-records/package-lock.json tests/runtime/durable-records/runner.mjs tests/runtime/durable-records/worker.mjs hangout-worker/src/durable-record-storage.mjs > runtime-proof-artifacts/source-sha256.txt
+
+      - name: Install only the isolated locked runtime tools
+        shell: bash
+        run: |
+          set +e
+          npm ci --ignore-scripts --no-audit --no-fund --prefix tests/runtime/durable-records > runtime-proof-artifacts/install.stdout.log 2> runtime-proof-artifacts/install.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/install.stdout.log
+          cat runtime-proof-artifacts/install.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/install.exit-code.txt
+          exit "$status"
+
+      - name: Audit the isolated runtime dependency graph
+        shell: bash
+        run: |
+          set +e
+          npm audit --json --audit-level=low --prefix tests/runtime/durable-records > runtime-proof-artifacts/audit.json 2> runtime-proof-artifacts/audit.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/audit.json
+          cat runtime-proof-artifacts/audit.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/audit.exit-code.txt
+          exit "$status"
+
+      - name: Prove local mapping and whole-runtime crash recovery
+        shell: bash
+        run: |
+          set +e
+          npm run test:durable-runtime > runtime-proof-artifacts/runtime.stdout.log 2> runtime-proof-artifacts/runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/runtime.stdout.log
+          cat runtime-proof-artifacts/runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/runtime.exit-code.txt
+          exit "$status"
+
+      - name: Preserve source-bound runtime diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: durable-record-runtime-${{ github.run_id }}-${{ github.run_attempt }}
+          path: runtime-proof-artifacts/
+          if-no-files-found: warn
+          retention-days: 7

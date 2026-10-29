@@ -73,6 +73,19 @@ installation, legal retention policy or production transaction latency. Chunking
 still materializes a whole bounded logical record; it is not a new I1 partition
 design, heap measurement or single-room scaling result.
 
+A separate [local workerd fixture](../tests/runtime/durable-records/README.md)
+now exercises the actual codec in a SQLite-backed Durable Object using native
+asynchronous transactions. The recorded macOS ARM64 run checks chunk rollback,
+caught-error poisoning, eight concurrent callers and recovery after SIGKILL of
+the owned Node/workerd group. It recovers a full 3,355,494-byte record across
+52 chunks and verifies committed/aborted state in fresh runtime processes.
+These checks establish local mapping behavior, not callback-retry occurrence,
+hosted replication, PITR, authority or production recovery. The pinned local
+runtime accepted a raw 3 MiB single value: the original rejection-control failure
+is retained, and hosted limit qualification remains explicitly false. There is
+no synthetic native cap or production limit change. The isolated runtime CI
+uses its own locked development dependencies and does not modify deployment CI.
+
 Production `lobby-do.mjs` remains on its existing persistence path. Before any
 activation the receiving owner must supply trusted transaction-local sessions,
 consent/guardian and incident authority, keys and backup recovery, explicit

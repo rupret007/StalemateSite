@@ -12,6 +12,7 @@
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
+    "test:durable-runtime": "npm --prefix tests/runtime/durable-records test",
     "test:install-browsers": "playwright install chromium webkit"
   },
   "devDependencies": {
