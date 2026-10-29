@@ -14,6 +14,7 @@
     "test:e2e": "playwright test",
     "test:durable-runtime": "npm --prefix tests/runtime/durable-records test",
     "test:beta-runtime": "node tests/runtime/beta-sessions/runner.mjs",
+    "test:lobby-runtime": "node tests/runtime/lobby-effects/runner.mjs",
     "test:install-browsers": "playwright install chromium webkit"
   },
   "devDependencies": {

@@ -5,16 +5,26 @@ on:
     paths:
       - '.github/workflows/durable-record-runtime.yml'
       - 'hangout-worker/src/**'
+      - 'hangout-worker/wrangler.beta.toml'
       - 'tests/runtime/durable-records/**'
       - 'tests/runtime/beta-sessions/**'
+      - 'tests/runtime/lobby-effects/**'
+      - 'r/45662413410ed051/sync-core.js'
+      - 'r/45662413410ed051/entry-sites.mjs'
       - 'package.json'
+      - 'package-lock.json'
   pull_request:
     paths:
       - '.github/workflows/durable-record-runtime.yml'
       - 'hangout-worker/src/**'
+      - 'hangout-worker/wrangler.beta.toml'
       - 'tests/runtime/durable-records/**'
       - 'tests/runtime/beta-sessions/**'
+      - 'tests/runtime/lobby-effects/**'
+      - 'r/45662413410ed051/sync-core.js'
+      - 'r/45662413410ed051/entry-sites.mjs'
       - 'package.json'
+      - 'package-lock.json'
 
 permissions:
   contents: read
@@ -37,7 +47,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: tests/runtime/durable-records/package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            tests/runtime/durable-records/package-lock.json
 
       - name: Record source and runtime identity
         shell: bash
@@ -48,7 +60,11 @@ jobs:
           sha256sum .github/workflows/durable-record-runtime.yml package.json tests/runtime/durable-records/package.json tests/runtime/durable-records/package-lock.json tests/runtime/durable-records/runner.mjs tests/runtime/durable-records/worker.mjs hangout-worker/src/durable-record-storage.mjs \
             tests/runtime/beta-sessions/runner.mjs tests/runtime/beta-sessions/worker.mjs \
             hangout-worker/src/beta-sessions.mjs hangout-worker/src/beta-session-state.mjs hangout-worker/src/core.mjs hangout-worker/src/beta-session-client.mjs \
-            hangout-worker/src/beta-ops.mjs hangout-worker/src/beta-auth.mjs hangout-worker/src/ai-eligibility.mjs hangout-worker/src/auth.mjs > runtime-proof-artifacts/source-sha256.txt
+            hangout-worker/src/beta-ops.mjs hangout-worker/src/beta-auth.mjs hangout-worker/src/ai-eligibility.mjs hangout-worker/src/auth.mjs \
+            package-lock.json tests/runtime/lobby-effects/runner.mjs tests/runtime/lobby-effects/worker.mjs \
+            hangout-worker/wrangler.beta.toml hangout-worker/src/lobby-effect-records.mjs hangout-worker/src/lobby-core.mjs \
+            hangout-worker/src/community-state.mjs hangout-worker/src/filter.mjs hangout-worker/src/lobby-act.mjs hangout-worker/src/message-receipts.mjs \
+            hangout-worker/src/transport-budget.mjs hangout-worker/src/participation-checkpoint.mjs r/45662413410ed051/sync-core.js r/45662413410ed051/entry-sites.mjs > runtime-proof-artifacts/source-sha256.txt
 
       - name: Install only the isolated locked runtime tools
         shell: bash
@@ -74,6 +90,30 @@ jobs:
           printf '%s\n' "$status" > runtime-proof-artifacts/audit.exit-code.txt
           exit "$status"
 
+      - name: Install the existing locked application bundler dependencies
+        shell: bash
+        run: |
+          set +e
+          npm ci --ignore-scripts --no-audit --no-fund > runtime-proof-artifacts/app-install.stdout.log 2> runtime-proof-artifacts/app-install.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/app-install.stdout.log
+          cat runtime-proof-artifacts/app-install.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/app-install.exit-code.txt
+          exit "$status"
+
+      - name: Audit the application bundler dependency graph
+        shell: bash
+        run: |
+          set +e
+          npm audit --json --audit-level=low > runtime-proof-artifacts/app-audit.json 2> runtime-proof-artifacts/app-audit.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/app-audit.json
+          cat runtime-proof-artifacts/app-audit.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/app-audit.exit-code.txt
+          exit "$status"
+
       - name: Prove local mapping and whole-runtime crash recovery
         shell: bash
         run: |
@@ -96,6 +136,18 @@ jobs:
           cat runtime-proof-artifacts/beta-runtime.stdout.log
           cat runtime-proof-artifacts/beta-runtime.stderr.log >&2
           printf '%s\n' "$status" > runtime-proof-artifacts/beta-runtime.exit-code.txt
+          exit "$status"
+
+      - name: Prove real Lobby effects and fresh runtime recovery
+        shell: bash
+        run: |
+          set +e
+          npm run test:lobby-runtime > runtime-proof-artifacts/lobby-runtime.stdout.log 2> runtime-proof-artifacts/lobby-runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/lobby-runtime.stdout.log
+          cat runtime-proof-artifacts/lobby-runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/lobby-runtime.exit-code.txt
           exit "$status"
 
       - name: Preserve source-bound runtime diagnostics
