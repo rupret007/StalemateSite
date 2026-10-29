@@ -5,6 +5,12 @@ application source is not a claim that the current hosted beta contains it.
 The receiving website/release session must identify the matching approved
 Worker, assets and canonical address before inviting Che to that version.
 
+The finished Che demo includes **live WebJam music with verified two-way
+audio**, as well as the browser community. The five-minute visitor journey
+below is one part of acceptance. Follow the [music acceptance plan](HANGOUT_MUSIC_DEMO_ACCEPTANCE.md)
+for the ARM Mac mini, Intel/x86 MacBook Pro and Windows PC; keep the original
+Linux requirements too. Audio remains opt-in for each participant.
+
 ## Choose the environment
 
 For a local dry run, use the repository's existing dependencies and run:
