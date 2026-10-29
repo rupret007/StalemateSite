@@ -4,14 +4,16 @@ on:
   push:
     paths:
       - '.github/workflows/durable-record-runtime.yml'
-      - 'hangout-worker/src/durable-record-storage.mjs'
+      - 'hangout-worker/src/**'
       - 'tests/runtime/durable-records/**'
+      - 'tests/runtime/beta-sessions/**'
       - 'package.json'
   pull_request:
     paths:
       - '.github/workflows/durable-record-runtime.yml'
-      - 'hangout-worker/src/durable-record-storage.mjs'
+      - 'hangout-worker/src/**'
       - 'tests/runtime/durable-records/**'
+      - 'tests/runtime/beta-sessions/**'
       - 'package.json'
 
 permissions:
@@ -43,7 +45,10 @@ jobs:
           mkdir -p runtime-proof-artifacts
           git rev-parse HEAD > runtime-proof-artifacts/commit.txt
           node --version > runtime-proof-artifacts/node-version.txt
-          sha256sum .github/workflows/durable-record-runtime.yml package.json tests/runtime/durable-records/package.json tests/runtime/durable-records/package-lock.json tests/runtime/durable-records/runner.mjs tests/runtime/durable-records/worker.mjs hangout-worker/src/durable-record-storage.mjs > runtime-proof-artifacts/source-sha256.txt
+          sha256sum .github/workflows/durable-record-runtime.yml package.json tests/runtime/durable-records/package.json tests/runtime/durable-records/package-lock.json tests/runtime/durable-records/runner.mjs tests/runtime/durable-records/worker.mjs hangout-worker/src/durable-record-storage.mjs \
+            tests/runtime/beta-sessions/runner.mjs tests/runtime/beta-sessions/worker.mjs \
+            hangout-worker/src/beta-sessions.mjs hangout-worker/src/beta-session-state.mjs hangout-worker/src/core.mjs hangout-worker/src/beta-session-client.mjs \
+            hangout-worker/src/beta-ops.mjs hangout-worker/src/beta-auth.mjs hangout-worker/src/ai-eligibility.mjs hangout-worker/src/auth.mjs > runtime-proof-artifacts/source-sha256.txt
 
       - name: Install only the isolated locked runtime tools
         shell: bash
@@ -79,6 +84,18 @@ jobs:
           cat runtime-proof-artifacts/runtime.stdout.log
           cat runtime-proof-artifacts/runtime.stderr.log >&2
           printf '%s\n' "$status" > runtime-proof-artifacts/runtime.exit-code.txt
+          exit "$status"
+
+      - name: Prove actual beta session rollback and bounded cleanup
+        shell: bash
+        run: |
+          set +e
+          npm run test:beta-runtime > runtime-proof-artifacts/beta-runtime.stdout.log 2> runtime-proof-artifacts/beta-runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/beta-runtime.stdout.log
+          cat runtime-proof-artifacts/beta-runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/beta-runtime.exit-code.txt
           exit "$status"
 
       - name: Preserve source-bound runtime diagnostics
