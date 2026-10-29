@@ -54,7 +54,6 @@
 
         function teardown() {
             roomGeneration += 1; captureVersion += 1;
-            cancelStroke();
             clearTimeout(videoPublishTimer);
             turnClient?.stop(); turnClient = null; turnInit = null; state.ice = null;
             ui.relayStatus.textContent = '';
@@ -130,9 +129,8 @@
         }
 
         function onAct(m) {
-            // A late frame cannot re-establish a room which was left, revoked
-            // or torn down while navigation/session state was changing.
-            if (!m.ch || m.ch !== app.active || m.ch !== state.ch) return;
+            if (!m.ch || m.ch !== app.active) return;
+            if (state.ch !== m.ch) state.ch = m.ch;
             if (Number.isFinite(m.ts)) state.clock.sample(m.ts);
             if (m.kind === 'stroke' && m.from !== state.myId && H.apply(state.room, { type: 'stroke', stroke: m.stroke }) === 'draw') {
                 const s = state.room.strokes.find((x) => x.id === m.stroke.id);
@@ -150,12 +148,6 @@
         }
 
         /* ---- canvas ---- */
-        const paintActive = () => !!state.ch && state.ch === app.active && ['art', 'bobross'].includes(state.kind);
-        const currentStroke = () => live && paintActive() && live.channel === state.ch && live.generation === roomGeneration;
-        function cancelStroke() {
-            clearTimeout(flushTimer); flushTimer = 0; live = null; pendingPts = [];
-        }
-
         function setupCanvas() {
             if (!ui.swatches.dataset.ready) {
                 ui.swatches.dataset.ready = '1';
@@ -190,13 +182,8 @@
                     const t = e.touches ? e.touches[0] : e;
                     return [(t.clientX - r.left) / r.width, (t.clientY - r.top) / r.height];
                 };
-                const down = (e) => {
-                    if (!paintActive() || e.type === 'mousedown' && e.button !== 0) return;
-                    e.preventDefault(); cancelStroke();
-                    live = { id: `s${Date.now().toString(36)}`, color: ui.swatches.dataset.color, size: 8, pts: [], channel: state.ch, generation: roomGeneration };
-                    addPt(...pos(e));
-                };
-                const move = (e) => { if (!currentStroke()) { cancelStroke(); return; } e.preventDefault(); addPt(...pos(e)); };
+                const down = (e) => { e.preventDefault(); live = { id: `s${Date.now().toString(36)}`, color: ui.swatches.dataset.color, size: 8, pts: [] }; pendingPts = []; addPt(...pos(e)); };
+                const move = (e) => { if (!live) return; e.preventDefault(); addPt(...pos(e)); };
                 const up = () => { if (!live) return; flushStroke(); live = null; };
                 ui.canvas.addEventListener('mousedown', down);
                 ui.canvas.addEventListener('mousemove', move);
@@ -205,7 +192,6 @@
                 ui.canvas.addEventListener('touchstart', down, { passive: false });
                 ui.canvas.addEventListener('touchmove', move, { passive: false });
                 ui.canvas.addEventListener('touchend', up);
-                ui.canvas.addEventListener('touchcancel', () => { cancelStroke(); redraw(); });
             }
             redraw();
         }
@@ -217,18 +203,14 @@
             pendingPts.push([px, py]);
             drawStroke(live, Math.max(0, live.pts.length - 2));
             if (pendingPts.length >= 16) flushStroke();
-            else if (!flushTimer) {
-                const stroke = live;
-                flushTimer = window.setTimeout(() => { if (live === stroke) flushStroke(); }, 80);
-            }
+            else if (!flushTimer) flushTimer = window.setTimeout(flushStroke, 80);
         }
 
         function flushStroke() {
             clearTimeout(flushTimer);
             flushTimer = 0;
-            if (!currentStroke()) { cancelStroke(); return; }
-            if (!pendingPts.length) return;
-            send({ t: 'act', ch: live.channel, kind: 'stroke', stroke: { id: live.id, color: live.color, size: live.size, pts: pendingPts } });
+            if (!live || !pendingPts.length) return;
+            actSend({ kind: 'stroke', stroke: { id: live.id, color: live.color, size: live.size, pts: pendingPts } });
             H.apply(state.room, { type: 'stroke', stroke: { id: live.id, color: live.color, size: live.size, pts: pendingPts } });
             pendingPts = [];
         }
@@ -451,24 +433,19 @@
         }
 
         function openPc(id) {
-            if (!state.ch || state.ch !== app.active || state.pcs.has(id) || id === state.myId) return;
-            const channel = state.ch, generation = roomGeneration;
+            if (state.pcs.has(id) || id === state.myId) return;
             const pc = new RTCPeerConnection({ iceServers: state.ice || STUN });
             const polite = (state.myId || '') > id;
             const entry = { pc, polite, makingOffer: false, ignoreOffer: false, pendingIce: [], stream: new MediaStream() };
-            entry.current = () => generation === roomGeneration && state.ch === channel && app.active === channel && state.pcs.get(id) === entry;
-            entry.signal = message => { if (entry.current()) send({ t: 'act', ch: channel, kind: 'rtc', to: id, ...message }); };
             state.pcs.set(id, entry);
-            pc.onicecandidate = (e) => { if (entry.current() && e.candidate) entry.signal({ ice: e.candidate.toJSON() }); };
-            pc.ontrack = (e) => { if (!entry.current()) { e.track.stop(); return; } entry.stream.addTrack(e.track); layoutTiles(); };
+            pc.onicecandidate = (e) => { if (e.candidate) actSend({ kind: 'rtc', to: id, ice: e.candidate.toJSON() }); };
+            pc.ontrack = (e) => { entry.stream.addTrack(e.track); layoutTiles(); };
             pc.onnegotiationneeded = async () => {
                 try {
-                    if (!entry.current()) return;
                     entry.makingOffer = true;
                     const offer = await pc.createOffer();
-                    if (!entry.current()) return;
                     await pc.setLocalDescription(offer);
-                    if (entry.current()) entry.signal({ sdp: pc.localDescription.toJSON() });
+                    actSend({ kind: 'rtc', to: id, sdp: pc.localDescription.toJSON() });
                 } catch (e) { /* */ } finally { entry.makingOffer = false; }
             };
             if (state.stream) state.stream.getTracks().forEach((t) => pc.addTrack(t, state.stream));
@@ -480,7 +457,7 @@
         async function onRtc(from, msg) {
             if (!state.pcs.has(from)) openPc(from);
             const entry = state.pcs.get(from);
-            if (!entry?.current()) return;
+            if (!entry) return;
             const pc = entry.pc;
             try {
                 if (msg.sdp) {
@@ -488,16 +465,13 @@
                     entry.ignoreOffer = collision && !entry.polite;
                     if (entry.ignoreOffer) return;
                     await pc.setRemoteDescription(msg.sdp);
-                    if (!entry.current()) return;
                     for (const ice of entry.pendingIce.splice(0)) {
                         try { await pc.addIceCandidate(ice); } catch (_) { /* stale negotiation */ }
-                        if (!entry.current()) return;
                     }
                     if (msg.sdp.type === 'offer') {
                         const answer = await pc.createAnswer();
-                        if (!entry.current()) return;
                         await pc.setLocalDescription(answer);
-                        if (entry.current()) entry.signal({ sdp: pc.localDescription.toJSON() });
+                        actSend({ kind: 'rtc', to: from, sdp: pc.localDescription.toJSON() });
                     }
                 } else if (msg.ice) {
                     if (!pc.remoteDescription) { if (entry.pendingIce.length < 64) entry.pendingIce.push(msg.ice); }
@@ -508,13 +482,8 @@
 
         function closePc(id) {
             const e = state.pcs.get(id);
+            if (e) e.pc.close();
             state.pcs.delete(id);
-            if (e) {
-                e.pc.onicecandidate = null; e.pc.ontrack = null; e.pc.onnegotiationneeded = null;
-                e.pendingIce.length = 0;
-                e.stream.getTracks().forEach(track => track.stop());
-                e.pc.close();
-            }
             layoutTiles();
         }
 
