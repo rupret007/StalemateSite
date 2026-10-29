@@ -4,7 +4,53 @@ Updated October 28, 2026. Goal active: finish the application for a private Che
 demonstration and website integration. This is an application checkpoint, not
 deployment approval or a claim that the live beta contains these changes.
 
-## Source composition
+## Current assembly: one source for the receiving website session
+
+Branch: **`codex/che-demo-candidate`**. This local application assembly merges
+these inputs cleanly and updates the handoff; it does not merge GitHub PRs or
+authorize deployment. Preserve the input branches and all 62 original outcomes.
+
+| Input | Exact revision | Included work |
+| --- | --- | --- |
+| PR162 | `772451673574178409725994f0f5a7eea6905662` | Visible desktop/browser music invitation sharing, immediate local Stop/cached-action retirement; includes PR159 and PR161 |
+| PR160 | `24c362065df13aff4f6bd243c9ee6c295bd09748` | Five-client real TCP-loss recovery probe and its scope contract |
+
+Evidence remains attached to the revision actually exercised:
+
+- Physical Intel MacBook, macOS15.7.9/Chrome156: source `0705d8e` passed 155
+  focused units/3 files and 12 selected browser journeys. Fresh 375/390px images
+  were inspected. Temporary software, processes and the exact test key were
+  removed. This is browser/loopback proof, with synthetic own-status HTTP and an
+  intercepted Web Join destination; it is not physical music or hosted sign-in.
+- That source's full site CI passed 1,857 units and 410 browser cases; one existing
+  case failed because the copy changed “using Jamulus” to “running Jamulus.”
+  `7724516` restores the expected phrase without changing the assertion.
+- Its native CI run 40772528981 passed ten existing proof groups/seven session
+  modes at checkout `d341113ff7e08d2e40a6c33b2674e77ba3af87e4`, whose tree
+  equals `0705d8e`. All 51 recorded/68 compiled inputs matched in both stages.
+  This is Linux workerd/SQLite evidence. The eighth provider-start mode has not
+  been observed in CI; its workflow remains the core owner's dependency.
+- PR160's exact-source site CI passed 1,857 units/408 browser cases, including the
+  five-client probe. Its earlier CSP fixture failure remains preserved. This
+  assembly must run that probe alongside the new music handoff cases.
+
+Music is still required and unverified. The historical Intel package `5effbc58`
+passed hash/architecture/signature inspection, but macOS refused its transport
+launch with EPERM; no trust override or audio run followed. Windows remains
+unsigned. The browser page matches WebJam source `4263e1f9` with one private-beta
+robots-meta addition. Its beta route deliberately returns 503 when participation
+enforcement is enabled; an allowed browser-link origin alone does not qualify
+that route. Preserve these guards, AI/TURN/vault pauses and release holds.
+
+Next: qualify this assembly's actual CI and normal current-head Karen; supply
+the exact approved source to StoryPool 10-21-26 for matched packaging/deployment;
+observe both real website entrances, moderator review and the required live
+music matrix. Local results and a green badge do not complete that handoff.
+Use [website integration](HANGOUT_WEBSITE_INTEGRATION.md),
+[browser invitation sharing](HANGOUT_BROWSER_INVITATION_HANDOFF.md) and
+[required music acceptance](HANGOUT_MUSIC_DEMO_ACCEPTANCE.md).
+
+## Previous source composition (PR158)
 
 Branch: `codex/webjam-demo-readiness`. The application merge commit before this
 documentation update is `b713cadf0e7a570454eddbbc6f9054d93514917b`.

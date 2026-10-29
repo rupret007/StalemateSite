@@ -121,6 +121,12 @@ visitor chooses **Copy full WebJam invitation**, opens WebJam, selects Join and
 pastes it. This website handoff does not establish a successful native audio
 session.
 
+When the release owner has qualified Web Join, the host can instead paste
+**Copy web invite** into the same box; the visitor explicitly chooses **Join in
+browser**. Follow [browser invitation sharing](HANGOUT_BROWSER_INVITATION_HANDOFF.md).
+An enabled link does not establish supported participation permissions, issuer
+readiness or audio. Keep an unsupported audio route disabled.
+
 If a guest or verified owner's session expires or is revoked, **Session ended**
 replaces automatic retries. The beta offers **Return to invitation** through its
 existing admission page; room owners then verify their email again. A refused
