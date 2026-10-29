@@ -89,6 +89,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     $('[data-chat-announcements]').addEventListener('change', (event) => announcements.setEnabled(event.currentTarget.checked));
     let belowFold = 0;
     let roomApi = null;
+    let jamContext = null;
     function room() {
         if (!roomApi && window.LobbyRoom) {
             roomApi = window.LobbyRoom.attach({ app, send, $, previewKey, turnUrl, isLocal, params });
@@ -166,6 +167,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     let connectionAttempt = 0;
     function setConnection(state) {
         connectionState = state;
+        if (state !== 'connected') clearJamInvitations();
         const label = { offline: 'Offline', connecting: 'Connecting…', reconnecting: 'Reconnecting…', connected: 'Connected' }[state];
         $('[data-connection]').textContent = label;
         $('[data-connection]').dataset.state = state;
@@ -390,7 +392,19 @@ import { createEntrySharing } from './entry-sharing.mjs';
         case 'pm': { const other = m.from === app.me ? m.to : m.from; openPm(other, false); pushLine(`pm:${other}`, { ...m, ch: `pm:${other}` }); break; }
         case 'pm-setting': $('[data-pm-off]').checked = m.off; toast(m.text); break;
         case 'invite': toast(`${m.by} invited you to ${m.ch}`, [['Join', () => cmd('join', [m.ch])]]); break;
-        case 'kicked': app.kicked = m.ch === '#stalemate'; toast(`${m.banned ? 'Banned' : 'Kicked'} from ${m.ch} by ${m.by}: ${m.reason}`); if (app.kicked) { $('[data-gate]').hidden = false; $('[data-app]').hidden = true; gateStatus(`You got the boot (${m.reason}). Take a breather.`); } break;
+        case 'kicked': {
+            app.kicked = m.ch === '#stalemate';
+            toast(`${m.banned ? 'Banned' : 'Kicked'} from ${m.ch} by ${m.by}: ${m.reason}`);
+            if (app.kicked) {
+                clearJamInvitations();
+                $('[data-gate]').hidden = false; $('[data-app]').hidden = true; gateStatus(`You got the boot (${m.reason}). Take a breather.`);
+            } else {
+                app.chans.delete(m.ch);
+                if (app.active === m.ch) switchTo('#stalemate');
+                drawTabs();
+            }
+            break;
+        }
         case 'cam': {
             const c = app.chans.get(m.ch);
             if (c) c.myCam = m.on;
@@ -545,6 +559,49 @@ import { createEntrySharing } from './entry-sharing.mjs';
     });
 
     const amOp = (c) => app.band || (c && c.names && c.names.some((n) => n.nick === app.me && n.prefix === '@'));
+    function resetJamControls() {
+        $('[data-jam]').hidden = true;
+        const desktop = $('[data-jam-desktop]'); desktop.hidden = true; desktop.removeAttribute('href');
+        $('[data-jam-copy]').hidden = true;
+        $('[data-jam-copy-fallback]').hidden = true; $('[data-jam-copy-value]').value = '';
+        $('[data-jam-link]').value = ''; $('[data-jam-form]').hidden = true;
+        $('[data-jam-wait]').hidden = false;
+        const web = $('[data-jam-web]'); web.disabled = true; web.onclick = null; web.textContent = 'Browser join unavailable';
+    }
+    function clearJamInvitations() {
+        // A disconnected tab has no current room admission. Purge cached
+        // capabilities too, so selecting an old tab cannot reveal them again.
+        for (const c of app.chans.values()) if (c.kind === 'jam') c.jam = null;
+        jamContext = null;
+        resetJamControls();
+    }
+    function currentJam() {
+        const c = app.chans.get(app.active);
+        return connectionState === 'connected' && c?.kind === 'jam' && c.names?.some(n => n.nick === app.me) ? c : null;
+    }
+    function drawJam() {
+        const c = currentJam();
+        const next = c ? { room: c, host: !!amOp(c), invitation: c.jam?.invitation || c.jam?.desktop || '',
+            desktop: c.jam?.desktop || '', web: c.jam?.web || '', webReady: c.jam?.webReady === true } : null;
+        const unchanged = jamContext && next && Object.keys(next).every(key => next[key] === jamContext[key]);
+        // The shared host editor belongs to one room and current authority.
+        // Presence redraws keep it; switching, replacement or power loss clears it.
+        if (!unchanged) { resetJamControls(); jamContext = next; }
+        if (!next) return;
+        $('[data-jam]').hidden = false; $('[data-jam-form]').hidden = !next.host;
+        const desktop = $('[data-jam-desktop]');
+        desktop.hidden = !next.desktop;
+        if (/^webjam:\/\//.test(next.desktop)) desktop.setAttribute('href', next.desktop);
+        else desktop.removeAttribute('href');
+        $('[data-jam-wait]').hidden = !!next.invitation; $('[data-jam-copy]').hidden = !next.invitation;
+        const web = $('[data-jam-web]'); web.disabled = !next.webReady;
+        web.textContent = web.disabled ? 'Browser join unavailable' : 'Join in browser (higher delay)';
+        const context = jamContext;
+        web.onclick = () => {
+            if (jamContext === context && currentJam() === context.room && context.webReady && /^https:\/\//.test(context.web))
+                window.open(context.web, '_blank', 'noopener,noreferrer');
+        };
+    }
     function drawChan() {
         const key = app.active;
         const c = store(key);
@@ -554,7 +611,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         $('[data-topic]').textContent = isPm ? `Private chat with ${key.slice(3)} · not end-to-end encrypted · report shares selected text · tap their name to block` : c ? `${c.topic || ''}` : '';
         const room = !isPm && c && c.kind !== 'lobby';
         $('[data-roombar]').hidden = !room;
-        $('[data-jam]').hidden = !(room && c.kind === 'jam');
+        drawJam();
         const showAct = room && ['bobross', 'watch', 'art'].includes(c.kind);
         $('[data-activity]').hidden = !showAct;
         $('[data-activity-title]').textContent = showAct ? c.kind === 'art' ? 'A canvas for everyone' : c.kind === 'bobross' ? 'A little paint. A little Bob Ross.' : 'Watching together' : 'Shared activity';
@@ -570,21 +627,6 @@ import { createEntrySharing } from './entry-sharing.mjs';
             cam.setAttribute('aria-pressed', String(!!c.myCam));
             cam.textContent = c.myCam ? '📷 Camera on' : m.C ? '📷 Camera (18+)' : '📷 Cameras off here';
             cam.disabled = !m.C && !c.myCam;
-            if (c.kind === 'jam') {
-                const a = $('[data-jam-desktop]');
-                const link = c.jam && c.jam.desktop;
-                const invitation = c.jam && (c.jam.invitation || link);
-                a.hidden = !link; $('[data-jam-wait]').hidden = !!invitation;
-                $('[data-jam-copy]').hidden = !invitation;
-                $('[data-jam-copy-fallback]').hidden = true;
-                $('[data-jam-copy-value]').value = '';
-                if (link && /^webjam:\/\//.test(link)) a.setAttribute('href', link);
-                else a.removeAttribute('href');
-                const web = $('[data-jam-web]');
-                web.disabled = !(c.jam && c.jam.webReady);
-                web.textContent = web.disabled ? 'Browser join unavailable' : 'Join in browser (higher delay)';
-                web.onclick = () => { if (c.jam && /^https:\/\//.test(c.jam.web)) window.open(c.jam.web, '_blank', 'noopener,noreferrer'); };
-            }
         }
         $('[data-people-title]').textContent = isPm ? 'PM' : c ? `${c.name} · ${c.count || c.names?.length || 0}` : 'People';
         const ul = $('[data-nicks]');
@@ -831,18 +873,23 @@ import { createEntrySharing } from './entry-sharing.mjs';
     });
     $('[data-cam-yes]').addEventListener('click', () => { if (!$('[data-adult]').checked) return toast('Tick the 18+ box first.'); send({ t: 'cam', ch: app.active, on: true, adult18: true }); return $('[data-cam-gate]').close(); });
     $('[data-cam-no]').addEventListener('click', () => $('[data-cam-gate]').close());
-    $('[data-jam-form]').addEventListener('submit', (e) => { e.preventDefault(); const v = $('[data-jam-link]').value; if (v && cmd('jamlink', ['invitation', v])) $('[data-jam-link]').value = ''; });
+    $('[data-jam-form]').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const c = currentJam(), input = $('[data-jam-link]');
+        if (!c || jamContext?.room !== c || !jamContext.host || !amOp(c)) { input.value = ''; return; }
+        if (input.value && cmd('jamlink', ['invitation', input.value], c.name)) input.value = '';
+    });
     $('[data-jam-copy]').addEventListener('click', async () => {
-        const c = store(app.active);
-        const link = c?.kind === 'jam' && (c.jam?.invitation || c.jam?.desktop);
+        const c = currentJam(), context = jamContext;
+        const link = context?.room === c && context.invitation;
         if (!link) return;
         try {
             await navigator.clipboard.writeText(link);
-            toast('Invite copied. Open WebJam, choose Join, and paste it there.');
+            if (jamContext === context && currentJam() === c) toast('Invite copied. Open WebJam, choose Join, and paste it there.');
         } catch (_) {
             // Clipboard access is unavailable in some embedded browsers. Keep the
             // invitation in this room only; never place its bearer in storage.
-            if (app.active !== c.name || (store(app.active)?.jam?.invitation || store(app.active)?.jam?.desktop) !== link) return;
+            if (jamContext !== context || currentJam() !== c) return;
             $('[data-jam-copy-fallback]').hidden = false;
             const input = $('[data-jam-copy-value]');
             input.value = link; input.focus(); input.select();

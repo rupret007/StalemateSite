@@ -10,15 +10,38 @@ and the existing beta identity, privacy and data-inventory documents together.
 
 The shared-community branch started from application candidate `c91c625`, rather
 than website main `b1b947d`, which the initial remote inventory found had no
-Hang Out application. The current application branch also includes these
-separately reviewable safety slices:
+Hang Out application. The published application slices observed locally are
+listed below. These are dated source/review locations, not a fresh GitHub read:
 
 | Slice | Observed source/review location | Required release-owner action |
 | --- | --- | --- |
 | Preserve accepted reports at queue capacity | [PR 87](https://github.com/rupret007/StalemateSite/pull/87), head `35506907a472fde3e56e17890af7e07b872351ea`, based on `codex/webjam-setup-help` | Revalidate the current head, CI and normal exact-head Karen result. A full intake queue must not silently displace an accepted report. |
 | AI provider/child-data readiness gate and design documents | [PR 88](https://github.com/rupret007/StalemateSite/pull/88), head `0249a6a23d92a2e73f29fbf56a556a12dc7edccc`, based on `codex/moderation-queue-capacity` | Resolve the stacked dependency through normal review. Do not enable AI merely because readiness configuration names exist. |
 | Shared entry, client controls and bounded transport | [PR 89](https://github.com/rupret007/StalemateSite/pull/89), head `6597aa21ba8f3f338672e3222038269345b73bf7`, based on PR 88 | Source-bound local validation and package receipts are listed below. CI was green and normal Karen review requested on October 25; revalidate the current head/verdict before admission. Neither request nor CI is a Karen PASS or deployment. |
-| Inactive purpose-bound participation policy | [PR 90](https://github.com/rupret007/StalemateSite/pull/90), head `61261470c0ed591c2ef7733db40ec5a95afb9c95`, based on PR 89 | C1 pure evaluator only. Real consent/guardian verification, durable receipts and integration/revocation remain separate work. It does not change current beta admission. |
+| Inactive purpose-bound participation policy, C1 | [PR 90](https://github.com/rupret007/StalemateSite/pull/90), head `61261470c0ed591c2ef7733db40ec5a95afb9c95`, based on PR 89 | Pure evaluator. Later C2/C3 source adds a synthetic ledger and controlled engine integration; none establishes real enrollment or changes the default beta's admission. |
+| Restricted selected-evidence case primitives, I1 | [PR 91](https://github.com/rupret007/StalemateSite/pull/91), head `6c33ba010f44b9593cdab9a5a80949658a9689b7`, based on PR 89 | Preserve source/revision/digest binding, separate incident appointment and case ACL, purpose-key encryption, atomic copy/audit/idempotency, and finite policy-controlled disposition. Qualify the real policy, storage/source transaction and key lifecycle before activation. |
+| Transactional purpose-bound consent ledger, C2 | [PR 92](https://github.com/rupret007/StalemateSite/pull/92), head `5cfca178771be22d32ade4be2c19cc8d4e7d2934`, based on PR 90 | Storage-injected synthetic verification/consent primitives. They do not verify a real guardian, enroll a child or provide the production session/effect adapter. |
+| Private-message minimization and shared application journeys | [PR 93](https://github.com/rupret007/StalemateSite/pull/93), head `59ff67ee145f34fc2526b321f838bc285fdf8a81`, based on PR 90 | Keep PMs out of automatic classification and accepted-body moderation buffering, preserve selected-report witnesses and explicit private composer context, and qualify matched clients/server. Server-routed PMs are not end-to-end encrypted. |
+| Lobby field contrast and WebJam focus | [PR 94](https://github.com/rupret007/StalemateSite/pull/94), head `fdf7e9ab9396a313d7af68bb89f6967d7f2df2a5`, based on PR 93 | Preserve the authored field boundaries, placeholder colors and invitation focus treatment in the final composition. Scoped computed-color/browser checks are not full accessibility conformance. |
+
+The integration candidate is `9e0823d7409a31362ae2cd9111b76dfc86ba30f1`.
+It retains PR 93's application parent and composes the following additional
+source. Reused commits have different hashes from their original PR heads;
+their presence does not merge those PRs or transfer an old verdict to a new head.
+
+| Candidate layer, in dependency order | Exact local source | Review and receiving-owner boundary |
+| --- | --- | --- |
+| C2 and I1 model prerequisites on PR 93 | C2 `2a6aa9536e8759f525ebae73863316d81ded5f4a`, then I1 `c531348d3aa2a448a21995875c4f4e2a50e7c682` | Reconcile the reused PR 92/91 model changes with their separately published branches; preserve C1 from PR 90 and PM changes from PR 93. Avoid duplicated or omitted model changes when integrating the stack. |
+| Actual controlled participation enforcement, C3 | `c260de575f0b41d0d75e8024fe54f14776c88c89`, parent `c531348d3aa2a448a21995875c4f4e2a50e7c682` | New C3 PR not yet created. Base it on the reconciled PR 93 plus C2/I1 prerequisites. The optional adapter is exercised through actual engine actions with synthetic state; the production route remains disconnected. |
+| Restricted local incident-review flow, I2 | `a32d149d5cd0ee35c26f485288096d1d8e8fb6a8`, parent C3; original isolated source `57bb85d284a92703a1b871d710a8ecfcf8ea3134` | New I2 PR not yet created; stack it on C3. Loopback fixture only, with actual synthetic lobby reports and I1 preservation. Do not expose its role selector or routes as public authentication. |
+| Contrast and invitation lifecycle composition | PR 94 changes reused as `3482e0b5b0b9fce60c20f0dfade38cac160ca40a`, then lifecycle `9e0823d7409a31362ae2cd9111b76dfc86ba30f1`; original lifecycle source `e1b85605ac277ed9f8f619a43f77589dbb547317` | New final-composition PR not yet created; stack it on I2 and reconcile PR 94. Keep invitation drafts bound to the current room/host authority and preserve the focus/contrast changes. |
+
+At this checkpoint the shared GitHub API helper reports requests paused. The
+new C3, I2 and composition PRs are prepared as local source, not published PRs.
+Do not bypass that pause or repair shared API/core controls here. Once the normal
+path resumes, create/reconcile the dependency branches, record exact new heads
+and request normal review after the required CI is green. Every new push needs
+its own current-head evidence; local composition is not review or admission.
 
 Those heads are source snapshots, not claims that the PRs remain unchanged,
 have passed review or are deployed. The initial October 25 reconciliation also
@@ -32,6 +55,49 @@ Use the existing review/admission process, including current-head Karen and CI
 where required. This handoff adds no substitute approval, fabricated verdict,
 lock removal or bypass. If a dependency belongs to StoryPool core, provide its
 exact failure/evidence to that owner rather than repairing it in this branch.
+
+## Default beta, controlled C3 and local I2 are separate modes
+
+The production `lobby-do.mjs` constructor does not supply
+`createLobby({participation})`. With that option absent, the candidate retains
+the beta's existing synchronous engine/durability paths, invitation and verified
+role checks, 13+ admission and 18+ camera guards. That is the protected-beta
+path to qualify on its actual hosted revision; it is not a qualified public
+all-ages consent system. AI readiness gates and provider-off requirements still
+apply independently. Adding the new modules does not activate their fixtures.
+
+[C3](HANGOUT_PARTICIPATION_ENFORCEMENT.md) is an optional, controlled server
+integration, tested with the real C1/C2 models and actual engine handlers. A
+configured invalid/unavailable adapter refuses grants and cannot fall back to
+ordinary persistence. Production activation still needs trusted identity and
+commit-side current session/role validation, atomic C2/session/effect storage,
+bounded withdrawal notifications and a non-retrying provider start fence. The
+owner must await effectful restoration and participation refresh. Neither a
+browser badge nor an opaque `allowed: true` result satisfies these contracts.
+An already-started external request or independent native/P2P session cannot be
+recalled by the local model.
+
+[I2](HANGOUT_INCIDENT_REVIEW.md) is the separate loopback-only launcher
+`scripts/preview-incident-review.mjs`, fixture and `scripts/incident-review-ui/`.
+Its explicit handler/moderator/guest selector is synthetic, and its key/store
+are ephemeral. The public Worker graph does not import that launcher or fixture.
+Pilot/beta packaging copies only `r`, `assets` and, for beta, `join`; the Pages
+allowlist also excludes `scripts`. The entry generator emits reviewed link
+snippets and public configuration. The standalone toolkit can also carry its
+generation code and reviewed C3/I2/contrast documentation, while excluding the
+synthetic role selector, fixture server and incident UI. Keep these boundaries
+and inspect the actual artifact inventories; never copy the repository or local
+preview server wholesale into a public package. I1/I2 still need qualified incident appointments,
+source/case storage, purpose-key provisioning/recovery, policy deadlines and
+durable cleanup/backup ownership before handling real evidence.
+
+The composed WebJam invitation flow clears draft text, copy state, link targets
+and cached invitation data when room, authority or connection changes invalidate
+them. A stale asynchronous copy failure cannot restore an old manual-copy
+fallback. Ordinary chat drafts remain available across those invitation changes.
+Clearing application state cannot recall an OS clipboard value or a capability
+already delivered elsewhere; normal invitation expiry/revocation remains the
+authority for those copies.
 
 ## Preserve identity and data authority
 
@@ -104,6 +170,13 @@ federation. Public configuration and generated snippets are not a secret store.
 | Old client/new server | It does not opt into ACK transport or source updates. Legacy delivery gets a finite allowance and an explicit reload notice. Terminal code `4001` is understood by the older client and stops its automatic reconnect loop. This is a transition path, not indefinite support for stale code. |
 | Same live socket wakes from hibernation | Restore live identity, metadata-only delivery ledger, control grant and memberships. Rebuild shared window accounting from live attachments. Never send a new join/history replay merely because an actor wakes. |
 | Genuine new connection/reload | Reauthenticate/re-admit and start chat fresh. Entry capability is negotiated again; old nickname/device data cannot recover PM consent or room/account authority. |
+
+The private composer also relies on `features.privateMessageContext === 1`.
+Qualify the matched client/server and deliberate reload transition before
+advertising the revised PM experience. Do not infer safe private context from
+an older client merely because it still renders an ordinary chat line. Keep the
+finite legacy transport allowance and reload notice instead of promising
+indefinite support or forcing a rapid reconnect loop.
 
 Presence coalescing is server-side and does not require a new client frame or
 feature negotiation. Existing `chan`/`list` shapes are preserved. Only replaceable
@@ -206,6 +279,18 @@ that the older artifact is safe under the same load.
 
 ## Evidence and remaining qualification
 
+### Combined application candidate
+
+The combined application source at
+`9e0823d7409a31362ae2cd9111b76dfc86ba30f1` includes C3, I2, contrast and
+invitation lifecycle changes. Its complete unit run passed 974 tests and the
+complete configured browser run passed 316 cases. Bind the combined receipts,
+package inventories and screenshots to that same source and its artifact
+hashes before handoff; the PR 89 and PR 93 receipts below do not by
+themselves validate these newer changes. A later documentation-only commit can
+retain code/test tree equivalence while recording its own exact diff and head.
+None of this establishes a current-head Karen PASS, merge or deployment.
+
 ### Final shared-entry source and standalone artifact
 
 The exact PR 89 head `6597aa21ba8f3f338672e3222038269345b73bf7` passed
@@ -233,7 +318,8 @@ remained unchanged. Exactly the intentionally unacknowledging peer was retired;
 healthy peers continued, excess admission returned 429, and 30 rooms survived a
 memory-adapter restart without stored ordinary chat. The short local sample is
 not Cloudflare capacity, an invoice, real suspended TCP behavior or hosted
-recovery qualification.
+recovery qualification. This workload used the default beta engine, with no
+configured C3 participation adapter.
 
 `community-entry-toolkit-6597aa21ba8f.zip` is a 54,384-byte standalone entry
 toolkit with SHA-256
@@ -295,6 +381,13 @@ window is not proof of a hard Cloudflare memory limit against a custom peer that
 claims issued sequence credit without reading. Production encrypted private-room
 transport in `index.mjs` is separately scoped from the lobby delivery helper.
 
+**None of the earlier 150-client runs qualifies configured C3 capacity.** C3
+prepares current peer views and performs ledger, transaction and checkpoint
+copies that those workloads did not exercise. Consent-enabled throughput,
+latency, runtime memory and request/storage costs need their own stable-source
+bounded benchmark and owner-approved hosted qualification. Model defensive
+limits are not a selected public-community size or permission to raise caps.
+
 The product evidence directory also contains the lock-hashed production
 dependency audit (`shared-community-20261025/production-dependency-audit.json`),
 which reports zero advisories for `npm audit --omit=dev`. Direct installed
@@ -311,5 +404,17 @@ the actual minimal-data consent/capability and incident-preservation paths.
 See [privacy and incidents](HANGOUT_PRIVACY_AND_INCIDENTS.md) and
 [the data inventory](HANGOUT_DATA_INVENTORY.md). The existing age/media guards
 remain until a qualified replacement is implemented; a readiness flag or policy
-document does not complete it. No public go-live, paid signup, credential
-recovery, native-trust bypass or paused TURN work is performed by this handoff.
+document does not complete it. Resolve the legal operator and intended markets,
+approved notices/purposes, real guardian/public-identity verification and rights
+process, contact/media rules, staffed incident authority and lawful retention
+decisions with their qualified owner. Then qualify actual hosted enrollment,
+withdrawal, moderation and incident journeys with minimal data. Local fixture
+appointments and synthetic policy dates cannot supply those decisions.
+
+Physical iOS/desktop assistive-technology use, complete keyboard/zoom behavior,
+and native Intel/Apple Silicon Mac, Windows and Linux installation/trust and
+cross-house bidirectional audio remain separate proofs. Keep newer Stalemate
+and Rad Dad pages, their existing consent/navigation behavior and the shared
+canonical service when the receiving website session integrates the reviewed
+application. No public go-live, paid signup, credential recovery, native-trust
+bypass or paused TURN work is performed by this handoff.

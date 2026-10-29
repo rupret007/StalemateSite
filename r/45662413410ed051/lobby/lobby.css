@@ -11,6 +11,7 @@
   --pink: #eea9be;
   --amber: #e5c181;
   --line: #343d36;
+  --control-line: #6b776c;
   --bevel-hi: var(--line);
   --bevel-lo: #080a09;
   --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
@@ -27,7 +28,7 @@ button, input, select { font: inherit; }
 button, summary { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .45; }
 button, input, select { border-radius: 4px; }
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, .toast:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, .toast:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
 ::selection { background: var(--lime); color: var(--ink); }
 a { color: var(--blue); text-underline-offset: 3px; }
 h1, h2, h3, p { margin-top: 0; }
@@ -45,8 +46,9 @@ h2, h3 { font-weight: 650; }
 .btn--danger { color: var(--pink); background: #2c1b23; border-color: #6f3f51; }
 .btn--small { padding: 7px 11px; min-height: 38px; font-size: 12px; }
 .btn--big { width: 100%; min-height: 50px; }
-input, select { min-width: 0; min-height: 44px; padding: 10px 12px; background: var(--ink); color: var(--cream); border: 1px solid var(--line); font-size: 14px; }
-input::placeholder { color: #8b958f; opacity: 1; }
+input, select { min-width: 0; min-height: 44px; padding: 10px 12px; background: var(--ink); color: var(--cream); border: 1px solid var(--control-line); font-size: 14px; }
+textarea { border: 1px solid var(--control-line); background: var(--ink); color: var(--cream); }
+input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .titlebar { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 16px; min-height: 72px; padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--surface); }
 .brand { display: flex; align-items: center; gap: 12px; }
 .brand-mark { display: grid; place-items: center; width: 35px; height: 35px; background: var(--lime); color: var(--ink); font: 900 29px/1 var(--mono); letter-spacing: -6px; padding-right: 6px; }
