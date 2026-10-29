@@ -291,6 +291,77 @@ describe('explicit recovery and lifecycle fencing in the served invitation porta
     }
     const state = () => Response.json({ kind: 'guest', role: 'fan', emailConfigured: true, staffConfigured: true });
 
+    for (const operation of ['state', 'unlock', 'logout']) for (const stalledAt of ['headers', 'body']) {
+        it(`recovers explicitly from stalled ${operation} ${stalledAt} and ignores its late result`, async () => {
+            let release, bodyRead = false, recovering = false, nextTimer = 0;
+            const pending = new Promise(resolve => { release = resolve; });
+            const timers = new Map(), target = '/beta/' + operation;
+            const h = await portal((path, options) => {
+                if (path === target && !recovering) {
+                    expect(options.signal.aborted).toBe(false);
+                    if (stalledAt === 'headers') return pending;
+                    const response = Response.json({});
+                    response.json = () => { bodyRead = true; return pending; };
+                    return response;
+                }
+                if (path === '/beta/state') return (operation === 'unlock' && !recovering) || (operation === 'logout' && recovering)
+                    ? Response.json({ error: 'Private invitation required.' }, { status: 401 }) : state();
+                expect(path).toBe('/beta/logout');
+                return Response.json({ ok: true });
+            }, window => {
+                window.sessionStorage.setItem('hangout-owner', 'existing optional hint');
+                // Deterministic request-deadline seam around the actual served
+                // client, not a browser/network or actual server-revoke proof.
+                window.setTimeout = (callback, delay) => {
+                    expect(delay).toBe(10000);
+                    timers.set(++nextTimer, callback); return nextTimer;
+                };
+                window.clearTimeout = timer => timers.delete(timer);
+            });
+            try {
+                const { window } = h.dom, doc = window.document;
+                if (operation !== 'state') {
+                    await vi.waitFor(() => expect(doc.querySelector(operation === 'unlock' ? '#login' : '#inside').hidden).toBe(false));
+                    doc.querySelector('#code').value = 'unsent invitation draft';
+                    doc.querySelector(operation === 'unlock' ? '#unlock' : '#logout')
+                        .dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+                }
+                if (stalledAt === 'body') await vi.waitFor(() => expect(bodyRead).toBe(true));
+                expect(timers.size).toBe(1);
+                const request = window.fetch.mock.calls.find(call => call[0] === target);
+                const [, fire] = [...timers][0];
+                fire();
+                const retry = doc.querySelector(operation === 'logout' ? '#retry-leave' : '#retry');
+                await vi.waitFor(() => expect(retry.hidden).toBe(false));
+                expect(retry.disabled).toBe(false);
+                expect(request[1].signal.aborted).toBe(true);
+                expect(doc.querySelector('#inside').hidden).toBe(true);
+                expect(doc.querySelector('#status').textContent).toMatch(operation === 'logout' ? /Leaving was not confirmed/ : /temporarily unavailable/i);
+                expect(window.sessionStorage.getItem('hangout-owner')).toBe('existing optional hint');
+                if (operation === 'unlock') expect(doc.querySelector('#code').value).toBe('unsent invitation draft');
+                const beforeRetry = h.calls.length;
+                await new Promise(resolve => setTimeout(resolve, 0));
+                expect(h.calls).toHaveLength(beforeRetry); // No automatic POST replay.
+                recovering = true;
+                retry.click(); retry.click();
+                await vi.waitFor(() => expect(doc.querySelector('#status').textContent).toBe(operation === 'logout'
+                    ? 'A private invitation is required.' : 'Invitation accepted.'));
+                expect(h.calls.slice(beforeRetry)).toEqual(operation === 'logout'
+                    ? [{ path: '/beta/logout', method: 'POST' }, { path: '/beta/state', method: 'GET' }]
+                    : [{ path: '/beta/state', method: 'GET' }]);
+                expect(window.sessionStorage.getItem('hangout-owner')).toBe(operation === 'logout' ? null : 'existing optional hint');
+                const settledStatus = doc.querySelector('#status').textContent, settledCalls = h.calls.length;
+                const late = { ok: true, kind: 'staff', role: 'owner', emailConfigured: true, staffConfigured: true };
+                release(stalledAt === 'headers' ? Response.json(late) : late);
+                await new Promise(resolve => setTimeout(resolve, 0));
+                expect(doc.querySelector('#status').textContent).toBe(settledStatus);
+                expect(doc.querySelector('#moderation').hidden).toBe(true);
+                expect(h.calls).toHaveLength(settledCalls);
+                expect(timers.size).toBe(0);
+            } finally { release(Response.json({ ok: true })); h.dom.window.close(); }
+        });
+    }
+
     it('recovers only on explicit GET after network or malformed state without discarding an invitation draft', async () => {
         const replies = [
             () => { throw Error('private network fixture detail'); },
