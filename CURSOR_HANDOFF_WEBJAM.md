@@ -1,6 +1,6 @@
 # WebJam / Hang Out — Cursor continuation
 
-Resumed October 28, 2026. The October 27 pause checkpoint is retained below
+Resumed October 29, 2026. The October 27 pause checkpoint is retained below
 as history. Read the current [demo checkpoint](hangout-internal/HANGOUT_DEMO_CHECKPOINT.md)
 first: Cursor has since fixed the native health witness, recorded a local
 provider-start run, and moved internal documents from `docs/` to
@@ -9,7 +9,15 @@ below describe the earlier checkpoint, not the current source.
 
 ## Start here
 
-The current application assembly is **`codex/che-demo-candidate`**. It combines
+Current work is **`codex/irc-webjam-polish-20261029`**, based on merged demo
+commit `ec1eb14cfb2f7d068e5a01467193b70e21495dbc`. Its tree equals PR164's
+tested `41916eb`; Jeff merged PR163/164 on October 29. The new work retains
+rejected music invitations until confirmed room state, with 12 focused local
+Chromium journeys passing and fresh 375/390px images. See the current checkpoint
+for source hashes, the separately observed local eighth-mode proof and remaining
+CI/review/music gates. This branch is not deployment approval.
+
+The preceding application assembly is **`codex/che-demo-candidate`**. It combines
 PR162's visible browser-invitation/Stop fixes with PR160's bounded reconnect
 probe, inheriting PR159's access-request recovery and PR161's required music
 acceptance. Read the checkpoint's current-assembly section for exact input
@@ -100,11 +108,12 @@ downgrade is safe. Preserve historical failures and warnings; quiet later native
 runs do not clear the earlier184-byte ACK TimeoutNegativeWarning, whose impact
 is still unqualified.
 
-## Current WIP: inactive provider-start fence (P9)
+## Historical pause checkpoint: inactive provider-start fence (P9)
 
-**The new work has not run.** Fresh local guards stopped before Node/tests at
+**At the October 27 pause, the new work had not run.** Fresh local guards stopped before Node/tests at
 82.49% and86.85% swap, against the unchanged below80% limit. No baseline RED or
-new-source runtime PASS is claimed. Parent results above do not transfer here.
+new-source runtime PASS was claimed at that pause. The current checkpoint records
+the later source-bound local mode run; parent results do not transfer by intent.
 
 The implementation is in:
 

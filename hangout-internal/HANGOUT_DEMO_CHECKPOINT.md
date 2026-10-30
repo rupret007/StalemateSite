@@ -1,10 +1,64 @@
 # Shared Hang Out / WebJam demo checkpoint
 
-Updated October 28, 2026. Goal active: finish the application for a private Che
+Updated October 29, 2026. Goal active: finish the application for a private Che
 demonstration and website integration. This is an application checkpoint, not
 deployment approval or a claim that the live beta contains these changes.
 
-## Current assembly: one source for the receiving website session
+## Current work: recover rejected music invitations
+
+Branch: **`codex/irc-webjam-polish-20261029`**. Base:
+`ec1eb14cfb2f7d068e5a01467193b70e21495dbc`, the October 29 merge of PR164
+into `codex/che-demo-candidate`. Its tree equals tested PR164 head `41916eb`.
+Jeff also merged PR160/161/162/163. Preserve those branches and the separate
+source-specific Cursor review comments; a merge or a comment is not an
+independently verified signed local Karen result.
+
+The current application fix keeps a rejected invitation editable while the same
+connected room host retains authority. A successful socket send no longer clears
+the paste. Confirmed current-room state clears the matching submitted value,
+including a re-share of an unchanged published link. Existing room, host-power,
+disconnect, Stop and replacement fences still purge invitations. The server's
+exact-origin/permission checks and opaque desktop invitation format are unchanged.
+
+Observed local evidence, with original failures retained:
+
+- On unchanged base client `ec1eb14`, the strengthened real-relay test failed
+  because a rejected browser paste became empty. After the fix, 12 focused
+  Chromium journeys passed once, without skips/retries or stderr. These cover
+  rejection/correction/re-share, both website entrances, drawing, invitation
+  lifecycle and unconfirmed Stop. Fresh host/guest 375/390px screenshots were
+  captured. This is local browser/fixture proof, not hosted sign-in or music.
+- The full local unit run passed 1,856 cases and failed one of 1,857:
+  `hangout-incident-review.test.js` attempted to click an absent benign-sample
+  button. Its fixture/controller sources are unchanged by this music fix.
+  Original logs remain preserved; the cause is under investigation, and this
+  run is not recorded as green. A later diagnostic import was refused by the
+  unchanged 80-percent swap guard before starting Node.
+- On **base `ec1eb14`**, the explicit eighth provider-start mode passed locally
+  on macOS ARM64/Node26.12.0. Both phases matched 51 recorded inputs (49 tracked
+  inputs tied to this commit) and 68 compiled inputs. Final evidence storage was
+  ready, authority available and all three captured-owner failure tokens matched.
+  Intentional owned-process SIGKILL/cold recovery produced a fresh owner baseline,
+  no old request replay, no live owned processes and removed temporary state.
+  Raw stdout SHA256: `5be674c3cd19fd350bf8ec924f9d90b53305c69c7402cd25f5c030dcde7c2e0e`.
+  [Full evidence](https://github.com/rupret007/StalemateSite/pull/164#issuecomment-6514936023).
+  Inert callbacks/synthetic readiness remain explicit; no provider activation,
+  guardian/legal, hosted or native music result is claimed. **This is not CI.**
+- Earlier combined PR163 `4fd2d86` site proof passed 1,857 units/412 browser cases;
+  native proof ran ten groups/seven modes. PR164 `41916eb` push proof passed
+  1,857 units/424 browser cases with one attempt each. Its separate merge run
+  had one preserved Chromium moderation timeout/retry. These qualify their
+  actual revisions, not this new fix or an eighth CI mode.
+
+Next: current-source CI and normal review admission through the owning session,
+then a matching approved private deployment and actual ARM/Intel/Windows two-way
+music. Linux and all 62 outcomes remain. The Mini's configured StalemateSite
+review exclusion was handed to StoryPool 10-21-26; no protection was changed.
+Native WebJam PR402 is now merged, but no newly qualified runnable music package
+or deployed beta participation mode has been verified here. Keep the earlier
+Intel EPERM, unsigned Windows and protected-browser-route limitations below.
+
+## Previous assembly: one source for the receiving website session
 
 Branch: **`codex/che-demo-candidate`**. This local application assembly merges
 these inputs cleanly and updates the handoff; it does not merge GitHub PRs or

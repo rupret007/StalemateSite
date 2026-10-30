@@ -431,6 +431,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     let belowFold = 0;
     let roomApi = null;
     let jamContext = null;
+    let pendingJamShare = null;
     function stopLocalCamera(channel) {
         const c = app.chans.get(channel);
         if (!c) return false;
@@ -890,6 +891,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             const c = app.chans.get(m.ch.name);
             if (c) {
                 Object.assign(c, m.ch);
+                confirmJamShare(c);
                 if (app.active === c.name) drawChan();
                 const r = room();
                 if (r) r.onChan(c);
@@ -1128,6 +1130,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
 
     const amOp = (c) => app.band || (c && c.names && c.names.some((n) => n.nick === app.me && n.prefix === '@'));
     function resetJamControls() {
+        pendingJamShare = null;
         $('[data-jam]').hidden = true;
         const desktop = $('[data-jam-desktop]'); desktop.hidden = true; desktop.removeAttribute('href');
         $('[data-jam-copy]').hidden = true;
@@ -1147,6 +1150,15 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const c = app.chans.get(app.active);
         return connectionState === 'connected' && !app.localMediaPaused && !app.sharingStopped
             && c?.kind === 'jam' && c.names?.some(n => n.nick === app.me) ? c : null;
+    }
+    function confirmJamShare(c) {
+        const pending = pendingJamShare;
+        if (!pending || pending.room !== c || pending.context !== jamContext || currentJam() !== c || !amOp(c)) return;
+        const confirmed = pending.web ? c.jam?.web : c.jam?.invitation || c.jam?.desktop;
+        if (confirmed !== pending.sharedValue) return;
+        const input = $('[data-jam-link]');
+        if (input.value === pending.value) input.value = '';
+        pendingJamShare = null;
     }
     function drawJam() {
         if (app.sharingStopped || app.localMediaPaused) { resetJamControls(); $('[data-jam]').hidden = true; return; }
@@ -1738,12 +1750,20 @@ import { createEntrySharing } from './entry-sharing.mjs';
     $('[data-jam-form]').addEventListener('submit', (e) => {
         e.preventDefault();
         const c = currentJam(), input = $('[data-jam-link]');
-        if (!c || jamContext?.room !== c || !jamContext.host || !amOp(c)) { input.value = ''; return; }
+        if (!c || jamContext?.room !== c || !jamContext.host || !amOp(c)) { pendingJamShare = null; input.value = ''; return; }
         // Copy web invite produces one HTTPS URL. Only route that explicit
         // paste to the existing server-gated browser hook; keep complete
         // desktop invitations, including sealed replies, byte-for-byte.
         const value = input.value, web = /^https:\/\//i.test(value.trim());
-        if (value && cmd('jamlink', [web ? 'web' : 'invitation', web ? value.trim() : value], c.name)) input.value = '';
+        if (!value) return;
+        let sharedValue = web ? value.trim() : value;
+        // Match the server's URL spelling only for confirmation. This does
+        // not approve an origin or rewrite an opaque desktop invitation.
+        if (web) try { sharedValue = new URL(sharedValue).href; } catch { /* The server supplies the rejection. */ }
+        pendingJamShare = { room: c, context: jamContext, value, sharedValue, web };
+        // Retain the paste until current room state confirms it. Rejection
+        // leaves it editable; disconnect/room/power/Stop fences still purge it.
+        if (!cmd('jamlink', [web ? 'web' : 'invitation', web ? value.trim() : value], c.name)) pendingJamShare = null;
     });
     $('[data-jam-copy]').addEventListener('click', async () => {
         const c = currentJam(), context = jamContext;

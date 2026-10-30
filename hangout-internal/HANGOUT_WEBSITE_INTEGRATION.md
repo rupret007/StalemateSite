@@ -7,8 +7,9 @@ not a release approval or evidence that a live website contains the candidate.
 
 ## Select one tested candidate
 
-The current application assembly is `codex/che-demo-candidate`; see the
-[checkpoint](HANGOUT_DEMO_CHECKPOINT.md#current-assembly-one-source-for-the-receiving-website-session)
+Current readiness work is `codex/irc-webjam-polish-20261029`, based on the merged
+`codex/che-demo-candidate` at `ec1eb14cfb2f7d068e5a01467193b70e21495dbc`; see the
+[checkpoint](HANGOUT_DEMO_CHECKPOINT.md#current-work-recover-rejected-music-invitations)
 for its exact inputs and unresolved gates. Obtain the actual reviewed current
 commit, not just an input PR or branch name. This assembly includes both the
 music-invitation fixes and the reconnect probe; older input results do not

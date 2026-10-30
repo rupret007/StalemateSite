@@ -17,6 +17,13 @@ applies. Clearing links removes both room handoffs; it does not stop the native
 host or revoke a capability already copied. Use the host's **Kick web guest**
 or end its session for that.
 
+The host's paste clears after matching current-room state confirms publication,
+including re-sharing an unchanged link. A rejected paste stays editable while
+the visitor remains the same connected room host. Room changes, loss of host
+powers, disconnect and Stop still clear it. This is publication-state feedback,
+not proof that a particular command or downstream audio enrollment succeeded.
+The one pending paste stays in memory only and does not enter browser storage.
+
 Invitations remain room-scoped bearer capabilities. Existing room-switch,
 disconnect, host-power-loss and delayed-action fences remain in place. The
 local Stop action immediately retires room invitation controls, and cached
@@ -44,3 +51,10 @@ by this change. Passing these journeys proves application handoff, not actual
 browser enrollment, live mixing, cross-network transport or physical audio.
 The [required music acceptance](HANGOUT_MUSIC_DEMO_ACCEPTANCE.md) and all 62
 original acceptance outcomes remain required.
+
+The recovery change keeps existing programmatic error feedback without moving
+focus or announcing invitation contents. This follows the purpose of
+[WCAG status-message guidance](https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html).
+[Jamulus setup guidance](https://jamulus.app/wiki/Getting-Started) recommends
+wired networking and wired headphones; retain that preparation advice without
+claiming it establishes measured WebJam latency or successful live audio.

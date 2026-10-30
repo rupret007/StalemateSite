@@ -167,15 +167,28 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
     } finally { await f.close(); }
 });
 
-test('browser invitations remain unavailable without an exact configured origin', async ({ browser, baseURL }) => {
+test('browser invitations reject unconfigured origins and let hosts correct rejected pastes', async ({ browser, baseURL }) => {
     for (const configured of [false, true]) {
         const f = await browserRoom(browser, baseURL, configured);
         try {
             const host = await f.join('RejectedHost'); await host.click('[data-start="jam"]');
-            await paste(host, configured ? 'https://unapproved.example/join/#synthetic' : WEB_INVITE);
+            const rejected = configured ? 'https://unapproved.example/join/#synthetic' : WEB_INVITE;
+            await paste(host, rejected);
             await expect(host.locator('[data-toast]')).toContainText('Browser joining is not configured');
             await expect(host.locator('[data-jam-web]')).toBeDisabled();
             expect(await host.evaluate(() => __lobby.chans.get(__lobby.active).jam.web)).toBe('');
+            // A socket send is not confirmation. Retain a rejected paste so
+            // the same admitted host can correct it without recovering a lost invite.
+            await expect(host.locator('[data-jam-link]')).toHaveValue(rejected);
+            if (configured) {
+                await paste(host, WEB_INVITE);
+                await expect(host.locator('[data-jam-web]')).toBeEnabled();
+                await expect(host.locator('[data-jam-link]')).toHaveValue('');
+                // Re-sharing the already published link also needs a real
+                // room-state confirmation, even when its value is unchanged.
+                await paste(host, WEB_INVITE);
+                await expect(host.locator('[data-jam-link]')).toHaveValue('');
+            }
             expect(await host.evaluate(() => window.browserOpens)).toEqual([]);
             expect(await host.evaluate(() => window.audioRequests)).toBe(0);
             expect(f.external).toEqual([]);
