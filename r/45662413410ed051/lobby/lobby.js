@@ -432,6 +432,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     let roomApi = null;
     let jamContext = null;
     let pendingJamShare = null;
+    let jamShareResultsSupported = false, jamShareTimer;
     function stopLocalCamera(channel) {
         const c = app.chans.get(channel);
         if (!c) return false;
@@ -793,6 +794,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             break;
         case 'report-status': if (m.submitted === true) finishReport(m.id, true); break;
         case 'message-result': messageResult(m); break;
+        case 'jam-share-result': jamShareResult(m); break;
         case 'ownership': { const c = store(m.ch); if (c) c.cohosts = m.cohosts; break; }
         case 'owner-offer': toast(`${m.by} offered you ownership of ${m.ch}`, [['Accept ownership', () => { if (confirm(`Accept ownership of ${m.ch}?`)) cmd('acceptowner', [], m.ch); }]]); break;
         case 'sharing-stopped':
@@ -804,6 +806,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         case 'hello':
             endedPmLabel = null;
             messageResultsSupported = m.features?.messageResults === 1;
+            jamShareResultsSupported = m.features?.jamShareResults === 1;
             entrySourcesSupported = m.features?.entrySources === 1;
             privateMessageContextSupported = m.features?.privateMessageContext === 1;
             privateMessagePeersSupported = m.features?.privateMessagePeers === 1;
@@ -1133,8 +1136,32 @@ import { createEntrySharing } from './entry-sharing.mjs';
     });
 
     const amOp = (c) => app.band || (c && c.names && c.names.some((n) => n.nick === app.me && n.prefix === '@'));
+    function clearPendingJamShare() {
+        clearTimeout(jamShareTimer); pendingJamShare = null;
+        $('[data-jam-form] button[type="submit"]').disabled = false;
+    }
+    function waitForJamShare(pending) {
+        clearTimeout(jamShareTimer);
+        $('[data-jam-form] button[type="submit"]').disabled = true;
+        $('[data-jam-share-status]').textContent = 'Waiting for confirmation. You can edit the next paste.';
+        jamShareTimer = setTimeout(() => {
+            if (pendingJamShare === pending && currentJam() === pending.room && amOp(pending.room))
+                $('[data-jam-share-status]').textContent = 'Still waiting. Your edit is kept; copy it before leaving or reconnecting.';
+        }, Math.max(0, pending.deadline - Date.now()));
+    }
+    function jamShareResult(frame) {
+        const pending = pendingJamShare;
+        if (!jamShareResultsSupported || !pending?.requestId || frame.id !== pending.requestId
+            || !['published', 'rejected'].includes(frame.status) || pending.context !== jamContext
+            || currentJam() !== pending.room || !amOp(pending.room)) return;
+        if (frame.status === 'published' && pending.confirmed && $('[data-jam-link]').value === pending.value) $('[data-jam-link]').value = '';
+        clearPendingJamShare();
+        $('[data-jam-share-status]').textContent = frame.status === 'rejected' ? 'Share rejected. Edit the paste and try again.'
+            : pending.confirmed ? 'Invitation shared.' : 'The result arrived without matching room state. Your paste is kept.';
+    }
     function resetJamControls() {
-        pendingJamShare = null;
+        clearPendingJamShare();
+        $('[data-jam-share-status]').textContent = '';
         $('[data-jam]').hidden = true;
         const desktop = $('[data-jam-desktop]'); desktop.hidden = true; desktop.removeAttribute('href');
         $('[data-jam-copy]').hidden = true;
@@ -1157,6 +1184,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     }
     function confirmJamShare(c) {
         const pending = pendingJamShare;
+        if (pending?.requestId) return; // Correlated feedback, not a state echo, completes this request.
         if (!pending || pending.room !== c || pending.context !== jamContext || currentJam() !== c || !amOp(c)) return;
         const confirmed = pending.web ? c.jam?.web : c.jam?.invitation || c.jam?.desktop;
         if (confirmed !== pending.sharedValue) return;
@@ -1172,9 +1200,20 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const next = c ? { room: c, host: !!amOp(c), invitation: c.jam?.invitation || c.jam?.desktop || '',
             desktop: c.jam?.desktop || '', web: c.jam?.web || '', webReady: c.jam?.webReady === true } : null;
         const unchanged = jamContext && next && Object.keys(next).every(key => next[key] === jamContext[key]);
+        const pending = pendingJamShare;
+        const ownPublication = pending?.requestId && pending.room === c && pending.context === jamContext && next?.host
+            && (pending.web ? next.web : next.invitation) === pending.sharedValue;
+        if (ownPublication) pending.confirmed = true;
         // The shared host editor belongs to one room and current authority.
         // Presence redraws keep it; switching, replacement or power loss clears it.
-        if (!unchanged) { resetJamControls(); jamContext = next; }
+        if (!unchanged) {
+            const draft = ownPublication ? $('[data-jam-link]').value : '';
+            resetJamControls(); jamContext = next;
+            if (ownPublication) {
+                pending.context = jamContext; pendingJamShare = pending;
+                $('[data-jam-link]').value = draft; waitForJamShare(pending);
+            }
+        }
         if (!next) return;
         $('[data-jam]').hidden = false; $('[data-jam-form]').hidden = !next.host;
         const desktop = $('[data-jam-desktop]');
@@ -1765,7 +1804,8 @@ import { createEntrySharing } from './entry-sharing.mjs';
     $('[data-jam-form]').addEventListener('submit', (e) => {
         e.preventDefault();
         const c = currentJam(), input = $('[data-jam-link]');
-        if (!c || jamContext?.room !== c || !jamContext.host || !amOp(c)) { pendingJamShare = null; input.value = ''; return; }
+        if (!c || jamContext?.room !== c || !jamContext.host || !amOp(c)) { clearPendingJamShare(); input.value = ''; return; }
+        if (pendingJamShare?.requestId) return; // requestSubmit() must respect the same one-in-flight bound.
         // Copy web invite produces one HTTPS URL. Only route that explicit
         // paste to the existing server-gated browser hook; keep complete
         // desktop invitations, including sealed replies, byte-for-byte.
@@ -1775,10 +1815,18 @@ import { createEntrySharing } from './entry-sharing.mjs';
         // Match the server's URL spelling only for confirmation. This does
         // not approve an origin or rewrite an opaque desktop invitation.
         if (web) try { sharedValue = new URL(sharedValue).href; } catch { /* The server supplies the rejection. */ }
-        pendingJamShare = { room: c, context: jamContext, value, sharedValue, web };
+        let requestId;
+        if (jamShareResultsSupported) {
+            const bytes = new Uint8Array(16); crypto.getRandomValues(bytes);
+            requestId = [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('');
+        }
+        pendingJamShare = { room: c, context: jamContext, value, sharedValue, web, requestId, confirmed: false, deadline: Date.now() + 8000 };
         // Retain the paste until current room state confirms it. Rejection
         // leaves it editable; disconnect/room/power/Stop fences still purge it.
-        if (!cmd('jamlink', [web ? 'web' : 'invitation', web ? value.trim() : value], c.name)) pendingJamShare = null;
+        const args = [web ? 'web' : 'invitation', web ? value.trim() : value];
+        const sent = requestId ? send({ t: 'cmd', name: 'jamlink', args, ch: c.name, roomInstance: c.keepRef, jamRequestId: requestId }) : cmd('jamlink', args, c.name);
+        if (!sent) { clearPendingJamShare(); $('[data-jam-share-status]').textContent = 'Share was not sent. Your paste is kept.'; }
+        else if (requestId && pendingJamShare?.requestId === requestId) waitForJamShare(pendingJamShare);
     });
     $('[data-jam-copy]').addEventListener('click', async () => {
         const c = currentJam(), context = jamContext;

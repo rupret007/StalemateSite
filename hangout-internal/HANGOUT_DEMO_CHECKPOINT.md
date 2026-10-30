@@ -4,12 +4,67 @@ Updated October 30, 2026. Goal active: finish the application for a private Che
 demonstration and website integration. This is an application checkpoint, not
 deployment approval or a claim that the live beta contains these changes.
 
-## Current work: compact Jam setup
+## Current work: correlated invitation sharing
+
+Branch: **`codex/jam-share-order-20261030`**, based on PR168 head
+`2c4a191915e02c73f95b1c0d2aca1082f6974649`. Preserve PR166/167/168 and all62
+requirement outcomes. The source was left uncommitted by a capacity interruption;
+the resumed application work preserves those changes and their original logs.
+
+A real-engine browser test reproduced a second lost-paste defect on2c4: an
+earlier publication can erase a newer submitted paste even when that later
+share is rejected. The matched engine advertises `jamShareResults:1` and returns
+caller-only request feedback after staged output. The visible editor allows one
+pending Share, keeps the next paste editable, and requires a matching result.
+An eight-second waiting advisory does not resend, unlock or claim rejection.
+Room/authority/disconnect/Stop boundaries still purge the editor and pending
+state. Correlation is not authentication, deduplication or music enrollment.
+Read [the protocol/compatibility contract](HANGOUT_JAM_SHARE_FEEDBACK.md).
+
+Current local evidence, with fresh unchanged resource guards:
+
+- 64 focused units passed, including the strict hello-feature expectations;
+  the earlier31-case pass and original30-pass/one-new-assertion failure remain.
+  The resumed ordinary unit group passed 1,867 cases/112 files, then the separate
+  accepted-room-capacity group passed both cases/files. Together these local
+  runs cover 1,869 cases/114 files with no failures or pending cases; they are
+  separate from CI. The existing capacity thresholds and setup were retained.
+- 18 real-client/engine Chromium journeys passed once, with zero retries, skips,
+  flakes or report errors. They include manual correction, an old-room result
+  arriving during another room's request, and an actual eight-second wait with
+  no automatic retry. Seven fresh375/390 images were inspected: host, guest,
+  keyboard help and editable waiting status. No horizontal overflow or clipped
+  input/Send was observed in those scoped cases.
+- Explicit provider-start and separate fifty-guest native Worker/SQLite modes
+  passed locally on Mac ARM. The latter delivered 12 publications to 50 guests
+  (600 deliveries),
+  with admission p95 185.387ms. Both passed intentional process-loss/cold-owner
+  recovery and removed owned processes/temporary state. These use synthetic
+  consent/provider callbacks and do not prove WebJam audio or hosted capacity.
+
+The original lost-paste browser failure is retained. One browser attempt was
+refused before Node at load1 16.77; guards were not relaxed. The first local
+provider-start attempt failed its exact hello-feature expectation after the
+new capability was added; only the expectation was extended, retaining every
+previous flag/assertion, before the passing run. Do not erase those attempts.
+
+Current-source CI and normal review remain to qualify. The explicit eighth
+provider-start **CI** mode, matched protected deployment and approved actual
+two-way ARM/Intel/Windows music remain owner dependencies. Linux and every
+unverified acceptance outcome remain. This application change does not alter
+core, workflows, installed services, shared operational files or release holds.
+
+## Previous work: compact Jam setup
 
 Branch: **`codex/jam-mobile-setup-20261030`**, based on PR167 head
 `143b3905af12e029a645e96769cc1d04cec018a5`. PR167 remains ready with
 `needs-karen`; no formal review or signed local verdict has been observed.
 The preceding branches and all 62 requirement outcomes remain preserved.
+Exact2c4 push41012559205/job123921483032 later passed1,858 units/114 files and
+430 browser cases/430 attempts with no retries, skips, flakes or report errors.
+Six CI WebKit375/390 images were inspected; the separate PR event has green
+metadata only. PR168 is ready with `needs-karen`, without an observed signed
+verdict. This historical result does not qualify the current changed kernel.
 
 The Jam panel now keeps its title, headphone/delay advice, explicit Mac-host and
 unsigned-Windows limits, and invitation actions together. Detailed setup uses

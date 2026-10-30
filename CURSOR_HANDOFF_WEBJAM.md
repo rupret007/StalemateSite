@@ -9,11 +9,26 @@ below describe the earlier checkpoint, not the current source.
 
 ## Start here
 
-Current work is **`codex/jam-mobile-setup-20261030`**, based on PR167 head
+Current work is **`codex/jam-share-order-20261030`**, based on PR168 head
+`2c4a191915e02c73f95b1c0d2aca1082f6974649`. It fixes another reproduced
+lost-paste race when a newer Share is submitted before an older confirmation.
+The matched client/engine now allow one pending visible Share, keep the next
+paste editable, and correlate publication/rejection without automatic retry.
+Read the [protocol and rollback contract](hangout-internal/HANGOUT_JAM_SHARE_FEEDBACK.md)
+and current checkpoint. Local proof includes 64 focused unit cases, 18 browser
+journeys and separate provider-start/fifty-guest native Worker runs. These are
+not current-head CI, deployed, native WebJam audio or approval evidence.
+The resumed local ordinary and separate capacity unit projects also passed
+1,869 cases/114 files in total, with no failures or pending cases.
+
+The preceding **`codex/jam-mobile-setup-20261030`** is based on PR167 head
 `143b3905af12e029a645e96769cc1d04cec018a5`. The Jam panel now puts its title,
 platform limits and actions ahead of native expandable setup help. Read the
-current checkpoint for the retained short-screen readability failure, local
-15-case proof and current CI/review status. All 62 outcomes remain intact.
+checkpoint for the retained short-screen readability failure. Its exact2c4
+push41012559205 passed1,858 units and430 browser cases once; fresh CI WebKit
+images were inspected. PR168 is preserved ready with `needs-karen`, without an
+observed signed current-head verdict. That proof does not qualify this changed
+engine/client. All62 outcomes remain intact.
 
 The preceding **`codex/jam-confirmation-races-20261030`** is based on PR166
 head `1504f94837a68ce35844e0590cde469135c287b4`. It preserves a same-host newer

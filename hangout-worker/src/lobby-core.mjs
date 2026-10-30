@@ -829,7 +829,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             cams: new Set(), since: now(), lastNick: 0, tokens: L.burst, last: now(), frames: 0, lastSaid: {}, actTokens: L.actBurst, actLast: now() };
         conns.set(id, c);
         if (band) { net.lastBand = now(); if (net.shieldAuto || net.lockAuto) bot(c, 'A saved safety state needs review: fans can read but not talk while the lobby is read-only. Check the band panel; /lobby unlock and /shieldoff when you are ready.'); saveNet(); }
-        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1 } });
+        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1 } });
         return { ok: true };
     }
 
@@ -925,7 +925,12 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const feedback = Object.hasOwn(f, 'clientMessageId') && typeof f.clientMessageId === 'string'
             && /^[a-f0-9]{32}$/.test(f.clientMessageId) && (ordinarySay || ordinaryPm)
             ? { id: f.clientMessageId, status: 'rejected' } : null;
-        const result = feedback ? status => { feedback.status = status; } : undefined;
+        const jamFeedback = f.t === 'cmd' && f.name === 'jamlink' && Array.isArray(f.args) && f.args.length === 2
+            && ['invitation', 'web'].includes(f.args[0]) && typeof f.ch === 'string' && /^#[a-z0-9-]{2,30}$/i.test(f.ch)
+            && typeof f.jamRequestId === 'string' && /^[a-f0-9]{32}$/.test(f.jamRequestId)
+            ? { id: f.jamRequestId, status: 'rejected' } : null;
+        const result = feedback ? status => { feedback.status = status; }
+            : jamFeedback ? status => { jamFeedback.status = status; } : undefined;
         try {
         if (f.t !== 'cmd' && ['personContext', 'personPeer', 'personNamed', 'cohostAccount'].some(key => Object.hasOwn(f, key))) return stalePerson(c);
         if (c.safetyOnly) return safetyOnlyMessage(c, f);
@@ -973,6 +978,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             // Existing durable/controlled output staging also withholds this
             // result. A failed transaction discards it with the actual output.
             if (feedback) out(c, { t: 'message-result', id: feedback.id, status: feedback.status });
+            // Request feedback carries no room capability or authority. It is
+            // staged with real output and never added to connection/storage state.
+            if (jamFeedback) out(c, { t: 'jam-share-result', id: jamFeedback.id, status: jamFeedback.status });
         }
     }
 
@@ -1699,7 +1707,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         // Hand-off to WebJam: the host pastes the invite WebJam's desktop app made. We store and relay it, nothing more;
         // WebJam owns signaling, the mailbox, TURN and Jamulus. `web` is the Web Join (#388) hook, off until an
         // allowed origin is configured.
-        jamlink(c, chan, [which, link]) {
+        jamlink(c, chan, [which, link], _instance, result) {
             if (!chan.jam) return bot(c, '/jamlink only works in a #jam room.', 'error');
             if (lc(which) === 'clear') { chan.jam = { desktop: '', web: '' }; event(chan, `${c.nick} cleared the jam links`); return sendChan(chan); }
             requireParticipation(c, 'publicArtifact');
@@ -1711,7 +1719,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 ? `${c.nick} shared a WebJam browser invitation. Use Join in browser; headphones required. Browser audio has higher delay.`
                 : `${c.nick} shared a WebJam desktop invitation. Copy the full invitation into WebJam’s Join screen. Ethernet beats Wi-Fi.`);
             log(c.nick, 'jamlink', chan.name, which === 'web' ? 'web' : 'desktop', chan.name);
-            return sendChan(chan);
+            sendChan(chan);
+            result?.('published');
         },
         lock(c, chan, [v]) {
             if (chan.kind === 'lobby') return handlers.lobby(c, chan, [v === 'off' ? 'unlock' : 'readonly']);

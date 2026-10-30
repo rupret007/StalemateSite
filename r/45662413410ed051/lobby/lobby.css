@@ -236,6 +236,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .jam-actions [data-jam-wait] { flex-basis: 100%; }
 .jam-paste { margin-top: 10px; }
 .jam-paste .small { flex-basis: 100%; margin: 0; }
+[data-jam-share-status]:empty { display: none; }
 .jam-paste textarea, .act-load input { flex: 1; min-width: 0; }
 .jam textarea { box-sizing: border-box; width: 100%; max-width: 100%; font: inherit; font-size: 16px; resize: vertical; }
 .jam-setup { margin-top: 8px; border-top: 1px solid var(--line); }

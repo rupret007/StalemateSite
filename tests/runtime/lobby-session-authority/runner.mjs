@@ -291,7 +291,7 @@ async function runtime(phase, state, nonce) {
         const visitor = new Visitor(response.webSocket, label, transport, acknowledge); visitors.push(visitor);
         const hello = await visitor.wait(f => f.t === 'hello', 'actual hello');
         if (FANOUT_50 && admissionProfile) admissionProfile.serverHello = performance.now();
-        assert.deepEqual(hello.features, { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1 }); assert.equal(hello.role, 'fan');
+        assert.deepEqual(hello.features, { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1 }); assert.equal(hello.role, 'fan');
         if (FANOUT_50 && admissionProfile) admissionProfile.clientHello = performance.now();
         visitor.send({ t: 'hello', nick: label, age13: true, entrySource: source, ...(transport ? { transport: 1 } : {}) });
         await visitor.wait(f => f.t === 'join' && f.ch.name === '#stalemate', 'lobby membership');

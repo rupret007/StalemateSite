@@ -17,12 +17,13 @@ applies. Clearing links removes both room handoffs; it does not stop the native
 host or revoke a capability already copied. Use the host's **Kick web guest**
 or end its session for that.
 
-The host's paste clears after matching current-room state confirms publication,
-including re-sharing an unchanged link. A rejected paste stays editable while
-the visitor remains the same connected room host. Room changes, loss of host
-powers, disconnect and Stop still clear it. This is publication-state feedback,
-not proof that a particular command or downstream audio enrollment succeeded.
-The one pending paste stays in memory only and does not enter browser storage.
+With matching updated client/engine, the host's paste clears after current-room
+publication state and the request's published result both arrive, including
+re-sharing an unchanged link. A rejected paste stays editable while the visitor
+remains the same connected room host. Room changes, loss of host powers,
+disconnect and Stop still clear it. This is command/publication feedback, not
+downstream audio enrollment. The pending request and editable paste stay in
+memory only. See [the protocol and mixed-version limits](HANGOUT_JAM_SHARE_FEEDBACK.md).
 
 ## Finding setup help
 
@@ -51,8 +52,13 @@ If the same connected host edits the next paste while publication is delayed,
 confirmation of the submitted value preserves that newer edit through the
 room redraw. It does not submit the edit. An unrelated room's confirmation,
 room switch, authority loss or local Stop does not receive that preservation.
-This remains state confirmation, without a request-correlated acknowledgment
-or a queue of pending Share commands.
+The updated editor disables Share until its matching result arrives, while
+keeping the next paste editable. Programmatic submission respects the same
+bound. Rejection permits a manual correction. An eight-second advisory keeps
+the uncertain request pending and asks the host to copy edits before leaving;
+there is no submission queue, automatic retry or timeout-based success/failure.
+An old-room result cannot complete a new request. Older-engine fallback remains
+state-based and does not establish this new guarantee.
 
 Invitations remain room-scoped bearer capabilities. Existing room-switch,
 disconnect, host-power-loss and delayed-action fences remain in place. The
@@ -83,7 +89,10 @@ and local Stop before a delayed confirmation. The queue has a fixed 1,000-frame
 test bound and cannot inject arbitrary frames or reorder the stream. The Stop
 case uses synthetic own-status HTTP, and the independent guest's already
 received invitation is not recalled. These are browser/engine races, not native
-music, revoked transport capability or hosted consent proof.
+music, revoked transport capability or hosted consent proof. Additional cases
+check one pending Share/manual rejected correction, a real FIFO prefix ending
+after an old-room result while a new request remains pending, and an actual
+eight-second wait retaining the editable paste without automatic retry.
 
 No production origin, TURN/vault credential, provider or deployment is enabled
 by this change. Passing these journeys proves application handoff, not actual

@@ -63,7 +63,12 @@ async function community(browser, baseURL) {
             const id = identities.get(nick)?.id;
             if (!sockets.has(id) || held.has(id)) throw Error('Hold requires one live, unheld connection');
             const frames = []; held.set(id, frames);
-            return { frames, release: () => {
+            return { frames, releaseThrough: predicate => {
+                if (held.get(id) !== frames) throw Error('Frame hold already released');
+                const index = frames.findIndex(raw => predicate(JSON.parse(raw)));
+                if (index < 0) throw Error('Ordered release requires an existing real frame');
+                for (const raw of frames.splice(0, index + 1)) sockets.get(id)?.send(raw);
+            }, release: () => {
                 if (held.get(id) !== frames) throw Error('Frame hold already released');
                 held.delete(id);
                 for (const raw of frames) sockets.get(id)?.send(raw);
@@ -112,6 +117,83 @@ test('a delayed publication confirmation keeps a newer edit without sharing it',
         await expect(host.locator('[data-jam-link]')).toHaveValue(DRAFT);
         expect(f.inbound.filter(frame => frame.name === 'jamlink').map(frame => frame.args)).toEqual([['invitation', FIRST]]);
         expect(await host.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain(DRAFT);
+    } finally { await f.close(); }
+});
+
+test('a newer rejected share stays editable when an earlier publication arrives late', async ({ browser, baseURL }) => {
+    const f = await community(browser, baseURL);
+    const rejected = 'https://unapproved.example/join/#newer_unpublished_fixture';
+    try {
+        const host = await f.visitor('OrderHost'), guest = await f.visitor('OrderGuest');
+        await create(host, '#jam-order'); await invite(host, guest, '#jam-order', 'OrderGuest');
+        const held = f.holdServerFrames('OrderHost');
+        await host.fill('[data-jam-link]', FIRST); await host.locator('[data-jam-form] button[type="submit"]').click();
+        await expect(guest.locator('[data-jam-copy]')).toBeVisible();
+        await host.fill('[data-jam-link]', rejected);
+        const submit = host.locator('[data-jam-form] button[type="submit"]');
+        await expect(submit).toBeDisabled();
+        // Programmatic submission must not bypass the same single-flight bound.
+        await host.locator('[data-jam-form]').evaluate(form => form.requestSubmit());
+        expect(f.inbound.filter(frame => frame.name === 'jamlink')).toHaveLength(1);
+        held.release();
+        await expect(submit).toBeEnabled();
+        await expect(host.locator('[data-jam-link]')).toHaveValue(rejected);
+        await submit.click();
+        await expect(host.locator('[data-toast]')).toContainText('Browser joining is not configured');
+        await expect(host.locator('[data-jam-link]')).toHaveValue(rejected);
+        expect(await guest.evaluate(() => __lobby.chans.get(__lobby.active).jam.invitation)).toBe(FIRST);
+        expect(f.inbound.filter(frame => frame.name === 'jamlink').map(frame => frame.args)).toEqual([['invitation', FIRST], ['web', rejected]]);
+        const ids = f.inbound.filter(frame => frame.name === 'jamlink').map(frame => frame.jamRequestId);
+        expect(ids).toHaveLength(2); expect(ids[0]).toMatch(/^[a-f0-9]{32}$/); expect(ids[1]).toMatch(/^[a-f0-9]{32}$/);
+        expect(ids[0]).not.toBe(ids[1]);
+    } finally { await f.close(); }
+});
+
+test('an old room share result cannot complete the new room request', async ({ browser, baseURL }) => {
+    const f = await community(browser, baseURL);
+    try {
+        const host = await f.visitor('ReceiptHost'), guest = await f.visitor('ReceiptGuest');
+        await create(host, '#jam-receiptold'); await invite(host, guest, '#jam-receiptold', 'ReceiptGuest');
+        await create(host, '#jam-receiptnew'); await select(host, '#jam-receiptold');
+        const held = f.holdServerFrames('ReceiptHost');
+        await host.fill('[data-jam-link]', FIRST); await host.locator('[data-jam-form] button[type="submit"]').click();
+        await expect(guest.locator('[data-jam-copy]')).toBeVisible();
+        // This real later presence frame is a delivery barrier after the old
+        // result. It is queued before the new room's request, preserving FIFO.
+        await command(guest, 'away', ['Receipt barrier']);
+        await expect.poll(() => guest.evaluate(() => __lobby.chans.get('#jam-receiptold').names.some(n => n.nick === 'ReceiptGuest' && n.away))).toBe(true);
+        await select(host, '#jam-receiptnew'); await host.fill('[data-jam-link]', SECOND);
+        const submit = host.locator('[data-jam-form] button[type="submit"]'); await submit.click();
+        await expect.poll(() => f.inbound.filter(frame => frame.name === 'jamlink').length).toBe(2);
+        const requests = f.inbound.filter(frame => frame.name === 'jamlink');
+        await expect.poll(() => held.frames.some(raw => JSON.parse(raw).id === requests[1]?.jamRequestId && JSON.parse(raw).t === 'jam-share-result')).toBe(true);
+        held.releaseThrough(frame => frame.t === 'chan' && frame.ch.name === '#jam-receiptold' && frame.ch.names.some(n => n.nick === 'ReceiptGuest' && n.away));
+        await expect.poll(() => host.evaluate(() => __lobby.chans.get('#jam-receiptold').names.some(n => n.nick === 'ReceiptGuest' && n.away))).toBe(true);
+        await expect(host.locator('[data-jam-link]')).toHaveValue(SECOND); await expect(submit).toBeDisabled();
+        held.release(); await expect(submit).toBeEnabled(); await expect(host.locator('[data-jam-link]')).toHaveValue('');
+        expect(requests[0].jamRequestId).not.toBe(requests[1].jamRequestId);
+    } finally { await f.close(); }
+});
+
+test('an unconfirmed share keeps one request and an editable paste without automatic retry', async ({ browser, baseURL }, testInfo) => {
+    const f = await community(browser, baseURL);
+    try {
+        const host = await f.visitor('WaitingHost', { width: 390, height: 844 }), guest = await f.visitor('WaitingGuest');
+        await create(host, '#jam-waiting'); await invite(host, guest, '#jam-waiting', 'WaitingGuest');
+        const held = f.holdServerFrames('WaitingHost');
+        await host.fill('[data-jam-link]', FIRST); await host.locator('[data-jam-form] button[type="submit"]').click();
+        await expect(guest.locator('[data-jam-copy]')).toBeVisible();
+        await expect(host.locator('[data-jam-share-status]')).toContainText('Still waiting', { timeout: 10000 });
+        await expect(host.locator('[data-connection]')).toHaveText('Connected');
+        await expect(host.locator('[data-jam-link]')).toHaveValue(FIRST);
+        await host.screenshot({ path: testInfo.outputPath('jam-share-waiting-390.png'), fullPage: true });
+        await host.fill('[data-jam-link]', DRAFT); await host.locator('[data-jam-form]').evaluate(form => form.requestSubmit());
+        expect(f.inbound.filter(frame => frame.name === 'jamlink')).toHaveLength(1);
+        held.release(); await expect(host.locator('[data-jam-form] button[type="submit"]')).toBeEnabled();
+        await expect(host.locator('[data-jam-link]')).toHaveValue(DRAFT);
+        await expect(host.locator('[data-jam-share-status]')).toHaveText('Invitation shared.');
+        await host.click('[data-leave]'); await cleared(host);
+        await expect(host.locator('[data-jam-share-status]')).toHaveText('');
     } finally { await f.close(); }
 });
 

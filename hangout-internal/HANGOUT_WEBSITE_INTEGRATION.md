@@ -7,13 +7,15 @@ not a release approval or evidence that a live website contains the candidate.
 
 ## Select one tested candidate
 
-Current readiness work is `codex/jam-mobile-setup-20261030`, based on
-PR167 head `143b3905af12e029a645e96769cc1d04cec018a5`. Its parent
+Current readiness work is `codex/jam-share-order-20261030`, based on
+PR168 head `2c4a191915e02c73f95b1c0d2aca1082f6974649`. Its parent
+`codex/jam-mobile-setup-20261030` contains the compact setup help and is based on
+PR167 head `143b3905af12e029a645e96769cc1d04cec018a5`. The preceding
 `codex/jam-confirmation-races-20261030` contains PR166 head
 `1504f94837a68ce35844e0590cde469135c287b4`. The earlier parent
 `codex/irc-webjam-polish-20261029` is based on the merged
 `codex/che-demo-candidate` at `ec1eb14cfb2f7d068e5a01467193b70e21495dbc`; see the
-[checkpoint](HANGOUT_DEMO_CHECKPOINT.md#current-work-compact-jam-setup)
+[checkpoint](HANGOUT_DEMO_CHECKPOINT.md#current-work-correlated-invitation-sharing)
 for its exact inputs and unresolved gates. Obtain the actual reviewed current
 commit, not just an input PR or branch name. This assembly includes both the
 music-invitation fixes and the reconnect probe; older input results do not
@@ -112,6 +114,7 @@ stored state or establish a verified drain.
 
 | State or protocol | Contract | Receiving-owner compatibility condition |
 | --- | --- | --- |
+| `jamShareResults:1` / `jam-share-result` | [One pending Share](HANGOUT_JAM_SHARE_FEEDBACK.md#compatibility-and-qualification) | Deliver matching HTML/CSS/JS and engine. Older clients keep state-based behavior; a new client with an older engine does not establish the correlated rejection/single-pending guarantee. No stored schema is added, but existing drain and recovery contracts still apply. |
 | Room `keepRef` | [Keep-room state and rollback](HANGOUT_KEEP_ROOM_SIGNIN.md#compatibility-and-rollback-boundary) | Preserve a reader that accepts the room-instance reference and preflight snapshot/indexed-record sizes within unchanged caps. Older indexed readers can refuse the field; qualify a compatible reader or the documented drained rollback conditions before use. |
 | Restricted `safetyOnly` sessions and `sharing-stopped` | [Own-sharing integration](HANGOUT_OWN_SHARING_CONTROLS.md#integration-and-rollback-boundary) | Keep compatible stored-session readers and current clients. An older client can ignore media teardown; qualify current assets/cache delivery and drain older sockets. Do not remove the restriction to resume sharing. |
 | Required C3 `participationMode` marker | [Required-mode and rollback rules](HANGOUT_OWN_SHARING_CONTROLS.md#integration-and-rollback-boundary) | Preserve the latch and matching reviewed configuration. Old unlatched domains need separately qualified drained mode admission; deleting policy/latch state or removing flags is not recovery. |
