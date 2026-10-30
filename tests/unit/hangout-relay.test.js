@@ -8,7 +8,7 @@ const ROOM = 'a'.repeat(64);
 
 function connectRelay(relay, roomId = ROOM) {
     return new Promise((resolve, reject) => {
-        const ws = new WebSocket(`ws://127.0.0.1:${relay.port}/room?room=${roomId}&preview=${KEY}`, {
+        const ws = new WebSocket(`ws://127.0.0.1:${relay.port}/room?room=${roomId}`, [KEY], {
             headers: { origin: 'http://127.0.0.1:4320' }
         });
         ws.on('message', (data) => {
@@ -16,7 +16,7 @@ function connectRelay(relay, roomId = ROOM) {
                 const frame = JSON.parse(String(data));
                 if (frame.welcome) {
                     ws.off('error', reject);
-                    resolve({ ws, welcome: frame });
+                    resolve({ ws, welcome: frame, protocol: ws.protocol });
                 }
             } catch (error) { /* ignore */ }
         });
@@ -42,6 +42,13 @@ function waitJson(ws, filter) {
 describe('hangout dev relay', () => {
     let relay;
     afterEach(async () => { if (relay) await relay.close(); relay = null; });
+
+    it('echoes the offered Sec-WebSocket-Protocol on upgrade', async () => {
+        relay = await startRelay({ previewKey: KEY, origins: 'http://127.0.0.1:4320' });
+        const peer = await connectRelay(relay);
+        expect(peer.protocol).toBe(KEY);
+        peer.ws.close();
+    });
 
     it('broadcasts the departing peer id when a socket closes', async () => {
         relay = await startRelay({ previewKey: KEY, origins: 'http://127.0.0.1:4320' });

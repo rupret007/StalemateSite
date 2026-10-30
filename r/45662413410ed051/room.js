@@ -116,9 +116,9 @@
             setGate('The room server isn’t switched on yet. Nothing to join.');
             return;
         }
-        const url = `${relayBase.replace(/\/$/, '')}/room?room=${app.roomId}&preview=${encodeURIComponent(previewKey)}`;
+        const url = `${relayBase.replace(/\/$/, '')}/room?room=${app.roomId}`;
         setGate('Connecting…');
-        const ws = new WebSocket(url);
+        const ws = previewKey ? new WebSocket(url, [previewKey]) : new WebSocket(url);
         app.ws = ws;
         ws.onmessage = (event) => onRelay(event.data);
         ws.onclose = (event) => {
@@ -318,7 +318,9 @@
     }
 
     ui.copy.addEventListener('click', async () => {
-        const link = win.location.href;
+        const linkUrl = new URL(win.location.href);
+        linkUrl.searchParams.delete('preview');
+        const link = linkUrl.href;
         try {
             if (navigator.share && /Mobi/.test(navigator.userAgent)) await navigator.share({ title: 'Hang out with Stalemate', url: link });
             else { await navigator.clipboard.writeText(link); say('Invite copied. Text it to your people.'); }

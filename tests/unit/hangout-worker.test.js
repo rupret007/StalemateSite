@@ -1,7 +1,7 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { admit, createBucket, limitsFrom, validFrame, previewKeyOk } from '../../hangout-worker/src/core.mjs';
-import worker, { HangoutQuota } from '../../hangout-worker/src/index.mjs';
+import worker, { HangoutQuota, HangoutRoom } from '../../hangout-worker/src/index.mjs';
 
 const KEY = 'k'.repeat(24);
 const ROOM = 'a'.repeat(64);
@@ -10,17 +10,17 @@ const url = (q) => new URL(`https://relay.example/room?${q}`);
 
 describe('hangout relay worker rules', () => {
     it('fails closed when the preview secret or bindings are missing', () => {
-        expect(admit({ url: url(`room=${ROOM}&preview=${KEY}`), origin: 'https://stalemate.band', env: {} })).toEqual({ status: 503, reason: 'not-configured' });
+        expect(admit({ url: url(`room=${ROOM}`), origin: 'https://stalemate.band', env: {}, previewKey: KEY })).toEqual({ status: 503, reason: 'not-configured' });
         expect(previewKeyOk('', undefined)).toBe(false);
         expect(previewKeyOk('short', 'short')).toBe(false);
     });
 
     it('checks exact origin, preview key and room id', () => {
-        const ok = { url: url(`room=${ROOM}&preview=${KEY}`), origin: 'https://stalemate.band', env };
+        const ok = { url: url(`room=${ROOM}`), origin: 'https://stalemate.band', env, previewKey: KEY };
         expect(admit(ok)).toBeNull();
         expect(admit({ ...ok, origin: 'https://stalemate.band.evil.com' }).status).toBe(403);
-        expect(admit({ ...ok, url: url(`room=${ROOM}&preview=nope`) }).reason).toBe('preview');
-        expect(admit({ ...ok, url: url(`room=xyz&preview=${KEY}`) }).status).toBe(400);
+        expect(admit({ ...ok, previewKey: 'nope' }).reason).toBe('preview');
+        expect(admit({ ...ok, url: url(`room=xyz`), previewKey: KEY }).status).toBe(400);
         expect(admit({ ...ok, origin: 'http://127.0.0.1:4320' }).status).toBe(403);
         expect(admit({ ...ok, origin: 'http://127.0.0.1:4320', extraOrigins: 'http://127.0.0.1:4320' })).toBeNull();
     });
@@ -58,10 +58,70 @@ describe('hangout relay worker rules', () => {
     });
 
     it('worker answers 503 when quota accounting is unreachable', async () => {
-        const broken = { ...env, QUOTA: { idFromName: () => 'x', get: () => ({ fetch: async () => { throw new Error('down'); } }) } };
-        const req = new Request(`https://relay.example/room?room=${ROOM}&preview=${KEY}`, { headers: { Upgrade: 'websocket', Origin: 'https://stalemate.band' } });
-        expect((await worker.fetch(req, broken)).status).toBe(503);
-        const noKey = new Request(`https://relay.example/room?room=${ROOM}`, { headers: { Upgrade: 'websocket', Origin: 'https://stalemate.band' } });
+        const brokenQuota = { idFromName: () => 'x', get: () => ({ fetch: async () => { throw new Error('down'); } }) };
+        const room = new HangoutRoom({ getWebSockets: () => [] }, { ...env, QUOTA: brokenQuota });
+        const rooms = { idFromName: () => 'room', get: () => room };
+        const req = wsRequest(ROOM, KEY);
+        expect((await worker.fetch(req, { ...env, QUOTA: brokenQuota, ROOMS: rooms })).status).toBe(503);
+        const noKey = wsRequest(ROOM, '');
         expect((await worker.fetch(noKey, env)).status).toBe(403);
     });
+
+    it('does not consume daily quota when admission fails before the room accepts', async () => {
+        let quotaTakes = 0;
+        const quotaBinding = {
+            idFromName: () => 'global',
+            get: () => ({
+                fetch: async () => {
+                    quotaTakes += 1;
+                    return new Response('ok');
+                }
+            })
+        };
+        const fullRoom = { fetch: async () => new Response('room full', { status: 429 }) };
+        const rooms = { idFromName: () => 'room', get: () => fullRoom };
+        const req = wsRequest(ROOM, KEY);
+        const res = await worker.fetch(req, { ...env, QUOTA: quotaBinding, ROOMS: rooms });
+        expect(res.status).toBe(429);
+        expect(quotaTakes).toBe(0);
+    });
+
+    it('accepts the preview key from Sec-WebSocket-Protocol, not the query string', () => {
+        const base = { url: url(`room=${ROOM}`), origin: 'https://stalemate.band', env };
+        expect(admit({ ...base, previewKey: KEY })).toBeNull();
+        expect(admit({ ...base, previewKey: 'nope' }).reason).toBe('preview');
+        expect(admit({ ...base, url: url(`room=${ROOM}&preview=${KEY}`), previewKey: undefined }).reason).toBe('preview');
+    });
+
+    it('echoes Sec-WebSocket-Protocol on the 101 when the client offered one', async () => {
+        globalThis.WebSocketPair = vi.fn(function WebSocketPair() {
+            return [{}, { send: () => {}, close: () => {} }];
+        });
+        let upgradeInit;
+        const ResponseMock = vi.fn(function Response(body, init) {
+            upgradeInit = init;
+            return {
+                status: init?.status,
+                headers: new Headers(init?.headers || {}),
+                webSocket: init?.webSocket
+            };
+        });
+        vi.stubGlobal('Response', ResponseMock);
+        const state = { getWebSockets: () => [], acceptWebSocket: vi.fn() };
+        const quotaBinding = {
+            idFromName: () => 'global',
+            get: () => ({ fetch: async () => ({ status: 200 }) })
+        };
+        const room = new HangoutRoom(state, { QUOTA: quotaBinding });
+        const res = await room.fetch(wsRequest(ROOM, KEY));
+        expect(res.status).toBe(101);
+        expect(res.headers.get('Sec-WebSocket-Protocol')).toBe(KEY);
+        expect(upgradeInit.headers).toEqual({ 'Sec-WebSocket-Protocol': KEY });
+    });
 });
+
+function wsRequest(room, previewKey) {
+    const headers = { Upgrade: 'websocket', Origin: 'https://stalemate.band' };
+    if (previewKey) headers['Sec-WebSocket-Protocol'] = previewKey;
+    return new Request(`https://relay.example/room?room=${room}`, { headers });
+}

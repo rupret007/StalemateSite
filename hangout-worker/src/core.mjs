@@ -46,14 +46,31 @@ export function previewKeyOk(given, expected) {
 }
 
 // Decide whether a WebSocket upgrade may proceed. Returns {status, reason} or null for OK.
-export function admit({ url, origin, env, extraOrigins }) {
+export function admit({ url, origin, env, extraOrigins, previewKey }) {
     if (!env || typeof env.HANGOUT_PREVIEW_KEY !== 'string' || !env.ROOMS || !env.QUOTA) {
         return { status: 503, reason: 'not-configured' };
     }
     if (!originAllowed(origin, extraOrigins)) return { status: 403, reason: 'origin' };
-    if (!previewKeyOk(url.searchParams.get('preview'), env.HANGOUT_PREVIEW_KEY)) return { status: 403, reason: 'preview' };
+    if (url.searchParams.has('preview')) return { status: 403, reason: 'preview' };
+    if (!previewKeyOk(previewKey, env.HANGOUT_PREVIEW_KEY)) return { status: 403, reason: 'preview' };
     if (!validRoomId(url.searchParams.get('room'))) return { status: 400, reason: 'room' };
     return null;
+}
+
+/** Preview gate secret travels in Sec-WebSocket-Protocol, never in the URL. */
+export function previewKeyFromProtocols(header) {
+    if (!header) return undefined;
+    const token = String(header).split(',').map((s) => s.trim()).find(Boolean);
+    return token || undefined;
+}
+
+export async function takeConnectionQuota(env) {
+    try {
+        const res = await env.QUOTA.get(env.QUOTA.idFromName('global')).fetch('https://quota/take', { method: 'POST' });
+        return res.status;
+    } catch (error) {
+        return 503;
+    }
 }
 
 export function validFrame(raw, limits = DEFAULTS) {

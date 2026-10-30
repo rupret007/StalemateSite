@@ -69,8 +69,18 @@ describe('hidden hangout room', () => {
     it('ships robots.txt and the room directory in the Pages package', () => {
         const script = readFileSync(join(repoRoot, 'scripts/package-pages.cjs'), 'utf8');
         expect(script).toContain("'robots.txt'");
-        expect(script).toMatch(/const DIRS = \[[^\]]*'r'[^\]]*\]/);
+        expect(script).toMatch(/copyHangoutRoomRuntime|HANGOUT_ROOM_FILES|const HANGOUT_ROOM/);
         expect(existsSync(join(repoRoot, 'r', 'index.html'))).toBe(false); // no listing page for /r/
-        expect(script).not.toContain(SLUG);
+        expect(script).not.toMatch(/preview=[A-Za-z0-9_-]{8,}/);
+    });
+
+    it('never puts the preview key in relay WebSocket URLs or copied invite links', () => {
+        const roomJs = readFileSync(join(ROOM, 'room.js'), 'utf8');
+        const wsUrlBlock = roomJs.match(/function connect\(\)[\s\S]*?ws\.onclose/m)?.[0] || '';
+        expect(wsUrlBlock, 'relay WebSocket URL').not.toMatch(/preview=/);
+        expect(wsUrlBlock, 'relay WebSocket URL').toMatch(/\/room\?room=\$\{app\.roomId\}/);
+        const copyBlock = roomJs.match(/ui\.copy\.addEventListener[\s\S]*?\}\);/)?.[0] || '';
+        expect(copyBlock, 'copy invite handler').toContain("searchParams.delete('preview')");
+        expect(copyBlock, 'copy invite handler').not.toMatch(/preview=/);
     });
 });

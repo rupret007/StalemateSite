@@ -2,7 +2,7 @@
 // Same admission rules and caps (from hangout-worker/src/core.mjs); in-memory only.
 import http from 'node:http';
 import { WebSocketServer } from 'ws';
-import { admit, createBucket, limitsFrom, validFrame } from '../hangout-worker/src/core.mjs';
+import { admit, createBucket, limitsFrom, previewKeyFromProtocols, validFrame } from '../hangout-worker/src/core.mjs';
 
 export function startRelay({ port = 0, previewKey = 'local-preview-key-0001', origins = '', connectionsPerDay } = {}) {
     const env = { HANGOUT_PREVIEW_KEY: previewKey, ROOMS: {}, QUOTA: {}, HANGOUT_CONNECTIONS_PER_DAY: connectionsPerDay };
@@ -11,17 +11,25 @@ export function startRelay({ port = 0, previewKey = 'local-preview-key-0001', or
     let connections = 0;
     let seq = 0;
     const server = http.createServer((req, res) => { res.writeHead(404); res.end(); });
-    const wss = new WebSocketServer({ noServer: true, maxPayload: limits.maxFrameBytes });
+    const wss = new WebSocketServer({
+        noServer: true,
+        maxPayload: limits.maxFrameBytes,
+        handleProtocols(protocols) {
+            const token = protocols?.values?.().next?.().value;
+            return token || false;
+        }
+    });
     server.on('upgrade', (req, socket, head) => {
         const url = new URL(req.url, 'http://relay');
         const reject = (status, reason) => { socket.end(`HTTP/1.1 ${status} ${reason}\r\n\r\n`); };
         if (url.pathname !== '/room') return reject(404, 'nope');
-        const denied = admit({ url, origin: req.headers.origin, env, extraOrigins: origins });
+        const previewKey = previewKeyFromProtocols(req.headers['sec-websocket-protocol']);
+        const denied = admit({ url, origin: req.headers.origin, env, extraOrigins: origins, previewKey });
         if (denied) return reject(denied.status, denied.reason);
-        if (connections >= limits.connectionsPerDay) return reject(429, 'cap');
         const roomId = url.searchParams.get('room');
         const room = rooms.get(roomId) || new Set();
         if (room.size >= limits.maxPeers) return reject(429, 'full');
+        if (connections >= limits.connectionsPerDay) return reject(429, 'cap');
         connections += 1;
         wss.handleUpgrade(req, socket, head, (ws) => {
             rooms.set(roomId, room);
