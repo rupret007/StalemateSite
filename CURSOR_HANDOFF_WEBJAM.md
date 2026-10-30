@@ -9,7 +9,14 @@ below describe the earlier checkpoint, not the current source.
 
 ## Start here
 
-Current work is **`codex/irc-webjam-polish-20261029`**, based on merged demo
+Current work is **`codex/jam-confirmation-races-20261030`**, based on PR166
+head `1504f94837a68ce35844e0590cde469135c287b4`. It preserves a same-host newer
+edit when a delayed publication redraw arrives and adds ordered-response cases
+for a room switch and local Stop. Initial local attempts were resource-refused;
+read the current checkpoint for actual execution evidence before qualification.
+PR166 remains preserved and awaits its normal owner-controlled review route.
+
+The preceding **`codex/irc-webjam-polish-20261029`** is based on merged demo
 commit `ec1eb14cfb2f7d068e5a01467193b70e21495dbc`. Its tree equals PR164's
 tested `41916eb`; Jeff merged PR163/164 on October 29. The new work retains
 rejected music invitations until confirmed room state, with 12 focused local

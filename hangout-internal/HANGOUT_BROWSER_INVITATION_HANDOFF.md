@@ -24,6 +24,13 @@ powers, disconnect and Stop still clear it. This is publication-state feedback,
 not proof that a particular command or downstream audio enrollment succeeded.
 The one pending paste stays in memory only and does not enter browser storage.
 
+If the same connected host edits the next paste while publication is delayed,
+confirmation of the submitted value preserves that newer edit through the
+room redraw. It does not submit the edit. An unrelated room's confirmation,
+room switch, authority loss or local Stop does not receive that preservation.
+This remains state confirmation, without a request-correlated acknowledgment
+or a queue of pending Share commands.
+
 Invitations remain room-scoped bearer capabilities. Existing room-switch,
 disconnect, host-power-loss and delayed-action fences remain in place. The
 local Stop action immediately retires room invitation controls, and cached
@@ -46,6 +53,15 @@ The popup is intercepted; these tests do not contact a Web Join endpoint.
 The Stop case uses synthetic own-status HTTP replies and a failed withdrawal;
 it proves the real client's immediate opt-out, not real server consent ordering.
 
+The invitation-lifecycle fixture can hold one connection's complete server
+stream in FIFO order, freezing each real-engine frame when emitted. New cases
+cover editing before publication arrives, another room's pending confirmation,
+and local Stop before a delayed confirmation. The queue has a fixed 1,000-frame
+test bound and cannot inject arbitrary frames or reorder the stream. The Stop
+case uses synthetic own-status HTTP, and the independent guest's already
+received invitation is not recalled. These are browser/engine races, not native
+music, revoked transport capability or hosted consent proof.
+
 No production origin, TURN/vault credential, provider or deployment is enabled
 by this change. Passing these journeys proves application handoff, not actual
 browser enrollment, live mixing, cross-network transport or physical audio.
@@ -58,3 +74,9 @@ focus or announcing invitation contents. This follows the purpose of
 [Jamulus setup guidance](https://jamulus.app/wiki/Getting-Started) recommends
 wired networking and wired headphones; retain that preparation advice without
 claiming it establishes measured WebJam latency or successful live audio.
+
+The delayed-response fixture preserves ordering in accordance with the
+[WebSocket framing rules](https://datatracker.ietf.org/doc/html/rfc6455#section-5.4).
+Avoiding unnecessary re-entry is also a design consideration in
+[WCAG's redundant-entry guidance](https://www.w3.org/WAI/WCAG22/Understanding/redundant-entry.html);
+preserving a newer edit here is an application improvement, not a WCAG audit.

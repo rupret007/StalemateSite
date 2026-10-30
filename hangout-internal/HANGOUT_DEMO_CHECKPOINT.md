@@ -1,10 +1,43 @@
 # Shared Hang Out / WebJam demo checkpoint
 
-Updated October 29, 2026. Goal active: finish the application for a private Che
+Updated October 30, 2026. Goal active: finish the application for a private Che
 demonstration and website integration. This is an application checkpoint, not
 deployment approval or a claim that the live beta contains these changes.
 
-## Current work: recover rejected music invitations
+## Current work: delayed invitation confirmations
+
+Branch: **`codex/jam-confirmation-races-20261030`**, based on PR166 head
+`1504f94837a68ce35844e0590cde469135c287b4`. PR166 remains open/ready with
+`needs-karen`; its source is preserved. A scoped independent source comment
+found no inspected blocker and identified delayed-confirmation coverage as a
+gap. No formal review or signed Karen verdict was observed.
+
+The same connected host's newer invitation edit now survives the synchronous
+room redraw caused by confirming an earlier submitted value. It is never
+automatically sent. Existing different-room, authority, disconnect and Stop
+fences remain. Three new real-engine browser cases hold the complete host-bound
+stream in FIFO order to check the newer edit, another room's pending response
+and local Stop before a delayed response. Own-status HTTP in the Stop case is
+synthetic; already delivered guest capabilities are not revoked by local Stop.
+
+Initial targeted local RED and GREEN attempts were refused **before Node** by
+the unchanged below-80-percent swap guard (80.82 percent at both observations).
+No executed new-case RED or local PASS is claimed. Current-source CI and review
+remain required. The following PR166 evidence applies only to its exact source:
+push41006231478 checked out `1504f94` and passed 1,858 units/114 files plus
+424 unique browser cases/424 attempts, with no retries, skips, flakes or report
+errors. Its 11 incident-review cases include the forced random-suffix regression.
+Fresh CI WebKit host/guest375/390 screenshots were inspected. The PR event's
+separate green metadata was observed, without independently decoding its report.
+Pages deployment checks were skipped. None of this is music or hosted proof.
+
+All 62 original outcomes remain unchanged. Owner-controlled review admission,
+the explicit eighth native CI mode, matching protected deployment and actual
+two-way ARM/Intel/Windows music remain dependencies. Linux scope and all holds
+are retained. Continue using the application integration handoff; preserve newer
+band-site pages and do not substitute a source asset archive for a release.
+
+## Previous work: recover rejected music invitations
 
 Branch: **`codex/irc-webjam-polish-20261029`**. Base:
 `ec1eb14cfb2f7d068e5a01467193b70e21495dbc`, the October 29 merge of PR164

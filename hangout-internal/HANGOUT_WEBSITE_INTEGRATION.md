@@ -7,9 +7,11 @@ not a release approval or evidence that a live website contains the candidate.
 
 ## Select one tested candidate
 
-Current readiness work is `codex/irc-webjam-polish-20261029`, based on the merged
+Current readiness work is `codex/jam-confirmation-races-20261030`, based on
+PR166 head `1504f94837a68ce35844e0590cde469135c287b4`. The parent
+`codex/irc-webjam-polish-20261029` is based on the merged
 `codex/che-demo-candidate` at `ec1eb14cfb2f7d068e5a01467193b70e21495dbc`; see the
-[checkpoint](HANGOUT_DEMO_CHECKPOINT.md#current-work-recover-rejected-music-invitations)
+[checkpoint](HANGOUT_DEMO_CHECKPOINT.md#current-work-delayed-invitation-confirmations)
 for its exact inputs and unresolved gates. Obtain the actual reviewed current
 commit, not just an input PR or branch name. This assembly includes both the
 music-invitation fixes and the reconnect probe; older input results do not

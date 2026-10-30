@@ -891,8 +891,12 @@ import { createEntrySharing } from './entry-sharing.mjs';
             const c = app.chans.get(m.ch.name);
             if (c) {
                 Object.assign(c, m.ch);
-                confirmJamShare(c);
+                const jamDraft = confirmJamShare(c);
                 if (app.active === c.name) drawChan();
+                // An own-share confirmation changes the room's invitation
+                // context. Keep a newer edit through that synchronous redraw,
+                // only while the same connected host still owns this editor.
+                if (jamDraft && currentJam() === c && amOp(c)) $('[data-jam-link]').value = jamDraft;
                 const r = room();
                 if (r) r.onChan(c);
             }
@@ -1157,8 +1161,10 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const confirmed = pending.web ? c.jam?.web : c.jam?.invitation || c.jam?.desktop;
         if (confirmed !== pending.sharedValue) return;
         const input = $('[data-jam-link]');
+        const newerDraft = input.value === pending.value ? '' : input.value;
         if (input.value === pending.value) input.value = '';
         pendingJamShare = null;
+        return newerDraft;
     }
     function drawJam() {
         if (app.sharingStopped || app.localMediaPaused) { resetJamControls(); $('[data-jam]').hidden = true; return; }
