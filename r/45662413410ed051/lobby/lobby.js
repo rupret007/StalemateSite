@@ -1181,9 +1181,11 @@ import { createEntrySharing } from './entry-sharing.mjs';
         desktop.hidden = !next.desktop;
         if (/^webjam:\/\//.test(next.desktop)) desktop.setAttribute('href', next.desktop);
         else desktop.removeAttribute('href');
-        $('[data-jam-wait]').hidden = !!(next.invitation || next.webReady); $('[data-jam-copy]').hidden = !next.invitation;
+        const shared = !!(next.invitation || next.webReady);
+        $('[data-jam-actions]').hidden = next.host && !shared;
+        $('[data-jam-wait]').hidden = shared; $('[data-jam-copy]').hidden = !next.invitation;
         const web = $('[data-jam-web]'); web.disabled = !next.webReady;
-        web.textContent = web.disabled ? 'Browser join unavailable' : 'Join in browser (higher delay)';
+        web.textContent = web.disabled ? 'Browser join unavailable' : 'Join in browser';
         web.title = web.disabled ? 'The host has not shared an approved browser invitation' : 'Open the host’s browser invitation; headphones and audio consent are required there';
         const context = jamContext;
         web.onclick = () => {
@@ -1753,6 +1755,13 @@ import { createEntrySharing } from './entry-sharing.mjs';
     });
     $('[data-cam-yes]').addEventListener('click', () => { if (app.localMediaPaused) return; if (!$('[data-adult]').checked) return toast('Tick the 18+ box first.'); send({ t: 'cam', ch: app.active, on: true, adult18: true }); return $('[data-cam-gate]').close(); });
     $('[data-cam-no]').addEventListener('click', () => $('[data-cam-gate]').close());
+    $('[data-jam-help]').addEventListener('toggle', (e) => {
+        const help = e.currentTarget, panel = $('[data-jam]');
+        if (!help.open || panel.hidden || !currentJam()) return;
+        // Reveal the first steps immediately, including while a toast uses
+        // workspace height. Keep native keyboard focus on the summary.
+        panel.scrollTop += help.getBoundingClientRect().top - panel.getBoundingClientRect().top - 8;
+    });
     $('[data-jam-form]').addEventListener('submit', (e) => {
         e.preventDefault();
         const c = currentJam(), input = $('[data-jam-link]');

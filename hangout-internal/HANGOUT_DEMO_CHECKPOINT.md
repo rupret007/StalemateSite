@@ -4,7 +4,43 @@ Updated October 30, 2026. Goal active: finish the application for a private Che
 demonstration and website integration. This is an application checkpoint, not
 deployment approval or a claim that the live beta contains these changes.
 
-## Current work: delayed invitation confirmations
+## Current work: compact Jam setup
+
+Branch: **`codex/jam-mobile-setup-20261030`**, based on PR167 head
+`143b3905af12e029a645e96769cc1d04cec018a5`. PR167 remains ready with
+`needs-karen`; no formal review or signed local verdict has been observed.
+The preceding branches and all 62 requirement outcomes remain preserved.
+
+The Jam panel now keeps its title, headphone/delay advice, explicit Mac-host and
+unsigned-Windows limits, and invitation actions together. Detailed setup uses
+native closed-by-default `details`/`summary`, including the full beta-app,
+private-invite, hosting, expiry and local-Stop limitations. A host without an
+invitation sees the editor instead of waiting for themselves. Labels and fields
+wrap; browser Join still needs an explicit click and approved server state.
+
+Six fresh local Chromium images were directly inspected: host/guest375/390 at
+844px height, plus keyboard-open help at both widths/667px height. The heading,
+warnings and actions are readable in the normal view; input/Send stay visible,
+inputs are at least16px, and the page does not overflow horizontally. Help keeps
+native focus and scrolls its first paragraph into the panel when opened. No
+page opening or capture occurs while using help.
+
+The first15-case local run passed before the screenshot review exposed a timing
+gap: transient toast feedback left only one line of opened help visible on short
+screens. A default-five-second assertion passed after that feedback disappeared;
+it did not prove immediate readability. The stricter one-second check failed
+at both widths (visible ratios0.134/0.167), with both original failures retained.
+After the panel scroll correction, all15 focused journeys passed once with
+zero retries/skips/report errors or stderr. Tested frontend/fixture hashes are
+recorded separately. Current-source CI and normal review are still required;
+no physical Safari, full accessibility, hosted consent or music proof is claimed.
+
+Owner-controlled application review, the explicit eighth native CI mode,
+approved runnable music packages/path and matching protected deployment remain
+dependencies. No core/workflow/service/shared operational or hold changes were
+made. AI/TURN/vault, trust/release and age/consent/camera safeguards remain.
+
+## Previous work: delayed invitation confirmations
 
 Branch: **`codex/jam-confirmation-races-20261030`**, based on PR166 head
 `1504f94837a68ce35844e0590cde469135c287b4`. PR166 remains open/ready with
@@ -22,8 +58,17 @@ synthetic; already delivered guest capabilities are not revoked by local Stop.
 
 Initial targeted local RED and GREEN attempts were refused **before Node** by
 the unchanged below-80-percent swap guard (80.82 percent at both observations).
-No executed new-case RED or local PASS is claimed. Current-source CI and review
-remain required. The following PR166 evidence applies only to its exact source:
+Later fresh guards admitted actual execution: new tests on parent1504 failed
+only the newer-edit assertion, while the room/Stop fence cases passed. Fixed143
+passed15 local Chromium cases/15 attempts, with no retries/skips/report errors
+and fresh375/390 images. Exact143 push41009684832/job123912504998 independently
+passed1,858units/114files plus430browser cases/430attempts, with zero retries,
+skips, flakes or report errors. All three new races passed Chromium and WebKit;
+fresh CI WebKit375/390 images were inspected. The separate PR event has green
+metadata only. [Current source-specific evidence](https://github.com/rupret007/StalemateSite/pull/167#issuecomment-6516077291)
+does not qualify the new panel, eighth native CI mode or actual music.
+
+The following PR166 evidence applies only to its exact source:
 push41006231478 checked out `1504f94` and passed 1,858 units/114 files plus
 424 unique browser cases/424 attempts, with no retries, skips, flakes or report
 errors. Its 11 incident-review cases include the forced random-suffix regression.

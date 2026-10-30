@@ -24,6 +24,29 @@ powers, disconnect and Stop still clear it. This is publication-state feedback,
 not proof that a particular command or downstream audio enrollment succeeded.
 The one pending paste stays in memory only and does not enter browser storage.
 
+## Finding setup help
+
+The compact music panel keeps platform availability and headphone/delay advice
+outside its expandable help. Copy/Join and the host editor remain direct actions.
+**Setup & invitation help** contains the full beta-app, paste, host, expiry and
+Stop instructions. It starts closed and uses native keyboard disclosure. Opening
+it scrolls the first steps into the panel without moving focus from the summary;
+closing it is the same native action. It neither opens a destination nor requests
+capture. The host's empty-state action row stays out of the way until an invitation
+exists; ordinary guests still see their waiting state.
+
+The375/390 browser journeys also check keyboard-open help at667px height, an
+immediately readable first paragraph, visible input/Send, at-least16px inputs,
+the normal title/platform warning, and no page overflow. This is partial browser
+accessibility coverage, not a full WCAG or physical screen-reader/iPhone audit.
+No framework, dependency, external component or copied code is added. The design
+uses the native [HTML disclosure element](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/details),
+with [reflow](https://www.w3.org/WAI/WCAG22/Understanding/reflow.html) and
+[visible-focus guidance](https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html)
+as constraints. Passing these cases does not establish conformance.
+
+## Publication and capability lifetime
+
 If the same connected host edits the next paste while publication is delayed,
 confirmation of the submitted value preserves that newer edit through the
 room redraw. It does not submit the edit. An unrelated room's confirmation,

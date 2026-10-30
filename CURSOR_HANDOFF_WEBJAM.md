@@ -9,12 +9,19 @@ below describe the earlier checkpoint, not the current source.
 
 ## Start here
 
-Current work is **`codex/jam-confirmation-races-20261030`**, based on PR166
+Current work is **`codex/jam-mobile-setup-20261030`**, based on PR167 head
+`143b3905af12e029a645e96769cc1d04cec018a5`. The Jam panel now puts its title,
+platform limits and actions ahead of native expandable setup help. Read the
+current checkpoint for the retained short-screen readability failure, local
+15-case proof and current CI/review status. All 62 outcomes remain intact.
+
+The preceding **`codex/jam-confirmation-races-20261030`** is based on PR166
 head `1504f94837a68ce35844e0590cde469135c287b4`. It preserves a same-host newer
 edit when a delayed publication redraw arrives and adds ordered-response cases
-for a room switch and local Stop. Initial local attempts were resource-refused;
-read the current checkpoint for actual execution evidence before qualification.
-PR166 remains preserved and awaits its normal owner-controlled review route.
+for a room switch and local Stop. Later local proof reproduced the parent
+failure and passed 15 fixed-client journeys. Exact143 CI passed 1,858 units and
+430 browser cases, each once. PR166/167 remain preserved and await their normal
+owner-controlled review route; those results do not qualify the new panel.
 
 The preceding **`codex/irc-webjam-polish-20261029`** is based on merged demo
 commit `ec1eb14cfb2f7d068e5a01467193b70e21495dbc`. Its tree equals PR164's

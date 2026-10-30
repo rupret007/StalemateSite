@@ -151,9 +151,41 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         expect(await guest.evaluate(() => window.audioRequests)).toBe(0);
         expect(await guest.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }))).not.toContain(WEB_INVITE);
         for (const [role, page] of [['host', host], ['guest', guest]]) {
+            await expect(page.locator('[data-jam-help]')).not.toHaveAttribute('open');
+            // Platform limits must remain visible without expanding setup help.
+            await expect(page.locator('[data-jam-platform]')).toBeVisible();
+            await expect(page.locator('[data-jam-platform]')).toContainText('A Mac hosts music');
+            await expect(page.locator('[data-jam-platform]')).toContainText('this unsigned beta cannot join natively');
+            expect(await page.locator('#jam-title').evaluate(title => {
+                const panel = title.closest('[data-jam]').getBoundingClientRect(), rect = title.getBoundingClientRect();
+                return rect.top >= panel.top && rect.bottom <= panel.bottom;
+            })).toBe(true);
             await page.screenshot({ path: testInfo.outputPath(`jam-browser-${role}-${width}.png`), fullPage: true });
             expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+            expect(await page.locator('[data-text]').evaluate(input => parseFloat(getComputedStyle(input).fontSize))).toBeGreaterThanOrEqual(16);
         }
+        expect(await host.locator('[data-jam-link]').evaluate(input => parseFloat(getComputedStyle(input).fontSize))).toBeGreaterThanOrEqual(16);
+        // Native disclosure remains keyboard-operable on a shorter phone too.
+        // Reading help must not open a music page or request capture.
+        await guest.setViewportSize({ width, height: 667 });
+        const help = guest.locator('[data-jam-help]'), summary = help.locator('summary');
+        await summary.focus(); await summary.press('Enter');
+        await expect(help).toHaveAttribute('open'); await expect(summary).toBeFocused();
+        await expect(help).toContainText('Sharing an invite does not turn on your microphone');
+        await expect(help.locator('p').first()).toBeInViewport({ ratio: 0.5, timeout: 1000 });
+        expect(await summary.evaluate(element => {
+            const panel = element.closest('[data-jam]').getBoundingClientRect(), rect = element.getBoundingClientRect();
+            return rect.top >= panel.top && rect.bottom <= panel.bottom;
+        })).toBe(true);
+        for (const selector of ['[data-text]', '[data-send]']) expect(await guest.locator(selector).evaluate(element => {
+            const rect = element.getBoundingClientRect(); return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight;
+        })).toBe(true);
+        expect(await guest.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await guest.screenshot({ path: testInfo.outputPath(`jam-help-keyboard-${width}.png`), fullPage: true });
+        await summary.press('Enter'); await expect(help).not.toHaveAttribute('open');
+        await expect(summary).toBeFocused();
+        expect(await guest.evaluate(() => window.browserOpens)).toHaveLength(1);
+        expect(await guest.evaluate(() => window.audioRequests)).toBe(0);
         await guest.locator('[data-jam-web]').evaluate(button => { window.oldBrowserJoin = button.onclick; });
         await guest.locator('[data-tabs] [role="tab"]').filter({ hasText: '#stalemate' }).click();
         await guest.evaluate(() => window.oldBrowserJoin());
