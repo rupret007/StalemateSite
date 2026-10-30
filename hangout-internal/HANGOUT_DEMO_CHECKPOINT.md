@@ -34,6 +34,15 @@ Observed local evidence, with original failures retained:
   Original logs remain preserved; the cause is under investigation, and this
   run is not recorded as green. A later diagnostic import was refused by the
   unchanged 80-percent swap guard before starting Node.
+- Follow-up source investigation found that this local-only fixture used random
+  identifier suffixes as nicknames without confirming admission. An admitted
+  diagnostic confirmed that `Authorb00b00`/`Visitorb00b00` are rejected by the real
+  nickname filter; the original failing run did not retain its random suffix.
+  The fixture now uses separate benign counter labels, keeps random opaque IDs
+  and requires a real welcome frame. A deterministic regression forces that
+  suffix through real report/preservation. Its initial targeted local run was
+  refused before Node by the swap guard; no local pass is claimed for that new
+  case until executed. Production filtering and the review controller are unchanged.
 - On **base `ec1eb14`**, the explicit eighth provider-start mode passed locally
   on macOS ARM64/Node26.12.0. Both phases matched 51 recorded inputs (49 tracked
   inputs tied to this commit) and 68 compiled inputs. Final evidence storage was
