@@ -5,6 +5,11 @@ Current application checkpoint: October 31, 2026. Start with the
 linked below. Older dated sections retain their original evidence and limits;
 their pending-CI and StoryPool-admission statements are historical.
 
+Read the [audit of all 62 outcomes](hangout-internal/HANGOUT_ACCEPTANCE_AUDIT_20261031.md)
+for current source/deployment/package distinctions, demonstrated scopes and every
+remaining outcome. WebJam PR411 and website PR181 are merged; the private music
+decision, resource admission and required physical trials remain pending.
+
 ## Start here
 
 **Latest source, packages and expiry observations:** read the
