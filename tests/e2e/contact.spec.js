@@ -55,24 +55,40 @@ test.describe('contact', () => {
     });
 
     test('form submit is intercepted and never hits FormSubmit live', async ({ page }) => {
-        let hitLive = false;
-        await page.route('**/*', async (route) => {
-            const url = route.request().url();
-            if (url.startsWith('https://formsubmit.co/')) {
-                hitLive = true;
-                await route.fulfill({ status: 200, body: 'stubbed' });
+        await page.route(FORMSUBMIT, async (route) => {
+            const request = route.request();
+            if (request.method() !== 'POST') {
+                await route.continue();
                 return;
             }
-            await route.continue();
+            const fields = request.postDataJSON();
+            const redirectTo = fields._next;
+            await route.fulfill({
+                status: 302,
+                headers: { Location: redirectTo }
+            });
         });
+
         await page.goto('/#contact');
         await page.locator('[data-contact-form] input[name="name"]').fill('Test Fan');
         await page.locator('[data-contact-form] input[name="email"]').fill('fan@example.com');
         await page.locator('[data-contact-form] textarea[name="message"]').fill('Loud show!');
-        await page.locator('[data-contact-form]').evaluate((form) => {
-            form.addEventListener('submit', (event) => event.preventDefault(), { once: true });
-            form.requestSubmit();
+
+        const [request] = await Promise.all([
+            page.waitForRequest((req) => req.method() === 'POST' && req.url() === FORMSUBMIT),
+            page.locator('[data-contact-form] button[type="submit"]').click()
+        ]);
+
+        const fields = request.postDataJSON();
+        expect(fields).toMatchObject({
+            name: 'Test Fan',
+            email: 'fan@example.com',
+            message: 'Loud show!',
+            _captcha: 'false',
+            _subject: 'New message from stalemate.band'
         });
-        expect(hitLive).toBe(false);
+        expect(fields._honey ?? '').toBe('');
+        expect(fields._next).toMatch(/\?contact=sent#contact$/);
+        expect(request.url()).toBe(FORMSUBMIT);
     });
 });
