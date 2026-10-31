@@ -401,7 +401,9 @@ for (const width of [375, 390]) test(`delayed owner metadata updates open host t
         await expect(palette).toBeVisible(); await expect(removal).toHaveCount(0);
         await expect(palette.locator('[data-palette-status]')).toContainText('Checking verified co-hosts');
         const focused = palette.getByRole('button', { name: 'Transfer ownership', exact: true });
-        await focused.focus();
+        for (let step = 0; step < 30 && !await focused.evaluate(element => element === document.activeElement); step++)
+            await returned.keyboard.press('Tab');
+        await expect(focused).toBeFocused();
         await returned.screenshot({ path: testInfo.outputPath(`owner-tools-waiting-${width}.png`), fullPage: true });
         releaseOwnership();
         await expect(removal).toBeVisible(); await expect(focused).toBeFocused();
