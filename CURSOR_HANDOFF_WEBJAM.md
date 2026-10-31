@@ -11,7 +11,10 @@ their pending-CI and StoryPool-admission statements are historical.
 [October 31 continuation](hangout-internal/HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md)
 and its sanitized receipt before older pending/running statements. Native PR410
 and website PR178 are merged; the four matching private-beta packages built
-successfully. The real eight-hour observer is terminal FAILED because its lobby
+successfully. The new ARM package passed sealed identity, normal Join recovery
+and idle transport checks. Private source 4ed1525 now runs as version a972, with
+inspected hosted 375/390/short layout, logout/asset denial and healthy read-only
+checks. No actual music ran. The real eight-hour observer is terminal FAILED because its lobby
 predicate expected `offline` instead of the app's `ended` state. The separate
 diagnosis retains actual socket/HTTP/cleanup observations and ending deployment
 identity without relabeling that failed run. Physical music remains unqualified.
@@ -23,29 +26,30 @@ checks also passed locally. A separate native Chrome Guest journey confirmed
 the full input and Send remain visible at actual 400% and 200% zoom, with a
 saved copy retained and a normal message submitted through Tab/Space. The
 original native failure and both intermediate CI failures remain recorded.
-This is local/CI proof; hosted deployment and physical music are separate.
+The newer dated note adds private deployment/layout evidence separately; physical
+music remains unqualified.
 
 **Native PR410 merged as`bf24e7d`.** Its source-identical full CI ran all555
-modules once:12,796 passed,60 skipped; all16 applicable checks passed. One
+modules once:12,796 passed, 60 skipped; all 16 applicable checks passed. One
 matching private-beta package run completed successfully:
 [41193954131](https://github.com/rupret007/webjam/actions/runs/41193954131),
 branch`codex/private-web-join-test-bf24e7d-20261031`. Do not dispatch another.
 All four builders verified their actual bundled private target. The ARM archive
-download passed its published digest and ZIP integrity; local mounted-package,
-installation and physical music remain separate proof. Provider
+download, sealed bundle, idle transport and normal launcher/recovery passed;
+actual browser invitation, installation and physical music remain separate. Provider
 and release holds are unchanged. The bb40 package below remains the previous
 qualified cohort, not a private-beta profile artifact.
 
 [Browser music destination and prerequisites](hangout-internal/HANGOUT_WEB_JOIN_READINESS_20261031.md):
 WebJam PR410 adds build-bound protected-community invitations. Its complete CI
-and matching four-platform private builds passed; new local frozen GUI and
-physical music proof remain. The read-only
+and matching four-platform private builds and new ARM frozen GUI passed; actual
+Web Join and physical music proof remain. The read-only
 issuer inventory lacks the separate browser bindings. The normal frozen app's
 LAN route is not automatically selectable. Preserve provider/release holds and
 use the ordered qualification plan before physical music. The existing bb40
 package and website observations below remain their own evidence.
 
-**Current ARM package and native accessibility now pass.** Read the
+**Earlier bb40 ARM package and accessibility proof.** Read the
 [bb40 package/GUI receipt](hangout-internal/HANGOUT_NATIVE_PACKAGE_BB40_20261031.md)
 and its actual screenshot/native snapshots. Archive/source/signature/architecture
 and the production transport lifecycle passed. The frozen Mac app exposes the
@@ -74,7 +78,7 @@ their source/failures retained. No StoryPool application gate was used.
 for the actual screenshot and macOS accessibility snapshot. Source83 correctly
 refused a malformed invitation before opening a workspace. Its accessibility
 tree omitted the visible recovery explanation; application PR408 merged as
-`a62f01f` after all550 test modules ran once (12,626 passed,60 skipped).
+`a62f01f` after all550 test modules ran once (12,626 passed, 60 skipped).
 The newer bb40 package observation above demonstrates the correction separately.
 The test app is closed and saved settings metadata is unchanged. This was not
 a music/capture test. Windows PR409 subsequently merged as`bb40fac`; its full CI
@@ -89,7 +93,7 @@ signing/public-release jobs were skipped. The ARM download, signature, embedded
 source and production transport lifecycle are verified. Earlier GUI resource
 refusals remain in the evidence; admission later succeeded. Physical music
 remains unqualified. The website remains
-on96/runtime629 during the real eight-hour observer; do not redeploy it yet.
+on96/runtime 629 during the real eight-hour observer; do not redeploy it yet.
 
 **October30 evening: the private demo has now been upgraded.** Read
 [the current release and test receipt](hangout-internal/HANGOUT_PRIVATE_DEMO_20261030.md)

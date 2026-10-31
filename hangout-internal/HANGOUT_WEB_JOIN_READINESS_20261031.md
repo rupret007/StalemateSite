@@ -11,8 +11,8 @@ StoryPool checkouts, services, configuration, locks and operational files.
 | --- | --- | --- |
 | Qualified native package cohort | `bb40fac7fcaa032c2f19cf9af8c49ac4276d3cf1`, run41181580413; all four desktop builds passed | Actual ARM archive/transport/Join accessibility proof is separate from physical music; see the [package receipt](HANGOUT_NATIVE_PACKAGE_BB40_20261031.md) |
 | New application routing source | [WebJam PR410](https://github.com/rupret007/webjam/pull/410), merged `bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35`, tree `1c04fb436337987cca75054be54d3695db0db194`; all 555 modules ran once, 12,796 passed and 60 skipped | Source/CI proof is separate from real music |
-| Matching private-beta builds | [Run 41193954131](https://github.com/rupret007/webjam/actions/runs/41193954131), all four desktop builders and target verification steps succeeded; ARM archive digest/ZIP integrity passed | New local mounted-package/GUI/installation and physical music remain unqualified; see the [dated receipt](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md) |
-| Private community | Source `96f356a6f2a9af4bbd2834bb94f1e5df81d200dd`, runtime `6293386f-31b8-4415-bf0b-f81296190a4d` | Hosted chat/drawing proof does not qualify hosted Web Join or audio |
+| Matching private-beta builds | [Run 41193954131](https://github.com/rupret007/webjam/actions/runs/41193954131), all four desktop builders and target checks succeeded; actual ARM archive/bundle/source/signature/private target, idle transport and normal GUI/recovery passed | Actual browser invitation, installation and physical music remain unqualified; see the [dated receipt](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md) |
+| Private community | Source `4ed1525c84f48173077f506261cb5acd19e3c1dc`, runtime `a9724702-3ce5-418a-bbd4-950f2e169c9e`; hosted 375/390/short layout, logout/asset denial and read-only health passed | Earlier chat/drawing/expiry evidence stays bound to source 96/runtime 629; neither qualifies actual Web Join or audio |
 | TURN issuer | Normal read-only deployment/version queries at 08:50–08:51 UTC observed version `e7cda1bb-be95-4824-a363-924ff6f2948b`, created October16 | No credentials were read or minted; deployment/configuration remained unchanged |
 
 PR410 replaces the native host's fixed public browser page with two build-time
@@ -55,7 +55,7 @@ These focused results do not qualify an actual new package or physical music.
 
 The sourcebb40 audit found that the ordinary packaged host with its sidecar
 selects `direct-stun`. Its normal launcher does not expose a separate packaged
-version2 LAN selector. The documented LAN protocol accepts only RFC1918 hosts;
+version 2 LAN selector. The documented LAN protocol accepts only RFC1918 hosts;
 Tailscale administration at100.x does not make that address eligible. A LAN
 procedure in a document is not proof that the current frozen app offers it.
 Do not remove the sidecar, source-run the test, fake a platform/frozen flag or
@@ -75,16 +75,18 @@ putting both devices on Wi-Fi does not bypass that issuer requirement.
 
 1. PR410's source, full CI, normal merge and one matching four-target private
    package run are qualified as described above. Do not rebuild unchanged.
-   Continue local package/GUI verification of actual bundled target/source,
-   archive hashes, existing platform trust and normal app behavior; retain
+   ARM bundled target/source, archive hashes, platform trust and normal launcher
+   recovery are demonstrated in the dated receipt. Continue remaining actual
+   browser invitation, installation and physical-device checks; retain
    failures. Do not relabel an old public-target package as the new candidate.
 2. The original eight-hour observer is terminal FAILED with a confirmed
    `offline`/`ended` predicate mismatch. The [dated observation](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md)
    retains actual 4401 socket closes within the original 90-second deadline,
    HTTP/token denial, cleanup and unchanged post-expiry deployment identity.
    Preserve the original failure and reconnect budgets; no corrected observer
-   run or provider/music result is claimed. Website PR178 is merged but its
-   separate private application deployment remains to qualify.
+   run or provider/music result is claimed. Website PR178 now runs privately as
+   source 4ed/version a972 with separate layout/logout/health evidence; all existing
+   bindings and settings are unchanged.
 3. Review the actual protected page and exact browser Origin with the matching
    issuer source. The read-only issuer inventory had desktop key bindings but
    no `WEB_TURN_KEY_ID`, `WEB_TURN_KEY_API_TOKEN` or `CORS_ALLOWED_ORIGINS` binding.

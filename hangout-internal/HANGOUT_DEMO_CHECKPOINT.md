@@ -9,15 +9,17 @@ below; historical sections describe their own revisions and earlier limitations.
 Start with the [latest dated application evidence](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md).
 PR410 is merged and its four matching private-beta builds succeeded. Website
 PR178 is merged after current-head CI and actual native 400%/200% verification;
-its fix is not yet deployed. The eight-hour observer is terminal FAILED with a
+source 4ed now runs privately as version a972 with inspected hosted 375/390 and
+retained-copy layout, logout/asset denial and healthy read-only checks. The new
+ARM package/launcher/idle transport also passed. The eight-hour observer is terminal FAILED with a
 confirmed `offline`/`ended` predicate mismatch. Its original failure, actual
 expiry observations and unchanged ending deployment identity are separate
 evidence. The earlier pending/running descriptions below are historical.
 
 [Browser music destination and prerequisites](HANGOUT_WEB_JOIN_READINESS_20261031.md):
 WebJam PR410 adds build-bound protected-community invitations. Current-source
-CI, merge and all four matching private builds passed; new local frozen GUI and
-physical music remain to qualify. The read-only
+CI, merge, all four matching private builds and new ARM frozen GUI passed; actual
+Web Join and physical music remain to qualify. The read-only
 issuer inventory lacks the separate browser bindings. The normal frozen app's
 LAN route is not automatically selectable. Preserve provider/release holds and
 use the ordered qualification plan before physical music. The existing bb40
@@ -75,12 +77,12 @@ outsider denial and reciprocal drawing at375/390. Separate real reload,
 fresh-scrollback and logout/copied-cookie denial checks passed in both engines.
 One benign report was acknowledged and queued; Jeff's human disposition remains.
 A new actual eight-hour observer started October31 at04:08UTC, due12:08:30UTC.
-Keep runtime629/source96, assets, configuration and identity keys unchanged until
+Keep runtime 629/source 96, assets, configuration and identity keys unchanged until
 it is terminal. A running observer is not an expiry pass; the October19 failure
 remains. Four native builds passed; physical two-way music, current authorized
 human review and all other unverified62 outcomes remain. Native PR407's
 pre-workspace role/Join guard merged as`83d2950` after all550 tracked modules
-ran once:12,622 passed,60 skipped, zero failures/errors. The reviewed927 head,
+ran once:12,622 passed, 60 skipped, zero failures/errors. The reviewed927 head,
 actual CI checkout and merged source have the same tree. Matching private
 packaging completed in run41168394794. The ARM package's bounded static,
 transport and launcher checks are recorded separately from physical audio.

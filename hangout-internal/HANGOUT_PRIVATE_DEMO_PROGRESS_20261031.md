@@ -1,109 +1,135 @@
 # Private demo: October 31 application evidence
 
-This work is owned directly in the application session. It does not route
-application changes through StoryPool/Karen or modify shared services,
-checkouts, locks or operational state. Existing GitHub protections and all
-[62 requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md) remain in force.
+Updated at 13:00 UTC. This session owns application changes directly, without a
+StoryPool/Karen application route. Shared services, checkouts, locks and
+operational state are untouched. All
+[62 original requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md) remain in force.
 
-## What changed
+## Current private website
 
-The native host now uses a bounded, build-bound first-party destination for
-browser invitations. A private-beta package selects the protected community;
-public packages retain their established first-party page. Runtime URL and
-user-environment overrides cannot choose another destination. Invalid, missing,
-symlinked or wrong-build metadata fails before bridge/capability allocation.
-This changes the invitation page only, not transport selection or permission.
+[Website PR178](https://github.com/rupret007/StalemateSite/pull/178) merged as
+`4ed1525c84f48173077f506261cb5acd19e3c1dc`. Its reviewed final head
+`a56c2ff08b9a86ba3627b8fd787baef867630fa5` has the same complete tree,
+`2144677d638fee4b078a18e75892db9d75c6acdc`. Both required workflows passed;
+the inspected final-head job passed 1,869 unit cases and 438 browser cases in 438
+attempts, with no retry markers. Both new focused cases also passed locally.
+Separate actual native Chrome 400%/200% checks demonstrated visible input/Send
+and Tab/Space delivery with a saved copy retained. Original native and
+intermediate CI failures remain in the
+[zoom note](HANGOUT_NATIVE_BROWSER_ZOOM_20261031.md).
+
+The invitation-only beta now runs this exact merged source as version
+`a9724702-3ce5-418a-bbd4-950f2e169c9e`, deployed at 12:50 UTC. The only application
+change since source 96 is chat CSS. All 65 packaged files matched tracked source
+and excluded private values. All 17 effective variables, five Durable Object
+bindings, five secret-binding metadata entries and runtime settings remained
+exactly equal. Previous version`6293386f-31b8-4415-bf0b-f81296190a4d` remains
+available for rollback. No secret value, namespace or provider setting changed.
+
+Actual hosted WebKit passed 375×812, 390×844 and 300×299 with a rejected copy
+retained in the short view. Page/body width stayed within each viewport;
+input/Send corners were uncovered and input text was 16px. Captures were
+inspected. One ordinary guest used real admission and a real socket. No room
+was created or ordinary chat intentionally published. JSON logout returned 200,
+then the protected asset returned 401. Context and browser cleanup completed.
+These are browser viewport checks, separate from physical iPhone/native zoom.
+
+The first hosted attempt remains FAILED: it assumed one WebKit Tab focuses
+Send and omitted the JSON logout body, returning 403. The later run records
+actual Tab targets (BODY/DIV) and uses ordinary locator focus for viewport
+measurement; it makes no WebKit keyboard-pass claim. The original failure and
+unconfirmed first logout remain recorded. Its browser/context closed and no
+room was created; no original-session revocation is claimed. Actual native
+Chrome/CI Tab/Space evidence is separate.
+
+An authenticated read-only probe returned healthy/HTTP 200 with no issues,
+storage reads only, no provider checks, state writes or notifications. Ending
+deployment metadata confirmed 100% traffic on version a972 after the layout run.
+
+![Hosted WebKit at390px](../pr-assets/beta-collaboration/20261031/private-demo-progress/hosted-390x844.png)
+
+## Native source and new private packages
 
 [Native PR410](https://github.com/rupret007/webjam/pull/410) merged as
-`bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35`. Its reviewed head
-`7faf4edd6943eb87cb98b0381e25cb37f8c063e5`, actual CI checkout
-`619a32f1d947a9f73beef4d79580c5915b903665` and merged source have the same tree,
-`1c04fb436337987cca75054be54d3695db0db194`. The main CI ran all 555 tracked
-modules once, in order: 12,796 passed, 60 skipped. All 16 applicable checks passed.
-The earlier workflow-size and release-assertion failures remain preserved.
+`bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35`. Reviewed head 7faf4ed, actual CI
+checkout 619a32f and merged source share tree
+`1c04fb436337987cca75054be54d3695db0db194`. All 555 tracked modules ran once in
+order: 12,796 passed, 60 skipped; all 16 applicable checks passed. Earlier failures
+are preserved in the [routing readiness note](HANGOUT_WEB_JOIN_READINESS_20261031.md).
 
 Exactly one matching [private package run 41193954131](https://github.com/rupret007/webjam/actions/runs/41193954131)
-completed successfully on that merged source. ARM Mac, Intel Mac, Windows and
-Linux builders each passed their actual bundled Web Join target verification.
-The run has 16 successful jobs and six expected skips. Signing, publication,
-one-hour and unapproved-headless inputs stayed off. Four unexpired artifacts
-are pinned by ID, exact size and SHA256 in the accompanying sanitized receipt.
-Do not dispatch another unchanged build.
+completed successfully. ARM Mac, Intel Mac, Windows and Linux each passed their
+actual bundled Web Join target verification. There were 16 successful jobs and
+six expected skips. Signing, publication, one-hour and unapproved-headless
+inputs stayed off. The sanitized receipt pins all four unexpired artifact IDs,
+exact sizes and SHA256 digests. Do not dispatch another unchanged build.
 
-The ARM archive downloaded with the published digest and passed ZIP integrity.
-It has not yet been extracted, mounted, installed or exercised as the new frozen
-GUI. A successful package build is not proof of physical music. The existing
-bb40 package/GUI observation remains valid for that older public-target source.
+The ARM download matched its published digest and ZIP integrity. Later recovered
+headroom admitted extraction with 15.48 GiB projected after expansion. The sealed
+app passed strict deep signature, ARM architecture, embedded source, transport
+digest and canonical private-target checks through the production reader. The
+actual packaged sidecar passed ready/hello in idle state and clean Stop under
+the production signature policy. No installer, quarantine-removal script or
+signing change ran. Keep the existing 15 GiB reserve for subsequent work.
 
-## Native zoom correction
+The normal frozen app opened from that bundle; actual process path and embedded
+build were checked before input. An incomplete encrypted invitation failed
+before connection. Its full explanation was visible and exposed in AX, editing
+cleared it, and Return-key retry restored it. Back returned to the launcher.
+The original process exited on Close; a following app AX read observed a new
+same-bundle launcher process. That owned replacement was closed without another
+app activation/read, then OS checks confirmed no app/transport remained and
+saved-settings metadata was unchanged. This observation is retained instead of
+claiming cleanup from one PID alone. No music/provider or actual Web Join action
+ran. Installation and physical music remain unqualified.
 
-[Website PR178](https://github.com/rupret007/StalemateSite/pull/178) fixes a real
-400% composer-clipping defect when a rejected-message copy is retained. The
-implementation at `80a1a5d` passed 1,869 units and 438 browser cases, including
-two new real-socket short-screen cases. Both focused cases also passed locally
-with one worker and retries disabled. A separate native Chrome Guest journey
-confirmed actual 400% and 200% zoom: the complete input and Send stayed visible,
-Tab/Space delivered a normal message, and the rejected copy remained saved.
-Before/after captures and exact source hashes are committed. See the
-[native-browser-zoom note](HANGOUT_NATIVE_BROWSER_ZOOM_20261031.md) for failure
-history and proof boundaries. Final head `a56c2ff08b9a86ba3627b8fd787baef867630fa5` passed both required
-CI workflows. PR178 merged as `4ed1525c84f48173077f506261cb5acd19e3c1dc`;
-reviewed and merged trees match. The fix is not yet deployed.
+[Actual new-package recovery capture](../pr-assets/beta-collaboration/20261031/private-demo-progress/native-incomplete-invite.jpg)
+and its AX/edit/retry/Back snapshots are included in the receipt. Older bb40
+package/GUI proof remains scoped to that earlier public-target source.
 
-## Real eight-hour expiry: observed behavior and failed observer
+## Eight-hour expiry: original failure and separately observed behavior
 
-One normally admitted guest ran from 04:08:30 UTC with actual natural expiry at
+One normally admitted guest ran from 04:08:30 UTC, with actual natural expiry at
 12:08:30.618 UTC. The original observer ended FAILED at 12:10:01.073 UTC with
-`natural-expiry-socket-observation-timeout`. Its original script and failed
-receipt are unchanged. No clock/TTL change, re-admission or manual reconnect was
-used, and no media, chat or report was sent by this run.
+`natural-expiry-socket-observation-timeout`. Its original script and receipt are
+unchanged. No clock/TTL change, re-admission, manual reconnect, media, chat or
+report was used in that run.
 
-The terminal receipt records the current private socket closing 4401 at +26ms
-and the late same-session lobby socket closing 4401 at +47,429ms. Both are within
-the original 90-second allowance. Private-room state ended and hid the room;
-lobby state became `ended` with no replacement attempt. Expired state/asset HTTP
-requests and the original expired token were denied 401. Owned browser and
-idle-sleep helper cleanup completed.
+Its terminal record has the current private socket closing 4401 at +26ms and the
+late same-session lobby socket closing 4401 at +47,429ms, both within the original
+90-second allowance. The private room ended/hidden; the lobby became `ended`
+with no replacement attempt. Expired state/asset HTTP and the original expired
+token were denied401. Owned browser and idle-sleep helper cleanup completed.
+The observer incorrectly required lobby `offline`; exact deployed source handles
+4401 with `endSession()` and finishes in `ended`. A separate diagnostic records
+these observed criteria without relabeling the original run PASS. A future
+helper copy corrects the expectation but has not run; it remains bound to the
+old source/runtime and must not be run against the new deployment unchanged.
 
-The observer's completion predicate incorrectly required lobby state `offline`.
-The exact deployed source handles 4401 with `endSession()` and finishes in state
-`ended`. This mismatch explains the timeout; a separate diagnostic records the
-actually observed criteria. It does not relabel the original automated run PASS
-or claim a newly corrected observer has run. A future helper copy corrects the
-state expectation and has not been executed.
+Normal post-expiry reads at 12:23–12:25 UTC confirmed the then-current 100%
+deployment remained source 96/runtime 629, before the later CSS-only upgrade.
+The original 10500 read error is preserved separately from its successful retry.
+Those expiry observations are not a new eight-hour test of version a972.
 
-Normal post-expiry Cloudflare reads at 12:23–12:25 UTC confirmed the latest
-100%-traffic deployment still uses `6293386f-31b8-4415-bf0b-f81296190a4d`, source
-`96f356a6f2a9af4bbd2834bb94f1e5df81d200dd`. The immutable version has the same
-17 plain variables and five Durable Object bindings. No secret value was read.
-The earlier 10500 read error is retained separately; its later read succeeded.
+## Remaining work
 
-## Remaining work in dependency order
+1. Finish actual browser invitation, installation and physical-device use. The
+   normal frozen host still selects direct-stun; its version 2 LAN route is not
+   automatically exposed. Tailscale 100.x is not an eligible RFC1918 invitation.
+2. Preserve AI, TURN/vault, native-trust, purchases/signing and public-release
+   holds. Browser-scoped issuer bindings/exact origins remain absent. Same
+   Wi-Fi and unsigned Windows do not bypass those prerequisites. Prepare the
+   concrete owner decision through the existing documented plan; no activation
+   is implied by this receipt.
+3. Demonstrate real reciprocal music involving the ARM Mini, Intel MacBook Pro
+   and Windows, retaining Linux. Record exact builds, networks, explicit capture
+   consent, usable audio, errors and Stop/leave. Packages, synthetic checks and
+   same-machine echo do not qualify physical music.
+4. Jeff's authorized disposition of the current benign report remains separate
+   from server acknowledgement. Keep other reports untouched. Continue the
+   remaining 62 outcomes and receiving-site integration handoff without reducing
+   legal, accessibility or capacity requirements.
 
-1. The website fix is merged. Qualify its separate private application
-   deployment when resource guards admit it. The private deployment remains
-   source96; source/CI/native zoom do not substitute for a new hosted observation.
-2. Resume normal package inspection only when resource guards admit it. The
-   ARM download was admitted with 16.29 GiB free and 15.87 GiB projected; later
-   disk headroom fell below 15 GiB. No extraction was started. A read-only DMG
-   inspection can avoid another expanded app copy; preserve signature and
-   quarantine behavior, and verify the exact mounted source and target.
-3. Preserve AI, TURN/vault, native-trust, purchases/signing and public-release
-   holds. The browser issuer lacks its separate browser-scoped credentials and
-   exact origins; an advertised link or same-Wi-Fi connection does not solve it.
-   The normal frozen app does not expose the documented version 2 LAN route.
-   Unsigned Windows is not a signed native remote-transport pass.
-4. Finish actual two-way music with ARM Mini, Intel MacBook Pro and Windows
-   through an approved path; retain Linux. Record devices, builds, networks,
-   consent, usable audio, errors and Stop/leave. Synthetic checks, package
-   verification and same-machine echo do not satisfy this requirement.
-5. Jeff's authorized disposition of the current benign report remains separate
-   from automated acknowledgement. Keep other reports untouched. Continue
-   remaining acceptance, legal, accessibility and capacity evidence and the
-   receiving-site integration handoff without reducing the original outcomes.
-
-The community remains private. No public launch, paid service, credential
-activation or broad security-policy change occurred in this application work.
-
-[Sanitized source/artifact/expiry receipt](../pr-assets/beta-collaboration/20261031/private-demo-progress/receipt.json)
-retains the exact package identities and limited observed expiry criteria.
+[Sanitized source/artifact/expiry/deployment receipt](../pr-assets/beta-collaboration/20261031/private-demo-progress/receipt.json)
+contains exact identities, geometry, original failures and scoped checks.
+The community remains private; there was no public launch or paid activation.
