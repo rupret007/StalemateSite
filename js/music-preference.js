@@ -89,6 +89,8 @@
             global.dispatchEvent(new CustomEvent('stalemate-music-change', { detail: { on: isOn() } }));
         });
         global.addEventListener('stalemate-music-change', function () {
+            syncDocument();
+            global.document.querySelectorAll('[data-music-toggle]').forEach(renderToggle);
             if (!isOn()) pauseSiteBackgroundMedia();
         });
     }

@@ -22,7 +22,9 @@
     }
 
     function musicOn() {
-        return !pref() || pref().isOn();
+        var p = pref();
+        if (!p) return true;
+        return p.isOn();
     }
 
     function mediaRoot() {
@@ -288,8 +290,8 @@
             }
             toggle(id, button);
         });
-        global.addEventListener('stalemate-music-change', function () {
-            if (!musicOn() && audio) {
+        global.addEventListener('stalemate-music-change', function (event) {
+            if (event.detail && !event.detail.on && audio) {
                 try { audio.pause(); } catch (e) { /* */ }
             }
             syncButtons();

@@ -111,10 +111,21 @@
     isMuted() { return muted; },
     isMusicEnabled() { return musicEnabled; },
     setMusicEnabled(on) {
-      musicEnabled = !!on;
+      on = !!on;
+      if (musicEnabled === on) {
+        syncMusicToggleUi();
+        if (musicEngine && typeof musicEngine.sync === 'function') musicEngine.sync();
+        return;
+      }
+      musicEnabled = on;
       writeMusicEnabled(musicEnabled);
       syncMusicToggleUi();
       if (musicEngine && typeof musicEngine.sync === 'function') musicEngine.sync();
+      try {
+        if (typeof window.CustomEvent === 'function') {
+          window.dispatchEvent(new window.CustomEvent('stalemate-music-change', { detail: { on: musicEnabled } }));
+        }
+      } catch (e) {}
     },
     playManic() {
       if (!musicEnabled) return;
@@ -748,6 +759,31 @@
   // table waiting. The static "no sign-in" badge reassures first-timers; a
   // player who already has a live table is better served by the shortcut.
   // Reads the same validated continue list the cards use; writes no storage.
+  function applySiteMusicPref(on) {
+    on = !!on;
+    if (musicEnabled === on) {
+      syncMusicToggleUi();
+      if (musicEngine && typeof musicEngine.sync === 'function') musicEngine.sync();
+      return;
+    }
+    musicEnabled = on;
+    writeMusicEnabled(musicEnabled);
+    syncMusicToggleUi();
+    if (musicEngine && typeof musicEngine.sync === 'function') musicEngine.sync();
+  }
+
+  function wireSiteMusicPref() {
+    try {
+      window.addEventListener('stalemate-music-change', function (event) {
+        if (event && event.detail && typeof event.detail.on === 'boolean') {
+          applySiteMusicPref(event.detail.on);
+        } else {
+          applySiteMusicPref(readMusicEnabled());
+        }
+      });
+    } catch (e) {}
+  }
+
   function syncMusicToggleUi() {
     try {
       const btn = document.getElementById('suite-music-toggle');
@@ -1005,6 +1041,7 @@
   function boot() {
     migrateStalemateMusic();
     musicEnabled = readMusicEnabled();
+    wireSiteMusicPref();
     try {
       if (isSuiteHubPage(currentPageName())) {
         document.body.classList.add('suite-hub-door');
@@ -1034,6 +1071,7 @@
     }
     window.addEventListener('storage', function (event) {
       if (event.key === 'turdsuite_muted') { muted = event.newValue === '1'; notifySoundState(); }
+      else if (event.key === STALEMATE_MUSIC_KEY) { applySiteMusicPref(readMusicEnabled()); }
       else if (event.key === EFFECTS_VOLUME_KEY) {
         const next = event.newValue === null ? .65 : Number(event.newValue);
         if (Number.isFinite(next)) { effectsVolume = Math.max(0, Math.min(1, next)); notifySoundState(); }
