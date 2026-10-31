@@ -40,8 +40,8 @@ module.exports = defineConfig({
         {
             name: 'webkit-community',
             // Phone projects select a different file set. Exercise the shared
-            // entrance, invitation/Stop and authored contrast checks in WebKit.
-            testMatch: /(?:community-entry|community-moderation|lobby-contrast|lobby-webjam|lobby-invitation-lifecycle)\.spec\.js$/,
+            // entrance, keyboard/focus, motion, contrast and invitation/Stop checks.
+            testMatch: /(?:community-entry|community-moderation|lobby-accessibility|lobby-contrast|lobby-webjam|lobby-invitation-lifecycle)\.spec\.js$/,
             use: { browserName: 'webkit' }
         },
         phoneProject('webkit-iphone-se', {
