@@ -52,7 +52,7 @@ for (const width of [375, 390]) {
         await expect(join).toBeEnabled();
         expect(await page.evaluate(() => window.captureCount)).toBe(0);
         await join.click();
-        await expect(page.locator('#status')).toContainText('Relay busy');
+        await expect(page.locator('#status')).toContainText('Web Join is unavailable');
         await expect(join).toBeEnabled();
         await expect(page.getByRole('button', { name: 'Leave session', exact: true })).toBeHidden();
         expect(await page.evaluate(() => captureTracks.length > 0 && captureTracks.every(track => track.readyState === 'ended'))).toBe(true);

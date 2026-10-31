@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/rupret007/webjam",
-  "commit": "4263e1f9f2718b06c6de0239822c929d44683347",
-  "sourcePR": "https://github.com/rupret007/webjam/pull/398",
+  "commit": "caf76d810608fab6308bce7831598a99754b13d2",
+  "sourcePR": "https://github.com/rupret007/webjam/pull/411",
   "license": "MIT",
   "modifications": {
     "index.html": "Add noindex metadata for the private beta; all other copied files remain unchanged."
@@ -34,13 +34,13 @@
     },
     "mailbox.js": {
       "source": "web/join/mailbox.js",
-      "upstreamSha256": "11345de5b625067af5df7dfbeb4381ba09eb2220fa3a2167812ec42f918b01d1",
-      "shippedSha256": "11345de5b625067af5df7dfbeb4381ba09eb2220fa3a2167812ec42f918b01d1"
+      "upstreamSha256": "ee387e616630cba550844940e77631d98b4a19d4aa1c8b7ee5efb12a2170e541",
+      "shippedSha256": "ee387e616630cba550844940e77631d98b4a19d4aa1c8b7ee5efb12a2170e541"
     },
     "policy.js": {
       "source": "web/join/policy.js",
-      "upstreamSha256": "63d7a0156c268f4e8060d7e61e8d5feeaead29024a4282fa12a69311e17f12c3",
-      "shippedSha256": "63d7a0156c268f4e8060d7e61e8d5feeaead29024a4282fa12a69311e17f12c3"
+      "upstreamSha256": "3fff203766179b8b31d4475d3b1354efe3797e145c10a826a308b4cb5e791b75",
+      "shippedSha256": "3fff203766179b8b31d4475d3b1354efe3797e145c10a826a308b4cb5e791b75"
     },
     "session.js": {
       "source": "web/join/session.js",
