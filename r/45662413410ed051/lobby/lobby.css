@@ -432,6 +432,9 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
      the conversation/composer below fixed workspace rows. */
   body { overflow-y: auto; }
   .irc { min-height: 252px; flex-shrink: 0; }
+  /* Recovery/jump rows can exceed the short pane. Keep them and the composer
+     reachable by vertical scrolling, including when keyboard focus moves. */
+  .chat { overflow-y: auto; }
   .titlebar { min-height: 35px; padding-block: 4px; gap: 8px; }
   .brand { flex: none; gap: 8px; }
   .brand b { font-size: 10px; white-space: nowrap; }

@@ -7,6 +7,21 @@ their pending-CI and StoryPool-admission statements are historical.
 
 ## Start here
 
+**Native browser zoom found a real400% clipping defect.** Read the
+[before evidence and focused candidate](hangout-internal/HANGOUT_NATIVE_BROWSER_ZOOM_20261031.md).
+With an unsent copy retained, keyboard Send worked but the composer was partly
+hidden. The short-height scroll fix and two recovery regressions need current CI
+and a separate native400 after check; preserve the original failure.
+
+**Native PR410 merged as`bf24e7d`.** Its source-identical full CI ran all555
+modules once:12,796 passed,60 skipped; all16 applicable checks passed. One
+matching private-beta package run is active:
+[41193954131](https://github.com/rupret007/webjam/actions/runs/41193954131),
+branch`codex/private-web-join-test-bf24e7d-20261031`. Do not dispatch another.
+Package manifest/installation and physical music remain separate proof; provider
+and release holds are unchanged. The bb40 package below remains the previous
+qualified cohort, not a private-beta profile artifact.
+
 [Browser music destination and prerequisites](hangout-internal/HANGOUT_WEB_JOIN_READINESS_20261031.md):
 WebJam PR410 adds build-bound protected-community invitations; head7faf4ed is
 under current-source CI after190 focused local passes, with no new
@@ -28,7 +43,7 @@ Signing/publication jobs were skipped; do not dispatch another. Physical two-way
 music and full VoiceOver remain unqualified. This newer
 receipt supersedes the pending fixed-package AX statements in older entries.
 
-**Latest native source: `bb40fac`, qualified application CI.** Read the
+**Qualified bb40 baseline, application CI.** Read the
 [current native readiness checkpoint](hangout-internal/HANGOUT_NATIVE_READINESS_20261031.md).
 PR #409 includes the existing Windows work and merged launcher/accessibility fix;
 its full module loop passed 12,760 cases across all 553 tracked modules, with 60
