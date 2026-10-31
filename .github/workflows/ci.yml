@@ -35,6 +35,22 @@ jobs:
       - name: Run automated tests
         run: npm test
 
+      - name: Build the shared-community entry toolkit
+        run: |
+          set -euo pipefail
+          node hangout-worker/tools/package-community-toolkit.mjs \
+            --community-address https://stalemate-hangout-beta.jeffstory007.workers.dev/beta/ \
+            --out "$RUNNER_TEMP/community-entry-toolkit"
+          cat "$RUNNER_TEMP/community-entry-toolkit/SOURCE-MANIFEST.json"
+
+      - name: Preserve the reviewed community entry toolkit
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: community-entry-toolkit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/community-entry-toolkit
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Preserve generated Playwright diagnostics
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
