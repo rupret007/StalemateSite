@@ -128,6 +128,69 @@ describe('hangout relay worker rules', () => {
         expect(res.headers.get('Sec-WebSocket-Protocol')).toBe(KEY);
         expect(upgradeInit.headers).toEqual({ 'Sec-WebSocket-Protocol': KEY });
     });
+
+    it('persists per-socket rate bucket via WebSocket attachments across a simulated DO hibernation', async () => {
+        const tight = { ...limitsFrom({}), messagesPerConnection: 5, burst: 100, refillPerSecond: 8 };
+        const frame = JSON.stringify({ iv: 'A'.repeat(16), c: 'x' });
+        let attachment;
+        const ws = {
+            send: vi.fn(),
+            close: vi.fn(),
+            serializeAttachment: (data) => { attachment = data; },
+            deserializeAttachment: () => attachment
+        };
+        const tag = 'p-test';
+        const state = {
+            getWebSockets: () => [ws],
+            getTags: () => [tag]
+        };
+
+        const roomBefore = new HangoutRoom(state, env);
+        roomBefore.limits = tight;
+        for (let i = 0; i < 4; i += 1) await roomBefore.webSocketMessage(ws, frame);
+        expect(attachment).toEqual(expect.objectContaining({ total: 4 }));
+        expect(ws.close).not.toHaveBeenCalled();
+
+        const roomAfter = new HangoutRoom(state, env);
+        roomAfter.limits = tight;
+        await roomAfter.webSocketMessage(ws, frame);
+        expect(ws.close).not.toHaveBeenCalled();
+        expect(attachment.total).toBe(5);
+
+        await roomAfter.webSocketMessage(ws, frame);
+        expect(ws.close).toHaveBeenCalledWith(4429, 'message cap');
+        expect(attachment.total).toBe(6);
+    });
+
+    it('restores token-bucket counters from attachment after hibernation, not a fresh burst', async () => {
+        const tight = { ...limitsFrom({}), messagesPerConnection: 8000, burst: 30, refillPerSecond: 8 };
+        const frame = JSON.stringify({ iv: 'A'.repeat(16), c: 'x' });
+        let attachment;
+        const ws = {
+            send: vi.fn(),
+            close: vi.fn(),
+            serializeAttachment: (data) => { attachment = data; },
+            deserializeAttachment: () => attachment
+        };
+        const tag = 'p-burst';
+        const state = {
+            getWebSockets: () => [ws],
+            getTags: () => [tag]
+        };
+
+        const roomBefore = new HangoutRoom(state, env);
+        roomBefore.limits = tight;
+        for (let i = 0; i < 31; i += 1) await roomBefore.webSocketMessage(ws, frame);
+        expect(attachment.total).toBe(31);
+        expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ slow: true }));
+
+        const roomAfter = new HangoutRoom(state, env);
+        roomAfter.limits = tight;
+        ws.send.mockClear();
+        await roomAfter.webSocketMessage(ws, frame);
+        expect(attachment.total).toBe(32);
+        expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ slow: true }));
+    });
 });
 
 function wsRequest(room, previewKey) {

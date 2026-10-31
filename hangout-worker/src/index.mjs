@@ -1,6 +1,6 @@
 // Stalemate hangout relay: a dumb, capped, encrypted-frame broadcaster.
 // One Durable Object per invite room. No video, audio, or files ever pass through here.
-import { admit, createBucket, dayKey, limitsFrom, previewKeyFromProtocols, takeConnectionQuota, validFrame } from './core.mjs';
+import { admit, bucketStateFromAttachment, createBucket, dayKey, limitsFrom, previewKeyFromProtocols, takeConnectionQuota, validFrame } from './core.mjs';
 
 export default {
     async fetch(request, env) {
@@ -54,8 +54,21 @@ export class HangoutRoom {
 
     bucket(ws) {
         const tag = this.tagOf(ws);
-        if (!this.buckets.has(tag)) this.buckets.set(tag, createBucket(this.limits));
+        if (!this.buckets.has(tag)) {
+            const initial = typeof ws.deserializeAttachment === 'function'
+                ? bucketStateFromAttachment(ws.deserializeAttachment())
+                : null;
+            this.buckets.set(tag, createBucket(this.limits, undefined, initial));
+        }
         return this.buckets.get(tag);
+    }
+
+    persistBucket(ws) {
+        const tag = this.tagOf(ws);
+        const bucket = this.buckets.get(tag);
+        if (bucket && typeof ws.serializeAttachment === 'function') {
+            ws.serializeAttachment(bucket.snapshot());
+        }
     }
 
     broadcast(payload, except) {
@@ -69,6 +82,7 @@ export class HangoutRoom {
 
     async webSocketMessage(ws, raw) {
         const verdict = this.bucket(ws).take();
+        this.persistBucket(ws);
         if (verdict === 'spent') { ws.close(4429, 'message cap'); return; }
         if (verdict === 'slow') { ws.send(JSON.stringify({ slow: true })); return; }
         const frame = validFrame(raw, this.limits);

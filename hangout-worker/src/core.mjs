@@ -110,10 +110,18 @@ export function validFrame(raw, limits = DEFAULTS) {
     return { iv: frame.iv, c: frame.c };
 }
 
-export function createBucket(limits = DEFAULTS, now = () => Date.now()) {
-    let tokens = limits.burst;
-    let last = now();
-    let total = 0;
+export function bucketStateFromAttachment(attachment) {
+    if (!attachment || typeof attachment !== 'object') return null;
+    const { tokens, last, total } = attachment;
+    if (!Number.isFinite(tokens) || !Number.isFinite(last) || !Number.isFinite(total)) return null;
+    if (tokens < 0 || total < 0) return null;
+    return { tokens, last, total };
+}
+
+export function createBucket(limits = DEFAULTS, now = () => Date.now(), initial = null) {
+    let tokens = initial?.tokens ?? limits.burst;
+    let last = initial?.last ?? now();
+    let total = initial?.total ?? 0;
     return {
         take() {
             const t = now();
@@ -124,6 +132,9 @@ export function createBucket(limits = DEFAULTS, now = () => Date.now()) {
             if (tokens < 1) return 'slow';
             tokens -= 1;
             return 'ok';
+        },
+        snapshot() {
+            return { tokens, last, total };
         },
         get total() { return total; }
     };
