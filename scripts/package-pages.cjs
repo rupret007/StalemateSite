@@ -21,6 +21,8 @@ const FILES = [
     'js/count.PROVENANCE.json',
     'js/track.js',
     'js/site-track.js',
+    'js/music-preference.js',
+    'js/site-player.js',
     'js/contact-mail.js',
     'js/contact-form.js',
     'styles.css',
