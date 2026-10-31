@@ -118,7 +118,8 @@ const server = http.createServer((request, response) => {
     sendFile(request, response, path.join(ROOT, '404.html'), 404);
 });
 
-// Outlive client keep-alive pools so a loaded CI runner never reuses a socket the server just closed.
+// Keep idle sockets open longer than any client pool so a reused keep-alive
+// socket is never closed mid-request (undici "other side closed" flake).
 server.keepAliveTimeout = 65000;
 server.headersTimeout = 66000;
 

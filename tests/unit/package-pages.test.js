@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const repoRoot = join(fileURLToPath(new URL('../..', import.meta.url)));
+const SLUG = '45662413410ed051';
 
 describe('GitHub Pages package', () => {
     it('copies only the public site and never ships tests or node_modules', () => {
@@ -32,6 +33,7 @@ describe('GitHub Pages package', () => {
         expect(script).not.toContain('node_modules');
         expect(script).not.toContain('tests/');
         expect(script).not.toContain('worker/');
+        expect(script).not.toContain(SLUG);
     });
 
     it('can package into dist/ from this checkout', () => {
@@ -83,6 +85,30 @@ describe('GitHub Pages package', () => {
                 expect(existsSync(packagedPath), screenshot).toBe(true);
                 expect(readFileSync(packagedPath)).toEqual(readFileSync(join(repoRoot, screenshot)));
             }
+        } finally {
+            rmSync(join(repoRoot, 'dist'), { recursive: true, force: true });
+        }
+    });
+
+    it('packages only hangout room runtime files, not docs or markdown under r/', () => {
+        const script = readFileSync(join(repoRoot, 'scripts/package-pages.cjs'), 'utf8');
+        expect(script).toMatch(/copyHangoutRoomRuntime|HANGOUT_ROOM_FILES|const HANGOUT_ROOM/);
+        expect(script).not.toMatch(/fs\.cpSync\([^)]*['"]r['"]/);
+
+        const result = spawnSync(process.execPath, [join(repoRoot, 'scripts/package-pages.cjs')], {
+            cwd: repoRoot,
+            encoding: 'utf8'
+        });
+        try {
+            expect(result.status, result.stderr).toBe(0);
+            const roomDir = join(repoRoot, 'dist/r/45662413410ed051');
+            expect(existsSync(join(roomDir, 'index.html'))).toBe(true);
+            expect(existsSync(join(roomDir, 'room.js'))).toBe(true);
+            expect(existsSync(join(roomDir, 'room.css'))).toBe(true);
+            expect(existsSync(join(roomDir, 'TWO-HOUSE-TEST.md'))).toBe(false);
+            const packaged = readdirSync(roomDir);
+            expect(packaged).not.toContain('TWO-HOUSE-TEST.md');
+            expect(packaged.every((name) => !/\.md$/i.test(name))).toBe(true);
         } finally {
             rmSync(join(repoRoot, 'dist'), { recursive: true, force: true });
         }

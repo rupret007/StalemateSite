@@ -31,7 +31,7 @@ describe('arcade search discovery', () => {
         const robots = readFileSync(join(root, 'robots.txt'), 'utf8');
         expect(robots).toMatch(/User-agent: \*/);
         expect(robots).toMatch(/Allow: \/\n/);
-        expect(robots).not.toMatch(/Disallow:/);
+        expect([...robots.matchAll(/^Disallow: (.+)$/gm)].map((m) => m[1])).toEqual(['/r/']);
         expect(robots).toContain('Sitemap: https://stalemate.band/sitemap.xml');
     });
 });

@@ -61,7 +61,7 @@ describe('Apache repository-root public boundary', () => {
     it('denies every tracked non-public root entry so new source files cannot silently become public', () => {
         const tracked = spawnSync('git', ['ls-files', '--cached'], { cwd: root, encoding: 'utf8' });
         expect(tracked.status, tracked.stderr).toBe(0);
-        const publicRoots = new Set([...packageList('FILES'), ...packageList('DIRS')].map(file => file.split('/')[0]));
+        const publicRoots = new Set([...packageList('FILES'), ...packageList('DIRS'), 'r'].map(file => file.split('/')[0]));
         const sourceRoots = new Set(tracked.stdout.trim().split('\n').map(file => file.split('/')[0]).filter(entry => !publicRoots.has(entry)));
         expect(sourceRoots.size).toBeGreaterThan(10);
         for (const entry of sourceRoots) {
