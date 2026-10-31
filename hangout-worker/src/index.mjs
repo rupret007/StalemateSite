@@ -1,7 +1,7 @@
 // Stalemate hangout relay: capped, opaque room frames and separate consented
 // report controls sent only to the staff queue. Ordinary chat stays encrypted.
 // One Durable Object per invite room. No video, audio, or files ever pass through here.
-import { admit, createBucket, dayKey, limitsFrom, validFrame, validRoomId } from './core.mjs';
+import { admit, bucketStateFromAttachment, createBucket, dayKey, limitsFrom, previewKeyFromProtocols, takeConnectionQuota, validFrame, validRoomId } from './core.mjs';
 import { admitTurn, HangoutTurnBudget } from './turn.mjs';
 import { adminGate, ownerGate, admitLobby, HangoutLobby } from './lobby-do.mjs';
 import { activeBetaSession, registryRequest, validBetaSession } from './beta-session-client.mjs';
@@ -32,16 +32,9 @@ export default {
         if (url.pathname === '/lobby' || url.pathname === '/lobby-admin' || url.pathname === '/lobby-owner') return admitLobby(request, env, url);
         if (url.pathname !== '/room') return new Response('nope', { status: 404 });
         if (request.headers.get('Upgrade') !== 'websocket') return new Response('websocket only', { status: 426 });
-        const denied = admit({ url, origin: request.headers.get('Origin'), env, extraOrigins: env.HANGOUT_EXTRA_ORIGINS });
+        const previewKey = previewKeyFromProtocols(request.headers.get('Sec-WebSocket-Protocol'));
+        const denied = await admit({ url, origin: request.headers.get('Origin'), env, extraOrigins: env.HANGOUT_EXTRA_ORIGINS, previewKey });
         if (denied) return new Response(denied.reason, { status: denied.status });
-        let quota;
-        try {
-            const res = await env.QUOTA.get(env.QUOTA.idFromName('global')).fetch('https://quota/take', { method: 'POST' });
-            quota = res.status;
-        } catch (error) {
-            quota = 503; // accounting unreadable: fail closed
-        }
-        if (quota !== 200) return new Response('room server is resting', { status: quota === 429 ? 429 : 503 });
         if (env.HANGOUT_BETA_MODE === 'protected') {
             let beta;
             try { beta = JSON.parse(request.headers.get('X-Hangout-Beta-Session')); } catch { /* refused below */ }
@@ -81,7 +74,7 @@ export class HangoutRoom {
         this.env = env;
         this.limits = limitsFrom(env);
         this.buckets = new Map();
-        this.ready = state.blockConcurrencyWhile(async () => {
+        const restore = async () => {
             const checks = new Map();
             for (const ws of this.state.getWebSockets()) {
                 const a = this.attachment(ws);
@@ -94,7 +87,8 @@ export class HangoutRoom {
                 catch { this.end(ws, 4401, 'room limits unavailable'); }
             }
             await this.schedule();
-        });
+        };
+        this.ready = typeof state.blockConcurrencyWhile === 'function' ? state.blockConcurrencyWhile(restore) : restore();
     }
 
     async fetch(request) {
@@ -118,6 +112,8 @@ export class HangoutRoom {
             for (const ws of this.liveSockets()) if (!this.validAttachment(this.attachment(ws))) this.end(ws, 4401, 'room session ended');
             const sockets = this.liveSockets();
             if (this.state.getWebSockets().filter((ws) => ws.readyState === undefined || ws.readyState === 1).length >= this.limits.maxPeers) return new Response('room full', { status: 429 });
+            const quota = await takeConnectionQuota(this.env);
+            if (quota !== 200) return new Response('room server is resting', { status: quota === 429 ? 429 : 503 });
             const pair = new WebSocketPair();
             const id = `p${crypto.randomUUID().replace(/-/g, '')}`;
             const bucket = createBucket(this.limits);
@@ -130,7 +126,9 @@ export class HangoutRoom {
                 ...(this.privateReportsConfigured() && validRoomId(roomId) ? { privateReports: true } : {}) }));
             this.broadcast({ peers: sockets.length + 1, t: Date.now() }, pair[1]);
             await this.schedule();
-            return new Response(null, { status: 101, webSocket: pair[0] });
+            const offered = previewKeyFromProtocols(request?.headers?.get('Sec-WebSocket-Protocol'));
+            const headers = offered ? { 'Sec-WebSocket-Protocol': offered } : undefined;
+            return new Response(null, { status: 101, webSocket: pair[0], headers });
         });
     }
 
@@ -156,7 +154,11 @@ export class HangoutRoom {
 
     bucket(ws) {
         const tag = this.tagOf(ws);
-        if (!this.buckets.has(tag)) this.buckets.set(tag, createBucket(this.limits, () => Date.now(), this.attachment(ws).bucket));
+        if (!this.buckets.has(tag)) {
+            const attachment = this.attachment(ws);
+            const initial = bucketStateFromAttachment(attachment) ?? attachment.bucket;
+            this.buckets.set(tag, createBucket(this.limits, () => Date.now(), initial));
+        }
         return this.buckets.get(tag);
     }
 

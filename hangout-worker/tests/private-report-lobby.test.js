@@ -74,9 +74,19 @@ function harness(extra = {}) {
         async wakeLobby() { lobby = new HangoutLobby(lobbyState, env); await lobby.ready; return lobby; } };
 }
 function request(path, { cookie, body, upgrade = false, method = body === undefined ? 'GET' : 'POST', headers = {} } = {}) {
-    return new Request(ORIGIN + path, { method, headers: { Origin: ORIGIN, ...(cookie ? { Cookie: cookie } : {}),
-        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(upgrade ? { Upgrade: 'websocket' } : {}), ...headers },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    let url = ORIGIN + path;
+    const hdrs = { Origin: ORIGIN, ...(cookie ? { Cookie: cookie } : {}),
+        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(upgrade ? { Upgrade: 'websocket' } : {}), ...headers };
+    if (upgrade && path.startsWith('/room?')) {
+        const parsed = new URL(url);
+        const preview = parsed.searchParams.get('preview');
+        if (preview) {
+            parsed.searchParams.delete('preview');
+            url = parsed.toString();
+            hdrs['Sec-WebSocket-Protocol'] = preview;
+        }
+    }
+    return new Request(url, { method, headers: hdrs, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
 async function guest(h) {
     const response = await betaFetch(request('/beta/unlock', { body: { key: INVITE } }), h.env);

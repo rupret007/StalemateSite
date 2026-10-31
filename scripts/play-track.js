@@ -6,7 +6,7 @@
   var levelCap = window.smLevelCap;
   if (!track) return;
 
-  var file = (location.pathname.split('/').pop() || '').toLowerCase();
+  var file = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
   var SLUG = {
     'index.html': 'hub',
     'hub.html': 'hub',
@@ -95,6 +95,38 @@
 
   if (!g) return;
 
+  /* The shared playlist owns one audio element; titles can change between songs. */
+  var musicWired = false;
+  function wireMusic(music) {
+    if (musicWired || !music || typeof music.addEventListener !== 'function') return;
+    musicWired = true;
+    var playedTrack = false;
+    music.addEventListener('play', function () {
+      if (playedTrack) return;
+      playedTrack = true;
+      track('music-ingame-play');
+    });
+    document.addEventListener('click', function (e) {
+      if (!e.target || !e.target.closest || !e.target.closest('#btnSound, #suite-music-toggle')) return;
+      setTimeout(function () {
+        var blocked = false;
+        try {
+          blocked = (typeof window.soundBlocked === 'function' && window.soundBlocked())
+            || (window.Suite && typeof window.Suite.isMuted === 'function' && window.Suite.isMuted())
+            || (window.Suite && typeof window.Suite.isMusicEnabled === 'function' && !window.Suite.isMusicEnabled());
+        } catch (err) { /* Optional player preferences cannot interrupt the game. */ }
+        if (music.paused && blocked) track('music-ingame-mute');
+      }, 0);
+    }, true);
+  }
+  try {
+    if (window.Suite && typeof window.Suite.music === 'function') {
+      Promise.resolve(window.Suite.music()).then(function (player) {
+        if (player) wireMusic(player.audioElement);
+      }).catch(function () { /* Playback and analytics remain optional. */ });
+    }
+  } catch (err) { /* Optional shared player is unavailable. */ }
+
   /* --- Turdanoid: start #btnStart; over #endScreen.show; level window.TQA.level --- */
   if (g === 'turdanoid') {
     var btnStart = document.getElementById('btnStart');
@@ -111,26 +143,6 @@
         track('gameover-turdanoid-listen-manic');
       }
     }, true);
-    var music = document.getElementById('stalemate-music') || window.StalemateMusic;
-    if (music) {
-      var playedTrack = false;
-      music.addEventListener('play', function () {
-        if (!playedTrack) {
-          playedTrack = true;
-          track('music-ingame-manic-play');
-        }
-      });
-      var btnSound = document.getElementById('btnSound');
-      if (btnSound) {
-        btnSound.addEventListener('click', function () {
-          setTimeout(function () {
-            if (music.paused && typeof window.soundBlocked === 'function' && window.soundBlocked()) {
-              track('music-ingame-mute');
-            }
-          }, 0);
-        });
-      }
-    }
     document.getElementById('btnRestart') && document.getElementById('btnRestart').addEventListener('click', resetRound);
     return;
   }

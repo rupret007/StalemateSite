@@ -4,7 +4,7 @@
 import http from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { WebSocketServer } from 'ws';
-import { admit, createBucket, limitsFrom, validFrame, originAllowed, previewKeyOk } from '../hangout-worker/src/core.mjs';
+import { admit, createBucket, limitsFrom, validFrame, originAllowed, previewKeyOk, previewKeyFromProtocols } from '../hangout-worker/src/core.mjs';
 import { createLobby, LOBBY_LIMITS } from '../hangout-worker/src/lobby-core.mjs';
 import { accountId, ipHash, newDeviceId, signDevice, verifyDevice } from '../hangout-worker/src/auth.mjs';
 import { createBoundedSerialQueue, createSocketDelivery } from '../hangout-worker/src/socket-delivery.mjs';
@@ -135,7 +135,7 @@ export function createHangoutRelay({ previewKey = 'local-preview-key-0001', orig
             return;
         }
         if (url.pathname !== '/room') return reject(404, 'nope');
-        const denied = admit({ url, origin: req.headers.origin, env, extraOrigins: origins });
+        const denied = await admit({ url, origin: req.headers.origin, env, extraOrigins: origins, previewKey: previewKeyFromProtocols(req.headers['sec-websocket-protocol']) });
         if (denied) return reject(denied.status, denied.reason);
         if (connections >= limits.connectionsPerDay) return reject(429, 'cap');
         const roomId = url.searchParams.get('room');

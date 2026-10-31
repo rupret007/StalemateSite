@@ -207,7 +207,7 @@ describe('reversible user LaunchAgent installation, without installing in tests'
         expect(plist).toContain('<integer>300</integer>'); expect(plist).toContain('<key>Umask</key><integer>63</integer>');
         expect(plist).toContain('A &amp; B/&quot;config&quot;.json'); expect(plist).toContain('<string>Aqua</string>');
         expect(plist).not.toContain(KEY); expect(plist).not.toContain('EnvironmentVariables'); expect(plist).not.toContain('/bin/sh');
-        expect(installer.stableNode()).not.toContain('/Cellar/'); expect(fs.existsSync(p.plist)).toBe(false); // plan is read-only
+        expect(installer.stableNode(process.execPath)).not.toContain('/Cellar/'); expect(fs.existsSync(p.plist)).toBe(false); // plan is read-only
         expect(() => installer.createPlan({ platform: 'linux', uid: 501 })).toThrow('macos-user-session-required');
         expect(() => installer.createPlan({ platform: 'darwin', uid: 0 })).toThrow('macos-user-session-required');
     });

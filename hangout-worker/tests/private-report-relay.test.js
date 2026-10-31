@@ -40,7 +40,9 @@ function harness(extra = {}) {
     const env = { HANGOUT_BETA_MODE: 'protected', HANGOUT_BETA_INVITE_VERSION: '1',
         HANGOUT_HMAC_KEY: 'fixture-private-report-hmac-key-'.repeat(2),
         HANGOUT_BETA_INVITE_KEY: 'fixture-private-report-invitation-'.repeat(2),
-        HANGOUT_PREVIEW_KEY: 'fixture-private-report-preview-'.repeat(2), ...extra };
+        HANGOUT_PREVIEW_KEY: 'fixture-private-report-preview-'.repeat(2),
+        QUOTA: { idFromName: () => 'global', get: () => ({ fetch: async () => new Response('ok', { status: 200 }) }) },
+        ...extra };
     const check = vi.fn(async request => {
         const body = await request.json(), entry = sessions.get(body.sid);
         return new Response('fixture registry result', { status: entry && !entry.revoked

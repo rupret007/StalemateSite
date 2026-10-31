@@ -61,6 +61,8 @@
    Default wide: bottom-left. Narrow (≤520px): top-left compact icon so
    thumb docks / Sort buttons stay clear. Opt out with body data-suite-back="bottom".
    Force top on all widths with data-suite-back="top". */
+.suite-game-heading { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip-path:inset(50%); white-space:nowrap; }
+.suite-back-nav { position:fixed; top:0; left:0; width:0; height:0; z-index:10000; }
 .suite-back-pill {
   position: fixed;
   left: max(10px, calc(var(--suite-safe-left) + 8px));
@@ -99,6 +101,7 @@ body[data-suite-back="top"] .suite-back-pill {
     left: max(8px, calc(var(--suite-safe-left) + 6px));
     width: 44px;
     padding: 0;
+    flex-direction: column;
     justify-content: center;
     gap: 0;
     letter-spacing: 0;
@@ -110,15 +113,25 @@ body[data-suite-back="top"] .suite-back-pill {
     opacity: 1;
   }
   body:not([data-suite-back="bottom"]) .suite-back-pill .suite-back-pill-label {
-    display: none;
+    display: block;
+    font-size: 9px;
+    line-height: 1.2;
+    letter-spacing: 0.08em;
   }
-  /* In-page Hub links duplicate the suite pill and overlap it on phones. */
+  /* Duplicate in-page Hub exits share one job with the suite pill on phones.
+     Header/topbar links, overlay Back to Hub, Game Hub, and chrome Hub
+     buttons hide when the pill is present. Desktop keeps a named Hub. */
   body:has(.suite-back-pill) header a[href="./"]:not(.suite-back-pill),
-  body:has(.suite-back-pill) .topbar a[href="./"]:not(.suite-back-pill) {
+  body:has(.suite-back-pill) .topbar a[href="./"]:not(.suite-back-pill),
+  body:has(.suite-back-pill) a.dialog-hub,
+  body:has(.suite-back-pill) .overlay a[href="./"]:not(.suite-back-pill),
+  body:has(.suite-back-pill) #btnHub,
+  body:has(.suite-back-pill) button[onclick="location.href='./'"] {
     display: none !important;
   }
 }
 .suite-back-pill:hover { background: rgba(20, 50, 40, 0.85); transform: translateY(-1px); border-color: rgba(158, 255, 200, 0.6); }
+.suite-back-pill:focus-visible { outline: 2px solid var(--suite-accent); outline-offset: 3px; background: #143228; }
 .suite-back-pill:active { transform: scale(0.95); }
 .suite-back-pill .arrow { font-size: 13px; opacity: 0.85; }
 @media (prefers-reduced-motion: reduce) {
@@ -189,13 +202,17 @@ body[data-suite-back="top"]:has(.suite-back-pill) {
     min-width: 44px;
     min-height: 44px;
     padding: 0;
+    flex-direction: column;
     justify-content: center;
     gap: 0;
     font-size: 0;
     letter-spacing: 0;
   }
   body:has(.club-label):not([data-suite-back="bottom"]):has(.suite-back-pill) .suite-back-pill .suite-back-pill-label {
-    display: none;
+    display: block;
+    font-size: 9px;
+    line-height: 1.2;
+    letter-spacing: 0.08em;
   }
   body:has(.club-label):not([data-suite-back="bottom"]):has(.suite-back-pill) .suite-back-pill .arrow {
     font-size: 18px;
@@ -405,6 +422,16 @@ body[data-suite-back="top"]:has(.suite-back-pill) {
   .suite-bg-bubble { opacity: 0.35; bottom: auto; top: 30%; }
   .suite-bg-critter { display: none; }
 }
+html.suite-motion-reduce .suite-bg-wisp,
+html.suite-motion-reduce .suite-bg-bubble,
+html.suite-motion-reduce .suite-bg-parallax-far,
+html.suite-motion-reduce .suite-bg-parallax-near,
+html.suite-motion-reduce .suite-bg-critter {
+  animation: none;
+}
+html.suite-motion-reduce .suite-bg-critter {
+  display: none;
+}
 
 /* ---------- Shared motion vocabulary (opt-in classes / keyframes) ---------- */
 @keyframes suiteDealIn {
@@ -564,6 +591,121 @@ body label:has(input:is([type="checkbox"], [type="radio"])) {
   border: 0;
 }
 
+/* Completed-game sharing keeps native controls and copy fallbacks accessible. */
+.suite-result-share[hidden], .suite-result-share [hidden] { display:none!important; }
+.suite-result-share { margin-top:8px; width:100%; }
+.suite-result-share-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.suite-result-share-actions :is(button,a) { display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding:8px 12px; border:2px solid #8ee8c7; border-radius:10px; background:#171c17; color:#f4f0e6; font:700 14px/1.2 system-ui,sans-serif; text-decoration:none; cursor:pointer; }
+.suite-result-share-actions :is(button,a):focus-visible, .suite-result-share textarea:focus-visible { outline:3px solid #ffcb87; outline-offset:2px; }
+.suite-result-share .suite-result-share-status { font:13px/1.3 system-ui,sans-serif; margin:6px 0 0; overflow-wrap:anywhere; }
+.suite-result-share-status:empty { display:none; }
+.suite-result-share textarea { display:block; width:100%; min-height:74px; padding:8px; margin-top:6px; color:#171410; background:#f4f0e6; font:14px/1.3 system-ui,sans-serif; }
+#endOverlayCard, body.turdomania #overlay > div { max-height:100%; overflow:auto; overscroll-behavior:contain; }
+@media(max-width:980px) {
+  html[data-mobile-game="turdtris"] #gameOverOverlay { position:fixed; inset:calc(56px + env(safe-area-inset-top)) max(4px,env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom) + var(--mobile-footer,0px)) max(4px,env(safe-area-inset-left)); z-index:10000; padding:8px; grid-template-rows:minmax(0,1fr); backdrop-filter:none; -webkit-backdrop-filter:none; }
+  html[data-mobile-game="turdtris"] #endOverlayCard { max-height:100%; min-height:0; animation:none; }
+}
+
+/* ---------- Site-wide Stalemate music controls ---------- */
+.suite-music-status {
+  position:fixed; bottom:0; left:0; right:0; z-index:9998;
+  box-sizing:border-box; height:calc(50px + env(safe-area-inset-bottom)); padding:2px max(12px,env(safe-area-inset-right)) max(2px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
+  display:flex; align-items:center; justify-content:center; gap:12px;
+  color:#f4f0e6; background:#171c17; border-top:1px solid #546450;
+  font:12px/1.25 system-ui,sans-serif;
+}
+.suite-music-status .suite-music-title { min-width:0; flex:1; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
+.suite-music-status a { color:#bcf6d2; display:inline-flex; align-items:center; min-height:44px; flex-shrink:0; }
+.suite-music-status [hidden], #suite-music-picker[hidden] { display:none!important; }
+.suite-music-status button, #suite-music-picker button { min-height:44px; min-width:44px; flex-shrink:0; padding:4px 8px; color:#f4f0e6; background:#263329; border:1px solid #8ee8c7; border-radius:8px; font:700 12px system-ui,sans-serif; cursor:pointer; }
+.suite-music-status :is(button,a):focus-visible, #suite-music-picker :is(select,button):focus-visible { outline:3px solid #ffcb87; outline-offset:1px; }
+#suite-music-picker { position:fixed; bottom:calc(58px + env(safe-area-inset-bottom)); right:max(8px,env(safe-area-inset-right)); z-index:10004; width:min(300px,calc(100vw - 16px)); max-height:calc(100dvh - 130px - env(safe-area-inset-top)); overflow:auto; box-sizing:border-box; padding:12px; border:2px solid #8ee8c7; border-radius:12px; background:#171c17; color:#f4f0e6; font:14px/1.4 system-ui,sans-serif; }
+#suite-music-picker label { display:block; margin-bottom:6px; }
+#suite-music-picker select { width:100%; min-height:44px; font:16px system-ui,sans-serif; color:#171c17; background:#f4f0e6; }
+#suite-music-retry { margin-top:8px; }
+#suite-music-retry[hidden] { display:none!important; }
+body:has(.suite-music-status):not(.suite-hub-door) { padding-bottom:calc(52px + env(safe-area-inset-bottom)); }
+body.suite-hub-door .suite-music-status { position:static; border-radius:8px; margin:8px auto 0; width:min(100%,560px); }
+@media(min-width:981px) {
+  body:has(.suite-back-pill):not([data-suite-back="top"]):not(.suite-hub-door) .suite-music-status { padding-left:calc(104px + env(safe-area-inset-left)); }
+}
+@media(max-width:600px) { .suite-music-status { gap:6px; padding-left:8px; padding-right:8px; } }
+@media(max-width:980px) and (orientation:landscape) {
+  .suite-music-status { height:calc(46px + env(safe-area-inset-bottom)); padding-top:0; padding-bottom:env(safe-area-inset-bottom); }
+}
+.suite-music-toggle {
+  position: fixed;
+  z-index: 10001;
+  left: max(12px, var(--suite-safe-left));
+  bottom: max(12px, var(--suite-safe-bottom));
+  margin: 0;
+  padding: 10px 14px;
+  min-height: 44px;
+  min-width: 44px;
+  border-radius: 999px;
+  font: 700 0.76rem/1 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  color: var(--suite-ink, #e8f7ff);
+  background: rgba(8, 22, 18, 0.88);
+  border: 1px solid var(--suite-edge, rgba(120, 255, 213, 0.32));
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+  -webkit-tap-highlight-color: transparent;
+}
+.suite-music-toggle:hover,
+.suite-music-toggle:focus-visible {
+  border-color: rgba(158, 255, 200, 0.65);
+  outline: 2px solid var(--suite-accent, #78ffd5);
+  outline-offset: 2px;
+}
+.suite-listen-manic {
+  position: fixed;
+  z-index: 10002;
+  right: max(12px, var(--suite-safe-right));
+  bottom: max(12px, var(--suite-safe-bottom));
+  margin: 0;
+  padding: 10px 16px;
+  min-height: 44px;
+  min-width: 44px;
+  border-radius: 999px;
+  font: 700 0.76rem/1 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  color: #2a1a0e;
+  background: linear-gradient(180deg, #ffe08d, #ffd76a);
+  border: 1px solid rgba(255, 215, 106, 0.65);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+  -webkit-tap-highlight-color: transparent;
+}
+.suite-listen-manic:hover,
+.suite-listen-manic:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+/* Hub: music bottom-left, Manic bottom-right. Game pages: tuck under the top pause/sound row. */
+body:not(.suite-hub-door) .suite-music-toggle {
+  left: auto;
+  bottom: auto;
+  right: max(12px, var(--suite-safe-right));
+  top: max(66px, calc(var(--suite-safe-top) + 56px));
+}
+/* Pages with a settings slot reserve space for music alongside their controls. */
+body:not(.suite-hub-door) [data-suite-music-slot] .suite-music-toggle {
+  position: static;
+  flex-shrink: 0;
+  z-index: auto;
+}
+/* Crappy Eights: stat ribbon and Table details sit lower than the pause row. */
+body:not(.suite-hub-door):has(.hud > .hud-card) .suite-music-toggle {
+  top: max(188px, calc(var(--suite-safe-top) + 178px));
+}
+/* Turdjack phone Table Menu row: keep suite music clear of mobile sound controls. */
+@media (max-width: 680px) {
+  body:has(.mobile-menu-stats.hud):not(.suite-hub-door) .suite-music-toggle {
+    top: max(152px, calc(var(--suite-safe-top) + 142px));
+  }
+}
+
 /* ---------- Hub door controls ---------- */
 .suite-hub-mute {
   margin: 0;
@@ -586,6 +728,74 @@ body label:has(input:is([type="checkbox"], [type="radio"])) {
   outline: 2px solid var(--suite-accent);
   outline-offset: 2px;
   box-shadow: 0 0 0 2px rgba(158, 255, 200, 0.25);
+}
+
+/* ---------- HUD settings row (difficulty + arcade a11y mount on merge) ---------- */
+.suite-hud-settings {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
+/* ---------- Shared difficulty segmented control ---------- */
+.suite-difficulty {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  max-width: 100%;
+}
+.suite-difficulty-seg {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(8, 22, 18, 0.82);
+  border: 1px solid var(--suite-edge);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+}
+.suite-difficulty-btn {
+  margin: 0;
+  padding: 0 12px;
+  min-height: 44px;
+  min-width: 44px;
+  border: 0;
+  border-radius: 999px;
+  font: 700 0.72rem/1 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(234, 255, 242, 0.82);
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.suite-difficulty-btn[aria-pressed='true'] {
+  color: #062218;
+  background: linear-gradient(180deg, var(--suite-accent), #5fd49a);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.suite-difficulty-btn:focus-visible {
+  outline: 2px solid var(--suite-accent);
+  outline-offset: 2px;
+}
+@media (max-width: 520px) {
+  .suite-difficulty--hub .suite-difficulty-seg,
+  .suite-difficulty--topbar .suite-difficulty-seg,
+  .suite-difficulty--hud .suite-difficulty-seg {
+    width: 100%;
+    justify-content: stretch;
+  }
+  .suite-difficulty--hub .suite-difficulty-btn,
+  .suite-difficulty--topbar .suite-difficulty-btn,
+  .suite-difficulty--hud .suite-difficulty-btn {
+    flex: 1 1 0;
+    padding: 0 6px;
+    font-size: 0.68rem;
+  }
 }
 .suite-hub-stat {
   display: inline-block;
@@ -900,4 +1110,176 @@ body.hub-attract-paused .cover.cover-motion-on,
   .masthead.hub-attract-on h1 .logo { animation: none; }
   .cover.cover-motion-on .art-ball,
   .cover.cover-motion-on .art-piece { animation: none; }
+}
+html.suite-motion-reduce .masthead.hub-attract-on h1 .logo {
+  animation: none;
+}
+html.suite-motion-reduce .cover.cover-motion-on .art-ball,
+html.suite-motion-reduce .cover.cover-motion-on .art-piece {
+  animation: none;
+}
+
+/* ---------- Arcade accessibility toggle (colorblind-safe palettes) ---------- */
+/* Crapjack owns focus while its insurance / pit decision dialog is open. */
+body:has(#jackConfirmOverlay[aria-hidden="false"]) #suite-arcade-a11y-mount {
+  display: none;
+}
+.suite-arcade-a11y-toggle {
+  margin: 0;
+  padding: 10px 14px;
+  min-height: 44px;
+  min-width: 44px;
+  border-radius: 999px;
+  font: 800 0.72rem/1 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  color: var(--suite-ink, #e8f7ff);
+  background: rgba(8, 22, 18, 0.9);
+  border: 1px solid var(--suite-edge, rgba(120, 255, 213, 0.32));
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+.suite-arcade-a11y-toggle--floating {
+  position: fixed;
+  z-index: 10001;
+  right: max(12px, var(--suite-safe-right));
+  bottom: max(64px, calc(var(--suite-safe-bottom) + 52px));
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .suite-arcade-a11y-toggle--floating {
+    bottom: auto;
+    top: max(10px, var(--suite-safe-top, env(safe-area-inset-top, 0px)));
+    right: calc(max(12px, var(--suite-safe-right, 0px)) + 44px + 8px);
+  }
+}
+/* Portrait / tall: reserve space so topbar a11y never sits under fixed music. */
+body:not(.suite-hub-door) .topbar:has(.suite-a11y-topbar-slot) {
+  padding-right: calc(44px + 10px + var(--suite-safe-right, 0px));
+}
+.suite-a11y-play-shell-slot {
+  position: absolute;
+  left: max(10px, calc(env(safe-area-inset-left, 0px) + 6px));
+  bottom: max(68px, calc(env(safe-area-inset-bottom, 0px) + 52px));
+  z-index: 13; /* Keep the setting above Turdanoid's title and coach overlays. */
+  pointer-events: auto;
+}
+/* Table pages: fixed bottom-right slot (clears top HUD rows + left welcome CTAs). */
+body > .suite-a11y-play-shell-slot.suite-a11y-body-slot {
+  position: fixed;
+  z-index: 10000;
+  left: auto;
+  right: max(12px, calc(env(safe-area-inset-right, 0px) + 12px));
+  top: auto;
+  bottom: max(64px, calc(env(safe-area-inset-bottom, 0px) + 52px));
+  height: 44px;
+  margin: 0;
+}
+body > .suite-a11y-play-shell-slot.suite-a11y-body-slot .suite-arcade-a11y-toggle {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.suite-a11y-topbar-slot,
+.suite-a11y-dock-slot,
+.suite-a11y-header-slot {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+/* TurdRummy: keep the setting in the sticky dock, clear of the card hand. */
+.action-dock:has(> .suite-a11y-rummy-dock-slot) {
+  padding-left: 72px;
+}
+.suite-a11y-rummy-dock-slot {
+  position: absolute;
+  left: 10px;
+  top: 8px;
+}
+@media (min-width: 521px) {
+  .action-dock:has(> .suite-a11y-rummy-dock-slot) {
+    padding-left: 98px;
+  }
+}
+.suite-a11y-dock-slot {
+  margin-right: 4px;
+}
+.suite-arcade-a11y-toggle--inline,
+.suite-arcade-a11y-toggle--title {
+  position: relative;
+  z-index: 1;
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  body > .suite-a11y-play-shell-slot.suite-a11y-body-slot {
+    bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  }
+}
+.suite-arcade-a11y-toggle--topbtns {
+  position: relative;
+  z-index: 1;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.suite-arcade-a11y-toggle:hover,
+.suite-arcade-a11y-toggle:focus-visible {
+  border-color: rgba(158, 255, 200, 0.65);
+  outline: 2px solid var(--suite-accent, #78ffd5);
+  outline-offset: 2px;
+}
+
+html.suite-colorblind button.card.red .card-index-rank,
+html.suite-colorblind button.card.red .card-index-suit {
+  color: var(--suite-cb-hearts, #d55e00);
+}
+html.suite-colorblind button.card:not(.red) .card-index-suit[data-suit='S'],
+html.suite-colorblind button.card:not(.red) .card-index-suit[data-suit='C'] {
+  color: var(--suite-cb-clubs, #0072b2);
+}
+html.suite-colorblind button.card.red {
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent,
+    transparent 5px,
+    rgba(0, 0, 0, 0.07) 5px,
+    rgba(0, 0, 0, 0.07) 7px
+  );
+}
+html.suite-colorblind button.card:not(.red) {
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 4px,
+    rgba(0, 0, 0, 0.06) 4px,
+    rgba(0, 0, 0, 0.06) 6px
+  );
+}
+html.suite-colorblind .suite-chip[data-denom='25'] {
+  --chip-stripe: #1f2528;
+}
+html.suite-colorblind .suite-chip[data-denom='50'] {
+  --chip-a: #56b4e9;
+  --chip-b: #0072b2;
+}
+html.suite-colorblind .turdomania .tile {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+html.suite-colorblind .turdomania .tile[data-kind='1'] {
+  background-image: radial-gradient(circle at 30% 30%, rgba(0, 0, 0, 0.12) 2px, transparent 2px);
+  background-size: 8px 8px;
+}
+html.suite-colorblind .turdomania .tile[data-kind='2'] {
+  background-image: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.1) 2px, transparent 2px, transparent 6px);
+}
+html.suite-colorblind .turdomania .tile[data-kind='4'] {
+  background-image: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.12) 1px, transparent 1px, transparent 5px);
 }

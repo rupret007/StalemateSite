@@ -54,13 +54,14 @@
       return soundAllowed({
         unlocked,
         localEnabled,
-        masterMuted: stored('turdsuite_muted') === '1' || !!globalThis.Suite?.isMuted?.(),
+        masterMuted: typeof globalThis.Suite?.isMuted === 'function' ? !!globalThis.Suite.isMuted() : stored('turdsuite_muted') === '1',
         hidden: !!globalThis.document?.hidden
       });
     }
 
     function syncMute() {
       const enabled = allowed();
+      if (globalThis.Suite?.isStudioAudio?.()) { globalThis.Suite.syncSoundState(); return enabled; }
       if (output && context) {
         output.gain.cancelScheduledValues(context.currentTime);
         output.gain.setValueAtTime(enabled ? 0.55 : 0, context.currentTime);
@@ -92,11 +93,16 @@
     function unlock() {
       // This method must be called by a pointer/keyboard handler, never at boot.
       unlocked = true;
+      if (globalThis.Suite?.isStudioAudio?.()) {return syncMute();}
       ensureContext();
       return syncMute();
     }
 
     function play(type) {
+      if (globalThis.Suite?.isStudioAudio?.()) {
+        if (!allowed()) { globalThis.Suite.syncSoundState(); return false; }
+        return globalThis.Suite.playSound('eights.' + type);
+      }
       if (!syncMute() || !SCORES[type]) { return false; }
       const audio = ensureContext();
       if (!audio) { return false; }

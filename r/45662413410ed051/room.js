@@ -237,7 +237,14 @@
         const frag = new URLSearchParams(win.location.hash.slice(1));
         const secret = frag.get('r');
         const host = frag.get('h');
-        return H.validSecret(secret) && /^[A-Za-z0-9_-]{80,100}$/.test(host || '') ? { secret, host } : null;
+        const relay = frag.get('a') || '';
+        if (!H.validSecret(secret) || !/^[A-Za-z0-9_-]{80,100}$/.test(host || '')) return null;
+        return { secret, host, relay: /^[A-Za-z0-9_-]{16,}$/.test(relay) ? relay : '' };
+    }
+
+    function relayAdmission(invite) {
+        if (previewKey) return previewKey;
+        return invite && invite.relay ? invite.relay : '';
     }
 
     async function makeRoom() {
@@ -247,9 +254,12 @@
         const host = b64u(pubRaw);
         const privJwk = await crypto.subtle.exportKey('jwk', pair.privateKey);
         const { roomId } = await H.deriveRoom(secret);
+        let relay = '';
+        if (previewKey) relay = await H.roomRelayToken(roomId, previewKey);
         try { localStorage.setItem(HOST_STORE + roomId, JSON.stringify(privJwk)); } catch (error) { /* private mode: host only for this tab */ }
         app.hostPrivMemory = pair.privateKey;
-        win.history.replaceState(null, '', `${win.location.pathname}${win.location.search}#r=${secret}&h=${host}`);
+        const hash = relay ? `#r=${secret}&h=${host}&a=${relay}` : `#r=${secret}&h=${host}`;
+        win.history.replaceState(null, '', `${win.location.pathname}${win.location.search}${hash}`);
         return { secret, host };
     }
 
@@ -620,9 +630,10 @@
             setGate('The room server isn’t switched on yet. Nothing to join.');
             return;
         }
-        const url = `${relayBase.replace(/\/$/, '')}/room?room=${app.roomId}&preview=${encodeURIComponent(previewKey)}`;
+        const url = `${relayBase.replace(/\/$/, '')}/room?room=${app.roomId}`;
         setGate('Connecting…');
-        const ws = new WebSocket(url);
+        const admission = relayAdmission(readInvite());
+        const ws = admission ? new WebSocket(url, [admission]) : new WebSocket(url);
         app.ws = ws;
         const incoming = new Set();
         inboundWork.set(ws, incoming);
@@ -1035,7 +1046,7 @@
 
     async function start() {
         let invite = readInvite();
-        if (!previewKey) {
+        if (!previewKey && !invite) {
             ui.gateTitle.textContent = 'Not open yet';
             ui.gateCopy.textContent = 'This room isn’t open to the public. Ask whoever sent you here for the full link.';
             ui.enter.hidden = true;
@@ -1076,7 +1087,9 @@
     }
 
     ui.copy.addEventListener('click', async () => {
-        const link = win.location.href;
+        const linkUrl = new URL(win.location.href);
+        linkUrl.searchParams.delete('preview');
+        const link = linkUrl.href;
         try {
             if (navigator.share && /Mobi/.test(navigator.userAgent)) await navigator.share({ title: 'Hang out with Stalemate', url: link });
             else { await navigator.clipboard.writeText(link); say('Invite copied. Text it to your people.'); }
@@ -1517,7 +1530,7 @@
     let turnClient;
     async function iceServers() {
         if (!turnClient) turnClient = win.HangoutTurn.createTurnClient({
-            url: turnUrl, preview: previewKey, room: app.roomId,
+            url: turnUrl, preview: relayAdmission(readInvite()), room: app.roomId,
             getDevice: () => { try { return localStorage.getItem('hangout-dev'); } catch (_) { return ''; } },
             onStatus: (status) => {
                 ui.turnStatus.textContent = status === 'ready' ? 'Video relay available for connections that need it.'

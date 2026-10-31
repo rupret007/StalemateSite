@@ -1,6 +1,14 @@
 // Pure relay rules shared by the Cloudflare Worker and the local dev/test relay.
 // The relay never sees plaintext: frames are {iv, c} ciphertext from the browser.
 
+const enc = new TextEncoder();
+
+function b64u(bytes) {
+    let s = '';
+    bytes.forEach((b) => { s += String.fromCharCode(b); });
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 export const DEFAULTS = Object.freeze({
     maxPeers: 8,
     maxFrameBytes: 1024 * 1024,
@@ -45,15 +53,52 @@ export function previewKeyOk(given, expected) {
     return diff === 0;
 }
 
+/** Per-room relay token (HMAC). Lives in the invite #fragment, not the global preview query param. */
+export async function roomRelayToken(previewKey, roomId) {
+    if (typeof previewKey !== 'string' || previewKey.length < 16) return '';
+    if (!validRoomId(roomId)) return '';
+    const macKey = await crypto.subtle.importKey('raw', enc.encode(previewKey), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const sig = await crypto.subtle.sign('HMAC', macKey, enc.encode(`stalemate-hangout-relay-v1:${roomId}`));
+    return b64u(new Uint8Array(sig));
+}
+
+export async function roomRelayTokenOk(given, roomId, previewKey) {
+    const expected = await roomRelayToken(previewKey, roomId);
+    if (!expected) return false;
+    const a = String(given || '');
+    let diff = a.length ^ expected.length;
+    for (let i = 0; i < expected.length; i += 1) diff |= (a.charCodeAt(i) || 0) ^ expected.charCodeAt(i);
+    return diff === 0;
+}
+
 // Decide whether a WebSocket upgrade may proceed. Returns {status, reason} or null for OK.
-export function admit({ url, origin, env, extraOrigins }) {
+export async function admit({ url, origin, env, extraOrigins, previewKey }) {
     if (!env || typeof env.HANGOUT_PREVIEW_KEY !== 'string' || !env.ROOMS || !env.QUOTA) {
         return { status: 503, reason: 'not-configured' };
     }
     if (!originAllowed(origin, extraOrigins)) return { status: 403, reason: 'origin' };
-    if (!previewKeyOk(url.searchParams.get('preview'), env.HANGOUT_PREVIEW_KEY)) return { status: 403, reason: 'preview' };
-    if (!validRoomId(url.searchParams.get('room'))) return { status: 400, reason: 'room' };
-    return null;
+    if (url.searchParams.has('preview')) return { status: 403, reason: 'preview' };
+    const room = url.searchParams.get('room');
+    if (!validRoomId(room)) return { status: 400, reason: 'room' };
+    if (previewKeyOk(previewKey, env.HANGOUT_PREVIEW_KEY)) return null;
+    if (await roomRelayTokenOk(previewKey, room, env.HANGOUT_PREVIEW_KEY)) return null;
+    return { status: 403, reason: 'preview' };
+}
+
+/** Preview gate secret travels in Sec-WebSocket-Protocol, never in the URL. */
+export function previewKeyFromProtocols(header) {
+    if (!header) return undefined;
+    const token = String(header).split(',').map((s) => s.trim()).find(Boolean);
+    return token || undefined;
+}
+
+export async function takeConnectionQuota(env) {
+    try {
+        const res = await env.QUOTA.get(env.QUOTA.idFromName('global')).fetch('https://quota/take', { method: 'POST' });
+        return res.status;
+    } catch (error) {
+        return 503;
+    }
 }
 
 export function validFrame(raw, limits = DEFAULTS) {
@@ -65,12 +110,28 @@ export function validFrame(raw, limits = DEFAULTS) {
     return { iv: frame.iv, c: frame.c };
 }
 
-export function createBucket(limits = DEFAULTS, now = () => Date.now(), saved) {
-    if (saved !== undefined && (saved?.v !== 1 || !Number.isFinite(saved.tokens) || saved.tokens < 0 || saved.tokens > limits.burst ||
-        !Number.isFinite(saved.last) || saved.last < 0 || !Number.isSafeInteger(saved.total) || saved.total < 0 || saved.total > limits.messagesPerConnection + 1)) throw new Error('invalid bucket metadata');
-    let tokens = saved?.tokens ?? limits.burst;
-    let last = saved?.last ?? now();
-    let total = saved?.total ?? 0;
+export function bucketStateFromAttachment(attachment) {
+    if (!attachment || typeof attachment !== 'object') return null;
+    const bucket = attachment.bucket && typeof attachment.bucket === 'object' ? attachment.bucket : attachment;
+    const { tokens, last, total } = bucket;
+    if (!Number.isFinite(tokens) || !Number.isFinite(last) || !Number.isFinite(total)) return null;
+    if (tokens < 0 || total < 0) return null;
+    return { tokens, last, total };
+}
+
+export function createBucket(limits = DEFAULTS, now = () => Date.now(), initial = null) {
+    let seed = initial;
+    if (seed?.v === 1) seed = { tokens: seed.tokens, last: seed.last, total: seed.total };
+    if (seed !== null && seed !== undefined) {
+        if (!Number.isFinite(seed.tokens) || !Number.isFinite(seed.last) || !Number.isFinite(seed.total)
+            || seed.tokens < 0 || seed.total < 0 || seed.total > limits.messagesPerConnection + 1
+            || seed.tokens > limits.burst) {
+            throw new Error('invalid bucket metadata');
+        }
+    }
+    let tokens = seed?.tokens ?? limits.burst;
+    let last = seed?.last ?? now();
+    let total = seed?.total ?? 0;
     return {
         take() {
             const t = now();
@@ -82,8 +143,10 @@ export function createBucket(limits = DEFAULTS, now = () => Date.now(), saved) {
             tokens -= 1;
             return 'ok';
         },
-        get total() { return total; },
-        snapshot() { return { v: 1, tokens, last, total }; }
+        snapshot() {
+            return { v: 1, tokens, last, total };
+        },
+        get total() { return total; }
     };
 }
 

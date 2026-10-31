@@ -33,9 +33,9 @@ describe('hangout sync core', () => {
     it('estimates the relay clock offset from the tightest sample', () => {
         let now = 0;
         const clock = H.createClock(() => now);
-        now = 1000; clock.sample(5900); // 100 ms late
-        now = 2000; clock.sample(6990); // 10 ms late (tighter)
-        now = 3000; clock.sample(7500); // very late, ignored
+        now = 1000; clock.sample(5900);
+        now = 2000; clock.sample(6990);
+        now = 3000; clock.sample(7500);
         expect(clock.offset).toBe(4990);
         expect(clock.relayNow()).toBe(7990);
     });
@@ -87,15 +87,12 @@ describe('hangout sync core', () => {
         const replacement = { id: 'verified', color: '#000000', size: 8, pts: [[0.5, 0.5]] };
         H.apply(s, { type: 'chat', name: 'Present visitor', text: 'Received while the snapshot loads' }, { t: 110 });
         const liveChat = s.chat;
-        // A first chunk without a chat field must not erase an already received line.
         H.apply(s, { type: 'snapshot', state: { strokes: [first] } });
         expect(s.chat).toBe(liveChat);
         H.apply(s, { type: 'chat', name: 'Present visitor', text: 'Received between chunks' }, { t: 120 });
         H.apply(s, { type: 'snapshot', state: { strokes: [second], append: true,
             chat: [{ name: 'Earlier visitor', text: 'Legacy backlog', t: 90 }] } });
         expect(s.strokes).toEqual([first, second]);
-        // A later authenticated host snapshot can replace unverified drawing,
-        // but an explicit legacy chat field still cannot replace live scrollback.
         H.apply(s, { type: 'snapshot', state: { strokes: [replacement], chat: [] } });
         expect(s.strokes).toEqual([replacement]);
         expect(s.chat).toBe(liveChat);
@@ -116,10 +113,18 @@ describe('hangout sync core', () => {
         expect(frame.c).not.toContain('happy');
         expect(await H.open(b.key, frame)).toEqual({ type: 'chat', text: 'paint a happy tree' });
         const ciphertext = Buffer.from(frame.c, 'base64url');
-        ciphertext[0] ^= 1; // Change an authenticated byte, rather than unused base64 trailing bits.
+        ciphertext[0] ^= 1;
         const bad = { ...frame, c: ciphertext.toString('base64url') };
         await expect(H.open(b.key, bad)).rejects.toBeTruthy();
         const other = await H.deriveRoom(H.newSecret());
         await expect(H.open(other.key, frame)).rejects.toBeTruthy();
+    });
+
+    it('derives a per-room relay token that matches the worker HMAC', async () => {
+        const { roomRelayToken: workerToken } = await import('../../hangout-worker/src/core.mjs');
+        const secret = H.newSecret();
+        const { roomId } = await H.deriveRoom(secret);
+        const preview = 'local-preview-key-0001';
+        expect(await H.roomRelayToken(roomId, preview)).toBe(await workerToken(preview, roomId));
     });
 });

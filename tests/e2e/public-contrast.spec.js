@@ -10,6 +10,9 @@ const SAMPLE_SELECTORS = [
     '.button--listen',
     '.site-nav a',
     '.hero__tag',
+    '.hero-video__label',
+    '.hero-video__teaser',
+    '.hero-show .button--ghost',
     '.footer-layout a'
 ];
 
@@ -105,4 +108,24 @@ test('next-up sticker uses dark text on lime with AA contrast', async ({ page })
         return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
     });
     expect(ratio).toBeGreaterThanOrEqual(4.5);
+});
+
+test('desktop video copy and show actions have opaque backing over the checkerboard', async ({ page }) => {
+    for (const width of [1024, 1280]) {
+        await page.setViewportSize({ width, height: 1000 });
+        await page.goto('/');
+        for (const selector of ['.hero-video__label', '.hero-video__teaser', '.hero-show .button--ghost']) {
+            const surface = await page.locator(selector).first().evaluate(el => {
+                // Stop before the hero: its painted checkerboard is a separate layer,
+                // so the hero's base backgroundColor alone cannot establish contrast.
+                for (let node = el; node && !node.matches('.hero'); node = node.parentElement) {
+                    const style = getComputedStyle(node);
+                    if (style.backgroundColor === 'rgb(23, 20, 16)' && style.backgroundImage === 'none') return true;
+                }
+                return false;
+            });
+            expect(surface, selector + ' must have an opaque dark surface below its text').toBe(true);
+        }
+        expect(await page.evaluate(contrastScript)).toEqual([]);
+    }
 });

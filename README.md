@@ -9,21 +9,24 @@ Official site for **Stalemate** — a punk rock band with original songs. Featur
 
 No press kit, EPK, or QR landing. Those pages are not published.
 
-The public pages carry only confirmed facts. No empty shelves, stub forms, dummy embeds or fill-in copy.
+The public pages carry only confirmed facts. No empty shelves, dummy embeds or fill-in copy. The homepage contact form posts to [FormSubmit](https://formsubmit.co/) (`stalemate.punk@gmail.com`); the first real submission emails Jeff a one-time activation link he must click.
 
 ## Facts still needed
 
 Do not publish guesses for any of these:
 
-- Member names and roles (do not name anyone on the site)
 - Stream / store URLs for Better Than Now and Manic
 - A public YouTube watch URL for the Manic lyric video (the band channel lists Andrea and It’s Only Been 18)
 - ICS for Rockin’ October
-- Booking email
+- A genuine approved band photo
 - TikTok handle
 - Press kit / EPK / QR landing (do not publish until the band has them)
 
-The homepage countdown and next-show block hide after `2026-10-24T16:45:00-05:00` and leave no empty slot. The Manic lyric video stays.
+The homepage uses evergreen metadata. Its static show card keeps the confirmed date, set time, venue and direct Saturday ticket link usable when JavaScript is disabled or the countdown fails to load. Checkout guidance asks visitors to choose October 24, then select Stalemate; the full festival lineup stays linked separately. This dated fallback cannot expire without JavaScript and needs an HTML update after the show. When the countdown runs, the existing `2026-10-24T16:45:00-05:00` cutoff controls all dated promotions and show actions together; after it, the band/social links remain. This is a promotion cutoff, not a confirmed set end time. The Manic lyric video stays.
+
+Booking/contact: **stalemate.punk@gmail.com**, supplied by the owner and corroborated October 21, 2026. Mail delivery has not been tested.
+
+Member names and roles, confirmed by the owner October 25, 2026 and published in the existing About section: **Sean — Bass and Vocals; Jeff — Guitars and Vocals; Che’ — Drums and Vocals**.
 
 ## Visual identity
 
@@ -38,7 +41,8 @@ Privacy-safe [GoatCounter](https://www.goatcounter.com/) events (account `stalem
 - `music-apple`, `music-spotify`, `music-youtube`, `music-bandcamp` — streaming links in Listen (not social icons)
 - `manic-video-play` — Manic lyric video play
 - `show-details` — Rockin’ October info links
-- `` `show-tick` + `et-<venue-slug>` `` — admission links when present
+- `show-ticket-rockin-october` — the official Rockin’ October TicketSpice link
+- `show-cta-header`, `show-cta-hero`, `show-cta-under-video` — existing show-action placements, recorded alongside the ticket category; `show-cta-next-fallback` remains the evergreen follow action
 - `nav-home`, `nav-listen`, `nav-about`, `nav-games`, `nav-contact`, … — header/footer in-page nav
 - `social-instagram`, `social-youtube`, `social-facebook`, … — `.social-link` clicks
 - `scroll-home-25`, `scroll-home-50`, `scroll-home-75`, `scroll-home-100` (and `scroll-404-*` on `404.html`)
@@ -52,7 +56,27 @@ Privacy-safe [GoatCounter](https://www.goatcounter.com/) events (account `stalem
 
 - `play-<g>-start`, `play-<g>-over`, `play-<g>-dur-<bucket>`, `play-<g>-level-<n>` — buckets: `lt30s`, `30s-2m`, `2-5m`, `5-15m`, `15m+`; levels `1`–`9`, `10plus`
 - `gameover-turdanoid-share`, `gameover-turdanoid-listen-manic` — Turdanoid end screen
-- `music-ingame-manic-play`, `music-ingame-mute` — Turdanoid overlay playlist
+- `music-ingame-play`, `music-ingame-mute` — shared arcade playlist playback and mute actions; playback is counted once per game page, without inferring which song played
+
+These events measure actual visits and actions. Retention improvements require usage data; the release itself establishes no retention uplift.
+
+## Arcade source and synchronization
+
+Reusable gameplay, shared art, and the playlist player live in [Turdanoid](https://github.com/rupret007/Turdanoid). The arcade offers eight games, including Royal Flush Chess against the computer or two players sharing this device, plus ordinary Turdomania with difficulty choices, new boards and undo. Site-specific branding and analytics live in `scripts/stalemate-overlay/`, `scripts/stalemate-strip.css`, and `scripts/play-track.js`. The generated `play/` files are replaced during synchronization; edit their source instead.
+
+The default import pins the shared arcade polish release `e07511d991ea8cd40b313e45f7b6826b48ac27be`. Synchronize a reviewed branch, tag, or exact commit. A local repository avoids a network clone and imports committed files at the requested revision:
+
+```bash
+scripts/sync-turdanoid.sh --source ../Turdanoid <full-upstream-commit-SHA>
+# Or fetch a reviewed remote branch, tag, or SHA:
+scripts/sync-turdanoid.sh <branch-tag-or-SHA>
+cat play/VENDORED.txt
+npm run test:unit -- --maxWorkers=2
+npm run test:e2e
+npm run package:pages
+```
+
+The importer records the full resolved upstream revision in `play/VENDORED.txt`, copies the shared playlist audio, applies site security/branding/analytics, and removes upstream test files. Chessground, chess.js, Stockfish and the Spatial artwork retain their separate notices and corresponding source under `play/assets/chess/`; see its `credits.html`. Repeating synchronization with the same committed source should preserve the generated result. Validate with the Node 24 runtime used by this site's CI; review the generated diff before committing.
 
 ## Local checks
 
@@ -62,6 +86,8 @@ npm run test:install-browsers
 npm test
 ```
 
+Run `npm run test:live:local` to validate the deployment checker at both local URL prefixes. See [audio diagnostics and live verification](docs/audio-live-verification.md) for manual live commands and the explicitly unverified physical-iPhone checklist.
+
 Unit tests use Vitest. Browser tests use Playwright against a local server on **4320** (override with `STALEMATE_TEST_PORT`). The server also mounts the site at `/StalemateSite/` so the GitHub Pages project path can be exercised. Navigation and song names work with JavaScript disabled.
 
 ## GitHub Pages (temporary host)
@@ -70,7 +96,7 @@ Intended URL until a custom domain exists:
 
 `https://rupret007.github.io/StalemateSite/`
 
-The workflow in `.github/workflows/ci.yml` runs Vitest + Playwright on every push and pull request. After those checks pass, a **deploy-pages** job runs on **push to `main` only**. This pull request does not enable Pages and does not merge.
+The workflow in `.github/workflows/ci.yml` runs Vitest + Playwright on every push and pull request. After those checks pass, a **deploy-pages** job runs on **push to `main` only**. The separate `Verify published site` workflow then checks both public hosts against that exact revision, with Chromium/WebKit gameplay and real audio checks. Readiness waits for the independently refreshed band domain; browser failures are not retried. Reports and first-failure diagnostics are retained as Actions artifacts.
 
 When you are ready to publish:
 

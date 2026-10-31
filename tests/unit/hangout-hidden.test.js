@@ -30,7 +30,6 @@ describe('hidden hangout room', () => {
         for (const file of publicFiles) {
             const rel = relative(repoRoot, file);
             if (rel === 'robots.txt' || rel === 'scripts/package-pages.cjs' || rel === 'scripts/hangout-relay-dev.mjs') continue;
-            // Local preview instructions/runner are developer files, excluded from the Pages package.
             if (rel === 'scripts/preview-hangout.cjs' || rel === 'hangout-internal/HANGOUT_IRC_PREVIEW.md') continue;
             const text = readFileSync(file, 'utf8');
             expect(text, rel).not.toContain(SLUG);
@@ -44,7 +43,7 @@ describe('hidden hangout room', () => {
         expect(robots).toMatch(/^User-agent: \*$/m);
         expect(robots).toMatch(/^Disallow: \/r\/$/m);
         expect(robots).not.toContain(SLUG);
-        expect(robots).not.toMatch(/sitemap/i);
+        expect(robots).toMatch(/Sitemap:/);
     });
 
     it.each(['index.html', 'lobby/index.html', 'admin/index.html', 'terms/index.html'])('%s says noindex, nofollow and sends no referrer', (page) => {
@@ -73,8 +72,23 @@ describe('hidden hangout room', () => {
     it('ships robots.txt and the room directory in the Pages package', () => {
         const script = readFileSync(join(repoRoot, 'scripts/package-pages.cjs'), 'utf8');
         expect(script).toContain("'robots.txt'");
-        expect(script).toMatch(/const DIRS = \[[^\]]*'r'[^\]]*\]/);
-        expect(existsSync(join(repoRoot, 'r', 'index.html'))).toBe(false); // no listing page for /r/
+        expect(script).toMatch(/copyHangoutRoomRuntime|HANGOUT_ROOM_FILES|const HANGOUT_ROOM/);
+        expect(existsSync(join(repoRoot, 'r', 'index.html'))).toBe(false);
         expect(script).not.toContain(SLUG);
+        expect(script).not.toMatch(/preview=[A-Za-z0-9_-]{8,}/);
+    });
+
+    it('never puts the preview key in relay WebSocket URLs or copied invite links', () => {
+        const roomJs = readFileSync(join(ROOM, 'room.js'), 'utf8');
+        const wsUrlBlock = roomJs.match(/function connect\(\)[\s\S]*?ws\.onclose/m)?.[0] || '';
+        expect(wsUrlBlock, 'relay WebSocket URL').not.toMatch(/preview=/);
+        expect(wsUrlBlock, 'relay WebSocket URL').toMatch(/\/room\?room=\$\{app\.roomId\}/);
+        const startBlock = roomJs.match(/async function start\(\)[\s\S]*?ui\.copy\.addEventListener/)?.[0] || '';
+        expect(startBlock, 'start gate').toMatch(/!previewKey && !invite/);
+        const copyBlock = roomJs.match(/ui\.copy\.addEventListener[\s\S]*?\}\);/)?.[0] || '';
+        expect(copyBlock, 'copy invite handler').toContain("searchParams.delete('preview')");
+        expect(copyBlock, 'copy invite handler').not.toMatch(/preview=/);
+        expect(copyBlock, 'copy invite handler').not.toMatch(/searchParams\.(set|append)\(['"]preview/);
+        expect(roomJs, 'invite relay token').toMatch(/frag\.get\(['"]a['"]\)/);
     });
 });

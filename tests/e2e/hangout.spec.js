@@ -75,6 +75,27 @@ test('without the preview key the room stays shut and never dials the relay', as
     expect(sockets).toEqual([]);
 });
 
+test('copied invite link joins without the preview query param', async ({ browser }) => {
+    const host = await openBrowser(browser);
+    await host.goto(roomUrl());
+    await host.fill('[data-name]', 'Jeff');
+    await host.click('[data-enter]');
+    const invite = await host.evaluate(() => {
+        const link = new URL(window.location.href);
+        link.searchParams.delete('preview');
+        return link.href;
+    });
+    expect(invite).not.toMatch(/[?&]preview=/);
+    expect(invite).toMatch(/#r=[A-Za-z0-9_-]{24}&h=[A-Za-z0-9_-]+&a=[A-Za-z0-9_-]+/);
+    const guest = await openBrowser(browser);
+    await guest.goto(invite);
+    await expect(guest.locator('[data-gate-title]')).toHaveText('You’re invited');
+    await guest.fill('[data-name]', 'Karen');
+    await guest.click('[data-enter]');
+    await expect(guest.locator('[data-peers]')).toContainText('2 here');
+    await expect(host.locator('[data-peers]')).toContainText('Karen');
+});
+
 test('a wrong preview key is refused by the relay', async ({ browser }) => {
     const page = await openBrowser(browser);
     await page.goto(`/r/${SLUG}/?preview=wrong-key-wrong-key&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`);

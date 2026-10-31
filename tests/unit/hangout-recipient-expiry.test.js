@@ -46,6 +46,7 @@ function installRuntime() {
 }
 const env = () => ({ HANGOUT_BETA_MODE: 'protected', HANGOUT_BETA_INVITE_VERSION: '1',
     HANGOUT_MODERATOR_EMAILS: 'first@example.test,second@example.test',
+    QUOTA: { idFromName: () => 'global', get: () => ({ fetch: async () => new Response('ok', { status: 200 }) }) },
     BETA_SESSIONS: { idFromName: (name) => name, get: () => ({ fetch: vi.fn(async () => new Response('active')) }) } });
 const identity = (label, expiry = 60000) => ({ dev: `dev-${label}`, iph: `ip-${label}`, role: 'fan', email: '', admin: false,
     betaSid: `beta-session-${label.toLowerCase()}-123456`, betaInviteVersion: '1', expiresAt: Date.now() + expiry });

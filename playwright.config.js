@@ -17,6 +17,8 @@ module.exports = defineConfig({
         timeout: 5000
     },
     fullyParallel: false,
+    // Keep native media decode, tracing and video from competing on CI runners.
+    workers: process.env.CI ? 1 : undefined,
     retries: process.env.CI ? 1 : 0,
     reporter: [
         ['list'],

@@ -2,6 +2,8 @@
  * Bot intent copy for TurdSpades — mirrors live table heuristics (hints only).
  */
 
+import { DIFFICULTY_KEY, loadDifficulty, mapCardAiDifficulty } from './suite-difficulty.js';
+
 const NAMES = ['You', 'West', 'North', 'East'];
 
 export function formatCardLabel(card) {
@@ -105,6 +107,10 @@ export function normalizeAiDifficulty(raw) {
 
 export function loadAiDifficulty(storage = globalThis.localStorage) {
   try {
+    const suiteVal = storage?.getItem(DIFFICULTY_KEY);
+    if (suiteVal !== null && suiteVal !== undefined) {
+      return normalizeAiDifficulty(mapCardAiDifficulty(loadDifficulty(storage), 'hard'));
+    }
     return normalizeAiDifficulty(storage?.getItem(AI_DIFFICULTY_KEY));
   } catch {
     return 'normal';

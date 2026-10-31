@@ -11,6 +11,7 @@ const FILES = [
     '404.html',
     'index.html',
     'robots.txt',
+    'sitemap.xml',
     'countdown.js',
     'script.js',
     'show-state.js',
@@ -20,6 +21,8 @@ const FILES = [
     'js/count.PROVENANCE.json',
     'js/track.js',
     'js/site-track.js',
+    'js/contact-mail.js',
+    'js/contact-form.js',
     'styles.css',
     'assets/favicon.svg',
     'assets/games/turdanoid.webp',
@@ -49,7 +52,22 @@ function copyFile(relativePath) {
     fs.copyFileSync(from, to);
 }
 
-const DIRS = ['play', 'qr', 'tap', 'r', 'join'];
+const HANGOUT_RUNTIME = /\.(html|css|js|webp|png|jpe?g|gif|svg|woff2?|ttf|otf|ico)$/i;
+
+function copyHangoutRoomRuntime() {
+    const rRoot = path.join(ROOT, 'r');
+    if (!fs.existsSync(rRoot)) return;
+    for (const slug of fs.readdirSync(rRoot, { withFileTypes: true })) {
+        if (!slug.isDirectory()) continue;
+        const roomDir = path.join(rRoot, slug.name);
+        for (const ent of fs.readdirSync(roomDir, { withFileTypes: true })) {
+            if (!ent.isFile() || /\.md$/i.test(ent.name) || !HANGOUT_RUNTIME.test(ent.name)) continue;
+            copyFile(path.join('r', slug.name, ent.name));
+        }
+    }
+}
+
+const DIRS = ['play', 'qr', 'tap', 'events', 'join'];
 // Internal notes stay in the repository and out of the Pages artifact. GitHub
 // still reports Pages source.path as "/" for this workflow build, so a new
 // file under docs/ would look published. Do not add these directories here.
@@ -63,6 +81,7 @@ emptyDir(DIST);
 for (const relativePath of FILES) {
     copyFile(relativePath);
 }
+copyHangoutRoomRuntime();
 for (const dir of DIRS) {
     fs.cpSync(path.join(ROOT, dir), path.join(DIST, dir), { recursive: true });
 }

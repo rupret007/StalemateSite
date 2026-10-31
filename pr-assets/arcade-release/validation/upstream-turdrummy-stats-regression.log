@@ -1,0 +1,19 @@
+FAIL turdrummy 360x640: turdrummy ready stat text fits: {"label":"1","card":{"left":7,"right":63,"top":104,"bottom":140.796875},"text":{"left":14,"right":20.421875,"top":119.796875,"bottom":136.796875},"clipped":true}
+FAIL turdrummy 375x667: turdrummy ready stat text fits: {"label":"1","card":{"left":7,"right":65.5,"top":104,"bottom":140.796875},"text":{"left":14,"right":20.421875,"top":119.796875,"bottom":136.796875},"clipped":true}
+FAIL turdrummy 390x844: turdrummy ready stat text fits: {"label":"1","card":{"left":7,"right":68,"top":104,"bottom":140.796875},"text":{"left":14,"right":20.421875,"top":119.796875,"bottom":136.796875},"clipped":true}
+FAIL turdrummy 430x932: turdrummy ready stat text fits: {"label":"1","card":{"left":7,"right":74.65625,"top":104,"bottom":140.796875},"text":{"left":14,"right":20.421875,"top":119.796875,"bottom":136.796875},"clipped":true}
+FAIL turdrummy 667x375: turdrummy ready stat text fits: {"label":"1","card":{"left":7,"right":114.15625,"top":56,"bottom":98},"text":{"left":14,"right":20.421875,"top":77,"bottom":94},"clipped":true}
+FAIL turdrummy 844x390: turdrummy ready stat text fits: {"label":"1","card":{"left":7,"right":143.65625,"top":56,"bottom":98},"text":{"left":14,"right":20.421875,"top":77,"bottom":94},"clipped":true}
+AssertionError [ERR_ASSERTION]: 6 mobile cases failed
+
+6 !== 0
+
+    at /Users/jeffstory/Documents/ChatGPT/Stalemate Website/Turdanoid/scripts/mobile-fit.cjs:207:10
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 6,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
