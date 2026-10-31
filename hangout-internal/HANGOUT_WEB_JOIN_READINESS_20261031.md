@@ -10,7 +10,7 @@ StoryPool checkouts, services, configuration, locks and operational files.
 | Component | Actual observation | Limit |
 | --- | --- | --- |
 | Qualified native package cohort | `bb40fac7fcaa032c2f19cf9af8c49ac4276d3cf1`, run41181580413; all four desktop builds passed | Actual ARM archive/transport/Join accessibility proof is separate from physical music; see the [package receipt](HANGOUT_NATIVE_PACKAGE_BB40_20261031.md) |
-| New application routing candidate | [WebJam PR410](https://github.com/rupret007/webjam/pull/410), current pushed head `6241b4747f4f704e7cbf8abd5a5da9f765fa40e2`, tree `076ca15438a840e768459648501db4b2b7b246ea` | Current-head full CI, merge and a matching private-beta package remain to qualify; bb40 packages do not contain this feature |
+| New application routing candidate | [WebJam PR410](https://github.com/rupret007/webjam/pull/410), current pushed head `7faf4edd6943eb87cb98b0381e25cb37f8c063e5`, tree `1c04fb436337987cca75054be54d3695db0db194` | Current-head full CI, merge and a matching private-beta package remain to qualify; bb40 packages do not contain this feature |
 | Private community | Source `96f356a6f2a9af4bbd2834bb94f1e5df81d200dd`, runtime `6293386f-31b8-4415-bf0b-f81296190a4d` | Hosted chat/drawing proof does not qualify hosted Web Join or audio |
 | TURN issuer | Normal read-only deployment/version queries at 08:50–08:51 UTC observed version `e7cda1bb-be95-4824-a363-924ff6f2948b`, created October16 | No credentials were read or minted; deployment/configuration remained unchanged |
 
@@ -32,10 +32,21 @@ Preserve the earlier failure: head426e6d4's main job in
 [run41190083283](https://github.com/rupret007/webjam/actions/runs/41190083283)
 stopped at the existing workflow-size guard: 20,801 UTF-16 units exceeded its
 20,500 safety limit. Head6241b47 separates bundle creation/verification from
-packaging; it does not raise that limit or remove an assertion. Its new
+packaging; it does not raise that limit or remove an assertion. Its
 [PR run41191002007](https://github.com/rupret007/webjam/actions/runs/41191002007)
-is the source to qualify. Earlier development passes and resource-refused local
-attempts do not establish a current full-suite or packaged-feature pass.
+then failed the old exact release-condition assertion. Head7faf4ed updates both
+existing installer/Mac release contracts to require every earlier condition
+plus the new private-target exclusion. Require its own complete current-head
+CI; neither failed event qualifies the final source.
+
+At10:13–10:14 UTC fresh guards admitted seven focused modules in separate
+interpreters. Their tested inputs match the committed candidate: **190 passed**
+(31 destination,42 host,3 target workflow,54 workflow limits,33 installer,
+20 Mac release policy and7 build-info cases); changed-source Ruff passed.
+The separate packaged-data attempt passed18 cases and failed one because the
+minimal local environment lacks PySide6. Preserve that failure; no dependency
+or test was bypassed. Full application CI supplies the required Qt environment.
+These focused results do not qualify an actual new package or physical music.
 
 ## Why neither same Wi-Fi nor unsigned Windows closes the gap
 

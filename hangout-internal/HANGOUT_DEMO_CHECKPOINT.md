@@ -7,8 +7,9 @@ below; historical sections describe their own revisions and earlier limitations.
 ## Current private release and demonstrated guests
 
 [Browser music destination and prerequisites](HANGOUT_WEB_JOIN_READINESS_20261031.md):
-WebJam PR410 adds build-bound protected-community invitations; head6241b47 is
-under current-source CI, with no new package/provider/music pass. The read-only
+WebJam PR410 adds build-bound protected-community invitations; head7faf4ed is
+under current-source CI after190 focused local passes, with no new
+package/provider/music pass. The read-only
 issuer inventory lacks the separate browser bindings. The normal frozen app's
 LAN route is not automatically selectable. Preserve provider/release holds and
 use the ordered qualification plan before physical music. The existing bb40
