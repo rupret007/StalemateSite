@@ -3,3 +3,8 @@
 .stalemate-music-toggle:focus-visible{outline:3px solid #20baff;outline-offset:2px}
 nav.stalemate-strip .stalemate-music-toggle{position:static;flex:0 0 auto;min-height:44px;margin-left:0}
 nav.stalemate-strip .sm-listen{margin-left:auto}
+[data-suite-music-slot]{display:inline-flex;align-items:center;gap:6px;vertical-align:middle}
+[data-suite-music-slot] .stalemate-music-toggle{position:static;flex:0 0 auto;z-index:auto;margin:0;min-height:44px;box-shadow:2px 2px 0 #ff4d84}
+body.arcade:not(.suite-hub-door)>button.stalemate-music-toggle[data-music-toggle]{top:max(66px,calc(env(safe-area-inset-top) + 56px));bottom:auto}
+.chess-page [data-suite-music-slot] .stalemate-music-toggle{min-width:44px}
+@media(max-width:360px){.chess-page [data-suite-music-slot] .stalemate-music-toggle{min-width:38px;padding:.35rem .5rem;font-size:11px}}

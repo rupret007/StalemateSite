@@ -11,7 +11,8 @@
         btn.className = 'stalemate-music-toggle';
         btn.setAttribute('data-music-toggle', '');
         btn.setAttribute('aria-label', 'Site music on or off');
-        document.body.appendChild(btn);
+        var slot = document.querySelector('[data-suite-music-slot]');
+        (slot || document.body).appendChild(btn);
         pref.bindToggles();
     }
 
