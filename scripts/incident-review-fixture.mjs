@@ -28,7 +28,7 @@ export function createIncidentFixtureStore() {
 
 export async function createIncidentReviewFixture({ now = () => Date.now(), schedule = (fn, delay) => setTimeout(fn, delay), cancel = id => clearTimeout(id), limits = {} } = {}) {
     const started = now(), storage = createIncidentFixtureStore(), frames = new Map(), watches = new Map(), acknowledgements = new Map();
-    let stopped = false, timer = null, model, lobby, running = null, cleanupStatus = { at: null, errors: [] };
+    let stopped = false, timer = null, model, lobby, running = null, displaySerial = 0, cleanupStatus = { at: null, errors: [] };
     const engineWork = createBoundedSerialQueue({ maxPending: 32, maxBytes: 65536 });
     const policy = { qualified: true, version: 'local_synthetic_v1', procedure: 'local_selected_report', authority: 'local_synthetic_decision', reason: 'selected_report',
         validFrom: started, validUntil: started + 3 * DAY, reviewAt: started + DAY + 1000, holdUntil: started + DAY + 2000,
@@ -77,6 +77,7 @@ export async function createIncidentReviewFixture({ now = () => Date.now(), sche
         await engineWork.enqueue(async () => {
             lobby.connect({ id, dev: opaque('dev'), iph: opaque('iph'), role, admin: role === 'moderator' });
             await lobby.message(id, JSON.stringify({ t: 'hello', nick, age13: true }));
+            if (!(frames.get(id) || []).some(frame => frame.t === 'welcome' && frame.nick === nick)) throw Error('Local fixture nickname admission was not confirmed.');
         });
     }
     await join('ordinary_moderator', 'OrdinaryModerator', 'moderator');
@@ -170,8 +171,11 @@ export async function createIncidentReviewFixture({ now = () => Date.now(), sche
                 await tx.put(`session:${id}`, { active: true, profile, actorRef, appointmentRevision: actorRef ? 1 : null, connection });
                 await tx.put(SESSIONS, [...sessions, id]);
             });
-            await join(connection, `Visitor${id.slice(-6)}`, profile === 'moderator' ? 'moderator' : 'fan');
-            const author = opaque('author'); await join(author, `Author${id.slice(-6)}`);
+            // Opaque identifiers may contain text rejected by the real nick
+            // filter. Keep benign display labels separate; IDs remain random.
+            const label = ++displaySerial;
+            await join(connection, `Visitor${label}`, profile === 'moderator' ? 'moderator' : 'fan');
+            const author = opaque('author'); await join(author, `Author${label}`);
             for (const text of SAMPLES) await engineWork.enqueue(() => lobby.message(author, JSON.stringify({ t: 'say', ch: '#stalemate', text })));
             return id;
         },

@@ -1,6 +1,6 @@
 # WebJam / Hang Out — Cursor continuation
 
-Resumed October 28, 2026. The October 27 pause checkpoint is retained below
+Resumed October 29, 2026. The October 27 pause checkpoint is retained below
 as history. Read the current [demo checkpoint](hangout-internal/HANGOUT_DEMO_CHECKPOINT.md)
 first: Cursor has since fixed the native health witness, recorded a local
 provider-start run, and moved internal documents from `docs/` to
@@ -9,7 +9,60 @@ below describe the earlier checkpoint, not the current source.
 
 ## Start here
 
-The current application assembly is **`codex/che-demo-candidate`**. It combines
+**October30 ownership clarification:** Jeff directed this application work to
+proceed here independently of StoryPool. Application code, project CI, tests,
+documentation and application PRs are handled in this workstream. Do not route
+them through StoryPool/Karen or wait for its admission. Existing GitHub checks
+and protections still apply. Shared StoryPool core/services/configuration,
+installed checkouts, locks and operational files remain outside this task;
+security, provider and release holds remain unchanged. Earlier StoryPool
+application handoffs below are historical, not current prerequisites.
+
+Current work is **`codex/webjam-native-ci-20261030`**, based on PR169 head
+`43457849374bfa00e68fcf3f224954e3f3832026`. This repository's workflow now invokes
+the eighth provider-start session mode as an explicit eleventh proof group,
+retaining the previous ten groups, timeout, diagnostics and failure propagation.
+Verify the actual new CI results; earlier local passes or green metadata do not
+prove this newly added step. No installed/shared StoryPool files are changed.
+
+The preceding **`codex/jam-share-order-20261030`** is based on PR168 head
+`2c4a191915e02c73f95b1c0d2aca1082f6974649`. It fixes another reproduced
+lost-paste race when a newer Share is submitted before an older confirmation.
+The matched client/engine now allow one pending visible Share, keep the next
+paste editable, and correlate publication/rejection without automatic retry.
+Read the [protocol and rollback contract](hangout-internal/HANGOUT_JAM_SHARE_FEEDBACK.md)
+and current checkpoint. Local proof includes 64 focused unit cases, 18 browser
+journeys and separate provider-start/fifty-guest native Worker runs. These are
+not current-head CI, deployed, native WebJam audio or approval evidence.
+The resumed local ordinary and separate capacity unit projects also passed
+1,869 cases/114 files in total, with no failures or pending cases.
+
+The preceding **`codex/jam-mobile-setup-20261030`** is based on PR167 head
+`143b3905af12e029a645e96769cc1d04cec018a5`. The Jam panel now puts its title,
+platform limits and actions ahead of native expandable setup help. Read the
+checkpoint for the retained short-screen readability failure. Its exact2c4
+push41012559205 passed1,858 units and430 browser cases once; fresh CI WebKit
+images were inspected. PR168 is preserved ready with `needs-karen`, without an
+observed signed current-head verdict. That proof does not qualify this changed
+engine/client. All62 outcomes remain intact.
+
+The preceding **`codex/jam-confirmation-races-20261030`** is based on PR166
+head `1504f94837a68ce35844e0590cde469135c287b4`. It preserves a same-host newer
+edit when a delayed publication redraw arrives and adds ordered-response cases
+for a room switch and local Stop. Later local proof reproduced the parent
+failure and passed 15 fixed-client journeys. Exact143 CI passed 1,858 units and
+430 browser cases, each once. PR166/167 remain preserved and await their normal
+owner-controlled review route; those results do not qualify the new panel.
+
+The preceding **`codex/irc-webjam-polish-20261029`** is based on merged demo
+commit `ec1eb14cfb2f7d068e5a01467193b70e21495dbc`. Its tree equals PR164's
+tested `41916eb`; Jeff merged PR163/164 on October 29. The new work retains
+rejected music invitations until confirmed room state, with 12 focused local
+Chromium journeys passing and fresh 375/390px images. See the current checkpoint
+for source hashes, the separately observed local eighth-mode proof and remaining
+CI/review/music gates. This branch is not deployment approval.
+
+The preceding application assembly is **`codex/che-demo-candidate`**. It combines
 PR162's visible browser-invitation/Stop fixes with PR160's bounded reconnect
 probe, inheriting PR159's access-request recovery and PR161's required music
 acceptance. Read the checkpoint's current-assembly section for exact input
@@ -65,10 +118,10 @@ Minimize data; no default ID/biometrics, PM scanning or media recording.
 Moderation assists human review; legal readiness requires qualified review,
 not a compliance claim. AI remains off.
 
-This application workstream owns source, design, tests, documentation and PRs.
-**“StoryPool 10-21-26” owns StoryPool core, Karen, CI infrastructure, deployments
-and shared operational files.** Hand off those dependencies. Do not edit its
-services, locks, maintenance/release holds, `MONITOR.md` or `NEEDS_JEFF.md` here.
+This workstream owns application source, design, project CI, tests, documentation
+and application PRs independently of StoryPool. Shared StoryPool core, services,
+installed checkouts, configuration and operational files remain outside scope.
+Do not edit its locks, maintenance/release holds, `MONITOR.md` or `NEEDS_JEFF.md`.
 TURN/vault work remains paused. Do not inspect/unlock credentials, activate
 providers, buy signing services or change platform trust. Windows builds remain
 unsigned; Mac/Windows/Linux audio and installation must be qualified honestly.
@@ -100,11 +153,12 @@ downgrade is safe. Preserve historical failures and warnings; quiet later native
 runs do not clear the earlier184-byte ACK TimeoutNegativeWarning, whose impact
 is still unqualified.
 
-## Current WIP: inactive provider-start fence (P9)
+## Historical pause checkpoint: inactive provider-start fence (P9)
 
-**The new work has not run.** Fresh local guards stopped before Node/tests at
+**At the October 27 pause, the new work had not run.** Fresh local guards stopped before Node/tests at
 82.49% and86.85% swap, against the unchanged below80% limit. No baseline RED or
-new-source runtime PASS is claimed. Parent results above do not transfer here.
+new-source runtime PASS was claimed at that pause. The current checkpoint records
+the later source-bound local mode run; parent results do not transfer by intent.
 
 The implementation is in:
 
@@ -174,7 +228,10 @@ calling that proof qualified:
 3. Execute the new mode. Source review, a FIFO unit double or compiling it in
    another mode cannot establish its native result.
 
-## Resume sequence
+## Historical October27 resume sequence
+
+The sequence below is preserved as earlier evidence. For current application
+ownership and the eleventh CI group, follow Start here and the current checkpoint.
 
 1. Read this note, the62 requirements and relevant linked source contracts.
    Revalidate branch/PR/release state. Preserve other work and original evidence.
@@ -204,11 +261,13 @@ calling that proof qualified:
    journeys, accessibility, capacity/recovery, legal/guardian readiness and honest
    platform qualification. A passing P9 slice is not project completion.
 
-## CI-owner dependency — proposed, not applied
+## Historical CI-owner handoff — now implemented in application CI
 
-`.github/workflows/durable-record-runtime.yml` is unchanged, SHA256
+At that earlier checkpoint, `.github/workflows/durable-record-runtime.yml`
+was unchanged, SHA256
 `5b8cb2382b4e324a0e65635c4e7b819d2702c0e99c979f4c34f9bdd0418b51c1`.
-Its owner can review an additional step following the existing capture pattern:
+The proposed capture pattern below is now the explicit application CI step.
+Its actual current execution must still be qualified:
 
 ```yaml
 - name: Prove native permission ordering for moderation start

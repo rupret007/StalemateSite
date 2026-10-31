@@ -17,6 +17,49 @@ applies. Clearing links removes both room handoffs; it does not stop the native
 host or revoke a capability already copied. Use the host's **Kick web guest**
 or end its session for that.
 
+With matching updated client/engine, the host's paste clears after current-room
+publication state and the request's published result both arrive, including
+re-sharing an unchanged link. A rejected paste stays editable while the visitor
+remains the same connected room host. Room changes, loss of host powers,
+disconnect and Stop still clear it. This is command/publication feedback, not
+downstream audio enrollment. The pending request and editable paste stay in
+memory only. See [the protocol and mixed-version limits](HANGOUT_JAM_SHARE_FEEDBACK.md).
+
+## Finding setup help
+
+The compact music panel keeps platform availability and headphone/delay advice
+outside its expandable help. Copy/Join and the host editor remain direct actions.
+**Setup & invitation help** contains the full beta-app, paste, host, expiry and
+Stop instructions. It starts closed and uses native keyboard disclosure. Opening
+it scrolls the first steps into the panel without moving focus from the summary;
+closing it is the same native action. It neither opens a destination nor requests
+capture. The host's empty-state action row stays out of the way until an invitation
+exists; ordinary guests still see their waiting state.
+
+The375/390 browser journeys also check keyboard-open help at667px height, an
+immediately readable first paragraph, visible input/Send, at-least16px inputs,
+the normal title/platform warning, and no page overflow. This is partial browser
+accessibility coverage, not a full WCAG or physical screen-reader/iPhone audit.
+No framework, dependency, external component or copied code is added. The design
+uses the native [HTML disclosure element](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/details),
+with [reflow](https://www.w3.org/WAI/WCAG22/Understanding/reflow.html) and
+[visible-focus guidance](https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html)
+as constraints. Passing these cases does not establish conformance.
+
+## Publication and capability lifetime
+
+If the same connected host edits the next paste while publication is delayed,
+confirmation of the submitted value preserves that newer edit through the
+room redraw. It does not submit the edit. An unrelated room's confirmation,
+room switch, authority loss or local Stop does not receive that preservation.
+The updated editor disables Share until its matching result arrives, while
+keeping the next paste editable. Programmatic submission respects the same
+bound. Rejection permits a manual correction. An eight-second advisory keeps
+the uncertain request pending and asks the host to copy edits before leaving;
+there is no submission queue, automatic retry or timeout-based success/failure.
+An old-room result cannot complete a new request. Older-engine fallback remains
+state-based and does not establish this new guarantee.
+
 Invitations remain room-scoped bearer capabilities. Existing room-switch,
 disconnect, host-power-loss and delayed-action fences remain in place. The
 local Stop action immediately retires room invitation controls, and cached
@@ -39,8 +82,33 @@ The popup is intercepted; these tests do not contact a Web Join endpoint.
 The Stop case uses synthetic own-status HTTP replies and a failed withdrawal;
 it proves the real client's immediate opt-out, not real server consent ordering.
 
+The invitation-lifecycle fixture can hold one connection's complete server
+stream in FIFO order, freezing each real-engine frame when emitted. New cases
+cover editing before publication arrives, another room's pending confirmation,
+and local Stop before a delayed confirmation. The queue has a fixed 1,000-frame
+test bound and cannot inject arbitrary frames or reorder the stream. The Stop
+case uses synthetic own-status HTTP, and the independent guest's already
+received invitation is not recalled. These are browser/engine races, not native
+music, revoked transport capability or hosted consent proof. Additional cases
+check one pending Share/manual rejected correction, a real FIFO prefix ending
+after an old-room result while a new request remains pending, and an actual
+eight-second wait retaining the editable paste without automatic retry.
+
 No production origin, TURN/vault credential, provider or deployment is enabled
 by this change. Passing these journeys proves application handoff, not actual
 browser enrollment, live mixing, cross-network transport or physical audio.
 The [required music acceptance](HANGOUT_MUSIC_DEMO_ACCEPTANCE.md) and all 62
 original acceptance outcomes remain required.
+
+The recovery change keeps existing programmatic error feedback without moving
+focus or announcing invitation contents. This follows the purpose of
+[WCAG status-message guidance](https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html).
+[Jamulus setup guidance](https://jamulus.app/wiki/Getting-Started) recommends
+wired networking and wired headphones; retain that preparation advice without
+claiming it establishes measured WebJam latency or successful live audio.
+
+The delayed-response fixture preserves ordering in accordance with the
+[WebSocket framing rules](https://datatracker.ietf.org/doc/html/rfc6455#section-5.4).
+Avoiding unnecessary re-entry is also a design consideration in
+[WCAG's redundant-entry guidance](https://www.w3.org/WAI/WCAG22/Understanding/redundant-entry.html);
+preserving a newer edit here is an application improvement, not a WCAG audit.

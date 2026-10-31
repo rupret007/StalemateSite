@@ -10,13 +10,33 @@ const COMPLETE = `Join a synthetic rehearsal on WebJam:\nPaste this entire invit
 
 async function community(browser, baseURL) {
     const { createLobby } = await import('../../hangout-worker/src/lobby-core.mjs');
-    const contexts = [], sockets = new Map(), identities = new Map(), inbound = [];
+    const contexts = [], sockets = new Map(), identities = new Map(), inbound = [], held = new Map();
     let at = 1800000000000, serial = 0;
-    const engine = createLobby({ now: () => at, send: (id, frame) => sockets.get(id)?.send(JSON.stringify(frame)),
+    const engine = createLobby({ now: () => at, send: (id, frame) => {
+        // Freeze the real engine's frame now, and delay the entire connection's
+        // outbound stream in FIFO order. Never let later frames overtake it.
+        const raw = JSON.stringify(frame), queue = held.get(id);
+        if (queue) { if (queue.length >= 1000) throw Error('Synthetic frame hold exceeded its bound'); queue.push(raw); }
+        else sockets.get(id)?.send(raw);
+    },
         limits: { defaultSlow: 0, roomPerDevice: 1 } });
-    const visitor = async (nick, viewport) => {
-        const context = await browser.newContext({ viewport }); contexts.push(context);
+    const visitor = async (nick, viewport, controls = false) => {
+        const context = await browser.newContext({ viewport,
+            ...(controls && browser.browserType().name() === 'chromium' ? { permissions: ['local-network-access'] } : {}) }); contexts.push(context);
         await context.route('**/*', route => new URL(route.request().url()).origin === new URL(baseURL).origin ? route.continue() : route.abort());
+        if (controls) {
+            // Own-status HTTP is synthetic, as in lobby-webjam.spec.js. The
+            // actual client handles Stop; this is not native consent proof.
+            await context.route(url => url.pathname === '/r/45662413410ed051/lobby/', async route => {
+                const response = await route.fetch();
+                await route.fulfill({ response, body: (await response.text()).replace('<head>', '<head><script src="/beta/bootstrap.js"></script>') });
+            });
+            await context.route('**/beta/bootstrap.js', route => route.fulfill({ contentType: 'text/javascript', body: 'window.HangoutParticipationControls=true;' }));
+            await context.route('**/beta/participation', route => route.fulfill({ json: {
+                ok: true, state: 'authorized', available: true, purposes: ['public-text', 'camera'], revision: 2, canStop: true
+            } }));
+            await context.route('**/beta/participation/stop', route => route.fulfill({ status: 503, json: { error: 'Synthetic unconfirmed withdrawal' } }));
+        }
         await context.addInitScript(() => {
             window.copiedInvites = []; window.clipboardMode = 'ok';
             Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => {
@@ -39,6 +59,21 @@ async function community(browser, baseURL) {
         return page;
     };
     return { visitor, inbound,
+        holdServerFrames: nick => {
+            const id = identities.get(nick)?.id;
+            if (!sockets.has(id) || held.has(id)) throw Error('Hold requires one live, unheld connection');
+            const frames = []; held.set(id, frames);
+            return { frames, releaseThrough: predicate => {
+                if (held.get(id) !== frames) throw Error('Frame hold already released');
+                const index = frames.findIndex(raw => predicate(JSON.parse(raw)));
+                if (index < 0) throw Error('Ordered release requires an existing real frame');
+                for (const raw of frames.splice(0, index + 1)) sockets.get(id)?.send(raw);
+            }, release: () => {
+                if (held.get(id) !== frames) throw Error('Frame hold already released');
+                held.delete(id);
+                for (const raw of frames) sockets.get(id)?.send(raw);
+            } };
+        },
         disconnect: nick => { const identity = identities.get(nick); engine.disconnect(identity.id); sockets.get(identity.id).close({ code: 1000, reason: 'Synthetic normal disconnect' }); },
         close: () => Promise.all(contexts.map(context => context.close())) };
 }
@@ -65,6 +100,150 @@ async function cleared(page) {
     await expect(page.locator('[data-jam-link]')).toHaveValue('');
     await expect(page.locator('[data-jam-desktop]')).not.toHaveAttribute('href');
 }
+
+test('a delayed publication confirmation keeps a newer edit without sharing it', async ({ browser, baseURL }) => {
+    const f = await community(browser, baseURL);
+    try {
+        const host = await f.visitor('EditingHost'), guest = await f.visitor('EditingGuest');
+        await create(host, '#jam-editing'); await invite(host, guest, '#jam-editing', 'EditingGuest');
+        const held = f.holdServerFrames('EditingHost');
+        await host.fill('[data-jam-link]', FIRST); await host.locator('[data-jam-form] button[type="submit"]').click();
+        // The independent guest observes actual engine publication while the
+        // host's complete ordered response stream remains delayed.
+        await expect(guest.locator('[data-jam-copy]')).toBeVisible();
+        expect(held.frames.some(raw => JSON.parse(raw).ch?.jam?.invitation === FIRST)).toBe(true);
+        await host.fill('[data-jam-link]', DRAFT); held.release();
+        await expect(host.locator('[data-jam-copy]')).toBeVisible();
+        await expect(host.locator('[data-jam-link]')).toHaveValue(DRAFT);
+        expect(f.inbound.filter(frame => frame.name === 'jamlink').map(frame => frame.args)).toEqual([['invitation', FIRST]]);
+        expect(await host.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain(DRAFT);
+    } finally { await f.close(); }
+});
+
+test('a newer rejected share stays editable when an earlier publication arrives late', async ({ browser, baseURL }) => {
+    const f = await community(browser, baseURL);
+    const rejected = 'https://unapproved.example/join/#newer_unpublished_fixture';
+    try {
+        const host = await f.visitor('OrderHost'), guest = await f.visitor('OrderGuest');
+        await create(host, '#jam-order'); await invite(host, guest, '#jam-order', 'OrderGuest');
+        const held = f.holdServerFrames('OrderHost');
+        await host.fill('[data-jam-link]', FIRST); await host.locator('[data-jam-form] button[type="submit"]').click();
+        await expect(guest.locator('[data-jam-copy]')).toBeVisible();
+        await host.fill('[data-jam-link]', rejected);
+        const submit = host.locator('[data-jam-form] button[type="submit"]');
+        await expect(submit).toBeDisabled();
+        // Programmatic submission must not bypass the same single-flight bound.
+        await host.locator('[data-jam-form]').evaluate(form => form.requestSubmit());
+        expect(f.inbound.filter(frame => frame.name === 'jamlink')).toHaveLength(1);
+        held.release();
+        await expect(submit).toBeEnabled();
+        await expect(host.locator('[data-jam-link]')).toHaveValue(rejected);
+        await submit.click();
+        await expect(host.locator('[data-toast]')).toContainText('Browser joining is not configured');
+        await expect(host.locator('[data-jam-link]')).toHaveValue(rejected);
+        expect(await guest.evaluate(() => __lobby.chans.get(__lobby.active).jam.invitation)).toBe(FIRST);
+        expect(f.inbound.filter(frame => frame.name === 'jamlink').map(frame => frame.args)).toEqual([['invitation', FIRST], ['web', rejected]]);
+        const ids = f.inbound.filter(frame => frame.name === 'jamlink').map(frame => frame.jamRequestId);
+        expect(ids).toHaveLength(2); expect(ids[0]).toMatch(/^[a-f0-9]{32}$/); expect(ids[1]).toMatch(/^[a-f0-9]{32}$/);
+        expect(ids[0]).not.toBe(ids[1]);
+    } finally { await f.close(); }
+});
+
+test('an old room share result cannot complete the new room request', async ({ browser, baseURL }) => {
+    const f = await community(browser, baseURL);
+    try {
+        const host = await f.visitor('ReceiptHost'), guest = await f.visitor('ReceiptGuest');
+        await create(host, '#jam-receiptold'); await invite(host, guest, '#jam-receiptold', 'ReceiptGuest');
+        await create(host, '#jam-receiptnew'); await select(host, '#jam-receiptold');
+        const held = f.holdServerFrames('ReceiptHost');
+        await host.fill('[data-jam-link]', FIRST); await host.locator('[data-jam-form] button[type="submit"]').click();
+        await expect(guest.locator('[data-jam-copy]')).toBeVisible();
+        // This real later presence frame is a delivery barrier after the old
+        // result. It is queued before the new room's request, preserving FIFO.
+        await command(guest, 'away', ['Receipt barrier']);
+        await expect.poll(() => guest.evaluate(() => __lobby.chans.get('#jam-receiptold').names.some(n => n.nick === 'ReceiptGuest' && n.away))).toBe(true);
+        await select(host, '#jam-receiptnew'); await host.fill('[data-jam-link]', SECOND);
+        const submit = host.locator('[data-jam-form] button[type="submit"]'); await submit.click();
+        await expect.poll(() => f.inbound.filter(frame => frame.name === 'jamlink').length).toBe(2);
+        const requests = f.inbound.filter(frame => frame.name === 'jamlink');
+        await expect.poll(() => held.frames.some(raw => JSON.parse(raw).id === requests[1]?.jamRequestId && JSON.parse(raw).t === 'jam-share-result')).toBe(true);
+        held.releaseThrough(frame => frame.t === 'chan' && frame.ch.name === '#jam-receiptold' && frame.ch.names.some(n => n.nick === 'ReceiptGuest' && n.away));
+        await expect.poll(() => host.evaluate(() => __lobby.chans.get('#jam-receiptold').names.some(n => n.nick === 'ReceiptGuest' && n.away))).toBe(true);
+        await expect(host.locator('[data-jam-link]')).toHaveValue(SECOND); await expect(submit).toBeDisabled();
+        held.release(); await expect(submit).toBeEnabled(); await expect(host.locator('[data-jam-link]')).toHaveValue('');
+        expect(requests[0].jamRequestId).not.toBe(requests[1].jamRequestId);
+    } finally { await f.close(); }
+});
+
+test('an unconfirmed share keeps one request and an editable paste without automatic retry', async ({ browser, baseURL }, testInfo) => {
+    const f = await community(browser, baseURL);
+    try {
+        const host = await f.visitor('WaitingHost', { width: 390, height: 844 }), guest = await f.visitor('WaitingGuest');
+        await create(host, '#jam-waiting'); await invite(host, guest, '#jam-waiting', 'WaitingGuest');
+        const held = f.holdServerFrames('WaitingHost');
+        await host.fill('[data-jam-link]', FIRST); await host.locator('[data-jam-form] button[type="submit"]').click();
+        await expect(guest.locator('[data-jam-copy]')).toBeVisible();
+        await expect(host.locator('[data-jam-share-status]')).toContainText('Still waiting', { timeout: 10000 });
+        await expect(host.locator('[data-connection]')).toHaveText('Connected');
+        await expect(host.locator('[data-jam-link]')).toHaveValue(FIRST);
+        await host.screenshot({ path: testInfo.outputPath('jam-share-waiting-390.png'), fullPage: true });
+        await host.fill('[data-jam-link]', DRAFT); await host.locator('[data-jam-form]').evaluate(form => form.requestSubmit());
+        expect(f.inbound.filter(frame => frame.name === 'jamlink')).toHaveLength(1);
+        held.release(); await expect(host.locator('[data-jam-form] button[type="submit"]')).toBeEnabled();
+        await expect(host.locator('[data-jam-link]')).toHaveValue(DRAFT);
+        await expect(host.locator('[data-jam-share-status]')).toHaveText('Invitation shared.');
+        await host.click('[data-leave]'); await cleared(host);
+        await expect(host.locator('[data-jam-share-status]')).toHaveText('');
+    } finally { await f.close(); }
+});
+
+test('a delayed confirmation from another room cannot clear or share the current room draft', async ({ browser, baseURL }) => {
+    const f = await community(browser, baseURL);
+    try {
+        const host = await f.visitor('DelayedHost'), guest = await f.visitor('DelayedGuest');
+        await create(host, '#jam-origin'); await invite(host, guest, '#jam-origin', 'DelayedGuest');
+        await create(host, '#jam-current'); await share(host, SECOND); await select(host, '#jam-origin');
+        const held = f.holdServerFrames('DelayedHost');
+        await host.fill('[data-jam-link]', FIRST); await host.locator('[data-jam-form] button[type="submit"]').click();
+        await expect(guest.locator('[data-jam-copy]')).toBeVisible();
+        expect(held.frames.some(raw => JSON.parse(raw).ch?.jam?.invitation === FIRST)).toBe(true);
+        await select(host, '#jam-current'); await host.fill('[data-jam-link]', DRAFT); held.release();
+        await expect.poll(() => host.evaluate(() => __lobby.chans.get('#jam-origin').jam.invitation)).toBe(FIRST);
+        await expect(host.locator('[data-chat-context]')).toHaveText('#jam-current');
+        await expect(host.locator('[data-jam-link]')).toHaveValue(DRAFT);
+        expect(f.inbound.filter(frame => frame.name === 'jamlink' && frame.ch === '#jam-current').map(frame => frame.args)).toEqual([['invitation', SECOND]]);
+        await select(host, '#jam-origin'); await expect(host.locator('[data-jam-link]')).toHaveValue('');
+        await fallback(host, FIRST);
+    } finally { await f.close(); }
+});
+
+test('local Stop purges a pending paste before a delayed publication confirmation arrives', async ({ browser, baseURL }) => {
+    const f = await community(browser, baseURL);
+    try {
+        const host = await f.visitor('PendingStopHost', { width: 375, height: 812 }, true), guest = await f.visitor('PendingStopGuest');
+        await create(host, '#jam-pendingstop'); await invite(host, guest, '#jam-pendingstop', 'PendingStopGuest');
+        const held = f.holdServerFrames('PendingStopHost');
+        await host.fill('[data-jam-link]', FIRST); await host.locator('[data-jam-form] button[type="submit"]').click();
+        await expect(guest.locator('[data-jam-copy]')).toBeVisible();
+        expect(held.frames.some(raw => JSON.parse(raw).ch?.jam?.invitation === FIRST)).toBe(true);
+        await host.fill('[data-jam-link]', DRAFT);
+        await host.locator('[data-sharing-controls] summary').click();
+        await host.click('[data-sharing-stop]'); await host.click('[data-sharing-accept]');
+        await expect(host.locator('[data-sharing-status]')).toContainText('could not be confirmed');
+        await cleared(host); held.release();
+        // A real later chat event is an ordered delivery barrier, without
+        // requiring stopped clients to retain the old invitation in memory.
+        await command(guest, 'me', ['Synthetic delivery barrier']);
+        await expect(host.locator('[data-buffer]')).toContainText('Synthetic delivery barrier');
+        await expect(host.locator('[data-jam]')).toBeHidden(); await cleared(host);
+        await expect(host.locator('[data-text]')).toBeDisabled();
+        expect(await host.evaluate(() => __lobby.localMediaPaused)).toBe(true);
+        expect(f.inbound.filter(frame => frame.name === 'jamlink').map(frame => frame.args)).toEqual([['invitation', FIRST]]);
+        // The guest already received the capability; local Stop does not
+        // revoke a copied invitation or falsely claim server withdrawal.
+        await expect(guest.locator('[data-jam-copy]')).toBeVisible();
+    } finally { await f.close(); }
+});
 
 test('published fallback and unpublished invite disappear on leave while unrelated chat drafts stay tab-local', async ({ browser, baseURL }, testInfo) => {
     const f = await community(browser, baseURL);

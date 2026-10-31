@@ -1,10 +1,232 @@
 # Shared Hang Out / WebJam demo checkpoint
 
-Updated October 28, 2026. Goal active: finish the application for a private Che
+Updated October 30, 2026. Goal active: finish the application for a private Che
 demonstration and website integration. This is an application checkpoint, not
 deployment approval or a claim that the live beta contains these changes.
 
-## Current assembly: one source for the receiving website session
+## Current work: independent application CI
+
+Jeff's October30 direction is to implement the application here without putting
+it through StoryPool. This workstream owns application code, project CI, tests,
+docs and application PRs. It does not change shared StoryPool core, installed
+services/checkouts, configuration, locks or operational files. Existing GitHub
+protections and all security/provider/release holds remain. The earlier normal
+Karen-admission and CI-owner handoffs are historical application dependencies.
+
+Branch **`codex/webjam-native-ci-20261030`** starts at PR169 head
+`43457849374bfa00e68fcf3f224954e3f3832026`. Its focused change adds the explicit
+`--participation --provider-start` command to the existing native application
+workflow as an eleventh proof group. It retains the ten preceding groups,
+ten-minute timeout, locked dependencies/audits and stdout/stderr/exit-code
+capture. The existing artifact upload covers the new files. There is no provider
+activation or deployed behavior change. Current-source CI execution remains
+to verify; local proof or the preceding green ten-group runs do not substitute.
+
+## Previous work: correlated invitation sharing
+
+Branch: **`codex/jam-share-order-20261030`**, based on PR168 head
+`2c4a191915e02c73f95b1c0d2aca1082f6974649`. Preserve PR166/167/168 and all62
+requirement outcomes. The source was left uncommitted by a capacity interruption;
+the resumed application work preserves those changes and their original logs.
+It was subsequently committed as PR169 head
+`43457849374bfa00e68fcf3f224954e3f3832026`. Its push41049339983 checked out that
+exact source and passed 1,869 units/114 files and 436 unique browser cases in
+436 attempts. The complete report was decoded: no retries, skips, flakes or
+report errors. Seven fresh CI WebKit375/390 host/guest/help/waiting screenshots
+were inspected. The native ten-group runs have green metadata; their full
+proof is not yet independently qualified here. These results do not establish
+the newly added eleventh group, deployed journeys or music.
+
+A real-engine browser test reproduced a second lost-paste defect on2c4: an
+earlier publication can erase a newer submitted paste even when that later
+share is rejected. The matched engine advertises `jamShareResults:1` and returns
+caller-only request feedback after staged output. The visible editor allows one
+pending Share, keeps the next paste editable, and requires a matching result.
+An eight-second waiting advisory does not resend, unlock or claim rejection.
+Room/authority/disconnect/Stop boundaries still purge the editor and pending
+state. Correlation is not authentication, deduplication or music enrollment.
+Read [the protocol/compatibility contract](HANGOUT_JAM_SHARE_FEEDBACK.md).
+
+Current local evidence, with fresh unchanged resource guards:
+
+- 64 focused units passed, including the strict hello-feature expectations;
+  the earlier31-case pass and original30-pass/one-new-assertion failure remain.
+  The resumed ordinary unit group passed 1,867 cases/112 files, then the separate
+  accepted-room-capacity group passed both cases/files. Together these local
+  runs cover 1,869 cases/114 files with no failures or pending cases; they are
+  separate from CI. The existing capacity thresholds and setup were retained.
+- 18 real-client/engine Chromium journeys passed once, with zero retries, skips,
+  flakes or report errors. They include manual correction, an old-room result
+  arriving during another room's request, and an actual eight-second wait with
+  no automatic retry. Seven fresh375/390 images were inspected: host, guest,
+  keyboard help and editable waiting status. No horizontal overflow or clipped
+  input/Send was observed in those scoped cases.
+- Explicit provider-start and separate fifty-guest native Worker/SQLite modes
+  passed locally on Mac ARM. The latter delivered 12 publications to 50 guests
+  (600 deliveries),
+  with admission p95 185.387ms. Both passed intentional process-loss/cold-owner
+  recovery and removed owned processes/temporary state. These use synthetic
+  consent/provider callbacks and do not prove WebJam audio or hosted capacity.
+
+The original lost-paste browser failure is retained. One browser attempt was
+refused before Node at load1 16.77; guards were not relaxed. The first local
+provider-start attempt failed its exact hello-feature expectation after the
+new capability was added; only the expectation was extended, retaining every
+previous flag/assertion, before the passing run. Do not erase those attempts.
+
+Current-source CI and normal review remain to qualify. The explicit eighth
+provider-start **CI** mode, matched protected deployment and approved actual
+two-way ARM/Intel/Windows music remain owner dependencies. Linux and every
+unverified acceptance outcome remain. This application change does not alter
+core, workflows, installed services, shared operational files or release holds.
+
+## Previous work: compact Jam setup
+
+Branch: **`codex/jam-mobile-setup-20261030`**, based on PR167 head
+`143b3905af12e029a645e96769cc1d04cec018a5`. PR167 remains ready with
+`needs-karen`; no formal review or signed local verdict has been observed.
+The preceding branches and all 62 requirement outcomes remain preserved.
+Exact2c4 push41012559205/job123921483032 later passed1,858 units/114 files and
+430 browser cases/430 attempts with no retries, skips, flakes or report errors.
+Six CI WebKit375/390 images were inspected; the separate PR event has green
+metadata only. PR168 is ready with `needs-karen`, without an observed signed
+verdict. This historical result does not qualify the current changed kernel.
+
+The Jam panel now keeps its title, headphone/delay advice, explicit Mac-host and
+unsigned-Windows limits, and invitation actions together. Detailed setup uses
+native closed-by-default `details`/`summary`, including the full beta-app,
+private-invite, hosting, expiry and local-Stop limitations. A host without an
+invitation sees the editor instead of waiting for themselves. Labels and fields
+wrap; browser Join still needs an explicit click and approved server state.
+
+Six fresh local Chromium images were directly inspected: host/guest375/390 at
+844px height, plus keyboard-open help at both widths/667px height. The heading,
+warnings and actions are readable in the normal view; input/Send stay visible,
+inputs are at least16px, and the page does not overflow horizontally. Help keeps
+native focus and scrolls its first paragraph into the panel when opened. No
+page opening or capture occurs while using help.
+
+The first15-case local run passed before the screenshot review exposed a timing
+gap: transient toast feedback left only one line of opened help visible on short
+screens. A default-five-second assertion passed after that feedback disappeared;
+it did not prove immediate readability. The stricter one-second check failed
+at both widths (visible ratios0.134/0.167), with both original failures retained.
+After the panel scroll correction, all15 focused journeys passed once with
+zero retries/skips/report errors or stderr. Tested frontend/fixture hashes are
+recorded separately. Current-source CI and normal review are still required;
+no physical Safari, full accessibility, hosted consent or music proof is claimed.
+
+Owner-controlled application review, the explicit eighth native CI mode,
+approved runnable music packages/path and matching protected deployment remain
+dependencies. No core/workflow/service/shared operational or hold changes were
+made. AI/TURN/vault, trust/release and age/consent/camera safeguards remain.
+
+## Previous work: delayed invitation confirmations
+
+Branch: **`codex/jam-confirmation-races-20261030`**, based on PR166 head
+`1504f94837a68ce35844e0590cde469135c287b4`. PR166 remains open/ready with
+`needs-karen`; its source is preserved. A scoped independent source comment
+found no inspected blocker and identified delayed-confirmation coverage as a
+gap. No formal review or signed Karen verdict was observed.
+
+The same connected host's newer invitation edit now survives the synchronous
+room redraw caused by confirming an earlier submitted value. It is never
+automatically sent. Existing different-room, authority, disconnect and Stop
+fences remain. Three new real-engine browser cases hold the complete host-bound
+stream in FIFO order to check the newer edit, another room's pending response
+and local Stop before a delayed response. Own-status HTTP in the Stop case is
+synthetic; already delivered guest capabilities are not revoked by local Stop.
+
+Initial targeted local RED and GREEN attempts were refused **before Node** by
+the unchanged below-80-percent swap guard (80.82 percent at both observations).
+Later fresh guards admitted actual execution: new tests on parent1504 failed
+only the newer-edit assertion, while the room/Stop fence cases passed. Fixed143
+passed15 local Chromium cases/15 attempts, with no retries/skips/report errors
+and fresh375/390 images. Exact143 push41009684832/job123912504998 independently
+passed1,858units/114files plus430browser cases/430attempts, with zero retries,
+skips, flakes or report errors. All three new races passed Chromium and WebKit;
+fresh CI WebKit375/390 images were inspected. The separate PR event has green
+metadata only. [Current source-specific evidence](https://github.com/rupret007/StalemateSite/pull/167#issuecomment-6516077291)
+does not qualify the new panel, eighth native CI mode or actual music.
+
+The following PR166 evidence applies only to its exact source:
+push41006231478 checked out `1504f94` and passed 1,858 units/114 files plus
+424 unique browser cases/424 attempts, with no retries, skips, flakes or report
+errors. Its 11 incident-review cases include the forced random-suffix regression.
+Fresh CI WebKit host/guest375/390 screenshots were inspected. The PR event's
+separate green metadata was observed, without independently decoding its report.
+Pages deployment checks were skipped. None of this is music or hosted proof.
+
+All 62 original outcomes remain unchanged. Owner-controlled review admission,
+the explicit eighth native CI mode, matching protected deployment and actual
+two-way ARM/Intel/Windows music remain dependencies. Linux scope and all holds
+are retained. Continue using the application integration handoff; preserve newer
+band-site pages and do not substitute a source asset archive for a release.
+
+## Previous work: recover rejected music invitations
+
+Branch: **`codex/irc-webjam-polish-20261029`**. Base:
+`ec1eb14cfb2f7d068e5a01467193b70e21495dbc`, the October 29 merge of PR164
+into `codex/che-demo-candidate`. Its tree equals tested PR164 head `41916eb`.
+Jeff also merged PR160/161/162/163. Preserve those branches and the separate
+source-specific Cursor review comments; a merge or a comment is not an
+independently verified signed local Karen result.
+
+The current application fix keeps a rejected invitation editable while the same
+connected room host retains authority. A successful socket send no longer clears
+the paste. Confirmed current-room state clears the matching submitted value,
+including a re-share of an unchanged published link. Existing room, host-power,
+disconnect, Stop and replacement fences still purge invitations. The server's
+exact-origin/permission checks and opaque desktop invitation format are unchanged.
+
+Observed local evidence, with original failures retained:
+
+- On unchanged base client `ec1eb14`, the strengthened real-relay test failed
+  because a rejected browser paste became empty. After the fix, 12 focused
+  Chromium journeys passed once, without skips/retries or stderr. These cover
+  rejection/correction/re-share, both website entrances, drawing, invitation
+  lifecycle and unconfirmed Stop. Fresh host/guest 375/390px screenshots were
+  captured. This is local browser/fixture proof, not hosted sign-in or music.
+- The full local unit run passed 1,856 cases and failed one of 1,857:
+  `hangout-incident-review.test.js` attempted to click an absent benign-sample
+  button. Its fixture/controller sources are unchanged by this music fix.
+  Original logs remain preserved; the cause is under investigation, and this
+  run is not recorded as green. A later diagnostic import was refused by the
+  unchanged 80-percent swap guard before starting Node.
+- Follow-up source investigation found that this local-only fixture used random
+  identifier suffixes as nicknames without confirming admission. An admitted
+  diagnostic confirmed that `Authorb00b00`/`Visitorb00b00` are rejected by the real
+  nickname filter; the original failing run did not retain its random suffix.
+  The fixture now uses separate benign counter labels, keeps random opaque IDs
+  and requires a real welcome frame. A deterministic regression forces that
+  suffix through real report/preservation. Its initial targeted local run was
+  refused before Node by the swap guard; no local pass is claimed for that new
+  case until executed. Production filtering and the review controller are unchanged.
+- On **base `ec1eb14`**, the explicit eighth provider-start mode passed locally
+  on macOS ARM64/Node26.12.0. Both phases matched 51 recorded inputs (49 tracked
+  inputs tied to this commit) and 68 compiled inputs. Final evidence storage was
+  ready, authority available and all three captured-owner failure tokens matched.
+  Intentional owned-process SIGKILL/cold recovery produced a fresh owner baseline,
+  no old request replay, no live owned processes and removed temporary state.
+  Raw stdout SHA256: `5be674c3cd19fd350bf8ec924f9d90b53305c69c7402cd25f5c030dcde7c2e0e`.
+  [Full evidence](https://github.com/rupret007/StalemateSite/pull/164#issuecomment-6514936023).
+  Inert callbacks/synthetic readiness remain explicit; no provider activation,
+  guardian/legal, hosted or native music result is claimed. **This is not CI.**
+- Earlier combined PR163 `4fd2d86` site proof passed 1,857 units/412 browser cases;
+  native proof ran ten groups/seven modes. PR164 `41916eb` push proof passed
+  1,857 units/424 browser cases with one attempt each. Its separate merge run
+  had one preserved Chromium moderation timeout/retry. These qualify their
+  actual revisions, not this new fix or an eighth CI mode.
+
+Next: current-source CI and normal review admission through the owning session,
+then a matching approved private deployment and actual ARM/Intel/Windows two-way
+music. Linux and all 62 outcomes remain. The Mini's configured StalemateSite
+review exclusion was handed to StoryPool 10-21-26; no protection was changed.
+Native WebJam PR402 is now merged, but no newly qualified runnable music package
+or deployed beta participation mode has been verified here. Keep the earlier
+Intel EPERM, unsigned Windows and protected-browser-route limitations below.
+
+## Previous assembly: one source for the receiving website session
 
 Branch: **`codex/che-demo-candidate`**. This local application assembly merges
 these inputs cleanly and updates the handoff; it does not merge GitHub PRs or

@@ -32,6 +32,22 @@ async function reportAndPreserve(view, index = 0) {
 }
 
 describe('restricted local incident review interface with the actual report engine', () => {
+    it('keeps fixture display names independent of opaque identifier suffixes', async () => {
+        let serial = 0;
+        const uuid = vi.spyOn(crypto, 'randomUUID').mockImplementation(() =>
+            `${(++serial).toString(16).padStart(8, '0')}-0000-4000-8000-000000b00b00`);
+        try {
+            // This suffix is rejected inside a nickname by the real filter.
+            // Opaque session/device IDs must stay independent of display labels.
+            const f = await fixture(), view = await f.view();
+            expect(view.token).toMatch(/b00b00$/);
+            expect([...view.root.querySelectorAll('button')].filter(node => node.textContent === 'Flag benign sample')).toHaveLength(2);
+            await reportAndPreserve(view);
+            expect(f.model.generalStaffState().reports).toHaveLength(1);
+            expect(state(f.model).cases).toHaveLength(1);
+        } finally { uuid.mockRestore(); }
+    });
+
     it('flags a real delivered report, preserves only selected bytes, survives source expiry/restart, then releases and deletes on scheduled deadlines', async () => {
         const f = await fixture(), view = await f.view();
         await reportAndPreserve(view);

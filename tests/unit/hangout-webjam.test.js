@@ -48,3 +48,77 @@ describe('complete WebJam clipboard invitation handoff', () => {
         expect(validWebjamInvitation('https://example.com/join')).toBe('');
     });
 });
+
+describe('request-correlated WebJam share feedback', () => {
+    const A = '1a'.repeat(16), B = '2b'.repeat(16);
+    const share = (lobby, id, token, args = ['invitation', INVITATION]) => lobby.message(id, JSON.stringify({
+        t: 'cmd', ch: '#jam-fixture', name: 'jamlink', args, jamRequestId: token,
+        roomInstance: lobby._debug.channels.get('#jam-fixture').keepRef
+    }));
+    const results = messages => messages.filter(row => row.message.t === 'jam-share-result');
+
+    it('advertises feedback and sends only the caller a bounded result after its room state', () => {
+        const { lobby, messages, writes } = harness();
+        expect(messages.find(row => row.id === 'host' && row.message.t === 'hello').message.features.jamShareResults).toBe(1);
+        share(lobby, 'host', A);
+        expect(results(messages)).toEqual([{ id: 'host', message: { t: 'jam-share-result', id: A, status: 'published' } }]);
+        const response = messages.findIndex(row => row.message.t === 'jam-share-result');
+        expect(messages.slice(0, response).some(row => row.id === 'host' && row.message.t === 'chan'
+            && row.message.ch.name === '#jam-fixture' && row.message.ch.jam.invitation === INVITATION)).toBe(true);
+        expect(JSON.stringify({ rooms: lobby.roomSnapshot(), sessions: lobby.sessionSnapshot(), writes, log: lobby.modlog })).not.toContain(A);
+    });
+    it('rejects an unconfigured origin without replacing the existing invitation or reflecting capabilities', () => {
+        const { lobby, messages } = harness();
+        share(lobby, 'host', A); share(lobby, 'host', B, ['web', 'https://unapproved.example/join/#fixture']);
+        expect(results(messages).at(-1)).toEqual({ id: 'host', message: { t: 'jam-share-result', id: B, status: 'rejected' } });
+        expect(lobby._debug.channels.get('#jam-fixture').jam.invitation).toBe(INVITATION);
+    });
+    it('never treats an echoed request ID as host permission', () => {
+        const { lobby, messages } = harness();
+        share(lobby, 'guest', A);
+        expect(results(messages)).toEqual([{ id: 'guest', message: { t: 'jam-share-result', id: A, status: 'rejected' } }]);
+        expect(lobby._debug.channels.get('#jam-fixture').jam.invitation).toBeUndefined();
+    });
+    it.each(['x'.repeat(32), 'A'.repeat(32), 'a'.repeat(33), { nested: A }, null])('does not reflect a malformed request ID: %j', token => {
+        const { lobby, messages } = harness(); share(lobby, 'host', token);
+        expect(results(messages)).toEqual([]);
+    });
+    it('does not attach invitation feedback to another command', () => {
+        const { lobby, messages } = harness();
+        lobby.message('host', JSON.stringify({ t: 'cmd', name: 'topic', ch: '#jam-fixture', args: ['Rehearsal'], jamRequestId: A }));
+        expect(results(messages)).toEqual([]);
+    });
+    it('reports refusal under the unchanged command limit without bypassing it', () => {
+        const { lobby, messages } = harness();
+        for (let i = 0; i < 12; i++) share(lobby, 'host', i.toString(16).padStart(32, '0'));
+        expect(results(messages)).toHaveLength(12);
+        expect(results(messages).some(row => row.message.status === 'published')).toBe(true);
+        expect(results(messages).at(-1).message.status).toBe('rejected');
+    });
+    it('withholds feedback with controlled output and discards it when the commit fails', async () => {
+        // The real engine/output transaction uses a held/refusing commit
+        // adapter here; this is not a native SQLite or provider execution test.
+        const messages = []; let armed = false, refuse = false, release, entered;
+        const reached = new Promise(resolve => { entered = resolve; });
+        const lobby = createLobby({ send: (id, message) => messages.push({ id, message }), effectCommit: {
+            prepare: () => ({}),
+            commit: async (_context, _effects, { costsOnly }) => {
+                if (armed && !costsOnly) { entered(); await new Promise(resolve => { release = resolve; }); }
+                return { ok: costsOnly || !refuse };
+            }
+        } });
+        await lobby.connect({ id: 'host', dev: 'device', iph: 'ip', role: 'fan' });
+        await lobby.message('host', JSON.stringify({ t: 'hello', nick: 'CommitHost', age13: true }));
+        await lobby.message('host', JSON.stringify({ t: 'cmd', name: 'join', args: ['#jam-fixture'] }));
+        messages.length = 0; armed = true; refuse = true;
+        const pending = share(lobby, 'host', A); await reached;
+        expect(results(messages)).toEqual([]);
+        expect(messages.some(row => row.message.t === 'chan')).toBe(false);
+        release(); await pending;
+        expect(results(messages)).toEqual([]);
+        expect(messages.some(row => row.message.t === 'chan')).toBe(false);
+        expect(lobby._debug.channels.get('#jam-fixture').jam.invitation).toBeUndefined();
+        armed = false; refuse = false; await share(lobby, 'host', B);
+        expect(results(messages)).toEqual([{ id: 'host', message: { t: 'jam-share-result', id: B, status: 'published' } }]);
+    });
+});

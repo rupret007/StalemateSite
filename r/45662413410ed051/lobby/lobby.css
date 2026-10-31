@@ -228,11 +228,21 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .host-status { flex-basis: 100%; color: #8b958c; font-size: 10px; }
 [data-cam][aria-pressed=true] { color: var(--lime); border-color: #637943; background: #242f1c; }
 .jam { flex: 0 1 auto; min-height: 0; overflow: auto; max-height: 35dvh; padding: 16px 20px; background: #171e15; border-bottom: 1px solid #43543a; font-size: 12px; }
+.jam-title { margin: 0 0 4px; font-size: 14px; }
+.jam-note { margin: 0 0 6px; }
+.jam-platform { margin: 0 0 10px; }
 .jam-actions, .jam-paste { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.jam-actions .btn { flex: 1 1 145px; min-width: 0; max-width: 260px; padding-inline: 10px; overflow-wrap: anywhere; }
+.jam-actions [data-jam-wait] { flex-basis: 100%; }
 .jam-paste { margin-top: 10px; }
 .jam-paste .small { flex-basis: 100%; margin: 0; }
+[data-jam-share-status]:empty { display: none; }
 .jam-paste textarea, .act-load input { flex: 1; min-width: 0; }
 .jam textarea { box-sizing: border-box; width: 100%; max-width: 100%; font: inherit; font-size: 16px; resize: vertical; }
+.jam-setup { margin-top: 8px; border-top: 1px solid var(--line); }
+.jam-setup summary { min-height: 44px; padding: 10px 2px; color: var(--blue); font: 12px/1.8 var(--mono); }
+.jam-setup p { margin: 0 0 10px; overflow-wrap: anywhere; }
+.jam-setup p:last-child { margin-bottom: 0; }
 .activity { flex: 0 1 auto; min-height: 0; max-height: 49dvh; overflow: auto; background: #141a14; border-bottom: 1px solid #43543a; scrollbar-width: thin; }
 .activity-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 20px; color: #c3d4af; list-style: none; font: 10px var(--mono); }
 .activity-heading::-webkit-details-marker { display: none; }
@@ -328,6 +338,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .conversation-starters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .conversation-starters button, .quiet-action { flex: none; min-height: 36px; font-size: 9px; padding: 5px 8px; }
   .buffer { padding: 10px 12px; font-size: 12px; line-height: 1.75; }
+  .jam { padding: 12px; max-height: 40dvh; }
   .buffer li { padding-inline: 0; }
   .who { font-size: 12px; }
   .ts { font-size: 9px; }

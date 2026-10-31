@@ -65,11 +65,13 @@ historical evidence and trust gaps, not a current package selection.
 
 ## Remaining dependencies and controls
 
-- Obtain normal current-head Karen review and the release owner's approved
-  matching deployment/packages. Site CI is not native desktop/audio proof.
+- Qualify current-head application review/CI and approved matching
+  deployment/packages. Jeff's October30 instruction keeps application work here
+  independently of StoryPool/Karen. Site CI is not native desktop/audio proof;
+  existing GitHub protections and security/release holds remain.
 - Keep the additional provider-start native CI mode separate from music audio
-  and existing native Worker/SQLite tests. Its prepared workflow patch and
-  static checks do not establish that it executed.
+  and existing native Worker/SQLite tests. The application workflow now invokes
+  it explicitly; adding the step and static checks do not establish execution.
 - Respect resource admission on each machine. October 28 device discovery found
   the Intel MacBook offline and the Mini/Windows PC online on Tailscale. Earlier
   temporary MacBook test keys were removed after testing. Jeff's testing
