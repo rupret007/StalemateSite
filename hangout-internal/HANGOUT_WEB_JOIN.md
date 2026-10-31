@@ -3,7 +3,7 @@
 The website now includes `/join/`, the static browser client used by WebJam's
 compiled invitation address. Its source is pinned in
 [`join/PROVENANCE.json`](../join/PROVENANCE.json) to WebJam commit
-`caf76d810608fab6308bce7831598a99754b13d2` and
+`da7e04580d31bd0fa1039e7e1cbf4c940336edea` and
 [PR411](https://github.com/rupret007/webjam/pull/411). That source retains the
 interrupted-Join recovery, delayed-playback cancellation and background-audio
 resume fixes. Unavailable relay guidance now asks guests to try later or contact
@@ -47,7 +47,7 @@ Before activating:
   network failure and recovery. Local synthetic audio and provider fixtures do
   not establish WAN timing, physical iPhone behavior or TURN reachability.
 
-Use WebJam's [canonical creator guide](https://github.com/rupret007/webjam/blob/caf76d810608fab6308bce7831598a99754b13d2/USER_GUIDE.md)
-and [Web Join protocol guide](https://github.com/rupret007/webjam/blob/caf76d810608fab6308bce7831598a99754b13d2/docs/web-join.md)
+Use WebJam's [canonical creator guide](https://github.com/rupret007/webjam/blob/da7e04580d31bd0fa1039e7e1cbf4c940336edea/USER_GUIDE.md)
+and [Web Join protocol guide](https://github.com/rupret007/webjam/blob/da7e04580d31bd0fa1039e7e1cbf4c940336edea/docs/web-join.md)
 for the existing host/guest workflow. Browser joining is a separate higher-delay
 option; it does not satisfy the remaining native Windows/Linux/Mac acceptance.
