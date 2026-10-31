@@ -4,7 +4,7 @@ Current continuation, October 31: start with the
 [website integration guide](HANGOUT_WEBSITE_INTEGRATION.md) and
 [current private evidence](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md). Private
 source4ed/versiona972 and native sourcebf24 supersede the dated revisions below.
-The repository now supplies `scripts/package-community-toolkit.mjs` for the
+The repository now supplies `hangout-worker/tools/package-community-toolkit.mjs` for the
 documented self-contained, committed-source entry toolkit. Its manifest binds
 the exported public files; the toolkit does not contain or deploy the full app.
 Jeff's October30 direction makes application code, project CI, docs and PRs

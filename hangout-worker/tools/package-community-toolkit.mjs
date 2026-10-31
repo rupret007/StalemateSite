@@ -5,10 +5,10 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
-const repo = fileURLToPath(new URL('../', import.meta.url));
+const repo = fileURLToPath(new URL('../../', import.meta.url));
 const args = process.argv.slice(2);
 if (args.length !== 4 || args[0] !== '--community-address' || args[2] !== '--out')
-    throw new Error('Usage: node scripts/package-community-toolkit.mjs --community-address https://approved.example/ --out NEW_DIRECTORY');
+    throw new Error('Usage: node hangout-worker/tools/package-community-toolkit.mjs --community-address https://approved.example/ --out NEW_DIRECTORY');
 const raw = args[1];
 let address;
 try { address = new URL(raw); } catch { throw new Error('Expected an approved HTTPS community address.'); }
@@ -37,7 +37,7 @@ function committedFile(name, optional = false) {
 const sources = new Map();
 for (const name of ['scripts/package-community-entry.mjs', 'hangout-worker/src/community-integration.mjs',
     'r/45662413410ed051/entry-sites.mjs', 'hangout-internal/community-integration.example.json']) sources.set(name, committedFile(name));
-const exporterName = 'scripts/package-community-toolkit.mjs', exporterBytes = committedFile(exporterName);
+const exporterName = 'hangout-worker/tools/package-community-toolkit.mjs', exporterBytes = committedFile(exporterName);
 function committedCheckout(actual, expected) {
     let offset = 0;
     for (let i = 0; i < expected.length; i++) {
@@ -71,18 +71,35 @@ const template = JSON.parse(sources.get('hangout-internal/community-integration.
 template.communityAddress = communityAddress;
 if (!Array.isArray(template.sites)) throw new Error('Expected the public registration example.');
 for (const site of template.sites) { site.enabled = false; site.domainVerified = false; }
-const { communityIntegration } = await import('../hangout-worker/src/community-integration.mjs');
+const { communityIntegration } = await import('../src/community-integration.mjs');
 communityIntegration(template);
-const files = new Map([...sources].filter(([name]) => name !== 'hangout-internal/community-integration.example.json'));
+function relocated(name, from, to) {
+    const bytes = sources.get(name), text = bytes.toString('utf8');
+    if (!Buffer.from(text).equals(bytes) || text.split(from).length !== 2)
+        throw new Error('Expected the reviewed UTF-8 module import before toolkit relocation.');
+    return Buffer.from(text.replace(from, to));
+}
+const files = new Map([
+    ['scripts/package-community-entry.mjs', relocated('scripts/package-community-entry.mjs',
+        "'../hangout-worker/src/community-integration.mjs'", "'../lib/community-integration.mjs'")],
+    ['lib/community-integration.mjs', relocated('hangout-worker/src/community-integration.mjs',
+        "'../../r/45662413410ed051/entry-sites.mjs'", "'./entry-sites.mjs'")],
+    ['lib/entry-sites.mjs', sources.get('r/45662413410ed051/entry-sites.mjs')],
+    ...licenseFiles.map(name => [name, sources.get(name)])
+]);
 files.set('community-integration.example.json', Buffer.from(JSON.stringify(template, null, 2) + '\n'));
 const escape = text => text.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 files.set('neutral-link.html', Buffer.from(`<a href="${escape(communityAddress)}" referrerpolicy="no-referrer">Hang Out</a>\n<small>Opens our shared community.</small>\n`));
-files.set('README.md', Buffer.from(`# Shared Hang Out entry toolkit\n\nCopy neutral-link.html into any existing website. It opens the one approved\ncommunity address without a site account, registration, badge or staff power.\nNormal invitation/sign-in rules still apply. No credentials belong in links.\n\nOptional registered badges and return links:\n1. Review community-integration.example.json and verify each domain separately.\n   Every example starts disabled and unverified; this tool verifies no domain.\n2. With Node.js 22 or newer, run:\n   node scripts/package-community-entry.mjs --config reviewed.json --out NEW_DIRECTORY\n3. The community operator must separately configure approved extra badge sites\n   in HANGOUT_ENTRY_SITES. The link builder makes no server changes. Disabling\n   an integration stops approved-link generation; ordinary links remain valid.\n\nSOURCE-MANIFEST.json binds this toolkit to committed source and hashes each\ndelivered file. It does not contain the full app or prove the deployed version.\nNo cookie copying, cross-site SSO, provider activation or deployment is performed.\nPreserve existing site pages and use a new output directory.\n`));
+files.set('README.md', Buffer.from(`# Shared Hang Out entry toolkit\n\nCopy neutral-link.html into any existing website. It opens the one approved\ncommunity address without a site account, registration, badge or staff power.\nNormal invitation/sign-in rules still apply. No credentials belong in links.\n\nOptional registered badges and return links:\n1. Review community-integration.example.json and verify each domain separately.\n   Every example starts disabled and unverified; this tool verifies no domain.\n2. With Node.js 22 or newer, run:\n   node scripts/package-community-entry.mjs --config reviewed.json --out NEW_DIRECTORY\n3. The community operator must separately configure approved extra badge sites\n   in HANGOUT_ENTRY_SITES. The link builder makes no server changes. Disabling\n   an integration stops approved-link generation; ordinary links remain valid.\n\nSOURCE-MANIFEST.json binds this toolkit to committed source and hashes every\npayload file. Only two fixed module imports are relocated for standalone use;\nsource-input hashes and delivered-file hashes are recorded separately.\nThe toolkit does not contain the full app or prove the deployed version.\nNo cookie copying, cross-site SSO, provider activation or deployment is performed.\nPreserve existing site pages and use a new output directory.\n`));
 files.set('LICENSE-NOTICE.txt', Buffer.from(`This export does not add or change any license or permission.\nRecognized repository-root license/notice files included: ${licenseFiles.join(', ') || 'none'}.\nReview the current project permissions before public code redistribution.\nNo third-party media, fonts, binaries or node_modules are included.\n`));
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
-const manifest = { version: 1, kind: 'community-entry-toolkit', sourceCommit, communityAddress, licenseFiles,
+const inputNames = new Map([
+    ['scripts/package-community-entry.mjs', 'entry-link-builder'], ['hangout-worker/src/community-integration.mjs', 'integration-contract'],
+    ['r/45662413410ed051/entry-sites.mjs', 'entry-registry'], ['hangout-internal/community-integration.example.json', 'registration-example']
+]);
+const manifest = { version: 1, kind: 'community-entry-toolkit', moduleLayout: 'standalone-imports-v1', sourceCommit, communityAddress, licenseFiles,
     exporter: { path: exporterName, bytes: exporterBytes.length, sha256: sha(exporterBytes) },
-    sourceFiles: [...sources].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([name, bytes]) => ({ path: name, bytes: bytes.length, sha256: sha(bytes) })),
+    sourceFiles: [...sources].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([name, bytes]) => ({ name: inputNames.get(name) || name, bytes: bytes.length, sha256: sha(bytes) })),
     files: [...files].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([name, bytes]) => ({ path: name, bytes: bytes.length, sha256: sha(bytes) })) };
 const created = [], directories = new Map();
 const same = (filename, identity, directory) => {

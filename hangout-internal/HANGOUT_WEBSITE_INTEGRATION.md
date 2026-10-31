@@ -63,15 +63,17 @@ From the committed application checkout, choose a new directory whose parent
 already exists. For the currently approved private entry address:
 
 ```sh
-node scripts/package-community-toolkit.mjs --community-address https://stalemate-hangout-beta.jeffstory007.workers.dev/beta/ --out /path/to/new-entry-toolkit
+node hangout-worker/tools/package-community-toolkit.mjs --community-address https://stalemate-hangout-beta.jeffstory007.workers.dev/beta/ --out /path/to/new-entry-toolkit
 ```
 
 The exporter reads a finite list of committed public files, not a repository
 copy. Selected executable files must match that commit, allowing ordinary CRLF
-checkout line endings while exporting exact Git bytes. It includes the link
+checkout line endings. Two fixed import paths are relocated for standalone use;
+all other module bytes come from Git unchanged. It includes the link
 builder and its two module dependencies, a disabled/unverified registration
 example, a neutral link, concise instructions, license status and per-file
-SHA256 hashes in `SOURCE-MANIFEST.json`. The manifest names the toolkit source;
+SHA256 hashes in `SOURCE-MANIFEST.json`. Input and output hashes are separate;
+the packet omits the hidden room path. The manifest names the toolkit source;
 it is not proof of a matching live application or a complete app distribution.
 The extracted link builder needs Node.js, without this checkout or node_modules.
 

@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -6,8 +7,8 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-const root = fileURLToPath(new URL('../../', import.meta.url));
-const exporter = 'scripts/package-community-toolkit.mjs';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const exporter = 'hangout-worker/tools/package-community-toolkit.mjs';
 const sourceNames = [exporter, 'scripts/package-community-entry.mjs', 'hangout-worker/src/community-integration.mjs',
     'r/45662413410ed051/entry-sites.mjs', 'hangout-internal/community-integration.example.json'];
 const temporary = [], address = 'https://community.example.test/beta/';
@@ -54,16 +55,23 @@ describe('committed-source community entry toolkit', () => {
         const manifest = JSON.parse(fs.readFileSync(path.join(f.out, 'SOURCE-MANIFEST.json')));
         expect(manifest).toMatchObject({ version: 1, kind: 'community-entry-toolkit', sourceCommit: f.head, communityAddress: address, licenseFiles: [] });
         expect(allFiles(f.out)).toEqual(['LICENSE-NOTICE.txt', 'README.md', 'SOURCE-MANIFEST.json', 'community-integration.example.json',
-            'hangout-worker/src/community-integration.mjs', 'neutral-link.html', 'r/45662413410ed051/entry-sites.mjs', 'scripts/package-community-entry.mjs']);
+            'lib/community-integration.mjs', 'lib/entry-sites.mjs', 'neutral-link.html', 'scripts/package-community-entry.mjs']);
         for (const file of manifest.files) {
             const bytes = fs.readFileSync(path.join(f.out, file.path)); expect(sha(bytes)).toBe(file.sha256); expect(bytes.length).toBe(file.bytes);
         }
-        for (const file of manifest.sourceFiles) expect(sha(f.rawGit('show', `${f.head}:${file.path}`))).toBe(file.sha256);
+        const inputs = { 'entry-link-builder': 'scripts/package-community-entry.mjs', 'integration-contract': 'hangout-worker/src/community-integration.mjs',
+            'entry-registry': 'r/45662413410ed051/entry-sites.mjs', 'registration-example': 'hangout-internal/community-integration.example.json' };
+        for (const file of manifest.sourceFiles) expect(sha(f.rawGit('show', `${f.head}:${inputs[file.name] || file.name}`))).toBe(file.sha256);
+        expect(fs.readFileSync(path.join(f.out, 'lib/community-integration.mjs'), 'utf8').replace("'./entry-sites.mjs'", "'../../r/45662413410ed051/entry-sites.mjs'"))
+            .toBe(f.rawGit('show', `${f.head}:hangout-worker/src/community-integration.mjs`).toString());
+        expect(fs.readFileSync(path.join(f.out, 'scripts/package-community-entry.mjs'), 'utf8').replace("'../lib/community-integration.mjs'", "'../hangout-worker/src/community-integration.mjs'"))
+            .toBe(f.rawGit('show', `${f.head}:scripts/package-community-entry.mjs`).toString());
         expect(manifest.exporter.sha256).toBe(sha(fs.readFileSync(path.join(f.repo, exporter))));
         const example = JSON.parse(fs.readFileSync(path.join(f.out, 'community-integration.example.json')));
         expect(example.communityAddress).toBe(address); expect(example.sites.every(site => !site.enabled && !site.domainVerified)).toBe(true);
         const contents = allFiles(f.out).map(name => fs.readFileSync(path.join(f.out, name), 'utf8')).join('\n');
         expect(contents).not.toContain('PRIVATE_FIXTURE_NEVER_EXPORT'); expect(contents).not.toContain('DIRTY_TEMPLATE_NEVER_EXPORT');
+        expect(contents).not.toContain('45662413410ed051');
         expect(contents).not.toContain(f.top); expect(fs.readFileSync(path.join(f.repo, 'hangout-internal/community-integration.example.json'), 'utf8')).toBe('DIRTY_TEMPLATE_NEVER_EXPORT');
     });
 
