@@ -220,6 +220,9 @@ for (const viewport of [{ width: 300, height: 299 }, { width: 320, height: 256 }
         await send(page, 'Native zoom reflow: ' + 'W'.repeat(260));
         await expect(page.locator('[data-message-recovery]')).toBeVisible();
         await expect(page.locator('[data-message-recovery-status]')).toContainText('1 not sent');
+        // A rejected line still consumes the ordinary three-second slow-mode
+        // window. Pace the next real request without changing server policy.
+        await delay(3100);
         await tabTo(page, page.getByRole('textbox', { name: 'Message', exact: true }));
         const text = 'The composer and Send remain usable with a saved message copy.';
         await page.keyboard.type(text); await page.keyboard.press('Tab');

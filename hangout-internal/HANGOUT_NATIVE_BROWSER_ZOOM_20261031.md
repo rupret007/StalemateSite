@@ -46,6 +46,14 @@ Current-source CI and a new native400 observation remain required; source code
 alone does not prove the fix. Keep the before receipt, use new names for after
 evidence, and verify375/390 regressions plus existing recovery/keyboard cases.
 
+The first candidate, head5e8a218, passed1,869 units/114 files in inspected
+CI41196234525. Its browser run passed436 cases and failed the two new cases,
+each again on its configured retry: the second request hit the unchanged
+three-second slow mode before geometry assertions ran. Preserve that run and
+its raw-log digest; it is not a clipping-fix pass or a measured geometry failure.
+The test now waits3.1 real seconds after the rejected line before its next
+request. No clock, rate limit, assertion or retry configuration is changed.
+
 W3C's [Reflow guidance](https://www.w3.org/WAI/WCAG22/Understanding/reflow.html)
 allows responsive relocation and vertical scrolling while retaining content and
 function. Its separate [Resize Text guidance](https://www.w3.org/WAI/WCAG22/Understanding/resize-text.html)
