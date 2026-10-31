@@ -1671,6 +1671,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         if (!currentHostPalette(context)) {
             const focused = palette.contains(document.activeElement);
             hostPaletteContext = null; cohostButtons.clear(); palette.close();
+            $('[data-palette-buttons]').replaceChildren();
             $('[data-palette-status]').textContent = '';
             if (focused && !sessionEnded) $(app.localMediaPaused || app.sharingStopped ? '[data-sharing-region]' : '[data-text]').focus({ preventScroll: true });
             return;
@@ -1701,8 +1702,9 @@ import { createEntrySharing } from './entry-sharing.mjs';
             if (button.textContent !== label) { button.textContent = label; changed = true; }
             button.disabled = !personTargetsSupported;
         }
-        status.textContent = !Array.isArray(context.room.cohosts) ? 'Checking verified co-hosts…'
+        const message = !Array.isArray(context.room.cohosts) ? 'Checking verified co-hosts…'
             : changed || status.textContent === 'Checking verified co-hosts…' ? 'Verified co-host list updated.' : status.textContent;
+        if (status.textContent !== message) status.textContent = message;
         if (removedFocus) $('[data-palette-close]').focus({ preventScroll: true });
     }
     function openPalette(ops) {
@@ -1742,7 +1744,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     $('[data-palette-close]').addEventListener('click', () => $('[data-palette]').close());
     $('[data-palette]').addEventListener('close', event => {
         if (event.currentTarget.open) return;
-        hostPaletteContext = null; cohostButtons.clear(); $('[data-palette-status]').textContent = '';
+        hostPaletteContext = null; cohostButtons.clear(); $('[data-palette-buttons]').replaceChildren(); $('[data-palette-status]').textContent = '';
     });
 
     let inviteInstance = '', invitePeople = new Map();

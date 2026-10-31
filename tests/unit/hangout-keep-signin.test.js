@@ -142,11 +142,23 @@ describe('live verified co-host controls in an open host palette', () => {
         expect(ws.sent.at(-1).args).toEqual(['remove', 'different-account']);
     });
 
-    it.each(['room-switch', 'instance-change', 'same-name-rejoin', 'owner-lost', 'disconnect', 'sharing-stopped'])(
+    it('does not mutate the live status or focused row for repeated identical ownership updates', async () => {
+        const { window, ws, buttons } = await owner([{ id: account, label: 'OfflineFriend' }]);
+        const removal = buttons().find(button => button.textContent === 'Remove verified co-host: OfflineFriend'); removal.focus();
+        const observer = new window.MutationObserver(() => {});
+        observer.observe(window.document.querySelector('[data-palette-status]'), { childList: true, subtree: true, characterData: true });
+        for (let repeat = 0; repeat < 5; repeat++) ownership(ws, [{ id: account, label: 'OfflineFriend' }]);
+        expect(observer.takeRecords()).toEqual([]);
+        expect(window.document.activeElement).toBe(removal);
+        observer.disconnect();
+    });
+
+    it.each(['menu-close', 'room-switch', 'instance-change', 'same-name-rejoin', 'owner-lost', 'disconnect', 'sharing-stopped'])(
         'retires open host controls after %s and never revives them on a later ownership frame', async boundary => {
             const { window, ws, join, palette, buttons } = await owner([{ id: account, label: 'OfflineFriend' }], boundary === 'sharing-stopped');
             const removal = buttons().find(button => button.textContent === 'Remove verified co-host: OfflineFriend');
             expect(removal).toBeDefined();
+            if (boundary === 'menu-close') palette.close();
             if (boundary === 'room-switch') join('#another-room');
             if (boundary === 'instance-change') ws.receive({ t: 'chan', ch: { name: '#keep-me', keepRef: 'b'.repeat(32) } });
             if (boundary === 'same-name-rejoin') join('#keep-me', { persistent: true, names: [{ id: 'viewer', nick: 'Viewer', prefix: '@', owner: true }] });
