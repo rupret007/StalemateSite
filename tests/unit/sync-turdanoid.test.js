@@ -19,7 +19,7 @@ function fixture() {
     const upstream = join(base, 'upstream');
     mkdirSync(join(root, 'scripts/lib'), { recursive: true });
     mkdirSync(join(root, 'scripts/stalemate-overlay'), { recursive: true });
-    for (const file of ['scripts/sync-turdanoid.sh', 'scripts/lib/sync-turdanoid.cjs', 'scripts/lib/arcade-asset-versions.cjs', 'scripts/play-track.js', 'scripts/play-music-pref.js', 'scripts/play-music-pref.css', 'scripts/stalemate-strip.css', 'scripts/chess-stockfish-loader.js']) {
+    for (const file of ['scripts/sync-turdanoid.sh', 'scripts/lib/sync-turdanoid.cjs', 'scripts/lib/arcade-asset-versions.cjs', 'scripts/play-track.js', 'scripts/stalemate-strip.css', 'scripts/chess-stockfish-loader.js']) {
         cpSync(join(sourceRoot, file), join(root, file));
     }
     for (const song of songs) writeFileSync(join(root, 'scripts/stalemate-overlay', song), song);

@@ -68,19 +68,8 @@
         });
         audio.addEventListener('error', function () { generation += 1; loadFailed(); });
 
-        var pref = window.StalemateMusicPref;
-        if (pref) {
-            window.addEventListener('stalemate-music-change', function (event) {
-                if (event.detail && !event.detail.on) {
-                    generation += 1;
-                    audio.pause();
-                    render();
-                }
-            });
-        }
-
         // Try to start right away; browsers that block autoplay keep the big button.
-        if (!pref || pref.isOn()) start();
+        start();
 
         if (!countScan()) {
             var tries = 0;

@@ -1,32 +1,17 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const source = readFileSync(new URL('../../qr/script.js', import.meta.url), 'utf8');
-const prefSource = readFileSync(path.join(repoRoot, 'js/music-preference.js'), 'utf8');
 const windows = [];
 const settle = async () => { await Promise.resolve(); await Promise.resolve(); };
-function boot(playFirst, options) {
+function boot(playFirst) {
     const dom = new JSDOM('<audio data-qr-audio></audio><button data-qr-play></button><p data-qr-status></p>', {
         url: 'https://stalemate.band/qr/', runScripts: 'outside-only'
     });
     const w = dom.window; windows.push(w);
     Object.defineProperty(w.document, 'readyState', { value: 'complete' });
-    if (options && options.musicPref === 'off') {
-        const store = new Map([['stalemate.music', 'off']]);
-        Object.defineProperty(w, 'localStorage', {
-            value: {
-                getItem: (k) => store.get(k) ?? null,
-                setItem: (k, v) => store.set(k, v)
-            },
-            configurable: true
-        });
-        w.eval(prefSource);
-    }
     const audio = w.document.querySelector('audio'), button = w.document.querySelector('button');
     const state = { paused: true, error: null }, calls = [];
     Object.defineProperties(audio, { paused: { get: () => state.paused }, error: { get: () => state.error } });
@@ -40,13 +25,6 @@ function boot(playFirst, options) {
 afterEach(() => windows.splice(0).forEach(w => w.close()));
 
 describe('QR audio recovery', () => {
-    it('does not autoplay when site music preference is off', async () => {
-        const page = boot(undefined, { musicPref: 'off' });
-        await settle();
-        expect(page.audio.play).not.toHaveBeenCalled();
-        expect(page.state.paused).toBe(true);
-    });
-
     it('distinguishes autoplay blocking and retries from the user gesture without reloading good media', async () => {
         const page = boot(() => Promise.reject(Object.assign(new Error('Gesture needed'), { name: 'NotAllowedError' })));
         await settle();

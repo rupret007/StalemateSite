@@ -43,11 +43,13 @@ test('homepage is a finished band page with originals, show and real links', asy
     ];
     for (const [name, href] of socials) {
         const header = page.locator('.site-header a.social-link[href="' + href + '"]');
+        const hero = page.locator('#home a.social-link[href="' + href + '"]');
         const footer = page.locator('.site-footer a.social-link[href="' + href + '"]');
         await expect(header).toBeVisible();
-        await expect(page.locator('#home a.social-link[href="' + href + '"]')).toHaveCount(0);
+        await expect(hero).toBeVisible();
         await expect(footer).toBeVisible();
         expect(tapHeight(await header.boundingBox())).toBeGreaterThanOrEqual(44);
+        expect(tapHeight(await hero.boundingBox())).toBeGreaterThanOrEqual(44);
         expect(tapHeight(await footer.boundingBox())).toBeGreaterThanOrEqual(44);
         await expect(header).toHaveAttribute('rel', /noopener/);
         await expect(header).toContainText(name);
