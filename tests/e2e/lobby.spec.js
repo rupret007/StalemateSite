@@ -1,6 +1,5 @@
 // #stalemate lobby: real browsers against the local stand-in relay (same engine as the Worker DO).
 const { test, expect } = require('@playwright/test');
-
 const { hangoutRelayWsBase, HANGOUT_RELAY_PREFIX } = require('../../scripts/lib/e2e-test-server.cjs');
 
 const SLUG = '45662413410ed051';
@@ -8,14 +7,11 @@ const KEY = 'local-preview-key-0001';
 const ADMIN = 'local-dev-admin-key-0001';
 test.skip(({ browserName }) => browserName !== 'chromium', 'Chromium carries the lobby suite');
 
-let relayWs;
-test.beforeAll(async ({ baseURL }) => {
-    relayWs = hangoutRelayWsBase(baseURL);
-});
+let testOrigin;
+test.beforeAll(async ({ baseURL }) => { testOrigin = baseURL; });
 
-const lobbyUrl = () => `/r/${SLUG}/lobby/?preview=${KEY}&relay=${encodeURIComponent(relayWs)}`;
-const adminUrl = (key = ADMIN) => `/r/${SLUG}/admin/?preview=${KEY}&relay=${encodeURIComponent(relayWs)}&devadmin=${key}`;
-const modlogUrl = (baseURL) => new URL(`${HANGOUT_RELAY_PREFIX}/__test/modlog.json`, baseURL).href;
+const lobbyUrl = () => `/r/${SLUG}/lobby/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`;
+const adminUrl = (key = ADMIN) => `/r/${SLUG}/admin/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}&devadmin=${key}`;
 
 async function fan(browser, nick, viewport) {
     const ctx = await browser.newContext(viewport ? { viewport } : {});
@@ -105,7 +101,7 @@ test('three fans + a band op: chat, /me, slap button, filters, PM accept-first, 
     await c.evaluate(() => window.__lobby.ws.send(JSON.stringify({ t: 'cmd', name: 'shield', args: [], ch: '#stalemate' })));
     await expect(buffer(c)).toContainText('permission denied');
     await expect(a.locator('[data-app]')).toBeVisible();
-    const modlog = await (await fetch(modlogUrl(baseURL))).json();
+    const modlog = await a.request.get(`${testOrigin}${HANGOUT_RELAY_PREFIX}/__test/modlog.json`).then((r) => r.json());
     expect(modlog.filter((e) => e.action === 'denied').length).toBeGreaterThanOrEqual(2);
     // Band panel: sees the report queue, kicks and bans.
     const admin = await (await browser.newContext()).newPage();

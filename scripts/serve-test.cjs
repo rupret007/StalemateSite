@@ -18,6 +18,9 @@ const MIME = {
     '.jpg': 'image/jpeg',
     '.jpeg': 'image/jpeg',
     '.m4a': 'audio/mp4',
+    '.mjs': 'text/javascript; charset=utf-8',
+    '.tflite': 'application/octet-stream',
+    '.wasm': 'application/wasm',
     '.mp4': 'video/mp4',
     '.png': 'image/png',
     '.svg': 'image/svg+xml',
@@ -136,6 +139,8 @@ async function main() {
         sendFile(request, response, path.join(ROOT, '404.html'), 404);
     });
 
+    // Keep idle sockets open longer than any client pool so a reused keep-alive
+    // socket is never closed mid-request (undici "other side closed" flake).
     server.keepAliveTimeout = 65000;
     server.headersTimeout = 66000;
 
