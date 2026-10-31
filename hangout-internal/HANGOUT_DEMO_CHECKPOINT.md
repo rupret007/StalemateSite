@@ -1,10 +1,30 @@
 # Shared Hang Out / WebJam demo checkpoint
 
 Updated October 30, 2026. Goal active: finish the application for a private Che
-demonstration and website integration. This is an application checkpoint, not
-deployment approval or a claim that the live beta contains these changes.
+demonstration and website integration. The current private deployment is recorded
+below; historical sections describe their own revisions and earlier limitations.
 
-## Current work: independent application CI
+## Current private release and demonstrated guests
+
+[October30 release/test receipt](HANGOUT_PRIVATE_DEMO_20261030.md) supersedes
+earlier pending-CI/deployment statements. PR170 is merged as `96f356a`; protected
+runtime `6293386f-31b8-4415-bf0b-f81296190a4d` serves its matched assets/backend.
+All existing binding metadata, secret names, namespace IDs, effective variables
+and runtime settings were compared before/after and remained identical. AI is
+off, TURN is disabled, and no new authority/participation mode was enabled.
+
+The fully decoded source-identical PR CI passed 1,869 units and436 browser cases
+once, with zero retries/skips/flakes/report errors. All eleven native proof
+groups and eight session modes passed, including explicit provider-start CI.
+Actual hosted guests proved shared entry badges/chat, no pre-join replay,
+visitor room creation/discovery, once-only delivery, 375/390 reflow and logout.
+The full hosted walkthrough remains incomplete: the script subsequently hit
+the unchanged room-creation limits. Preserve that failure and the original
+test-driver assumptions; do not reset quotas or change identities/networks to
+complete a test sooner. Four native builds passed; physical two-way music,
+current authorized human review and all other unverified62 outcomes remain.
+
+## Previous work: independent application CI
 
 Jeff's October30 direction is to implement the application here without putting
 it through StoryPool. This workstream owns application code, project CI, tests,
@@ -19,8 +39,8 @@ Branch **`codex/webjam-native-ci-20261030`** starts at PR169 head
 workflow as an eleventh proof group. It retains the ten preceding groups,
 ten-minute timeout, locked dependencies/audits and stdout/stderr/exit-code
 capture. The existing artifact upload covers the new files. There is no provider
-activation or deployed behavior change. Current-source CI execution remains
-to verify; local proof or the preceding green ten-group runs do not substitute.
+activation. Its current-source CI execution is now qualified in the release
+receipt; local proof and the preceding ten-group runs remain distinct.
 
 ## Previous work: correlated invitation sharing
 
