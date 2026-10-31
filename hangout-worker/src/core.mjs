@@ -1,6 +1,14 @@
 // Pure relay rules shared by the Cloudflare Worker and the local dev/test relay.
 // The relay never sees plaintext: frames are {iv, c} ciphertext from the browser.
 
+const enc = new TextEncoder();
+
+function b64u(bytes) {
+    let s = '';
+    bytes.forEach((b) => { s += String.fromCharCode(b); });
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 export const DEFAULTS = Object.freeze({
     maxPeers: 8,
     maxFrameBytes: 1024 * 1024,
@@ -45,16 +53,36 @@ export function previewKeyOk(given, expected) {
     return diff === 0;
 }
 
+/** Per-room relay token (HMAC). Lives in the invite #fragment, not the global preview query param. */
+export async function roomRelayToken(previewKey, roomId) {
+    if (typeof previewKey !== 'string' || previewKey.length < 16) return '';
+    if (!validRoomId(roomId)) return '';
+    const macKey = await crypto.subtle.importKey('raw', enc.encode(previewKey), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const sig = await crypto.subtle.sign('HMAC', macKey, enc.encode(`stalemate-hangout-relay-v1:${roomId}`));
+    return b64u(new Uint8Array(sig));
+}
+
+export async function roomRelayTokenOk(given, roomId, previewKey) {
+    const expected = await roomRelayToken(previewKey, roomId);
+    if (!expected) return false;
+    const a = String(given || '');
+    let diff = a.length ^ expected.length;
+    for (let i = 0; i < expected.length; i += 1) diff |= (a.charCodeAt(i) || 0) ^ expected.charCodeAt(i);
+    return diff === 0;
+}
+
 // Decide whether a WebSocket upgrade may proceed. Returns {status, reason} or null for OK.
-export function admit({ url, origin, env, extraOrigins, previewKey }) {
+export async function admit({ url, origin, env, extraOrigins, previewKey }) {
     if (!env || typeof env.HANGOUT_PREVIEW_KEY !== 'string' || !env.ROOMS || !env.QUOTA) {
         return { status: 503, reason: 'not-configured' };
     }
     if (!originAllowed(origin, extraOrigins)) return { status: 403, reason: 'origin' };
     if (url.searchParams.has('preview')) return { status: 403, reason: 'preview' };
-    if (!previewKeyOk(previewKey, env.HANGOUT_PREVIEW_KEY)) return { status: 403, reason: 'preview' };
-    if (!validRoomId(url.searchParams.get('room'))) return { status: 400, reason: 'room' };
-    return null;
+    const room = url.searchParams.get('room');
+    if (!validRoomId(room)) return { status: 400, reason: 'room' };
+    if (previewKeyOk(previewKey, env.HANGOUT_PREVIEW_KEY)) return null;
+    if (await roomRelayTokenOk(previewKey, room, env.HANGOUT_PREVIEW_KEY)) return null;
+    return { status: 403, reason: 'preview' };
 }
 
 /** Preview gate secret travels in Sec-WebSocket-Protocol, never in the URL. */

@@ -8,7 +8,7 @@ export default {
         if (url.pathname !== '/room') return new Response('nope', { status: 404 });
         if (request.headers.get('Upgrade') !== 'websocket') return new Response('websocket only', { status: 426 });
         const previewKey = previewKeyFromProtocols(request.headers.get('Sec-WebSocket-Protocol'));
-        const denied = admit({ url, origin: request.headers.get('Origin'), env, extraOrigins: env.HANGOUT_EXTRA_ORIGINS, previewKey });
+        const denied = await admit({ url, origin: request.headers.get('Origin'), env, extraOrigins: env.HANGOUT_EXTRA_ORIGINS, previewKey });
         if (denied) return new Response(denied.reason, { status: denied.status });
         const stub = env.ROOMS.get(env.ROOMS.idFromName(url.searchParams.get('room')));
         return stub.fetch(request);

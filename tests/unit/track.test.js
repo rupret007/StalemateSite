@@ -26,6 +26,7 @@ describe('js/track.js', () => {
   });
 
   afterEach(() => {
+    win.close();
     vi.restoreAllMocks();
   });
 
@@ -52,6 +53,36 @@ describe('js/track.js', () => {
     win.smTrackFlush();
     expect(count).toHaveBeenCalledTimes(2);
     expect(count.mock.calls[0][0].path).toBe('nav-listen');
+  });
+
+  it('keeps provider failures from interrupting site and game callers', () => {
+    const count = vi.fn().mockImplementationOnce(() => {
+      throw new Error('Provider unavailable');
+    });
+    win.goatcounter = { count };
+
+    expect(() => win.smTrack('gameover-turdanoid-show')).not.toThrow();
+    win.smTrack('nav-listen');
+    expect(count).toHaveBeenLastCalledWith({
+      path: 'nav-listen', title: 'nav-listen', event: true
+    });
+  });
+
+  it('continues flushing queued events after a provider failure', () => {
+    win.smTrack('nav-listen');
+    win.smTrack('nav-games');
+    const count = vi.fn().mockImplementationOnce(() => {
+      throw new Error('Provider unavailable');
+    });
+    win.goatcounter = { count };
+
+    expect(() => win.smTrackFlush()).not.toThrow();
+    expect(count).toHaveBeenCalledTimes(2);
+    expect(count).toHaveBeenLastCalledWith({
+      path: 'nav-games', title: 'nav-games', event: true
+    });
+    win.smTrackFlush();
+    expect(count).toHaveBeenCalledTimes(2);
   });
 
   it('maps duration buckets', () => {

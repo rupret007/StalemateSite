@@ -54,7 +54,14 @@
         const frag = new URLSearchParams(win.location.hash.slice(1));
         const secret = frag.get('r');
         const host = frag.get('h');
-        return H.validSecret(secret) && /^[A-Za-z0-9_-]{80,100}$/.test(host || '') ? { secret, host } : null;
+        const relay = frag.get('a') || '';
+        if (!H.validSecret(secret) || !/^[A-Za-z0-9_-]{80,100}$/.test(host || '')) return null;
+        return { secret, host, relay: /^[A-Za-z0-9_-]{16,}$/.test(relay) ? relay : '' };
+    }
+
+    function relayAdmission(invite) {
+        if (previewKey) return previewKey;
+        return invite && invite.relay ? invite.relay : '';
     }
 
     async function makeRoom() {
@@ -64,9 +71,12 @@
         const host = b64u(pubRaw);
         const privJwk = await crypto.subtle.exportKey('jwk', pair.privateKey);
         const { roomId } = await H.deriveRoom(secret);
+        let relay = '';
+        if (previewKey) relay = await H.roomRelayToken(roomId, previewKey);
         try { localStorage.setItem(HOST_STORE + roomId, JSON.stringify(privJwk)); } catch (error) { /* private mode: host only for this tab */ }
         app.hostPrivMemory = pair.privateKey;
-        win.history.replaceState(null, '', `${win.location.pathname}${win.location.search}#r=${secret}&h=${host}`);
+        const hash = relay ? `#r=${secret}&h=${host}&a=${relay}` : `#r=${secret}&h=${host}`;
+        win.history.replaceState(null, '', `${win.location.pathname}${win.location.search}${hash}`);
         return { secret, host };
     }
 
@@ -118,7 +128,8 @@
         }
         const url = `${relayBase.replace(/\/$/, '')}/room?room=${app.roomId}`;
         setGate('Connecting…');
-        const ws = previewKey ? new WebSocket(url, [previewKey]) : new WebSocket(url);
+        const admission = relayAdmission(readInvite());
+        const ws = admission ? new WebSocket(url, [admission]) : new WebSocket(url);
         app.ws = ws;
         ws.onmessage = (event) => onRelay(event.data);
         ws.onclose = (event) => {
@@ -289,7 +300,7 @@
 
     async function start() {
         let invite = readInvite();
-        if (!previewKey) {
+        if (!previewKey && !invite) {
             ui.gateTitle.textContent = 'Not open yet';
             ui.gateCopy.textContent = 'This room isn’t open to the public. Ask whoever sent you here for the full link.';
             ui.enter.hidden = true;
@@ -645,7 +656,7 @@
         let servers = STUN;
         if (!turnUrl) { app.av.ice = servers; return servers; }
         try {
-            const res = await fetch(turnUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preview: previewKey, room: app.roomId }) });
+            const res = await fetch(turnUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preview: relayAdmission(readInvite()), room: app.roomId }) });
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data.iceServers)) servers = STUN.concat(data.iceServers);

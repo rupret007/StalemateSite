@@ -42,7 +42,6 @@ describe('hidden hangout room', () => {
         expect(robots).toMatch(/^User-agent: \*$/m);
         expect(robots).toMatch(/^Disallow: \/r\/$/m);
         expect(robots).not.toContain(SLUG);
-        expect(robots).not.toMatch(/sitemap/i);
     });
 
     it('the room page says noindex, nofollow and sends no referrer', () => {
@@ -82,5 +81,8 @@ describe('hidden hangout room', () => {
         const copyBlock = roomJs.match(/ui\.copy\.addEventListener[\s\S]*?\}\);/)?.[0] || '';
         expect(copyBlock, 'copy invite handler').toContain("searchParams.delete('preview')");
         expect(copyBlock, 'copy invite handler').not.toMatch(/preview=/);
+        expect(copyBlock, 'copy invite handler').not.toMatch(/searchParams\.(set|append)\(['"]preview/);
+        expect(roomJs, 'start gate').toMatch(/!previewKey && !invite/);
+        expect(roomJs, 'invite relay token').toMatch(/frag\.get\(['"]a['"]\)/);
     });
 });

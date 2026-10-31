@@ -1,0 +1,11 @@
+Command: npm run test:smoke
+Runtime: v22.22.3
+fd3b0a8d18b61fc449b5dc7cb66c0eee34f31ade
+ M assets/arcade-hub.css
+
+> turdanoid@1.0.0 test:smoke
+> node smoke-runner.js
+
+hub-phone-320-returning: Turdomania escaped the first screen: {"left":21,"right":158,"top":528.859375,"bottom":585.984375,"height":57.125}
+
+Exit: 1; seconds: 120.1

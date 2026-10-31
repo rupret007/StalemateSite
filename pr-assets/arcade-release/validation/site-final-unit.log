@@ -1,0 +1,13 @@
+
+> stalemate-site@1.0.0 test:unit
+> vitest run --maxWorkers=2
+
+
+ RUN  v4.1.12 /Users/jeffstory/Documents/ChatGPT/Stalemate Website/StalemateSite
+
+
+ Test Files  20 passed (20)
+      Tests  104 passed (104)
+   Start at  08:44:17
+   Duration  6.80s (transform 91ms, setup 112ms, import 1.21s, tests 8.93s, environment 1.53s)
+

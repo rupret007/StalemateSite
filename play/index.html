@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta name="robots" content="noindex,nofollow">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta name="robots" content="index,follow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -10,9 +10,14 @@
   <meta name="theme-color" content="#10192d">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="assets/turdsuite.css">
-  <script src="games/table-continue-core.js"></script>
-  <script src="assets/turdsuite.js"></script>
-  <title>Turdanoid — Seven Games, One Sewer</title>
+  <link rel="stylesheet" href="assets/arcade.css">
+  <link rel="stylesheet" href="assets/arcade-hub.css?v=11e436f0a0024e1f">
+  <link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
+  <script src="games/suite-progress-core.js?v=3c92de426327c7d1"></script>
+  <script src="assets/suite-progress.js?v=cf46f758fae8dff1"></script>
+  <script src="games/table-continue-core.js?v=bc5fab705a134ab5"></script>
+  <script src="assets/turdsuite.js?v=3a5cafdb70bf7654"></script>
+  <title>Stalemate Arcade — Nine Free Games</title>
   <style>
     :root {
       --bg-a: #10192d;
@@ -332,7 +337,7 @@
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    .cover svg {
+    .cover svg, .cover img {
       position: absolute;
       inset: 0;
       width: 100%;
@@ -622,7 +627,7 @@
       .play { min-width: 58px; padding: 7px 8px; font-size: 0.6rem; }
     }
 
-    /* Squat phone landscape: two compact columns so seven ≥44px rows stay
+    /* Squat phone landscape: two compact columns so nine ≥44px rows stay
        reachable without horizontal overflow. Vertical scroll is allowed.
        Width can exceed 600px (844×390), so this block restates the phone-row
        chrome instead of depending on the portrait 600px query. */
@@ -691,27 +696,34 @@
       .game-card:focus-visible { transform: none; }
     }
   </style>
+<link rel="canonical" href="https://stalemate.band/play/">
+<meta name="description" content="Play nine free browser games at Stalemate Arcade: chess, brick breaking, block stacking, matching puzzles and card games, with optional music by punk rock band Stalemate.">
+<meta property="og:url" content="https://stalemate.band/play/">
+<meta property="og:type" content="website">
 <link rel="stylesheet" href="stalemate-strip.css">
-<meta property="og:title" content="Turdanoid on stalemate.band">
-<meta property="og:description" content="Brick-breaker, but gross. Free, plays in the browser.">
+<meta property="og:title" content="Stalemate Arcade">
+<meta property="og:description" content="Nine free browser games, including chess. Music by Stalemate.">
 <meta property="og:image" content="https://stalemate.band/play/stalemate/og-play.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 </head>
-<body class="suite-ambient suite-no-zoom">
-<nav class="stalemate-strip" aria-label="Stalemate"><a href="../" class="sm-home"><img src="../assets/mark.svg" alt="" width="22" height="22"> stalemate.band</a><a href="https://www.youtube.com/@stalemate.punkband" class="sm-listen" rel="noopener">Listen to Manic</a></nav>
-  <div class="shell">
-    <header class="masthead">
-      <h1><span class="logo">💩</span> Turdanoid</h1>
-      <p class="subtitle">Seven games. Pick your next round.</p>
+<body class="suite-ambient suite-no-zoom arcade" data-arcade-game="hub">
+<nav class="stalemate-strip" aria-label="Stalemate"><a href="../" class="sm-home"><img src="../assets/mark.svg" alt="" width="22" height="22">Stalemate Arcade</a><a href="../#contact" class="sm-contact">Contact</a><a href="https://www.youtube.com/@stalemate.punkband" class="sm-listen" rel="noopener">Listen to Stalemate</a></nav>
+  <div class="shell" role="main">
+    <div class="masthead">
+      <p class="arcade-kicker">Punk rock. Bathroom humor. One more round.</p>
+      <h1>Stalemate Arcade</h1>
+      <p class="subtitle">Nine games. Pick your next round.</p>
       <div class="meta-row">
         <p class="hero-badge">No sign-in • works on phone and desktop</p>
         <button type="button" class="suite-hub-mute" id="suite-hub-mute" aria-pressed="false" aria-label="Sound on, tap to mute suite sounds">🔊 Sound on</button>
       </div>
-    </header>
+    </div>
 
-    <main class="games" id="hub-games" aria-label="Choose a game">
+    <div class="arcade-grid-heading"><h2>Nine games. Zero dignity.</h2><p>Your records stay on this device.</p></div>
+    <p class="arcade-mode-shortcut"><a href="turdtris.html?mode=ultra">Turdtris · 2-minute Ultra →</a></p>
+    <section class="games" id="hub-games" aria-label="Choose a game">
       <a href="TurdAnoid.html" class="game-card" data-vibe="Bricks. Busted. Flushed." style="--c:#9effc8;--c2:#7ae6ff">
         <div class="cover" aria-hidden="true">
           <svg viewBox="0 0 320 150" preserveAspectRatio="xMidYMid slice">
@@ -994,17 +1006,48 @@
           <span class="play">Play <i>→</i></span>
         </div>
       </a>
-    </main>
-    <p class="footer-note">Seven games • one sewer • <a href="neon-arkanoid.html">play the original Neon Arkanoid</a></p>
+      <a href="chess.html" class="game-card" data-vibe="Take the throne." style="--c:#b5dc08;--c2:#56c9ff">
+        <div class="cover" aria-hidden="true">
+          <svg viewBox="0 0 320 150" role="img" aria-label="Chess pieces on an arcade checkerboard">
+            <defs><pattern id="chessCoverBoard" width="48" height="48" patternTransform="rotate(-12)" patternUnits="userSpaceOnUse"><rect width="48" height="48" fill="#9cb2aa"/><path d="M0 0h24v24H0zM24 24h24v24H24z" fill="#e7dac0"/></pattern><linearGradient id="chessCoverShade" x2="0" y2="1"><stop stop-color="#0b182b" stop-opacity=".2"/><stop offset="1" stop-color="#0b182b"/></linearGradient></defs>
+            <rect width="320" height="150" fill="url(#chessCoverBoard)"/><rect width="320" height="150" fill="url(#chessCoverShade)"/>
+            <g stroke="#152238" stroke-width="3" stroke-linejoin="round"><g fill="#fff6dc"><path d="M105 29h10v-9h7v9h10v7h-10v11h-7V36h-10zM94 57c0-13 17-12 25-5 8-7 25-8 25 5 0 12-10 19-13 37h-24c-3-18-13-25-13-37zM100 96h38l6 14H94z"/></g><g fill="#253e52" stroke="#fff6dc"><path d="m176 43 13 13 13-25 13 25 13-13-10 50h-32zM183 96h38l6 14h-50z"/><circle cx="175" cy="37" r="5"/><circle cx="202" cy="25" r="5"/><circle cx="229" cy="37" r="5"/></g></g>
+            <rect x="19" y="120" width="282" height="24" rx="12" fill="#b5dc08"/><text x="160" y="137" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="900" fill="#10200b" letter-spacing="2">TAKE THE THRONE</text>
+          </svg>
+        </div>
+        <div class="body"><div class="game-info"><div class="title-row"><span class="emoji" aria-hidden="true">♟</span><h2>Royal Flush Chess</h2></div><p>Play the computer or 2 players on one device.</p></div><span class="play">Play <i>→</i></span></div>
+      </a>
+      <a href="turdrush.html" class="game-card" data-vibe="Make a clean getaway." style="--c:#ffcb87;--c2:#78ffd5">
+        <div class="cover" aria-hidden="true"><img src="assets/turdrush-cover.svg?v=f9e006843c69ccc3" width="320" height="150" alt="" loading="lazy"></div>
+        <div class="body"><div class="game-info"><div class="title-row"><span class="emoji" aria-hidden="true">↗</span><h2>Turd Rush</h2></div><p>Dash, jump and slide through the sewer.</p></div><span class="play">Play <i>→</i></span></div>
+      </a>
+    </section>
+    <div id="suite-progress-hub"></div>
+    <p class="footer-note">Nine games • one sewer • Stalemate punk rock on every table — <a href="#hub-games">back to the grid</a></p>
+    <footer class="site-footer site-footer--play">
+      <nav aria-label="Footer navigation">
+        <a href="../">Band homepage</a>
+        <a href="../#contact">Contact</a>
+      </nav>
+    </footer>
   </div>
   <script type="module">
     import { injectSkipLink, createAnnouncer } from './assets/suite-a11y.js';
-    import { decorateHubStatBadges } from './assets/suite-hub-stats.js';
+    import { decorateHubStatBadges, readHubStatBadge } from './assets/suite-hub-stats.js?v=2573f9a9a5304d0a';
     import { wireHubCoverIdleMotion, wireHubAttractHeader } from './assets/suite-hub-attract.js';
 
     function bootHubModules() {
       injectSkipLink(document, 'hub-games');
-      decorateHubStatBadges(document, localStorage);
+      let storage = null;
+      try { storage = window.localStorage; } catch { /* device storage unavailable */ }
+      decorateHubStatBadges(document, storage || { getItem: () => null });
+      window.SuiteProgress?.mountHub({
+        host: document.getElementById('suite-progress-hub'),
+        recordFor: game => {
+          const page = window.SuiteProgress.games.find(item => item.id === game)?.href;
+          return readHubStatBadge(key => { try { return storage?.getItem(key); } catch { return null; } }, page)?.text;
+        }
+      });
       wireHubCoverIdleMotion(document);
       wireHubAttractHeader(document);
       if (window.Suite) {

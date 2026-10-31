@@ -9,20 +9,20 @@ const env = { HANGOUT_PREVIEW_KEY: KEY, ROOMS: {}, QUOTA: {} };
 const url = (q) => new URL(`https://relay.example/room?${q}`);
 
 describe('hangout relay worker rules', () => {
-    it('fails closed when the preview secret or bindings are missing', () => {
-        expect(admit({ url: url(`room=${ROOM}`), origin: 'https://stalemate.band', env: {}, previewKey: KEY })).toEqual({ status: 503, reason: 'not-configured' });
+    it('fails closed when the preview secret or bindings are missing', async () => {
+        await expect(admit({ url: url(`room=${ROOM}`), origin: 'https://stalemate.band', env: {}, previewKey: KEY })).resolves.toEqual({ status: 503, reason: 'not-configured' });
         expect(previewKeyOk('', undefined)).toBe(false);
         expect(previewKeyOk('short', 'short')).toBe(false);
     });
 
-    it('checks exact origin, preview key and room id', () => {
+    it('checks exact origin, preview key and room id', async () => {
         const ok = { url: url(`room=${ROOM}`), origin: 'https://stalemate.band', env, previewKey: KEY };
-        expect(admit(ok)).toBeNull();
-        expect(admit({ ...ok, origin: 'https://stalemate.band.evil.com' }).status).toBe(403);
-        expect(admit({ ...ok, previewKey: 'nope' }).reason).toBe('preview');
-        expect(admit({ ...ok, url: url(`room=xyz`), previewKey: KEY }).status).toBe(400);
-        expect(admit({ ...ok, origin: 'http://127.0.0.1:4320' }).status).toBe(403);
-        expect(admit({ ...ok, origin: 'http://127.0.0.1:4320', extraOrigins: 'http://127.0.0.1:4320' })).toBeNull();
+        expect(await admit(ok)).toBeNull();
+        expect((await admit({ ...ok, origin: 'https://stalemate.band.evil.com' })).status).toBe(403);
+        expect((await admit({ ...ok, previewKey: 'nope' })).reason).toBe('preview');
+        expect((await admit({ ...ok, url: url(`room=xyz`), previewKey: KEY })).status).toBe(400);
+        expect((await admit({ ...ok, origin: 'http://127.0.0.1:4320' })).status).toBe(403);
+        expect(await admit({ ...ok, origin: 'http://127.0.0.1:4320', extraOrigins: 'http://127.0.0.1:4320' })).toBeNull();
     });
 
     it('only forwards well-formed ciphertext frames under the size cap', () => {
@@ -86,11 +86,21 @@ describe('hangout relay worker rules', () => {
         expect(quotaTakes).toBe(0);
     });
 
-    it('accepts the preview key from Sec-WebSocket-Protocol, not the query string', () => {
+    it('accepts the preview key from Sec-WebSocket-Protocol, not the query string', async () => {
         const base = { url: url(`room=${ROOM}`), origin: 'https://stalemate.band', env };
-        expect(admit({ ...base, previewKey: KEY })).toBeNull();
-        expect(admit({ ...base, previewKey: 'nope' }).reason).toBe('preview');
-        expect(admit({ ...base, url: url(`room=${ROOM}&preview=${KEY}`), previewKey: undefined }).reason).toBe('preview');
+        expect(await admit({ ...base, previewKey: KEY })).toBeNull();
+        expect((await admit({ ...base, previewKey: 'nope' })).reason).toBe('preview');
+        expect((await admit({ ...base, url: url(`room=${ROOM}&preview=${KEY}`), previewKey: undefined })).reason).toBe('preview');
+    });
+
+    it('accepts a per-room invite relay token instead of the global preview key', async () => {
+        const { roomRelayToken } = await import('../../hangout-worker/src/core.mjs');
+        const token = await roomRelayToken(KEY, ROOM);
+        expect(token.length).toBeGreaterThan(16);
+        expect(token).not.toBe(KEY);
+        const base = { url: url(`room=${ROOM}`), origin: 'https://stalemate.band', env };
+        expect(await admit({ ...base, previewKey: token })).toBeNull();
+        expect((await admit({ ...base, previewKey: 'nope' })).reason).toBe('preview');
     });
 
     it('echoes Sec-WebSocket-Protocol on the 101 when the client offered one', async () => {

@@ -180,6 +180,14 @@
         const roomId = Array.from(new Uint8Array(idBits), (b) => b.toString(16).padStart(2, '0')).join('');
         return { roomId, key };
     }
+
+    async function roomRelayToken(roomId, previewKey, subtle = global.crypto.subtle) {
+        if (!/^[0-9a-f]{64}$/.test(String(roomId || ''))) throw new Error('bad room');
+        if (typeof previewKey !== 'string' || previewKey.length < 16) throw new Error('bad preview');
+        const macKey = await subtle.importKey('raw', enc.encode(previewKey), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+        const sig = await subtle.sign('HMAC', macKey, enc.encode(`stalemate-hangout-relay-v1:${roomId}`));
+        return b64u(new Uint8Array(sig));
+    }
     async function seal(key, obj, cryptoImpl = global.crypto) {
         const iv = cryptoImpl.getRandomValues(new Uint8Array(12));
         const data = await cryptoImpl.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(JSON.stringify(obj)));
@@ -190,7 +198,7 @@
         return JSON.parse(dec.decode(data));
     }
 
-    const api = { LIMITS, COLORS, FILE_SOURCES, parseYouTubeId, cleanSource, expectedPosition, needsCorrection, createClock, cleanStroke, emptyState, apply, newSecret, validSecret, deriveRoom, seal, open };
+    const api = { LIMITS, COLORS, FILE_SOURCES, parseYouTubeId, cleanSource, expectedPosition, needsCorrection, createClock, cleanStroke, emptyState, apply, newSecret, validSecret, deriveRoom, roomRelayToken, seal, open };
     if (typeof module === 'object' && module.exports) module.exports = api;
     global.HangoutCore = api;
 }(typeof window !== 'undefined' ? window : globalThis));

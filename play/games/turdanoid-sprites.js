@@ -1,5 +1,5 @@
 import './turdanoid-theme.js';
-import './turdanoid-sprites-core.js';
+import './turdanoid-sprites-core.js?v=291cbfad320c500d';
 
 const api = globalThis.TurdanoidSprites;
 

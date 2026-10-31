@@ -1,16 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mobile-game="turdomania">
 <head>
 <meta name="robots" content="noindex,nofollow">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<script src="assets/suite-loading.js"></script>
+<script src="games/suite-progress-core.js?v=3c92de426327c7d1"></script>
+<script src="assets/suite-progress.js?v=cf46f758fae8dff1"></script>
+<script src="assets/suite-share.js?v=ad4aecc45730b022"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Turdomania: a free click-to-pop puzzle in the Turdanoid suite. Pop matching piles of 2 or more, bigger piles score more, flush the whole board for a bonus.">
 <meta name="theme-color" content="#1a120c">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="assets/turdsuite.css">
-<script src="games/table-continue-core.js"></script>
-<script src="assets/turdsuite.js"></script>
+<link rel="stylesheet" href="assets/arcade.css">
+<link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
+<script src="games/table-continue-core.js?v=bc5fab705a134ab5"></script>
+<script src="assets/turdsuite.js?v=3a5cafdb70bf7654"></script>
 <title>Turdomania</title>
 <style>
 :root {
@@ -59,6 +65,7 @@ main.tm { display: contents; }
 .tile.cursor { outline: 3px solid var(--accent-2); outline-offset: -2px; z-index: 3; }
 .tile.popping { opacity: 0; transform: var(--pos) scale(1.6) rotate(25deg) !important; pointer-events: none; }
 .tile.nope { animation: nope 260ms; }
+.tile svg { width:92%; height:92%; pointer-events:none; filter:drop-shadow(0 1px 0 #0005); }
 @keyframes nope { 25% { margin-left: -3px; } 75% { margin-left: 3px; } }
 .float { position: absolute; pointer-events: none; font-weight: 900; color: #fff; text-shadow: 0 2px 0 #000; animation: floatUp 800ms ease-out forwards; z-index: 5; }
 @keyframes floatUp { from { transform: translate(-50%, 0); opacity: 1; } to { transform: translate(-50%, -40px); opacity: 0; } }
@@ -88,14 +95,77 @@ body.reduced .tile.popping { transform: var(--pos) !important; }
   .dock { margin-top: 6px; gap: 6px; flex-wrap: wrap; }
   .dock button, .dock select { padding: 0 10px; font-size: .85rem; white-space: nowrap; }
   .dock select { min-width: 0; flex: 1 1 100%; max-width: none; }
+  .dock .suite-difficulty-seg { max-width: 100%; }
+  .dock .suite-difficulty-btn { min-width: 0; padding: 0 8px; font-size: 0.62rem; }
+}
+.dock:has(.suite-difficulty) #levelSel { display: none; }
+.tm-start-hint { flex:1 0 100%; max-width:100%; text-align:center; font-size:12px; line-height:14px; color:#f6e4c5; }
+.tm-start-hint[hidden] { display:none; }
+/* Dismiss the first-play copy without moving the board or Undo under a finger. */
+body.tm-hint-space .tm-start-hint[hidden] { display:block!important; visibility:hidden; }
+@media(max-width:980px) and (orientation:portrait) {
+  .dock { gap:4px; }
+  .dock button { padding:0 4px; }
+  .dock .tm-control-label { display:none; }
+  .dock #suite-difficulty-mount { min-width:0; }
+  .dock .suite-difficulty-btn { padding:0 4px; }
+}
+@media(max-width:360px) and (orientation:portrait) {
+  html[data-mobile-game="turdomania"] header.hud .stat { font-size:11px; line-height:1.1; padding:2px; }
+  html[data-mobile-game="turdomania"] header.hud .stat b { font-size:16px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .tile, .float { transition: none !important; animation: none !important; }
   .tile.popping { transform: var(--pos) !important; }
 }
 </style>
+<link rel="stylesheet" href="assets/mobile-fit.css">
+<script src="assets/mobile-fit.js" defer></script>
+<style>
+@media(max-width:980px) {
+  html[data-mobile-game="turdomania"] header.hud { height:56px; flex-wrap:nowrap; }
+  html[data-mobile-game="turdomania"] header.hud .stat { min-width:0; flex:1 1 0; }
+  html[data-mobile-game="turdomania"] .dock .suite-difficulty-seg { padding:0; }
+  html[data-mobile-game="turdomania"] .tm-aim nav { position:fixed; left:50%; right:auto; bottom:calc(100dvh - var(--tm-dock-top, 100dvh) + 8px); transform:translateX(-50%); width:max-content; max-width:calc(100vw - 12px); flex-wrap:wrap; justify-content:center; z-index:60; }
+}
+@media(max-width:360px) and (orientation:portrait) {
+  html[data-mobile-game="turdomania"] header.hud { height:44px; }
+}
+@media(max-width:980px) and (orientation:landscape) {
+  html[data-mobile-game="turdomania"] header.hud { height:44px; }
+  html[data-mobile-game="turdomania"] header.hud .stat { font-size:11px; line-height:1.1; padding:2px; }
+  html[data-mobile-game="turdomania"] header.hud .stat b { font-size:16px; }
+  html[data-mobile-game="turdomania"] .dock { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; align-self:flex-start; margin-top:108px; }
+  html[data-mobile-game="turdomania"] .dock #suite-difficulty-mount,
+  html[data-mobile-game="turdomania"] .dock .tm-aim { grid-column:1/-1; }
+  html[data-mobile-game="turdomania"] .dock .tm-control-label { display:none; }
+  html[data-mobile-game="turdomania"] .dock:has(.tm-start-hint:not([hidden])) { align-self:flex-start; margin-top:136px; }
+  html[data-mobile-game="turdomania"] body.tm-hint-space .dock { margin-top:136px; }
+  html[data-mobile-game="turdomania"] .tm-start-hint { position:fixed; top:108px; right:max(8px,env(safe-area-inset-right)); width:180px; }
+}
+@media(max-width:980px) and (orientation:landscape) and (max-height:340px) {
+  html[data-mobile-game="turdomania"] header.hud { top:56px; }
+  html[data-mobile-game="turdomania"] .tm-start-hint { top:100px; line-height:12px; }
+  html[data-mobile-game="turdomania"] .dock:has(.tm-start-hint:not([hidden])),
+  html[data-mobile-game="turdomania"] body.tm-hint-space .dock { margin-top:124px; }
+}
+/* A wide window gives the same puzzle a larger board beside its controls.
+   Mobile keeps its established layout and logical board dimensions. */
+@media(min-width:981px) {
+  body.turdomania { display:grid; grid-template-columns:var(--board-w) clamp(260px,24vw,320px); grid-template-rows:max-content max-content minmax(0,1fr); grid-template-areas:"board hud" "board dock" "board help"; gap:16px 28px; justify-content:center; align-content:start; align-items:start; padding:24px 24px calc(24px + var(--mobile-footer,0px)); }
+  body.turdomania #boardWrap { grid-area:board; margin:0; justify-self:center; }
+  body.turdomania header.hud { grid-area:hud; padding:18px 12px; gap:12px 8px; }
+  body.turdomania header.hud h1 { font-size:32px; }
+  body.turdomania .stat { flex:1; min-width:0; padding:8px 4px; }
+  body.turdomania .stat b { font-size:24px; }
+  body.turdomania .tagline { font-size:14px; min-height:42px; }
+  body.turdomania .dock { grid-area:dock; margin:0; padding:12px 0; gap:10px; }
+  body.turdomania #suite-difficulty-mount { flex-basis:100%; justify-content:center; }
+  body.turdomania .help { grid-area:help; margin:0; font-size:14px; line-height:1.5; }
+}
+</style>
 </head>
-<body class="suite-ambient">
+<body class="suite-ambient turdomania arcade" data-arcade-game="turdomania">
 <header class="hud">
   <h1>💩 Turdomania</h1>
   <div class="stat">Score<b id="score">0</b></div>
@@ -110,6 +180,7 @@ body.reduced .tile.popping { transform: var(--pos) !important; }
     <div>
       <h2 id="overTitle">Clogged!</h2>
       <p id="overText"></p>
+      <p class="suite-progress-result" id="progressResult" role="status" hidden></p>
       <div class="row">
         <button type="button" id="againBtn">Flush &amp; Again</button>
         <button type="button" id="overUndoBtn">Undo last pop</button>
@@ -118,8 +189,17 @@ body.reduced .tile.popping { transform: var(--pos) !important; }
   </div>
 </div>
 <div class="dock" role="toolbar" aria-label="Game controls">
-  <button type="button" id="undoBtn" aria-keyshortcuts="U">↶ Undo</button>
-  <button type="button" id="newBtn" aria-keyshortcuts="N">🚽 New board</button>
+  <p class="tm-start-hint" id="startHint" role="status" hidden>Tap 2+ matching tiles. Bigger groups score more.</p>
+  <div class="suite-hud-settings" id="suite-difficulty-mount"></div>
+  <button type="button" id="undoBtn" aria-label="Undo" aria-keyshortcuts="U">↶<span class="tm-control-label"> Undo</span></button>
+  <button type="button" id="newBtn" aria-label="New board" aria-keyshortcuts="N">🚽<span class="tm-control-label"> New board</span></button>
+  <details class="tm-aim"><summary>Aim</summary><nav aria-label="Precise board controls">
+    <button type="button" data-board-key="ArrowLeft" aria-label="Aim left">←</button>
+    <button type="button" data-board-key="ArrowUp" aria-label="Aim up">↑</button>
+    <button type="button" data-board-key="ArrowDown" aria-label="Aim down">↓</button>
+    <button type="button" data-board-key="ArrowRight" aria-label="Aim right">→</button>
+    <button type="button" data-board-key="Enter">Pop</button>
+  </nav></details>
   <label class="sr-only" for="levelSel">Difficulty</label>
   <select id="levelSel" aria-label="Difficulty">
     <option value="easy">Squirt · 3 kinds</option>
@@ -138,35 +218,57 @@ window.tmView = function () {
   var w = Math.min(window.innerWidth || Infinity, de.clientWidth || Infinity);
   var h = Math.min(window.innerHeight || Infinity, de.clientHeight || Infinity);
   var compact = w <= 360 || h <= 600;
-  return { availW: Math.min(w, 760) - 36, availH: h - (compact ? 170 : 230) };
+  var mobile = w <= 980;
+  var landscape = w > h;
+  var strip = document.querySelector('.stalemate-strip');
+  var footer = (strip ? strip.getBoundingClientRect().height : 0) + (document.getElementById('suite-music-status')?.getBoundingClientRect().height || 0);
+  var hud = document.querySelector('header.hud');
+  var dock = document.querySelector('.dock');
+  var chrome = mobile ? (landscape ? 24 : (hud ? hud.offsetHeight : 64) + (dock ? dock.offsetHeight : 100) + 20) : (compact ? 182 : 230);
+  if (!mobile) {
+    var side = Math.max(260, Math.min(320, w * .24));
+    return { availW: w - 48 - side - 28 - 16, availH: h - footer - 48 - 16, desktop: true };
+  }
+  return { availW: Math.min(w - (mobile && landscape ? 210 : 0), 760) - 36, availH: h - chrome - footer, desktop: false };
 };
 window.tmFit = function (levelKey) {
   var d = TM_DIMS[levelKey] || TM_DIMS.normal;
-  var v = tmView(), availW = v.availW, availH = v.availH;
+  // Preserve the established board sizes; layout() fits this same board after rotation.
+  var w = Math.min(window.innerWidth, document.documentElement.clientWidth);
+  var h = Math.min(window.innerHeight, document.documentElement.clientHeight);
+  var availW = Math.min(w, 760) - 36, availH = h - (w <= 360 || h <= 600 ? 182 : 230);
   var fit = function (n, avail, floor) { return Math.max(Math.min(n, floor), Math.min(n, Math.floor(avail / 32))); };
   return { availW: availW, availH: availH, cols: fit(d[0], availW, 6), rows: fit(d[1], availH, 8) };
 };
 (function () {
   var q = new URLSearchParams(location.search), lvl = q.get('level');
-  if (!TM_DIMS[lvl]) { try { lvl = (JSON.parse(localStorage.getItem('turdomania_prefs_v1') || 'null') || {}).level; } catch (e) { lvl = null; } }
+  if (!TM_DIMS[lvl]) {
+    try {
+      if (window.Suite && Suite.difficulty) { lvl = Suite.difficulty.get(); }
+      else { lvl = localStorage.getItem('turdsuite_difficulty_v1'); }
+    } catch (e) { lvl = null; }
+    if (!TM_DIMS[lvl]) { try { lvl = (JSON.parse(localStorage.getItem('turdomania_prefs_v1') || 'null') || {}).level; } catch (e) { lvl = null; } }
+  }
   var f = tmFit(TM_DIMS[lvl] ? lvl : 'normal');
   window.TM_INIT = { level: TM_DIMS[lvl] ? lvl : 'normal', cols: f.cols, rows: f.rows };
-  var cell = Math.max(22, Math.min(56, Math.floor(Math.min(f.availW / f.cols, f.availH / f.rows))));
+  var view = tmView();
+  var cell = Math.max(22, Math.min(view.desktop ? 72 : 56, Math.floor(Math.min(view.availW / f.cols, view.availH / f.rows))));
   var st = document.documentElement.style;
   st.setProperty('--cell', cell + 'px'); st.setProperty('--board-w', cell * f.cols + 'px'); st.setProperty('--board-h', cell * f.rows + 'px');
 })();
 </script>
 </main>
-<p class="help">Tap a pile of 2+ touching matches. Stuff falls, empty columns slide left. Score = (pile − 2)². Keys: arrows, Enter/Space, U undo, N new.</p>
+<p class="help" role="region" aria-label="How to play">Tap a pile of 2+ touching matches. Stuff falls, empty columns slide left. Score = (pile − 2)². Keys: arrows, Enter/Space, U undo, N new.</p>
 <div id="live" class="sr-only" aria-live="polite"></div>
 
-<script type="module">
+<script type="module" data-game-required>
 import * as Core from './games/turdomania-core.js';
 
 const qs = new URLSearchParams(location.search);
 const boardEl = document.getElementById('board');
 const wrap = document.getElementById('boardWrap');
 const overlay = document.getElementById('overlay');
+const resultShare = window.SuiteShare?.create({ host: overlay.firstElementChild, game: 'turdomania' });
 const liveEl = document.getElementById('live');
 const els = {
   score: document.getElementById('score'), best: document.getElementById('best'), left: document.getElementById('left'),
@@ -176,14 +278,21 @@ const els = {
 };
 const reduced = () => qs.get('reducedMotion') === '1' || matchMedia('(prefers-reduced-motion: reduce)').matches;
 if (reduced()) document.body.classList.add('reduced');
+// Accessing the storage property itself can throw in private/embedded browsers.
+const safeStorage = (() => { try { return window.localStorage; } catch { return null; } })();
+const hintEl = document.getElementById('startHint');
+const HINT_KEY = 'turdomania_first_pop_v1';
+try { hintEl.hidden = safeStorage?.getItem(HINT_KEY) === '1'; } catch { hintEl.hidden = false; }
+document.body.classList.toggle('tm-hint-space', !hintEl.hidden);
 
 function readPrefs() {
-  try { const p = JSON.parse(localStorage.getItem(Core.PREFS_KEY) || 'null'); return p && p.v === 1 ? p : { v: 1 }; } catch { return { v: 1 }; }
+  try { const p = JSON.parse(safeStorage.getItem(Core.PREFS_KEY) || 'null'); return p && p.v === 1 ? p : { v: 1 }; } catch { return { v: 1 }; }
 }
-function writePrefs(p) { try { localStorage.setItem(Core.PREFS_KEY, JSON.stringify({ ...p, v: 1 })); } catch { /* full */ } }
+function writePrefs(p) { try { safeStorage.setItem(Core.PREFS_KEY, JSON.stringify({ ...p, v: 1 })); } catch { /* full */ } }
 
 // Sound hooks: shared suite synth, which honours the suite mute toggle.
 function sfx(name) {
+  if (window.Suite?.isStudioAudio?.()) return Suite.playSound('mania.' + name);
   try { if (window.Suite && Suite.audio) Suite.audio().then((a) => a && a.playPreset(name)); } catch { /* no audio */ }
 }
 function announce(msg) {
@@ -192,17 +301,22 @@ function announce(msg) {
 }
 
 let state = null;
+let progressRunId = null;
+let progressRunResult = null;
+let progressStartedAt = 0;
 let cursor = { c: 0, r: 0 };
 let cell = 32;
 const tileEls = new Map();
 const fixedSeed = qs.has('seed') ? Number(qs.get('seed')) >>> 0 : null;
+let busy = false;
+let popTimer = 0;
+let generation = 0;
 
-function start(levelKey, seed) {
-  // First board reuses the size reserved before paint; later boards re-measure.
-  const init = window.TM_INIT && window.TM_INIT.level === levelKey ? window.TM_INIT : null;
-  window.TM_INIT = null;
-  const fit = init || (window.tmFit ? window.tmFit(levelKey) : null);
-  state = Core.newGame(levelKey, seed ?? (fixedSeed ?? ((Math.random() * 2 ** 32) >>> 0)), fit && !qs.has('fullsize') ? { cols: fit.cols, rows: fit.rows } : null);
+function resetView() {
+  resultShare?.setResult(null);
+  generation++;
+  clearTimeout(popTimer);
+  busy = false;
   boardEl.innerHTML = '';
   rowEls.length = 0;
   tileEls.clear();
@@ -213,13 +327,43 @@ function start(levelKey, seed) {
   sfx('shuffle');
 }
 
+function start(levelKey, seed) {
+  window.Suite?.stopSounds?.();
+  progressRunId = window.SuiteProgress?.newRunId('turdomania') || null;
+  progressRunResult = null;
+  progressStartedAt = Date.now();
+  document.getElementById('progressResult').hidden = true;
+  document.getElementById('progressResult').textContent = '';
+  // First board reuses the size reserved before paint; later boards re-measure.
+  const init = window.TM_INIT && window.TM_INIT.level === levelKey ? window.TM_INIT : null;
+  window.TM_INIT = null;
+  const fit = init || (window.tmFit ? window.tmFit(levelKey) : null);
+  state = Core.newGame(levelKey, seed ?? (fixedSeed ?? ((Math.random() * 2 ** 32) >>> 0)), fit && !qs.has('fullsize') ? { cols: fit.cols, rows: fit.rows } : null);
+  resetView();
+}
+
 function layout() {
-  const { availW, availH } = window.tmView();
-  cell = Math.max(22, Math.min(56, Math.floor(Math.min(availW / state.cols, availH / state.rows))));
+  const view = window.tmView();
+  let { availW, availH } = view;
+  const viewH = Math.min(window.innerHeight, document.documentElement.clientHeight);
+  const viewW = Math.min(window.innerWidth, document.documentElement.clientWidth);
+  const footer = (document.querySelector('.stalemate-strip')?.getBoundingClientRect().height || 0) + (document.getElementById('suite-music-status')?.getBoundingClientRect().height || 0);
+  const landscape = viewW <= 980 && viewW > viewH;
+  const bodyStyle = getComputedStyle(document.body);
+  const padding = (parseFloat(bodyStyle.paddingTop) || 0) + (parseFloat(bodyStyle.paddingBottom) || 0);
+  const help = document.querySelector('.help');
+  const helpHeight = help && getComputedStyle(help).display !== 'none' ? help.getBoundingClientRect().height + 8 : 0;
+  // Measure the actual kit and footer; fonts and settings can change their height.
+  const frameHeight = wrap.offsetHeight - boardEl.offsetHeight;
+  const reserve = viewW <= 980 && frameHeight > 0 ? frameHeight + (parseFloat(getComputedStyle(document.querySelector('.dock')).marginTop) || 0) : 24;
+  if (!view.desktop) availH = landscape ? viewH - footer - 24 : viewH - document.querySelector('header.hud').offsetHeight - document.querySelector('.dock').offsetHeight - helpHeight - Math.max(footer, padding) - reserve;
+  if (landscape) availW = viewW - 224;
+  cell = Math.max(22, Math.min(view.desktop ? 72 : 56, Math.floor(Math.min(availW / state.cols, availH / state.rows))));
   const st = document.documentElement.style;
   st.setProperty('--cell', cell + 'px');
   st.setProperty('--board-w', cell * state.cols + 'px');
   st.setProperty('--board-h', cell * state.rows + 'px');
+  st.setProperty('--tm-dock-top', document.querySelector('.dock').getBoundingClientRect().top + 'px');
 }
 
 // Grid semantics: one role="row" per visual row (top to bottom); each tile lives in its row.
@@ -253,12 +397,21 @@ function render() {
       el.className = 'tile';
       el.id = 'tile-' + t.id;
       el.setAttribute('role', 'gridcell');
-      el.textContent = kind.emoji;
-      el.style.setProperty('--k', kind.color);
+      const art = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      art.setAttribute('viewBox', '0 0 64 64');
+      art.setAttribute('aria-hidden', 'true');
+      const icon = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+      icon.setAttribute('href', './assets/turdomania-tiles.svg#' + ['swirl', 'corn', 'splat', 'paper', 'bean', 'cheese'][t.kind]);
+      art.appendChild(icon);
+      el.appendChild(art);
+      el.dataset.kind = String(t.kind);
+      el.style.setProperty('--k', (window.Suite && Suite.turdomaniaKindColor) ? Suite.turdomaniaKindColor(t.kind, kind.color) : kind.color);
       el.dataset.id = t.id;
       tileEls.set(t.id, el);
     }
     el.classList.remove('popping');
+    el.dataset.kind = String(t.kind);
+    el.style.setProperty('--k', (window.Suite && Suite.turdomaniaKindColor) ? Suite.turdomaniaKindColor(t.kind, kind.color) : kind.color);
     el.dataset.col = c; el.dataset.row = r;
     const rowEl = rowEls[state.rows - 1 - r];
     if (el.parentNode !== rowEl) {
@@ -279,7 +432,7 @@ function render() {
   }));
   for (const [id, el] of tileEls) if (!live.has(id)) { el.remove(); tileEls.delete(id); }
   els.score.textContent = state.score;
-  const best = Core.readBest(localStorage)[state.level];
+  const best = Core.readBest(safeStorage)[state.level];
   els.best.textContent = Math.max(best, state.score);
   els.left.textContent = Core.tileCount(state.board);
   els.undo.disabled = state.history.length === 0;
@@ -298,12 +451,18 @@ function clampCursor() {
   cursor.r = Math.max(0, Math.min(h - 1, cursor.r));
 }
 
-function clearHot() { boardEl.querySelectorAll('.hot').forEach((e) => e.classList.remove('hot')); }
+const tagline = document.getElementById('tagline');
+const defaultTagline = tagline.textContent;
+function clearHot() {
+  boardEl.querySelectorAll('.hot').forEach((e) => e.classList.remove('hot'));
+  tagline.textContent = defaultTagline;
+}
 function highlight(c, r) {
   clearHot();
   const g = Core.findGroup(state.board, c, r);
   if (g.length < 2) return g.length;
   for (const [gc, gr] of g) { const t = state.board[gc][gr]; tileEls.get(t.id)?.classList.add('hot'); }
+  tagline.textContent = `${g.length} matching tiles · ${Core.scoreForGroup(g.length)} points`;
   return g.length;
 }
 function paintCursor() {
@@ -331,7 +490,6 @@ function floatText(text, c, r) {
   setTimeout(() => f.remove(), 850);
 }
 
-let busy = false;
 function popAt(c, r) {
   if (busy || !state) return;
   const res = Core.play(state, c, r);
@@ -343,26 +501,38 @@ function popAt(c, r) {
     return;
   }
   clearHot();
+  if (!hintEl.hidden) {
+    hintEl.hidden = true;
+    try { safeStorage?.setItem(HINT_KEY, '1'); } catch { /* session-only when denied */ }
+  }
   const removedEls = res.removed.map((t) => tileEls.get(t.id)).filter(Boolean);
   removedEls.forEach((el) => el.classList.add('popping'));
   floatText(res.points ? `+${res.points}` : 'plop', c, r);
   sfx(res.removed.length >= 6 ? 'ding' : 'blip');
   state = res.state;
-  if (state.over) Core.recordBest(localStorage, state.level, state.score);
+  if (state.over) Core.recordBest(safeStorage, state.level, state.score);
+  const startedGeneration = generation;
   const finish = () => {
+    if (startedGeneration !== generation) return;
     removedEls.forEach((el) => { el.remove(); tileEls.delete(Number(el.dataset.id)); });
     busy = false;
     render();
     announce(`Popped ${res.removed.length}${res.points ? `, +${res.points}` : ''}. Score ${state.score}.`);
   };
   if (reduced()) finish();
-  else { busy = true; setTimeout(finish, 170); }
+  else { busy = true; popTimer = setTimeout(finish, 170); }
 }
 
 function doUndo() {
+  if (busy) return;
   const prev = state && Core.undo(state);
   if (!prev) return;
   state = prev;
+  // Undo reopens this attempt; its next finish updates the same history entry.
+  progressRunResult = null;
+  document.getElementById('progressResult').hidden = true;
+  document.getElementById('progressResult').textContent = '';
+  resultShare?.setResult(null);
   overlay.classList.remove('show');
   // Rebuild tiles: undone tiles come back with their old ids.
   render();
@@ -372,12 +542,29 @@ function doUndo() {
 
 function showOver() {
   const left = Core.tileCount(state.board);
-  const best = Core.readBest(localStorage)[state.level];
+  const best = Core.readBest(safeStorage)[state.level];
   els.overTitle.textContent = state.cleared ? 'Squeaky clean! 🧼' : 'Clogged! 🪠';
   els.overText.textContent = state.cleared
     ? `Board flushed. +${Core.CLEAR_BONUS} bonus. Final ${state.score}.${state.score >= best ? ' New best!' : ''}`
     : `No more matches. ${left} turd${left === 1 ? '' : 's'} left behind. Final ${state.score}.${state.score >= best && state.score > 0 ? ' New best!' : ''}`;
   overlay.classList.add('show');
+  if (progressRunId && state.moves > 0 && !progressRunResult) {
+    progressRunResult = {
+      id: progressRunId, game: 'turdomania', mode: state.level, difficulty: state.level, level: state.level, kind: 'run',
+      outcome: state.cleared ? 'win' : 'loss', score: state.score, left, cleared: state.cleared,
+      cols: state.cols, rows: state.rows,
+      elapsedMs: Math.max(0, Date.now() - progressStartedAt)
+    };
+    try {
+      const recorded = window.SuiteProgress?.record(progressRunResult);
+      if (recorded?.improvement) progressRunResult.improvement = recorded.improvement;
+      const goals = recorded?.newlyEarned?.map(goal => goal.title) || [];
+      const feedback = [goals.length ? `Goal earned: ${goals.join(' · ')}` : '', recorded?.improvement || '', recorded && !recorded.storageAvailable ? 'Your browser could not save progress on this device.' : ''].filter(Boolean).join(' ');
+      document.getElementById('progressResult').textContent = feedback;
+      document.getElementById('progressResult').hidden = !feedback;
+    } catch { /* Optional progress never interrupts the completed game. */ }
+  }
+  resultShare?.setResult(state.moves > 0 ? progressRunResult || { level: state.level, score: state.score, left, cleared: state.cleared } : null);
   sfx(state.cleared ? 'win' : 'lose');
   announce(els.overTitle.textContent + ' ' + els.overText.textContent);
   setTimeout(() => els.again.focus({ preventScroll: true }), 30);
@@ -410,19 +597,89 @@ document.addEventListener('keydown', (e) => {
   if (moves[k]) { e.preventDefault(); cursor.c += moves[k][0]; cursor.r += moves[k][1]; clampCursor(); paintCursor(); return; }
   if (k === 'Enter' || k === ' ') { e.preventDefault(); popAt(cursor.c, cursor.r); }
 });
+document.querySelectorAll('[data-board-key]').forEach(button => {
+  button.addEventListener('click', () => {
+    boardEl.focus({ preventScroll: true });
+    boardEl.dispatchEvent(new KeyboardEvent('keydown', { key: button.dataset.boardKey, bubbles: true }));
+  });
+});
 els.undo.addEventListener('click', doUndo);
 els.overUndo.addEventListener('click', doUndo);
 els.newBtn.addEventListener('click', () => start(state.level));
 els.again.addEventListener('click', () => { start(state.level); boardEl.focus({ preventScroll: true }); });
-els.level.addEventListener('change', () => { writePrefs({ level: els.level.value }); start(els.level.value); });
+function suiteBoardLevel() {
+  try {
+    if (window.Suite && Suite.difficulty) { return Suite.difficulty.get(); }
+    const raw = localStorage.getItem('turdsuite_difficulty_v1');
+    return Core.LEVELS[raw] ? raw : null;
+  } catch { return null; }
+}
+els.level.addEventListener('change', () => {
+  const lvl = els.level.value;
+  writePrefs({ level: lvl });
+  try {
+    if (window.Suite && Suite.difficulty) { Suite.difficulty.set(lvl); }
+    else { localStorage.setItem('turdsuite_difficulty_v1', lvl); }
+  } catch { /* ignore */ }
+  start(lvl);
+});
+const pinnedLevel = Core.LEVELS[qs.get('level')] ? qs.get('level') : null;
+
+if (window.Suite && Suite.difficulty) {
+  Suite.difficulty.onChange((lvl) => {
+    if (pinnedLevel) { return; }
+    if (!Core.LEVELS[lvl] || (state && state.level === lvl)) { return; }
+    if (els.level.value !== lvl) { els.level.value = lvl; }
+    writePrefs({ level: lvl });
+    start(lvl);
+  });
+}
 let rz = 0;
 window.addEventListener('resize', () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(() => { if (state) { layout(); render(); } }); });
+// Fonts and the first-play hint change the toolbar independently of viewport size.
+if (window.ResizeObserver) {
+  const chromeObserver = new ResizeObserver(() => window.dispatchEvent(new Event('resize')));
+  chromeObserver.observe(document.querySelector('header.hud'));
+  chromeObserver.observe(document.querySelector('.dock'));
+}
 
-const startLevel = Core.LEVELS[qs.get('level')] ? qs.get('level') : (readPrefs().level || 'normal');
+function armSuiteMusic() {
+  try {
+    if (window.Suite && typeof Suite.music === 'function') {
+      Suite.music().then((player) => { if (player) player.armFromGesture(); });
+    }
+  } catch { /* optional */ }
+}
+function suiteMusicBlocked() {
+  try {
+    if (window.Suite && typeof Suite.isMusicEnabled === 'function' && !Suite.isMusicEnabled()) return true;
+  } catch { /* optional */ }
+  return false;
+}
+try {
+  if (window.Suite && typeof Suite.setMusicGameBlocked === 'function') {
+    Suite.setMusicGameBlocked(suiteMusicBlocked);
+  }
+} catch { /* optional */ }
+
+boardEl.addEventListener('pointerdown', armSuiteMusic, { once: true, passive: true });
+boardEl.addEventListener('keydown', armSuiteMusic, { once: true });
+
+const startLevel = pinnedLevel
+  || (window.TM_INIT && window.TM_INIT.level)
+  || suiteBoardLevel()
+  || readPrefs().level
+  || 'normal';
 start(startLevel);
+try {
+  if (pinnedLevel && window.Suite && Suite.difficulty && Suite.difficulty.get() !== pinnedLevel) {
+    Suite.difficulty.set(pinnedLevel);
+  }
+} catch { /* ignore */ }
 // Test hook: deterministic actions without hunting pixels.
 window.__turdomaniaPop = (c, r) => popAt(c, r);
 window.__turdomaniaUndo = doUndo;
+window.SuiteLoading?.ready();
 </script>
 <script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>
 <script src="../js/track.js" defer></script>

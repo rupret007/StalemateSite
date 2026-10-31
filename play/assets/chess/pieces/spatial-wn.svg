@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 933.333 933.333" width="933.333" height="933.333" shape-rendering="geometricPrecision">
+  <style id="style-base">
+    .base { 
+      fill-opacity:1;
+      fill-rule:evenodd;
+      stroke-miterlimit:4;
+      stroke-dasharray:none;
+      stroke-linecap:round;
+      stroke-linejoin:round;
+      stroke-opacity:1
+    }
+    .shadow {
+      stroke:none;
+      filter:url(#filterBlur);
+    }
+  </style>
+  <style id="stroke-medium">.stroke-medium {stroke-width:18;}</style>
+  <style id="stroke-boundary">.stroke-boundary {stroke-width:28;}</style>
+  <style id="stroke-color">.stroke-color {stroke:#1c2b3b;}</style>
+  <style id="fill-color">.fill-color {fill:#fffdf0;}</style>
+  <defs id="defs36222">
+    <linearGradient id="fillGradient">
+      <stop style="stop-color:#fffdf0;stop-opacity:1" offset="0" id="stop0" />
+      <stop style="stop-color:#c3d7da;stop-opacity:1" offset="1" id="stop1" />
+    </linearGradient>
+    <linearGradient xlink:href="#fillGradient" id="main-gradient" x1="163.67708" y1="244.15625" x2="741.16382" y2="814.15625" gradientUnits="userSpaceOnUse" gradientTransform="matrix(1.1088151,0,0,1.1088151,-23.077232,-23.377473)" />
+    <filter style="color-interpolation-filters:sRGB;" id="filterBlur" x="-0.19086554" y="-0.16337513" width="1.3817311" height="1.3267503">
+      <feGaussianBlur stdDeviation="50 50" result="blur" id="feGaussianBlur13" />
+    </filter>
+  </defs>
+  <metadata id="metadata36225">
+    </metadata>
+  <path class="base stroke-color stroke-boundary" style="fill:none" d="m 391.90912,61.450044 c -1.87108,129.020126 4.71982,80.296336 -76.69714,20.735693 12.56487,84.162693 4.03621,86.935523 -17.71405,122.949753 -11.9034,19.70971 -22.39347,81.76996 -29.84171,95.44939 -45.13264,82.89059 -148.78572,191.10338 -148.60689,226.38142 0.22637,44.65606 53.3369,84.62878 101.91888,37.40667 -45.45156,66.53561 91.77418,-0.30152 149.28111,-41.34129 76.12165,46.86106 182.46981,-4.41788 184.44662,-79.71127 C 589.33625,613.62991 265.8615,643.2097 248.58246,864.1159 489.66461,919.14963 623.94374,739.8463 770.88819,878.50042 846.00572,660.69889 852.93779,296.63376 503.72619,160.13458 456.26353,141.58247 436.32473,93.860474 391.90912,61.450044 Z" id="boundary" />
+  <path class="base stroke-color stroke-medium" style="fill:url(#main-gradient)" d="m 391.90912,61.450044 c -1.87108,129.020126 4.71982,80.296336 -76.69714,20.735693 12.56487,84.162693 4.03621,86.935523 -17.71405,122.949753 -11.9034,19.70971 -22.39347,81.76996 -29.84171,95.44939 -45.13264,82.89059 -148.78572,191.10338 -148.60689,226.38142 0.22637,44.65606 53.3369,84.62878 101.91888,37.40667 -45.45156,66.53561 91.77418,-0.30152 149.28111,-41.34129 76.12165,46.86106 182.46981,-4.41788 184.44662,-79.71127 C 589.33625,613.62991 265.8615,643.2097 248.58246,864.1159 489.66461,919.14963 623.94374,739.8463 770.88819,878.50042 846.00572,660.69889 852.93779,296.63376 503.72619,160.13458 456.26353,141.58247 436.32473,93.860474 391.90912,61.450044 Z M 390.45227,301.7017 c -7.89238,11.19789 -24.48987,29.47575 -39.0526,26.79941 -13.46457,-2.47452 -18.88219,-7.03827 -19.50352,-22.98358 -0.52315,-13.4254 47.04822,-12.99238 58.55612,-3.81583 z" id="main" />
+</svg>

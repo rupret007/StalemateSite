@@ -7,7 +7,7 @@ Hidden preview. Don't share the link outside the test group.
 - Optional: one phone on cellular with Wi-Fi off. That's the hardest case.
 
 **Run it** (about 30 minutes)
-1. **Start a room:** Jeff opens the preview link and taps **Start a room**. Then tap **Copy invite link** and text it to House B. ☐ It opens in under 3 seconds and needs no account.
+1. **Start a room:** Jeff opens the preview link and taps **Start a room**. Then tap **Copy invite link** and text it to House B. The copied link keeps the invite in the `#` hash (including a room pass) and drops the preview key from the query string, so servers never see the shared secret. ☐ It opens in under 3 seconds and needs no account.
 2. **Join:** House B taps the link and taps **Jump in**. ☐ Both see "2 here" with names. ☐ No camera or mic prompt shows up yet.
 3. **Chat:** say something each way. ☐ It shows up within a second.
 4. **Draw:** both draw at the same time. ☐ Strokes show up on the other screen right away. ☐ Jeff's **Wipe it** clears both screens. ☐ House B doesn't see a Wipe button.

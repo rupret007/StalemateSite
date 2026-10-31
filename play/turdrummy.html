@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mobile-game="turdrummy">
 <head>
 <meta name="robots" content="noindex,nofollow">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<script src="assets/suite-loading.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -10,10 +11,16 @@
   <meta name="theme-color" content="#18311f">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="assets/turdsuite.css">
-  <script src="games/table-continue-core.js"></script>
-  <script src="assets/turdsuite.js"></script>
+<link rel="stylesheet" href="assets/arcade.css">
+  <script src="games/table-continue-core.js?v=bc5fab705a134ab5"></script>
+  <script src="games/suite-progress-core.js?v=3c92de426327c7d1"></script>
+  <script src="assets/suite-progress.js?v=cf46f758fae8dff1"></script>
+  <script src="assets/suite-share.js?v=ad4aecc45730b022"></script>
+  <script src="games/suite-dialog-focus.js"></script>
+  <script src="assets/turdsuite.js?v=3a5cafdb70bf7654"></script>
+  <!-- Bot strength follows turdsuite_difficulty_v1 / Suite.difficulty (turdrummy-ai-core.js). -->
   <script src="games/turdrummy-ai-core.js"></script>
-  <script src="games/turdrummy-audio-core.js"></script>
+  <script src="games/turdrummy-audio-core.js?v=bfc951560116f766"></script>
   <script src="games/turdrummy-fx-core.js"></script>
   <script src="games/turdrummy-meld-core.js"></script>
   <script src="games/turdrummy-hand-visibility-core.js"></script>
@@ -746,14 +753,13 @@
     }
 
     .card-button:hover {
-      transform: translateY(-5px);
       box-shadow: var(--suite-card-shadow-lift), var(--suite-paper-edge);
       z-index: calc(var(--fan-z, 1) + 4);
     }
 
-    .card-button:active {
-      transform: translateY(-2px) scale(0.98);
-    }
+    /* Keep an unselected card's hit area still through pointerdown/up. Moving
+       an exposed fan edge can release over its neighbour and lose the click.
+       The selected state below still lifts the card after activation. */
 
     .card-button:focus-visible {
       outline: 2px solid var(--mint);
@@ -929,7 +935,7 @@
     .pile-body { justify-content: center; }
 
 
-    .pile h3 {
+    .pile h2 {
       color: rgba(255, 225, 168, 0.85);
       font-size: 0.6rem;
       letter-spacing: 0.16em;
@@ -1211,6 +1217,22 @@
       text-align: center;
       letter-spacing: 0.04em;
       opacity: 0.8;
+    }
+
+    .tr-difficulty-stat {
+      justify-content: center;
+      padding: 2px 0 0;
+    }
+
+    .tr-difficulty-topbar {
+      flex: 1 1 100%;
+      order: 3;
+      justify-content: center;
+      margin-top: 2px;
+    }
+
+    .app:has(.tr-difficulty-stat .suite-difficulty) #difficultyBtn {
+      display: none;
     }
 
     /* ---------- Overlay / guide ---------- */
@@ -1919,6 +1941,25 @@
         border-radius: 8px;
       }
 
+      .tr-difficulty-stat .suite-difficulty-btn {
+        min-height: 28px;
+        min-width: 0;
+        padding: 0 5px;
+        font-size: 0.58rem;
+      }
+
+      .tr-difficulty-stat .suite-difficulty-seg {
+        padding: 2px;
+      }
+
+      .tr-difficulty-topbar {
+        display: none !important;
+      }
+
+      #difficultyBtn {
+        display: inline-flex !important;
+      }
+
       .status {
         grid-template-columns: repeat(6, minmax(0, 1fr));
         gap: 2px 3px;
@@ -2064,7 +2105,7 @@
         flex: 1 1 0;
         padding: 2px 0;
       }
-      .zone--center .pile h3 { margin-bottom: 2px; }
+      .zone--center .pile h2 { margin-bottom: 2px; }
       .zone--center .pile-body { min-height: calc(var(--back-h) + 4px); gap: 4px; }
 
       #playerHand button.card.selected,
@@ -2114,7 +2155,7 @@
       .zone--opponent { padding-top: 0; }
       .zone-header { margin-bottom: 2px; }
       .piles { padding: 0; }
-      .pile h3 { margin-bottom: 4px; }
+      .pile h2 { margin-bottom: 4px; }
       .action-dock { padding: 5px 8px; padding-bottom: max(5px, env(safe-area-inset-bottom)); }
       .footer-note { display: none; }
       .zone--hand { padding: 4px 2px 0; }
@@ -2240,15 +2281,95 @@
       .coach-actions { display: grid; grid-template-columns: 44px 44px; gap: 4px; }
       .coach-actions .btn { padding: 2px; font-size: 10px; }
     }
+
+    @media (orientation: landscape) and (max-height: 440px) {
+      .tr-difficulty-topbar {
+        order: 2;
+        flex: 1 1 auto;
+        margin-top: 0;
+        justify-content: flex-end;
+        max-width: min(220px, 42vw);
+      }
+
+      .top-links {
+        flex: 1 1 auto;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .title-group p {
+        display: none;
+      }
+
+      .status {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        padding: 4px 8px;
+        gap: 4px;
+      }
+
+      .action-dock {
+        z-index: 24;
+      }
+    }
+    /* Reserve the measured player strip without shrinking phone tables twice. */
+    @media (min-width: 981px) {
+      .app { height: calc(100dvh - var(--mobile-footer, 0px) - 16px); min-height: 0; grid-template-rows: auto auto minmax(0, 1fr) auto; }
+      .table-stage { overflow: auto; }
+      .action-dock { position: relative; }
+      .topbar { flex-wrap: nowrap; }
+      .title-group { min-width: 0; }
+      .tr-difficulty-topbar { flex: 0 0 auto; order: 0; margin: 0; }
+      .zone--center { padding: 4px 8px; }
+      .zone--center:has(.coach:not([hidden])) { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr); gap: 4px 10px; }
+      .zone--center > .zone-header, .zone--center > .message { grid-column: 1 / -1; }
+      .zone--center:has(.coach:not([hidden])) > .piles { grid-column: 1; }
+      .zone--center:has(.coach:not([hidden])) > .coach { grid-column: 2; grid-row: 2; align-self: center; }
+      #opponentCards { min-height: 0; height: 66px; padding: 2px 0; transform: none; }
+      #opponentCards .back-card { height: 58px; width: 40px; }
+      .zone--hand { flex: 1 0 auto; }
+      .zone-header { margin-bottom: 4px; }
+      .piles { padding: 0; }
+      .coach { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; margin-top: 4px; padding: 6px 10px; }
+      .coach-step, .coach h2, .coach p { grid-column: 1; }
+      .coach-actions { grid-column: 1; grid-row: auto; flex-direction: row; align-items: center; justify-content: flex-start; }
+      .coach-actions .btn { min-height: 44px; }
+      #playerHand { flex: 0 0 auto; min-height: calc(var(--card-h) + 44px); padding-bottom: 30px; }
+    }
+    @media (min-width: 981px) and (max-height: 860px) {
+      /* Keep the complete human fan above the dock. Stacking opponent, piles
+         and hand consumed more height than a short desktop could provide. */
+      .table { display: grid; grid-template-columns: minmax(180px,.85fr) minmax(0,2fr); grid-template-rows: minmax(0,1fr) auto; }
+      .zone--opponent { grid-column: 1; grid-row: 1; align-self: center; min-width: 0; }
+      .zone--opponent .zone-header { flex-wrap: wrap; gap: 4px; }
+      #opponentCards .back-card { margin-left: -22px; }
+      .zone--center { grid-column: 2; grid-row: 1; min-height: 0; overflow: auto; }
+      .zone--center .pile-body { min-height: 92px; }
+      .zone--center .card { width: 62px; height: 88px; }
+      .zone--hand { grid-column: 1 / -1; grid-row: 2; }
+      #playerHand { min-height: calc(var(--card-h) + 36px); padding-top: 16px; padding-bottom: 18px; }
+    }
+    @media (max-width: 980px) and (orientation: landscape) and (max-height: 400px) {
+      html[data-mobile-game="turdrummy"] .table .zone--hand .zone-header { flex-wrap: nowrap; min-height: 24px; }
+      html[data-mobile-game="turdrummy"] .table .tr-deadwood .bar { display: none; }
+      html[data-mobile-game="turdrummy"] .table #coachCard { padding: 4px; gap: 2px; }
+      html[data-mobile-game="turdrummy"] #coachCard .coach-step { font-size: 9px; }
+      html[data-mobile-game="turdrummy"] #coachCard h2 { font-size: 13px; line-height: 1.2; }
+      html[data-mobile-game="turdrummy"] #coachCard p { font-size: 12px; line-height: 1.3; }
+      html[data-mobile-game="turdrummy"] #coachCard .coach-actions { flex-wrap: nowrap; }
+    }
   </style>
+<link rel="stylesheet" href="assets/mobile-fit.css">
+<script src="assets/mobile-fit.js" defer></script>
+<link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
 </head>
-<body class="suite-ambient suite-no-zoom">
+<body class="suite-ambient suite-no-zoom arcade" data-arcade-game="turdrummy">
   <div class="app">
     <header class="topbar">
       <div class="title-group">
         <h1>TurdRummy</h1>
         <p>Gin Rummy with smug deadwood math and a table that looks slightly too damp.</p>
       </div>
+      <div class="suite-hud-settings tr-difficulty-stat tr-difficulty-topbar" id="suite-difficulty-mount"></div>
       <div class="top-links">
         <a href="./" aria-label="Back to game hub">&#x1F3E0; Hub</a>
         <button class="btn" id="soundToggleBtn" data-sound-toggle aria-pressed="true">&#x1F50A; Sound On</button>
@@ -2259,7 +2380,7 @@
       </div>
     </header>
 
-    <section class="status">
+    <section class="status" aria-label="Match score">
       <div class="stat" title="Which hand you are on. Round 1 deals the first hand."><div class="stat-label"><span class="lbl-full">Round</span><span class="lbl-short">Rnd</span></div><div class="stat-value" id="roundValue">0</div></div>
       <div class="stat" title="Your running match score. First to the target wins."><div class="stat-label"><span class="lbl-full">Player Score</span><span class="lbl-short">You</span></div><div class="stat-value" id="playerScoreValue">0</div></div>
       <div class="stat" title="The bot's running match score."><div class="stat-label"><span class="lbl-full">AI Score</span><span class="lbl-short">Bot</span></div><div class="stat-value" id="aiScoreValue">0</div></div>
@@ -2268,8 +2389,8 @@
       <div class="stat" title="First player to this score wins the match."><div class="stat-label"><span class="lbl-full">Target</span><span class="lbl-short">Tgt</span></div><div class="stat-value" id="targetValue">100</div></div>
     </section>
 
-    <div class="table-stage">
-    <main class="table" data-motto="Deadwood Dept. says this table smells strategic">
+    <div class="table-stage" role="main">
+    <section class="table" data-motto="Deadwood Dept. says this table smells strategic">
       <section class="zone zone--opponent" aria-label="Bot hand">
         <div class="zone-header">
           <div class="zone-title">Opponent Hand</div>
@@ -2285,11 +2406,11 @@
         </div>
         <div class="piles">
           <div class="pile" id="stockWell">
-            <h3>Stock</h3>
+            <h2>Stock</h2>
             <div class="pile-body" id="stockPile" role="group" aria-label="Stock pile"></div>
           </div>
           <div class="pile" id="discardWell">
-            <h3>Discard Top</h3>
+            <h2>Discard Top</h2>
             <div class="pile-body" id="discardPile" role="group" aria-label="Discard pile"></div>
           </div>
         </div>
@@ -2312,13 +2433,14 @@
         </div>
         <div class="card-row" id="playerHand" role="group" aria-label="Your cards. Use arrow keys to move between cards."></div>
       </section>
-    </main>
+    </section>
 
       <details class="tr-drawer tr-drawer--side" id="tableDrawer">
         <summary>Melds, log &amp; stats</summary>
-        <div class="tr-drawer-body">
+        <div class="tr-drawer-body" tabindex="0" role="region" aria-label="Melds and match log">
           <div class="melds" id="meldPreview"></div>
           <ol class="round-log" id="roundLog" aria-label="Recent table events"></ol>
+          <p id="rummyProgressStatus" class="suite-progress-result" role="status" hidden></p>
           <dl class="drawer-stats" id="drawerStats" aria-label="Your match stats on this device"></dl>
         </div>
       </details>
@@ -2337,7 +2459,7 @@
       <div class="footer-note">Core controls stay fixed at bottom for mobile play.</div>
     </footer>
 
-    <div class="overlay" id="guideOverlay">
+    <div class="overlay" id="guideOverlay" role="dialog" aria-modal="true" aria-label="Rummy rules">
       <div class="overlay-card">
         <h2>How TurdRummy Works</h2>
         <p>Goal: first to 100 by making melds and minimizing deadwood.</p>
@@ -2371,6 +2493,8 @@
         <h2 id="trophyHeadline">Match Over</h2>
         <p class="trophy-scores" id="trophyScores"></p>
         <dl id="trophyStats" aria-label="Match stats saved on this device"></dl>
+        <p id="rummyTrophyProgressStatus" class="suite-progress-result" role="status" hidden></p>
+        <div id="rummyResultShare"></div>
         <div class="overlay-actions">
           <button class="btn primary" id="trophyRematchBtn" type="button">Rematch</button>
           <button class="btn" id="trophyKeepBtn" type="button">Keep Table</button>
@@ -2448,9 +2572,12 @@
     let aiTurnTimeoutId = null;
     let focusPausedAiTurn = false;
 
+    // Acquiring storage can itself throw before the helpers can handle failure.
+    const rummyStorage = (() => { try { return window.localStorage; } catch { return null; } })();
     const audioPlayer = (window.TurdRummyAudio && TurdRummyAudio.createPlayer)
-      ? TurdRummyAudio.createPlayer(window.localStorage)
+      ? TurdRummyAudio.createPlayer(rummyStorage)
       : null;
+    window.Suite?.setSoundLocalEnabled?.(() => !!audioPlayer?.isEnabled());
 
     function playSfx(name) {
       try {
@@ -2471,7 +2598,7 @@
     const reducedMotionQuery = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
     const presentationTimers = [];
     const roundLog = [];
-    let aiLevel = AIApi ? AIApi.loadDifficulty(window.localStorage) : "normal";
+    let aiLevel = AIApi ? AIApi.loadDifficulty(rummyStorage) : "normal";
     let coachIndex = 0;
     let handLayoutQueued = false;
     let bannerTimer = 0;
@@ -2732,27 +2859,67 @@
       el.difficultyBtn.setAttribute("aria-label", "Bot: " + label + ". Activate to change difficulty.");
     }
 
+    function suiteLevelToAi(level) {
+      const id = typeof level === "string" ? level.trim().toLowerCase() : "normal";
+      if (id === "hard") { return "sharp"; }
+      if (id === "easy") { return "easy"; }
+      return "normal";
+    }
+
+    function applyAiLevel(next) {
+      if (!DIFFICULTY_ORDER.includes(next)) { return; }
+      aiLevel = next;
+      if (AIApi) { AIApi.saveDifficulty(rummyStorage, aiLevel); }
+      updateDifficultyLabel();
+      const previousProgressDifficulty = progressMeta?.difficulty;
+      trackCardProgressDifficulty();
+      if (progressMeta?.difficulty !== previousProgressDifficulty) persistTable();
+      try {
+        if (window.Suite && Suite.difficulty) {
+          const suiteId = aiLevel === "sharp" ? "hard" : aiLevel === "easy" ? "easy" : "normal";
+          if (Suite.difficulty.get() !== suiteId) {
+            Suite.difficulty.set(suiteId);
+          }
+        }
+      } catch (err) { /* optional */ }
+    }
+
     function cycleDifficulty() {
       const at = DIFFICULTY_ORDER.indexOf(aiLevel);
-      aiLevel = DIFFICULTY_ORDER[(at + 1) % DIFFICULTY_ORDER.length];
-      if (AIApi) AIApi.saveDifficulty(window.localStorage, aiLevel);
-      updateDifficultyLabel();
+      applyAiLevel(DIFFICULTY_ORDER[(at + 1) % DIFFICULTY_ORDER.length]);
       playSfx("select");
       try {
         if (window.Suite) Suite.toast("Bot is now " + DIFFICULTY_LABELS[aiLevel] + ".");
       } catch (err) { /* cosmetic only */ }
     }
 
+    function wireSuiteDifficultySync() {
+      if (!window.Suite || !Suite.difficulty) { return; }
+      Suite.difficulty.onChange((level) => {
+        applyAiLevel(suiteLevelToAi(level));
+      });
+      window.addEventListener("storage", (event) => {
+        if (event.key !== "turdsuite_difficulty_v1" || event.newValue == null) { return; }
+        applyAiLevel(suiteLevelToAi(event.newValue));
+      });
+      window.addEventListener("turdsuite:difficulty", (event) => {
+        const level = event && event.detail && event.detail.level;
+        if (level) { applyAiLevel(suiteLevelToAi(level)); }
+      });
+    }
+
     // Coach: a first-round, non-blocking card. The page reports the real actions it teaches.
     function coachIsDone() {
-      return !!Coach && Coach.loadCoachDone(window.localStorage);
+      return !!Coach && Coach.loadCoachDone(rummyStorage);
     }
 
     function syncCoach() {
       const steps = Coach ? Coach.COACH_STEPS : [];
       const show = !!Coach && state.initialized && state.round === 1 && !state.roundOver && !state.matchOver
         && !coachIsDone() && coachIndex < steps.length && !el.guideOverlay.classList.contains("show");
+      const wasHidden = el.coachCard.hidden;
       el.coachCard.hidden = !show;
+      if (wasHidden !== !show) window.dispatchEvent(new Event('turdrummy:coach-visibility'));
       document.querySelectorAll(".coach-spot").forEach((node) => node.classList.remove("coach-spot"));
       if (!show) return;
       const step = steps[coachIndex];
@@ -2766,7 +2933,7 @@
     }
 
     function finishCoach() {
-      if (Coach) Coach.markCoachDone(window.localStorage);
+      if (Coach) Coach.markCoachDone(rummyStorage);
       coachIndex = Coach ? Coach.COACH_STEPS.length : 0;
       syncCoach();
     }
@@ -2878,11 +3045,17 @@
         .map(([label, value]) => "<div><dt>" + label + "</dt><dd>" + (Number(value) || 0) + "</dd></div>")
         .join("");
       el.trophyOverlay.classList.add("show");
-      el.trophyRematchBtn.focus();
+      window.SuiteDialogFocus?.open(el.trophyOverlay, {
+        initialFocus: '#trophyRematchBtn',
+        fallbackFocus: () => el.resetMatchBtn,
+        onEscape: hideTrophy
+      });
+      if (!window.SuiteDialogFocus) el.trophyRematchBtn.focus();
     }
 
     function hideTrophy() {
       el.trophyOverlay.classList.remove("show");
+      window.SuiteDialogFocus?.close(el.trophyOverlay);
     }
 
     // Presentation-only feed risk: the bot avoids discards that would help a set or run the human is building.
@@ -2996,6 +3169,63 @@
       }
     }
 
+    // Optional progress is independent of the legacy game/stat save keys.
+    let progressMeta = null;
+    const cardResultShare = window.SuiteShare?.create({ host: document.getElementById('rummyResultShare'), game: 'turdrummy' });
+    function cardProgressDifficulty() { return aiLevel === 'sharp' ? 'hard' : aiLevel; }
+    function newCardProgress(legacy = false) {
+      const id = window.SuiteProgress?.newRunId('turdrummy');
+      return id ? { v: 1, id, difficulty: legacy ? 'unknown' : cardProgressDifficulty(), pending: [] } : null;
+    }
+    function trackCardProgressDifficulty() {
+      if (!progressMeta || !(state.initialized && !state.matchOver) || ['mixed', 'unknown'].includes(progressMeta.difficulty)) return;
+      if (progressMeta.difficulty !== cardProgressDifficulty()) progressMeta.difficulty = 'mixed';
+    }
+    function clearCardProgressResult() {
+      cardResultShare?.setResult(null);
+      const status = document.getElementById('rummyProgressStatus');
+      status.textContent = ''; status.hidden = true;
+      const trophyStatus = document.getElementById('rummyTrophyProgressStatus');
+      trophyStatus.textContent = ''; trophyStatus.hidden = true;
+    }
+    function restoreCardProgress(meta, live) {
+      progressMeta = meta && meta.v === 1 && typeof meta.id === 'string'
+        ? JSON.parse(JSON.stringify(meta)) : (live ? newCardProgress(true) : null);
+      if (progressMeta && live && !progressMeta.roundId) {
+        progressMeta.roundId = window.SuiteProgress?.newRunId('turdrummy');
+      }
+    }
+    function beginCardProgressRound() {
+      if (!progressMeta) progressMeta = newCardProgress();
+      trackCardProgressDifficulty();
+      if (progressMeta) {
+        progressMeta.roundId = window.SuiteProgress?.newRunId('turdrummy');
+        progressMeta.pending = [];
+      }
+      clearCardProgressResult();
+    }
+    function publishCardProgress() {
+      const pending = progressMeta?.pending || [];
+      const earned = [];
+      let storageUnavailable = false;
+      for (const event of pending) {
+        const receipt = window.SuiteProgress?.record(event);
+        if (receipt?.newlyEarned) earned.push(...receipt.newlyEarned);
+        if (receipt?.storageAvailable === false) storageUnavailable = true;
+      }
+      cardResultShare?.setResult(pending.find(event => event.history !== false) || null);
+      const status = document.getElementById('rummyProgressStatus');
+      if (earned.length) {
+        status.textContent = 'Goal complete: ' + earned.map(goal => goal.title).join(' · ');
+        status.hidden = false;
+      } else if (storageUnavailable) {
+        status.textContent = 'Progress could not be saved on this device.';
+        status.hidden = false;
+      }
+      const trophyStatus = document.getElementById('rummyTrophyProgressStatus');
+      trophyStatus.textContent = status.textContent; trophyStatus.hidden = status.hidden;
+    }
+
     function persistTable() {
       if (!window.Suite || !Suite.table) return;
       if (!state.initialized) {
@@ -3004,6 +3234,7 @@
       }
       Suite.table.remember("turdrummy.html", {
         kind: "turdrummy",
+        ...(progressMeta ? { progressMeta } : {}),
         v: 1,
         round: state.round,
         dealer: state.dealer,
@@ -3055,6 +3286,7 @@
       state.humanDiscardTakes = [];
       state.aiTurns = 0;
       state.initialized = true;
+      restoreCardProgress(snap.progressMeta, !snap.matchOver);
       return true;
     }
 
@@ -3067,6 +3299,8 @@
       }
       focusPausedAiTurn = false;
       renderAll();
+      if (progressMeta?.pending?.length) publishCardProgress();
+      if (state.matchOver && progressMeta?.pending?.some(event => event.kind === "match")) showTrophy();
       if (!state.roundOver && state.turn === "ai") queueAiTurn(180);
       try { Suite.toast("Picked up where you left off."); } catch (e) {}
       return true;
@@ -3586,13 +3820,13 @@
         if (!window.Suite) return;
         const note = (String(text || "") + " " + String(summary || "")).toLowerCase();
         const last = setMessage._last || ""; if (note === last) return; setMessage._last = note;
-        if (note.includes("you called gin"))           { Suite.hype(Suite.quip('gin') || 'GIN!'); Suite.win(); }
-        else if (note.includes("you knocked"))         { Suite.hype(Suite.quip('knock') || 'KNOCK KNOCK'); Suite.ding(); }
-        else if (note.includes("undercut! you"))       { Suite.hype('UNDERCUT!'); Suite.win(); }
-        else if (note.includes("match winner: player")){ Suite.hype(Suite.quip('win') || 'CHAMPION'); Suite.win(); }
-        else if (note.includes("ai called gin"))       { Suite.toast('💩 BOT GIN'); Suite.fart(); }
+        if (note.includes("you called gin"))           { Suite.hype(Suite.quip('gin') || 'GIN!');  }
+        else if (note.includes("you knocked"))         { Suite.hype(Suite.quip('knock') || 'KNOCK KNOCK');  }
+        else if (note.includes("undercut! you"))       { Suite.hype('UNDERCUT!');  }
+        else if (note.includes("match winner: player")){ Suite.hype(Suite.quip('win') || 'CHAMPION');  }
+        else if (note.includes("ai called gin"))       { Suite.toast('💩 BOT GIN');  }
         else if (note.includes("ai knocked"))          { Suite.toast('💩 BOT KNOCK'); }
-        else if (note.includes("match winner: ai"))    { Suite.hype(Suite.quip('lose') || 'OUTPLAYED'); Suite.fart(); }
+        else if (note.includes("match winner: ai"))    { Suite.hype(Suite.quip('lose') || 'OUTPLAYED');  }
       } catch (e) {}
     }
 
@@ -3647,6 +3881,7 @@
     }
 
     function renderAll() {
+      trackCardProgressDifficulty();
       renderStatus();
       renderOpponentCards();
       renderPiles();
@@ -3675,7 +3910,20 @@
       return state.stock.pop() || null;
     }
 
+    function completeRummyProgress({ outcome, gin = false, points = 0 }) {
+      if (!progressMeta?.roundId) return;
+      const common = { game: 'turdrummy', mode: 'match-100', difficulty: progressMeta.difficulty,
+        target: TURDRUMMY_BALANCE.matchTarget, rounds: state.round };
+      progressMeta.pending = [{ ...common, id: progressMeta.roundId, kind: 'round', history: false, outcome, gin,
+        roundWon: outcome === 'win', score: outcome === 'win' ? points : 0 }];
+      if (state.matchOver) progressMeta.pending.push({ ...common, id: progressMeta.id, kind: 'match',
+        outcome: state.playerScore > state.aiScore ? 'win' : state.playerScore < state.aiScore ? 'loss' : 'draw',
+        matchWon: state.playerScore > state.aiScore, score: state.playerScore,
+        playerScore: state.playerScore, opponentScore: state.aiScore });
+    }
+
     function resolveStockStall(reasonText) {
+      trackCardProgressDifficulty();
       if (state.roundOver) return;
       clearAiTurnTimeout();
       focusPausedAiTurn = false;
@@ -3690,8 +3938,10 @@
       state.matchOver = false;
       state.message = reasonText || "Stock exhausted.";
       state.roundSummary = "No legal draw remained. Round is a draw (0 points).";
+      completeRummyProgress({ outcome: "draw" });
       saveStats();
       renderAll();
+      publishCardProgress();
     }
 
     function selectCard(cardId) {
@@ -3705,6 +3955,7 @@
       clearAiTurnTimeout();
       clearPresentation();
       focusPausedAiTurn = false;
+      beginCardProgressRound();
       state.round += 1;
       state.humanDiscardTakes = [];
       state.aiTurns = 0;
@@ -4108,6 +4359,7 @@
     }
 
     function finishRound(knocker, isGin, knockerDeadwood, knockerMelds) {
+      trackCardProgressDifficulty();
       clearAiTurnTimeout();
       focusPausedAiTurn = false;
       state.roundOver = true;
@@ -4174,8 +4426,10 @@
       state.drawnCardSource = null;
       state.message = state.lastAiAction || "Round complete.";
       state.roundSummary = summary + " Knocker deadwood: " + knockerDeadwood + ", defender deadwood: " + defenderDeadwood + ".";
+      completeRummyProgress({ outcome: awardedTo === "player" ? "win" : "loss", gin: knocker === "player" && isGin, points });
       saveStats();
       renderAll();
+      publishCardProgress();
       // Big-moment presentation runs after the state is final; the score above never waits on it.
       pushLog(summary);
       armPresentation({ showTrophyAfter: state.matchOver });
@@ -4264,6 +4518,9 @@
     }
 
     function resetMatch() {
+      window.Suite?.stopSounds?.();
+      progressMeta = null;
+      clearCardProgressResult();
       clearAiTurnTimeout();
       clearPresentation();
       hideTrophy();
@@ -4317,10 +4574,16 @@
     function openGuide() {
       clearAiTurnTimeout();
       el.guideOverlay.classList.add("show");
+      window.SuiteDialogFocus?.open(el.guideOverlay, {
+        initialFocus: '#startRoundBtn',
+        fallbackFocus: () => [el.drawStockBtn, el.discardBtn, el.newRoundBtn, el.quickGuideBtn].find(button => button && !button.disabled),
+        onEscape: closeGuide
+      });
     }
 
     function closeGuide() {
       el.guideOverlay.classList.remove("show");
+      window.SuiteDialogFocus?.close(el.guideOverlay);
       if (window.Suite && Suite.guide) Suite.guide.mark("turdrummy.html");
       syncCoach();
       if (!state.roundOver && state.turn === "ai") {
@@ -4446,6 +4709,7 @@
       hideTrophy();
       finishCoach();
       el.guideOverlay.classList.remove("show");
+      window.SuiteDialogFocus?.close(el.guideOverlay);
       roundLog.length = 0;
       const table = Moments.buildTableState(kind);
       state.initialized = true;
@@ -4488,6 +4752,7 @@
     function init() {
       loadStats();
       bindEvents();
+      wireSuiteDifficultySync();
       updateSoundToggleLabel();
       updateDifficultyLabel();
       // The stats drawer starts open on wide screens and folded on phones, where the table needs the room.
@@ -4510,6 +4775,27 @@
       else resumeAiFromBackground();
     });
 
+    function suiteMusicBlocked() {
+      try {
+        if (window.Suite && typeof Suite.isMusicEnabled === 'function' && !Suite.isMusicEnabled()) return true;
+      } catch (err) { /* ignore */ }
+      return !(audioPlayer && audioPlayer.isEnabled());
+    }
+
+    function syncSuiteMusic() {
+      try {
+        if (window.Suite && typeof Suite.music === 'function') {
+          Suite.music().then(function (player) { if (player) player.sync(); });
+        }
+      } catch (err) { /* ignore */ }
+    }
+
+    try {
+      if (window.Suite && typeof Suite.setMusicGameBlocked === 'function') {
+        Suite.setMusicGameBlocked(suiteMusicBlocked);
+      }
+    } catch (err) { /* ignore */ }
+
     (function setupAudioUnlock() {
       if (!audioPlayer) return;
       const unlockOnce = () => {
@@ -4521,7 +4807,12 @@
       window.addEventListener("keydown", unlockOnce, { once: true });
     })();
 
+    if (el.soundToggleBtn) {
+      el.soundToggleBtn.addEventListener('click', () => { syncSuiteMusic(); });
+    }
+
     init();
+    window.SuiteLoading?.ready();
   
 
 // ============================================================

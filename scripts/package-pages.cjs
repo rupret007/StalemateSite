@@ -11,6 +11,7 @@ const FILES = [
     '404.html',
     'index.html',
     'robots.txt',
+    'sitemap.xml',
     'countdown.js',
     'script.js',
     'show-state.js',
@@ -18,6 +19,8 @@ const FILES = [
     'js/count.js',
     'js/track.js',
     'js/site-track.js',
+    'js/contact-mail.js',
+    'js/contact-form.js',
     'styles.css',
     'assets/favicon.svg',
     'assets/games/turdanoid.webp',
@@ -62,7 +65,7 @@ function copyHangoutRoomRuntime() {
     }
 }
 
-const DIRS = ['play', 'qr', 'tap'];
+const DIRS = ['play', 'qr', 'tap', 'events'];
 
 emptyDir(DIST);
 for (const relativePath of FILES) {

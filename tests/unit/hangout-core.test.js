@@ -84,4 +84,12 @@ describe('hangout sync core', () => {
         const other = await H.deriveRoom(H.newSecret());
         await expect(H.open(other.key, frame)).rejects.toBeTruthy();
     });
+
+    it('derives a per-room relay token that matches the worker HMAC', async () => {
+        const { roomRelayToken: workerToken } = await import('../../hangout-worker/src/core.mjs');
+        const secret = H.newSecret();
+        const { roomId } = await H.deriveRoom(secret);
+        const preview = 'local-preview-key-0001';
+        expect(await H.roomRelayToken(roomId, preview)).toBe(await workerToken(preview, roomId));
+    });
 });

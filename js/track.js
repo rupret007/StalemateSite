@@ -14,11 +14,19 @@
     return s;
   }
 
+  function deliver(path) {
+    try {
+      window.goatcounter.count({ path: path, title: path, event: true });
+    } catch (e) {
+      // Analytics is best-effort: drop failed events without interrupting the site.
+    }
+  }
+
   function send(name) {
     var path = sanitize(name);
     if (!path) return;
     if (window.goatcounter && typeof window.goatcounter.count === 'function') {
-      window.goatcounter.count({ path: path, title: path, event: true });
+      deliver(path);
       return;
     }
     if (queue.length < MAX_QUEUE) queue.push(path);
@@ -28,7 +36,7 @@
     if (!window.goatcounter || typeof window.goatcounter.count !== 'function') return;
     while (queue.length) {
       var n = queue.shift();
-      window.goatcounter.count({ path: n, title: n, event: true });
+      deliver(n);
     }
   }
 

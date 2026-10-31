@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Stalemate | Original punk rock, played loud</title>
-    <meta name="description" content="Original punk rock from Dallas, played loud and a little sloppy. Catch Stalemate at Rockin’ October: Saturday, Oct 24, 4:45 PM, Los Amigo’s in Plano.">
+    <meta name="description" content="Original punk rock, played loud and a little sloppy. Watch Manic, listen to Stalemate, and play nine free arcade games.">
     <meta name="theme-color" content="#171410">
     <link rel="canonical" href="https://stalemate.band/">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Stalemate">
     <meta property="og:title" content="Stalemate | Original punk rock, played loud">
-    <meta property="og:description" content="Loud, fast, a little sloppy. Stalemate plays Rockin’ October, Sat Oct 24, 4:45 PM at Los Amigo’s, Plano.">
+    <meta property="og:description" content="Loud, fast, a little sloppy. Original songs, the Manic lyric video, and nine free Stalemate Arcade games.">
     <meta property="og:url" content="https://stalemate.band/">
     <meta property="og:image" content="https://stalemate.band/assets/og.png">
     <meta property="og:image:type" content="image/png">
@@ -20,7 +20,7 @@
     <meta property="og:image:alt" content="Stalemate wordmark on a checkerboard">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Stalemate | Original punk rock, played loud">
-    <meta name="twitter:description" content="Loud, fast, a little sloppy. Sat Oct 24, 4:45 PM, Los Amigo’s, Plano.">
+    <meta name="twitter:description" content="Original punk rock, the Manic lyric video, and nine free Stalemate Arcade games.">
     <meta name="twitter:image" content="https://stalemate.band/assets/og.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -56,7 +56,8 @@
                     <a href="#top">Home</a>
                     <a href="#listen">Listen</a>
                     <a href="#about">About</a>
-                    <a href="play/#hub-games">Games</a>
+                    <a href="#contact">Contact</a>
+                    <a href="play/#hub-games">Arcade</a>
                 </nav>
                 <nav class="social-nav social-nav--icons" aria-label="Social">
                     <a class="social-link" href="https://www.instagram.com/stalemate.punk/" target="_blank" rel="noopener noreferrer">
@@ -72,7 +73,7 @@
                         <span class="sr-only">Facebook</span>
                     </a>
                 </nav>
-                <a class="button button--hot header-cta" data-track="show-cta-header" href="https://rockinoctober.com" target="_blank" rel="noopener noreferrer">Show details</a>
+                <a class="button button--hot header-cta" data-show-action data-before-label="Get Saturday tickets" data-before-track="show-cta-header" data-track="show-cta-next-fallback" href="https://www.instagram.com/stalemate.punk/" target="_blank" rel="noopener noreferrer">Follow the band</a>
             </div>
         </div>
     </header>
@@ -115,10 +116,10 @@
                             <figcaption>
                                 <p class="board-square">Manic</p>
                                 <p class="hero-video__label">Lyric video (turn it up)</p>
-                                <p class="hero-video__teaser">Manic is just the first one out of the garage. There’s a whole new album in the works, and you can hear some of it live before anyone else.</p>
+                                <p class="hero-video__teaser" data-show-copy data-before="Manic is just the first one out of the garage. There’s a whole new album in the works, and you can hear some of it live before anyone else.">Turn up Manic, then find more Stalemate in Listen.</p>
                             </figcaption>
                         </figure>
-                        <div class="hero-next" data-next-show data-starts-at="2026-10-24T16:45:00-05:00">
+                        <div class="hero-next" data-next-show data-show-href="https://studio801.ticketspice.com/rockin-october" data-starts-at="2026-10-24T16:45:00-05:00">
                             <div class="hero-show-card panel">
                                 <p class="hero-show__tie">Hear it loud Oct 24<br> at Los Amigo’s, Plano</p>
                                 <div class="hero-countdown" data-countdown>
@@ -135,17 +136,23 @@
                                 <aside class="next-show-block" data-next-show-block>
                                     <p class="board-square">Next up</p>
                                     <p class="next-show-event">Rockin’ October</p>
-                                    <p>Studio 801 &amp; The Local Show with Chaz</p>
-                                    <p><time datetime="2026-10-24T16:45:00-05:00">Saturday, Oct 24, 2026 · 4:45 PM Central</time></p>
+                                    <p class="next-show-organizers">Studio 801 &amp; The Local Show with Chaz</p>
+                                    <p><time datetime="2026-10-24T16:45:00-05:00">Oct 24, 2026 · 4:45 PM Central</time></p>
                                     <p>Los Amigo’s, Plano, TX</p>
-                                    <p>Doors at noon. All ages, so bring the kids (under 18 with a parent or guardian). We go on at 4:45.</p>
+                                    <p>Doors at noon. All ages; under 18 with a parent or guardian.</p>
                                 </aside>
-                                <p class="hero-show__cta"><a class="button button--hot button--big" href="https://rockinoctober.com" target="_blank" rel="noopener noreferrer" data-track="show-cta-hero">Show details</a></p>
+                                <div class="hero-show__cta">
+                                    <a class="button button--hot button--big" href="https://studio801.ticketspice.com/rockin-october" target="_blank" rel="noopener noreferrer" data-track="show-cta-hero" aria-describedby="show-ticket-guidance">Get Saturday tickets</a>
+                                    <p class="hero-show__guidance" id="show-ticket-guidance">Choose October 24, then select Stalemate at checkout.</p>
+                                    <a class="hero-show__festival" href="https://rockinoctober.com" target="_blank" rel="noopener noreferrer">Full festival lineup</a>
+                                </div>
                             </div>
                         </div>
                         <div class="button-row">
-                            <a class="button button--hot" href="https://rockinoctober.com" target="_blank" rel="noopener noreferrer" data-track="show-cta-under-video" data-show-cta data-show-ends="2026-10-24T16:45:00-05:00" data-fallback-href="https://www.instagram.com/stalemate.punk/" data-fallback-label="Catch the next show">See us Oct 24</a>
+                            <a class="button button--hot" href="https://www.instagram.com/stalemate.punk/" target="_blank" rel="noopener noreferrer" data-track="show-cta-next-fallback" data-show-action data-show-cta data-before-label="Get Saturday tickets" data-before-track="show-cta-under-video">Follow the band</a>
                             <a class="button button--listen" href="#about">Meet the band</a>
+                            <a class="button button--ghost" data-show-before hidden href="events/stalemate-rockin-october-2026.ics" download="stalemate-rockin-october-2026.ics" data-track="show-calendar">Save to calendar</a>
+                            <a class="button button--ghost" data-show-before hidden href="https://www.google.com/maps/dir/?api=1&amp;destination=Los+Amigo%27s+Sports+Bar+%2B+Bites%2C+8604+Preston+Rd+Suite+100%2C+Plano+TX+75024" target="_blank" rel="noopener noreferrer" aria-label="Directions to Los Amigo’s, 8604 Preston Road, Suite 100, Plano, TX 75024" data-track="show-directions">Venue directions</a>
                         </div>
                     </div>
                 </div>
@@ -158,10 +165,10 @@
             <div class="page-shell">
                 <div class="games-card panel">
                     <div class="games-card__body">
-                        <p class="board-square">Games</p>
-                        <h2 id="games-title" class="heading-natural">Seven free arcade games. Zero dignity.</h2>
-                        <p class="games-card__lede">Free, in the browser, scored by Stalemate songs. <span class="games-card__joke">Brick-breaker, but gross.</span></p>
-                        <ul class="games-card__list" aria-label="All seven games">
+                        <p class="board-square">Stalemate Arcade</p>
+                        <h2 id="games-title" class="heading-natural">Nine free arcade games. Zero dignity.</h2>
+                        <p class="games-card__lede">Nine free games and optional Stalemate songs. <span class="games-card__joke">Pick another round.</span></p>
+                        <ul class="games-card__list" aria-label="All nine games">
                             <li><a href="play/TurdAnoid.html" data-track="hub-card-game-turdanoid">Turdanoid</a></li>
                             <li><a href="play/turdomania.html" data-track="hub-card-game-turdomania">Turdomania</a></li>
                             <li><a href="play/turdtris.html" data-track="hub-card-game-turdtris">Turdtris</a></li>
@@ -169,8 +176,10 @@
                             <li><a href="play/turdrummy.html" data-track="hub-card-game-turdrummy">TurdRummy</a></li>
                             <li><a href="play/turdspades.html" data-track="hub-card-game-turdspades">TurdSpades</a></li>
                             <li><a href="play/crapeights.html" data-track="hub-card-game-crapeights">Crappy Eights</a></li>
+                            <li><a href="play/chess.html" data-track="hub-card-game-chess" aria-label="Royal Flush Chess · 1 or 2 players">Royal Flush Chess</a></li>
+                            <li><a href="play/turdrush.html" data-track="hub-card-game-turdrush">Turd Rush</a></li>
                         </ul>
-                        <p class="games-card__actions"><a class="button button--hot games-card__play" href="play/TurdAnoid.html" data-track="hub-card-turdanoid">Play Turdanoid</a> <a class="button button--ghost" href="play/" data-track="hub-card-all-games">All seven games</a></p>
+                        <p class="games-card__actions"><a class="button button--hot games-card__play" href="play/" data-track="hub-card-all-games">Open Stalemate Arcade</a> <a class="button button--ghost" href="play/TurdAnoid.html" data-track="hub-card-turdanoid">Play Turdanoid</a></p>
                     </div>
                     <div class="games-card__shots">
                         <div class="games-card__thumb" aria-hidden="true"></div>
@@ -185,8 +194,8 @@
             <div class="page-shell">
                 <div class="section-heading">
                     <p class="board-square">Listen</p>
-                    <h2 id="listen-title" class="heading-natural">Homework before the show</h2>
-                    <p>Learn the words now so you can yell them at us on Oct 24. Tap play and it starts right here.</p>
+                    <h2 id="listen-title" class="heading-natural" data-show-copy data-before="Homework before the show">Learn the words</h2>
+                    <p data-show-copy data-before="Learn the words now so you can yell them at us on Oct 24. Tap play and it starts right here.">Short songs. Loud choruses. Tap play and it starts right here.</p>
                 </div>
                 <ol class="listen-list">
                     <li class="listen-track" data-listen-track>
@@ -227,17 +236,75 @@
                     <h2 id="about-title" class="heading-natural">We wrote these. Sorry in advance.</h2>
                     <p>Fast songs, dumb jokes, real amps.</p>
                 </div>
-                <p>Stalemate is a punk rock band that only plays its own songs: short, loud, and catchy enough to follow you home. Manic is the newest, and the next album is coming together now. Want to hear it before everyone else? We’re at Rockin’ October on Saturday, Oct 24, 4:45 PM at Los Amigo’s in Plano. Come early, stand close.</p>
+                <p>Stalemate is a punk rock band that only plays its own songs: short, loud, and catchy enough to follow you home. Watch the Manic lyric video, find a song to yell along with, or take a break in Stalemate Arcade. <span data-show-before hidden>We’re at Rockin’ October on Saturday, Oct 24, 4:45 PM at Los Amigo’s in Plano. Come early, stand close.</span></p>
+                <ul class="band-members" aria-label="Band members">
+                    <li><strong>Sean</strong> <span>Bass and Vocals</span></li>
+                    <li><strong>Jeff</strong> <span>Guitars and Vocals</span></li>
+                    <li><strong>Che’</strong> <span>Drums and Vocals</span></li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section content-section--surface" id="contact" aria-labelledby="contact-title">
+            <div class="page-shell">
+                <div class="section-heading">
+                    <p class="board-square">Contact</p>
+                    <h2 id="contact-title" class="heading-natural">Say something loud.</h2>
+                    <p>Booking, weird ideas, or just hello — drop a line.</p>
+                </div>
+                <div class="contact-layout">
+                    <div data-contact-thanks class="contact-thanks panel" hidden tabindex="-1">
+                        <p class="board-square">Sent</p>
+                        <p><strong>Thanks — we got it.</strong> We’ll read it between practices.</p>
+                    </div>
+                    <div data-contact-panel class="contact-panel">
+                        <form class="mail-form" data-contact-form method="POST" action="https://formsubmit.co/stalemate.punk@gmail.com">
+                            <input type="hidden" name="_subject" value="New message from stalemate.band">
+                            <input type="hidden" name="_captcha" value="false">
+                            <input type="hidden" name="_next" value="https://stalemate.band/?contact=sent#contact">
+                            <p class="contact-form__honeypot" aria-hidden="true">
+                                <label for="contact-honey">Leave blank</label>
+                                <input type="text" name="_honey" id="contact-honey" tabindex="-1" autocomplete="off" aria-hidden="true">
+                            </p>
+                            <p>
+                                <label for="contact-name">Name</label>
+                                <input type="text" id="contact-name" name="name" required autocomplete="name">
+                            </p>
+                            <p>
+                                <label for="contact-email">Email</label>
+                                <input type="email" id="contact-email" name="email" required autocomplete="email" inputmode="email">
+                            </p>
+                            <p>
+                                <label for="contact-message">Message</label>
+                                <textarea id="contact-message" name="message" rows="5" required></textarea>
+                            </p>
+                            <p><button class="button button--hot" type="submit">Send it</button></p>
+                        </form>
+                        <p class="contact-alt">
+                            Prefer email?
+                            <noscript><a href="mailto:stalemate.punk@gmail.com">stalemate.punk@gmail.com</a></noscript>
+                            <a data-contact-mailto hidden></a>
+                        </p>
+                        <p class="contact-alt">
+                            Or say hi on
+                            <a class="social-link" href="https://www.facebook.com/stalemate.band/" target="_blank" rel="noopener noreferrer">
+                                <img src="assets/icon-facebook.svg" alt="" width="24" height="24">
+                                <span>Facebook</span>
+                            </a>
+                        </p>
+                    </div>
+                </div>
             </div>
         </section>
     </main>
 
     <div class="checker-rule" aria-hidden="true"></div>
 
-    <footer class="site-footer" id="contact">
+    <footer class="site-footer">
         <div class="page-shell footer-layout">
             <p class="footer-brand">Stalemate</p>
             <p>Dallas-area punk rock. Loud on purpose.</p>
+            <p class="booking-contact">Booking &amp; contact: <a href="#contact">use the contact form</a></p>
             <nav class="social-nav social-nav--row" aria-label="Social">
                 <a class="social-link" href="https://www.instagram.com/stalemate.punk/" target="_blank" rel="noopener noreferrer">
                     <img src="assets/icon-instagram.svg" alt="" width="24" height="24">
@@ -255,10 +322,11 @@
             <nav aria-label="Footer navigation">
                 <a href="#top">Home</a>
                 <a href="#listen">Listen</a>
-                    <a href="#about">About</a>
+                <a href="#about">About</a>
+                <a href="#contact">Contact</a>
             </nav>
             <div class="band-share">
-                <button class="share-button" data-share-band type="button" hidden>Send this to a friend who needs a loud Saturday</button>
+                <button class="share-button" data-share-band type="button" hidden>Send this to a friend who likes it loud</button>
                 <p data-share-status role="status" aria-live="polite"></p>
                 <div data-share-fallback hidden>
                     <label for="band-share-url">Band website</label>
@@ -270,6 +338,8 @@
         </div>
     </footer>
     <script src="site-base.js" defer></script>
+    <script src="js/contact-mail.js" defer></script>
+    <script src="js/contact-form.js" defer></script>
     <script src="countdown.js" defer></script>
     <script src="script.js" defer></script>
     <script data-goatcounter="https://stalemate.goatcounter.com/count" async src="js/count.js"></script>
