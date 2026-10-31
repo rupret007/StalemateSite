@@ -28,7 +28,7 @@ function workspace() {
     const git = (...args) => rawGit(...args).toString().trim();
     git('init', '-q'); git('config', 'user.name', 'Toolkit fixture'); git('config', 'user.email', 'fixture@example.test');
     git('config', 'commit.gpgsign', 'false'); git('config', 'core.hooksPath', path.join(repo, '.git/unused-hooks'));
-    const commit = () => { git('add', '.'); git('commit', '-qm', 'Public toolkit fixture'); return git('rev-parse', 'HEAD'); };
+    const commit = () => { git('add', '--force', '.'); git('commit', '-qm', 'Public toolkit fixture'); return git('rev-parse', 'HEAD'); };
     const head = commit();
     return { top, repo, git, rawGit, commit, head, out: path.join(top, 'toolkit') };
 }
@@ -46,6 +46,8 @@ function allFiles(dir, prefix = '') {
 describe('committed-source community entry toolkit', () => {
     it('exports only the finite public graph, committed source and complete hashes', () => {
         const f = workspace();
+        expect(f.git('ls-files', '--', '.env', '.local/private.txt', 'README.md').split('\n'))
+            .toEqual(['.env', '.local/private.txt', 'README.md']);
         // Dirty non-executable material is not silently included or modified.
         fs.writeFileSync(path.join(f.repo, 'hangout-internal/community-integration.example.json'), 'DIRTY_TEMPLATE_NEVER_EXPORT');
         const r = run(f); expect(r.status, r.stderr).toBe(0);
