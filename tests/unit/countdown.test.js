@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const source = readFileSync(path.join(repoRoot, 'countdown.js'), 'utf8');
@@ -70,6 +70,33 @@ describe('hero countdown remaining time', () => {
 });
 
 describe('hero countdown and next-show visibility', () => {
+    it.each([BEFORE + 60000, AFTER])('refreshes a cached page on return at %s', (restoredAt) => {
+        const window = loadCountdown(nextShowMarkup());
+        const now = vi.spyOn(window.Date, 'now').mockReturnValue(BEFORE);
+        const setInterval = vi.spyOn(window, 'setInterval').mockReturnValue(1);
+        const clearInterval = vi.spyOn(window, 'clearInterval');
+        window.document.dispatchEvent(new window.Event('DOMContentLoaded'));
+        expect(setInterval).toHaveBeenCalledTimes(1);
+
+        window.dispatchEvent(new window.PageTransitionEvent('pagehide', { persisted: true }));
+        expect(clearInterval).toHaveBeenCalledWith(1);
+        now.mockReturnValue(restoredAt);
+        window.dispatchEvent(new window.PageTransitionEvent('pageshow', { persisted: true }));
+
+        const block = window.document.querySelector('[data-next-show]');
+        if (restoredAt === AFTER) {
+            expect(block.hidden).toBe(true);
+            expect(setInterval).toHaveBeenCalledTimes(1);
+        } else {
+            expect(block.hidden).toBe(false);
+            expect(block.querySelector('[data-countdown-minutes]').textContent).toBe('44');
+            expect(setInterval).toHaveBeenCalledTimes(2);
+            now.mockReturnValue(restoredAt + 1000);
+            setInterval.mock.calls[1][0]();
+            expect(block.querySelector('[data-countdown-seconds]').textContent).toBe('59');
+        }
+    });
+
     it('fills the clock and keeps the next-show block before the set', () => {
         const { document, StalemateCountdown } = loadCountdown(nextShowMarkup());
         const result = StalemateCountdown.apply(document, BEFORE);
