@@ -94,6 +94,82 @@ describe('verify email to keep the intended room', () => {
     });
 });
 
+describe('live verified co-host controls in an open host palette', () => {
+    const ref = 'a'.repeat(32), account = 'account-offline-friend';
+    async function owner(cohosts) {
+        const value = await visitor({ verified: true, features: { entrySources: 1, roomKeep: 1, personTargets: 1 } });
+        value.window.confirm = vi.fn(() => true);
+        value.join('#keep-me', { persistent: true, names: [{ id: 'viewer', nick: 'Viewer', prefix: '@', owner: true }] });
+        if (cohosts) value.ws.receive({ t: 'ownership', ch: '#keep-me', cohosts });
+        value.window.document.querySelector('[data-roomtools]').click();
+        return { ...value, palette: value.window.document.querySelector('[data-palette]'),
+            buttons: () => [...value.window.document.querySelectorAll('[data-palette-buttons] button')] };
+    }
+    const ownership = (ws, cohosts) => ws.receive({ t: 'ownership', ch: '#keep-me', cohosts });
+
+    it('adds delayed offline co-host controls without reopening the menu or replacing a focused action', async () => {
+        const { window, ws, palette, buttons } = await owner();
+        const action = buttons().find(button => button.textContent === 'Transfer ownership'); action.focus();
+        const waitingText = window.document.querySelector('[data-palette-status]')?.textContent;
+        ownership(ws, [{ id: account, label: 'OfflineFriend' }]);
+        expect(palette.open).toBe(true);
+        expect(window.document.activeElement).toBe(action);
+        const removal = buttons().find(button => button.textContent === 'Remove verified co-host: OfflineFriend');
+        expect(removal).toBeDefined();
+        expect(waitingText).toContain('Checking verified co-hosts');
+        removal.click();
+        expect(ws.sent.at(-1)).toEqual({ t: 'cmd', name: 'cohost', args: ['remove', account], ch: '#keep-me', roomInstance: ref, cohostAccount: true });
+        expect(palette.open).toBe(false);
+    });
+
+    it('retains an unchanged focused co-host button and retires a removed account even when another uses the same label', async () => {
+        const { window, ws, palette, buttons } = await owner([{ id: account, label: 'Friend' }]);
+        const original = buttons().find(button => button.textContent === 'Remove verified co-host: Friend');
+        expect(original).toBeDefined(); original.focus();
+        ownership(ws, [{ id: account, label: 'RenamedFriend' }]);
+        expect(window.document.activeElement).toBe(original);
+        expect(original.textContent).toBe('Remove verified co-host: RenamedFriend');
+        ownership(ws, [{ id: 'different-account', label: 'Friend' }]);
+        expect(palette.open).toBe(true);
+        expect(original.isConnected).toBe(false);
+        expect(window.document.activeElement).toBe(window.document.querySelector('[data-palette-close]'));
+        const count = ws.sent.length; original.click();
+        expect(ws.sent).toHaveLength(count);
+        expect(window.confirm).not.toHaveBeenCalled();
+        buttons().find(button => button.textContent === 'Remove verified co-host: Friend').click();
+        expect(ws.sent.at(-1).args).toEqual(['remove', 'different-account']);
+    });
+
+    it.each(['room-switch', 'instance-change', 'same-name-rejoin', 'owner-lost', 'disconnect', 'sharing-stopped'])(
+        'retires open host controls after %s and never revives them on a later ownership frame', async boundary => {
+            const { window, ws, join, palette, buttons } = await owner([{ id: account, label: 'OfflineFriend' }]);
+            const removal = buttons().find(button => button.textContent === 'Remove verified co-host: OfflineFriend');
+            expect(removal).toBeDefined();
+            if (boundary === 'room-switch') join('#another-room');
+            if (boundary === 'instance-change') ws.receive({ t: 'chan', ch: { name: '#keep-me', keepRef: 'b'.repeat(32) } });
+            if (boundary === 'same-name-rejoin') join('#keep-me', { persistent: true, names: [{ id: 'viewer', nick: 'Viewer', prefix: '@', owner: true }] });
+            if (boundary === 'owner-lost') ws.receive({ t: 'chan', ch: { name: '#keep-me', names: [{ id: 'viewer', nick: 'Viewer', prefix: '@', owner: false }] } });
+            if (boundary === 'disconnect') ws.close(4003);
+            if (boundary === 'sharing-stopped') ws.receive({ t: 'sharing-stopped' });
+            expect(palette.open).toBe(false);
+            const count = ws.sent.length; removal.click();
+            ownership(ws, [{ id: account, label: 'OfflineFriend' }]);
+            expect(ws.sent).toHaveLength(count);
+            expect(window.confirm).not.toHaveBeenCalled();
+            expect(palette.open).toBe(false);
+        }
+    );
+
+    it('does not turn the ordinary command palette into host controls on an ownership update', async () => {
+        const { window, ws, palette, buttons } = await owner();
+        palette.close(); window.document.querySelector('[data-palette-open]').click();
+        const action = buttons().find(button => button.textContent === '/help'); action.focus();
+        ownership(ws, [{ id: account, label: 'OfflineFriend' }]);
+        expect(palette.open).toBe(true); expect(window.document.activeElement).toBe(action);
+        expect(buttons().some(button => button.textContent.startsWith('Remove verified co-host:'))).toBe(false);
+    });
+});
+
 
 describe('bounded explicit Keep return', () => {
     const room = '#keep-me', ref = 'a'.repeat(32);
