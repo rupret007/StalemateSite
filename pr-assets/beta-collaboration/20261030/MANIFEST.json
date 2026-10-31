@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "sourceCommit": "96f356a6f2a9af4bbd2834bb94f1e5df81d200dd",
+  "runtimeVersion": "6293386f-31b8-4415-bf0b-f81296190a4d",
+  "scope": "Sanitized actual hosted guest receipts/owned screenshots on one ARM Mini, plus separate native CI and equal-tree merge receipts. No actual music, physical-device/Internet-route, human disposition, new-package installation or natural-expiry pass claimed.",
+  "credentialValuesExcluded": true,
+  "files": [
+    {
+      "path": "hosted96-reload-revocation-c3d2c1.json",
+      "bytes": 1249,
+      "sha256": "26a3ccc6f94a8cfe96265a5d67fb67f8273e0cda2bfe8a62930b543cbd1fd6dd"
+    },
+    {
+      "path": "hosted96-remaining-b3c68b.json",
+      "bytes": 1523,
+      "sha256": "398a654bcf3589af943b48ee241dfe960ed626c3a7e8c3cba51979952b4e4fda"
+    },
+    {
+      "path": "hosted96-report-289035.json",
+      "bytes": 1089,
+      "sha256": "37007eb8121cfb4d3c683a8e4720b663359c5b3f22e154a95ceae31c0c862c0b"
+    },
+    {
+      "path": "hosted96-jam-host-375-b3c68b.png",
+      "bytes": 92769,
+      "sha256": "7ef35952b9b2bdb8fd7080e62ce1e7d4f21c10522062c6ab422a66866ff6e6a0"
+    },
+    {
+      "path": "hosted96-jam-guest-390-b3c68b.png",
+      "bytes": 79931,
+      "sha256": "9caa43ccb20343423c543df15682ede702863b5fb1d7943c27d2b8ffa79f8d9d"
+    },
+    {
+      "path": "hosted96-art-375-b3c68b.png",
+      "bytes": 66681,
+      "sha256": "639c0639f3fae64b954194ae85594d589b8616b926fe652e37c6bcb8a6c6da77"
+    },
+    {
+      "path": "hosted96-art-390-b3c68b.png",
+      "bytes": 62773,
+      "sha256": "73c885f0e4a9aa400d4c0c5c724904ee1a8d95f6436370d20d5df1635f20da86"
+    },
+    {
+      "path": "hosted96-report-289035.png",
+      "bytes": 9560,
+      "sha256": "25174234dca24ce101322039e00912401219ea93236cd790aa2b8f952e81d890"
+    },
+    {
+      "path": "native407-ci-927-qualification.json",
+      "bytes": 2356,
+      "sha256": "6146720b6be6114acfc5a4c5af44dee13ba3a73400469a2756f1f25937a8a66a"
+    },
+    {
+      "path": "native407-ci-tree-927.json",
+      "bytes": 307,
+      "sha256": "085bbbc8df5a42e4eda08e53bb80f9d3f9e824a5fa768b156e6d16042a665fcd"
+    },
+    {
+      "path": "native407-merge-qualification.json",
+      "bytes": 426,
+      "sha256": "31a459f6e10e8646c4e834442f80c80be283492295a04ce7d54874282ce65aa4"
+    }
+  ],
+  "nativeReviewedHead": "92739df418d00c983cfd54c818e54945ab1aa43e",
+  "nativeMergeSource": "83d2950b5f95baa183c392bb7b5eb2da4a496114"
+}

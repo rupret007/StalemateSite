@@ -18,11 +18,22 @@ once, with zero retries/skips/flakes/report errors. All eleven native proof
 groups and eight session modes passed, including explicit provider-start CI.
 Actual hosted guests proved shared entry badges/chat, no pre-join replay,
 visitor room creation/discovery, once-only delivery, 375/390 reflow and logout.
-The full hosted walkthrough remains incomplete: the script subsequently hit
-the unchanged room-creation limits. Preserve that failure and the original
-test-driver assumptions; do not reset quotas or change identities/networks to
-complete a test sooner. Four native builds passed; physical two-way music,
-current authorized human review and all other unverified62 outcomes remain.
+Initial scripted continuation hit the unchanged room-creation limits; those
+failures and the original driver assumptions remain. After honoring the actual
+allowance, hosted Chromium/WebKit passed protected Jam invitation/delivery,
+outsider denial and reciprocal drawing at375/390. Separate real reload,
+fresh-scrollback and logout/copied-cookie denial checks passed in both engines.
+One benign report was acknowledged and queued; Jeff's human disposition remains.
+A new actual eight-hour observer started October31 at04:08UTC, due12:08:30UTC.
+Keep runtime629/source96, assets, configuration and identity keys unchanged until
+it is terminal. A running observer is not an expiry pass; the October19 failure
+remains. Four native builds passed; physical two-way music, current authorized
+human review and all other unverified62 outcomes remain. Native PR407's
+pre-workspace role/Join guard merged as`83d2950` after all550 tracked modules
+ran once:12,622 passed,60 skipped, zero failures/errors. The reviewed927 head,
+actual CI checkout and merged source have the same tree. Matching private
+packaging was requested in run41168394794; no new installation or physical
+audio has been qualified.
 
 ## Previous work: independent application CI
 

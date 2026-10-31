@@ -1,0 +1,54 @@
+{
+  "source": "96f356a6f2a9af4bbd2834bb94f1e5df81d200dd",
+  "runtime": "6293386f-31b8-4415-bf0b-f81296190a4d",
+  "run": "b3c68b",
+  "startedAt": "2026-10-31T03:50:55.716Z",
+  "checks": [
+    "Ordinary guest creates protected Jam room; outsider join/invite permissions refused",
+    "hosted96-jam-host-375-b3c68b.png: page reflow/input/Send passed",
+    "hosted96-jam-guest-390-b3c68b.png: page reflow/input/Send passed",
+    "Real correlated Share acknowledgement and exact invited-peer fixture delivery; outsider/storage exclude invitation; browser audio remains disabled",
+    "hosted96-art-375-b3c68b.png: page reflow/input/Send passed",
+    "hosted96-art-390-b3c68b.png: page reflow/input/Send passed",
+    "Two independent hosted guests draw through real pointer gestures and each receives the other stroke"
+  ],
+  "pageErrors": 0,
+  "capture": "not exercised",
+  "actualMusic": false,
+  "sameMachine": true,
+  "externalProvidersBlocked": true,
+  "realBandSiteNavigation": false,
+  "engines": {
+    "webkit": "27.2",
+    "chromium": "156.0.8078.4"
+  },
+  "status": "passed",
+  "cleanup": {
+    "rooms": [
+      {
+        "name": "#art-check-b3c68b",
+        "closed": true
+      },
+      {
+        "name": "#jam-check-b3c68b",
+        "closed": true
+      }
+    ],
+    "logouts": [
+      200,
+      200,
+      200
+    ],
+    "copiedCookieAssetDenials": [
+      401,
+      401,
+      401
+    ],
+    "copiedCookieSocketDenials": [
+      401,
+      401,
+      401
+    ]
+  },
+  "completedAt": "2026-10-31T03:51:04.330Z"
+}
