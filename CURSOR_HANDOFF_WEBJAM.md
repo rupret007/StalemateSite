@@ -1,20 +1,32 @@
 # WebJam / Hang Out — Cursor continuation
 
-Resumed October 29, 2026. The October 27 pause checkpoint is retained below
-as history. Read the current [demo checkpoint](hangout-internal/HANGOUT_DEMO_CHECKPOINT.md)
-first: Cursor has since fixed the native health witness, recorded a local
-provider-start run, and moved internal documents from `docs/` to
-`hangout-internal/`. The original P9 runtime and unfinished-review statements
-below describe the earlier checkpoint, not the current source.
+Current application checkpoint: October 31, 2026. Start with the
+[demo checkpoint](hangout-internal/HANGOUT_DEMO_CHECKPOINT.md) and the receipts
+linked below. Older dated sections retain their original evidence and limits;
+their pending-CI and StoryPool-admission statements are historical.
 
 ## Start here
 
-**October31: matching native test packages are built.** Read
+**October31: the ARM app's normal Join was exercised.** Read the
+[native accessibility observation](hangout-internal/HANGOUT_NATIVE_ACCESSIBILITY_20261031.md)
+for the actual screenshot and macOS accessibility snapshot. Source83 correctly
+refused a malformed invitation before opening a workspace. Its accessibility
+tree omitted the visible recovery explanation; application PR408 merged as
+`a62f01f` after all550 test modules ran once (12,626 passed,60 skipped).
+A new package's native accessibility behavior still needs observation.
+The test app is closed and saved settings metadata is unchanged. This was not
+a music/capture test. Windows PR409 integrates the existing application work on
+an isolated branch. Its167 portable cases passed; combined-source full CI and
+the actual eight-case Windows diagnostic remain pending. Portable, native CI
+and physical music evidence remain separate.
+
+**Matching native test packages are built.** Read
 [the current package receipt](hangout-internal/HANGOUT_NATIVE_CANDIDATE_20261031.md).
 Source83d2950 produced successful ARM Mac, Intel Mac, Windows and Linux artifacts;
 signing/public-release jobs were skipped. The ARM download, signature, embedded
-source and production transport lifecycle are verified. Main-window testing is
-resource-deferred, and physical music remains unqualified. The website remains
+source and production transport lifecycle are verified. Earlier GUI resource
+refusals remain in the evidence; admission later succeeded. Physical music
+remains unqualified. The website remains
 on96/runtime629 during the real eight-hour observer; do not redeploy it yet.
 
 **October30 evening: the private demo has now been upgraded.** Read
@@ -34,8 +46,8 @@ cleanly. Real Chromium/WebKit reload and copied-cookie revocation now also pass.
 The native GUI test's string was accepted as a valid legacy hostname; its
 invalid-input assumption was corrected. PR407's incomplete dialog/factory guard
 merged as`83d2950` after all550 tracked modules ran once:12,622 passed and60
-skipped. Matching four-target private packaging was requested in run41168394794;
-the new packages are not yet qualified or installed. Do not call
+skipped. Matching four-target private packaging completed in run41168394794;
+the package receipt records the bounded ARM checks and remaining device work. Do not call
 these package/transport checks two-way audio, or reactivate paused providers.
 One benign report has an actual server acknowledgement; only Jeff's disposition
 remains. A new real eight-hour observer started at04:08UTC on October31, with

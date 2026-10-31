@@ -1,6 +1,6 @@
 # Shared Hang Out / WebJam demo checkpoint
 
-Updated October 30, 2026. Goal active: finish the application for a private Che
+Updated October 31, 2026. Goal active: finish the application for a private Che
 demonstration and website integration. The current private deployment is recorded
 below; historical sections describe their own revisions and earlier limitations.
 
@@ -10,7 +10,13 @@ below; historical sections describe their own revisions and earlier limitations.
 source83d2950 desktop builds passed, with actual artifact identities/digests
 recorded. Signing/public release stayed skipped. ARM archive/source/signature
 checks and the production packaged-transport verifier passed locally. Its normal
-main window has not been opened because the resource guard refused admission.
+ARM main window subsequently opened after resource admission. The actual
+[Join observation](HANGOUT_NATIVE_ACCESSIBILITY_20261031.md) retained a safe
+malformed-invitation refusal and found a missing native accessibility explanation.
+PR408 merged as`a62f01f` after all550 tracked modules ran once (12,626 passed,
+60 skipped). A matching package still needs a new native observation. Windows
+PR409 combines the existing application fixes;167 portable checks passed, while
+its combined-source full CI and eight-case native Windows diagnostic are pending.
 Physical music, human report disposition and natural expiry remain pending.
 
 [October30 release/test receipt](HANGOUT_PRIVATE_DEMO_20261030.md) supersedes
@@ -39,8 +45,8 @@ human review and all other unverified62 outcomes remain. Native PR407's
 pre-workspace role/Join guard merged as`83d2950` after all550 tracked modules
 ran once:12,622 passed,60 skipped, zero failures/errors. The reviewed927 head,
 actual CI checkout and merged source have the same tree. Matching private
-packaging was requested in run41168394794; no new installation or physical
-audio has been qualified.
+packaging completed in run41168394794. The ARM package's bounded static,
+transport and launcher checks are recorded separately from physical audio.
 
 ## Previous work: independent application CI
 

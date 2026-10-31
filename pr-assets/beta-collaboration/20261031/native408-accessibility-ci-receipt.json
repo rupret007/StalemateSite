@@ -1,0 +1,38 @@
+{
+  "PR": 408,
+  "reviewedHead": "f22e1ba8d9b8a959ad3b90417080ec643192db25",
+  "actualCIcheckout": "37e81ec3c43e43c46d75cdce99927ade74bed70c",
+  "reviewedTree": "aabe92fb6a2b23d7bbd91c910e0c06ea8ed4f2ce",
+  "CIcheckoutTree": "aabe92fb6a2b23d7bbd91c910e0c06ea8ed4f2ce",
+  "treesEqual": true,
+  "run": 41175572450,
+  "job": 124462304870,
+  "modulesInvoked": 550,
+  "allTrackedModulesOnce": true,
+  "totals": {
+    "passed": 12626,
+    "skipped": 60
+  },
+  "newQtAccessibilityProfilesPassed": [
+    "art",
+    "music",
+    "podcast_voice",
+    "review_rehearsal"
+  ],
+  "all14ApplicableChecksPassed": true,
+  "localQtRuntime": false,
+  "frozenMacOSAXGreen": false,
+  "actualMusic": false,
+  "qualifiedAt": "2026-10-31T06:37:54.982400+00:00",
+  "merged": true,
+  "merge": "a62f01f40fc5fb71c2b901ad433dc73ed85c8593",
+  "mergeTree": "aabe92fb6a2b23d7bbd91c910e0c06ea8ed4f2ce",
+  "PRurl": "https://github.com/rupret007/webjam/pull/408",
+  "CIurl": "https://github.com/rupret007/webjam/actions/runs/41175572450/job/124462304870",
+  "rawLog": {
+    "job": 124462304870,
+    "bytes": 2465863,
+    "sha256": "32eef041dba91ca751e71d04d89b070394c06c3ea83afc7a1df8cabe9c76fc56"
+  },
+  "limits": "Qt CI is not a fixed frozen macOS AX observation, VoiceOver qualification or actual music."
+}

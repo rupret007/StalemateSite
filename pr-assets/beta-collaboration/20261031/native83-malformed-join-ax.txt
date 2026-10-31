@@ -1,0 +1,16 @@
+Window: "WebJam", App: WebJam.
+0 dialog WebJam, Secondary Actions: Raise
+	1 text Description: WebJam symbol: one continuous three-loop trefoil., Value: WebJam WebJam Join Music. How to join Join status, ID: WebJamApplication.LaunchDialog.LaunchBrandMark
+	2 secure text field (settable) Paste the invite, Description: Paste the invite or the whole message., Value: •••••••••••••••••, ID: WebJamApplication.LaunchDialog._LaunchPages.QWidget.LaunchInviteInput, Secondary Actions: Raise
+	3 text Value: Invitation privacy Join error, ID: WebJamApplication.LaunchDialog._LaunchPages.QWidget.LaunchPrivacyNote
+	4 button Join, Description: Paste the invite you were sent., ID: WebJamApplication.LaunchDialog._LaunchPages.QWidget.LaunchPrimary, Secondary Actions: Raise
+	5 button Back, Description: Return to Host and Join without using the pasted invite., ID: WebJamApplication.LaunchDialog._LaunchPages.QWidget.GhostButton, Secondary Actions: Raise
+	6 close button
+	7 zoom button
+	8 text WebJam
+9 menu bar
+	10 WebJam
+	11 File
+	12 Help
+
+The focused UI element is 2 secure text field (settable) Paste the invite, Description: Paste the invite or the whole message., Value: •••••••••••••••••, ID: WebJamApplication.LaunchDialog._LaunchPages.QWidget.LaunchInviteInput, Secondary Actions: Raise
