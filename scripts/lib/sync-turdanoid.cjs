@@ -60,6 +60,8 @@ function transform(stage) {
     const overlaySource = path.join(ROOT, 'scripts/stalemate-overlay');
     fs.cpSync(overlaySource, path.join(stage, 'stalemate'), { recursive: true });
     fs.copyFileSync(path.join(ROOT, 'scripts/play-track.js'), path.join(stage, 'stalemate/play-track.js'));
+    fs.copyFileSync(path.join(ROOT, 'scripts/play-music-pref.js'), path.join(stage, 'stalemate/play-music-pref.js'));
+    fs.copyFileSync(path.join(ROOT, 'scripts/play-music-pref.css'), path.join(stage, 'stalemate/play-music-pref.css'));
     fs.copyFileSync(path.join(ROOT, 'scripts/stalemate-strip.css'), path.join(stage, 'stalemate-strip.css'));
     // suite-music.js resolves assets/stalemate/. Keep the legacy copies for /qr/ audio links.
     fs.mkdirSync(path.join(stage, 'assets/stalemate'), { recursive: true });
@@ -108,8 +110,9 @@ function transform(stage) {
                 .replace(/\n[ \t]*\.changelog \{[^}]*\}/gi, '');
             if (/changelog/i.test(html)) throw new Error('Hub changelog strip failed');
             html = insert(html, '</head>', '<link rel="stylesheet" href="stalemate-strip.css">', filename);
-            html = html.replace(/<body\b[^>]*>/i, '$&\n<nav class="stalemate-strip" aria-label="Stalemate"><a href="../" class="sm-home"><img src="../assets/mark.svg" alt="" width="22" height="22">Stalemate Arcade</a><a href="https://www.youtube.com/@stalemate.punkband" class="sm-listen" rel="noopener">Listen to Stalemate</a></nav>');
+            html = html.replace(/<body\b[^>]*>/i, '$&\n<nav class="stalemate-strip" aria-label="Stalemate"><a href="../" class="sm-home"><img src="../assets/mark.svg" alt="" width="22" height="22">Stalemate Arcade</a><a href="../#contact" class="sm-contact">Contact</a><button type="button" class="stalemate-music-toggle" data-music-toggle aria-label="Site music on or off">Music on</button><button type="button" class="sm-listen" data-site-play="manic" data-site-play-label="Listen to Manic" aria-label="Play Manic here">Listen to Manic</button></nav>');
         }
+        html = insert(html, '</head>', '<link rel="stylesheet" href="stalemate/play-music-pref.css">\n<script src="../js/music-preference.js"></script>', filename);
         if (filename === 'TurdAnoid.html') {
             html = insert(html, '</head>', '<link rel="stylesheet" href="stalemate/stalemate-overlay.css">', filename);
             html = insert(html, '</body>', '<script src="../countdown.js"></script>\n<script src="stalemate/stalemate-overlay.js"></script>', filename);
@@ -124,7 +127,10 @@ function transform(stage) {
                 '<meta name="twitter:card" content="summary_large_image">'
             ].join('\n'), filename);
         }
-        html = insert(html, '</body>', '<script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>\n<script src="../js/track.js" defer></script>\n<script src="stalemate/play-track.js" defer></script>', filename);
+        const bodyScripts = '<script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>\n<script src="../js/track.js" defer></script>\n<script src="stalemate/play-track.js" defer></script>\n<script src="stalemate/play-music-pref.js" defer></script>';
+        html = insert(html, '</body>', filename === 'index.html'
+            ? '<script src="../site-base.js" defer></script>\n<script src="../js/site-player.js" defer></script>\n' + bodyScripts
+            : bodyScripts, filename);
         fs.writeFileSync(path.join(stage, filename), html);
     }
 }
