@@ -7,6 +7,15 @@ their pending-CI and StoryPool-admission statements are historical.
 
 ## Start here
 
+**Latest source, packages and expiry observations:** read the
+[October 31 continuation](hangout-internal/HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md)
+and its sanitized receipt before older pending/running statements. Native PR410
+and website PR178 are merged; the four matching private-beta packages built
+successfully. The real eight-hour observer is terminal FAILED because its lobby
+predicate expected `offline` instead of the app's `ended` state. The separate
+diagnosis retains actual socket/HTTP/cleanup observations and ending deployment
+identity without relabeling that failed run. Physical music remains unqualified.
+
 **The focused 400% composer fix is demonstrated.** Read the
 [before/after evidence](hangout-internal/HANGOUT_NATIVE_BROWSER_ZOOM_20261031.md).
 Source `80a1a5d` passed 1,869 units and 438 browser cases; both new retained-copy
@@ -18,17 +27,19 @@ This is local/CI proof; hosted deployment and physical music are separate.
 
 **Native PR410 merged as`bf24e7d`.** Its source-identical full CI ran all555
 modules once:12,796 passed,60 skipped; all16 applicable checks passed. One
-matching private-beta package run is active:
+matching private-beta package run completed successfully:
 [41193954131](https://github.com/rupret007/webjam/actions/runs/41193954131),
 branch`codex/private-web-join-test-bf24e7d-20261031`. Do not dispatch another.
-Package manifest/installation and physical music remain separate proof; provider
+All four builders verified their actual bundled private target. The ARM archive
+download passed its published digest and ZIP integrity; local mounted-package,
+installation and physical music remain separate proof. Provider
 and release holds are unchanged. The bb40 package below remains the previous
 qualified cohort, not a private-beta profile artifact.
 
 [Browser music destination and prerequisites](hangout-internal/HANGOUT_WEB_JOIN_READINESS_20261031.md):
-WebJam PR410 adds build-bound protected-community invitations; head7faf4ed is
-under current-source CI after190 focused local passes, with no new
-package/provider/music pass. The read-only
+WebJam PR410 adds build-bound protected-community invitations. Its complete CI
+and matching four-platform private builds passed; new local frozen GUI and
+physical music proof remain. The read-only
 issuer inventory lacks the separate browser bindings. The normal frozen app's
 LAN route is not automatically selectable. Preserve provider/release holds and
 use the ordered qualification plan before physical music. The existing bb40

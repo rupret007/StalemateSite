@@ -10,7 +10,8 @@ StoryPool checkouts, services, configuration, locks and operational files.
 | Component | Actual observation | Limit |
 | --- | --- | --- |
 | Qualified native package cohort | `bb40fac7fcaa032c2f19cf9af8c49ac4276d3cf1`, run41181580413; all four desktop builds passed | Actual ARM archive/transport/Join accessibility proof is separate from physical music; see the [package receipt](HANGOUT_NATIVE_PACKAGE_BB40_20261031.md) |
-| New application routing candidate | [WebJam PR410](https://github.com/rupret007/webjam/pull/410), current pushed head `7faf4edd6943eb87cb98b0381e25cb37f8c063e5`, tree `1c04fb436337987cca75054be54d3695db0db194` | Current-head full CI, merge and a matching private-beta package remain to qualify; bb40 packages do not contain this feature |
+| New application routing source | [WebJam PR410](https://github.com/rupret007/webjam/pull/410), merged `bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35`, tree `1c04fb436337987cca75054be54d3695db0db194`; all 555 modules ran once, 12,796 passed and 60 skipped | Source/CI proof is separate from real music |
+| Matching private-beta builds | [Run 41193954131](https://github.com/rupret007/webjam/actions/runs/41193954131), all four desktop builders and target verification steps succeeded; ARM archive digest/ZIP integrity passed | New local mounted-package/GUI/installation and physical music remain unqualified; see the [dated receipt](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md) |
 | Private community | Source `96f356a6f2a9af4bbd2834bb94f1e5df81d200dd`, runtime `6293386f-31b8-4415-bf0b-f81296190a4d` | Hosted chat/drawing proof does not qualify hosted Web Join or audio |
 | TURN issuer | Normal read-only deployment/version queries at 08:50–08:51 UTC observed version `e7cda1bb-be95-4824-a363-924ff6f2948b`, created October16 | No credentials were read or minted; deployment/configuration remained unchanged |
 
@@ -37,7 +38,9 @@ packaging; it does not raise that limit or remove an assertion. Its
 then failed the old exact release-condition assertion. Head7faf4ed updates both
 existing installer/Mac release contracts to require every earlier condition
 plus the new private-target exclusion. Require its own complete current-head
-CI; neither failed event qualifies the final source.
+CI; neither failed event qualifies the final source. Its subsequent full CI
+passed and merged; the [current evidence](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md)
+records that result separately from these preserved failures.
 
 At10:13–10:14 UTC fresh guards admitted seven focused modules in separate
 interpreters. Their tested inputs match the committed candidate: **190 passed**
@@ -70,15 +73,18 @@ putting both devices on Wi-Fi does not bypass that issuer requirement.
 
 ## Ordered work before real browser music
 
-1. Qualify PR410's current source, CI and normal merge. Then admit one matching
-   four-target private-beta package run. Verify actual bundled target/source,
+1. PR410's source, full CI, normal merge and one matching four-target private
+   package run are qualified as described above. Do not rebuild unchanged.
+   Continue local package/GUI verification of actual bundled target/source,
    archive hashes, existing platform trust and normal app behavior; retain
    failures. Do not relabel an old public-target package as the new candidate.
-2. Keep the current private website source, assets, settings and keys frozen
-   until the original eight-hour observer is terminal. Its natural expiry is
-   12:08:30.618 UTC / 07:08 CDT. At10:04 UTC it was still running, with zero page
-   errors; that is not a pass. Require the ending deployment identity and
-   actual expiry/replay/socket/cleanup results. Preserve reconnect budgets.
+2. The original eight-hour observer is terminal FAILED with a confirmed
+   `offline`/`ended` predicate mismatch. The [dated observation](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md)
+   retains actual 4401 socket closes within the original 90-second deadline,
+   HTTP/token denial, cleanup and unchanged post-expiry deployment identity.
+   Preserve the original failure and reconnect budgets; no corrected observer
+   run or provider/music result is claimed. Website PR178 is merged but its
+   separate private application deployment remains to qualify.
 3. Review the actual protected page and exact browser Origin with the matching
    issuer source. The read-only issuer inventory had desktop key bindings but
    no `WEB_TURN_KEY_ID`, `WEB_TURN_KEY_API_TOKEN` or `CORS_ALLOWED_ORIGINS` binding.

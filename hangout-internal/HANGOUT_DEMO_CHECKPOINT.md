@@ -6,10 +6,18 @@ below; historical sections describe their own revisions and earlier limitations.
 
 ## Current private release and demonstrated guests
 
+Start with the [latest dated application evidence](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md).
+PR410 is merged and its four matching private-beta builds succeeded. Website
+PR178 is merged after current-head CI and actual native 400%/200% verification;
+its fix is not yet deployed. The eight-hour observer is terminal FAILED with a
+confirmed `offline`/`ended` predicate mismatch. Its original failure, actual
+expiry observations and unchanged ending deployment identity are separate
+evidence. The earlier pending/running descriptions below are historical.
+
 [Browser music destination and prerequisites](HANGOUT_WEB_JOIN_READINESS_20261031.md):
-WebJam PR410 adds build-bound protected-community invitations; head7faf4ed is
-under current-source CI after190 focused local passes, with no new
-package/provider/music pass. The read-only
+WebJam PR410 adds build-bound protected-community invitations. Current-source
+CI, merge and all four matching private builds passed; new local frozen GUI and
+physical music remain to qualify. The read-only
 issuer inventory lacks the separate browser bindings. The normal frozen app's
 LAN route is not automatically selectable. Preserve provider/release holds and
 use the ordered qualification plan before physical music. The existing bb40
