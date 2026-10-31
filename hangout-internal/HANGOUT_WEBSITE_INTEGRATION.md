@@ -90,6 +90,14 @@ change Worker origins or release a provider/public-launch hold. For approved
 badge/return snippets, use the extracted builder as described below. Leave the
 example disabled until the operator has reviewed the domain and scopes.
 
+The existing application CI also builds this packet after its tests pass and
+attaches `community-entry-toolkit-<run-id>-<attempt>` to that workflow run. Its
+public manifest is printed in the build log. Check the actual commit and hashes
+before using a downloaded packet; a PR merge checkout can have a different SHA
+from the branch head. These CI artifacts expire after seven days; the committed
+command above reproduces the packet later. The artifact is entry tooling for
+the invitation-only beta, not a public-site deployment or music qualification.
+
 ## Prepare entrance links
 
 The release owner selects one approved canonical community address and one
