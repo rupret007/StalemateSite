@@ -13,15 +13,17 @@ const discovery = readFileSync(new URL('../../r/45662413410ed051/lobby/discovery
 const windows = [];
 afterEach(() => { for (const dom of windows.splice(0)) { dom.window.close(); expect(dom.clientErrors || []).toEqual([]); } });
 
-async function visitor({ via = 'rad-dad', verified = false, stored = {}, returning = false, features = { entrySources: 1, roomKeep: 1 }, storageFailure = '' } = {}) {
+async function visitor({ via = 'rad-dad', verified = false, stored = {}, returning = false, features = { entrySources: 1, roomKeep: 1 }, storageFailure = '', sharing = false } = {}) {
     // jsdom cannot navigate. Its expected navigation diagnostic is suppressed;
     // the actual click handler still runs and writes the real tab storage.
     const errors = [], console = new VirtualConsole();
     console.on('jsdomError', error => { if (!/Not implemented: navigation/.test(error.message)) errors.push(error.message); });
-    const dom = new JSDOM(html, { url: `http://127.0.0.1:4320/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=ws%3A%2F%2F127.0.0.1%3A4320%2Frelay&via=${via}${returning ? '&owner=1&entry-return=1' : ''}`, runScripts: 'outside-only', virtualConsole: console });
+    const dom = new JSDOM(sharing ? html.replace('<head>', '<head><script src="/beta/bootstrap.js"></script>') : html, { url: `http://127.0.0.1:4320/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=ws%3A%2F%2F127.0.0.1%3A4320%2Frelay&via=${via}${returning ? '&owner=1&entry-return=1' : ''}`, runScripts: 'outside-only', virtualConsole: console });
     dom.clientErrors = errors;
     windows.push(dom);
     const { window } = dom, sockets = [];
+    window.HangoutParticipationControls = sharing;
+    window.fetch = vi.fn(async () => Response.json({ ok: true, state: 'unknown', available: false, purposes: [], revision: 0, canStop: false }));
     for (const [key, value] of Object.entries(stored)) window.sessionStorage.setItem(key, value);
     if (storageFailure) {
         const original = window.Storage.prototype[storageFailure];
@@ -96,8 +98,8 @@ describe('verify email to keep the intended room', () => {
 
 describe('live verified co-host controls in an open host palette', () => {
     const ref = 'a'.repeat(32), account = 'account-offline-friend';
-    async function owner(cohosts) {
-        const value = await visitor({ verified: true, features: { entrySources: 1, roomKeep: 1, personTargets: 1 } });
+    async function owner(cohosts, sharing = false) {
+        const value = await visitor({ verified: true, features: { entrySources: 1, roomKeep: 1, personTargets: 1 }, sharing });
         value.window.confirm = vi.fn(() => true);
         value.join('#keep-me', { persistent: true, names: [{ id: 'viewer', nick: 'Viewer', prefix: '@', owner: true }] });
         if (cohosts) value.ws.receive({ t: 'ownership', ch: '#keep-me', cohosts });
@@ -142,7 +144,7 @@ describe('live verified co-host controls in an open host palette', () => {
 
     it.each(['room-switch', 'instance-change', 'same-name-rejoin', 'owner-lost', 'disconnect', 'sharing-stopped'])(
         'retires open host controls after %s and never revives them on a later ownership frame', async boundary => {
-            const { window, ws, join, palette, buttons } = await owner([{ id: account, label: 'OfflineFriend' }]);
+            const { window, ws, join, palette, buttons } = await owner([{ id: account, label: 'OfflineFriend' }], boundary === 'sharing-stopped');
             const removal = buttons().find(button => button.textContent === 'Remove verified co-host: OfflineFriend');
             expect(removal).toBeDefined();
             if (boundary === 'room-switch') join('#another-room');

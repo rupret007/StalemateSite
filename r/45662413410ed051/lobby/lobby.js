@@ -61,6 +61,8 @@ import { createEntrySharing } from './entry-sharing.mjs';
     const slug = () => `${pick(WORDS)}-${pick(THINGS)}`.replace(/[^a-z0-9-]/g, '');
 
     const app = window.__lobby = { ws: null, me: '', role: 'fan', band: false, chans: new Map(), pms: new Map(), active: '#stalemate', rooms: [], ignores: new Set(), peerIgnores: new Set(), selfId: '', pending: null, confirmedGathering: null, approvedCreation: null };
+    let hostPaletteContext = null;
+    const cohostButtons = new Map();
     // Same words as REPORT_QUEUED_LABEL in the lobby engine. This page does not
     // import that engine. A queued flag is not proof a moderator is reading it.
     const REPORT_QUEUED_LABEL = 'Queued for review when a moderator is available';
@@ -290,6 +292,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         if ($('[data-cam-gate]').open) $('[data-cam-gate]').close();
         $('[data-adult]').checked = false;
         drawMessageRecovery();
+        syncHostPalette();
     }
     function leaveSharingChat() {
         if (sessionEnded || !app.ws) return;
@@ -549,6 +552,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             $('[data-channel-error]').textContent = 'Connection lost. Reconnect and try this channel again.';
         }
         drawCommunity(); drawRooms(); drawMessageRecovery();
+        syncHostPalette();
     }
     let cancelTransportAck = () => {};
     async function connect(nick) {
@@ -795,7 +799,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         case 'report-status': if (m.submitted === true) finishReport(m.id, true); break;
         case 'message-result': messageResult(m); break;
         case 'jam-share-result': jamShareResult(m); break;
-        case 'ownership': { const c = store(m.ch); if (c) c.cohosts = m.cohosts; break; }
+        case 'ownership': { const c = app.chans.get(m.ch); if (c) { c.cohosts = m.cohosts; syncHostPalette(); } break; }
         case 'owner-offer': toast(`${m.by} offered you ownership of ${m.ch}`, [['Accept ownership', () => { if (confirm(`Accept ownership of ${m.ch}?`)) cmd('acceptowner', [], m.ch); }]]); break;
         case 'sharing-stopped':
             sharingConfirmation++; sharingCleanup = 'confirmed';
@@ -1304,6 +1308,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
                 else target.focus({ preventScroll: true });
             }
         }
+        syncHostPalette();
     }
 
     function drawRooms() {
@@ -1654,11 +1659,59 @@ import { createEntrySharing } from './entry-sharing.mjs';
         }
         return text.split(' ');
     }
+    function currentHostPalette(context) {
+        const current = context && app.chans.get(context.channel);
+        return context && context === hostPaletteContext && $('[data-palette]').open && connectionState === 'connected' && !app.sharingStopped && !app.localMediaPaused
+            && app.active === context.channel && current === context.room && roomNonce(context.instance) && current.keepRef === context.instance
+            && amOp(current) && !!current.names?.find(person => person.nick === app.me)?.owner === context.owner;
+    }
+    function syncHostPalette() {
+        const palette = $('[data-palette]'), context = hostPaletteContext;
+        if (!context || !palette.open) return;
+        if (!currentHostPalette(context)) {
+            const focused = palette.contains(document.activeElement);
+            hostPaletteContext = null; cohostButtons.clear(); palette.close();
+            $('[data-palette-status]').textContent = '';
+            if (focused && !sessionEnded) $(app.localMediaPaused || app.sharingStopped ? '[data-sharing-region]' : '[data-text]').focus({ preventScroll: true });
+            return;
+        }
+        if (!context.owner) return;
+        const status = $('[data-palette-status]');
+        const hosts = new Map((Array.isArray(context.room.cohosts) ? context.room.cohosts : []).map(host => [host.id, host]));
+        let changed = false, removedFocus = false;
+        for (const [id, button] of cohostButtons) if (!hosts.has(id)) {
+            removedFocus ||= document.activeElement === button;
+            button.remove(); cohostButtons.delete(id); changed = true;
+        }
+        for (const [id, host] of hosts) {
+            let button = cohostButtons.get(id);
+            if (!button) {
+                button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn--small';
+                button.addEventListener('click', () => {
+                    const target = context.room.cohosts?.find(person => person.id === id);
+                    if (!button.isConnected || !personTargetsSupported || !currentHostPalette(context) || !target) return;
+                    if (!confirm(`Remove ${target.label} as a verified co-host?`)) return;
+                    if (!personTargetsSupported || !currentHostPalette(context) || !context.room.cohosts?.some(person => person.id === id)) return;
+                    if (send({ t: 'cmd', name: 'cohost', args: ['remove', id], ch: context.channel, roomInstance: context.instance, cohostAccount: true })) palette.close();
+                    else toast('Co-host removal was not sent. Reconnect before trying again.');
+                });
+                cohostButtons.set(id, button); $('[data-palette-buttons]').append(button); changed = true;
+            }
+            const label = `Remove verified co-host: ${host.label}`;
+            if (button.textContent !== label) { button.textContent = label; changed = true; }
+            button.disabled = !personTargetsSupported;
+        }
+        status.textContent = !Array.isArray(context.room.cohosts) ? 'Checking verified co-hosts…'
+            : changed || status.textContent === 'Checking verified co-hosts…' ? 'Verified co-host list updated.' : status.textContent;
+        if (removedFocus) $('[data-palette-close]').focus({ preventScroll: true });
+    }
     function openPalette(ops) {
         const box = $('[data-palette-buttons]');
         const current = store(app.active);
         const origin = { channel: app.active, instance: current?.keepRef };
         const owner = current?.names?.find((n) => n.nick === app.me)?.owner;
+        const context = ops ? { ...origin, room: current, owner: !!owner } : null;
+        hostPaletteContext = context; cohostButtons.clear(); $('[data-palette-status]').textContent = '';
         box.replaceChildren();
         for (const [label, name, ask, fixed] of (ops ? OP_PALETTE : PALETTE)) {
             if (name === 'register' && current?.persistent) continue;
@@ -1667,8 +1720,8 @@ import { createEntrySharing } from './entry-sharing.mjs';
             if (store(app.active)?.kind === 'chat' && name === 'mode' && ['+C', '-C'].includes(fixed?.[0])) continue;
             const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--small'; b.textContent = label;
             b.addEventListener('click', () => {
+                if (ops && !currentHostPalette(context)) return toast('That room or your host access changed. Choose current Host tools before trying again.');
                 $('[data-palette]').close();
-                if (ops && (!roomNonce(origin.instance) || app.chans.get(origin.channel)?.keepRef !== origin.instance)) return toast('That room changed. Choose current Host tools before trying again.');
                 const channel = ops ? origin.channel : app.active, instance = ops ? origin.instance : undefined;
                 if (name === 'invite-guest') return openInviteDialog();
                 if (['deop', 'unregister', 'transfer', 'close'].includes(name) && !confirm(current?.persistent && ['close', 'unregister'].includes(name) ? `Permanently delete ${app.active} and release its registered name?` : `${label} in ${app.active}?`)) return;
@@ -1681,21 +1734,16 @@ import { createEntrySharing } from './entry-sharing.mjs';
             });
             box.append(b);
         }
-        if (ops && owner) for (const host of current.cohosts || []) {
-            const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--small'; b.textContent = `Remove verified co-host: ${host.label}`;
-            b.disabled = !personTargetsSupported || !roomNonce(origin.instance);
-            b.addEventListener('click', () => {
-                if (!confirm(`Remove ${host.label} as a verified co-host?`)) return;
-                if (!personTargetsSupported || !roomNonce(origin.instance) || app.chans.get(origin.channel)?.keepRef !== origin.instance) return toast('That room changed. Choose current Host tools before trying again.');
-                if (send({ t: 'cmd', name: 'cohost', args: ['remove', host.id], ch: origin.channel, roomInstance: origin.instance, cohostAccount: true })) $('[data-palette]').close();
-                else toast('Co-host removal was not sent. Reconnect before trying again.');
-            }); box.append(b);
-        }
         $('[data-palette]').showModal();
+        syncHostPalette();
     }
     $('[data-palette-open]').addEventListener('click', () => openPalette(false));
     $('[data-roomtools]').addEventListener('click', () => openPalette(true));
     $('[data-palette-close]').addEventListener('click', () => $('[data-palette]').close());
+    $('[data-palette]').addEventListener('close', event => {
+        if (event.currentTarget.open) return;
+        hostPaletteContext = null; cohostButtons.clear(); $('[data-palette-status]').textContent = '';
+    });
 
     let inviteInstance = '', invitePeople = new Map();
     function closeInviteDialog() {

@@ -1,0 +1,41 @@
+{
+  "recordedAt": "2026-10-31T19:55:58.054731+00:00",
+  "status": "ORIGINAL_CI_TIMEOUT_AND_DETERMINISTIC_LOCAL_FAILURE_RETAINED; FIX_VERIFICATION_PENDING",
+  "originalCi": {
+    "repository": "rupret007/StalemateSite",
+    "source": "e3bed05970ff8db670f3972c1429a80757ef616f",
+    "run": 41230986018,
+    "job": 124624968129,
+    "artifact": 13053883053,
+    "artifactDigest": "sha256:9baf982d1b82a1478ac5ade524d100b341ad78376b571f7fd4516a3f8bd211d1",
+    "case": "one fixture-verified account keeps ownership across entries and revokes an offline cross-entry co-host",
+    "result": "Original30second timeout; context disposal error during teardown. Retry passed; push437PASS1flaky. Separate PR run438PASS0retry.",
+    "screenshot": "owner-tools-original-timeout-390.png",
+    "screenshotSha256": "18dc9e0c46b6c53b72146709a3fc1456d0b6943c79dec6684edeb9d3b31b4ecc",
+    "observation": "Original390px Host tools menu lacks the named saved co-host removal button. Retained trace is retry1 only; it does not prove the original execution timeline."
+  },
+  "localBaseline": {
+    "testOnlyCommit": "b9b6c6874262965f69666e8cde9d2a7479717f39",
+    "applicationBaseline": "e032fe32044475e94fb42d82ce2866063b5b3910",
+    "clientSha256": "7cba8e30c0813136467f419715547c6449bd648983d7dc69175f6828cbe6484a",
+    "testFile": "tests/unit/hangout-keep-signin.test.js",
+    "testFileSha256": "1286875450f6d7ce0fa4a2339d74b774eab08196fe2104b610861490e6bbc43c",
+    "executed": 36,
+    "passed": 28,
+    "failed": 8,
+    "exitCode": 1,
+    "timedOut": false,
+    "resourceAdmitted": true,
+    "logSha256": {
+      "stdout": "a6ead9e33bc52dee6f3af50be281e7e0ded30d36bbf182f60aa3d808e0b66cbf",
+      "stderr": "e88b60ddac386a3f62298cbe52367da8a24cca04e8b84031e92cf4c44226de12"
+    },
+    "scope": "Actual jsdom client and fixture WebSocket frames; deterministic delayed metadata and retired menu boundaries, not a real account/email/provider/music trial.",
+    "qualifiedClientFailures": 7,
+    "initialFixtureCorrection": "The sharing-stopped variant lacked the enabled private-shell sharing-controls fixture. Its original failure is retained but is not counted as demonstrated Stop behavior. Corrected fixture adds the shell marker and feature flag before fixed verification."
+  },
+  "fixScope": "Live keyed co-host rows, focus preservation and menu retirement at room/authority/connection/Stop boundaries; exact account+room-instance command remains server-authorized.",
+  "runtimeDeploymentChanged": false,
+  "providerActivationChanged": false,
+  "all62RequirementsSha256": "3d5db107977f652a1bd51286c02657aaff70c9c3590adb876e03f6d909679999"
+}
