@@ -7,11 +7,14 @@ their pending-CI and StoryPool-admission statements are historical.
 
 ## Start here
 
-**Native browser zoom found a real400% clipping defect.** Read the
-[before evidence and focused candidate](hangout-internal/HANGOUT_NATIVE_BROWSER_ZOOM_20261031.md).
-With an unsent copy retained, keyboard Send worked but the composer was partly
-hidden. The short-height scroll fix and two recovery regressions need current CI
-and a separate native400 after check; preserve the original failure.
+**The focused 400% composer fix is demonstrated.** Read the
+[before/after evidence](hangout-internal/HANGOUT_NATIVE_BROWSER_ZOOM_20261031.md).
+Source `80a1a5d` passed 1,869 units and 438 browser cases; both new retained-copy
+checks also passed locally. A separate native Chrome Guest journey confirmed
+the full input and Send remain visible at actual 400% and 200% zoom, with a
+saved copy retained and a normal message submitted through Tab/Space. The
+original native failure and both intermediate CI failures remain recorded.
+This is local/CI proof; hosted deployment and physical music are separate.
 
 **Native PR410 merged as`bf24e7d`.** Its source-identical full CI ran all555
 modules once:12,796 passed,60 skipped; all16 applicable checks passed. One
