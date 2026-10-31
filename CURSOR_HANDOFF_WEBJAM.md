@@ -7,6 +7,14 @@ their pending-CI and StoryPool-admission statements are historical.
 
 ## Start here
 
+[Browser music destination and prerequisites](hangout-internal/HANGOUT_WEB_JOIN_READINESS_20261031.md):
+WebJam PR410 adds build-bound protected-community invitations; head6241b47 is
+under current-source CI, with no new package/provider/music pass. The read-only
+issuer inventory lacks the separate browser bindings. The normal frozen app's
+LAN route is not automatically selectable. Preserve provider/release holds and
+use the ordered qualification plan before physical music. The existing bb40
+package and website observations below remain their own evidence.
+
 **Current ARM package and native accessibility now pass.** Read the
 [bb40 package/GUI receipt](hangout-internal/HANGOUT_NATIVE_PACKAGE_BB40_20261031.md)
 and its actual screenshot/native snapshots. Archive/source/signature/architecture

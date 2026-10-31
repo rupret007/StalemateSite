@@ -42,16 +42,18 @@ Browser Web Join is a separate opt-in host capability whose issuer, exact
 origin, enrollment and network readiness must be qualified. Do not silently
 present either blocked path as working support.
 
-Start physical qualification with the documented same-network desktop path when
-the actual machines share a LAN. That is a separate invitation/transport path
-from frozen Windows remote Music; it neither proves remote support nor requires
-weakening that package's signature check. Version2 private peer invitations
-restrict their host to RFC1918 addresses. A Tailscale administration connection
-does not make a100.x address eligible for that private control plane. Keep the
-host-generated invitation intact and identify its actual version/route. If the
-normal invitation or network is ineligible, record the gap and use an approved
-remote path when its prerequisites are qualified. Do not rewrite the invitation
-or treat a different protocol's success as remote Music evidence.
+Choose a music route that the actual frozen build offers. The sourcebb40 audit
+found that the normal packaged host with its sidecar selects `direct-stun`;
+it does not expose an ordinary packaged version2 LAN selector. Do not assume the
+documented same-network protocol is selectable, remove the sidecar or source-run
+the test to manufacture that route. Version2 private peer invitations restrict
+their host to RFC1918 addresses; a Tailscale100.x administration connection is
+not eligible. Keep the host-generated invitation intact and identify its actual
+version/route. If that route is ineligible, retain the gap until an approved path
+is qualified. The [browser destination and issuer readiness assessment](HANGOUT_WEB_JOIN_READINESS_20261031.md)
+records PR410 and the held provider prerequisites. Same Wi-Fi does not waive
+browser-scoped issuance, and a different protocol's success does not qualify
+frozen Windows remote Music.
 
 ## Demonstrate the complete music journey
 
