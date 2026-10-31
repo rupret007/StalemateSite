@@ -50,7 +50,8 @@ async function assertAdvancing(page) {
 
 test('homepage and hub expose nine playable same-origin games', async ({ page, baseURL }) => {
     await page.goto(baseURL);
-    await expect(page.locator('.booking-contact a')).toHaveAttribute('href', 'mailto:stalemate.punk@gmail.com');
+    await expect(page.locator('.booking-contact a')).toHaveAttribute('href', '#contact');
+    await expect(page.locator('#contact')).toHaveCount(1);
     await expect(page.locator('#games a[href="play/"]')).toBeVisible();
     await page.goto(target(baseURL, 'play/'));
     const links = page.locator('.game-card');
