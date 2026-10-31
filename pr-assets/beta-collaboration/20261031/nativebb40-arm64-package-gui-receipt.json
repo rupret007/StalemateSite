@@ -84,5 +84,76 @@
     "cameraMicrophoneOrProviderStarted": false,
     "publicRelease": false,
     "aiOrTurnActivated": false
+  },
+  "desktopCohort": {
+    "jobsObservedAt": "2026-10-31T08:31:37.277303+00:00",
+    "artifactsObservedAt": "2026-10-31T08:32:56.515874+00:00",
+    "completedJobs": 22,
+    "successfulJobs": 16,
+    "skippedJobs": 6,
+    "otherResults": 0,
+    "desktopJobs": [
+      {
+        "id": 124484800018,
+        "name": "Build Desktop (linux-x64)",
+        "conclusion": "success",
+        "completedAt": "2026-10-31T08:11:03Z"
+      },
+      {
+        "id": 124484800032,
+        "name": "Build Desktop (windows-x64)",
+        "conclusion": "success",
+        "completedAt": "2026-10-31T08:18:51Z"
+      },
+      {
+        "id": 124484800036,
+        "name": "Build Desktop (macos-arm64)",
+        "conclusion": "success",
+        "completedAt": "2026-10-31T08:16:02Z"
+      },
+      {
+        "id": 124484800049,
+        "name": "Build Desktop (macos-x64)",
+        "conclusion": "success",
+        "completedAt": "2026-10-31T08:31:05Z"
+      }
+    ],
+    "artifacts": [
+      {
+        "id": 13036762004,
+        "name": "webjam-macos-x64",
+        "bytes": 471460999,
+        "digest": "sha256:bf7c7b93b20033e2f14c402046795c0152a547778e1b7985307964defeb11a76",
+        "head": "bb40fac7fcaa032c2f19cf9af8c49ac4276d3cf1",
+        "expired": false
+      },
+      {
+        "id": 13036610720,
+        "name": "webjam-windows-x64",
+        "bytes": 610884199,
+        "digest": "sha256:df7bd38b1fb869ce557d288b28d009dd83755a9c20c486c1455df8374bb31dfb",
+        "head": "bb40fac7fcaa032c2f19cf9af8c49ac4276d3cf1",
+        "expired": false
+      },
+      {
+        "id": 13035758533,
+        "name": "webjam-linux-x64",
+        "bytes": 457714132,
+        "digest": "sha256:308b7df2dccb1533e31c11ca2d177bb0ba28d957dbba924d40833f736e0e5df5",
+        "head": "bb40fac7fcaa032c2f19cf9af8c49ac4276d3cf1",
+        "expired": false
+      },
+      {
+        "id": 13035694388,
+        "name": "webjam-macos-arm64",
+        "bytes": 456511553,
+        "digest": "sha256:f0946862d1bb40b1c88b31d7143e2031dfdc250fc03688c0f5bbdde5a5699e35",
+        "head": "bb40fac7fcaa032c2f19cf9af8c49ac4276d3cf1",
+        "expired": false
+      }
+    ],
+    "releaseTrustAndPublicationJobsSkipped": true,
+    "nonARMArchivesLocallyDownloaded": false,
+    "physicalDeviceOrMusicQualification": false
   }
 }

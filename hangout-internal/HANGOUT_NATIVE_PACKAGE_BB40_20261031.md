@@ -1,6 +1,6 @@
 # Current WebJam package and actual Mac launcher proof
 
-Recorded October 31, 2026, 08:19–08:28 UTC. This receipt qualifies the current
+Recorded October 31, 2026, 08:19–08:32 UTC. This receipt qualifies the current
 ARM package and its normal launcher. Physical two-way music remains unqualified.
 It supersedes source83 package selection for this target while preserving the
 [original package](HANGOUT_NATIVE_CANDIDATE_20261031.md) and
@@ -16,20 +16,22 @@ the separately qualified full CI and Windows controls.
 
 Exactly one matching private package dispatch started at 07:41:16 UTC:
 [run 41181580413](https://github.com/rupret007/webjam/actions/runs/41181580413),
-branch `codex/private-music-test-bb40fac-20261031`. The 08:22:35 job observation
-showed ARM, Windows and Linux successful. Intel Mac was still building its disk
-image at 08:28:42. The 08:26:28 artifact observation contained these source-bound,
-unexpired archives:
+branch `codex/private-music-test-bb40fac-20261031`. All four desktop jobs passed;
+Intel completed at 08:31:05 UTC. The 08:31:37 observation contained 22 completed
+jobs: 16 successful and six skipped, with no other result. Actual macOS/Windows
+release-trust and publication jobs were skipped. Earlier in-progress observations
+remain in the private journal. The 08:32:56 artifact observation contained these
+source-bound, unexpired archives:
 
 | Target | Artifact ID | Archive bytes | GitHub SHA256 |
 | --- | --- | --- | --- |
 | ARM Mac | `13035694388` | 456511553 | `f0946862d1bb40b1c88b31d7143e2031dfdc250fc03688c0f5bbdde5a5699e35` |
+| Intel Mac x64 | `13036762004` | 471460999 | `bf7c7b93b20033e2f14c402046795c0152a547778e1b7985307964defeb11a76` |
 | Windows x64 | `13036610720` | 610884199 | `df7bd38b1fb869ce557d288b28d009dd83755a9c20c486c1455df8374bb31dfb` |
 | Linux x64 | `13035758533` | 457714132 | `308b7df2dccb1533e31c11ca2d177bb0ba28d957dbba924d40833f736e0e5df5` |
 
-Windows/Linux identities above are official artifact metadata, not local
-download, installation or physical-device proof. Intel and the complete cohort
-remain pending; observe this existing run rather than dispatching another.
+Intel/Windows/Linux identities above are official artifact metadata, not local
+download, installation or physical-device proof. No additional dispatch is needed.
 Signing inputs, one-hour certification, unapproved headless evidence and public
 publication remain disabled. No package was re-signed or stripped of quarantine.
 
@@ -86,7 +88,7 @@ microphone/camera capture, recording or provider was started.
 
 ## Continue toward the actual demo
 
-Qualify the remaining Intel build, then follow the
+Follow the
 [physical music acceptance](HANGOUT_MUSIC_DEMO_ACCEPTANCE.md) with approved
 device access. The Mini's read-only production CoreAudio resolver separately
 found official BlackHole16ch, 16 input/output channels at 48 kHz. Discovery does

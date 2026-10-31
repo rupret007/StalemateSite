@@ -1,7 +1,7 @@
 # Native application source and remaining demo proof
 
 Evidence recorded October 31, 2026; resource, package and native GUI observations
-are stamped 07:19–08:28 UTC. Application work proceeds here directly,
+are stamped 07:19–08:32 UTC. Application work proceeds here directly,
 without StoryPool/Karen routing. Shared StoryPool services, installed checkouts,
 configuration, locks and operational files remain outside this workstream.
 
@@ -38,10 +38,11 @@ lifecycle. The normal frozen app now exposes the full error through macOS
 accessibility; editing and Return-key retry passed. Normal window Close left no
 WebJam/transport and saved configuration metadata unchanged. The first Cmd-Q
 cleanup observation remains recorded. This is separate from physical music.
-ARM/Windows/Linux builds passed; Intel Mac remained in progress at 08:28:42.
+All four matching desktop builds passed. The 08:32:56 artifact observation pins
+their IDs, sizes, digests and source; signing/publication jobs remained skipped.
 
-The most recent completed four-target package cohort remains source `83d2950`,
-described in the [package receipt](HANGOUT_NATIVE_CANDIDATE_20261031.md). Its ARM
+The earlier source `83d2950` cohort is preserved in the
+[package receipt](HANGOUT_NATIVE_CANDIDATE_20261031.md). Its ARM
 archive, architecture, signature and production transport lifecycle passed.
 Its normal launcher refused malformed Join safely but omitted the useful
 explanation from the macOS accessibility tree. The
@@ -77,9 +78,10 @@ normal checksum/signature checks and never remove quarantine or re-sign it.
 
 ## Required evidence still outstanding
 
-- Finish qualifying the matching Intel package and complete cohort. Current ARM
-  static/production-transport/native-AX checks passed; Windows/Linux artifact
-  metadata is recorded separately. Package builds and physical music are separate proof.
+- Qualify actual Intel/Windows/Linux installation, launch and music. All four
+  matching package jobs passed; current ARM static/production-transport/native-AX
+  checks passed. Other archives have official metadata, without a local-download
+  or physical-device claim. Package builds and physical music are separate proof.
 - Bring the Intel MacBook online/awake through approved access, and establish
   the existing Windows desktop connection. At 06:51 the MacBook was offline;
   Windows/WSL were online. Earlier temporary test keys were removed. Do not

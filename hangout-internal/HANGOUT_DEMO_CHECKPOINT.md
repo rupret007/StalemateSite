@@ -13,7 +13,8 @@ exposes the full invitation recovery explanation in macOS accessibility, clears
 it on edit and restores it on keyboard retry. Back/window Close worked; no app or
 transport remained and saved settings metadata was unchanged. The original83 AX
 failure and first Cmd-Q cleanup failure remain. No audio/provider was started.
-ARM/Windows/Linux jobs passed; Intel was still building at08:28:42. This receipt
+All four matching desktop jobs passed; the 08:32:56 artifact observation pins all
+IDs/sizes/digests to bb40. Signing/publication jobs were skipped. This receipt
 supersedes the earlier pending fixed-package AX statements below.
 
 [Current native source and dated remaining work](HANGOUT_NATIVE_READINESS_20261031.md):
@@ -21,8 +22,9 @@ PR #409 merged `bb40fac` includes the existing Windows work and current launcher
 fixes. Reviewed/actual-CI/merged trees match. The full module loop passed 12,760
 cases across all 553 tracked modules, with 60 skips; actual Windows CI passed all
 eight ACL/API cases and four sharing controls. A fresh 07:41 guard admitted
-exactly one matching `bb40fac` package run, 41181580413; it is in progress. Source83 remains the completed package
-cohort. Keep physical music, fixed-package AX and source/CI/package proof distinct.
+exactly one matching `bb40fac` package run, 41181580413; all four desktop jobs
+subsequently passed. Source83 remains historical package evidence. Keep physical
+music, actual fixed-package AX and source/CI/package proof distinct.
 
 [October31 native candidate](HANGOUT_NATIVE_CANDIDATE_20261031.md): all four
 source83d2950 desktop builds passed, with actual artifact identities/digests
@@ -32,7 +34,7 @@ ARM main window subsequently opened after resource admission. The actual
 [Join observation](HANGOUT_NATIVE_ACCESSIBILITY_20261031.md) retained a safe
 malformed-invitation refusal and found a missing native accessibility explanation.
 PR408 merged as`a62f01f` after all550 tracked modules ran once (12,626 passed,
-60 skipped). A matching package still needs a new native observation. Windows
+60 skipped). The newer bb40 receipt above supplies the separate native observation. Windows
 PR409 combines the existing application fixes;167 portable checks remain
 separate from its later qualified full CI and eight-case Windows diagnostic.
 Physical music, human report disposition and natural expiry remain pending.
