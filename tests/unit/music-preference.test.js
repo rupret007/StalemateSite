@@ -53,6 +53,44 @@ describe('music preference', () => {
         expect(site.paused).toBe(true);
     });
 
+    it('blocks QR landing audio play when off', async () => {
+        const storage = {
+            getItem: (k) => store.get(k) ?? null,
+            setItem: (k, v) => store.set(k, v)
+        };
+        const dom = new JSDOM('<!DOCTYPE html><html><body><audio data-qr-audio></audio></body></html>', {
+            url: 'https://stalemate.band/qr/',
+            runScripts: 'outside-only'
+        });
+        const { window } = dom;
+        Object.defineProperty(window, 'localStorage', { value: storage, configurable: true });
+        window.eval(source);
+        window.StalemateMusicPref.write('off');
+        const qr = window.document.querySelector('[data-qr-audio]');
+        await qr.play();
+        expect(qr.paused).toBe(true);
+    });
+
+    it('pauseAllMedia pauses QR audio when preference is off', () => {
+        const storage = {
+            getItem: (k) => store.get(k) ?? null,
+            setItem: (k, v) => store.set(k, v)
+        };
+        const dom = new JSDOM('<!DOCTYPE html><html><body><audio data-qr-audio></audio></body></html>', {
+            url: 'https://stalemate.band/qr/',
+            runScripts: 'outside-only'
+        });
+        const { window } = dom;
+        Object.defineProperty(window, 'localStorage', { value: storage, configurable: true });
+        window.eval(source);
+        const qr = window.document.querySelector('[data-qr-audio]');
+        let paused = false;
+        qr.pause = () => { paused = true; };
+        window.StalemateMusicPref.write('off');
+        window.StalemateMusicPref.pauseAllMedia();
+        expect(paused).toBe(true);
+    });
+
     it('allows user-started non-site media when off', async () => {
         const storage = {
             getItem: (k) => store.get(k) ?? null,

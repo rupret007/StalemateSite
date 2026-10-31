@@ -3,7 +3,7 @@
     'use strict';
 
     var KEY = 'stalemate.music';
-    var SITE_AUDIO_SELECTOR = '#stalemate-site-player, [data-stalemate-site-audio]';
+    var SITE_AUDIO_SELECTOR = '#stalemate-site-player, [data-stalemate-site-audio], [data-qr-audio]';
     var playPatched = false;
 
     function read() {

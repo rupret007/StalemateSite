@@ -26,11 +26,22 @@ test.describe('site music toggle', () => {
     }
 
     test('QR autoplay stays quiet when music is off', async ({ page }) => {
-        await page.addInitScript(() => localStorage.setItem('stalemate.music', 'off'));
+        await page.addInitScript(() => {
+            localStorage.setItem('stalemate.music', 'off');
+            window.__qrAutoplayPlayCalls = 0;
+            const nativePlay = HTMLMediaElement.prototype.play;
+            HTMLMediaElement.prototype.play = function patchedPlay() {
+                if (this.matches && this.matches('[data-qr-audio]')) {
+                    window.__qrAutoplayPlayCalls += 1;
+                }
+                return nativePlay.apply(this, arguments);
+            };
+        });
         await page.goto('/qr/');
         const audio = page.locator('[data-qr-audio]');
         await page.waitForTimeout(400);
         expect(await audio.evaluate((node) => node.paused)).toBe(true);
+        expect(await page.evaluate(() => window.__qrAutoplayPlayCalls)).toBe(0);
     });
 });
 
