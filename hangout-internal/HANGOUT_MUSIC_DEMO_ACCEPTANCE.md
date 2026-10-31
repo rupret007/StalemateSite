@@ -13,6 +13,14 @@ limit, and `services/native_remote_transport.py` requires platform signatures
 for frozen transport builds. This is source assessment, not package/audio
 qualification.
 
+The October30 [private release receipt](HANGOUT_PRIVATE_DEMO_20261030.md) records
+newer source299's four built desktop targets and actual ARM transport shutdown,
+plus native PR407's reviewed927 launch guard, passed full CI and equal-tree
+merge83d2950. Matching private packaging was requested in run41168394794; its
+packages and physical audio still need qualification. Hosted
+Jam invitation/drawing checks now pass on the private beta; they remain separate
+from every required physical audio row below.
+
 ## Required machines and honest evidence
 
 | Target | Required outcome | Current evidence limits |
@@ -29,6 +37,17 @@ a platform signature. An unsigned package does not satisfy that policy.
 Browser Web Join is a separate opt-in host capability whose issuer, exact
 origin, enrollment and network readiness must be qualified. Do not silently
 present either blocked path as working support.
+
+Start physical qualification with the documented same-network desktop path when
+the actual machines share a LAN. That is a separate invitation/transport path
+from frozen Windows remote Music; it neither proves remote support nor requires
+weakening that package's signature check. Version2 private peer invitations
+restrict their host to RFC1918 addresses. A Tailscale administration connection
+does not make a100.x address eligible for that private control plane. Keep the
+host-generated invitation intact and identify its actual version/route. If the
+normal invitation or network is ineligible, record the gap and use an approved
+remote path when its prerequisites are qualified. Do not rewrite the invitation
+or treat a different protocol's success as remote Music evidence.
 
 ## Demonstrate the complete music journey
 
@@ -69,9 +88,11 @@ historical evidence and trust gaps, not a current package selection.
   deployment/packages. Jeff's October30 instruction keeps application work here
   independently of StoryPool/Karen. Site CI is not native desktop/audio proof;
   existing GitHub protections and security/release holds remain.
-- Keep the additional provider-start native CI mode separate from music audio
-  and existing native Worker/SQLite tests. The application workflow now invokes
-  it explicitly; adding the step and static checks do not establish execution.
+- Keep provider-start native CI separate from music audio. Its actual eighth
+  session mode/eleventh proof group passed in run41154418757 with inert
+  callbacks and matched source/input hashes; see the
+  [current receipt](HANGOUT_PRIVATE_DEMO_20261030.md). This does not establish
+  real provider activation, guardian decisions or physical music.
 - Respect resource admission on each machine. October 28 device discovery found
   the Intel MacBook offline and the Mini/Windows PC online on Tailscale. Earlier
   temporary MacBook test keys were removed after testing. Jeff's testing

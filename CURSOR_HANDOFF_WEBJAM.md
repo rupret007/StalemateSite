@@ -17,11 +17,23 @@ before older checkpoint statements. PR170 merged application source
 The source-identical PR head has fully decoded website and eleven-group native
 proof, including the actual eighth provider-start mode. Hosted ordinary guests
 exchanged chat across both entry badges, created/discovered a room and passed
-375/390 layout checks. The remaining hosted Jam/drawing walk-through hit the
-unchanged creation limits; music and the full demo remain incomplete. Four
+375/390 layout checks. After honoring the real creation allowance, protected
+Jam creation/invitation, outsider denial, exact invitation delivery and two-way
+drawing also passed in hosted Chromium/WebKit at375/390. Music and the full demo
+remain incomplete. Four
 native packages built successfully. ARM transport executed and shut down
-cleanly; a native Join-to-audio observation is being investigated. Do not call
+cleanly. Real Chromium/WebKit reload and copied-cookie revocation now also pass.
+The native GUI test's string was accepted as a valid legacy hostname; its
+invalid-input assumption was corrected. PR407's incomplete dialog/factory guard
+merged as`83d2950` after all550 tracked modules ran once:12,622 passed and60
+skipped. Matching four-target private packaging was requested in run41168394794;
+the new packages are not yet qualified or installed. Do not call
 these package/transport checks two-way audio, or reactivate paused providers.
+One benign report has an actual server acknowledgement; only Jeff's disposition
+remains. A new real eight-hour observer started at04:08UTC on October31, with
+natural expiry due12:08:30UTC. It is running, not a pass. Keep this private beta's
+source/assets/settings/keys unchanged until its owned journal is terminal; read
+the current receipt for the exact evidence paths and remaining requirements.
 PR166 is merged; PR167–169 are closed as superseded with branches/evidence kept.
 
 **October30 ownership clarification:** Jeff directed this application work to

@@ -1,0 +1,59 @@
+{
+  "qualifiedAt": "2026-10-31T04:18:25.921453+00:00",
+  "source": "92739df418d00c983cfd54c818e54945ab1aa43e",
+  "base": "299e3da2c82495f824bfdbb29ec65dbaa0651377",
+  "run": 41165979858,
+  "testJob": 124433529094,
+  "jobLogSha256": "6fd70e48183c02e8eb910a92da1a540ad06cf3bf0c9da0db0d9fedb651078e0d",
+  "trackedTestModules": 550,
+  "eachTrackedModuleExecutedOnce": true,
+  "fullModuleTotals": {
+    "passed": 12622,
+    "skipped": 60,
+    "failed": 0,
+    "error": 0,
+    "errors": 0,
+    "xfailed": 0,
+    "xpassed": 0,
+    "deselected": 0
+  },
+  "newPureCases": 15,
+  "newFactoryCases": 5,
+  "newDialogCases": 4,
+  "allCurrentChecksSuccessOrIntentionalSkipped": true,
+  "metadataCheckNames": {
+    "Cloudflare Worker unit tests": "SUCCESS",
+    "Web Join and Worker unit tests": "SUCCESS",
+    "Windows native diagnostic control": "SUCCESS",
+    "Web Join Playwright e2e": "SUCCESS",
+    "test": "SUCCESS",
+    "Test integrity guards": "SUCCESS",
+    "Changelog fragment": "SUCCESS",
+    "Jamulus 3.12.3 HEADLESS evidence (${{ matrix.target }})": "SKIPPED",
+    "Transport (Go security and cross-build)": "SUCCESS",
+    "Reference service (protocol and container)": "SUCCESS",
+    "iOS change gate": "SUCCESS",
+    "Certify Jamulus/JACK (one hour, manual)": "SKIPPED",
+    "Integration (real Jamulus 3.12.2)": "SUCCESS",
+    "Integration (real Jamulus 3.12.3)": "SUCCESS",
+    "Jamulus 3.12.3 update input (windows-x64)": "SUCCESS",
+    "Jamulus 3.12.3 update input (macos-universal)": "SUCCESS",
+    "Art companion (iPhone and iPad)": "SKIPPED",
+    "Pocket Stage (iOS app)": "SKIPPED",
+    "Build Desktop (${{ matrix.target }})": "SKIPPED",
+    "Windows Release Trust (windows-x64)": "SKIPPED",
+    "macOS Release Trust (${{ matrix.target }})": "SKIPPED",
+    "Publish GitHub Release": "SKIPPED"
+  },
+  "sourceLog": [
+    "2026-10-31T03:49:15.0858307Z [command]/usr/bin/git log -1 --format=%H",
+    "2026-10-31T03:49:15.0900454Z 80b863265caccbe89ef8c9d119c5c021eaa83b3d",
+    "2026-10-31T03:49:15.1386998Z ##[group]Run actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1"
+  ],
+  "actualMusic": false,
+  "skipsQualifyPhysicalAcceptance": false,
+  "preservedFirstFailures": {
+    "changelog": "Markdown bullet correction",
+    "fullTests": "Original30min cancellation and cold-launch mock corrected without changing timeout or assertions"
+  }
+}
