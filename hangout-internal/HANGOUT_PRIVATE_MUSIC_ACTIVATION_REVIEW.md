@@ -1,9 +1,32 @@
 # Private browser music: activation review
 
-Prepared October31, 2026. This is an unapplied review for the existing TURN/vault
-hold. It authorizes no provider change, credential retrieval, purchase or public
-launch. Application work proceeds directly here; shared StoryPool state stays
-with its existing owner. All62 acceptance outcomes remain required.
+Prepared October31, 2026; updated after the owner's decision that day. The
+reviewed private-trial scope below is authorized, with its prerequisites still
+required. No TURN/vault credential retrieval or provider configuration change
+has been applied by this checkpoint. Application work proceeds directly here; shared StoryPool
+state stays with its existing owner. All62 acceptance outcomes remain required.
+
+## Recorded owner decision
+
+Jeff explicitly authorized the reviewed private trials: one native host and
+one browser guest at a time, at most ten minutes per trial, only after actual
+account/free-tier headroom and normal trust checks pass. This releases the
+TURN/vault hold only for that scope. Do not ask for the same authorization again.
+It does not establish that a trial ran or that a prerequisite passed.
+
+Keep in-product AI and Hang Out's separate chat/media TURN off. Preserve
+resource guards, native signatures, capture consent, headphones, signing and
+public-release holds. No purchase, plan upgrade or public launch is authorized.
+Jeff enters any vault master password locally; credentials and session keys
+must never appear in chat, commits, arguments or logs.
+
+The successful 17:26–17:30UTC preflight confirmed normal Cloudflare OAuth
+sign-in and the account's enabled Realtime entitlement. The account-wide
+October TURN query returned no records, without an API error; that is not a
+billing or free-headroom qualification. Subscription access returned403, and
+the separate SFU usage check has not run. The earlier normal CLI vault check
+reported locked. Jeff subsequently reported local sign-in; availability to the
+test process still needs verification through its normal authorized flow.
 
 ## Candidate and observed baseline
 
@@ -68,8 +91,8 @@ live reachability. [Cloudflare TURN FAQ](https://developers.cloudflare.com/realt
 
 1. Revalidate the reviewed source/packages, actual current Worker versions,
    effective nonsecret settings and binding-name inventory. Preserve a matched
-   rollback candidate and all existing state. Require an explicit owner decision
-   releasing only this private browser-music TURN/vault hold.
+   rollback candidate and all existing state. Confirm that the recorded owner
+   decision covers the trial; broader activation needs a separate decision.
 2. Apply only the approved issuer/page/origin changes through the normal app
    path. Keep the public-launch, AI, native trust, signing and unrelated media
    holds intact. Do not create a second community namespace.
@@ -88,6 +111,7 @@ live reachability. [Cloudflare TURN FAQ](https://developers.cloudflare.com/realt
    recovery. Restore the reviewed configuration/assets through the normal path;
    do not delete a ledger, rotate session keys or erase another room/report.
 
-Current dependencies remain the explicit provider decision, actual account
-readiness, usable authorized device access and the physical trials. Preparing
-this review or passing fixtures completes none of those outcomes.
+Current dependencies remain actual account readiness, normal vault/device
+access, resource admission and the physical trials. The recorded authorization
+removes only its decision dependency. Preparing this review or passing fixtures
+completes none of the required live outcomes.

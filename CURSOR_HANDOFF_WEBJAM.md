@@ -7,8 +7,19 @@ their pending-CI and StoryPool-admission statements are historical.
 
 Read the [audit of all 62 outcomes](hangout-internal/HANGOUT_ACCEPTANCE_AUDIT_20261031.md)
 for current source/deployment/package distinctions, demonstrated scopes and every
-remaining outcome. WebJam PR411 and website PR181 are merged; the private music
-decision, resource admission and required physical trials remain pending.
+remaining outcome. WebJam PR411 and website PR181 are merged. Jeff has now
+authorized the [reviewed bounded private music trials](hangout-internal/HANGOUT_PRIVATE_MUSIC_ACTIVATION_REVIEW.md);
+account/free-tier headroom, resource admission, usable vault/device access and
+required physical trials remain pending. Do not ask again for that same scope.
+
+**The actual integration-toolkit download is verified.** The
+[eight-file ZIP](pr-assets/beta-collaboration/20261031/toolkit-integrity/community-entry-toolkit-ci-116ca44.zip)
+matches the official CI artifact digest and every payload hash in its source
+manifest. Its [receipt](pr-assets/beta-collaboration/20261031/toolkit-integrity/receipt.json)
+retains source116ca44/run41211329202 and the distinction between archive
+integrity, earlier standalone CI execution and live site integration. This copy
+keeps the handoff available after the Actions artifact expires. Its license
+notice grants no new redistribution rights; public licensing remains unresolved.
 
 ## Start here
 

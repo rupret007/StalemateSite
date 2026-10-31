@@ -57,7 +57,11 @@ Evidence references:
   Earlier real email/staff observations remain dated evidence.
 - **[T]** [Website integration guide](HANGOUT_WEBSITE_INTEGRATION.md) and
   [toolkit PR180](https://github.com/rupret007/StalemateSite/pull/180).
-  The actual eight-file CI export is source-bound; its archive expires November 7.
+  The actual eight-file CI export is source-bound. Its downloaded ZIP and all
+  seven payload hashes now match the official digest and qualified manifest;
+  the [retained ZIP and receipt](../pr-assets/beta-collaboration/20261031/toolkit-integrity/receipt.json)
+  remain separate from local runtime or live-site proof. The Actions copy
+  expires November 7; the small committed copy preserves the receiving handoff.
 - **[S]** [Scale qualification](HANGOUT_SCALE_QUALIFICATION.md) and
   [participation capacity](HANGOUT_PARTICIPATION_CAPACITY.md).
   Local/default/controlled-mode measurements are independently scoped.
@@ -89,7 +93,7 @@ Evidence references:
 | E2 | Versioned registration, origins, scopes and verified-domain assertions have code/CLI checks. [C] [T] | Verify actual additional domain control and record the operator decision; fixture assertions do not verify a domain. |
 | E3 | The third-site link contract and extracted builder are tested. [C] [T] | An actual third test site reaching the same deployed community is unobserved. |
 | E4 | Disabled generation and neutral missing-registry behavior are documented/tested. [C] [T] | Exercise real staged registration removal; preserve existing labels and ordinary-link semantics. |
-| E5 | The finite committed-source export and eight-file upload succeeded; private fixtures, hashes and output preservation are tested. [C] [T] | Verify downloaded archive/payload hashes and redistribution permissions before public use; no full repository copy is delivered. |
+| E5 | The finite export/upload succeeded; actual downloaded ZIP, exact eight-file inventory, manifest and all seven payload hashes are now verified against CI. [C] [T] | Redistribution permissions still require review before public use; no full repository copy or new licensing grant is delivered. |
 | E6 | The design remains one shared community; federation is outside this requirement. [R] | Preserve this boundary rather than adding another community namespace. |
 | D1 | Retro channel/composer/presence UI and inspected responsive captures exist. [C] [H] [L] | Broader accessibility outcomes below remain separate. |
 | D2 | Connection/retry states and corrected Web Join failure guidance have current CI. [C] | Deploy the correction privately and verify the approved real music failure path. |
@@ -135,13 +139,16 @@ Evidence references:
 
 ## Next actions within the existing controls
 
-1. Restore resource admission before local app/CLI/test execution. The 15:49 UTC
-   check had 12.59 GiB free and 81.79% swap, below the existing 15 GiB reserve and
-   above the below 80% swap limit. Source, evidence, private packages, shared
-   services and unrelated caches were preserved.
-2. Await the already-sent decision on the unapplied
+1. Recheck resource admission before local app/CLI/test execution. The owner's
+   storage cleanup restored36.44GiB free at18:39UTC; the same check still refused
+   CLI execution at load14.30. Preserve the unchanged load below10, swap below80%
+   and15GiB reserve. Copies were verified before cold data moved to external
+   storage; the local continuation records its mount and original-path links.
+   Current application source, tooling, staged ARM app, vaults and shared
+   StoryPool state stayed internal and unchanged. Earlier resource refusals remain.
+2. Jeff authorized the reviewed bounded private trials in the
    [private music activation review](HANGOUT_PRIVATE_MUSIC_ACTIVATION_REVIEW.md).
-   Once explicitly authorized, reconcile the matching issuer code, actual
+   Preserve that scope without repeating the approval question. Reconcile the matching issuer code, actual
    account/free capacity, separate web credentials and exact origins before
    live use. Keep Hang Out's separate chat/media TURN and in-product AI off.
 3. Complete ordinary authorized device access, the required physical music
@@ -152,5 +159,6 @@ Evidence references:
 
 Application work proceeds directly here, without StoryPool/Karen admission.
 Shared StoryPool core, installed services/configuration, locks, conductor state
-and operational files remain outside this work. No public launch, purchase,
-provider activation or trust/age/camera/consent bypass is authorized by this audit.
+and operational files remain outside this work. This audit adds no public launch,
+purchase, provider scope or trust/age/camera/consent bypass to the recorded
+conditional private-trial decision.

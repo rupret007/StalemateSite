@@ -30,6 +30,8 @@ secrets*
 !secrets.example*
 *.tar.gz
 *.zip
+# Verified eight-file CI integration handoff, retained past artifact expiry.
+!pr-assets/beta-collaboration/20261031/toolkit-integrity/community-entry-toolkit-ci-116ca44.zip
 
 .pilot-assets/
 .beta-assets/

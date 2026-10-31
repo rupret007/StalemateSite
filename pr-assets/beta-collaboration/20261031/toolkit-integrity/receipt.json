@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "kind": "actual-community-entry-toolkit-integrity",
+  "at": "2026-10-31T18:31:52.269109+00:00",
+  "repository": "rupret007/StalemateSite",
+  "PR": 180,
+  "sourceCommit": "116ca44cbdff06d32d5531d871d2951a3f8d9ec7",
+  "run": 41211329202,
+  "artifactId": 13046414047,
+  "artifactUrl": "https://github.com/rupret007/StalemateSite/actions/runs/41211329202/artifacts/13046414047",
+  "archive": "community-entry-toolkit-ci-116ca44.zip",
+  "archiveBytes": 8620,
+  "officialDigest": "sha256:fce86498413a82616a803dd6e45fa478707547227a344e92b1b6cdd6a3ac8099",
+  "zipCrcPassed": true,
+  "exactEightFileInventory": true,
+  "manifestEqualsQualifiedCiManifest": true,
+  "payload": [
+    {
+      "path": "LICENSE-NOTICE.txt",
+      "bytes": 268,
+      "sha256": "e755e359983e3d2c229078afc077bd0c2008dae7d2149ba3dd8f333506722f0e"
+    },
+    {
+      "path": "README.md",
+      "bytes": 1271,
+      "sha256": "a5cd02d7eae2f30c36a1cb33e1352cd579229143f09407fc00571e120ad2abc1"
+    },
+    {
+      "path": "community-integration.example.json",
+      "bytes": 737,
+      "sha256": "6529eaa61f871914f577355e89db7c2ccd61e34ebe6ca541c751a1f5a25287c9"
+    },
+    {
+      "path": "lib/community-integration.mjs",
+      "bytes": 6861,
+      "sha256": "61daf686212af934425e44aaa0bf10b2b6a88d1f0802a924c4dbc7e63a196f7b"
+    },
+    {
+      "path": "lib/entry-sites.mjs",
+      "bytes": 5124,
+      "sha256": "af76f0cccec4e7bdffdb8f01574d71bf5d7a5a6dee738bfc5fd4169942e157fb"
+    },
+    {
+      "path": "neutral-link.html",
+      "bytes": 157,
+      "sha256": "dcea93f8d72a247cf9d4b243c775f7ef474f9cdb0e41fc6d85a7bbde58056194"
+    },
+    {
+      "path": "scripts/package-community-entry.mjs",
+      "bytes": 2735,
+      "sha256": "46c4d1d75f8bc78291692d29a9089744f13a78a0b220c2777fa9ac3e874f792d"
+    }
+  ],
+  "runtimeExecutedLocally": false,
+  "standaloneExecutionScope": "Existing exact-source CI toolkit cases only; no new runtime, site/domain verification, deployment or music trial.",
+  "licenseFiles": [],
+  "publicRedistributionPermissions": "Unresolved; original LICENSE-NOTICE retained, no new licensing grant.",
+  "ownerPrivateTrialDecision": {
+    "authorized": true,
+    "oneNativeHost": true,
+    "oneBrowserGuest": true,
+    "maximumSecondsPerTrial": 600,
+    "requires": [
+      "actual account/free-tier headroom",
+      "normal trust",
+      "resource admission",
+      "capture consent and headphones"
+    ],
+    "preserves": [
+      "in-product AI off",
+      "separate Hang Out chat/media TURN off",
+      "no purchases",
+      "no public launch",
+      "native signatures",
+      "other release holds"
+    ]
+  },
+  "activationApplied": false,
+  "actualMusic": false,
+  "all62RequirementsComplete": false
+}
