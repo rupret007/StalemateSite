@@ -7,9 +7,15 @@ StoryPool checkouts, services, configuration, locks and operational files.
 
 ## Exact source and proof boundaries
 
+Use the [delivery table](HANGOUT_WEBSITE_INTEGRATION.md#select-one-tested-candidate)
+to distinguish later qualified application/browser source from the frozen
+private-beta cohort. The bb40 row below is earlier public-target evidence;
+run41193954131 is the selected qualified private package cohort. Neither is
+installation or physical music proof.
+
 | Component | Actual observation | Limit |
 | --- | --- | --- |
-| Qualified native package cohort | `bb40fac7fcaa032c2f19cf9af8c49ac4276d3cf1`, run41181580413; all four desktop builds passed | Actual ARM archive/transport/Join accessibility proof is separate from physical music; see the [package receipt](HANGOUT_NATIVE_PACKAGE_BB40_20261031.md) |
+| Earlier public-target native package cohort | `bb40fac7fcaa032c2f19cf9af8c49ac4276d3cf1`, run41181580413; all four desktop builds passed | Actual ARM archive/transport/Join accessibility proof is separate from physical music; see the [package receipt](HANGOUT_NATIVE_PACKAGE_BB40_20261031.md) |
 | New application routing source | [WebJam PR410](https://github.com/rupret007/webjam/pull/410), merged `bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35`, tree `1c04fb436337987cca75054be54d3695db0db194`; all 555 modules ran once, 12,796 passed and 60 skipped | Source/CI proof is separate from real music |
 | Matching private-beta builds | [Run 41193954131](https://github.com/rupret007/webjam/actions/runs/41193954131), all four desktop builders and target checks succeeded; actual ARM archive/bundle/source/signature/private target, idle transport and normal GUI/recovery passed | Actual browser invitation, installation and physical music remain unqualified; see the [dated receipt](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md) |
 | Private community | Source `4ed1525c84f48173077f506261cb5acd19e3c1dc`, runtime `a9724702-3ce5-418a-bbd4-950f2e169c9e`; hosted 375/390/short layout, logout/asset denial and read-only health passed | Earlier chat/drawing/expiry evidence stays bound to source 96/runtime 629; neither qualifies actual Web Join or audio |

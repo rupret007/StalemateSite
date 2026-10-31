@@ -13,15 +13,25 @@ limit, and `services/native_remote_transport.py` requires platform signatures
 for frozen transport builds. This is source assessment, not package/audio
 qualification.
 
-The [current bb40 package and actual ARM GUI receipt](HANGOUT_NATIVE_PACKAGE_BB40_20261031.md)
-qualifies current source/signature/architecture/transport and the corrected native
-accessibility behavior. It does not qualify any physical audio row below.
+The qualified frozen private-beta cohort is source
+`bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35`,
+[package run41193954131](https://github.com/rupret007/webjam/actions/runs/41193954131).
+Its four platform builders and bundled private-destination checks passed;
+actual ARM archive, signature, architecture, idle transport and normal Join
+recovery were separately observed in the
+[dated private-package receipt](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md).
+The [bb40 package receipt](HANGOUT_NATIVE_PACKAGE_BB40_20261031.md) is earlier
+public-target evidence. Neither receipt qualifies any physical audio row below.
+Later qualified native-repository source is a separate revision, not a rebuilt
+package; select identities from the
+[delivery table](HANGOUT_WEBSITE_INTEGRATION.md#select-one-tested-candidate).
 
-The October30 [private release receipt](HANGOUT_PRIVATE_DEMO_20261030.md) records
+The historical October30 [private release receipt](HANGOUT_PRIVATE_DEMO_20261030.md) records
 newer source299's four built desktop targets and actual ARM transport shutdown,
 plus native PR407's reviewed927 launch guard, passed full CI and equal-tree
 merge83d2950. Matching private packaging was requested in run41168394794; its
-packages and physical audio still need qualification. Hosted
+packages were still pending at that observation. The newer package qualification
+above does not supply physical audio proof. Hosted
 Jam invitation/drawing checks now pass on the private beta; they remain separate
 from every required physical audio row below.
 
@@ -99,15 +109,20 @@ historical evidence and trust gaps, not a current package selection.
   callbacks and matched source/input hashes; see the
   [current receipt](HANGOUT_PRIVATE_DEMO_20261030.md). This does not establish
   real provider activation, guardian decisions or physical music.
-- Respect resource admission on each machine. October 28 device discovery found
-  the Intel MacBook offline and the Mini/Windows PC online on Tailscale. Earlier
-  temporary MacBook test keys were removed after testing. Jeff's testing
-  authorization persists; authentication may need to be re-established through
-  the approved access path. Recheck availability before physical trials.
-- Keep AI, TURN/vault activation, current age/camera/consent safeguards, platform
-  trust and release holds unchanged. Do not bypass signature checks or purchase
-  signing services. If the approved secure music route needs an external action,
-  identify that dependency and hand it to its owner.
+- Respect resource admission on each machine and recheck current availability
+  through the approved access path before physical trials. Historical offline
+  observations are not current device status. Earlier temporary MacBook test
+  keys were removed after testing. Jeff's testing authorization persists;
+  authentication may need to be re-established through the approved path.
+- Jeff authorized the [reviewed bounded private browser-music trials](HANGOUT_PRIVATE_MUSIC_ACTIVATION_REVIEW.md)
+  on October31: one native host and one browser guest, at most ten minutes,
+  after actual account/free-tier headroom and normal trust checks. Only that
+  scope releases the TURN/vault hold. The vault subsequently unlocked and synced;
+  the intended credential location and account permissions remain dependencies,
+  not a reason to repeat generic sign-in advice. Provider/deployment changes
+  remain with their designated owner. Keep in-product AI, Hang Out's separate
+  chat/media TURN, age/camera/consent safeguards, platform trust and release
+  holds unchanged. Do not bypass signatures or purchase signing services.
 
 Every unperformed or failed music row stays pending/failed. Browser community
 proof is valuable progress, but does not complete the required live-music demo

@@ -5,7 +5,27 @@ are stamped 07:19–08:32 UTC. Application work proceeds here directly,
 without StoryPool/Karen routing. Shared StoryPool services, installed checkouts,
 configuration, locks and operational files remain outside this workstream.
 
-## Qualified application source
+## Later checkpoint supersedes the earlier next actions
+
+The material below preserves the 07:19–08:32 observations. Use the
+[current delivery table](HANGOUT_WEBSITE_INTEGRATION.md#select-one-tested-candidate)
+and [later private-demo receipt](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md)
+for the qualified candidate:
+
+- Frozen private-beta packages: source `bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35`,
+  run41193954131. All four builders/private-target checks passed; actual ARM
+  bundle, transport and normal Join recovery have their own dated observations.
+  The earlier bb40 cohort targets the public browser destination.
+- The original eight-hour observer is terminal FAILED, with the actual
+  expiry/revocation/cleanup observations recorded separately. The old instruction
+  to wait for that observer is discharged; do not restart it or treat it as a pass.
+- Jeff's [bounded private music trial authorization](HANGOUT_PRIVATE_MUSIC_ACTIVATION_REVIEW.md)
+  keeps account headroom, matching issuer configuration, normal trust, capture
+  consent and release holds required. Vault sign-in succeeded; intended
+  credential location and provider permissions remain pending. No provider
+  activation or physical music is established by these receipts.
+
+## Earlier qualified application source
 
 [WebJam PR #409](https://github.com/rupret007/webjam/pull/409) merged as
 `bb40fac7fcaa032c2f19cf9af8c49ac4276d3cf1`. It includes the existing verifier,
@@ -30,9 +50,9 @@ working-tree hashes match the exact Windows CRLF rendering of the reviewed Git
 blobs and stayed unchanged. Existing ACLs were not repaired. These are CI
 controls, separate from Jeff's Windows PC, installation, signing and music.
 
-## Matching packages and resource admission
+## Earlier matching packages and resource admission
 
-The [current bb40 package and actual ARM GUI receipt](HANGOUT_NATIVE_PACKAGE_BB40_20261031.md)
+The [earlier bb40 package and actual ARM GUI receipt](HANGOUT_NATIVE_PACKAGE_BB40_20261031.md)
 records the verified archive, signature, architecture and production transport
 lifecycle. The normal frozen app now exposes the full error through macOS
 accessibility; editing and Return-key retry passed. Normal window Close left no
@@ -76,7 +96,11 @@ changed files. The original archive and every result remain. A read-only disk
 image can avoid expanding another app copy when admission permits it; retain
 normal checksum/signature checks and never remove quarantine or re-sign it.
 
-## Required evidence still outstanding
+## Evidence outstanding at the earlier checkpoint
+
+These are historical next actions; the later checkpoint above identifies
+discharged waits and the selected frozen private-beta cohort. Actual-device
+music and the remaining acceptance outcomes still require their own proof.
 
 - Qualify actual Intel/Windows/Linux installation, launch and music. All four
   matching package jobs passed; current ARM static/production-transport/native-AX
