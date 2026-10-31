@@ -97,11 +97,16 @@
                 <p><b>Music runs in the WebJam desktop app</b> (Jamulus under the hood) so the timing is tight. <b>Plug in Ethernet</b> — Wi-Fi adds lag and dropouts.</p>
                 <div class="jam-actions">
                     <a class="btn" data-jam-desktop href="#" hidden>Open in WebJam 🎸</a>
+                    <button class="btn" type="button" data-jam-copy hidden>Copy full WebJam invitation</button>
                     <span class="small" data-jam-wait>Waiting for the host to paste their WebJam invite.</span>
-                    <button class="btn btn--ghost" type="button" data-jam-web disabled title="Arrives with WebJam Web Join">Join in browser (soon, higher delay)</button>
+                    <button class="btn btn--ghost" type="button" data-jam-web disabled title="Browser joining is not configured for this beta">Browser join unavailable</button>
                 </div>
+                <p class="small">On a computer, copy the invite, open WebJam, choose Join, and paste it there. Opening the app directly is supported on Mac; Windows and Linux require pasting private invites. Phones can use this room’s chat while music runs on a computer. Invites may expire or admit one guest; ask the host for a fresh one if needed.</p>
+                <label class="small" data-jam-copy-fallback hidden>Copy this invite, then paste it into WebJam’s Join screen.
+                    <textarea data-jam-copy-value readonly aria-label="WebJam invitation to copy" autocomplete="off" spellcheck="false" rows="4"></textarea>
+                </label>
                 <form class="jam-paste op-only" data-jam-form>
-                    <input data-jam-link placeholder="Host: paste the webjam:// invite" aria-label="WebJam invite">
+                    <textarea data-jam-link placeholder="Host: paste the complete message from WebJam’s Copy Invite" aria-label="WebJam invitation" maxlength="8192" rows="3"></textarea>
                     <button class="btn btn--small" type="submit">Share</button>
                 </form>
             </div>

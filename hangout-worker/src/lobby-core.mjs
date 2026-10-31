@@ -80,6 +80,15 @@ export function validWebjamInvite(link) {
     const s = String(link || '');
     return /^webjam:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]{8,1800}$/.test(s) && !/[\s<>"`]/.test(s) ? s : '';
 }
+// WebJam's Copy Invite includes prose and, for direct-STUN sessions, a sealed
+// webjam-signal line. Its paste boundary accepts at most 8,192 characters. Keep
+// that complete message opaque; the desktop app validates its protocol.
+export function validWebjamInvitation(message) {
+    if (typeof message !== 'string' || !message || message.length > 8192 || encoder.encode(message).byteLength > 8192
+        || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(message)) return '';
+    const links = message.split(/\s+/).filter((token) => token.startsWith('webjam://'));
+    return links.length === 1 && validWebjamInvite(links[0]) ? message : '';
+}
 export function validWebJoin(link, origins = []) {
     let u;
     try { u = new URL(String(link || '')); } catch (e) { return ''; }
@@ -204,7 +213,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     };
     const names = (chan) => membersOf(chan).filter((m) => m.nick).map((m) => ({ id: m.id, nick: m.nick, prefix: prefix(m, chan), band: isBand(m), moderator: m.role === 'moderator', verified: !!m.account, owner: owns(m, chan), away: !!m.away, cam: !!(m.cams && m.cams.has(lc(chan.name))) }))
         .sort((a, b) => (a.prefix === b.prefix ? lc(a.nick).localeCompare(lc(b.nick)) : a.prefix === '@' ? -1 : b.prefix === '@' ? 1 : a.prefix === '+' ? -1 : 1));
-    const chanView = (chan) => ({ name: chan.name, kind: chan.kind, title: chan.title, topic: chan.topic, modes: { ...chan.modes, k: chan.modes.k ? true : false }, count: chan.members.size, persistent: !!chan.owner, expiresAt: chan.owner ? chan.renewed + ROOM_TTL : null, names: names(chan), jam: chan.jam ? { desktop: chan.jam.desktop, web: chan.jam.web, webReady: !!chan.jam.web } : null });
+    const chanView = (chan) => ({ name: chan.name, kind: chan.kind, title: chan.title, topic: chan.topic, modes: { ...chan.modes, k: chan.modes.k ? true : false }, count: chan.members.size, persistent: !!chan.owner, expiresAt: chan.owner ? chan.renewed + ROOM_TTL : null, names: names(chan), jam: chan.jam ? { desktop: chan.jam.desktop, invitation: chan.jam.invitation || chan.jam.desktop, web: chan.jam.web, webReady: !!chan.jam.web } : null });
     const sendChan = (chan) => {
         cast(chan, { t: 'chan', ch: chanView(chan) });
         for (const c of membersOf(chan)) if (owns(c, chan)) out(c, { t: 'ownership', ch: chan.name,
@@ -463,7 +472,8 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         let f;
         try { f = JSON.parse(raw); } catch (e) { return kill(c, 4400, 'bad frame'); }
         if (!f || typeof f !== 'object' || typeof f.t !== 'string') return kill(c, 4400, 'bad frame');
-        const maxBytes = f.t === 'act' ? L.actFrameBytes : L.frameBytes;
+        const jamEnvelope = f.t === 'cmd' && f.name === 'jamlink' && Array.isArray(f.args) && f.args.length === 2 && f.args[0] === 'invitation';
+        const maxBytes = f.t === 'act' || jamEnvelope ? L.actFrameBytes : L.frameBytes;
         if (raw.length > maxBytes) return kill(c, 4400, 'bad frame');
         if (c.frames > L.framesPerConnection) return kill(c, 4429, 'frame cap');
         if (!c.nick && f.t !== 'hello') return bot(c, 'Pick a nickname first.', 'error');
@@ -477,7 +487,8 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         }
         case 'cmd': {
             const name = lc(f.name);
-            const args = Array.isArray(f.args) ? f.args.slice(0, 8).map((a) => String(a).slice(0, 300)) : [];
+            const args = jamEnvelope ? ['invitation', typeof f.args[1] === 'string' ? f.args[1] : '']
+                : Array.isArray(f.args) ? f.args.slice(0, 8).map((a) => String(a).slice(0, 300)) : [];
             return command(c, f.ch, name, args);
         }
         case 'report': return report(c, String(f.id || ''));
@@ -967,10 +978,11 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         jamlink(c, chan, [which, link]) {
             if (!chan.jam) return bot(c, '/jamlink only works in a #jam room.', 'error');
             if (lc(which) === 'clear') { chan.jam = { desktop: '', web: '' }; event(chan, `${c.nick} cleared the jam links`); return sendChan(chan); }
-            const v = which === 'web' ? validWebJoin(link, L.webJoinOrigins) : validWebjamInvite(which === 'desktop' ? link : which);
-            if (!v) return bot(c, which === 'web' ? 'Browser join isn’t switched on yet (it arrives with WebJam Web Join).' : 'Paste the webjam:// invite from the WebJam app: /jamlink webjam://…', 'error');
-            chan.jam[which === 'web' ? 'web' : 'desktop'] = v;
-            event(chan, `${c.nick} shared a WebJam ${which === 'web' ? 'browser' : 'desktop'} invite. Tap “Open in WebJam”. Ethernet beats Wi-Fi.`);
+            const v = which === 'web' ? validWebJoin(link, L.webJoinOrigins) : which === 'invitation' ? validWebjamInvitation(link) : validWebjamInvite(which === 'desktop' ? link : which);
+            if (!v) return bot(c, which === 'web' ? 'Browser joining is not configured for this beta.' : 'Paste the complete message from WebJam’s Copy Invite into the room’s invitation box (maximum 8 KB).', 'error');
+            if (which === 'web') chan.jam.web = v;
+            else { chan.jam.invitation = v; chan.jam.desktop = validWebjamInvite(v); }
+            event(chan, `${c.nick} shared a WebJam ${which === 'web' ? 'browser' : 'desktop'} invitation. Copy the full invitation into WebJam’s Join screen. Ethernet beats Wi-Fi.`);
             log(c.nick, 'jamlink', chan.name, which === 'web' ? 'web' : 'desktop', chan.name);
             return sendChan(chan);
         },

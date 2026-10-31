@@ -26,16 +26,15 @@
         if (!relayBase) return status('The chat server isn’t switched on yet.');
         const q = new URLSearchParams({ preview: previewKey });
         if (devAdmin) q.set('devadmin', devAdmin);
-        const dev = localStorage.getItem('hangout-dev');
-        if (dev) q.set('dev', dev);
-        const ws = new WebSocket(`${relayBase}/lobby-admin?${q}`);
+        const dev = localStorage.getItem('hangout-dev'); // subprotocol only; server rotates so tokens stay within 24h
+        const ws = new WebSocket(`${relayBase}/lobby-admin?${q}`, dev ? ['hangout', 'dev.' + dev] : ['hangout']);
         app.ws = ws;
         let opened = false;
         ws.onopen = () => { opened = true; };
         ws.onclose = () => { if (!opened) status('Not signed in as a site moderator. Tap “Sign in with email code” first.'); else toast('Disconnected. Reload to reconnect.'); };
         ws.onmessage = (e) => {
             let m; try { m = JSON.parse(e.data); } catch (err) { return; }
-            if (m.t === 'device') localStorage.setItem('hangout-dev', m.token);
+            if (m.t === 'device') localStorage.setItem('hangout-dev', m.token); // server-rotated; 24h TTL limits stolen-token lifetime
             if (m.t === 'hello') send({ t: 'hello', nick: $('[data-nick]').value.trim() || 'Helper', age13: true });
             if (m.t === 'nick-error') status(m.text);
             if (m.t === 'welcome') { $('[data-gate]').hidden = true; $('[data-panel]').hidden = false; }

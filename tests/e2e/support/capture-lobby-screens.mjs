@@ -60,7 +60,7 @@ await c.locator('[data-tabs] button').first().click();
 await c.click('[data-start="jam"]');
 await wait(300);
 await c.fill('[data-jam-link]', 'webjam://join?v=1#demo-invite-not-real');
-await c.press('[data-jam-link]', 'Enter');
+await c.locator('[data-jam-form] button[type="submit"]').click();
 await wait(300);
 const flag = b.locator('[data-tabs] button', { hasText: '#stalemate' });
 await flag.click();

@@ -5,7 +5,7 @@ import http from 'node:http';
 import { WebSocketServer } from 'ws';
 import { admit, createBucket, limitsFrom, validFrame, originAllowed, previewKeyOk } from '../hangout-worker/src/core.mjs';
 import { createLobby } from '../hangout-worker/src/lobby-core.mjs';
-import { accountId, ipHash, newDeviceId, signDevice, verifyDevice } from '../hangout-worker/src/auth.mjs';
+import { accountId, deviceFromProtocols, ipHash, newDeviceId, signDevice, verifyDevice } from '../hangout-worker/src/auth.mjs';
 
 const DEV_HMAC = 'local-dev-only-hmac-key-not-a-secret-000';
 
@@ -16,7 +16,11 @@ export function createHangoutRelay({ previewKey = 'local-preview-key-0001', orig
     const rooms = new Map();
     let connections = 0;
     let seq = 0;
-    const wss = new WebSocketServer({ noServer: true, maxPayload: limits.maxFrameBytes });
+    const wss = new WebSocketServer({
+        noServer: true,
+        maxPayload: limits.maxFrameBytes,
+        handleProtocols: (protocols) => (protocols.has('hangout') ? 'hangout' : false)
+    });
     const lobbySockets = new Map();
     const pendingAdmission = new Map();
     let work = Promise.resolve();
@@ -58,8 +62,9 @@ export function createHangoutRelay({ previewKey = 'local-preview-key-0001', orig
                 if (!devAdminKey || !previewKeyOk(url.searchParams.get('devadmin'), devAdminKey)) return reject(403, 'access');
                 role = ['owner', 'moderator'].includes(url.searchParams.get('as')) ? url.searchParams.get('as') : 'band';
             }
-            let dev = await verifyDevice(url.searchParams.get('dev'), DEV_HMAC);
-            const token = dev ? null : await signDevice((dev = newDeviceId()), DEV_HMAC);
+            let dev = await verifyDevice(deviceFromProtocols(req.headers['sec-websocket-protocol']), DEV_HMAC);
+            if (!dev) dev = newDeviceId();
+            const token = await signDevice(dev, DEV_HMAC);
             const iph = await ipHash(resolveIdentity ? req.socket.remoteAddress : req.headers['x-test-ip'] || url.searchParams.get('testip') || req.socket.remoteAddress, DEV_HMAC);
             const id = `c${(lobbySeq += 1)}`;
             pendingAdmission.set(id, []);
