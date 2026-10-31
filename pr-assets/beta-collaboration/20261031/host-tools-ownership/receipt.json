@@ -1,6 +1,6 @@
 {
   "recordedAt": "2026-10-31T19:55:58.054731+00:00",
-  "status": "ORIGINAL_FAILURE_RETAINED; SOURCE188_LOCAL_AND_CI_VERIFIED; LATER_TAB_KEY_TEST_AND_DOCUMENT_HEAD_REQUIRE_CURRENT_CI",
+  "status": "FINAL_F720_CI_QUALIFIED_AND_MERGED_C9B5DB0; ORIGINAL_FAILURES_AND_DISTINCT_LOCAL_SCOPES_RETAINED",
   "originalCi": {
     "repository": "rupret007/StalemateSite",
     "source": "e3bed05970ff8db670f3972c1429a80757ef616f",
@@ -121,6 +121,40 @@
     "localCommit": "443d9815c5f582e1e5bd10b55718f04162ad5fb8",
     "change": "Bounded actual Tab navigation replaces direct focus setup; application runtime bytes unchanged.",
     "localAttempt": "Guard refused before Node; no second local browser pass claimed.",
-    "currentHeadCiRequired": true
+    "currentHeadCiRequired": true,
+    "qualifiedByFinalCI": true
+  },
+  "updatedAt": "2026-10-31T20:51:07.388912+00:00",
+  "qualifiedFinal": {
+    "reviewedHead": "f7209caa5562544cd8712ff3a64e2c8f5db71409",
+    "merge": "c9b5db0fb51f7eac184f78aaef43914a32d76920",
+    "tree": "7074e1f0d340460a7db5d04df2d4484fd6657c68",
+    "unitFilesPerRun": 115,
+    "unitCasesPerRun": 1894,
+    "browserCasesPerRun": 447,
+    "browserAttemptsPerRun": 447,
+    "retries": 0,
+    "skips": 0,
+    "failures": 0,
+    "executedNewJourneysPerRun": 5,
+    "runs": [
+      {
+        "scope": "pr",
+        "run": 41238835230,
+        "job": 124648228307,
+        "url": "https://github.com/rupret007/StalemateSite/actions/runs/41238835230/job/124648228307",
+        "logSha256": "c8f38592bc46e73faf906134379fe10d50c97ab12d6c1b637bdea5060c6a8961"
+      },
+      {
+        "scope": "push",
+        "run": 41238831486,
+        "job": 124648217010,
+        "url": "https://github.com/rupret007/StalemateSite/actions/runs/41238831486/job/124648217010",
+        "logSha256": "fa841a3f65b64840dff3e3ba169bb22f90edeefa6a922a45087c6266216cca2d"
+      }
+    ],
+    "actualScope": "GitHub-hosted Ubuntu24.04; four actual-Tab375/390 Chromium/WebKit journeys plus client-only visible withdrawal recovery. Not real email/identity, physical iPhone, deployment or music.",
+    "pagesDeployment": "SKIPPED",
+    "providerActivationChanged": false
   }
 }

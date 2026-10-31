@@ -7,19 +7,23 @@ not redefine an outcome around a passing fixture or assign a readiness percentag
 
 ## Revisions and evidence scopes
 
-- **Application code baseline:** website merge `87b6922a97afe4a887d1cdad62cc84f9e8f03824`
+- **Application code baseline:** website merge `c9b5db0fb51f7eac184f78aaef43914a32d76920`
   and native-repository merge `54f6e5ff9c64d2de837292b7fb4b1d63c7835733`.
   Their complete trees match the reviewed heads. [C]
 - **Last observed private deployment:** website source `4ed1525`, Worker version
   `a9724702-3ce5-418a-bbd4-950f2e169c9e`. The newer browser recovery guidance is
-  merged source, pending private deployment. No provider was activated. [H]
+  merged source, pending private deployment, along with the Host tools correction.
+  No provider was activated. [H] [C]
 - **Private desktop packages:** source `bf24e7d`, run `41193954131`, all four
   platform builds successful. Actual ARM archive, sealed bundle, normal Join
   recovery and idle transport checks are separate from installation or music.
   The later source change touches browser modules and documentation, with no
   native runtime, transport, build or update-input changes. [N]
-- **Current CI:** website head `94b9451` passed 1,883 units in 115 files and
-  438 browser attempts with zero retries. Native head `da7e045` ran all 555
+- **Current qualified application CI:** website head `f7209ca` passed 1,894
+  units in 115 files and 447 distinct browser cases in 447 attempts, with zero
+  retries/skips in both push and PR runs. These include actual Tab-key menu
+  updates at 375/390px in Chromium/WebKit and visible withdrawal recovery.
+  Native head `da7e045` ran all 555
   tracked Python modules once: 12,796 passed and 60 skipped. Its separate Web
   Join workflow passed 70 Worker tests, 13 browser units and 24 Chromium/WebKit
   cases. All six protected-branch required checks passed. The optional macOS
@@ -34,7 +38,9 @@ not redefine an outcome around a passing fixture or assign a readiness percentag
 - **Source continuity:** from hosted source 96 to website merge 87, the only
   difference under chat assets and `hangout-worker/src/` is `lobby.css`.
   The private 4ed layout observations qualify that CSS separately. New Web Join
-  modules are pinned independently in `join/PROVENANCE.json`. [H] [L] [C]
+  modules are pinned independently in `join/PROVENANCE.json`. The later PR184
+  changes lobby HTML/JavaScript for Host tools; it is qualified by its own CI
+  and does not inherit a deployed claim from the CSS-only upgrade. [H] [L] [C]
 - **Expiry:** the original eight-hour observer remains FAILED because its
   predicate expected `offline` while the app reports `ended`. Actual 4401 closes,
   HTTP/token denial and cleanup are separately recorded. They are not a new
@@ -43,6 +49,8 @@ not redefine an outcome around a passing fixture or assign a readiness percentag
 Evidence references:
 
 - **[C]** [Website PR181](https://github.com/rupret007/StalemateSite/pull/181),
+  [PR184](https://github.com/rupret007/StalemateSite/pull/184) and its
+  [source-bound Host tools receipt](../pr-assets/beta-collaboration/20261031/host-tools-ownership/receipt.json),
   [WebJam PR411](https://github.com/rupret007/webjam/pull/411), source tests and
   their exact-head CI/log qualifications. Fixture and Linux-runner results retain
   that scope.
@@ -98,7 +106,7 @@ Evidence references:
 | D1 | Retro channel/composer/presence UI and inspected responsive captures exist. [C] [H] [L] | Broader accessibility outcomes below remain separate. |
 | D2 | Connection/retry states and corrected Web Join failure guidance have current CI. [C] | Deploy the correction privately and verify the approved real music failure path. |
 | D3 | Hosted discovery/create/join/drawing/leave observations and quiet-room starters exist. [H] [C] | Complete the final creative journey and recovery on the chosen deployment. |
-| D4 | Actual Chrome Tab/Space sending and native Join edit/Return recovery were observed. [L] [N] | Broader dialogs, music and staff keyboard journeys remain. |
+| D4 | Actual Chrome Tab/Space sending, native Join edit/Return recovery and CI Tab-key Host tools/visible withdrawal recovery were observed at their stated scopes. [L] [N] [C] | Broader dialogs, music and staff keyboard journeys remain; synthetic status is not a real server withdrawal. |
 | D5 | Native accessibility snapshots and browser semantics have scoped checks. [C] [N] | Actual screen-reader speech/announcements and complete use remain unverified. |
 | D6 | Actual 200/400% Chrome and short-pane reflow regression evidence exist. [L] | Full WCAG 2.2 AA, including contrast and other applicable criteria, remains unqualified. |
 | D7 | Reduced-motion behavior has source/browser coverage. [C] | Check it across the final advertised flows; decorative and user-requested media have different purposes. |

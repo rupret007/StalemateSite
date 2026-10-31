@@ -43,6 +43,14 @@ real-browser client fixture checks visible focus, Enter to expose the current
 status and Tab to reach its check button, while new sharing stays disabled.
 That synthetic protocol frame does not qualify actual server withdrawal.
 
+The final reviewed source `f7209ca` merged as `c9b5db0`; their complete trees
+match. Both final CI runs passed 1,894 units in 115 files and 447 distinct browser
+cases in 447 attempts, without retries or skips. Each log explicitly records
+all four actual-Tab 375/390px Chromium/WebKit journeys and the visible withdrawal
+recovery case. This qualifies those later tests separately from source188's
+programmatic-focus local captures below. Pages deployment was skipped; private
+delivery and physical music remain outstanding.
+
 New real-relay browser journeys delay only the separate ownership metadata,
 then update the already-open menu at 375px and 390px. They exercise a returning
 fixture account, preserved focus, exact offline co-host removal and refusal of
