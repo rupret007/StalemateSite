@@ -585,13 +585,14 @@ selects a separate eighth session mode in this existing framework. It rejects
 incident, traffic, pressure, fanout and diagnostic combinations. The seven
 original modes retain their original journeys, assertions, limits and timers;
 this mode does not requalify their canonical nine-plus-three or two physical
-rollback witnesses. The existing workflow currently runs only those seven
-modes/ten groups. Adding this command as an eleventh group requires the existing
-CI owner's separate change; a green ten-group workflow does not execute or
-qualify the new flag. This workstream does not edit that workflow. The proposed
-step, for StoryPool 10-21-26 only, follows the existing capture pattern and
-does not raise the ten-minute job limit, remove an old step, or hide this mode
-inside an old one:
+rollback witnesses. Following Jeff's October30 clarification that application
+work proceeds independently of StoryPool, this repository's application workflow
+now includes the command as a separate eleventh proof group. The ten preceding
+groups and seven original session modes remain. A green older ten-group run
+does not execute or qualify this flag; inspect the actual current run and its
+source-bound stdout/stderr/exit-code artifacts. The new step follows the existing
+capture pattern without raising the ten-minute job limit, removing an old step
+or hiding this mode inside an old one:
 
 ```yaml
 - name: Prove native permission ordering for moderation start
@@ -617,8 +618,9 @@ owner baseline. Callback-close marked the synchronous fence before denial, and
 `retirement-resolved` was the close promise settling after that await. It does
 not measure when `retireClosed` begins relative to owner-gate exit. The run is
 local Worker/SQLite only. It does not qualify provider activation, the other
-seven modes, Windows, Intel Mac, hosted capacity, or audio. GitHub's existing
-workflow still does not execute this flag.
+seven modes, Windows, Intel Mac, hosted capacity, or audio. The application
+workflow now invokes this flag explicitly; adding the step is not proof that
+it executed successfully in CI.
 
 The new mode deliberately omits the plain-retention diagnostic facade. It uses
 the original authority and frozen owner actually created by `HangoutLobby.start`.

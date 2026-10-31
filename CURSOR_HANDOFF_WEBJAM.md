@@ -9,7 +9,23 @@ below describe the earlier checkpoint, not the current source.
 
 ## Start here
 
-Current work is **`codex/jam-share-order-20261030`**, based on PR168 head
+**October30 ownership clarification:** Jeff directed this application work to
+proceed here independently of StoryPool. Application code, project CI, tests,
+documentation and application PRs are handled in this workstream. Do not route
+them through StoryPool/Karen or wait for its admission. Existing GitHub checks
+and protections still apply. Shared StoryPool core/services/configuration,
+installed checkouts, locks and operational files remain outside this task;
+security, provider and release holds remain unchanged. Earlier StoryPool
+application handoffs below are historical, not current prerequisites.
+
+Current work is **`codex/webjam-native-ci-20261030`**, based on PR169 head
+`43457849374bfa00e68fcf3f224954e3f3832026`. This repository's workflow now invokes
+the eighth provider-start session mode as an explicit eleventh proof group,
+retaining the previous ten groups, timeout, diagnostics and failure propagation.
+Verify the actual new CI results; earlier local passes or green metadata do not
+prove this newly added step. No installed/shared StoryPool files are changed.
+
+The preceding **`codex/jam-share-order-20261030`** is based on PR168 head
 `2c4a191915e02c73f95b1c0d2aca1082f6974649`. It fixes another reproduced
 lost-paste race when a newer Share is submitted before an older confirmation.
 The matched client/engine now allow one pending visible Share, keep the next
@@ -102,10 +118,10 @@ Minimize data; no default ID/biometrics, PM scanning or media recording.
 Moderation assists human review; legal readiness requires qualified review,
 not a compliance claim. AI remains off.
 
-This application workstream owns source, design, tests, documentation and PRs.
-**“StoryPool 10-21-26” owns StoryPool core, Karen, CI infrastructure, deployments
-and shared operational files.** Hand off those dependencies. Do not edit its
-services, locks, maintenance/release holds, `MONITOR.md` or `NEEDS_JEFF.md` here.
+This workstream owns application source, design, project CI, tests, documentation
+and application PRs independently of StoryPool. Shared StoryPool core, services,
+installed checkouts, configuration and operational files remain outside scope.
+Do not edit its locks, maintenance/release holds, `MONITOR.md` or `NEEDS_JEFF.md`.
 TURN/vault work remains paused. Do not inspect/unlock credentials, activate
 providers, buy signing services or change platform trust. Windows builds remain
 unsigned; Mac/Windows/Linux audio and installation must be qualified honestly.
@@ -212,7 +228,10 @@ calling that proof qualified:
 3. Execute the new mode. Source review, a FIFO unit double or compiling it in
    another mode cannot establish its native result.
 
-## Resume sequence
+## Historical October27 resume sequence
+
+The sequence below is preserved as earlier evidence. For current application
+ownership and the eleventh CI group, follow Start here and the current checkpoint.
 
 1. Read this note, the62 requirements and relevant linked source contracts.
    Revalidate branch/PR/release state. Preserve other work and original evidence.
@@ -242,11 +261,13 @@ calling that proof qualified:
    journeys, accessibility, capacity/recovery, legal/guardian readiness and honest
    platform qualification. A passing P9 slice is not project completion.
 
-## CI-owner dependency — proposed, not applied
+## Historical CI-owner handoff — now implemented in application CI
 
-`.github/workflows/durable-record-runtime.yml` is unchanged, SHA256
+At that earlier checkpoint, `.github/workflows/durable-record-runtime.yml`
+was unchanged, SHA256
 `5b8cb2382b4e324a0e65635c4e7b819d2702c0e99c979f4c34f9bdd0418b51c1`.
-Its owner can review an additional step following the existing capture pattern:
+The proposed capture pattern below is now the explicit application CI step.
+Its actual current execution must still be qualified:
 
 ```yaml
 - name: Prove native permission ordering for moderation start

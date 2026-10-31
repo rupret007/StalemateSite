@@ -1,13 +1,19 @@
 # Website integration: one shared Hang Out
 
 Use this short guide to prepare the receiving owner's release. This application
-session supplies source, tests and integration assets. StoryPool 10-21-26 owns
-deployments, core, Karen administration and shared operations. This document is
-not a release approval or evidence that a live website contains the candidate.
+session supplies source, tests and integration assets. Following Jeff's October30
+clarification, application code, project CI and application PRs proceed here
+independently of StoryPool/Karen. Shared StoryPool core, installed services and
+operational files remain outside this task. Existing GitHub protections and
+security/provider/release holds still apply. This document is not release
+approval or evidence that a live website contains the candidate.
 
 ## Select one tested candidate
 
-Current readiness work is `codex/jam-share-order-20261030`, based on
+Current readiness work is `codex/webjam-native-ci-20261030`, based on
+PR169 head `43457849374bfa00e68fcf3f224954e3f3832026`. It adds the separate eighth
+provider-start mode to application CI; verify actual new execution and artifacts.
+The preceding `codex/jam-share-order-20261030` is based on
 PR168 head `2c4a191915e02c73f95b1c0d2aca1082f6974649`. Its parent
 `codex/jam-mobile-setup-20261030` contains the compact setup help and is based on
 PR167 head `143b3905af12e029a645e96769cc1d04cec018a5`. The preceding
@@ -15,7 +21,7 @@ PR167 head `143b3905af12e029a645e96769cc1d04cec018a5`. The preceding
 `1504f94837a68ce35844e0590cde469135c287b4`. The earlier parent
 `codex/irc-webjam-polish-20261029` is based on the merged
 `codex/che-demo-candidate` at `ec1eb14cfb2f7d068e5a01467193b70e21495dbc`; see the
-[checkpoint](HANGOUT_DEMO_CHECKPOINT.md#current-work-correlated-invitation-sharing)
+[checkpoint](HANGOUT_DEMO_CHECKPOINT.md#current-work-independent-application-ci)
 for its exact inputs and unresolved gates. Obtain the actual reviewed current
 commit, not just an input PR or branch name. This assembly includes both the
 music-invitation fixes and the reconnect probe; older input results do not
@@ -25,7 +31,7 @@ Use the delivered source commit and its matching CI/review receipts. The entry
 toolkit's `SOURCE-MANIFEST.json` names the commit used to build that archive; it
 contains link tooling and documentation, not the whole application. Obtain the
 application from the corresponding source branch or verified source patch.
-Revalidate the exact current commit's normal CI and Karen result. Historical
+Revalidate the exact current commit's application CI and review. Historical
 dependency tables are an audit trail, not a list to cherry-pick blindly.
 
 Retain newer Stalemate and Rad Dad pages, navigation, media consent and the

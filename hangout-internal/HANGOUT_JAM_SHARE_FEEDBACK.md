@@ -58,8 +58,8 @@ copied capability or changes the native host's guest/session controls.
 
 ## Compatibility and qualification
 
-Deploy matching browser HTML/CSS/JS and the engine through the release owner's
-normal reviewed path. The feature bit selects the new behavior. Older clients
+Deliver matching browser HTML/CSS/JS and the engine through the reviewed
+application path while preserving release holds. The feature bit selects the new behavior. Older clients
 omit the ID and keep their existing channel-state protocol. An updated client
 on an older engine retains the preceding state-based fallback; that mixed pair
 does not establish the new one-request/correlated-rejection guarantee. Do not
@@ -106,6 +106,8 @@ hosted performance or CI. The old failed attempt remains retained.
 Current-source full unit/browser/native evidence and normal review remain
 required. Historical fifty-guest/component comparisons apply to their named
 committed source; they do not qualify this changed kernel. The explicit eighth
-provider-start CI mode remains with its workflow owner. All 62 original outcomes,
+provider-start CI command is now an explicit application workflow step following
+Jeff's independent-implementation direction; its actual execution must still be
+verified separately. All 62 original outcomes,
 actual ARM/Intel/Windows music, Linux, protected hosted journeys, current
 age/consent/camera safeguards and AI/TURN/vault/trust/release holds remain.

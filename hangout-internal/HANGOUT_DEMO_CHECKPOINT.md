@@ -4,12 +4,38 @@ Updated October 30, 2026. Goal active: finish the application for a private Che
 demonstration and website integration. This is an application checkpoint, not
 deployment approval or a claim that the live beta contains these changes.
 
-## Current work: correlated invitation sharing
+## Current work: independent application CI
+
+Jeff's October30 direction is to implement the application here without putting
+it through StoryPool. This workstream owns application code, project CI, tests,
+docs and application PRs. It does not change shared StoryPool core, installed
+services/checkouts, configuration, locks or operational files. Existing GitHub
+protections and all security/provider/release holds remain. The earlier normal
+Karen-admission and CI-owner handoffs are historical application dependencies.
+
+Branch **`codex/webjam-native-ci-20261030`** starts at PR169 head
+`43457849374bfa00e68fcf3f224954e3f3832026`. Its focused change adds the explicit
+`--participation --provider-start` command to the existing native application
+workflow as an eleventh proof group. It retains the ten preceding groups,
+ten-minute timeout, locked dependencies/audits and stdout/stderr/exit-code
+capture. The existing artifact upload covers the new files. There is no provider
+activation or deployed behavior change. Current-source CI execution remains
+to verify; local proof or the preceding green ten-group runs do not substitute.
+
+## Previous work: correlated invitation sharing
 
 Branch: **`codex/jam-share-order-20261030`**, based on PR168 head
 `2c4a191915e02c73f95b1c0d2aca1082f6974649`. Preserve PR166/167/168 and all62
 requirement outcomes. The source was left uncommitted by a capacity interruption;
 the resumed application work preserves those changes and their original logs.
+It was subsequently committed as PR169 head
+`43457849374bfa00e68fcf3f224954e3f3832026`. Its push41049339983 checked out that
+exact source and passed 1,869 units/114 files and 436 unique browser cases in
+436 attempts. The complete report was decoded: no retries, skips, flakes or
+report errors. Seven fresh CI WebKit375/390 host/guest/help/waiting screenshots
+were inspected. The native ten-group runs have green metadata; their full
+proof is not yet independently qualified here. These results do not establish
+the newly added eleventh group, deployed journeys or music.
 
 A real-engine browser test reproduced a second lost-paste defect on2c4: an
 earlier publication can erase a newer submitted paste even when that later
