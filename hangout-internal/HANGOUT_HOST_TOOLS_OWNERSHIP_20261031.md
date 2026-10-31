@@ -45,12 +45,30 @@ identity adapter is not Cloudflare Access or real email-delivery evidence.
 Fixture cleanup tracks only live contexts and attempts every owned website
 shutdown even if another cleanup operation fails.
 
-Fixed-source verification is pending at preparation. The first fixed local
-attempts were refused before Node because swap usage exceeded the unchanged
-80% guard. Do not count a guard receipt as an executed test. Current-head CI,
-the new screenshots and any later local result must retain their own revisions,
-counts, retries and limits. No workflow, deployed Worker, credential, provider,
-resource threshold or release hold is changed by this application patch.
+Source `188c787` passed 49 focused local cases in two files after a fresh guard
+admitted execution. Four real-relay browser journeys then passed once, with
+one worker, no retries, skips or report errors. The inspected local captures
+show the waiting and updated menu at
+[375px](../pr-assets/beta-collaboration/20261031/host-tools-ownership/webkit-community-375-updated.png)
+and [390px](../pr-assets/beta-collaboration/20261031/host-tools-ownership/webkit-community-390-updated.png).
+These are desktop-engine viewport checks, not physical iPhone evidence. The
+first run set focus programmatically; it does not establish Tab navigation.
+
+Both source188 CI jobs passed 1,894 units in 115 files and 446 distinct browser
+cases in 446 attempts, with zero retries, failures or skips. They ran on
+GitHub-hosted Ubuntu, separately from the local checks. Pages deployment was
+skipped. The later browser test uses actual Tab keys to reach the control
+before delayed metadata arrives. Its first local attempt was resource-refused;
+read [PR184](https://github.com/rupret007/StalemateSite/pull/184) for the exact
+latest-head CI result rather than counting the earlier focus setup as that
+test. The receipt retains each scope and the original failures.
+
+Initial fixed local attempts were refused before Node because swap usage
+exceeded the unchanged 80% guard. Those refusals remain; they are not executed
+tests. No workflow, deployed Worker, credential, provider, resource threshold
+or release hold is changed by this application patch. Delivery still requires
+the deployment owner to apply matched HTML/JavaScript through the existing
+private release path, preserving all settings, bindings and rollback state.
 
 All [62 acceptance requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md) remain.
 Real music on the ARM Mini, Intel MacBook and Windows, Linux qualification,

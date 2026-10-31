@@ -1,6 +1,6 @@
 {
   "recordedAt": "2026-10-31T19:55:58.054731+00:00",
-  "status": "ORIGINAL_CI_TIMEOUT_AND_DETERMINISTIC_LOCAL_FAILURE_RETAINED; FIX_VERIFICATION_PENDING",
+  "status": "ORIGINAL_FAILURE_RETAINED; SOURCE188_LOCAL_AND_CI_VERIFIED; LATER_TAB_KEY_TEST_AND_DOCUMENT_HEAD_REQUIRE_CURRENT_CI",
   "originalCi": {
     "repository": "rupret007/StalemateSite",
     "source": "e3bed05970ff8db670f3972c1429a80757ef616f",
@@ -37,5 +37,90 @@
   "fixScope": "Live keyed co-host rows, focus preservation and menu retirement at room/authority/connection/Stop boundaries; exact account+room-instance command remains server-authorized.",
   "runtimeDeploymentChanged": false,
   "providerActivationChanged": false,
-  "all62RequirementsSha256": "3d5db107977f652a1bd51286c02657aaff70c9c3590adb876e03f6d909679999"
+  "all62RequirementsSha256": "3d5db107977f652a1bd51286c02657aaff70c9c3590adb876e03f6d909679999",
+  "qualifiedCi188": {
+    "at": "2026-10-31T20:15:48.088302+00:00",
+    "source": "188c7878a902e518446445ba576dc7a15f66f942",
+    "allChecksSuccess": true,
+    "pagesSkipped": true,
+    "applicationOrProviderDeployed": false,
+    "runs": [
+      {
+        "scope": "pr",
+        "run": 41236994392,
+        "job": 124642736617,
+        "unitFilesPassed": 115,
+        "unitCasesPassed": 1894,
+        "browserCases": 446,
+        "browserAttempts": 446,
+        "retries": 0,
+        "skips": 0,
+        "failures": 0,
+        "logSha256": "3d2986db85ead76cfe88a2735419d26ed7af30984fece81c0ad6ac5bc2fe60c2",
+        "url": "https://github.com/rupret007/StalemateSite/actions/runs/41236994392/job/124642736617"
+      },
+      {
+        "scope": "push",
+        "run": 41236989457,
+        "job": 124642721664,
+        "unitFilesPassed": 115,
+        "unitCasesPassed": 1894,
+        "browserCases": 446,
+        "browserAttempts": 446,
+        "retries": 0,
+        "skips": 0,
+        "failures": 0,
+        "logSha256": "a9ba965d3dfcf54c7276c500742d83d8c1e3653cdc2d317673048273661f775d",
+        "url": "https://github.com/rupret007/StalemateSite/actions/runs/41236989457/job/124642721664"
+      }
+    ]
+  },
+  "fixedLocal": {
+    "source": "188c7878a902e518446445ba576dc7a15f66f942",
+    "unitCasesPassed": 49,
+    "unitFilesPassed": 2,
+    "browserCasesPassed": 4,
+    "browserAttempts": 4,
+    "retries": 0,
+    "skips": 0,
+    "reportErrors": 0,
+    "browserScope": "Actual local Chromium and WebKit at375px/390px, one worker. Real loopback relay and explicit fixture accounts; programmatic focus setup in this first run. Not physical iPhone, Cloudflare email, real-site navigation, music or deployment.",
+    "unitLogSha256": "072ebf889d2cd39b4dd19db913f9fff7a51d835886899a84e41a31daf1f8a09e",
+    "browserLogSha256": "b75cd9534f32b40f68eb6d7c78882eac6b6a20a0a8a1cc05033a242d817f3b7b",
+    "resourceAdmitted": true,
+    "ownedServerAndWorkerPidsGone": true,
+    "owned4499PortConnectResult": 61,
+    "captures": [
+      {
+        "file": "webkit-community-375-waiting.png",
+        "sha256": "89cf271bede997e84083d61d5ae6c5a29f5ed86dd7691978cb74e63c21f45540",
+        "visuallyInspected": true,
+        "observation": "Menu stays within viewport; wrapping labels and saved co-host row readable. WebKit focus ring remains on Transfer ownership. The Chromium first-run focus setup was programmatic, not a keyboard-input qualification."
+      },
+      {
+        "file": "webkit-community-375-updated.png",
+        "sha256": "44bf7989cf73be58085fc79e783eb1f18f5113dfacaa806194f770dc7a1556aa",
+        "visuallyInspected": true,
+        "observation": "Menu stays within viewport; wrapping labels and saved co-host row readable. WebKit focus ring remains on Transfer ownership. The Chromium first-run focus setup was programmatic, not a keyboard-input qualification."
+      },
+      {
+        "file": "webkit-community-390-updated.png",
+        "sha256": "ef408c1b8729c183f45cf90814662802a65d46c347258979fe931d8b94f05450",
+        "visuallyInspected": true,
+        "observation": "Menu stays within viewport; wrapping labels and saved co-host row readable. WebKit focus ring remains on Transfer ownership. The Chromium first-run focus setup was programmatic, not a keyboard-input qualification."
+      },
+      {
+        "file": "chromium-390-updated.png",
+        "sha256": "1759150500508dcd07fc24cd832598bfbf46f829efdb076526f24f518d279c41",
+        "visuallyInspected": true,
+        "observation": "Menu stays within viewport; wrapping labels and saved co-host row readable. WebKit focus ring remains on Transfer ownership. The Chromium first-run focus setup was programmatic, not a keyboard-input qualification."
+      }
+    ]
+  },
+  "laterKeyboardTest": {
+    "localCommit": "443d9815c5f582e1e5bd10b55718f04162ad5fb8",
+    "change": "Bounded actual Tab navigation replaces direct focus setup; application runtime bytes unchanged.",
+    "localAttempt": "Guard refused before Node; no second local browser pass claimed.",
+    "currentHeadCiRequired": true
+  }
 }
