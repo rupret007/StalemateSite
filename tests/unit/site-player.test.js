@@ -9,8 +9,8 @@ const playerSource = readFileSync(path.join(repoRoot, 'js/site-player.js'), 'utf
 const baseSource = readFileSync(path.join(repoRoot, 'site-base.js'), 'utf8');
 const prefSource = readFileSync(path.join(repoRoot, 'js/music-preference.js'), 'utf8');
 
-function loadPlayer(storage) {
-    const dom = new JSDOM('<!DOCTYPE html><html><body><button data-site-play="manic" type="button">Play</button></body></html>', {
+function loadPlayer(storage, bodyHtml) {
+    const dom = new JSDOM(`<!DOCTYPE html><html><body>${bodyHtml || '<button data-site-play="manic" type="button">Play</button>'}</body></html>`, {
         url: 'https://stalemate.band/',
         runScripts: 'outside-only'
     });
@@ -75,5 +75,36 @@ describe('site player', () => {
         other.dispatchEvent(new win.Event('play'));
 
         expect(pausedCalled).toBe(true);
+    });
+
+    it('enters reload state after a load error', () => {
+        const win = loadPlayer(storage, '<li data-listen-track><button data-site-play="andrea" type="button" data-site-play-label="▶ PLAY HERE" aria-label="Play Andrea here">▶ PLAY HERE</button></li>');
+        win.HTMLMediaElement.prototype.play = function playStub() {
+            return Promise.resolve();
+        };
+        const button = win.document.querySelector('[data-site-play="andrea"]');
+        button.click();
+        const el = win.document.getElementById('stalemate-site-player');
+        el.dispatchEvent(new win.Event('error'));
+        expect(button.textContent).toBe('Reload player');
+        expect(button.getAttribute('aria-label')).toBe('Reload Andrea here');
+        const status = win.document.querySelector('[data-site-play-status]');
+        expect(status.hidden).toBe(false);
+        expect(status.textContent).toMatch(/could not be opened/);
+    });
+
+    it('resets load UI on pagehide', () => {
+        const win = loadPlayer(storage, '<li data-listen-track><button data-site-play="andrea" type="button" data-site-play-label="▶ PLAY HERE" aria-label="Play Andrea here">▶ PLAY HERE</button></li>');
+        win.HTMLMediaElement.prototype.play = function playStub() {
+            return Promise.resolve();
+        };
+        const button = win.document.querySelector('[data-site-play="andrea"]');
+        button.click();
+        const el = win.document.getElementById('stalemate-site-player');
+        el.dispatchEvent(new win.Event('error'));
+        expect(button.textContent).toBe('Reload player');
+        win.dispatchEvent(new win.Event('pagehide'));
+        expect(button.textContent).toBe('▶ PLAY HERE');
+        expect(win.document.querySelector('[data-site-play-status]').textContent).toBe('');
     });
 });

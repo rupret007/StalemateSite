@@ -1,4 +1,7 @@
+const path = require('node:path');
 const { test, expect, tapHeight } = require('./fixtures');
+
+const ANDREA_M4A = path.join(__dirname, '..', '..', 'play', 'stalemate', 'andrea.m4a');
 
 const TRACKS = [
     ['Andrea', 'andrea', 'https://music.apple.com/us/album/andrea/1718463871?i=1718463872', '6GBydFSUtZ7wZ7pSAvbytw'],
@@ -56,63 +59,62 @@ test('listen section plays on-site audio only on tap', async ({ page }) => {
     await rows.first().locator('[data-site-play]').click();
     await expect.poll(() => page.evaluate(() => {
         const el = document.getElementById('stalemate-site-player');
-        return el && el.src.includes('/play/stalemate/andrea.m4a');
+        return el && el.src.includes('/play/stalemate/andrea.m4a') && !el.paused;
     })).toBe(true);
-    await expect(section.locator('iframe')).toHaveCount(0);
-    await rows.first().locator('[data-listen-load]').click();
-    const frame = rows.first().locator('iframe');
-    await expect(frame).toHaveCount(1);
-    await expect(frame).toHaveAttribute('src', 'https://embed.music.apple.com/us/album/andrea/1718463871?i=1718463872');
-    await expect(section.locator('iframe')).toHaveCount(1);
-    await expect(rows.first().locator('[data-listen-load]')).toHaveText('Reload player');
+    await expect(rows.first().locator('[data-site-play]')).toHaveAttribute('aria-pressed', 'true');
+    await rows.first().locator('[data-site-play]').click();
+    await expect.poll(() => page.evaluate(() => {
+        const el = document.getElementById('stalemate-site-player');
+        return el && el.paused;
+    })).toBe(true);
+    await expect(rows.first().locator('[data-site-play]')).toHaveAttribute('aria-pressed', 'false');
+    await rows.first().locator('[data-site-play]').click();
+    await expect.poll(() => page.evaluate(() => {
+        const el = document.getElementById('stalemate-site-player');
+        return el && !el.paused;
+    })).toBe(true);
 
     const fits = await page.evaluate(() => Math.max(document.body.scrollWidth, document.documentElement.scrollWidth) <= innerWidth + 1);
     expect(fits).toBe(true);
 });
 
-test('blocked music preview keeps focused manual reload and the existing streaming destinations', async ({ page }) => {
+test('blocked on-site audio keeps focused manual reload and the existing streaming destinations', async ({ page }) => {
     await page.clock.install();
     let attempts = 0;
-    await page.route('https://embed.music.apple.com/**', async route => {
+    await page.route('**/play/stalemate/andrea.m4a', async route => {
         attempts += 1;
         if (attempts === 1) await route.abort('internetdisconnected');
-        else await route.fulfill({ contentType: 'text/html', body: '<!doctype html><p>Deliberate replacement frame fixture</p>' });
+        else await route.fulfill({ path: ANDREA_M4A });
     });
     await page.goto('/');
     const row = page.locator('[data-listen-track]').first();
-    const button = row.locator('[data-listen-load]');
+    const button = row.locator('[data-site-play]');
     const destinations = await row.locator('a').evaluateAll(links => links.map(link => link.href));
     await button.focus();
     await page.keyboard.press('Enter');
     await expect.poll(() => attempts).toBe(1);
-    await page.evaluate(() => { window.__oldMusicFrame = document.querySelector('[data-listen-embed] iframe'); });
-    // WebKit can leave an aborted cross-origin navigation pending. Exercise
-    // the product's existing bounded deadline, rather than assuming load fires.
     await page.clock.fastForward(10_001);
     await expect(button).toHaveText('Reload player');
     await expect(button).toBeFocused();
     const status = row.getByRole('status');
-    await expect(status).toHaveText(/If the player does not play|taking longer|could not be opened/);
-    await expect(button).toHaveAccessibleName('Reload Andrea by Stalemate on Apple Music');
+    await expect(status).toHaveText(/taking longer|could not be opened/);
+    await expect(button).toHaveAccessibleName('Reload Andrea here');
     await expect(status).not.toHaveText(/^(Playing|Successfully loaded|Playback started)/i);
     await expect(button).toHaveAttribute('aria-describedby', await status.getAttribute('id'));
     await page.keyboard.press('Enter');
     await expect.poll(() => attempts).toBe(2);
-    await expect(button).toHaveText('Reload player');
-    await expect(row.locator('iframe')).toHaveCount(1);
-    expect(await page.evaluate(() => window.__oldMusicFrame.isConnected)).toBe(false);
-    await expect(row.frameLocator('iframe').locator('body')).toContainText('Deliberate replacement frame fixture');
+    await expect(button).toHaveAttribute('aria-pressed', 'true');
     expect(await row.locator('a').evaluateAll(links => links.map(link => link.href))).toEqual(destinations);
 });
 
-test('stalled music preview cancels late navigation and offers only deliberate retries', async ({ page }) => {
+test('stalled on-site audio cancels late load and offers only deliberate retries', async ({ page }) => {
     await page.clock.install();
     const attempts = [];
-    await page.route('https://embed.music.apple.com/**', route => { attempts.push(route); });
+    await page.route('**/play/stalemate/andrea.m4a', route => { attempts.push(route); });
     try {
         await page.goto('/');
         const row = page.locator('[data-listen-track]').first();
-        const button = row.locator('[data-listen-load]');
+        const button = row.locator('[data-site-play]');
         const status = row.getByRole('status');
         await button.focus();
         await page.keyboard.press('Enter');
@@ -121,48 +123,50 @@ test('stalled music preview cancels late navigation and offers only deliberate r
         await expect(button).toBeFocused();
         await page.keyboard.press('Enter');
         expect(attempts).toHaveLength(1);
-        await page.evaluate(() => { window.__oldMusicFrame = document.querySelector('[data-listen-embed] iframe'); });
         await page.clock.fastForward(10_001);
         await expect(status).toContainText('taking longer');
-        await expect(row.locator('iframe')).toHaveCount(0);
         await expect(button).toHaveText('Reload player');
         await page.clock.fastForward(30_000);
         expect(attempts).toHaveLength(1);
         await page.keyboard.press('Enter');
         await expect.poll(() => attempts.length).toBe(2);
-        await page.evaluate(() => {
-            window.__oldMusicFrame.dispatchEvent(new Event('load'));
-            window.__oldMusicFrame.dispatchEvent(new Event('error'));
-        });
-        await expect(status).toContainText('Opening');
         await expect(button).toHaveAttribute('aria-disabled', 'true');
-        await attempts[1].fulfill({ contentType: 'text/html', body: '<!doctype html><p>Reload fixture</p>' });
-        await expect(button).toHaveText('Reload player');
-        await expect(row.frameLocator('iframe').locator('body')).toContainText('Reload fixture');
+        await expect(status).toContainText('Opening');
+        await attempts[1].fulfill({ path: ANDREA_M4A });
+        await expect.poll(() => page.evaluate(() => {
+            const el = document.getElementById('stalemate-site-player');
+            return el && !el.paused;
+        })).toBe(true);
+        await expect(button).toHaveAttribute('aria-pressed', 'true');
     } finally {
         for (const route of attempts) await route.abort().catch(() => {});
     }
 });
 
-test('leaving an opening music preview retires it before history return', async ({ page }) => {
+test('leaving an opening on-site preview retires it before history return', async ({ page }) => {
     const attempts = [];
-    await page.route('https://embed.music.apple.com/**', route => { attempts.push(route); });
+    await page.route('**/play/stalemate/andrea.m4a', route => { attempts.push(route); });
     try {
         await page.goto('/');
-        const button = page.locator('[data-listen-load]').first();
+        const button = page.locator('[data-listen-track]').first().locator('[data-site-play]');
         await button.click();
         await expect.poll(() => attempts.length).toBe(1);
-        await page.evaluate(() => window.addEventListener('pagehide', () => sessionStorage.setItem('test-music-preview-exit', JSON.stringify({
-            frames: document.querySelectorAll('[data-listen-embed] iframe').length,
-            label: document.querySelector('[data-listen-load]').textContent,
-            busy: document.querySelector('[data-listen-load]').getAttribute('aria-disabled'),
-            status: document.querySelector('[data-listen-embed] [role=status]').textContent
+        await page.evaluate(() => window.addEventListener('pagehide', () => sessionStorage.setItem('test-site-audio-exit', JSON.stringify({
+            paused: document.getElementById('stalemate-site-player')?.paused ?? true,
+            label: document.querySelector('[data-listen-track] [data-site-play]').textContent,
+            busy: document.querySelector('[data-listen-track] [data-site-play]').getAttribute('aria-disabled'),
+            status: document.querySelector('[data-listen-track] [data-site-play-status]')?.textContent || ''
         })), { once: true }));
         await page.goto('/qr/');
-        expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem('test-music-preview-exit')))).toEqual({ frames: 0, label: 'Play here', busy: null, status: '' });
+        expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem('test-site-audio-exit')))).toEqual({
+            paused: true,
+            label: '▶ PLAY HERE',
+            busy: null,
+            status: ''
+        });
         await page.goBack();
-        await expect(button).toHaveText('Play here');
-        await expect(page.locator('[data-listen-embed] iframe')).toHaveCount(0);
+        await expect(button).toHaveText('▶ PLAY HERE');
+        expect(await page.evaluate(() => document.getElementById('stalemate-site-player')?.paused ?? true)).toBe(true);
         expect(attempts).toHaveLength(1);
     } finally {
         for (const route of attempts) await route.abort().catch(() => {});

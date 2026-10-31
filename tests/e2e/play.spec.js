@@ -20,7 +20,7 @@ test('/play/ is discoverable and hosts same-origin games that remain noindex', a
         const el = document.getElementById('stalemate-site-player');
         return el && el.src.includes('/play/stalemate/manic.m4a');
     })).toBe(true);
-    await expect(strip.locator('a.sm-listen')).toContainText('Listen to Stalemate');
+    await expect(strip.locator('button.sm-listen')).toHaveAttribute('aria-pressed', 'true');
     const card = page.locator('a.game-card[href="TurdAnoid.html"]');
     await expect(card).toBeVisible();
     await card.click();
