@@ -7,6 +7,17 @@ their pending-CI and StoryPool-admission statements are historical.
 
 ## Start here
 
+**Current ARM package and native accessibility now pass.** Read the
+[bb40 package/GUI receipt](hangout-internal/HANGOUT_NATIVE_PACKAGE_BB40_20261031.md)
+and its actual screenshot/native snapshots. Archive/source/signature/architecture
+and the production transport lifecycle passed. The frozen Mac app exposes the
+full invitation error, clears it on edit and restores it on Return-key retry.
+Window Close cleaned up without changing saved settings. Preserve the original83
+failure and the first Cmd-Q cleanup observation. ARM/Windows/Linux jobs
+passed and Intel was still building at08:28:42 in the same run41181580413; do not dispatch
+another. Physical two-way music and full VoiceOver remain unqualified. This newer
+receipt supersedes the pending fixed-package AX statements in older entries.
+
 **Latest native source: `bb40fac`, qualified application CI.** Read the
 [current native readiness checkpoint](hangout-internal/HANGOUT_NATIVE_READINESS_20261031.md).
 PR #409 includes the existing Windows work and merged launcher/accessibility fix;

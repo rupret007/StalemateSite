@@ -6,6 +6,16 @@ below; historical sections describe their own revisions and earlier limitations.
 
 ## Current private release and demonstrated guests
 
+[Current bb40 package and actual ARM GUI](HANGOUT_NATIVE_PACKAGE_BB40_20261031.md):
+the official ARM archive passed checksum/CRC, embedded source, strict signature,
+architecture, manifest and production ready/hello/Stop checks. The normal app now
+exposes the full invitation recovery explanation in macOS accessibility, clears
+it on edit and restores it on keyboard retry. Back/window Close worked; no app or
+transport remained and saved settings metadata was unchanged. The original83 AX
+failure and first Cmd-Q cleanup failure remain. No audio/provider was started.
+ARM/Windows/Linux jobs passed; Intel was still building at08:28:42. This receipt
+supersedes the earlier pending fixed-package AX statements below.
+
 [Current native source and dated remaining work](HANGOUT_NATIVE_READINESS_20261031.md):
 PR #409 merged `bb40fac` includes the existing Windows work and current launcher
 fixes. Reviewed/actual-CI/merged trees match. The full module loop passed 12,760

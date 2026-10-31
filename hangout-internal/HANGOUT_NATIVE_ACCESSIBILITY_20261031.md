@@ -36,15 +36,18 @@ all four new accessibility-profile journeys passed. All14 applicable checks
 passed. The [source-bound CI receipt](../pr-assets/beta-collaboration/20261031/native408-accessibility-ci-receipt.json)
 links the actual run and retains the raw-log digest. Local application Ruff and
 compileall passed; local Qt runtime tests were not run because that environment
-has no PySide6. A new frozen package still needs an actual macOS accessibility
-observation. No VoiceOver or comprehensive screen-reader qualification is claimed.
+has no PySide6. The subsequent [actual bb40 frozen-app observation](HANGOUT_NATIVE_PACKAGE_BB40_20261031.md)
+now demonstrates the full macOS accessibility explanation, editing and keyboard
+retry. It has its own screenshot/snapshots; the original83 failure below remains.
+No VoiceOver or comprehensive screen-reader qualification is claimed.
 
 [Windows application PR409](https://github.com/rupret007/webjam/pull/409) retains
 this merged fix and combines the existing verifier, directory/ACL protections,
 native diagnostic and Music guidance. Its167 focused portable checks passed
 with no skips; all ten recorded test/runtime inputs stayed byte-identical after
 the launcher merge. The combined source's full CI and actual eight-case Windows
-diagnostic remain pending. Older native Windows evidence is kept separate.
+diagnostic subsequently passed; see the [current source/CI receipt](HANGOUT_NATIVE_READINESS_20261031.md).
+Those Windows CI controls remain separate from physical music.
 
 The app closed through its normal launcher close action. The06:06UTC kernel
 inventory found no WebJam/transport process; saved settings size, modification
