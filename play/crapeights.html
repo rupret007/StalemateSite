@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mobile-game="crapeights">
 <head>
 <meta name="robots" content="noindex,nofollow">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<script src="assets/suite-loading.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -10,8 +11,12 @@
   <meta name="theme-color" content="#121a11">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="assets/turdsuite.css">
-  <script src="games/table-continue-core.js"></script>
-  <script src="assets/turdsuite.js"></script>
+<link rel="stylesheet" href="assets/arcade.css">
+  <script src="games/table-continue-core.js?v=bc5fab705a134ab5"></script>
+  <script src="games/suite-progress-core.js?v=3c92de426327c7d1"></script>
+  <script src="assets/suite-progress.js?v=cf46f758fae8dff1"></script>
+  <script src="assets/suite-share.js?v=ad4aecc45730b022"></script>
+  <script src="assets/turdsuite.js?v=3a5cafdb70bf7654"></script>
   <title>Crappy Eights</title>
   <style>
     :root{
@@ -201,9 +206,9 @@
       border-radius:14px;background:transparent;padding:10px 9px 9px;
       display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;min-height:150px;
     }
-    .pile h3{font-size:.66rem;text-transform:uppercase;letter-spacing:.16em;color:var(--gold-soft);text-shadow:0 1px 2px rgba(0,0,0,.5),0 0 10px rgba(255,215,106,.3);display:flex;align-items:center;gap:6px}
-    .pile h3::before,.pile h3::after{content:"";width:18px;height:1px;background:linear-gradient(90deg,transparent,rgba(255,215,106,.55));}
-    .pile h3::after{background:linear-gradient(90deg,rgba(255,215,106,.55),transparent)}
+    .pile h2{font-size:.66rem;text-transform:uppercase;letter-spacing:.16em;color:var(--gold-soft);text-shadow:0 1px 2px rgba(0,0,0,.5),0 0 10px rgba(255,215,106,.3);display:flex;align-items:center;gap:6px}
+    .pile h2::before,.pile h2::after{content:"";width:18px;height:1px;background:linear-gradient(90deg,transparent,rgba(255,215,106,.55));}
+    .pile h2::after{background:linear-gradient(90deg,rgba(255,215,106,.55),transparent)}
     .pile-meta{font-size:.72rem;color:#d9f2e0;letter-spacing:.02em;padding:2px 9px;border-radius:999px;background:rgba(0,0,0,.28);box-shadow:inset 0 1px 2px rgba(0,0,0,.3)}
     .pile-stack{position:relative;width:var(--pile-w);height:var(--pile-h);margin:4px 0 6px}
     .pile-stack::before,.pile-stack::after{content:"";position:absolute;inset:0;border-radius:11px;pointer-events:none}
@@ -487,7 +492,7 @@
       .pile-card[data-rank="K"]::after,.card-btn[data-rank="K"]::after{bottom:8px;font-size:.62rem}
       .panel p,.panel li,.panel div{font-size:.75rem}
       .suit-btn .suit-glyph{font-size:1.8rem}
-      .pile h3{font-size:.6rem;letter-spacing:.12em;white-space:nowrap}.pile h3::before,.pile h3::after{width:10px}
+      .pile h2{font-size:.6rem;letter-spacing:.12em;white-space:nowrap}.pile h2::before,.pile h2::after{width:10px}
       .suit-chip{font-size:.68rem;padding:6px 4px}
       .action-dock .btn{padding:8px 5px;font-size:11.5px;letter-spacing:0}
     }
@@ -522,7 +527,7 @@
     .opp-card.danger{box-shadow:none;border-color:#ffad8e88}.opp-name{font-size:13px;margin-top:4px;max-width:100%;overflow:hidden;text-overflow:ellipsis}.opp-meta{font-size:10px;margin-top:2px;white-space:nowrap}.opp-score{font-size:10px;color:#e7ce98;margin-top:3px}.ce-avatar{width:54px;height:54px;margin:0;border:1px solid #dbd0a544;background:#142f2c;display:block;overflow:hidden;box-shadow:0 4px 9px #0004}.ce-avatar svg{width:100%;height:100%;display:block}.opp-card.active .ce-avatar{animation:none;border-color:#eeca79;box-shadow:0 0 0 2px #eeca7933}
     .opp-cards{height:48px;width:100%;position:relative;padding:0;margin-top:5px;display:block}.mini-back{position:absolute;left:calc(50% - 14px);top:0;width:28px;height:39px;margin:0;transform-origin:50% 120%;border-radius:4px;background:repeating-linear-gradient(45deg,#d3b86d33 0 1px,transparent 1px 5px),#173b35;box-shadow:inset 0 0 0 2px #dfd9b9,0 2px 4px #0008}.mini-back::after{content:"8";color:#eeca79;font-size:17px;font-family:Georgia,serif;font-weight:bold}
     .table-stamp{position:absolute;left:50%;top:156px;transform:translate(-50%,-50%) rotate(-5deg);border:1px solid #dbe3b71a;border-radius:50%;width:340px;height:185px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#dbe3b71a;pointer-events:none}.table-stamp b{font-size:24px;letter-spacing:.13em}.table-stamp span{font-size:9px;letter-spacing:.3em;margin-top:8px}
-    .pile-row{position:absolute;left:50%;top:154px;transform:translateX(-50%);display:flex;gap:28px;width:max-content}.pile{padding:0;gap:4px;min-height:0}.pile h3{font-size:9px;letter-spacing:.16em;text-shadow:none}.pile h3::before,.pile h3::after{display:none}.pile-stack{margin:3px 0 4px}.pile-meta{font-size:10px;background:#092f2588;box-shadow:none;padding:3px 8px}.draw-back:not(:disabled){animation:none}.draw-back::after{content:"DIRTY DECK";font-size:6px;letter-spacing:.1em;bottom:12px}.draw-back{font-size:30px}
+    .pile-row{position:absolute;left:50%;top:154px;transform:translateX(-50%);display:flex;gap:28px;width:max-content}.pile{padding:0;gap:4px;min-height:0}.pile h2{font-size:9px;letter-spacing:.16em;text-shadow:none}.pile h2::before,.pile h2::after{display:none}.pile-stack{margin:3px 0 4px}.pile-meta{font-size:10px;background:#092f2588;box-shadow:none;padding:3px 8px}.draw-back:not(:disabled){animation:none}.draw-back::after{content:"DIRTY DECK";font-size:6px;letter-spacing:.1em;bottom:12px}.draw-back{font-size:30px}
     .suit-row{position:absolute;bottom:0;left:50%;transform:translateX(-50%);display:flex;gap:5px}.suit-chip{font-size:10px;padding:5px 9px;white-space:nowrap;border-color:#d4d1a633;background:#103c3266;box-shadow:none}.suit-chip.active{box-shadow:none;transform:none}
     .hand-wrap{border:0;border-top:1px solid #d4d1a63d;border-radius:0;background:transparent;box-shadow:none;padding:10px 0 0}.hand-head{margin:0;gap:8px}.hand-head strong{font-size:11px;letter-spacing:.12em;white-space:nowrap;color:#fff0c8}.hand-head strong::before{content:none}.hand-head span{border:0;background:none;padding:0;font-size:11px}.hand-head strong span{font-size:12px}.hand-head #handRisk{margin-left:auto;color:#d9e5d9}.hand-head .btn{min-height:28px;font-size:10px;padding:4px 7px;border-color:#c6dbc344;color:#d9e5d9}.selection-note{display:block;font-size:11px;color:#bdd4c5;margin:5px 0 0;min-height:15px}
     .hand-rail{padding:18px 7px 10px;min-height:148px;gap:10px;overscroll-behavior-x:contain;scrollbar-width:thin;scrollbar-color:#b6cead55 transparent;touch-action:pan-x pan-y;scroll-snap-type:x proximity}.card-btn{scroll-snap-align:start;animation:none;font-size:16px}.card-btn.playable{animation:none;box-shadow:0 0 0 2px #a3e5c0,0 7px 10px #001d1980;transform:translateY(-3px)}.card-btn:not(.playable){opacity:1;filter:saturate(.65) brightness(.83)}.card-btn.selected,.card-btn.selected:hover:not(:disabled){transform:translateY(-9px);box-shadow:0 0 0 3px #eeca79,0 10px 16px #001d1980}.card-btn .center,.pile-card .center{font-size:34px}.card-btn>div:first-child,.pile-card>div:first-child,.card-btn .small,.pile-card .small{font-size:17px}.card-btn[data-face]:not([data-face=""])::after,.pile-card[data-face]:not([data-face=""])::after{font-size:7px;padding:3px 6px;bottom:8px;transform:translateX(-50%);letter-spacing:.04em}
@@ -533,7 +538,7 @@
     #suitChooser .overlay-card{text-align:center}.suit-grid{width:276px;max-width:100%;height:290px;position:relative;display:block;margin:8px auto 18px}.suit-btn{position:absolute;width:88px;height:92px;min-height:0;gap:3px;border-radius:17px;padding:8px}.suit-btn[data-suit="S"]{top:0;left:calc(50% - 44px)}.suit-btn[data-suit="H"]{right:0;top:98px}.suit-btn[data-suit="D"]{bottom:0;left:calc(50% - 44px)}.suit-btn[data-suit="C"]{left:0;top:98px}.suit-btn .suit-name{font-size:9px;opacity:1;letter-spacing:.06em}.suit-btn .suit-glyph{font-size:30px}.suit-count{font-size:9px;color:#234436}.suit-btn.recommended{box-shadow:0 0 0 3px #eeca79,0 5px 16px #0004}.wheel-center{position:absolute;top:112px;left:calc(50% - 30px);width:60px;height:60px;line-height:58px;font-family:Georgia,serif;font-size:48px;color:#eeca79;border:1px solid #eeca7955;border-radius:50%}
     button:focus-visible,summary:focus-visible,a:focus-visible{outline:3px solid #fff2b8;outline-offset:4px}.card-btn:focus-visible{outline-color:#fff2b8;outline-offset:3px}.ce-skip{position:fixed;top:-90px;left:12px;background:#ffe2a3;color:#172c22;padding:12px;z-index:11000}.ce-skip:focus{top:12px}
     @media(min-width:761px){.hand-rail{justify-content:safe center}.table{padding-top:18px}.arena{margin:0 30px}.hand-wrap{margin:0 35px}.action-dock{margin:0 35px}.status{margin:0 35px}}
-    @media(max-width:760px){body{padding:12px 10px}.shell{width:100%;padding:0;border-radius:0}.topbar{flex-wrap:nowrap;gap:8px;margin:0 0 12px}.topbar>div:first-child{min-width:0}.topbar h1{font-size:26px;white-space:nowrap}.brand-kicker{font-size:8px;letter-spacing:.18em}.brand-eight{font-size:18px;width:22px;height:29px;margin-left:2px}.topbar p{font-size:10px}.mobile-menu{width:auto;align-self:center;flex-shrink:0}.mobile-menu details{padding:4px 8px;border-radius:8px;background:#0a241d;position:relative}.mobile-menu summary{font-size:10px;letter-spacing:0;min-height:34px;line-height:22px}.mobile-menu-actions{position:absolute;right:0;top:100%;width:250px;z-index:30;padding:10px;background:#0a241d;border:1px solid #809780;border-radius:8px}.hud{padding:8px 0;grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:9px}.hud-card:nth-child(4),.hud-card:nth-child(6),.hud-card:nth-child(7){display:none}.hud-card:nth-child(5){border:0}.hud-card .k{font-size:8px}.hud-card .v{font-size:11px}.table{border-width:4px;padding:12px 10px 10px;border-radius:22px;gap:8px}.table::before{border-radius:15px;inset:5px}.turn-banner strong{font-size:16px}.turn-banner span#turnHint{font-size:10px}.flow-badge{width:32px;height:32px;font-size:25px;line-height:28px}.arena{height:300px}.opp-card{width:100px;padding:6px 1px 0;border-radius:12px}#oppCard1{left:0;top:15px}#oppCard3{right:0;top:15px}#oppCard2{top:0}.ce-avatar{width:43px;height:43px}.opp-name{font-size:12px}.opp-meta,.opp-score{font-size:9px}.opp-cards{height:37px;transform:scale(.75)}.mini-back{width:23px;height:33px;left:calc(50% - 11px)}.table-stamp{width:220px;height:170px;top:182px}.table-stamp b{font-size:14px}.table-stamp span{font-size:7px}.pile-row{top:139px;gap:28px}.pile h3{font-size:8px}.pile-meta{font-size:9px}.pile-stack{margin:2px 0 3px}:root{--pile-w:73px;--pile-h:101px;--hand-w:74px;--hand-h:106px}.suit-row{gap:4px;bottom:0}.suit-chip{font-size:9px;padding:4px 7px}.hand-rail{min-height:137px;padding:16px 5px 10px;gap:9px}.hand-head strong{font-size:10px;letter-spacing:.04em}.hand-head #handRisk{font-size:10px}.hand-head .btn{font-size:9px}.selection-note{font-size:10px}.action-dock{gap:5px}.action-dock .btn{min-height:46px;font-size:11px;padding:8px 3px}.status{font-size:10px;min-height:30px;line-height:1.4}.card-btn>div:first-child,.pile-card>div:first-child,.card-btn .small,.pile-card .small{font-size:15px}.card-btn[data-face]:not([data-face=""])::after,.pile-card[data-face]:not([data-face=""])::after{font-size:6px;padding:3px 5px}.sidebar{gap:8px}.panel{padding:10px}.panel summary{font-size:11px}.panel summary span{display:none}#standingsText{gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}.score-line{font-size:11px}.table-event{top:114px;font-size:10px;padding:5px 10px}.table-event small{font-size:9px}}
+    @media(max-width:760px){body{padding:12px 10px}.shell{width:100%;padding:0;border-radius:0}.topbar{flex-wrap:nowrap;gap:8px;margin:0 0 12px}.topbar>div:first-child{min-width:0}.topbar h1{font-size:26px;white-space:nowrap}.brand-kicker{font-size:8px;letter-spacing:.18em}.brand-eight{font-size:18px;width:22px;height:29px;margin-left:2px}.topbar p{font-size:10px}.mobile-menu{width:auto;align-self:center;flex-shrink:0}.mobile-menu details{padding:4px 8px;border-radius:8px;background:#0a241d;position:relative}.mobile-menu summary{font-size:10px;letter-spacing:0;min-height:34px;line-height:22px}.mobile-menu-actions{position:absolute;right:0;top:100%;width:250px;z-index:30;padding:10px;background:#0a241d;border:1px solid #809780;border-radius:8px}.hud{padding:8px 0;grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:9px}.hud-card:nth-child(4),.hud-card:nth-child(6),.hud-card:nth-child(7){display:none}.hud-card:nth-child(5){border:0}.hud-card .k{font-size:8px}.hud-card .v{font-size:11px}.table{border-width:4px;padding:12px 10px 10px;border-radius:22px;gap:8px}.table::before{border-radius:15px;inset:5px}.turn-banner strong{font-size:16px}.turn-banner span#turnHint{font-size:10px}.flow-badge{width:32px;height:32px;font-size:25px;line-height:28px}.arena{height:300px}.opp-card{width:100px;padding:6px 1px 0;border-radius:12px}#oppCard1{left:0;top:15px}#oppCard3{right:0;top:15px}#oppCard2{top:0}.ce-avatar{width:43px;height:43px}.opp-name{font-size:12px}.opp-meta,.opp-score{font-size:9px}.opp-cards{height:37px;transform:scale(.75)}.mini-back{width:23px;height:33px;left:calc(50% - 11px)}.table-stamp{width:220px;height:170px;top:182px}.table-stamp b{font-size:14px}.table-stamp span{font-size:7px}.pile-row{top:139px;gap:28px}.pile h2{font-size:8px}.pile-meta{font-size:9px}.pile-stack{margin:2px 0 3px}:root{--pile-w:73px;--pile-h:101px;--hand-w:74px;--hand-h:106px}.suit-row{gap:4px;bottom:0}.suit-chip{font-size:9px;padding:4px 7px}.hand-rail{min-height:137px;padding:16px 5px 10px;gap:9px}.hand-head strong{font-size:10px;letter-spacing:.04em}.hand-head #handRisk{font-size:10px}.hand-head .btn{font-size:9px}.selection-note{font-size:10px}.action-dock{gap:5px}.action-dock .btn{min-height:46px;font-size:11px;padding:8px 3px}.status{font-size:10px;min-height:30px;line-height:1.4}.card-btn>div:first-child,.pile-card>div:first-child,.card-btn .small,.pile-card .small{font-size:15px}.card-btn[data-face]:not([data-face=""])::after,.pile-card[data-face]:not([data-face=""])::after{font-size:6px;padding:3px 5px}.sidebar{gap:8px}.panel{padding:10px}.panel summary{font-size:11px}.panel summary span{display:none}#standingsText{gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}.score-line{font-size:11px}.table-event{top:114px;font-size:10px;padding:5px 10px}.table-event small{font-size:9px}}
     @media(max-width:360px){body{padding:10px 7px}.topbar h1{font-size:23px}.topbar p{font-size:9px}.brand-eight{display:none}.table{padding-left:7px;padding-right:7px}.arena{height:291px}.opp-card{width:83px}.ce-avatar{width:37px;height:37px}.opp-cards{transform:scale(.8);margin-top:0}.opp-name{font-size:11px}.opp-meta,.opp-score{font-size:8px}#oppCard1,#oppCard3{top:10px}.pile-row{top:131px}.suit-chip{font-size:8px;padding:4px 6px}.hand-head{gap:4px}.hand-head #handRisk{font-size:9px}.overlay{padding:12px}.overlay-card{padding:18px;max-height:calc(100dvh - 24px)}.overlay-card h2{font-size:23px}.guide-cards{gap:5px}.guide-cards small{font-size:8px}.guide-cards span{font-size:7px}.suit-grid{width:254px}.suit-btn{width:80px}.suit-btn[data-suit="S"],.suit-btn[data-suit="D"]{left:calc(50% - 40px)}}
     .hud-card.hot.pressure{animation:cePressurePulse 1.6s ease-in-out infinite}
     .shell.play-bump{animation:ceTableSettle .24s ease-out}
@@ -553,6 +558,7 @@
     #playerHand .card-btn.selected,#playerHand .card-btn:focus-visible{transform:translateY(-28px) rotate(0deg);z-index:80;box-shadow:0 0 0 3px #ffe199,0 0 22px #ffdc7966,0 16px 18px #001b1980}
     #playerHand .card-btn>div:first-child{font-size:20px;left:8px;top:7px}#playerHand .card-btn .center{font-size:38px}
     .hand-head .btn{min-height:44px}.hand-head{min-height:44px}.selection-note{margin:0;font-size:11px}
+    .table-settings{display:flex;align-items:center;gap:6px;flex-shrink:0}
     .drawer-launch{min-height:44px;padding:8px 12px;font:700 11px 'Trebuchet MS',sans-serif;letter-spacing:.03em;color:#ead5a3;border:1px solid #c1b47966;border-radius:8px;background:#102b23;cursor:pointer}
     .drawer-titlebar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:16px}.drawer-titlebar h2{font-size:22px}.drawer-card{width:min(640px,100%)}.sidebar{gap:12px}.panel summary{min-height:44px;line-height:44px}.panel{padding:12px}.panel ul{padding-left:18px}
     .difficulty-label{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px;color:#e7dfc4}.difficulty-label select{font:700 13px 'Trebuchet MS',sans-serif;color:#f5efd3;background:#153c30;border:1px solid #a2b997;border-radius:8px;min-height:44px;padding:8px 12px;max-width:150px}#difficultyHint{font-size:11px;line-height:1.5;margin-top:9px;color:#bdcfc8}#roundTwoStats{font-size:11px;line-height:1.7;color:#e8d69f;margin-top:8px}
@@ -562,6 +568,9 @@
     @keyframes ceIdleBob{0%,100%{translate:0 0}50%{translate:0 -3px}}@keyframes ceBlink{0%,44%,48%,100%{transform:scaleY(1)}46%{transform:scaleY(.08)}}@keyframes ceCardTease{0%,100%{translate:0 -2px}50%{translate:0 -10px}}@keyframes ceReact{0%,100%{rotate:0deg}30%{rotate:-9deg}70%{rotate:7deg}}
     .round-trophy{height:88px;margin:4px auto 12px;width:110px;display:none;filter:drop-shadow(0 6px 14px #eeca7966)}.round-trophy.show{display:block}.round-trophy svg{width:100%;height:100%}
     #roundReceipt{margin-top:15px;text-align:left}#roundOverlay .overlay-card{width:min(640px,100%)}#roundOverlay .overlay-flavor{font-size:11px}#roundScoreboard{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;font-size:11px}.round-score{padding:8px 4px;background:#ffffff08;border-radius:7px;text-align:center}.round-score b{display:block;font-size:17px;color:#eeca79;margin-top:5px}
+    /* Result actions remain inside the visible scroll surface above the music strip. */
+    #roundOverlay{bottom:var(--mobile-footer,0px)}
+    #roundOverlay .overlay-card{max-height:calc(100dvh - 40px - var(--mobile-footer,0px));overscroll-behavior:contain}
     #suitChooser[style*="flex"] .suit-grid{animation:ceWheelBloom .4s cubic-bezier(.2,.8,.3,1)}@keyframes ceWheelBloom{from{transform:scale(.78) rotate(-12deg);opacity:.2}to{transform:none;opacity:1}}
     @media(min-width:761px){body{padding:16px 20px;min-height:100dvh}.shell{min-height:calc(100dvh - 32px);display:flex;flex-direction:column}.table{min-height:calc(100dvh - 174px)}.arena{flex:1;min-height:240px;height:auto;max-height:560px}.pile-row{top:48%}.table-stamp{top:47%;width:420px;height:230px}.turn-banner{min-height:40px}.hand-wrap{padding-top:5px}.topbar{margin-bottom:12px}.status{margin-top:2px}#oppCard1,#oppCard3{top:22%}.table-event{top:35%}}
     @media(max-width:760px){.arena{height:255px}.pile-row{top:109px}.table-stamp{top:164px}.opp-card{width:92px}.ce-avatar{width:43px;height:43px}.opp-score{display:none}.opp-cards{height:33px;margin-top:2px}#oppCard1,#oppCard3{top:8px}.opp-card.active::after{font-size:7px;top:-8px;padding:2px 5px}.table-event{top:93px}.topbar{margin-bottom:8px}.topbar p{margin-top:3px}.hud{padding:6px 0;margin-bottom:8px}.table{padding-top:9px;gap:6px}.hand-wrap{padding-top:3px}.hand-head #handRisk{font-size:9px}.hand-head .btn{font-size:9px}.turn-banner{min-height:36px}.turn-banner strong{font-size:14px}.turn-banner span#turnHint{font-size:9px}.drawer-launch{font-size:9px;padding:4px 7px}.turn-banner>div:first-child{min-width:0}.flow-badge{width:28px;height:28px;font-size:22px;line-height:24px}.sidebar{display:flex}.drawer-card{padding:16px}.panel summary span{display:none}.round-trophy{height:65px;margin-bottom:5px}.overlay-card{padding:18px}#roundScoreboard{gap:4px;font-size:10px}.hand-rail.opponent-threat{box-shadow:none}}
@@ -599,15 +608,38 @@
 </style>
 <link rel="stylesheet" href="stalemate/play-music-pref.css">
 <script src="../js/music-preference.js"></script>
+    @media (min-width: 981px) {
+      /* Match the shell's 20px height budget at tall desktop/tablet sizes too. */
+      body { padding-block: 10px; }
+      .shell { height: calc(100dvh - var(--mobile-footer, 0px) - 20px); min-height: 0; }
+      .hud { grid-template-columns: repeat(7, minmax(0, 1fr)) auto; }
+      #suite-difficulty-mount { grid-column: auto; align-self: center; }
+      .layout, .table { min-height: 0; }
+      .table { overflow: auto; padding: 8px 16px; gap: 4px; }
+      .arena { min-height: 190px; max-height: none; }
+      .pile-row { top: 52px; }
+      .hand-wrap, .action-dock { flex-shrink: 0; }
+    }
+    @media (max-width: 980px) and (orientation: landscape) and (max-height: 400px) {
+      html[data-mobile-game="crapeights"] .shell .layout > .table { padding: 4px !important; gap: 2px; }
+      html[data-mobile-game="crapeights"] .table > .turn-banner { grid-column: 1; }
+      html[data-mobile-game="crapeights"] .table > .hand-wrap { grid-row: 1 / 3; }
+      html[data-mobile-game="crapeights"] .table .pile-row { top: 44px !important; }
+      html[data-mobile-game="crapeights"] .table .pile-stack { --pile-w: 46px; --pile-h: 64px; }
+    }
+  </style>
+<link rel="stylesheet" href="assets/mobile-fit.css">
+<script src="assets/mobile-fit.js" defer></script>
+<link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
 </head>
-<body class="suite-ambient">
+<body class="suite-ambient arcade" data-arcade-game="crapeights">
   <a class="ce-skip" href="#playTable">Skip to card table</a>
   <div class="overlay" id="welcomeGuide" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
     <div class="overlay-card">
       <div class="guide-brand" aria-hidden="true">8<span>THE SEWER SOCIAL CLUB</span></div>
       <h2 id="guideTitle">Good cards. Dirty tricks.</h2>
       <p>Empty your hand before three sewer regulars do. Match the pile's <strong>suit or rank</strong>, or throw a wild 8.</p>
-      <div class="guide-cards" aria-label="Action cards">
+      <div class="guide-cards" role="group" aria-label="Action cards">
         <div><b>2</b><span>DRAW TWO</span><small>Next player draws 2<br>and misses a turn</small></div>
         <div><b>J</b><span>SKIP</span><small>Next player<br>sits this one out</small></div>
         <div><b>Q</b><span>REVERSE</span><small>Send play in<br>the other direction</small></div>
@@ -626,15 +658,17 @@
 
   <div class="overlay" id="roundOverlay" role="dialog" aria-modal="true" aria-labelledby="roundTitle" aria-describedby="roundSummary">
     <div class="overlay-card" id="roundOverlayCard" data-tone="victory">
-      <div class="round-trophy" id="roundTrophy" aria-label="Sewer Crown trophy"><svg viewBox="0 0 120 100" aria-hidden="true"><path d="M33 15H87V40Q87 67 60 73Q33 67 33 40Z" fill="#f0c960" stroke="#fff0b0" stroke-width="3"/><path d="M33 23H16V35Q16 53 37 53M87 23H104V35Q104 53 83 53" fill="none" stroke="#dfb45d" stroke-width="8"/><path d="M55 72H65V86H83V96H37V86H55Z" fill="#c79a43"/><text x="60" y="51" text-anchor="middle" font-family="Georgia,serif" font-size="34" fill="#684e1d">8</text><path d="M48 9 46 0 58 6 68 0 72 9" fill="#ffedac"/></svg></div><div class="overlay-kicker" id="roundKicker">Round Riot</div>
+      <div class="round-trophy" id="roundTrophy" role="img" aria-label="Sewer Crown trophy"><svg viewBox="0 0 120 100" aria-hidden="true"><path d="M33 15H87V40Q87 67 60 73Q33 67 33 40Z" fill="#f0c960" stroke="#fff0b0" stroke-width="3"/><path d="M33 23H16V35Q16 53 37 53M87 23H104V35Q104 53 83 53" fill="none" stroke="#dfb45d" stroke-width="8"/><path d="M55 72H65V86H83V96H37V86H55Z" fill="#c79a43"/><text x="60" y="51" text-anchor="middle" font-family="Georgia,serif" font-size="34" fill="#684e1d">8</text><path d="M48 9 46 0 58 6 68 0 72 9" fill="#ffedac"/></svg></div><div class="overlay-kicker" id="roundKicker">Round Riot</div>
       <h2 id="roundTitle">Round Over</h2>
       <p id="roundSummary" role="status" aria-live="polite" aria-atomic="true">Summary</p>
-      <div id="roundReceipt" aria-label="Leftover card scoring receipt"></div>
+      <div id="roundReceipt" role="group" aria-label="Leftover card scoring receipt"></div>
       <p class="overlay-flavor" id="roundFlavor">Somebody definitely made a scene.</p>
       <div class="panel" style="margin-top:8px;">
         <h3><span class="h-ico">&#x1F4CA;</span>Scoreboard</h3>
         <div id="roundScoreboard">-</div>
       </div>
+      <p id="eightsProgressStatus" class="suite-progress-result" role="status" hidden></p>
+      <div id="eightsResultShare"></div>
       <div class="overlay-actions">
         <button class="btn hot" id="nextRoundBtn">Next Round</button>
         <button class="btn" id="newMatchOverlayBtn">New Match</button>
@@ -658,7 +692,7 @@
     </div>
   </div>
 
-  <div class="shell">
+  <div class="shell" role="main">
     <div class="topbar">
       <div>
         <div class="brand-kicker">THE SEWER SOCIAL CLUB</div><h1>Crappy Eights<span class="brand-eight" aria-hidden="true">8</span></h1>
@@ -691,23 +725,24 @@
       <div class="hud-card"><div class="k">Active Suit</div><div class="v" id="suitText">-</div></div>
       <div class="hud-card hot"><div class="k">Your Cards</div><div class="v" id="youCardsText">0</div></div>
       <div class="hud-card"><div class="k">Leader</div><div class="v" id="leaderText">-</div></div>
+      <div class="suite-hud-settings" id="suite-difficulty-mount"></div>
     </div>
 
     <div class="layout">
       <section class="table" id="playTable" tabindex="-1" aria-label="Crappy Eights card table">
-        <div class="turn-banner"><div><strong id="turnPrompt">Your move</strong><span id="turnHint">Match suit or rank.</span></div><span id="flowBadge" class="flow-badge">↻</span><button class="drawer-launch" id="tableDrawerBtn" aria-haspopup="dialog">Table details</button></div>
+        <div class="turn-banner"><div><strong id="turnPrompt">Your move</strong><span id="turnHint">Match suit or rank.</span></div><span id="flowBadge" class="flow-badge" role="img">↻</span><div class="table-settings" data-suite-music-slot><button class="drawer-launch" id="tableDrawerBtn" aria-haspopup="dialog">Table details</button></div></div>
         <div class="status" id="statusText" role="status" aria-live="polite" aria-atomic="true">Deal in progress. Match suit, sling chaos, and pretend this smell is strategic.</div>
         <div class="arena">
         <div class="table-stamp" aria-hidden="true"><b>THE DIRTY DECK</b><span>EST. IN THE SEWER</span></div>
         <div class="table-event" id="tableEvent" aria-hidden="true"></div>
         <div class="opponents">
-          <div class="opp-card" id="oppCard1"><div class="opp-name" id="oppName1">Bot 1</div><div class="opp-meta" id="oppMeta1">Cards: 0</div><div class="opp-cards" id="oppBacks1"></div></div>
-          <div class="opp-card" id="oppCard2"><div class="opp-name" id="oppName2">Bot 2</div><div class="opp-meta" id="oppMeta2">Cards: 0</div><div class="opp-cards" id="oppBacks2"></div></div>
-          <div class="opp-card" id="oppCard3"><div class="opp-name" id="oppName3">Bot 3</div><div class="opp-meta" id="oppMeta3">Cards: 0</div><div class="opp-cards" id="oppBacks3"></div></div>
+          <div class="opp-card" role="group" id="oppCard1"><div class="opp-name" id="oppName1">Bot 1</div><div class="opp-meta" id="oppMeta1">Cards: 0</div><div class="opp-cards" id="oppBacks1"></div></div>
+          <div class="opp-card" role="group" id="oppCard2"><div class="opp-name" id="oppName2">Bot 2</div><div class="opp-meta" id="oppMeta2">Cards: 0</div><div class="opp-cards" id="oppBacks2"></div></div>
+          <div class="opp-card" role="group" id="oppCard3"><div class="opp-name" id="oppName3">Bot 3</div><div class="opp-meta" id="oppMeta3">Cards: 0</div><div class="opp-cards" id="oppBacks3"></div></div>
         </div>
         <div class="pile-row">
-          <div class="pile"><h3>Draw Pile</h3><div class="pile-stack draw-stack"><button class="draw-back" id="drawPileBtn" title="Draw" aria-label="Draw one card">&#x1F4A9;</button></div><div class="pile-meta" id="drawMeta">0 cards</div></div>
-          <div class="pile"><h3>Discard Pile</h3><div class="pile-stack discard-stack"><div class="pile-card" id="discardCard"><div>A</div><div class="center">&#9827;</div><div class="small">A<br>&#9827;</div></div></div><div class="pile-meta" id="discardMeta">Top card</div></div>
+          <div class="pile"><h2>Draw Pile</h2><div class="pile-stack draw-stack"><button class="draw-back" id="drawPileBtn" title="Draw" aria-label="Draw one card">&#x1F4A9;</button></div><div class="pile-meta" id="drawMeta">0 cards</div></div>
+          <div class="pile"><h2>Discard Pile</h2><div class="pile-stack discard-stack"><div class="pile-card" id="discardCard"><div>A</div><div class="center">&#9827;</div><div class="small">A<br>&#9827;</div></div></div><div class="pile-meta" id="discardMeta">Top card</div></div>
         </div>
         <div class="suit-row" id="suitRow">
           <div class="suit-chip" data-suit-chip="S">Spades &#9824;</div>
@@ -752,7 +787,7 @@
   </div>
 
   <script src="games/crapeights-ai.js"></script>
-  <script src="games/crapeights-presentation.js"></script>
+  <script src="games/crapeights-presentation.js?v=7243470350b7a5dc"></script>
   <script src="games/crapeights-table.js"></script>
   <script src="games/crapeights-hand.js"></script>
   <script src="games/crapeights-effects.js"></script>
@@ -847,6 +882,7 @@
     let focusSuspendedRound = false;
     let resumeHumanAutoPassAfterFocus = false;
     let soundEnabled = true;
+    window.Suite?.setSoundLocalEnabled?.(() => soundEnabled);
     const tableAudio = CrapeightsPresentation.createAudio({ readLocalEnabled: () => soundEnabled });
     const tableEffects = window.CrapeightsEffects?.createController({
       seat: index => index === 0 ? document.querySelector('.hand-wrap') : ui.oppCards[index - 1],
@@ -858,8 +894,58 @@
     let aiMemory = CrapeightsAI.createMemory();
     let sortMode = 'suit';
     let drawerOpen = false;
-    let aiDifficulty = 'normal';
-    try { aiDifficulty = CrapeightsAI.normalizeDifficulty?.(localStorage.getItem('crapeights_difficulty_v1')) || 'normal'; } catch (e) {}
+    function suiteToEightsAi(level) {
+      const id = typeof level === 'string' ? level.trim().toLowerCase() : 'normal';
+      if (id === 'hard') { return 'sharp'; }
+      if (id === 'easy') { return 'easy'; }
+      return 'normal';
+    }
+    function migrateLegacyEightsDifficulty() {
+      try {
+        const suiteKey = 'turdsuite_difficulty_v1';
+        const legacyKey = 'crapeights_difficulty_v1';
+        let suiteRaw = localStorage.getItem(suiteKey);
+        const legacyRaw = localStorage.getItem(legacyKey);
+        if (suiteRaw === 'sharp') {
+          suiteRaw = 'hard';
+          if (window.Suite && Suite.difficulty) {
+            Suite.difficulty.set('hard');
+          } else {
+            localStorage.setItem(suiteKey, 'hard');
+          }
+        }
+        if ((suiteRaw == null || suiteRaw === '') && legacyRaw) {
+          const leg = CrapeightsAI.normalizeDifficulty?.(legacyRaw) || 'normal';
+          const suiteLevel = leg === 'sharp' ? 'hard' : leg;
+          if (window.Suite && Suite.difficulty) {
+            Suite.difficulty.set(suiteLevel);
+          } else {
+            localStorage.setItem(suiteKey, suiteLevel);
+          }
+          return leg;
+        }
+      } catch (e) { /* ignore */ }
+      return null;
+    }
+    function loadAiDifficultyPref() {
+      try {
+        const migrated = migrateLegacyEightsDifficulty();
+        if (migrated) {
+          return migrated;
+        }
+        if (window.Suite && Suite.difficulty) {
+          return suiteToEightsAi(Suite.difficulty.get());
+        }
+        const suiteRaw = localStorage.getItem('turdsuite_difficulty_v1');
+        if (suiteRaw != null && suiteRaw !== '') {
+          return suiteToEightsAi(suiteRaw);
+        }
+        return CrapeightsAI.normalizeDifficulty?.(localStorage.getItem('crapeights_difficulty_v1')) || 'normal';
+      } catch (e) {
+        return 'normal';
+      }
+    }
+    let aiDifficulty = loadAiDifficultyPref();
     let eventTimer = null;
     let dialogReturnFocus = null;
     let nextCardId = 1;
@@ -898,6 +984,7 @@
 
     function toggleSound() {
       soundEnabled = !soundEnabled;
+      syncSuiteMusic();
       saveSoundPref();
       tableAudio.syncMute();
       updateSoundButtons();
@@ -1148,12 +1235,18 @@
     }
 
     const dealtCardIds = new Set(); // cosmetic: which hand cards have already played their deal-in animation
+    function focusHandCard(card) {
+      if (!card) return;
+      ui.playerHand.dispatchEvent(new CustomEvent('suite:hand-reveal', { detail: { card } }));
+      card.focus({ preventScroll: true });
+    }
     function renderPlayerHand() {
       const hand = players[0] ? players[0].hand : [];
       if (!ui.playerHand) return;
       const focusId = document.activeElement?.dataset.cardId;
       const focusIndex = [...ui.playerHand.children].indexOf(document.activeElement);
-      const geometry = window.CrapeightsHand?.layout(hand.length, ui.playerHand.clientWidth || 300, window.innerWidth > 760 && window.innerHeight <= 760);
+      const footerHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mobile-footer')) || 0;
+      const geometry = window.CrapeightsHand?.layout(hand.length, ui.playerHand.clientWidth || 300, window.innerWidth > 760 && window.innerHeight - footerHeight <= 760);
       if (geometry) {
         ui.playerHand.style.height = `${geometry.height}px`;
         ui.playerHand.style.setProperty('--fan-w', `${geometry.cardWidth}px`);
@@ -1197,10 +1290,11 @@
         fragment.appendChild(btn);
       });
       ui.playerHand.replaceChildren(fragment);
+      ui.playerHand.dispatchEvent(new CustomEvent('suite:hand-rendered'));
       if (focusId) {
         const nextFocus = ui.playerHand.querySelector(`[data-card-id="${focusId}"]`)
           || ui.playerHand.children[Math.min(Math.max(0, focusIndex), ordered.length - 1)];
-        nextFocus?.focus({ preventScroll: true });
+        focusHandCard(nextFocus);
       }
 
     }
@@ -1209,10 +1303,64 @@
       return { id: card.id, suit: card.suit, rank: card.rank };
     }
 
+    // Optional progress is independent of the legacy game/stat save keys.
+    let progressMeta = null;
+    const cardResultShare = window.SuiteShare?.create({ host: document.getElementById('eightsResultShare'), game: 'crapeights' });
+    function cardProgressDifficulty() { return aiDifficulty === 'sharp' ? 'hard' : aiDifficulty; }
+    function newCardProgress(legacy = false) {
+      const id = window.SuiteProgress?.newRunId('crapeights');
+      return id ? { v: 1, id, difficulty: legacy ? 'unknown' : cardProgressDifficulty(), pending: [] } : null;
+    }
+    function trackCardProgressDifficulty() {
+      if (!progressMeta || !(roundActive) || ['mixed', 'unknown'].includes(progressMeta.difficulty)) return;
+      if (progressMeta.difficulty !== cardProgressDifficulty()) progressMeta.difficulty = 'mixed';
+    }
+    function clearCardProgressResult() {
+      cardResultShare?.setResult(null);
+      const status = document.getElementById('eightsProgressStatus');
+      status.textContent = ''; status.hidden = true;
+    }
+    function restoreCardProgress(meta, live) {
+      progressMeta = meta && meta.v === 1 && typeof meta.id === 'string'
+        ? JSON.parse(JSON.stringify(meta)) : (live ? newCardProgress(true) : null);
+      if (progressMeta && live && !progressMeta.roundId) {
+        progressMeta.roundId = window.SuiteProgress?.newRunId('crapeights');
+      }
+    }
+    function beginCardProgressRound() {
+      if (!progressMeta) progressMeta = newCardProgress();
+      trackCardProgressDifficulty();
+      if (progressMeta) {
+        progressMeta.roundId = window.SuiteProgress?.newRunId('crapeights');
+        progressMeta.pending = [];
+      }
+      clearCardProgressResult();
+    }
+    function publishCardProgress() {
+      const pending = progressMeta?.pending || [];
+      const earned = [];
+      let storageUnavailable = false;
+      for (const event of pending) {
+        const receipt = window.SuiteProgress?.record(event);
+        if (receipt?.newlyEarned) earned.push(...receipt.newlyEarned);
+        if (receipt?.storageAvailable === false) storageUnavailable = true;
+      }
+      cardResultShare?.setResult(pending.find(event => event.history !== false) || null);
+      const status = document.getElementById('eightsProgressStatus');
+      if (earned.length) {
+        status.textContent = 'Goal complete: ' + earned.map(goal => goal.title).join(' · ');
+        status.hidden = false;
+      } else if (storageUnavailable) {
+        status.textContent = 'Progress could not be saved on this device.';
+        status.hidden = false;
+      }
+    }
+
     function persistTable() {
       if (!window.Suite || !Suite.table || !players.length) return;
       Suite.table.remember('crapeights.html', {
         kind: 'crapeights',
+        ...(progressMeta ? { progressMeta } : {}),
         v: 1,
         players: players.map((player) => ({
           name: player.name,
@@ -1264,6 +1412,7 @@
       historyLog = Array.isArray(snap.historyLog) ? snap.historyLog.slice(0, 12) : [];
       nextCardId = snap.nextCardId;
       lastOverlay = snap.overlay || null;
+      restoreCardProgress(snap.progressMeta, !snap.overlay?.matchFinished);
       return true;
     }
 
@@ -1289,6 +1438,7 @@
         );
       }
       updateAll();
+      if (!roundActive && progressMeta?.pending?.length) publishCardProgress();
       if (!lastOverlay) {
         applyPendingEffectsAtTurnStart();
         scheduleTurnIfNeeded();
@@ -1298,6 +1448,7 @@
     }
 
     function updateAll() {
+      trackCardProgressDifficulty();
       updateHud();
       renderDiscard();
       renderPlayerHand();
@@ -1461,6 +1612,7 @@
       if (ui.roundOverlay) ui.roundOverlay.style.display = 'flex';
       syncDialogFocus(ui.roundOverlay);
       persistTable();
+      publishCardProgress();
     }
 
     function hideRoundOverlay() {
@@ -1532,6 +1684,7 @@
     }
 
     function endRound(winnerIndex) {
+      trackCardProgressDifficulty();
       roundActive = false;
       focusSuspendedRound = false;
       resumeHumanAutoPassAfterFocus = false;
@@ -1553,6 +1706,15 @@
         summary = `${winner.name} reached ${winner.score}. Match complete in round ${roundNumber}.`;
         stats.matchesPlayed += 1;
         if (winnerIndex === 0) stats.matchesWon += 1;
+      }
+      if (progressMeta?.roundId) {
+        trackCardProgressDifficulty();
+        const common = { game: 'crapeights', mode: 'match-200', difficulty: progressMeta.difficulty, target: MATCH_TARGET, rounds: roundNumber };
+        progressMeta.pending = [{ ...common, id: progressMeta.roundId, kind: 'round', history: false,
+          outcome: winnerIndex === 0 ? 'win' : 'loss', roundWon: winnerIndex === 0, score: winnerIndex === 0 ? points : 0 }];
+        if (matchFinished) progressMeta.pending.push({ ...common, id: progressMeta.id, kind: 'match',
+          outcome: winnerIndex === 0 ? 'win' : 'loss', matchWon: winnerIndex === 0,
+          score: players[0].score, playerScore: players[0].score, opponentScore: Math.max(...players.slice(1).map(player => player.score)) });
       }
       saveStats();
       if (window.CrapeightsEffects) {
@@ -1722,6 +1884,7 @@
       document.getElementById('tableEvent').classList.remove('show');
       CrapeightsPresentation.clearEffects();
       tableEffects?.clear();
+      beginCardProgressRound();
       deck = buildDeck();
       discard = [];
       activeSuit = 'C';
@@ -1749,6 +1912,8 @@
     }
 
     function startFreshMatch() {
+      window.Suite?.stopSounds?.();
+      progressMeta = newCardProgress();
       clearAiTimer();
       clearHumanAutoPassTimer();
       focusSuspendedRound = false;
@@ -1810,12 +1975,16 @@
     function syncDialogFocus(opening) {
       const modal = currentDialog();
       document.querySelector('.shell').inert = !!modal;
+      document.querySelector('.ce-skip').hidden = !!modal;
       if (opening) {
         if (!dialogReturnFocus) dialogReturnFocus = document.activeElement;
         const target = opening.querySelector('.recommended') || opening.querySelector('button:not([disabled])');
         target?.focus({ preventScroll: true });
       } else if (!modal && dialogReturnFocus) {
-        const target = dialogReturnFocus.isConnected ? dialogReturnFocus : ui.drawBtn;
+        const previous = dialogReturnFocus;
+        const menu = previous.closest?.('details:not([open])')?.querySelector(':scope > summary');
+        const target = menu || (previous.isConnected && previous.tabIndex >= 0 && !previous.disabled
+          ? previous : document.getElementById('playTable'));
         dialogReturnFocus = null;
         target?.focus({ preventScroll: true });
       } else if (modal && !modal.contains(document.activeElement)) {
@@ -1824,10 +1993,18 @@
     }
 
     function trapDialogTab(event, modal) {
-      const buttons = [...modal.querySelectorAll('button:not([disabled]),a[href],select,summary')].filter(el => el.style.display !== 'none');
-      const index = buttons.indexOf(document.activeElement);
-      if (event.shiftKey && index <= 0) { event.preventDefault(); buttons.at(-1)?.focus(); }
-      else if (!event.shiftKey && (index < 0 || index === buttons.length - 1)) { event.preventDefault(); buttons[0]?.focus(); }
+      const visible = el => el && el.getClientRects().length > 0 && !['hidden', 'collapse'].includes(getComputedStyle(el).visibility);
+      const controls = [...modal.querySelectorAll('button:not([disabled]),a[href],select:not([disabled]),summary')].filter(visible);
+      const hub = document.querySelector('.suite-back-pill');
+      // On phones the shared Hub replaces the hidden dialog exit. Include it
+      // in the focus loop even though it lives outside the overlay's DOM tree.
+      if (!controls.some(el => el.matches('a[href="./"]')) && visible(hub)) controls.push(hub);
+      if (!controls.length) return;
+      const index = controls.indexOf(document.activeElement);
+      const next = index < 0 ? (event.shiftKey ? controls.length - 1 : 0)
+        : (index + (event.shiftKey ? -1 : 1) + controls.length) % controls.length;
+      event.preventDefault();
+      controls[next].focus();
     }
 
     function openTableDrawer() {
@@ -1849,6 +2026,9 @@
       scheduleTurnIfNeeded();
     }
     function updateDifficulty() {
+      const previousProgressDifficulty = progressMeta?.difficulty;
+      trackCardProgressDifficulty();
+      if (progressMeta?.difficulty !== previousProgressDifficulty) persistTable();
       document.getElementById('aiDifficulty').value = aiDifficulty;
       document.getElementById('difficultyHint').textContent = {
         easy: 'Easy · relaxed rivals who play simple matches. Great for learning dirty tricks.',
@@ -1857,6 +2037,10 @@
       }[aiDifficulty];
     }
     function wireEvents() {
+      const tableMenu = document.querySelector('.mobile-menu details');
+      tableMenu?.addEventListener('click', event => {
+        if (event.target.closest('button, a')) tableMenu.open = false;
+      });
       // The suite's document touchend zoom guard cancels a second rapid tap,
       // even when it targets a different button. Native manipulation controls
       // already suppress double-tap zoom; preserve their native click sequence.
@@ -1870,11 +2054,39 @@
       document.getElementById('aiDifficulty').addEventListener('change', event => {
         playSfx('ui');
         aiDifficulty = CrapeightsAI.normalizeDifficulty?.(event.target.value) || 'normal';
-        try { localStorage.setItem('crapeights_difficulty_v1', aiDifficulty); } catch (e) {}
+        const suiteLevel = aiDifficulty === 'sharp' ? 'hard' : aiDifficulty;
+        try {
+          if (window.Suite && Suite.difficulty) {
+            Suite.difficulty.set(suiteLevel);
+          } else {
+            localStorage.setItem('turdsuite_difficulty_v1', suiteLevel);
+          }
+          localStorage.setItem('crapeights_difficulty_v1', aiDifficulty);
+        } catch (e) {}
         updateDifficulty();
       });
-      if (window.ResizeObserver) new ResizeObserver(() => renderPlayerHand()).observe(ui.playerHand);
-      else window.addEventListener('resize', renderPlayerHand);
+      if (window.Suite && Suite.difficulty) {
+        Suite.difficulty.onChange((level) => {
+          aiDifficulty = suiteToEightsAi(level);
+          const sel = document.getElementById('aiDifficulty');
+          if (sel && sel.value !== aiDifficulty) {
+            sel.value = aiDifficulty;
+          }
+          updateDifficulty();
+        });
+      }
+      // Rendering the observed hand synchronously can resize it again during
+      // WebKit's observer delivery. Coalesce presentation work on the next frame.
+      let handResizeFrame = 0;
+      const scheduleHandResize = () => {
+        if (handResizeFrame) return;
+        handResizeFrame = requestAnimationFrame(() => {
+          handResizeFrame = 0;
+          renderPlayerHand();
+        });
+      };
+      if (window.ResizeObserver) new ResizeObserver(scheduleHandResize).observe(ui.playerHand);
+      else window.addEventListener('resize', scheduleHandResize);
 
       if (ui.playBtn) ui.playBtn.addEventListener('click', playSelectedCard);
       if (ui.drawBtn) ui.drawBtn.addEventListener('click', drawForHuman);
@@ -1909,7 +2121,7 @@
             else if (pendingWildCard) { hideSuitChooser(); updateAll(); }
             return;
           }
-          if (onboardingOpen && (e.code === 'Enter' || e.code === 'Space') && !e.target.closest?.('button')) {
+          if (onboardingOpen && (e.code === 'Enter' || e.code === 'Space') && !e.target.closest?.('button,a[href],select,summary')) {
             e.preventDefault(); hideWelcomeGuide();
           }
           return;
@@ -1920,7 +2132,7 @@
         if (focused >= 0 && ['ArrowLeft','ArrowRight','Home','End'].includes(e.code)) {
           e.preventDefault();
           const next = cards[CrapeightsTable.focusIndex(focused, e.code, cards.length)];
-          next.focus({ preventScroll: true }); next.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+          focusHandCard(next); next.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
           return;
         }
         // Let Enter/Space activate the focused native control once.
@@ -1934,10 +2146,32 @@
       });
     }
 
+    function suiteMusicBlocked() {
+      try {
+        if (window.Suite && typeof Suite.isMusicEnabled === 'function' && !Suite.isMusicEnabled()) return true;
+      } catch (err) { /* ignore */ }
+      return !soundEnabled;
+    }
+
+    function syncSuiteMusic() {
+      try {
+        if (window.Suite && typeof Suite.music === 'function') {
+          Suite.music().then(function (player) { if (player) player.sync(); });
+        }
+      } catch (err) { /* ignore */ }
+    }
+
+    try {
+      if (window.Suite && typeof Suite.setMusicGameBlocked === 'function') {
+        Suite.setMusicGameBlocked(suiteMusicBlocked);
+      }
+    } catch (err) { /* ignore */ }
+
     function init() {
       players = createPlayers();
       soundEnabled = loadSoundPref();
       updateSoundButtons();
+      updateDifficulty();
       wireEvents();
       const restoredTable = tryRestoreTable();
       if (!restoredTable) {
@@ -1956,6 +2190,7 @@
     });
 
     init();
+    window.SuiteLoading?.ready();
   
 
 </script>

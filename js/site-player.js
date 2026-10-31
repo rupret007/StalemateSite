@@ -11,6 +11,8 @@
     var audio = null;
     var currentId = null;
     var bound = false;
+    var statusEl = null;
+    var statusTimer = null;
 
     function pref() {
         return global.StalemateMusicPref;
@@ -34,12 +36,40 @@
         return mediaRoot() + track.file;
     }
 
+    function getStatusEl() {
+        if (!statusEl && global.document) {
+            statusEl = global.document.getElementById('stalemate-site-play-status');
+            if (!statusEl) {
+                statusEl = global.document.createElement('p');
+                statusEl.id = 'stalemate-site-play-status';
+                statusEl.setAttribute('role', 'status');
+                statusEl.setAttribute('aria-live', 'polite');
+                statusEl.hidden = true;
+                global.document.body.appendChild(statusEl);
+            }
+        }
+        return statusEl;
+    }
+
+    function showMusicOffStatus() {
+        var el = getStatusEl();
+        if (!el) return;
+        if (statusTimer) global.clearTimeout(statusTimer);
+        el.textContent = 'Site music is off. Turn it on with the Music toggle.';
+        el.hidden = false;
+        statusTimer = global.setTimeout(function () {
+            el.hidden = true;
+            el.textContent = '';
+        }, 4000);
+    }
+
     function getAudio() {
         if (!audio && global.document) {
             audio = global.document.createElement('audio');
             audio.preload = 'none';
             audio.setAttribute('playsinline', '');
             audio.id = 'stalemate-site-player';
+            audio.setAttribute('data-stalemate-site-audio', '');
             global.document.body.appendChild(audio);
             audio.addEventListener('play', syncButtons);
             audio.addEventListener('pause', syncButtons);
@@ -76,6 +106,7 @@
         var track = TRACKS[id];
         if (!track) return Promise.resolve();
         if (!musicOn()) {
+            showMusicOffStatus();
             syncButtons();
             return Promise.resolve();
         }
@@ -106,7 +137,11 @@
             if (!button || button.tagName !== 'BUTTON') return;
             event.preventDefault();
             var id = button.getAttribute('data-site-play');
-            if (!musicOn()) return;
+            if (!musicOn()) {
+                showMusicOffStatus();
+                syncButtons();
+                return;
+            }
             toggle(id);
         });
         global.addEventListener('stalemate-music-change', function () {

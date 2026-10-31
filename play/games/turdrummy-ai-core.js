@@ -134,11 +134,37 @@
     return score + (draw * 2 - 1) * amplitude;
   }
 
+  const SUITE_DIFFICULTY_KEY = 'turdsuite_difficulty_v1';
+
+  function suiteToAiLevel(raw) {
+    const d = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+    if (d === 'easy') { return 'easy'; }
+    if (d === 'hard') { return 'sharp'; }
+    return 'normal';
+  }
+
+  function suiteFromAiLevel(level) {
+    if (level === 'sharp') { return 'hard'; }
+    if (level === 'easy') { return 'easy'; }
+    return 'normal';
+  }
+
   /** @returns {'easy'|'normal'|'sharp'} the saved level, defaulting to Normal. */
   function loadDifficulty(storage) {
     try {
-      const raw = (storage || root.localStorage).getItem(DIFFICULTY_KEY);
-      return Object.prototype.hasOwnProperty.call(AI_PROFILES, raw) ? raw : DEFAULT_LEVEL;
+      const store = storage || root.localStorage;
+      const suiteRaw = store.getItem(SUITE_DIFFICULTY_KEY);
+      if (suiteRaw !== null && suiteRaw !== undefined && suiteRaw !== '') {
+        const mapped = suiteToAiLevel(suiteRaw);
+        if (Object.prototype.hasOwnProperty.call(AI_PROFILES, mapped)) {
+          return mapped;
+        }
+      }
+      const raw = store.getItem(DIFFICULTY_KEY);
+      if (raw !== null && raw !== undefined && Object.prototype.hasOwnProperty.call(AI_PROFILES, raw)) {
+        return raw;
+      }
+      return DEFAULT_LEVEL;
     } catch {
       return DEFAULT_LEVEL;
     }
@@ -147,7 +173,9 @@
   function saveDifficulty(storage, level) {
     const next = Object.prototype.hasOwnProperty.call(AI_PROFILES, level) ? level : DEFAULT_LEVEL;
     try {
-      (storage || root.localStorage).setItem(DIFFICULTY_KEY, next);
+      const store = storage || root.localStorage;
+      store.setItem(DIFFICULTY_KEY, next);
+      store.setItem(SUITE_DIFFICULTY_KEY, suiteFromAiLevel(next));
     } catch {
       /* ignore */
     }

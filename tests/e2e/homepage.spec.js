@@ -8,8 +8,8 @@ test('homepage is a finished band page with originals, show and real links', asy
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.locator('#band-title')).toContainText('Stalemate');
     await expect(page.locator('#home a.button--listen')).toHaveAttribute('href', '#about');
-    await expect(page.locator('#home a.button--hot')).toHaveCount(1);
-    await expect(page.locator('#home a.button--hot')).toHaveAttribute('href', 'https://rockinoctober.com');
+    await expect(page.locator('#home a.button--hot')).toHaveCount(2);
+    for (const cta of await page.locator('#home a.button--hot').all()) await expect(cta).toHaveAttribute('href', 'https://studio801.ticketspice.com/rockin-october');
     const video = page.locator('.hero-video__player');
     await expect(video).toBeVisible();
     await expect(video).not.toHaveAttribute('autoplay');
@@ -28,7 +28,7 @@ test('homepage is a finished band page with originals, show and real links', asy
     await expect(page.locator('#merch')).toHaveCount(0);
     await expect(page.locator('[data-embed]')).toHaveCount(0);
     await expect(page.locator('iframe')).toHaveCount(0);
-    await expect(page.locator('form')).toHaveCount(0);
+    await expect(page.locator('[data-contact-form]')).toHaveCount(1);
     await expect(page.locator('#home')).toContainText('Rockin’ October');
     await expect(page.locator('#home')).toContainText('Los Amigo’s');
     await expect(page.locator('.hero__tag')).toContainText('All originals. All too loud.');
@@ -57,10 +57,11 @@ test('homepage is a finished band page with originals, show and real links', asy
     expect(await page.locator('meta[name="description"]').getAttribute('content')).not.toMatch(/SoCal/);
     expect(await page.locator('meta[property="og:description"]').getAttribute('content')).not.toMatch(/SoCal/);
     expect(await page.locator('meta[name="twitter:description"]').getAttribute('content')).not.toMatch(/SoCal/);
-    await expect(page.locator('body')).not.toContainText(/ticket/i);
-    await expect(page.locator('body')).not.toContainText(/\bJeff\b/);
-    await expect(page.locator('body')).not.toContainText(/\bChe\b/);
-    await expect(page.locator('body')).not.toContainText(/\bSean\b/);
+    await expect(page.locator('.hero-show__cta .button--hot')).toHaveText('Get Saturday tickets');
+    const members = page.getByRole('list', { name: 'Band members' });
+    await expect(members.getByRole('listitem')).toHaveText([
+        'Sean Bass and Vocals', 'Jeff Guitars and Vocals', 'Che’ Drums and Vocals'
+    ]);
     const metadata = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent());
     expect(metadata['@type']).toBe('MusicGroup');
     expect(metadata.name).toBe('Stalemate');
@@ -137,23 +138,46 @@ for (const width of [320, 390, 768, 1440]) {
 
 test.describe('homepage without JavaScript', () => {
     test.use({ javaScriptEnabled: false });
-    test('keeps about, the show facts and festival link usable', async ({ page }) => {
-        await page.goto('/');
+    for (const path of ['/', '/StalemateSite/']) {
+      test(`keeps the dated show card and band information usable: ${path}`, async ({ page }) => {
+        await page.goto(path);
         await expect(page.locator('#home a[href="#about"]')).toBeVisible();
-        await expect(page.locator('#home a.button--hot[href="https://rockinoctober.com"]')).toHaveCount(1);
+        await expectStaticShowCard(page);
+        await expect(page.locator('.header-cta')).toHaveText('Follow the band');
+        await expect(page.locator('#listen-title')).toHaveText('Learn the words');
         await expect(page.locator('.hero-video__player source')).toHaveAttribute('src', 'assets/manic.mp4');
-        await expect(page.locator('.hero-show__tie')).toContainText('Hear it loud Oct 24 at Los Amigo’s, Plano');
-        await expect(page.locator('#about')).toContainText('Rockin’ October on Saturday, Oct 24, 4:45 PM');
+        await expect(page.locator('#about')).toContainText(/punk rock/i);
+        expect(await page.locator('body').innerText()).not.toContain('Homework before');
+        await expect(page.locator('a[href="mailto:stalemate.punk@gmail.com"]')).toBeVisible();
         await expect(page.locator('[data-load-preview]')).toHaveCount(0);
         await expect(page.locator('[data-share-band]:not([hidden])')).toHaveCount(0);
-        await expect(page.locator('#about')).toContainText(/punk rock/i);
-        await expect(page.locator('#about dt')).toHaveCount(0);
-        await expect(page.locator('[data-next-show-block]')).toContainText('Rockin’ October');
-        await expect(page.locator('[data-countdown-clock]')).toBeHidden();
-        await expect(page.locator('body')).not.toContainText(/ticket/i);
         await expect(page.locator('body')).not.toContainText(PLACEHOLDER_COPY);
-    });
+      });
+    }
 });
+
+async function expectStaticShowCard(page) {
+    await expect(page.locator('[data-next-show]')).toBeVisible();
+    await expect(page.locator('[data-countdown-clock]')).toBeHidden();
+    await expect(page.locator('[data-countdown-fallback]')).toHaveText('Saturday, Oct 24, 2026 · 4:45 PM Central');
+    await expect(page.locator('[data-next-show-block]')).toContainText('Los Amigo’s, Plano, TX');
+    const ticket = page.getByRole('link', { name: 'Get Saturday tickets', exact: true });
+    await expect(ticket).toBeVisible();
+    await expect(ticket).toHaveAttribute('href', 'https://studio801.ticketspice.com/rockin-october');
+    await expect(page.locator('#show-ticket-guidance')).toBeVisible();
+    await expect(page.locator('#show-ticket-guidance')).toHaveText('Choose October 24, then select Stalemate at checkout.');
+    await expect(page.getByRole('link', { name: 'Full festival lineup' })).toHaveAttribute('href', 'https://rockinoctober.com');
+}
+
+for (const path of ['/', '/StalemateSite/']) {
+    test(`show details and checkout survive a blocked countdown script: ${path}`, async ({ page }) => {
+        await page.route('**/countdown.js', (route) => route.abort('blockedbyclient'));
+        await page.goto(path);
+        await expectStaticShowCard(page);
+        await expect(page.locator('.hero-video__player')).toBeVisible();
+        await expect(page.locator('.header-cta')).toHaveText('Follow the band');
+    });
+}
 
 test.describe('hero countdown before the set', () => {
     test.use({ showTime: '2026-10-15T12:00:00-05:00' });
@@ -173,7 +197,7 @@ test.describe('hero countdown before the set', () => {
         await expect(page.locator('.hero-show__tie')).toContainText('Hear it loud Oct 24 at Los Amigo’s, Plano');
         await expect(page.locator('.hero-video__player')).toBeVisible();
         await expect(page.locator('#home a[href="https://rockinoctober.com"]').first()).toBeVisible();
-        await expect(page.locator('#home')).not.toContainText(/ticket/i);
+        await expect(page.locator('.hero-show__cta .button--hot')).toHaveText('Get Saturday tickets');
         await expect(page.locator('#home')).not.toContainText(/\bJeff\b/);
         const box = await next.boundingBox();
         expect(box.height).toBeGreaterThan(80);
@@ -193,16 +217,16 @@ test.describe('hero countdown after the set', () => {
         await expect(page.locator('#home a[href="#about"]')).toBeVisible();
         const repeat = page.locator('#home .button-row [data-show-cta]');
         await expect(repeat).toBeVisible();
-        await expect(repeat).toHaveText('Catch the next show');
+        await expect(repeat).toHaveText('Follow the band');
         await expect(repeat).toHaveAttribute('href', 'https://www.instagram.com/stalemate.punk/');
         await expect(repeat).toHaveAttribute('data-track', 'show-cta-next-fallback');
-        await expect(page.locator('#home')).not.toContainText('See us Oct 24');
-        await expect(page.locator('#home .hero-show__cta a')).toBeHidden();
+        expect(await page.locator('#home').innerText()).not.toContain('Get Saturday tickets');
+        await expect(page.locator('#home .hero-show__cta .button--hot')).toBeHidden();
         await expect(page.locator('#home')).not.toContainText('Shows coming soon');
         expect(await page.locator('[data-next-show]').boundingBox()).toBeNull();
         await expect(page.locator('[data-upcoming-empty]')).toHaveCount(0);
-        await expect(page.locator('#about')).toContainText('Rockin’ October');
-        await expect(page.locator('body')).not.toContainText(/ticket/i);
+        expect(await page.locator('#about').innerText()).not.toContain('Rockin’ October');
+        expect(await page.locator('body').innerText()).not.toMatch(/ticket/i);
         await expect(page.locator('body')).not.toContainText(PLACEHOLDER_COPY);
     });
 });
@@ -214,11 +238,11 @@ test('the GitHub Pages project prefix serves the same homepage', async ({ page }
 });
 
 test.describe('repeat show button', () => {
-    test('before the show it says See us Oct 24 and links to the show', async ({ page }) => {
+    test('before the show it links directly to Saturday checkout', async ({ page }) => {
         await page.goto('/');
         const repeat = page.locator('#home .button-row [data-show-cta]');
-        await expect(repeat).toHaveText('See us Oct 24');
-        await expect(repeat).toHaveAttribute('href', 'https://rockinoctober.com');
+        await expect(repeat).toHaveText('Get Saturday tickets');
+        await expect(repeat).toHaveAttribute('href', 'https://studio801.ticketspice.com/rockin-october');
         await expect(repeat).toHaveAttribute('data-track', 'show-cta-under-video');
     });
 
@@ -226,27 +250,39 @@ test.describe('repeat show button', () => {
         await page.clock.setFixedTime(new Date('2026-10-24T16:44:59-05:00'));
         await page.goto('/');
         const repeat = page.locator('#home .button-row [data-show-cta]');
-        await expect(repeat).toHaveText('See us Oct 24');
+        await expect(repeat).toHaveText('Get Saturday tickets');
         await page.clock.setFixedTime(new Date('2026-10-24T16:45:01-05:00'));
         await expect(page.locator('[data-next-show]')).toBeHidden();
-        await expect(repeat).toHaveText('Catch the next show');
+        await expect(repeat).toHaveText('Follow the band');
         await expect(repeat).toHaveAttribute('href', 'https://www.instagram.com/stalemate.punk/');
         await expect(repeat).toHaveAttribute('data-track', 'show-cta-next-fallback');
     });
 
-    test.describe('after the show with a next show booked', () => {
-        test.use({ showTime: '2026-11-01T12:00:00-05:00' });
-        test('points at the next show', async ({ page }) => {
-            await page.route(/\/(index\.html)?$/, async (route) => {
-                const res = await route.fetch();
-                const html = (await res.text()).replace('data-show-cta ', 'data-show-cta data-next-starts="2026-12-05T20:00:00-06:00" data-next-href="https://example.com/next" data-next-label="See us Dec 5" ');
-                await route.fulfill({ response: res, body: html });
+    test.describe('complete rollover with a controlled clock', () => {
+        test.use({ showTime: null });
+        for (const path of ['/', '/StalemateSite/']) {
+            test(`all promotions and refresh stay accurate at the cutoff: ${path}`, async ({ page }) => {
+                // Install before all clock calls and load at a paused pre-cutoff time.
+                await page.clock.install({ time: new Date('2026-10-24T16:44:50-05:00') });
+                await page.clock.pauseAt(new Date('2026-10-24T16:44:59-05:00'));
+                await page.goto(path);
+                await expect(page.locator('.header-cta')).toHaveText('Get Saturday tickets');
+                await expect(page.locator('#listen-title')).toHaveText('Homework before the show');
+                await expect(page.locator('[data-show-before]')).toHaveCount(3);
+                for (const promotion of await page.locator('[data-show-before]').all()) await expect(promotion).toBeVisible();
+                await page.clock.runFor(1000);
+                for (const refresh of [false, true]) {
+                    if (refresh) await page.reload();
+                    await expect(page.locator('.header-cta')).toHaveText('Follow the band');
+                    await expect(page.locator('#listen-title')).toHaveText('Learn the words');
+                    await expect(page.locator('[data-next-show]')).toBeHidden();
+                    for (const promotion of await page.locator('[data-show-before]').all()) await expect(promotion).toBeHidden();
+                    expect(await page.locator('body').innerText()).not.toMatch(/Oct 24|Rockin’ October|Homework before|ticket/i);
+                    for (const name of ['meta[name="description"]', 'meta[property="og:description"]', 'meta[name="twitter:description"]']) {
+                        expect(await page.locator(name).getAttribute('content')).not.toMatch(/Oct 24|Rockin/);
+                    }
+                }
             });
-            await page.goto('/');
-            const repeat = page.locator('#home .button-row [data-show-cta]');
-            await expect(repeat).toHaveText('See us Dec 5');
-            await expect(repeat).toHaveAttribute('href', 'https://example.com/next');
-            await expect(repeat).toHaveAttribute('data-track', 'show-cta-next');
-        });
+        }
     });
 });

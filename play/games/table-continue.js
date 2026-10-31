@@ -1,4 +1,4 @@
-import './table-continue-core.js';
+import './table-continue-core.js?v=bc5fab705a134ab5';
 
 const api = globalThis.TurdSuiteTableContinue;
 

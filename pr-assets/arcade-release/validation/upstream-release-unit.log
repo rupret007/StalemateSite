@@ -1,0 +1,18 @@
+Command: npm test -- --maxWorkers=2
+Runtime: v22.22.3
+4dc8730f5bce149c71c5708a1e0996cb0ce2ec0b
+
+> turdanoid@1.0.0 test
+> vitest run --maxWorkers=2
+
+
+ RUN  v4.1.11 /Users/jeffstory/Documents/ChatGPT/Stalemate Website/Turdanoid
+
+
+ Test Files  137 passed (137)
+      Tests  1883 passed (1883)
+   Start at  08:39:40
+   Duration  210.56s (transform 3.87s, setup 0ms, import 17.56s, tests 261.96s, environment 106.35s)
+
+
+Exit: 0; seconds: 211.6

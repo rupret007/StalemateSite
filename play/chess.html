@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en" data-mobile-game="chess">
+<head>
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141b25">
+<title>Royal Flush Chess — Arcade</title>
+<meta name="description" content="Take the throne. Free untimed chess against the computer or a friend on this device.">
+<link rel="icon" href="favicon.svg">
+<script src="assets/suite-loading.js"></script>
+<link rel="stylesheet" href="assets/turdsuite.css">
+<link rel="stylesheet" href="assets/arcade.css">
+<link rel="stylesheet" href="assets/chess/chess.css">
+<link rel="stylesheet" href="assets/chess/chessground.base.css" data-game-required>
+<link rel="stylesheet" href="assets/chess/chess-board.css?v=46d744938ede3695" data-game-required>
+<script src="games/table-continue-core.js?v=bc5fab705a134ab5"></script>
+<script src="assets/turdsuite.js?v=3a5cafdb70bf7654"></script>
+<link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
+<script src="games/suite-progress-core.js?v=3c92de426327c7d1"></script>
+<script src="assets/suite-progress.js?v=cf46f758fae8dff1"></script>
+<script src="assets/suite-share.js?v=ad4aecc45730b022"></script>
+<script type="module" src="games/chess-ui.js?v=c67bce5a3ada7b99" data-game-required></script>
+<link rel="stylesheet" href="stalemate/play-music-pref.css">
+<script src="../js/music-preference.js"></script>
+</head>
+<!-- New chess page and source modules: GPL-3.0-or-later. See assets/chess/credits.html. -->
+<body class="arcade chess-page" data-arcade-game="chess" data-suite-no-difficulty="1" data-suite-no-back="1" data-suite-no-bg="1">
+<a class="chess-skip" href="#board">Skip to chessboard</a>
+<main class="chess-shell">
+<noscript><p>Chess needs JavaScript to play on your device. <a href="./">Return to the arcade</a>.</p></noscript>
+<header class="chess-header">
+<a class="chess-hub" href="./" aria-label="Back to arcade">← Arcade</a>
+<div><p class="chess-kicker">TAKE THE THRONE</p><h1>Royal Flush <span>Chess</span></h1></div>
+<div class="chess-audio-controls"><span data-suite-music-slot></span><button id="mute" type="button" aria-pressed="false">Sound on</button></div>
+</header>
+<section id="setup" class="chess-card chess-setup" aria-labelledby="setup-title">
+<div class="setup-copy"><div id="setup-art" class="setup-art" aria-hidden="true"></div><p class="chess-kicker">ONE BOARD. BIG PLANS.</p><h2 id="setup-title">Your next move?</h2><p>Challenge the computer or share a board with a friend. No clock. No sign-in.</p><button id="continue" type="button" class="primary" hidden>Continue game</button><p id="saved-description" class="subtle"></p></div>
+<form id="new-game">
+<fieldset id="mode" class="mode-picker"><legend>Choose your match</legend><div class="mode-choices">
+<label class="mode-choice"><input type="radio" name="mode" value="computer" checked><span class="mode-art" data-mode-art="computer" aria-hidden="true"></span><strong>1 player</strong><span class="mode-caption">Versus the computer</span></label>
+<label class="mode-choice"><input type="radio" name="mode" value="local"><span class="mode-art" data-mode-art="local" aria-hidden="true"></span><strong>2 players</strong><span class="mode-caption">Share this device</span></label>
+</div></fieldset>
+<div id="computer-options"><label for="level">Opponent</label><select id="level" aria-describedby="level-description"><option value="friendly" selected>Friendly</option><option value="casual">Casual</option><option value="club">Club</option><option value="sharp">Sharp</option></select><p id="level-description" class="subtle"></p><label for="side">Your pieces</label><select id="side"><option value="w">White · you move first</option><option value="b">Black · computer moves first</option><option value="random">Surprise me</option></select></div>
+<p id="local-description" class="subtle" hidden>White goes first. Pass the device after your move. Flip the board whenever you like.</p>
+<button class="primary" type="submit" disabled>Loading chess…</button>
+<button type="button" id="how-to" disabled>How to play</button>
+</form>
+</section>
+<section id="game" class="chess-game" aria-label="Chess game" hidden>
+<div class="chess-table">
+<div class="player-strip"><span id="top-player"></span><span id="top-captured" class="captured"></span></div>
+<div id="board" class="chess-board" role="group" aria-label="Chessboard. Arrow keys move focus. Enter or Space selects a piece and destination. Escape clears selection." tabindex="-1"></div>
+<div class="player-strip"><span id="bottom-player"></span><span id="bottom-captured" class="captured"></span></div>
+</div>
+<aside class="chess-console" aria-label="Game controls and moves">
+<div class="chess-card turn-card"><p id="game-label" class="chess-kicker"></p><h2 id="turn">White to move</h2><p id="status" role="status" aria-live="polite" aria-atomic="true"></p><p id="save-status" class="subtle"></p>
+<div class="chess-actions"><button id="hint" type="button">Hint</button><button id="undo" type="button">Undo turn</button><button id="flip" type="button">Flip board</button><button id="claim" type="button">Claim draw</button></div>
+<div id="engine-recovery" hidden><p>The computer is unavailable. Your position is safe while this page stays open.</p><button id="retry" type="button">Retry computer</button><button id="switch-local" type="button">Continue with a friend</button></div>
+<div id="result" hidden><p id="result-details"></p><button id="rematch" type="button" class="primary">Play again →</button><p id="progress-result" class="suite-progress-result" role="status"></p><div id="chess-result-share"></div></div>
+</div>
+<details id="moves-panel" class="chess-card" open><summary>Moves &amp; review <span id="move-count"></span></summary><div class="review-controls"><button id="previous" type="button" aria-label="Review previous move">←</button><button id="live" type="button">Live board</button><button id="next" type="button" aria-label="Review next move">→</button></div><ol id="moves" class="chess-moves" aria-label="Move history"></ol><p id="no-moves" class="subtle">Your story starts with the first move.</p><div class="capture-review" role="group" aria-label="Captured pieces"><p id="white-captured-review"></p><p id="black-captured-review"></p></div></details>
+<details id="game-options" class="chess-card"><summary>Game options &amp; help</summary><p id="mode-help"></p><div class="chess-actions"><button id="new" type="button">New game</button><button id="resign" type="button">Resign</button><button id="export" type="button">Download PGN</button><button id="help" type="button">How to play</button></div><div id="suite-arcade-a11y-mount" class="chess-contrast-control"></div><p id="records" class="subtle"></p><p class="subtle">Computer strength depends on your device. These are search settings, not Elo ratings. Your results are casual practice.</p></details>
+</aside>
+</section>
+<footer class="chess-footer"><span>Every pawn has potential.</span><a href="assets/chess/credits.html">Engine, licenses &amp; source</a></footer>
+</main>
+<dialog id="guide" aria-labelledby="guide-title">
+<div class="guide-header"><h2 id="guide-title" tabindex="-1" autofocus>Make your move.</h2><button id="dismiss-guide" type="button" aria-label="Close how to play">Close</button></div>
+<p>Tap your piece, then a marked square. White moves first. Win by checkmate: the king is in check with no legal escape.</p>
+<p>Dots show moves; rings show captures. A checked king has a red outline and a CHECK label. Corner marks show the last move.</p>
+<details id="piece-guide"><summary>Meet the pieces</summary><dl id="piece-reference" class="piece-reference"></dl><p>These are movement rules. The marked squares also account for other pieces and keeping your king safe.</p></details>
+<details><summary>Special moves</summary><p><strong>Castling:</strong> select your king and move it two squares toward a rook. Neither piece can have moved, the path must be clear, and your king must be safe at the start, on the way and at the end.</p><p><strong>En passant:</strong> immediately after an enemy pawn moves two squares beside yours, you can capture it diagonally as if it moved only one. The marked destination handles this.</p><p><strong>Promotion:</strong> a pawn reaching the far end becomes your choice of queen, rook, bishop or knight. You can have more than one queen.</p></details>
+<details><summary>Draws &amp; practice aids</summary><p>Stalemate means the player to move has no legal moves and is not in check. It is a draw. Standard insufficient material also ends play.</p><p>Three identical positions or 50 moves per side without a pawn move or capture allow a claim. Claim draw also offers qualifying intended moves, without playing them. Five repetitions or 75 moves end play automatically; checkmate takes priority.</p><p>Hints suggest moves without playing them. In computer practice, Undo takes back your turn and its reply. In local play, Undo takes back one move; both players should agree. Hints and takebacks are counted, and are available until the game ends.</p></details>
+<details><summary>Keyboard &amp; move review</summary><p>Tab to the board, arrows to a square, Enter/Space to select or move, Escape to clear. Flip board changes your view.</p><p>Use the review arrows or choose a move in the history. Live board returns to your unfinished game; Final board returns to a completed result. Download PGN saves the moves as a chess game file.</p></details>
+<button class="primary" id="close-guide" type="button">Got it · let’s play</button>
+</dialog>
+<dialog id="promotion" aria-labelledby="promotion-title"><h2 id="promotion-title">Your pawn earned a promotion.</h2><p>Choose a piece. You can pick more than one queen.</p><div class="promotion-choices"><button type="button" data-promote="q">Queen</button><button type="button" data-promote="r">Rook</button><button type="button" data-promote="b">Bishop</button><button type="button" data-promote="n">Knight</button></div><button id="cancel-promotion" type="button">Cancel move</button></dialog>
+<dialog id="confirm" aria-labelledby="confirm-title"><h2 id="confirm-title"></h2><p id="confirm-text"></p><div class="chess-actions"><button id="confirm-no" type="button">Keep playing</button><button id="confirm-yes" type="button">Confirm</button></div></dialog>
+<dialog id="draw-dialog" aria-labelledby="draw-title"><h2 id="draw-title">Claim a draw</h2><p id="draw-text"></p><label for="draw-move">Intended legal move</label><select id="draw-move"></select><div class="chess-actions"><button id="draw-cancel" type="button">Keep playing</button><button id="draw-confirm" type="button">Declare move &amp; claim</button></div></dialog>
+<script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>
+<script src="../js/track.js" defer></script>
+<script src="stalemate/play-track.js" defer></script>
+<script src="stalemate/play-music-pref.js" defer></script>
+</body>
+</html>

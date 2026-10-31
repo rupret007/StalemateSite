@@ -47,11 +47,11 @@ describe('song title: It\u2019s Only Been 18', () => {
     const files = [];
     walk(repoRoot, files);
 
-    it('uses the canonical title in site-player and overlay playlists', () => {
+    it('uses the canonical title in site-player and suite music', () => {
         const player = readFileSync(path.join(repoRoot, 'js/site-player.js'), 'utf8');
-        const overlay = readFileSync(path.join(repoRoot, 'scripts/stalemate-overlay/stalemate-overlay.js'), 'utf8');
+        const suiteMusic = readFileSync(path.join(repoRoot, 'play/assets/suite-music.js'), 'utf8');
         expect(player).toContain("It\\u2019s Only Been 18");
-        expect(overlay).toContain("title: 'It\\u2019s Only Been 18'");
+        expect(suiteMusic).toContain("It\\u2019s Only Been 18");
     });
 
     it('has no banned variants in repo text/metadata', () => {

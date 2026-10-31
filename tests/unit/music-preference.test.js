@@ -8,7 +8,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 const source = readFileSync(path.join(repoRoot, 'js/music-preference.js'), 'utf8');
 
 function loadPref(storage) {
-    const dom = new JSDOM('<!DOCTYPE html><html><body><button data-music-toggle type="button">Music on</button><audio></audio></body></html>', {
+    const dom = new JSDOM('<!DOCTYPE html><html><body><button data-music-toggle type="button">Music on</button><audio id="stalemate-site-player" data-stalemate-site-audio></audio><video></video></body></html>', {
         url: 'https://stalemate.band/',
         runScripts: 'outside-only'
     });
@@ -41,15 +41,35 @@ describe('music preference', () => {
         expect(store.get('stalemate.music')).toBe('off');
     });
 
-    it('blocks HTMLMediaElement.play when off', async () => {
+    it('blocks stalemate site player play when off', async () => {
         const storage = {
             getItem: (k) => store.get(k) ?? null,
             setItem: (k, v) => store.set(k, v)
         };
         const win = loadPref(storage);
         win.StalemateMusicPref.write('off');
-        const audio = win.document.createElement('audio');
-        await expect(audio.play()).resolves.toBeUndefined();
+        const site = win.document.getElementById('stalemate-site-player');
+        await site.play();
+        expect(site.paused).toBe(true);
+    });
+
+    it('allows user-started non-site media when off', async () => {
+        const storage = {
+            getItem: (k) => store.get(k) ?? null,
+            setItem: (k, v) => store.set(k, v)
+        };
+        const win = loadPref(storage);
+        win.StalemateMusicPref.write('off');
+        const video = win.document.createElement('video');
+        let nativeCalled = false;
+        const nativePlay = win.HTMLMediaElement.prototype.play;
+        win.HTMLMediaElement.prototype.play = function playStub() {
+            nativeCalled = true;
+            return Promise.resolve();
+        };
+        await video.play();
+        expect(nativeCalled).toBe(true);
+        win.HTMLMediaElement.prototype.play = nativePlay;
     });
 });
 

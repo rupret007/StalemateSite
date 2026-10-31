@@ -3,6 +3,7 @@
     'use strict';
 
     var KEY = 'stalemate.music';
+    var SITE_AUDIO_SELECTOR = '#stalemate-site-player, [data-stalemate-site-audio]';
     var playPatched = false;
 
     function read() {
@@ -30,19 +31,24 @@
         }
     }
 
-    function pauseAllMedia() {
+    function isSiteBackgroundMedia(el) {
+        if (!el || !el.matches) return false;
+        return el.matches(SITE_AUDIO_SELECTOR);
+    }
+
+    function pauseSiteBackgroundMedia() {
         if (!global.document) return;
-        global.document.querySelectorAll('audio, video').forEach(function (el) {
+        global.document.querySelectorAll(SITE_AUDIO_SELECTOR).forEach(function (el) {
             try { el.pause(); } catch (e) { /* */ }
         });
     }
 
-    function patchAutoplay() {
+    function patchSiteAutoplay() {
         if (playPatched || !global.HTMLMediaElement) return;
         playPatched = true;
         var nativePlay = global.HTMLMediaElement.prototype.play;
         global.HTMLMediaElement.prototype.play = function patchedPlay() {
-            if (!isOn()) {
+            if (!isOn() && isSiteBackgroundMedia(this)) {
                 try { this.pause(); } catch (e) { /* */ }
                 return Promise.resolve();
             }
@@ -64,26 +70,26 @@
             write(isOn() ? 'off' : 'on');
             syncDocument();
             renderToggle(button);
-            if (!isOn()) pauseAllMedia();
+            if (!isOn()) pauseSiteBackgroundMedia();
             global.dispatchEvent(new CustomEvent('stalemate-music-change', { detail: { on: isOn() } }));
         });
     }
 
     function init() {
-        patchAutoplay();
+        patchSiteAutoplay();
         syncDocument();
-        if (!isOn()) pauseAllMedia();
+        if (!isOn()) pauseSiteBackgroundMedia();
         if (!global.document) return;
         global.document.querySelectorAll('[data-music-toggle]').forEach(bindToggle);
         global.addEventListener('storage', function (event) {
             if (event.key !== KEY) return;
             syncDocument();
             global.document.querySelectorAll('[data-music-toggle]').forEach(renderToggle);
-            if (!isOn()) pauseAllMedia();
+            if (!isOn()) pauseSiteBackgroundMedia();
             global.dispatchEvent(new CustomEvent('stalemate-music-change', { detail: { on: isOn() } }));
         });
         global.addEventListener('stalemate-music-change', function () {
-            if (!isOn()) pauseAllMedia();
+            if (!isOn()) pauseSiteBackgroundMedia();
         });
     }
 
@@ -97,12 +103,12 @@
         read: read,
         write: write,
         isOn: isOn,
-        pauseAllMedia: pauseAllMedia,
+        pauseAllMedia: pauseSiteBackgroundMedia,
         bindToggles: bindToggles,
         init: init
     });
 
-    patchAutoplay();
+    patchSiteAutoplay();
     syncDocument();
 
     if (global.document) {

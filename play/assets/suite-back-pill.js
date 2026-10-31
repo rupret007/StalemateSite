@@ -5,6 +5,19 @@
 /** Viewport width at which shared CSS moves the pill to the top-left. */
 export const NARROW_BACK_PILL_MAX_WIDTH = 520;
 
+/**
+ * Inner selectors hidden at ≤520px when `body:has(.suite-back-pill)`.
+ * Matches TurdAnoid Game Hub, overlay Back to Hub, and chrome Hub buttons.
+ */
+export const DUPLICATE_INPAGE_HUB_INNER_SELECTORS = [
+  'header a[href="./"]:not(.suite-back-pill)',
+  '.topbar a[href="./"]:not(.suite-back-pill)',
+  'a.dialog-hub',
+  '.overlay a[href="./"]:not(.suite-back-pill)',
+  '#btnHub',
+  'button[onclick="location.href=\'./\'"]'
+];
+
 /** Compact top-left control size (matches shared CSS). */
 export const BACK_PILL_TAP_SIZE = 44;
 

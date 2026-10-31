@@ -8,6 +8,82 @@
         if (initialized) return;
         initialized = true;
 
+        document.querySelectorAll('[data-listen-load]').forEach((button) => {
+            const row = button.closest('[data-listen-track]');
+            const slot = row && row.querySelector('[data-listen-embed]');
+            const src = button.getAttribute('data-embed-src') || '';
+            if (!slot || !src.startsWith('https://embed.music.apple.com/')) return;
+            const initialLabel = button.textContent;
+            const initialName = button.getAttribute('aria-label');
+            const status = document.createElement('p');
+            status.id = `listen-preview-status-${[...document.querySelectorAll('[data-listen-load]')].indexOf(button)}`;
+            status.setAttribute('role', 'status');
+            status.hidden = true;
+            slot.append(status);
+            button.setAttribute('aria-describedby', status.id);
+            let frame = null;
+            let attempt = null;
+            function retire() {
+                if (!attempt) return;
+                clearTimeout(attempt.timer);
+                attempt.frame.removeEventListener('load', attempt.onLoad);
+                attempt.frame.removeEventListener('error', attempt.onError);
+                attempt = null;
+            }
+            function reset() {
+                retire();
+                frame?.remove();
+                frame = null;
+                slot.hidden = true;
+                status.hidden = true;
+                status.textContent = '';
+                button.textContent = initialLabel;
+                if (initialName === null) button.removeAttribute('aria-label');
+                else button.setAttribute('aria-label', initialName);
+                button.removeAttribute('aria-disabled');
+                slot.removeAttribute('aria-busy');
+            }
+            button.addEventListener('click', () => {
+                if (attempt) return;
+                frame?.remove();
+                frame = document.createElement('iframe');
+                frame.title = button.getAttribute('data-embed-title') || 'Apple Music player';
+                frame.height = '175';
+                frame.loading = 'eager';
+                frame.allow = 'autoplay *; encrypted-media *; clipboard-write';
+                frame.setAttribute('sandbox', 'allow-forms allow-popups allow-same-origin allow-scripts allow-storage-access-by-user-activation allow-top-navigation-by-user-activation');
+                const current = { frame, timer: null, onLoad: null, onError: null };
+                attempt = current;
+                function settle(message, stop = false) {
+                    if (attempt !== current) return;
+                    retire();
+                    if (stop) { frame.remove(); frame = null; }
+                    button.textContent = 'Reload player';
+                    button.setAttribute('aria-label', `Reload ${button.getAttribute('data-embed-title') || 'Apple Music player'}`);
+                    button.removeAttribute('aria-disabled');
+                    slot.removeAttribute('aria-busy');
+                    status.textContent = message;
+                }
+                // Cross-origin frame load is not proof that its media can play.
+                current.onLoad = () => settle('If the player does not play, reload it or use the streaming links.');
+                current.onError = () => settle('The embedded player could not be opened. Reload it or use the streaming links.', true);
+                frame.addEventListener('load', current.onLoad);
+                frame.addEventListener('error', current.onError);
+                current.timer = setTimeout(() => settle('The embedded player is taking longer than expected. Reload it or use the streaming links.', true), 10000);
+                slot.hidden = false;
+                status.hidden = false;
+                status.textContent = 'Opening the player. You can also use the streaming links.';
+                slot.setAttribute('aria-busy', 'true');
+                // Keep focus on the control while duplicate activations are ignored.
+                button.textContent = 'Opening…';
+                button.setAttribute('aria-label', `Opening ${frame.title}`);
+                button.setAttribute('aria-disabled', 'true');
+                frame.src = src;
+                slot.appendChild(frame);
+            });
+            window.addEventListener('pagehide', reset);
+        });
+
         const logo = document.getElementById('logo');
         function showLogoFallback() {
             if (!logo) return;
@@ -29,7 +105,12 @@
         function measureHeader() {
             const height = header?.getBoundingClientRect().height;
             if (height > 0) {
-                document.documentElement.style.setProperty('--header-height', `${Math.ceil(height)}px`);
+                const measured = `${Math.ceil(height)}px`;
+                if (document.body.classList.contains('qr-page')) {
+                    // QR intro spacing also uses the existing token. Measure only
+                    // its sticky-header scroll clearance, preserving that spacing.
+                    document.documentElement.style.scrollPaddingTop = measured;
+                } else document.documentElement.style.setProperty('--header-height', measured);
             }
         }
         if (header && 'ResizeObserver' in window) new ResizeObserver(measureHeader).observe(header);
@@ -147,26 +228,3 @@ document.addEventListener('click', function (e) {
     var el = e.target && e.target.closest ? e.target.closest('[data-track]') : null;
     if (el && typeof window.smTrack === 'function') window.smTrack(el.getAttribute('data-track'));
 });
-
-// Repeat show button: after the show, point at the next one (data-next-*) or fall back to "Catch the next show".
-(function () {
-    var el = document.querySelector('[data-show-cta]');
-    if (!el) return;
-    var ends = Date.parse(el.getAttribute('data-show-ends'));
-    if (!Number.isFinite(ends)) return;
-    function update() {
-        var now = Date.now();
-        if (now < ends) return true;
-        var next = Date.parse(el.getAttribute('data-next-starts') || '');
-        var useNext = Number.isFinite(next) && now < next && el.getAttribute('data-next-href');
-        el.setAttribute('href', useNext ? el.getAttribute('data-next-href') : el.getAttribute('data-fallback-href'));
-        el.textContent = useNext ? el.getAttribute('data-next-label') : el.getAttribute('data-fallback-label');
-        el.setAttribute('data-track', useNext ? 'show-cta-next' : 'show-cta-next-fallback');
-        return Boolean(useNext);
-    }
-    if (update()) {
-        var timer = window.setInterval(function () {
-            if (!update()) window.clearInterval(timer);
-        }, 1000);
-    }
-})();

@@ -16,7 +16,9 @@
     'crapeights.html',
     'turdrummy.html',
     'turdspades.html',
-    'turdomania.html'
+    'turdomania.html',
+    'chess.html',
+    'turdrush.html'
   ];
 
   const TABLE_CONTINUE_GAMES = [
@@ -251,6 +253,23 @@
       }
       trick.push({ player, card });
     }
+    // Live Spades snapshots are taken between atomic card plays. Every seat
+    // has 13 minus completed tricks, and one fewer after playing this trick.
+    // Won cards may be absent from legacy history, but these counts still hold.
+    const completedTricks = tricks.reduce((sum, count) => sum + count, 0);
+    if (phase === 'bidding' && (completedTricks !== 0 || trick.length !== 0 ||
+      hands.some((hand) => hand.length !== 13))) {
+      return null;
+    }
+    if (phase === 'play') {
+      if (completedTricks >= 13 || trick.length > 3 || bids.includes(null) ||
+        currentPlayer !== (leader + trick.length) % 4 ||
+        trick.some((entry, index) => entry.player !== (leader + index) % 4) ||
+        hands.some((hand, player) => hand.length !== 13 - completedTricks -
+          (trick.some((entry) => entry.player === player) ? 1 : 0))) {
+        return null;
+      }
+    }
     const allCards = hands.flat().concat(trick.map((entry) => entry.card));
     if (allCards.length > 52) {
       return null;
@@ -260,6 +279,22 @@
     }
     if (!uniqueCardKeys(allCards, (card) => card.id)) {
       return null;
+    }
+    // Older v1 saves have no public play history. Preserve it when present so
+    // continuing a table does not erase the bots' already observed cards.
+    let playedThisRound;
+    if (snapshot.playedThisRound !== undefined) {
+      playedThisRound = cleanCardList(snapshot.playedThisRound, cleanSpadeCard, 52);
+      if (!playedThisRound ||
+        !uniqueCardKeys(playedThisRound, (card) => `${card.suit}:${card.rank}`) ||
+        !uniqueCardKeys(playedThisRound, (card) => card.id)) {
+        return null;
+      }
+      const held = hands.flat();
+      if (playedThisRound.some((card) => held.some((other) =>
+        other.id === card.id || (other.suit === card.suit && other.rank === card.rank)))) {
+        return null;
+      }
     }
     const selected = snapshot.selected === null ? null : cleanCardId(snapshot.selected);
     if (snapshot.selected !== null && !selected) {
@@ -300,7 +335,8 @@
       sortMode,
       msg,
       summary,
-      lastRoundTone
+      lastRoundTone,
+      ...(playedThisRound === undefined ? {} : { playedThisRound })
     };
   }
 
@@ -377,6 +413,17 @@
     if (typeof snapshot.initialized !== 'boolean' || !snapshot.initialized) {
       return null;
     }
+    // A live Gin hand has ten cards, or eleven while the human chooses a
+    // discard. A shorter hand can otherwise claim a bogus gin after Continue.
+    const humanDiscard = turn === 'player' && phase === 'discard';
+    if (snapshot.matchOver && !snapshot.roundOver) {
+      return null;
+    }
+    if (!snapshot.roundOver && (playerHand.length !== (humanDiscard ? 11 : 10) ||
+      aiHand.length !== 10 || (humanDiscard && (!drawnCardId || !drawnCardSource ||
+        !playerHand.some((card) => card.id === drawnCardId))))) {
+      return null;
+    }
     return {
       kind: 'turdrummy',
       v: CONTINUE_VERSION,
@@ -442,7 +489,9 @@
       return null;
     }
     const allCards = players.flatMap((player) => player.hand).concat(deck, discard);
-    if (allCards.length > 52 || allCards.length < 1) {
+    // Eights never removes cards from the table, including at round end.
+    // A missing discard leaves every card unplayable after Continue.
+    if (allCards.length !== 52 || discard.length === 0) {
       return null;
     }
     if (!uniqueCardKeys(allCards, (card) => `${card.suit}:${card.rank}`)) {
@@ -483,7 +532,10 @@
     let pendingWildCard = null;
     if (snapshot.pendingWildCard !== null && snapshot.pendingWildCard !== undefined) {
       pendingWildCard = cleanEightsCard(snapshot.pendingWildCard);
-      if (!pendingWildCard) {
+      const heldWild = players[0].hand.find((card) => card.id === pendingWildCard?.id);
+      if (!pendingWildCard || pendingWildCard.rank !== '8' ||
+        !snapshot.roundActive || currentPlayer !== 0 || snapshot.overlay ||
+        !heldWild || heldWild.rank !== '8' || heldWild.suit !== pendingWildCard.suit) {
         return null;
       }
     }
@@ -705,6 +757,34 @@
     if (!rules || !stats || status === null) {
       return null;
     }
+    // Missing in legacy v1 saves: those snapshots already represent player turns.
+    const pendingDecision = snapshot.pendingDecision === undefined ? null : snapshot.pendingDecision;
+    if (pendingDecision !== null && pendingDecision !== 'insurance' && pendingDecision !== 'even-money') {
+      return null;
+    }
+    const dealerResolving = snapshot.dealerResolving === true;
+    if (snapshot.dealerResolving !== undefined && typeof snapshot.dealerResolving !== 'boolean') {
+      return null;
+    }
+    if (dealerResolving && (pendingDecision !== null || snapshot.firstDecisionOpen)) {
+      return null;
+    }
+    if (pendingDecision !== null) {
+      const playerNatural = playerHand.length === 2 &&
+        playerHand.some((card) => card.rank === 'A') &&
+        playerHand.some((card) => ['10', 'J', 'Q', 'K'].includes(card.rank));
+      if (
+        !rules.allowInsurance || dealerHand[0].rank !== 'A' ||
+        playerHand.length !== 2 || dealerHand.length !== 2 ||
+        snapshot.splitRound || splitBet !== 0 || activeHandIndex !== 0 ||
+        !snapshot.firstDecisionOpen || !snapshot.dealerHoleHidden ||
+        snapshot.dealerHoleCountResolved || dealerHoleShoeGeneration !== shoeGeneration ||
+        (pendingDecision === 'even-money') !== playerNatural ||
+        (pendingDecision === 'insurance' && bankroll < Math.floor(currentBet / 2))
+      ) {
+        return null;
+      }
+    }
     const decisionStreak = finiteInt(snapshot.decisionStreak, 0, 10000);
     const hotStreak = finiteInt(snapshot.hotStreak, 0, 10000);
     const coldStreak = finiteInt(snapshot.coldStreak, 0, 10000);
@@ -714,6 +794,8 @@
     return {
       kind: 'turdjack',
       v: CONTINUE_VERSION,
+      pendingDecision,
+      ...(snapshot.dealerResolving === undefined ? {} : { dealerResolving }),
       bankroll,
       currentBet,
       splitBet,
@@ -743,6 +825,55 @@
     };
   }
 
+  // Optional progress is independent of the playable save. A damaged progress
+  // extension must not discard an otherwise valid pre-existing game.
+  function cleanProgressMeta(value, game) {
+    if (!isPlainObject(value) || hasDangerousKey(value) || value.v !== 1) {return null;}
+    const validId = id => typeof id === 'string' && id.length <= 200 &&
+      new RegExp(`^p1\\.[a-z0-9-]{8,80}\\.${game}\\.[1-9][0-9]{0,15}$`).test(id) &&
+      Number.isSafeInteger(Number(id.split('.').at(-1)));
+    if (!validId(value.id) || (value.roundId !== undefined && !validId(value.roundId))) {return null;}
+    if (!['easy', 'normal', 'hard', 'mixed', 'unknown', 'house'].includes(value.difficulty)) {return null;}
+    const result = { v: 1, id: value.id, difficulty: value.difficulty };
+    if (value.roundId !== undefined) {result.roundId = value.roundId;}
+    if (value.startBankroll !== undefined) {
+      if (typeof value.startBankroll !== 'number' || !Number.isFinite(value.startBankroll) || Math.abs(value.startBankroll) > 1e9) {return null;}
+      result.startBankroll = value.startBankroll;
+    }
+    if (value.pending !== undefined) {
+      if (!Array.isArray(value.pending) || value.pending.length > 2) {return null;}
+      const numbers = new Set(['score', 'net', 'bid', 'tricks', 'target', 'rounds', 'playerScore', 'opponentScore', 'wager', 'hands', 'wins', 'losses', 'pushes', 'decks']);
+      const booleans = new Set(['history', 'natural', 'roundWon', 'matchWon', 'gin', 'surrender']);
+      result.pending = [];
+      for (const event of value.pending) {
+        if (!isPlainObject(event) || hasDangerousKey(event) || !validId(event.id) || event.game !== game ||
+            ![value.id, value.roundId].includes(event.id) ||
+            !['hand', 'round', 'match'].includes(event.kind) ||
+            !['win', 'loss', 'draw', 'complete'].includes(event.outcome) ||
+            typeof event.mode !== 'string' || !/^[a-z][a-z0-9-]{0,31}$/.test(event.mode) ||
+            !['easy', 'normal', 'hard', 'mixed', 'unknown', 'house'].includes(event.difficulty)) {return null;}
+        const clean = { id: event.id, game, mode: event.mode, difficulty: event.difficulty, kind: event.kind, outcome: event.outcome };
+        for (const [key, field] of Object.entries(event)) {
+          if (numbers.has(key)) {
+            if (typeof field !== 'number' || !Number.isFinite(field) || Math.abs(field) > 1e9) {return null;}
+            clean[key] = field;
+          } else if (booleans.has(key)) {
+            if (typeof field !== 'boolean') {return null;}
+            clean[key] = field;
+          } else if (key === 'rules') {
+            if (typeof field !== 'string' || cleanString(field, 240) === null) {return null;}
+            clean.rules = field;
+          } else if (key === 'team') {
+            if (typeof field !== 'string' || !/^[a-z][a-z0-9-]{0,31}$/.test(field)) {return null;}
+            clean.team = field;
+          }
+        }
+        result.pending.push(clean);
+      }
+    }
+    return result;
+  }
+
   function validateSnapshot(page, snapshot) {
     if (!TABLE_CONTINUE_GAMES.includes(page)) {
       return null;
@@ -750,16 +881,14 @@
     if (!isPlainObject(snapshot) || snapshot.kind !== kindForPage(page)) {
       return null;
     }
-    if (page === 'turdspades.html') {
-      return validateSpadesSnapshot(snapshot);
+    const validators = { 'turdspades.html': validateSpadesSnapshot, 'turdrummy.html': validateRummySnapshot,
+      'crapeights.html': validateEightsSnapshot, 'turdjack.html': validateJackSnapshot };
+    const clean = validators[page](snapshot);
+    if (clean && snapshot.progressMeta !== undefined) {
+      const progress = cleanProgressMeta(snapshot.progressMeta, kindForPage(page));
+      if (progress) {clean.progressMeta = progress;}
     }
-    if (page === 'turdrummy.html') {
-      return validateRummySnapshot(snapshot);
-    }
-    if (page === 'crapeights.html') {
-      return validateEightsSnapshot(snapshot);
-    }
-    return validateJackSnapshot(snapshot);
+    return clean;
   }
 
   function emptyStore() {

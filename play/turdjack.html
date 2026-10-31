@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mobile-game="turdjack">
 <head>
 <meta name="robots" content="noindex,nofollow">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<script src="assets/suite-loading.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -10,8 +11,13 @@
   <meta name="theme-color" content="#0f1914">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="assets/turdsuite.css">
-  <script src="games/table-continue-core.js"></script>
-  <script src="assets/turdsuite.js"></script>
+<link rel="stylesheet" href="assets/arcade.css">
+  <script src="games/table-continue-core.js?v=bc5fab705a134ab5"></script>
+  <script src="games/suite-progress-core.js?v=3c92de426327c7d1"></script>
+  <script src="assets/suite-progress.js?v=cf46f758fae8dff1"></script>
+  <script src="assets/suite-share.js?v=ad4aecc45730b022"></script>
+  <script src="games/suite-dialog-focus.js"></script>
+  <script src="assets/turdsuite.js?v=3a5cafdb70bf7654"></script>
   <title>Crapjack 21</title>
   <style>
     :root {
@@ -512,8 +518,31 @@
       pointer-events: none;
     }
 
+    .jack-difficulty-bar {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+      padding: 2px 8px 4px;
+      box-sizing: border-box;
+    }
+
     /* Between hands at phone widths: match table-first HUD (2 live stats; session grid in Table Menu). */
     @media (max-width: 390px) {
+      .jack-difficulty-bar {
+        padding: 1px 6px 2px;
+      }
+
+      .jack-difficulty-bar .suite-difficulty-btn {
+        min-height: 28px;
+        min-width: 0;
+        padding: 0 6px;
+        font-size: 0.6rem;
+      }
+
+      .jack-difficulty-bar .suite-difficulty-seg {
+        padding: 2px;
+      }
+
       body.jack-phone-compact-hud:not(.jack-table-first) .shell > .hud {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 4px;
@@ -982,6 +1011,9 @@
       color: #ffe566;
       text-shadow: 0 0 30px rgba(255, 215, 106, 0.95), 0 4px 16px rgba(0, 0, 0, 0.65);
       padding: 10px 22px;
+      min-width: 44px;
+      min-height: 44px;
+      box-sizing: border-box;
       border-radius: 14px;
       border: 2px solid rgba(255, 215, 106, 0.55);
       background: linear-gradient(180deg, rgba(50, 35, 8, 0.92), rgba(20, 12, 4, 0.88));
@@ -2130,6 +2162,9 @@
     .welcome-card {
       position: relative;
       width: min(640px, 100%);
+      max-height: calc(100dvh - 40px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
       border: 1px solid rgba(255, 215, 106, 0.45);
       border-radius: 18px;
       background:
@@ -2283,8 +2318,6 @@
         max-width: 72px;
         aspect-ratio: 1;
         padding: 0;
-        font-size: 0;
-        color: transparent;
       }
       .table[data-phase="betting"] .mobile-felt-chip-rack {
         display: flex;
@@ -2514,8 +2547,31 @@
         display: block;
       }
       .table {
-        min-height: 620px;
+        min-height: 0;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
       }
+      body { padding-block: 8px; }
+      .shell { height: calc(100dvh - var(--mobile-footer, 0px) - 16px); min-height: 0; display: flex; flex-direction: column; }
+      .topbar, .hud, .jack-difficulty-bar, .table-pit-rail, .table > .status { flex-shrink: 0; }
+      .layout { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+      .table-stage { flex: 1; min-height: 0; overflow: auto; align-content: start; }
+      .table-bet-zone { flex-direction: row; justify-content: center; gap: 12px; }
+      .bet-circle { width: 96px; height: 96px; flex-shrink: 0; }
+    }
+
+    @media (min-width: 981px) and (min-height: 921px) {
+      /* Fit complete 108px cards and betting chips without spending a large
+         part of the usable table on hand padding or the decorative inlay. */
+      .table-stage .cards { min-height: 110px; }
+      .table-stage .hand { padding: 6px 10px 8px; margin-bottom: 6px; }
+      .table-stage .hand-title { margin-bottom: 4px; }
+      .table-stage .felt-inlay { height: 28px; aspect-ratio: auto; margin-bottom: 4px; }
+      .bet-circle { width: 72px; height: 72px; }
+      /* Keep the decorative memo readable below decisions, never over them. */
+      .table::after { position: static; align-self: flex-end; flex-shrink: 0; margin-top: 4px; padding: 5px 8px; white-space: normal; transform: none; }
+      body:has(.table[data-phase="playing"]) .boss-bubble { opacity: 0; }
     }
 
     @media (min-width: 981px) and (max-height: 920px) {
@@ -2586,6 +2642,18 @@
         gap: 2px 8px;
         margin-bottom: 4px;
         align-content: start;
+        overflow: auto;
+      }
+      .table-stage .felt-inlay { height: 24px; aspect-ratio: auto; margin-bottom: 2px; }
+      .table-stage .hand-title { margin-bottom: 4px; }
+      .table-stage .total-badge { min-height: 28px; min-width: 34px; padding: 2px 6px; font-size: .85rem; }
+      .table-stage .hand-meter { margin-top: 2px; }
+      .table-stage .cards { gap: 6px; }
+      .table::after { top: 120px; bottom: auto; }
+      .table-stage:has(#splitHandWrap:not([hidden])) {
+        grid-template-columns: 72px minmax(0, 1fr) minmax(0, 1fr) 72px;
+        grid-template-rows: auto auto auto auto;
+        grid-template-areas: "discard dealer dealer shoe" ". inlay inlay ." "player player split split" "bet bet bet bet";
       }
       .table-stage .hand {
         margin-bottom: 4px;
@@ -2644,8 +2712,6 @@
       .table-bet-zone .chip-rack .chip-btn {
         width: 42px;
         height: 42px;
-        font-size: 0;
-        color: transparent;
       }
       .table-pit-rail {
         flex-shrink: 0;
@@ -2718,10 +2784,13 @@
   </style>
 <link rel="stylesheet" href="stalemate/play-music-pref.css">
 <script src="../js/music-preference.js"></script>
+<link rel="stylesheet" href="assets/mobile-fit.css">
+<script src="assets/mobile-fit.js" defer></script>
+<link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
 </head>
-<body class="suite-ambient suite-no-zoom">
+<body class="suite-ambient suite-no-zoom arcade" data-arcade-game="crapjack">
   <div id="jackLiveRegion" class="sr-live" aria-live="polite" aria-atomic="true"></div>
-  <div class="welcome-guide" id="welcomeGuide">
+  <div class="welcome-guide" id="welcomeGuide" role="dialog" aria-modal="true" aria-label="Start Crapjack 21">
     <div class="welcome-card">
           <h2>Crapjack 21</h2>
       <p>Beat the dealer without busting. Manage bankroll, pick smart actions, and use house rules to your advantage.</p>
@@ -2736,7 +2805,7 @@
         <li><strong>Clear Bet (Clear on phones):</strong> remove your bet before dealing</li>
       </ul>
       <p><strong>Keyboard (optional):</strong> N deal · H hit · S stand · D double · P split · X surrender · C clear bet.</p>
-      <p>Tip: adjust table rules on the right, then follow the strategy hint for cleaner decisions.</p>
+      <p>Tip: find Table Setup and strategy hints in Table Intel (Table Menu → Intel → Strategy, history &amp; rules on phones).</p>
       <div class="welcome-actions">
         <button class="btn" id="quickGuideBtn">Quick Start</button>
         <button class="btn subtle" id="closeGuideBtn">Close Guide</button>
@@ -2763,7 +2832,7 @@
     </div>
   </div>
 
-  <div class="shell">
+  <div class="shell" role="main">
     <div class="topbar">
       <div>
           <h1>Crapjack 21</h1>
@@ -2777,6 +2846,7 @@
         <button class="btn" data-sound-toggle onclick="toggleSound()">🔊 Sound On</button>
         <button class="btn danger" id="resetStatsBtn" data-reset-bank>↻ Reset Bank</button>
       </div>
+      <span class="suite-a11y-header-slot" id="suite-arcade-a11y-mount"></span>
       <div class="mobile-menu">
         <details>
           <summary>Table Menu</summary>
@@ -2788,7 +2858,7 @@
             <button class="btn" data-sound-toggle onclick="toggleSound()">🔊 Sound</button>
             <button class="btn danger" data-reset-bank onclick="resetBankroll()">↻ Reset Bank</button>
           </div>
-          <div class="mobile-menu-stats hud" aria-label="Session stats">
+          <div class="mobile-menu-stats hud" role="group" aria-label="Session stats">
             <div class="card-stat"><div class="k">Hands</div><div class="v" data-jack-mirror="handsText">0</div></div>
             <div class="card-stat"><div class="k">Wins</div><div class="v" data-jack-mirror="winsText">0</div></div>
             <div class="card-stat"><div class="k">Losses</div><div class="v" data-jack-mirror="lossesText">0</div></div>
@@ -2801,6 +2871,8 @@
         </details>
       </div>
     </div>
+
+    <div class="suite-hud-settings jack-difficulty-bar" id="suite-difficulty-mount"></div>
 
       <div class="hud">
         <div class="card-stat hot" data-jack-stat-tier="live"><div class="k">Bankroll</div><div class="v" id="bankrollText">$0</div></div>
@@ -2914,7 +2986,7 @@
           </div>
         </div>
 
-        <div class="mobile-felt-chip-rack" id="mobileFeltChipRack" aria-label="Quick bet chips">
+        <div class="mobile-felt-chip-rack" id="mobileFeltChipRack" role="group" aria-label="Quick bet chips">
           <button class="chip-btn" type="button" data-chip="10" aria-label="Bet ten dollars">+$10</button>
           <button class="chip-btn" type="button" data-chip="25" aria-label="Bet twenty-five dollars">+$25</button>
           <button class="chip-btn" type="button" data-chip="50" aria-label="Bet fifty dollars">+$50</button>
@@ -2965,6 +3037,8 @@
         <div>
           <h3 data-icon="📜">Hand History</h3>
           <div class="status history-log" id="historyText">No resolved hands yet.</div>
+          <p id="jackProgressStatus" class="suite-progress-result" role="status" hidden></p>
+          <div id="jackResultShare"></div>
         </div>
 
         <div>
@@ -3037,6 +3111,15 @@
     };
 
     const INITIAL_BANKROLL = 1000;
+    function suiteDefaultBankroll() {
+      try {
+        const t = window.Suite && Suite.difficulty && Suite.difficulty.tuning();
+        const bonus = t && Number.isFinite(t.lives) ? t.lives * 200 : 0;
+        return INITIAL_BANKROLL + bonus;
+      } catch (e) {
+        return INITIAL_BANKROLL;
+      }
+    }
     const MIN_BET = 10;
     const ALLOW_ONE_SPLIT = true;
     const DEFAULT_RULES = {
@@ -3095,7 +3178,7 @@
       resetStatsBtn: document.getElementById('resetStatsBtn')
     };
 
-    let bankroll = readNumber(STORAGE.bankroll, INITIAL_BANKROLL);
+    let bankroll = readNumber(STORAGE.bankroll, suiteDefaultBankroll());
     let stats = normalizeStats(readObject(STORAGE.stats, {
       hands: 0,
       wins: 0,
@@ -3120,6 +3203,9 @@
     let lastBet = Math.max(MIN_BET, readNumber(STORAGE.lastBet, MIN_BET));
     let splitBet = 0;
     let roundActive = false;
+    let dealerResolving = false;
+    let pendingDecision = null;
+    let openingHandInFlight = false;
     let dealerHoleHidden = true;
     let firstDecisionOpen = false;
     let splitRound = false;
@@ -3138,6 +3224,7 @@
     let roundHistory = [];
     const SOUND_STORAGE_KEY = 'turdjackSoundOn_v1';
     let soundEnabled = true;
+    window.Suite?.setSoundLocalEnabled?.(() => soundEnabled);
     let audioCtx = null;
     let statusPulseTimer = null;
     let turdjackKit = null;
@@ -3273,13 +3360,36 @@
 
     function suiteMutedGlobal() {
       try {
+        if (window.Suite && typeof Suite.isMuted === 'function') return !!Suite.isMuted();
         return localStorage.getItem('turdsuite_muted') === '1';
       } catch (e) {
         return false;
       }
     }
 
+    function suiteMusicBlocked() {
+      try {
+        if (window.Suite && typeof Suite.isMusicEnabled === 'function' && !Suite.isMusicEnabled()) return true;
+      } catch (e) { /* ignore */ }
+      return !soundEnabled || suiteMutedGlobal();
+    }
+
+    function syncSuiteMusic() {
+      try {
+        if (window.Suite && typeof Suite.music === 'function') {
+          Suite.music().then(function (player) { if (player) player.sync(); });
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    try {
+      if (window.Suite && typeof Suite.setMusicGameBlocked === 'function') {
+        Suite.setMusicGameBlocked(suiteMusicBlocked);
+      }
+    } catch (e) { /* ignore */ }
+
     function unlockAudio() {
+      if (window.Suite?.isStudioAudio?.()) return;
       if (!soundEnabled || suiteMutedGlobal()) return;
       if (window.__turdjackAudio) {
         window.__turdjackAudio.unlock();
@@ -3294,6 +3404,7 @@
 
     function playSfx(type) {
       if (!soundEnabled || suiteMutedGlobal()) return;
+      if (window.Suite?.isStudioAudio?.()) return Suite.playSound('jack.' + type);
       if (window.__turdjackAudio) {
         window.__turdjackAudio.play(type);
         return;
@@ -3348,9 +3459,11 @@
 
     function toggleSound() {
       soundEnabled = !soundEnabled;
+      window.Suite?.syncSoundState?.();
       syncKitSoundFlag();
       saveSoundPref();
       updateSoundButtons();
+      syncSuiteMusic();
       if (soundEnabled) {
         unlockAudio();
         setStatus('Sound on. Toilet dealer is noisy again.');
@@ -3371,10 +3484,10 @@
         hotStreak = 0;
         return;
       }
-      if (roundPushes > 0) {
-        hotStreak = 0;
-        coldStreak = 0;
-      }
+      // A neutral split (one win and one loss) breaks the streak just like a
+      // push. Retaining a milestone would pay its bonus again on every tie.
+      hotStreak = 0;
+      coldStreak = 0;
     }
 
     function getTableFlavor() {
@@ -3394,7 +3507,7 @@
     function canDoubleOnActiveHand() {
       const hand = getActiveHand();
       const activeBet = getActiveBet();
-      if (!roundActive || !firstDecisionOpen || hand.length !== 2) return false;
+      if (!roundActive || dealerResolving || pendingDecision || !firstDecisionOpen || hand.length !== 2) return false;
       if (splitRound && !rules.allowDoubleAfterSplit) return false;
       return bankroll >= activeBet;
     }
@@ -3480,6 +3593,61 @@
       return { rank: card.rank, suit: card.suit };
     }
 
+    // Optional progress is independent of the legacy game/stat save keys.
+    let progressMeta = null;
+    const cardResultShare = window.SuiteShare?.create({ host: document.getElementById('jackResultShare'), game: 'turdjack' });
+    function cardProgressDifficulty() { return 'house'; }
+    function newCardProgress(legacy = false) {
+      const id = window.SuiteProgress?.newRunId('turdjack');
+      return id ? { v: 1, id, difficulty: legacy ? 'unknown' : cardProgressDifficulty(), pending: [] } : null;
+    }
+    function trackCardProgressDifficulty() {
+      if (!progressMeta || !(roundActive) || ['mixed', 'unknown'].includes(progressMeta.difficulty)) return;
+      if (progressMeta.difficulty !== cardProgressDifficulty()) progressMeta.difficulty = 'mixed';
+    }
+    function clearCardProgressResult() {
+      cardResultShare?.setResult(null);
+      const status = document.getElementById('jackProgressStatus');
+      status.textContent = ''; status.hidden = true;
+    }
+    function restoreCardProgress(meta, live) {
+      progressMeta = meta && meta.v === 1 && typeof meta.id === 'string'
+        ? JSON.parse(JSON.stringify(meta)) : (live ? newCardProgress(true) : null);
+    }
+    function completeJackProgress({ wins = 0, losses = 0, pushes = 0, natural = false, surrender = false, hands = 1, wager = currentBet }) {
+      if (!progressMeta) return;
+      const net = Number.isFinite(progressMeta.startBankroll) ? bankroll - progressMeta.startBankroll : null;
+      const event = { id: progressMeta.id, game: 'turdjack', mode: 'house-rules', difficulty: progressMeta.difficulty,
+        kind: 'hand', outcome: net === null ? 'complete' : net > 0 ? 'win' : net < 0 ? 'loss' : 'draw',
+        ...(net === null ? {} : { net, wager }), natural, surrender, hands, wins, losses, pushes, decks: rules.decks,
+        rules: [rules.dealerHitsSoft17 ? 'H17' : 'S17', blackjackPayoutLabel(),
+          rules.allowDoubleAfterSplit ? 'DAS' : 'no DAS', rules.allowSurrender ? 'surrender' : 'no surrender',
+          rules.allowInsurance ? 'insurance' : 'no insurance', rules.allowHitSplitAces ? 'hit split aces' : 'stand split aces'].join(' · ') };
+      progressMeta.pending = [event];
+      // Record before the ordinary settled-hand HUD clears its Continue entry.
+      publishCardProgress();
+    }
+
+    function publishCardProgress() {
+      const pending = progressMeta?.pending || [];
+      const earned = [];
+      let storageUnavailable = false;
+      for (const event of pending) {
+        const receipt = window.SuiteProgress?.record(event);
+        if (receipt?.newlyEarned) earned.push(...receipt.newlyEarned);
+        if (receipt?.storageAvailable === false) storageUnavailable = true;
+      }
+      cardResultShare?.setResult(pending.find(event => event.history !== false) || null);
+      const status = document.getElementById('jackProgressStatus');
+      if (earned.length) {
+        status.textContent = 'Goal complete: ' + earned.map(goal => goal.title).join(' · ');
+        status.hidden = false;
+      } else if (storageUnavailable) {
+        status.textContent = 'Progress could not be saved on this device.';
+        status.hidden = false;
+      }
+    }
+
     function persistTable() {
       if (!window.Suite || !Suite.table) return;
       if (!roundActive) {
@@ -3488,6 +3656,7 @@
       }
       Suite.table.remember('turdjack.html', {
         kind: 'turdjack',
+        ...(progressMeta ? { progressMeta } : {}),
         v: 1,
         bankroll,
         currentBet,
@@ -3509,6 +3678,8 @@
         cutCardsRemaining,
         shoeDecks,
         roundActive: true,
+        dealerResolving,
+        pendingDecision,
         rules: {
           dealerHitsSoft17: !!rules.dealerHitsSoft17,
           blackjackPayout: rules.blackjackPayout,
@@ -3562,15 +3733,19 @@
       cutCardsRemaining = snap.cutCardsRemaining;
       shoeDecks = snap.shoeDecks;
       roundActive = true;
+      dealerResolving = false;
+      pendingDecision = snap.pendingDecision ?? null;
       rules = normalizeRules(snap.rules);
       stats = normalizeStats(snap.stats);
       decisionStreak = snap.decisionStreak || 0;
       hotStreak = snap.hotStreak || 0;
       coldStreak = snap.coldStreak || 0;
+      restoreCardProgress(snap.progressMeta, true);
       return true;
     }
 
     function tryRestoreTable() {
+      if (openingHandInFlight || dealerResolving) return true;
       if (!window.Suite || !Suite.table) return false;
       const snap = Suite.table.load('turdjack.html');
       if (!snap || !applyJackSnapshot(snap)) {
@@ -3582,6 +3757,8 @@
       renderCards();
       setStatus(snap.status || 'Picked up the live hand.');
       updateHud();
+      if (snap.dealerResolving === true) dealerTurnAndResolve();
+      else if (pendingDecision) resolveOpeningHand();
       try { Suite.toast('Picked up where you left off.'); } catch (e) {}
       return true;
     }
@@ -3694,12 +3871,19 @@
       const guide = document.getElementById('welcomeGuide');
       if (guide) guide.style.display = 'flex';
       onboardingOpen = true;
+      window.SuiteDialogFocus?.open(guide, {
+        initialFocus: '#quickGuideBtn',
+        fallbackFocus: () => [...document.querySelectorAll('[data-mobile-action="hit"], [data-mobile-action="deal"]'), ui.hitBtn, ui.dealBtn, document.getElementById('helpBtn')]
+          .find(button => button && !button.disabled && button.getClientRects().length > 0),
+        onEscape: hideWelcomeGuide
+      });
     }
 
     function hideWelcomeGuide() {
       const guide = document.getElementById('welcomeGuide');
       if (guide) guide.style.display = 'none';
       onboardingOpen = false;
+      window.SuiteDialogFocus?.close(guide);
       if (window.Suite && Suite.guide) Suite.guide.mark('turdjack.html');
     }
 
@@ -3957,6 +4141,8 @@
     function canSplitActiveHand() {
       return (
         roundActive &&
+        !dealerResolving &&
+        !pendingDecision &&
         firstDecisionOpen &&
         ALLOW_ONE_SPLIT &&
         !splitRound &&
@@ -3977,7 +4163,7 @@
     }
 
     function strategyDecision() {
-      if (!roundActive || dealerHand.length === 0) return null;
+      if (!roundActive || dealerResolving || pendingDecision || dealerHand.length === 0) return null;
 
       const hand = getActiveHand();
       if (!hand || hand.length === 0) return null;
@@ -4092,6 +4278,7 @@
     }
 
     function getBasicHint() {
+      if (pendingDecision) return 'Hint: Answer the table decision to continue.';
       if (!roundActive || dealerHand.length === 0) {
         if (currentBet >= MIN_BET) return 'Hint: Bet is ready. Deal to start.';
         return `Hint: Bet at least $${MIN_BET}, then Deal. Quick Start auto-loads a sane bet.`;
@@ -4126,11 +4313,11 @@
         canSplitActiveHand();
 
       ui.dealBtn.disabled = roundActive;
-      ui.hitBtn.disabled = !roundActive;
-      ui.standBtn.disabled = !roundActive;
+      ui.hitBtn.disabled = !roundActive || dealerResolving || !!pendingDecision;
+      ui.standBtn.disabled = !roundActive || dealerResolving || !!pendingDecision;
       ui.doubleBtn.disabled = !canDoubleOnActiveHand();
       ui.splitBtn.disabled = !canSplit;
-      ui.surrenderBtn.disabled = !roundActive || !firstDecisionOpen || splitRound || !rules.allowSurrender;
+      ui.surrenderBtn.disabled = !roundActive || dealerResolving || !!pendingDecision || !firstDecisionOpen || splitRound || !rules.allowSurrender;
 
       const lockedBet = roundActive;
       document.querySelectorAll('[data-chip]').forEach((btn) => {
@@ -4199,7 +4386,7 @@
       setMobileActionState('max-bet', ui.maxBetBtn.disabled);
       setMobileActionState('rebet', ui.rebetBtn.disabled);
       setMobileActionState('new-shoe', ui.newShoeBtn.disabled);
-      setMobileActionState('smart', false);
+      setMobileActionState('smart', dealerResolving || !!pendingDecision);
     }
 
     function setStatus(text) {
@@ -4211,8 +4398,8 @@
       try {
         const note = String(text || '').toLowerCase();
         if (!window.Suite) return;
-        if (note.includes('blackjack') && !note.includes('dealer')) { Suite.hype('BLACKJACK!'); Suite.win(); }
-        else if (note.includes('bust')) { Suite.hype(Suite.quip('bust') || 'BUSTED'); Suite.fart(); }
+        if (note.includes('blackjack') && !note.includes('dealer')) { Suite.hype('BLACKJACK!');  }
+        else if (note.includes('bust')) { Suite.hype(Suite.quip('bust') || 'BUSTED');  }
         else if (statusMood.tone === 'win') { Suite.toast('💰 ' + (Suite.quip('win_s') || 'NICE')); }
         else if (statusMood.tone === 'loss' && note.includes('dealer')) { Suite.toast('💩 ' + (Suite.quip('lose_s') || 'oof')); }
       } catch (e) {}
@@ -4278,6 +4465,7 @@
     }
 
     async function startRound() {
+      window.Suite?.stopSounds?.();
       if (roundActive) return;
       unlockAudio();
       if (currentBet < MIN_BET) {
@@ -4294,6 +4482,15 @@
         setStatus('Cut card reached. Fresh shoe shuffled.');
       }
 
+      // Keep this shoe's complete inventory for Continue after the first hand.
+      // A manual/cut shuffle already replaced that inventory with a new shoe.
+      if (dealerHoleShoeGeneration === shoeGeneration) {
+        discard.push(...playerHand, ...dealerHand, ...splitHand);
+      }
+
+      progressMeta = newCardProgress();
+      if (progressMeta) progressMeta.startBankroll = bankroll;
+      clearCardProgressResult();
       lastBet = currentBet;
       bankroll -= currentBet;
       roundActive = true;
@@ -4321,6 +4518,16 @@
 
       renderCards();
 
+      return resolveOpeningHand();
+    }
+
+    // Both a fresh deal and Continue enter here, before any natural is settled.
+    async function resolveOpeningHand() {
+      if (!roundActive) return;
+      await resolveOpeningDecision();
+    }
+
+    async function resolveOpeningDecision() {
       const pBJ = isBlackjack(playerHand);
       const dBJ = isBlackjack(dealerHand);
       const dealerShowsAce = dealerHand[0] && dealerHand[0].rank === 'A';
@@ -4329,12 +4536,22 @@
 
       if (dealerShowsAce && rules.allowInsurance) {
         if (pBJ) {
-          const evenMoney = await jackConfirm({
-            title: 'Even money',
-            message: `Dealer shows Ace and you have blackjack. Take even money for guaranteed $${currentBet * 2}?`,
-            acceptLabel: 'Yes — lock it',
-            declineLabel: 'No — ride it'
-          });
+          pendingDecision = 'even-money';
+          setStatus('Choose whether to take even money.');
+          updateHud();
+          openingHandInFlight = true;
+          let evenMoney;
+          try {
+            evenMoney = await jackConfirm({
+              title: 'Even money',
+              message: `Dealer shows Ace and you have blackjack. Take even money for guaranteed $${currentBet * 2}?`,
+              acceptLabel: 'Yes — lock it',
+              declineLabel: 'No — ride it'
+            });
+          } finally {
+            openingHandInFlight = false;
+            pendingDecision = null;
+          }
           if (evenMoney) {
             revealDealerHole();
             bankroll += currentBet * 2;
@@ -4345,6 +4562,7 @@
             firstDecisionOpen = false;
             setStatus(`Even money locked. You bank $${currentBet * 2} and skip the sweat.`);
             logHistory(`Even money cashed for $${currentBet * 2}.`);
+            completeJackProgress({ wins: 1, natural: true });
             playSfx('win');
             renderCards();
             updateHud();
@@ -4357,19 +4575,29 @@
             const countNote = tc >= 3
               ? `Running count is hot (TC ${tc.toFixed(1)}), so insurance is less terrible here.`
               : `Running count is ${tc.toFixed(1)} TC, so insurance is usually -EV.`;
-            const buyInsurance = await (async () => {
-              const devFlag = window.__turdjackDev && window.__turdjackDev._autoInsurance;
-              if (devFlag === 'buy' || devFlag === 'skip') {
-                window.__turdjackDev._autoInsurance = null;
-                return devFlag === 'buy';
-              }
-              return jackConfirm({
-                title: 'Insurance',
-                message: `Dealer shows Ace. Buy insurance for $${premium}? ${countNote}`,
-                acceptLabel: 'Yes — insure',
-                declineLabel: 'No thanks'
-              });
-            })();
+            pendingDecision = 'insurance';
+            setStatus('Choose whether to buy insurance.');
+            updateHud();
+            openingHandInFlight = true;
+            let buyInsurance;
+            try {
+              buyInsurance = await (async () => {
+                const devFlag = window.__turdjackDev && window.__turdjackDev._autoInsurance;
+                if (devFlag === 'buy' || devFlag === 'skip') {
+                  window.__turdjackDev._autoInsurance = null;
+                  return devFlag === 'buy';
+                }
+                return jackConfirm({
+                  title: 'Insurance',
+                  message: `Dealer shows Ace. Buy insurance for $${premium}? ${countNote}`,
+                  acceptLabel: 'Yes — insure',
+                  declineLabel: 'No thanks'
+                });
+              })();
+            } finally {
+              openingHandInFlight = false;
+              pendingDecision = null;
+            }
             if (buyInsurance) {
               bankroll -= premium;
               insuranceBet = premium;
@@ -4382,6 +4610,7 @@
       }
 
       if (pBJ || dBJ) {
+        const settlementWager = currentBet + insuranceBet;
         revealDealerHole();
         renderCards();
 
@@ -4419,6 +4648,8 @@
 
         roundActive = false;
         firstDecisionOpen = false;
+        completeJackProgress({ wins: pBJ && !dBJ ? 1 : 0, losses: dBJ && !pBJ ? 1 : 0,
+          pushes: pBJ && dBJ ? 1 : 0, natural: pBJ, wager: settlementWager });
       } else {
         const roundIntro = insuranceBet > 0
           ? `No dealer blackjack. Insurance burned for $${insuranceBet}.`
@@ -4431,7 +4662,7 @@
     }
 
     function playerHit() {
-      if (!roundActive) return;
+      if (!roundActive || dealerResolving || pendingDecision) return;
       trackDecision('hit');
       const hand = getActiveHand();
       firstDecisionOpen = false;
@@ -4448,7 +4679,7 @@
         return;
       } else if (value === 21) {
         setStatus(`${handTag(activeHandIndex)} locks 21.`);
-        playSfx('win');
+        playSfx(window.Suite?.isStudioAudio?.() ? 'twentyOne' : 'win');
         if (advanceToNextHand()) return;
         dealerTurnAndResolve();
         return;
@@ -4457,7 +4688,7 @@
     }
 
     function playerStand() {
-      if (!roundActive) return;
+      if (!roundActive || dealerResolving || pendingDecision) return;
       trackDecision('stand');
       firstDecisionOpen = false;
       playSfx('stand');
@@ -4466,7 +4697,7 @@
     }
 
     function playerDouble() {
-      if (!roundActive) return;
+      if (!roundActive || dealerResolving || pendingDecision) return;
       const hand = getActiveHand();
       const activeBet = getActiveBet();
       if (!firstDecisionOpen || hand.length !== 2) {
@@ -4500,7 +4731,7 @@
     }
 
     function playerSplit() {
-      if (!roundActive || !firstDecisionOpen) return;
+      if (!roundActive || dealerResolving || pendingDecision || !firstDecisionOpen) return;
       if (!ALLOW_ONE_SPLIT) {
         setStatus('Split is disabled for this table.');
         return;
@@ -4546,7 +4777,7 @@
     }
 
     function playerSurrender() {
-      if (!roundActive || !firstDecisionOpen) return;
+      if (!roundActive || dealerResolving || pendingDecision || !firstDecisionOpen) return;
       if (!rules.allowSurrender) {
         setStatus('Surrender is disabled at this table.');
         return;
@@ -4561,6 +4792,7 @@
       roundActive = false;
       activeHandIndex = 0;
 
+      const settlementWager = Number.isFinite(progressMeta?.startBankroll) ? progressMeta.startBankroll - bankroll : currentBet;
       const refund = Math.floor(currentBet / 2);
       bankroll += refund;
       stats.losses = (stats.losses || 0) + 1;
@@ -4568,12 +4800,14 @@
       recordMomentum(0, 1, 0);
       setStatus(`Surrender accepted. You recover $${refund} and keep your dignity.`);
       logHistory(`Surrender. Recovered $${refund} from $${currentBet}.`);
+      completeJackProgress({ losses: 1, surrender: true, wager: settlementWager });
       playSfx('surrender');
       renderCards();
       updateHud();
     }
 
     function smartAction() {
+      if (dealerResolving) return;
       if (!roundActive) {
         if (currentBet < MIN_BET && lastBet >= MIN_BET && lastBet <= bankroll) {
           currentBet = lastBet;
@@ -4624,10 +4858,15 @@
     }
 
     function dealerTurnAndResolve() {
+      if (!roundActive || dealerResolving) return;
+      dealerResolving = true;
       firstDecisionOpen = false;
+      updateHud();
       const runAfterReveal = () => {
+      if (!dealerResolving || !roundActive) return;
       revealDealerHole();
       renderCards();
+      updateHud();
       const hands = [
         { cards: playerHand, bet: currentBet, label: splitRound ? 'Hand 1' : 'Main hand' }
       ];
@@ -4661,6 +4900,9 @@
       };
 
       const resolveRound = () => {
+      if (!dealerResolving || !roundActive) return;
+      const settlementWager = Number.isFinite(progressMeta?.startBankroll)
+        ? progressMeta.startBankroll - bankroll : hands.reduce((sum, entry) => sum + entry.bet, 0);
       const dealer = handValue(dealerHand);
       const notes = [];
       let roundWins = 0;
@@ -4710,10 +4952,13 @@
       }
 
       recordMomentum(roundWins, roundLosses, roundPushes);
+      completeJackProgress({ wins: roundWins, losses: roundLosses, pushes: roundPushes,
+        hands: hands.length, wager: settlementWager });
       if (hotStreak >= 3) notes.push(`Heater x${hotStreak}.`);
       if (coldStreak >= 3) notes.push(`Cold streak x${coldStreak}.`);
 
       roundActive = false;
+      dealerResolving = false;
       firstDecisionOpen = false;
       splitRound = false;
       splitBet = 0;
@@ -4722,7 +4967,11 @@
       setStatus(finalNote);
       logHistory(finalNote);
       if (roundWins > roundLosses) playSfx('win');
-      else if (roundLosses > roundWins) playSfx('lose');
+      else if (roundLosses > roundWins) {
+        // A busted hand already has immediate feedback; don't announce the
+        // same all-busted loss again after the dealer's reveal animation.
+        if (!window.Suite?.isStudioAudio?.() || !allBusted) playSfx('lose');
+      }
       else playSfx('push');
       renderCards();
       updateHud();
@@ -4736,12 +4985,14 @@
         const shown = handValue(dealerHand);
         announceDealerLive(revealAnnouncement(shown));
         const step = () => {
+          if (!dealerResolving || !roundActive) return;
           if (!dealerNeedsHit()) {
             resolveRound();
             return;
           }
           dealerHand.push(drawCard());
           renderCards();
+          updateHud();
           const total = handValue(dealerHand);
           announceDealerLive(hitAnnouncement(total));
           playSfx('card');
@@ -4789,6 +5040,8 @@
         declineLabel: 'No — keep stats'
       });
       if (!ok) return;
+      progressMeta = null;
+      clearCardProgressResult();
       bankroll = INITIAL_BANKROLL;
       currentBet = 0;
       lastBet = MIN_BET;
@@ -4875,6 +5128,10 @@
     }
 
     function wireEvents() {
+      const tableMenu = document.querySelector('.mobile-menu details');
+      tableMenu?.addEventListener('click', event => {
+        if (event.target.closest('button, a')) tableMenu.open = false;
+      });
       document.querySelectorAll('[data-chip]').forEach((btn) => {
         btn.addEventListener('click', () => addBet(parseInt(btn.dataset.chip, 10)));
       });
@@ -4921,6 +5178,10 @@
         if (isJackConfirmOpen()) {
           return;
         }
+        // Native links, form fields and focused buttons own their activation.
+        // Otherwise Enter on Hub deals a hand, and Quick Play only hides help.
+        if (e.code !== 'Escape' && e.target.closest?.('a, input, select, textarea, summary, [contenteditable="true"]')) return;
+        if ((e.code === 'Enter' || e.code === 'Space') && e.target.closest?.('button')) return;
         if (onboardingOpen) {
           if (e.code === 'Escape' || e.code === 'Enter' || e.code === 'Space') {
             e.preventDefault();
@@ -4984,8 +5245,7 @@
         .then((m) => {
           m.attachTurdjackDev(window, {
             dismissGuide() {
-              const g = document.getElementById('welcomeGuide');
-              if (g) g.style.display = 'none';
+              hideWelcomeGuide();
             },
             prepareBetting() {
               roundActive = false;
@@ -5052,7 +5312,7 @@
         .catch(() => {});
 
       if (!window.__TURDJACK_SKIP_KIT__) {
-        import('./games/turdjack-page-kit.js')
+        import('./games/turdjack-page-kit.js?v=d36643080fe94fbc')
           .then((m) => {
             turdjackKit = m.installTurdjackKit(window);
             updateHud();
@@ -5063,6 +5323,7 @@
     }
 
     init();
+    window.SuiteLoading?.ready();
   
   
   // ============================================================

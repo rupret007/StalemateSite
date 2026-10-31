@@ -16,15 +16,31 @@
     </script>
     <style>
         :root { color-scheme: dark; font-family: Arial, sans-serif; background: #171410; color: #f4f0e6; }
-        body { min-height: 100vh; margin: 0; display: grid; place-items: center; text-align: center; }
-        a { display: inline-flex; align-items: center; min-height: 44px; padding-inline: 0.75rem; color: #20baff; font-weight: 700; }
+        body { min-height: 100vh; margin: 0; display: grid; grid-template-rows: auto 1fr auto; text-align: center; }
+        header, footer { padding: 0.75rem 1rem; }
+        nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem 1rem; }
+        nav a { min-height: 44px; display: inline-flex; align-items: center; padding-inline: 0.75rem; color: #20baff; font-weight: 700; }
+        main { display: grid; place-items: center; padding: 1rem; }
+        a { color: #20baff; font-weight: 700; }
         a:focus-visible { outline: 3px solid #b5dc08; outline-offset: 3px; }
     </style>
 </head>
 <body>
+    <header>
+        <nav class="site-nav" aria-label="Primary navigation">
+            <a href="../">Home</a>
+            <a href="../#contact">Contact</a>
+        </nav>
+    </header>
     <main>
         <p>Taking you to Stalemate.</p>
         <a href="../qr/">Continue to the music</a>
     </main>
+    <footer class="site-footer">
+        <nav aria-label="Footer navigation">
+            <a href="../">Band homepage</a>
+            <a href="../#contact">Contact</a>
+        </nav>
+    </footer>
 </body>
 </html>

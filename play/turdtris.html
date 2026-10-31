@@ -1,8 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mobile-game="turdtris">
 <head>
 <meta name="robots" content="noindex,nofollow">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<script src="assets/suite-loading.js"></script>
+<script src="games/suite-progress-core.js?v=3c92de426327c7d1"></script>
+<script src="assets/suite-progress.js?v=cf46f758fae8dff1"></script>
+  <script src="assets/suite-share.js?v=ad4aecc45730b022"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -10,8 +14,10 @@
 <meta name="theme-color" content="#120d0a">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="assets/turdsuite.css">
-<script src="games/table-continue-core.js"></script>
-<script src="assets/turdsuite.js"></script>
+<link rel="stylesheet" href="assets/arcade.css">
+<link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
+<script src="games/table-continue-core.js?v=bc5fab705a134ab5"></script>
+<script src="assets/turdsuite.js?v=3a5cafdb70bf7654"></script>
 <title>Turdtris</title>
 <style>
 :root {
@@ -141,6 +147,17 @@ body::after {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.topbar-difficulty {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.topbar-difficulty .suite-difficulty-btn {
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .mobile-menu {
@@ -312,8 +329,8 @@ body::after {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 14px 30px rgba(0, 0, 0, 0.22);
 }
 
-.cabinet-hold h3,
-.next-queue h3 {
+.cabinet-hold h2,
+.next-queue h2 {
   font-size: 0.78rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -395,6 +412,8 @@ body::after {
 }
 
 body.desktop-cabinet {
+  height: 100dvh;
+  min-height: 0;
   padding: clamp(6px, 1vw, 12px);
   align-items: stretch;
   overflow-y: hidden;
@@ -402,7 +421,7 @@ body.desktop-cabinet {
 
 body.desktop-cabinet .layout {
   width: min(100vw - 16px, 1360px);
-  max-height: calc(100dvh - 12px);
+  max-height: calc(100dvh - 24px - var(--mobile-footer, 0px));
   display: flex;
   flex-direction: column;
   padding: 10px 12px 12px;
@@ -456,9 +475,9 @@ body.desktop-cabinet .cabinet-rail {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 100%;
-  overflow: hidden;
-  align-self: center;
+  max-height: calc(100dvh - 112px - var(--mobile-footer, 0px));
+  overflow: auto;
+  align-self: start;
 }
 
 body.desktop-cabinet .cabinet-rail .hud {
@@ -482,8 +501,14 @@ body.desktop-cabinet .cabinet-rail .rail-extra {
 }
 
 body.desktop-cabinet #game {
-  width: min(420px, calc((100dvh - 108px - env(safe-area-inset-bottom)) / 2), calc((100vw - 360px) / 2));
-  max-height: calc(100dvh - 120px);
+  width: min(420px, calc((100dvh - 160px - var(--mobile-footer, 0px) - env(safe-area-inset-bottom)) / 2), calc((100vw - 360px) / 2));
+  max-height: none;
+}
+
+body.desktop-cabinet .next-queue-slots canvas {
+  width: 96px;
+  height: 64px;
+  max-width: 100%;
 }
 
 body.desktop-cabinet .run-progress-copy {
@@ -809,7 +834,7 @@ body.desktop-cabinet .status {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 14px 30px rgba(0, 0, 0, 0.22);
 }
 
-.panel h3 {
+.panel h2 {
   font-size: 0.82rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -830,7 +855,7 @@ body.desktop-cabinet .status {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
-.preview-box h3 {
+.preview-box h2 {
   margin-bottom: 5px;
 }
 
@@ -1178,8 +1203,19 @@ body.desktop-cabinet .status {
   .top-actions {
     display: none;
   }
+  .topbar {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .topbar-difficulty {
+    order: 2;
+    width: 100%;
+    justify-content: center;
+    margin-top: 4px;
+  }
   .mobile-menu {
     display: block;
+    order: 3;
   }
   .hud {
     grid-template-columns: repeat(2, minmax(70px, 1fr));
@@ -1393,11 +1429,13 @@ body.desktop-cabinet .status {
 </style>
 <link rel="stylesheet" href="stalemate/play-music-pref.css">
 <script src="../js/music-preference.js"></script>
+<link rel="stylesheet" href="assets/mobile-fit.css">
+<script src="assets/mobile-fit.js" defer></script>
 </head>
-<body class="suite-ambient suite-no-zoom board-focus">
+<body class="suite-ambient suite-no-zoom board-focus arcade" data-arcade-game="turdtris">
 <div id="statusLive" class="sr-live" aria-live="polite" aria-atomic="true"></div>
 <div class="desktop-scene" id="desktopScene" aria-hidden="true"></div>
-<div class="welcome-guide" id="welcomeGuide">
+<div class="welcome-guide" id="welcomeGuide" role="region" aria-label="Start Turdtris">
   <canvas class="attract-canvas" id="attractCanvas" aria-hidden="true" width="640" height="480"></canvas>
   <div class="welcome-card attract-card">
     <div class="attract-logo" aria-hidden="true">Turdtris</div>
@@ -1414,6 +1452,7 @@ body.desktop-cabinet .status {
     </div>
     <h2 class="sr-live" style="position:absolute;width:1px;height:1px;overflow:hidden">Turdtris</h2>
     <p>Stack clean, survive level modifiers, and score big with combos and back-to-back clears.</p>
+    <details class="mobile-guide-details"><summary>Rules &amp; tips</summary><div>
     <ul tabindex="0" aria-label="Keyboard and touch controls">
       <li><strong>Move:</strong> Left/Right arrows</li>
       <li><strong>Rotate:</strong> Up or <strong>X</strong> (clockwise), <strong>Z</strong> (counterclockwise)</li>
@@ -1425,20 +1464,21 @@ body.desktop-cabinet .status {
     </ul>
     <div class="guide-legend"><span><strong>Ghost outline</strong><br>Your landing spot.</span><span><strong>Landing meter</strong><br>Time left to slide or spin.</span><span><strong>4 rows</strong><br>A mighty TURDTRIS!</span></div>
     <p>Hold saves a piece for later. Clear rows to travel from bathroom to orbit. Run Menu also has Sprint 40L, Ultra 2-minute, movement tuning and music.</p>
+    </div></details>
     <div class="welcome-actions">
-      <button class="btn" type="button" onclick="startAttractMode()">Play</button>
-      <button class="btn subtle" type="button" onclick="quickStartRun()">Quick Start</button>
-      <button class="btn subtle" type="button" onclick="hideWelcomeGuide()">Close Guide</button>
+      <button class="btn" id="attractPlay" type="button" onclick="startAttractMode()" disabled>Play</button>
+      <button class="btn subtle" id="guideResume" type="button" onclick="hideWelcomeGuide()" hidden>Resume run</button>
     </div>
   </div>
 </div>
 
-<div class="layout">
+<div class="layout" role="main">
   <div class="topbar">
     <div>
       <h1>Turdtris</h1>
       <p>Hold system, ghost piece, chaos modifiers, and the energy of a suspiciously spicy arcade booth.</p>
     </div>
+    <div class="suite-hud-settings topbar-difficulty" id="suite-difficulty-mount"></div>
     <div class="top-actions">
       <button class="btn subtle" onclick="location.href='./'">🏠 Hub</button>
       <button class="btn" onclick="showWelcomeGuide()">❓ How To Play</button>
@@ -1473,7 +1513,7 @@ body.desktop-cabinet .status {
 
   <div class="main-stage">
     <aside class="cabinet-hold" aria-label="Hold piece">
-      <h3>Hold</h3>
+      <h2>Hold</h2>
       <canvas width="120" height="80" id="hold"></canvas>
     </aside>
 
@@ -1506,6 +1546,7 @@ body.desktop-cabinet .status {
             <div class="overlay-stat"><div class="k">Time / PPS</div><div class="v" id="finalPace">0:00 / 0.00</div></div>
           </div>
           <p class="overlay-flavor">Space or Enter runs it back.</p>
+          <p class="suite-progress-result" id="progressResult" role="status" hidden></p>
           <button class="btn" onclick="restartGame()">Play Again</button>
         </div>
       </div>
@@ -1514,7 +1555,7 @@ body.desktop-cabinet .status {
     <aside class="panel legacy-panel">
       <div class="preview-row">
         <div class="preview-box">
-          <h3>Next</h3>
+          <h2>Next</h2>
           <canvas width="120" height="80" id="next"></canvas>
         </div>
       </div>
@@ -1524,13 +1565,13 @@ body.desktop-cabinet .status {
       </div>
 
       <div>
-        <h3>Status</h3>
+        <h2>Status</h2>
         <div class="status" id="statusTextLegacy">Stack clean, survive long, and chain line clears.</div>
       </div>
     </aside>
   </div>
 
-    <aside class="cabinet-rail" aria-label="Run stats and queue">
+    <aside class="cabinet-rail" aria-label="Run stats and queue" tabindex="0">
       <div class="hud" id="hudRail">
         <div class="card"><div class="k">Score</div><div class="v" id="score">0</div></div>
         <div class="card"><div class="k" id="highLabel">High</div><div class="v" id="highScore">0</div></div>
@@ -1541,7 +1582,7 @@ body.desktop-cabinet .status {
       </div>
 
       <div class="next-queue" id="desktopNextQueue">
-        <h3>Next</h3>
+        <h2>Next</h2>
         <div class="next-queue-slots" id="nextQueueSlots">
           <canvas class="queue-slot" width="96" height="64" id="nextQueue0" aria-label="Next piece"></canvas>
           <canvas class="queue-slot" width="96" height="64" id="nextQueue1" aria-hidden="true"></canvas>
@@ -1569,14 +1610,14 @@ body.desktop-cabinet .status {
       </details>
 
       <div class="rail-extra">
-        <h3>Status</h3>
+        <h2>Status</h2>
         <div class="status" id="statusText">Stack clean, survive long, and chain line clears.</div>
       </div>
     </aside>
   </div>
 </div>
 
-<div class="mobile-controls" id="mobileControls">
+<div class="mobile-controls" id="mobileControls" role="region" aria-label="Touch game controls">
     <div class="mobile-run-strip">
       <div class="mobile-piece-queue" id="mobilePieceQueue">
         <div class="mobile-preview-box" id="mobileHoldBox">
@@ -1639,6 +1680,18 @@ let b2b = 0;
 let softDrop = false;
 let paused = false;
 let gameOver = false;
+const resultShare = window.SuiteShare?.create({ host: document.getElementById('endOverlayCard'), game: 'turdtris' });
+let progressRunId = null;
+let progressRunResult = null;
+let progressRunDifficulty = 'normal';
+let progressCurrentDifficulty = 'normal';
+try {
+  window.Suite?.difficulty?.onChange?.(value => {
+    if (value === progressCurrentDifficulty) return;
+    if (progressRunId && !progressRunResult && hasStartedRun && !gameOver) progressRunDifficulty = 'mixed';
+    progressCurrentDifficulty = value;
+  });
+} catch { /* Difficulty metadata is optional. */ }
 let statusText = 'Guideline-inspired run: SRS, bag randomizer, and escalating garbage.';
 let activeMutator = 'Warmup Flow';
 let sceneShake = 0;
@@ -1646,6 +1699,11 @@ let hypeText = '';
 let hypeTimer = 0;
 const SOUND_STORAGE_KEY = 'turdtrisSoundOn_v1';
 let soundEnabled = true;
+window.Suite?.setSoundLocalEnabled?.(() => soundEnabled);
+window.Suite?.setSoundSettingsPause?.(() => {
+  if (!paused && !gameOver && hasStartedRun && !onboardingOpen) togglePause();
+  return paused ? document.querySelector('#pauseOverlay button') : null;
+});
 let audioCtx = null;
 let audioArmed = false;
 const MUSIC_STORAGE_KEY = 'turdtrisMusic_v1';
@@ -1714,13 +1772,16 @@ let dasLeftMs = 0;
 let dasRightMs = 0;
 let arrLeftMs = 0;
 let arrRightMs = 0;
+const MAX_FRAME_MS = 33;
 
 function tickDasRepeat(delta) {
   if (!tetromino || gameOver || paused) return;
+  const dt = !Number.isFinite(delta) || delta <= 0 ? 0 : Math.min(MAX_FRAME_MS, delta);
   if (dasLeftHeld) {
-    dasLeftMs += delta;
+    const delayRemaining = Math.max(0, inputSettings.das - dasLeftMs);
+    dasLeftMs += dt;
     if (dasLeftMs >= inputSettings.das) {
-      arrLeftMs += delta;
+      arrLeftMs += Math.max(0, dt - delayRemaining);
       while (arrLeftMs >= inputSettings.arr) {
         arrLeftMs -= inputSettings.arr;
         movePiece(-1);
@@ -1728,9 +1789,10 @@ function tickDasRepeat(delta) {
     }
   }
   if (dasRightHeld) {
-    dasRightMs += delta;
+    const delayRemaining = Math.max(0, inputSettings.das - dasRightMs);
+    dasRightMs += dt;
     if (dasRightMs >= inputSettings.das) {
-      arrRightMs += delta;
+      arrRightMs += Math.max(0, dt - delayRemaining);
       while (arrRightMs >= inputSettings.arr) {
         arrRightMs -= inputSettings.arr;
         movePiece(1);
@@ -1856,10 +1918,10 @@ let lastKickUsed = false;
 let dropAccumulator = 0;
 let lockAccumulator = 0;
 let lockResets = 0;
-const MAX_FRAME_MS = 33;
 let lastFrameTime = 0;
 let rAF = null;
 let onboardingOpen = false;
+let hasStartedRun = false;
 let guidePausedGame = false;
 let clearHoldIntervalRef = () => {};
 let cancelBoardGesture = () => {};
@@ -1910,6 +1972,7 @@ function showWelcomeGuide() {
   syncChallengeClock();
   clearHeldInput();
   refreshAttractBest();
+  document.getElementById("guideResume").hidden = !hasStartedRun || gameOver;
   const guide = document.getElementById('welcomeGuide');
   if (guide) {
     guide.style.display = 'flex';
@@ -1942,27 +2005,18 @@ function hideWelcomeGuide() {
   ensureLoopRunning();
 }
 
-function quickStartRun() {
-  hideWelcomeGuide();
-  unlockAudio();
-  statusText = 'Quick start live. Stack clean and trust your ghost piece.';
-  setHype('Quick start active. Build filthy combos.', 90);
-  playSfx('level');
-  ensureLoopRunning();
-  updateScore();
-}
-
 function startAttractMode() {
+  if (!window.TurdtrisModes) return;
   const attractMode = document.getElementById('attractModeSetting');
   const modeSetting = document.getElementById('modeSetting');
   if (attractMode && modeSetting) modeSetting.value = attractMode.value;
   hideWelcomeGuide();
   unlockAudio();
-  if (typeof startSelectedMode === 'function') startSelectedMode();
-  else quickStartRun();
+  startSelectedMode();
 }
 
 function handleWindowBlur() {
+  window.Suite?.setSoundPaused?.(true);
   syncChallengeClock();
   clearHeldInput();
   stopLoop();
@@ -2009,6 +2063,7 @@ function ensureAudio() {
 }
 
 function unlockAudio() {
+  if (window.Suite?.isStudioAudio?.()) return;
   if (!audioArmed || !soundEnabled || suiteMuted()) return;
   const ctx = ensureAudio();
   if (!ctx) return;
@@ -2018,6 +2073,9 @@ function unlockAudio() {
 }
 
 function suiteMuted() {
+  try {
+    if (window.Suite && typeof window.Suite.isMuted === 'function') return !!window.Suite.isMuted();
+  } catch (err) {}
   try {
     const stored = localStorage.getItem('turdsuite_muted');
     if (stored !== null) return stored === '1';
@@ -2031,6 +2089,7 @@ function suiteMuted() {
 
 function playSfx(type, opts) {
   if (!audioArmed || !soundEnabled || suiteMuted()) return;
+  if (window.Suite?.isStudioAudio?.()) return Suite.playSound('tris.' + type, opts || {});
   unlockAudio();
   if (window.__turdtrisAudio) {
     window.__turdtrisAudio.play(type, opts || {});
@@ -2050,6 +2109,11 @@ function armAudio(event) {
   audioArmed = true;
   if (window.__turdtrisAudio) window.__turdtrisAudio.arm();
   unlockAudio();
+  try {
+    if (window.Suite && typeof Suite.music === 'function') {
+      Suite.music().then(function (player) { if (player) player.armFromGesture(); });
+    }
+  } catch (e) { /* ignore */ }
 }
 document.addEventListener('pointerdown', armAudio, { capture: true });
 document.addEventListener('keydown', armAudio, { capture: true });
@@ -2061,18 +2125,33 @@ function updateMusic() {
   if (window.__turdtrisAudio) window.__turdtrisAudio.update(musicUpdateOptions);
 }
 
+function currentMusicEnabled() {
+  try {
+    if (window.Suite && typeof Suite.isMusicEnabled === 'function') return Suite.isMusicEnabled();
+  } catch (e) { /* Standalone play can use the local preference. */ }
+  return musicEnabled;
+}
+
 function toggleMusic() {
-  musicEnabled = !musicEnabled;
-  try { localStorage.setItem(MUSIC_STORAGE_KEY, musicEnabled ? '1' : '0'); } catch (e) {}
+  musicEnabled = !currentMusicEnabled();
+  try {
+    if (window.Suite && typeof Suite.setMusicEnabled === 'function') {
+      Suite.setMusicEnabled(musicEnabled);
+    } else {
+      localStorage.setItem(MUSIC_STORAGE_KEY, musicEnabled ? '1' : '0');
+    }
+  } catch (e) {}
   syncSettings();
   updateMusic();
+  syncSuiteMusic();
 }
 
 function syncSettings() {
   const music = document.getElementById('musicToggle');
   if (music) {
-    music.textContent = musicEnabled ? '♫ Music on' : '♫ Music off';
-    music.setAttribute('aria-pressed', String(musicEnabled));
+    const enabled = currentMusicEnabled();
+    music.textContent = enabled ? '♫ Music on' : '♫ Music off';
+    music.setAttribute('aria-pressed', String(enabled));
   }
   for (const [id, key] of [['dasSetting', 'das'], ['arrSetting', 'arr'], ['softSetting', 'softDrop']]) {
     const field = document.getElementById(id);
@@ -2138,6 +2217,7 @@ function toggleGestures() {
 
 function toggleSound() {
   soundEnabled = !soundEnabled;
+  window.Suite?.syncSoundState?.();
   saveSoundPref();
   updateSoundButtons();
   updateMusic();
@@ -2148,6 +2228,7 @@ function toggleSound() {
   } else {
     setHype('Sound muted. Silent stink mode.', 84);
   }
+  syncSuiteMusic();
   updateScore();
 }
 
@@ -2165,9 +2246,21 @@ function generateSequence() {
   }
 }
 
+function suiteGravityMul() {
+  try {
+    const t = window.Suite && Suite.difficulty && Suite.difficulty.tuning();
+    return t && Number.isFinite(t.speed) ? t.speed : 1;
+  } catch (e) {
+    return 1;
+  }
+}
 function getGravityMs() {
-  if (level <= gravityTable.length) return gravityTable[level - 1];
-  return 1;
+  let ms = level <= gravityTable.length ? gravityTable[level - 1] : 1;
+  const mul = suiteGravityMul();
+  if (mul !== 1) {
+    ms = Math.max(1, Math.round(ms / mul));
+  }
+  return ms;
 }
 
 function getLinesGoalForLevel(currentLevel) {
@@ -2389,6 +2482,7 @@ function holdCurrentPiece() {
       lastActionRotate: false,
       lastKick: false
     };
+    lockResets = 0;
 
     if (!isValidMove(tetromino.matrix, tetromino.row, tetromino.col)) {
       if (!recoverSpawnPlacement(tetromino)) {
@@ -3334,6 +3428,23 @@ function showGameOver(won) {
   }
 
   playSfx(isWin ? 'victory' : 'gameover');
+  if (progressRunId && hasStartedRun && !progressRunResult) {
+    progressRunResult = {
+      id: progressRunId, game: 'turdtris', mode: runMode, difficulty: progressRunDifficulty, kind: 'run',
+      outcome: isWin ? (runMode === 'classic' ? 'win' : 'complete') : 'loss',
+      score, lines: linesCleared, elapsedMs: Math.max(0, Math.floor(runStats.elapsedMs)), completed: isWin,
+      levelsCleared: runMode === 'classic' ? Math.max(0, level - 1) : 0, maxCombo: runStats.maxCombo
+    };
+    try {
+      const recorded = window.SuiteProgress?.record(progressRunResult);
+      if (recorded?.improvement) progressRunResult.improvement = recorded.improvement;
+      const goals = recorded?.newlyEarned?.map(goal => goal.title) || [];
+      const feedback = [goals.length ? `Goal earned: ${goals.join(' · ')}` : '', recorded?.improvement || '', recorded && !recorded.storageAvailable ? 'Your browser could not save progress on this device.' : ''].filter(Boolean).join(' ');
+      document.getElementById('progressResult').textContent = feedback;
+      document.getElementById('progressResult').hidden = !feedback;
+    } catch { /* Optional progress never interrupts the completed game. */ }
+  }
+  resultShare?.setResult(progressRunResult || { mode: runMode, score, lines: linesCleared, elapsedMs: runStats.elapsedMs, completed: isWin });
   updateScore();
 }
 
@@ -3341,6 +3452,7 @@ function togglePause() {
   if (gameOver) return;
   if (syncChallengeClock()) return;
   paused = !paused;
+  window.Suite?.setSoundPaused?.(paused);
   if (!paused) {
     const menu = document.querySelector('.mobile-menu details');
     if (menu) menu.open = false;
@@ -3358,6 +3470,15 @@ function togglePause() {
 }
 
 function restartGame() {
+  window.Suite?.stopSounds?.();
+  window.Suite?.setSoundPaused?.(false);
+  resultShare?.setResult(null);
+  progressRunId = window.SuiteProgress?.newRunId('turdtris') || null;
+  progressRunResult = null;
+  document.getElementById('progressResult').hidden = true;
+  document.getElementById('progressResult').textContent = '';
+  try { progressRunDifficulty = window.Suite?.difficulty?.get() || 'normal'; } catch { progressRunDifficulty = 'normal'; }
+  progressCurrentDifficulty = progressRunDifficulty;
   const menu = document.querySelector('.mobile-menu details');
   if (menu) menu.open = false;
   clearHeldInput();
@@ -3426,6 +3547,7 @@ function startSelectedMode() {
   if (!window.TurdtrisModes) return;
   const definition = window.TurdtrisModes.modeDefinition(document.getElementById('modeSetting').value);
   runMode = definition.id;
+  hasStartedRun = true;
   modeBest = 0;
   try { modeBest = window.TurdtrisModes.readModeBest(localStorage, runMode); } catch (e) {}
   document.querySelector('.hud').dataset.mode = runMode;
@@ -3513,14 +3635,12 @@ function loop(timestamp) {
       }
     }
 
+    // Airborne frames pause the timer; only a new piece renews the reset budget.
     if (isGrounded(tetromino)) {
       lockAccumulator += delta;
       if (lockAccumulator >= lockDelayMs) {
         lockPiece();
       }
-    } else {
-      lockAccumulator = 0;
-      lockResets = 0;
     }
 
     tickDasRepeat(delta);
@@ -3535,11 +3655,22 @@ function loop(timestamp) {
 
 document.addEventListener('keydown', (e) => {
   if (e.target?.matches?.('select, input, textarea, summary')) return;
-  if (!gameOver && e.target?.matches?.('button') && (e.code === 'Space' || e.code === 'Enter')) return;
+  if (e.target?.matches?.('.cabinet-rail')) return;
+  if (e.target?.closest?.('button, a') && (e.code === 'Space' || e.code === 'Enter')) return;
+  // Discrete actions belong to a fresh press. OS key-repeat must never drop
+  // the following pieces, toggle pause/mute again, or rotate after one intent.
+  if (e.repeat && ['Space', 'Enter', 'KeyC', 'KeyP', 'KeyM', 'ArrowUp', 'KeyX', 'KeyZ'].includes(e.code)) {
+    e.preventDefault();
+    return;
+  }
   if (onboardingOpen) {
-    if (e.code === 'Escape' || e.code === 'Enter' || e.code === 'Space') {
+    if (e.code === 'Enter' || e.code === 'Space') {
       e.preventDefault();
-      hideWelcomeGuide();
+      startAttractMode();
+    } else if (e.code === 'Escape') {
+      e.preventDefault();
+      if (hasStartedRun) hideWelcomeGuide();
+      else document.querySelector('#welcomeGuide details').open = false;
     }
     return;
   }
@@ -3759,16 +3890,42 @@ if (canvas) {
   }, { passive: true });
 }
 
-try { musicEnabled = localStorage.getItem(MUSIC_STORAGE_KEY) !== '0'; } catch (e) {}
+try {
+  if (window.Suite && typeof Suite.isMusicEnabled === 'function') {
+    musicEnabled = Suite.isMusicEnabled();
+  } else {
+    const siteMusic = localStorage.getItem('stalemate.music');
+    if (siteMusic === 'off') musicEnabled = false;
+    else if (siteMusic === 'on') musicEnabled = true;
+    else musicEnabled = localStorage.getItem(MUSIC_STORAGE_KEY) !== '0';
+  }
+} catch (e) {}
+function suiteMusicBlocked() {
+  return suiteMuted() || !soundEnabled || !currentMusicEnabled();
+}
+function syncSuiteMusic() {
+  try {
+    if (window.Suite && typeof Suite.music === 'function') {
+      Suite.music().then(function (player) { if (player) player.sync(); });
+    }
+  } catch (e) {}
+}
+try {
+  if (window.Suite && typeof Suite.setMusicGameBlocked === 'function') {
+    Suite.setMusicGameBlocked(suiteMusicBlocked);
+  }
+} catch (e) {}
 syncSettings();
 soundEnabled = loadSoundPref();
 gesturesEnabled = loadGesturesPref();
 updateSoundButtons();
 updateGesturesButton();
 restartGame();
+document.getElementById('attractPlay').disabled = !window.TurdtrisModes;
 if (!(window.Suite && Suite.guide && Suite.guide.hasSeen('turdtris.html'))) {
   showWelcomeGuide();
 } else {
+  hasStartedRun = true;
   refreshAttractBest();
 }
 
@@ -3787,6 +3944,7 @@ if (!(window.Suite && Suite.guide && Suite.guide.hasSeen('turdtris.html'))) {
   document.body.appendChild(_boss);
   const _bubble = document.createElement('div');
   _bubble.className = 'pb-bubble';
+  _bubble.setAttribute('aria-hidden', 'true');
   document.body.appendChild(_bubble);
   let _bubbleT = null;
   function bossSay(text, dur) {
@@ -3906,7 +4064,7 @@ if (!(window.Suite && Suite.guide && Suite.guide.hasSeen('turdtris.html'))) {
 window.turdtrisRuntime = {
   ensureAudio,
   soundEnabled: () => soundEnabled,
-  musicEnabled: () => musicEnabled,
+  musicEnabled: () => currentMusicEnabled(),
   audioArmed: () => audioArmed,
   initializePresentation(helpers, theme) {
     window.TurdtrisPresentation = helpers;
@@ -3919,12 +4077,12 @@ window.turdtrisRuntime = {
 };
 
 </script>
-<script type="module">
+<script type="module" data-game-required>
 import * as TurdtrisFx from './games/turdtris-fx.js';
 import * as TurdtrisPresentation from './games/turdtris-presentation.js';
 import * as TurdtrisModes from './games/turdtris-modes.js';
 import { createTurdtrisArt, themeForLevel } from './games/turdtris-art.js';
-import { createTurdtrisAudioPlayer, playTurdtrisSfx } from './games/turdtris-audio.js';
+import { createTurdtrisAudioPlayer, playTurdtrisSfx } from './games/turdtris-audio.js?v=48556fe58f015741';
 import { shouldUseBoardFocusLayout, boardCanvasCssWidth } from './games/turdtris-layout.js';
 import * as TurdtrisQueue from './games/turdtris-queue.js';
 import { createAttractField } from './games/turdtris-attract.js';
@@ -3932,6 +4090,18 @@ import { createAttractField } from './games/turdtris-attract.js';
 window.TurdtrisFx = TurdtrisFx;
 window.TurdtrisQueue = TurdtrisQueue;
 window.TurdtrisModes = TurdtrisModes;
+// Allow only existing modes; a hub shortcut selects the real mode and its records.
+const linkedMode = new URLSearchParams(location.search).get('mode');
+if (Object.hasOwn(TurdtrisModes.MODES, linkedMode)) {
+  const guideWasOpen = document.getElementById('welcomeGuide').classList.contains('is-open');
+  document.getElementById('modeSetting').value = linkedMode;
+  startSelectedMode();
+  refreshAttractBest();
+  if (guideWasOpen) {
+    hasStartedRun = false;
+    showWelcomeGuide();
+  }
+}
 window.TurdtrisArt = createTurdtrisArt();
 window.TurdtrisAudio = { playTurdtrisSfx };
 
@@ -3955,7 +4125,12 @@ function applyBoardFocus() {
   const scene = document.getElementById('desktopScene');
   if (scene) scene.style.display = mobile ? 'none' : 'block';
   const board = document.getElementById('game');
-  if (board) board.style.width = boardCanvasCssWidth(window.innerWidth, window.innerHeight).width;
+  // Desktop CSS includes the measured music footer; keep that reservation
+  // authoritative instead of covering it with the footer-free inline width.
+  if (board) {
+    board.style.width = mobile ? boardCanvasCssWidth(window.innerWidth, window.innerHeight).width : '';
+    if (!mobile) board.style.removeProperty('height');
+  }
 }
 
 const attractCanvas = document.getElementById('attractCanvas');
@@ -3978,7 +4153,9 @@ function paintAttractFrame(now) {
   attractLast = now;
   attractField.step(delta);
   ctx.clearRect(0, 0, w, h);
-  const colors = { I: '#7ad7ff', O: '#ffd56a', T: '#c98bff', S: '#7dffb2', Z: '#ff8f8f', J: '#7f9dff', L: '#ffb07a' };
+  const colors = (window.Suite && typeof Suite.turdtrisPieceColors === 'function')
+    ? Suite.turdtrisPieceColors()
+    : { I: '#7ad7ff', O: '#ffd56a', T: '#c98bff', S: '#7dffb2', Z: '#ff8f8f', J: '#7f9dff', L: '#ffb07a' };
   for (const piece of attractField.pieces()) {
     ctx.save();
     ctx.globalAlpha = piece.alpha;
@@ -4037,6 +4214,8 @@ runMenu.addEventListener('toggle', () => {
   }
 });
 window.addEventListener('storage', updateMusic);
+document.getElementById('attractPlay').disabled = false;
+window.SuiteLoading?.ready();
 </script>
 <script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>
 <script src="../js/track.js" defer></script>

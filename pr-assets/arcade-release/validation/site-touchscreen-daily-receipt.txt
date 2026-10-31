@@ -1,0 +1,37 @@
+VALIDATION RECEIPT — reconstructed from observed console output; not a raw log.
+
+Date: 2026-10-21
+Working directory: /Users/jeffstory/Documents/ChatGPT/Stalemate Website/StalemateSite
+Branch: codex/arcade-release
+Runtime: Node.js v24.22.0
+Test helper subsequently committed as: b62ef03
+
+Exact successful command:
+PATH=/private/tmp/stalemate-npm-cache/_npx/387698761821791d/node_modules/node/bin:$PATH node node_modules/@playwright/test/cli.js test tests/e2e/arcade-play.spec.js --workers=2 --retries=0
+
+Observed final Playwright summary:
+  20 passed (23.6s)
+
+Coverage: four Daily Dump tests in each of five configured projects:
+- chromium: 4 passed
+- webkit-iphone-se: 4 passed
+- webkit-iphone-15: 4 passed
+- webkit-iphone-15-pro-max: 4 passed
+- chromium-android: 4 passed
+
+Retries: zero; explicitly disabled by --retries=0.
+Phone helper uses touchscreen input after visibility, viewport-bounds and center-hit checks.
+Every legal pop asserts an exact one-move increment. Desktop retains locator.click().
+The completion test also verifies the visible next-puzzle arrival line.
+
+Observed completion-case durations:
+- chromium: 3.0s
+- webkit-iphone-se: 3.2s
+- webkit-iphone-15: 2.9s
+- webkit-iphone-15-pro-max: 3.5s
+- chromium-android: 1.6s
+
+A separate subsequent --workers=1 verification was stopped at the parent's request
+because the successful complete run already supplied the required evidence. That
+separate run reported 18 passed, 1 interrupted, and 1 not run. It is not included
+in the 20-pass result above.

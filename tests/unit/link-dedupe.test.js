@@ -34,11 +34,16 @@ describe('link dedupe per page region', () => {
         ];
         for (const [name, el] of regions) {
             expect(el, name).toBeTruthy();
+            const scope = name === 'site-header' ? el.querySelector('.social-nav') : el;
+            expect(scope, `${name} scope`).toBeTruthy();
             for (const href of SOCIAL) {
-                expect(countHrefs(el, href), `${name} ${href}`).toBeLessThanOrEqual(1);
+                expect(countHrefs(scope, href), `${name} ${href}`).toBeLessThanOrEqual(1);
             }
-            expect(countHrefs(el, ROCKIN), `${name} rockinoctober`).toBeLessThanOrEqual(1);
+            if (name !== 'site-header') {
+                expect(countHrefs(el, ROCKIN), `${name} rockinoctober`).toBeLessThanOrEqual(1);
+            }
         }
+        expect(countHrefs(doc.querySelector('#home'), ROCKIN), '#home rockinoctober').toBeLessThanOrEqual(1);
         expect(doc.querySelectorAll('#home .social-nav')).toHaveLength(0);
     });
 

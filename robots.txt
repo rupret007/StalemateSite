@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://stalemate.band/sitemap.xml

@@ -23,7 +23,7 @@ const PUBLIC_COPY = [
 ];
 
 describe('content boundaries', () => {
-    it('keeps confirmed facts and finished CTAs without template slots or member names', async () => {
+    it('keeps confirmed facts and finished CTAs without template slots', async () => {
         const home = await readFile(join(repoRoot, 'index.html'), 'utf8');
         const readme = await readFile(join(repoRoot, 'README.md'), 'utf8');
         expect(home).not.toMatch(/Better Than Now|named cut|on this page|A lyric video\. A Saturday set\.|Originals\. Punk rock\. Live\./);
@@ -41,7 +41,9 @@ describe('content boundaries', () => {
         expect(home).not.toMatch(/SoCal|Southern California|do not link|other act|Head2Wall/i);
         expect(home).not.toMatch(/Ska \/ punk/i);
         expect(home).not.toMatch(/ska\/punk/i);
-        expect(home).not.toMatch(/ticket/i);
+        expect(home).toContain('https://studio801.ticketspice.com/rockin-october');
+        expect(home).toContain('Choose October 24, then select Stalemate at checkout.');
+        expect(home).toContain('Full festival lineup');
         expect(home).toContain('href="#top">Home');
         expect(home).toContain('href="#about">About');
         expect(home).not.toMatch(/href=["'][^"']*(epk|qr)[^"']*["']/i);
@@ -51,7 +53,7 @@ describe('content boundaries', () => {
         expect(home).toContain('2026-10-24T16:45:00-05:00');
         expect(home).toContain('Rockin’ October');
         expect(home).toContain('Los Amigo’s');
-        expect(home).toContain('Show details');
+        expect(home).toContain('Get Saturday tickets');
         expect(home).toContain('assets/manic.mp4');
         expect(home).toContain('Hear it loud Oct 24');
         expect(home).toContain('at Los Amigo’s, Plano');
@@ -62,7 +64,8 @@ describe('content boundaries', () => {
         expect(home).not.toMatch(/\bautoplay\b/);
         expect(home).not.toMatch(/id="(music|video|follow|merch)"/);
         expect(disallowedEmbedAttributes(home)).toEqual([]);
-        expect(home).not.toContain('<form');
+        expect(home).toContain('data-contact-form');
+        expect(home).toContain('formsubmit.co/stalemate.punk@gmail.com');
         expect(home).not.toMatch(/\[(DATE\/VENUE|MAILING LIST TOOL|MERCH|BOOKING EMAIL|HANDLE|STREAM LINK|CITY) NEEDED\]/);
         expect(home).not.toMatch(/\bTBA\b|coming soon|\blorem\b|\bplaceholder\b|\byour\b|\benter\b/i);
         expect(home).not.toMatch(/A1\s*·/);
@@ -70,7 +73,8 @@ describe('content boundaries', () => {
         expect(readme).toContain('original songs');
         expect(readme).not.toMatch(/Lewisville|Flower Mound/);
         expect(readme).toContain('Member names and roles');
-        expect(readme).not.toMatch(/ticket/i);
+        expect(readme).toContain('show-ticket-rockin-october');
+        expect(readme).toContain('This dated fallback cannot expire without JavaScript');
         expect(readme).not.toMatch(/\[(MAILING LIST TOOL|MERCH|BOOKING EMAIL|HANDLE) NEEDED\]/);
     });
 
@@ -80,9 +84,12 @@ describe('content boundaries', () => {
         expect(css).toMatch(/\.social-link\s*\{[^}]*min-width:\s*46px/);
     });
 
-    it('never names band members on public surfaces', async () => {
+    it('confines member names to the approved About list', async () => {
         for (const relativePath of PUBLIC_COPY) {
-            const source = await readFile(join(repoRoot, relativePath), 'utf8');
+            const original = await readFile(join(repoRoot, relativePath), 'utf8');
+            const source = relativePath === 'index.html'
+                ? original.replace(/<ul class="band-members"[^>]*>[\s\S]*?<\/ul>/, '')
+                : original;
             expect(source, relativePath).not.toMatch(/\bJeff\b/);
             expect(source, relativePath).not.toMatch(/\bChe\b/);
             expect(source, relativePath).not.toMatch(/\bSean\b/);

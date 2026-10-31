@@ -59,9 +59,128 @@ test('listen section plays on-site audio only on tap', async ({ page }) => {
         return el && el.src.includes('/play/stalemate/andrea.m4a');
     })).toBe(true);
     await expect(section.locator('iframe')).toHaveCount(0);
+    await rows.first().locator('[data-listen-load]').click();
+    const frame = rows.first().locator('iframe');
+    await expect(frame).toHaveCount(1);
+    await expect(frame).toHaveAttribute('src', 'https://embed.music.apple.com/us/album/andrea/1718463871?i=1718463872');
+    await expect(section.locator('iframe')).toHaveCount(1);
+    await expect(rows.first().locator('[data-listen-load]')).toHaveText('Reload player');
 
     const fits = await page.evaluate(() => Math.max(document.body.scrollWidth, document.documentElement.scrollWidth) <= innerWidth + 1);
     expect(fits).toBe(true);
+});
+
+test('blocked music preview keeps focused manual reload and the existing streaming destinations', async ({ page }) => {
+    await page.clock.install();
+    let attempts = 0;
+    await page.route('https://embed.music.apple.com/**', async route => {
+        attempts += 1;
+        if (attempts === 1) await route.abort('internetdisconnected');
+        else await route.fulfill({ contentType: 'text/html', body: '<!doctype html><p>Deliberate replacement frame fixture</p>' });
+    });
+    await page.goto('/');
+    const row = page.locator('[data-listen-track]').first();
+    const button = row.locator('[data-listen-load]');
+    const destinations = await row.locator('a').evaluateAll(links => links.map(link => link.href));
+    await button.focus();
+    await page.keyboard.press('Enter');
+    await expect.poll(() => attempts).toBe(1);
+    await page.evaluate(() => { window.__oldMusicFrame = document.querySelector('[data-listen-embed] iframe'); });
+    // WebKit can leave an aborted cross-origin navigation pending. Exercise
+    // the product's existing bounded deadline, rather than assuming load fires.
+    await page.clock.fastForward(10_001);
+    await expect(button).toHaveText('Reload player');
+    await expect(button).toBeFocused();
+    const status = row.getByRole('status');
+    await expect(status).toHaveText(/If the player does not play|taking longer|could not be opened/);
+    await expect(button).toHaveAccessibleName('Reload Andrea by Stalemate on Apple Music');
+    await expect(status).not.toHaveText(/^(Playing|Successfully loaded|Playback started)/i);
+    await expect(button).toHaveAttribute('aria-describedby', await status.getAttribute('id'));
+    await page.keyboard.press('Enter');
+    await expect.poll(() => attempts).toBe(2);
+    await expect(button).toHaveText('Reload player');
+    await expect(row.locator('iframe')).toHaveCount(1);
+    expect(await page.evaluate(() => window.__oldMusicFrame.isConnected)).toBe(false);
+    await expect(row.frameLocator('iframe').locator('body')).toContainText('Deliberate replacement frame fixture');
+    expect(await row.locator('a').evaluateAll(links => links.map(link => link.href))).toEqual(destinations);
+});
+
+test('stalled music preview cancels late navigation and offers only deliberate retries', async ({ page }) => {
+    await page.clock.install();
+    const attempts = [];
+    await page.route('https://embed.music.apple.com/**', route => { attempts.push(route); });
+    try {
+        await page.goto('/');
+        const row = page.locator('[data-listen-track]').first();
+        const button = row.locator('[data-listen-load]');
+        const status = row.getByRole('status');
+        await button.focus();
+        await page.keyboard.press('Enter');
+        await expect.poll(() => attempts.length).toBe(1);
+        await expect(button).toHaveAttribute('aria-disabled', 'true');
+        await expect(button).toBeFocused();
+        await page.keyboard.press('Enter');
+        expect(attempts).toHaveLength(1);
+        await page.evaluate(() => { window.__oldMusicFrame = document.querySelector('[data-listen-embed] iframe'); });
+        await page.clock.fastForward(10_001);
+        await expect(status).toContainText('taking longer');
+        await expect(row.locator('iframe')).toHaveCount(0);
+        await expect(button).toHaveText('Reload player');
+        await page.clock.fastForward(30_000);
+        expect(attempts).toHaveLength(1);
+        await page.keyboard.press('Enter');
+        await expect.poll(() => attempts.length).toBe(2);
+        await page.evaluate(() => {
+            window.__oldMusicFrame.dispatchEvent(new Event('load'));
+            window.__oldMusicFrame.dispatchEvent(new Event('error'));
+        });
+        await expect(status).toContainText('Opening');
+        await expect(button).toHaveAttribute('aria-disabled', 'true');
+        await attempts[1].fulfill({ contentType: 'text/html', body: '<!doctype html><p>Reload fixture</p>' });
+        await expect(button).toHaveText('Reload player');
+        await expect(row.frameLocator('iframe').locator('body')).toContainText('Reload fixture');
+    } finally {
+        for (const route of attempts) await route.abort().catch(() => {});
+    }
+});
+
+test('leaving an opening music preview retires it before history return', async ({ page }) => {
+    const attempts = [];
+    await page.route('https://embed.music.apple.com/**', route => { attempts.push(route); });
+    try {
+        await page.goto('/');
+        const button = page.locator('[data-listen-load]').first();
+        await button.click();
+        await expect.poll(() => attempts.length).toBe(1);
+        await page.evaluate(() => window.addEventListener('pagehide', () => sessionStorage.setItem('test-music-preview-exit', JSON.stringify({
+            frames: document.querySelectorAll('[data-listen-embed] iframe').length,
+            label: document.querySelector('[data-listen-load]').textContent,
+            busy: document.querySelector('[data-listen-load]').getAttribute('aria-disabled'),
+            status: document.querySelector('[data-listen-embed] [role=status]').textContent
+        })), { once: true }));
+        await page.goto('/qr/');
+        expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem('test-music-preview-exit')))).toEqual({ frames: 0, label: 'Play here', busy: null, status: '' });
+        await page.goBack();
+        await expect(button).toHaveText('Play here');
+        await expect(page.locator('[data-listen-embed] iframe')).toHaveCount(0);
+        expect(attempts).toHaveLength(1);
+    } finally {
+        for (const route of attempts) await route.abort().catch(() => {});
+    }
+});
+
+test('QR Listen clears the actual sticky header through phone rotation without changing intro spacing', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/qr/');
+    for (const viewport of [{ width: 320, height: 568 }, { width: 568, height: 320 }, { width: 1280, height: 900 }]) {
+        await page.setViewportSize(viewport);
+        await expect.poll(() => page.evaluate(() => Math.abs(parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) - document.querySelector('.site-header').getBoundingClientRect().height))).toBeLessThan(1);
+        await page.locator('.site-nav a[href="#manic"]').click();
+        await expect.poll(() => page.evaluate(() => document.querySelector('#manic').getBoundingClientRect().top - document.querySelector('.site-header').getBoundingClientRect().bottom)).toBeGreaterThanOrEqual(-1);
+        expect(await page.locator('.qr-intro').evaluate(el => getComputedStyle(el).paddingTop)).toBe('112px');
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+        await page.locator('a[href="#top"]').click();
+    }
 });
 
 test('Manic teaser and stalemate.band share metadata', async ({ page }) => {

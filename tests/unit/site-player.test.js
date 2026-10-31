@@ -49,6 +49,17 @@ describe('site player', () => {
         expect(el).toBeNull();
     });
 
+    it('shows status when play is blocked because site music is off', async () => {
+        const win = loadPlayer(storage);
+        win.StalemateMusicPref.write('off');
+        const button = win.document.querySelector('[data-site-play="manic"]');
+        button.click();
+        const status = win.document.getElementById('stalemate-site-play-status');
+        expect(status).not.toBeNull();
+        expect(status.hidden).toBe(false);
+        expect(status.textContent).toMatch(/Site music is off/i);
+    });
+
     it('pauses when another media element starts playing', async () => {
         const win = loadPlayer(storage);
         win.HTMLMediaElement.prototype.play = function playStub() {
