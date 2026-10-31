@@ -30,7 +30,9 @@ source hashes and detailed setup observations stay in ignored local evidence.
 ## Candidate and required verification
 
 At short heights, the existing chat pane is allowed to scroll vertically when
-recovery/jump rows exceed its height. Existing controls, text, retained drafts,
+recovery/jump rows exceed its height. The complete composer stays at that pane's
+bottom while the other rows scroll; focusing only Send cannot leave the taller
+form clipped. Existing controls, text, retained drafts,
 input16px sizing and horizontal containment remain. No information, spam rule,
 session policy or control is removed to manufacture a smaller layout.
 
@@ -53,6 +55,13 @@ three-second slow mode before geometry assertions ran. Preserve that run and
 its raw-log digest; it is not a clipping-fix pass or a measured geometry failure.
 The test now waits3.1 real seconds after the rejected line before its next
 request. No clock, rate limit, assertion or retry configuration is changed.
+
+The paced headd1ac728 [run41197593615](https://github.com/rupret007/StalemateSite/actions/runs/41197593615) reached geometry:1,869 units/114files and
+436 browser cases passed, while both new cases failed again on their configured
+retry. At300x299, the form bottom was233.71875px versus the chat pane's225.5px.
+The visibility assertions stay intact. The candidate now anchors the whole
+composer within the short pane instead of relying on focus scrolling to its
+smaller Send button. Current-source CI and actual native400 proof remain needed.
 
 W3C's [Reflow guidance](https://www.w3.org/WAI/WCAG22/Understanding/reflow.html)
 allows responsive relocation and vertical scrolling while retaining content and

@@ -452,7 +452,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .activity-heading { padding-block: 8px; }
   .buffer { min-height: 0; padding-block: 1px; }
   .buffer li { padding-block: 0; }
-  .say { margin-block: 4px; }
+  .say { position: sticky; bottom: 0; z-index: 1; margin-block: 4px; }
   .say input { min-height: 36px; padding-block: 8px; }
   .say .btn { min-height: 32px; padding: 6px 8px; margin: 3px; }
   .toast { padding: 4px 12px; }
