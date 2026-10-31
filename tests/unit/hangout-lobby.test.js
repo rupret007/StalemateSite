@@ -377,8 +377,13 @@ describe('PMs are accept-first, blockable, switchable and need lobby time', () =
         cmd(b, 'accept', ['Alpha']);
         expect(got(b).find((m) => m.t === 'pm').text).toBe('hey great set');
         cmd(a, 'msg', ['Bravo', 'Private', 'contact', 'choice:', 'person@example.test']);
+        // Jeff-approved product change (G-0116): PMs get the same personal-info filter as public chat.
+        expect(got(b).filter((m) => m.t === 'pm').length).toBe(1);
+        expect(JSON.stringify(got(b))).not.toContain('person@example.test');
+        expect(notices(a)).toMatch(/emails/);
+        later(4000);
+        cmd(a, 'msg', ['Bravo', 'see', 'you', 'there']);
         expect(got(b).filter((m) => m.t === 'pm').length).toBe(2);
-        expect(got(b).filter((m) => m.t === 'pm').at(-1).text).toBe('Private contact choice: person@example.test');
         cmd(b, 'block', ['Alpha']);
         cmd(a, 'msg', ['Bravo', 'yo']);
         expect(got(b).filter((m) => m.t === 'pm').length).toBe(2);

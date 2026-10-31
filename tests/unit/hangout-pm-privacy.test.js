@@ -28,22 +28,30 @@ function fixture() {
 }
 
 describe('private messages use consent and participant reports without automatic content classification', () => {
-    it('does not apply public word or personal-information filters to pending or accepted PMs', () => {
+    // Jeff-approved product change (G-0116): PMs use the same deterministic checkText filter as public chat.
+    it('applies public word and personal-information filters to pending and accepted PMs, without logging the text', () => {
         const f = fixture();
         f.join('Sender'); f.join('Recipient'); f.join('Observer'); f.join('Staff', 'owner'); f.later(180000);
         f.cmd('Staff', 'filter', ['block', 'syntheticmarker']);
         const text = 'syntheticmarker person@example.test';
         f.cmd('Sender', 'msg', ['Recipient', text]);
-        expect(f.frames.filter(frame => frame.recipient === 'Recipient' && frame.t === 'pm-request')).toHaveLength(1);
-        expect(f.pm('Recipient')).toEqual([]);
+        expect(f.frames.filter(frame => frame.recipient === 'Recipient' && frame.t === 'pm-request')).toHaveLength(0);
+        expect(JSON.stringify(f.frames.filter(frame => frame.recipient !== 'Sender'))).not.toContain('person@example.test');
+        f.later(4000); f.cmd('Sender', 'msg', ['Recipient', 'Synthetic clean opener']);
         f.cmd('Recipient', 'accept', ['Sender']);
-        expect(f.pm('Recipient').map(frame => frame.text)).toEqual([text]);
+        expect(f.pm('Recipient').map(frame => frame.text)).toEqual(['Synthetic clean opener']);
         f.later(4000); f.cmd('Sender', 'msg', ['Recipient', 'Another contact choice: second@example.test']);
-        expect(f.pm('Recipient')).toHaveLength(2);
+        expect(f.pm('Recipient')).toHaveLength(1);
+        f.later(4000); f.cmd('Sender', 'msg', ['Recipient', 'syntheticmarker']);
+        expect(f.pm('Recipient')).toHaveLength(1);
+        expect(JSON.stringify(f.frames.filter(frame => frame.recipient !== 'Sender'))).not.toContain('second@example.test');
+        expect(f.frames.some(frame => frame.recipient === 'Sender' && frame.kind === 'error' && /emails/.test(frame.text))).toBe(true);
         expect(f.pm('Observer')).toEqual([]); expect(f.pm('Staff')).toEqual([]);
         expect(f.providerCalls).toEqual([]);
-        expect(f.engine.modlog.some(entry => entry.action === 'pm-filter')).toBe(false);
-        // Public text still has its existing deterministic moderation policy.
+        expect(f.engine.modlog.some(entry => entry.action === 'pm-filter-block')).toBe(true);
+        for (const value of [f.engine.modlog, f.engine.adminState(), f.writes])
+            expect(JSON.stringify(value)).not.toContain('example.test');
+        // Public text keeps its existing deterministic moderation policy.
         f.later(4000); f.engine.message('Sender', JSON.stringify({ t: 'say', ch: '#stalemate', text: 'syntheticmarker' }));
         expect(f.frames.some(frame => frame.t === 'line' && frame.text === 'syntheticmarker')).toBe(false);
         expect(f.engine.modlog.some(entry => entry.action === 'filter-block')).toBe(true);
@@ -62,8 +70,8 @@ describe('private messages use consent and participant reports without automatic
     });
 
     it('still normalizes and bounds private protocol text without publishing an empty frame', () => {
-        const f = fixture(), line = f.establish(` \u202e${'p'.repeat(320)}  `);
-        expect(line.text).toMatch(/^p+$/);
+        const f = fixture(), line = f.establish(` \u202e${'pq'.repeat(160)}  `); // non-repeating chars: a 15+ run of one char is now spam-blocked like public chat (G-0116)
+        expect(line.text).toMatch(/^[pq]+$/);
         expect(line.text.length).toBeGreaterThan(250);
         expect(line.text.length).toBeLessThanOrEqual(300);
         f.later(4000); f.cmd('Sender', 'msg', ['Recipient', '\u202e\u0001  ']);

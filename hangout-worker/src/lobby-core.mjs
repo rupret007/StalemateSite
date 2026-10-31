@@ -1621,6 +1621,25 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         }
     }
 
+    function pmFilterUserMessage(reason) {
+        return reason.startsWith('personal-info')
+            ? 'Not cool here: no phone numbers, emails, addresses or socials, even in PMs.'
+            : reason === 'link' ? 'Only YouTube links are allowed.'
+            : reason === 'threat' ? 'Nope. No threats. Don’t be a dick.'
+            : reason === 'spam' ? 'Easy on the keyboard mash.'
+            : 'Don’t be a dick. Message not sent.';
+    }
+    function filterPmText(c, rawText) {
+        if (!rawText) return { ok: true, text: '' };
+        const v = checkText(rawText, net.lists);
+        if (v.verdict === 'ok' || (isBand(c) && v.verdict === 'block' && v.reason.startsWith('link'))) return { ok: true, text: v.text };
+        if (v.verdict === 'block' || v.verdict === 'hold') {
+            if (v.reason !== 'empty') { bot(c, pmFilterUserMessage(v.reason), 'error'); log(BOT, 'pm-filter-block', c.nick, v.reason, 'pm'); }
+            return { ok: false, text: '' };
+        }
+        return { ok: true, text: v.text };
+    }
+
     function privmsg(c, to, rawText, action = false) {
         prunePendingPm();
         const t = byNick(to);
@@ -1643,10 +1662,14 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             if (now() - c.since < L.pmMinLobbyMs) return bot(c, `Hang in the lobby for ${Math.ceil(L.pmMinLobbyMs / MIN)} minutes before sending PM requests.`, 'error');
         }
         if (!limited(c, 'pm-request', 3, 3 / 60)) return;
-        // Normalize/bound protocol text, without public-content classification.
-        // The first body stays volatile only until acceptance/expiry/disconnect.
-        const first = rawText ? normalize(rawText, L.maxChars) : '';
         if (p && p.state === 'pending') return bot(c, `Still waiting for ${t.nick} to accept.`);
+        // Normalize/bound protocol text; deterministic filter matches public chat (no mod queue).
+        let first = '';
+        if (rawText) {
+            const filtered = filterPmText(c, rawText);
+            if (!filtered.ok) return;
+            first = normalize(filtered.text, L.maxChars);
+        }
         pm.set(k, { state: 'pending', from: c.dev, fromId: c.id, toId: t.id, first, firstMe: !!action, at: now() });
         out(t, { t: 'pm-request', from: c.nick, band: isBand(c) });
         return bot(c, `PM request sent to ${t.nick}. It opens if they accept.`);
@@ -1658,7 +1681,9 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (!isBand(from) && (net.lock === 'readonly' || budgetLevel() !== 'ok')) return bot(from, 'The lobby is read-only right now, PMs too.', 'error');
         if (!isBand(from) && Math.max(net.mutes[from.dev] || 0, net.mutes[from.account] || 0) > now()) return bot(from, 'You’re muted for now.', 'error');
         if (to.blocks.has(from.dev)) return bot(from, `${to.nick} isn't taking PMs.`, 'error');
-        const text = normalize(rawText, L.maxChars);
+        const filtered = filterPmText(from, rawText);
+        if (!filtered.ok) return;
+        const text = normalize(filtered.text, L.maxChars);
         if (!text) return undefined;
         const msg = { t: 'pm', id: `p${now().toString(36)}${(seq += 1).toString(36)}`, from: from.nick, entrySource: from.entrySource, to: to.nick, text, me: !!action, band: isBand(from), ts: now() };
         const recipients = new Set([from.id]);
