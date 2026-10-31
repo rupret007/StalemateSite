@@ -100,6 +100,9 @@ putting both devices on Wi-Fi does not bypass that issuer requirement.
    Keep separate web credentials, exact CORS, durable quotas, combined desktop/web
    limits and existing namespaces. Source admission limits alone do not establish
    account entitlement, account-wide usage or a hard spending guarantee.
+   The [private activation review](HANGOUT_PRIVATE_MUSIC_ACTIVATION_REVIEW.md)
+   names both Worker destinations, exact proposed origins and unchanged controls.
+   WebJam music does not require enabling Hang Out's separate chat/media TURN.
 5. Once authorized and configured, prove exact-origin denial, protected-page
    admission, sealed signaling, actual expiry/revocation, forced relay and Stop
    with sanitized logs. Then use actual ARM Mini, Intel MacBook and Windows

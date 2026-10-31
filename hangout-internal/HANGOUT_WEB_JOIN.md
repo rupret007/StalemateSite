@@ -3,10 +3,12 @@
 The website now includes `/join/`, the static browser client used by WebJam's
 compiled invitation address. Its source is pinned in
 [`join/PROVENANCE.json`](../join/PROVENANCE.json) to WebJam commit
-`4263e1f9f2718b06c6de0239822c929d44683347` and
-[PR398](https://github.com/rupret007/webjam/pull/398). That source contains the
+`da7e04580d31bd0fa1039e7e1cbf4c940336edea` and
+[PR411](https://github.com/rupret007/webjam/pull/411). That source retains the
 interrupted-Join recovery, delayed-playback cancellation and background-audio
-resume fixes. The MIT license is shipped with the client.
+resume fixes. Unavailable relay guidance now asks guests to try later or contact
+their host; it does not suggest that same Wi-Fi replaces required credentials.
+The MIT license is shipped with the client.
 Every runtime file is copied unchanged except for the page's noindex metadata;
 the manifest records both source and shipped hashes. No dependency installer,
 test harness, provider key or generated invitation is part of the page.
@@ -25,7 +27,11 @@ and their complete-message copy/paste route remain unchanged.
 
 ## Deployment-owner handoff
 
-StoryPool 10-21-26 owns review coordination and deployment. Before activating:
+Jeff's October30 clarification keeps application code, project CI, tests, docs
+and application PRs in this workstream without StoryPool/Karen admission.
+Shared StoryPool core, services, configuration and operational state remain
+outside this work. Provider, native-trust and public-release holds remain.
+Before activating:
 
 - Review the pinned WebJam source, this application PR and their exact heads.
 - Confirm the intended page origin and native host's compiled invite address.
@@ -41,7 +47,7 @@ StoryPool 10-21-26 owns review coordination and deployment. Before activating:
   network failure and recovery. Local synthetic audio and provider fixtures do
   not establish WAN timing, physical iPhone behavior or TURN reachability.
 
-Use WebJam's [canonical creator guide](https://github.com/rupret007/webjam/blob/4263e1f9f2718b06c6de0239822c929d44683347/USER_GUIDE.md)
-and [Web Join protocol guide](https://github.com/rupret007/webjam/blob/4263e1f9f2718b06c6de0239822c929d44683347/docs/web-join.md)
+Use WebJam's [canonical creator guide](https://github.com/rupret007/webjam/blob/da7e04580d31bd0fa1039e7e1cbf4c940336edea/USER_GUIDE.md)
+and [Web Join protocol guide](https://github.com/rupret007/webjam/blob/da7e04580d31bd0fa1039e7e1cbf4c940336edea/docs/web-join.md)
 for the existing host/guest workflow. Browser joining is a separate higher-delay
 option; it does not satisfy the remaining native Windows/Linux/Mac acceptance.
