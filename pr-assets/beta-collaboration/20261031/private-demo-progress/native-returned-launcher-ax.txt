@@ -1,0 +1,16 @@
+Window: "WebJam", App: WebJam.
+0 dialog WebJam, Secondary Actions: Raise
+	1 text Description: WebJam symbol: one continuous three-loop trefoil., Value: WebJam WebJam, ID: WebJamApplication.LaunchDialog.LaunchBrandMark
+	2 checkbox Art, Description: Make art together., Value: 0, ID: WebJamApplication.LaunchDialog._LaunchPages.QWidget.LaunchProfileCards.LaunchProfileCard, Secondary Actions: Raise
+	3 checkbox Music, Description: Write songs or play live together., Value: 1, ID: WebJamApplication.LaunchDialog._LaunchPages.QWidget.LaunchProfileCards.LaunchProfileCard, Secondary Actions: Raise
+	4 button Host, Description: Copy an invite once you're in the room., ID: WebJamApplication.LaunchDialog._LaunchPages.QWidget.LaunchPrimary, Secondary Actions: Raise
+	5 button Join, Description: Paste the invite you were sent., ID: WebJamApplication.LaunchDialog._LaunchPages.QWidget.LaunchSecondary, Secondary Actions: Raise
+	6 close button
+	7 zoom button
+	8 text WebJam
+9 menu bar
+	10 WebJam
+	11 File
+	12 Help
+
+The focused UI element is 4 button Host, Description: Copy an invite once you're in the room., ID: WebJamApplication.LaunchDialog._LaunchPages.QWidget.LaunchPrimary, Secondary Actions: Raise
