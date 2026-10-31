@@ -1,0 +1,109 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+*{box-sizing:border-box} [hidden]{display:none!important}
+body.chess-page{margin:0;min-height:100dvh;color:#f4f0e6;background:radial-gradient(ellipse at 20% 0%,#263849,transparent 70%),#101720;--ch-accent:#b5dc08;--ch-blue:#56c9ff;--ch-panel:#1a2532;font:16px/1.45 var(--arc-body,system-ui,sans-serif);padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+.chess-shell{width:min(1080px,100%);margin:auto}.chess-header{display:flex;align-items:center;gap:16px;justify-content:space-between;margin:0 0 18px}.chess-header h1{font:800 clamp(26px,4.5vw,42px)/1 var(--arc-display,system-ui);margin:0}.chess-header h1 span{color:var(--ch-blue)}.chess-kicker{font-size:11px!important;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--ch-accent);margin:0 0 7px}.chess-header .chess-kicker{margin-bottom:4px}.chess-page a{color:var(--ch-blue);text-underline-offset:4px}.chess-hub{font-weight:700;min-height:44px;display:inline-flex;align-items:center}.chess-page button,.chess-page select{font:700 16px/1.2 var(--arc-body,system-ui);min-height:44px;border:1px solid #66798b;border-radius:8px;color:#f4f0e6;background:#233244;padding:9px 12px;cursor:pointer}.chess-page button:hover:enabled{background:#364b60}.chess-page button:disabled{opacity:.48;cursor:default}.chess-page button.primary{background:var(--ch-accent);color:#121b0a;border-color:var(--ch-accent);font-weight:850}.chess-page button.primary:hover:enabled{background:#d1ef59}.chess-page :focus-visible{outline:3px solid #ffd166;outline-offset:3px}.chess-skip{position:absolute;top:-80px;left:16px;z-index:20;background:#101720;padding:12px}.chess-skip:focus{top:10px}.chess-card{border:1px solid #415466;background:var(--ch-panel);border-radius:14px;padding:18px;box-shadow:0 8px 24px #0003}.chess-setup{display:grid;grid-template-columns:1fr 1fr;gap:38px;padding:clamp(20px,5vw,48px);border-top:4px solid var(--ch-blue)}.setup-copy{align-self:center}.setup-copy h2{font-size:clamp(32px,5vw,54px);line-height:1;margin:8px 0 18px}.chess-page label{display:block;font-weight:700;margin-bottom:5px}.chess-setup select{display:block;width:100%;margin-bottom:14px}.chess-setup form>button{margin:8px 6px 0 0}.subtle{font-size:13px;color:#c0ceda}.chess-game{display:grid;grid-template-columns:minmax(0,620px) minmax(250px,1fr);gap:20px;align-items:start}.chess-table{min-width:0}.player-strip{min-height:38px;display:flex;gap:12px;align-items:center;justify-content:space-between;padding:5px 3px;font-weight:700;font-size:14px}.captured{font-size:12px;font-weight:500;text-align:right;max-width:75%}.chess-board{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));aspect-ratio:1;border:6px solid #304255;border-radius:6px;box-shadow:0 14px 40px #0006;isolation:isolate}.chess-page .square{position:relative;min-width:0;min-height:0;padding:0;border:0;border-radius:0;background:#e7dac0;color:#151f2d;aspect-ratio:1;touch-action:manipulation;display:flex;align-items:center;justify-content:center}.chess-page .square.dark{background:#6b8890}.chess-page .square:hover:enabled{background:#c0cfaa}.square svg{width:86%;height:86%;pointer-events:none;filter:drop-shadow(0 2px 1px #0005)}.square .coord{position:absolute;z-index:2;font:800 clamp(9px,1.3vw,12px)/1 system-ui;pointer-events:none}.coord.file{bottom:2px;right:3px}.coord.rank{top:2px;left:3px}.chess-page .square.selected{box-shadow:inset 0 0 0 4px #102c81;background:#a9c1ee}.square.legal:after{content:'';width:24%;height:24%;background:#102c81;border:2px solid #fff9;border-radius:50%;position:absolute}.square.capture:after{width:88%;height:88%;background:transparent;border:4px solid #102c81}.square.last:before{content:'';position:absolute;inset:3px;border:3px solid #5c3816;clip-path:polygon(0 0,30% 0,30% 6%,6% 6%,6% 30%,0 30%,0 0,100% 100%,70% 100%,70% 94%,94% 94%,94% 70%,100% 70%,100% 100%);z-index:2}.square.hinted{box-shadow:inset 0 0 0 4px #8d239c}.square.checked{box-shadow:inset 0 0 0 4px #ab1431}.check-label{position:absolute;bottom:0;left:0;right:0;background:#8f102a;color:white;font:800 9px/1.2 system-ui;padding:2px;z-index:3}.chess-page .square:focus-visible{z-index:4;outline:3px solid #16102b;outline-offset:-3px;box-shadow:inset 0 0 0 6px #ffd166}.chess-console{display:flex;flex-direction:column;gap:12px;min-width:0}.turn-card h2{font-size:28px;margin:0 0 8px}.turn-card #status{margin:4px 0;min-height:44px}.chess-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.chess-console summary{font-weight:750;cursor:pointer;min-height:32px}.chess-console details{padding:12px 16px}.chess-moves{max-height:190px;overflow:auto;list-style:none;margin:8px 0 0;padding:0;scrollbar-gutter:stable}.chess-moves li{display:grid;grid-template-columns:32px 1fr 1fr;gap:4px;align-items:center;border-bottom:1px solid #415466}.chess-moves button{border:0;min-height:36px;text-align:left;background:transparent;padding:4px 8px}.chess-moves button[aria-current=true]{background:#3d5269}.review-controls{display:flex;gap:8px;margin-top:8px}.review-controls button{flex:1;padding:8px}.chess-footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:12px;color:#c0ceda;margin-top:24px}.chess-footer a{min-height:32px;display:inline-flex;align-items:center}.chess-page dialog{width:min(530px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto;margin:auto;border:2px solid var(--ch-blue);border-radius:16px;background:#1a2532;color:#f4f0e6;padding:24px;font:16px/1.45 var(--arc-body,system-ui)}.chess-page dialog::backdrop{background:#000c}.chess-page dialog h2{font-size:28px;line-height:1.15;margin:0 0 14px}.chess-page dialog p{margin:12px 0}.promotion-choices{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:20px 0}.promotion-choices svg{width:36px;height:36px}.chess-page dialog select{width:100%;margin:8px 0}.chess-page #engine-recovery{border-top:1px solid #f6b17e;margin-top:12px}.chess-page #engine-recovery button{margin:4px 0}.chess-page #result{border-top:2px solid var(--ch-accent);margin-top:14px}.chess-page #result .primary{width:100%}
+@media(max-width:740px){.chess-game{grid-template-columns:1fr;gap:14px}.chess-table{width:min(100%,560px);margin:auto}.chess-console{width:100%}.chess-header{gap:9px;margin-bottom:12px}.chess-header h1{font-size:28px}.chess-header .chess-kicker{font-size:9px!important}.chess-header button{font-size:13px;padding:8px}.chess-setup{grid-template-columns:1fr;gap:15px}.setup-copy h2{font-size:36px}.setup-copy p{margin:8px 0}.chess-actions{grid-template-columns:repeat(4,1fr)}.chess-actions button{padding:8px 5px;font-size:14px}.turn-card #status{min-height:0}.chess-footer{margin-top:16px}.chess-board{border-width:4px}.square svg{width:88%;height:88%}.check-label{font-size:8px;padding:1px}}
+@media(max-width:360px){.chess-header h1{font-size:23px}.chess-header .chess-kicker{display:none}.chess-hub{font-size:14px}.chess-card{padding:14px}.chess-actions{grid-template-columns:1fr 1fr}.chess-page{padding-inline:8px}.chess-header{gap:6px}}
+@media(min-width:520px) and (max-height:520px) and (orientation:landscape){.chess-game{grid-template-columns:minmax(220px,calc(100dvh - 100px)) minmax(240px,1fr);gap:16px}.chess-header{margin-bottom:5px}.chess-header h1{font-size:25px}.player-strip{min-height:25px;font-size:12px;padding:2px}.chess-console .chess-actions{grid-template-columns:1fr 1fr}.chess-table{width:100%}.chess-setup{grid-template-columns:1fr 1fr;gap:25px}.chess-header .chess-kicker{display:none}}
+@media(prefers-reduced-motion:reduce){.chess-page *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+.chess-audio-controls{display:flex;gap:6px;align-items:center}.chess-page .suite-music-toggle{position:static!important;inset:auto!important;transform:none!important;min-width:44px}.chess-page .suite-music-status{position:static!important;margin:12px auto 0;width:min(1080px,100%);inset:auto!important;transform:none!important}.chess-page .suite-listen-manic{position:static!important;display:inline-flex;margin:8px 12px;min-height:44px;align-items:center}
+@media(max-width:360px){.chess-header h1{font-size:20px}.chess-audio-controls{gap:3px}.chess-header button{padding:7px;font-size:12px}.chess-hub{font-size:13px}.chess-page .suite-music-toggle{min-width:38px;width:38px}}
+/* Controls and notation use the reading face; display type stays in headings. */
+body.chess-page button,body.chess-page select{font-family:var(--arc-body,system-ui,sans-serif)}
+body.chess-page .chess-moves button{font-variant-numeric:tabular-nums;font-weight:700}
+.chess-page .turn-card{border-top:3px solid var(--ch-blue)}
+.chess-page .square.last:before{border-color:#3e2a10}
+
+/* Dense board cells need their square geometry; primary controls remain 44px.
+   At 320px each cell is 36px, above WCAG 2.2's 24px target minimum. */
+body.chess-page #board .square{min-width:0!important;min-height:0!important}
+.chess-board{grid-template-rows:repeat(8,minmax(0,1fr))}
+.chess-contrast-control{display:flex;margin-top:12px}
+.suite-colorblind body.chess-page .square{background:#f6f3dd}
+.suite-colorblind body.chess-page .square.dark{background:#526779}
+.suite-colorblind body.chess-page .square.selected{background:#bdd7fc}
+.suite-colorblind body.chess-page .square.last:before{border-color:#10151f;filter:drop-shadow(0 0 1px #fff)}
+
+@media(max-width:740px) and (orientation:portrait){
+ .player-strip{min-height:28px;font-size:12px}
+ .chess-game{gap:10px}
+ .chess-console .turn-card{padding:10px 12px}
+ .turn-card .chess-kicker{display:none}
+ .turn-card h2{font-size:22px;line-height:1.1;margin-bottom:5px}
+ .turn-card #status{font-size:13px;line-height:1.3;margin:4px 0}
+ .turn-card #save-status:not(.storage-problem){display:none}
+ .turn-card .chess-actions{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:8px}
+ .turn-card .chess-actions button{font-size:13px;padding:6px 3px}
+}
+/* Match the shared kit's selector weight so its display font cannot win. */
+body.arcade.chess-page :is(button,select){font-family:var(--arc-body,system-ui,sans-serif)}
+/* Small coordinates and hint marks retain contrast on both board palettes. */
+body.chess-page #board .square{color:#101923}
+body.chess-page #board .square.hinted{box-shadow:inset 0 0 0 4px #4c0955}
+.suite-colorblind body.chess-page #board .square.dark .coord{color:#fff6dc}
+.suite-colorblind body.chess-page #board .square.last:before{border-color:#000}
+.suite-colorblind body.chess-page #board .square.dark.legal:after{background:#fff6dc;border-color:#101923}
+.suite-colorblind body.chess-page #board .square.dark.capture:after{background:transparent;border-color:#fff6dc}
+.suite-colorblind body.chess-page #board .square.dark.hinted{box-shadow:inset 0 0 0 4px #fff6dc}
+.suite-colorblind body.chess-page #board .square:focus-visible{outline:3px solid #fff6dc;outline-offset:-3px;box-shadow:inset 0 0 0 6px #101923}
+
+.chess-setup button:disabled{cursor:wait}
+/* Auto block margins can vertically center the board beside a taller console
+   in Firefox. Keep it anchored while results/history/options grow. */
+body.chess-page .chess-table{align-self:start;margin-block:0}
+
+/* Optional visual reference shares the actual board silhouettes. Keep the
+   dismissal reachable and the first instructions visible in short dialogs. */
+.guide-header{display:flex;align-items:start;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:1;background:#1a2532;padding-bottom:12px}
+.chess-page .guide-header h2{margin:0;align-self:center}
+.chess-page #guide details{border-top:1px solid #415466}
+.chess-page #guide summary{cursor:pointer;font-weight:750;min-height:44px;padding-block:11px}
+.chess-page #guide summary::marker{color:var(--ch-accent)}
+.piece-reference{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:6px 0 12px}
+.piece-reference>div{min-width:0;background:#233244;border:1px solid #66798b;border-radius:10px;padding:10px}
+.piece-reference dt{display:flex;flex-direction:column;gap:5px;font-weight:800}
+.piece-reference dd{margin:5px 0 0;font-size:14px;line-height:1.4}
+.piece-pair{display:flex;gap:4px}.piece-pair svg{width:30px;height:30px}
+.chess-page #guide #close-guide{margin-top:12px}
+.promotion-choices button{display:flex;align-items:center;justify-content:center;gap:8px}
+@media(max-width:360px){.chess-page #guide{padding:16px}.guide-header{gap:8px}.chess-page .guide-header h2{font-size:25px}.piece-reference>div{padding:8px}}
+
+/* Both match types are visible before starting; the whole card is a native
+   radio label, with a large target and a color-independent checked circle. */
+.chess-page .mode-picker{border:0;padding:0;margin:0 0 16px;min-width:0}
+.mode-picker legend{font-weight:750;margin-bottom:8px;padding:0}
+.mode-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.chess-page .mode-choice{position:relative;display:flex;flex-direction:column;align-items:start;gap:3px;min-height:112px;margin:0;padding:12px;border:2px solid #66798b;border-radius:12px;background:#15212e;cursor:pointer;line-height:1.25}
+.mode-choice input{position:absolute;top:12px;right:10px;width:18px;height:18px;margin:0;accent-color:var(--ch-accent)}
+.mode-choice:has(input:checked){border-color:var(--ch-accent);background:linear-gradient(140deg,#2d402b,#1b2f3a);box-shadow:inset 0 0 0 1px #b5dc0838}
+.mode-choice:has(input:focus-visible){outline:3px solid #ffd166;outline-offset:3px}
+.mode-choice strong{font-size:19px}.mode-caption{font-size:13px;font-weight:500;color:#d6e1e9}
+.mode-art{display:flex;height:32px;margin-bottom:3px}.mode-art svg{width:30px;height:30px}
+.setup-art{width:190px;margin:0 0 24px;transform:rotate(-5deg)}
+.setup-mini-board{display:grid;grid-template-columns:repeat(4,1fr);aspect-ratio:1;border:7px solid #40586a;border-radius:14px;overflow:hidden;box-shadow:8px 10px 0 #56c9ff20,0 12px 26px #0004}
+.setup-mini-board span{display:flex;align-items:center;justify-content:center;background:#dce7c7}
+.setup-mini-board span:nth-child(8n+2),.setup-mini-board span:nth-child(8n+4),.setup-mini-board span:nth-child(8n+5),.setup-mini-board span:nth-child(8n+7){background:#64838b}
+.setup-mini-board svg{width:92%;height:92%;overflow:visible;filter:drop-shadow(0 2px 1px #0005)}
+.chess-board{border-color:#40586a;box-shadow:0 0 0 1px #90b6cc55,0 16px 36px #0006}
+.player-strip>span:first-child:before{content:'';display:inline-block;vertical-align:-1px;width:11px;height:11px;border-radius:50%;background:#fff6dc;border:2px solid #192638;box-shadow:0 0 0 1px #9ab0bf;margin-right:7px}
+.player-strip>span[data-color=b]:before{background:#192638;border-color:#fff6dc}
+@media(max-width:740px){.setup-art{display:none}.mode-choices{gap:8px}.chess-page .mode-choice{padding:10px;min-height:105px}.mode-choice input{top:10px;right:8px}.mode-choice strong{font-size:18px}.chess-setup .setup-copy>p:not(.chess-kicker):not(#saved-description){font-size:14px}.chess-setup{padding:20px}.setup-copy h2{font-size:32px;margin:6px 0 10px}}
+@media(min-width:520px) and (max-height:520px) and (orientation:landscape){.setup-art{display:none}.chess-page .mode-choice{min-height:100px}}
+/* WebKit's native menulist ignores the authored 44px minimum. Keep the
+   native select behavior with an authored, scalable trigger and clear caret. */
+body.arcade.chess-page select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23d6e1e9' stroke-width='2'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:12px 8px;padding-right:34px}
+.capture-short,.capture-review{display:none}
+@media(min-width:520px) and (max-height:520px) and (orientation:landscape){
+ body.chess-page .chess-game{grid-template-columns:minmax(210px,calc(100dvh - 112px)) minmax(240px,1fr)}
+ .player-strip{min-height:24px;height:24px;gap:6px;white-space:nowrap}
+ .player-level{display:none}
+ .capture-detail{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+ .capture-short{display:inline}
+ .capture-review{display:block;border-top:1px solid #415466;margin-top:10px;padding-top:8px;font-size:12px}
+ .capture-review p{margin:4px 0}
+ .chess-console .turn-card{padding:10px 12px}
+ .turn-card h2{font-size:24px;line-height:1.1;margin-bottom:5px}
+ .turn-card #status{font-size:14px;line-height:1.3;min-height:0}
+ .turn-card #save-status:not(.storage-problem){display:none}
+}

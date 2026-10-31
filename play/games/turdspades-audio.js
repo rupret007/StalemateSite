@@ -6,6 +6,7 @@ const MUTE_KEY = 'turdsuite_muted';
 
 export function readSuiteMuted() {
   try {
+    if (typeof globalThis.Suite?.isMuted === 'function') {return !!globalThis.Suite.isMuted();}
     return localStorage.getItem(MUTE_KEY) === '1';
   } catch {
     return false;
@@ -16,6 +17,10 @@ export function createTurdspadesAudio(options = {}) {
   const isMuted = options.isMuted || readSuiteMuted;
   let ctx = null;
   let unlocked = false;
+  function studioSound(event) {
+    if (!unlocked || isMuted()) {return false;}
+    return globalThis.Suite.playSound(event);
+  }
 
   function ensureContext() {
     if (isMuted()) {
@@ -87,10 +92,12 @@ export function createTurdspadesAudio(options = {}) {
   return {
     unlockFromGesture() {
       unlocked = true;
+      if (globalThis.Suite?.isStudioAudio?.()) {return;}
       ensureContext();
     },
     isMuted,
     playCardPlay(card) {
+      if (globalThis.Suite?.isStudioAudio?.()) {return studioSound(card?.suit === 'S' ? 'spades.trump' : 'spades.card');}
       const trump = card?.suit === 'S';
       tone(trump ? 220 : 340, trump ? 0.09 : 0.06, trump ? 'square' : 'triangle', trump ? 0.07 : 0.05, trump ? -80 : 0);
       if (trump) {
@@ -98,17 +105,21 @@ export function createTurdspadesAudio(options = {}) {
       }
     },
     playTrickWin() {
+      if (globalThis.Suite?.isStudioAudio?.()) {return studioSound('spades.trick');}
       tone(520, 0.08, 'sine', 0.06);
       tone(780, 0.1, 'sine', 0.05, 120);
     },
     playSpadesBroken() {
+      if (globalThis.Suite?.isStudioAudio?.()) {return studioSound('spades.broken');}
       tone(180, 0.14, 'sawtooth', 0.06, -200);
       tone(360, 0.12, 'square', 0.05, 100);
     },
     playBidTick() {
+      if (globalThis.Suite?.isStudioAudio?.()) {return studioSound('spades.bid');}
       tone(640, 0.04, 'triangle', 0.04);
     },
     playBidLock(nil) {
+      if (globalThis.Suite?.isStudioAudio?.()) {return studioSound(nil ? 'spades.nil' : 'spades.lock');}
       if (nil) {
         tone(300, 0.1, 'sine', 0.06);
         tone(240, 0.12, 'sine', 0.05, -40);
@@ -118,10 +129,12 @@ export function createTurdspadesAudio(options = {}) {
       }
     },
     playBagPenalty() {
+      if (globalThis.Suite?.isStudioAudio?.()) {return studioSound('spades.bag');}
       tone(120, 0.18, 'sawtooth', 0.07);
       tone(90, 0.22, 'square', 0.06, -50);
     },
     playMatchFanfare(won) {
+      if (globalThis.Suite?.isStudioAudio?.()) {return studioSound(won ? 'spades.win' : 'spades.lose');}
       if (won) {
         tone(523, 0.12, 'sine', 0.06);
         tone(659, 0.12, 'sine', 0.05);

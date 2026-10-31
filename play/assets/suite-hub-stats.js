@@ -1,3 +1,5 @@
+import { formatRunTime } from '../games/turdtris-modes.js';
+
 /**
  * Read-only hub stat chips from existing localStorage keys (no new save formats).
  */
@@ -9,7 +11,9 @@ export const LIVE_HUB_PAGES = [
   'crapeights.html',
   'turdrummy.html',
   'turdspades.html',
-  'turdomania.html'
+  'turdomania.html',
+  'chess.html',
+  'turdrush.html'
 ];
 
 export function parseSafeInt(raw, fallback = 0) {
@@ -45,7 +49,13 @@ export function readHubStatBadge(getItem, href) {
     }
     case 'turdtris.html': {
       const best = parseSafeInt(getItem('turdtrisHighScore'));
-      return best > 0 ? { text: `Best ${best.toLocaleString('en-US')}` } : null;
+      const sprint = parseSafeInt(getItem('turdtrisSprint40BestMs_v1'));
+      const ultra = parseSafeInt(getItem('turdtrisUltra120Best_v1'));
+      const parts = [];
+      if (best > 0) parts.push(`Classic best ${best.toLocaleString('en-US')}`);
+      if (sprint > 0) parts.push(`Sprint best ${formatRunTime(sprint, true)}`);
+      if (ultra > 0) parts.push(`Ultra best ${ultra.toLocaleString('en-US')}`);
+      return parts.length ? { text: parts.join(' · ') } : null;
     }
     case 'turdjack.html': {
       const bankroll = parseSafeInt(getItem('turdjackBankroll'));
@@ -81,12 +91,28 @@ export function readHubStatBadge(getItem, href) {
       if (won > 0) return { text: `${won} match win${won === 1 ? '' : 's'}` };
       return played > 0 ? { text: `${played} played` } : null;
     }
+    case 'turdrush.html': {
+      const progress = readJsonObject(getItem, 'arcade_progress_v1');
+      const bests = progress?.version === 1 ? progress.bests?.['turdrush|endless|standard'] : null;
+      if (!Array.isArray(bests)) return null;
+      const best = bests.filter(entry => Number.isSafeInteger(entry?.value) && entry.value > 0).reduce((value, entry) => Math.max(value, entry.value), 0);
+      return best > 0 ? { text: `Best ${best.toLocaleString('en-US')}`, title: 'Completed endless runs on this device.' } : null;
+    }
+    case 'chess.html': {
+      const stats = readJsonObject(getItem, 'arcade_chess_results_v1');
+      if (!stats || stats.version !== 1 || !['wins', 'losses', 'draws', 'local'].every(key => Number.isSafeInteger(stats[key]) && stats[key] >= 0)) return null;
+      const played = stats.wins + stats.losses + stats.draws + stats.local;
+      return played ? { text: `${played} completed · ${stats.wins} computer wins`, title: 'Casual games on this device; hints and takebacks allowed.' } : null;
+    }
     case 'turdomania.html': {
       const wrap = readJsonObject(getItem, 'turdomania_best_v1');
       const best = wrap && wrap.best && typeof wrap.best === 'object' ? wrap.best : null;
       if (!best) return null;
-      const top = Math.max(parseSafeInt(best.easy), parseSafeInt(best.normal), parseSafeInt(best.hard));
-      return top > 0 ? { text: `Best ${top}` } : null;
+      const parts = ['easy', 'normal', 'hard'].flatMap((level) => {
+        const value = parseSafeInt(best[level]);
+        return value > 0 ? [`${level[0].toUpperCase() + level.slice(1)} best ${value.toLocaleString('en-US')}`] : [];
+      });
+      return parts.length ? { text: parts.join(' · ') } : null;
     }
     default:
       return null;
@@ -117,7 +143,6 @@ export function decorateHubStatBadges(doc, storage) {
     el.className = 'suite-hub-stat';
     el.textContent = badge.text;
     if (badge.title) el.setAttribute('title', badge.title);
-    el.setAttribute('aria-hidden', 'true');
     const info = card.querySelector('.game-info');
     if (info) info.appendChild(el);
   }

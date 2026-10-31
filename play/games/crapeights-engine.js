@@ -99,8 +99,14 @@ export class CrapeightsEngine {
   }
 
   playCard(card, suitOverride = null) {
+    if (this.currentPlayer !== 'player' || this.gameOver) {
+      return { valid: false, message: 'Player cannot act now' };
+    }
     if (!this.canPlayCard(card)) {
       return { valid: false, message: 'Cannot play this card' };
+    }
+    if (card.rank === '8' && !SUITS.includes(suitOverride)) {
+      return { valid: false, message: 'Declare a valid suit for an 8' };
     }
 
     // Remove card from hand
@@ -114,7 +120,7 @@ export class CrapeightsEngine {
     // Handle 8
     if (card.rank === '8') {
       this.lastPlayWasEight = true;
-      this.currentSuit = suitOverride || card.suit;
+      this.currentSuit = suitOverride;
       // 8 doesn't change direction in standard rules, just forces suit declaration
     } else {
       this.lastPlayWasEight = false;
@@ -135,6 +141,9 @@ export class CrapeightsEngine {
   }
 
   drawFromDeck() {
+    if (this.currentPlayer !== 'player' || this.gameOver) {
+      return { card: null, canPlay: false };
+    }
     const drawn = this.drawCard();
     if (!drawn) {
       this.switchTurn();

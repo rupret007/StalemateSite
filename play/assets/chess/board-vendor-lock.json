@@ -1,0 +1,92 @@
+{
+  "chessground": {
+    "version": "10.5.0",
+    "repository": "https://github.com/lichess-org/chessground",
+    "commit": "b4f605018e1043640c917e82a74b214cb58e4a05",
+    "license": "GPL-3.0-or-later",
+    "bundler": "rolldown 1.2.15"
+  },
+  "artwork": {
+    "theme": "Spatial",
+    "author": "Maurizio Monge",
+    "repository": "https://github.com/maurimo/chess-art",
+    "commit": "d8705d8bc9879fef44208de19e2a20c937409e1f",
+    "license": "MIT",
+    "modifications": "Configured ivory/navy gradients and stroke widths; removed baked shadow and editor metadata; CSS supplies a restrained shadow."
+  },
+  "board": {
+    "author": "Rad Dad arcade contributors",
+    "license": "GPL-3.0-or-later",
+    "texture": "CSS colors and gradients; no third-party texture"
+  },
+  "files": {
+    "chessground.js": {
+      "bytes": 33373,
+      "sha256": "135193baae3ccaad1d534f81241c798fb5bb7fd607ff2f89de6926a481ca0e1f"
+    },
+    "chessground.base.css": {
+      "bytes": 3537,
+      "sha256": "fbfa4b0e791c58c9e793161e543ce712d85663318a82e547aee7db8f817770f2"
+    },
+    "Chessground-LICENSE.txt": {
+      "bytes": 35147,
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+    },
+    "Spatial-LICENSE.txt": {
+      "bytes": 1066,
+      "sha256": "6a659f43b1e9e0000a3b85655ed94d3e70b4de878b3054c5bcc79ff99bc7f253"
+    },
+    "chessground-10.5.0-source.tar.gz": {
+      "bytes": 86966,
+      "sha256": "47d896745d62594c0e7fb50f9e77fded3acf42f581a0724375e7eaf5e0f57c82"
+    },
+    "pieces/spatial-wp.svg": {
+      "bytes": 3096,
+      "sha256": "cf425c65beb86965ae0bd765e61690c2bf239b7496c65a11b0002b260f33f8a2"
+    },
+    "pieces/spatial-wn.svg": {
+      "bytes": 3289,
+      "sha256": "8747c0c390b7d43306faa6b01aadef77fc4d6c2652149159ea3baa2cdde440c0"
+    },
+    "pieces/spatial-wb.svg": {
+      "bytes": 5644,
+      "sha256": "139fcc2c58990f42907f7e109c9461c47a6664e77e0a50c46a856747159c86be"
+    },
+    "pieces/spatial-wr.svg": {
+      "bytes": 4127,
+      "sha256": "dbf76fe3735a63773044509a5d1b29bb5cbe91f210f66676a7ccb6275e6413e0"
+    },
+    "pieces/spatial-wq.svg": {
+      "bytes": 3715,
+      "sha256": "6b06f83946dbead32116ce7d859a7c16d580e9494d0baa9d1bd32ef78f25cbe5"
+    },
+    "pieces/spatial-wk.svg": {
+      "bytes": 3986,
+      "sha256": "b0185938c0e22794e1d0ee577a5b6c1773546e394d5598f12075d97deb61ea6e"
+    },
+    "pieces/spatial-bp.svg": {
+      "bytes": 3096,
+      "sha256": "38b3d630c6f7b81b4e50a49e8aa6fc7089990023eec29a612ac94a9b3d84dfa8"
+    },
+    "pieces/spatial-bn.svg": {
+      "bytes": 3289,
+      "sha256": "ae32a08aa32a1f4361a186601bf958941262dc6131d93b43032346bdb6134ae3"
+    },
+    "pieces/spatial-bb.svg": {
+      "bytes": 5644,
+      "sha256": "fa45526ab35273c5e8267c4c112962f02e53e210ca933805416f783d671cfb9d"
+    },
+    "pieces/spatial-br.svg": {
+      "bytes": 4127,
+      "sha256": "c0b89a70e11a5b7ac21d5b5e255f5faa1ac678b8bd2dab35bfdea975439def4d"
+    },
+    "pieces/spatial-bq.svg": {
+      "bytes": 3715,
+      "sha256": "5e837dcdba0b313e64d83d2a6bdc9dbc2585a298628ae802c934061b117e2011"
+    },
+    "pieces/spatial-bk.svg": {
+      "bytes": 3986,
+      "sha256": "937a44522ccfc0bd0b51fbbcf99fb5e78efed7e330bf306c02d81ce0960d3aee"
+    }
+  }
+}

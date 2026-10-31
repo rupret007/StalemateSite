@@ -3,7 +3,7 @@
  */
 import { buildChipStackHtml } from './turdjack-chips.js';
 import { buildFeltInlay } from './turdjack-felt.js';
-import { createTurdjackAudio } from './turdjack-audio.js';
+import { createTurdjackAudio } from './turdjack-audio.js?v=26c990164039a5a6';
 import { createTableFx } from './turdjack-fx.js';
 import { handMeterState, renderHandMeterHtml } from './turdjack-hand-meter.js';
 import {

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <!-- Original small-size arcade tiles. Every kind has a distinct silhouette. -->
+  <symbol id="swirl" viewBox="0 0 64 64">
+    <path d="M13 53C3 53 6 40 16 39C9 30 16 24 25 23C21 15 31 16 35 6C49 15 44 25 40 27C52 27 57 34 49 40C62 43 60 55 49 55Z" fill="#ad744c" stroke="#2d1923" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M18 39H44M24 25H37" stroke="#6f4234" stroke-width="3" stroke-linecap="round"/>
+    <ellipse cx="24" cy="40" rx="4" ry="6" fill="#fff7df"/><ellipse cx="39" cy="40" rx="4" ry="6" fill="#fff7df"/>
+    <path d="M25 40V43M38 40V43M28 49Q32 52 36 48" fill="none" stroke="#2d1923" stroke-width="3" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="corn" viewBox="0 0 64 64">
+    <path d="M22 48C3 49 4 31 9 24C10 38 18 34 22 48M42 48C61 49 60 31 55 24C54 38 46 34 42 48" fill="#7fbb67" stroke="#263329" stroke-width="3"/>
+    <path d="M19 18Q20 7 32 7Q44 7 45 18V45Q43 55 32 57Q21 55 19 45Z" fill="#ffda58" stroke="#2d1923" stroke-width="3"/>
+    <path d="M27 11V28M37 11V28M20 19H44M20 28H44M20 44H44M28 45V53M36 45V53" stroke="#bc802b" stroke-width="2"/>
+    <path d="M25 33L29 35L25 37M39 33L35 35L39 37M28 43Q32 46 36 42" fill="none" stroke="#2d1923" stroke-width="3" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="splat" viewBox="0 0 64 64">
+    <path d="M22 17C12 0 4 9 13 24C-2 21 1 34 15 36C-2 47 11 58 23 47C24 64 39 64 39 48C55 62 65 48 49 38C67 34 63 20 48 25C59 6 43 0 36 17C31 4 24 5 22 17Z" fill="#8be883" stroke="#203529" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M20 26L28 30M43 26L35 30" stroke="#203529" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="25" cy="33" r="4" fill="#fff7df"/><circle cx="38" cy="33" r="4" fill="#fff7df"/>
+    <path d="M25 33V35M38 33V35M25 42Q32 49 40 41" fill="none" stroke="#203529" stroke-width="3" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="paper" viewBox="0 0 64 64">
+    <path d="M14 13H45V42L53 54L45 51L39 56L32 52L25 56L20 51L14 54Z" fill="#fff5df" stroke="#2d1923" stroke-width="3" stroke-linejoin="round"/>
+    <ellipse cx="30" cy="14" rx="17" ry="8" fill="#d9c6b7" stroke="#2d1923" stroke-width="3"/>
+    <ellipse cx="30" cy="14" rx="7" ry="3" fill="#2d1923"/>
+    <path d="M17 41H42" stroke="#b1a3a0" stroke-width="2" stroke-dasharray="3 3"/>
+    <path d="M24 28V32M36 28V32M26 36Q30 40 34 35" fill="none" stroke="#2d1923" stroke-width="3" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="bean" viewBox="0 0 64 64">
+    <path d="M37 7C61 9 58 35 44 49C25 68 4 48 10 30C14 16 21 26 24 16C26 9 30 6 37 7Z" fill="#e9766c" stroke="#361b2b" stroke-width="3"/>
+    <path d="M32 17Q48 23 36 36Q24 49 20 44" fill="none" stroke="#ad3d49" stroke-width="4" stroke-linecap="round"/>
+    <path d="M23 27V31M35 22V26M23 36Q27 41 32 33" fill="none" stroke="#361b2b" stroke-width="3" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="cheese" viewBox="0 0 64 64">
+    <path d="M8 25L44 9L56 43L8 55Z" fill="#ffc34e" stroke="#3b2330" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M8 25L44 9L56 23L8 37Z" fill="#ffe38c" stroke="#3b2330" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="23" cy="25" r="4" fill="#d38a32"/><circle cx="42" cy="20" r="3" fill="#d38a32"/>
+    <path d="M23 39V42M38 35V38M27 46Q33 49 38 42" fill="none" stroke="#3b2330" stroke-width="3" stroke-linecap="round"/>
+  </symbol>
+</svg>

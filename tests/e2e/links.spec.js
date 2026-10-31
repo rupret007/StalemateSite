@@ -3,11 +3,14 @@ const { test, expect } = require('@playwright/test');
 // Every link on every public page: internal targets load, external targets are ours.
 const PAGES = ['/', '/qr/', '/tap/', '/play/', '/404.html'];
 const OURS = [
+    // The verified show venue is an approved destination for the new directions action.
+    /^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=Los\+Amigo%27s\+Sports\+Bar\+%2B\+Bites%2C\+8604\+Preston\+Rd\+Suite\+100%2C\+Plano\+TX\+75024$/,
     /^mailto:stalemate\.punk@gmail\.com$/,
     /^https:\/\/www\.instagram\.com\/stalemate\.punk\/$/,
     /^https:\/\/www\.youtube\.com\/@stalemate\.punkband$/,
     /^https:\/\/www\.facebook\.com\/stalemate\.band\/$/,
     /^https:\/\/rockinoctober\.com\/?$/,
+    /^https:\/\/studio801\.ticketspice\.com\/rockin-october$/,
     /^https:\/\/music\.apple\.com\/us\/album\/(my-mom-says-were-cool\/1718884118|andrea\/1718463871\?i=1718463872|its-been-only-18\/1718464113\?i=1718464114)$/,
     /^https:\/\/open\.spotify\.com\/(artist\/5cZqYe3bDw3xcKIk4aPHNH|track\/6GBydFSUtZ7wZ7pSAvbytw|track\/00i8GYyog0bCGJnhtqNJKo)$/
 ];
@@ -19,7 +22,9 @@ const GAMES = [
     ['Crapjack 21', 'play/turdjack.html', /^Crapjack 21$/],
     ['TurdRummy', 'play/turdrummy.html', /^TurdRummy/],
     ['TurdSpades', 'play/turdspades.html', /^TurdSpades$/],
-    ['Crappy Eights', 'play/crapeights.html', /^Crappy Eights$/]
+    ['Crappy Eights', 'play/crapeights.html', /^Crappy Eights$/],
+    ['Royal Flush Chess · 1 or 2 players', 'play/chess.html', /^Royal Flush Chess/],
+    ['Turd Rush', 'play/turdrush.html', /^Turd Rush/]
 ];
 
 test('every link on every page resolves and every external link is our Stalemate', async ({ page, request, baseURL }) => {
@@ -51,15 +56,15 @@ test('every link on every page resolves and every external link is our Stalemate
     }
 });
 
-test('homepage Play Turdanoid and every game link open their own game', async ({ page }) => {
+test('homepage arcade action and every game link open their destination', async ({ page }) => {
     await page.goto('/');
     const games = page.locator('#games');
+    await expect(games.getByRole('link', { name: 'Open Stalemate Arcade' })).toHaveAttribute('href', 'play/');
     await expect(games.getByRole('link', { name: 'Play Turdanoid' })).toHaveAttribute('href', 'play/TurdAnoid.html');
-    await expect(games.getByRole('link', { name: 'All seven games' })).toHaveAttribute('href', 'play/');
     const list = games.locator('.games-card__list');
-    await expect(list.locator('a')).toHaveCount(7);
+    await expect(list.locator('a')).toHaveCount(9);
     const hrefs = await list.locator('a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
-    expect(new Set(hrefs).size).toBe(7);
+    expect(new Set(hrefs).size).toBe(9);
     for (const [name, href, title] of GAMES) {
         const link = list.getByRole('link', { name, exact: true });
         await expect(link).toHaveAttribute('href', href);
@@ -72,15 +77,15 @@ test('homepage Play Turdanoid and every game link open their own game', async ({
         const b = await a.boundingBox();
         expect(b.height, `${await a.textContent()} tap target`).toBeGreaterThanOrEqual(44);
     }
-    await games.getByRole('link', { name: 'Play Turdanoid' }).click();
-    await expect(page).toHaveURL(/\/play\/TurdAnoid\.html$/);
-    await expect(page).toHaveTitle(/^Turdanoid\b/);
+    await games.getByRole('link', { name: 'Open Stalemate Arcade' }).click();
+    await expect(page).toHaveURL(/\/play\/$/);
+    await expect(page).toHaveTitle(/^Stalemate Arcade/);
 });
 
 test('the /play/ hub cards each open a different game', async ({ page }) => {
     await page.goto('/play/');
     const cards = page.locator('a.game-card');
-    await expect(cards).toHaveCount(7);
+    await expect(cards).toHaveCount(9);
     const hrefs = await cards.evaluateAll((as) => as.map((a) => a.getAttribute('href')));
     expect(hrefs.sort()).toEqual(GAMES.map(([, h]) => h.replace('play/', '')).sort());
     await cards.first().click();
@@ -95,14 +100,14 @@ test('no page calls any game "Turbo"', async ({ page }) => {
     }
 });
 
-test('Games nav goes straight to all seven game cards in one click', async ({ page }) => {
+test('Arcade nav goes straight to all nine game cards in one click', async ({ page }) => {
     for (const [start, nav] of [['/', 'Primary navigation'], ['/qr/', null]]) {
         await page.goto(start);
-        const link = nav ? page.getByRole('navigation', { name: nav, exact: true }).getByRole('link', { name: 'Games', exact: true }) : page.locator('header').getByRole('link', { name: 'Games', exact: true });
+        const link = nav ? page.getByRole('navigation', { name: nav, exact: true }).getByRole('link', { name: 'Arcade', exact: true }) : page.locator('header').getByRole('link', { name: 'Arcade', exact: true });
         await link.click();
         await expect(page).toHaveURL(/\/play\/#hub-games$/);
         const cards = page.locator('#hub-games a.game-card');
-        await expect(cards).toHaveCount(7);
+        await expect(cards).toHaveCount(9);
         await expect(cards.first()).toBeInViewport();
     }
 });

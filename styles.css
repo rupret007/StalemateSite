@@ -528,6 +528,8 @@ textarea:focus-visible {
 
 .hero-show .button-row {
     grid-area: ctas;
+    padding: 0.75rem;
+    background: var(--ink);
 }
 
 .hero-video {
@@ -557,6 +559,8 @@ textarea:focus-visible {
     align-items: center;
     gap: 0.4rem 0.65rem;
     margin-top: 0.5rem;
+    padding: 0.75rem;
+    background: var(--ink);
 }
 
 .hero-video__label {
@@ -838,6 +842,30 @@ textarea:focus-visible {
 .chess-grid {
     display: grid;
     gap: 1.25rem;
+}
+
+.content-section .band-members {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.band-members li {
+    display: grid;
+    gap: 0.25rem;
+    padding: 1rem;
+    border: 1px solid var(--line-strong);
+    border-top: 3px solid var(--blue);
+    background: var(--surface);
+}
+
+.band-members strong {
+    color: var(--cream);
+    font-family: var(--display);
+    font-size: 1.5rem;
 }
 
 .panel {
@@ -1557,7 +1585,7 @@ textarea:focus-visible {
 }
 .games-section .games-card {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-    gap: 28px; padding: 28px;
+    gap: 28px; padding: 18px;
     border: 3px solid var(--lime);
     box-shadow: 8px 8px 0 var(--pink);
 }
@@ -1584,7 +1612,7 @@ textarea:focus-visible {
 .listen-games-link { margin: 0.5rem 0; font-size: 0.95rem; }
 .listen-games-link a { display: inline-flex; align-items: center; min-height: 44px; color: var(--lime); }
 @media (max-width: 760px) {
-    .games-section .games-card { grid-template-columns: 1fr; padding: 18px; gap: 18px; box-shadow: 5px 5px 0 var(--pink); }
+    .games-section .games-card { grid-template-columns: 1fr; padding: 14px; gap: 10px; box-shadow: 5px 5px 0 var(--pink); }
     .games-card__shots { order: -1; }
     .games-card__shots .games-card__thumb { width: 48px; right: -8px; top: -8px; }
 }
@@ -1595,7 +1623,9 @@ textarea:focus-visible {
 /* Show first: countdown + Oct 24 card, then Manic, then the repeat show button. */
 .hero-show { grid-template-areas: "next" "video" "ctas"; }
 .hero-show__cta { margin: 0.75rem 0 0; }
-.hero-show__cta .button--big { display: flex; justify-content: center; width: 100%; font-size: 1.15rem; min-height: 52px; }
+.hero-show__cta .button--big { display: flex; justify-content: center; width: 100%; padding: 0.65rem 0.75rem; font-size: 1rem; letter-spacing: 0.04em; line-height: 1.2; text-align: center; min-height: 52px; }
+.hero-show__cta .hero-show__guidance { margin: 0.5rem 0 0; color: var(--cream); font-size: 0.875rem; line-height: 1.3; }
+.hero-show__festival { display: inline-flex; align-items: center; min-height: 44px; color: var(--cream); font-size: 0.875rem; }
 @media (min-width: 900px) {
     .hero-show {
         grid-template-columns: minmax(17.25rem, 0.95fr) minmax(0, 1.45fr);
@@ -1605,6 +1635,9 @@ textarea:focus-visible {
 @media (max-width: 719px) {
     /* Socials already live in the header; drop the hero copy so Manic makes the first phone screen. */
     .hero .social-nav--row { display: none; }
+    /* Keep the date, venue, checkout guidance and Manic ahead of repeated show copy on phones. */
+    .hero-show-card .hero-show__tie,
+    .hero-show-card .next-show-organizers { display: none; }
 }
 @media (max-width: 719px) {
     /* Tighter phone spacing so the countdown, show and the top of Manic share the first screen. */
@@ -1638,7 +1671,7 @@ textarea:focus-visible {
 }
 @media (max-width: 719px) {
     .hero-show-card { gap: 0.4rem; }
-    .panel.hero-show-card { padding: 0.75rem 1rem 0.85rem; }
+    .panel.hero-show-card { padding: 0.4rem 1rem 0.55rem; }
 }
 @media (max-width: 719px) {
     .hero-show { margin-top: 0.4rem; }
@@ -1652,3 +1685,7 @@ textarea:focus-visible {
 /* Real 44px tap chips with 8px gaps: no overlapping hit areas. */
 .games-card__list a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border: 2px solid currentColor; border-radius: 999px; font-weight: 700; text-decoration: none; }
 .games-card__list a:hover, .games-card__list a:focus-visible { background: var(--lime); color: #171410; border-color: var(--lime); }
+/* Band contact remains readable and tappable on small screens. */
+.booking-contact { overflow-wrap:anywhere; }
+.booking-contact a { display:inline-flex; align-items:center; min-height:44px; color:inherit; }
+.hero-show:has([data-next-show][hidden]) { grid-template-columns:minmax(0,1fr); grid-template-areas:"video" "ctas"; max-width:48rem; }

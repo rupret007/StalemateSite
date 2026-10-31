@@ -64,6 +64,11 @@
       if (me) { track(me); return; }
     }
 
+    if (h === 'studio801.ticketspice.com' && new URL(href, location.href).pathname.replace(/\/$/, '') === '/rockin-october') {
+      track('show-ticket-rockin-october');
+      return;
+    }
+
     if (h.indexOf('rockinoctober.') !== -1) {
       var label = (el.textContent || '').trim().toLowerCase();
       if (label.indexOf('ticket') !== -1) {

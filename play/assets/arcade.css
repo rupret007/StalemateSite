@@ -1,0 +1,147 @@
+/* ============================================================
+   Stalemate Arcade kit — shared look for every game.
+   Website look (dark base, Barlow Condensed display, Source Sans 3
+   text, mint actions, gold scores, orange danger) + a light retro
+   touch (glowing score digits, chunky buttons, title-screen-only
+   scanlines). Mobile-first: 44px+ targets, safe-area aware.
+   Opt in with <body class="arcade" data-arcade-game="turdanoid">.
+   Fonts are self-hosted (SIL OFL, see assets/fonts/OFL-*.txt).
+   ============================================================ */
+@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:600;font-display:swap;src:url(fonts/barlow-condensed-600.woff2) format('woff2')}
+@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:800;font-display:swap;src:url(fonts/barlow-condensed-800.woff2) format('woff2')}
+@font-face{font-family:'Source Sans 3';font-style:normal;font-weight:200 900;font-display:swap;src:url(fonts/source-sans-3.woff2) format('woff2')}
+
+body.arcade{
+  /* Core palette (shared by all games) */
+  --arc-base:#14110e; --arc-base-2:#1f1a16; --arc-surface:#27201b;
+  --arc-text:#f4f0e6; --arc-muted:#c9bba9;
+  --arc-mint:#3fe0a5; --arc-mint-deep:#1fa775;
+  --arc-gold:#ffd166; --arc-orange:#ff7a3d;
+  --arc-display:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+  --arc-body:'Source Sans 3',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --arc-tap:48px;              /* comfortable thumb target (>=44) */
+  --arc-radius:12px;
+  --arc-sig:var(--arc-mint);   /* overridden per game */
+
+  /* Map onto the legacy game tokens so existing CSS picks the kit up */
+  --ta-font:var(--arc-body);
+  --ta-ink:var(--arc-base); --ta-ink-mid:var(--arc-base-2);
+  --ta-ink-text:var(--arc-text); --ta-muted:var(--arc-muted);
+  --ta-slime:var(--arc-mint); --ta-coral:var(--arc-orange); --ta-brass:var(--arc-gold);
+  --ta-glass:rgba(20,17,14,.84); --ta-glass-border:color-mix(in srgb,var(--arc-sig) 34%,transparent);
+  font-family:var(--arc-body);
+}
+/* One signature color per game */
+body.arcade[data-arcade-game="turdanoid"]{--arc-sig:#49c6ff}
+body.arcade[data-arcade-game="turdtris"]{--arc-sig:#b98cff}
+body.arcade[data-arcade-game="turdomania"]{--arc-sig:#ff6fae}
+body.arcade[data-arcade-game="crapjack"]{--arc-sig:#3fe0a5}
+body.arcade[data-arcade-game="crapeights"]{--arc-sig:#ffb547}
+body.arcade[data-arcade-game="turdspades"]{--arc-sig:#7fa8ff}
+body.arcade[data-arcade-game="turdrummy"]{--arc-sig:#c6e85a}
+
+/* ---------- Type ---------- */
+body.arcade :is(h1,h2,h3,button,.arc-display){font-family:var(--arc-display);letter-spacing:.02em}
+body.arcade .overlay h1{
+  font-weight:800;text-transform:uppercase;line-height:.9;letter-spacing:.01em;
+  background:none;-webkit-text-fill-color:currentColor;color:var(--arc-text);filter:none;
+  text-shadow:0 0 18px color-mix(in srgb,var(--arc-sig) 55%,transparent),0 3px 0 rgba(0,0,0,.55);
+}
+body.arcade .overlay h1 .sub{font-family:var(--arc-body);font-weight:700;color:var(--arc-sig);-webkit-text-fill-color:var(--arc-sig);text-shadow:none;letter-spacing:.14em}
+
+/* ---------- Chunky buttons ---------- */
+body.arcade .overlay button,
+body.arcade .arc-btn{
+  min-height:var(--arc-tap);border-radius:var(--arc-radius);
+  font-family:var(--arc-display);font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+  background:var(--arc-surface);color:var(--arc-text);
+  border:2px solid rgba(244,240,230,.16);
+  box-shadow:0 4px 0 #0a0806,0 10px 22px rgba(0,0,0,.35);
+  transition:transform .08s,box-shadow .08s,background .15s;
+}
+body.arcade .overlay button:active,body.arcade .arc-btn:active{transform:translateY(3px);box-shadow:0 1px 0 #0a0806,0 4px 10px rgba(0,0,0,.3)}
+body.arcade .overlay button:hover{transform:translateY(-1px)}
+/* Primary action = mint, one per screen */
+body.arcade :is(#btnStart,#btnResume,#btnRestart,#btnAgain,.arc-primary){
+  background:linear-gradient(180deg,#7bf3c6 0%,var(--arc-mint) 45%,var(--arc-mint-deep) 100%);
+  color:#06261a;border-color:transparent;
+  box-shadow:0 5px 0 #0d5c40,0 14px 30px color-mix(in srgb,var(--arc-mint) 35%,transparent);
+  font-size:clamp(20px,5.6vw,24px);min-height:58px;min-width:min(78vw,300px);
+}
+body.arcade :is(#btnStart,#btnResume,#btnRestart,#btnAgain,.arc-primary):active{box-shadow:0 2px 0 #0d5c40}
+body.arcade :is(.arc-danger){background:var(--arc-orange);color:#2a0d00}
+body.arcade .overlay button:focus-visible,body.arcade .iconbtn:focus-visible{outline:3px solid var(--arc-gold);outline-offset:3px}
+
+/* ---------- Top bar icons ---------- */
+body.arcade .iconbtn{
+  min-width:var(--arc-tap);min-height:var(--arc-tap);border-radius:var(--arc-radius);
+  background:rgba(20,17,14,.82);border:2px solid rgba(244,240,230,.14);box-shadow:0 3px 0 #0a0806;
+}
+
+/* ---------- HUD: <=3 stats, glowing gold score ---------- */
+body.arcade .hud{background:rgba(20,17,14,.82);border:2px solid rgba(244,240,230,.12);border-radius:var(--arc-radius);box-shadow:0 3px 0 #0a0806}
+body.arcade .hud .lbl{font-family:var(--arc-display);font-weight:600;letter-spacing:.14em;color:var(--arc-muted)}
+body.arcade .hud .val,body.arcade .arc-score{
+  font-family:var(--arc-display);font-weight:800;font-variant-numeric:tabular-nums;
+}
+body.arcade #hudScore,body.arcade .arc-score{color:var(--arc-gold);text-shadow:0 0 10px rgba(255,209,102,.65),0 0 2px rgba(255,209,102,.9)}
+body.arcade #hudLevel{color:var(--arc-sig);text-shadow:0 0 8px color-mix(in srgb,var(--arc-sig) 55%,transparent)}
+body.arcade .overlay .stat .v{font-family:var(--arc-display);color:var(--arc-gold);text-shadow:0 0 10px rgba(255,209,102,.55)}
+
+/* ---------- Overlays: dark base, slide-up pause sheet ---------- */
+body.arcade .overlay{background:radial-gradient(ellipse 90% 60% at 50% 30%,color-mix(in srgb,var(--arc-sig) 14%,transparent),transparent 70%),rgba(14,11,9,.9)}
+body.arcade .overlay::before{background:none}
+body.arcade .overlay p{font-family:var(--arc-body)}
+body.arcade .overlay .quip{color:var(--arc-orange)}
+
+/* Title screen: the only place with scanlines */
+body.arcade #titleScreen.overlay::after,
+body.arcade .arc-title::after{
+  content:"";position:absolute;inset:0;height:auto;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.22) 0 1px,transparent 1px 3px);
+  mix-blend-mode:multiply;opacity:.7;
+}
+body.arcade #titleScreen .title-kicker{font-family:var(--arc-display);font-weight:600;font-size:15px;letter-spacing:.16em;white-space:nowrap;color:var(--arc-sig)}
+/* Phones: no keyboard legends, no reading */
+@media (pointer:coarse){body.arcade #pauseScreen .helprow{display:none}}
+
+/* Pause = bottom sheet in the thumb zone */
+body.arcade #pauseScreen.overlay{justify-content:flex-end;padding-bottom:max(24px,calc(env(safe-area-inset-bottom) + 18px))}
+body.arcade #pauseScreen.overlay.show > *{animation:arcSheet .32s cubic-bezier(.2,1,.3,1) both}
+@keyframes arcSheet{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+
+/* First-run hint chip (non-blocking, replaces modal coach) */
+.arc-hint{position:absolute;left:50%;bottom:max(96px,calc(env(safe-area-inset-bottom) + 90px));transform:translateX(-50%);
+  z-index:7;pointer-events:none;padding:10px 18px;border-radius:999px;white-space:nowrap;
+  font:800 18px/1 var(--arc-display);letter-spacing:.08em;text-transform:uppercase;color:var(--arc-text);
+  background:rgba(20,17,14,.88);border:2px solid var(--arc-sig);box-shadow:0 0 18px color-mix(in srgb,var(--arc-sig) 45%,transparent);
+  animation:arcHint 1.4s ease-in-out infinite alternate}
+.arc-hint[hidden]{display:none}
+@keyframes arcHint{to{transform:translateX(-50%) translateY(-6px)}}
+
+/* Launch pill = mint primary */
+body.arcade #mobileLaunch{font-family:var(--arc-display);font-size:18px;letter-spacing:.12em;min-height:56px;
+  background:linear-gradient(180deg,#7bf3c6,var(--arc-mint) 50%,var(--arc-mint-deep));color:#06261a;box-shadow:0 5px 0 #0d5c40,0 12px 26px rgba(63,224,165,.35)}
+
+@media (prefers-reduced-motion:reduce){
+  body.arcade .overlay.show > *,.arc-hint{animation:none!important}
+}
+
+/* Narrow phones (320–359): keep the kicker on one calm line */
+@media (max-width:359px){
+  body.arcade #titleScreen .title-kicker{font-size:12px;letter-spacing:.1em}
+}
+
+/* Short phones: one row of secondary buttons, drop the keyboard legend,
+   so the playfield preview stays clear and START sits in the thumb zone */
+@media (max-height:720px) and (pointer:coarse){
+  body.arcade #titleScreen .helprow{display:none}
+  body.arcade #titleScreen .menu-secondary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:min(100%,340px)}
+  body.arcade #titleScreen .menu-secondary button{margin:0;padding:8px 4px;font-size:15px;min-width:0}
+}
+
+/* Shared suite controls inherit the kit without changing game-specific layout. */
+body.arcade :is(.btn,.dock button,.action-grid button,.suite-music-toggle,.suite-hub-mute,summary) { font-family:var(--arc-display); font-weight:600; letter-spacing:.025em; }
+body.arcade :is(.welcome-card,.guide-card,.overlay-card,.how-card) { color:var(--arc-text); border-color:color-mix(in srgb,var(--arc-sig) 42%,#37352c); }
+body.arcade :is(.welcome-card,.guide-card,.overlay-card,.how-card)::before { content:""; display:block; height:8px; margin-bottom:12px; background:conic-gradient(#f4f0e6 25%,#27241f 0 50%,#f4f0e6 0 75%,#27241f 0) 0 0/16px 16px; }
+body.arcade :is(button,a,summary,select):focus-visible { outline:3px solid var(--arc-gold); outline-offset:3px; }

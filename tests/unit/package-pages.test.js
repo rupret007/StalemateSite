@@ -41,6 +41,9 @@ describe('GitHub Pages package', () => {
         });
         expect(result.status, result.stderr).toBe(0);
         expect(readFileSync(join(repoRoot, 'dist/index.html'), 'utf8')).toContain('Stalemate');
+        for (const file of ['robots.txt', 'sitemap.xml', 'events/stalemate-rockin-october-2026.ics']) {
+            expect(readFileSync(join(repoRoot, 'dist', file), 'utf8')).toBe(readFileSync(join(repoRoot, file), 'utf8'));
+        }
         expect(readFileSync(join(repoRoot, 'dist/.nojekyll'), 'utf8')).toBeDefined();
         expect(existsSync(join(repoRoot, 'dist/epk'))).toBe(false);
         expect(readFileSync(join(repoRoot, 'dist/qr/index.html'), 'utf8')).toContain('play/stalemate/manic.m4a');

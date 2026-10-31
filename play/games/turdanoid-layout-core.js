@@ -15,7 +15,7 @@
   function computePlayfield(stageW, stageH) {
     const sw = Math.max(1, Math.floor(stageW));
     const sh = Math.max(1, Math.floor(stageH));
-    const wide = sw >= 720 && sw / sh > 1.12;
+    const wide = sw >= 981 && sw / sh > 1.12;
     if (!wide) {
       return { canvasW: sw, canvasH: sh, wide: false };
     }
@@ -26,8 +26,8 @@
       canvasW = maxW;
       canvasH = Math.floor(canvasW / ASPECT);
     }
-    canvasW = Math.max(320, canvasW);
-    canvasH = Math.max(480, canvasH);
+    canvasW = Math.min(sw, Math.max(1, canvasW));
+    canvasH = Math.min(sh, Math.max(1, canvasH));
     canvasW -= canvasW % 2;
     canvasH -= canvasH % 2;
     return { canvasW, canvasH, wide: true };

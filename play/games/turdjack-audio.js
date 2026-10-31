@@ -42,6 +42,7 @@ export function createTurdjackAudio(opts) {
 
   function unlock() {
     if (!getSoundEnabled() || getSuiteMuted()) {return;}
+    if (globalThis.Suite?.isStudioAudio?.()) {return;}
     const ctx = ensureAudio();
     if (ctx && ctx.state === 'suspended') {
       ctx.resume().catch(() => {});
@@ -67,6 +68,7 @@ export function createTurdjackAudio(opts) {
 
   function play(type) {
     if (!shouldPlay()) {return;}
+    if (globalThis.Suite?.isStudioAudio?.()) { return globalThis.Suite.playSound('jack.' + type); }
     const ctx = ensureAudio();
     if (!ctx || ctx.state !== 'running') {return;}
     const p = SFX_PROFILES[type] || SFX_PROFILES.chip;

@@ -79,19 +79,75 @@
     return (rowBand + rot + zig) % bands;
   }
 
+  function applyColorblindBrick(colors) {
+    try {
+      if (root.Suite && typeof root.Suite.remapBrickColors === 'function') {
+        return root.Suite.remapBrickColors(colors);
+      }
+      if (root.SuiteArcadeA11y && root.SuiteArcadeA11y.remapBrickColors) {
+        const on = root.Suite && root.Suite.isColorblindMode && root.Suite.isColorblindMode();
+        return root.SuiteArcadeA11y.remapBrickColors(colors, on);
+      }
+    } catch { /* ignore */ }
+    return colors;
+  }
+
   function brickColors(row, rows, material, col = 0, worldIndex = 0) {
+    let out;
     if (material && DISTINCT_MATERIALS.has(material) && MATERIAL_PALETTES[material]) {
       const p = MATERIAL_PALETTES[material];
-      return { c1: p[0], c2: p[1], glow: p[2], material };
+      out = { c1: p[0], c2: p[1], glow: p[2], material };
+    } else {
+      const pal = ROW_PALETTES[rowPaletteIndex(row, rows, col, worldIndex)];
+      out = { c1: pal[0], c2: pal[1], glow: pal[2], material: material || 'sewer' };
     }
-    const pal = ROW_PALETTES[rowPaletteIndex(row, rows, col, worldIndex)];
-    return { c1: pal[0], c2: pal[1], glow: pal[2], material: material || 'sewer' };
+    return applyColorblindBrick(out);
   }
 
   function assignBrickStyle(row, rows, col, level, rng, worldIndex = 0) {
     const material = pickMaterial(row, col, level, rng);
     const colors = brickColors(row, rows, material, col, worldIndex);
     return colors;
+  }
+
+  /**
+   * Colorblind-only hatch on heavy bricks (not generic multi-HP).
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {{ heavy?: boolean }} b
+   * @param {number} px
+   * @param {number} py
+   * @param {number} pw
+   * @param {number} ph
+   * @param {boolean} colorblind
+   * @param {(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => void} [roundRectFn]
+   */
+  function paintCbHeavyBrickMark(ctx, b, px, py, pw, ph, colorblind, roundRectFn) {
+    if (!b || !b.heavy) {
+      return;
+    }
+    if (!colorblind) {
+      return;
+    }
+    const strokeRound = roundRectFn || function strokeRectFallback(c, x, y, w, h) {
+      c.rect(x, y, w, h);
+    };
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(px, py, pw, ph);
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(0,0,0,.72)';
+    ctx.lineWidth = 2;
+    strokeRound(ctx, px + 1.5, py + 1.5, pw - 3, ph - 3, 4);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.4)';
+    ctx.lineWidth = 1;
+    for (let d = -ph; d < pw + ph; d += 7) {
+      ctx.beginPath();
+      ctx.moveTo(px + d, py + ph - 1);
+      ctx.lineTo(px + d + ph * 0.65, py + 1);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   function distinctRowHueCount(rows, worldIndex = 0) {
@@ -116,6 +172,7 @@
     rowPaletteIndex,
     brickColors,
     assignBrickStyle,
-    distinctRowHueCount
+    distinctRowHueCount,
+    paintCbHeavyBrickMark
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

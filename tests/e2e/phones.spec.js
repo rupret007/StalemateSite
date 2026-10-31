@@ -58,7 +58,9 @@ test('phone homepage keeps the video-show hero usable without overflow', async (
     }
 
     await expect(page.locator('.hero-show__tie')).toContainText('Hear it loud Oct 24 at Los Amigo’s, Plano');
-    await expect(page.locator('body')).not.toContainText(/ticket/i);
+    await expect(page.locator('.hero-show__cta .button--hot')).toHaveText('Get Saturday tickets');
+    await expect(page.locator('.hero-show__guidance')).toBeVisible();
+    expect(tapHeight(await page.locator('.hero-show__festival').boundingBox())).toBeGreaterThanOrEqual(44);
 });
 
 test('phone first screen shows the countdown, Oct 24 show and Manic video before Games', async ({ page }) => {
@@ -72,9 +74,9 @@ test('phone first screen shows the countdown, Oct 24 show and Manic video before
     const cta = page.locator('[data-track="show-cta-hero"]');
     const ctaBox = await cta.boundingBox();
     const repeat = page.locator('[data-track="show-cta-under-video"]');
-    await expect(repeat).toHaveText('See us Oct 24');
-    await expect(repeat).toHaveAttribute('href', 'https://rockinoctober.com');
-    await expect(cta).toHaveAttribute('href', 'https://rockinoctober.com');
+    await expect(repeat).toHaveText('Get Saturday tickets');
+    await expect(repeat).toHaveAttribute('href', 'https://studio801.ticketspice.com/rockin-october');
+    await expect(cta).toHaveAttribute('href', 'https://studio801.ticketspice.com/rockin-october');
     expect(clock.y + clock.height, 'countdown fully on the first screen').toBeLessThan(vh);
     expect(clock.y).toBeLessThan(video.y);
     expect(card.y).toBeLessThan(video.y);
@@ -97,6 +99,6 @@ test.describe('390x844 first screen', () => {
         expect(844 - video.y, 'a real slice of the video shows').toBeGreaterThanOrEqual(40);
         const clock = await page.locator('[data-countdown-clock]').boundingBox();
         expect(clock.y + clock.height).toBeLessThan(video.y);
-        await expect(page.locator('.hero-show__cta a')).toBeVisible();
+        await expect(page.locator('.hero-show__cta .button--hot')).toBeVisible();
     });
 });
