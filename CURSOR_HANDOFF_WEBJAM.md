@@ -9,6 +9,21 @@ below describe the earlier checkpoint, not the current source.
 
 ## Start here
 
+**October30 evening: the private demo has now been upgraded.** Read
+[the current release and test receipt](hangout-internal/HANGOUT_PRIVATE_DEMO_20261030.md)
+before older checkpoint statements. PR170 merged application source
+`96f356a6f2a9af4bbd2834bb94f1e5df81d200dd`; the protected beta now runs
+`6293386f-31b8-4415-bf0b-f81296190a4d`. Both merged-head CI workflows passed.
+The source-identical PR head has fully decoded website and eleven-group native
+proof, including the actual eighth provider-start mode. Hosted ordinary guests
+exchanged chat across both entry badges, created/discovered a room and passed
+375/390 layout checks. The remaining hosted Jam/drawing walk-through hit the
+unchanged creation limits; music and the full demo remain incomplete. Four
+native packages built successfully. ARM transport executed and shut down
+cleanly; a native Join-to-audio observation is being investigated. Do not call
+these package/transport checks two-way audio, or reactivate paused providers.
+PR166 is merged; PR167–169 are closed as superseded with branches/evidence kept.
+
 **October30 ownership clarification:** Jeff directed this application work to
 proceed here independently of StoryPool. Application code, project CI, tests,
 documentation and application PRs are handled in this workstream. Do not route
@@ -18,12 +33,12 @@ installed checkouts, locks and operational files remain outside this task;
 security, provider and release holds remain unchanged. Earlier StoryPool
 application handoffs below are historical, not current prerequisites.
 
-Current work is **`codex/webjam-native-ci-20261030`**, based on PR169 head
+The preceding work is **`codex/webjam-native-ci-20261030`**, based on PR169 head
 `43457849374bfa00e68fcf3f224954e3f3832026`. This repository's workflow now invokes
 the eighth provider-start session mode as an explicit eleventh proof group,
 retaining the previous ten groups, timeout, diagnostics and failure propagation.
-Verify the actual new CI results; earlier local passes or green metadata do not
-prove this newly added step. No installed/shared StoryPool files are changed.
+Its actual new CI results are now qualified in the receipt above. Earlier local
+passes remain separate evidence. No installed/shared StoryPool files changed.
 
 The preceding **`codex/jam-share-order-20261030`** is based on PR168 head
 `2c4a191915e02c73f95b1c0d2aca1082f6974649`. It fixes another reproduced
