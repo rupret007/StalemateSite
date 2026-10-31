@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "recordedAt": "2026-10-31T11:00:34.287616+00:00",
+  "sourceBefore": "dbae92212247faa80f305062bc9175600f2b82ea",
+  "assetsMatchSource": "96f356a6f2a9af4bbd2834bb94f1e5df81d200dd",
+  "installedChromeBundleVersion": "156.0.8078.76",
+  "scope": "Actual native Mac Chrome Guest window on disposable loopback fixture; actual browser Zoom400% confirmed by AX. Not viewport emulation, hosted sign-in, real media, screen-reader speech or WCAG conformance.",
+  "result": "FAIL: composer/Send partly hidden beneath section navigation while a retained rejected-message copy is present. KeyboardTabSpace still submits; that does not qualify visibility.",
+  "native200": "Composer/Send visible in separately retained actual200 screenshot.",
+  "afterPageScroll": "Scrolling over navigation did not expose composer; original same-byte second screenshot retained privately.",
+  "artifacts": {
+    "chrome-400-before.png": {
+      "bytes": 236834,
+      "sha256": "ed7f0e560a2f6b72cecb478f380b751f2c709795de6179501b568fe4459a6240"
+    },
+    "chrome-400-before-ax.txt": {
+      "bytes": 3597,
+      "sha256": "279f1a3b6827d80a6257639616f50141640812ff6cf8a75cfdf00293c093d8dc"
+    }
+  },
+  "imagePixels": {
+    "width": 4718592,
+    "height": 4292935744
+  },
+  "cleanup": "Zoom100 observed afterreset; later defaultzoomAX hasno nondefaultbadge. Guestwindowclosed; boundedloopbackserverterminated at600s andPID/portabsent.",
+  "providerOrMediaActivation": false,
+  "currentFixQualification": "Pending current-source browserCI and a new actualnative400 journey; preserve this beforefailure.",
+  "sourceSha256": {
+    "r/45662413410ed051/lobby/index.html": "4e2679a0e15568f7993ab1fc82855c5d716c33dd7df0914a8869106ee7031749",
+    "r/45662413410ed051/lobby/lobby.css": "b36604e1a67f22567e298cbb03bab876afd50817468eee16d3e951edaface19b",
+    "r/45662413410ed051/lobby/lobby.js": "7cba8e30c0813136467f419715547c6449bd648983d7dc69175f6828cbe6484a"
+  }
+}

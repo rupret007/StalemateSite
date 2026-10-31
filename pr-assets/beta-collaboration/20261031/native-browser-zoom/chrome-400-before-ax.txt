@@ -1,0 +1,82 @@
+Window: "#stalemate · Hang Out", App: Google Chrome.
+0 standard window #stalemate · Hang Out - Google Chrome (Guest), URL: 127.0.0.1:4493/r/45662413410ed051/lobby/, Secondary Actions: Raise
+	1 container #stalemate · Hang Out - Google Chrome (Guest), URL: 127.0.0.1:4493/r/45662413410ed051/lobby/
+		2 container
+			3 toolbar
+				4 button Back
+				5 button (disabled) Forward
+				6 button Reload
+				7 container
+					8 pop up button View site information
+					9 text field (settable) Address and search bar, Value: 127.0.0.1:4493/r/45662413410ed051/lobby/, Placeholder: Ask Google or type a URL
+					10 button Zoom: 400%
+				11 button Guest
+				12 pop up button Chrome
+			13 container
+				14 scroll area
+					15 HTML content #stalemate · Hang Out, URL: 127.0.0.1:4493/r/45662413410ed051/lobby/
+						16 container
+							17 text HANG OUT
+							18 link Back to Rad Dad, Value: raddadband.com/
+							19 container
+								20 text Connected
+							21 container Chat
+								22 tab group
+									23 tab (selected) #stalemate, Value: 1
+								24 text Welcome to #stalemate. Pull up a nick, say hello, make something together. /help for commands.
+								25 container Conversation
+									26 text [05:49]
+									27 text * ZoomCheck has joined #stalemate
+									28 text [05:49]
+									29 text -StaleBot-
+									30 text welcome to #stalemate, ZoomCheck. One rule: Don’t be a dick. Swear all you want; no hate, threats, creepy stuff or personal info. 🚩 anything gross. /help for commands.
+									31 text [05:51]
+									32 text -StaleBot-
+									33 text Easy on the keyboard mash.
+									34 text [05:52]
+									35 button (disabled) <ZoomCheck>
+									36 text via Rad Dad
+									37 text I am checking the lobby with Chrome set to 200 percent. The welcome, conversation, room controls and composer should stay readable, and Send should remain available. This message exists only in a disposable local test room.
+									38 text [05:54]
+									39 button (disabled) <ZoomCheck>
+									40 text via Rad Dad
+									41 text At 400 percent, I can still reach the composer and Send with the keyboard.
+								42 button 1 new message ↓
+								43 container Saved message copies
+									44 text 1 saved message copy: 1 not sent. Only in this tab. Restore never sends automatically.
+									45 content list
+										46 container
+											47 text #stalemate — Message was not sent. Native zoom reflow: WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
+											48 button (disabled) Restore draft
+											49 button Copy saved text
+											50 button Discard saved copy
+								51 container
+									52 button Commands
+									53 text field (settable) Message, Placeholder: Say something (or /help)
+									54 button Send
+							55 container Sections
+								56 button 🎨 Rooms
+								57 button 💬 Chat
+								58 button 🤘 People
+			59 pop up button Tab search
+			60 container
+				61 tab group
+					62 tab (selected, settable, boolean) #stalemate · Hang Out - Memory usage - 95.2 MB, Value: on
+						63 button Close
+			64 button New Tab
+	65 close button
+	66 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	67 minimize button
+68 menu bar
+	69 Chrome
+	70 File
+	71 Edit
+	72 View
+	73 History
+	74 Bookmarks
+	75 Profiles
+	76 Tab
+	77 Window
+	78 Help
+
+The focused UI element is 54 button Send

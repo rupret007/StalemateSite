@@ -7,6 +7,24 @@ their pending-CI and StoryPool-admission statements are historical.
 
 ## Start here
 
+**The focused 400% composer fix is demonstrated.** Read the
+[before/after evidence](hangout-internal/HANGOUT_NATIVE_BROWSER_ZOOM_20261031.md).
+Source `80a1a5d` passed 1,869 units and 438 browser cases; both new retained-copy
+checks also passed locally. A separate native Chrome Guest journey confirmed
+the full input and Send remain visible at actual 400% and 200% zoom, with a
+saved copy retained and a normal message submitted through Tab/Space. The
+original native failure and both intermediate CI failures remain recorded.
+This is local/CI proof; hosted deployment and physical music are separate.
+
+**Native PR410 merged as`bf24e7d`.** Its source-identical full CI ran all555
+modules once:12,796 passed,60 skipped; all16 applicable checks passed. One
+matching private-beta package run is active:
+[41193954131](https://github.com/rupret007/webjam/actions/runs/41193954131),
+branch`codex/private-web-join-test-bf24e7d-20261031`. Do not dispatch another.
+Package manifest/installation and physical music remain separate proof; provider
+and release holds are unchanged. The bb40 package below remains the previous
+qualified cohort, not a private-beta profile artifact.
+
 [Browser music destination and prerequisites](hangout-internal/HANGOUT_WEB_JOIN_READINESS_20261031.md):
 WebJam PR410 adds build-bound protected-community invitations; head7faf4ed is
 under current-source CI after190 focused local passes, with no new
@@ -28,7 +46,7 @@ Signing/publication jobs were skipped; do not dispatch another. Physical two-way
 music and full VoiceOver remain unqualified. This newer
 receipt supersedes the pending fixed-package AX statements in older entries.
 
-**Latest native source: `bb40fac`, qualified application CI.** Read the
+**Qualified bb40 baseline, application CI.** Read the
 [current native readiness checkpoint](hangout-internal/HANGOUT_NATIVE_READINESS_20261031.md).
 PR #409 includes the existing Windows work and merged launcher/accessibility fix;
 its full module loop passed 12,760 cases across all 553 tracked modules, with 60

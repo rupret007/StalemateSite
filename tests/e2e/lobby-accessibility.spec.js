@@ -210,6 +210,35 @@ for (const viewport of viewports) test(`${viewport.label}: long chat, error and 
     } finally { await visitor.close(); }
 });
 
+// A retained rejected message adds a separate scrollable recovery row. Deep
+// native Chrome zoom exposed clipping that the empty-recovery viewport probes
+// did not cover. These dimensions are local reflow regressions; native zoom
+// remains a separate observed browser journey.
+for (const viewport of [{ width: 300, height: 299 }, { width: 320, height: 256 }]) test(`retained copy at ${viewport.width}x${viewport.height}: composer remains visible and keyboard usable`, async ({ browser, baseURL }, testInfo) => {
+    const visitor = await guest(browser, baseURL, 'RecoveryReflow', viewport), { page } = visitor;
+    try {
+        await send(page, 'Native zoom reflow: ' + 'W'.repeat(260));
+        await expect(page.locator('[data-message-recovery]')).toBeVisible();
+        await expect(page.locator('[data-message-recovery-status]')).toContainText('1 not sent');
+        // A rejected line still consumes the ordinary three-second slow-mode
+        // window. Pace the next real request without changing server policy.
+        await delay(3100);
+        await tabTo(page, page.getByRole('textbox', { name: 'Message', exact: true }));
+        const text = 'The composer and Send remain usable with a saved message copy.';
+        await page.keyboard.type(text); await page.keyboard.press('Tab');
+        await expect(page.locator('[data-send]')).toBeFocused();
+        await page.keyboard.press('Space');
+        await expect(page.locator('[data-buffer]')).toContainText(text);
+        await expect(page.locator('[data-message-recovery-status]')).toContainText('1 not sent');
+        const geometry = await composerGeometry(page);
+        await attachGeometry(testInfo, `retained-copy-${viewport.width}-${viewport.height}`, geometry);
+        await page.screenshot({ path: testInfo.outputPath(`retained-copy-${viewport.width}-${viewport.height}.png`) });
+        contained(geometry);
+        expect(geometry.fontSize).toBe('16px');
+        expect(visitor.errors).toEqual([]);
+    } finally { await visitor.close(); }
+});
+
 for (const viewport of [viewports[0], viewports[3]]) test(`${viewport.label}: invitation status action remains keyboard-reachable without covering chat input`, async ({ browser, baseURL }, testInfo) => {
     const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
     const host = await guest(browser, baseURL, 'InvitationHost', { width: 1280, height: 900 }, relay);

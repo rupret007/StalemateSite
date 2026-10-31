@@ -1,0 +1,108 @@
+# Native browser zoom: retained-message composer clipping
+
+Recorded October 31, 2026. The focused fix is now demonstrated in current-source
+CI and a separate actual native browser journey. The original 400% failure and
+both intermediate CI failures remain recorded below.
+
+## Actual baseline observation
+
+A separate native macOS Chrome Guest window used the existing disposable
+loopback relay. Its application assets matched website source
+`96f356a6f2a9af4bbd2834bb94f1e5df81d200dd`; the tested local Git head was
+`dbae92212247faa80f305062bc9175600f2b82ea`. The installed Chrome bundle version
+was156.0.8078.76. No extension, DOM/native hook, fake clock, microphone/camera capture, provider or
+production session was used.
+
+Chrome's native View menu/zoom controls and AX state confirmed200% and400%.
+At200%, the composer and Send remained visible. At400%, a retained rejected
+message copy and the new-message row consumed the short chat pane; the composer
+was clipped beneath section navigation. Tab/Space still sent a real local
+message, but keyboard submission did not prove visibility. Scrolling over the
+navigation did not expose it. The initial repeated-character probe was refused
+by unchanged spam policy and retained as an unsent copy; a normal message passed.
+
+The [original screenshot](../pr-assets/beta-collaboration/20261031/native-browser-zoom/chrome-400-before.png),
+[actual AX snapshot](../pr-assets/beta-collaboration/20261031/native-browser-zoom/chrome-400-before-ax.txt)
+and [sanitized source/artifact receipt](../pr-assets/beta-collaboration/20261031/native-browser-zoom/before-receipt.json)
+retain that negative result. The original200% and post-scroll400% images,
+source hashes and detailed setup observations stay in ignored local evidence.
+
+## Fix and verification
+
+At short heights, the existing chat pane is allowed to scroll vertically when
+recovery/jump rows exceed its height. The complete composer stays at that pane's
+bottom while the other rows scroll; focusing only Send cannot leave the taller
+form clipped. Existing controls, text, retained drafts,
+input16px sizing and horizontal containment remain. No information, spam rule,
+session policy or control is removed to manufacture a smaller layout.
+
+Two new cases in [the accessibility suite](../tests/e2e/lobby-accessibility.spec.js)
+exercise saved-message recovery at300x299 and320x256. They use real loopback
+sockets and keyboard Tab/Space, retain the unsent copy, check successful normal
+message delivery, and hit-test the input/Send corners against clipping. These
+are reflow regression dimensions, separate from actual browser zoom.
+
+The first local baseline and candidate attempts were both refused before Node
+started by the unchanged swap guard. They are not red/green test results.
+These resource refusals are separate from the subsequently admitted checks
+described below. The original before receipt remains unchanged.
+
+The first candidate, head5e8a218, passed1,869 units/114 files in inspected
+CI41196234525. Its browser run passed436 cases and failed the two new cases,
+each again on its configured retry: the second request hit the unchanged
+three-second slow mode before geometry assertions ran. Preserve that run and
+its raw-log digest; it is not a clipping-fix pass or a measured geometry failure.
+The test now waits3.1 real seconds after the rejected line before its next
+request. No clock, rate limit, assertion or retry configuration is changed.
+
+The paced headd1ac728 [run41197593615](https://github.com/rupret007/StalemateSite/actions/runs/41197593615) reached geometry:1,869 units/114files and
+436 browser cases passed, while both new cases failed again on their configured
+retry. At300x299, the form bottom was233.71875px versus the chat pane's225.5px.
+The visibility assertions stay intact. The candidate now anchors the whole
+composer within the short pane instead of relying on focus scrolling to its
+smaller Send button.
+
+## Actual corrected-source result
+
+At head `80a1a5d6730e4f91098db046e797fd44e7431324`, the inspected
+[PR CI run](https://github.com/rupret007/StalemateSite/actions/runs/41198635869)
+passed all 1,869 unit cases in 114 files and all 438 browser cases in 438
+attempts, with no retry markers. Both new retained-copy cases passed. Its actual
+checkout, `324a8f1fd2d37bc3ccaed1639a1d1a51ed915e6b`, has the same complete
+tree as the tested head: `5a56e1ac66936e860f44e00b9c2652d77ef19fed`.
+The separate push workflow also succeeded. A newly admitted local Chromium run
+passed the two focused cases with one worker and retries disabled.
+
+A new disposable native Chrome Guest window then used those exact application
+assets on a loopback relay. Chrome's actual zoom indicator confirmed 400%.
+The rejected repeated-character message stayed in saved copies. Typing a normal
+message, pressing Tab to focus Send and pressing Space delivered that message;
+the entire input and Send stayed visible above section navigation. A separate
+observed 200% setting also kept both visible. No DOM/native hook, viewport
+override or provider was used.
+
+The [after screenshot](../pr-assets/beta-collaboration/20261031/native-browser-zoom/chrome-400-after.jpg),
+[after AX snapshot](../pr-assets/beta-collaboration/20261031/native-browser-zoom/chrome-400-after-ax.txt)
+and [source-bound receipt](../pr-assets/beta-collaboration/20261031/native-browser-zoom/after-receipt.json)
+retain this result. Native captures contain JPEG bytes at 1200x1284; the original
+before receipt's `imagePixels` field incorrectly interpreted those bytes as a
+PNG header. Its failed observation and original capture bytes remain unchanged;
+the new receipt explicitly records the metadata correction.
+
+This result qualifies the focused composer defect. It does not establish hosted
+deployment, full accessibility conformance or physical two-way music. Actual
+100% restoration was captured before closing only the owned Guest window back
+to the original profile picker. Its owned loopback server was stopped after
+verifying its command and port, and that listener was confirmed absent.
+
+W3C's [Reflow guidance](https://www.w3.org/WAI/WCAG22/Understanding/reflow.html)
+allows responsive relocation and vertical scrolling while retaining content and
+function. Its separate [Resize Text guidance](https://www.w3.org/WAI/WCAG22/Understanding/resize-text.html)
+addresses enlargement through200%. These observations do not establish complete
+WCAG conformance, screen-reader speech, text-only zoom or physical iPhone use.
+
+The Guest window was restored to100% and closed back to the original profile
+picker. The loopback server ended at its original600-second bound; no process or
+port remained. No user profile or hosted-session observer was changed. All
+[62 original outcomes](HANGOUT_ACCEPTANCE_REQUIREMENTS.md), provider/AI/vault,
+age/camera/consent, native-trust and public-release holds remain intact.
