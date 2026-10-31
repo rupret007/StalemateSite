@@ -1,5 +1,10 @@
 # Community beta readiness assessment
 
+Historical assessment, October 19. For the current source, terminal expiry
+observation and all 62 requirement scopes, start with the
+[October 31 acceptance audit](HANGOUT_ACCEPTANCE_AUDIT_20261031.md). The older
+pending/running and StoryPool/Karen statements below retain their dated scope.
+
 Updated October 19, 2026 UTC. **The guest technical beta works; it is not yet
 ready for general visitor invitations.** Real email owner login and separate
 staff access now work; Jeff confirmed the test-report dismissal. Second-device ownership recovery
