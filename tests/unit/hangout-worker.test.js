@@ -27,7 +27,8 @@ describe('hangout relay worker rules', () => {
 
     it('only forwards well-formed ciphertext frames under the size cap', () => {
         expect(validFrame(JSON.stringify({ iv: 'A'.repeat(16), c: 'abc_-' }))).toEqual({ iv: 'A'.repeat(16), c: 'abc_-' });
-        expect(validFrame(JSON.stringify({ iv: 'A'.repeat(16), c: 'x'.repeat(60000) }))).toBeNull();
+        expect(validFrame(JSON.stringify({ iv: 'A'.repeat(16), c: 'x'.repeat(60000) }))).not.toBeNull();
+        expect(validFrame(JSON.stringify({ iv: 'A'.repeat(16), c: 'x'.repeat(1024 * 1024) }))).toBeNull();
         expect(validFrame(JSON.stringify({ text: 'plaintext' }))).toBeNull();
         expect(validFrame('not json')).toBeNull();
     });

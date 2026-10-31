@@ -2,6 +2,7 @@
 
 const DEFAULT_TEST_PORT = 4320;
 const TITLE_NEEDLE = 'Stalemate';
+const HANGOUT_RELAY_PREFIX = '/__hangout-relay';
 
 function resolveTestPort(env = process.env) {
     const rawTestPort = env.STALEMATE_TEST_PORT || String(DEFAULT_TEST_PORT);
@@ -55,11 +56,17 @@ async function assertStalemateTestOrigin(origin) {
     return assertStalemateHomepage(await response.text(), origin);
 }
 
+function hangoutRelayWsBase(origin) {
+    return new URL(HANGOUT_RELAY_PREFIX, origin).href.replace(/^http/, 'ws');
+}
+
 module.exports = {
     DEFAULT_TEST_PORT,
+    HANGOUT_RELAY_PREFIX,
     TITLE_NEEDLE,
     resolveTestPort,
     testBaseURL,
+    hangoutRelayWsBase,
     homepageTitle,
     assertStalemateHomepage,
     assertStalemateTestOrigin

@@ -27,3 +27,7 @@ export const isClearable = api.isClearable;
 export const hazardIntervalFrames = api.hazardIntervalFrames;
 export const collectDripSpawns = api.collectDripSpawns;
 export const hazardHitsPaddle = api.hazardHitsPaddle;
+export const ENDGAME_MAX_BRICKS = api.ENDGAME_MAX_BRICKS;
+export const ENDGAME_IDLE_FRAMES = api.ENDGAME_IDLE_FRAMES;
+export const endgameAssistActive = api.endgameAssistActive;
+export const endgameSteer = api.endgameSteer;

@@ -1,7 +1,7 @@
 // @vitest-environment node
 // Admin auth (Cloudflare Access JWT), signed device ids, IP hashing, and the Worker-side lobby gate.
 import { describe, expect, it } from 'vitest';
-import { verifyAccessJwt, roleForEmail, signDevice, verifyDevice, ipHash, newDeviceId, accessConfigured } from '../../hangout-worker/src/auth.mjs';
+import { verifyAccessJwt, roleForEmail, signDevice, verifyDevice, deviceFromProtocols, DEVICE_TOKEN_TTL_MS, ipHash, newDeviceId, accessConfigured } from '../../hangout-worker/src/auth.mjs';
 import { lobbyGate, lobbyConfigured } from '../../hangout-worker/src/lobby-do.mjs';
 
 const TEAM = 'stalemate.cloudflareaccess.com';
@@ -62,8 +62,19 @@ describe('device ids and IP hashing', () => {
         const tok = await signDevice(id, KEY);
         expect(await verifyDevice(tok, KEY)).toBe(id);
         expect(await verifyDevice(tok, 'x'.repeat(40))).toBeNull();
-        expect(await verifyDevice(`${newDeviceId()}.${tok.split('.')[1]}`, KEY)).toBeNull();
+        expect(await verifyDevice(`${newDeviceId()}.${tok.split('.').slice(1).join('.')}`, KEY)).toBeNull();
         expect(await verifyDevice('garbage', KEY)).toBeNull();
+    });
+    it('rejects expired and legacy two-part device tokens', async () => {
+        const id = newDeviceId();
+        const tok = await signDevice(id, KEY, now);
+        expect(await verifyDevice(tok, KEY, now + DEVICE_TOKEN_TTL_MS + 1)).toBeNull();
+        expect(await verifyDevice(`${id}.${'x'.repeat(32)}`, KEY)).toBeNull();
+    });
+    it('reads device tokens from Sec-WebSocket-Protocol entries', () => {
+        expect(deviceFromProtocols('hangout, dev.abc.def.ghi')).toBe('abc.def.ghi');
+        expect(deviceFromProtocols('hangout')).toBeNull();
+        expect(deviceFromProtocols('')).toBeNull();
     });
     it('IP hash is daily, keyed and never contains the IP', async () => {
         const a = await ipHash('203.0.113.9', KEY, now);
@@ -102,6 +113,22 @@ describe('Worker lobby gate fails closed', async () => {
         expect(ok.ok).toBe(true);
         expect(ok.identity.role).toBe('fan');
         expect(ok.identity.devToken).toMatch(/\./);
+    });
+    it('device auth uses Sec-WebSocket-Protocol only, rotates every admission', async () => {
+        const id = newDeviceId();
+        const tok = await signDevice(id, env.HANGOUT_HMAC_KEY, Date.now() - 1000);
+        const q = `preview=${'p'.repeat(24)}&ts=tok&dev=${encodeURIComponent(tok)}`;
+        const [rUrl, uUrl] = req('/lobby', {}, q);
+        const viaUrl = await lobbyGate(rUrl, env, uUrl, deps);
+        expect(viaUrl.ok).toBe(true);
+        expect(viaUrl.identity.dev).not.toBe(id);
+        expect(viaUrl.identity.devToken).toMatch(/\./);
+        const [rProto, uProto] = req('/lobby', { 'Sec-WebSocket-Protocol': `hangout, dev.${tok}` });
+        const viaProto = await lobbyGate(rProto, env, uProto, deps);
+        expect(viaProto.ok).toBe(true);
+        expect(viaProto.identity.dev).toBe(id);
+        expect(viaProto.identity.devToken).toMatch(/\./);
+        expect(viaProto.identity.devToken).not.toBe(tok);
     });
     it('a fan cannot become band by asking: /lobby ignores role params, /lobby-admin needs a valid Access JWT', async () => {
         const [r, u] = req('/lobby', { 'Cf-Access-Jwt-Assertion': await token(pair, good) }, `preview=${'p'.repeat(24)}&ts=tok&role=owner&admin=1`);

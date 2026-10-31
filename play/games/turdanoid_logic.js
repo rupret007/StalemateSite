@@ -1,5 +1,5 @@
 /**
- * TurdAnoid Turbo balance logic.
+ * Turdanoid balance logic.
  *
  * These constants and helpers mirror the live tuning inside TurdAnoid.html
  * (single-file game, no build step). If you change balance numbers there,
