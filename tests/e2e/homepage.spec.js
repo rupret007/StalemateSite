@@ -28,7 +28,7 @@ test('homepage is a finished band page with originals, show and real links', asy
     await expect(page.locator('#merch')).toHaveCount(0);
     await expect(page.locator('[data-embed]')).toHaveCount(0);
     await expect(page.locator('iframe')).toHaveCount(0);
-    await expect(page.locator('form')).toHaveCount(0);
+    await expect(page.locator('[data-contact-form]')).toHaveCount(1);
     await expect(page.locator('#home')).toContainText('Rockin’ October');
     await expect(page.locator('#home')).toContainText('Los Amigo’s');
     await expect(page.locator('.hero__tag')).toContainText('All originals. All too loud.');
