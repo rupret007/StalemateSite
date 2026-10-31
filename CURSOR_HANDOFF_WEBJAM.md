@@ -7,16 +7,28 @@ their pending-CI and StoryPool-admission statements are historical.
 
 ## Start here
 
+**Current ARM package and native accessibility now pass.** Read the
+[bb40 package/GUI receipt](hangout-internal/HANGOUT_NATIVE_PACKAGE_BB40_20261031.md)
+and its actual screenshot/native snapshots. Archive/source/signature/architecture
+and the production transport lifecycle passed. The frozen Mac app exposes the
+full invitation error, clears it on edit and restores it on Return-key retry.
+Window Close cleaned up without changing saved settings. Preserve the original83
+failure and the first Cmd-Q cleanup observation. All four desktop jobs passed in
+run41181580413; the 08:32:56 artifact observation pins every ID/size/digest to bb40.
+Signing/publication jobs were skipped; do not dispatch another. Physical two-way
+music and full VoiceOver remain unqualified. This newer
+receipt supersedes the pending fixed-package AX statements in older entries.
+
 **Latest native source: `bb40fac`, qualified application CI.** Read the
 [current native readiness checkpoint](hangout-internal/HANGOUT_NATIVE_READINESS_20261031.md).
 PR #409 includes the existing Windows work and merged launcher/accessibility fix;
 its full module loop passed 12,760 cases across all 553 tracked modules, with 60
 skips. Actual Windows CI passed eight ACL/API cases and four sharing controls.
 Its first package dispatch was resource-refused before CLI execution. A fresh
-07:41 guard later admitted exactly one matching build, run41181580413; observe
-that existing run. Read the dated checkpoint and actual branch runs. The latest
-completed packages still use83d2950. Physical music and fixed-package macOS AX
-are unqualified. Native PR #401 is merged; #403–405 are closed as superseded, with
+07:41 guard later admitted exactly one matching build, run41181580413; all four
+desktop jobs subsequently passed. Current packages use bb40 and the ARM native
+AX correction is observed; physical music remains unqualified. Read the newer
+receipt above. Native PR #401 is merged; #403–405 are closed as superseded, with
 their source/failures retained. No StoryPool application gate was used.
 
 **October31: the ARM app's normal Join was exercised.** Read the
@@ -25,15 +37,15 @@ for the actual screenshot and macOS accessibility snapshot. Source83 correctly
 refused a malformed invitation before opening a workspace. Its accessibility
 tree omitted the visible recovery explanation; application PR408 merged as
 `a62f01f` after all550 test modules ran once (12,626 passed,60 skipped).
-A new package's native accessibility behavior still needs observation.
+The newer bb40 package observation above demonstrates the correction separately.
 The test app is closed and saved settings metadata is unchanged. This was not
 a music/capture test. Windows PR409 subsequently merged as`bb40fac`; its full CI
 and actual Windows diagnostic are qualified in the newer checkpoint above.
 Its167 portable cases remain separately recorded. Portable, native CI and
 physical music evidence remain separate.
 
-**Matching native test packages are built.** Read
-[the current package receipt](hangout-internal/HANGOUT_NATIVE_CANDIDATE_20261031.md).
+**Previous source83 native test packages.** Read
+[the historical package receipt](hangout-internal/HANGOUT_NATIVE_CANDIDATE_20261031.md).
 Source83d2950 produced successful ARM Mac, Intel Mac, Windows and Linux artifacts;
 signing/public-release jobs were skipped. The ARM download, signature, embedded
 source and production transport lifecycle are verified. Earlier GUI resource

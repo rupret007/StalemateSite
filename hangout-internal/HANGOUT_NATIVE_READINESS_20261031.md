@@ -1,7 +1,7 @@
 # Native application source and remaining demo proof
 
-Evidence recorded October 31, 2026; resource and branch-run observations are
-stamped 07:19–07:42 UTC. Application work proceeds here directly,
+Evidence recorded October 31, 2026; resource, package and native GUI observations
+are stamped 07:19–08:32 UTC. Application work proceeds here directly,
 without StoryPool/Karen routing. Shared StoryPool services, installed checkouts,
 configuration, locks and operational files remain outside this workstream.
 
@@ -32,13 +32,22 @@ controls, separate from Jeff's Windows PC, installation, signing and music.
 
 ## Matching packages and resource admission
 
-The most recent completed four-target package cohort remains source `83d2950`,
-described in the [package receipt](HANGOUT_NATIVE_CANDIDATE_20261031.md). Its ARM
+The [current bb40 package and actual ARM GUI receipt](HANGOUT_NATIVE_PACKAGE_BB40_20261031.md)
+records the verified archive, signature, architecture and production transport
+lifecycle. The normal frozen app now exposes the full error through macOS
+accessibility; editing and Return-key retry passed. Normal window Close left no
+WebJam/transport and saved configuration metadata unchanged. The first Cmd-Q
+cleanup observation remains recorded. This is separate from physical music.
+All four matching desktop builds passed. The 08:32:56 artifact observation pins
+their IDs, sizes, digests and source; signing/publication jobs remained skipped.
+
+The earlier source `83d2950` cohort is preserved in the
+[package receipt](HANGOUT_NATIVE_CANDIDATE_20261031.md). Its ARM
 archive, architecture, signature and production transport lifecycle passed.
 Its normal launcher refused malformed Join safely but omitted the useful
 explanation from the macOS accessibility tree. The
 [original observation and qualified PR408 fix](HANGOUT_NATIVE_ACCESSIBILITY_20261031.md)
-remain distinct; no fixed frozen-app AX result is claimed yet.
+remain distinct from the new bb40 passing native observation.
 
 The matching `bb40fac` test branch is
 `codex/private-music-test-bb40fac-20261031`. The 07:19 UTC dispatch attempt was
@@ -69,9 +78,10 @@ normal checksum/signature checks and never remove quarantine or re-sign it.
 
 ## Required evidence still outstanding
 
-- Qualify the matching ARM/Intel/Windows/Linux packages, production transport
-  and actual fixed macOS accessibility behavior. Package builds and Qt CI are
-  separate proof.
+- Qualify actual Intel/Windows/Linux installation, launch and music. All four
+  matching package jobs passed; current ARM static/production-transport/native-AX
+  checks passed. Other archives have official metadata, without a local-download
+  or physical-device claim. Package builds and physical music are separate proof.
 - Bring the Intel MacBook online/awake through approved access, and establish
   the existing Windows desktop connection. At 06:51 the MacBook was offline;
   Windows/WSL were online. Earlier temporary test keys were removed. Do not

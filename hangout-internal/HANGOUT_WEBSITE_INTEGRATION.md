@@ -10,9 +10,25 @@ approval or evidence that a live website contains the candidate.
 
 ## Select one tested candidate
 
-Current readiness work is `codex/webjam-native-ci-20261030`, based on
-PR169 head `43457849374bfa00e68fcf3f224954e3f3832026`. It adds the separate eighth
-provider-start mode to application CI; verify actual new execution and artifacts.
+The current protected private website uses application source
+`96f356a6f2a9af4bbd2834bb94f1e5df81d200dd`, tree
+`7ffc5b662744609f92ba490c70d146cfea40676e`, matched to Worker version
+`6293386f-31b8-4415-bf0b-f81296190a4d`. Its actual site/native CI and deployed
+visitor journeys are in the [private release receipt](HANGOUT_PRIVATE_DEMO_20261030.md).
+The explicit eighth provider-start CI mode ran with inert callbacks; it does not
+prove music or activate providers. Preserve this source/assets/configuration/key
+set until the existing eight-hour observer is terminal and ending deployment
+identity is checked. Documentation-only merges do not change that runtime.
+
+Current native source is `bb40fac7fcaa032c2f19cf9af8c49ac4276d3cf1`; its
+[package/actual ARM GUI receipt](HANGOUT_NATIVE_PACKAGE_BB40_20261031.md) keeps
+source, CI, package and physical-device proof distinct. Actual two-way music
+remains required. Use these exact identities and receipts before historical
+branch descriptions below.
+
+The preceding `codex/webjam-native-ci-20261030`, based on PR169 head
+`43457849374bfa00e68fcf3f224954e3f3832026`, added the separate eighth provider-start
+mode to application CI.
 The preceding `codex/jam-share-order-20261030` is based on
 PR168 head `2c4a191915e02c73f95b1c0d2aca1082f6974649`. Its parent
 `codex/jam-mobile-setup-20261030` contains the compact setup help and is based on
@@ -21,7 +37,7 @@ PR167 head `143b3905af12e029a645e96769cc1d04cec018a5`. The preceding
 `1504f94837a68ce35844e0590cde469135c287b4`. The earlier parent
 `codex/irc-webjam-polish-20261029` is based on the merged
 `codex/che-demo-candidate` at `ec1eb14cfb2f7d068e5a01467193b70e21495dbc`; see the
-[checkpoint](HANGOUT_DEMO_CHECKPOINT.md#current-work-independent-application-ci)
+[checkpoint](HANGOUT_DEMO_CHECKPOINT.md#previous-work-independent-application-ci)
 for its exact inputs and unresolved gates. Obtain the actual reviewed current
 commit, not just an input PR or branch name. This assembly includes both the
 music-invitation fixes and the reconnect probe; older input results do not

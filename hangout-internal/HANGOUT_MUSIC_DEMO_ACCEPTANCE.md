@@ -13,6 +13,10 @@ limit, and `services/native_remote_transport.py` requires platform signatures
 for frozen transport builds. This is source assessment, not package/audio
 qualification.
 
+The [current bb40 package and actual ARM GUI receipt](HANGOUT_NATIVE_PACKAGE_BB40_20261031.md)
+qualifies current source/signature/architecture/transport and the corrected native
+accessibility behavior. It does not qualify any physical audio row below.
+
 The October30 [private release receipt](HANGOUT_PRIVATE_DEMO_20261030.md) records
 newer source299's four built desktop targets and actual ARM transport shutdown,
 plus native PR407's reviewed927 launch guard, passed full CI and equal-tree
