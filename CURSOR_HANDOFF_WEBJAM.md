@@ -7,6 +7,17 @@ their pending-CI and StoryPool-admission statements are historical.
 
 ## Start here
 
+**Latest native source: `bb40fac`, qualified application CI.** Read the
+[current native readiness checkpoint](hangout-internal/HANGOUT_NATIVE_READINESS_20261031.md).
+PR #409 includes the existing Windows work and merged launcher/accessibility fix;
+its full module loop passed 12,760 cases across all 553 tracked modules, with 60
+skips. Actual Windows CI passed eight ACL/API cases and four sharing controls.
+Its matching package dispatch was resource-refused before CLI execution; read
+the dated checkpoint and actual branch runs before starting one. The latest
+completed packages still use83d2950. Physical music and fixed-package macOS AX
+are unqualified. Native PR #401 is merged; #403–405 are closed as superseded, with
+their source/failures retained. No StoryPool application gate was used.
+
 **October31: the ARM app's normal Join was exercised.** Read the
 [native accessibility observation](hangout-internal/HANGOUT_NATIVE_ACCESSIBILITY_20261031.md)
 for the actual screenshot and macOS accessibility snapshot. Source83 correctly
@@ -15,10 +26,10 @@ tree omitted the visible recovery explanation; application PR408 merged as
 `a62f01f` after all550 test modules ran once (12,626 passed,60 skipped).
 A new package's native accessibility behavior still needs observation.
 The test app is closed and saved settings metadata is unchanged. This was not
-a music/capture test. Windows PR409 integrates the existing application work on
-an isolated branch. Its167 portable cases passed; combined-source full CI and
-the actual eight-case Windows diagnostic remain pending. Portable, native CI
-and physical music evidence remain separate.
+a music/capture test. Windows PR409 subsequently merged as`bb40fac`; its full CI
+and actual Windows diagnostic are qualified in the newer checkpoint above.
+Its167 portable cases remain separately recorded. Portable, native CI and
+physical music evidence remain separate.
 
 **Matching native test packages are built.** Read
 [the current package receipt](hangout-internal/HANGOUT_NATIVE_CANDIDATE_20261031.md).

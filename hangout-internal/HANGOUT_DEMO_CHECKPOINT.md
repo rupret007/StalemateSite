@@ -6,6 +6,14 @@ below; historical sections describe their own revisions and earlier limitations.
 
 ## Current private release and demonstrated guests
 
+[Current native source and dated remaining work](HANGOUT_NATIVE_READINESS_20261031.md):
+PR #409 merged `bb40fac` includes the existing Windows work and current launcher
+fixes. Reviewed/actual-CI/merged trees match. The full module loop passed 12,760
+cases across all 553 tracked modules, with 60 skips; actual Windows CI passed all
+eight ACL/API cases and four sharing controls. Matching `bb40fac` packaging has
+not been admitted at this checkpoint. Source83 remains the completed package
+cohort. Keep physical music, fixed-package AX and source/CI/package proof distinct.
+
 [October31 native candidate](HANGOUT_NATIVE_CANDIDATE_20261031.md): all four
 source83d2950 desktop builds passed, with actual artifact identities/digests
 recorded. Signing/public release stayed skipped. ARM archive/source/signature
@@ -15,8 +23,8 @@ ARM main window subsequently opened after resource admission. The actual
 malformed-invitation refusal and found a missing native accessibility explanation.
 PR408 merged as`a62f01f` after all550 tracked modules ran once (12,626 passed,
 60 skipped). A matching package still needs a new native observation. Windows
-PR409 combines the existing application fixes;167 portable checks passed, while
-its combined-source full CI and eight-case native Windows diagnostic are pending.
+PR409 combines the existing application fixes;167 portable checks remain
+separate from its later qualified full CI and eight-case Windows diagnostic.
 Physical music, human report disposition and natural expiry remain pending.
 
 [October30 release/test receipt](HANGOUT_PRIVATE_DEMO_20261030.md) supersedes
