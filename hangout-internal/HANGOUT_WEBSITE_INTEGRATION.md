@@ -10,6 +10,22 @@ approval or evidence that a live website contains the candidate.
 
 ## Select one tested candidate
 
+Delivery snapshot after application PR184, October 31, 2026. Revalidate the
+receiving branch and runtime before release. These are different deliverables:
+
+| Deliverable | Qualified revision | Scope |
+| --- | --- | --- |
+| Website application assembly | `c9b5db0fb51f7eac184f78aaef43914a32d76920`, reviewed `f7209caa5562544cd8712ff3a64e2c8f5db71409` | Trees match; both CI runs passed 1,894 units and 447 distinct browser cases without retries/skips. Includes browser recovery guidance and live Host tools. Pending private delivery. |
+| Native-repository code | `54f6e5ff9c64d2de837292b7fb4b1d63c7835733`, reviewed `da7e04580d31bd0fa1039e7e1cbf4c940336edea` | Qualified source and browser modules; not a new frozen package cohort. |
+| Private frozen desktop packages | `bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35`, run `41193954131` | Four platform builds; bounded ARM seal/Join/idle transport observations. Installation and physical music remain separate. |
+| Retained entry toolkit | Source `116ca44cbdff06d32d5531d871d2951a3f8d9ec7`, run `41211329202` | Eight verified files for links and optional registration. Does not contain the application or native packages. |
+| Last qualified private deployment | Source `4ed1525c84f48173077f506261cb5acd19e3c1dc`, Worker `a9724702-3ce5-418a-bbd4-950f2e169c9e` | Dated deployed/layout evidence; the newer merged source is not implied to be deployed. |
+
+Start with the [62-outcome audit](HANGOUT_ACCEPTANCE_AUDIT_20261031.md) and
+[Host tools qualification](HANGOUT_HOST_TOOLS_OWNERSHIP_20261031.md).
+The source recorded in an archive manifest identifies that archive, not every
+other deliverable in the table. Preserve newer band pages during integration.
+
 The current protected private website uses application source
 `4ed1525c84f48173077f506261cb5acd19e3c1dc`, tree
 `2144677d638fee4b078a18e75892db9d75c6acdc`, matched to Worker version
@@ -23,11 +39,17 @@ The explicit eighth provider-start CI mode used inert callbacks; it does not
 prove music or activate providers. Keep settings, keys, namespaces and release
 holds intact. Documentation/toolkit-only merges do not change the live app.
 
-Current native source is `bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35`. All four
-matching private builds succeeded; actual ARM package identity, normal GUI and
+The qualified private frozen package cohort uses
+`bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35`. All four matching private builds
+succeeded; actual ARM package identity, normal GUI and
 idle transport checks are in the dated receipt above. Actual browser invitation,
 installation and reciprocal ARM/Intel/Windows music remain required. Keep those
-proof scopes distinct and use these identities before historical branches below.
+proof scopes distinct. Later native source `54f6e5f` changes browser guidance,
+browser tests and documentation; its reviewed tree matches `da7e045`. Website
+[`join/PROVENANCE.json`](../join/PROVENANCE.json) pins those browser modules.
+Do not replace them with the older package revision's copy or relabel the frozen
+packages as built from the later source. Use these identities before historical
+branches below.
 
 The preceding `codex/webjam-native-ci-20261030`, based on PR169 head
 `43457849374bfa00e68fcf3f224954e3f3832026`, added the separate eighth provider-start

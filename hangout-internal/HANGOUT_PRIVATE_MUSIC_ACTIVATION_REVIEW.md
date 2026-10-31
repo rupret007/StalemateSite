@@ -2,8 +2,8 @@
 
 Prepared October31, 2026; updated after the owner's decision that day. The
 reviewed private-trial scope below is authorized, with its prerequisites still
-required. No TURN/vault credential retrieval or provider configuration change
-has been applied by this checkpoint. Application work proceeds directly here; shared StoryPool
+required. Read-only account/vault checks are recorded below; provider activation
+remains unapplied. Application work proceeds directly here; shared StoryPool
 state stays with its existing owner. All62 acceptance outcomes remain required.
 
 ## Recorded owner decision
@@ -20,23 +20,40 @@ public-release holds. No purchase, plan upgrade or public launch is authorized.
 Jeff enters any vault master password locally; credentials and session keys
 must never appear in chat, commits, arguments or logs.
 
-The successful 17:26–17:30UTC preflight confirmed normal Cloudflare OAuth
-sign-in and the account's enabled Realtime entitlement. The account-wide
-October TURN query returned no records, without an API error; that is not a
-billing or free-headroom qualification. Subscription access returned403, and
-the separate SFU usage check has not run. The earlier normal CLI vault check
-reported locked. Jeff subsequently reported local sign-in; availability to the
-test process still needs verification through its normal authorized flow.
+The 19:28UTC read-only preflight confirmed normal Cloudflare OAuth and the
+enabled Realtime entitlement. Account-wide October TURN and SFU queries both
+returned no records without API errors; empty analytics do not qualify billing
+or free headroom. Subscriptions and TURN-key inventory returned403. Existing
+desktop/account/analytics secret bindings and issuer namespaces were present;
+the separate web pair and CORS variable were absent at that observation.
+
+The correct CLI vault profile unlocked and synced successfully at 19:15UTC.
+Targeted TURN, Cloudflare, WebJam and Hangout searches found no matching items.
+The owner-only handoff file was consumed/removed and the isolated session was
+closed. This resolves the sign-in issue, not the intended credential location;
+do not repeat generic unlock advice or infer that the entire vault is empty.
+
+The admitted 20:17UTC `wrangler@4.151.1 login --scopes-list` check offered no
+Billing or Calls scope. Repeating Wrangler login is not a presumed remedy.
+The owner needs normal dashboard access or appropriately authorized account
+access: [Billing Read](https://developers.cloudflare.com/api/resources/accounts/subresources/subscriptions/methods/get/)
+for subscription reads and [Calls Read](https://developers.cloudflare.com/api/resources/calls/subresources/turn/methods/list/)
+for key inventory. [Calls Write](https://developers.cloudflare.com/api/resources/calls/subresources/turn/methods/create/)
+is needed for the reviewed distinct web key creation. Billing Write/global keys
+are unnecessary for those reads. This checkpoint grants no broader permissions.
 
 ## Candidate and observed baseline
 
 The private community is `https://stalemate-hangout-beta.jeffstory007.workers.dev/beta/`.
-Its protected music page is `/join/` on the same origin. Website source4ed1525 /
-Worker versiona972 and native sourcebf24e7d / private package run41193954131
-have their own [dated evidence](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md).
-The newer browser guidance candidate is pinned in
-[`join/PROVENANCE.json`](../join/PROVENANCE.json). Obtain its actual reviewed CI
-before delivery; a source pin is not deployment or physical music evidence.
+Its protected music page is `/join/` on the same origin. The last qualified
+private deployment uses website source4ed1525 / Worker versiona972. Frozen
+private packages use bf24e7d / run41193954131 and retain their own
+[dated evidence](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md). Later qualified
+native-repository code is54f6e5f / reviewed da7e045; the copied browser modules
+are pinned in [`join/PROVENANCE.json`](../join/PROVENANCE.json). Website source
+c9b5db0 includes that guidance and the qualified Host tools correction. Use the
+[delivery table](HANGOUT_WEBSITE_INTEGRATION.md#select-one-tested-candidate)
+and exact CI evidence; a source pin or merge is not deployment or physical music.
 
 The issuer metadata read at08:50–08:51UTC observed version
 `e7cda1bb-be95-4824-a363-924ff6f2948b`, with desktop bindings but without separate

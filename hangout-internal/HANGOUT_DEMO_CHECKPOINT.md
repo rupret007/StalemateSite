@@ -4,6 +4,23 @@ Updated October 31, 2026. Goal active: finish the application for a private Che
 demonstration and website integration. The current private deployment is recorded
 below; historical sections describe their own revisions and earlier limitations.
 
+## Latest qualified source and pending delivery
+
+Website PR184 merged as `c9b5db0`, matching reviewed `f7209ca`. Both exact-source
+CI runs passed 1,894 units/115 files and 447 distinct browser cases in 447
+attempts, without retries or skips. Four actual-Tab Chromium/WebKit journeys
+at 375/390px and a visible sharing-withdrawal recovery case executed. Earlier
+local source188 passed 49 focused units and four viewport journeys; later local
+attempts were resource-refused. See the [qualified Host tools note](HANGOUT_HOST_TOOLS_OWNERSHIP_20261031.md).
+
+The [delivery table](HANGOUT_WEBSITE_INTEGRATION.md#select-one-tested-candidate)
+separates website code `c9b5db0`, native-repository code `54f6e5f`/`da7e045`,
+frozen packages `bf24e7d`, toolkit source `116ca44` and the last qualified
+private deployment `4ed1525`/version `a972`. A source merge or toolkit download
+does not update that deployment. Older sections below retain their dated scopes.
+The deployment/provider dependencies have been handed to the existing owner;
+application work remains here. All 62 requirements and physical music remain.
+
 ## Current private release and demonstrated guests
 
 Start with the [latest dated application evidence](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md).

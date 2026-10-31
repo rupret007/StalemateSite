@@ -5,17 +5,23 @@ Current application checkpoint: October 31, 2026. Start with the
 linked below. Older dated sections retain their original evidence and limits;
 their pending-CI and StoryPool-admission statements are historical.
 
-New focused work corrects [Host tools receiving delayed ownership metadata](hangout-internal/HANGOUT_HOST_TOOLS_OWNERSHIP_20261031.md).
-The original CI screenshot and deterministic local failures are retained. Read
-that note and current PR checks for verification; this source change is not a
-deployed correction or real music evidence.
+**Latest qualified application assembly:** PR184 merged as `c9b5db0`, tree-equal
+to reviewed `f7209ca`. Both CI runs passed 1,894 units and 447 browser cases
+without retries/skips, including actual Tab navigation at 375/390px and visible
+sharing-withdrawal recovery. The [Host tools note](hangout-internal/HANGOUT_HOST_TOOLS_OWNERSHIP_20261031.md)
+and receipt preserve the original failures and separate local/CI scopes.
+This correction remains pending private delivery; it is not music evidence.
+Use the [delivery table](hangout-internal/HANGOUT_WEBSITE_INTEGRATION.md#select-one-tested-candidate)
+to distinguish website/native source, frozen packages, toolkit and deployment.
 
 Read the [audit of all 62 outcomes](hangout-internal/HANGOUT_ACCEPTANCE_AUDIT_20261031.md)
 for current source/deployment/package distinctions, demonstrated scopes and every
-remaining outcome. WebJam PR411 and website PR181 are merged. Jeff has now
+remaining outcome. WebJam PR411 and website PR181/184 are merged. Jeff has now
 authorized the [reviewed bounded private music trials](hangout-internal/HANGOUT_PRIVATE_MUSIC_ACTIVATION_REVIEW.md);
-account/free-tier headroom, resource admission, usable vault/device access and
-required physical trials remain pending. Do not ask again for that same scope.
+account/free-tier headroom, resource admission, intended web credentials/device
+access and required physical trials remain pending. The correct CLI vault
+unlocked and synced; its targeted credential searches found no matches. Do not
+repeat generic vault sign-in advice or the authorization question.
 
 **The actual integration-toolkit download is verified.** The
 [eight-file ZIP](pr-assets/beta-collaboration/20261031/toolkit-integrity/community-entry-toolkit-ci-116ca44.zip)
