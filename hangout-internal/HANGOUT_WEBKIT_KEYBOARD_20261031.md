@@ -40,10 +40,22 @@ evidence; the receipt grants no broader qualification.
 
 ## Execution limits
 
+The corrected head `1b0c151f84fc80e9138b1e3be0391d465c69d22d` passed both
+[push CI](https://github.com/rupret007/StalemateSite/actions/runs/41250109029)
+and [PR CI](https://github.com/rupret007/StalemateSite/actions/runs/41250112049):
+1,894 units in 115 files and 478 distinct browser cases in 478 attempts per run,
+zero failures/retries/skips. Both include all 27 WebKit keyboard cases and the
+375/390px short-copy cases in Chromium and WebKit. Actual PR checkout
+`c523e286bcc47924cc8e86492783f08b8af80a6a`, reviewed head and merge
+`7857ab37a6011bb5435b0f33da7c55d63d4a46d2` share tree
+`c71ca53e9958623e8788e87988fcfbf45d446042`. The
+[source receipt](../pr-assets/beta-collaboration/20261031/current-source-handoff/receipt.json)
+retains log hashes and scopes. Pages jobs skipped; no deployment occurred here.
+
 The focused local check was resource-refused before any browser runtime started
 at 22:51 UTC (80.47% swap; the unchanged limit is below 80%). There is no local
-pass for this correction. Qualify the corrected exact head from its actual CI
-reports before merging; the original failed head does not qualify it.
+pass for this correction. The actual CI results above qualify the merged
+correction; the original failed head remains failed.
 
 These cases exercise actual keyboard events and a local WebSocket relay with an
 explicit clipboard-refusal fixture and an opaque, nonfunctional invitation.

@@ -1,0 +1,134 @@
+{
+  "at": "2026-10-31T23:09:48.803342+00:00",
+  "website": {
+    "pr": 188,
+    "url": "https://github.com/rupret007/StalemateSite/pull/188",
+    "merged": "7857ab37a6011bb5435b0f33da7c55d63d4a46d2",
+    "reviewed": "1b0c151f84fc80e9138b1e3be0391d465c69d22d",
+    "actualPRCheckout": "c523e286bcc47924cc8e86492783f08b8af80a6a",
+    "wholeTree": "c71ca53e9958623e8788e87988fcfbf45d446042",
+    "allTreesEqual": true,
+    "checks": [
+      {
+        "kind": "pr",
+        "job": 124681662110,
+        "run": 41250112049,
+        "actualCheckout": "c523e286bcc47924cc8e86492783f08b8af80a6a",
+        "bytes": 353218,
+        "sha256": "2912e7e3b54301d3d7d8b4a7678e8b465fce6ceed26c48c3ade39d32e38dd1b8",
+        "unitFilesPassed": 115,
+        "unitTestsPassed": 1894,
+        "browserCases": 478,
+        "browserAttempts": 478,
+        "retries": 0,
+        "skips": 0,
+        "failures": 0,
+        "webkitKeyboardCases": 27
+      },
+      {
+        "kind": "push",
+        "job": 124681652885,
+        "run": 41250109029,
+        "actualCheckout": "1b0c151f84fc80e9138b1e3be0391d465c69d22d",
+        "bytes": 356897,
+        "sha256": "d5fd703cf462dc84926405a7fed7ddf1370e0655b75b5d7dff3e46363af464be",
+        "unitFilesPassed": 115,
+        "unitTestsPassed": 1894,
+        "browserCases": 478,
+        "browserAttempts": 478,
+        "retries": 0,
+        "skips": 0,
+        "failures": 0,
+        "webkitKeyboardCases": 27
+      }
+    ],
+    "productionAssets": "Byte-identical to PR184 merge c9b5db0fb51f7eac184f78aaef43914a32d76920; subsequent changes are docs/proof and Playwright selection/tests.",
+    "localBrowserRuntime": "Resource-refused before launch; no local correction pass claimed.",
+    "originalHead": "0e1ce31139555012624f72866be03308ed12c586",
+    "originalResults": "Both original runs476passed2failed, preserved with official artifact digest and inspected baseline375/390captures; not reclassified as passes.",
+    "newDeployment": false
+  },
+  "native": {
+    "pr": 414,
+    "url": "https://github.com/rupret007/webjam/pull/414",
+    "merged": "94f3205c66ad25d726a3de48a839417d2c449c43",
+    "reviewed": "91cf895bf51dd67765a8455dd6da3df4cb0c84a1",
+    "actualCICheckout": "3e953da192d02ae686962184462c99a7eb63a4bb",
+    "wholeTree": "327e18b68e680952f829779983c9bbe52ca359b0",
+    "allTreesEqual": true,
+    "requiredChecks": [
+      "test",
+      "Test integrity guards",
+      "Transport (Go security and cross-build)",
+      "Reference service (protocol and container)",
+      "Windows native diagnostic control",
+      "iOS change gate"
+    ],
+    "allSixRequiredChecksPassed": true,
+    "terminalCheckCounts": {
+      "SUCCESS": 13,
+      "SKIPPED": 8,
+      "CANCELLED": 1
+    },
+    "mainLoop": {
+      "modules": 557,
+      "passed": 12874,
+      "skipped": 60,
+      "failures": 0,
+      "warnings": 8,
+      "warningClasses": {
+        "StarletteDeprecationWarning": 3,
+        "PytestAssertRewriteWarning": 3,
+        "websocketConnectDeprecationWarning": 2
+      },
+      "licensePolicyCasesPassed": 31
+    },
+    "linuxRealJamulus": [
+      {
+        "version": "3.12.2",
+        "rpcPassed": 11,
+        "audioRecordingBoundaryPassed": 7,
+        "bytes": 63292,
+        "sha256": "def165297cb4c6945b77ff037f52e77f79d5a13ba5830c2feb674a4fa2ac243c",
+        "scope": "Linux CI real Jamulus/JACK integration, not physical Mac/Windows audibility"
+      },
+      {
+        "version": "3.12.3",
+        "rpcPassed": 11,
+        "audioRecordingBoundaryPassed": 7,
+        "bytes": 63262,
+        "sha256": "4077a555edd99a9fbf27581468df8249da52af8a98ff0c63aa33160dfa7580b1",
+        "scope": "Linux CI real Jamulus/JACK integration, not physical Mac/Windows audibility"
+      }
+    ],
+    "notNewPackageProof": [
+      "Desktop build skipped",
+      "Windows and macOS release trust skipped",
+      "Publish skipped",
+      "optional macOS Jamulus update input cancelled; not retried or counted as a pass"
+    ],
+    "issuerBrowserContinuity": {
+      "at": "2026-10-31T21:39:25.969595+00:00",
+      "olderQualifiedSource": "54f6e5ff9c64d2de837292b7fb4b1d63c7835733",
+      "newHead": "91cf895bf51dd67765a8455dd6da3df4cb0c84a1",
+      "unchangedPaths": [
+        "deploy/relay/cloudflare-worker",
+        "web/join"
+      ],
+      "gitDiffExitCode": 0,
+      "limit": "Only these issuer/browser paths match; newer native core/transport changes and notice/spec changes do not inherit frozen package proof."
+    },
+    "scope": "PR414 adds Qt/PySide notices and packaging gates. The overall merge also includes upstream native runtime/transport changes; frozenbf24 does not inherit qualification for those changes."
+  },
+  "unchangedDeliverables": {
+    "frozenPrivatePackageSource": "bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35",
+    "frozenPackageRun": 41193954131,
+    "lastQualifiedPrivateWebsiteSource": "4ed1525c84f48173077f506261cb5acd19e3c1dc",
+    "lastQualifiedPrivateWorker": "a9724702-3ce5-418a-bbd4-950f2e169c9e",
+    "retainedEntryToolkitSource": "116ca44cbdff06d32d5531d871d2951a3f8d9ec7",
+    "retainedToolkitRun": 41211329202
+  },
+  "canonical62RequirementsSha256": "3d5db107977f652a1bd51286c02657aaff70c9c3590adb876e03f6d909679999",
+  "all62RequirementsPreserved": true,
+  "scope": "Qualified source and source-bound CI only; no new deployment, frozen cohort, physical music, account headroom or public/operator/legal readiness proof."
+}

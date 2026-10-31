@@ -5,14 +5,27 @@ Current application checkpoint: October 31, 2026. Start with the
 linked below. Older dated sections retain their original evidence and limits;
 their pending-CI and StoryPool-admission statements are historical.
 
-**Latest qualified application assembly:** PR184 merged as `c9b5db0`, tree-equal
-to reviewed `f7209ca`. Both CI runs passed 1,894 units and 447 browser cases
-without retries/skips, including actual Tab navigation at 375/390px and visible
-sharing-withdrawal recovery. The [Host tools note](hangout-internal/HANGOUT_HOST_TOOLS_OWNERSHIP_20261031.md)
-and receipt preserve the original failures and separate local/CI scopes.
-This correction remains pending private delivery; it is not music evidence.
+**Latest qualified website assembly:** PR188 merged as `7857ab3`, tree-equal
+to reviewed `1b0c151` and actual CI checkout `c523e28`. Both CI runs passed
+1,894 units and 478 browser cases without retries/skips, including all 27 lobby
+keyboard cases in WebKit. The [keyboard note](hangout-internal/HANGOUT_WEBKIT_KEYBOARD_20261031.md)
+preserves the original short-copy failures and inspected 375/390px captures.
+PR187 adds existing contrast samples to WebKit; neither PR changes production
+assets. The last production correction is PR184's
+[Host tools work](hangout-internal/HANGOUT_HOST_TOOLS_OWNERSHIP_20261031.md),
+still pending private delivery. These are not music observations.
 Use the [delivery table](hangout-internal/HANGOUT_WEBSITE_INTEGRATION.md#select-one-tested-candidate)
 to distinguish website/native source, frozen packages, toolkit and deployment.
+
+**Latest qualified native source:** WebJam PR414 merged as `94f3205`, tree-equal
+to reviewed `91cf895` and CI checkout `3e953da`. All six protected checks passed;
+557 tracked Python modules ran once (12,874 passed, 60 skipped). Its rollup has
+13 successes, eight skips and one canceled optional macOS update-input job;
+that cancellation is not a pass. The
+[source receipt](pr-assets/beta-collaboration/20261031/current-source-handoff/receipt.json)
+records the boundaries. This source adds Qt/PySide license copies and includes
+upstream native core/transport changes. It is not a new package cohort.
+Frozen private packages remain `bf24e7d`; do not relabel them as `94f3205`.
 
 Read the [audit of all 62 outcomes](hangout-internal/HANGOUT_ACCEPTANCE_AUDIT_20261031.md)
 for current source/deployment/package distinctions, demonstrated scopes and every
