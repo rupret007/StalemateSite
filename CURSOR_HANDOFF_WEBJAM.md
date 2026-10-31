@@ -5,6 +5,11 @@ Current application checkpoint: October 31, 2026. Start with the
 linked below. Older dated sections retain their original evidence and limits;
 their pending-CI and StoryPool-admission statements are historical.
 
+New focused work corrects [Host tools receiving delayed ownership metadata](hangout-internal/HANGOUT_HOST_TOOLS_OWNERSHIP_20261031.md).
+The original CI screenshot and deterministic local failures are retained. Read
+that note and current PR checks for verification; this source change is not a
+deployed correction or real music evidence.
+
 Read the [audit of all 62 outcomes](hangout-internal/HANGOUT_ACCEPTANCE_AUDIT_20261031.md)
 for current source/deployment/package distinctions, demonstrated scopes and every
 remaining outcome. WebJam PR411 and website PR181 are merged. Jeff has now

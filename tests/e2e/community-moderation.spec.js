@@ -13,7 +13,7 @@ const LOCAL_STAFF = 'local-dev-admin-key-0001';
 const escapeHtml = value => value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 
 async function scenario(browser, baseURL) {
-    const contexts = [], websites = [], errors = [], providerRequests = [];
+    const contexts = new Set(), websites = [], errors = [], providerRequests = [];
     const relay = hangoutRelayWsBase(baseURL, `shared-community-moderation-${randomUUID()}`);
     const lobbyUrl = (source, owner = false) => {
         const target = new URL(`${ROOT}lobby/`, baseURL);
@@ -29,7 +29,8 @@ async function scenario(browser, baseURL) {
         return target.href;
     };
     async function context(options = {}) {
-        const value = await browser.newContext(options); contexts.push(value);
+        const value = await browser.newContext(options); contexts.add(value);
+        value.once('close', () => contexts.delete(value));
         // Matches only the explicit shared-community namespace's relay fixture.
         await value.addInitScript(() => { window.HangoutEntrySites = [{ id: 'makers', label: 'Makers & Friends' }]; });
         value.on('page', page => page.on('pageerror', error => errors.push(error.message)));
@@ -52,7 +53,7 @@ async function scenario(browser, baseURL) {
         websites.push(server);
         return url;
     }
-    async function guest(source, nickname, existingContext, { account, viewport } = {}) {
+    async function guest(source, nickname, existingContext, { account, viewport, beforePage } = {}) {
         const profile = existingContext || await context(viewport ? { viewport } : {});
         if (account) await profile.addInitScript(identity => {
             const NativeSocket = window.WebSocket;
@@ -68,6 +69,7 @@ async function scenario(browser, baseURL) {
                 }
             };
         }, account);
+        if (beforePage) await beforePage(profile);
         const page = await profile.newPage();
         if (source) {
             const origin = await website(source, { stalemate: 'Stalemate', 'rad-dad': 'Rad Dad', makers: 'Makers & Friends' }[source], !!account);
@@ -101,8 +103,12 @@ async function scenario(browser, baseURL) {
     }
     return { guest, moderator, adminUrl, websiteOrigins: () => websites.map(server => `http://127.0.0.1:${server.address().port}`),
         close: async () => {
-            await Promise.all(contexts.map(value => value.close()));
-            await Promise.all(websites.map(server => new Promise(resolve => { server.closeIdleConnections(); server.close(resolve); })));
+            const closed = await Promise.allSettled([...contexts].map(value => value.close()));
+            const stopped = await Promise.allSettled(websites.map(server => new Promise((resolve, reject) => {
+                server.closeIdleConnections(); server.close(error => error ? reject(error) : resolve());
+            })));
+            const failures = [...closed, ...stopped].filter(result => result.status === 'rejected');
+            if (failures.length) throw new AggregateError(failures.map(result => result.reason), 'Community fixture cleanup failed');
             expect(providerRequests).toEqual([]); expect(errors).toEqual([]);
         }
     };
@@ -348,5 +354,72 @@ test('one fixture-verified account keeps ownership across entries and revokes an
         await expect(returnedOwner.locator('[data-topic]')).not.toContainText('A revoked host');
         await returnedOwner.screenshot({ path: testInfo.outputPath('shared-owner-revocation-390.png'), fullPage: true });
         expect(await returnedOwner.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    } finally { await app.close(); }
+});
+
+for (const width of [375, 390]) test(`delayed owner metadata updates open host tools at ${width}px without losing focus`, async ({ browser, baseURL }, testInfo) => {
+    const app = await scenario(browser, baseURL);
+    const room = '#delayed-owner-tools', account = 'delayed-owner@example.test', cohostAccount = 'delayed-cohost@example.test';
+    let releaseOwnership;
+    const held = [];
+    try {
+        const owner = await app.guest('stalemate', 'FirstHost', null, { account });
+        const cohost = await app.guest('rad-dad', 'OfflineCoHost', null, { account: cohostAccount });
+        for (const page of [owner, cohost]) {
+            await page.evaluate(name => window.__lobby.cmd('join', [name]), room);
+            await expect(page.locator('[data-chat-context]')).toHaveText(room);
+        }
+        await owner.click('[data-roomtools]');
+        await owner.getByRole('button', { name: 'Keep this room', exact: true }).click();
+        await expect(owner.locator('[data-host-status]')).toContainText('Registered');
+        await owner.evaluate(ch => window.__lobby.cmd('cohost', ['add', 'OfflineCoHost'], ch), room);
+        await expect(cohost.locator('[data-roomtools]')).toBeVisible();
+        await owner.context().close(); await cohost.context().close();
+
+        const returned = await app.guest('rad-dad', 'ReturnedHost', null, { account, viewport: { width, height: 844 }, beforePage: async profile => {
+            await profile.routeWebSocket(url => url.hostname === '127.0.0.1' && url.pathname.endsWith('/lobby-owner'), socket => {
+                const server = socket.connectToServer();
+                let released = false;
+                releaseOwnership = () => { released = true; for (const frame of held.splice(0)) socket.send(frame); };
+                server.onMessage(message => {
+                    const frame = typeof message === 'string' ? JSON.parse(message) : null;
+                    // Delay only the separate owner-only metadata. Real join,
+                    // account authorization and room state still run normally.
+                    if (!released && frame?.t === 'ownership' && frame.ch === room) held.push(message);
+                    else socket.send(message);
+                });
+            });
+        } });
+        await returned.click('nav [data-show="rooms"]');
+        await returned.selectOption('[data-room-filter]', 'mine');
+        await returned.locator(`[data-room="${room}"]`).click();
+        await expect(returned.locator('[data-chat-context]')).toHaveText(room);
+        await expect.poll(() => held.length).toBeGreaterThan(0);
+        await returned.click('[data-roomtools]');
+        const palette = returned.getByRole('dialog', { name: 'Commands', exact: true });
+        const removal = palette.getByRole('button', { name: 'Remove verified co-host: OfflineCoHost', exact: true });
+        await expect(palette).toBeVisible(); await expect(removal).toHaveCount(0);
+        await expect(palette.locator('[data-palette-status]')).toContainText('Checking verified co-hosts');
+        const focused = palette.getByRole('button', { name: 'Transfer ownership', exact: true });
+        for (let step = 0; step < 30 && !await focused.evaluate(element => element === document.activeElement); step++)
+            await returned.keyboard.press('Tab');
+        await expect(focused).toBeFocused();
+        await returned.screenshot({ path: testInfo.outputPath(`owner-tools-waiting-${width}.png`), fullPage: true });
+        releaseOwnership();
+        await expect(removal).toBeVisible(); await expect(focused).toBeFocused();
+        await expect(palette.locator('[data-palette-status]')).toHaveText('Verified co-host list updated.');
+        await returned.screenshot({ path: testInfo.outputPath(`owner-tools-updated-${width}.png`), fullPage: true });
+        expect(await returned.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+        const bounds = await palette.boundingBox();
+        expect(bounds.x).toBeGreaterThanOrEqual(0); expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+        returned.once('dialog', dialog => dialog.accept());
+        await removal.click(); await expect(palette).toBeHidden();
+        await expect.poll(() => returned.evaluate(ch => window.__lobby.chans.get(ch).cohosts.length, room)).toBe(0);
+
+        const revoked = await app.guest('stalemate', 'ReturnedCoHost', null, { account: cohostAccount });
+        await revoked.evaluate(ch => window.__lobby.cmd('join', [ch]), room);
+        await expect(revoked.locator('[data-chat-context]')).toHaveText(room);
+        await expect(revoked.locator('[data-roomtools]')).toBeHidden();
+        expect(await returned.evaluate(() => window.__lobby.capabilities.moderate)).toBe(false);
     } finally { await app.close(); }
 });
