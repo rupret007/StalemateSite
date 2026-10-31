@@ -32,6 +32,7 @@
     const app = window.__lobby = { ws: null, me: '', role: 'fan', band: false, chans: new Map(), pms: new Map(), active: '#stalemate', rooms: [], ignores: new Set(), pending: null };
     // Drafts are tab-local only. Chat, PMs and invitation links are never copied into browser storage.
     const drafts = new Map();
+    const pendingReports = new Map();
     let connectionState = 'offline';
     let replaying = false;
     let belowFold = 0;
@@ -151,6 +152,7 @@
         };
         ws.onclose = (e) => {
             if (attempt !== connectionAttempt) return;
+            resetPendingReports();
             setConnection('offline');
             if (roomApi) roomApi.onLeave();
             if (ownerSession && (!opened || e.code === 4401)) { $('[data-gate-guest]').hidden = false; return gateStatus('Email sign-in is unavailable or expired. Sign in again to manage your rooms, or continue as a guest.'); }
@@ -172,9 +174,11 @@
     function handle(m, nick) {
         switch (m.t) {
         case 'rate-limit':
+            resetPendingReports();
             if (connectionState !== 'connected') { setConnection('offline'); gateStatus(m.text); app.ws?.close(1000); }
             else toast(m.text);
             break;
+        case 'report-status': if (m.submitted === true) finishReport(m.id, true); break;
         case 'ownership': { const c = store(m.ch); if (c) c.cohosts = m.cohosts; break; }
         case 'owner-offer': toast(`${m.by} offered you ownership of ${m.ch}`, [['Accept ownership', () => { if (confirm(`Accept ownership of ${m.ch}?`)) cmd('acceptowner', [], m.ch); }]]); break;
         case 'device': localStorage.setItem('hangout-dev', m.token); break; // server-rotated; 24h TTL limits stolen-token lifetime
@@ -257,6 +261,7 @@
         case 'notice':
             line(app.active, { notice: true, from: m.from, text: m.text, kind: m.kind });
             if (m.kind === 'error') {
+                resetPendingReports();
                 if (app.pendingChannel && $('[data-channel-dialog]').open) {
                     $('[data-channel-error]').textContent = m.text;
                     app.pendingChannel = '';
@@ -267,8 +272,9 @@
         case 'list': app.rooms = m.rooms; drawRooms(); if (m.show) show('rooms'); break;
         case 'delete': for (const c of [...app.chans.values(), ...app.pms.values()]) c.lines = c.lines.filter((l) => !m.ids.includes(l.id)); $$('[data-id]').forEach((li) => { if (m.ids.includes(li.dataset.id)) li.remove(); }); break;
         case 'pm-request': pmRequest(m.from, m.band); break;
+        case 'pm-request-ended': clearPmRequest(m.from); if (m.reason) toast(m.reason); break;
         case 'pm-open': openPm(m.with, true); break;
-        case 'pm-closed': toast(`PM with ${m.with} closed.`); break;
+        case 'pm-closed': clearPmRequest(m.with); toast(`PM with ${m.with} closed.`); break;
         case 'pm': { const other = m.from === app.me ? m.to : m.from; openPm(other, false); pushLine(`pm:${other}`, { ...m, ch: `pm:${other}` }); break; }
         case 'pm-setting': $('[data-pm-off]').checked = m.off; toast(m.text); break;
         case 'invite': toast(`${m.by} invited you to ${m.ch}`, [['Join', () => cmd('join', [m.ch])]]); break;
@@ -307,6 +313,20 @@
 
     const hhmm = (ts) => { const d = ts ? new Date(ts) : new Date(); return `[${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}]`; };
     const colorOf = (nick) => { let h = 0; for (const ch of String(nick || "")) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return `hsl(${h % 360} 80% 70%)`; };
+    function finishReport(id, submitted) {
+        const pending = pendingReports.get(id);
+        if (pending) { clearTimeout(pending.timer); pendingReports.delete(id); }
+        if (submitted) for (const c of [...app.chans.values(), ...app.pms.values()]) {
+            const l = c.lines.find((line) => line.id === id); if (l) l.reported = true;
+        }
+        const button = pending?.button || $$('[data-id]').find((line) => line.dataset.id === id)?.querySelector('.flag');
+        if (button) {
+            button.disabled = submitted;
+            button.textContent = submitted ? '✓' : '🚩';
+            button.title = submitted ? 'Report submitted to moderators' : 'Report this message';
+        }
+    }
+    function resetPendingReports() { for (const id of [...pendingReports.keys()]) finishReport(id, false); }
     function appendLine(l) {
         const buf = $('[data-buffer]');
         const li = document.createElement('li');
@@ -326,7 +346,14 @@
             li.append(' ', l.text);
             if (l.from !== app.me && l.id) {
                 const r = document.createElement('button'); r.type = 'button'; r.className = 'flag'; r.textContent = '🚩'; r.setAttribute('aria-label', `Report this message from ${l.from}`);
-                r.addEventListener('click', () => { send({ t: 'report', id: l.id }); r.disabled = true; });
+                if (l.reported) { r.disabled = true; r.textContent = '✓'; r.title = 'Report submitted to moderators'; }
+                else if (pendingReports.has(l.id)) { r.disabled = true; r.textContent = '…'; pendingReports.get(l.id).button = r; }
+                r.addEventListener('click', () => {
+                    if (!send({ t: 'report', id: l.id, text: l.text })) return toast('You are offline. Reconnect before reporting this message.');
+                    r.disabled = true; r.textContent = '…';
+                    const timer = setTimeout(() => { finishReport(l.id, false); toast('Report confirmation did not arrive. Try again or use the moderation contact.'); }, 10000);
+                    pendingReports.set(l.id, { button: r, timer });
+                });
                 li.append(r);
             }
             if (l.me) li.classList.add('act');
@@ -562,18 +589,20 @@
         if (focus) switchTo(`pm:${nick}`);
     }
     function pmRequest(from, band) {
+        clearPmRequest(from);
         const box = $('[data-pmreqs]');
         const div = document.createElement('div');
-        div.className = 'req';
+        div.className = 'req'; div.dataset.pmFrom = from;
         const p = document.createElement('span'); p.textContent = `✉ ${from}${band ? ' ⭐' : ''} wants to chat`;
         div.append(p);
         for (const [label, fn] of [['Accept', () => cmd('accept', [from])], ['No thanks', () => cmd('decline', [from])], ['Block', () => cmd('block', [from])]]) {
             const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--small'; b.textContent = label;
-            b.addEventListener('click', () => { fn(); div.remove(); });
+            b.addEventListener('click', () => { if (fn()) div.remove(); else toast('You are offline. Reconnect before answering a PM request.'); });
             div.append(b);
         }
         box.append(div);
     }
+    function clearPmRequest(from) { $$('[data-pm-from]', $('[data-pmreqs]')).forEach((request) => { if (request.dataset.pmFrom === from) request.remove(); }); }
 
     function nickSheet(nick) {
         if (!nick || nick === app.me) return;

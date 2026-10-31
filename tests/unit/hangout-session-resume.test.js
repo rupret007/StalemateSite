@@ -48,7 +48,8 @@ describe('same-WebSocket hibernation continuity', () => {
         const saved = state();
         expect(saved.sessions.pm).toHaveLength(1); expect(JSON.stringify(saved.sessions)).not.toContain('Private accepted words');
         expect(JSON.stringify(saved.sessions)).not.toContain('Pending private secret');
-        expect(wake(saved).resumed).toHaveLength(3); expect(engine._debug.pm.size).toBe(1);
+        expect(saved.sessions.pendingPm).toHaveLength(1);
+        expect(wake(saved).resumed).toHaveLength(3); expect(engine._debug.pm.size).toBe(2);
         cmd(a, 'msg', ['Bravo', 'New private sentence']);
         expect(frames.some((f) => f.recipient === b && f.t === 'pm' && f.text === 'New private sentence')).toBe(true);
         expect(frames.some((f) => f.t === 'pm-request')).toBe(false);

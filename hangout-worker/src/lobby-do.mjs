@@ -133,15 +133,15 @@ export class HangoutLobby {
                 },
                 close: (id, code, reason) => { const ws = this.byId(id); if (ws) try { ws.close(code, reason); } catch (e) { /* gone */ } },
                 persist: (kind, data) => {
-                    if (['rooms', 'abuse', 'sessions'].includes(kind)) return this.persistRequired(kind, data);
-                    if (['net', 'ai-reviews', 'moderation-queue'].includes(kind)) return this.persistState(kind, data);
+                    if (['rooms', 'abuse', 'sessions', 'moderation-queue', 'net'].includes(kind)) return this.persistRequired(kind, data);
+                    if (kind === 'ai-reviews') return this.persistState(kind, data);
                     if (kind === 'modlog') { this.logSeq = (this.logSeq || 0) + 1; this.persistState(`log:${String(Date.now()).padStart(15, '0')}:${crypto.randomUUID()}`, data); }
                 },
                 limits: { webJoinOrigins: String(env.WEBJAM_WEB_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean) }
             });
             this.engine.restore((await state.storage.get('net')) || {});
             this.engine.restoreAiReviews((await state.storage.get('ai-reviews')) || []);
-            this.engine.restoreModerationQueue((await state.storage.get('moderation-queue')) || {});
+            await this.engine.restoreModerationQueue((await state.storage.get('moderation-queue')) || {});
             const roomIndex = await state.storage.get('room-index');
             if (roomIndex !== undefined) {
                 let records = roomIndex?.version === 1 && Array.isArray(roomIndex.names) && roomIndex.names.length <= 1030
