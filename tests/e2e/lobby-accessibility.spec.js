@@ -628,15 +628,27 @@ for (const width of [375, 390]) test(`short Jam instructions and manual invite c
         expect(await fallback.evaluate(input => input.selectionEnd - input.selectionStart)).toBe(invitation.length);
         expect(await page.evaluate(() => window.__shortJamClipboardRefusals)).toBe(1);
         const manualCopy = await composerGeometry(page);
-        const beforeNativeTab = await page.locator('[data-jam]').evaluate(panel => ({ scrollTop: panel.scrollTop, scrollHeight: panel.scrollHeight, clientHeight: panel.clientHeight }));
-        await attachGeometry(testInfo, `short-jam-manual-copy-${width}`, { ...manualCopy, jam: beforeNativeTab });
+        const manualCopyPanel = await page.locator('[data-jam]').evaluate(panel => ({ scrollTop: panel.scrollTop, scrollHeight: panel.scrollHeight, clientHeight: panel.clientHeight }));
+        await attachGeometry(testInfo, `short-jam-manual-copy-${width}`, { ...manualCopy, jam: manualCopyPanel });
         await page.screenshot({ path: testInfo.outputPath(`short-jam-manual-copy-${width}.png`), fullPage: true });
 
         // These first containment checks use the snapshots taken without a
         // composer focus action, not geometry repaired by focusing Message.
         contained(standard); contained(manualCopy);
         expect(standard.fontSize).toBe('16px'); expect(manualCopy.fontSize).toBe('16px');
-        expect(beforeNativeTab.scrollHeight).toBeGreaterThan(beforeNativeTab.clientHeight);
+        expect(manualCopyPanel.scrollHeight).toBeGreaterThan(manualCopyPanel.clientHeight);
+        // Engines reveal the selected textarea differently: WebKit can leave
+        // Copy fully visible already. Explicitly scroll this panel to its end
+        // before testing native focus scrolling, without moving textarea focus.
+        const beforeNativeTab = await copy.evaluate(button => {
+            const panel = button.closest('[data-jam]');
+            panel.scrollTop = panel.scrollHeight;
+            const r = button.getBoundingClientRect(), p = panel.getBoundingClientRect();
+            return { scrollTop: panel.scrollTop, scrollHeight: panel.scrollHeight, clientHeight: panel.clientHeight,
+                buttonBottom: r.bottom, panelTop: p.top + panel.clientTop };
+        });
+        await expect(fallback).toBeFocused();
+        expect(beforeNativeTab.buttonBottom).toBeLessThan(beforeNativeTab.panelTop);
         await page.keyboard.press('Shift+Tab'); await expect(copy).toBeFocused();
         const afterNativeTab = await copy.evaluate(button => {
             const panel = button.closest('[data-jam]'), r = button.getBoundingClientRect(), p = panel.getBoundingClientRect();

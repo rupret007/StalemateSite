@@ -1,0 +1,75 @@
+{
+  "at": "2026-10-31T22:52:16.903360+00:00",
+  "source": "0e1ce31139555012624f72866be03308ed12c586",
+  "base": "b8babfc4c622b1b0178fadab200b1433c3c148b1",
+  "pr": 188,
+  "originalRuns": [
+    {
+      "run": 41247695174,
+      "job": 124674458795,
+      "passed": 476,
+      "failed": 2
+    },
+    {
+      "run": 41247806656,
+      "job": 124674774161,
+      "passed": 476,
+      "failed": 2
+    }
+  ],
+  "artifact": {
+    "id": 13060830958,
+    "bytes": 34065138,
+    "sha256": "6ddd70ecea3ebc95bb10b08fece0e8029e35443d3d1dedffb4787f52a1354968",
+    "officialDigestMatches": true
+  },
+  "observations": [
+    {
+      "width": 375,
+      "height": 667,
+      "geometry": {
+        "before": {
+          "scrollTop": 88,
+          "scrollHeight": 488,
+          "clientHeight": 107
+        },
+        "after": {
+          "scrollTop": 88,
+          "buttonTop": 307.203125,
+          "buttonBottom": 351.203125,
+          "panelTop": 276.140625,
+          "panelBottom": 383.140625,
+          "uncovered": true
+        }
+      },
+      "screenshot": "copy-already-visible-375.png",
+      "screenshotSha256": "83551319e4fbf19f4d571baf7af1195cb01601883fd266395c30f3bd04733d51"
+    },
+    {
+      "width": 390,
+      "height": 667,
+      "geometry": {
+        "before": {
+          "scrollTop": 88,
+          "scrollHeight": 488,
+          "clientHeight": 107
+        },
+        "after": {
+          "scrollTop": 88,
+          "buttonTop": 307.203125,
+          "buttonBottom": 351.203125,
+          "panelTop": 276.140625,
+          "panelBottom": 383.140625,
+          "uncovered": true
+        }
+      },
+      "screenshot": "copy-already-visible-390.png",
+      "screenshotSha256": "d473c97d912027b15daaa505bb80e37187701f291e974a7ba8f39589f66af091"
+    }
+  ],
+  "diagnosis": "Both original cases and saved retry snapshots have focused, fully contained, unobstructed Copy controls. The strict scrollTop decrease failed because WebKit had already revealed the control.",
+  "change": "Keep original composer snapshots and visibility/focus/hit tests. Explicitly scroll the Jam panel to its end while preserving textarea focus, assert Copy is fully clipped above the panel, then require actual Shift+Tab to restore focus, reduce panel scroll and reveal the unobstructed button.",
+  "localExecution": "Resource guard refused before browser runtime at 22:51:10 UTC: load6.3208, swap80.4728%, free33.5249GiB. No local pass claimed.",
+  "scope": "Local-relay browser UI with opaque invitation and explicit clipboard-refusal fixture. No native music, physical iPhone, hosted Safari, provider activation or deployed-demo proof.",
+  "originalFailureRetained": true
+}
