@@ -101,5 +101,8 @@
             start(global.document);
         }
         global.addEventListener('pagehide', stop);
+        global.addEventListener('pageshow', (event) => {
+            if (event.persisted) start(global.document);
+        });
     }
 }(typeof globalThis === 'undefined' ? window : globalThis));

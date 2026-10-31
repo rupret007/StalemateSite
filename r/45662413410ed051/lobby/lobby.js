@@ -68,11 +68,10 @@
     let retry = 0;
     function connect(nick) {
         const q = new URLSearchParams({ preview: previewKey });
-        const dev = localStorage.getItem('hangout-dev');
-        if (dev) q.set('dev', dev);
+        const dev = localStorage.getItem('hangout-dev'); // sent as subprotocol only; server rotates so tokens stay within 24h
         if (tsToken) q.set('ts', tsToken);
         if (app.ws && !app.me) { app.ws.onclose = null; app.ws.close(1000); }
-        const ws = new WebSocket(`${relayBase}/lobby?${q}`);
+        const ws = new WebSocket(`${relayBase}/lobby?${q}`, dev ? ['hangout', 'dev.' + dev] : ['hangout']);
         app.ws = ws;
         let opened = false;
         ws.onopen = () => { opened = true; retry = 0; };
@@ -91,7 +90,7 @@
 
     function handle(m, nick) {
         switch (m.t) {
-        case 'device': localStorage.setItem('hangout-dev', m.token); break;
+        case 'device': localStorage.setItem('hangout-dev', m.token); break; // server-rotated; 24h TTL limits stolen-token lifetime
         case 'hello': app.role = m.role; send({ t: 'hello', nick: app.me || nick, age13: true }); break;
         case 'nick-error': gateStatus(m.text); $('[data-gate]').hidden = false; $('[data-app]').hidden = true; break;
         case 'welcome': {

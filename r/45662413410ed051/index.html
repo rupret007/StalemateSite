@@ -9,6 +9,7 @@
     <!-- Hidden preview. Not linked from anywhere on the public site. -->
     <meta name="hangout-relay" content="wss://stalemate-hangout.jeffstory007.workers.dev">
     <meta name="hangout-turn" content="">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://www.youtube.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' wss://stalemate-hangout.jeffstory007.workers.dev; worker-src 'self' blob:; frame-src https://www.youtube.com; object-src 'none'; base-uri 'self'; form-action 'none'">
     <title>Hang Out · Stalemate</title>
     <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="room.css">
@@ -21,7 +22,7 @@
             <p class="tag">Draw together. Watch together. Yell at each other. Bring your own bad ideas.</p>
         </div>
         <a class="show-link lobby-link" href="lobby/">← #stalemate lobby</a>
-        <a class="show-link" data-next-show href="../../#home">Next show: Sat Oct 24 · Los Amigo’s, Plano →</a>
+        <a class="show-link" data-next-show data-starts-at="2026-10-24T16:45:00-05:00" href="../../#home">Next show: Sat Oct 24 · Los Amigo’s, Plano →</a>
     </header>
 
     <section class="gate" data-gate>
@@ -159,6 +160,7 @@
     </dialog>
     <dialog class="ask tile-menu" data-tile-menu></dialog>
 
+    <script src="../../countdown.js" defer></script>
     <script src="sync-core.js"></script>
     <script src="video-core.js"></script>
     <script src="bob-ross.js"></script>

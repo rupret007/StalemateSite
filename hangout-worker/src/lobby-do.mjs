@@ -1,7 +1,7 @@
 // The #stalemate lobby Durable Object + its Worker-side admission. Everything that can be refused is refused here,
 // before a DO request is spent. Missing config/secrets => 503 (fail closed).
 import { originAllowed, previewKeyOk } from './core.mjs';
-import { accessConfigured, hmacKeyOk, ipHash, newDeviceId, roleForEmail, signDevice, verifyAccessJwt, verifyDevice } from './auth.mjs';
+import { accessConfigured, deviceFromProtocols, hmacKeyOk, ipHash, newDeviceId, roleForEmail, signDevice, verifyAccessJwt, verifyDevice } from './auth.mjs';
 import { createLobby } from './lobby-core.mjs';
 
 export function lobbyConfigured(env = {}) {
@@ -56,11 +56,10 @@ export async function lobbyGate(request, env, url, deps = {}) {
     } else if (!(await (deps.turnstile || turnstileOk)(url.searchParams.get('ts'), ip, env.HANGOUT_TURNSTILE_SECRET))) {
         return { status: 403, reason: 'bot-check' };
     }
-    let dev = await verifyDevice(url.searchParams.get('dev'), env.HANGOUT_HMAC_KEY);
-    const fresh = !dev;
+    let dev = await verifyDevice(deviceFromProtocols(request.headers.get('Sec-WebSocket-Protocol')), env.HANGOUT_HMAC_KEY);
     if (!dev) dev = newDeviceId();
     identity.dev = dev;
-    identity.devToken = fresh ? await signDevice(dev, env.HANGOUT_HMAC_KEY) : null;
+    identity.devToken = await signDevice(dev, env.HANGOUT_HMAC_KEY);
     identity.iph = await ipHash(ip, env.HANGOUT_HMAC_KEY);
     return { ok: true, identity };
 }
@@ -116,8 +115,10 @@ export class HangoutLobby {
         const pair = new WebSocketPair();
         this.state.acceptWebSocket(pair[1], [id]);
         pair[1].serializeAttachment({ id, dev: identity.dev, iph: identity.iph, role: identity.role, email: identity.email, admin: identity.admin });
-        if (identity.devToken) pair[1].send(JSON.stringify({ t: 'device', token: identity.devToken }));
-        return new Response(null, { status: 101, webSocket: pair[0] });
+        pair[1].send(JSON.stringify({ t: 'device', token: identity.devToken }));
+        const offered = String(request.headers.get('Sec-WebSocket-Protocol') || '').split(',').map((s) => s.trim());
+        const headers = offered.includes('hangout') ? { 'Sec-WebSocket-Protocol': 'hangout' } : undefined;
+        return new Response(null, { status: 101, webSocket: pair[0], headers });
     }
     async webSocketMessage(ws, raw) { await this.ready; this.engine.message(this.state.getTags(ws)[0], typeof raw === 'string' ? raw : ''); }
     async webSocketClose(ws) { await this.ready; this.engine.disconnect(this.state.getTags(ws)[0]); }

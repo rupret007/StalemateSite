@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
 const KEY = 'local-preview-key-0001';
 test.use({
@@ -6,12 +7,8 @@ test.use({
     launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] }
 });
 
-let relay;
-test.beforeAll(async ({ baseURL }) => {
-    const { startRelay } = await import('../../scripts/hangout-relay-dev.mjs');
-    relay = await startRelay({ previewKey: KEY, origins: new URL(baseURL).origin });
-});
-test.afterAll(async () => { if (relay) await relay.close(); });
+let testOrigin;
+test.beforeAll(async ({ baseURL }) => { testOrigin = baseURL; });
 
 async function openCheck(page, { delayMedia = false } = {}) {
     await page.addInitScript(({ delayMedia }) => {
@@ -33,7 +30,7 @@ async function openCheck(page, { delayMedia = false } = {}) {
             close() { this.closed = true; }
         };
     }, { delayMedia });
-    await page.goto(`/r/45662413410ed051/?preview=${KEY}&relay=ws://127.0.0.1:${relay.port}`);
+    await page.goto(`/r/45662413410ed051/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`);
     await page.click('[data-check-btn]');
     await expect.poll(() => page.evaluate(() => window.checkStreams.length)).toBe(1);
 }

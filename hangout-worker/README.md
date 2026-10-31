@@ -6,7 +6,7 @@ A tiny Cloudflare Worker with Durable Objects that forwards **encrypted data fra
 - **Admission:** an exact-origin allowlist plus the `HANGOUT_PREVIEW_KEY` secret. A missing secret or binding returns 503, and a wrong key returns 403.
 - **Rooms:** 8 people per room. Cameras and mics are capped at 4 by the client.
 - **Daily connections:** 200 a day for the whole account, after which it returns 429. If quota accounting can't be reached, it returns 503.
-- **Per connection:** up to 8,000 messages, a burst of 30, refilling at 8 a second, and frames of 48 KB or less.
+- **Per connection:** up to 8,000 messages, a burst of 30, refilling at 8 a second, and frames of 1 MB or less.
 - **Request budget:** worst case is 200 × 8,000 messages ÷ 20 (WebSocket messages bill 20:1) ≈ 80k request-equivalents, under the free 100k a day.
 
 ## Deployment preparation (hidden, NOT deployed)

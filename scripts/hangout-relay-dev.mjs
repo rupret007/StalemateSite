@@ -4,19 +4,22 @@ import http from 'node:http';
 import { WebSocketServer } from 'ws';
 import { admit, createBucket, limitsFrom, validFrame, originAllowed, previewKeyOk } from '../hangout-worker/src/core.mjs';
 import { createLobby } from '../hangout-worker/src/lobby-core.mjs';
-import { ipHash, newDeviceId, signDevice, verifyDevice } from '../hangout-worker/src/auth.mjs';
+import { deviceFromProtocols, ipHash, newDeviceId, signDevice, verifyDevice } from '../hangout-worker/src/auth.mjs';
 
 const DEV_HMAC = 'local-dev-only-hmac-key-not-a-secret-000';
 
 // devAdminKey: TEST-ONLY stand-in for Cloudflare Access. The real Worker has no such path (see lobby-do.mjs).
-export function startRelay({ port = 0, previewKey = 'local-preview-key-0001', origins = '', connectionsPerDay, devAdminKey = '', lobbyLimits = {}, now } = {}) {
+export function createHangoutRelay({ previewKey = 'local-preview-key-0001', origins = '', connectionsPerDay, devAdminKey = '', lobbyLimits = {}, now } = {}) {
     const env = { HANGOUT_PREVIEW_KEY: previewKey, ROOMS: {}, QUOTA: {}, HANGOUT_CONNECTIONS_PER_DAY: connectionsPerDay };
     const limits = limitsFrom(env);
     const rooms = new Map();
     let connections = 0;
     let seq = 0;
-    const server = http.createServer((req, res) => { res.writeHead(404); res.end(); });
-    const wss = new WebSocketServer({ noServer: true, maxPayload: limits.maxFrameBytes });
+    const wss = new WebSocketServer({
+        noServer: true,
+        maxPayload: limits.maxFrameBytes,
+        handleProtocols: (protocols) => (protocols.has('hangout') ? 'hangout' : false)
+    });
     const lobbySockets = new Map();
     const lobby = createLobby({
         now,
@@ -26,8 +29,8 @@ export function startRelay({ port = 0, previewKey = 'local-preview-key-0001', or
     });
     const ticker = setInterval(() => lobby.tick(), 1000);
     let lobbySeq = 0;
-    server.on('upgrade', async (req, socket, head) => {
-        const url = new URL(req.url, 'http://relay');
+
+    const handleUpgrade = async (req, socket, head, url) => {
         const reject = (status, reason) => { socket.end(`HTTP/1.1 ${status} ${reason}\r\n\r\n`); };
         if (url.pathname === '/lobby' || url.pathname === '/lobby-admin') {
             if (!originAllowed(req.headers.origin, origins)) return reject(403, 'origin');
@@ -37,16 +40,16 @@ export function startRelay({ port = 0, previewKey = 'local-preview-key-0001', or
                 if (!devAdminKey || !previewKeyOk(url.searchParams.get('devadmin'), devAdminKey)) return reject(403, 'access');
                 role = url.searchParams.get('as') === 'owner' ? 'owner' : 'band';
             }
-            let dev = await verifyDevice(url.searchParams.get('dev'), DEV_HMAC);
-            const token = dev ? null : await signDevice((dev = newDeviceId()), DEV_HMAC);
-            // Tests may pose as a different IP via x-test-ip (dev relay only) to exercise IP-hash bans.
+            let dev = await verifyDevice(deviceFromProtocols(req.headers['sec-websocket-protocol']), DEV_HMAC);
+            if (!dev) dev = newDeviceId();
+            const token = await signDevice(dev, DEV_HMAC);
             const iph = await ipHash(req.headers['x-test-ip'] || url.searchParams.get('testip') || req.socket.remoteAddress, DEV_HMAC);
             const id = `c${(lobbySeq += 1)}`;
             const verdict = lobby.connect({ id, dev, iph, role, admin: role !== 'fan' });
             if (!verdict.ok) return reject(verdict.status, verdict.reason);
             return wss.handleUpgrade(req, socket, head, (ws) => {
                 lobbySockets.set(id, ws);
-                if (token) ws.send(JSON.stringify({ t: 'device', token }));
+                ws.send(JSON.stringify({ t: 'device', token }));
                 ws.send(JSON.stringify({ t: 'hello', role, needNick: true }));
                 ws.on('message', (data) => lobby.message(id, String(data)));
                 ws.on('close', () => { lobbySockets.delete(id); lobby.disconnect(id); });
@@ -76,10 +79,32 @@ export function startRelay({ port = 0, previewKey = 'local-preview-key-0001', or
                 if (!frame) return ws.close(4400, 'bad frame');
                 cast({ t: Date.now(), from: ws.id, iv: frame.iv, c: frame.c }, ws);
             });
-            ws.on('close', () => { room.delete(ws); cast({ peers: room.size, t: Date.now() }); if (!room.size) rooms.delete(roomId); });
+            ws.on('close', () => { room.delete(ws); cast({ peers: room.size, left: ws.id, t: Date.now() }); if (!room.size) rooms.delete(roomId); });
         });
+    };
+
+    const close = () => new Promise((resolve) => {
+        clearInterval(ticker);
+        wss.clients.forEach((c) => c.terminate());
+        resolve();
     });
-    return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve({ port: server.address().port, lobby, close: () => new Promise((r) => { clearInterval(ticker); wss.clients.forEach((c) => c.terminate()); server.close(r); }) })));
+
+    return { handleUpgrade, lobby, close };
+}
+
+export function startRelay(options = {}) {
+    const relay = createHangoutRelay(options);
+    const server = http.createServer((req, res) => { res.writeHead(404); res.end(); });
+    server.on('upgrade', (req, socket, head) => {
+        const url = new URL(req.url, 'http://relay');
+        relay.handleUpgrade(req, socket, head, url);
+    });
+    const { port = 0 } = options;
+    return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve({
+        port: server.address().port,
+        lobby: relay.lobby,
+        close: () => relay.close().then(() => new Promise((r) => server.close(r)))
+    })));
 }
 
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop())) {

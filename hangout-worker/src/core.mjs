@@ -3,7 +3,7 @@
 
 export const DEFAULTS = Object.freeze({
     maxPeers: 8,
-    maxFrameBytes: 48 * 1024,
+    maxFrameBytes: 1024 * 1024,
     connectionsPerDay: 200,     // whole account, keeps Durable Object requests far below the free 100k/day
     messagesPerConnection: 8000,
     burst: 30,                  // token bucket per socket
