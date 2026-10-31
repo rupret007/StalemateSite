@@ -11,20 +11,23 @@ approval or evidence that a live website contains the candidate.
 ## Select one tested candidate
 
 The current protected private website uses application source
-`96f356a6f2a9af4bbd2834bb94f1e5df81d200dd`, tree
-`7ffc5b662744609f92ba490c70d146cfea40676e`, matched to Worker version
-`6293386f-31b8-4415-bf0b-f81296190a4d`. Its actual site/native CI and deployed
-visitor journeys are in the [private release receipt](HANGOUT_PRIVATE_DEMO_20261030.md).
-The explicit eighth provider-start CI mode ran with inert callbacks; it does not
-prove music or activate providers. Preserve this source/assets/configuration/key
-set until the existing eight-hour observer is terminal and ending deployment
-identity is checked. Documentation-only merges do not change that runtime.
+`4ed1525c84f48173077f506261cb5acd19e3c1dc`, tree
+`2144677d638fee4b078a18e75892db9d75c6acdc`, matched to Worker version
+`a9724702-3ce5-418a-bbd4-950f2e169c9e`. Its current site CI, hosted mobile/short
+layout, logout and read-only health evidence are in the
+[dated application receipt](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md).
+Only chat CSS changed since the preceding source96/runtime629. That older
+source retains the broader hosted chat/drawing proof and original failed
+eight-hour observer, with its separate predicate diagnosis and ending identity.
+The explicit eighth provider-start CI mode used inert callbacks; it does not
+prove music or activate providers. Keep settings, keys, namespaces and release
+holds intact. Documentation/toolkit-only merges do not change the live app.
 
-Current native source is `bb40fac7fcaa032c2f19cf9af8c49ac4276d3cf1`; its
-[package/actual ARM GUI receipt](HANGOUT_NATIVE_PACKAGE_BB40_20261031.md) keeps
-source, CI, package and physical-device proof distinct. Actual two-way music
-remains required. Use these exact identities and receipts before historical
-branch descriptions below.
+Current native source is `bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35`. All four
+matching private builds succeeded; actual ARM package identity, normal GUI and
+idle transport checks are in the dated receipt above. Actual browser invitation,
+installation and reciprocal ARM/Intel/Windows music remain required. Keep those
+proof scopes distinct and use these identities before historical branches below.
 
 The preceding `codex/webjam-native-ci-20261030`, based on PR169 head
 `43457849374bfa00e68fcf3f224954e3f3832026`, added the separate eighth provider-start
@@ -53,6 +56,37 @@ dependency tables are an audit trail, not a list to cherry-pick blindly.
 Retain newer Stalemate and Rad Dad pages, navigation, media consent and the
 permanent Rad Dad `/tap/` to `/qr/` path. Do not replace either site with a stale
 application checkout.
+
+## Export a self-contained entry toolkit
+
+From the committed application checkout, choose a new directory whose parent
+already exists. For the currently approved private entry address:
+
+```sh
+node scripts/package-community-toolkit.mjs --community-address https://stalemate-hangout-beta.jeffstory007.workers.dev/beta/ --out /path/to/new-entry-toolkit
+```
+
+The exporter reads a finite list of committed public files, not a repository
+copy. Selected executable files must match that commit, allowing ordinary CRLF
+checkout line endings while exporting exact Git bytes. It includes the link
+builder and its two module dependencies, a disabled/unverified registration
+example, a neutral link, concise instructions, license status and per-file
+SHA256 hashes in `SOURCE-MANIFEST.json`. The manifest names the toolkit source;
+it is not proof of a matching live application or a complete app distribution.
+The extracted link builder needs Node.js, without this checkout or node_modules.
+
+Existing output is refused. Published application asset directories are also
+refused, so operator tooling is not accidentally placed in the visitor app.
+No `.local`, `.env`, credentials, internal notes, third-party media or app/native
+binary is included. Recognized repository-root license/notice files are
+preserved when present; the export adds no licensing grant. Confirm appropriate
+project permissions before public code redistribution. A plain entry link needs
+no registry or toolkit execution.
+
+This command does not verify domains, enable registrations, deploy either site,
+change Worker origins or release a provider/public-launch hold. For approved
+badge/return snippets, use the extracted builder as described below. Leave the
+example disabled until the operator has reviewed the domain and scopes.
 
 ## Prepare entrance links
 
@@ -168,8 +202,10 @@ Use two separate browser contexts entering through the actual two site links:
    use updated clients and server: signaling denial alone cannot terminate an
    already established P2P connection between two outdated clients. Check that
    an unrelated participant continues and no new camera prompt is triggered.
-6. Verify a separately registered third test-site entrance reaches the same
-   service without gaining moderator or owner permissions.
+6. From a third test site, follow its neutral link to the same canonical service
+   and verify guest role isolation. Qualify an optional registered third-site
+   badge/return entrance separately after actual domain review; a local fixture
+   is not evidence of public-domain control or a configured live integration.
 
 Record the actual deployed revision, environment, observed results and failures.
 Local fixtures do not establish real Access sign-in, public all-ages readiness,
