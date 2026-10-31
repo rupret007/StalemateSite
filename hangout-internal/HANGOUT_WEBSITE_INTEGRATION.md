@@ -10,19 +10,21 @@ approval or evidence that a live website contains the candidate.
 
 ## Select one tested candidate
 
-Delivery snapshot after application PR184, October 31, 2026. Revalidate the
+Delivery snapshot after website PR188 and native PR414, October 31, 2026. Revalidate the
 receiving branch and runtime before release. These are different deliverables:
 
 | Deliverable | Qualified revision | Scope |
 | --- | --- | --- |
-| Website application assembly | `c9b5db0fb51f7eac184f78aaef43914a32d76920`, reviewed `f7209caa5562544cd8712ff3a64e2c8f5db71409` | Trees match; both CI runs passed 1,894 units and 447 distinct browser cases without retries/skips. Includes browser recovery guidance and live Host tools. Pending private delivery. |
-| Native-repository code | `54f6e5ff9c64d2de837292b7fb4b1d63c7835733`, reviewed `da7e04580d31bd0fa1039e7e1cbf4c940336edea` | Qualified source and browser modules; not a new frozen package cohort. |
+| Website application assembly | `7857ab37a6011bb5435b0f33da7c55d63d4a46d2`, reviewed `1b0c151f84fc80e9138b1e3be0391d465c69d22d` | Trees match; both CI runs passed 1,894 units and 478 distinct browser cases without retries/skips. Adds WebKit contrast and keyboard coverage; production assets still match PR184 `c9b5db0`. Pending private delivery. |
+| Native-repository code | `94f3205c66ad25d726a3de48a839417d2c449c43`, reviewed `91cf895bf51dd67765a8455dd6da3df4cb0c84a1` | Qualified source, all six required checks successful; 12,874 Python passes and 60 skips across all 557 tracked modules once. Not a new frozen package cohort; upstream native runtime/transport changes need matching package qualification. |
 | Private frozen desktop packages | `bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35`, run `41193954131` | Four platform builds; bounded ARM seal/Join/idle transport observations. Installation and physical music remain separate. |
 | Retained entry toolkit | Source `116ca44cbdff06d32d5531d871d2951a3f8d9ec7`, run `41211329202` | Eight verified files for links and optional registration. Does not contain the application or native packages. |
 | Last qualified private deployment | Source `4ed1525c84f48173077f506261cb5acd19e3c1dc`, Worker `a9724702-3ce5-418a-bbd4-950f2e169c9e` | Dated deployed/layout evidence; the newer merged source is not implied to be deployed. |
 
 Start with the [62-outcome audit](HANGOUT_ACCEPTANCE_AUDIT_20261031.md) and
 [Host tools qualification](HANGOUT_HOST_TOOLS_OWNERSHIP_20261031.md).
+The [current source receipt](../pr-assets/beta-collaboration/20261031/current-source-handoff/receipt.json)
+pins reviewed, CI and merge revisions, log digests, actual coverage and limits.
 The source recorded in an archive manifest identifies that archive, not every
 other deliverable in the table. Preserve newer band pages during integration.
 
@@ -44,12 +46,26 @@ The qualified private frozen package cohort uses
 succeeded; actual ARM package identity, normal GUI and
 idle transport checks are in the dated receipt above. Actual browser invitation,
 installation and reciprocal ARM/Intel/Windows music remain required. Keep those
-proof scopes distinct. Later native source `54f6e5f` changes browser guidance,
-browser tests and documentation; its reviewed tree matches `da7e045`. Website
-[`join/PROVENANCE.json`](../join/PROVENANCE.json) pins those browser modules.
+proof scopes distinct. Native source `94f3205` includes upstream native
+core/transport changes plus PR414's Qt/PySide notice packaging and checks.
+There are no newly qualified frozen `94f3205` packages. Its issuer Worker and
+`web/join` directory bytes match the earlier qualified `54f6e5f`; website
+[`join/PROVENANCE.json`](../join/PROVENANCE.json) still pins those browser modules.
 Do not replace them with the older package revision's copy or relabel the frozen
 packages as built from the later source. Use these identities before historical
 branches below.
+
+Normal account sign-in and the correct vault's unlock/sync have been observed;
+targeted credential searches found no intended items. Do not repeat generic
+vault sign-in advice. Numeric account/free-tier headroom, the intended separate
+web credentials, exact origins and normal device/package trust remain required
+for Jeff's already authorized bounded private trials. An empty usage display is
+not a measured remaining allowance. Reconcile the actual subscription period
+and shared SFU/TURN usage; the application's UTC-calendar/key-scoped cap is not
+an account spending guarantee. Cloudflare documents
+[billing-cycle usage](https://developers.cloudflare.com/billing/manage/billable-usage/)
+and the [shared Realtime allowance](https://developers.cloudflare.com/realtime/sfu/platform/pricing/).
+No provider, public-launch or purchase permission is added by this handoff.
 
 The preceding `codex/webjam-native-ci-20261030`, based on PR169 head
 `43457849374bfa00e68fcf3f224954e3f3832026`, added the separate eighth provider-start

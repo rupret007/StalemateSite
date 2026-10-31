@@ -5,6 +5,12 @@ for every ID in the unchanged [62 original requirements](HANGOUT_ACCEPTANCE_REQU
 Each row identifies the evidence scope and remaining proof or boundary. It does
 not redefine an outcome around a passing fixture or assign a readiness percentage.
 
+The rows below retain their website PR184/native PR411 baseline. For later
+website PR187/188 coverage and native PR414 source/package distinctions, read
+the [current delivery table](HANGOUT_WEBSITE_INTEGRATION.md#select-one-tested-candidate)
+and its source receipt. New CI passes do not complete the remaining physical,
+hosted, accessibility or operator outcomes in this ledger.
+
 ## Revisions and evidence scopes
 
 - **Application code baseline:** website merge `c9b5db0fb51f7eac184f78aaef43914a32d76920`
@@ -19,7 +25,7 @@ not redefine an outcome around a passing fixture or assign a readiness percentag
   recovery and idle transport checks are separate from installation or music.
   The later source change touches browser modules and documentation, with no
   native runtime, transport, build or update-input changes. [N]
-- **Current qualified application CI:** website head `f7209ca` passed 1,894
+- **Audit-baseline application CI:** website head `f7209ca` passed 1,894
   units in 115 files and 447 distinct browser cases in 447 attempts, with zero
   retries/skips in both push and PR runs. These include actual Tab-key menu
   updates at 375/390px in Chromium/WebKit and visible withdrawal recovery.
