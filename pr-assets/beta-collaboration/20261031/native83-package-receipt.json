@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "qualifiedAt": "2026-10-31T05:30:42.583960+00:00",
+  "sourceCommit": "83d2950b5f95baa183c392bb7b5eb2da4a496114",
+  "sourceTree": "52b14fd25600c8449b46ac807ade20def3888a38",
+  "workflowRun": 41168394794,
+  "workflowURL": "https://github.com/rupret007/webjam/actions/runs/41168394794",
+  "workflowConclusion": "success",
+  "fourBuildJobs": [
+    {
+      "id": 124445177128,
+      "name": "Build Desktop (linux-x64)",
+      "conclusion": "success",
+      "completedAt": "2026-10-31T04:49:13Z"
+    },
+    {
+      "id": 124445177136,
+      "name": "Build Desktop (windows-x64)",
+      "conclusion": "success",
+      "completedAt": "2026-10-31T04:58:30Z"
+    },
+    {
+      "id": 124445177138,
+      "name": "Build Desktop (macos-x64)",
+      "conclusion": "success",
+      "completedAt": "2026-10-31T05:04:54Z"
+    },
+    {
+      "id": 124445177167,
+      "name": "Build Desktop (macos-arm64)",
+      "conclusion": "success",
+      "completedAt": "2026-10-31T04:54:03Z"
+    }
+  ],
+  "signingAndPublication": [
+    {
+      "name": "macOS Release Trust (${{ matrix.target }})",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Windows Release Trust (windows-x64)",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Publish GitHub Release",
+      "conclusion": "skipped"
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "webjam-macos-arm64",
+      "id": 13030802100,
+      "bytes": 456491962,
+      "digest": "sha256:60863231d98e85d61e8b4f975e0395f3de10d30457716112306415b9b16b20fc",
+      "localDownloadVerified": true
+    },
+    {
+      "name": "webjam-macos-x64",
+      "id": 13030997623,
+      "bytes": 471445835,
+      "digest": "sha256:248d859d0f7905f9f87a0222b8d6bd800e64308bdae1de730f910c7668b0ffb7",
+      "localDownloadVerified": false
+    },
+    {
+      "name": "webjam-windows-x64",
+      "id": 13031415319,
+      "bytes": 610854687,
+      "digest": "sha256:bed688d1953a71de7d74eab67ca74131b67ffdf334941e93c59ba27f7e344cb5",
+      "localDownloadVerified": false
+    },
+    {
+      "name": "webjam-linux-x64",
+      "id": 13031065731,
+      "bytes": 457699612,
+      "digest": "sha256:1c32962ffa6cff9af5e2b387448ac4a8cc3a3a538cc701f7ed62479d81aef50b",
+      "localDownloadVerified": false
+    }
+  ],
+  "armLocal": {
+    "outerDigest": "sha256:60863231d98e85d61e8b4f975e0395f3de10d30457716112306415b9b16b20fc",
+    "outerBytes": 456491962,
+    "archiveCRCValid": true,
+    "innerZipSha256": "0ce16ff2c37c4f1429339a59e12fc344088389489bc6de5526f16f428f857a62",
+    "embeddedCommit": "83d2950b5f95baa183c392bb7b5eb2da4a496114",
+    "appArchitecture": "arm64",
+    "transportArchitecture": "arm64",
+    "strictDeepCodesignExit": 0,
+    "transportSha256": "60f566add236d5f8cf7d4a4bef07f0ae3458288d902f4fa4d98009cf6a2c1d24",
+    "productionVerifierExit": 0,
+    "productionVerifierStdoutSha256": "a083c5ef117613ed1d4b8a261ba6d20fe258c56836fd4347d589da52de072606",
+    "productionVerifierStderrEmpty": true,
+    "productionPolicyRequiresSignature": true,
+    "productionVerifierInputs": [
+      {
+        "path": "tests/support/verify_packaged_transport.py",
+        "sha256": "ef3653c1107d5f6894e11d7a63ee6a8eeee225815de4e168d9f469e7b2495080"
+      },
+      {
+        "path": "services/transport_runtime.py",
+        "sha256": "3e7f328fe32be728d9546bf7fa6522b006677ff81b50b8961ae4f43f98c8c04e"
+      },
+      {
+        "path": "core/remote_invitation.py",
+        "sha256": "0b9e49a81bd20b2a9632945cbf321cbc7039d02af6f2d996d9954d0c82c871c6"
+      },
+      {
+        "path": "core/room_state.py",
+        "sha256": "27f21a61251397fa5a6f38a63f67d79de39247b498317f948c6d9e219be3a1c0"
+      }
+    ],
+    "mainGUIStarted": false,
+    "GUIResourceGuard": {
+      "at": "2026-10-31T05:27:48.330557+00:00",
+      "load1": 6.71484375,
+      "swapPercent": 81.0517578125,
+      "diskGiB": 15.477420806884766,
+      "admitted": false
+    },
+    "actualMusic": false
+  },
+  "retainedFailures": [
+    {
+      "kind": "operator inspection",
+      "finding": "Initial app-only ZIP assumption was wrong. Extra installer/readme/mobile roots match source83 packaging workflow; corrected driver verifies installer/readme bytes as data. Original failure/source retained.",
+      "productFailureEstablished": false
+    }
+  ],
+  "installerScriptsExecuted": false,
+  "quarantineOrTrustModified": false,
+  "mobileKitExecuted": false,
+  "inProductAIOrTURNActivated": false,
+  "scope": "Unreleased desktop build/provenance and local ARM packaged-sidecar evidence. No normal GUI, physical music, human report disposition, natural8h expiry or public-launch qualification."
+}

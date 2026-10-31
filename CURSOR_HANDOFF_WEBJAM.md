@@ -9,6 +9,14 @@ below describe the earlier checkpoint, not the current source.
 
 ## Start here
 
+**October31: matching native test packages are built.** Read
+[the current package receipt](hangout-internal/HANGOUT_NATIVE_CANDIDATE_20261031.md).
+Source83d2950 produced successful ARM Mac, Intel Mac, Windows and Linux artifacts;
+signing/public-release jobs were skipped. The ARM download, signature, embedded
+source and production transport lifecycle are verified. Main-window testing is
+resource-deferred, and physical music remains unqualified. The website remains
+on96/runtime629 during the real eight-hour observer; do not redeploy it yet.
+
 **October30 evening: the private demo has now been upgraded.** Read
 [the current release and test receipt](hangout-internal/HANGOUT_PRIVATE_DEMO_20261030.md)
 before older checkpoint statements. PR170 merged application source

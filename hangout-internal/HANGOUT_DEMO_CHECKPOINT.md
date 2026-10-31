@@ -6,6 +6,13 @@ below; historical sections describe their own revisions and earlier limitations.
 
 ## Current private release and demonstrated guests
 
+[October31 native candidate](HANGOUT_NATIVE_CANDIDATE_20261031.md): all four
+source83d2950 desktop builds passed, with actual artifact identities/digests
+recorded. Signing/public release stayed skipped. ARM archive/source/signature
+checks and the production packaged-transport verifier passed locally. Its normal
+main window has not been opened because the resource guard refused admission.
+Physical music, human report disposition and natural expiry remain pending.
+
 [October30 release/test receipt](HANGOUT_PRIVATE_DEMO_20261030.md) supersedes
 earlier pending-CI/deployment statements. PR170 is merged as `96f356a`; protected
 runtime `6293386f-31b8-4415-bf0b-f81296190a4d` serves its matched assets/backend.
