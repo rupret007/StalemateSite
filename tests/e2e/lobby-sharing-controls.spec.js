@@ -93,6 +93,32 @@ async function geometry(page, width) {
     expect(result.input.left).toBeGreaterThanOrEqual(0); expect(result.send.right).toBeLessThanOrEqual(width);
     expect(result.send.bottom).toBeLessThanOrEqual(result.height); expect(result.input.bottom).toBeLessThanOrEqual(result.height);
 }
+test('server withdrawal closes host tools and leaves visible keyboard access to sharing status', async ({ browser, baseURL }) => {
+    const app = await scenario(browser, baseURL, 390);
+    try {
+        await app.host.evaluate(() => window.__lobby.cmd('join', ['#sharing-host-tools']));
+        await expect(app.host.locator('[data-chat-context]')).toHaveText('#sharing-host-tools');
+        const controls = app.host.locator('[data-sharing-controls]');
+        expect(await controls.evaluate(element => element.open)).toBe(false);
+        await app.host.click('[data-roomtools]');
+        const palette = app.host.getByRole('dialog', { name: 'Commands', exact: true });
+        await expect(palette).toBeVisible();
+        // Explicit client-only protocol fixture: this does not revoke a real
+        // account or qualify the server's withdrawal/identity implementation.
+        await app.host.evaluate(() => window.__lobby.ws.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ t: 'sharing-stopped' }) })));
+        await expect(palette).toBeHidden();
+        expect(await controls.evaluate(element => element.contains(document.activeElement))).toBe(true);
+        await expect(app.host.locator(':focus')).toBeVisible();
+        if (await controls.locator('summary').evaluate(element => element === document.activeElement)) await app.host.keyboard.press('Enter');
+        await expect(app.host.locator('[data-sharing-status]')).toBeVisible();
+        await expect(app.host.locator('[data-sharing-status]')).toContainText('Sharing is stopped');
+        await app.host.keyboard.press('Tab');
+        await expect(app.host.getByRole('button', { name: 'Check my sharing', exact: true })).toBeFocused();
+        await expect(app.host.locator('[data-text]')).toBeDisabled();
+        expect(await app.host.evaluate(() => window.__sharingCaptureCalls)).toBe(0);
+        expect(app.requests).toEqual([]);
+    } finally { await app.close(); }
+});
 for (const width of [375, 390]) test(`own sharing confirmation preserves received reporting and phone layout at ${width}px`, async ({ browser, baseURL }, testInfo) => {
     testInfo.annotations.push({ type: 'scope', description: 'Actual client/loopback chat; synthetic own-status HTTP responses only. Server withdrawal/identity/SQLite proof is separate.' });
     const app = await scenario(browser, baseURL, width);

@@ -1673,7 +1673,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             hostPaletteContext = null; cohostButtons.clear(); palette.close();
             $('[data-palette-buttons]').replaceChildren();
             $('[data-palette-status]').textContent = '';
-            if (focused && !sessionEnded) $(app.localMediaPaused || app.sharingStopped ? '[data-sharing-region]' : '[data-text]').focus({ preventScroll: true });
+            if (focused && !sessionEnded) $(app.localMediaPaused || app.sharingStopped ? '[data-sharing-controls] summary' : '[data-text]').focus({ preventScroll: true });
             return;
         }
         if (!context.owner) return;

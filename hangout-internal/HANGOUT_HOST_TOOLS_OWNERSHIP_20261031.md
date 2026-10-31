@@ -36,6 +36,13 @@ server authorization path. It does not substitute a nickname, change account
 linking or trust the entry-site badge. Room, ownership, disconnect and local
 Stop boundaries remain required.
 
+When an enabled private sharing withdrawal retires an open host menu, focus
+returns to the visible sharing-controls summary. Its status region may be
+inside a closed disclosure and must not be assumed focusable. A separate
+real-browser client fixture checks visible focus, Enter to expose the current
+status and Tab to reach its check button, while new sharing stays disabled.
+That synthetic protocol frame does not qualify actual server withdrawal.
+
 New real-relay browser journeys delay only the separate ownership metadata,
 then update the already-open menu at 375px and 390px. They exercise a returning
 fixture account, preserved focus, exact offline co-host removal and refusal of
