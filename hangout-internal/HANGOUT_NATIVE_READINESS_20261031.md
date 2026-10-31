@@ -1,7 +1,7 @@
 # Native application source and remaining demo proof
 
 Evidence recorded October 31, 2026; resource and branch-run observations are
-stamped 07:19–07:32 UTC. Application work proceeds here directly,
+stamped 07:19–07:42 UTC. Application work proceeds here directly,
 without StoryPool/Karen routing. Shared StoryPool services, installed checkouts,
 configuration, locks and operational files remain outside this workstream.
 
@@ -46,8 +46,19 @@ refused **before the CLI started**, at 81.95% swap. At 07:31 the read-only snaps
 still failed admission: load 8.49, swap 81.36%, disk 14.92 GiB. The 07:32 actual branch
 run listing contained no workflow-dispatch run. Preserve these observations.
 Check current runs before one admitted dispatch; do not start another if a
-matching run already exists. The proposed cohort keeps signing, purchases,
+matching run already exists. This cohort's dispatch inputs keep signing, purchases,
 provider activation and public publication disabled.
+
+**07:41 update:** a fresh guard admitted exactly one dispatch at load 4.01,
+swap 79.80%, disk 17.18 GiB. The actual workflow-dispatch event started 07:41:16 UTC
+at source `bb40fac`:
+[run 41181580413](https://github.com/rupret007/webjam/actions/runs/41181580413).
+The 07:42 branch listing showed this one run in progress. Both signing inputs
+are false; the test branch is ineligible for publication. One-hour certification
+and unapproved headless evidence remain false; the optional Windows diagnostic
+source run is empty.
+Observe this run; do not dispatch another while it is live. These admission
+records are not terminal build, artifact, installation or music qualification.
 
 Keep the existing admission limits: load1 < 10, swap < 80%, free disk ≥ 15 GiB. Do not
 lower them or stop unrelated processes. Only an unused extracted source83 test

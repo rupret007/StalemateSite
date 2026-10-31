@@ -10,8 +10,8 @@ below; historical sections describe their own revisions and earlier limitations.
 PR #409 merged `bb40fac` includes the existing Windows work and current launcher
 fixes. Reviewed/actual-CI/merged trees match. The full module loop passed 12,760
 cases across all 553 tracked modules, with 60 skips; actual Windows CI passed all
-eight ACL/API cases and four sharing controls. Matching `bb40fac` packaging has
-not been admitted at this checkpoint. Source83 remains the completed package
+eight ACL/API cases and four sharing controls. A fresh 07:41 guard admitted
+exactly one matching `bb40fac` package run, 41181580413; it is in progress. Source83 remains the completed package
 cohort. Keep physical music, fixed-package AX and source/CI/package proof distinct.
 
 [October31 native candidate](HANGOUT_NATIVE_CANDIDATE_20261031.md): all four

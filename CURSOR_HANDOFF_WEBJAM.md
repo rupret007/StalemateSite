@@ -12,8 +12,9 @@ their pending-CI and StoryPool-admission statements are historical.
 PR #409 includes the existing Windows work and merged launcher/accessibility fix;
 its full module loop passed 12,760 cases across all 553 tracked modules, with 60
 skips. Actual Windows CI passed eight ACL/API cases and four sharing controls.
-Its matching package dispatch was resource-refused before CLI execution; read
-the dated checkpoint and actual branch runs before starting one. The latest
+Its first package dispatch was resource-refused before CLI execution. A fresh
+07:41 guard later admitted exactly one matching build, run41181580413; observe
+that existing run. Read the dated checkpoint and actual branch runs. The latest
 completed packages still use83d2950. Physical music and fixed-package macOS AX
 are unqualified. Native PR #401 is merged; #403–405 are closed as superseded, with
 their source/failures retained. No StoryPool application gate was used.
