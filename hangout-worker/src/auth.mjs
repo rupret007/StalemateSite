@@ -61,18 +61,32 @@ const safeEq = (a, b) => {
 };
 export const hmacKeyOk = (k) => typeof k === 'string' && k.length >= 32;
 
+export const DEVICE_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+export const DEVICE_PROTOCOL = 'hangout';
+
 export function newDeviceId() {
     return bytesToB64url(crypto.getRandomValues(new Uint8Array(16)));
 }
-export async function signDevice(id, key) {
-    return `${id}.${(await hmac(key, `dev:${id}`)).slice(0, 32)}`;
+export async function signDevice(id, key, now = Date.now()) {
+    const exp = (now + DEVICE_TOKEN_TTL_MS).toString(36);
+    return `${id}.${exp}.${(await hmac(key, `dev:${id}:${exp}`)).slice(0, 32)}`;
 }
 // Returns the device id if the token is genuine, else null (a forged id is simply a brand-new device).
-export async function verifyDevice(token, key) {
-    const m = /^([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{32})$/.exec(String(token || ''));
+export async function verifyDevice(token, key, now = Date.now()) {
+    const m = /^([A-Za-z0-9_-]{22})\.([A-Za-z0-9]+)\.([A-Za-z0-9_-]{32})$/.exec(String(token || ''));
     if (!m) return null;
-    const want = (await hmac(key, `dev:${m[1]}`)).slice(0, 32);
-    return safeEq(m[2], want) ? m[1] : null;
+    const exp = parseInt(m[2], 36);
+    if (!Number.isFinite(exp) || exp <= now) return null;
+    const want = (await hmac(key, `dev:${m[1]}:${m[2]}`)).slice(0, 32);
+    return safeEq(m[3], want) ? m[1] : null;
+}
+export function deviceFromProtocols(headerValue) {
+    if (!headerValue || typeof headerValue !== 'string') return null;
+    for (const part of headerValue.split(',')) {
+        const p = part.trim();
+        if (p.startsWith('dev.')) return p.slice(4);
+    }
+    return null;
 }
 // Daily IP hash. No raw IP is ever stored.
 export async function ipHash(ip, key, now = Date.now()) {

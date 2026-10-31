@@ -134,11 +134,10 @@
         if (attempt !== connectionAttempt) return;
         if (!ownerSession && siteKey && !tsToken) { setConnection('offline'); return gateStatus('The guest check couldn’t finish. Please try again.'); }
         const q = new URLSearchParams({ preview: previewKey });
-        const dev = localStorage.getItem('hangout-dev');
-        if (dev) q.set('dev', dev);
+        const dev = localStorage.getItem('hangout-dev'); // sent as subprotocol only; server rotates so tokens stay within 24h
         if (tsToken) q.set('ts', tsToken);
         if (app.ws) { app.ws.onclose = null; app.ws.onmessage = null; app.ws.close(1000); }
-        const ws = new WebSocket(`${relayBase}/${ownerSession ? 'lobby-owner' : 'lobby'}?${q}`);
+        const ws = new WebSocket(`${relayBase}/${ownerSession ? 'lobby-owner' : 'lobby'}?${q}`, dev ? ['hangout', 'dev.' + dev] : ['hangout']);
         app.ws = ws;
         let opened = false;
         let sessionNick = nick;
@@ -178,7 +177,7 @@
             break;
         case 'ownership': { const c = store(m.ch); if (c) c.cohosts = m.cohosts; break; }
         case 'owner-offer': toast(`${m.by} offered you ownership of ${m.ch}`, [['Accept ownership', () => { if (confirm(`Accept ownership of ${m.ch}?`)) cmd('acceptowner', [], m.ch); }]]); break;
-        case 'device': localStorage.setItem('hangout-dev', m.token); break;
+        case 'device': localStorage.setItem('hangout-dev', m.token); break; // server-rotated; 24h TTL limits stolen-token lifetime
         case 'hello':
             app.role = m.role; app.verified = m.verified === true; app.capabilities = m.capabilities || {}; $('[data-owner-signout]').hidden = !ownerSession; app.netLock = m.lock; app.budget = m.budget;
             if (app.me) {
