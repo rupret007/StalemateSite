@@ -2,7 +2,7 @@
 (function initTurnClient(global) {
     'use strict';
     const STUN = Object.freeze([{ urls: 'stun:stun.cloudflare.com:3478' }]);
-    const signedDevice = (token) => /^[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{32}$/.test(String(token || ''));
+    const signedDevice = (token) => /^[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{32}$/.test(String(token || ''));
 
     function createTurnClient({ url, preview, room, getDevice, fetchImpl = global.fetch.bind(global), now = Date.now,
         setTimer = global.setTimeout.bind(global), clearTimer = global.clearTimeout.bind(global), onChange = () => {}, onStatus = () => {} }) {
