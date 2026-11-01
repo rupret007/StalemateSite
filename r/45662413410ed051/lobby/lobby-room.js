@@ -60,6 +60,7 @@
             ui.stage.hidden = true;
             ui.paint.hidden = true;
             ui.video.hidden = true;
+            $('[data-activity]').hidden = true;
             ui.tiles.replaceChildren();
             if (player.yt && player.yt.stopVideo) try { player.yt.stopVideo(); } catch (e) { /* */ }
             player.key = '';
@@ -70,6 +71,7 @@
             if (!chan || !['art', 'bobross', 'watch'].includes(chan.kind)) return;
             state.ch = chan.name;
             state.kind = chan.kind;
+            $('[data-activity]').hidden = false;
             ui.stage.hidden = false;
             const paint = chan.kind === 'art' || chan.kind === 'bobross';
             const video = chan.kind === 'bobross' || chan.kind === 'watch';
