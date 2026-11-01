@@ -2,7 +2,7 @@
 (function initTurnClient(global) {
     'use strict';
     const STUN = Object.freeze([{ urls: 'stun:stun.cloudflare.com:3478' }]);
-    const signedDevice = (token) => /^[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{32}$/.test(String(token || ''));
+    const signedDevice = (token) => /^[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{32}$/.test(String(token || ''));
 
     function createTurnClient({ url, preview, room, getDevice, fetchImpl = global.fetch.bind(global), now = Date.now,
         setTimer = global.setTimeout.bind(global), clearTimer = global.clearTimeout.bind(global), onChange = () => {}, onStatus = () => {} }) {
@@ -15,10 +15,12 @@
         async function load(device) {
             const controller = new AbortController();
             const deadline = setTimer(() => controller.abort(), 8000);
+            const payload = { preview, room };
+            if (signedDevice(device)) payload.device = device;
             try {
                 const response = await fetchImpl(url, { method: 'POST', credentials: 'same-origin', redirect: 'error',
                     headers: { 'content-type': 'application/json' }, signal: controller.signal,
-                    body: JSON.stringify({ preview, room, device }) });
+                    body: JSON.stringify(payload) });
                 if (stopped) return servers;
                 if (controller.signal.aborted) throw new Error('timeout');
                 if (!response.ok) {
@@ -67,7 +69,8 @@
             const device = getDevice();
             if (!signedDevice(device)) {
                 onStatus('device-required');
-                return Promise.resolve(servers);
+                pending = load('').finally(() => { pending = null; });
+                return pending;
             }
             pending = load(device).finally(() => { pending = null; });
             return pending;

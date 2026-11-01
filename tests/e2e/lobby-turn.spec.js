@@ -29,8 +29,9 @@ for (const cancellation of ['camera off', 'leave room']) {
         await expect.poll(() => page.evaluate(() => window.pendingStreams.length)).toBe(1);
         expect(requests).toHaveLength(1);
         expect(requests[0].room).toMatch(/^[a-f0-9]{64}$/);
-        expect(requests[0].device).toBe(await page.evaluate(() => localStorage.getItem('hangout-dev')));
-        expect(requests[0].device).toMatch(/^[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{32}$/);
+        expect(requests[0].device).toBeUndefined();
+        const devCookie = (await page.context().cookies()).find((c) => c.name === '__Host-hangout-dev');
+        expect(devCookie?.value).toMatch(/^[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{32}$/);
         if (cancellation === 'camera off') {
             await page.evaluate(() => __lobby.ws.send(JSON.stringify({ t: 'cam', ch: __lobby.active, on: false })));
             await expect.poll(() => page.evaluate(() => __lobbyRoom.state.camOn)).toBe(false);
