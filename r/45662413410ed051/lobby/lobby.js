@@ -177,7 +177,11 @@
             break;
         case 'ownership': { const c = store(m.ch); if (c) c.cohosts = m.cohosts; break; }
         case 'owner-offer': toast(`${m.by} offered you ownership of ${m.ch}`, [['Accept ownership', () => { if (confirm(`Accept ownership of ${m.ch}?`)) cmd('acceptowner', [], m.ch); }]]); break;
-        case 'device': localStorage.setItem('hangout-dev', m.token); break; // server-rotated; 24h TTL limits stolen-token lifetime
+        case 'device': {
+            localStorage.setItem('hangout-dev', m.token); // server-rotated; 24h TTL limits stolen-token lifetime
+            room()?.onDevice?.();
+            break;
+        }
         case 'hello':
             app.role = m.role; app.verified = m.verified === true; app.capabilities = m.capabilities || {}; $('[data-owner-signout]').hidden = !ownerSession; app.netLock = m.lock; app.budget = m.budget;
             if (app.me) {

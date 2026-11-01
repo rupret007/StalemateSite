@@ -344,17 +344,8 @@
 
         /* ---- P2P video (cameras only) ---- */
         const readDevice = () => { try { return localStorage.getItem('hangout-dev') || ''; } catch (_) { return ''; } };
-        async function waitForSignedDevice(deadlineMs = 5000) {
-            const end = Date.now() + deadlineMs;
-            while (Date.now() < end) {
-                if (window.HangoutTurn.signedDevice(readDevice())) return readDevice();
-                await new Promise((resolve) => setTimeout(resolve, 25));
-            }
-            return readDevice();
-        }
         async function iceServers() {
             if (!turnUrl || !state.ch) return state.ice = STUN;
-            await waitForSignedDevice();
             const generation = roomGeneration;
             if (!turnInit) turnInit = (async () => {
                 const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`hangout-channel:${state.ch.toLowerCase()}`));
@@ -387,6 +378,7 @@
         async function startCam() {
             const generation = roomGeneration, version = ++captureVersion;
             await iceServers();
+            if (turnClient && window.HangoutTurn.signedDevice(readDevice())) await turnClient.get();
             if (state.stream || !state.camOn || generation !== roomGeneration || version !== captureVersion) return;
             try {
                 const got = await navigator.mediaDevices.getUserMedia({ video: CAM, audio: false });
@@ -494,7 +486,11 @@
             }
         }
 
-        return { onJoin, onChan, onCam, onAct, onLeave: teardown };
+        return { onJoin, onChan, onCam, onAct, onLeave: teardown, onDevice() {
+            if (!state.camOn) return;
+            if (turnClient) turnClient.get();
+            if (!state.stream) startCam();
+        } };
     }
 
     window.LobbyRoom = { attach };
