@@ -5,7 +5,7 @@ import http from 'node:http';
 import { WebSocketServer } from 'ws';
 import { admit, createBucket, limitsFrom, validFrame, originAllowed, previewKeyOk } from '../hangout-worker/src/core.mjs';
 import { createLobby } from '../hangout-worker/src/lobby-core.mjs';
-import { accountId, deviceCookie, deviceFromCookie, ipHash, newDeviceId, signDevice, verifyDevice } from '../hangout-worker/src/auth.mjs';
+import { accountId, deviceFromCookie, ipHash, newDeviceId, signDevice, verifyDevice } from '../hangout-worker/src/auth.mjs';
 
 const DEV_HMAC = 'local-dev-only-hmac-key-not-a-secret-000';
 
@@ -69,18 +69,7 @@ export function createHangoutRelay({ previewKey = 'local-preview-key-0001', orig
             catch { pendingAdmission.delete(id); return reject(503, 'storage'); }
             if (!verdict.ok) { pendingAdmission.delete(id); return reject(verdict.status, verdict.reason); }
             if (socket.destroyed) { pendingAdmission.delete(id); enqueue(() => lobby.disconnect(id)).catch(() => {}); return; }
-            const cookieHeader = deviceCookie(token);
-            const origWrite = socket.write.bind(socket);
-            let wrote101 = false;
-            socket.write = (chunk, ...args) => {
-                if (!wrote101 && typeof chunk === 'string' && chunk.includes('101 Switching Protocols')) {
-                    wrote101 = true;
-                    chunk = chunk.replace('\r\n\r\n', `\r\nSet-Cookie: ${cookieHeader}\r\n\r\n`);
-                }
-                return origWrite(chunk, ...args);
-            };
             return wss.handleUpgrade(req, socket, head, (ws) => {
-                socket.write = origWrite;
                 lobbySockets.set(id, ws);
                 ws.send(JSON.stringify({ t: 'device' }));
                 for (const frame of pendingAdmission.get(id) || []) ws.send(JSON.stringify(frame));
