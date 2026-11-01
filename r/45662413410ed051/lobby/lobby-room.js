@@ -343,8 +343,18 @@
         }, 2000);
 
         /* ---- P2P video (cameras only) ---- */
+        const readDevice = () => { try { return localStorage.getItem('hangout-dev') || ''; } catch (_) { return ''; } };
+        async function waitForSignedDevice(deadlineMs = 5000) {
+            const end = Date.now() + deadlineMs;
+            while (Date.now() < end) {
+                if (window.HangoutTurn.signedDevice(readDevice())) return readDevice();
+                await new Promise((resolve) => setTimeout(resolve, 25));
+            }
+            return readDevice();
+        }
         async function iceServers() {
             if (!turnUrl || !state.ch) return state.ice = STUN;
+            await waitForSignedDevice();
             const generation = roomGeneration;
             if (!turnInit) turnInit = (async () => {
                 const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`hangout-channel:${state.ch.toLowerCase()}`));
@@ -352,7 +362,7 @@
                 const room = [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
                 turnClient = window.HangoutTurn.createTurnClient({
                     url: turnUrl, preview: previewKey, room,
-                    getDevice: () => { try { return localStorage.getItem('hangout-dev'); } catch (_) { return ''; } },
+                    getDevice: () => readDevice(),
                     onChange: (ice) => {
                         if (generation !== roomGeneration) return;
                         state.ice = ice;
