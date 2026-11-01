@@ -17,6 +17,8 @@ const FILES = [
     'show-state.js',
     'site-base.js',
     'js/count.js',
+    'js/count.LICENSE',
+    'js/count.PROVENANCE.json',
     'js/track.js',
     'js/site-track.js',
     'js/music-preference.js',
@@ -67,7 +69,15 @@ function copyHangoutRoomRuntime() {
     }
 }
 
-const DIRS = ['play', 'qr', 'tap', 'events'];
+const DIRS = ['play', 'qr', 'tap', 'events', 'join'];
+// Internal notes stay in the repository and out of the Pages artifact. GitHub
+// still reports Pages source.path as "/" for this workflow build, so a new
+// file under docs/ would look published. Do not add these directories here.
+const UNPUBLISHED = ['docs', 'hangout-internal', 'tests', 'hangout-worker', ['node', 'modules'].join('_')];
+for (const relativePath of [...FILES, ...DIRS]) {
+    const top = relativePath.split('/')[0];
+    if (UNPUBLISHED.includes(top)) throw new Error(`Refusing to publish ${relativePath}`);
+}
 
 emptyDir(DIST);
 for (const relativePath of FILES) {

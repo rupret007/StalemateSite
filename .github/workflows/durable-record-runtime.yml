@@ -1,0 +1,264 @@
+name: Local Durable Object runtime
+
+on:
+  push:
+    paths:
+      - '.github/workflows/durable-record-runtime.yml'
+      - 'hangout-worker/src/**'
+      - 'hangout-worker/wrangler.beta.toml'
+      - 'tests/runtime/durable-records/**'
+      - 'tests/runtime/beta-sessions/**'
+      - 'tests/runtime/lobby-effects/**'
+      - 'tests/runtime/lobby-session-authority/**'
+      - 'r/45662413410ed051/sync-core.js'
+      - 'r/45662413410ed051/entry-sites.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+  pull_request:
+    paths:
+      - '.github/workflows/durable-record-runtime.yml'
+      - 'hangout-worker/src/**'
+      - 'hangout-worker/wrangler.beta.toml'
+      - 'tests/runtime/durable-records/**'
+      - 'tests/runtime/beta-sessions/**'
+      - 'tests/runtime/lobby-effects/**'
+      - 'tests/runtime/lobby-session-authority/**'
+      - 'r/45662413410ed051/sync-core.js'
+      - 'r/45662413410ed051/entry-sites.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+
+permissions:
+  contents: read
+
+jobs:
+  durable-record-runtime:
+    name: Local workerd mapping and crash recovery
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out exact workflow commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            tests/runtime/durable-records/package-lock.json
+
+      - name: Record source and runtime identity
+        shell: bash
+        run: |
+          mkdir -p runtime-proof-artifacts
+          git rev-parse HEAD > runtime-proof-artifacts/commit.txt
+          node --version > runtime-proof-artifacts/node-version.txt
+          sha256sum .github/workflows/durable-record-runtime.yml package.json tests/runtime/durable-records/package.json tests/runtime/durable-records/package-lock.json tests/runtime/durable-records/runner.mjs tests/runtime/durable-records/worker.mjs hangout-worker/src/durable-record-storage.mjs \
+            tests/runtime/beta-sessions/runner.mjs tests/runtime/beta-sessions/worker.mjs \
+            hangout-worker/src/beta-sessions.mjs hangout-worker/src/beta-session-state.mjs hangout-worker/src/core.mjs hangout-worker/src/beta-session-client.mjs \
+            hangout-worker/src/beta-ops.mjs hangout-worker/src/beta-auth.mjs hangout-worker/src/ai-eligibility.mjs hangout-worker/src/auth.mjs \
+            package-lock.json tests/runtime/lobby-effects/runner.mjs tests/runtime/lobby-effects/worker.mjs tests/runtime/lobby-effects/source-catalogue.mjs \
+            hangout-worker/wrangler.beta.toml hangout-worker/src/lobby-effect-records.mjs hangout-worker/src/lobby-core.mjs \
+            hangout-worker/src/community-state.mjs hangout-worker/src/filter.mjs hangout-worker/src/lobby-act.mjs hangout-worker/src/message-receipts.mjs \
+            hangout-worker/src/transport-budget.mjs hangout-worker/src/participation-checkpoint.mjs r/45662413410ed051/sync-core.js r/45662413410ed051/entry-sites.mjs \
+            tests/runtime/lobby-session-authority/runner.mjs tests/runtime/lobby-session-authority/worker.mjs tests/runtime/lobby-session-authority/README.md \
+            hangout-worker/src/lobby-session-authority.mjs hangout-worker/src/beta-entry.mjs hangout-worker/src/beta-public-help.mjs hangout-worker/src/index.mjs \
+            hangout-worker/src/private-reports.mjs hangout-worker/src/participation-enforcement.mjs hangout-worker/src/lobby-do.mjs \
+            hangout-worker/src/lobby-participation.mjs hangout-worker/src/participation-policy.mjs hangout-worker/src/participation-consents.mjs \
+            hangout-worker/src/participation-partitions.mjs hangout-internal/HANGOUT_PRODUCTION_PARTICIPATION.md \
+            hangout-worker/src/lobby-incident-sources.mjs hangout-worker/src/incident-cases.mjs hangout-internal/HANGOUT_INCIDENT_SOURCES.md > runtime-proof-artifacts/source-sha256.txt
+
+      - name: Install only the isolated locked runtime tools
+        shell: bash
+        run: |
+          set +e
+          npm ci --ignore-scripts --no-audit --no-fund --prefix tests/runtime/durable-records > runtime-proof-artifacts/install.stdout.log 2> runtime-proof-artifacts/install.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/install.stdout.log
+          cat runtime-proof-artifacts/install.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/install.exit-code.txt
+          exit "$status"
+
+      - name: Audit the isolated runtime dependency graph
+        shell: bash
+        run: |
+          set +e
+          npm audit --json --audit-level=low --prefix tests/runtime/durable-records > runtime-proof-artifacts/audit.json 2> runtime-proof-artifacts/audit.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/audit.json
+          cat runtime-proof-artifacts/audit.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/audit.exit-code.txt
+          exit "$status"
+
+      - name: Install the existing locked application bundler dependencies
+        shell: bash
+        run: |
+          set +e
+          npm ci --ignore-scripts --no-audit --no-fund > runtime-proof-artifacts/app-install.stdout.log 2> runtime-proof-artifacts/app-install.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/app-install.stdout.log
+          cat runtime-proof-artifacts/app-install.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/app-install.exit-code.txt
+          exit "$status"
+
+      - name: Audit the application bundler dependency graph
+        shell: bash
+        run: |
+          set +e
+          npm audit --json --audit-level=low > runtime-proof-artifacts/app-audit.json 2> runtime-proof-artifacts/app-audit.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/app-audit.json
+          cat runtime-proof-artifacts/app-audit.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/app-audit.exit-code.txt
+          exit "$status"
+
+      - name: Prove local mapping and whole-runtime crash recovery
+        shell: bash
+        run: |
+          set +e
+          npm run test:durable-runtime > runtime-proof-artifacts/runtime.stdout.log 2> runtime-proof-artifacts/runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/runtime.stdout.log
+          cat runtime-proof-artifacts/runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/runtime.exit-code.txt
+          exit "$status"
+
+      - name: Prove actual beta session rollback and bounded cleanup
+        shell: bash
+        run: |
+          set +e
+          npm run test:beta-runtime > runtime-proof-artifacts/beta-runtime.stdout.log 2> runtime-proof-artifacts/beta-runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/beta-runtime.stdout.log
+          cat runtime-proof-artifacts/beta-runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/beta-runtime.exit-code.txt
+          exit "$status"
+
+      - name: Prove real Lobby effects and fresh runtime recovery
+        shell: bash
+        run: |
+          set +e
+          npm run test:lobby-runtime > runtime-proof-artifacts/lobby-runtime.stdout.log 2> runtime-proof-artifacts/lobby-runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/lobby-runtime.stdout.log
+          cat runtime-proof-artifacts/lobby-runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/lobby-runtime.exit-code.txt
+          exit "$status"
+
+      - name: Prove actual guest journeys and cold session recovery
+        shell: bash
+        run: |
+          set +e
+          npm run test:lobby-session-runtime > runtime-proof-artifacts/lobby-session-runtime.stdout.log 2> runtime-proof-artifacts/lobby-session-runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/lobby-session-runtime.stdout.log
+          cat runtime-proof-artifacts/lobby-session-runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/lobby-session-runtime.exit-code.txt
+          exit "$status"
+
+      - name: Prove production C3 composition with synthetic consent decisions
+        shell: bash
+        run: |
+          set +e
+          npm run test:lobby-session-runtime -- --participation > runtime-proof-artifacts/lobby-participation-runtime.stdout.log 2> runtime-proof-artifacts/lobby-participation-runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/lobby-participation-runtime.stdout.log
+          cat runtime-proof-artifacts/lobby-participation-runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/lobby-participation-runtime.exit-code.txt
+          exit "$status"
+
+      - name: Prove paced native ACKs and C3 withdrawal with healthy peers
+        shell: bash
+        run: |
+          set +e
+          npm run --silent test:lobby-session-runtime -- --participation --traffic-acks > runtime-proof-artifacts/lobby-traffic-acks-runtime.stdout.log 2> runtime-proof-artifacts/lobby-traffic-acks-runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/lobby-traffic-acks-runtime.stdout.log
+          cat runtime-proof-artifacts/lobby-traffic-acks-runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/lobby-traffic-acks-runtime.exit-code.txt
+          exit "$status"
+
+      - name: Prove native non-ACK pressure isolation and cold recovery
+        shell: bash
+        run: |
+          set +e
+          npm run --silent test:lobby-session-runtime -- --participation --pressure-only > runtime-proof-artifacts/lobby-pressure-runtime.stdout.log 2> runtime-proof-artifacts/lobby-pressure-runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/lobby-pressure-runtime.stdout.log
+          cat runtime-proof-artifacts/lobby-pressure-runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/lobby-pressure-runtime.exit-code.txt
+          exit "$status"
+
+      - name: Prove fifty native guests and hot-lobby ACK fan-out
+        shell: bash
+        run: |
+          set +e
+          npm run --silent test:lobby-session-runtime -- --participation --fanout-50 > runtime-proof-artifacts/lobby-fanout-50-runtime.stdout.log 2> runtime-proof-artifacts/lobby-fanout-50-runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/lobby-fanout-50-runtime.stdout.log
+          cat runtime-proof-artifacts/lobby-fanout-50-runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/lobby-fanout-50-runtime.exit-code.txt
+          exit "$status"
+
+      - name: Prove public report source composition with synthetic incident authority
+        shell: bash
+        run: |
+          set +e
+          npm run test:lobby-session-runtime -- --incident-sources > runtime-proof-artifacts/lobby-incident-sources-runtime.stdout.log 2> runtime-proof-artifacts/lobby-incident-sources-runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/lobby-incident-sources-runtime.stdout.log
+          cat runtime-proof-artifacts/lobby-incident-sources-runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/lobby-incident-sources-runtime.exit-code.txt
+          exit "$status"
+
+      - name: Prove combined C3 sharing controls and public report sources
+        shell: bash
+        run: |
+          set +e
+          npm run test:lobby-session-runtime -- --participation --incident-sources > runtime-proof-artifacts/lobby-combined-runtime.stdout.log 2> runtime-proof-artifacts/lobby-combined-runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/lobby-combined-runtime.stdout.log
+          cat runtime-proof-artifacts/lobby-combined-runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/lobby-combined-runtime.exit-code.txt
+          exit "$status"
+
+      - name: Prove native permission ordering for moderation start
+        shell: bash
+        run: |
+          set +e
+          npm run --silent test:lobby-session-runtime -- --participation --provider-start > runtime-proof-artifacts/lobby-provider-start-runtime.stdout.log 2> runtime-proof-artifacts/lobby-provider-start-runtime.stderr.log
+          status=$?
+          set -e
+          cat runtime-proof-artifacts/lobby-provider-start-runtime.stdout.log
+          cat runtime-proof-artifacts/lobby-provider-start-runtime.stderr.log >&2
+          printf '%s\n' "$status" > runtime-proof-artifacts/lobby-provider-start-runtime.exit-code.txt
+          exit "$status"
+
+      - name: Preserve source-bound runtime diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: durable-record-runtime-${{ github.run_id }}-${{ github.run_attempt }}
+          path: runtime-proof-artifacts/
+          if-no-files-found: warn
+          retention-days: 7

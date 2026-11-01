@@ -1,0 +1,155 @@
+# Public-room Block, cameras and activity pacing
+
+This describes the application candidate's contract and the checks required for
+matched clients and server. The earlier `282163` candidate does not contain this
+fix. Source, local tests and hosted acceptance are separate evidence; use the
+delivered commit's receipts before a demonstration or rollout.
+
+## What personal Block means
+
+Choose a person in People and use **Block**. The existing device reference is
+the server's preference key for that live/restored connection. Nickname and
+entry-badge changes do not change that reference. A parallel connection of the
+blocked device is also denied media with the blocker where they share a public
+activity room. Another device or a new identity is not silently identified or
+tracked as the same person.
+
+Personal Block is separate from a host/staff ban. It closes PM consent and
+suppresses the existing text path, plus the affected camera peer connection.
+The other visitor's own block remains effective if only one person unblocks.
+Unblock does not restore PM consent or start a camera prompt. Shared canvases,
+watch-room state and copies already delivered elsewhere are not erased.
+
+## Current policy reaches the affected connections
+
+Normal join/channel views contain recipient-specific `mediaBlocked` connection
+IDs. Block/unblock sends compact `media-policy` changes only to the blocker and
+matching current device connections in shared activity rooms. The client applies
+changes only to an existing joined channel and its current member IDs; it does
+not replace the roster or create a new channel. Raw device references stay in
+private session preferences.
+
+RTC routing preserves the complete admitted connection ID. The gateway issues
+`c` plus 32 hexadecimal characters; the existing reference contract permits
+1–128 ASCII letters, digits, underscores or hyphens. Invalid or oversized
+recipients are rejected, never truncated into another participant's prefix.
+The local relay uses the gateway's ID shape so browser tests exercise this
+boundary. Membership, bilateral Block and current authority still decide access.
+
+Both signaling directions consult the current bilateral block sets before media
+bookkeeping. Updated clients retire only the affected peer connection and
+received tracks, remove its tile and invalidate queued negotiation. Unrelated
+participants and shared local capture continue. Pending capture attaches its
+tracks once to still-allowed existing receive-only peers when it completes.
+Incoming signaling creates a passive peer connection. Its local-track attachment
+and offer generation wait until a genuine incoming offer has been applied,
+including when capture finishes during that native operation. The incoming
+offer creates its receiving transceiver through the browser; attaching the
+already opted-in track then reuses the eligible sender without another capture.
+Accepted incoming offers also hold a per-peer operation fence through native
+answer creation. Later negotiation work is retained and starts when that fence
+clears and the answer has received its raw send attempt. This is not a server
+acknowledgement. Block, room exit and transport failure prevent stale work from
+resuming; a native failure does not start a retry loop.
+If a polite peer accepts a simultaneous offer after its own native local-
+description call has begun, it first waits for that owned operation. Only an
+initial pending local offer with no current or pending remote description may
+retire that unestablished connection and use a fresh passive answerer. This
+preserves shared capture and bounded early incoming ICE, purges the retired
+entry's output and rechecks room/Block/current-entry authority. Established
+peers keep their connection and explicitly await native rollback before applying
+the remote offer. Ownership is recorded before the native call; close releases
+waiting work, and each later phase checks that the peer is still current.
+Rollback and initial transport retirement introduce no new wire message.
+An already-pending remote answer keeps its existing native answer-then-offer order.
+
+Policy outputs use the existing effect-commit boundary. A failed commit must
+not publish a successful Block, PM closure or changed media policy. Duplicate
+Block/unblock does not repeat unchanged pair-policy output. Repeating a full
+roster for every shared room is deliberately avoided: a retained local fixture
+with 58 legitimately admitted connections in 30 rooms exceeded the existing
+16 MiB staged-output ceiling before the compact update. This is a regression
+fixture with synthetic trusted staff, not maximum hosted capacity or real staff
+identity qualification.
+
+## One bounded outgoing activity allowance
+
+Drawing, watch controls and camera signaling share the browser module's smaller
+allowance: burst 8 and refill 8 frames per second. The server retains its existing
+burst 24 / refill 10 per second. The tab-local queue accepts at most 128 frames,
+256 KiB of encoded payload and 16 KiB per frame. These are logical accounting
+bounds, not a measurement of browser heap, WebSocket buffers or hosting cost.
+
+SDP controls can precede queued candidates; paint/clear/watch ordering remains
+FIFO. Consecutive unsent chunks of the same stroke may merge without losing or
+reordering points, up to 400 points and the existing frame/byte bounds. A merge
+does not cross a clear, watch update, another stroke or room generation.
+
+Queue overflow is explicit. An unaccepted drawing or watch action is not
+presented as successfully shared; the visitor receives a busy/error status.
+Queued work rechecks membership, current host authority where needed, peer
+policy and native negotiation generation before sending. Peer retirement,
+Block and room teardown discard invalid work. There is no automatic retry or
+server-delivery acknowledgement implied by local queue acceptance.
+Queued ICE uses its selected media section's effective username fragment and
+password, including session-level inheritance. MID and media-index selectors
+must agree. Changing another section does not invalidate that candidate;
+changing the selected credentials does. No BUNDLE transport is guessed.
+
+## Camera display and mobile layout
+
+Camera tiles appear above the shared canvas or watch activity in their own
+bounded horizontal row. The count covers rendered tiles, including your muted
+preview. A remote tile is shown only while that camera is advertised in the
+room. Full nicknames wrap below each tile;
+frames fit inside the display slot without changing capture constraints. The
+activity panel can still scroll vertically, while chat input and Send remain
+outside it.
+
+When the row overflows, it becomes keyboard focusable and exposes scroll help;
+Left/Right, Home and End move only that row. The region references its visible
+count. With no overflow, the extra keyboard stop and scroll instructions are
+removed. Existing videos and streams are reused through roster updates.
+
+A participant's camera-off update removes that displayed tile and clears its
+detached video source/cache entry, even when the allowed receive-only peer
+connection is retained. Other camera tiles and local capture continue. Turning
+off the last local camera or leaving clears presentation counts, visibility and
+saved scrolling. If the row held focus, cleanup returns focus to an available
+visible control, preferring the command button, without clicking that control.
+
+The regression covers decoded frames at 375/390px widths and 667/812px heights,
+contained page/composer geometry, wrapping names, scrolling, collapse/resize,
+camera-off, Block and last-tile/room cleanup. These are Chromium viewport and
+synthetic-camera checks; physical iPhone, virtual-keyboard and assistive-
+technology acceptance remain separate.
+
+## Privacy and rollout boundaries
+
+The activity queue stays in tab memory. SDP/ICE can contain network information;
+it is not a chat transcript and must not enter routine diagnostics or durable
+records. Personal preferences persist only within the documented live/restored
+session model. [The data inventory](HANGOUT_DATA_INVENTORY.md) distinguishes
+these records from received scrollback, unsent composer drafts and evidence.
+
+The release owner must qualify matching client assets and backend, including
+old-client drain. Server signaling denial alone cannot close an already
+established P2P connection between two outdated clients. Nor can it erase a
+participant's separately captured copy. The encrypted `/hangout/<room>` local
+Hide control and native WebJam/external meeting sessions have separate identity
+and transport boundaries; they do not inherit a global Lobby block.
+
+Verify the [demo journey](HANGOUT_DEMO_GUIDE.md) at 375/390px with actual decoded
+camera frames before Block, pair teardown, continuing third-peer frames,
+parallel-device/nickname/entry changes and mutual unblock.
+Run the separate pending-capture/early-ICE startup regression at both widths too.
+Cover an initial simultaneous offer, a pending remote-description operation,
+capture finishing during that operation, retirement during Block/leave, and
+genuine established-peer glare with the same connection retained. Ordinary
+later renegotiation does not prove established glare. After mutual unblock,
+require all four visitors'
+twelve directed video paths to be stable, connected and decoding.
+Synthetic RTC in the local SQLite authority proof verifies signaling and storage,
+not camera capture,
+physical media, TURN or WAN connectivity. Existing consent/age safeguards remain
+until their replacement is qualified; AI/provider activation is separate work.

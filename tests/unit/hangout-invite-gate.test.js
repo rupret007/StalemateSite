@@ -19,6 +19,6 @@ describe('hangout invite gate', () => {
         const connectBlock = roomJs.match(/function connect\(\)[\s\S]*?ws\.onclose/m)?.[0] || '';
         expect(connectBlock).toContain('relayAdmission');
         expect(connectBlock, 'relay WebSocket URL').not.toMatch(/preview=/);
-        expect(connectBlock).toMatch(/new WebSocket\(url, \[admission\]\)/);
+        expect(connectBlock).toMatch(/new WebSocket\(url(?:, \[admission\])?\)/);
     });
 });

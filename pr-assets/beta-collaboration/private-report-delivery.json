@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "status": "prepared-backend-not-deployed",
+  "foundationPr": 58,
+  "foundationCommit": "1203974cd2f730802116644e8662104be4647e39",
+  "scope": "Protected beta backend transport and fresh staff authorization only. Consent/review interface follows separately. Private quotes are reporter allegations, not independently authenticated transcripts.",
+  "files": {
+    "hangout-worker/src/private-reports.mjs": "90f0af6de56a3a8fc796a63e2f49bee1726644899130b6cf0599f3b6130cf17d",
+    "hangout-worker/src/index.mjs": "edeb4034fdc7050ff9af47f9f5e8b146f7a088f6dbdf6ca9b71626a4023ca36c",
+    "hangout-worker/src/lobby-core.mjs": "f10024feb43cfcea7f280633af49b04a85831ed575c090dfaf6ba37c1784c162",
+    "hangout-worker/src/lobby-do.mjs": "aa5a3549e955e8560b273276695c67f10ab0bc415de44f8dafca80e6fb059e5b",
+    "hangout-worker/tests/private-report-relay.test.js": "239273cd92915b2fbb7fb37f2b5f943b4ee2ad1771d5ec0ca3b8b41a5948242b",
+    "hangout-worker/tests/private-report-lobby.test.js": "02b9ff455b032dbde9443a6f49344ad3678ad0a1390e975fc4ef8a89b68119b9",
+    "tests/unit/hangout-recipient-expiry.test.js": "becf33a7fd17b08bb1fb6264e35aaf7d5e53428b44db76c65afe6265e5c40a8c"
+  },
+  "validation": {
+    "fullUnitTests": 715,
+    "unitFiles": 61,
+    "directPasses": 715,
+    "retries": 0,
+    "elapsedSeconds": 11.79,
+    "fullUnitLogSha256": "ef07728d41dc15297d45c998661e4d353b9be47196e8e5aa30a1661582228faf",
+    "queueCases": 26,
+    "relayCases": 18,
+    "actualClassPipelineCases": 18,
+    "recipientAuthorizationCases": 4,
+    "staffFixture": "Actual Room/Lobby/registry classes and durable queue with explicitly trusted synthetic staff admission. This is not a real Access or human staff acceptance.",
+    "coverage": [
+      "Real beta guest admission, active registry and room binding; report controls never broadcast with ordinary ciphertext.",
+      "Required atomic writes before confirmed ACK; same-request retry and uncertain failure honesty.",
+      "Staff-only unverified evidence; no AI or automatic punishment.",
+      "Staff actions wait for required abuse accounting; failed writes never produce confirmed disposition or a success modlog.",
+      "Fresh registry checks at evidence delivery and actions; current socket/role/allowlist/expiry fences.",
+      "Queued moderator revocation, registry outages, exact TTL before alarm, obsolete asynchronous snapshot suppression.",
+      "Resolved/dismissed evidence removed durably; opposite duplicate preserves actual status; wake/alarm purge."
+    ]
+  },
+  "nativeLocalAcceptance": {
+    "status": "passed",
+    "startedAt": "2026-10-19T11:25:08.509Z",
+    "finishedAt": "2026-10-19T11:25:11.853Z",
+    "snapshotBaseCommit": "e43d14205976846c4ff9d1e75ce923e60d4eedac",
+    "snapshotHadUncommittedPatch": true,
+    "snapshotFileCount": 68,
+    "snapshotManifestSha256": "077a721ab980b39d6792cec3d1ddcb2da94721a2c5f4e9b8e6c0505f2e9caf10",
+    "currentBackendBytesMatchProbe": true,
+    "runnerSha256": "3f8a4d775c52394220437f8bda40dfbc4a24865bdc34b21d5473d76f87e3a7d5",
+    "localConfigSha256": "c20c6bf17712b43339fe67dd4c16430731f02fe2fc322e80e5f6d51e04e8cf36",
+    "toolVersions": {
+      "wrangler": "4.151.1",
+      "miniflare": "5.20261012.1-beta",
+      "workerd": "1.20261012.1"
+    },
+    "checks": {
+      "realProtectedGuestReportAccepted": true,
+      "sameSocketRetrySameId": true,
+      "noReportBroadcastToPrivateOrLobbyGuest": true,
+      "normalEncryptedTrafficBeforeAndAfter": true,
+      "publicIntakeAndGuestStaffPanelDenied": true,
+      "sameCookieNewSocketRetryAfterRealRestartSameId": true,
+      "changedPayloadSameNonceRejected": true,
+      "noQuoteBacklogAfterRestart": true
+    },
+    "normalGuestSessions": 2,
+    "processGenerations": 2,
+    "actualWorkerdProcessesPerGeneration": [
+      2,
+      2
+    ],
+    "gracefulSigterm": true,
+    "cleanup": {
+      "logouts": 2,
+      "copiedCookieAssetsDenied": 2,
+      "allOwnedProcessesGone": true,
+      "portReleased": true
+    },
+    "limits": [
+      "One Mac, actual native local WebSockets and SQLite; no browser UI in this probe.",
+      "Short graceful local process restart, not a hosted/cloud restart, crash, long outage, real Access or human review.",
+      "Random new local-only credentials; no hosted/user credentials, signed-in Chrome, provider features or deployment.",
+      "Public receipt excludes selected text, nicknames, cookies, keys, room identifiers and request URLs."
+    ]
+  },
+  "retainedFailures": [
+    {
+      "scope": "First actual-class fixture setup",
+      "passed": 1,
+      "failed": 11,
+      "classification": "Synthetic claimed nickname exceeded24-character protocol maximum; corrected fixture passed before security regressions."
+    },
+    {
+      "scope": "Candidate before fresh guarded staff dispatch",
+      "failed": 4,
+      "classification": "Meaningful privacy negatives: revoked session queued behind report write; expired quote before alarm; registry failure on existing or newly admitted staff. All now pass."
+    },
+    {
+      "scope": "Initial715-unit integration",
+      "passed": 714,
+      "failed": 1,
+      "classification": "Existing recipient fixture expected delivery after one microtask; fresh async auth required actual waitUntil work. First collector-only correction remained3/4; explicit queued-producer barrier now4/4 with assertions unchanged."
+    },
+    {
+      "scope": "First two native probe setups",
+      "failed": 2,
+      "classification": "No report submitted:22-character nickname first, then randomized shorter nickname rejected by existing profanity filter. Fixed fixture uses verified fixed nickname; every attempt cleaned owned processes and logged guests out."
+    }
+  ],
+  "remaining": [
+    "Consent/review interface is a separate stacked change.",
+    "Required human/Karen review. No deployment during original hosted8-hour observation.",
+    "Hosted guest-to-real-staff report/disposition acceptance and independent review persistence still pending."
+  ]
+}

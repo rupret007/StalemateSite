@@ -1,0 +1,66 @@
+{
+  "repository": "https://github.com/rupret007/webjam",
+  "commit": "da7e04580d31bd0fa1039e7e1cbf4c940336edea",
+  "sourcePR": "https://github.com/rupret007/webjam/pull/411",
+  "license": "MIT",
+  "modifications": {
+    "index.html": "Add noindex metadata for the private beta; all other copied files remain unchanged."
+  },
+  "files": {
+    "app.js": {
+      "source": "web/join/app.js",
+      "upstreamSha256": "bc58f36801524baa4928242f025e8fea0432d57c5c52b32b1879fb88c4da12f9",
+      "shippedSha256": "bc58f36801524baa4928242f025e8fea0432d57c5c52b32b1879fb88c4da12f9"
+    },
+    "audio.js": {
+      "source": "web/join/audio.js",
+      "upstreamSha256": "8023438309b0b7145cfcebd3e448a1c2717d9e82abf0df17a86a9c77d5b438d5",
+      "shippedSha256": "8023438309b0b7145cfcebd3e448a1c2717d9e82abf0df17a86a9c77d5b438d5"
+    },
+    "config.js": {
+      "source": "web/join/config.js",
+      "upstreamSha256": "f0e6dabeff031994670126b6c2008d645aeda58cd3a1fb87513a2f0418b0ccfd",
+      "shippedSha256": "f0e6dabeff031994670126b6c2008d645aeda58cd3a1fb87513a2f0418b0ccfd"
+    },
+    "crypto.js": {
+      "source": "web/join/crypto.js",
+      "upstreamSha256": "9f4cdfb4a34606df5cf7181523a16d8317071c5c1d283d20b2fdf95c432c4fc8",
+      "shippedSha256": "9f4cdfb4a34606df5cf7181523a16d8317071c5c1d283d20b2fdf95c432c4fc8"
+    },
+    "index.html": {
+      "source": "web/join/index.html",
+      "upstreamSha256": "0be444981d7310435cd14d9a12d5788b9e34909fc2930c2ba5488c8081e17b97",
+      "shippedSha256": "cdc27bb124aed18e258d416a8d0da967055ebebf77679fb81dee7f3c6c6d2c49"
+    },
+    "mailbox.js": {
+      "source": "web/join/mailbox.js",
+      "upstreamSha256": "ee387e616630cba550844940e77631d98b4a19d4aa1c8b7ee5efb12a2170e541",
+      "shippedSha256": "ee387e616630cba550844940e77631d98b4a19d4aa1c8b7ee5efb12a2170e541"
+    },
+    "policy.js": {
+      "source": "web/join/policy.js",
+      "upstreamSha256": "3fff203766179b8b31d4475d3b1354efe3797e145c10a826a308b4cb5e791b75",
+      "shippedSha256": "3fff203766179b8b31d4475d3b1354efe3797e145c10a826a308b4cb5e791b75"
+    },
+    "session.js": {
+      "source": "web/join/session.js",
+      "upstreamSha256": "862e96a9f421c2ca9f9062564e6ff67e33a2cf8dd49d3c19aa685ce85f651972",
+      "shippedSha256": "862e96a9f421c2ca9f9062564e6ff67e33a2cf8dd49d3c19aa685ce85f651972"
+    },
+    "style.css": {
+      "source": "web/join/style.css",
+      "upstreamSha256": "8876121a107c35d360eb60d98893653f336a5490fc993d0f194aa7f9eb9a1924",
+      "shippedSha256": "8876121a107c35d360eb60d98893653f336a5490fc993d0f194aa7f9eb9a1924"
+    },
+    "_headers": {
+      "source": "web/join/_headers",
+      "upstreamSha256": "4877e052aaf7cec4f51f758614100e3291942fda0c8741209231b5386fd45b43",
+      "shippedSha256": "4877e052aaf7cec4f51f758614100e3291942fda0c8741209231b5386fd45b43"
+    },
+    "LICENSE": {
+      "source": "LICENSE",
+      "upstreamSha256": "a4280fb054e6e7d066c5face14d72dc65cc8f56f0a46bf2eaf147c872c97e3a1",
+      "shippedSha256": "a4280fb054e6e7d066c5face14d72dc65cc8f56f0a46bf2eaf147c872c97e3a1"
+    }
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "status": "verified-pure-foundations-not-deployed",
+  "checkedAt": "2026-10-19T10:43:53.066019+00:00",
+  "baseCommit": "df9cc55da76c289bb0e9f49583e8eeb3ae29d5ac",
+  "deploymentPerformed": false,
+  "scope": "Pure private drawing and recovery primitives. Browser integration and its integration tests are a separate dependent change. No hosted, provider, physical-device or separate-network acceptance.",
+  "sourceHashes": {
+    "r/45662413410ed051/sync-core.js": "acb2ba02ea79788a31ccbfaf19427ddf54d308f6ff927b60de2d20bff208699b",
+    "r/45662413410ed051/private-snapshot.js": "1ff25018d9c29b99b26a5b3b884807594e4be20e345e59eeb5a964eaa7aeebb5",
+    "r/45662413410ed051/private-recovery.js": "fed51acaf3aa89270053d138657417a6d80b7bf7774cf109db65c6a93ae3c196",
+    "tests/unit/hangout-stroke-ranges.test.js": "9473b0364332b66333070954dba3c3bd7fb83f468699bd368d4bd8ac7ecfad74",
+    "tests/unit/hangout-private-snapshot.test.js": "bac9b7c5af38815acda4310eefaa5ff1283779a19929557c31e03c18d0abd6bb",
+    "tests/unit/hangout-private-recovery.test.js": "9b99e0693212607ebf8d509c08aaf38e5c54ea64e1c44cb4e683b054ddb18f15"
+  },
+  "behavior": [
+    "Absolute stroke offsets deduplicate repeated or overlapping matching ranges, stage bounded gaps without displaying holes, reject conflicting style/points atomically, and preserve legacy append messages. Complete snapshot strokes retain up to 3200 points.",
+    "Fresh snapshot proofs bind the recipient, fresh request nonce, batch, part count/index, sequence and SHA-256 digest of the complete bounded payload; staging completes atomically. Embedded signed body key order is preserved.",
+    "Peer assembly has a distinct untrusted brand and cannot supply a fresh host proof. Signature checks, socket ownership and authority decisions remain the browser integration responsibility.",
+    "A bounded recovery journal merges continuous offset drawing and already verified persistent controls onto a complete snapshot without erasing live chat, lowering the global replay floor, reviving an old clear epoch or importing unknown older controls.",
+    "An explicit preserveDrawing option retains the reconnecting creator\u2019s same-epoch canvas when an uninitialized peer answers first; a higher verified clear still discards older drawing. Conflicts, missing ranges and capacity limits fail atomically."
+  ],
+  "limits": {
+    "snapshotBytes": 8388608,
+    "snapshotPartBytes": 196608,
+    "snapshotParts": 128,
+    "snapshotStrokes": 1500,
+    "strokePoints": 3200,
+    "journalOps": 512,
+    "journalPoints": 128000,
+    "journalBytes": 4194304
+  },
+  "validation": {
+    "newUnitTests": 76,
+    "newUnitBreakdown": {
+      "strokeRanges": 18,
+      "snapshotProofs": 25,
+      "recoveryJournal": 33
+    },
+    "fullUnit": {
+      "passed": 653,
+      "files": 58,
+      "elapsedSeconds": 13.57,
+      "retries": 0
+    },
+    "negativeEvidence": {
+      "oldSourceRangeCases": {
+        "failedAsExpected": 2,
+        "reason": "Duplicated absolute range and truncated 3200-point snapshot."
+      },
+      "creatorPreservationBeforeFix": {
+        "passed": 28,
+        "failedAsExpected": 5,
+        "reason": "Empty peer erased art, shorter prefix left gap, layer order changed, conflict was missed, and over-cap union lost art."
+      }
+    },
+    "retainedFailures": [
+      "Initial snapshot test fixture attempted to mutate a frozen object; corrected only the fixture.",
+      "A separate inner signed-body-key-order test exposed a real digest binding gap; the payload capture now preserves signed key order.",
+      "Original range and preservation negative results are retained privately."
+    ],
+    "independentReview": "Reviewed pure helper bounds, digest binding, peer branding and atomic merge. Concrete issues were corrected; final focused checks pass.",
+    "ci": {
+      "status": "pending-normal-first-runs",
+      "rerunsRequested": false
+    }
+  },
+  "remaining": [
+    "Browser entry-point integration and real relay regression checks are a separate dependent change.",
+    "No deployment during the original normal eight-hour hosted session observation.",
+    "Human/Karen review remains pending; no main merge, public navigation change, invitations or public launch."
+  ]
+}

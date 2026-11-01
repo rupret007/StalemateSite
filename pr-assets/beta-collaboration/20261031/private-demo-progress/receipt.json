@@ -1,0 +1,426 @@
+{
+  "recordedAt": "2026-10-31T13:01:12.473517+00:00",
+  "scope": "Sanitized application evidence: source/CI, actual packaged ARM identity/GUI/idle transport and protected hosted layouts. No real WebJoin action, installation, physical music, screen-reader speech or public launch claim.",
+  "nativeSource": "bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35",
+  "nativeRun": 41193954131,
+  "nativeRunAttempt": 1,
+  "nativeRunConclusion": "success",
+  "nativeDesktopJobs": [
+    {
+      "name": "Build Desktop (windows-x64)",
+      "jobId": 124521180013,
+      "bundleTargetVerification": "success",
+      "jobConclusion": "success"
+    },
+    {
+      "name": "Build Desktop (macos-x64)",
+      "jobId": 124521180077,
+      "bundleTargetVerification": "success",
+      "jobConclusion": "success"
+    },
+    {
+      "name": "Build Desktop (macos-arm64)",
+      "jobId": 124521180078,
+      "bundleTargetVerification": "success",
+      "jobConclusion": "success"
+    },
+    {
+      "name": "Build Desktop (linux-x64)",
+      "jobId": 124521180098,
+      "bundleTargetVerification": "success",
+      "jobConclusion": "success"
+    }
+  ],
+  "nativeArtifacts": [
+    {
+      "name": "webjam-windows-x64",
+      "artifactId": 13041376018,
+      "bytes": 610917721,
+      "digest": "sha256:0d399c8053379ae5062f6e7341b74058a0dd893fb7cc9d13fb6a4f56d4694117"
+    },
+    {
+      "name": "webjam-macos-x64",
+      "artifactId": 13041117499,
+      "bytes": 471481706,
+      "digest": "sha256:84c1a17b33ca1cb1200c66f6257c1f793f000c97bc98b023a6d64b17844c6696"
+    },
+    {
+      "name": "webjam-linux-x64",
+      "artifactId": 13040901223,
+      "bytes": 457718477,
+      "digest": "sha256:e13bf766a35b4106d708d87b049ab378098f631f4ff7b23e1c854795fdf6eebf"
+    },
+    {
+      "name": "webjam-macos-arm64",
+      "artifactId": 13040433162,
+      "bytes": 456536544,
+      "digest": "sha256:9417af62625152b83bf6891a5168a3c0d1ab13f3cbc2f87c9cb95390b4931e9a"
+    }
+  ],
+  "armDownload": {
+    "artifactId": 13040433162,
+    "expectedBytes": 456536544,
+    "completedAt": "2026-10-31T12:25:58.695177+00:00",
+    "actualDigest": "sha256:9417af62625152b83bf6891a5168a3c0d1ab13f3cbc2f87c9cb95390b4931e9a",
+    "digestMatches": true,
+    "archiveIntegrityPassed": true,
+    "status": "passed"
+  },
+  "expiry": {
+    "sourceCommit": "96f356a6f2a9af4bbd2834bb94f1e5df81d200dd",
+    "runtimeVersion": "6293386f-31b8-4415-bf0b-f81296190a4d",
+    "originalAutomatedVerdict": "failed",
+    "originalFailureCode": "natural-expiry-socket-observation-timeout",
+    "originalObserverSha256": "3414f67ee1337666f47c1687c4e1587703ba495f9c84deb30fa6fc99f9e2b1f9",
+    "originalReceiptSha256": "84eb8fbb3702ebb9ec6e0e7b0416c15fae28ead1a3d968be858cd1e7587dbd5f",
+    "originalStartedAt": "2026-10-31T04:08:30.053Z",
+    "actualExpiryAt": "2026-10-31T12:08:30.618Z",
+    "actualCompletedAt": "2026-10-31T12:10:01.073Z",
+    "privateCurrentSocketCloseMillisecondsFromExpiry": 26,
+    "lobbyCurrentSocketCloseMillisecondsFromExpiry": 47429,
+    "closeCode": 4401,
+    "allowanceMs": 90000,
+    "httpStateStatus": 401,
+    "httpAssetStatus": 401,
+    "ownExpiredTokenStatus": 401,
+    "observedCriteria": {
+      "bothPreExpirySocketsLive": true,
+      "privateCurrentSocket4401WithinOriginalDeadline": true,
+      "lobbyCurrentSocket4401WithinOriginalDeadline": true,
+      "privateEndedClosedHidden": true,
+      "lobbyEndedClosed": true,
+      "lobbyNoAutomaticReplacement": true,
+      "expiredHttpStateAndAsset401": true,
+      "originalTokenReplay401": true,
+      "originalScopeCounts": true,
+      "cleanupCompleted": true
+    },
+    "endingDeploymentRead": {
+      "receipt": "hosted96-post-expiry-deployments-g3-receipt.json",
+      "at": "2026-10-31T12:23:34.844041+00:00",
+      "exitCode": 0,
+      "latestDeploymentRuntime": "6293386f-31b8-4415-bf0b-f81296190a4d",
+      "trafficPercent": 100
+    },
+    "endingVersionRead": {
+      "receipt": "hosted96-post-expiry-version-g1-receipt.json",
+      "id": "6293386f-31b8-4415-bf0b-f81296190a4d",
+      "bindingTypeCounts": {
+        "assets": 1,
+        "durable_object_namespace": 5,
+        "plain_text": 17,
+        "secret_text": 5
+      },
+      "secretValuesRead": false
+    },
+    "finding": "Original predicate expected lobby offline. The exact deployed handler ends the session with ended. Actual terminal evidence records ended and closed. Original failed run unchanged; no new observer run is claimed."
+  },
+  "holds": "AI, TURN/vault activation, native trust, purchases/signing and public release unchanged; all62 requirements preserved.",
+  "nativeLocalPackage": {
+    "source": "bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35",
+    "status": "passed",
+    "outerDigest": "sha256:9417af62625152b83bf6891a5168a3c0d1ab13f3cbc2f87c9cb95390b4931e9a",
+    "innerTargetManifest": {
+      "path": "WebJam.app/Contents/Resources/webjam-web-join-target.json",
+      "source": "bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35",
+      "target": "private-beta",
+      "sha256": "6afbf7073ada9e53864b2dbcb25c21bdb83a31d06a7199b3b20df51a3db33a60"
+    },
+    "bundleIdentity": {
+      "CFBundleIdentifier": "com.webjam.app",
+      "CFBundleShortVersionString": "0.29.0",
+      "CFBundleVersion": "0.29.0",
+      "CFBundleExecutable": "WebJam"
+    },
+    "transportSha256": "365742aab558eba73b6f63cb4991e2629c091085001a592c959525bf9ac61c18",
+    "actualBundledTargetReadByProductionReader": true,
+    "frozenWebJoinActionActuallyUsed": false,
+    "installerOrQuarantineRemovalScriptExecuted": false,
+    "signatureAndArchitectureChecks": {
+      "ditto": {
+        "exitCode": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "signature": {
+        "exitCode": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "appArch": {
+        "exitCode": 0,
+        "stdout": "arm64",
+        "stderr": ""
+      },
+      "transportArch": {
+        "exitCode": 0,
+        "stdout": "arm64",
+        "stderr": ""
+      }
+    },
+    "productionTransport": {
+      "exitCode": 0,
+      "timedOut": false,
+      "stdoutSha256": "a083c5ef117613ed1d4b8a261ba6d20fe258c56836fd4347d589da52de072606",
+      "behavior": "Actual signed packaged sidecar ready/hello idle, then Stop. No audio/provider start."
+    }
+  },
+  "nativeLocalGui": {
+    "source": "bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35",
+    "actualPackageNormalLaunch": true,
+    "recoveryExplanationVisibleAndInAx": true,
+    "editingClearedOldError": true,
+    "returnRetryRestoredFullError": true,
+    "backReturnedLauncher": true,
+    "cleanup": {
+      "WebJamAbsent": true,
+      "webjam-fabricAbsent": true,
+      "defaultConfigMetadataUnchanged": true
+    },
+    "firstCloseNote": "OriginalPID exited; following appAX read observed a replacement same-bundlePID. Owned replacement then closed without another app activation/read; OS process checks prove noWebJam/transport remains. Original observation preserved.",
+    "configurationValuesReadOrChanged": false,
+    "installerOrQuarantineRemovalScriptExecuted": false,
+    "signaturesChanged": false,
+    "providerOrMediaStarted": false,
+    "actualMusic": false
+  },
+  "newPrivateDeployment": {
+    "at": "2026-10-31T13:01:12.471749+00:00",
+    "source": "4ed1525c84f48173077f506261cb5acd19e3c1dc",
+    "runtime": "a9724702-3ce5-418a-bbd4-950f2e169c9e",
+    "trafficPercent": 100,
+    "previousVersionRollbackRetained": "6293386f-31b8-4415-bf0b-f81296190a4d",
+    "versionComparison": {
+      "at": "2026-10-31T12:55:14.658064+00:00",
+      "source": "4ed1525c84f48173077f506261cb5acd19e3c1dc",
+      "previousVersion": "6293386f-31b8-4415-bf0b-f81296190a4d",
+      "newVersion": "a9724702-3ce5-418a-bbd4-950f2e169c9e",
+      "all17PlainVariablesExactlyEqual": true,
+      "all5DurableObjectBindingsExactlyEqual": true,
+      "all5SecretBindingMetadataExactlyEqual": true,
+      "runtimeSettingsExactlyEqual": true,
+      "secretValuesReadOrChanged": false,
+      "aiTurnAuthorityParticipationAndIdentitySettingsUnchanged": true,
+      "publicLaunch": false
+    },
+    "onlyApplicationChange": "lobby.css; backend/config/migration bytes unchanged",
+    "assetCount": 65,
+    "allAssetSourceAndPackagedBytesEqual": true,
+    "assetPrivateValuesExcluded": true,
+    "cssSha256": "a91c1092bd565dbde68efd903a8a98e96c73f440f765f34a566fb5a7b187803b",
+    "health": {
+      "kind": "healthy",
+      "checkedAt": "2026-10-31T12:59:47.890Z",
+      "httpStatus": 200,
+      "issues": [],
+      "storageCheck": "read-only",
+      "providerChecks": "not-performed",
+      "dryRun": true,
+      "notification": "not-requested"
+    }
+  },
+  "hostedLayout": {
+    "source": "4ed1525c84f48173077f506261cb5acd19e3c1dc",
+    "runtime": "a9724702-3ce5-418a-bbd4-950f2e169c9e",
+    "status": "passed",
+    "scope": "One ordinary owned guest, actual hosted WebKit and real socket; viewport layout, not physical iPhone/native zoom/music.",
+    "checks": {
+      "anonymousAssetDenied": true,
+      "normalGuestFanAdmitted": true,
+      "servedMergedCssMatches": true
+    },
+    "cases": [
+      {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "retained": false,
+        "geometry": {
+          "width": 375,
+          "height": 812,
+          "pageWidth": 375,
+          "bodyWidth": 375,
+          "input": {
+            "x": 46,
+            "y": 678,
+            "right": 294,
+            "bottom": 726,
+            "width": 248,
+            "height": 48
+          },
+          "send": {
+            "x": 299,
+            "y": 684,
+            "right": 357,
+            "bottom": 720,
+            "width": 58,
+            "height": 36
+          },
+          "inputUncovered": true,
+          "sendUncovered": true,
+          "fontSize": 16,
+          "role": "fan",
+          "verified": false,
+          "band": false
+        },
+        "image": "375x812.png",
+        "imageSha256": "cd7bb05360e0b6cbe829382868f38864d48349a6c8e1714265e808691be27b0c"
+      },
+      {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "retained": false,
+        "geometry": {
+          "width": 390,
+          "height": 844,
+          "pageWidth": 390,
+          "bodyWidth": 390,
+          "input": {
+            "x": 46,
+            "y": 710,
+            "right": 309,
+            "bottom": 758,
+            "width": 263,
+            "height": 48
+          },
+          "send": {
+            "x": 314,
+            "y": 716,
+            "right": 372,
+            "bottom": 752,
+            "width": 58,
+            "height": 36
+          },
+          "inputUncovered": true,
+          "sendUncovered": true,
+          "fontSize": 16,
+          "role": "fan",
+          "verified": false,
+          "band": false
+        },
+        "image": "390x844.png",
+        "imageSha256": "d90f660f2c600f335642f22b1cb7f07b8962c6f0c9e4dabc1361d2ecaecddb0b"
+      },
+      {
+        "viewport": {
+          "width": 300,
+          "height": 299
+        },
+        "retained": true,
+        "geometry": {
+          "width": 300,
+          "height": 299,
+          "pageWidth": 300,
+          "bodyWidth": 300,
+          "input": {
+            "x": 46,
+            "y": 185.5,
+            "right": 223,
+            "bottom": 231.5,
+            "width": 177,
+            "height": 46
+          },
+          "send": {
+            "x": 226,
+            "y": 192.5,
+            "right": 284,
+            "bottom": 224.5,
+            "width": 58,
+            "height": 32
+          },
+          "inputUncovered": true,
+          "sendUncovered": true,
+          "fontSize": 16,
+          "role": "fan",
+          "verified": false,
+          "band": false
+        },
+        "image": "300x299-retained.png",
+        "imageSha256": "ae373171afd9b7a8fce4372baf88a174155ec44dcdd260e5d4f6f8d509caa089"
+      }
+    ],
+    "tabObservations": [
+      {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "tag": "BODY",
+        "send": false
+      },
+      {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "tag": "BODY",
+        "send": false
+      },
+      {
+        "viewport": {
+          "width": 300,
+          "height": 299
+        },
+        "tag": "DIV",
+        "send": false
+      }
+    ],
+    "cleanup": {
+      "logoutStatus": 200,
+      "assetAfterLogoutStatus": 401,
+      "contextClosed": true,
+      "browserClosed": true
+    },
+    "pageErrors": 0,
+    "actualMusic": false,
+    "focusScope": "WebKit viewport containment uses ordinary locator focus after recording actual Tab target. This is not a WebKit keyboard navigation pass; real Tab/Space proof is separate native Chrome/CI evidence.",
+    "originalFailedAttempt": {
+      "status": "failed",
+      "failedStage": "mobile-375",
+      "errorType": "Error",
+      "cleanup": {
+        "logoutStatus": 403,
+        "contextClosed": true,
+        "browserClosed": true
+      }
+    },
+    "firstAttemptDiagnosis": "Original mobile precondition assumed one WebKitTab focuses Send; the later actual Tab observations instead show BODY/DIV. Original logout omitted required JSON body, returning403. New scoped viewport run records actual Tab targets and uses ordinary focus; JSON logout200 plus asset401 passed. Original failure is unchanged; no original-session revocation is claimed."
+  },
+  "newPublicArtifacts": {
+    "hosted-390x844.png": {
+      "bytes": 82473,
+      "sha256": "d90f660f2c600f335642f22b1cb7f07b8962c6f0c9e4dabc1361d2ecaecddb0b"
+    },
+    "native-incomplete-invite.jpg": {
+      "bytes": 43638,
+      "sha256": "943abdbdbbb949fcdce83e4168fe779acaac9bffcb64ffb4e2adf0d59ba07507"
+    },
+    "native-edited-invite-ax.txt": {
+      "bytes": 1427,
+      "sha256": "06c3fbcb9d5a1efe5ff010058c4b3890c607f0950346afb58f45855c4c4638a1"
+    },
+    "native-retried-invite-ax.txt": {
+      "bytes": 1392,
+      "sha256": "14b3eb058514b9599596fd4f8c1d404dd7c2f1da379e1b3e73383d827c8d6857"
+    },
+    "hosted-375x812.png": {
+      "bytes": 81029,
+      "sha256": "cd7bb05360e0b6cbe829382868f38864d48349a6c8e1714265e808691be27b0c"
+    },
+    "hosted-300x299-retained.png": {
+      "bytes": 30934,
+      "sha256": "ae373171afd9b7a8fce4372baf88a174155ec44dcdd260e5d4f6f8d509caa089"
+    },
+    "native-returned-launcher-ax.txt": {
+      "bytes": 1197,
+      "sha256": "dd2c89495be112e55450c56984eb57ecb3f8f436de3d851ced3b436192927924"
+    },
+    "native-incomplete-invite-ax.txt": {
+      "bytes": 1392,
+      "sha256": "14b3eb058514b9599596fd4f8c1d404dd7c2f1da379e1b3e73383d827c8d6857"
+    }
+  }
+}

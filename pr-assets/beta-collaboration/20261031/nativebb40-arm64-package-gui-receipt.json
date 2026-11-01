@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-31T08:25:03.570513+00:00",
+  "source": "bb40fac7fcaa032c2f19cf9af8c49ac4276d3cf1",
+  "sourceTree": "9f6af28b1429a71f011bf82af7dea25327613a70",
+  "target": "macos-arm64",
+  "packageRun": "https://github.com/rupret007/webjam/actions/runs/41181580413",
+  "artifact": {
+    "id": 13035694388,
+    "bytes": 456511553,
+    "digest": "sha256:f0946862d1bb40b1c88b31d7143e2031dfdc250fc03688c0f5bbdde5a5699e35",
+    "downloadedDigestMatches": true,
+    "zipCRCVerified": true,
+    "innerZipSha256": "d8d9f68750073d548c16453311d2fe2cab857dd1f207d641be550afa4b1c8ad4"
+  },
+  "static": {
+    "embeddedSourceMatches": true,
+    "signature": "codesign --verify --deep --strict passed; no trust change",
+    "appArchitecture": "arm64",
+    "transportArchitecture": "arm64",
+    "transportSha256": "894239b1e6782b47f977281a2e4cdde1f554651aefb58554fb6ec343d6bc912e",
+    "transportManifestMatches": true,
+    "installerAndReadmeBytesMatchSource": true,
+    "installerQuarantineOrMobileScriptsExecuted": false
+  },
+  "productionTransport": {
+    "signatureRequired": true,
+    "readyAndHelloMatchBuildAndIdle": true,
+    "stoppedCleanly": true,
+    "receiptSha256": "0608f7ee19b5636e4b6ecccbdd0800631cb615d3df1e91c67b67004558894d92"
+  },
+  "normalFrozenGUI": {
+    "actualKernelExecutableMatchedVerifiedStageBeforeInput": true,
+    "embeddedSourceMatches": true,
+    "pid": 85746,
+    "journey": "Music launcher > Join > incomplete URI > Join > edit > Return retry > Back > window Close",
+    "checks": {
+      "fullExplanationInMacOSAX": true,
+      "editClearsStaleError": true,
+      "keyboardRetryRestoresExplanation": true,
+      "returnedToMusicLauncher": true,
+      "privateInputMasked": true
+    },
+    "normalWindowCloseLeavesNoWebJamOrTransport": true,
+    "savedConfigurationMetadataUnchanged": true,
+    "configurationValuesReadOrChanged": false
+  },
+  "preservedFailures": {
+    "source83MacOSAXOmission": true,
+    "firstCmdQCleanupCheck": "Process remained. The launch-dialog Quit menu was disabled; normal window Close subsequently exited. Initial failed receipt retained. No process termination used."
+  },
+  "admission": {
+    "limits": "load1 < 10, swap < 80%, free and projected disk >= 15 GiB",
+    "allStaticTransportAndGUILaunchGuardsAdmitted": true,
+    "limitsChanged": false
+  },
+  "artifacts": [
+    {
+      "path": "nativebb40-malformed-join.png",
+      "bytes": 46001,
+      "sha256": "64440492b0ec644a080cf9b2733599ed16d7901f08f3cdb15481905e63bcf5c5"
+    },
+    {
+      "path": "nativebb40-malformed-join-ax.txt",
+      "bytes": 1512,
+      "sha256": "3d5a9132b105b3aa1c00a80a279b4a5da206095cbbee4a91fc295de8b528fea6"
+    },
+    {
+      "path": "nativebb40-edited-join-ax.txt",
+      "bytes": 1511,
+      "sha256": "410b90a87fe7c0d9159f3f363ef16833a2ca1415f01220df4631fea3fa7a901d"
+    },
+    {
+      "path": "nativebb40-retried-join-ax.txt",
+      "bytes": 1596,
+      "sha256": "a44b69688d07794b9e3e87fcdc55bb27beeb0e7724c3cb2dac41a6553ed63220"
+    }
+  ],
+  "limits": {
+    "actualMusic": false,
+    "physicalIntelMac": false,
+    "physicalWindowsPC": false,
+    "fullVoiceOver": false,
+    "cameraMicrophoneOrProviderStarted": false,
+    "publicRelease": false,
+    "aiOrTurnActivated": false
+  },
+  "desktopCohort": {
+    "jobsObservedAt": "2026-10-31T08:31:37.277303+00:00",
+    "artifactsObservedAt": "2026-10-31T08:32:56.515874+00:00",
+    "completedJobs": 22,
+    "successfulJobs": 16,
+    "skippedJobs": 6,
+    "otherResults": 0,
+    "desktopJobs": [
+      {
+        "id": 124484800018,
+        "name": "Build Desktop (linux-x64)",
+        "conclusion": "success",
+        "completedAt": "2026-10-31T08:11:03Z"
+      },
+      {
+        "id": 124484800032,
+        "name": "Build Desktop (windows-x64)",
+        "conclusion": "success",
+        "completedAt": "2026-10-31T08:18:51Z"
+      },
+      {
+        "id": 124484800036,
+        "name": "Build Desktop (macos-arm64)",
+        "conclusion": "success",
+        "completedAt": "2026-10-31T08:16:02Z"
+      },
+      {
+        "id": 124484800049,
+        "name": "Build Desktop (macos-x64)",
+        "conclusion": "success",
+        "completedAt": "2026-10-31T08:31:05Z"
+      }
+    ],
+    "artifacts": [
+      {
+        "id": 13036762004,
+        "name": "webjam-macos-x64",
+        "bytes": 471460999,
+        "digest": "sha256:bf7c7b93b20033e2f14c402046795c0152a547778e1b7985307964defeb11a76",
+        "head": "bb40fac7fcaa032c2f19cf9af8c49ac4276d3cf1",
+        "expired": false
+      },
+      {
+        "id": 13036610720,
+        "name": "webjam-windows-x64",
+        "bytes": 610884199,
+        "digest": "sha256:df7bd38b1fb869ce557d288b28d009dd83755a9c20c486c1455df8374bb31dfb",
+        "head": "bb40fac7fcaa032c2f19cf9af8c49ac4276d3cf1",
+        "expired": false
+      },
+      {
+        "id": 13035758533,
+        "name": "webjam-linux-x64",
+        "bytes": 457714132,
+        "digest": "sha256:308b7df2dccb1533e31c11ca2d177bb0ba28d957dbba924d40833f736e0e5df5",
+        "head": "bb40fac7fcaa032c2f19cf9af8c49ac4276d3cf1",
+        "expired": false
+      },
+      {
+        "id": 13035694388,
+        "name": "webjam-macos-arm64",
+        "bytes": 456511553,
+        "digest": "sha256:f0946862d1bb40b1c88b31d7143e2031dfdc250fc03688c0f5bbdde5a5699e35",
+        "head": "bb40fac7fcaa032c2f19cf9af8c49ac4276d3cf1",
+        "expired": false
+      }
+    ],
+    "releaseTrustAndPublicationJobsSkipped": true,
+    "nonARMArchivesLocallyDownloaded": false,
+    "physicalDeviceOrMusicQualification": false
+  }
+}

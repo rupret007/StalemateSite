@@ -3,7 +3,7 @@
 const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
-const { resolveTestPort } = require('./lib/e2e-test-server.cjs');
+const { resolveTestPort, parseHangoutRelayPath } = require('./lib/e2e-test-server.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const PORT = resolveTestPort(process.env);
@@ -11,20 +11,22 @@ const PROJECT_PREFIX = '/StalemateSite';
 const MIME = {
     '.css': 'text/css; charset=utf-8',
     '.html': 'text/html; charset=utf-8',
+    '.ics': 'text/calendar; charset=utf-8',
     '.ico': 'image/x-icon',
     '.js': 'text/javascript; charset=utf-8',
     '.json': 'application/json; charset=utf-8',
     '.jpg': 'image/jpeg',
     '.jpeg': 'image/jpeg',
     '.m4a': 'audio/mp4',
+    '.mjs': 'text/javascript; charset=utf-8',
+    '.tflite': 'application/octet-stream',
+    '.wasm': 'application/wasm',
     '.mp4': 'video/mp4',
     '.png': 'image/png',
     '.svg': 'image/svg+xml',
     '.txt': 'text/plain; charset=utf-8',
     '.webp': 'image/webp',
-    '.wasm': 'application/wasm',
-    '.xml': 'application/xml; charset=utf-8',
-    '.ics': 'text/calendar; charset=utf-8'
+    '.xml': 'application/xml; charset=utf-8'
 };
 
 function stripPrefix(urlPath) {
@@ -67,8 +69,6 @@ function sendFile(request, response, filePath, status = 200) {
         'Content-Length': contents.length,
         'Accept-Ranges': 'bytes'
     };
-    // WebKit probes media with bytes=0-1 before requesting the remaining file.
-    // Ignore Range on HEAD, error responses, and unsupported multi-range requests.
     const range = request.method === 'GET' && status === 200
         && /^bytes=(\d*)-(\d*)$/.exec(request.headers.range || '');
     if (range && (range[1] || range[2])) {
@@ -88,41 +88,93 @@ function sendFile(request, response, filePath, status = 200) {
     send(response, status, request.method === 'HEAD' ? undefined : contents, headers);
 }
 
-const server = http.createServer((request, response) => {
-    if (request.method !== 'GET' && request.method !== 'HEAD') {
-        send(response, 405, 'Method Not Allowed', { Allow: 'GET, HEAD' });
-        return;
-    }
+async function main() {
+    const { createHangoutRelay } = await import('./hangout-relay-dev.mjs');
+    const { createEntrySiteRegistry } = await import('../hangout-worker/src/community-integration.mjs');
+    const origin = `http://127.0.0.1:${PORT}`;
+    // Each browser scenario can choose a namespace while retaining CSP's same-origin
+    // relay. Engines keep their real limits, moderation state and membership rules.
+    const hangoutRelays = new Map();
+    const relayFor = (namespace) => {
+        if (!hangoutRelays.has(namespace)) hangoutRelays.set(namespace, createHangoutRelay({
+            previewKey: 'local-preview-key-0001',
+            devAdminKey: process.env.HANGOUT_DEV_ADMIN_KEY || 'local-dev-admin-key-0001',
+            origins: origin,
+            lobbyLimits: { pmMinLobbyMs: 1500,
+                // Synthetic browser-invitation fixture on this loopback server
+                // only. No production origin or Web Join provider is enabled.
+                ...(namespace.startsWith('webjam-browser-') ? { webJoinOrigins: ['https://webjam.example'] } : {}),
+                // Explicit loopback-only partner fixture. Never added to the
+                // production registry or enabled by a visitor query parameter.
+                ...(namespace.startsWith('shared-community-') ? { entrySites: createEntrySiteRegistry([{ id: 'makers', label: 'Makers & Friends' }]) } : {}) }
+        }));
+        return hangoutRelays.get(namespace);
+    };
 
-    const urlPath = new URL(request.url, `http://127.0.0.1:${PORT}`).pathname;
-    const filePath = safeJoin(urlPath);
-
-    if (!filePath) {
-        send(response, 400, 'Bad Request', { 'Content-Type': 'text/plain; charset=utf-8' });
-        return;
-    }
-
-    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-        sendFile(request, response, filePath);
-        return;
-    }
-
-    if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
-        const indexPath = path.join(filePath, 'index.html');
-        if (fs.existsSync(indexPath)) {
-            sendFile(request, response, indexPath);
+    const server = http.createServer((request, response) => {
+        if (request.method !== 'GET' && request.method !== 'HEAD') {
+            send(response, 405, 'Method Not Allowed', { Allow: 'GET, HEAD' });
             return;
         }
-    }
 
-    sendFile(request, response, path.join(ROOT, '404.html'), 404);
-});
+        const url = new URL(request.url, origin);
+        const urlPath = url.pathname;
 
-// Keep idle sockets open longer than any client pool so a reused keep-alive
-// socket is never closed mid-request (undici "other side closed" flake).
-server.keepAliveTimeout = 65000;
-server.headersTimeout = 66000;
+        const relayRoute = parseHangoutRelayPath(urlPath);
+        if (relayRoute?.pathname === '/__test/modlog.json') {
+            const body = JSON.stringify(relayFor(relayRoute.namespace).lobby.modlog);
+            send(response, 200, request.method === 'HEAD' ? undefined : body, {
+                'Content-Type': 'application/json; charset=utf-8',
+                'Content-Length': Buffer.byteLength(body)
+            });
+            return;
+        }
 
-server.listen(PORT, '127.0.0.1', () => {
-    process.stdout.write(`Stalemate test server on http://127.0.0.1:${PORT}\n`);
+        const filePath = safeJoin(urlPath);
+
+        if (!filePath) {
+            send(response, 400, 'Bad Request', { 'Content-Type': 'text/plain; charset=utf-8' });
+            return;
+        }
+
+        if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+            sendFile(request, response, filePath);
+            return;
+        }
+
+        if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
+            const indexPath = path.join(filePath, 'index.html');
+            if (fs.existsSync(indexPath)) {
+                sendFile(request, response, indexPath);
+                return;
+            }
+        }
+
+        sendFile(request, response, path.join(ROOT, '404.html'), 404);
+    });
+
+    // Keep idle sockets open longer than any client pool so a reused keep-alive
+    // socket is never closed mid-request (undici "other side closed" flake).
+    server.keepAliveTimeout = 65000;
+    server.headersTimeout = 66000;
+
+    server.on('upgrade', (req, socket, head) => {
+        const url = new URL(req.url, origin);
+        const relayRoute = parseHangoutRelayPath(url.pathname);
+        if (!relayRoute) {
+            socket.destroy();
+            return;
+        }
+        url.pathname = relayRoute.pathname;
+        relayFor(relayRoute.namespace).handleUpgrade(req, socket, head, url);
+    });
+
+    server.listen(PORT, '127.0.0.1', () => {
+        process.stdout.write(`Stalemate test server on ${origin}\n`);
+    });
+}
+
+main().catch((error) => {
+    process.stderr.write(`${error.stack || error}\n`);
+    process.exit(1);
 });

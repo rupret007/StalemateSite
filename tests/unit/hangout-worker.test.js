@@ -5,8 +5,15 @@ import worker, { HangoutQuota, HangoutRoom } from '../../hangout-worker/src/inde
 
 const KEY = 'k'.repeat(24);
 const ROOM = 'a'.repeat(64);
-const env = { HANGOUT_PREVIEW_KEY: KEY, ROOMS: {}, QUOTA: {} };
+const env = { HANGOUT_PREVIEW_KEY: KEY, ROOMS: {}, QUOTA: { idFromName: () => 'global', get: () => ({ fetch: async () => ({ status: 200 }) }) } };
 const url = (q) => new URL(`https://relay.example/room?${q}`);
+const doState = (extra = {}) => ({
+    blockConcurrencyWhile: (fn) => fn(),
+    acceptWebSocket: vi.fn(),
+    getWebSockets: () => [],
+    getTags: (ws) => (extra.getTags ? extra.getTags(ws) : []),
+    ...extra
+});
 
 describe('hangout relay worker rules', () => {
     it('fails closed when the preview secret or bindings are missing', async () => {
@@ -59,7 +66,7 @@ describe('hangout relay worker rules', () => {
 
     it('worker answers 503 when quota accounting is unreachable', async () => {
         const brokenQuota = { idFromName: () => 'x', get: () => ({ fetch: async () => { throw new Error('down'); } }) };
-        const room = new HangoutRoom({ getWebSockets: () => [] }, { ...env, QUOTA: brokenQuota });
+        const room = new HangoutRoom(doState(), { ...env, QUOTA: brokenQuota });
         const rooms = { idFromName: () => 'room', get: () => room };
         const req = wsRequest(ROOM, KEY);
         expect((await worker.fetch(req, { ...env, QUOTA: brokenQuota, ROOMS: rooms })).status).toBe(503);
@@ -105,7 +112,9 @@ describe('hangout relay worker rules', () => {
 
     it('echoes Sec-WebSocket-Protocol on the 101 when the client offered one', async () => {
         globalThis.WebSocketPair = vi.fn(function WebSocketPair() {
-            return [{}, { send: () => {}, close: () => {} }];
+            const client = {};
+            const server = { send: () => {}, close: () => {}, serializeAttachment: () => {} };
+            return [client, server];
         });
         let upgradeInit;
         const ResponseMock = vi.fn(function Response(body, init) {
@@ -117,12 +126,12 @@ describe('hangout relay worker rules', () => {
             };
         });
         vi.stubGlobal('Response', ResponseMock);
-        const state = { getWebSockets: () => [], acceptWebSocket: vi.fn() };
+        const state = doState();
         const quotaBinding = {
             idFromName: () => 'global',
             get: () => ({ fetch: async () => ({ status: 200 }) })
         };
-        const room = new HangoutRoom(state, { QUOTA: quotaBinding });
+        const room = new HangoutRoom(state, { ...env, QUOTA: quotaBinding });
         const res = await room.fetch(wsRequest(ROOM, KEY));
         expect(res.status).toBe(101);
         expect(res.headers.get('Sec-WebSocket-Protocol')).toBe(KEY);
@@ -132,63 +141,87 @@ describe('hangout relay worker rules', () => {
     it('persists per-socket rate bucket via WebSocket attachments across a simulated DO hibernation', async () => {
         const tight = { ...limitsFrom({}), messagesPerConnection: 5, burst: 100, refillPerSecond: 8 };
         const frame = JSON.stringify({ iv: 'A'.repeat(16), c: 'x' });
-        let attachment;
+        const tag = 'p-test';
+        let attachment = { v: 1, id: tag, bucket: { v: 1, tokens: 30, last: 0, total: 0 } };
+        let runRestore;
         const ws = {
             send: vi.fn(),
             close: vi.fn(),
             serializeAttachment: (data) => { attachment = data; },
             deserializeAttachment: () => attachment
         };
-        const tag = 'p-test';
         const state = {
+            blockConcurrencyWhile: (fn) => { runRestore = fn; return Promise.resolve(); },
+            acceptWebSocket: vi.fn(),
             getWebSockets: () => [ws],
             getTags: () => [tag]
         };
 
         const roomBefore = new HangoutRoom(state, env);
         roomBefore.limits = tight;
+        await runRestore();
         for (let i = 0; i < 4; i += 1) await roomBefore.webSocketMessage(ws, frame);
-        expect(attachment).toEqual(expect.objectContaining({ total: 4 }));
+        expect(attachment.bucket).toEqual(expect.objectContaining({ total: 4 }));
         expect(ws.close).not.toHaveBeenCalled();
 
-        const roomAfter = new HangoutRoom(state, env);
+        let runRestoreAfter;
+        const stateAfter = {
+            blockConcurrencyWhile: (fn) => { runRestoreAfter = fn; return Promise.resolve(); },
+            acceptWebSocket: vi.fn(),
+            getWebSockets: () => [ws],
+            getTags: () => [tag]
+        };
+        const roomAfter = new HangoutRoom(stateAfter, env);
         roomAfter.limits = tight;
+        await runRestoreAfter();
         await roomAfter.webSocketMessage(ws, frame);
         expect(ws.close).not.toHaveBeenCalled();
-        expect(attachment.total).toBe(5);
+        expect(attachment.bucket.total).toBe(5);
 
         await roomAfter.webSocketMessage(ws, frame);
         expect(ws.close).toHaveBeenCalledWith(4429, 'message cap');
-        expect(attachment.total).toBe(6);
+        expect(attachment.bucket.total).toBe(6);
     });
 
     it('restores token-bucket counters from attachment after hibernation, not a fresh burst', async () => {
         const tight = { ...limitsFrom({}), messagesPerConnection: 8000, burst: 30, refillPerSecond: 8 };
         const frame = JSON.stringify({ iv: 'A'.repeat(16), c: 'x' });
-        let attachment;
+        const tag = 'p-burst';
+        let attachment = { v: 1, id: tag, bucket: { v: 1, tokens: 30, last: 0, total: 0 } };
+        let runRestore;
         const ws = {
             send: vi.fn(),
             close: vi.fn(),
             serializeAttachment: (data) => { attachment = data; },
             deserializeAttachment: () => attachment
         };
-        const tag = 'p-burst';
         const state = {
+            blockConcurrencyWhile: (fn) => { runRestore = fn; return Promise.resolve(); },
+            acceptWebSocket: vi.fn(),
             getWebSockets: () => [ws],
             getTags: () => [tag]
         };
 
         const roomBefore = new HangoutRoom(state, env);
         roomBefore.limits = tight;
+        await runRestore();
         for (let i = 0; i < 31; i += 1) await roomBefore.webSocketMessage(ws, frame);
-        expect(attachment.total).toBe(31);
+        expect(attachment.bucket.total).toBe(31);
         expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ slow: true }));
 
-        const roomAfter = new HangoutRoom(state, env);
+        let runRestoreAfter;
+        const stateAfter = {
+            blockConcurrencyWhile: (fn) => { runRestoreAfter = fn; return Promise.resolve(); },
+            acceptWebSocket: vi.fn(),
+            getWebSockets: () => [ws],
+            getTags: () => [tag]
+        };
+        const roomAfter = new HangoutRoom(stateAfter, env);
         roomAfter.limits = tight;
+        await runRestoreAfter();
         ws.send.mockClear();
         await roomAfter.webSocketMessage(ws, frame);
-        expect(attachment.total).toBe(32);
+        expect(attachment.bucket.total).toBe(32);
         expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ slow: true }));
     });
 });

@@ -1,0 +1,142 @@
+{
+  "PR": 409,
+  "reviewedHead": "4734e04e2f31a19726dd43d1f535500e936978ba",
+  "actualCIcheckout": "2b085ce6d5258bbc9dbc7c49f8c127f5ef6c6da1",
+  "reviewedTree": "9f6af28b1429a71f011bf82af7dea25327613a70",
+  "CIcheckoutTree": "9f6af28b1429a71f011bf82af7dea25327613a70",
+  "treesEqual": true,
+  "run": 41177625235,
+  "job": 124468347336,
+  "fullSuiteModuleLoop": {
+    "modulesInvoked": 553,
+    "allTrackedModulesOnce": true,
+    "totals": {
+      "passed": 12760,
+      "skipped": 60
+    }
+  },
+  "nativeWindowsACL": 8,
+  "nativeWindowsDirectorySharing": 4,
+  "all16ApplicableChecksPassed": true,
+  "actualMusic": false,
+  "frozenMacOSAXGreen": false,
+  "qualifiedAt": "2026-10-31T07:13:55.630873+00:00",
+  "merged": true,
+  "merge": "bb40fac7fcaa032c2f19cf9af8c49ac4276d3cf1",
+  "mergeTree": "9f6af28b1429a71f011bf82af7dea25327613a70",
+  "allOriginal401403404405And408Included": true,
+  "rawLog": {
+    "job": 124468347336,
+    "bytes": 2491035,
+    "sha256": "5daf85b1922d25193218aeea7bcd8e336de5aea69088684cddc18bfc9f873d25"
+  },
+  "CIurl": "https://github.com/rupret007/webjam/actions/runs/41177625235/job/124468347336",
+  "windowsCIurl": "https://github.com/rupret007/webjam/actions/runs/41177625235/job/124468347314",
+  "windowsArtifact": {
+    "artifactID": 13032879821,
+    "job": 124468347314,
+    "bytes": 38061,
+    "sha256": "99f68e0ebe84263e1732f6856bc0acd3a57b2abf9c2be16f265d901a11cba8d4",
+    "officialDigest": "sha256:99f68e0ebe84263e1732f6856bc0acd3a57b2abf9c2be16f265d901a11cba8d4"
+  },
+  "windowsNativeACL": {
+    "executed": 8,
+    "pytestExit": 0,
+    "runnerAborted": false,
+    "allExpectedCollectedAndAllPhasesPass": true,
+    "JUnitCases": 8,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "apiMocked": false,
+    "existingACLsModified": false,
+    "sourceBeforeEqualsAfter": true,
+    "bindings": {
+      "guard": {
+        "path": "services/windows_transport_permissions.py",
+        "gitLFsha256": "4f1373209fb8b3dd46b8828f5b1f5f150011ff33a2accf846a48638e066cd3e8",
+        "actualWindowsCRLFsha256": "f22c044d24475cd114228b75e7ce465b239fc43db69345372bafd36cbee2fef2",
+        "exactLFtoCRLFWorkingTreeBinding": true
+      },
+      "control": {
+        "path": "tests/support/windows_transport_permissions_native_control.py",
+        "gitLFsha256": "765cde5fc0fe3cb1b01e28246dfe8f8692b368967ba044b7b7fa2e9be5e11f97",
+        "actualWindowsCRLFsha256": "0a33f80f1b3d03579f23020c6f91d35b0b9e26e1581400daa31a4496e8e0d712",
+        "exactLFtoCRLFWorkingTreeBinding": true
+      }
+    },
+    "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+    "windows": [
+      10,
+      0,
+      26100,
+      2,
+      ""
+    ]
+  },
+  "windowsSharing": {
+    "qualified": true,
+    "tests_run": 4,
+    "expected": [
+      "__main__.DirectorySharing.test_directory_only_fence_without_leaf_handle",
+      "__main__.DirectorySharing.test_full_guard_fences_ancestor_delete_and_rename_until_release",
+      "__main__.DirectorySharing.test_full_guard_refuses_existing_ancestor_delete_and_cleans_up",
+      "__main__.DirectorySharing.test_preexisting_delete_refuses_directory_pin"
+    ],
+    "failures": [],
+    "errors": [],
+    "skips": 0,
+    "source_hashes_before": {
+      "guard": "f22c044d24475cd114228b75e7ce465b239fc43db69345372bafd36cbee2fef2",
+      "control": "4be5f1bffe8835a9f828dbce0ae38067c7a6f90e82264bbf055fbc46ec4302a8"
+    },
+    "source_hashes_after": {
+      "guard": "f22c044d24475cd114228b75e7ce465b239fc43db69345372bafd36cbee2fef2",
+      "control": "4be5f1bffe8835a9f828dbce0ae38067c7a6f90e82264bbf055fbc46ec4302a8"
+    },
+    "python": "3.11.9",
+    "api_mocked": false
+  },
+  "PowerShellSmokeExitScenarios": {
+    "cases": [
+      {
+        "actual_exit": 17,
+        "expected_exit": 17,
+        "first_exit": 17,
+        "helpers_called": [
+          "tests.support.run_frozen_pocket_stage_smoke"
+        ],
+        "passed": true,
+        "second_exit": 0
+      },
+      {
+        "actual_exit": 29,
+        "expected_exit": 29,
+        "first_exit": 0,
+        "helpers_called": [
+          "tests.support.run_frozen_pocket_stage_smoke",
+          "tests.support.run_frozen_reference_studio_smoke"
+        ],
+        "passed": true,
+        "second_exit": 29
+      },
+      {
+        "actual_exit": 0,
+        "expected_exit": 0,
+        "first_exit": 0,
+        "helpers_called": [
+          "tests.support.run_frozen_pocket_stage_smoke",
+          "tests.support.run_frozen_reference_studio_smoke"
+        ],
+        "passed": true,
+        "second_exit": 0
+      }
+    ],
+    "commands_sha256": "a946379efeba156d2778e609ceee1791a2c4d1ee6bf3e4ab1611e02df7972be4",
+    "native_windows": true,
+    "passed": true
+  },
+  "physicalUserWindowsPC": false,
+  "installationOrSigningQualification": false,
+  "limit": "Source/CI qualification; no matching bb40 packages, fixed frozen macOS AX, physical music or public launch claimed."
+}

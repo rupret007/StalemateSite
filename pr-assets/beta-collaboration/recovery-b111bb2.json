@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "preparedAt": "2026-10-19T08:03:15.007766+00:00",
+  "status": "passed",
+  "scope": "Local pinned source-and-assets recovery preparation only; not an executed rollback or complete live service backup.",
+  "sourceCommit": "b111bb2aa070cd791834f40f26665996ad406421",
+  "sourceTree": "56bcdf0dd5d0919472b49954da5a6d14bd720b51",
+  "targetWorker": "stalemate-hangout-beta",
+  "runtimeReference": "0ee7705e-e381-4cb4-a70a-1f26daa10e78",
+  "runtimeReferenceEvidence": {
+    "path": "pr-assets/beta-collaboration/hosted-watch-privacy-asset.json",
+    "sha256": "81af183586204b4ebe55c44f514b07f272e82a64a5d76b4637feff648cedc640",
+    "checkedAt": "2026-10-19T07:28:34.827Z",
+    "liveRuntimeCheckedDuringPreparation": false
+  },
+  "operatorLocalDirectory": ".local/recovery-b111bb2",
+  "archive": {
+    "file": "stalemate-beta-b111bb2.tar.gz",
+    "bytes": 34733077,
+    "sha256": "58ec6699e647980dc31a520e207324cea38c7466f1ce4f7f9819ee5c8dc69822"
+  },
+  "payloadManifestSha256": "061eb0ec18920108b6f06c979e035c2e7cb82c5e62041ac3f420437a25890f68",
+  "recoveryToolSha256": "30991f6bd760b9eacf60de6457434d3e69341b49174a5f67a7a6b71cf91348c4",
+  "counts": {
+    "allowlistedCommittedSourceFiles": 68,
+    "builtBetaAssets": 46,
+    "verifiedPayloadFiles": 114
+  },
+  "selectedGitPaths": [
+    "package.json",
+    "package-lock.json",
+    "scripts/package-pilot.cjs",
+    "hangout-worker/src",
+    "hangout-worker/wrangler.beta.toml",
+    "r",
+    "assets"
+  ],
+  "tools": {
+    "node": "v26.12.0",
+    "git": "git version 2.39.5 (Apple Git-154)",
+    "python": "Python 3.9.6",
+    "wranglerRequiredVersion": "4.151.1",
+    "wranglerExecuted": false
+  },
+  "buildCommand": "node scripts/package-pilot.cjs beta",
+  "criticalSourceSha256": {
+    "hangout-worker/wrangler.beta.toml": "57ab0eae3f1a24422e9e6c7ebdd9e4ffa320c97b80eb2ccd9235a6e71e82b2fc",
+    "package-lock.json": "a30ff3bf7390701f4de57d7d94c85dbde7612cc729bfde430b86dadc10396c44",
+    "hangout-worker/src/beta-entry.mjs": "c0098641511d0c5a72242e9b77ac0cbe9614e2aa2a40e579b00e464a7c5153a3",
+    "hangout-worker/src/beta-auth.mjs": "2340f7705e5f1713b9c88e0fce2149a10c02d8cb235aa6beb794c93b4cfc9b13",
+    "hangout-worker/src/beta-sessions.mjs": "17e052bf2b953031b1d51846bab65d5caeeb2d5f9a43f0d74e0019907109f93b",
+    "hangout-worker/src/community-state.mjs": "9ecfe12e999f1ae1a9b63b47cc5cb2a8782824c32aa17526a502cacb318adc9a",
+    "hangout-worker/src/beta-ops.mjs": "039cd31f4340cf2824fb87fd950e4746c447388b71de9ce0d63fd32d34910339",
+    "r/45662413410ed051/room.js": "b5593e7c9d7933bdfe595e5e57ef64d474fb678265dd82e9ea0cd9b720a17158",
+    "r/45662413410ed051/lobby/lobby.js": "b11c1a268478ccaf5af1cd4daaf780a5bc6a190f2ee789cd56991eb5de3df7d1",
+    "r/45662413410ed051/lobby/lobby-room.js": "114170b76b44436e8571346dba0d95554c701c77ac5814f78d3a98a4e8c50516"
+  },
+  "verification": {
+    "archiveChecksum": "passed",
+    "safeFreshExtraction": "passed",
+    "sourceFilesComparedToPinnedGitObjects": 68,
+    "assetFilesComparedToSource": 46,
+    "extractedOfflineAssetRebuild": "passed",
+    "postRebuildPayloadDigests": "passed",
+    "forbiddenArchiveEntries": 0,
+    "ownerOnlyPermissions": "passed",
+    "existingDeploymentCheckoutUnchanged": true
+  },
+  "exclusions": [
+    "node_modules",
+    ".git",
+    ".wrangler",
+    ".env",
+    ".dev.vars",
+    "credentials and authentication material",
+    "logs and private evidence",
+    "DO storage and provider state",
+    "Wrangler executable and npm cache"
+  ],
+  "deploymentPerformed": false,
+  "rollbackDrillPerformed": false,
+  "networkPerformed": false,
+  "admissionsPerformed": false,
+  "secretsRead": false,
+  "liveStateBackup": false,
+  "limits": [
+    "Runtime reference comes from prior protected-asset receipt; no live runtime/provider query during preparation.",
+    "No durable data, provider configuration, Access policy, remote overrides or credentials are included.",
+    "No node_modules, cached packages or Wrangler executable are included; future Worker compilation/deployment needs separately available tooling and dependencies.",
+    "Extracted source/asset verification does not establish deployment or rollback success."
+  ]
+}

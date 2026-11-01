@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-31T04:20:56.651851+00:00",
+  "PR": 407,
+  "merge": "83d2950b5f95baa183c392bb7b5eb2da4a496114",
+  "parents": [
+    "299e3da2c82495f824bfdbb29ec65dbaa0651377",
+    "92739df418d00c983cfd54c818e54945ab1aa43e"
+  ],
+  "tree": "52b14fd25600c8449b46ac807ade20def3888a38",
+  "treeEqualsReviewedHeadAndActualCI": true,
+  "sourceWTBranchPreserved": "codex/join-before-audio-20261030",
+  "sourceWTTrackedClean": true
+}

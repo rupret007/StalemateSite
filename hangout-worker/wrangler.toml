@@ -3,6 +3,7 @@
 name = "stalemate-hangout"
 main = "src/index.mjs"
 compatibility_date = "2025-10-01"
+compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
 [[durable_objects.bindings]]
@@ -13,6 +14,43 @@ class_name = "HangoutRoom"
 name = "QUOTA"
 class_name = "HangoutQuota"
 
+[[durable_objects.bindings]]
+name = "LOBBY"
+class_name = "HangoutLobby"
+
+[[durable_objects.bindings]]
+name = "TURN_BUDGET"
+class_name = "HangoutTurnBudget"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["HangoutRoom", "HangoutQuota"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["HangoutLobby"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["HangoutTurnBudget"]
+
+# Lobby (hidden, not deployed). Public ids only here; fill in after creating the Cloudflare Access app.
+# Secrets via `wrangler secret put`: HANGOUT_PREVIEW_KEY, HANGOUT_HMAC_KEY (32+ chars), HANGOUT_TURNSTILE_SECRET,
+# HANGOUT_OWNER_EMAIL, HANGOUT_BAND_EMAILS. Any missing => the lobby answers 503.
+[vars]
+HANGOUT_OPEN = "1"
+HANGOUT_TURN_ENABLED = "0"
+HANGOUT_TURN_MONTHLY_GB = "800"
+HANGOUT_CF_ACCOUNT_ID = ""
+HANGOUT_ACCESS_TEAM = ""
+HANGOUT_ACCESS_AUD = ""
+WEBJAM_WEB_ORIGINS = ""
+# Review-only AI is opt-in; no provider traffic until set to "review" and a Worker OPENAI_API_KEY secret exists.
+HANGOUT_AI_MODERATION = "off"
+HANGOUT_AI_DAILY_LIMIT = "1000"
+
+# Optional community roles/ownership: configure through deployment variables/secrets.
+# HANGOUT_MODERATOR_EMAILS: owner-maintained staff allowlist; no UI can modify it.
+# HANGOUT_OWNER_ACCESS_AUD: a DIFFERENT Access application's audience for public email OTP.
+# HANGOUT_OWNER_RETURN: https://stalemate.band/r/45662413410ed051/lobby/
+# Protect /lobby-owner* separately; never broaden the /lobby-admin* staff policy.

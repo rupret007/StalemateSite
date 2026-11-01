@@ -1,0 +1,287 @@
+{
+  "version": 1,
+  "startedAt": "2026-10-19T07:28:53.065Z",
+  "sourceCommit": "b111bb2aa070cd791834f40f26665996ad406421",
+  "runtimeVersion": "0ee7705e-e381-4cb4-a70a-1f26daa10e78",
+  "runId": "df203684",
+  "publicVideoId": "BtnyqIHTDMM",
+  "scope": "Actual YouTube playback and signed synchronization through the protected beta, with two owned guest Chromium contexts on one Mac. No physical iPhone, mobile autoplay, separate-network, WAN-audio, TURN or forced-relay acceptance claim.",
+  "status": "passed",
+  "pageErrors": 0,
+  "checks": {
+    "guestFanRolesAndCaptureOff": true,
+    "actualInitialPlayback": {
+      "samples": [
+        {
+          "role": "host",
+          "providerState": 1,
+          "expectedVideo": true,
+          "providerTime": 0.4726669027252197,
+          "shared": {
+            "expectedVideo": true,
+            "playing": true,
+            "pos": 0,
+            "seq": 1792394935952,
+            "signedVideo": true
+          },
+          "native": {
+            "available": true,
+            "ad": false,
+            "errorVisible": false,
+            "paused": false,
+            "readyState": 4,
+            "width": 854,
+            "time": 0.478276,
+            "frames": 19,
+            "frameCounterType": "decoded"
+          },
+          "autoplayBlockedEvents": 0
+        },
+        {
+          "role": "guest",
+          "providerState": 1,
+          "expectedVideo": true,
+          "providerTime": 0.6652430400543213,
+          "shared": {
+            "expectedVideo": true,
+            "playing": true,
+            "pos": 0,
+            "seq": 1792394935952,
+            "signedVideo": true
+          },
+          "native": {
+            "available": true,
+            "ad": false,
+            "errorVisible": false,
+            "paused": false,
+            "readyState": 4,
+            "width": 854,
+            "time": 0.671477,
+            "frames": 26,
+            "frameCounterType": "decoded"
+          },
+          "autoplayBlockedEvents": 0
+        }
+      ],
+      "normalizedDriftSeconds": 0.19327601602172856
+    },
+    "actualPause": [
+      {
+        "role": "host",
+        "providerState": 2,
+        "expectedVideo": true,
+        "providerTime": 0.48842,
+        "shared": {
+          "expectedVideo": true,
+          "playing": false,
+          "pos": 0.48842,
+          "seq": 1792394937043,
+          "signedVideo": true
+        },
+        "native": {
+          "available": true,
+          "ad": false,
+          "errorVisible": false,
+          "paused": true,
+          "readyState": 4,
+          "width": 854,
+          "time": 0.48842,
+          "frames": 19,
+          "frameCounterType": "decoded"
+        },
+        "autoplayBlockedEvents": 0
+      },
+      {
+        "role": "guest",
+        "providerState": 2,
+        "expectedVideo": true,
+        "providerTime": 0.48842,
+        "shared": {
+          "expectedVideo": true,
+          "playing": false,
+          "pos": 0.48842,
+          "seq": 1792394937043,
+          "signedVideo": true
+        },
+        "native": {
+          "available": true,
+          "ad": false,
+          "errorVisible": false,
+          "paused": true,
+          "readyState": 4,
+          "width": 854,
+          "time": 0.48842,
+          "frames": 48,
+          "frameCounterType": "decoded"
+        },
+        "autoplayBlockedEvents": 0
+      }
+    ],
+    "actualPausedSeek": {
+      "requestedSeconds": 21,
+      "samples": [
+        {
+          "role": "host",
+          "providerState": 2,
+          "expectedVideo": true,
+          "providerTime": 21,
+          "shared": {
+            "expectedVideo": true,
+            "playing": false,
+            "pos": 21,
+            "seq": 1792394938180,
+            "signedVideo": true
+          },
+          "native": {
+            "available": true,
+            "ad": false,
+            "errorVisible": false,
+            "paused": true,
+            "readyState": 4,
+            "width": 854,
+            "time": 21,
+            "frames": 172,
+            "frameCounterType": "decoded"
+          },
+          "autoplayBlockedEvents": 0
+        },
+        {
+          "role": "guest",
+          "providerState": 2,
+          "expectedVideo": true,
+          "providerTime": 21,
+          "shared": {
+            "expectedVideo": true,
+            "playing": false,
+            "pos": 21,
+            "seq": 1792394938180,
+            "signedVideo": true
+          },
+          "native": {
+            "available": true,
+            "ad": false,
+            "errorVisible": false,
+            "paused": true,
+            "readyState": 4,
+            "width": 854,
+            "time": 21,
+            "frames": 201,
+            "frameCounterType": "decoded"
+          },
+          "autoplayBlockedEvents": 0
+        }
+      ]
+    },
+    "actualResume": {
+      "samples": [
+        {
+          "role": "host",
+          "providerState": 1,
+          "expectedVideo": true,
+          "providerTime": 21.70567604005432,
+          "shared": {
+            "expectedVideo": true,
+            "playing": true,
+            "pos": 21.305505925613403,
+            "seq": 1792394938652,
+            "signedVideo": true
+          },
+          "native": {
+            "available": true,
+            "ad": false,
+            "errorVisible": false,
+            "paused": false,
+            "readyState": 4,
+            "width": 854,
+            "time": 21.71073,
+            "frames": 194,
+            "frameCounterType": "decoded"
+          },
+          "autoplayBlockedEvents": 0
+        },
+        {
+          "role": "guest",
+          "providerState": 1,
+          "expectedVideo": true,
+          "providerTime": 21.594587996185304,
+          "shared": {
+            "expectedVideo": true,
+            "playing": true,
+            "pos": 21.305505925613403,
+            "seq": 1792394938652,
+            "signedVideo": true
+          },
+          "native": {
+            "available": true,
+            "ad": false,
+            "errorVisible": false,
+            "paused": false,
+            "readyState": 4,
+            "width": 854,
+            "time": 21.599783,
+            "frames": 373,
+            "frameCounterType": "decoded"
+          },
+          "autoplayBlockedEvents": 0
+        }
+      ],
+      "normalizedDriftSeconds": 0.1102880675201412
+    }
+  },
+  "requestGuard": {
+    "enabled": true,
+    "checkedThirdPartyRequests": 85,
+    "blockedRequests": 0,
+    "checks": [
+      "URL",
+      "request-body",
+      "Referer"
+    ],
+    "secretRepresentations": [
+      "raw",
+      "percent-encoded/decoded",
+      "base64-token"
+    ]
+  },
+  "publishedSourceResponseModified": false,
+  "providerResponsesStubbed": false,
+  "providerApiReplaced": false,
+  "autoplayPolicyBypassed": false,
+  "browserAudioOutputMuted": true,
+  "credentialsRecorded": false,
+  "invitationUrlsRecorded": false,
+  "rawProviderPayloadsRecorded": false,
+  "tracesScreenshotsOrHarRecorded": false,
+  "publicLobbyJoined": false,
+  "namedPublicRoomCreated": false,
+  "deploymentOrProviderConfigurationChanged": false,
+  "roomJsSha256": "b5593e7c9d7933bdfe595e5e57ef64d474fb678265dd82e9ea0cd9b720a17158",
+  "runtimeEvidence": "Prior protected-asset receipt identifies runtime; both admitted contexts recheck the committed room.js digest.",
+  "cleanup": [
+    {
+      "role": "host",
+      "admissionConfirmed": true,
+      "logoutStatus": 200,
+      "deniedAfterLogout": true,
+      "endedStateVerified": true,
+      "contextClosed": true,
+      "nativePlayClicks": 0,
+      "confirmed": true
+    },
+    {
+      "role": "guest",
+      "admissionConfirmed": true,
+      "logoutStatus": 200,
+      "deniedAfterLogout": true,
+      "endedStateVerified": true,
+      "contextClosed": true,
+      "nativePlayClicks": 0,
+      "confirmed": true
+    }
+  ],
+  "browserClosed": true,
+  "completedAt": "2026-10-19T07:28:59.264Z",
+  "visitorsCreated": 2,
+  "admittedVisitors": 2,
+  "successfulLogouts": 2
+}

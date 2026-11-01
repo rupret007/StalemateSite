@@ -1,0 +1,242 @@
+{
+  "version": 1,
+  "startedAt": "2026-10-19T08:36:57.588Z",
+  "sourceCommit": "baf96de8ca10f40cdc02d98ac83b85d3652b7e33",
+  "scope": "One ordinary local guest naturally founding a temporary watch channel, exact committed client bytes and actual YouTube on one Mac Chromium. Controlled browser-policy diagnosis only; no private-room, hosted, physical iPhone/mobile, separate-network or synchronization acceptance claim.",
+  "authority": "Normal server-authenticated temporary channel @, not band/staff identity or E2EE host signatures",
+  "videoId": "BtnyqIHTDMM",
+  "status": "passed",
+  "sourceResponseModified": false,
+  "providerResponsesStubbed": false,
+  "providerApiReplaced": false,
+  "playerOrNativeEventsFabricated": false,
+  "browserPolicy": "document-user-activation-required",
+  "browserAudioOutputMuted": true,
+  "productGateAndLoadActions": "DOM element.click via raw CDP userGesture:false; no trusted input before blocking observation",
+  "preBlockObservation": "raw CDP Runtime.evaluate with userGesture:false only",
+  "publicDummyPreviewOnly": true,
+  "localDeviceValuesRecorded": false,
+  "channelNamesRecorded": false,
+  "hostedAdmissions": 0,
+  "providerCredentialsRead": false,
+  "captureRequested": false,
+  "recoveryMode": "product",
+  "nativePlayClicks": 0,
+  "nativePlayClickAttempts": 0,
+  "productTapClicks": 1,
+  "productTapClickAttempts": 1,
+  "pageErrors": 0,
+  "requestGuard": {
+    "checkedThirdPartyRequests": 37,
+    "blockedMatches": 0,
+    "otherFailures": 0
+  },
+  "cleanup": {
+    "ownedChannelClosed": true,
+    "contextClosed": true,
+    "browserClosed": true,
+    "browserProcessClosed": true,
+    "localRelayClosed": true,
+    "ownedServerClosed": true,
+    "confirmed": true
+  },
+  "clientSha256": "bf7fafcadf28d02ff1250302a1b716387007eb2c5d93906ce4ffca99e5558e21",
+  "lobbyClientSha256": "b11c1a268478ccaf5af1cd4daaf780a5bc6a190f2ee789cd56991eb5de3df7d1",
+  "indexSha256": "d71ab4e6f2b22ad46d3268c32f19c233bc1bc58ffe85e72d07d02b3f1210dde6",
+  "exactCommittedProductFiles": 47,
+  "nativeReaderSha256": "16855acbb372c3320e457ede186c4128b86677b05bcc433dcf72955884b0f373",
+  "ownedLoopbackBound": true,
+  "browserVersion": "156.0.8078.4",
+  "initialActivation": {
+    "active": false,
+    "ever": false
+  },
+  "channelCreationAttempts": 1,
+  "normalGuestNaturalFounderVerified": true,
+  "nativeObservationRoute": "parent-session",
+  "blocked": {
+    "first": {
+      "top": {
+        "activation": {
+          "active": false,
+          "ever": false
+        },
+        "joined": true,
+        "ordinaryGuest": true,
+        "lobbyOnly": false,
+        "ownOnly": true,
+        "naturalTemporaryFounder": true,
+        "noEarlierWatchRooms": false,
+        "emptyActivity": false,
+        "tapVisible": true,
+        "captureOff": true,
+        "providerState": -1,
+        "time": 0.364,
+        "sharedPlaying": true,
+        "expectedVideo": true,
+        "playerMuted": false,
+        "volume": 100,
+        "blockedEvents": 1,
+        "errorCount": 0,
+        "knownErrorCodes": [],
+        "observerAttached": true
+      },
+      "native": {
+        "activation": {
+          "active": false,
+          "ever": false
+        },
+        "available": true,
+        "paused": true,
+        "muted": false,
+        "time": 0,
+        "width": 0,
+        "readyState": 0,
+        "frames": 0,
+        "frameCounterType": "decoded",
+        "ad": false,
+        "errorVisible": false,
+        "nativePlayVisible": false
+      }
+    },
+    "stationary": {
+      "top": {
+        "activation": {
+          "active": false,
+          "ever": false
+        },
+        "joined": true,
+        "ordinaryGuest": true,
+        "lobbyOnly": false,
+        "ownOnly": true,
+        "naturalTemporaryFounder": true,
+        "noEarlierWatchRooms": false,
+        "emptyActivity": false,
+        "tapVisible": true,
+        "captureOff": true,
+        "providerState": -1,
+        "time": 0.364,
+        "sharedPlaying": true,
+        "expectedVideo": true,
+        "playerMuted": false,
+        "volume": 100,
+        "blockedEvents": 1,
+        "errorCount": 0,
+        "knownErrorCodes": [],
+        "observerAttached": true
+      },
+      "native": {
+        "activation": {
+          "active": false,
+          "ever": false
+        },
+        "available": true,
+        "paused": true,
+        "muted": false,
+        "time": 0.364,
+        "width": 854,
+        "readyState": 4,
+        "frames": 15,
+        "frameCounterType": "decoded",
+        "ad": false,
+        "errorVisible": false,
+        "nativePlayVisible": false
+      }
+    },
+    "stationaryObservationMs": 2303,
+    "productTapVisible": true,
+    "nativePlayVisible": false
+  },
+  "recovered": {
+    "initial": {
+      "top": {
+        "activation": {
+          "active": true,
+          "ever": true
+        },
+        "joined": true,
+        "ordinaryGuest": true,
+        "lobbyOnly": false,
+        "ownOnly": true,
+        "naturalTemporaryFounder": true,
+        "noEarlierWatchRooms": false,
+        "emptyActivity": false,
+        "tapVisible": false,
+        "captureOff": true,
+        "providerState": 1,
+        "time": 3.254530141143799,
+        "sharedPlaying": true,
+        "expectedVideo": true,
+        "playerMuted": false,
+        "volume": 100,
+        "blockedEvents": 1,
+        "errorCount": 0,
+        "knownErrorCodes": [],
+        "observerAttached": true
+      },
+      "native": {
+        "activation": {
+          "active": false,
+          "ever": false
+        },
+        "available": true,
+        "paused": false,
+        "muted": false,
+        "time": 3.254431,
+        "width": 854,
+        "readyState": 4,
+        "frames": 118,
+        "frameCounterType": "decoded",
+        "ad": false,
+        "errorVisible": false,
+        "nativePlayVisible": false
+      }
+    },
+    "advancing": {
+      "top": {
+        "activation": {
+          "active": true,
+          "ever": true
+        },
+        "joined": true,
+        "ordinaryGuest": true,
+        "lobbyOnly": false,
+        "ownOnly": true,
+        "naturalTemporaryFounder": true,
+        "noEarlierWatchRooms": false,
+        "emptyActivity": false,
+        "tapVisible": false,
+        "captureOff": true,
+        "providerState": 1,
+        "time": 3.5063819828338625,
+        "sharedPlaying": true,
+        "expectedVideo": true,
+        "playerMuted": false,
+        "volume": 100,
+        "blockedEvents": 1,
+        "errorCount": 0,
+        "knownErrorCodes": [],
+        "observerAttached": true
+      },
+      "native": {
+        "activation": {
+          "active": false,
+          "ever": false
+        },
+        "available": true,
+        "paused": false,
+        "muted": false,
+        "time": 3.507341,
+        "width": 854,
+        "readyState": 4,
+        "frames": 125,
+        "frameCounterType": "decoded",
+        "ad": false,
+        "errorVisible": false,
+        "nativePlayVisible": false
+      }
+    }
+  },
+  "productFallbackVisible": true,
+  "completedAt": "2026-10-19T08:37:02.504Z"
+}

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+    <meta name="googlebot" content="noindex, nofollow">
+    <meta name="referrer" content="no-referrer">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' wss://stalemate-hangout.jeffstory007.workers.dev https://stalemate.goatcounter.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <!-- Hidden moderation panel. The server checks the staff allowlist and Cloudflare Access assertion. -->
+    <meta name="hangout-relay" content="">
+    <title>Moderation panel · Hang Out</title>
+    <link rel="icon" href="../../../assets/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../lobby/lobby.css">
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body class="admin">
+    <div class="titlebar"><span>Moderation panel — #stalemate ops</span><span class="dots" aria-hidden="true">▁ ▢ ✕</span></div>
+    <section class="gate" data-gate>
+        <div class="gate-card">
+            <h1>Moderation panel</h1>
+            <p class="lede">For appointed site moderators and band administrators. Sign in with the email code from Cloudflare (nothing to install).</p>
+            <a class="btn btn--big" data-signin href="#">Sign in with email code</a>
+            <label class="nickrow">Nick in chat <span class="nickbox"><input data-nick maxlength="16" value="Helper"></span></label>
+            <button class="btn btn--big" type="button" data-enter>Open the panel</button>
+            <p class="status" data-status role="status"></p>
+        </div>
+    </section>
+    <main class="panel" data-panel hidden>
+        <section class="card big" aria-label="Quick controls">
+            <div class="state" data-state></div>
+            <div class="row">
+                <button class="btn btn--danger btn--big" type="button" data-panic>🛡️ PANIC: shield everything</button>
+                <button class="btn btn--ghost" type="button" data-shieldoff>Lower shield</button>
+            </div>
+            <div class="row">
+                <span>Lobby:</span>
+                <button class="btn btn--small" type="button" data-lobby="unlock">Open</button>
+                <button class="btn btn--small btn--ghost" type="button" data-lobby="readonly">Read-only</button>
+                <button class="btn btn--small btn--danger" type="button" data-lobby="lock">Back soon (lock)</button>
+            </div>
+            <div class="row">
+                <span>Slow mode:</span>
+                <button class="btn btn--small btn--ghost" type="button" data-slow="0">Off</button>
+                <button class="btn btn--small btn--ghost" type="button" data-slow="3">3s</button>
+                <button class="btn btn--small btn--ghost" type="button" data-slow="10">10s</button>
+                <button class="btn btn--small btn--ghost" type="button" data-slow="30">30s</button>
+                <button class="btn btn--small btn--ghost" type="button" data-slow="120">2m</button>
+                <button class="btn btn--small btn--ghost" type="button" data-camoff>📷 All cameras off</button>
+            </div>
+        </section>
+        <nav class="admintabs" role="tablist">
+            <button type="button" data-tab="queue" aria-selected="true">🚩 Queue <span data-qcount></span></button>
+            <button type="button" data-tab="people">People</button>
+            <button type="button" data-tab="rooms">Rooms</button>
+            <button type="button" data-tab="stats">📈 Stats</button>
+            <button type="button" data-tab="filter">Word filter</button>
+            <button type="button" data-tab="log">Mod log</button>
+            <a class="chatlink" data-chatlink href="../lobby/">Open chat →</a>
+        </nav>
+        <section class="card" data-view="queue">
+            <section class="ai-review" aria-labelledby="ai-review-title">
+                <h2 id="ai-review-title">AI-assisted review</h2>
+                <p class="ai-state" data-ai-state role="status" tabindex="-1">Waiting for AI review status.</p>
+                <p class="small" data-ai-counts></p>
+                <p class="state" data-moderation-storage role="status" hidden>Moderation state could not be saved. Current evidence may be lost on restart; check storage before relying on this queue.</p>
+                <p class="small">AI review happens after posting. Category signals are not rulings. A moderator decides whether to delete the message or dismiss the signal. Ordinary filters and visitor reports still apply.</p>
+                <p class="small">Only eligible public text is checked. Flagged, reported and held evidence stays in active review queues for up to 24 hours, separate from public chat scrollback. Configuration stays on the server.</p>
+                <ul class="list" data-ai-reviews></ul>
+                <p class="small" data-ai-empty>No AI signals awaiting review. This does not mean every message was checked.</p>
+            </section>
+            <h2>Reports</h2><ul class="list" data-reports></ul>
+            <section data-private-report-review hidden>
+                <h2>Private-room reports</h2>
+                <p class="small">Visitors explicitly shared these quotes or descriptions. They are not independently verified transcripts. Private chat is not monitored or sent to AI. Resolving a report removes its saved text; it does not delete private chat or punish a participant.</p>
+                <p class="state" data-private-report-storage role="status" tabindex="-1"></p>
+                <ul class="list" data-private-reports></ul>
+            </section>
+            <h2>Held by StaleBot</h2><ul class="list" data-held></ul>
+            <p class="small" data-queue-empty>Nothing in the review queues.</p>
+        </section>
+        <section class="card" data-view="people" hidden><h2>Online</h2><ul class="list" data-users></ul><h2>Bans</h2><ul class="list" data-bans></ul></section>
+        <section class="card" data-view="rooms" hidden><h2>Open rooms</h2><ul class="list" data-rooms></ul><p class="small">Ordinary private chat stays encrypted, and private rooms are not listed here. Visitors may explicitly share selected details in Private-room reports.</p></section>
+        <section class="card" data-view="stats" hidden>
+            <p class="small">Counts only: no names, devices or IPs. Times in your timezone. Page views live in GoatCounter.</p>
+            <div class="kpis" data-kpis></div>
+            <h2>Visitors per day</h2><div class="bars" data-days></div>
+            <h2>Busiest hours</h2><div class="bars hours" data-hours></div>
+            <h2>Room types started</h2><div class="bars" data-kinds></div>
+            <h2>Busiest rooms</h2><ol class="list" data-busiest></ol>
+            <h2>Moderation</h2><div class="kpis" data-modsum></div>
+        </section>
+        <section class="card" data-view="filter" hidden>
+            <p class="small">Mild swearing is allowed. Slurs, sexual stuff, personal info and non-YouTube links are always blocked.</p>
+            <form class="row" data-filter-form>
+                <input data-filter-word placeholder="word" aria-label="Word">
+                <button class="btn btn--small btn--danger" type="submit" value="block">Block</button>
+                <button class="btn btn--small" type="submit" value="hold">Hold for review</button>
+                <button class="btn btn--small btn--ghost" type="submit" value="allow">Allow</button>
+            </form>
+            <div data-lists></div>
+        </section>
+        <section class="card" data-view="log" hidden><h2>Mod log</h2><ol class="list log" data-modlog></ol></section>
+    </main>
+    <div class="toast" data-toast role="status" hidden></div>
+    <script src="admin.js"></script>
+</body>
+</html>

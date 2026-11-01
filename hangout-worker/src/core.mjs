@@ -112,21 +112,31 @@ export function validFrame(raw, limits = DEFAULTS) {
 
 export function bucketStateFromAttachment(attachment) {
     if (!attachment || typeof attachment !== 'object') return null;
-    const { tokens, last, total } = attachment;
+    const bucket = attachment.bucket && typeof attachment.bucket === 'object' ? attachment.bucket : attachment;
+    const { tokens, last, total } = bucket;
     if (!Number.isFinite(tokens) || !Number.isFinite(last) || !Number.isFinite(total)) return null;
     if (tokens < 0 || total < 0) return null;
     return { tokens, last, total };
 }
 
 export function createBucket(limits = DEFAULTS, now = () => Date.now(), initial = null) {
-    let tokens = initial?.tokens ?? limits.burst;
-    let last = initial?.last ?? now();
-    let total = initial?.total ?? 0;
+    let seed = initial;
+    if (seed?.v === 1) seed = { tokens: seed.tokens, last: seed.last, total: seed.total };
+    if (seed !== null && seed !== undefined) {
+        if (!Number.isFinite(seed.tokens) || !Number.isFinite(seed.last) || !Number.isFinite(seed.total)
+            || seed.tokens < 0 || seed.total < 0 || seed.total > limits.messagesPerConnection + 1
+            || seed.tokens > limits.burst) {
+            throw new Error('invalid bucket metadata');
+        }
+    }
+    let tokens = seed?.tokens ?? limits.burst;
+    let last = seed?.last ?? now();
+    let total = seed?.total ?? 0;
     return {
         take() {
             const t = now();
-            tokens = Math.min(limits.burst, tokens + ((t - last) / 1000) * limits.refillPerSecond);
-            last = t;
+            tokens = Math.min(limits.burst, tokens + (Math.max(0, t - last) / 1000) * limits.refillPerSecond);
+            last = Math.max(last, t);
             total += 1;
             if (total > limits.messagesPerConnection) return 'spent';
             if (tokens < 1) return 'slow';
@@ -134,7 +144,7 @@ export function createBucket(limits = DEFAULTS, now = () => Date.now(), initial 
             return 'ok';
         },
         snapshot() {
-            return { tokens, last, total };
+            return { v: 1, tokens, last, total };
         },
         get total() { return total; }
     };

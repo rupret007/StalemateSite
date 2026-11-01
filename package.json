@@ -4,11 +4,18 @@
   "private": true,
   "description": "Static site for Stalemate punk rock originals.",
   "scripts": {
+    "dev:hangout": "node scripts/preview-hangout.cjs",
+    "package:pilot": "node scripts/package-pilot.cjs",
+    "package:beta": "node scripts/package-pilot.cjs beta",
     "package:pages": "node scripts/package-pages.cjs",
     "serve:test": "node scripts/serve-test.cjs",
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
+    "test:durable-runtime": "npm --prefix tests/runtime/durable-records test",
+    "test:beta-runtime": "node tests/runtime/beta-sessions/runner.mjs",
+    "test:lobby-runtime": "node tests/runtime/lobby-effects/runner.mjs",
+    "test:lobby-session-runtime": "node tests/runtime/lobby-session-authority/runner.mjs",
     "test:install-browsers": "playwright install chromium webkit",
     "verify:live": "node scripts/verify-live.cjs",
     "test:live:local": "node scripts/test-live-local.cjs"
@@ -18,5 +25,8 @@
     "jsdom": "^29.0.1",
     "vitest": "^4.1.2",
     "ws": "^8.18.3"
+  },
+  "dependencies": {
+    "obscenity": "^0.4.6"
   }
 }

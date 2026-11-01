@@ -6,6 +6,8 @@ import { readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import WebSocket from 'ws';
+import { hangoutRelayWsBase } from '../../scripts/lib/e2e-test-server.cjs';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 const media = readFileSync(new URL('../../play/stalemate/manic.m4a', import.meta.url));
@@ -93,5 +95,53 @@ describe('test server media responses', { timeout: 30000 }, () => {
         expect(response.status).toBe(404);
         expect(response.headers.get('content-range')).toBeNull();
         expect(Buffer.from(await response.arrayBuffer())).toEqual(missing);
+    });
+});
+
+describe('same-origin lobby test namespaces', () => {
+    function guest(namespace, nick) {
+        const ws = new WebSocket(`${hangoutRelayWsBase(origin, namespace)}/lobby?preview=local-preview-key-0001`, { headers: { origin } });
+        const frames = [];
+        const waiters = new Set();
+        ws.on('message', (raw) => {
+            const frame = JSON.parse(String(raw));
+            frames.push(frame);
+            if (frame.t === 'hello') ws.send(JSON.stringify({ t: 'hello', nick, age13: true }));
+            for (const waiter of waiters) if (waiter.predicate(frame)) { waiters.delete(waiter); waiter.resolve(frame); }
+        });
+        const next = (predicate) => {
+            const found = frames.find(predicate);
+            return found ? Promise.resolve(found) : new Promise((resolve) => waiters.add({ predicate, resolve }));
+        };
+        return { ws, next, joined: next((frame) => frame.t === 'join' && frame.ch.name === '#stalemate') };
+    }
+
+    it('isolates memberships and per-IP room quotas without raising the production cap', async () => {
+        const peers = [];
+        try {
+            for (let i = 0; i < 3; i += 1) {
+                const peer = guest('quota-first', `Host${i}`); peers.push(peer);
+                await peer.joined;
+                const room = `#art-first-${i}`;
+                peer.ws.send(JSON.stringify({ t: 'cmd', name: 'join', args: [room], ch: '#stalemate' }));
+                await peer.next((frame) => frame.t === 'join' && frame.ch.name === room);
+            }
+            const blocked = guest('quota-first', 'HostFourth'); peers.push(blocked);
+            await blocked.joined;
+            blocked.ws.send(JSON.stringify({ t: 'cmd', name: 'join', args: ['#art-fourth'], ch: '#stalemate' }));
+            // A deliberately legacy peer also receives an update notice. Wait
+            // for the actual quota decision, preserving the admission assertion.
+            const refusal = await blocked.next((frame) => frame.t === 'notice' && frame.kind === 'error' && frame.text.includes('Too many new rooms'));
+            expect(refusal.text).toContain('Too many new rooms');
+
+            // Same origin/IP and same nickname as the first engine, but a new scenario.
+            const separate = guest('quota-second', 'Host0'); peers.push(separate);
+            const joined = await separate.joined;
+            expect(joined.ch.names.map((person) => person.nick)).toEqual(['Host0']);
+            separate.ws.send(JSON.stringify({ t: 'cmd', name: 'join', args: ['#art-second'], ch: '#stalemate' }));
+            await separate.next((frame) => frame.t === 'join' && frame.ch.name === '#art-second');
+            const logs = await fetch(`${hangoutRelayWsBase(origin, 'quota-second').replace(/^ws/, 'http')}/__test/modlog.json`).then((response) => response.json());
+            expect(logs.filter((entry) => entry.action === 'room-open').map((entry) => entry.target)).toEqual(['#art-second']);
+        } finally { for (const peer of peers) peer.ws.terminate(); }
     });
 });

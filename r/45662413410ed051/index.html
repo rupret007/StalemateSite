@@ -9,9 +9,24 @@
     <!-- Hidden preview. Not linked from anywhere on the public site. -->
     <meta name="hangout-relay" content="wss://stalemate-hangout.jeffstory007.workers.dev">
     <meta name="hangout-turn" content="">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://www.youtube.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' wss://stalemate-hangout.jeffstory007.workers.dev; worker-src 'self' blob:; frame-src https://www.youtube.com; object-src 'none'; base-uri 'self'; form-action 'none'">
     <title>Hang Out · Stalemate</title>
     <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="room.css">
+    <style>
+        .private-report{width:calc(100% - 24px);max-width:32rem;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow:auto;overflow-wrap:anywhere}
+        .private-report form,.private-report label{display:grid;gap:6px;min-width:0}
+        .private-report label{margin:8px 0}
+        .private-report input,.private-report textarea,.private-report select{box-sizing:border-box;width:100%;max-width:100%;min-width:0;font:16px/1.4 var(--body);background:var(--ink);color:var(--cream);border:1px solid var(--line);border-radius:4px;padding:9px}
+        .private-report textarea{resize:vertical;overflow-wrap:anywhere}
+        .private-report .report-consent{display:flex;align-items:flex-start;gap:8px}
+        .private-report .report-consent input{width:auto;flex:0 0 auto;margin-top:4px}
+        .private-report .tools{flex-wrap:wrap;min-width:0}
+        .private-report .btn{max-width:100%;min-height:44px;white-space:normal;overflow-wrap:anywhere}
+        .private-report :focus-visible{outline:2px solid var(--lime);outline-offset:3px}
+        [data-log] li{overflow-wrap:anywhere}
+        [data-message-report]{margin-left:8px;max-width:100%;min-height:44px;font-size:.8rem;white-space:normal}
+    </style>
 </head>
 <body>
     <header class="hang-head">
@@ -20,6 +35,7 @@
             <h1>Hang Out</h1>
             <p class="tag">Draw together. Watch together. Yell at each other. Bring your own bad ideas.</p>
         </div>
+        <a class="show-link lobby-link" href="lobby/">← #stalemate lobby</a>
         <a class="show-link" data-next-show data-starts-at="2026-10-24T16:45:00-05:00" href="../../#home">Next show: Sat Oct 24 · Los Amigo’s, Plano →</a>
     </header>
 
@@ -27,8 +43,15 @@
         <div class="gate-card">
             <h2 data-gate-title>Start a room</h2>
             <p data-gate-copy>Make a private room, copy the invite, text it to your people. No accounts, no app.</p>
-            <label>Your name <input data-name maxlength="24" placeholder="Punk #12" autocomplete="nickname"></label>
+            <label>Your name <span class="namebox"><input data-name maxlength="24" placeholder="Type a nickname… or roll one →" autocomplete="nickname"><button class="btn btn--ghost dice" type="button" data-dice aria-label="Make me a random fun nickname">🎲 Make me a name</button></span></label>
             <button class="btn btn--big" data-enter type="button">Start a room</button>
+            <button class="btn btn--ghost" data-check-btn type="button">Test my camera (optional)</button>
+            <div class="check" data-check hidden>
+                <video data-check-video autoplay playsinline muted></video>
+                <label>Mic level <meter data-check-meter min="0" max="1" low="0.1" high="0.8" optimum="0.5" value="0"></meter></label>
+                <p class="small" data-check-out role="status"></p>
+                <button class="btn btn--ghost" data-check-done type="button">Looks good</button>
+            </div>
             <p class="status" data-gate-status role="status"></p>
         </div>
     </section>
@@ -38,6 +61,7 @@
             <span class="peers" data-peers>Just you</span>
             <button class="btn" data-copy type="button">Copy invite link</button>
             <button class="btn btn--bob" data-bob-toggle type="button" aria-pressed="false">Paint along with Bob</button>
+            <button class="btn btn--ghost" data-private-report type="button" hidden>Report a problem to staff</button>
             <span class="status" data-status role="status"></span>
         </div>
 
@@ -45,6 +69,7 @@
             <h2>Watch</h2>
             <div class="screen"><div id="yt-player" data-yt></div><video data-file playsinline controls hidden></video></div>
             <p class="small" data-host-note></p>
+            <p class="small" data-video-status role="status" hidden></p>
             <button class="btn tap" type="button" data-tap hidden>Tap to sync in</button>
             <form class="load host-only" data-load>
                 <input data-url placeholder="Paste any YouTube link" aria-label="YouTube link">
@@ -86,18 +111,34 @@
 
         <section class="panel call" aria-label="Camera and mic">
             <h2>Faces &amp; voices</h2>
-            <p class="small">Off until you turn it on. Up to 4 people on camera. Video goes straight between browsers when it can.</p>
-            <div class="tiles" data-tiles></div>
-            <div class="tools">
+            <p class="small">Off until you turn it on. Cameras are for adults 18+. Up to 8 people on camera. Video goes straight between browsers when it can.</p>
+            <p class="small" data-turn-status role="status"></p>
+            <p class="small jam-note" data-jam-note hidden>🎸 Jam room: your music goes through the WebJam app (plug in Ethernet). The browser mic is just for talking between songs, so it starts off and nobody hears you twice.</p>
+            <p class="hands" data-hands hidden></p>
+            <div class="tiles" data-tiles data-view="grid"></div>
+            <div class="react-float" data-react-float aria-live="polite"></div>
+            <div class="tools callbar" role="toolbar" aria-label="Call controls">
                 <button class="btn" type="button" data-mic>Turn on my mic</button>
                 <button class="btn" type="button" data-cam>Turn on my camera</button>
+                <button class="btn btn--ghost desk-only" type="button" data-share aria-pressed="false">Share screen</button>
+                <button class="btn btn--ghost" type="button" data-hand aria-pressed="false">Raise hand</button>
+                <span class="reacts" data-reacts role="group" aria-label="Reactions"></span>
+                <button class="btn btn--ghost" type="button" data-view-toggle hidden>Speaker view</button>
+                <button class="btn btn--ghost" type="button" data-pip hidden>Pop out</button>
+                <button class="btn btn--ghost" type="button" data-settings>⚙ Camera &amp; background</button>
                 <button class="btn btn--bob" type="button" data-canvas-cam aria-pressed="false">Show my real canvas</button>
                 <button class="btn btn--ghost" type="button" data-hangup hidden>Turn both off</button>
+            </div>
+            <div class="tools host-only host-call">
+                <button class="btn btn--ghost" type="button" data-lock aria-pressed="false">Lock faces</button>
+                <button class="btn btn--ghost" type="button" data-all-cams-off>Cameras off for everyone</button>
             </div>
         </section>
 
         <section class="panel chat" aria-label="Chat">
             <h2>Chat</h2>
+            <p class="small" data-sync-status role="status" hidden></p>
+            <button class="btn btn--ghost" type="button" data-sync-retry hidden>Retry room sync</button>
             <ol class="log" data-log aria-live="polite"></ol>
             <form class="say" data-say>
                 <input data-text maxlength="400" placeholder="Say something dumb" aria-label="Message">
@@ -105,6 +146,37 @@
             </form>
         </section>
     </main>
+
+    <dialog class="ask private-report" data-report-dialog aria-labelledby="private-report-title" aria-describedby="private-report-privacy">
+        <h2 id="private-report-title">Report to community staff</h2>
+        <p class="small" id="private-report-privacy">The details you choose below, limited room and connection references, and submission time are shared with community staff when you submit. Regular encrypted chat is not monitored or sent to AI. No invitation, room key, full history or automatic chat context is attached. Review the quote and do not include invitation links, passwords or access codes.</p>
+        <form data-report-form>
+            <label>What are you reporting?
+                <select data-report-kind><option value="member">A member or room problem</option><option value="message">A message</option></select>
+            </label>
+            <label>Member, if known
+                <select data-report-target><option value="">Someone who left, the host, or another problem</option></select>
+            </label>
+            <label>Nickname you saw (not a verified identity)
+                <input data-report-name maxlength="24" autocomplete="off">
+            </label>
+            <label>Selected quote (optional for a member report)
+                <textarea data-report-excerpt maxlength="400" rows="3" spellcheck="false"></textarea>
+            </label>
+            <label>Why are you reporting this?
+                <textarea data-report-reason maxlength="400" rows="3" required></textarea>
+            </label>
+            <label class="report-consent"><input data-report-consent type="checkbox" required><span>I agree to share this selected quote, nickname and reason, with limited room and connection references, with community staff for review.</span></label>
+            <p class="small" data-report-availability hidden></p>
+            <p class="small" data-report-status role="status" aria-live="polite">Draft only. Nothing has been sent.</p>
+            <div class="tools">
+                <button class="btn" data-report-send type="submit" disabled>Send selected details to staff</button>
+                <button class="btn btn--ghost" data-report-retry type="button" hidden>Retry the same report</button>
+                <button class="btn btn--ghost" data-report-new type="button">Clear / new report</button>
+                <button class="btn btn--ghost" data-report-close type="button">Close</button>
+            </div>
+        </form>
+    </dialog>
 
     <dialog class="ask" data-ask>
         <h2 data-ask-title>Use your camera?</h2>
@@ -115,9 +187,38 @@
         </div>
     </dialog>
 
+    <dialog class="ask settings" data-settings-dlg>
+        <h2>Camera &amp; background</h2>
+        <label>Camera <select data-dev-cam></select></label>
+        <label>Mic <select data-dev-mic></select></label>
+        <label>Speaker <select data-dev-spk></select></label>
+        <label class="music"><input type="checkbox" data-music> Music mode (no echo cancelling; headphones on). For listening and singing along, not in time: play together in WebJam.</label>
+        <fieldset class="bg">
+            <legend>Background (only you run this; your video never leaves your device for it)</legend>
+            <div class="bg-picks" data-bg-picks>
+                <button type="button" data-bg="none" aria-pressed="true">None</button>
+                <button type="button" data-bg="blur" aria-pressed="false">Blur</button>
+                <button type="button" data-bg="checkerboard" aria-pressed="false" style="background-image:url(fx/bg/checkerboard.png)">Checkerboard</button>
+                <button type="button" data-bg="stripes" aria-pressed="false" style="background-image:url(fx/bg/stripes.png)">Stripes</button>
+                <button type="button" data-bg="stage" aria-pressed="false" style="background-image:url(fx/bg/stage.png)">Stage</button>
+                <button type="button" data-bg="blue" aria-pressed="false" style="background-image:url(fx/bg/blue.png)">Blue</button>
+            </div>
+            <p class="small" data-bg-status role="status"></p>
+            <p class="small" data-bg-support></p>
+        </fieldset>
+        <div class="tools"><button class="btn" type="button" data-settings-close>Done</button></div>
+    </dialog>
+    <dialog class="ask tile-menu" data-tile-menu></dialog>
+
     <script src="../../countdown.js" defer></script>
     <script src="sync-core.js"></script>
+    <script src="private-snapshot.js"></script>
+    <script src="private-recovery.js"></script>
+    <script src="video-core.js"></script>
+    <script src="youtube-player.js"></script>
+    <script src="turn-client.js"></script>
     <script src="bob-ross.js"></script>
+    <script src="names.js"></script>
     <script src="room.js"></script>
 </body>
 </html>

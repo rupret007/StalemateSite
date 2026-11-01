@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "checkedOn": "2026-10-19",
+  "status": "verified-private-deployment-and-actual-provider",
+  "scope": "Actual provider privacy comparison with public dummy markers on loopback, browser construction/synchronization regressions for both watch surfaces, and separate two-guest real-provider private-room and naturally guest-hosted channel receipts. Physical-device, mobile-autoplay, separate-network and TURN acceptance remain separate.",
+  "providerLibrary": {
+    "sha256": "316a92f17a6607590c3675c075dbea110f7ab5bf8dd3e24a6eaf3bd767122038",
+    "source": "https://www.youtube.com/iframe_api"
+  },
+  "before": {
+    "startedAt": "2026-10-19T07:14:13.350Z",
+    "embedRequests": [
+      {
+        "refererPresent": true,
+        "originOnly": true,
+        "refererContainsSyntheticQueryOrFragment": false,
+        "urlOrBodyContainsSyntheticQueryOrFragment": true
+      }
+    ],
+    "requestsContainingDummyMarkers": 2,
+    "actualPlaybackState": 1,
+    "actualPlaybackSeconds": 1.0106048474121094,
+    "contextClosed": true,
+    "browserClosed": true
+  },
+  "after": {
+    "startedAt": "2026-10-19T07:17:20.447Z",
+    "embedRequests": [
+      {
+        "refererPresent": true,
+        "originOnly": true,
+        "refererContainsSyntheticQueryOrFragment": false,
+        "urlOrBodyContainsSyntheticQueryOrFragment": false
+      }
+    ],
+    "requestsContainingDummyMarkers": 0,
+    "actualPlaybackState": 1,
+    "actualPlaybackSeconds": 1.0055250019073485,
+    "contextClosed": true,
+    "browserClosed": true
+  },
+  "fix": "Both watch surfaces validate video IDs and pre-create an iframe whose embed URL contains only the video ID, JS API and playback flags, site origin, and an origin-only widget referrer. The real API attaches to that existing iframe, avoiding its full-parent-URL constructor path. Global no-referrer policy and room URLs remain unchanged.",
+  "roomJsSha256": "b5593e7c9d7933bdfe595e5e57ef64d474fb678265dd82e9ea0cd9b720a17158",
+  "lobbyRoomJsSha256": "114170b76b44436e8571346dba0d95554c701c77ac5814f78d3a98a4e8c50516",
+  "validation": {
+    "newPrivacyScenariosPassed": 2,
+    "targetedWatchScenariosPassed": 9,
+    "retries": 0,
+    "sourceSwitchPausePausedSeekResumeLateJoinAndCancellationCovered": true,
+    "fixtureIsNotActualProviderAcceptance": true,
+    "oldSourcePrivacyFailures": 2,
+    "negativeSourceCommit": "07252efd77ea62314327dc4bac9abdd80b166497",
+    "negativeFailuresWereBooleanSecurityAssertions": true,
+    "independentSourceReview": "No actionable product issue found; nullable fixture metadata normalized before the final proof.",
+    "targetedUnitTestsPassed": 14,
+    "targetedUnitFilesPassed": 3
+  },
+  "deployed": true,
+  "humanKarenReviewComplete": false,
+  "references": [
+    "https://developers.google.com/youtube/iframe_api_reference#Loading_a_Video_Player",
+    "https://developers.google.com/youtube/terms/required-minimum-functionality#api-client-identity-and-credentials"
+  ],
+  "credentialsOrInvitationUrlsRecorded": false,
+  "precedingDocumentationCi": {
+    "sourceCommit": "07252efd77ea62314327dc4bac9abdd80b166497",
+    "push": {
+      "run": 39214295390,
+      "unitPassed": 575,
+      "browserDirectPasses": 205,
+      "retries": 0,
+      "conclusion": "success"
+    },
+    "pullRequest": {
+      "run": 39214300532,
+      "unitPassed": 575,
+      "browserDirectPasses": 203,
+      "browserRetryPasses": 1,
+      "browserFailed": 1,
+      "conclusion": "failure",
+      "failure": "Unrelated iPhone SE /play share button measured 43.999969px against >=44px on both attempts.",
+      "retry": "Existing late-joiner snapshot fixture immediately asserted receiver snapshotDone after cross-page socket send; retry passed. Product cause not established."
+    }
+  },
+  "sourceCommit": "b111bb2aa070cd791834f40f26665996ad406421",
+  "ci": {
+    "push": {
+      "run": 39215495193,
+      "unitTestsPassed": 575,
+      "unitFilesPassed": 55,
+      "browserDirectPasses": 207,
+      "retries": 0
+    },
+    "pullRequest": {
+      "run": 39215533300,
+      "unitTestsPassed": 575,
+      "unitFilesPassed": 55,
+      "browserDirectPasses": 207,
+      "retries": 0
+    }
+  },
+  "runtimeVersion": "0ee7705e-e381-4cb4-a70a-1f26daa10e78",
+  "deploymentEvidence": "hosted-watch-privacy-asset.json",
+  "hostedProviderEvidence": "hosted-watch-provider.json",
+  "localProviderComparisonScope": "Actual current YouTube IFrame API on an owned loopback page with public dummy query/fragment markers, plus repository browser regressions. No Stalemate admission, deployed invitation or user secret was used in the provider comparison. This is not hosted synchronization or physical-device acceptance.",
+  "privateRoomHostedScope": "Two separate guest/fan contexts, actual YouTube and signed private-room synchronization on one Mac; this original receipt does not cover the separately tested channel path.",
+  "channelHostedEvidence": "hosted-channel-watch-provider.json",
+  "channelHostedScope": "One naturally guest-hosted temporary channel, two normal unverified guests, real YouTube and server-authorized host controls, one ordinary guest denial, no prejoin chat replay, exact founder close and both logouts. One Mac, no physical/mobile/separate-network/TURN acceptance.",
+  "documentationFollowUpCi": {
+    "sourceCommit": "99ff97e73e5a4de0dba826fb6bcf56ec9096cd3a",
+    "push": {
+      "run": 39216572974,
+      "unitPassed": 575,
+      "browserDirectPasses": 207,
+      "retries": 0
+    },
+    "pullRequest": {
+      "run": 39216578587,
+      "unitPassed": 575,
+      "browserDirectPasses": 206,
+      "browserRetryPasses": 1,
+      "retry": "Unrelated iPhone SE /play share-button height43.999969px against44px; retry passed. All Hang Out checks passed directly."
+    }
+  }
+}

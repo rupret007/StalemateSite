@@ -177,6 +177,7 @@ test('game over offers Listen to Manic, the Oct 24 show and Share score next to 
     await expect(end.getByRole('button', { name: 'Share score' })).toHaveCount(1);
     await expect(extra.locator('#stalemateShare')).toHaveCount(0);
     await expect(share).toBeVisible();
+    await extra.evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)).then(() => {}));
     const h = await share.boundingBox();
     expect(h.height).toBeGreaterThanOrEqual(44);
     await page.evaluate(() => {

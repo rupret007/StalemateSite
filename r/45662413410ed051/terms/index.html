@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+    <meta name="googlebot" content="noindex, nofollow">
+    <meta name="referrer" content="no-referrer">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' wss://stalemate-hangout.jeffstory007.workers.dev https://stalemate.goatcounter.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <!-- DRAFT. A lawyer reviews these before any public link (rollout gate R3). -->
+    <title>House rules · Hang Out</title>
+    <link rel="icon" href="../../../assets/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../lobby/lobby.css">
+    <link rel="stylesheet" href="terms.css">
+</head>
+<body>
+    <div class="titlebar"><span>Hang Out — house rules</span><span class="dots" aria-hidden="true">▁ ▢ ✕</span></div>
+    <main class="terms">
+        <h1>House rules</h1>
+        <p class="big-rule">Don’t be a dick.</p>
+        <p>That’s basically it. Swear all you want. Just don’t be hateful, threatening or creepy toward anyone.</p>
+        <h2>The short version</h2>
+        <ul>
+            <li><b>13+ only.</b> If you’re under 13, this isn’t for you. Cameras in open rooms are 18+.</li>
+            <li><b>Your words, your responsibility.</b> What you post is on you, not on Stalemate.</li>
+            <li><b>Site moderators handle abuse.</b> In the lobby and its channels, they can remove messages, restrict cameras, mute, kick or ban visitors, and close abusive channels. Hosts manage their own rooms. Reviewing a private-room report does not delete encrypted chat or automatically punish someone.</li>
+            <li><b>No hate, threats, sexual stuff aimed at people, or sharing anyone’s personal info</b> (yours included: no phone numbers, addresses, emails or socials in public chat).</li>
+            <li><b>See something gross?</b> Tap 🚩 beside a message in the lobby or its channels. Where an encrypted private room offers <b>Report to staff</b>, review the selected details and agree to share them. Review evidence and action records have the retention limits below.</li>
+            <li><b>Private rooms</b> are end-to-end encrypted between participants; the relay does not decrypt ordinary private chat. Choosing to report to staff shares only the quote, nickname and reason you confirm, plus the connection metadata described below. It does not share your room key or full conversation.</li>
+        </ul>
+        <h2>Hosting and returning to rooms</h2>
+        <p>Anyone can host a temporary room without an account. To keep a room name across visits, sign in with an email code. Email verification does not reserve your nickname or give you site-moderator powers. We store an opaque identifier for ownership, room settings and co-host grants; your email is not displayed to visitors. Registered rooms expire after 90 days without an owner or verified co-host visit. Temporary rooms close after 10 empty minutes. Drawing and video state clears after 10 empty minutes even in registered rooms; chat has no saved backlog.</p>
+        <p>PMs open only after the recipient accepts. Unaccepted requests expire after 10 minutes. A server restart preserves the request for the same still-connected people, but never saves its undelivered first message. If that text is lost, both people are told to resend it after acceptance. A real disconnect ends that connection’s pending requests and PM consent; a reconnect must ask again.</p>
+        <h2>How AI review works</h2>
+        <p>When AI review is enabled, public text from #stalemate and open rooms may be sent to OpenAI after posting to identify messages for our moderators to review. Category signals are not rulings: a moderator decides whether to delete the message or dismiss the signal. Ordinary filters and visitor reports still apply.</p>
+
+        <p>PMs, invitation links, invite-only rooms, key-protected rooms, locked rooms, camera video and encrypted private rooms are excluded from AI review. Private-room reports shared with staff are also excluded. Checks can be unavailable or reach a usage limit; an empty review queue does not mean every message was checked.</p>
+        <h2>What we keep (not much)</h2>
+        <ul>
+            <li>Guest chat requires no account or email. Optional room ownership uses Cloudflare email-code sign-in; Cloudflare processes your email and the room service stores an opaque ownership identifier. We do not ask for real names or birthdays.</li>
+            <li>Our stored community state uses a keyed, daily-changing IP code for abuse limits instead of a raw IP address. Cloudflare processes connection information, including your IP address; when enabled, its Turnstile check also receives that address.</li>
+            <li>The invitation-only beta keeps up to 1,000 session records until their eight-hour expiry and scheduled cleanup. Records contain a random session ID, creation/expiry times, revocation and retry status, and up to 16 hashed private-room IDs so leaving the beta can close your connections. They contain no chat, PM text or camera media. Signed, HttpOnly cookies hold your access session and, after optional email verification, your email and role until that shorter verified session expires. Your email is not displayed to visitors.</li>
+            <li>Chat starts when you join a channel. This site keeps your last 300 received lines in that tab while you remain joined; leaving, reconnecting or refreshing starts fresh. Earlier messages aren’t replayed.</li>
+            <li>A limited buffer of lobby and channel messages is held in server memory for moderation. It is separate from your scrollback and isn’t a public chat archive. To let you report a line still visible after a server restart, we also keep bounded content digests and delivery metadata for up to 24 hours, only for connections that remain open. Digests do not contain the message text. Tapping 🚩 submits the exact text you received so the server can verify it before retaining report evidence. This delivery check does not verify a quote submitted from an encrypted private room.</li>
+            <li>Lobby and channel messages reported by visitors, held by filters or flagged by AI can be kept in bounded active review queues for up to 24 hours. This can include message text, nickname, channel, nearby context and AI model/category signals. This evidence is separate from public chat scrollback and is not a public chat archive. Infrastructure backup retention is separate from the active review queue.</li>
+            <li>When private-room staff reporting is available, up to 100 submitted reports are kept in a separate active queue for up to 24 hours. A report contains your selected quote or description, reported nickname, reason, submission time, sender/target connection identifiers and opaque keyed room and target-session references. A target-session reference is recorded only when that connection is present; it does not verify the quote or nickname. These references are not invitation links or room decryption keys. No full history or automatic nearby context is attached. Resolving or dismissing removes the report’s text and metadata from the active queue.</li>
+            <li>Private reporting also keeps up to 200 retry receipts for up to 24 hours so retrying the same submission does not create another report. Receipts contain a report ID, time, random request code, content digest, status and opaque reporter reference, not quote, nickname or reason text. A report draft is not sent automatically when you reconnect; ending the room session clears the report form. Scheduled cleanup and infrastructure backup retention are separate from your connected chat history.</li>
+            <li>The active moderation log records actions and nicknames separately from chat, for up to 30 days or 2,000 records, whichever limit is reached first. Scheduled cleanup runs approximately once per minute; infrastructure backups have separate retention.</li>
+            <li>Visitor stats are counts only (how many, when, which room types). Camera media is encrypted between participating browsers. When a direct connection is unavailable and a relay is enabled, encrypted media can pass through the relay. This service does not record camera media.</li>
+            <li>Loading a YouTube video connects your browser to YouTube, which receives connection information and the selected video. The embedded player identifies this site by its origin; room invitation data is excluded from its embed URL. YouTube handles its own cookies and data under <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google’s privacy policy</a>.</li>
+        </ul>
+        <h2 id="reports">Reports, appeals and contact</h2>
+        <p>In the lobby and its channels, tap 🚩 beside a received message. In a private room that offers staff reporting, use <b>Report to staff</b> beside a received message or <b>Report a problem to staff</b> even when a host has left or cameras are off. Nothing from the report draft is sent until you agree and submit. A saved confirmation means the server stored it for human review; an unconfirmed result can be retried manually. Private quotes are claims supplied by the reporter, not independently verified transcripts.</p>
+        <p>The separate camera-tile <b>Report to the host</b> action sends a best-effort encrypted notice to that room’s host and hides the participant for you. It is not a saved staff report or a confirmation that the host received it.</p>
+        <p id="contact-details">Moderators review reports when available; this service does not promise immediate or round-the-clock review. For a moderation appeal, copyright complaint or a report you cannot submit in chat, use <b data-contact>[A monitored contact must be configured before visitor invitations]</b>. Include the channel or a brief private-room description, approximate time and message ID if available. Do not send private invitation links, room keys, access codes or passwords.</p>
+        <h3 id="urgent-help">Urgent safety concerns</h3>
+        <p>If someone is in immediate danger, contact local emergency services. This report queue is not an emergency service. You can block a participant or leave a room while seeking help.</p>
+        <ul>
+            <li><b>Child safety:</b> use the <a href="#contact-details">moderation contact above</a> for concerns about exploitation or grooming, including when a room host is involved. Give a brief, non-graphic description, approximate time and message ID if available. Do not download, forward or send sexual images of minors.</li>
+            <li><b>Intimate images shared without consent:</b> contact us to request removal or report the problem. You do not need a chat account to email us. Identify the relevant message or public location where possible; do not upload or email another copy of the imagery. Staff cannot remove copies on someone else’s device.</li>
+            <li><b>Copyright:</b> identify the work and the content/location you are concerned about, with a way for us to reply. Do not send room keys or private invitation links. Staff may need more information to assess a rights or removal request.</li>
+            <li><b>Appeals and privacy requests:</b> describe the action or request, approximate time and relevant channel/message ID. A reused nickname does not establish identity. Do not send identification documents, passwords or login codes in your first message.</li>
+        </ul>
+        <p class="small">Draft v0.1, October 2026. These rules get a lawyer’s review before Hang Out is linked publicly.</p>
+        <p><a class="btn" href="../lobby/">Back to #stalemate</a></p>
+    </main>
+</body>
+</html>

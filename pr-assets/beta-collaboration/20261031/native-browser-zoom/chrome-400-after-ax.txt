@@ -1,0 +1,78 @@
+Window: "#stalemate · Hang Out", App: Google Chrome.
+0 standard window #stalemate · Hang Out - Google Chrome (Guest), URL: 127.0.0.1:4495/r/45662413410ed051/lobby/, Secondary Actions: Raise
+	1 container #stalemate · Hang Out - Google Chrome (Guest), URL: 127.0.0.1:4495/r/45662413410ed051/lobby/
+		2 container
+			3 toolbar
+				4 button Back
+				5 button (disabled) Forward
+				6 button Reload
+				7 container
+					8 pop up button View site information
+					9 text field (settable) Address and search bar, Value: 127.0.0.1:4495/r/45662413410ed051/lobby/, Placeholder: Ask Google or type a URL
+					10 button Zoom: 400%
+				11 button Guest
+				12 pop up button Chrome
+			13 container
+				14 scroll area
+					15 HTML content #stalemate · Hang Out, URL: 127.0.0.1:4495/r/45662413410ed051/lobby/
+						16 container
+							17 text HANG OUT
+							18 link Back to Rad Dad, Value: raddadband.com/
+							19 container
+								20 text Connected
+							21 container Chat
+								22 tab group
+									23 tab (selected) #stalemate, Value: 1
+								24 text Welcome to #stalemate. Pull up a nick, say hello, make something together. /help for commands.
+								25 container Conversation
+									26 text [07:18]
+									27 text * ZoomAfter has joined #stalemate
+									28 text [07:18]
+									29 text -StaleBot-
+									30 text welcome to #stalemate, ZoomAfter. One rule: Don’t be a dick. Swear all you want; no hate, threats, creepy stuff or personal info. 🚩 anything gross. /help for commands.
+									31 text [07:18]
+									32 text -StaleBot-
+									33 text Easy on the keyboard mash.
+									34 text [07:18]
+									35 button (disabled) <ZoomAfter>
+									36 text via Rad Dad
+									37 text The composer stays visible while we make music together.
+								38 button 1 new message ↓
+								39 container Saved message copies
+									40 text 1 saved message copy: 1 not sent. Only in this tab. Restore never sends automatically.
+									41 content list
+										42 container
+											43 text #stalemate — Message was not sent. Native zoom reflow: WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
+											44 button (disabled) Restore draft
+											45 button Copy saved text
+											46 button Discard saved copy
+								47 container
+									48 button Commands
+									49 text field (settable) Message, Placeholder: Say something (or /help)
+									50 button Send
+							51 container Sections
+								52 button 🎨 Rooms
+								53 button 💬 Chat
+								54 button 🤘 People
+			55 pop up button Tab search
+			56 container
+				57 tab group
+					58 tab (selected, settable, boolean) #stalemate · Hang Out - Memory usage - 50.9 MB, Value: on
+						59 button Close
+			60 button New Tab
+	61 close button
+	62 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	63 minimize button
+64 menu bar
+	65 Chrome
+	66 File
+	67 Edit
+	68 View
+	69 History
+	70 Bookmarks
+	71 Profiles
+	72 Tab
+	73 Window
+	74 Help
+
+The focused UI element is 50 button Send

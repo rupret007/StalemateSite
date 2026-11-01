@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "recordedAt": "2026-10-31T12:21:50.994650+00:00",
+  "testedSource": "80a1a5d6730e4f91098db046e797fd44e7431324",
+  "sourceSha256": {
+    "r/45662413410ed051/lobby/index.html": "4e2679a0e15568f7993ab1fc82855c5d716c33dd7df0914a8869106ee7031749",
+    "r/45662413410ed051/lobby/lobby.css": "a91c1092bd565dbde68efd903a8a98e96c73f440f765f34a566fb5a7b187803b",
+    "r/45662413410ed051/lobby/lobby.js": "7cba8e30c0813136467f419715547c6449bd648983d7dc69175f6828cbe6484a"
+  },
+  "installedChromeBundleVersion": "156.0.8078.76",
+  "scope": "Actual native macOS Chrome Guest window on disposable loopback fixture; browser controls and AX confirmed400/200, with saved rejected-message copy and ordinary keyboard-submitted message. No viewport emulation, DOM/native hooks, hosted sign-in, microphone/camera, provider or physical-device music claim.",
+  "result": "PASS for this focused native400/200 composer visibility and keyboard submission journey; saved copy retained. Original baseline failure remains unchanged.",
+  "native400": {
+    "actualZoomAxConfirmed": true,
+    "messageInputFullyVisible": true,
+    "sendFullyVisible": true,
+    "keyboardTabFocusedSend": true,
+    "spaceSubmittedNormalMessage": true,
+    "savedUnsentCopyStillPresent": true
+  },
+  "native200": {
+    "actualZoomAxConfirmed": true,
+    "messageInputFullyVisible": true,
+    "sendFullyVisible": true,
+    "savedUnsentCopyStillPresent": true
+  },
+  "setupObservations": [
+    "Guest startup focus produced an unintended file URL; corrected observed address field before joining.",
+    "Two reductions from400 reached250; one further reduction produced observed200. Only the verified200/400 images are qualified."
+  ],
+  "imageEncoding": {
+    "actualFormat": "JPEG",
+    "width": 1200,
+    "height": 1284,
+    "originalCaptureBytesUnmodified": true,
+    "note": "Native screenshot API returned JPEG bytes. Private capture names end in.png; published after image uses.jpg. Original before-receipt imagePixels incorrectly interpreted a PNG header; actual before JPEG is also1200x1284, confirmed by file(1). Original before failure and capture bytes are retained."
+  },
+  "providerOrMediaActivation": false,
+  "completeAccessibilityConformance": false,
+  "hostedOrPhysicalMusicAcceptance": false,
+  "cleanup": "Actual100% restored; own Guest window closed to original profile picker. Own loopback server stopped after command/port verification; listener absent. No user profile changed.",
+  "artifacts": {
+    "chrome-400-after.jpg": {
+      "bytes": 204974,
+      "sha256": "1ed1d7ef3f0325ed3f6713866ef7a51b0bf188bce2053dec4de5a9b663828ad0"
+    },
+    "chrome-400-after-ax.txt": {
+      "bytes": 3242,
+      "sha256": "1e96d5b955f3bc0fa58d359b319ea8fba3db17bd9749913a8df9d476cbbe3b0b"
+    }
+  },
+  "ci": {
+    "at": "2026-10-31T12:21:50.994650+00:00",
+    "head": "80a1a5d6730e4f91098db046e797fd44e7431324",
+    "actualCiCheckout": "324a8f1fd2d37bc3ccaed1639a1d1a51ed915e6b",
+    "tree": "5a56e1ac66936e860f44e00b9c2652d77ef19fed",
+    "actualCiCheckoutTreeEqual": true,
+    "run": 41198635869,
+    "job": 124529813858,
+    "unitFilesPassed": 114,
+    "unitTestsPassed": 1869,
+    "browserTestsPassed": 438,
+    "browserAttempts": 438,
+    "browserRetryMarkers": 0,
+    "focusedNewCasesPassed": 2,
+    "rawLogReceipt": "site178-80a1a5d-log-receipt.json",
+    "localFocusedReceipt": "lobby-native400-sticky-green-g2-receipt.json",
+    "scope": "Current PR CI merge checkout with equal complete tree; no hosted, physical music or complete accessibility conformance claim."
+  }
+}

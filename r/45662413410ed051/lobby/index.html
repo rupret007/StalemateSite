@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+    <meta name="googlebot" content="noindex, nofollow">
+    <meta name="referrer" content="no-referrer">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com https://www.youtube.com; frame-src https://challenges.cloudflare.com https://www.youtube.com; media-src 'self' blob:; connect-src 'self' wss://stalemate-hangout.jeffstory007.workers.dev https://stalemate.goatcounter.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <!-- Hidden preview. Not linked from anywhere on the public site. -->
+    <meta name="hangout-relay" content="">
+    <meta name="hangout-turn" content="">
+    <meta name="hangout-turnstile" content="">
+    <title>#stalemate · Hang Out</title>
+    <link rel="icon" href="../../../assets/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="lobby.css">
+</head>
+<body>
+    <header class="titlebar"><div class="brand"><span class="brand-mark" aria-hidden="true">#</span><span><b>HANG OUT</b><span class="brand-caption">IRC / COMMUNITY</span></span><span class="title-extra">A place to hang out.</span></div><div class="connection-tools"><a class="entry-return" data-entry-return hidden></a><span class="connection" data-connection role="status" data-state="offline">Not connected</span><button type="button" data-reconnect hidden>Try again</button></div></header>
+
+    <section class="session-ended" data-session-ended hidden aria-labelledby="session-ended-title">
+        <div><h2 id="session-ended-title" tabindex="-1">Session ended</h2><p data-session-reason role="status"></p><p class="small">Your current unsent message stays below for copying. Leaving this page clears unsent drafts; they are never sent automatically.</p></div>
+        <a class="btn" data-session-reentry href="/beta/" hidden>Return to invitation</a>
+    </section>
+
+    <section class="gate" data-gate>
+        <div class="gate-layout">
+          <div class="gate-intro">
+            <p class="eyebrow">OFF THE STAGE. INTO THE CONVERSATION.</p>
+            <h1>#stalemate</h1>
+            <p class="gate-headline">Start with a hello.<br>See what happens.</p>
+            <p class="lede" data-gate-copy>Talk about whatever. Find your people. Draw, watch or jam together. Guest access. No account needed.</p>
+            <div class="gate-features" aria-label="Ways to hang out"><span><b>#</b> Open channels</span><span><b>↗</b> Creative rooms</span><span><b>@</b> Anyone can host</span></div>
+            <p class="gate-command"><span aria-hidden="true">&gt;</span> /join #stalemate<span class="terminal-cursor" aria-hidden="true">_</span></p>
+          </div>
+          <div class="gate-card">
+            <div class="window-chrome"><span><i aria-hidden="true"></i> CONNECT TO THE COMMUNITY</span><span aria-hidden="true">↵</span></div>
+            <h2>Pick a name. Pull up a chair.</h2>
+            <label class="nickrow">Your nick
+                <span class="nickbox"><input data-nick maxlength="20" autocomplete="off" spellcheck="false" aria-label="Your nick" placeholder="Type a nickname… or roll one →"><button class="btn btn--ghost dice" type="button" data-reroll aria-label="Make me a random fun nickname" title="Make me a random fun nickname">🎲 Make me a name</button></span>
+            </label>
+            <p class="small gate-hint">Remembered on this device, not reserved. Camera &amp; mic stay off.</p>
+            <div class="entry-choice" data-entry-context hidden><label><input type="checkbox" data-entry-share checked> Show <span data-entry-label></span> beside my name</label><p class="small">Your entrance, not a verified identity. You can hide it in People.</p></div>
+            <p class="small" data-entry-unavailable hidden>Entry-site badges aren’t available on this server. Your return link still works.</p>
+            <button class="btn btn--big" type="button" data-enter disabled>I’m 13+ and I agree · Let me in ↗</button>
+            <p class="rules"><b>One rule: Don’t be a dick.</b> Swear all you want. You own what you post; site moderators can remove abusive content. <a href="../terms/" data-terms>House rules &amp; privacy</a></p>
+            <details class="entry-details"><summary>How session scrollback works</summary><p class="small">Chat starts when you join. Scrollback stays in this tab for your connected session.</p></details>
+            <p class="small gate-disclosure" data-ai-disclosure>When AI review is enabled, public text may go to OpenAI after posting to flag messages for our moderators. PMs, invite links, invite-only/key-protected/locked rooms, cameras and encrypted private rooms are excluded. Flagged, reported or held evidence stays up to 24 hours, separate from chat scrollback.</p>
+            <button class="btn btn--ghost" data-gate-guest hidden>Continue as guest</button>
+            <p class="status" data-gate-status role="status"></p>
+          </div>
+        </div>
+    </section>
+
+    <main class="irc" data-app hidden>
+        <aside class="pane rooms" data-pane="rooms" aria-label="Rooms">
+            <button class="channel-home" type="button" data-lobby-home><b>#stalemate</b><span data-lobby-count>The main conversation</span></button>
+            <section class="presence" aria-label="Lobby presence">
+                <h2 data-presence-title>Getting connected</h2>
+                <p data-presence-detail>Everyone starts in the same conversation.</p>
+                <div class="visit-gathering" data-gathering hidden>
+                    <b data-gathering-heading>Confirmed gathering</b>
+                    <span data-gathering-host></span>
+                    <span data-gathering-when></span>
+                    <span data-gathering-activity></span>
+                    <span class="small" data-gathering-note></span>
+                    <button class="quiet-action" type="button" data-gathering-save hidden>Save a reminder on this device</button>
+                </div>
+                <div class="visit-creation" data-creation hidden>
+                    <b data-creation-heading>Past creation</b>
+                    <span data-creation-title></span>
+                    <span data-creation-detail></span>
+                </div>
+            </section>
+            <h2>Room directory <span class="count" data-room-count>0</span></h2>
+            <p class="small directory-hint">Find a conversation. Make something together.</p>
+            <div class="directory-controls"><label class="small"><span class="sr-only">Show</span><select data-room-filter aria-label="Room directory"><option value="active">Active now</option><option value="registered">Registered rooms</option><option value="mine">My rooms</option></select></label>
+            <label class="small"><span class="sr-only">Find a room</span><input data-room-search type="search" maxlength="40" aria-label="Find a room" placeholder="Find a room…"></label></div>
+            <a class="private" data-owner-signin href="#">Sign in with email to keep a room</a>
+            <button class="btn btn--small btn--ghost" data-owner-signout hidden>Continue as guest</button>
+            <ul class="roomlist" data-roomlist></ul>
+            <p class="empty" data-rooms-empty>No rooms yet. Stay for a chat, or be the first to start one.</p>
+            <h2 class="start-heading">Make room for something</h2>
+            <p class="small creation-hint">Pick a starting point. You’re the host.</p>
+            <div class="tiles" data-tiles>
+                <button class="tile tile-chat" type="button" data-start="chat"><b aria-hidden="true">#</b><strong>Start a chat channel</strong><span>Your name. Your corner of the internet.</span></button>
+                <button class="tile" type="button" data-start="art"><b aria-hidden="true">✎</b><strong>Draw together</strong><span>One canvas. Everyone’s ideas.</span></button>
+                <button class="tile" type="button" data-start="watch"><b aria-hidden="true">▷</b><strong>Watch together</strong><span>Same video. Same moment.</span></button>
+                <button class="tile" type="button" data-start="bobross"><b aria-hidden="true">◒</b><strong>Paint along</strong><span>Bob Ross + a shared canvas.</span></button>
+                <button class="tile" type="button" data-start="jam"><b aria-hidden="true">≋</b><strong>Jam (WebJam)</strong><span>Bring a riff. Find your band.</span></button>
+            </div>
+            <details class="room-details"><summary>About hosting &amp; keeping a room</summary><p class="small">Anyone can host a temporary room. Sign in with email to keep its name across visits. Registered rooms expire after 90 days without an owner or verified co-host visit. You can stay in #stalemate while a room is open. Cameras are always optional.</p></details>
+            <a class="private private-invite" data-private href="../">↗ Encrypted private room</a>
+        </aside>
+
+        <section class="pane chat" data-pane="chat" aria-label="Chat">
+            <nav class="tabs" data-tabs role="tablist"></nav>
+            <div class="topic" data-topic></div>
+            <p class="network-note" data-network-note role="status" hidden></p>
+            <details class="network-note" data-sharing-controls hidden>
+                <summary>My sharing controls</summary>
+                <div data-sharing-region tabindex="-1" role="region" aria-label="My sharing status">
+                    <p data-sharing-status role="status">Sharing permissions have not been checked.</p>
+                    <p class="small">Email verifies your account, not permission to share. Stopping prevents new sharing; it does not erase messages or copies already received.</p>
+                    <button class="btn btn--small btn--ghost" type="button" data-sharing-check>Check my sharing</button>
+                    <button class="btn btn--small btn--ghost" type="button" data-sharing-stop disabled>Stop all my sharing</button>
+                    <button class="btn btn--small btn--ghost" type="button" data-sharing-leave disabled>Leave chat</button>
+                    <span data-sharing-confirm hidden>
+                        <span>Stop new chat, direct contact and media sharing?</span>
+                        <button class="btn btn--small" type="button" data-sharing-accept>Yes, stop sharing</button>
+                        <button class="btn btn--small btn--ghost" type="button" data-sharing-cancel>Not now</button>
+                    </span>
+                </div>
+            </details>
+            <section class="lobby-welcome" data-lobby-welcome aria-label="Conversation starters">
+                <div class="welcome-symbol" aria-hidden="true">#</div><div class="welcome-copy"><b data-welcome-title>Make yourself at home.</b><p>Chat starts here, when you join. Say hello or just settle in.</p>
+                <div class="conversation-starters">
+                    <button type="button" data-prompt="Hey everyone, I’m new here. ">Say hello</button>
+                    <button type="button" data-prompt="What’s everyone making or working on? ">What are you making?</button>
+                    <button type="button" data-prompt="Anyone up for drawing something together? ">Find a collaborator</button>
+                    <button type="button" data-quiet-prompt hidden>Offer a one-line idea</button>
+                </div>
+                </div>
+            </section>
+            <div class="roombar" data-roombar hidden>
+                <span class="modes" data-modes></span>
+                <button class="btn btn--small btn--ghost" type="button" data-cam aria-pressed="false">📷 Camera (18+)</button>
+                <button class="btn btn--small btn--ghost op-only" type="button" data-roomtools>@ Host tools</button>
+                <button class="btn btn--small btn--ghost" type="button" data-leave>Leave</button>
+                <span class="small host-status" data-host-status></span>
+            </div>
+            <section class="network-note" data-keep-prompt hidden tabindex="-1" aria-label="Keep this room">
+                <p data-keep-message role="status"></p>
+                <button class="btn btn--small" type="button" data-keep-accept>Keep this room</button>
+                <button class="btn btn--small btn--ghost" type="button" data-keep-cancel>Not now</button>
+            </section>
+            <div class="jam" data-jam hidden role="region" aria-labelledby="jam-title">
+                <h3 class="jam-title" id="jam-title">Live music with WebJam</h3>
+                <p class="small jam-note">Browser audio: headphones required; higher delay.</p>
+                <p class="small jam-platform" data-jam-platform>A Mac hosts music. Windows remote music needs a signed build; this unsigned beta cannot join natively.</p>
+                <div class="jam-actions" data-jam-actions>
+                    <a class="btn" data-jam-desktop href="#" hidden>Open in WebJam 🎸</a>
+                    <button class="btn" type="button" data-jam-copy hidden>Copy full invitation</button>
+                    <span class="small" data-jam-wait>Waiting for the host to paste their WebJam invite.</span>
+                    <button class="btn btn--ghost" type="button" data-jam-web disabled title="The host has not shared an approved browser invitation">Browser join unavailable</button>
+                </div>
+                <label class="small" data-jam-copy-fallback hidden>Copy this invite, then paste it into WebJam’s Join screen.
+                    <textarea data-jam-copy-value readonly aria-label="WebJam invitation to copy" autocomplete="off" spellcheck="false" rows="4"></textarea>
+                </label>
+                <form class="jam-paste op-only" data-jam-form>
+                    <textarea data-jam-link placeholder="Paste a full desktop invite or browser link" aria-label="WebJam invitation" aria-describedby="jam-share-help" autocomplete="off" spellcheck="false" maxlength="8192" rows="2"></textarea>
+                    <button class="btn btn--small" type="submit">Share</button>
+                    <p class="small" id="jam-share-help">Paste the full desktop invite or one approved browser link.</p>
+                    <p class="small" data-jam-share-status role="status"></p>
+                </form>
+                <details class="jam-setup" data-jam-help>
+                    <summary>Setup &amp; invitation help</summary>
+                    <p>Use the beta app supplied by your host; the public download may reject this invitation. WebJam connects through a desktop host using Jamulus. Ethernet is recommended; actual delay and dropouts depend on the devices and network.</p>
+                    <p>On a computer, copy the invite, open WebJam, choose Join, and paste it there. Opening the app directly is supported on Mac; Windows and Linux require pasting private invites. Phones can use this room’s chat while music runs on a computer.</p>
+                    <p>Hosting: paste the entire Copy Invite message. For browser guests, in the host app choose Web Join → Allow a web guest, then Copy web invite. Share that link here. Browser joining stays unavailable until an approved invitation is shared. Sharing an invite does not turn on your microphone.</p>
+                    <p>Invites may expire or admit one guest; ask the host for a fresh one if needed. A rejected paste stays editable while you remain this room’s connected host. Leaving the room or stopping locally clears its controls; it does not revoke an invitation already copied. End the music session or remove the guest in the host app when needed.</p>
+                </details>
+            </div>
+            <details class="activity" data-activity hidden open>
+                <summary class="activity-heading"><span class="activity-label"><span data-activity-title>Shared activity</span><span class="activity-camera-count" data-act-camera-summary hidden></span></span><span class="activity-toggle" aria-hidden="true"></span></summary>
+                <div class="act-stage" data-act-stage hidden>
+                    <div class="act-camera-strip" data-act-camera-strip hidden>
+                        <p class="camera-heading"><b id="lobby-camera-count" data-act-camera-count>Cameras (0)</b><span class="camera-scroll-hint" data-act-camera-hint aria-hidden="true" hidden>Swipe / ← →</span></p>
+                        <p class="sr-only" id="lobby-camera-scroll-help" hidden>More cameras: swipe or focus this row and use Left and Right arrows. Home and End reach either end.</p>
+                        <div class="act-cams" data-act-tiles role="region" aria-label="Room cameras" aria-describedby="lobby-camera-count" tabindex="-1"></div>
+                    </div>
+                    <div class="act-video" data-act-video hidden>
+                        <div class="yt-wrap"><div data-act-yt id="lobby-yt-player"></div></div>
+                        <p class="small" data-act-video-status role="status" hidden></p>
+                        <button class="btn btn--small" type="button" data-act-tap hidden>Tap to play</button>
+                        <form class="act-load op-only" data-act-load>
+                            <input data-act-url placeholder="Paste a YouTube link" aria-label="YouTube URL">
+                            <button class="btn btn--small" type="submit">Load</button>
+                        </form>
+                        <div class="bob-picks op-only" data-bob-picks></div>
+                    </div>
+                    <div class="act-paint" data-act-paint hidden>
+                        <canvas data-act-canvas width="600" height="360" aria-label="Shared paint canvas"></canvas>
+                        <div class="act-tools">
+                            <span class="swatches" data-act-swatches></span>
+                            <button class="btn btn--small op-only" type="button" data-act-clear>Clear canvas</button>
+                        </div>
+                    </div>
+                </div>
+            </details>
+            <p class="small" data-act-relay-status role="status"></p>
+            <ol class="buffer" data-buffer role="log" aria-label="Conversation" aria-live="polite" aria-relevant="additions" aria-atomic="false"></ol>
+            <button class="jump-new" data-new-messages type="button" hidden>New messages ↓</button>
+            <div class="pmreq" data-pmreqs></div>
+            <div class="quick" data-quick>
+                <button type="button" class="startroom" data-show="rooms">＋ Start a room</button>
+                <button type="button" data-quick-line="🤘 SHRED">🤘</button>
+                <button type="button" data-quick-line="happy little tree 🌲">🌲</button>
+                <button type="button" data-quick-me="moshes">/me mosh</button>
+                <button type="button" data-quick-cmd="slap">🐟 slap</button>
+                <button type="button" data-quick-cmd="away">💤 away</button>
+                <button type="button" data-quick-cmd="help">? help</button>
+            </div>
+            <section class="message-recovery" data-message-recovery hidden aria-label="Saved message copies">
+                <p data-message-recovery-status role="status"></p>
+                <ul data-message-recovery-list></ul>
+            </section>
+            <form class="say" data-say>
+                <button class="slash" type="button" data-palette-open aria-label="Commands">/</button>
+                <input data-text maxlength="300" autocomplete="off" placeholder="Say something (or /help)" aria-label="Message">
+                <button class="btn" data-send type="submit">Send</button>
+            </form>
+            <div class="chat-status"><span data-chat-context>#stalemate</span><span title="The last 300 lines received in this channel during this session. No earlier messages are replayed.">Session scrollback · /help</span></div>
+        </section>
+
+        <aside class="pane people" data-pane="people" aria-label="People">
+            <p class="eyebrow people-eyebrow">IN THIS CHANNEL</p><h2 data-people-title>People</h2>
+            <ul class="nicks" data-nicks></ul>
+            <label class="pmtoggle"><input type="checkbox" data-pm-off> Turn off PM requests</label>
+            <label class="pmtoggle"><input type="checkbox" data-chat-announcements checked aria-describedby="chat-announcements-help"> Announce new chat messages</label>
+            <p class="small" id="chat-announcements-help">Pause screen-reader announcements to read at your own pace. Messages remain visible.</p>
+            <p class="small people-help"><a href="../terms/">House rules</a><br>Use 🚩 beside a message to report it.</p>
+            <div class="session-card"><span class="eyebrow">YOUR SESSION</span><b data-self-nick>Guest</b><span data-self-role>Guest access</span><span class="session-history">Chat starts when you join.</span></div>
+            <div class="entry-choice" data-entry-context hidden><label><input type="checkbox" data-entry-share checked> Show <span data-entry-label></span></label><p class="small">People and new messages. Earlier messages may still show your entrance.</p></div>
+            <p class="small" data-entry-unavailable hidden>Entry-site badges aren’t available on this server.</p>
+        </aside>
+
+        <div class="toast" data-toast role="status" tabindex="0" hidden></div>
+        <nav class="phonetabs" aria-label="Sections">
+            <button type="button" data-show="rooms">🎨 Rooms</button>
+            <button type="button" data-show="chat" aria-current="true">💬 Chat</button>
+            <button type="button" data-show="people">🤘 People</button>
+        </nav>
+    </main>
+
+    <dialog class="sheet" data-channel-dialog aria-labelledby="channel-dialog-title">
+        <h3 id="channel-dialog-title">Your own #channel</h3>
+        <p>Anyone can host. Join an existing channel, or create one and become its @ host.</p>
+        <form data-channel-form>
+            <label class="channel-label" for="channel-name">Channel name</label>
+            <input id="channel-name" data-channel-name maxlength="31" autocomplete="off" spellcheck="false" placeholder="#night-owls" aria-describedby="channel-name-hint channel-name-error" required>
+            <p class="small" id="channel-name-hint">2–30 letters, numbers or dashes. You can also type /join #night-owls in chat.</p>
+            <p class="status" id="channel-name-error" data-channel-error role="status"></p>
+            <div class="sheet-buttons"><button class="btn" type="submit">Join / create</button><button class="btn btn--ghost" type="button" data-channel-cancel>Cancel</button></div>
+        </form>
+        <p class="small">Give another member @ with /op nick before you leave. Rooms close after 10 minutes empty.</p>
+    </dialog>
+    <dialog class="sheet" data-message-copy aria-labelledby="message-copy-title">
+        <h2 id="message-copy-title">Copy saved text</h2>
+        <p class="small" data-message-copy-label></p>
+        <textarea data-message-copy-text readonly aria-label="Saved message text" rows="5"></textarea>
+        <p class="small">Select and copy this text yourself. Nothing is sent again.</p>
+        <button class="btn" type="button" data-message-copy-close>Done</button>
+    </dialog>
+    <dialog class="sheet" data-sheet aria-labelledby="person-dialog-title">
+        <h3 id="person-dialog-title" data-sheet-title></h3>
+        <div class="sheet-buttons" data-sheet-buttons></div>
+        <button class="btn btn--ghost" type="button" data-sheet-close>Close</button>
+    </dialog>
+    <dialog class="sheet" data-invite-dialog aria-labelledby="invite-dialog-title">
+        <h3 id="invite-dialog-title">Invite a guest</h3>
+        <p>Invite someone to <b data-invite-room></b>. They choose whether to join.</p>
+        <form data-invite-form>
+            <label class="channel-label" for="invite-person">Choose a current person</label>
+            <select id="invite-person" data-invite-options aria-describedby="invite-person-hint"></select>
+            <p class="small" id="invite-person-hint">This choice stays with that connection if their nickname changes.</p>
+            <button class="btn" type="button" data-invite-person-send>Invite selected person</button>
+            <label class="channel-label" for="invite-nickname">Guest nickname</label>
+            <input id="invite-nickname" data-invite-nick maxlength="20" autocomplete="off" spellcheck="false" aria-describedby="invite-nickname-hint invite-nickname-error" required>
+            <p class="small" id="invite-nickname-hint">Typing a nickname selects whoever uses it when the invitation is sent. An invitation does not give host controls.</p>
+            <p class="status" id="invite-nickname-error" data-invite-error role="status"></p>
+            <div class="sheet-buttons"><button class="btn" type="submit">Send invitation</button><button class="btn btn--ghost" type="button" data-invite-cancel>Cancel</button></div>
+        </form>
+    </dialog>
+    <dialog class="sheet" data-cam-gate aria-labelledby="camera-dialog-title">
+        <h3 id="camera-dialog-title">Camera on?</h3>
+        <p>Cameras in open rooms are for grown-ups. Others in this room will see you.</p>
+        <label class="check"><input type="checkbox" data-adult> I’m 18 or older</label>
+        <div class="sheet-buttons"><button class="btn" type="button" data-cam-yes>Turn it on</button><button class="btn btn--ghost" type="button" data-cam-no>Never mind</button></div>
+    </dialog>
+    <dialog class="sheet" data-palette aria-labelledby="commands-dialog-title">
+        <h3 id="commands-dialog-title">Commands</h3>
+        <p class="small">Tap one. Typing them works too.</p>
+        <div class="sheet-buttons" data-palette-buttons></div>
+        <button class="btn btn--ghost" type="button" data-palette-close>Close</button>
+    </dialog>
+    <aside class="guest-check" data-guest-check hidden><p role="status">Checking your guest connection…</p><div data-turnstile></div></aside>
+    <!-- Page-level counts only: fixed event names, no query string (the preview key is stripped first), no referrer. -->
+    <script data-goatcounter="https://stalemate.goatcounter.com/count" data-goatcounter-settings='{"no_onload": true}' async src="../../../js/count.js"></script>
+    <script src="../names.js"></script>
+    <script src="../sync-core.js"></script>
+    <script src="../video-core.js"></script>
+    <script src="../youtube-player.js"></script>
+    <script src="../turn-client.js"></script>
+    <script src="../bob-ross.js"></script>
+    <script src="discovery-core.js"></script>
+    <script src="lobby-room.js"></script>
+    <script type="module" src="lobby.js"></script>
+</body>
+</html>

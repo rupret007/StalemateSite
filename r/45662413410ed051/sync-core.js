@@ -8,6 +8,10 @@
         chatChars: 400,
         nameChars: 24,
         strokePoints: 400,
+        strokeTotalPoints: 3200,
+        strokeRangeStrokes: 32,
+        strokeRanges: 64,
+        strokeRangePoints: 12800,
         strokesKept: 1500,
         chatKept: 200,
         driftSeconds: 1.0
@@ -78,19 +82,104 @@
         return String(value == null ? '' : value).replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max);
     }
 
-    function cleanStroke(stroke) {
+    function cleanStrokeLimit(stroke, limit) {
         if (!stroke || typeof stroke !== 'object') return null;
         const id = cleanText(stroke.id, 40);
         const color = COLORS.includes(stroke.color) ? stroke.color : null;
         const size = clampNumber(stroke.size, 1, 48);
         if (!id || !color || size === null || !Array.isArray(stroke.pts)) return null;
         const pts = [];
-        for (const p of stroke.pts.slice(0, LIMITS.strokePoints)) {
+        for (const p of stroke.pts.slice(0, limit)) {
             const x = clampNumber(p && p[0], 0, 1);
             const y = clampNumber(p && p[1], 0, 1);
             if (x !== null && y !== null) pts.push([Math.round(x * 10000) / 10000, Math.round(y * 10000) / 10000]);
         }
         return pts.length ? { id, color, size, pts } : null;
+    }
+    function cleanStroke(stroke) { return cleanStrokeLimit(stroke, LIMITS.strokePoints); }
+    function cleanSnapshotStroke(stroke) { return cleanStrokeLimit(stroke, LIMITS.strokeTotalPoints); }
+
+    // Gaps belong to the current in-memory activity state, never its snapshot.
+    // Only contiguous prefixes enter state.strokes and reach the canvas.
+    const strokeRanges = new WeakMap();
+    function rangesFor(state) {
+        let ranges = strokeRanges.get(state);
+        if (!ranges) {
+            ranges = { strokes: new Map(), exhausted: false, conflicted: false };
+            strokeRanges.set(state, ranges);
+        }
+        return ranges;
+    }
+    function rangeCounts(strokes) {
+        let pendingRanges = 0, pendingPoints = 0;
+        for (const stroke of strokes.values()) {
+            let previous = -2;
+            const positions = [...stroke.points.keys()].sort((a, b) => a - b);
+            pendingPoints += positions.length;
+            for (const position of positions) {
+                if (position !== previous + 1) pendingRanges += 1;
+                previous = position;
+            }
+        }
+        return { pendingStrokes: strokes.size, pendingRanges, pendingPoints };
+    }
+    function strokeRangeStatus(state) {
+        const ranges = strokeRanges.get(state);
+        return { ...rangeCounts(ranges?.strokes || new Map()), exhausted: ranges?.exhausted || false, conflicted: ranges?.conflicted || false };
+    }
+    function resetStrokeRanges(state) { strokeRanges.delete(state); }
+    const samePoint = (a, b) => a[0] === b[0] && a[1] === b[1];
+    const sameStroke = (a, b) => a.color === b.color && a.size === b.size;
+    function trimStrokes(state) {
+        if (state.strokes.length <= LIMITS.strokesKept) return;
+        const removed = state.strokes.splice(0, state.strokes.length - LIMITS.strokesKept);
+        const ranges = strokeRanges.get(state);
+        if (ranges) for (const stroke of removed) {
+            if (ranges.strokes.delete(stroke.id)) ranges.exhausted = true;
+        }
+    }
+    function mergeStrokeRange(state, stroke, offset) {
+        const ranges = rangesFor(state);
+        const existing = state.strokes.find((item) => item.id === stroke.id);
+        const staged = ranges.strokes.get(stroke.id);
+        if (existing && !sameStroke(existing, stroke) || staged && !sameStroke(staged, stroke)) {
+            ranges.conflicted = true; return null;
+        }
+        const prefix = existing?.pts || [];
+        const points = new Map(staged?.points || []);
+        // Legacy appends or an appended snapshot can supply the missing prefix.
+        // Their already visible points must agree with every staged overlap.
+        for (const [position, point] of points) if (position < prefix.length) {
+            if (!samePoint(prefix[position], point)) { ranges.conflicted = true; return null; }
+            points.delete(position);
+        }
+        for (let index = 0; index < stroke.pts.length; index += 1) {
+            const position = offset + index, point = stroke.pts[index];
+            const known = position < prefix.length ? prefix[position] : points.get(position);
+            if (known && !samePoint(known, point)) { ranges.conflicted = true; return null; }
+            if (position >= prefix.length) points.set(position, point);
+        }
+        const contiguous = prefix.slice();
+        while (points.has(contiguous.length)) {
+            const position = contiguous.length;
+            contiguous.push(points.get(position)); points.delete(position);
+        }
+        const pending = new Map(ranges.strokes);
+        if (points.size) pending.set(stroke.id, { id: stroke.id, color: stroke.color, size: stroke.size, points });
+        else pending.delete(stroke.id);
+        const counts = rangeCounts(pending);
+        if (counts.pendingStrokes > LIMITS.strokeRangeStrokes || counts.pendingRanges > LIMITS.strokeRanges
+            || counts.pendingPoints > LIMITS.strokeRangePoints) {
+            // Retain accepted state atomically. A fresh sync is required because
+            // this range was not kept; later gap filling does not erase the latch.
+            ranges.exhausted = true; return null;
+        }
+        ranges.strokes = pending;
+        if (contiguous.length === prefix.length) return null;
+        if (existing) existing.pts = contiguous;
+        else state.strokes.push({ id: stroke.id, color: stroke.color, size: stroke.size, pts: contiguous });
+        trimStrokes(state);
+        return 'draw';
     }
 
     function emptyState() { return { strokes: [], chat: [], video: null }; }
@@ -102,17 +191,24 @@
         case 'stroke': {
             const stroke = cleanStroke(msg.stroke);
             if (!stroke) return null;
+            if (Object.prototype.hasOwnProperty.call(msg, 'offset')) {
+                if (!Number.isInteger(msg.offset) || msg.offset < 0 || msg.offset >= LIMITS.strokeTotalPoints
+                    || msg.stroke.pts.length !== stroke.pts.length || msg.offset + stroke.pts.length > LIMITS.strokeTotalPoints) return null;
+                return mergeStrokeRange(state, stroke, msg.offset);
+            }
             const existing = state.strokes.find((s) => s.id === stroke.id);
             if (existing) {
                 if (existing.color !== stroke.color) return null;
-                existing.pts = existing.pts.concat(stroke.pts).slice(0, LIMITS.strokePoints * 8);
+                existing.pts = existing.pts.concat(stroke.pts).slice(0, LIMITS.strokeTotalPoints);
             } else {
                 state.strokes.push(stroke);
-                if (state.strokes.length > LIMITS.strokesKept) state.strokes.splice(0, state.strokes.length - LIMITS.strokesKept);
+                trimStrokes(state);
             }
+            if (strokeRanges.get(state)?.strokes.has(stroke.id)) mergeStrokeRange(state, existing || stroke, 0);
             return 'draw';
         }
         case 'clear':
+            resetStrokeRanges(state);
             state.strokes = [];
             return 'draw';
         case 'chat': {
@@ -134,13 +230,15 @@
         }
         case 'snapshot': {
             const snap = msg.state || {};
-            const newStrokes = (Array.isArray(snap.strokes) ? snap.strokes : []).map(cleanStroke).filter(Boolean);
-            state.strokes = snap.append ? state.strokes.concat(newStrokes).slice(-LIMITS.strokesKept) : newStrokes.slice(-LIMITS.strokesKept);
-            if (snap.chat || !snap.append) {
-                state.chat = (Array.isArray(snap.chat) ? snap.chat : []).slice(-LIMITS.chatKept).map((c) => ({
-                    name: cleanText(c && c.name, LIMITS.nameChars) || 'Someone', text: cleanText(c && c.text, LIMITS.chatChars), t: Number(c && c.t) || 0
-                })).filter((c) => c.text);
+            const newStrokes = (Array.isArray(snap.strokes) ? snap.strokes : []).map(cleanSnapshotStroke).filter(Boolean);
+            if (snap.append) {
+                for (const stroke of newStrokes) mergeStrokeRange(state, stroke, 0);
+            } else {
+                resetStrokeRanges(state);
+                state.strokes = newStrokes.slice(-LIMITS.strokesKept);
             }
+            // Activity snapshots never import or reset chat, including legacy
+            // snapshots. Only live chat frames add to this connection's buffer.
             if (snap.video !== undefined || !snap.append) {
                 const v = snap.video;
                 const source = v && cleanSource(v.source);
@@ -198,7 +296,7 @@
         return JSON.parse(dec.decode(data));
     }
 
-    const api = { LIMITS, COLORS, FILE_SOURCES, parseYouTubeId, cleanSource, expectedPosition, needsCorrection, createClock, cleanStroke, emptyState, apply, newSecret, validSecret, deriveRoom, roomRelayToken, seal, open };
+    const api = { LIMITS, COLORS, FILE_SOURCES, parseYouTubeId, cleanSource, expectedPosition, needsCorrection, createClock, cleanStroke, cleanSnapshotStroke, strokeRangeStatus, resetStrokeRanges, emptyState, apply, newSecret, validSecret, deriveRoom, roomRelayToken, seal, open };
     if (typeof module === 'object' && module.exports) module.exports = api;
     global.HangoutCore = api;
 }(typeof window !== 'undefined' ? window : globalThis));

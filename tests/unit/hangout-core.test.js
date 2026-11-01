@@ -33,9 +33,9 @@ describe('hangout sync core', () => {
     it('estimates the relay clock offset from the tightest sample', () => {
         let now = 0;
         const clock = H.createClock(() => now);
-        now = 1000; clock.sample(5900); // 100 ms late
-        now = 2000; clock.sample(6990); // 10 ms late (tighter)
-        now = 3000; clock.sample(7500); // very late, ignored
+        now = 1000; clock.sample(5900);
+        now = 2000; clock.sample(6990);
+        now = 3000; clock.sample(7500);
         expect(clock.offset).toBe(4990);
         expect(clock.relayNow()).toBe(7990);
     });
@@ -69,6 +69,39 @@ describe('hangout sync core', () => {
         expect(s.strokes[1].id).toBe('b');
     });
 
+    it('gives a new visitor current activity without importing legacy snapshot chat', () => {
+        const s = H.emptyState();
+        const stroke = { id: 'already-drawn', color: '#000000', size: 10, pts: [[0, 0], [1, 1]] };
+        const video = { source: { kind: 'file', id: 'manic' }, playing: false, pos: 21, t: 100 };
+        H.apply(s, { type: 'snapshot', state: { strokes: [stroke], video,
+            chat: [{ name: 'Earlier visitor', text: 'Sent before you joined', t: 90 }] } });
+        expect(s.strokes).toEqual([stroke]);
+        expect(s.video).toEqual(video);
+        expect(s.chat).toEqual([]);
+    });
+
+    it('preserves live chat across first, appended and replacement activity snapshots', () => {
+        const s = H.emptyState();
+        const first = { id: 'first', color: '#000000', size: 10, pts: [[0, 0]] };
+        const second = { id: 'second', color: '#ffffff', size: 10, pts: [[1, 1]] };
+        const replacement = { id: 'verified', color: '#000000', size: 8, pts: [[0.5, 0.5]] };
+        H.apply(s, { type: 'chat', name: 'Present visitor', text: 'Received while the snapshot loads' }, { t: 110 });
+        const liveChat = s.chat;
+        H.apply(s, { type: 'snapshot', state: { strokes: [first] } });
+        expect(s.chat).toBe(liveChat);
+        H.apply(s, { type: 'chat', name: 'Present visitor', text: 'Received between chunks' }, { t: 120 });
+        H.apply(s, { type: 'snapshot', state: { strokes: [second], append: true,
+            chat: [{ name: 'Earlier visitor', text: 'Legacy backlog', t: 90 }] } });
+        expect(s.strokes).toEqual([first, second]);
+        H.apply(s, { type: 'snapshot', state: { strokes: [replacement], chat: [] } });
+        expect(s.strokes).toEqual([replacement]);
+        expect(s.chat).toBe(liveChat);
+        expect(s.chat).toEqual([
+            { name: 'Present visitor', text: 'Received while the snapshot loads', t: 110 },
+            { name: 'Present visitor', text: 'Received between chunks', t: 120 }
+        ]);
+    });
+
     it('end-to-end encrypts frames; the relay cannot read or tamper', async () => {
         const secret = H.newSecret();
         expect(H.validSecret(secret)).toBe(true);
@@ -79,7 +112,9 @@ describe('hangout sync core', () => {
         const frame = await H.seal(a.key, { type: 'chat', text: 'paint a happy tree' });
         expect(frame.c).not.toContain('happy');
         expect(await H.open(b.key, frame)).toEqual({ type: 'chat', text: 'paint a happy tree' });
-        const bad = { ...frame, c: frame.c.slice(0, -2) + (frame.c.endsWith('A') ? 'BB' : 'AA') };
+        const ciphertext = Buffer.from(frame.c, 'base64url');
+        ciphertext[0] ^= 1;
+        const bad = { ...frame, c: ciphertext.toString('base64url') };
         await expect(H.open(b.key, bad)).rejects.toBeTruthy();
         const other = await H.deriveRoom(H.newSecret());
         await expect(H.open(other.key, frame)).rejects.toBeTruthy();

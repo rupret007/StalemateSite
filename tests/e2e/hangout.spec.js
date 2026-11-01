@@ -1,6 +1,7 @@
 // Two real browsers in one hidden room, synced over the local stand-in for the relay Worker.
 const path = require('node:path');
 const { test, expect } = require('@playwright/test');
+const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
 const SLUG = '45662413410ed051';
 const KEY = 'local-preview-key-0001';
@@ -12,20 +13,19 @@ test.use({
 });
 test.skip(({ browserName }) => browserName !== 'chromium', 'Chromium carries the two-browser sync suite');
 
-let relay;
-test.beforeAll(async ({ baseURL }) => {
-    const { startRelay } = await import('../../scripts/hangout-relay-dev.mjs');
-    relay = await startRelay({ previewKey: KEY, origins: new URL(baseURL).origin });
-});
-test.afterAll(async () => { if (relay) await relay.close(); });
+let testOrigin;
+test.beforeAll(async ({ baseURL }) => { testOrigin = baseURL; });
+const roomContexts = new Set();
+test.afterEach(async () => { await Promise.all([...roomContexts].map((context) => context.close())); roomContexts.clear(); });
 
 async function openBrowser(browser) {
     const context = await browser.newContext({ permissions: ['camera', 'microphone'] });
+    roomContexts.add(context);
     await context.route(/youtube\.com|ytimg|googlevideo/, (route) => route.abort());
     await context.route('https://www.youtube.com/iframe_api', (route) => route.fulfill({ path: FAKE_YT, contentType: 'text/javascript' }));
     return context.newPage();
 }
-const roomUrl = (extra = '') => `/r/${SLUG}/?preview=${KEY}&relay=ws://127.0.0.1:${relay.port}${extra}`;
+const roomUrl = (extra = '') => `/r/${SLUG}/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}${extra}`;
 
 async function hostAndGuest(browser) {
     const host = await openBrowser(browser);
@@ -34,7 +34,7 @@ async function hostAndGuest(browser) {
     await host.click('[data-enter]');
     await expect(host.locator('[data-room]')).toBeVisible();
     const invite = host.url();
-    expect(invite).toMatch(/#r=[A-Za-z0-9_-]{24}&h=[A-Za-z0-9_-]+&a=/);
+    expect(invite).toMatch(/#r=[A-Za-z0-9_-]{24}&h=/);
     const guest = await openBrowser(browser);
     await guest.goto(invite);
     await expect(guest.locator('[data-gate-title]')).toHaveText('You’re invited');
@@ -98,7 +98,8 @@ test('copied invite link joins without the preview query param', async ({ browse
 
 test('a wrong preview key is refused by the relay', async ({ browser }) => {
     const page = await openBrowser(browser);
-    await page.goto(`/r/${SLUG}/?preview=wrong-key-wrong-key&relay=ws://127.0.0.1:${relay.port}`);
+    await page.goto(`/r/${SLUG}/?preview=wrong-key-wrong-key&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`);
+    await page.fill('[data-name]', 'Nope');
     await page.click('[data-enter]');
     await expect(page.locator('[data-gate-status]')).toContainText('Couldn’t get in');
 });
@@ -158,15 +159,33 @@ test('late joiner who receives snapshot from a guest still gets lastHostSeq and 
     await late.click('[data-enter]');
     await expect.poll(() => late.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThan(0);
 
+    await expect.poll(() => late.evaluate(() => window.__hangout.snapshotFresh && window.__hangout.snapshotHasSeqProof)).toBe(true);
     const guestId = await guest.evaluate(() => window.__hangout.myId);
+    const hostId = await host.evaluate(() => window.__hangout.myId);
     const lateId = await late.evaluate(() => window.__hangout.myId);
-    await late.evaluate((gid) => {
+    await late.evaluate(({ gid, hid, seq }) => {
         const app = window.__hangout;
         app.snapshotDone = false;
         app.snapshotFrom = gid;
         app.snapshotHasSeqProof = false;
         app.lastHostSeq = 0;
-    }, guestId);
+        const original = app.ws.onmessage;
+        window.__legacyGuestSnapshotHandled = false;
+        window.__legacyHostSnapshotHandled = false;
+        window.__replayedClearHandled = false;
+        app.ws.onmessage = async (event) => {
+            const frame = JSON.parse(event.data);
+            const message = frame.c ? await window.HangoutCore.open(app.key, frame) : null;
+            await original(event);
+            if (message?.type === 'snapshot' && !Object.hasOwn(message, 'request') && message.to === app.myId && message.done) {
+                if (frame.from === gid && !message.lastHostSeqSigned) window.__legacyGuestSnapshotHandled = true;
+                if (frame.from === hid && message.lastHostSeqSigned?.body?.kind === 'seq'
+                    && message.lastHostSeqSigned.body.seq === seq) window.__legacyHostSnapshotHandled = true;
+            }
+            if (frame.from === gid && message?.type === 'host' && message.body?.kind === 'clear' && message.body.seq === seq)
+                window.__replayedClearHandled = true;
+        };
+    }, { gid: guestId, hid: hostId, seq: clearSeq });
 
     await guest.evaluate(async (to) => {
         const app = window.__hangout;
@@ -180,7 +199,9 @@ test('late joiner who receives snapshot from a guest still gets lastHostSeq and 
         });
         app.ws.send(JSON.stringify(frame));
     }, lateId);
-    expect(await late.evaluate(() => window.__hangout.snapshotDone)).toBe(true);
+    await expect.poll(() => late.evaluate(() => window.__legacyGuestSnapshotHandled && window.__hangout.snapshotDone)).toBe(true);
+    expect(await late.evaluate(() => window.__hangout.snapshotHasSeqProof)).toBe(false);
+    expect(await late.evaluate(() => window.__hangout.lastHostSeq)).toBe(0);
 
     await host.evaluate(async ({ to, seq }) => {
         const app = window.__hangout;
@@ -208,15 +229,15 @@ test('late joiner who receives snapshot from a guest still gets lastHostSeq and 
         app.ws.send(JSON.stringify(frame));
     }, { to: lateId, seq: clearSeq });
 
-    await expect.poll(() => late.evaluate(() => window.__hangout.snapshotDone)).toBe(true);
-    expect(await late.evaluate(() => window.__hangout.lastHostSeq)).toBeGreaterThanOrEqual(clearSeq);
+    await expect.poll(() => late.evaluate((seq) => window.__legacyHostSnapshotHandled && window.__hangout.snapshotDone
+        && window.__hangout.snapshotHasSeqProof && window.__hangout.lastHostSeq >= seq, clearSeq)).toBe(true);
 
     await guest.evaluate(async () => {
         const app = window.__hangout;
         const frame = await window.HangoutCore.seal(app.key, window.__capturedClear);
         app.ws.send(JSON.stringify(frame));
     });
-    await late.waitForTimeout(500);
+    await expect.poll(() => late.evaluate(() => window.__replayedClearHandled)).toBe(true);
     expect(await late.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThan(0);
 });
 
@@ -276,11 +297,12 @@ test('multi-chunk host snapshot (>100 strokes) with lastHostSeqSigned replaces a
     expect(await late.evaluate(() => window.__hangout.state.strokes.some((s) => s.id === 'bogus-only'))).toBe(false);
 });
 
-test('snapshot with a non-video host signature in msg.video still renders strokes and chat', async ({ browser }) => {
+test('snapshot with a non-video host signature still renders strokes without importing chat', async ({ browser }) => {
     const { host, invite } = await hostAndGuest(browser);
     await drawLine(host);
     await host.fill('[data-text]', 'canvas ok');
     await host.press('[data-text]', 'Enter');
+    await expect(host.locator('[data-log]')).toContainText('canvas ok');
 
     const late = await openBrowser(browser);
     await late.goto(invite);
@@ -326,7 +348,8 @@ test('snapshot with a non-video host signature in msg.video still renders stroke
     }, { to: lateId });
 
     await expect.poll(() => late.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThan(0);
-    await expect(late.locator('[data-log]')).toContainText('canvas ok');
+    await expect(late.locator('[data-log]')).not.toContainText('canvas ok');
+    expect(await late.evaluate(() => window.__hangout.state.chat)).toEqual([]);
 });
 
 test('late joiner receives lastHostSeq and ignores replayed clear messages', async ({ browser }) => {
@@ -354,6 +377,7 @@ test('late joiner receives lastHostSeq and ignores replayed clear messages', asy
 
     const late = await openBrowser(browser);
     await late.goto(invite);
+    await late.fill('[data-name]', 'Latecomer');
     await late.click('[data-enter]');
     await expect.poll(() => late.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThan(0);
 
@@ -429,12 +453,15 @@ test('switching from one playing YouTube video to another plays the second video
 
 test('guest snapshot without host seq proof still completes and blocks a later wipe', async ({ browser }) => {
     const { host, guest, invite } = await hostAndGuest(browser);
-    await host.evaluate(() => window.__hangout.ws.close());
+    // Keep the creator absent throughout this peer-only fallback. Closing just
+    // its socket starts the normal reconnect and a fresh creator attestation.
+    await host.close();
     await expect.poll(async () => await guest.locator('[data-peers]').textContent()).toBe('Just you');
 
     await drawLine(guest);
     await guest.fill('[data-text]', 'still here');
     await guest.press('[data-text]', 'Enter');
+    await expect(guest.locator('[data-log]')).toContainText('still here');
 
     const late = await openBrowser(browser);
     await late.goto(invite);
@@ -442,7 +469,8 @@ test('guest snapshot without host seq proof still completes and blocks a later w
     await late.click('[data-enter]');
     await expect.poll(() => late.evaluate(() => window.__hangout.snapshotDone)).toBe(true);
     await expect.poll(() => late.evaluate(() => window.__hangout.state.strokes.length)).toBeGreaterThan(0);
-    await expect(late.locator('[data-log]')).toContainText('still here');
+    await expect(late.locator('[data-log]')).not.toContainText('still here');
+    expect(await late.evaluate(() => window.__hangout.state.chat)).toEqual([]);
 
     const lateId = await late.evaluate(() => window.__hangout.myId);
     const guestId = await guest.evaluate(() => window.__hangout.myId);
@@ -468,12 +496,14 @@ test('guest snapshot cannot tamper with video timestamp to skew late joiner play
     const { host, guest, invite } = await hostAndGuest(browser);
     await host.click('[data-pick-yt="oh5p5f5_-7A"]');
     await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+    await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
     await host.evaluate(() => { window.__ytLog[window.__ytLog.length - 1].seekTo(45); });
     await expect.poll(() => host.evaluate(() => window.__ytLog[window.__ytLog.length - 1].getCurrentTime())).toBeGreaterThan(44);
     await expect.poll(() => guest.evaluate(() => Number.isFinite(Number(window.__hangout.lastVideoSigned?.signed?.body?.t)))).toBe(true);
 
     const late = await openBrowser(browser);
     await late.goto(invite);
+    await late.fill('[data-name]', 'Pat');
     await late.click('[data-enter]');
     const lateId = await late.evaluate(() => window.__hangout.myId);
     await late.evaluate(() => {
@@ -514,6 +544,115 @@ test('guest snapshot cannot tamper with video timestamp to skew late joiner play
     expect(skew).toBeGreaterThan(60);
 });
 
+test('snapshot with a forged video host signature does not change playback state', async ({ browser }) => {
+    const { host, guest, invite } = await hostAndGuest(browser);
+    await host.click('[data-pick-yt="oh5p5f5_-7A"]');
+    await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+    const honestT = await guest.evaluate(() => window.__hangout.lastVideoSigned.signed.body.t);
+
+    const late = await openBrowser(browser);
+    await late.goto(invite);
+    await late.fill('[data-name]', 'Pat');
+    await late.click('[data-enter]');
+    const lateId = await late.evaluate(() => window.__hangout.myId);
+    await late.evaluate(() => {
+        const app = window.__hangout;
+        app.snapshotDone = false;
+        app.snapshotFrom = null;
+        app.snapshotHasSeqProof = false;
+        app.state.video = null;
+    });
+
+    await guest.evaluate(async ({ to, forgedT }) => {
+        const app = window.__hangout;
+        const video = app.lastVideoSigned;
+        const frame = await window.HangoutCore.seal(app.key, {
+            type: 'snapshot',
+            to,
+            strokes: app.state.strokes.slice(-400),
+            chat: app.state.chat.slice(-50),
+            video: {
+                signed: {
+                    type: 'host',
+                    body: { ...video.signed.body, t: forgedT, pos: 9999 },
+                    sig: 'AAAA'
+                }
+            },
+            chunk: false,
+            first: true,
+            done: true
+        });
+        app.ws.send(JSON.stringify(frame));
+    }, { to: lateId, forgedT: honestT - 3_600_000 });
+
+    await late.waitForTimeout(400);
+    expect(await late.evaluate(() => window.__hangout.state.video?.pos)).not.toBe(9999);
+    expect(await late.evaluate(() => window.__hangout.state.video?.t)).not.toBe(honestT - 3_600_000);
+});
+
+test('guest snapshot with an unsigned moderation mod cannot change lock state', async ({ browser }) => {
+    const { host, guest, invite } = await hostAndGuest(browser);
+    await host.click('[data-lock]');
+    await expect(host.locator('[data-lock]')).toHaveText('Unlock faces');
+
+    const late = await openBrowser(browser);
+    await late.goto(invite);
+    await late.fill('[data-name]', 'Pat');
+    await late.click('[data-enter]');
+    const lateId = await late.evaluate(() => window.__hangout.myId);
+    await late.evaluate(() => {
+        const app = window.__hangout;
+        app.snapshotDone = false;
+        app.snapshotFrom = null;
+        app.snapshotHasSeqProof = false;
+    });
+
+    await guest.evaluate(async ({ to }) => {
+        const app = window.__hangout;
+        const frame = await window.HangoutCore.seal(app.key, {
+            type: 'snapshot',
+            to,
+            strokes: app.state.strokes.slice(-400),
+            chat: app.state.chat.slice(-50),
+            mods: [{ type: 'host', body: { kind: 'lock', on: false, seq: Date.now() }, sig: 'AAAA' }],
+            chunk: false,
+            first: true,
+            done: true
+        });
+        app.ws.send(JSON.stringify(frame));
+    }, { to: lateId });
+
+    await expect.poll(() => late.evaluate(() => window.__hangout.av.locked)).toBe(true);
+});
+
+test('periodic resync corrects guest drift without a tap', async ({ browser }) => {
+    const { host, guest } = await hostAndGuest(browser);
+    await host.click('[data-pick-yt="oh5p5f5_-7A"]');
+    await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+    await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+    await host.evaluate(() => { window.__ytLog[0].seekTo(90); window.__ytLog[0].pauseVideo(); });
+    await expect.poll(() => guest.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeGreaterThan(89);
+    await guest.evaluate(() => { window.__ytLog[0].seekTo(5); });
+    expect(await guest.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeLessThan(20);
+    await guest.waitForTimeout(2500);
+    await expect.poll(() => guest.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeGreaterThan(80);
+});
+
+test('room page loads under its CSP without violations', async ({ browser }) => {
+    const page = await openBrowser(browser);
+    await page.addInitScript(() => {
+        document.addEventListener('securitypolicyviolation', (e) => {
+            window.__cspViolations = window.__cspViolations || [];
+            window.__cspViolations.push(e.violatedDirective);
+        });
+    });
+    await page.goto(roomUrl());
+    await page.fill('[data-name]', 'Csp');
+    await page.click('[data-enter]');
+    await expect(page.locator('[data-room]')).toBeVisible();
+    expect(await page.evaluate(() => window.__cspViolations || [])).toEqual([]);
+});
+
 test('remote peer cannot exceed AV_MAX or open peer connections without AV state', async ({ browser }) => {
     const { host, guest } = await hostAndGuest(browser);
     const before = await host.evaluate(() => window.__hangout.av.pcs.size);
@@ -550,8 +689,24 @@ test('host pause right after load still reaches guests', async ({ browser }) => 
     await host.click('[data-pick-yt="oh5p5f5_-7A"]');
     const gYt = guest.locator('[data-fake-yt]');
     await expect(gYt).toHaveAttribute('data-state', 'playing');
+    // Shared intent can reach the guest before the host API is ready. Exercise
+    // a supported host-player control immediately after its own readiness.
+    await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
     await host.evaluate(() => { window.__ytLog[0].pauseVideo(); });
     await expect(gYt).toHaveAttribute('data-state', 'paused');
+});
+
+test('a paused YouTube seek without a player state event reaches the guest', async ({ browser }) => {
+    const { host, guest } = await hostAndGuest(browser);
+    await host.click('[data-pick-yt="oh5p5f5_-7A"]');
+    await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+    await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+    await host.evaluate(() => window.__ytLog[0].pauseVideo());
+    await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'paused');
+    // The fixture, like YouTube, omits a state-change event for this scrub.
+    await host.evaluate(() => window.__ytLog[0].seekTo(42));
+    await expect.poll(() => guest.evaluate(() => window.__ytLog[0].getCurrentTime())).toBe(42);
+    expect(await host.evaluate(() => window.__ytLog[0].getCurrentTime())).toBe(42);
 });
 
 test('host-driven YouTube stays in sync: load, play, pause, seek, late joiner', async ({ browser }) => {
@@ -577,6 +732,7 @@ test('host-driven YouTube stays in sync: load, play, pause, seek, late joiner', 
 
     const late = await openBrowser(browser);
     await late.goto(invite);
+    await late.fill('[data-name]', 'Latecomer');
     await late.click('[data-enter]');
     const lYt = late.locator('[data-fake-yt]');
     await expect(lYt).toHaveAttribute('data-video-id', 'oh5p5f5_-7A');
@@ -650,7 +806,7 @@ test('toggling camera off and back on while mic stays on updates remote video ti
     }), { timeout: 15000 }).toBe(true);
 
     await guest.click('[data-cam]');
-    await guest.click('[data-ask-yes]');
+    if (await guest.locator('[data-ask]').isVisible()) await guest.click('[data-ask-yes]');
     await expect.poll(() => host.evaluate(() => {
         const v = document.querySelector('[data-tiles] .tile:not([data-tile="me"]) video');
         return v && v.videoWidth > 0;
@@ -660,18 +816,27 @@ test('toggling camera off and back on while mic stays on updates remote video ti
 test('camera and mic are opt-in with a plain explainer, then connect peer to peer at capped size', async ({ browser }) => {
     const { host, guest } = await hostAndGuest(browser);
     expect(await host.evaluate(() => window.__hangout.av.stream)).toBeNull();
+    await host.evaluate(() => {
+        window.__gumCalls = 0;
+        const gum = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+        navigator.mediaDevices.getUserMedia = (constraints) => {
+            window.__gumCalls += 1;
+            return gum(constraints);
+        };
+    });
     await host.click('[data-cam]');
     await expect(host.locator('[data-ask]')).toBeVisible();
     await expect(host.locator('[data-ask-copy]')).toContainText('Tap Allow');
     await host.click('[data-ask-no]');
     expect(await host.evaluate(() => window.__hangout.av.cam)).toBe(false);
+    expect(await host.evaluate(() => window.__gumCalls)).toBe(0);
 
     await host.click('[data-cam]');
     await host.click('[data-ask-yes]');
     await expect(host.locator('[data-cam]')).toHaveText('Turn off my camera');
     const settings = await host.evaluate(() => window.__hangout.av.stream.getVideoTracks()[0].getSettings());
-    expect(settings.width).toBeLessThanOrEqual(320);
-    expect(settings.frameRate).toBeLessThanOrEqual(15);
+    expect(settings.width).toBeLessThanOrEqual(640);
+    expect(settings.frameRate).toBeLessThanOrEqual(24);
 
     await guest.click('[data-mic]');
     await guest.click('[data-ask-yes]');
@@ -681,12 +846,13 @@ test('camera and mic are opt-in with a plain explainer, then connect peer to pee
         const e = [...window.__hangout.av.pcs.values()][0];
         return e && e.pc.connectionState;
     }), { timeout: 15000 }).toBe('connected');
-    const bitrate = await host.evaluate(() => {
+    const enc = await host.evaluate(() => {
         const e = [...window.__hangout.av.pcs.values()][0];
         const s = e.pc.getSenders().find((x) => x.track && x.track.kind === 'video');
-        return s.getParameters().encodings[0].maxBitrate;
+        return s.getParameters().encodings[0];
     });
-    expect(bitrate).toBeLessThanOrEqual(250000);
+    expect(enc.maxBitrate).toBeLessThanOrEqual(250000);
+    expect(enc.scaleResolutionDownBy).toBeGreaterThanOrEqual(2);
 
     await host.click('[data-hangup]');
     expect(await host.evaluate(() => window.__hangout.av.stream)).toBeNull();
@@ -696,6 +862,7 @@ test('TURN servers are fetched before peer connections are opened', async ({ bro
     const host = await openBrowser(browser);
     await host.addInitScript(() => {
         const Orig = window.RTCPeerConnection;
+        localStorage.setItem('hangout-dev', `${'a'.repeat(22)}.${'b'.repeat(32)}`);
         window.__hangoutPcIce = [];
         window.RTCPeerConnection = function (config, ...args) {
             window.__hangoutPcIce.push(config);
@@ -705,7 +872,8 @@ test('TURN servers are fetched before peer connections are opened', async ({ bro
     await host.route('**/room-turn', async (route) => {
         if (route.request().method() === 'POST') {
             await new Promise((r) => setTimeout(r, 200));
-            await route.fulfill({ json: { iceServers: [{ urls: 'turn:fake' }] } });
+            expect(route.request().postDataJSON().device).toBe(`${'a'.repeat(22)}.${'b'.repeat(32)}`);
+            await route.fulfill({ json: { iceServers: [{ urls: 'turn:fake', username: 'fixture-user', credential: 'fixture-password' }], ttl: 600, expiresAt: Date.now() + 600000 } });
         } else {
             await route.continue();
         }
@@ -728,6 +896,7 @@ test('TURN servers are fetched before peer connections are opened', async ({ bro
 
     const guest = await openBrowser(browser);
     await guest.goto(host.url());
+    await guest.fill('[data-name]', 'Karen');
     await guest.click('[data-enter]');
     await guest.click('[data-cam]');
     await guest.click('[data-ask-yes]');
@@ -771,11 +940,11 @@ test('hanging up local AV does not drop incoming video from peers', async ({ bro
     await expect.poll(async () => await host.locator('[data-tiles] .tile:not([data-tile="me"])').count(), { timeout: 10000 }).toBe(0);
 });
 
-test('a fifth camera is refused politely', async ({ browser }) => {
+test('a ninth camera is refused politely (8 max, matching the room cap)', async ({ browser }) => {
     const { guest } = await hostAndGuest(browser);
-    await guest.evaluate(() => ['x1', 'x2', 'x3', 'x4'].forEach((id) => window.__hangout.av.peers.add(id)));
+    await guest.evaluate(() => ['x1', 'x2', 'x3', 'x4', 'x5', 'x6', 'x7', 'x8'].forEach((id) => window.__hangout.av.peers.add(id)));
     await guest.click('[data-cam]');
-    await expect(guest.locator('[data-status]')).toContainText('Faces are full (4 max)');
+    await expect(guest.locator('[data-status]')).toContainText('Faces are full (8 max)');
     await expect(guest.locator('[data-ask]')).toBeHidden();
 });
 
@@ -865,4 +1034,24 @@ test('show your real canvas: opt-in, rectangular tile for everyone, still capped
     await host.click('[data-canvas-cam]');
     expect(await host.evaluate(() => window.__hangout.av.canvas)).toBe(false);
     await expect(host.locator('[data-tile="me"]')).toHaveCount(0);
+});
+
+test('the name box starts blank, needs a name, offers a dice name, and is remembered', async ({ browser }) => {
+    const page = await openBrowser(browser);
+    await page.goto(roomUrl());
+    await expect(page.locator('[data-name]')).toHaveValue('');
+    await page.click('[data-enter]');
+    await expect(page.locator('[data-gate-status]')).toContainText('Type a name');
+    await expect(page.locator('[data-room]')).toBeHidden();
+    await expect(page.locator('[data-dice]')).toHaveText('🎲 Make me a name');
+    await expect(page.locator('[data-name]')).toHaveAttribute('placeholder', 'Type a nickname… or roll one →');
+    expect((await page.locator('[data-dice]').boundingBox()).height).toBeGreaterThanOrEqual(44);
+    await page.click('[data-dice]');
+    await expect(page.locator('[data-dice]')).toHaveText('🎲 Roll again');
+    await expect(page.locator('[data-name]')).toHaveValue(/^[A-Z][A-Za-z0-9-]{2,19}$/);
+    await page.fill('[data-name]', 'Remembered');
+    await page.click('[data-enter]');
+    await expect(page.locator('[data-room]')).toBeVisible();
+    await page.goto(roomUrl());
+    await expect(page.locator('[data-name]')).toHaveValue('Remembered');
 });

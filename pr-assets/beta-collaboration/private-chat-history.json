@@ -1,0 +1,115 @@
+{
+  "status": "verified-controlled-loopback-not-deployed",
+  "checkedAt": "2026-10-19T09:51:17.206830+00:00",
+  "sourceCommit": "ecc5deec70c4066cf4c65a6fe79489a11dffa746",
+  "baseCommit": "a1ecb473841c63f0099d32e59fd4d3cc15b11858",
+  "deployedSourceCommit": "b111bb2aa070cd791834f40f26665996ad406421",
+  "deployedRuntimeVersion": "0ee7705e-e381-4cb4-a70a-1f26daa10e78",
+  "deploymentPerformed": false,
+  "scope": "Encrypted private creative-room chat: new connections receive activity state without earlier chat, and actual disconnect clears delivered scrollback. Isolated Chromium contexts over the local relay stand-in, existing fake YouTube and synthetic camera fixtures. No hosted, physical-device, real-provider or separate-network acceptance.",
+  "directionSources": [
+    "docs/HANGOUT_PRODUCT_DIRECTION.md",
+    "docs/HANGOUT_PRIVATE_PILOT.md"
+  ],
+  "finding": "Legacy encrypted private-room snapshots exported the last 50 chat lines and imported them into late visitors; private reconnect retained delivered scrollback. Earlier hosted IRC-channel no-backlog receipts did not establish this separate path. No approved private-room exception was found.",
+  "sourceHashes": {
+    "r/45662413410ed051/room.js": "3e88bd2c2255392b8c4b7e52c2c28693a62bae09f09529926473d3f35e5eae95",
+    "r/45662413410ed051/sync-core.js": "1a255b8bc8347aa4c4eb88bce1c2661b0aa0d8b5bf8ee1f6ff21fbc2987bbce3",
+    "r/45662413410ed051/TWO-HOUSE-TEST.md": "dc81b4fc4af5d5aee1c503900ddd934a3ea40d95d2189c2d129a9920cde563d1",
+    "tests/unit/hangout-core.test.js": "a21754348dcfeba569e5345b3494f9a90f6afca9656c23e21dc6eb19162af250",
+    "tests/e2e/hangout-chat-history.spec.js": "7bc06998ab260ebbbcc6a5d0a1849a4aefecae0b69b596842e386fa097a83632",
+    "tests/e2e/hangout.spec.js": "882f19af80fa5878e706f51b0ee470253feaf86f15dad59826a0a9afaa9bb423",
+    "tests/e2e/hangout-video.spec.js": "aa9cf0fda9f610aada6ca8630790790ee82edf050d54ca7cc0c48dbe90caf3fc"
+  },
+  "behavior": [
+    "Outgoing host and guest activity snapshots omit chat, including multipart snapshots.",
+    "Incoming legacy snapshot chat is ignored; first, append and authenticated proof-upgrade snapshots do not erase live postjoin chat.",
+    "Actual own-socket close clears delivered chat state and DOM, while preserving the composer draft and bounded unsent outbound envelopes.",
+    "Chat decryptions that finish after own-socket close are suppressed, including during reconnect backoff; non-chat delivery semantics remain unchanged.",
+    "Drawing, video, signed host sequence floors and moderation/replay protections remain covered."
+  ],
+  "validation": {
+    "baselineSourceCommit": "a1ecb473841c63f0099d32e59fd4d3cc15b11858",
+    "baselineUnit": {
+      "existingPassed": 8,
+      "newFailedAsExpected": 2,
+      "failures": [
+        "Legacy snapshot imports earlier chat",
+        "First snapshot erases a live postjoin line"
+      ]
+    },
+    "baselineSetupAttempt1": {
+      "status": "not-regression-proof",
+      "reason": "Incorrect copy working directory failed before test copies; unchanged eight-test suite subsequently passed. Original log retained."
+    },
+    "initialBaselineBrowser": {
+      "failed": 5,
+      "intendedPrivacyOrReconnectFailures": 4,
+      "fixtureFailuresBeforeIntendedAssertion": 1,
+      "fixtureFailure": "Exact drawing comparison used local unrounded pointer samples against validated four-decimal wire coordinates."
+    },
+    "correctedBaselineLateJoin": {
+      "failedAsExpected": 1,
+      "reason": "The prejoin line appeared after current drawing/video and actual host snapshot were accepted. Only this fixture-corrected case was repeated."
+    },
+    "distinctBaselineBrowserRegressions": 5,
+    "initialCandidateBrowser": {
+      "passedDirect": 37,
+      "failed": 1,
+      "failure": "Same drawing-coordinate fixture expectation; not a product failure. Full original result retained.",
+      "elapsedSeconds": 42.1
+    },
+    "correctedLateJoinAndReconnect": {
+      "passedDirect": 5,
+      "retries": 0,
+      "skips": 0,
+      "elapsedSeconds": 14.1,
+      "cases": [
+        "Late join and refresh preserve current drawing/watch state without earlier chat; live chat arrives once",
+        "Dropped relay reconnect restores synthetic faces",
+        "Reconnect during camera publication cannot restore departed peer",
+        "Reconnect does not wait for obsolete ICE setup",
+        "Reconnect clears delivered chat; draft remains; queued chat reaches peer once; stale camera state is not restored"
+      ]
+    },
+    "distinctCandidateBrowserPassed": 42,
+    "localPassesAreAcrossTwoCommands": true,
+    "fullCorrectedLocalMatrixRepeated": false,
+    "candidateBrowserRetries": 0,
+    "candidateBrowserSkips": 0,
+    "newBrowserCases": 4,
+    "newBrowserCoverage": [
+      "Ordinary late join plus refresh: exact current canonical drawing and watch source; no earlier chat; postjoin lines once",
+      "Decrypt actual host and guest two-chunk snapshots: 105 strokes, no chat property",
+      "Legacy first/append/final and valid signed proof replacement preserve live chat while rejecting replayed clear; new authentic clear still works",
+      "Hold real chat decryption across actual socket close; await exact handler completion while fixture reconnect clock is paused, then reconnect and receive new chat once"
+    ],
+    "initialUnitBeforeNarrowedGuard": {
+      "passed": 577,
+      "files": 55
+    },
+    "finalUnit": {
+      "passed": 577,
+      "files": 55,
+      "elapsedSeconds": 11.43
+    },
+    "independentReview": {
+      "status": "clean-after-corrections",
+      "productionFinding": "Initial all-frame disconnect suppression could discard a drawing during backoff; narrowed to decoded chat only, preserving existing non-chat semantics.",
+      "fixtureFinding": "Wait for the late receiver to finish both ordinary sender snapshots before resetting snapshot ownership. Outgoing multipart observations wait for all chunks and preserve send order.",
+      "rootFixtureCorrection": "Compare accepted canonical drawing coordinates; no product tolerance, timeout or drift-budget change."
+    },
+    "ci": {
+      "status": "pending-normal-first-runs",
+      "rerunsRequested": false
+    }
+  },
+  "limits": [
+    "The hosted beta remains on b111bb2/runtime0ee7705e while its original normal eight-hour session observation runs; private-room history is not yet corrected there.",
+    "Already loaded older clients retain their old code until refreshed. Corrected clients ignore legacy snapshot chat; a participant can still copy or resend text.",
+    "Submitted-but-unflushed optimistic local echoes clear with scrollback; their queued outbound envelopes remain and are delivered once to the peer in the fixture. No new delivery acknowledgment protocol is claimed.",
+    "Drawing/video reconnect resynchronization beyond existing semantics is not changed or newly established by this correction.",
+    "No physical Safari, Windows/Linux, separate-network, hosted candidate or uninterrupted eight-hour socket acceptance is claimed.",
+    "Human/Karen review remains pending; no main merge, public navigation change, invitations or public launch."
+  ]
+}
