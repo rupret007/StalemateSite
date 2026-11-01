@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRequire } from 'node:module';
 const { createTurnClient, signedDevice } = createRequire(import.meta.url)('../../r/45662413410ed051/turn-client.js');
-const DEVICE = `${'a'.repeat(22)}.${'b'.repeat(32)}`;
+const DEVICE = `${'a'.repeat(22)}.${'b'.repeat(8)}.${'c'.repeat(32)}`;
 const ICE = [{ urls: ['turn:relay.example:3478'], username: 'fixture', credential: 'fixture-password' }];
 const STUN = [{ urls: 'stun:stun.cloudflare.com:3478' }];
 const good = () => ({ ok: true, status: 200, json: async () => ({ iceServers: ICE, ttl: 600, expiresAt: Date.now() + 600000 }) });
@@ -20,7 +20,7 @@ afterEach(() => { clients.forEach((c) => c.stop()); vi.useRealTimers(); });
 describe('private room TURN lifecycle', () => {
     it('requires a signed lobby device and never substitutes a chosen identifier', async () => {
         expect(signedDevice(DEVICE)).toBe(true);
-        for (const device of ['', 'chosen-id', `${'a'.repeat(22)}.bad`]) {
+        for (const device of ['', 'chosen-id', `${'a'.repeat(22)}.${'b'.repeat(32)}`, `${'a'.repeat(22)}.bad`]) {
             expect(await client({ getDevice: () => device }).get()).toEqual(STUN);
         }
         expect(fetchImpl).not.toHaveBeenCalled();

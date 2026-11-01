@@ -644,6 +644,18 @@ test('host pause right after load still reaches guests', async ({ browser }) => 
     await expect(gYt).toHaveAttribute('data-state', 'paused');
 });
 
+test('a paused YouTube seek without a player state event reaches the guest', async ({ browser }) => {
+    const { host, guest } = await hostAndGuest(browser);
+    await host.click('[data-pick-yt="oh5p5f5_-7A"]');
+    await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+    await host.evaluate(() => window.__ytLog[0].pauseVideo());
+    await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'paused');
+    // The fixture, like YouTube, omits a state-change event for this scrub.
+    await host.evaluate(() => window.__ytLog[0].seekTo(42));
+    await expect.poll(() => guest.evaluate(() => window.__ytLog[0].getCurrentTime())).toBe(42);
+    expect(await host.evaluate(() => window.__ytLog[0].getCurrentTime())).toBe(42);
+});
+
 test('host-driven YouTube stays in sync: load, play, pause, seek, late joiner', async ({ browser }) => {
     const { host, guest, invite } = await hostAndGuest(browser);
     await host.click('[data-pick-yt="oh5p5f5_-7A"]');
@@ -795,19 +807,20 @@ test('camera and mic are opt-in with a plain explainer, then connect peer to pee
 
 test('TURN servers are fetched before peer connections are opened', async ({ browser }) => {
     const host = await openBrowser(browser);
-    await host.addInitScript(() => {
+    const fixtureDevice = `${'a'.repeat(22)}.${'b'.repeat(8)}.${'c'.repeat(32)}`;
+    await host.addInitScript((device) => {
         const Orig = window.RTCPeerConnection;
-        localStorage.setItem('hangout-dev', `${'a'.repeat(22)}.${'b'.repeat(32)}`);
+        localStorage.setItem('hangout-dev', device);
         window.__hangoutPcIce = [];
         window.RTCPeerConnection = function (config, ...args) {
             window.__hangoutPcIce.push(config);
             return new Orig(config, ...args);
         };
-    });
+    }, fixtureDevice);
     await host.route('**/room-turn', async (route) => {
         if (route.request().method() === 'POST') {
             await new Promise((r) => setTimeout(r, 200));
-            expect(route.request().postDataJSON().device).toBe(`${'a'.repeat(22)}.${'b'.repeat(32)}`);
+            expect(route.request().postDataJSON().device).toBe(fixtureDevice);
             await route.fulfill({ json: { iceServers: [{ urls: 'turn:fake', username: 'fixture-user', credential: 'fixture-password' }], ttl: 600, expiresAt: Date.now() + 600000 } });
         } else {
             await route.continue();

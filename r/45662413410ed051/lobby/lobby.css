@@ -19,6 +19,7 @@
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; }
+html, body { overflow-x: hidden; }
 body { margin: 0; height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; display: flex; flex-direction: column; background: var(--ink); color: var(--cream); font: 15px/1.5 var(--body); }
 [hidden] { display: none !important; }
 button, input, select, a, summary { -webkit-tap-highlight-color: transparent; }
@@ -128,6 +129,8 @@ input::placeholder { color: #8b958f; opacity: 1; }
 .room-details p { margin: 6px 0; }
 .private-invite { border-top: 1px solid var(--line); margin: 14px 0 0; padding: 13px 0 0; color: var(--muted); }
 .chat { display: flex; flex-direction: column; overflow: hidden; background: var(--ink); }
+.irc, .pane, .lobby-welcome, .welcome-copy, .topic, .buffer, .quick, .say, .jam, .activity { min-width: 0; max-width: 100%; }
+.topic, .lobby-welcome, .buffer { overflow-wrap: anywhere; }
 .tabs { display: flex; flex: none; min-height: 54px; gap: 4px; padding: 8px 14px 0; overflow-x: auto; background: var(--surface); border-bottom: 1px solid var(--line); scrollbar-width: thin; }
 .tabs button { flex: none; min-height: 45px; padding: 10px 15px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font: 12px var(--mono); white-space: nowrap; border-radius: 3px 3px 0 0; }
 .tabs button[aria-selected=true] { background: #22291e; color: var(--lime); border-bottom-color: var(--lime); }
@@ -140,6 +143,7 @@ input::placeholder { color: #8b958f; opacity: 1; }
 .lobby-welcome b { font-size: 15px; font-weight: 550; color: var(--cream); letter-spacing: -.02em; }
 .lobby-welcome p { margin: 5px 0 13px; font-size: 12px; color: var(--muted); }
 .conversation-starters { display: flex; flex-wrap: wrap; gap: 6px; }
+.conversation-starters { min-width: 0; max-width: 100%; }
 .conversation-starters button { padding: 6px 9px; min-height: 32px; color: #c4d8ac; background: transparent; border: 1px solid #46593a; font: 10px var(--mono); }
 .conversation-starters button:hover { background: #2b3921; }
 .network-note { flex: none; margin: 0; padding: 10px 20px; color: var(--amber); font-size: 12px; background: #2b2519; border-bottom: 1px solid #5f5030; }
@@ -170,6 +174,7 @@ input::placeholder { color: #8b958f; opacity: 1; }
 .say input:focus { outline: none; }
 .slash { min-width: 42px; min-height: 46px; border: 0; background: transparent; color: var(--lime); font: 21px var(--mono); }
 .say .btn { min-width: 70px; align-self: center; min-height: 34px; padding: 8px 14px; margin: 6px; font: 600 11px var(--mono); }
+.say .btn { flex-shrink: 0; }
 .chat-status { display: flex; flex: none; justify-content: space-between; gap: 12px; padding: 8px 22px 15px; color: #8b958c; font: 9px var(--mono); }
 .chat-status span:first-child { min-width: 0; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chat-status span:last-child { white-space: nowrap; }
@@ -196,7 +201,8 @@ input::placeholder { color: #8b958f; opacity: 1; }
 .jam { flex: none; overflow: auto; max-height: 35dvh; padding: 16px 20px; background: #171e15; border-bottom: 1px solid #43543a; font-size: 12px; }
 .jam-actions, .jam-paste { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .jam-paste { margin-top: 10px; }
-.jam-paste input, .act-load input { flex: 1; min-width: 0; }
+.jam-paste textarea, .act-load input { flex: 1; min-width: 0; }
+.jam textarea { box-sizing: border-box; width: 100%; max-width: 100%; font: inherit; font-size: 16px; resize: vertical; }
 .activity { flex: 0 1 auto; min-height: 0; max-height: 49dvh; overflow: auto; background: #141a14; border-bottom: 1px solid #43543a; scrollbar-width: thin; }
 .activity-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 20px; color: #c3d4af; list-style: none; font: 10px var(--mono); }
 .activity-heading::-webkit-details-marker { display: none; }
@@ -338,6 +344,15 @@ input::placeholder { color: #8b958f; opacity: 1; }
   .welcome-symbol { display: none; }
   .activity { max-height: 33dvh; }
   .act-paint canvas { width: min(100%, 30dvh); }
+}
+@media (max-width: 480px) {
+  input, select, textarea, .nickbox input, .directory-controls input, .directory-controls select, .act-load input, .jam-paste input { font-size: 16px; }
+  .buffer, .who { font-size: 14px; }
+  .ev { font-size: 12px; }
+  .lobby-welcome b, .lobby-welcome p { font-size: 14px; }
+  .topic { font-size: 12px; }
+  .conversation-starters button { font-size: 11px; }
+  .quick button { font-size: 12px; }
 }
 /* Small phones and landscape windows keep the composer ahead of welcome copy. */
 @media (max-height: 620px) and (max-width: 900px) {

@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 const KEY = 'local-preview-key-0001';
-const DEVICE = `${'a'.repeat(22)}.${'b'.repeat(32)}`;
+const DEVICE = `${'a'.repeat(22)}.${'b'.repeat(8)}.${'c'.repeat(32)}`;
 test.use({ permissions: ['camera', 'microphone'], launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } });
 let testOrigin;
 test.beforeAll(async ({ baseURL }) => { testOrigin = baseURL; });
@@ -37,6 +37,31 @@ test('a direct invite without a lobby device makes no unauthenticated TURN reque
     await page.goto(roomUrl('&turn=/room-turn')); await enter(page);
     await expect(page.locator('[data-turn-status]')).toContainText('Join the lobby once');
     expect(requests).toBe(0);
+});
+
+test('private session expiry stops capture, relay refresh and playback and clears connected content', async ({ page }) => {
+    await page.addInitScript(() => {
+        window.capturedTracks = [];
+        const capture = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+        navigator.mediaDevices.getUserMedia = async (constraints) => {
+            const stream = await capture(constraints); capturedTracks.push(...stream.getTracks()); return stream;
+        };
+    });
+    await page.goto(roomUrl()); await enter(page);
+    await page.fill('[data-text]', 'Private connected message'); await page.press('[data-text]', 'Enter');
+    await expect(page.locator('[data-log]')).toContainText('Private connected message');
+    await page.click('[data-cam]'); await page.click('[data-ask-yes]');
+    await expect.poll(() => page.evaluate(() => __hangout.av.cam)).toBe(true);
+    // Close with the exact expiry code emitted by the beta authorization
+    // boundary. The browser runs the production socket close handler.
+    await page.evaluate(() => __hangout.ws.close(4401, 'session expired'));
+    await expect(page.locator('[data-room]')).toBeHidden();
+    await expect(page.locator('[data-gate-status]')).toContainText('sign-in expired');
+    await expect(page.locator('[data-log]')).toBeEmpty();
+    await expect(page.locator('[data-enter]')).toBeDisabled();
+    expect(await page.evaluate(() => ({ ended: __hangout.ended, captureStopped: capturedTracks.every((track) => track.readyState === 'ended'),
+        peers: __hangout.av.pcs.size, chat: __hangout.state.chat.length, video: __hangout.state.video, queued: __hangoutPace.queue.length })))
+        .toEqual({ ended: true, captureStopped: true, peers: 0, chat: 0, video: null, queued: 0 });
 });
 
 test('refresh replaces active peer configuration and restarts ICE without storing credentials', async ({ page }) => {

@@ -51,7 +51,7 @@
     const app = {
         state: H.emptyState(), clock: H.createClock(), ws: null, myId: null, key: null, roomId: null,
         hostPub: null, hostPriv: null, isHost: false, lastHostSeq: 0, lastHostSigned: null, lastVideoSigned: null,
-        names: new Map(), name: '', snapshotDone: false, snapshotFrom: null, snapshotHasSeqProof: false, connected: false, retries: 0,
+        names: new Map(), name: '', snapshotDone: false, snapshotFrom: null, snapshotHasSeqProof: false, connected: false, ended: false, retries: 0,
         bob: { on: false, touched: false, lastNudge: 0 },
         av: {
             stream: null, rawCam: null, mic: false, cam: false, canvas: false, screen: null, hand: null, away: false, music: false,
@@ -141,15 +141,18 @@
         if (pace.queue.length) pace.timer = win.setTimeout(paceFlush, 150);
     }
     async function send(obj) {
-        if (!app.ws || app.ws.readyState !== 1) return;
+        if (app.ended || !app.ws || app.ws.readyState !== 1) return;
         const frame = JSON.stringify(await H.seal(app.key, obj));
+        if (app.ended || app.ws.readyState !== 1) return;
         pace.queue = V.enqueue(pace.queue, { frame, ice: obj.type === 'rtc' && Boolean(obj.ice), priority: obj.type === 'host' }, QUEUE_MAX);
         if (!pace.timer) paceFlush();
     }
 
     if (isLocal) { win.__hangoutSend = send; win.__hangoutPace = pace; } // local test hooks only (localhost)
 
+    let reconnectTimer;
     function connect() {
+        if (app.ended) return;
         if (!relayBase) {
             setGate('The room server isn’t switched on yet. Nothing to join.');
             return;
@@ -169,18 +172,37 @@
                 say(`Lost the room for a sec. Reconnecting (${app.retries}/5)…`);
                 Array.from(app.av.pcs.keys()).forEach(closePc);
                 app.av.peers.clear();
-                win.setTimeout(connect, Math.min(8000, 500 * 2 ** app.retries));
+                reconnectTimer = win.setTimeout(connect, Math.min(8000, 500 * 2 ** app.retries));
                 return;
             }
-            const why = event.code === 4429 ? 'You’ve hit this room’s message limit for today.'
+            const why = event.code === 4401 ? 'Your private invitation or sign-in expired. Reopen your invitation and sign in again.'
+                : event.code === 4429 ? 'You’ve hit this room’s message limit for today.'
                 : app.myId ? 'Lost the room. Reload to get back in.'
                     : 'Couldn’t get in. The link may be wrong, the room may be full, or the room server is resting for today.';
-            if (app.myId) say(why); else setGate(why);
-            stopAv(true);
+            endSession(why);
         };
     }
 
+    function endSession(reason) {
+        app.ended = true; app.connected = false;
+        app.ws.onmessage = null;
+        clearTimeout(reconnectTimer); clearTimeout(pace.timer); clearTimeout(flushTimer);
+        clearTimeout(videoPublishTimer); clearInterval(videoSyncTimer);
+        pace.queue = []; pace.timer = 0; pending = []; live = null;
+        stopPreCheck(); stopAv(true); turnClient?.stop();
+        app.av.peers.clear(); app.av.opening.clear(); app.av.ice = null;
+        app.names.clear(); app.state = H.emptyState(); app.lastVideoSigned = null;
+        if (player.yt) { try { player.yt.stopVideo(); } catch (_) { /* provider already gone */ } }
+        ui.file.pause(); ui.file.removeAttribute('src'); ui.file.load();
+        player.kind = null; player.readyKey = '';
+        ui.log.replaceChildren(); ui.tiles.replaceChildren(); ui.text.value = ''; ui.url.value = '';
+        ui.peers.textContent = ''; ui.turnStatus.textContent = ''; redraw();
+        ui.room.hidden = true; ui.gate.hidden = false; ui.enter.disabled = true;
+        setGate(reason); say(reason);
+    }
+
     async function onRelay(raw) {
+        if (app.ended) return;
         let frame;
         try { frame = JSON.parse(raw); } catch (error) { return; }
         if (Number.isFinite(frame.t)) app.clock.sample(frame.t);
@@ -215,6 +237,7 @@
         if (!frame.c) return;
         let msg;
         try { msg = await H.open(app.key, frame); } catch (error) { return; }
+        if (app.ended) return;
         await handle(msg, { t: frame.t, from: frame.from });
     }
 
@@ -251,6 +274,7 @@
                 && Number.isFinite(seqSigned.body?.seq)
                 && await verifyHost(seqSigned)
             );
+            if (app.ended) return;
             if (app.snapshotDone) {
                 if (!(hasSeqProof && !app.snapshotHasSeqProof)) return;
             }
@@ -274,14 +298,14 @@
             });
             if (
                 msg.video?.signed?.body?.kind === 'video'
-                && await verifyHost(msg.video.signed)
+                && await verifyHost(msg.video.signed) && !app.ended
             ) {
                 const signedT = Number(msg.video.signed.body.t);
                 if (Number.isFinite(signedT)) acceptVideo(msg.video.signed, signedT);
             }
             if (finishing) {
                 for (const mod of (Array.isArray(msg.mods) ? msg.mods.slice(0, 4) : [])) {
-                    if (mod && V.cleanHostAction(mod.body) && await verifyHost(mod)) {
+                    if (mod && V.cleanHostAction(mod.body) && await verifyHost(mod) && !app.ended) {
                         if (mod.body.seq < app.lastHostSeq) continue; // snapshot replay guard
                         applyHostAction(mod.body, mod, false);
                         app.lastHostSeq = Math.max(app.lastHostSeq, mod.body.seq);
@@ -300,7 +324,7 @@
             renderChat();
             return;
         case 'host':
-            if (!(await verifyHost(msg))) return;
+            if (!(await verifyHost(msg)) || app.ended) return;
             if (!(msg.body.seq > app.lastHostSeq)) return; // replay guard
             app.lastHostSeq = msg.body.seq;
             app.lastHostSigned = msg;
@@ -576,7 +600,8 @@
     });
 
     /* ---------------- synced video (host drives) ---------------- */
-    const player = { kind: null, yt: null, ytReady: null, applying: 0, currentKey: '' };
+    const player = { kind: null, yt: null, ytReady: null, applying: 0, currentKey: '', readyKey: '' };
+    let videoPublishTimer;
 
     function loadYouTubeApi() {
         if (player.ytReady) return player.ytReady;
@@ -593,12 +618,14 @@
         const key = `${source.kind}:${source.id}`;
         if (player.currentKey === key) return;
         player.currentKey = key;
+        player.readyKey = '';
         if (source.kind === 'file') {
             if (player.yt) player.yt.stopVideo();
             ui.yt.hidden = true;
             ui.file.hidden = false;
             ui.file.src = H.FILE_SOURCES[source.id].src;
             player.kind = 'file';
+            player.readyKey = key;
             return;
         }
         ui.file.pause();
@@ -606,6 +633,7 @@
         ui.yt.hidden = false;
         player.kind = 'yt';
         const YT = await loadYouTubeApi();
+        if (app.ended || player.currentKey !== key) return;
         if (!player.yt) {
             await new Promise((resolve) => {
                 player.yt = new YT.Player(ui.yt, {
@@ -618,6 +646,7 @@
         } else {
             player.yt.cueVideoById(source.id);
         }
+        player.readyKey = key;
     }
 
     function localTime() {
@@ -646,6 +675,7 @@
     function pauseLocal() { hold(() => { if (player.kind === 'file') ui.file.pause(); else if (player.yt) player.yt.pauseVideo(); }); }
 
     async function acceptVideo(signed, t) {
+        if (app.ended) return;
         const b = signed.body;
         const relayT = Number.isFinite(Number(b.t)) ? Number(b.t) : t;
         if (H.apply(app.state, { type: 'video', source: b.source, playing: b.playing, pos: b.pos }, { t: relayT }) !== 'video') return;
@@ -659,18 +689,30 @@
         const v = app.state.video;
         if (!v) return;
         await ensureSource(v.source);
+        if (app.ended || app.state.video !== v) return;
         const want = H.expectedPosition(v, app.clock.relayNow());
         if (force || H.needsCorrection(localTime(), want)) seekTo(want);
         if (v.playing && !localPlaying()) playLocal();
         if (!v.playing && localPlaying()) pauseLocal();
     }
-    win.setInterval(() => { if (!app.isHost || !localPlaying()) syncToState(false); }, 2000);
+    const videoSyncTimer = win.setInterval(() => {
+        if (!app.connected) return;
+        if (!app.isHost) return syncToState(false);
+        const v = app.state.video;
+        if (!v || !player.kind || player.readyKey !== `${v.source.kind}:${v.source.id}` || Date.now() < player.applying) return;
+        // Paused YouTube scrubs can omit onStateChange. Host authority still
+        // travels through hostPublish's signed, sequenced video message.
+        if (localPlaying() !== v.playing || H.needsCorrection(localTime(), H.expectedPosition(v, app.clock.relayNow()))) {
+            hostPublish(v.source, localPlaying(), localTime());
+        }
+    }, 2000);
 
     async function hostPublish(source, playing, pos) {
-        if (!app.isHost) return;
+        if (!app.connected || !app.isHost) return;
         app.lastHostSeq = Math.max(app.lastHostSeq + 1, Date.now());
         const t = app.clock.relayNow();
         const signed = await signHost({ kind: 'video', seq: app.lastHostSeq, source, playing, pos: Math.max(0, pos), t });
+        if (!app.connected || app.ended) return;
         H.apply(app.state, { type: 'video', source, playing, pos }, { t });
         app.lastVideoSigned = { signed, t };
         showEpisode();
@@ -678,7 +720,7 @@
     }
 
     function onLocalChange() {
-        if (!app.isHost || !app.state.video) return;
+        if (!app.connected || !app.isHost || !app.state.video) return;
         const v = app.state.video;
         const playing = localPlaying();
         const pos = localTime();
@@ -689,7 +731,9 @@
         hostPublish(v.source, playing, pos);
     }
     function onYtState(event) {
-        if (event.data === 1 || event.data === 2) onLocalChange();
+        if (event.data !== 1 && event.data !== 2) return;
+        clearTimeout(videoPublishTimer);
+        videoPublishTimer = win.setTimeout(onLocalChange, 100);
     }
     ['play', 'pause', 'seeked'].forEach((e) => ui.file.addEventListener(e, onLocalChange));
     ui.tap.addEventListener('click', () => { ui.tap.hidden = true; syncToState(true); });
@@ -819,7 +863,7 @@
     // A permission prompt can outlive leaving the call or host moderation.
     const captureVersion = { audio: 0, video: 0 };
     function keepCapture(kind, version, stream, restore) {
-        if (version === captureVersion[kind] && !app.av.kicked && (restore || !(app.av.locked && !(app.av.mic || app.av.cam)))) return true;
+        if (!app.ended && version === captureVersion[kind] && !app.av.kicked && (restore || !(app.av.locked && !(app.av.mic || app.av.cam)))) return true;
         stream.getTracks().forEach((track) => track.stop());
         return false;
     }
@@ -840,6 +884,7 @@
     }
 
     async function toggle(kind, restore) {
+        if (app.ended) return;
         const turningOn = !app.av[kind] || (kind === 'cam' && Boolean(app.av.screen));
         const mediaKind = kind === 'cam' ? 'video' : 'audio';
         if (kind === 'cam' && app.av.canvas) { await toggleCanvasCam(); return; }
