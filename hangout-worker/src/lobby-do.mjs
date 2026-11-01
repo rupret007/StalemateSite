@@ -1,7 +1,7 @@
 // The #stalemate lobby Durable Object + its Worker-side admission. Everything that can be refused is refused here,
 // before a DO request is spent. Missing config/secrets => 503 (fail closed).
 import { originAllowed, previewKeyOk } from './core.mjs';
-import { accountId, accessConfigured, hmacKeyOk, ipHash, newDeviceId, roleForEmail, signDevice, verifyAccessJwt, verifyDevice } from './auth.mjs';
+import { accountId, accessConfigured, deviceCookie, deviceFromCookie, hmacKeyOk, ipHash, newDeviceId, roleForEmail, signDevice, verifyAccessJwt, verifyDevice } from './auth.mjs';
 import { createLobby, LOBBY_LIMITS } from './lobby-core.mjs';
 import { LOG_TTL } from './community-state.mjs';
 import { createAiModerator } from './ai-moderation.mjs';
@@ -98,11 +98,10 @@ export async function lobbyGate(request, env, url, deps = {}) {
     } else if (!(await (deps.turnstile || turnstileOk)(url.searchParams.get('ts'), ip, env.HANGOUT_TURNSTILE_SECRET))) {
         return { status: 403, reason: 'bot-check' };
     }
-    let dev = await verifyDevice(url.searchParams.get('dev'), env.HANGOUT_HMAC_KEY);
-    const fresh = !dev;
+    let dev = await verifyDevice(deviceFromCookie(request), env.HANGOUT_HMAC_KEY);
     if (!dev) dev = newDeviceId();
     identity.dev = dev;
-    identity.devToken = fresh ? await signDevice(dev, env.HANGOUT_HMAC_KEY) : null;
+    identity.devToken = await signDevice(dev, env.HANGOUT_HMAC_KEY);
     identity.iph = await ipHash(ip, env.HANGOUT_HMAC_KEY);
     return { ok: true, identity };
 }
@@ -440,12 +439,13 @@ export class HangoutLobby {
             betaSid: this.env.HANGOUT_BETA_MODE === 'protected' ? identity.betaSid : undefined,
             betaInviteVersion: this.env.HANGOUT_BETA_MODE === 'protected' ? identity.betaInviteVersion : undefined,
             dev: identity.dev, iph: identity.iph, role: identity.role, email: identity.email, account: identity.account, expiresAt: identity.expiresAt, admin: identity.admin });
-        if (identity.devToken) pair[1].send(JSON.stringify({ t: 'device', token: identity.devToken }));
+        if (identity.devToken) pair[1].send(JSON.stringify({ t: 'device' }));
         for (const frame of initialFrames) {
             if (frame.t === 'admin' && this.env.HANGOUT_BETA_MODE === 'protected') this.sendPrivateAdmin(pair[1], id, frame);
             else pair[1].send(JSON.stringify(frame));
         }
-        return new Response(null, { status: 101, webSocket: pair[0] });
+        const headers = identity.devToken ? { 'Set-Cookie': deviceCookie(identity.devToken) } : undefined;
+        return new Response(null, { status: 101, webSocket: pair[0], headers });
         });
     }
     async webSocketMessage(ws, raw) {
