@@ -6,6 +6,7 @@ import { HangoutLobby } from '../src/lobby-do.mjs';
 import { BetaSessions } from '../src/beta-sessions.mjs';
 import { aiHealth, dailyUsage, INTERNAL_HEALTH_PATH } from '../src/beta-ops.mjs';
 import { AI_CATEGORIES } from '../src/ai-moderation.mjs';
+import { LIMITS as PRIVATE_REPORT_LIMITS } from '../src/private-reports.mjs';
 
 const origin = 'https://beta.example';
 const OPS = 'ops-health-test-key-'.repeat(3), INVITE = 'invitation-test-key-'.repeat(3), SECRET = 'signing-test-key-'.repeat(3);
@@ -207,5 +208,116 @@ describe('actual DO health reads do not spend or reset application state', () =>
         const stored = { day: '2025-01-01', used: 99 }; expect(dailyUsage(stored, 'used')).toEqual({ day: today(), used: 0 }); expect(stored.used).toBe(99);
         expect(aiHealth({ HANGOUT_AI_MODERATION: 'review', OPENAI_API_KEY: 'configured', HANGOUT_AI_DAILY_LIMIT: '10' }, { day: today(), used: 10 })).toMatchObject({ state: 'capped', quota: { used: 10, limit: 10 } });
         expect(aiHealth({ HANGOUT_AI_MODERATION: 'review', OPENAI_API_KEY: 'configured' }, { day: '2099-01-01', used: 1 }).quota).toBeNull();
+    });
+});
+
+describe('mandatory private-report health', () => {
+    const selected = { type: 'private-report', v: 1, request: 'N'.repeat(24), kind: 'message',
+        target: 'pReportedHealth', claimedName: 'ClaimedHealthName',
+        excerpt: 'Selected synthetic allegation health sentinel', reason: 'Selected synthetic reason health sentinel', consent: true };
+    // Trusted queue input normally assembled by Room after current membership
+    // checks. This fixture does not grant a production visitor or staff role.
+    const provenance = { reporterRef: 'S'.repeat(43), roomRef: 'R'.repeat(43), reporterConnection: 'pReporterHealth',
+        targetConnection: selected.target, targetSessionRef: 'T'.repeat(43), targetMembership: 'live' };
+
+    async function actualHealth(extra = []) {
+        const { env } = config(), provider = vi.fn(); vi.stubGlobal('fetch', provider);
+        const lobbyState = state([['beta-initialized', true], ['net', { lock: 'off', budget: { day: today(), requests: 17 } }],
+            ['ai-usage', { day: today(), used: 4 }], ...extra]);
+        const quotaState = state([[`c:${today()}`, 9]]), registryState = state();
+        const lobby = new HangoutLobby(lobbyState, env), quota = new HangoutQuota(quotaState, env), registry = new BetaSessions(registryState, env);
+        await lobby.ready;
+        const namespace = object => ({ idFromName: name => name, get: () => object });
+        env.LOBBY = namespace(lobby); env.QUOTA = namespace(quota); env.BETA_SESSIONS = namespace(registry);
+        return { env, lobby, lobbyState, stores: [lobbyState, quotaState, registryState], provider };
+    }
+
+    async function readOnlyProbe(h, ids = []) {
+        const before = h.stores.map(s => ({ values: structuredClone(s.values), puts: s.storage.put.mock.calls.length,
+            deletes: s.storage.delete.mock.calls.length }));
+        const network = structuredClone(h.lobby.engine.snapshot());
+        const response = await betaFetch(request(), h.env), text = await response.text(), body = JSON.parse(text);
+        h.stores.forEach((s, i) => {
+            expect(s.values).toEqual(before[i].values);
+            expect(s.storage.put).toHaveBeenCalledTimes(before[i].puts);
+            expect(s.storage.delete).toHaveBeenCalledTimes(before[i].deletes);
+        });
+        expect(h.lobby.engine.snapshot()).toEqual(network);
+        expect(h.provider).not.toHaveBeenCalled();
+        expect(response.headers.get('Cache-Control')).toBe('no-store');
+        expect(response.headers.has('Set-Cookie')).toBe(false);
+        expect(body.storageCheck).toBe('read-only'); expect(body.providerChecks).toBe('not-performed');
+        expect(body.features.ai.enabled).toBe(false); expect(body.features.turn.enabled).toBe(false);
+        expect(body.service.reasons).not.toContain('ai-unavailable');
+        for (const secret of [selected.excerpt, selected.reason, selected.claimedName, selected.request,
+            ...Object.values(provenance), OPS, INVITE, SECRET, 'staff@example.test', ...ids]) expect(text).not.toContain(secret);
+        return { response, body };
+    }
+
+    function selectivePrivateWriteFailure(h) {
+        let failing = true;
+        const put = h.lobbyState.storage.put.getMockImplementation();
+        h.lobbyState.storage.put.mockImplementation(async (key, value) => {
+            if (failing && key === 'private-reports-v1') throw Error('Synthetic private evidence write detail');
+            return put(key, value);
+        });
+        return () => { failing = false; };
+    }
+
+    it('reports corrupt private queue restore unavailable without exposing or changing the stored allegation', async () => {
+        const corrupt = { v: 1, reports: [{ excerpt: selected.excerpt, roomRef: provenance.roomRef }], receipts: [] };
+        const h = await actualHealth([['private-reports-v1', corrupt]]);
+        expect(h.lobby.privateReportQueue.status().storage).toBe('unavailable');
+        expect(h.lobby.privateReportState.storage).toBe('unavailable'); expect(h.lobby.evidenceStorage).toBe('ready');
+        const { response, body } = await readOnlyProbe(h);
+        expect(response.status).toBe(503);
+        expect(body.service).toMatchObject({ state: 'unavailable', reasons: expect.arrayContaining(['lobby-unavailable']) });
+        expect(body.storage.lobby).toBe('unavailable');
+        expect(h.lobbyState.values.get('private-reports-v1')).toEqual(corrupt);
+    });
+
+    it('reports a selective required private write failure unavailable and becomes ready only after durable retry', async () => {
+        const h = await actualHealth();
+        expect((await readOnlyProbe(h)).body.service.state).toBe('ready');
+        const recoverWrites = selectivePrivateWriteFailure(h);
+        const failed = await h.lobby.privateReportQueue.submit(selected, provenance);
+        expect(failed).toMatchObject({ ok: false, status: 503 });
+        await h.lobby.refreshPrivateReports(false);
+        expect(h.lobby.privateReportQueue.status().storage).toBe('unavailable');
+        expect(h.lobby.privateReportState.storage).toBe('unavailable'); expect(h.lobby.evidenceStorage).toBe('ready');
+        const failedHealth = await readOnlyProbe(h);
+        expect(failedHealth.response.status).toBe(503);
+        expect(failedHealth.body.service).toMatchObject({ state: 'unavailable', reasons: expect.arrayContaining(['lobby-unavailable']) });
+        expect(h.lobbyState.values.has('private-reports-v1')).toBe(false);
+        recoverWrites();
+        const saved = await h.lobby.privateReportQueue.submit(selected, provenance);
+        expect(saved).toMatchObject({ ok: true, duplicate: false, status: 'pending' });
+        expect(h.lobbyState.values.get('private-reports-v1').reports[0].excerpt).toBe(selected.excerpt);
+        await h.lobby.refreshPrivateReports(false);
+        const recovered = await readOnlyProbe(h, [saved.id]);
+        expect(recovered.response.status).toBe(200);
+        expect(recovered.body.service).toEqual({ state: 'ready', reasons: [] });
+        expect(recovered.body.features.ai.state).toBe('disabled');
+    });
+
+    it('reports failed private TTL pruning unavailable without health silently retrying or erasing evidence', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-19T10:00:00Z'));
+        const h = await actualHealth(), saved = await h.lobby.privateReportQueue.submit(selected, provenance);
+        expect(saved.ok).toBe(true); await h.lobby.refreshPrivateReports(false);
+        vi.setSystemTime(Date.now() + PRIVATE_REPORT_LIMITS.ttlMs + 1);
+        const recoverWrites = selectivePrivateWriteFailure(h);
+        await h.lobby.refreshPrivateReports(false);
+        expect(h.lobby.privateReportQueue.status().storage).toBe('unavailable');
+        expect(h.lobby.privateReportState.storage).toBe('unavailable'); expect(h.lobby.evidenceStorage).toBe('ready');
+        expect(h.lobbyState.values.get('private-reports-v1').reports[0].excerpt).toBe(selected.excerpt);
+        const failedHealth = await readOnlyProbe(h, [saved.id]);
+        expect(failedHealth.response.status).toBe(503);
+        expect(failedHealth.body.service.state).toBe('unavailable');
+        recoverWrites();
+        await h.lobby.refreshPrivateReports(false);
+        expect(h.lobbyState.values.get('private-reports-v1')).toEqual({ v: 1, reports: [], receipts: [] });
+        const recovered = await readOnlyProbe(h, [saved.id]);
+        expect(recovered.response.status).toBe(200);
+        expect(recovered.body.service).toEqual({ state: 'ready', reasons: [] });
     });
 });

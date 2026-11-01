@@ -1,7 +1,7 @@
 // @vitest-environment node
 // Admin auth (Cloudflare Access JWT), signed device ids, IP hashing, and the Worker-side lobby gate.
 import { describe, expect, it } from 'vitest';
-import { verifyAccessJwt, roleForEmail, signDevice, verifyDevice, ipHash, newDeviceId, accessConfigured } from '../../hangout-worker/src/auth.mjs';
+import { verifyAccessJwt, roleForEmail, signDevice, verifyDevice, deviceFromCookie, deviceCookie, DEVICE_TOKEN_TTL_MS, ipHash, newDeviceId, accessConfigured } from '../../hangout-worker/src/auth.mjs';
 import { lobbyGate, lobbyConfigured } from '../../hangout-worker/src/lobby-do.mjs';
 
 const TEAM = 'stalemate.cloudflareaccess.com';
@@ -62,8 +62,29 @@ describe('device ids and IP hashing', () => {
         const tok = await signDevice(id, KEY);
         expect(await verifyDevice(tok, KEY)).toBe(id);
         expect(await verifyDevice(tok, 'x'.repeat(40))).toBeNull();
-        expect(await verifyDevice(`${newDeviceId()}.${tok.split('.')[1]}`, KEY)).toBeNull();
+        expect(await verifyDevice(`${newDeviceId()}.${tok.split('.').slice(1).join('.')}`, KEY)).toBeNull();
         expect(await verifyDevice('garbage', KEY)).toBeNull();
+    });
+    it('rejects expired and legacy two-part device tokens', async () => {
+        const id = newDeviceId();
+        const tok = await signDevice(id, KEY, now);
+        expect(await verifyDevice(tok, KEY, now + DEVICE_TOKEN_TTL_MS + 1)).toBeNull();
+        expect(await verifyDevice(`${id}.${'x'.repeat(32)}`, KEY)).toBeNull();
+    });
+    it('reads device tokens from the HttpOnly cookie name', async () => {
+        const id = newDeviceId();
+        const tok = await signDevice(id, KEY);
+        const req = new Request('https://w.example/lobby', { headers: { Cookie: `${deviceCookie(tok).split(';')[0]}` } });
+        expect(deviceFromCookie(req)).toBe(tok);
+        expect(deviceFromCookie(new Request('https://w.example/lobby'))).toBeNull();
+    });
+    it('reads session-scoped preview device cookies', async () => {
+        const id = newDeviceId();
+        const tok = await signDevice(id, KEY);
+        const scoped = deviceCookie(tok, { path: '/__preview/relay/abc/' });
+        expect(scoped.startsWith('hangout-dev=')).toBe(true);
+        const req = new Request('https://w.example/lobby', { headers: { Cookie: scoped.split(';')[0] } });
+        expect(deviceFromCookie(req)).toBe(tok);
     });
     it('IP hash is daily, keyed and never contains the IP', async () => {
         const a = await ipHash('203.0.113.9', KEY, now);
@@ -116,6 +137,25 @@ describe('Worker lobby gate fails closed', async () => {
         expect(ok.ok).toBe(true);
         expect(ok.identity.role).toBe('fan');
         expect(ok.identity.devToken).toMatch(/\./);
+    });
+    it('device auth uses HttpOnly cookie only and ignores query or subprotocol tokens', async () => {
+        const id = newDeviceId();
+        const tok = await signDevice(id, env.HANGOUT_HMAC_KEY, Date.now() - 1000);
+        const q = `preview=${'p'.repeat(24)}&ts=tok&dev=${encodeURIComponent(tok)}`;
+        const [rUrl, uUrl] = req('/lobby', {}, q);
+        const viaUrl = await lobbyGate(rUrl, env, uUrl, deps);
+        expect(viaUrl.ok).toBe(true);
+        expect(viaUrl.identity.dev).not.toBe(id);
+        const [rProto, uProto] = req('/lobby', { 'Sec-WebSocket-Protocol': `hangout, dev.${tok}` });
+        const viaProto = await lobbyGate(rProto, env, uProto, deps);
+        expect(viaProto.ok).toBe(true);
+        expect(viaProto.identity.dev).not.toBe(id);
+        const [rCookie, uCookie] = req('/lobby', { Cookie: `${deviceCookie(tok).split(';')[0]}` });
+        const viaCookie = await lobbyGate(rCookie, env, uCookie, deps);
+        expect(viaCookie.ok).toBe(true);
+        expect(viaCookie.identity.dev).toBe(id);
+        expect(viaCookie.identity.devToken).toMatch(/\./);
+        expect(viaCookie.identity.devToken).not.toBe(tok);
     });
     it('a fan cannot become band by asking: /lobby ignores role params, /lobby-admin needs a valid Access JWT', async () => {
         const [r, u] = req('/lobby', { 'Cf-Access-Jwt-Assertion': await token(pair, good) }, `preview=${'p'.repeat(24)}&ts=tok&role=owner&admin=1`);

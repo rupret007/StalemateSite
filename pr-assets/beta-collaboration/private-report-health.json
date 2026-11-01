@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "status": "prepared-not-deployed",
+  "baseCommit": "3277350bbd7b616366ac336953311080a8af5019",
+  "baselineNegativeCommit": "99c38cadc512e00df69f301601d94a532e2691bf",
+  "baselineLobbySha256": "aa5a3549e955e8560b273276695c67f10ab0bc415de44f8dafca80e6fb059e5b",
+  "files": {
+    "hangout-worker/src/lobby-do.mjs": "be406777cd6b11ff56b45184e33a53a7e563052b9831ae25c923dcda247fd0ae",
+    "hangout-worker/tests/beta-ops.test.js": "bf69653973aec9164c5dd59f90bd03d4a5a562fb3020c9dd643f966c7d90f9e7"
+  },
+  "problem": "A corrupt or failed required private-report queue could reject reports with503 while the existing protected health endpoint returned200 and service.ready.",
+  "change": "Protected Lobby health now requires both loaded queue storage status and cached cleanup/storage state to be ready, otherwise it returns the existing content-free503. Existing public beta health already propagates that as lobby-unavailable.",
+  "validation": {
+    "baselineActualDoRegressions": {
+      "failed": 3,
+      "expected": 503,
+      "received": 200,
+      "setupFailures": 0,
+      "existingCasesFiltered": 18,
+      "logSha256": "8b0c6ed9e49e484b7bf34cc071f3abc4b9fea9e42ae918e6413985f81eda3c48"
+    },
+    "focusedHealthSuite": {
+      "passed": 21,
+      "newCases": 3,
+      "retries": 0,
+      "elapsedSeconds": 0.291,
+      "logSha256": "22a311b335bd95fe289a6dcc621773782f1fe36eddc7badc89fa4c49ba6dec5a"
+    },
+    "fullUnitSuite": {
+      "passed": 718,
+      "files": 61,
+      "retries": 0,
+      "elapsedSeconds": 10.99,
+      "logSha256": "092baabb07eaab3c2f01d6ac4624d0f7d00300509e4d44218d032eed2cbdd920"
+    },
+    "scenarios": [
+      "Corrupt private-report object remains unchanged, queue unavailable and public health503.",
+      "Selective private-report required write fails while other storage works; health503. Confirmed durable retry restores200/ready.",
+      "Expiration cleanup write fails; health503 cannot silently retry or erase evidence. Ordinary confirmed cleanup restores200/ready."
+    ],
+    "privacyAndSideEffects": [
+      "Actual Lobby, quota and beta-session registry classes are used through public betaHealth. Trusted report provenance is an explicit pure-queue test fixture, not staff authorization.",
+      "Health probes leave initialized stores, write/delete calls, engine snapshots and counters unchanged. No provider request or auth cookie issued.",
+      "Health response excludes selected text, nickname, report/request IDs, opaque references and credentials; fixed no-store output only.",
+      "Required storage failures remain distinct from optional disabled AI/TURN. No schema or monitor change."
+    ],
+    "independentReview": "Guard placement, initialization, both required readiness checks, memory-only status and existing public503/privacy propagation reviewed independently."
+  },
+  "limits": [
+    "Readiness of already loaded storage; not an active write test, provider availability check or billing monitor.",
+    "Normal Durable Object wake/initialization and its cleanup are unchanged.",
+    "This changes health only, not report intake, role checks, queue state, private chat, AI or provider flags.",
+    "No hosted deployment, configuration change, public navigation or launch.",
+    "The private99c38cad offline package is historical preparation and not selected for release; rebuild from reviewed corrected source before deployment."
+  ],
+  "remaining": [
+    "Original CI for this source pending.",
+    "Human/Karen review and hosted health/report submission acceptance after the original8-hour expiry observation reaches terminal.",
+    "Full physical-device, verified identity/co-host, platform signing/installation and TURN/provider acceptance remain separate."
+  ]
+}
