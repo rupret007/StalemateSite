@@ -217,6 +217,11 @@
         }
         case 'join': {
             const c = { ...m.ch, lines: [] };
+            if (!c.kind && c.name) {
+                for (const k of ['bobross', 'watch', 'art', 'jam']) {
+                    if (c.name === `#${k}` || c.name.startsWith(`#${k}-`)) { c.kind = k; break; }
+                }
+            }
             if (app.pendingChannel === m.ch.name) {
                 app.pendingChannel = '';
                 $('[data-channel-dialog]').close();
@@ -365,15 +370,15 @@
         $('[data-buffer]').replaceChildren();
         (c ? c.lines : []).forEach(appendLine);
         replaying = false;
-        drawTabs(); drawChan();
-        drawCommunity(); drawRooms();
-        show('chat');
-        const buf = $('[data-buffer]'); buf.scrollTop = buf.scrollHeight;
         const r = room();
         if (r) {
             if (prev !== key && c && c.kind !== 'lobby' && c.kind !== 'jam') r.onJoin(c, c.actSnap);
             else if (prev !== key && (!c || c.kind === 'lobby' || c.kind === 'jam')) r.onLeave();
         }
+        drawTabs(); drawChan();
+        drawCommunity(); drawRooms();
+        show('chat');
+        const buf = $('[data-buffer]'); buf.scrollTop = buf.scrollHeight;
     }
 
     function drawTabs() {
@@ -420,6 +425,15 @@
         $('[data-activity]').hidden = !showAct;
         $('[data-activity-title]').textContent = showAct ? c.kind === 'art' ? 'A canvas for everyone' : c.kind === 'bobross' ? 'A little paint. A little Bob Ross.' : 'Watching together' : 'Shared activity';
         $('[data-act-stage]').hidden = !showAct;
+        const live = window.__lobbyRoom?.state;
+        if (live && live.ch === key && ['art', 'bobross', 'watch'].includes(live.kind)) {
+            $('[data-activity]').hidden = false;
+            $('[data-act-stage]').hidden = false;
+            const paint = live.kind === 'art' || live.kind === 'bobross';
+            const video = live.kind === 'bobross' || live.kind === 'watch';
+            $('[data-act-paint]').hidden = !paint;
+            $('[data-act-video]').hidden = !video;
+        }
         document.body.classList.toggle('am-op', !!(c && amOp(c)));
         if (room) {
             const m = c.modes;
@@ -672,7 +686,7 @@
     });
     $('[data-cam-yes]').addEventListener('click', () => { if (!$('[data-adult]').checked) return toast('Tick the 18+ box first.'); send({ t: 'cam', ch: app.active, on: true, adult18: true }); return $('[data-cam-gate]').close(); });
     $('[data-cam-no]').addEventListener('click', () => $('[data-cam-gate]').close());
-    $('[data-jam-form]').addEventListener('submit', (e) => { e.preventDefault(); const v = $('[data-jam-link]').value; if (v && cmd('jamlink', ['invitation', v])) $('[data-jam-link]').value = ''; });
+    $('[data-jam-form]').addEventListener('submit', (e) => { e.preventDefault(); const v = $('[data-jam-link]').value.trim(); if (v && cmd('jamlink', [v])) $('[data-jam-link]').value = ''; });
     $('[data-jam-copy]').addEventListener('click', async () => {
         const c = store(app.active);
         const link = c?.kind === 'jam' && (c.jam?.invitation || c.jam?.desktop);
