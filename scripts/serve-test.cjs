@@ -12,8 +12,9 @@ const HANGOUT_RELAY_PREFIX = '/__hangout-relay';
 
 function parseRelaySubpath(subpath) {
     const parts = String(subpath || '/').split('/').filter(Boolean);
+    const known = new Set(['lobby', 'lobby-admin', 'room']);
     if (!parts.length) return { namespace: '', pathname: '/lobby' };
-    if (parts[0] === 'lobby' || parts[0] === 'lobby-admin') {
+    if (known.has(parts[0])) {
         return { namespace: '', pathname: `/${parts.join('/')}` };
     }
     const namespace = parts[0];
