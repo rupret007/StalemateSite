@@ -1,6 +1,6 @@
 // Credentials never enter storage/logs. One global DO serializes reservations across rooms.
 import { originAllowed, previewKeyOk, validRoomId } from './core.mjs';
-import { hmacKeyOk, verifyDevice } from './auth.mjs';
+import { deviceFromCookie, hmacKeyOk, verifyDevice } from './auth.mjs';
 
 export const TURN_TTL = 600;
 const WINDOW = 10 * 60 * 1000;
@@ -44,7 +44,7 @@ export async function admitTurn(request, env) {
         if (!body || typeof body !== 'object' || Array.isArray(body)) return finish(reply(400, 'request'));
         if (!previewKeyOk(body.preview, env.HANGOUT_PREVIEW_KEY)) return finish(reply(403, 'preview'));
         if (!validRoomId(body.room)) return finish(reply(400, 'room'));
-        const device = await verifyDevice(body.device, env.HANGOUT_HMAC_KEY);
+        const device = await verifyDevice(deviceFromCookie(request) || body.device, env.HANGOUT_HMAC_KEY);
         if (!device) return finish(reply(403, 'device'));
         const stub = env.TURN_BUDGET.get(env.TURN_BUDGET.idFromName('global'));
         return finish(await stub.fetch('https://turn/issue', { method: 'POST', body: JSON.stringify({ room: body.room, device }) }));

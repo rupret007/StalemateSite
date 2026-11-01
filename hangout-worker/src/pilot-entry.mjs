@@ -1,6 +1,6 @@
 // Separate protected, invite-only pilot. Production index.mjs never imports these preview identities.
 import worker, { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget } from './index.mjs';
-import { accountId, ipHash, newDeviceId, signDevice, verifyDevice } from './auth.mjs';
+import { accountId, deviceFromCookie, ipHash, newDeviceId, signDevice, verifyDevice } from './auth.mjs';
 import { previewKeyOk } from './core.mjs';
 import { PILOT_TTL, equalSecret, signPilot, pilotCookie, pilotSession } from './pilot-auth.mjs';
 export { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget };
@@ -108,11 +108,11 @@ export default {
             const staff = ['owner', 'moderator'].includes(identity.role);
             if (url.pathname === '/lobby-admin' && !staff) return reply('Staff identity required.', 403);
             if (url.pathname === '/lobby-owner' && identity.role !== 'room-owner') return reply('Room-owner pilot identity required.', 403);
-            let dev = await verifyDevice(url.searchParams.get('dev'), env.HANGOUT_HMAC_KEY);
-            const fresh = !dev; if (!dev) dev = newDeviceId();
+            let dev = await verifyDevice(deviceFromCookie(request), env.HANGOUT_HMAC_KEY);
+            if (!dev) dev = newDeviceId();
             const email = staff ? stateEmail(identity.role) : '';
             const account = identity.role === 'room-owner' ? await accountId(`${identity.label.toLowerCase()}@pilot.invalid`, env.HANGOUT_HMAC_KEY) : '';
-            const who = { pilotSid: access.sid, role: staff ? identity.role : 'fan', email, admin: staff && url.pathname === '/lobby-admin', account, expiresAt: access.exp, dev, iph: await ipHash(request.headers.get('CF-Connecting-IP') || '0.0.0.0', env.HANGOUT_HMAC_KEY), devToken: fresh ? await signDevice(dev, env.HANGOUT_HMAC_KEY) : null };
+            const who = { pilotSid: access.sid, role: staff ? identity.role : 'fan', email, admin: staff && url.pathname === '/lobby-admin', account, expiresAt: access.exp, dev, iph: await ipHash(request.headers.get('CF-Connecting-IP') || '0.0.0.0', env.HANGOUT_HMAC_KEY), devToken: await signDevice(dev, env.HANGOUT_HMAC_KEY) };
             const quota = await env.QUOTA.get(env.QUOTA.idFromName('global')).fetch('https://quota/take', { method: 'POST' });
             if (quota.status !== 200) return reply('Pilot connection allowance reached.', 429);
             const nextHeaders = new Headers(request.headers); nextHeaders.set('X-Hangout-Identity', JSON.stringify(who));
