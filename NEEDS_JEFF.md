@@ -2,6 +2,26 @@
 
 Updated October 19, 2026. **Jeff confirmed there is no Windows signing certificate or service on record. Treat current Windows builds as unsigned. Do not purchase, sign up, submit identity/billing information, or start signing without a later explicit decision.** Mac, Windows and Linux remain required for the beta.
 
+## Reviewed infrastructure fix: human merge
+
+**Jeff-only action:** merge [OPS PR #101](https://github.com/rupret007/bob-ops-dashboard/pull/101)
+into its existing `cursor/storypool-all-in-one-47c7` base branch after confirming
+the head remains `aceba52c837837a79bcc152b5071082ca515b8fc` with green CI and its
+current-head Karen pass. At 19:11 UTC on October 19, the PR was open and clean;
+all nine CI checks had passed and the normal signed verdict receiver had
+accepted that exact head.
+
+The existing [StoryPool merge guard](https://github.com/rupret007/bob-ops-dashboard/blob/39fd69dbbe8bb5f3c8dae2543d5d2029a7b9d5e9/cluster/never_touch.py#L23-L29)
+includes `bob-ops-dashboard` in `CONDUCTOR_NEVER_MERGE_REPOS` and returns
+"requires human merge." The conductor skips this repository, including approved
+PRs. Its completed 19:05 UTC cycle therefore does not establish source admission
+for this fix; waiting for another cycle cannot override that policy.
+
+After the merge, preserve the normal exact-merged-SHA Nuc canary and Mini
+source-admission checks. Do not replace, reset or overlay the operator-owned
+checkout. PR #101 adds diagnostic detail; the actual context-feeding fix in
+PR #97 and the other required reviews remain separate requirements.
+
 ## Current Windows blocker
 
 The verified candidate is WebJam source `5effbc58db706254f8ca8b52de4a0520c482294a`, build [39197407138](https://github.com/rupret007/webjam/actions/runs/39197407138). Its unsigned Windows installer can pass installation/launch checks while native remote v3 Join still fails: the bundled `webjam-fabric.exe` must have an Authenticode status of **Valid** before WebJam starts it. That [runtime requirement](https://github.com/rupret007/webjam/blob/5effbc58db706254f8ca8b52de4a0520c482294a/services/transport_runtime.py#L693) stays intact. No v2 substitution or policy bypass.
