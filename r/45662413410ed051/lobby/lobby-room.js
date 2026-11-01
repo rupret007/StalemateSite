@@ -67,7 +67,7 @@
 
         function onJoin(chan, act) {
             teardown();
-            if (!chan || chan.kind === 'lobby' || chan.kind === 'jam') return;
+            if (!chan || !['art', 'bobross', 'watch'].includes(chan.kind)) return;
             state.ch = chan.name;
             state.kind = chan.kind;
             ui.stage.hidden = false;

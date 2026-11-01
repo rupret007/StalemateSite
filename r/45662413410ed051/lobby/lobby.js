@@ -113,7 +113,7 @@
         case 'join': {
             const c = { ...m.ch, lines: [] };
             app.chans.set(m.ch.name, c);
-            (m.history || []).forEach((h) => pushLine(m.ch.name, h.t === 'event' ? { ...h, event: true } : h));
+            // Classic IRC: joining begins a fresh buffer; never render pre-join backlog.
             if (m.act) c.actSnap = m.act;
             switchTo(m.ch.name); // switchTo calls room.onJoin with actSnap
             break;
@@ -253,7 +253,7 @@
         const room = !isPm && c && c.kind !== 'lobby';
         $('[data-roombar]').hidden = !room;
         $('[data-jam]').hidden = !(room && c.kind === 'jam');
-        const showAct = room && c.kind !== 'jam';
+        const showAct = room && ['bobross', 'watch', 'art'].includes(c.kind);
         $('[data-activity]').hidden = !showAct;
         $('[data-act-stage]').hidden = !showAct;
         document.body.classList.toggle('am-op', !!(c && amOp(c)));
