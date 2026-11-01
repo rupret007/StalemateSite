@@ -886,7 +886,7 @@
     async function iceServers() {
         if (!turnClient) turnClient = win.HangoutTurn.createTurnClient({
             url: turnUrl, preview: previewKey, room: app.roomId,
-            getDevice: () => { try { return localStorage.getItem('hangout-dev'); } catch (_) { return ''; } },
+            getDevice: () => { try { return ''; } catch (_) { return ''; } },
             onStatus: (status) => {
                 ui.turnStatus.textContent = status === 'ready' ? 'Video relay available for connections that need it.'
                     : status === 'device-required' ? 'Direct connections only. Join the lobby once on this browser to enable relay access.'
