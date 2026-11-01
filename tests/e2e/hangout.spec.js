@@ -807,19 +807,20 @@ test('camera and mic are opt-in with a plain explainer, then connect peer to pee
 
 test('TURN servers are fetched before peer connections are opened', async ({ browser }) => {
     const host = await openBrowser(browser);
-    await host.addInitScript(() => {
+    const fixtureDevice = `${'a'.repeat(22)}.${'b'.repeat(8)}.${'c'.repeat(32)}`;
+    await host.addInitScript((device) => {
         const Orig = window.RTCPeerConnection;
-        localStorage.setItem('hangout-dev', `${'a'.repeat(22)}.${'b'.repeat(32)}`);
+        localStorage.setItem('hangout-dev', device);
         window.__hangoutPcIce = [];
         window.RTCPeerConnection = function (config, ...args) {
             window.__hangoutPcIce.push(config);
             return new Orig(config, ...args);
         };
-    });
+    }, fixtureDevice);
     await host.route('**/room-turn', async (route) => {
         if (route.request().method() === 'POST') {
             await new Promise((r) => setTimeout(r, 200));
-            expect(route.request().postDataJSON().device).toBe(`${'a'.repeat(22)}.${'b'.repeat(32)}`);
+            expect(route.request().postDataJSON().device).toBe(fixtureDevice);
             await route.fulfill({ json: { iceServers: [{ urls: 'turn:fake', username: 'fixture-user', credential: 'fixture-password' }], ttl: 600, expiresAt: Date.now() + 600000 } });
         } else {
             await route.continue();
