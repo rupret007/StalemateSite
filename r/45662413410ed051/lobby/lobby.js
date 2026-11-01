@@ -121,6 +121,10 @@
             const cur = store(app.active);
             if (m.ch.name === '#stalemate' && cur && cur.kind !== 'lobby' && cur.kind !== 'jam') break;
             switchTo(m.ch.name); // switchTo calls room.onJoin with actSnap
+            const r = room();
+            if (r && ['art', 'bobross', 'watch'].includes(c.kind) && window.__lobbyRoom?.state?.ch !== c.name) {
+                r.onJoin(c, c.actSnap);
+            }
             break;
         }
         case 'chan': {
