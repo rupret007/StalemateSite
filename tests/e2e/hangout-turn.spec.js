@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { addSignedDeviceCookie } = require('./support/signed-device-cookie.cjs');
 const KEY = 'local-preview-key-0001';
-const DEVICE = `${'a'.repeat(22)}.${'b'.repeat(32)}`;
 test.use({ permissions: ['camera', 'microphone'], launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } });
 let testOrigin;
 test.beforeAll(async ({ baseURL }) => { testOrigin = baseURL; });
@@ -66,7 +66,7 @@ test('private session expiry stops capture, relay refresh and playback and clear
 
 test('refresh replaces active peer configuration and restarts ICE without storing credentials', async ({ page }) => {
     await page.clock.install({ time: new Date() });
-    await page.addInitScript((device) => localStorage.setItem('hangout-dev', device), DEVICE);
+    const device = await addSignedDeviceCookie(page.context(), testOrigin);
     const payloads = [];
     await page.route((url) => url.pathname === '/room-turn', async (route) => {
         payloads.push(route.request().postDataJSON());
@@ -85,7 +85,7 @@ test('refresh replaces active peer configuration and restarts ICE without storin
     await page.clock.fastForward(49000);
     await expect.poll(() => payloads.length).toBe(2);
     await expect.poll(() => page.evaluate(() => window.turnRestarts)).toBe(1);
-    expect(payloads.every((p) => p.device === DEVICE && /^[a-f0-9]{64}$/.test(p.room))).toBe(true);
+    expect(payloads.every((p) => !p.device && /^[a-f0-9]{64}$/.test(p.room))).toBe(true);
     expect(await page.evaluate(() => JSON.stringify(window.turnUpdates))).toContain('fixture-2');
     expect(await page.evaluate(() => JSON.stringify({ ...localStorage }))).not.toContain('fixture-2');
 });

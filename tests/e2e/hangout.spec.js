@@ -2,6 +2,7 @@
 const path = require('node:path');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { addSignedDeviceCookie } = require('./support/signed-device-cookie.cjs');
 
 const SLUG = '45662413410ed051';
 const KEY = 'local-preview-key-0001';
@@ -807,9 +808,9 @@ test('camera and mic are opt-in with a plain explainer, then connect peer to pee
 
 test('TURN servers are fetched before peer connections are opened', async ({ browser }) => {
     const host = await openBrowser(browser);
+    await addSignedDeviceCookie(host.context(), testOrigin);
     await host.addInitScript(() => {
         const Orig = window.RTCPeerConnection;
-        localStorage.setItem('hangout-dev', `${'a'.repeat(22)}.${'b'.repeat(32)}`);
         window.__hangoutPcIce = [];
         window.RTCPeerConnection = function (config, ...args) {
             window.__hangoutPcIce.push(config);
@@ -819,7 +820,7 @@ test('TURN servers are fetched before peer connections are opened', async ({ bro
     await host.route('**/room-turn', async (route) => {
         if (route.request().method() === 'POST') {
             await new Promise((r) => setTimeout(r, 200));
-            expect(route.request().postDataJSON().device).toBe(`${'a'.repeat(22)}.${'b'.repeat(32)}`);
+            expect(route.request().postDataJSON().device).toBeUndefined();
             await route.fulfill({ json: { iceServers: [{ urls: 'turn:fake', username: 'fixture-user', credential: 'fixture-password' }], ttl: 600, expiresAt: Date.now() + 600000 } });
         } else {
             await route.continue();
