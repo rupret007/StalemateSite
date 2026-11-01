@@ -38,10 +38,8 @@
         if (!relayBase) return status('The chat server isn’t switched on yet.');
         const q = new URLSearchParams({ preview: previewKey });
         if (devAdmin) q.set('devadmin', devAdmin);
-        const dev = localStorage.getItem('hangout-dev');
-        if (dev) q.set('dev', dev);
         const previous = app.ws;
-        const ws = new WebSocket(`${relayBase}/lobby-admin?${q}`);
+        const ws = new WebSocket(`${relayBase}/lobby-admin?${q}`, ['hangout']);
         app.ws = ws;
         clearPanel();
         if (previous && previous.readyState < 2) previous.close(1000, 'staff connection replaced');
@@ -61,7 +59,7 @@
         ws.onmessage = (e) => {
             if (app.ws !== ws || ws.readyState !== 1) return;
             let m; try { m = JSON.parse(e.data); } catch (err) { return; }
-            if (m.t === 'device') localStorage.setItem('hangout-dev', m.token);
+            if (m.t === 'device') { /* HttpOnly cookie set on WebSocket admission */ }
             if (m.t === 'hello') send({ t: 'hello', nick: $('[data-nick]').value.trim() || 'Helper', age13: true });
             if (m.t === 'nick-error') status(m.text);
             if (m.t === 'welcome') { $('[data-gate]').hidden = true; $('[data-panel]').hidden = false; }
