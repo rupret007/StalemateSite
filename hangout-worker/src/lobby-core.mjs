@@ -2,6 +2,7 @@
 // so no netsplits and no "first in gets @"). Pure logic, no I/O: the Worker DO and the local dev relay both
 // drive it, and unit tests drive it directly. Every permission is checked here, never in the browser.
 import { checkNick, checkText, defaultLists, normalize } from './filter.mjs';
+import { actSnapshot, applyClear, applyStroke, applyVideo, cleanRtc, parseActFrame, PAINT_KINDS, VIDEO_KINDS } from './lobby-act.mjs';
 
 export const BOT = 'StaleBot';
 export const LOBBY = '#stalemate';
@@ -21,6 +22,9 @@ export const LOBBY_LIMITS = Object.freeze({
     maxChars: 300,
     perDeviceDay: 200,
     frameBytes: 2048,
+    actFrameBytes: 16384,
+    actBurst: 24,
+    actPerSecond: 10,
     framesPerConnection: 4000,
     defaultSlow: 3,
     nickEvery: 60 * 1000,
@@ -124,7 +128,8 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         name, kind, title, founder, created: now(), topic: kind === 'lobby' ? 'Welcome to #stalemate. House rule: Don’t be a dick. Next show Sat Oct 24 @ Los Amigo’s, Plano' : '',
         modes: { m: false, i: false, k: '', l: kind === 'lobby' ? L.lobbyMax : L.roomMax, t: true, S: kind === 'lobby' ? L.defaultSlow : 0, C: kind !== 'lobby', Q: false, locked: false },
         jam: kind === 'jam' ? { desktop: '', web: '' } : null, ops: new Set(founder ? [founder] : []), voice: new Set(), bans: [], invites: new Set(), kicks: {},
-        members: new Set(), history: [], emptySince: null
+        members: new Set(), history: [], emptySince: null,
+        act: { strokes: [], video: null }
     });
     channels.set(LOBBY, mkChannel(LOBBY, 'lobby', 'The lobby', null));
 
@@ -162,7 +167,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (chan.history.length > L.history) chan.history.shift();
         cast(chan, msg);
     };
-    const names = (chan) => membersOf(chan).filter((m) => m.nick).map((m) => ({ nick: m.nick, prefix: prefix(m, chan), band: isBand(m), away: !!m.away, cam: !!(m.cams && m.cams.has(lc(chan.name))) }))
+    const names = (chan) => membersOf(chan).filter((m) => m.nick).map((m) => ({ id: m.id, nick: m.nick, prefix: prefix(m, chan), band: isBand(m), away: !!m.away, cam: !!(m.cams && m.cams.has(lc(chan.name))) }))
         .sort((a, b) => (a.prefix === b.prefix ? lc(a.nick).localeCompare(lc(b.nick)) : a.prefix === '@' ? -1 : b.prefix === '@' ? 1 : a.prefix === '+' ? -1 : 1));
     const chanView = (chan) => ({ name: chan.name, kind: chan.kind, title: chan.title, topic: chan.topic, modes: { ...chan.modes, k: chan.modes.k ? true : false }, count: chan.members.size, names: names(chan), jam: chan.jam ? { desktop: chan.jam.desktop, web: chan.jam.web, webReady: !!chan.jam.web } : null });
     const sendChan = (chan) => cast(chan, { t: 'chan', ch: chanView(chan) });
@@ -228,7 +233,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
             if (inLobby >= L.lobbyMax) return { ok: false, status: 429, reason: 'full' };
         }
         const c = { id, dev, iph, role, email, admin: band && admin, nick: '', channels: new Set(), away: '', ignores: new Set(), blocks: new Set(), pmOff: false,
-            cams: new Set(), since: now(), lastNick: 0, tokens: L.burst, last: now(), frames: 0, lastSaid: {} };
+            cams: new Set(), since: now(), lastNick: 0, tokens: L.burst, last: now(), frames: 0, lastSaid: {}, actTokens: L.actBurst, actLast: now() };
         conns.set(id, c);
         if (band) { net.lastBand = now(); if (net.shieldAuto || net.lockAuto) bot(c, 'Auto-lockdown is on because no band op was around for a day: fans can read but not talk. /lobby unlock and /shieldoff when you are ready.'); saveNet(); }
         out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true });
@@ -271,7 +276,8 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         chan.emptySince = null;
         if (chan.kind !== 'lobby') bump(net.stats.rooms, (KINDS[chan.kind].endsWith(chan.title) ? KINDS[chan.kind] : `${KINDS[chan.kind]} · ${chan.title}`).slice(0, 60));
         c.channels.add(chan.name);
-        out(c, { t: 'join', ch: chanView(chan), history: chan.history.filter((h) => !(h.from && c.ignores.has(lc(h.from)))) });
+        const act = actSnapshot(chan);
+        out(c, { t: 'join', ch: chanView(chan), history: chan.history.filter((h) => !(h.from && c.ignores.has(lc(h.from)))), act });
         event(chan, `${nickOf(c)} has joined ${chan.name}`);
         if (chan.kind === 'lobby') bot(c, `welcome to #stalemate, ${c.nick}. One rule: Don’t be a dick. Swear all you want; no hate, threats, creepy stuff or personal info. 🚩 anything gross. /help for commands.`);
         else if (chan.kind === 'jam') bot(c, `welcome to ${chan.name}. Music runs in the WebJam desktop app (Jamulus) for tight timing. Plug in Ethernet: Wi-Fi adds lag and dropouts.`);
@@ -287,11 +293,13 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         if (!c) return;
         c.frames += 1;
         spend(1 / 20);
-        if (typeof raw !== 'string' || raw.length > L.frameBytes) return kill(c, 4400, 'bad frame');
-        if (c.frames > L.framesPerConnection) return kill(c, 4429, 'frame cap');
+        if (typeof raw !== 'string' || raw.length > L.actFrameBytes) return kill(c, 4400, 'bad frame');
         let f;
         try { f = JSON.parse(raw); } catch (e) { return kill(c, 4400, 'bad frame'); }
         if (!f || typeof f !== 'object' || typeof f.t !== 'string') return kill(c, 4400, 'bad frame');
+        const maxBytes = f.t === 'act' ? L.actFrameBytes : L.frameBytes;
+        if (raw.length > maxBytes) return kill(c, 4400, 'bad frame');
+        if (c.frames > L.framesPerConnection) return kill(c, 4429, 'frame cap');
         if (!c.nick && f.t !== 'hello') return bot(c, 'Pick a nickname first.', 'error');
         switch (f.t) {
         case 'hello': return hello(c, f);
@@ -307,6 +315,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         }
         case 'report': return report(c, String(f.id || ''));
         case 'cam': return cam(c, f.ch, !!f.on, f.adult18 === true);
+        case 'act': return roomAct(c, f);
         case 'admin-refresh': if (isBand(c) && c.admin) out(c, { t: 'admin', state: adminState() }); return undefined;
         default: return kill(c, 4400, 'bad frame');
         }
@@ -666,7 +675,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     }
 
     function create(c, name, key, titleText) {
-        const kind = Object.keys(KINDS).find((k) => name.startsWith(`#${k}`)) || 'watch';
+        const kind = Object.keys(KINDS).find((k) => name === `#${k}` || name.startsWith(`#${k}-`)) || 'watch';
         if (net.shield && !isBand(c)) return bot(c, 'Shield is on, so new rooms are paused. Try again later.', 'error');
         const listed = [...channels.values()].filter((x) => x.kind !== 'lobby').length;
         if (listed >= L.roomsListed) return bot(c, 'All 30 room slots are busy. Join one from the list.', 'error');
@@ -720,6 +729,64 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
         c.cams.add(lc(chan.name));
         out(c, { t: 'cam', ch: chan.name, on: true });
         return sendChan(chan);
+    }
+
+    function actAllowed(c) {
+        if (isBand(c)) return true;
+        if (net.lock === 'readonly' || budgetLevel() !== 'ok') return false;
+        return true;
+    }
+
+    function takeActToken(c) {
+        const t = now();
+        c.actTokens = Math.min(L.actBurst, c.actTokens + ((t - c.actLast) / 1000) * L.actPerSecond);
+        c.actLast = t;
+        if (c.actTokens < 1) return false;
+        c.actTokens -= 1;
+        return true;
+    }
+
+    function castAct(chan, msg) {
+        cast(chan, msg, () => true);
+    }
+
+    function roomAct(c, raw) {
+        const f = parseActFrame(raw);
+        if (!f) return kill(c, 4400, 'bad frame');
+        const chan = ch(f.ch);
+        if (!chan || !chan.members.has(c.id)) return bot(c, 'Join the room first.', 'error');
+        if (chan.kind === 'lobby' || chan.kind === 'jam') return bot(c, 'Not in that kind of room.', 'error');
+        if (!actAllowed(c)) return bot(c, 'The lobby is read-only right now.', 'error');
+        if (!takeActToken(c)) return bot(c, 'Easy on the paint brush.', 'error');
+        const relayT = now();
+        if (f.kind === 'stroke') {
+            if (!PAINT_KINDS.has(chan.kind)) return undefined;
+            const stroke = applyStroke(chan, f.stroke);
+            if (!stroke) return undefined;
+            return castAct(chan, { t: 'act', ch: chan.name, kind: 'stroke', stroke, from: c.id, ts: relayT });
+        }
+        if (f.kind === 'clear') {
+            if (!isOp(c, chan)) return bot(c, 'Only @ can clear the canvas.', 'error');
+            if (!applyClear(chan)) return undefined;
+            return castAct(chan, { t: 'act', ch: chan.name, kind: 'clear', by: c.nick, ts: relayT });
+        }
+        if (f.kind === 'video') {
+            if (!VIDEO_KINDS.has(chan.kind)) return undefined;
+            if (!isOp(c, chan)) return bot(c, 'Only @ drives the video in open rooms.', 'error');
+            const video = applyVideo(chan, f, relayT);
+            if (!video) return undefined;
+            return castAct(chan, { t: 'act', ch: chan.name, kind: 'video', video, by: c.nick, ts: relayT });
+        }
+        if (f.kind === 'rtc') {
+            if (net.shield || !chan.modes.C) return undefined;
+            const rtc = cleanRtc(f);
+            if (!rtc) return undefined;
+            const target = conns.get(rtc.to);
+            if (!target || !chan.members.has(target.id)) return undefined;
+            if (!c.cams.has(lc(chan.name)) && !(target.cams && target.cams.has(lc(chan.name)))) return undefined;
+            return out(target, { t: 'act', ch: chan.name, kind: 'rtc', from: c.id, sdp: rtc.sdp, ice: rtc.ice });
+        }
+        return undefined;
     }
 
     function say(c, where, rawText, action) {

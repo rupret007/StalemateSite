@@ -12,6 +12,8 @@ const GOATCOUNTER = 'https://stalemate.goatcounter.com';
 const relayMeta = readFileSync(join(ROOM, 'index.html'), 'utf8').match(/name="hangout-relay" content="([^"]+)"/)[1];
 const HANGOUT_PAGE_CSP =
     `default-src 'self'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' ${relayMeta} ${GOATCOUNTER}; object-src 'none'; base-uri 'none'; form-action 'none'`;
+const LOBBY_PAGE_CSP =
+    `default-src 'self'; script-src 'self' https://challenges.cloudflare.com https://www.youtube.com; frame-src https://challenges.cloudflare.com https://www.youtube.com; media-src 'self' blob:; connect-src 'self' ${relayMeta} ${GOATCOUNTER}; object-src 'none'; base-uri 'none'; form-action 'none'`;
 
 const PAGES = ['lobby/index.html', 'admin/index.html', 'terms/index.html'];
 
@@ -38,7 +40,8 @@ describe('hangout lobby pages CSP', () => {
     for (const page of PAGES) {
         it(`${page} carries exactly the hangout CSP meta and no inline scripts`, () => {
             const html = readFileSync(join(ROOM, page), 'utf8');
-            expect(cspFromHtml(html)).toBe(HANGOUT_PAGE_CSP);
+            const expected = page === 'lobby/index.html' ? LOBBY_PAGE_CSP : HANGOUT_PAGE_CSP;
+            expect(cspFromHtml(html)).toBe(expected);
             assertNoInlineScript(html, page);
         });
     }

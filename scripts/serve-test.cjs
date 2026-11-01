@@ -9,6 +9,18 @@ const ROOT = path.resolve(__dirname, '..');
 const PORT = resolveTestPort(process.env);
 const PROJECT_PREFIX = '/StalemateSite';
 const HANGOUT_RELAY_PREFIX = '/__hangout-relay';
+
+function parseRelaySubpath(subpath) {
+    const parts = String(subpath || '/').split('/').filter(Boolean);
+    const known = new Set(['lobby', 'lobby-admin', 'room']);
+    if (!parts.length) return { namespace: '', pathname: '/lobby' };
+    if (known.has(parts[0])) {
+        return { namespace: '', pathname: `/${parts.join('/')}` };
+    }
+    const namespace = parts[0];
+    const rest = parts.slice(1);
+    return { namespace, pathname: rest.length ? `/${rest.join('/')}` : '/lobby' };
+}
 const MIME = {
     '.css': 'text/css; charset=utf-8',
     '.html': 'text/html; charset=utf-8',
@@ -91,12 +103,19 @@ function sendFile(request, response, filePath, status = 200) {
 async function main() {
     const { createHangoutRelay } = await import('./hangout-relay-dev.mjs');
     const origin = `http://127.0.0.1:${PORT}`;
-    const hangoutRelay = createHangoutRelay({
+    const relayOptions = {
         previewKey: 'local-preview-key-0001',
         devAdminKey: process.env.HANGOUT_DEV_ADMIN_KEY || 'local-dev-admin-key-0001',
         origins: origin,
         lobbyLimits: { pmMinLobbyMs: 1500 }
-    });
+    };
+    const relays = new Map();
+    const hangoutRelayFor = (namespace = '') => {
+        const key = namespace || '';
+        if (!relays.has(key)) relays.set(key, createHangoutRelay(relayOptions));
+        return relays.get(key);
+    };
+    const hangoutRelay = hangoutRelayFor('');
 
     const server = http.createServer((request, response) => {
         if (request.method !== 'GET' && request.method !== 'HEAD') {
@@ -151,8 +170,9 @@ async function main() {
             return;
         }
         const subpath = url.pathname.slice(HANGOUT_RELAY_PREFIX.length) || '/';
-        url.pathname = subpath.startsWith('/') ? subpath : `/${subpath}`;
-        hangoutRelay.handleUpgrade(req, socket, head, url);
+        const { namespace, pathname } = parseRelaySubpath(subpath);
+        url.pathname = pathname;
+        hangoutRelayFor(namespace).handleUpgrade(req, socket, head, url);
     });
 
     server.listen(PORT, '127.0.0.1', () => {

@@ -6,72 +6,135 @@
     <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
     <meta name="googlebot" content="noindex, nofollow">
     <meta name="referrer" content="no-referrer">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' wss://stalemate-hangout.jeffstory007.workers.dev https://stalemate.goatcounter.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com https://www.youtube.com; frame-src https://challenges.cloudflare.com https://www.youtube.com; media-src 'self' blob:; connect-src 'self' wss://stalemate-hangout.jeffstory007.workers.dev https://stalemate.goatcounter.com; object-src 'none'; base-uri 'none'; form-action 'none'">
     <!-- Hidden preview. Not linked from anywhere on the public site. -->
     <meta name="hangout-relay" content="">
+    <meta name="hangout-turn" content="">
     <meta name="hangout-turnstile" content="">
     <title>#stalemate · Hang Out</title>
     <link rel="icon" href="../../../assets/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="lobby.css">
 </head>
 <body>
-    <div class="titlebar"><span>Hang Out — #stalemate</span><span class="dots" aria-hidden="true">▁ ▢ ✕</span></div>
+    <header class="titlebar"><div class="brand"><span class="brand-mark" aria-hidden="true">s.</span><span><b>STALEMATE</b><span class="brand-caption">IRC / COMMUNITY</span></span><span class="title-extra">A place to hang out.</span></div><div class="connection-tools"><span class="connection" data-connection role="status" data-state="offline">Not connected</span><button type="button" data-reconnect hidden>Try again</button></div></header>
 
     <section class="gate" data-gate>
-        <div class="gate-card">
+        <div class="gate-layout">
+          <div class="gate-intro">
+            <p class="eyebrow">OFF THE STAGE. INTO THE CONVERSATION.</p>
             <h1>#stalemate</h1>
-            <p class="lede" data-gate-copy>The band’s hangout. Chat, paint along with Bob Ross, watch stuff, jam. No accounts.</p>
+            <p class="gate-headline">Start with a hello.<br>See what happens.</p>
+            <p class="lede" data-gate-copy>Talk about whatever. Find your people. Draw, watch or jam together. Guest access. No account needed.</p>
+            <div class="gate-features" aria-label="Ways to hang out"><span><b>#</b> Open channels</span><span><b>↗</b> Creative rooms</span><span><b>@</b> Anyone can host</span></div>
+            <p class="gate-command"><span aria-hidden="true">&gt;</span> /join #stalemate<span class="terminal-cursor" aria-hidden="true">_</span></p>
+          </div>
+          <div class="gate-card">
+            <div class="window-chrome"><span><i aria-hidden="true"></i> CONNECT TO THE COMMUNITY</span><span aria-hidden="true">↵</span></div>
+            <h2>Pick a name. Pull up a chair.</h2>
             <label class="nickrow">Your nick
-                <span class="nickbox"><input data-nick maxlength="20" autocomplete="off" spellcheck="false" aria-label="Your nick" placeholder="Type a nickname… or roll one →"><button class="btn btn--ghost dice" type="button" data-reroll aria-label="Make me a random fun nickname">🎲 Make me a name</button></span>
+                <span class="nickbox"><input data-nick maxlength="20" autocomplete="off" spellcheck="false" aria-label="Your nick" placeholder="Type a nickname… or roll one →"><button class="btn btn--ghost dice" type="button" data-reroll aria-label="Make me a random fun nickname" title="Make me a random fun nickname">🎲 Make me a name</button></span>
             </label>
-            <button class="btn btn--big" type="button" data-enter>I’m 13+ and I agree · Let me in 🤘</button>
-            <p class="rules"><b>One rule: Don’t be a dick.</b> Swear all you want. You own what you post; the band can remove anything. <a href="../terms/" data-terms>House rules &amp; privacy</a></p>
+            <p class="small gate-hint">Remembered on this device, not reserved. Camera &amp; mic stay off.</p>
+            <button class="btn btn--big" type="button" data-enter disabled>I’m 13+ and I agree · Let me in ↗</button>
+            <p class="rules"><b>One rule: Don’t be a dick.</b> Swear all you want. You own what you post; site moderators can remove abusive content. <a href="../terms/" data-terms>House rules &amp; privacy</a></p>
+            <details class="entry-details"><summary>How session scrollback works</summary><p class="small">Chat starts when you join. Scrollback stays in this tab for your connected session.</p></details>
+            <p class="small gate-disclosure" data-ai-disclosure>When AI review is enabled, public text may go to OpenAI after posting to flag messages for our moderators. PMs, invite links, invite-only/key-protected/locked rooms, cameras and encrypted private rooms are excluded. Flagged, reported or held evidence stays up to 24 hours, separate from chat scrollback.</p>
+            <button class="btn btn--ghost" data-gate-guest hidden>Continue as guest</button>
             <p class="status" data-gate-status role="status"></p>
-            <div data-turnstile></div>
+          </div>
         </div>
     </section>
 
     <main class="irc" data-app hidden>
         <aside class="pane rooms" data-pane="rooms" aria-label="Rooms">
-            <h2>Start something</h2>
-            <div class="tiles" data-tiles>
-                <button class="tile" type="button" data-start="bobross"><b>🎨</b>Bob Ross paint-along</button>
-                <button class="tile" type="button" data-start="watch"><b>📺</b>Watch together</button>
-                <button class="tile" type="button" data-start="art"><b>🖌️</b>Art on camera</button>
-                <button class="tile" type="button" data-start="jam"><b>🎸</b>Jam (WebJam)</button>
-            </div>
-            <a class="private" data-private href="../">🔒 Private room instead (end-to-end encrypted) →</a>
-            <h2>Open rooms <span class="count" data-room-count>0</span></h2>
+            <button class="channel-home" type="button" data-lobby-home><b>#stalemate</b><span data-lobby-count>The main conversation</span></button>
+            <section class="presence" aria-label="Lobby presence">
+                <h2 data-presence-title>Getting connected</h2>
+                <p data-presence-detail>Everyone starts in the same conversation.</p>
+            </section>
+            <h2>Room directory <span class="count" data-room-count>0</span></h2>
+            <p class="small directory-hint">Find a conversation. Make something together.</p>
+            <div class="directory-controls"><label class="small"><span class="sr-only">Show</span><select data-room-filter aria-label="Room directory"><option value="active">Active now</option><option value="registered">Registered rooms</option><option value="mine">My rooms</option></select></label>
+            <label class="small"><span class="sr-only">Find a room</span><input data-room-search type="search" maxlength="40" aria-label="Find a room" placeholder="Find a room…"></label></div>
+            <a class="private" data-owner-signin href="#">Sign in with email to keep a room</a>
+            <button class="btn btn--small btn--ghost" data-owner-signout hidden>Continue as guest</button>
             <ul class="roomlist" data-roomlist></ul>
-            <p class="empty" data-rooms-empty>No rooms yet. Tap a tile and you’re the host.</p>
+            <p class="empty" data-rooms-empty>No rooms yet. Stay for a chat, or be the first to start one.</p>
+            <h2 class="start-heading">Make room for something</h2>
+            <p class="small creation-hint">Pick a starting point. You’re the host.</p>
+            <div class="tiles" data-tiles>
+                <button class="tile tile-chat" type="button" data-start="chat"><b aria-hidden="true">#</b><strong>Start a chat channel</strong><span>Your name. Your corner of the internet.</span></button>
+                <button class="tile" type="button" data-start="art"><b aria-hidden="true">✎</b><strong>Draw together</strong><span>One canvas. Everyone’s ideas.</span></button>
+                <button class="tile" type="button" data-start="watch"><b aria-hidden="true">▷</b><strong>Watch together</strong><span>Same video. Same moment.</span></button>
+                <button class="tile" type="button" data-start="bobross"><b aria-hidden="true">◒</b><strong>Paint along</strong><span>Bob Ross + a shared canvas.</span></button>
+                <button class="tile" type="button" data-start="jam"><b aria-hidden="true">≋</b><strong>Jam (WebJam)</strong><span>Bring a riff. Find your band.</span></button>
+            </div>
+            <details class="room-details"><summary>About hosting &amp; keeping a room</summary><p class="small">Anyone can host a temporary room. Sign in with email to keep its name across visits. Registered rooms expire after 90 days without an owner or verified co-host visit. You can stay in #stalemate while a room is open. Cameras are always optional.</p></details>
+            <a class="private private-invite" data-private href="../">↗ Encrypted private room</a>
         </aside>
 
         <section class="pane chat" data-pane="chat" aria-label="Chat">
             <nav class="tabs" data-tabs role="tablist"></nav>
             <div class="topic" data-topic></div>
+            <p class="network-note" data-network-note role="status" hidden></p>
+            <section class="lobby-welcome" data-lobby-welcome aria-label="Conversation starters">
+                <div class="welcome-symbol" aria-hidden="true">#</div><div class="welcome-copy"><b data-welcome-title>Make yourself at home.</b><p>Chat starts here, when you join. Say hello or just settle in.</p>
+                <div class="conversation-starters">
+                    <button type="button" data-prompt="Hey everyone, I’m new here. ">Say hello</button>
+                    <button type="button" data-prompt="What’s everyone making or working on? ">What are you making?</button>
+                    <button type="button" data-prompt="Anyone up for drawing something together? ">Find a collaborator</button>
+                </div>
+                </div>
+            </section>
             <div class="roombar" data-roombar hidden>
                 <span class="modes" data-modes></span>
-                <button class="btn btn--small" type="button" data-cam aria-pressed="false">📷 Camera (18+)</button>
+                <button class="btn btn--small btn--ghost" type="button" data-cam aria-pressed="false">📷 Camera (18+)</button>
                 <button class="btn btn--small btn--ghost op-only" type="button" data-roomtools>@ Host tools</button>
                 <button class="btn btn--small btn--ghost" type="button" data-leave>Leave</button>
+                <span class="small host-status" data-host-status></span>
             </div>
             <div class="jam" data-jam hidden>
                 <p><b>Music runs in the WebJam desktop app</b> (Jamulus under the hood) so the timing is tight. <b>Plug in Ethernet</b> — Wi-Fi adds lag and dropouts.</p>
                 <div class="jam-actions">
                     <a class="btn" data-jam-desktop href="#" hidden>Open in WebJam 🎸</a>
+                    <button class="btn" type="button" data-jam-copy hidden>Copy full WebJam invitation</button>
                     <span class="small" data-jam-wait>Waiting for the host to paste their WebJam invite.</span>
-                    <button class="btn btn--ghost" type="button" data-jam-web disabled title="Arrives with WebJam Web Join">Join in browser (soon, higher delay)</button>
+                    <button class="btn btn--ghost" type="button" data-jam-web disabled title="Browser joining is not configured for this beta">Browser join unavailable</button>
                 </div>
+                <p class="small">On a computer, copy the invite, open WebJam, choose Join, and paste it there. Opening the app directly is supported on Mac; Windows and Linux require pasting private invites. Phones can use this room’s chat while music runs on a computer. Invites may expire or admit one guest; ask the host for a fresh one if needed.</p>
+                <label class="small" data-jam-copy-fallback hidden>Copy this invite, then paste it into WebJam’s Join screen.
+                    <textarea data-jam-copy-value readonly aria-label="WebJam invitation to copy" autocomplete="off" spellcheck="false" rows="4"></textarea>
+                </label>
                 <form class="jam-paste op-only" data-jam-form>
-                    <input data-jam-link placeholder="Host: paste the webjam:// invite" aria-label="WebJam invite">
+                    <textarea data-jam-link placeholder="Host: paste the complete message from WebJam’s Copy Invite" aria-label="WebJam invitation" maxlength="8192" rows="3"></textarea>
                     <button class="btn btn--small" type="submit">Share</button>
                 </form>
             </div>
-            <div class="activity" data-activity hidden>
-                <p data-activity-copy></p>
-                <a class="btn" data-activity-link href="../">Open the canvas &amp; player</a>
-            </div>
-            <ol class="buffer" data-buffer aria-live="polite" aria-relevant="additions"></ol>
+            <details class="activity" data-activity hidden open>
+                <summary class="activity-heading"><span data-activity-title>Shared activity</span><span class="activity-toggle" aria-hidden="true"></span></summary>
+                <div class="act-stage" data-act-stage hidden>
+                    <div class="act-video" data-act-video hidden>
+                        <div class="yt-wrap"><div data-act-yt id="lobby-yt-player"></div></div>
+                        <button class="btn btn--small" type="button" data-act-tap hidden>Tap to play</button>
+                        <form class="act-load op-only" data-act-load>
+                            <input data-act-url placeholder="Paste a YouTube link" aria-label="YouTube URL">
+                            <button class="btn btn--small" type="submit">Load</button>
+                        </form>
+                        <div class="bob-picks op-only" data-bob-picks></div>
+                    </div>
+                    <div class="act-paint" data-act-paint hidden>
+                        <canvas data-act-canvas width="600" height="360" aria-label="Shared paint canvas"></canvas>
+                        <div class="act-tools">
+                            <span class="swatches" data-act-swatches></span>
+                            <button class="btn btn--small op-only" type="button" data-act-clear>Clear canvas</button>
+                        </div>
+                    </div>
+                    <div class="act-cams" data-act-tiles aria-label="Room cameras"></div>
+                    <p class="small" data-act-relay-status role="status"></p>
+                </div>
+            </details>
+            <ol class="buffer" data-buffer role="log" aria-label="Conversation" aria-live="polite" aria-relevant="additions" aria-atomic="false"></ol>
+            <button class="jump-new" data-new-messages type="button" hidden>New messages ↓</button>
             <div class="pmreq" data-pmreqs></div>
             <div class="quick" data-quick>
                 <button type="button" class="startroom" data-show="rooms">＋ Start a room</button>
@@ -85,15 +148,17 @@
             <form class="say" data-say>
                 <button class="slash" type="button" data-palette-open aria-label="Commands">/</button>
                 <input data-text maxlength="300" autocomplete="off" placeholder="Say something (or /help)" aria-label="Message">
-                <button class="btn" type="submit">Send</button>
+                <button class="btn" data-send type="submit">Send</button>
             </form>
+            <div class="chat-status"><span data-chat-context>#stalemate</span><span title="The last 300 lines received in this channel during this session. No earlier messages are replayed.">Session scrollback · /help</span></div>
         </section>
 
         <aside class="pane people" data-pane="people" aria-label="People">
-            <h2 data-people-title>People</h2>
+            <p class="eyebrow people-eyebrow">IN THIS CHANNEL</p><h2 data-people-title>People</h2>
             <ul class="nicks" data-nicks></ul>
             <label class="pmtoggle"><input type="checkbox" data-pm-off> Turn off PM requests</label>
-            <p class="small"><a href="../terms/">House rules</a> · Tap 🚩 on anything gross.</p>
+            <p class="small people-help"><a href="../terms/">House rules</a><br>Use 🚩 beside a message to report it.</p>
+            <div class="session-card"><span class="eyebrow">YOUR SESSION</span><b data-self-nick>Guest</b><span data-self-role>Guest access</span><span class="session-history">Chat starts when you join.</span></div>
         </aside>
 
         <nav class="phonetabs" aria-label="Sections">
@@ -103,6 +168,18 @@
         </nav>
     </main>
 
+    <dialog class="sheet" data-channel-dialog aria-labelledby="channel-dialog-title">
+        <h3 id="channel-dialog-title">Your own #channel</h3>
+        <p>Anyone can host. Join an existing channel, or create one and become its @ host.</p>
+        <form data-channel-form>
+            <label class="channel-label" for="channel-name">Channel name</label>
+            <input id="channel-name" data-channel-name maxlength="31" autocomplete="off" spellcheck="false" placeholder="#night-owls" aria-describedby="channel-name-hint channel-name-error" required>
+            <p class="small" id="channel-name-hint">2–30 letters, numbers or dashes. You can also type /join #night-owls in chat.</p>
+            <p class="status" id="channel-name-error" data-channel-error role="status"></p>
+            <div class="sheet-buttons"><button class="btn" type="submit">Join / create</button><button class="btn btn--ghost" type="button" data-channel-cancel>Cancel</button></div>
+        </form>
+        <p class="small">Give another member @ with /op nick before you leave. Rooms close after 10 minutes empty.</p>
+    </dialog>
     <dialog class="sheet" data-sheet>
         <h3 data-sheet-title></h3>
         <div class="sheet-buttons" data-sheet-buttons></div>
@@ -120,10 +197,17 @@
         <div class="sheet-buttons" data-palette-buttons></div>
         <button class="btn btn--ghost" type="button" data-palette-close>Close</button>
     </dialog>
+    <aside class="guest-check" data-guest-check hidden><p role="status">Checking your guest connection…</p><div data-turnstile></div></aside>
     <div class="toast" data-toast role="status" hidden></div>
     <!-- Page-level counts only: fixed event names, no query string (the preview key is stripped first), no referrer. -->
     <script data-goatcounter="https://stalemate.goatcounter.com/count" data-goatcounter-settings='{"no_onload": true}' async src="../../../js/count.js"></script>
     <script src="../names.js"></script>
+    <script src="../sync-core.js"></script>
+    <script src="../video-core.js"></script>
+    <script src="../turn-client.js"></script>
+    <script src="../bob-ross.js"></script>
+    <script src="discovery-core.js"></script>
+    <script src="lobby-room.js"></script>
     <script src="lobby.js"></script>
 </body>
 </html>

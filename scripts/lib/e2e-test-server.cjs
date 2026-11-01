@@ -56,8 +56,10 @@ async function assertStalemateTestOrigin(origin) {
     return assertStalemateHomepage(await response.text(), origin);
 }
 
-function hangoutRelayWsBase(origin) {
-    return new URL(HANGOUT_RELAY_PREFIX, origin).href.replace(/^http/, 'ws');
+function hangoutRelayWsBase(origin, namespace = '') {
+    const base = HANGOUT_RELAY_PREFIX.replace(/\/$/, '');
+    const path = namespace ? `${base}/${String(namespace).replace(/^\/+/, '').replace(/\/+$/, '')}` : base;
+    return new URL(`${path}/`, origin).href.replace(/^http/, 'ws').replace(/\/$/, '');
 }
 
 module.exports = {

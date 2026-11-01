@@ -323,6 +323,15 @@ describe('abuse caps', () => {
         const a = join('Alpha');
         L.message(a.id, 'x'.repeat(5000));
         expect(closed.at(-1)).toEqual([a.id, 4400]);
+
+        const b = join('Bravo');
+        const validAct = JSON.stringify({ t: 'act', ch: '#art-1', kind: 'rtc', sdp: { type: 'offer', sdp: 'v=0\r\n' + 'a=x'.repeat(4000) } });
+        L.message(b.id, validAct);
+        expect(closed.some(([id]) => id === b.id)).toBe(false);
+
+        const c = join('Charlie');
+        L.message(c.id, 'x'.repeat(20000));
+        expect(closed.at(-1)).toEqual([c.id, 4400]);
     });
     it('the lobby caps at 150 fans (fail closed)', () => {
         boot({ lobbyMax: 3 });
@@ -739,5 +748,31 @@ describe('stats are aggregate only', () => {
         expect(s.mod.kick).toBe(1);
         const text = JSON.stringify(s);
         expect(text).not.toMatch(/Alpha|dev-|ip1/);
+    });
+});
+
+describe('open-room paint + synced video (act frames)', () => {
+    const act = (u, ch, body) => L.message(u.id, JSON.stringify({ t: 'act', ch, ...body }));
+    it('relays strokes, clear-by-@ and host-only video', () => {
+        const host = join('Host');
+        const guest = join('Guest');
+        cmd(host, 'join', ['#art-sync']);
+        cmd(guest, 'join', ['#art-sync']);
+        inbox.set(host.id, []);
+        inbox.set(guest.id, []);
+        act(guest, '#art-sync', { kind: 'stroke', stroke: { id: 's1', color: '#009ee8', size: 4, pts: [[0.1, 0.2]] } });
+        expect(got(host).some((m) => m.t === 'act' && m.kind === 'stroke')).toBe(true);
+        act(guest, '#art-sync', { kind: 'clear' });
+        expect(notices(guest)).toMatch(/Only @ can clear/);
+        act(host, '#art-sync', { kind: 'clear' });
+        expect(got(guest).some((m) => m.t === 'act' && m.kind === 'clear')).toBe(true);
+        cmd(host, 'join', ['#watch-sync']);
+        cmd(guest, 'join', ['#watch-sync']);
+        inbox.set(host.id, []);
+        inbox.set(guest.id, []);
+        act(guest, '#watch-sync', { kind: 'video', source: { kind: 'yt', id: 'oh5p5f5_-7A' }, playing: true, pos: 3 });
+        expect(got(host).some((m) => m.t === 'act' && m.kind === 'video')).toBe(false);
+        act(host, '#watch-sync', { kind: 'video', source: { kind: 'yt', id: 'oh5p5f5_-7A' }, playing: true, pos: 3 });
+        expect(got(guest).some((m) => m.t === 'act' && m.kind === 'video')).toBe(true);
     });
 });
