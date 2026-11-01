@@ -69,9 +69,10 @@ export function createHangoutRelay({ previewKey = 'local-preview-key-0001', orig
             catch { pendingAdmission.delete(id); return reject(503, 'storage'); }
             if (!verdict.ok) { pendingAdmission.delete(id); return reject(verdict.status, verdict.reason); }
             if (socket.destroyed) { pendingAdmission.delete(id); enqueue(() => lobby.disconnect(id)).catch(() => {}); return; }
+            const cookiePath = req.deviceCookiePath || '/';
             const onUpgradeHeaders = (headers, upgradeReq) => {
                 if (upgradeReq !== req) return;
-                headers.push(`Set-Cookie: ${deviceCookie(token)}`);
+                headers.push(`Set-Cookie: ${deviceCookie(token, { path: cookiePath })}`);
                 wss.off('headers', onUpgradeHeaders);
             };
             wss.on('headers', onUpgradeHeaders);

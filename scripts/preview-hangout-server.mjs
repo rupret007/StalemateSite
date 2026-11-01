@@ -128,6 +128,7 @@ export async function startPreview({ port = 4387, statePath = defaultPreviewStat
         const match = sessionRoute(url.pathname, 'relay');
         if (!match || !activeSession(match[1])) return reject();
         req.previewSession = activeSession(match[1]);
+        req.deviceCookiePath = `${PREFIX}/relay/${match[1]}/`;
         url.pathname = match[2] || '/';
         if (!['/lobby', '/lobby-owner', '/lobby-admin', '/room'].includes(url.pathname)) return reject();
         relay.handleUpgrade(req, socket, head, url).catch(() => socket.destroy());

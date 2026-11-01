@@ -90,11 +90,12 @@ function cookiePart(header, name) {
 }
 export function deviceFromCookie(request) {
     const header = request?.headers?.get ? request.headers.get('Cookie') : '';
-    const value = cookiePart(header, HANGOUT_DEV_COOKIE);
-    return value || null;
+    return cookiePart(header, HANGOUT_DEV_COOKIE) || cookiePart(header, 'hangout-dev') || null;
 }
-export function deviceCookie(token) {
-    return `${HANGOUT_DEV_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${Math.floor(DEVICE_TOKEN_TTL_MS / 1000)}`;
+export function deviceCookie(token, { path = '/' } = {}) {
+    const maxAge = Math.floor(DEVICE_TOKEN_TTL_MS / 1000);
+    if (path === '/') return `${HANGOUT_DEV_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge}`;
+    return `hangout-dev=${token}; Path=${path}; HttpOnly; SameSite=Strict; Max-Age=${maxAge}`;
 }
 // Daily IP hash. No raw IP is ever stored.
 export async function ipHash(ip, key, now = Date.now()) {

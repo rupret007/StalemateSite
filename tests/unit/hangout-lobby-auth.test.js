@@ -78,6 +78,14 @@ describe('device ids and IP hashing', () => {
         expect(deviceFromCookie(req)).toBe(tok);
         expect(deviceFromCookie(new Request('https://w.example/lobby'))).toBeNull();
     });
+    it('reads session-scoped preview device cookies', async () => {
+        const id = newDeviceId();
+        const tok = await signDevice(id, KEY);
+        const scoped = deviceCookie(tok, { path: '/__preview/relay/abc/' });
+        expect(scoped.startsWith('hangout-dev=')).toBe(true);
+        const req = new Request('https://w.example/lobby', { headers: { Cookie: scoped.split(';')[0] } });
+        expect(deviceFromCookie(req)).toBe(tok);
+    });
     it('IP hash is daily, keyed and never contains the IP', async () => {
         const a = await ipHash('203.0.113.9', KEY, now);
         expect(a).not.toContain('203');
