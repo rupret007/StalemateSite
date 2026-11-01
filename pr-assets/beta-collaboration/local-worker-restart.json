@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "sourceCommit": "11acab0b27594da3a85957502ec97bb5dbd44ee1",
+  "startedAt": "2026-10-19T09:30:00.126Z",
+  "status": "passed",
+  "scope": "Two owned normal guest Chromium contexts, a guest-founded temporary art channel, and a third late guest on one Mac, through the actual local protected beta entry and real SQLite-backed workerd processes. Short local process restart only; not hosted/cloud restart, real Access, verified ownership/co-host recovery, physical devices, media, provider availability, schema rollback, or power-loss/crash durability.",
+  "toolVersions": {
+    "wrangler": "4.151.1",
+    "miniflare": "5.20261012.1-beta",
+    "workerd": "1.20261012.1"
+  },
+  "processRestart": {
+    "method": "Verified owned process-group SIGTERM; verified individual SIGKILL only if needed for cleanup",
+    "generations": [
+      {
+        "generation": 1,
+        "wranglerPid": 93008,
+        "workerdPids": [
+          93016,
+          93018
+        ],
+        "termSent": true,
+        "forceKilledPids": [],
+        "processGroupTerminal": true,
+        "allRecordedWorkerdTerminal": true,
+        "actualWorkerdExecutableSha256": "2449d1a1404e54b832fd3265fd61803072438bf7559b7b28d491fd5f24a627bf",
+        "readyAt": "2026-10-19T09:30:02.642Z",
+        "stoppedAt": "2026-10-19T09:30:04.758Z"
+      },
+      {
+        "generation": 2,
+        "wranglerPid": 93061,
+        "workerdPids": [
+          93067,
+          93069
+        ],
+        "termSent": true,
+        "forceKilledPids": [],
+        "processGroupTerminal": true,
+        "allRecordedWorkerdTerminal": true,
+        "actualWorkerdExecutableSha256": "2449d1a1404e54b832fd3265fd61803072438bf7559b7b28d491fd5f24a627bf",
+        "readyAt": "2026-10-19T09:30:05.602Z",
+        "stoppedAt": "2026-10-19T09:30:09.837Z"
+      }
+    ],
+    "actualSignalsUsed": [
+      "SIGTERM"
+    ],
+    "fallbackForceKillCount": 0
+  },
+  "mainWorkDeadlineMs": 150000,
+  "mainDeadlineIncludingCleanupMs": 180000,
+  "hardDeadlineMs": 300000,
+  "checks": {
+    "exactSourceAndBuiltAssets": {
+      "sourceFileCount": 69,
+      "assetFileCount": 47,
+      "sourceArchiveSha256": "5321b9ee40fc0bf261ebf4bcfcfd6e99a97435bcb5331d414e19b39876f4be63",
+      "localConfigSha256": "f9b286f3016a71f81fc9bc2958a9b2aaf1c9ca88c1fdb5fea30c17d3c2f22ed8",
+      "backendUnchangedFrom": "f32d9d55f1038bd7bec22194df7abc87fda52d8a"
+    },
+    "beforeRestart": {
+      "normalGuestSessions": 2,
+      "naturalTemporaryFounder": true,
+      "ordinaryGuestDeniedBeforeGrant": true,
+      "deviceOpGranted": true,
+      "topicAndModesAcknowledged": true,
+      "actualPointerDrawingAcknowledged": true,
+      "earlierChatAcknowledged": true
+    },
+    "realProcessBoundary": {
+      "actualWorkerdObserved": true,
+      "firstGenerationTerminalBeforeSecondSpawn": true,
+      "ownedPortReleased": true,
+      "bothGuestsObservedDisconnect": true,
+      "distinctActualWorkerdPids": true
+    },
+    "afterRestart": {
+      "sameLocalSessionCookiesAccepted": true,
+      "sameDeviceTokens": true,
+      "freshConnections": true,
+      "explicitUiRejoin": true,
+      "settingsAndDrawingRestored": true,
+      "earlierChatAbsent": true,
+      "guestDeviceOpAuthorizesFreshMutation": true,
+      "localHealthStorageContinuity": true,
+      "expectedMissingAccessReasonsOnly": true,
+      "durableSessionCount": 2,
+      "connectionCountBefore": 2,
+      "connectionCountAfter": 4,
+      "shortDowntimeMs": 1588,
+      "intervalMeaning": "Restart/recovery interval including stop, startup, rejoin and checks; not a precisely measured service outage"
+    },
+    "lateGuest": {
+      "currentSettingsAndDrawingReceived": true,
+      "noPreJoinChat": true,
+      "noOpGrant": true,
+      "unauthorizedMutationDenied": true
+    }
+  },
+  "pageErrors": 0,
+  "requestGuard": {
+    "deniedNonlocalHttp": 0,
+    "deniedNonlocalWebSockets": 0,
+    "scope": "Browser HTTP and WebSocket attempts only, not packet-level observation of all tool subprocesses"
+  },
+  "credentials": "New random LOCAL-ONLY invite/HMAC/preview/ops values, never printed or copied to the receipt",
+  "deploymentPerformed": false,
+  "userChromeUsed": false,
+  "syntheticOwnerOrStaffUsed": false,
+  "providersDisabled": [
+    "Access",
+    "AI",
+    "TURN",
+    "Turnstile"
+  ],
+  "mediaCaptureRequested": false,
+  "browserAudioOutputMuted": true,
+  "tracesScreenshotsHarOrVideoRecorded": false,
+  "roomNamesNicknamesChatCookiesKeysFramesOrRequestUrlsRecorded": false,
+  "cleanup": {
+    "roomClosed": true,
+    "logouts": 3,
+    "assetDenied": 3,
+    "copiedCookieDenied": 3,
+    "offlineStable": 3,
+    "contextsClosed": 3,
+    "browserClosed": true,
+    "controlContextClosed": true,
+    "allOwnedProcessesGone": true,
+    "portReleased": true,
+    "confirmed": true
+  },
+  "elapsedMsIncludingCleanup": 9747,
+  "finishedAt": "2026-10-19T09:30:09.873Z",
+  "failedStage": null,
+  "failureCode": null,
+  "receiptKind": "Actual local protected Worker process restart with SQLite storage; not a hosted acceptance claim",
+  "frozenRunnerSha256": "a2e6124ad2e95d6286c37f404ae045c908e9604853c6fd1c4928b1055aa4bf95",
+  "originalPrivateReceiptSha256": "57ebba7125685d1c47c423c6cb424f73856536f61f5cd16bf89e17f887393d84",
+  "independentRootVerification": {
+    "sourceCommit": "11acab0b27594da3a85957502ec97bb5dbd44ee1",
+    "terminalStatus": "passed",
+    "sameRootRealSqliteFilesObserved": 14,
+    "allSqliteHeadersValid": true,
+    "workerGenerations": 2,
+    "allRecordedWranglerAndWorkerdPidsAbsent": true,
+    "ownedAcceptancePortClosed": true,
+    "hostedDeploymentPerformed": false
+  },
+  "documentation": [
+    "https://developers.cloudflare.com/workers/local-development/local-data/",
+    "https://developers.cloudflare.com/durable-objects/reference/environments/"
+  ],
+  "acceptanceLimits": [
+    "Local workerd with the actual protected beta code and local SQLite; no Cloudflare hosted process restart",
+    "Normal unverified guests and naturally granted device ops; no real Access, persistent-account ownership recovery or verified co-host",
+    "Temporary room restored during a short downtime inside its normal ten-minute empty-room window",
+    "No transport continuity claim: actual old sockets disconnected, new connections formed and visitors explicitly rejoined",
+    "Graceful owned process shutdown/restart, not crash, power loss, schema-changing rollback, provider availability or physical/network acceptance"
+  ],
+  "probeExplicitlyLoadedHostedOrUserCredentials": false,
+  "probeModifiedStaticSourceResponses": false,
+  "independentEvidenceReview": "Read-only source/receipt audit clean for short graceful local process recovery only; no additional execution."
+}

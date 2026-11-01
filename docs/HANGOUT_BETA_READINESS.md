@@ -35,7 +35,8 @@ protected Cloudflare beta, with separate actual visitor browser contexts.
 | Camera/TURN and cost controls | Two invited guests on one Mac exchanged decoded synthetic-camera video through the deployed beta, then passed capture-off, passive reconnect and logout cleanup. Consent, credential expiry/refresh, failure fallback and serialized usage/rate accounting pass provider fixtures. A separate read-only account-wide analytics query returned zero October TURN egress bytes. | Physical cameras, separate networks and forced relay remain unverified. TURN is off; beta issuer/analytics credentials and shared allocation are missing. The zero sample does not establish remaining free allowance or billing; admission estimates are not a billing cap. |
 | Mobile usability | All repository browser checks passed, including WebKit phone projects. Hosted 375/390px captures have no page overflow, wrapping text, 16px input and visible Send. | Real iPhone Safari keyboard, Access redirects, camera/audio and background/resume are unverified. |
 | IRC history/reconnect | Hosted newcomers saw no earlier messages; original live connections retained scrollback during idle. Exact-connection PM consent cannot transfer to a reconnect or another same-device tab. | Real device/network interruption acceptance. No transcript archive or pre-join history is introduced. |
-| Compatible rollback/recovery | Historical Cloudflare rollback/restoration retained two real lobby sockets, scrollback and drafts; newcomers received no backlog. A private [pinned recovery package](../pr-assets/beta-collaboration/recovery-b111bb2.json) now retains both watch privacy fixes and current backend/config, with all 114 source/asset payloads and an offline rebuild verified. | The package was not deployed and contains no live data or credentials. A separate temporary-room deployment rehearsal preserved guest-op permissions, settings and drawing. Registered-room acceptance, forced restart, schema-changing rollback and health continuity remain unverified. Raw versions before `b111bb2` reintroduce the demonstrated watch URL exposure; pre-operations versions can also return health 401. |
+| Worker process restart | An [actual local workerd restart](../pr-assets/beta-collaboration/local-worker-restart.json) retained normal guest sessions, temporary art-room settings, exact drawing and a granted device op. A fresh guest received current activity without earlier chat and could not change the topic. All three logouts and copied-cookie revocation checks passed. | This is graceful local process recovery during a short downtime inside the ten-minute temporary-room lifetime. Hosted restart, real Access/registered-account recovery, crash/power loss, longer downtime and schema-changing rollback remain unverified. |
+| Compatible rollback/recovery | Historical Cloudflare rollback/restoration retained two real lobby sockets, scrollback and drafts; newcomers received no backlog. A private [pinned recovery package](../pr-assets/beta-collaboration/recovery-b111bb2.json) now retains both watch privacy fixes and current backend/config, with all 114 source/asset payloads and an offline rebuild verified. | The package was not deployed and contains no live data or credentials. A separate temporary-room deployment rehearsal preserved guest-op permissions, settings and drawing. Registered-room acceptance, hosted forced restart, schema-changing rollback and health continuity remain unverified. Raw versions before `b111bb2` reintroduce the demonstrated watch URL exposure; pre-operations versions can also return health 401. |
 | Provider failures/full rooms | Automated failed quota/storage/JWKS/classifier/relay responses, room/session limits and retry behavior pass. Missing Access fails closed on the hosted beta. A [prepared YouTube recovery fix](../pr-assets/beta-collaboration/watch-loader.json) handles failed API downloads, player readiness deadlines and provider errors with local explicit retry; controlled loopback checks pass. | The YouTube candidate is not deployed during the natural expiry observation. Complete hosted controlled-failure recovery and the shared TURN budget drill; fixtures do not establish external provider availability. |
 | Operational checks | Actual bearer-only hosted health reads preserve admission counters and exclude visitor content. This Mac's five-minute LaunchAgent completed live probes; actual local failure/recovery notification submissions and deduplication passed a controlled fixture. | Mac must be awake, online and logged in. Provider billing, availability, storage writes and independent external alert coverage are not established by these checks. |
 | Handoff | Private access file, onboarding, moderator guide, deployment/rollback guidance and sanitized hosted receipts exist. | Complete the remaining provider/device checks and record reviewer acceptance before visitor invitations. |
@@ -133,7 +134,11 @@ acceptance.
   loader cases and ten relevant desktop/phone checks now pass in targeted
   runs. Three existing private checks explicitly wait for the host player
   before calling its API; their timeouts and drift limits stay unchanged.
-  The corrected full CI gate remains pending; the original failures are retained.
+  The corrected [push CI](https://github.com/rupret007/StalemateSite/actions/runs/39230423122)
+  passed all 575 unit and 225 browser checks directly. [PR CI](https://github.com/rupret007/StalemateSite/actions/runs/39230428352)
+  passed 575 units and 224 browser checks directly; one existing iPhone SE game
+  share-height assertion passed on retry. All eleven loader cases passed directly
+  in both runs, with no skips or final failures. The original failures are retained.
   Independent review also caught Bob controls accessing a retired player; they
   now use current shared intent while a replacement loads. The existing iframe
   privacy, autoplay and synchronization checks pass. The first diagnostic remains
@@ -147,6 +152,26 @@ acceptance.
   These are controlled loopback faults, not a real provider outage or hosted,
   physical-device, mobile or separate-network candidate acceptance. The hosted
   source remains unchanged during the natural eight-hour expiry observation.
+
+- [Actual local Worker process restart](../pr-assets/beta-collaboration/local-worker-restart.json):
+  exact source `11acab0` ran through the real protected beta entry and local
+  SQLite-backed workerd. Two normal guests created a temporary art room,
+  acknowledged drawing and settings, and granted a guest device op. The first
+  process group exited before distinct Worker processes started against the
+  same storage. The original cookies and device tokens remained valid on fresh
+  connections; explicit room rejoin restored settings and the exact drawing.
+  The delegated guest changed the topic after restart. A third guest received
+  current activity without earlier chat, had no host grant, and its topic change
+  was denied. Founder close, all three normal logouts, copied-cookie HTTP 401
+  checks and stable offline states passed. The run finished in 9.747 seconds
+  with zero page errors or nonlocal browser requests. Independent checks found
+  all recorded test processes gone and the port closed. Source and built assets
+  were independently compared to Git before execution. This used a separate
+  [local Durable Objects environment](https://developers.cloudflare.com/durable-objects/reference/environments/)
+  and new local-only keys, with Access, AI, TURN and Turnstile disabled. It proves
+  short graceful local process recovery, not hosted restart, hibernating socket
+  continuity, registered ownership, real Access, crash/power-loss durability,
+  physical devices or separate networks. No hosted deployment occurred.
 
 - [Initial-offer arbitration](../pr-assets/beta-collaboration/initial-offer-arbitration.json):
   when both peers already publish media, one defers its first offer while

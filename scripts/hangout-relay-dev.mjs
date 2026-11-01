@@ -5,7 +5,7 @@ import http from 'node:http';
 import { WebSocketServer } from 'ws';
 import { admit, createBucket, limitsFrom, validFrame, originAllowed, previewKeyOk } from '../hangout-worker/src/core.mjs';
 import { createLobby } from '../hangout-worker/src/lobby-core.mjs';
-import { accountId, ipHash, newDeviceId, signDevice, verifyDevice } from '../hangout-worker/src/auth.mjs';
+import { accountId, deviceCookie, deviceFromCookie, ipHash, newDeviceId, signDevice, verifyDevice } from '../hangout-worker/src/auth.mjs';
 
 const DEV_HMAC = 'local-dev-only-hmac-key-not-a-secret-000';
 
@@ -58,8 +58,9 @@ export function createHangoutRelay({ previewKey = 'local-preview-key-0001', orig
                 if (!devAdminKey || !previewKeyOk(url.searchParams.get('devadmin'), devAdminKey)) return reject(403, 'access');
                 role = ['owner', 'moderator'].includes(url.searchParams.get('as')) ? url.searchParams.get('as') : 'band';
             }
-            let dev = await verifyDevice(url.searchParams.get('dev'), DEV_HMAC);
-            const token = dev ? null : await signDevice((dev = newDeviceId()), DEV_HMAC);
+            let dev = await verifyDevice(deviceFromCookie({ headers: { get: (name) => (name === 'Cookie' ? req.headers.cookie || '' : '') } }), DEV_HMAC);
+            if (!dev) dev = newDeviceId();
+            const token = await signDevice(dev, DEV_HMAC);
             const iph = await ipHash(resolveIdentity ? req.socket.remoteAddress : req.headers['x-test-ip'] || url.searchParams.get('testip') || req.socket.remoteAddress, DEV_HMAC);
             const id = `c${(lobbySeq += 1)}`;
             pendingAdmission.set(id, []);
@@ -68,9 +69,16 @@ export function createHangoutRelay({ previewKey = 'local-preview-key-0001', orig
             catch { pendingAdmission.delete(id); return reject(503, 'storage'); }
             if (!verdict.ok) { pendingAdmission.delete(id); return reject(verdict.status, verdict.reason); }
             if (socket.destroyed) { pendingAdmission.delete(id); enqueue(() => lobby.disconnect(id)).catch(() => {}); return; }
+            const cookiePath = req.deviceCookiePath || '/';
+            const onUpgradeHeaders = (headers, upgradeReq) => {
+                if (upgradeReq !== req) return;
+                headers.push(`Set-Cookie: ${deviceCookie(token, { path: cookiePath })}`);
+                wss.off('headers', onUpgradeHeaders);
+            };
+            wss.on('headers', onUpgradeHeaders);
             return wss.handleUpgrade(req, socket, head, (ws) => {
                 lobbySockets.set(id, ws);
-                if (token) ws.send(JSON.stringify({ t: 'device', token }));
+                ws.send(JSON.stringify({ t: 'device' }));
                 for (const frame of pendingAdmission.get(id) || []) ws.send(JSON.stringify(frame));
                 pendingAdmission.delete(id);
                 ws.on('message', (data) => { enqueue(() => lobby.message(id, String(data))).catch(() => ws.close(4503, 'local storage')); });

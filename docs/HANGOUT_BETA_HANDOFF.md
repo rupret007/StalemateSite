@@ -212,6 +212,13 @@ invitation-version revocation, provider outages and full quotas. Redeploy the
 same compatible schema while a registered proof room exists, confirm recovery,
 and remove only the synthetic proof data. Do not delete other visitors' rooms.
 
+The [local Worker restart check](../pr-assets/beta-collaboration/local-worker-restart.json)
+passed with actual distinct workerd processes sharing local SQLite storage:
+normal guest sessions, a temporary art room, drawing and a delegated device op
+recovered. All three guests logged out and copied cookies were denied. This was
+a short graceful local restart with local-only keys; hosted registered-room,
+real Access, crash and schema-changing rollback acceptance remain separate.
+
 Automated WebKit phone viewports provide engine/layout coverage. They do not
 replace physical iPhone Safari checks for email redirects, keyboard, permissions,
 background/resume and real media. Record both types of evidence separately.
