@@ -103,14 +103,21 @@ async function main() {
         return hangoutRelays.get(namespace);
     };
 
-    const server = http.createServer((request, response) => {
-        if (request.method !== 'GET' && request.method !== 'HEAD') {
-            send(response, 405, 'Method Not Allowed', { Allow: 'GET, HEAD' });
+    const server = http.createServer(async (request, response) => {
+        const url = new URL(request.url, origin);
+        const urlPath = url.pathname;
+
+        if (urlPath === '/__test/hangout-device-cookie' && request.method === 'POST') {
+            const { signDevice, newDeviceId, deviceCookie } = await import('../hangout-worker/src/auth.mjs');
+            const token = await signDevice(newDeviceId(), 'local-dev-only-hmac-key-not-a-secret-000');
+            send(response, 204, undefined, { 'Set-Cookie': deviceCookie(token) });
             return;
         }
 
-        const url = new URL(request.url, origin);
-        const urlPath = url.pathname;
+        if (request.method !== 'GET' && request.method !== 'HEAD') {
+            send(response, 405, 'Method Not Allowed', { Allow: 'GET, HEAD, POST' });
+            return;
+        }
 
         const relayRoute = parseHangoutRelayPath(urlPath);
         if (relayRoute?.pathname === '/__test/modlog.json') {
