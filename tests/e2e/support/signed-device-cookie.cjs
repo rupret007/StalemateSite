@@ -1,21 +1,14 @@
 'use strict';
 
-const { createRequire } = require('node:module');
-const { signDevice, newDeviceId } = createRequire(__filename)('../../../hangout-worker/src/auth.mjs');
-
-const DEV_HMAC = 'local-dev-only-hmac-key-not-a-secret-000';
-
-async function signedDeviceToken() {
-    return signDevice(newDeviceId(), DEV_HMAC);
-}
-
 async function addSignedDeviceCookie(context, origin) {
-    const token = await signedDeviceToken();
-    const base = origin.replace(/\/$/, '');
+    if (!origin) throw new Error('origin required for device cookie fixture');
+    const { signDevice, newDeviceId } = await import('../../../hangout-worker/src/auth.mjs');
+    const token = await signDevice(newDeviceId(), 'local-dev-only-hmac-key-not-a-secret-000');
+    const base = origin.endsWith('/') ? origin : `${origin}/`;
     await context.addCookies([{
         name: '__Host-hangout-dev',
         value: token,
-        url: `${base}/`,
+        url: base,
         httpOnly: true,
         secure: true,
         sameSite: 'Strict',
@@ -24,4 +17,4 @@ async function addSignedDeviceCookie(context, origin) {
     return token;
 }
 
-module.exports = { addSignedDeviceCookie, signedDeviceToken, DEV_HMAC };
+module.exports = { addSignedDeviceCookie };

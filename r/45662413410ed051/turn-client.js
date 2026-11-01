@@ -26,6 +26,10 @@
                 if (!response.ok) {
                     let data = {};
                     try { data = await response.json(); } catch (_) { /* generic status only */ }
+                    if (response.status === 403 && data.reason === 'device') {
+                        onStatus('device-required');
+                        throw new Error('device');
+                    }
                     retryAt = data.reason === 'budget used'
                         ? Date.UTC(new Date(now()).getUTCFullYear(), new Date(now()).getUTCMonth() + 1, 1)
                         : now() + (response.status === 429 ? Math.max(30, Math.min(600, Number(data.retryAfter) || 600)) : 60) * 1000;

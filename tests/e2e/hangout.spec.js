@@ -806,9 +806,9 @@ test('camera and mic are opt-in with a plain explainer, then connect peer to pee
     expect(await host.evaluate(() => window.__hangout.av.stream)).toBeNull();
 });
 
-test('TURN servers are fetched before peer connections are opened', async ({ browser }) => {
+test('TURN servers are fetched before peer connections are opened', async ({ browser, baseURL }) => {
     const host = await openBrowser(browser);
-    await addSignedDeviceCookie(host.context(), testOrigin);
+    await addSignedDeviceCookie(host.context(), baseURL);
     await host.addInitScript(() => {
         const Orig = window.RTCPeerConnection;
         window.__hangoutPcIce = [];

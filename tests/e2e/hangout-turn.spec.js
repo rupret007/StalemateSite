@@ -33,10 +33,13 @@ test('camera and precheck require an explicit adult confirmation before requesti
 
 test('a direct invite without a lobby device makes no unauthenticated TURN request', async ({ page }) => {
     let requests = 0;
-    await page.route((url) => url.pathname === '/room-turn', async (route) => { requests++; await route.fulfill({ status: 403 }); });
+    await page.route((url) => url.pathname === '/room-turn', async (route) => {
+        requests++;
+        await route.fulfill({ status: 403, json: { iceServers: [], reason: 'device' } });
+    });
     await page.goto(roomUrl('&turn=/room-turn')); await enter(page);
-    await expect(page.locator('[data-turn-status]')).toContainText('Join the lobby once');
-    expect(requests).toBe(0);
+    await expect(page.locator('[data-turn-status]')).toContainText('Direct connections only. Join the lobby once');
+    expect(requests).toBe(1);
 });
 
 test('private session expiry stops capture, relay refresh and playback and clears connected content', async ({ page }) => {
@@ -64,9 +67,9 @@ test('private session expiry stops capture, relay refresh and playback and clear
         .toEqual({ ended: true, captureStopped: true, peers: 0, chat: 0, video: null, queued: 0 });
 });
 
-test('refresh replaces active peer configuration and restarts ICE without storing credentials', async ({ page }) => {
+test('refresh replaces active peer configuration and restarts ICE without storing credentials', async ({ page, baseURL }) => {
     await page.clock.install({ time: new Date() });
-    const device = await addSignedDeviceCookie(page.context(), testOrigin);
+    await addSignedDeviceCookie(page.context(), baseURL);
     const payloads = [];
     await page.route((url) => url.pathname === '/room-turn', async (route) => {
         payloads.push(route.request().postDataJSON());
