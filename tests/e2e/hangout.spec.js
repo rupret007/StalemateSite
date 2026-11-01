@@ -2,7 +2,6 @@
 const path = require('node:path');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
-const { addSignedDeviceCookie } = require('./support/signed-device-cookie.cjs');
 
 const SLUG = '45662413410ed051';
 const KEY = 'local-preview-key-0001';
@@ -806,9 +805,12 @@ test('camera and mic are opt-in with a plain explainer, then connect peer to pee
     expect(await host.evaluate(() => window.__hangout.av.stream)).toBeNull();
 });
 
-test('TURN servers are fetched before peer connections are opened', async ({ browser, baseURL }) => {
+test('TURN servers are fetched before peer connections are opened', async ({ browser }) => {
     const host = await openBrowser(browser);
-    await addSignedDeviceCookie(host.context(), baseURL);
+    await host.goto(`/r/${SLUG}/lobby/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`);
+    await host.fill('[data-nick]', 'Jeff');
+    await host.click('[data-enter]');
+    await expect(host.locator('[data-app]')).toBeVisible();
     await host.addInitScript(() => {
         const Orig = window.RTCPeerConnection;
         window.__hangoutPcIce = [];

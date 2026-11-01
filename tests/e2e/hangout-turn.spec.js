@@ -1,11 +1,17 @@
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
-const { addSignedDeviceCookie } = require('./support/signed-device-cookie.cjs');
 const KEY = 'local-preview-key-0001';
 test.use({ permissions: ['camera', 'microphone'], launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } });
 let testOrigin;
 test.beforeAll(async ({ baseURL }) => { testOrigin = baseURL; });
+const lobbyUrl = (extra = '') => `/r/45662413410ed051/lobby/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}${extra}`;
 const roomUrl = (extra = '') => `/r/45662413410ed051/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}${extra}`;
+async function enterLobby(page) {
+    await page.goto(lobbyUrl());
+    await page.fill('[data-nick]', 'Media tester');
+    await page.click('[data-enter]');
+    await expect(page.locator('[data-app]')).toBeVisible();
+}
 async function enter(page) {
     await page.fill('[data-name]', 'Media tester'); await page.click('[data-enter]');
     await expect(page.locator('[data-room]')).toBeVisible();
@@ -67,9 +73,9 @@ test('private session expiry stops capture, relay refresh and playback and clear
         .toEqual({ ended: true, captureStopped: true, peers: 0, chat: 0, video: null, queued: 0 });
 });
 
-test('refresh replaces active peer configuration and restarts ICE without storing credentials', async ({ page, baseURL }) => {
+test('refresh replaces active peer configuration and restarts ICE without storing credentials', async ({ page }) => {
     await page.clock.install({ time: new Date() });
-    await addSignedDeviceCookie(page.context(), baseURL);
+    await enterLobby(page);
     const payloads = [];
     await page.route((url) => url.pathname === '/room-turn', async (route) => {
         payloads.push(route.request().postDataJSON());
