@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from '../src/index.mjs';
 import { HangoutTurnBudget, TURN_TTL } from '../src/turn.mjs';
-import { newDeviceId, signDevice } from '../src/auth.mjs';
+import { newDeviceId, signDevice, deviceCookie } from '../src/auth.mjs';
 
 const ROOM = 'a'.repeat(64);
 const env = {
@@ -53,6 +53,16 @@ describe('TURN public endpoint', () => {
         expect(JSON.parse(init.body)).toEqual({ ttl: 600 });
         expect(JSON.parse(upstream.mock.calls[0][1].body).variables).toEqual({ account: env.HANGOUT_CF_ACCOUNT_ID, from: '2026-10-01', to: '2026-10-16' });
         expect(JSON.stringify([...store.values()])).not.toContain('test-credential');
+    });
+    it('accepts a signed device from the HttpOnly cookie when the body omits device', async () => {
+        const signed = await signDevice(newDeviceId(), env.HANGOUT_HMAC_KEY);
+        const binding = { idFromName: (name) => name, get: () => ({ fetch: (url, init) => budget.fetch(new Request(url, init)) }) };
+        const res = await worker.fetch(new Request('https://relay.example/turn', {
+            method: 'POST',
+            headers: { Origin: 'https://stalemate.band', Cookie: deviceCookie(signed).split(';')[0] },
+            body: JSON.stringify({ room: ROOM, preview: env.HANGOUT_PREVIEW_KEY })
+        }), { ...env, TURN_BUDGET: binding });
+        expect(res.status).toBe(200);
     });
     it.each(['analytics', 'credentials'])('refuses a %s redirect without following it or returning credentials', async (stage) => {
         upstream.mockImplementation(async (url, options) => {

@@ -376,7 +376,7 @@
                 const room = [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
                 turnClient = window.HangoutTurn.createTurnClient({
                     url: turnUrl, preview: previewKey, room,
-                    getDevice: () => { try { return localStorage.getItem('hangout-dev'); } catch (_) { return ''; } },
+                    getDevice: () => '',
                     onChange: (ice) => {
                         if (generation !== roomGeneration) return;
                         state.ice = ice;
