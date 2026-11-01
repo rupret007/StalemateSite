@@ -372,7 +372,9 @@
         replaying = false;
         const r = room();
         if (r) {
-            if (prev !== key && c && c.kind !== 'lobby' && c.kind !== 'jam') r.onJoin(c, c.actSnap);
+            const needJoin = c && c.kind !== 'lobby' && c.kind !== 'jam'
+                && (prev !== key || window.__lobbyRoom?.state?.ch !== key);
+            if (needJoin) r.onJoin(c, c.actSnap);
             else if (prev !== key && (!c || c.kind === 'lobby' || c.kind === 'jam')) r.onLeave();
         }
         drawTabs(); drawChan();
@@ -415,16 +417,28 @@
         const key = app.active;
         const c = store(key);
         const isPm = key.startsWith('pm:');
+        let actKind = c && c.kind;
+        if (c && !actKind && c.name) {
+            for (const k of ['bobross', 'watch', 'art', 'jam']) {
+                if (c.name === `#${k}` || c.name.startsWith(`#${k}-`)) { actKind = k; c.kind = k; break; }
+            }
+        }
         $('[data-lobby-welcome]').hidden = key !== '#stalemate';
         $('[data-chat-context]').textContent = isPm ? `PM · ${key.slice(3)}` : key;
         $('[data-topic]').textContent = isPm ? `Private chat with ${key.slice(3)} · filtered · tap their name to block` : c ? `${c.topic || ''}` : '';
-        const room = !isPm && c && c.kind !== 'lobby';
+        const room = !isPm && c && actKind !== 'lobby';
         $('[data-roombar]').hidden = !room;
-        $('[data-jam]').hidden = !(room && c.kind === 'jam');
-        const showAct = room && ['bobross', 'watch', 'art'].includes(c.kind);
+        $('[data-jam]').hidden = !(room && actKind === 'jam');
+        const showAct = room && ['bobross', 'watch', 'art'].includes(actKind);
         $('[data-activity]').hidden = !showAct;
         $('[data-activity-title]').textContent = showAct ? c.kind === 'art' ? 'A canvas for everyone' : c.kind === 'bobross' ? 'A little paint. A little Bob Ross.' : 'Watching together' : 'Shared activity';
         $('[data-act-stage]').hidden = !showAct;
+        if (showAct) {
+            const paint = actKind === 'art' || actKind === 'bobross';
+            const video = actKind === 'bobross' || actKind === 'watch';
+            $('[data-act-paint]').hidden = !paint;
+            $('[data-act-video]').hidden = !video;
+        }
         const live = window.__lobbyRoom?.state;
         if (live && live.ch === key && ['art', 'bobross', 'watch'].includes(live.kind)) {
             $('[data-activity]').hidden = false;
