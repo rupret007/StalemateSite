@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 const KEY = 'local-preview-key-0001';
-const DEVICE = `${'a'.repeat(22)}.${'b'.repeat(32)}`;
+const DEVICE = `${'a'.repeat(22)}.${'b'.repeat(8)}.${'c'.repeat(32)}`;
 test.use({ permissions: ['camera', 'microphone'], launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } });
 let testOrigin;
 test.beforeAll(async ({ baseURL }) => { testOrigin = baseURL; });
