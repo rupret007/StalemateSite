@@ -53,6 +53,7 @@ jobs:
         run: npm test
 
       - name: Build the shared-community entry toolkit
+        shell: bash
         run: |
           set -euo pipefail
           node hangout-worker/tools/package-community-toolkit.mjs \
