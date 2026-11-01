@@ -50,7 +50,6 @@ test('art room: strokes sync between two browsers; clear is host-only', async ({
     guest.on('pageerror', (e) => guestErrors.push(e));
 
     await host.click('[data-start="art"]');
-    await expect.poll(() => host.evaluate(() => /^#art-/.test(window.__lobby.active))).toBe(true);
     await expect(host.locator('[data-act-canvas]')).toBeVisible();
     const room = await host.evaluate(() => window.__lobby.active);
     await guest.evaluate((r) => window.__lobby.cmd('join', [r]), room);

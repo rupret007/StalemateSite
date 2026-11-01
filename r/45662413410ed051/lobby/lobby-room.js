@@ -21,18 +21,19 @@
             load: $('[data-act-load]'),
             url: $('[data-act-url]'),
             bobPicks: $('[data-bob-picks]'),
-            tiles: $('[data-act-tiles]')
+            tiles: $('[data-act-tiles]'), relayStatus: $('[data-act-relay-status]')
         };
         const state = {
             ch: null, kind: null, clock: H.createClock(), room: H.emptyState(),
             myId: null, names: new Map(), camOn: false, ice: null,
             pcs: new Map(), stream: null, peers: new Set()
         };
-        const player = { yt: null, ytReady: null, kind: null, key: '', applying: 0 };
+        const player = { yt: null, ytReady: null, kind: null, key: '', readyKey: '', loading: null, applying: 0 };
+        let videoPublishTimer;
         let live = null;
         let pendingPts = [];
         let flushTimer = 0;
-        let videoSyncTimer = 0;
+        let roomGeneration = 0, captureVersion = 0, turnClient = null, turnInit = null;
 
         window.__lobbyRoom = { state, player }; // test hook
 
@@ -46,6 +47,10 @@
         const phone = V.isPhoneDevice({ ua: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints, coarse: mq('(pointer: coarse)'), fine: mq('(any-pointer: fine)'), cores: navigator.hardwareConcurrency });
 
         function teardown() {
+            roomGeneration += 1; captureVersion += 1;
+            clearTimeout(videoPublishTimer);
+            turnClient?.stop(); turnClient = null; turnInit = null; state.ice = null;
+            ui.relayStatus.textContent = '';
             state.ch = null;
             state.kind = null;
             state.room = H.emptyState();
@@ -55,15 +60,12 @@
             if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
             state.stream = null;
             state.camOn = false;
-            if (videoSyncTimer) window.clearInterval(videoSyncTimer);
-            videoSyncTimer = 0;
             ui.stage.hidden = true;
             ui.paint.hidden = true;
             ui.video.hidden = true;
-            $('[data-activity]').hidden = true;
             ui.tiles.replaceChildren();
             if (player.yt && player.yt.stopVideo) try { player.yt.stopVideo(); } catch (e) { /* */ }
-            player.key = '';
+            player.key = ''; player.readyKey = '';
         }
 
         function onJoin(chan, act) {
@@ -71,7 +73,6 @@
             if (!chan || !['art', 'bobross', 'watch'].includes(chan.kind)) return;
             state.ch = chan.name;
             state.kind = chan.kind;
-            $('[data-activity]').hidden = false;
             ui.stage.hidden = false;
             const paint = chan.kind === 'art' || chan.kind === 'bobross';
             const video = chan.kind === 'bobross' || chan.kind === 'watch';
@@ -142,16 +143,30 @@
         function setupCanvas() {
             if (!ui.swatches.dataset.ready) {
                 ui.swatches.dataset.ready = '1';
+                ui.swatches.dataset.color = H.COLORS[2];
+                const colorNames = {
+                    '#f4f0e6': 'Ivory', '#171410': 'Charcoal', '#009ee8': 'Sky blue',
+                    '#b5dc08': 'Lime', '#ed2765': 'Pink', '#c98a24': 'Ochre',
+                    '#7a4a2a': 'Brown', '#2f7d3a': 'Forest green', '#ffffff': 'White',
+                    '#0c0040': 'Indigo', '#021e44': 'Navy', '#000000': 'Black'
+                };
                 H.COLORS.slice(0, 12).forEach((color) => {
                     const b = document.createElement('button');
                     b.type = 'button';
                     b.className = 'swatch';
                     b.style.background = color;
                     b.dataset.color = color;
-                    b.addEventListener('click', () => { ui.swatches.dataset.color = color; });
+                    b.setAttribute('aria-label', `${colorNames[color] || color} brush`);
+                    b.setAttribute('aria-pressed', String(color === ui.swatches.dataset.color));
+                    b.title = `${colorNames[color] || color} (${color})`;
+                    b.addEventListener('click', () => {
+                        ui.swatches.dataset.color = color;
+                        ui.swatches.querySelectorAll('.swatch').forEach((swatch) => {
+                            swatch.setAttribute('aria-pressed', String(swatch === b));
+                        });
+                    });
                     ui.swatches.append(b);
                 });
-                ui.swatches.dataset.color = H.COLORS[2];
                 ui.clear.addEventListener('click', () => { if (isOp()) actSend({ kind: 'clear' }); });
                 const ctx = ui.canvas.getContext('2d');
                 const pos = (e) => {
@@ -249,19 +264,30 @@
 
         async function ensureSource(source) {
             const key = `${source.kind}:${source.id}`;
-            if (player.key === key) return;
+            if (player.key === key) return player.loading;
+            const previous = player.loading;
             player.key = key;
+            player.readyKey = '';
             player.kind = 'yt';
-            const YT = await loadYouTubeApi();
-            if (!player.yt) {
-                await new Promise((resolve) => {
-                    player.yt = new YT.Player(ui.yt, {
-                        videoId: source.id,
-                        playerVars: { playsinline: 1, rel: 0, origin: location.origin },
-                        events: { onReady: resolve, onStateChange: onYtState }
+            const generation = roomGeneration;
+            const loading = (async () => {
+                if (previous) await previous;
+                const YT = await loadYouTubeApi();
+                if (generation !== roomGeneration || !state.ch || player.key !== key) return;
+                if (!player.yt) {
+                    await new Promise((resolve) => {
+                        player.yt = new YT.Player(ui.yt, {
+                            videoId: source.id,
+                            playerVars: { playsinline: 1, rel: 0, origin: location.origin },
+                            events: { onReady: resolve, onStateChange: onYtState }
+                        });
                     });
-                });
-            } else player.yt.cueVideoById(source.id);
+                } else player.yt.cueVideoById(source.id);
+                if (generation === roomGeneration && player.key === key) player.readyKey = key;
+            })();
+            player.loading = loading;
+            try { await loading; }
+            finally { if (player.loading === loading) player.loading = null; }
         }
 
         function localTime() { return player.yt && player.yt.getCurrentTime ? player.yt.getCurrentTime() || 0 : 0; }
@@ -272,9 +298,12 @@
         function pauseLocal() { hold(() => { if (player.yt) player.yt.pauseVideo(); }); }
 
         async function syncToState(force) {
+            const requested = state.room.video;
+            if (!requested) return;
+            const generation = roomGeneration;
+            await ensureSource(requested.source);
             const v = state.room.video;
-            if (!v) return;
-            await ensureSource(v.source);
+            if (generation !== roomGeneration || !v || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
             const want = H.expectedPosition(v, state.clock.relayNow());
             if (force || H.needsCorrection(localTime(), want)) seekTo(want);
             if (v.playing && !localPlaying()) playLocal();
@@ -290,31 +319,72 @@
 
         function onYtState(ev) {
             if (!isOp() || Date.now() < player.applying || !state.room.video) return;
-            if (ev.data === 1 || ev.data === 2) actSend({ kind: 'video', source: state.room.video.source, playing: localPlaying(), pos: localTime() });
+            if (ev.data !== 1 && ev.data !== 2) return;
+            clearTimeout(videoPublishTimer);
+            const channel = state.ch;
+            videoPublishTimer = setTimeout(() => {
+                if (state.ch === channel && isOp() && state.room.video && Date.now() >= player.applying) {
+                    actSend({ kind: 'video', source: state.room.video.source, playing: localPlaying(), pos: localTime() });
+                }
+            }, 100);
         }
-        if (!videoSyncTimer) videoSyncTimer = window.setInterval(() => { if (!isOp() || !localPlaying()) syncToState(false); }, 2000);
+        setInterval(() => {
+            if (!isOp()) return syncToState(false);
+            const v = state.room.video;
+            if (!v || !player.yt || player.readyKey !== `${v.source.kind}:${v.source.id}` || Date.now() < player.applying) return;
+            // YouTube does not reliably emit a state change when a paused
+            // player is scrubbed. Publish the host's changed position instead
+            // of correcting the host back to the previous shared position.
+            const pos = localTime(), playing = localPlaying();
+            if (playing !== v.playing || H.needsCorrection(pos, H.expectedPosition(v, state.clock.relayNow()))) {
+                actSend({ kind: 'video', source: v.source, playing, pos });
+                H.apply(state.room, { type: 'video', source: v.source, playing, pos }, { t: state.clock.relayNow() });
+            }
+        }, 2000);
 
         /* ---- P2P video (cameras only) ---- */
+        const readDevice = () => { try { return localStorage.getItem('hangout-dev') || ''; } catch (_) { return ''; } };
         async function iceServers() {
-            if (state.ice) return state.ice;
-            state.ice = STUN;
-            const url = turnUrl;
-            if (!url) return state.ice;
-            try {
-                const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preview: previewKey, room: state.ch }) });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (Array.isArray(data.iceServers)) state.ice = STUN.concat(data.iceServers);
-                }
-            } catch (e) { /* STUN only */ }
-            return state.ice;
+            if (!turnUrl || !state.ch) return state.ice = STUN;
+            const generation = roomGeneration;
+            if (!turnInit) turnInit = (async () => {
+                const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`hangout-channel:${state.ch.toLowerCase()}`));
+                if (generation !== roomGeneration) return null;
+                const room = [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
+                turnClient = window.HangoutTurn.createTurnClient({
+                    url: turnUrl, preview: previewKey, room,
+                    getDevice: () => readDevice(),
+                    onChange: (ice) => {
+                        if (generation !== roomGeneration) return;
+                        state.ice = ice;
+                        for (const { pc } of state.pcs.values()) {
+                            try { pc.setConfiguration({ ...pc.getConfiguration(), iceServers: ice }); pc.restartIce(); } catch (_) { /* closed peer */ }
+                        }
+                    },
+                    onStatus: (status) => {
+                        if (generation !== roomGeneration) return;
+                        ui.relayStatus.textContent = status === 'ready' ? 'Camera relay available for connections that need it.'
+                            : 'Camera relay unavailable for now. Direct connections, chat and drawing remain available.';
+                    }
+                });
+                return turnClient;
+            })();
+            const client = await turnInit;
+            const ice = client ? await client.get() : STUN;
+            if (generation === roomGeneration) state.ice = ice;
+            return ice;
         }
 
         async function startCam() {
+            const generation = roomGeneration, version = ++captureVersion;
             await iceServers();
-            if (state.stream) return;
+            if (turnClient && window.HangoutTurn.signedDevice(readDevice())) await turnClient.get();
+            if (state.stream || !state.camOn || generation !== roomGeneration || version !== captureVersion) return;
             try {
                 const got = await navigator.mediaDevices.getUserMedia({ video: CAM, audio: false });
+                if (!state.camOn || generation !== roomGeneration || version !== captureVersion) {
+                    got.getTracks().forEach((track) => track.stop()); return;
+                }
                 state.stream = got;
                 for (const id of state.peers) if (!state.pcs.has(id)) openPc(id);
                 layoutTiles();
@@ -322,6 +392,7 @@
         }
 
         function stopCam() {
+            captureVersion += 1;
             if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
             state.stream = null;
             for (const id of [...state.pcs.keys()]) closePc(id);
@@ -343,7 +414,7 @@
             if (state.pcs.has(id) || id === state.myId) return;
             const pc = new RTCPeerConnection({ iceServers: state.ice || STUN });
             const polite = (state.myId || '') > id;
-            const entry = { pc, polite, makingOffer: false, stream: new MediaStream() };
+            const entry = { pc, polite, makingOffer: false, ignoreOffer: false, pendingIce: [], stream: new MediaStream() };
             state.pcs.set(id, entry);
             pc.onicecandidate = (e) => { if (e.candidate) actSend({ kind: 'rtc', to: id, ice: e.candidate.toJSON() }); };
             pc.ontrack = (e) => { entry.stream.addTrack(e.track); layoutTiles(); };
@@ -369,14 +440,21 @@
             try {
                 if (msg.sdp) {
                     const collision = msg.sdp.type === 'offer' && (entry.makingOffer || pc.signalingState !== 'stable');
-                    if (collision && !entry.polite) return;
+                    entry.ignoreOffer = collision && !entry.polite;
+                    if (entry.ignoreOffer) return;
                     await pc.setRemoteDescription(msg.sdp);
+                    for (const ice of entry.pendingIce.splice(0)) {
+                        try { await pc.addIceCandidate(ice); } catch (_) { /* stale negotiation */ }
+                    }
                     if (msg.sdp.type === 'offer') {
                         const answer = await pc.createAnswer();
                         await pc.setLocalDescription(answer);
                         actSend({ kind: 'rtc', to: from, sdp: pc.localDescription.toJSON() });
                     }
-                } else if (msg.ice) await pc.addIceCandidate(msg.ice);
+                } else if (msg.ice) {
+                    if (!pc.remoteDescription) { if (entry.pendingIce.length < 64) entry.pendingIce.push(msg.ice); }
+                    else await pc.addIceCandidate(msg.ice);
+                }
             } catch (e) { /* */ }
         }
 
@@ -408,7 +486,11 @@
             }
         }
 
-        return { onJoin, onChan, onCam, onAct, onLeave: teardown };
+        return { onJoin, onChan, onCam, onAct, onLeave: teardown, onDevice() {
+            if (!state.camOn) return;
+            if (turnClient) turnClient.get();
+            if (!state.stream) startCam();
+        } };
     }
 
     window.LobbyRoom = { attach };
