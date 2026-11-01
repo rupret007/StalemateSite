@@ -32,6 +32,7 @@
         let live = null;
         let pendingPts = [];
         let flushTimer = 0;
+        let videoSyncTimer = 0;
 
         window.__lobbyRoom = { state, player }; // test hook
 
@@ -54,6 +55,8 @@
             if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
             state.stream = null;
             state.camOn = false;
+            if (videoSyncTimer) window.clearInterval(videoSyncTimer);
+            videoSyncTimer = 0;
             ui.stage.hidden = true;
             ui.paint.hidden = true;
             ui.video.hidden = true;
@@ -287,7 +290,7 @@
             if (!isOp() || Date.now() < player.applying || !state.room.video) return;
             if (ev.data === 1 || ev.data === 2) actSend({ kind: 'video', source: state.room.video.source, playing: localPlaying(), pos: localTime() });
         }
-        setInterval(() => { if (!isOp() || !localPlaying()) syncToState(false); }, 2000);
+        if (!videoSyncTimer) videoSyncTimer = window.setInterval(() => { if (!isOp() || !localPlaying()) syncToState(false); }, 2000);
 
         /* ---- P2P video (cameras only) ---- */
         async function iceServers() {

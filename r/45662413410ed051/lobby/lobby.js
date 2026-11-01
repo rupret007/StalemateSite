@@ -115,9 +115,7 @@
             app.chans.set(m.ch.name, c);
             (m.history || []).forEach((h) => pushLine(m.ch.name, h.t === 'event' ? { ...h, event: true } : h));
             if (m.act) c.actSnap = m.act;
-            switchTo(m.ch.name);
-            const r = room();
-            if (r) r.onJoin(c, m.act);
+            switchTo(m.ch.name); // switchTo calls room.onJoin with actSnap
             break;
         }
         case 'chan': {
