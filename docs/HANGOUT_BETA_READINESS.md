@@ -27,7 +27,7 @@ protected Cloudflare beta, with separate actual visitor browser contexts.
 | Restricted real staff | The separate real staff callback succeeded through Access SSO, connected its moderation WebSocket and showed the exact synthetic report. Automated allowlist/signature/audience/expiry checks pass; no synthetic staff role exists in beta. | Jeff confirmed dismissing the identified report. Complete real denied-identity/device acceptance. |
 | Session lifecycle | Actual hosted logout closed lobby and private relay sockets in two profiles sharing a session; copied pre-logout cookies could not fetch assets or reconnect. Automated expiry, version revocation, multi-room retries and admission races pass. | A normal eight-hour guest expiry observation started October 19 at 08:00 UTC, with issued expiry at 16:00 UTC; no result yet. Real Access callback/expiry acceptance on devices remains separate. |
 | Reports and human review | A pre-idle message was durably acknowledged after 75 seconds with the same live sockets. The real staff queue displayed the exact synthetic report, and Jeff confirmed dismissing it. Durable evidence and review controls pass automated checks. Jeff is the confirmed sole initial reviewer; the hosted contact link is verified. | Jeff confirmed dismissal and observed removal. Independent reload persistence and review coverage/handoff remain to be accepted. |
-| Encrypted private-room abuse intake | A [prepared, not deployed staff-intake candidate](../pr-assets/beta-collaboration/private-staff-reports.json) lets a connected guest explicitly share a selected quote, claimed name and reason with staff, including a concern about the host. Ordinary private chat stays encrypted; the selected evidence is an unverified claim, excluded from AI and automatic punishment. Actual local protected guest cookies and native WebSockets reached the SQLite-backed queue; a graceful restart across two workerd generations retained the pending report and returned the same ID on a same-cookie, fresh-socket retry. | The hosted source still offers only the older encrypted host notice, without durable staff acknowledgement or a per-message staff report. Complete human/Karen review and hosted guest-to-real-staff submission/review acceptance after the original eight-hour expiry observation has a recorded terminal result. The local check does not establish real Access admission, human disposition or hosted restart. |
+| Encrypted private-room abuse intake | A [prepared, not deployed staff-intake candidate](../pr-assets/beta-collaboration/private-staff-reports.json) lets a connected guest explicitly share a selected quote, claimed name and reason with staff, including a concern about the host. Ordinary private chat stays encrypted; the selected evidence is an unverified claim, excluded from AI and automatic punishment. Actual local protected guest cookies and native WebSockets reached the SQLite-backed queue; a graceful restart across two workerd generations retained the pending report and returned the same ID on a same-cookie, fresh-socket retry. | The hosted source still offers only the older encrypted host notice, without durable staff acknowledgement or a per-message staff report. Complete exact-head Karen review and hosted guest-to-real-staff submission/review acceptance after the original eight-hour expiry observation has a recorded terminal result. The local check does not establish real Access admission, human disposition or hosted restart. |
 | Host controls and abuse limits | Hosted guests verified restricted-room admission and device-op handoff. A granted guest kept managing a temporary room across deployment and after its creator logged out. Automated room/PM consent, account/device limits, caps and emergency controls pass. | Run Jeff's authenticated incident/recovery drill; any additional staff need an explicit appointment and separate allowlists. |
 | Bounded AI assistance | Actual hosted guest text completed one provider review under a one-request daily cap. A second message reached the other guest while quota stayed at one and review was skipped. Both guests logged out; AI was restored off with the configured 100/day allowance. Automated queue/privacy/outage checks pass. | A separate owned synthetic-fiction test produced one real provider flagged counter with one additional reserved attempt. Exact saved AI queue visibility and human disposition remain unverified; keep AI off. |
 | Shared drawing | Actual browser drawing reached a separate guest; a fresh post-deployment visitor received the saved drawing. WebKit/Android touch drawing and reconnect checks pass. | Physical touch-device acceptance. |
@@ -61,7 +61,7 @@ acceptance.
   The guard reads existing memory status and exposes no evidence; it adds no
   storage write, cleanup, allowance spend or provider call. This is a read-only
   readiness signal after normal initialization, not an active write/provider
-  probe. It is not deployed; hosted acceptance and human/Karen review remain.
+  probe. It is not deployed; hosted acceptance and exact-head Karen review remain.
 
 - [Consented private-room staff reports](../pr-assets/beta-collaboration/private-staff-reports.json):
   this candidate is prepared for review and has not been deployed. A connected
@@ -89,7 +89,7 @@ acceptance.
   and all owned processes stopped. This is local persistence and transport
   evidence, not real Access, human review, hosted deployment, crash durability
   or physical-device acceptance. Hosted intake and human review remain pending
-  after the eight-hour observation and required human/Karen review. The older
+  after the eight-hour observation and required exact-head Karen review. The older
   hosted host-notice action does not provide this staff submission path.
 
 - [Private creative-room activity recovery](../pr-assets/beta-collaboration/private-activity-recovery.json):
@@ -117,7 +117,7 @@ acceptance.
   multipart fixture seeds canonical state before join, then uses actual source
   capture/sign/encrypt/relay and real pointer strokes across the held cut.
   No hosted deployment, physical Safari, separate-network or provider acceptance
-  is claimed. Human/Karen review and the wider readiness gates remain pending.
+  is claimed. Exact-head Karen review and the wider readiness gates remain pending.
 
 - [Private creative-room chat from join onward](../pr-assets/beta-collaboration/private-chat-history.json):
   source `ecc5dee` omits chat from host/guest activity snapshots, ignores legacy
@@ -570,15 +570,18 @@ Initial hosted receipts and the assessment are supplied in documentation PR #36
 stacked on #35. Subsequent evidence and installer progress are recorded in
 documentation PRs #40 and #43, with the reconnect receipt in #44.
 
-These are draft PRs. The repository's CI is the configured automated gate; no
-automated Karen review or protected-branch rule was found. Human approval is not
-inferred from passing tests, and nothing has been merged to `main`.
+PR draft states vary as the local automation runs. The required code-review
+gate is StoryPool's local Karen poller: a trusted PASS for the exact current
+head, green CI and two agreeing reviewers. A new push invalidates the previous
+PASS. There is no additional human PR approval requirement. See the
+[handoff/runbook](HANGOUT_BETA_HANDOFF.md#build-and-deploy-privately) for the
+private review-output hold and rollout limits. Nothing has been merged to `main`.
 
 Use [the handoff/runbook](HANGOUT_BETA_HANDOFF.md),
 [moderator guide](HANGOUT_MODERATOR_GUIDE.md),
 [health operations](HANGOUT_BETA_OPERATIONS.md), and
-[first-session plan](HANGOUT_BETA_FIRST_SESSION.md). Complete the human review,
-coverage and device acceptance gates before distributing visitor invitations. Broader discovery,
+[first-session plan](HANGOUT_BETA_FIRST_SESSION.md). Complete Karen review,
+moderator coverage and device acceptance before distributing visitor invitations. Broader discovery,
 events, AI conversation features and additional collaboration modes remain future
 work; they are not prerequisites for this bounded beta.
 
