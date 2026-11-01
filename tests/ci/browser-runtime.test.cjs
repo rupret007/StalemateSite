@@ -72,7 +72,7 @@ test('workflow binds lockfile, image and preflight without changing test or depl
     assert.equal(lock.packages['node_modules/playwright-core'].version, EXPECTED_VERSION);
     assert.match(workflow, /mcr\.microsoft\.com\/playwright:v1\.64\.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea/);
     assert.match(workflow, /PLAYWRIGHT_BROWSERS_PATH: \/ms-playwright/);
-    assert.match(workflow, /timeout-minutes: 35/);
+    assert.match(workflow, /timeout-minutes: 60/);
     assert.match(workflow, /Install Chromium and WebKit\n        timeout-minutes: 10/);
     assert.match(workflow, /node scripts\/ci-ubuntu-mirror\.cjs/);
     assert.match(workflow, /npx playwright install --with-deps chromium webkit/);
