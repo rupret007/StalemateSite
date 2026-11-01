@@ -116,6 +116,10 @@
             app.chans.set(m.ch.name, c);
             // Classic IRC: joining begins a fresh buffer; never render pre-join backlog.
             if (m.act) c.actSnap = m.act;
+            // Hello sends welcome before the #stalemate join frame. If the user already
+            // opened an activity room, do not switch back to the lobby and tear down paint.
+            const cur = store(app.active);
+            if (m.ch.name === '#stalemate' && cur && cur.kind !== 'lobby' && cur.kind !== 'jam') break;
             switchTo(m.ch.name); // switchTo calls room.onJoin with actSnap
             break;
         }
@@ -224,7 +228,7 @@
         const r = room();
         if (r) {
             if (prev !== key && c && c.kind !== 'lobby' && c.kind !== 'jam') r.onJoin(c, c.actSnap);
-            else if (!c || c.kind === 'lobby' || c.kind === 'jam') r.onLeave();
+            else if (prev !== key && (!c || c.kind === 'lobby' || c.kind === 'jam')) r.onLeave();
         }
         drawTabs(); drawChan();
         show('chat');
@@ -256,6 +260,7 @@
         $('[data-jam]').hidden = !(room && c.kind === 'jam');
         const showAct = room && ['bobross', 'watch', 'art'].includes(c.kind);
         $('[data-activity]').hidden = !showAct;
+        $('[data-act-stage]').hidden = !showAct;
         document.body.classList.toggle('am-op', !!(c && amOp(c)));
         if (room) {
             const m = c.modes;
