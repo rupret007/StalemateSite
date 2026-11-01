@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "kind": "selected-private-beta-worker-compilation",
+  "checkedAt": "2026-10-19T17:17:53.973075+00:00",
+  "sourceCommit": "c41896b12ba7743d4f362869d5ea3bc9709038b1",
+  "targetWorker": "stalemate-hangout-beta",
+  "archiveSha256": "15d37af478480833cd5502ba7820607d98c44eb7435dc3358f2266d7db878c47",
+  "selectedInputs": {
+    "committedSourceFiles": 72,
+    "builtBetaAssets": 49
+  },
+  "sealedPayloadFiles": 121,
+  "tools": {
+    "wrangler": "4.151.1",
+    "node": "v26.12.0"
+  },
+  "result": "passed-worker-dry-run",
+  "dryRun": true,
+  "networkDeniedByOsSandbox": true,
+  "authMaterialSuppliedByRunner": false,
+  "toolAuthFileAccessInstrumented": false,
+  "selectedInputFilesUnchanged": true,
+  "originalSealedPayloadUnchanged": true,
+  "workerBundle": {
+    "path": "beta-entry.js",
+    "bytes": 370822,
+    "sha256": "ef87dd1b3148b89f4ef5e54c69d9fe0451d54e4da8e9824af3b4141439e5cc1b"
+  },
+  "buildLogSha256": "c10231b407dded12c395764c11ff5ea339045c1d6f14f895902b109d4629be90",
+  "warnings": 0,
+  "errors": 0,
+  "configurationScope": "Tracked source defaults only; effective live controls and bindings were not reconciled.",
+  "acceptance": {
+    "hostedDeployment": false,
+    "karenApproval": false,
+    "liveBindings": false,
+    "naturalExpiry": false,
+    "realVisitorsOrDevices": false,
+    "turnOrNativeAudio": false
+  }
+}
