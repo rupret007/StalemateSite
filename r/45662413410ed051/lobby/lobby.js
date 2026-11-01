@@ -255,7 +255,6 @@
         $('[data-jam]').hidden = !(room && c.kind === 'jam');
         const showAct = room && ['bobross', 'watch', 'art'].includes(c.kind);
         $('[data-activity]').hidden = !showAct;
-        $('[data-act-stage]').hidden = !showAct;
         document.body.classList.toggle('am-op', !!(c && amOp(c)));
         if (room) {
             const m = c.modes;
