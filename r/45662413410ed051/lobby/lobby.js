@@ -687,6 +687,7 @@
     $('[data-cam-yes]').addEventListener('click', () => { if (!$('[data-adult]').checked) return toast('Tick the 18+ box first.'); send({ t: 'cam', ch: app.active, on: true, adult18: true }); return $('[data-cam-gate]').close(); });
     $('[data-cam-no]').addEventListener('click', () => $('[data-cam-gate]').close());
     $('[data-jam-form]').addEventListener('submit', (e) => { e.preventDefault(); const v = $('[data-jam-link]').value.trim(); if (v && cmd('jamlink', [v])) $('[data-jam-link]').value = ''; });
+    $('[data-jam-link]').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } });
     $('[data-jam-copy]').addEventListener('click', async () => {
         const c = store(app.active);
         const link = c?.kind === 'jam' && (c.jam?.invitation || c.jam?.desktop);
