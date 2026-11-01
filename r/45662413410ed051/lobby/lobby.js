@@ -19,6 +19,7 @@
     // GoatCounter: fixed, privacy-safe event names only (no nicks, no room names, no query string).
     const count = (event) => { try { if (window.goatcounter && window.goatcounter.count) window.goatcounter.count({ path: `hangout-${event}`, title: 'Hang Out', event: true, referrer: '' }); } catch (e) { /* analytics never breaks chat */ } };
     count('lobby-view');
+    const Discovery = window.HangoutDiscovery;
     const KIND_ICON = { lobby: '#', bobross: '🎨', watch: '📺', art: '🖌️', jam: '🎸' };
     const KIND_NAME = { bobross: 'Bob Ross paint-along', watch: 'Watch together', art: 'Art on camera', jam: 'Jam' };
     const WORDS = ['happy', 'little', 'gross', 'loud', 'feral', 'fuzzy', 'mighty', 'snotty', 'rad', 'grumpy', 'soggy', 'mosh'];
@@ -220,14 +221,14 @@
         if (c) c.unread = 0;
         $('[data-buffer]').replaceChildren();
         (c ? c.lines : []).forEach(appendLine);
-        drawTabs(); drawChan();
-        show('chat');
-        const buf = $('[data-buffer]'); buf.scrollTop = buf.scrollHeight;
         const r = room();
         if (r) {
             if (prev !== key && c && c.kind !== 'lobby' && c.kind !== 'jam') r.onJoin(c, c.actSnap);
             else if (!c || c.kind === 'lobby' || c.kind === 'jam') r.onLeave();
         }
+        drawTabs(); drawChan();
+        show('chat');
+        const buf = $('[data-buffer]'); buf.scrollTop = buf.scrollHeight;
     }
 
     function drawTabs() {
@@ -289,14 +290,18 @@
     function drawRooms() {
         const ul = $('[data-roomlist]');
         ul.replaceChildren();
-        $('[data-room-count]').textContent = String(app.rooms.length);
-        $('[data-rooms-empty]').hidden = app.rooms.length > 0;
-        for (const r of app.rooms) {
+        const rooms = Discovery.describeRooms(app.rooms, [...app.chans.keys()]);
+        $('[data-room-count]').textContent = String(rooms.length);
+        $('[data-rooms-empty]').hidden = rooms.length > 0;
+        for (const r of rooms) {
             const li = document.createElement('li');
             const b = document.createElement('button');
             b.type = 'button'; b.className = 'room';
+            b.dataset.room = r.name;
+            b.dataset.state = r.state;
+            b.disabled = !r.canJoin;
             const t = document.createElement('b'); t.textContent = `${KIND_ICON[r.kind]} ${r.title}`;
-            const s = document.createElement('span'); s.textContent = `${r.name} · ${r.count}/${r.max}${r.locked ? ' · 🔒 ask the host' : ''}${r.key ? ' · 🔑' : ''}`;
+            const s = document.createElement('span'); s.textContent = `${r.name} · ${r.count}/${r.max}${r.locked ? ' · 🔒 ask the host' : ''}${r.key ? ' · 🔑' : ''} · ${r.statusLabel}`;
             b.append(t, s);
             b.addEventListener('click', () => {
                 if (app.chans.has(r.name)) return switchTo(r.name);

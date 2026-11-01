@@ -1,5 +1,6 @@
 // Open lobby rooms: shared canvas, synced YouTube, 18+ camera gate (two browsers).
 const path = require('node:path');
+const { randomUUID } = require('node:crypto');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
@@ -14,10 +15,12 @@ test.use({
 test.skip(({ browserName }) => browserName !== 'chromium', 'Chromium carries the lobby open-room suite');
 test.describe.configure({ mode: 'serial' });
 
-let testOrigin;
-test.beforeAll(async ({ baseURL }) => { testOrigin = baseURL; });
+let relayWs;
+test.beforeEach(async ({ baseURL }) => {
+    relayWs = hangoutRelayWsBase(baseURL, `activities-${randomUUID()}`);
+});
 
-const lobbyUrl = () => `/r/${SLUG}/lobby/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`;
+const lobbyUrl = () => `/r/${SLUG}/lobby/?preview=${KEY}&relay=${encodeURIComponent(relayWs)}`;
 
 async function fan(browser, nick) {
     const ctx = await browser.newContext({ permissions: ['camera', 'microphone'] });
