@@ -675,7 +675,7 @@ export function createLobby({ now = () => Date.now(), send = () => {}, close = (
     }
 
     function create(c, name, key, titleText) {
-        const kind = Object.keys(KINDS).find((k) => name.startsWith(`#${k}`)) || 'watch';
+        const kind = Object.keys(KINDS).find((k) => name === `#${k}` || name.startsWith(`#${k}-`)) || 'watch';
         if (net.shield && !isBand(c)) return bot(c, 'Shield is on, so new rooms are paused. Try again later.', 'error');
         const listed = [...channels.values()].filter((x) => x.kind !== 'lobby').length;
         if (listed >= L.roomsListed) return bot(c, 'All 30 room slots are busy. Join one from the list.', 'error');
