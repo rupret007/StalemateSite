@@ -46,7 +46,8 @@ test('local tabs represent distinct visitors, with working room registration and
     const guest = await openProfile(page, 'Open a guest'); await enter(guest);
     expect(await owner.evaluate(() => __lobby.verified)).toBe(true);
     expect(await guest.evaluate(() => __lobby.verified)).toBe(false);
-    expect(await owner.evaluate(() => localStorage.getItem('hangout-dev'))).not.toBe(await guest.evaluate(() => localStorage.getItem('hangout-dev')));
+    expect(await owner.evaluate(() => localStorage.getItem('hangout-dev'))).toBeNull();
+    expect(await guest.evaluate(() => localStorage.getItem('hangout-dev'))).toBeNull();
     await owner.evaluate(() => __lobby.cmd('join', ['#browser-room']));
     await expect.poll(() => owner.evaluate(() => __lobby.active)).toBe('#browser-room');
     await owner.evaluate(() => __lobby.cmd('register', [], '#browser-room'));
