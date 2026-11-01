@@ -54,13 +54,15 @@
                 update(STUN.concat(ice));
                 onStatus('ready');
                 schedule(refreshAt);
-            } catch (_) {
+            } catch (err) {
                 if (!stopped) {
-                    expiresAt = 0; refreshAt = 0;
-                    retryAt = Math.max(retryAt, now() + 30000);
-                    update(STUN.slice());
-                    onStatus('direct-only');
-                    schedule(retryAt);
+                    if (err.message !== 'device') {
+                        expiresAt = 0; refreshAt = 0;
+                        retryAt = Math.max(retryAt, now() + 30000);
+                        update(STUN.slice());
+                        onStatus('direct-only');
+                        schedule(retryAt);
+                    }
                 }
             } finally { clearTimer(deadline); }
             return servers;
