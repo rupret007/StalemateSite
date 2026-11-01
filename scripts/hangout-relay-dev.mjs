@@ -5,7 +5,7 @@ import http from 'node:http';
 import { WebSocketServer } from 'ws';
 import { admit, createBucket, limitsFrom, validFrame, originAllowed, previewKeyOk } from '../hangout-worker/src/core.mjs';
 import { createLobby } from '../hangout-worker/src/lobby-core.mjs';
-import { accountId, deviceFromCookie, ipHash, newDeviceId, signDevice, verifyDevice } from '../hangout-worker/src/auth.mjs';
+import { accountId, deviceCookie, deviceFromCookie, ipHash, newDeviceId, signDevice, verifyDevice } from '../hangout-worker/src/auth.mjs';
 
 const DEV_HMAC = 'local-dev-only-hmac-key-not-a-secret-000';
 
@@ -69,6 +69,12 @@ export function createHangoutRelay({ previewKey = 'local-preview-key-0001', orig
             catch { pendingAdmission.delete(id); return reject(503, 'storage'); }
             if (!verdict.ok) { pendingAdmission.delete(id); return reject(verdict.status, verdict.reason); }
             if (socket.destroyed) { pendingAdmission.delete(id); enqueue(() => lobby.disconnect(id)).catch(() => {}); return; }
+            const onUpgradeHeaders = (headers, upgradeReq) => {
+                if (upgradeReq !== req) return;
+                headers.push(`Set-Cookie: ${deviceCookie(token)}`);
+                wss.off('headers', onUpgradeHeaders);
+            };
+            wss.on('headers', onUpgradeHeaders);
             return wss.handleUpgrade(req, socket, head, (ws) => {
                 lobbySockets.set(id, ws);
                 ws.send(JSON.stringify({ t: 'device' }));
