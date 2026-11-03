@@ -53,7 +53,7 @@ line and **not** authorized in Cursor sessions that forbid deploys.
 4. To test **Web Join music** after native host setup:
    - Mac host runs the qualified private-beta WebJam build (`private-beta` target).
    - Host: start music session → **Web Join → Allow a web guest** → **Copy web invite**.
-   - Paste the browser link in the Hang Out room invitation box → **Share** → guest
+   - Paste the browser link in the community Jam invitation box → **Share** → guest
      clicks **Join in browser** (see [HANGOUT_BROWSER_INVITATION_HANDOFF.md](HANGOUT_BROWSER_INVITATION_HANDOFF.md)).
    - Guest page: complete the first-run checklist (headphones, mic consent), then
      **Join with microphone**.
