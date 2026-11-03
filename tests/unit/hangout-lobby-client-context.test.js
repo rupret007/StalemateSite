@@ -175,6 +175,13 @@ describe('browser client privacy and bounded delivery wiring', () => {
         expect([...timers.values()].some((timer) => timer.delay >= 750)).toBe(false);
         expect(sockets).toHaveLength(1);
     });
+    it('shows Session ended after a beta revocation close instead of a reconnectable offline state', async () => {
+        const { window, ws, welcome, join } = await visitor(); welcome(); join();
+        ws.close(4401);
+        expect(window.document.querySelector('[data-connection]').textContent).toBe('Session ended');
+        expect(window.document.querySelector('[data-connection]').getAttribute('data-state')).toBe('ended');
+        expect(window.document.querySelector('[data-session-ended]').hidden).toBe(false);
+    });
     it('retains an unsent draft when the actual browser send buffer is full', async () => {
         const { window, ws, welcome, join } = await visitor(); welcome(); join();
         ws.bufferedAmount = 2 * 1024 * 1024;

@@ -4,7 +4,9 @@
   "sourcePR": "https://github.com/rupret007/webjam/pull/411",
   "license": "MIT",
   "modifications": {
-    "index.html": "Add noindex metadata for the private beta; all other copied files remain unchanged."
+    "index.html": "Add noindex metadata for the private beta; add a first-run headphones/mic/consent checklist.",
+    "style.css": "Style the first-run checklist.",
+    "audio.js": "Map microphone NotAllowedError to an actionable Join status message."
   },
   "files": {
     "app.js": {
@@ -14,8 +16,8 @@
     },
     "audio.js": {
       "source": "web/join/audio.js",
-      "upstreamSha256": "8023438309b0b7145cfcebd3e448a1c2717d9e82abf0df17a86a9c77d5b438d5",
-      "shippedSha256": "8023438309b0b7145cfcebd3e448a1c2717d9e82abf0df17a86a9c77d5b438d5"
+      "upstreamSha256": "815253ee9d58fca3c9856186440a3c1f521dc275b49463b46ff7c98a220ea682",
+      "shippedSha256": "815253ee9d58fca3c9856186440a3c1f521dc275b49463b46ff7c98a220ea682"
     },
     "config.js": {
       "source": "web/join/config.js",
@@ -30,7 +32,7 @@
     "index.html": {
       "source": "web/join/index.html",
       "upstreamSha256": "0be444981d7310435cd14d9a12d5788b9e34909fc2930c2ba5488c8081e17b97",
-      "shippedSha256": "cdc27bb124aed18e258d416a8d0da967055ebebf77679fb81dee7f3c6c6d2c49"
+      "shippedSha256": "e24fd21fe6e43c9c0c437e4664f2c6ff55a0fd59df05613a60243ffca68ecfb1"
     },
     "mailbox.js": {
       "source": "web/join/mailbox.js",
@@ -49,8 +51,8 @@
     },
     "style.css": {
       "source": "web/join/style.css",
-      "upstreamSha256": "8876121a107c35d360eb60d98893653f336a5490fc993d0f194aa7f9eb9a1924",
-      "shippedSha256": "8876121a107c35d360eb60d98893653f336a5490fc993d0f194aa7f9eb9a1924"
+      "upstreamSha256": "13d6c7adda8881aab458188ed4649d037dd86b8cedf0b9d7af614b7feef6e35c",
+      "shippedSha256": "13d6c7adda8881aab458188ed4649d037dd86b8cedf0b9d7af614b7feef6e35c"
     },
     "_headers": {
       "source": "web/join/_headers",
