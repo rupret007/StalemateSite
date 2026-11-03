@@ -6,8 +6,8 @@ End-to-end path for a first-time bandmate and a host, using local preview / `ser
 
 | Step | Visitor action | Page / code | Notes |
 | --- | --- | --- | --- |
-| 1 | Open reviewed **Stalemate** entry link (“Hang Out”) | Band site fixture or packaged `stalemate.html` via `communityJoinLink()` → `r/45662413410ed051/lobby/?via=stalemate…` | `tests/e2e/community-entry.spec.js` pattern; `via` badge is optional to show/hide. |
-| 2 | Pick nickname, agree, enter lobby | Gate: `r/45662413410ed051/lobby/index.html` (`data-nick`, `data-enter`); connect in `lobby.js` | **Friction:** long gate button copy (“I’m 13+…”) reads like legal fine print before the obvious action. **Friction:** must wait for relay/preview params or enter stays disabled with no plain “missing link” copy on some builds. |
+| 1 | Open reviewed **Stalemate** entry link (“Hang Out”) | Band site fixture or packaged `stalemate.html` via `communityJoinLink()` → `r/<hidden-slug>/lobby/?via=stalemate…` | `tests/e2e/community-entry.spec.js` pattern; `via` badge is optional to show/hide. |
+| 2 | Pick nickname, agree, enter lobby | Gate: `r/<hidden-slug>/lobby/index.html` (`data-nick`, `data-enter`); connect in `lobby.js` | **Friction:** long gate button copy (“I’m 13+…”) reads like legal fine print before the obvious action. **Friction:** must wait for relay/preview params or enter stays disabled with no plain “missing link” copy on some builds. |
 | 3 | Say hello in `#stalemate` | Chat pane `data-text` / `data-send`; scrollback `data-buffer` | Slow mode (3s) between lines from same author in shared tests. Conversation starters help; optional. |
 | 4 | Host opens **Rooms** → **Jam (WebJam)** | `data-show="rooms"`, `data-start="jam"`; channel `#jam-…` | **Friction:** two navigation hops before hosting; no single “Start a jam” on chat home. Jam rooms are **invite-only** (`+i`); directory shows them but join without invite fails (`invite-only` toast). |
 | 5 | Bandmate **sees** the jam room in directory | Rooms pane `data-roomlist`, labels from `discovery-core.js` | **Friction (partially addressed):** old copy said “Try joining” on invite-only rows, implying a self-serve join. |
