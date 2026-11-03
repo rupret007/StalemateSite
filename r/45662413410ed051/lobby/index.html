@@ -141,11 +141,20 @@
                 <div class="jam-actions" data-jam-actions>
                     <a class="btn" data-jam-desktop href="#" hidden>Open in WebJam 🎸</a>
                     <button class="btn" type="button" data-jam-copy hidden>Copy full invitation</button>
+                    <button class="btn" type="button" data-jam-invite-copy hidden>Copy invite link</button>
                     <span class="small" data-jam-wait>Waiting for the host to paste their WebJam invite.</span>
                     <button class="btn btn--ghost" type="button" data-jam-web disabled title="The host has not shared an approved browser invitation">Browser join unavailable</button>
+                    <button class="btn btn--ghost" type="button" data-jam-invite-qr-toggle hidden aria-expanded="false">Show QR code</button>
+                </div>
+                <div class="jam-invite-qr" data-jam-invite-qr-panel hidden>
+                    <canvas data-jam-invite-qr width="200" height="200" role="img" aria-label="QR code for the browser invite link"></canvas>
+                    <p class="small">Scan to open the same browser invite link.</p>
                 </div>
                 <label class="small" data-jam-copy-fallback hidden>Copy this invite, then paste it into WebJam’s Join screen.
                     <textarea data-jam-copy-value readonly aria-label="WebJam invitation to copy" autocomplete="off" spellcheck="false" rows="4"></textarea>
+                </label>
+                <label class="small" data-jam-invite-copy-fallback hidden>Select this invite link, then copy it.
+                    <textarea data-jam-invite-copy-value readonly aria-label="Browser invite link to copy" autocomplete="off" spellcheck="false" rows="2"></textarea>
                 </label>
                 <form class="jam-paste op-only" data-jam-form>
                     <textarea data-jam-link placeholder="Paste a full desktop invite or browser link" aria-label="WebJam invitation" aria-describedby="jam-share-help" autocomplete="off" spellcheck="false" maxlength="8192" rows="2"></textarea>
@@ -295,6 +304,7 @@
     <script src="../bob-ross.js"></script>
     <script src="discovery-core.js"></script>
     <script src="lobby-room.js"></script>
+    <script src="qr-lite.js"></script>
     <script type="module" src="lobby.js"></script>
 </body>
 </html>

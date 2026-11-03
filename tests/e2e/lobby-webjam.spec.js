@@ -250,3 +250,100 @@ test('a cached browser Join action stays inactive after local Stop when server w
         expect(f.external).toEqual([]);
     } finally { await f.close(); }
 });
+
+test('copy invite link and QR encode the shared browser invitation', async ({ browser, baseURL }) => {
+    const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });
+    try {
+        const host = await f.join('QrHost');
+        await host.click('[data-show="rooms"]');
+        await host.click('[data-start="jam"]');
+        await paste(host, WEB_INVITE);
+        await expect(host.locator('[data-jam-invite-copy]')).toBeVisible();
+        await host.click('[data-jam-invite-copy]');
+        expect(await host.evaluate(() => window.copiedInvite)).toBe(WEB_INVITE);
+        expect(WEB_INVITE).not.toMatch(/preview=/);
+        await host.click('[data-jam-invite-qr-toggle]');
+        const canvas = host.locator('[data-jam-invite-qr]');
+        await expect(canvas).toBeVisible();
+        await expect(canvas).toHaveAttribute('data-invite-url', WEB_INVITE);
+        expect(await canvas.evaluate((node) => {
+            const ctx = node.getContext('2d');
+            const { data, width, height } = ctx.getImageData(0, 0, node.width, node.height);
+            let dark = 0;
+            for (let i = 0; i < data.length; i += 4) if (data[i] < 32) dark += 1;
+            return dark > width * height * 0.05;
+        })).toBe(true);
+        await host.evaluate(() => { navigator.clipboard.writeText = async () => { throw new Error('blocked'); }; });
+        await host.click('[data-jam-invite-copy]');
+        await expect(host.locator('[data-jam-invite-copy-value]')).toBeVisible();
+        await expect(host.locator('[data-jam-invite-copy-value]')).toHaveValue(WEB_INVITE);
+    } finally { await f.close(); }
+});
+
+test('a bandmate reaches the jam room within three clicks of opening the copied invite link', async ({ browser, baseURL }) => {
+    const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });
+    try {
+        const host = await f.join('LinkHost');
+        const relay = await host.evaluate(() => sessionStorage.getItem('hangout-relay'));
+        const bandmateContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+        await bandmateContext.route('**/*', route => new URL(route.request().url()).origin === new URL(baseURL).origin ? route.continue() : route.abort());
+        await bandmateContext.addInitScript(({ relay }) => {
+            sessionStorage.setItem('hangout-preview', 'local-preview-key-0001');
+            if (relay) sessionStorage.setItem('hangout-relay', relay);
+            window.copiedInvite = '';
+            Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+                writeText: async (text) => { window.copiedInvite = text; }
+            } });
+            if (sessionStorage.getItem('hangout-count-invite-clicks') === '1') {
+                window.__bandmateClicks = 0;
+                document.addEventListener('click', () => { window.__bandmateClicks += 1; }, true);
+                sessionStorage.removeItem('hangout-count-invite-clicks');
+            }
+        }, { relay });
+        const bandmate = await bandmateContext.newPage();
+        await bandmate.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+        await bandmate.fill('[data-nick]', 'LinkBandmate');
+        await bandmate.click('[data-enter]');
+        await expect(bandmate.locator('[data-connection]')).toHaveText('Connected');
+        await host.click('[data-show="rooms"]');
+        await host.click('[data-start="jam"]');
+        await expect(host.locator('[data-jam]')).toBeVisible();
+        const channel = await host.locator('[data-chat-context]').textContent();
+        await host.fill('[data-text]', '/invite LinkBandmate');
+        await host.press('[data-text]', 'Enter');
+        await paste(host, WEB_INVITE);
+        await expect(host.locator('[data-jam-invite-copy]')).toBeVisible();
+        await host.click('[data-jam-invite-copy]');
+        const browserInvite = await host.evaluate(() => window.copiedInvite);
+        expect(browserInvite).toBe(WEB_INVITE);
+        const lobbyEntry = await host.evaluate(({ channel }) => {
+            const relay = sessionStorage.getItem('hangout-relay') || '';
+            const url = new URL(location.href);
+            url.searchParams.delete('preview');
+            if (relay) url.searchParams.set('relay', relay);
+            url.hash = `room=${encodeURIComponent(channel)}`;
+            return url.href;
+        }, { channel });
+        await bandmateContext.route('https://webjam.example/join/**', route => route.fulfill({
+            status: 200,
+            contentType: 'text/html; charset=utf-8',
+            body: `<!doctype html><html><head><meta http-equiv="refresh" content="0;url=${lobbyEntry.replace(/"/g, '&quot;')}"></head><body></body></html>`
+        }));
+        await bandmate.evaluate(() => sessionStorage.setItem('hangout-count-invite-clicks', '1'));
+        await bandmate.goto(browserInvite, { waitUntil: 'networkidle' });
+        if (await bandmate.locator('[data-gate]').isVisible()) {
+            await bandmate.fill('[data-nick]', 'LinkBandmate');
+            await bandmate.click('[data-enter]');
+        }
+        await expect(bandmate.locator('[data-connection]')).toHaveText('Connected');
+        await host.fill('[data-text]', '/invite LinkBandmate');
+        await host.press('[data-text]', 'Enter');
+        const joinToast = bandmate.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true });
+        await expect(joinToast).toBeVisible();
+        await joinToast.click();
+        await expect(bandmate.locator('[data-jam]')).toBeVisible();
+        await expect(bandmate.locator('[data-chat-context]')).toHaveText(channel);
+        expect(await bandmate.evaluate(() => window.__bandmateClicks ?? 0)).toBeLessThanOrEqual(3);
+        await bandmateContext.close();
+    } finally { await f.close(); }
+});

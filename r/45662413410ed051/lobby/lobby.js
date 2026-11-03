@@ -49,6 +49,9 @@ import { createEntrySharing } from './entry-sharing.mjs';
     if (isLocal && params.get('relay')) writeTab('hangout-relay', params.get('relay'));
     if (location.search) history.replaceState(null, '', location.pathname + location.hash);
     const siteKey = $('meta[name="hangout-turnstile"]').content || '';
+    const inviteHash = new URLSearchParams(location.hash.slice(1));
+    const pendingRoomFromInvite = inviteHash.get('room') || '';
+    if (pendingRoomFromInvite) history.replaceState(null, '', location.pathname);
 
     // GoatCounter: fixed, privacy-safe event names only (no nicks, no room names, no query string).
     const count = (event) => { try { if (window.goatcounter && window.goatcounter.count) window.goatcounter.count({ path: `hangout-${event}`, title: 'Hang Out', event: true, referrer: '' }); } catch (e) { /* analytics never breaks chat */ } };
@@ -60,7 +63,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     const pick = (a) => a[Math.floor(Math.random() * a.length)];
     const slug = () => `${pick(WORDS)}-${pick(THINGS)}`.replace(/[^a-z0-9-]/g, '');
 
-    const app = window.__lobby = { ws: null, me: '', role: 'fan', band: false, chans: new Map(), pms: new Map(), active: '#stalemate', rooms: [], ignores: new Set(), peerIgnores: new Set(), selfId: '', pending: null, confirmedGathering: null, approvedCreation: null };
+    const app = window.__lobby = { ws: null, me: '', role: 'fan', band: false, chans: new Map(), pms: new Map(), active: '#stalemate', rooms: [], ignores: new Set(), peerIgnores: new Set(), selfId: '', pending: null, confirmedGathering: null, approvedCreation: null, pendingRoomJoin: pendingRoomFromInvite || '' };
     // Same words as REPORT_QUEUED_LABEL in the lobby engine. This page does not
     // import that engine. A queued flag is not proof a moderator is reading it.
     const REPORT_QUEUED_LABEL = 'Queued for review when a moderator is available';
@@ -852,6 +855,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             app.kicked = false; retry = 0; setConnection('connected');
             entrySharing.joined();
             returnToKeepRoom();
+            followPendingRoomJoin();
             if (app.restorePmOff) { cmd('pm', ['off']); app.restorePmOff = false; }
             $('[data-gate]').hidden = true; $('[data-app]').hidden = false;
             if (wasIn && app.resetSession) toast('Connected. Room ownership and settings are kept; chat starts fresh. Choose a room to rejoin. Cameras stay off.');
@@ -874,6 +878,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             // Classic IRC: joining begins a fresh buffer; never render pre-join backlog.
             if (activityRoom(c)) c.actSnap = activitySnapshot(m.act);
             switchTo(m.ch.name, { freshJoin: true });
+            followPendingRoomJoin();
             break;
         }
         case 'media-policy': {
@@ -1166,9 +1171,29 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const desktop = $('[data-jam-desktop]'); desktop.hidden = true; desktop.removeAttribute('href');
         $('[data-jam-copy]').hidden = true;
         $('[data-jam-copy-fallback]').hidden = true; $('[data-jam-copy-value]').value = '';
+        $('[data-jam-invite-copy]').hidden = true;
+        $('[data-jam-invite-copy-fallback]').hidden = true; $('[data-jam-invite-copy-value]').value = '';
+        $('[data-jam-invite-qr-toggle]').hidden = true;
+        $('[data-jam-invite-qr-panel]').hidden = true;
+        $('[data-jam-invite-qr-toggle]').setAttribute('aria-expanded', 'false');
+        $('[data-jam-invite-qr-toggle]').textContent = 'Show QR code';
         $('[data-jam-link]').value = ''; $('[data-jam-form]').hidden = true;
         $('[data-jam-wait]').hidden = false;
         const web = $('[data-jam-web]'); web.disabled = true; web.onclick = null; web.textContent = 'Browser join unavailable';
+    }
+    function browserInviteLink(context) {
+        return context?.webReady && /^https:\/\//.test(context.web) ? context.web : '';
+    }
+    function followPendingRoomJoin() {
+        const room = app.pendingRoomJoin;
+        if (!room || connectionState !== 'connected' || sessionEnded || app.localMediaPaused || app.sharingStopped) return;
+        app.pendingRoomJoin = '';
+        cmd('join', [room]);
+    }
+    function drawJamInviteQr(link) {
+        const canvas = $('[data-jam-invite-qr]');
+        if (!link || !window.HangoutQrLite?.draw) { canvas.removeAttribute('data-invite-url'); return; }
+        window.HangoutQrLite.draw(canvas, link);
     }
     function clearJamInvitations() {
         // A disconnected tab has no current room admission. Purge cached
@@ -1223,6 +1248,14 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const shared = !!(next.invitation || next.webReady);
         $('[data-jam-actions]').hidden = next.host && !shared;
         $('[data-jam-wait]').hidden = shared; $('[data-jam-copy]').hidden = !next.invitation;
+        const browserLink = browserInviteLink(next);
+        $('[data-jam-invite-copy]').hidden = !browserLink;
+        $('[data-jam-invite-qr-toggle]').hidden = !browserLink;
+        if (!browserLink) {
+            $('[data-jam-invite-qr-panel]').hidden = true;
+            $('[data-jam-invite-qr-toggle]').setAttribute('aria-expanded', 'false');
+            $('[data-jam-invite-qr-toggle]').textContent = 'Show QR code';
+        } else if (!$('[data-jam-invite-qr-panel]').hidden) drawJamInviteQr(browserLink);
         const web = $('[data-jam-web]'); web.disabled = !next.webReady;
         web.textContent = web.disabled ? 'Browser join unavailable' : 'Join in browser';
         web.title = web.disabled ? 'The host has not shared an approved browser invitation' : 'Open the host’s browser invitation; headphones and audio consent are required there';
@@ -1843,6 +1876,32 @@ import { createEntrySharing } from './entry-sharing.mjs';
             const input = $('[data-jam-copy-value]');
             input.value = link; input.focus(); input.select();
         }
+    });
+    $('[data-jam-invite-copy]').addEventListener('click', async () => {
+        const c = currentJam(), context = jamContext;
+        const link = context?.room === c && browserInviteLink(context);
+        if (!link) return;
+        try {
+            await navigator.clipboard.writeText(link);
+            if (jamContext === context && currentJam() === c) toast('Browser invite link copied. Send it to your bandmate.');
+        } catch (_) {
+            if (jamContext !== context || currentJam() !== c) return;
+            $('[data-jam-invite-copy-fallback]').hidden = false;
+            const input = $('[data-jam-invite-copy-value]');
+            input.value = link; input.focus(); input.select();
+        }
+    });
+    $('[data-jam-invite-qr-toggle]').addEventListener('click', () => {
+        const c = currentJam(), context = jamContext;
+        const link = context?.room === c && browserInviteLink(context);
+        if (!link) return;
+        const panel = $('[data-jam-invite-qr-panel]');
+        const open = panel.hidden;
+        panel.hidden = !open;
+        const toggle = $('[data-jam-invite-qr-toggle]');
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        toggle.textContent = open ? 'Hide QR code' : 'Show QR code';
+        if (open) drawJamInviteQr(link);
     });
 
     function show(pane) {
