@@ -48,11 +48,11 @@
             };
             room.state = room.joined ? 'joined' : room.count >= room.max ? 'full' : room.locked ? 'invite' : room.key ? 'key' : room.count > 0 ? 'open' : 'empty';
             room.statusLabel = {
-                joined: 'You are here', full: 'Full', invite: 'Invite-only or locked',
+                joined: 'You are here', full: 'Full', invite: 'Invite only',
                 key: 'Key required', open: 'Open', empty: 'No one here yet'
             }[room.state];
             room.actionLabel = {
-                joined: 'Return to room', full: 'Room full', invite: 'Try joining',
+                joined: 'Return to room', full: 'Room full', invite: 'Need host invite',
                 key: 'Enter room key', open: 'Join room', empty: 'Enter room'
             }[room.state];
             // This is a button affordance, not permission: the server still checks invites, keys,

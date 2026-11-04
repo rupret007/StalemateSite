@@ -33,7 +33,7 @@ describe('room discovery', () => {
 
     it('keeps invite and key restrictions explicit without pretending to know private invitation membership', () => {
         const [invite] = describeRooms([room('#art-invite', { locked: true, invited: true, secret: 'do not publish' })]);
-        expect(invite).toMatchObject({ state: 'invite', statusLabel: 'Invite-only or locked', actionLabel: 'Try joining', canJoin: true });
+        expect(invite).toMatchObject({ state: 'invite', statusLabel: 'Invite only', actionLabel: 'Need host invite', canJoin: true });
         expect(invite).not.toHaveProperty('invited');
         expect(invite).not.toHaveProperty('secret');
         expect(describeRooms([room('#art-key', { key: true })])[0]).toMatchObject({ state: 'key', statusLabel: 'Key required', actionLabel: 'Enter room key' });
