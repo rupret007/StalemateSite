@@ -197,6 +197,59 @@ without retry/flaky summaries; Pages jobs skipped. See the
 These are the previous documentation head's results, not automatic qualification
 of a later documentation push or physical music.
 
+## Physical device findings after the afternoon package checks
+
+[Hardware and installation receipts](../pr-assets/beta-collaboration/20261104/direct-private-delivery/hardware/receipt.json)
+retain both failed real ARM-native attempts. Jamulus selected
+`in: BlackHole 16ch/out: Jabra Evolve 75`. Disconnecting only Jamulus while the
+WebJam session remained active caused the owned engine to restart; Jeff also
+observed that restart. Normal **End Session → Yes** returned WebJam to
+**Start Session / Audio: Stopped**, with no owned engine/server/sidecar left.
+No browser music guest connected and the test requested no recording.
+
+For the second attempt, the operator backed up the dedicated WebJam Jamulus
+profile and changed only its encoded audio-device selector to the actual Jabra
+input/output names. A normal Start Session still showed the BlackHole input
+in Jamulus. This reproduces the route fallback; it does not prove its precise
+driver/application cause or qualify Bluetooth-native music. Do not repeat that
+capture path as a successful microphone test. Global audio routing was unchanged.
+An auxiliary standalone/reopened Jamulus process also produced a SIGABRT/malloc
+crash report during cleanup. It lacked the managed-profile arguments; its cause
+and regular-profile byte preservation remain unqualified. This is distinct from
+the parent WebJam process and the normal End Session cleanup observations.
+
+The user connected the Jabra to the Mini and retained the MacBook's internal
+microphone and wired headphones. At19:57UTC, after unplugging the HP dock's
+Ethernet cable, the Mini's actual default route was `en1`, **Wi-Fi**. The earlier
+18:44 chat qualifies the MacBook's Wi-Fi use; the Mini route was not measured
+then. A later wired observation must not be silently relabeled as Wi-Fi or vice versa.
+
+The actual verified e101 Intel archive was transferred to the physical MacBook.
+The first Desktop extraction failed normal `codesign --verify --deep --strict`
+with “resource fork, Finder information, or similar detritus not allowed”; its
+bundle had FinderInfo/file-provider attributes. That failed copy is preserved.
+The **same unchanged archive**, extracted into the private cache, passed normal
+verification on the MacBook; verification through its new Desktop shortcut also
+passed. No attributes were stripped, no quarantine/security setting changed,
+and no code was re-signed. **WebJam Private Demo** on the MacBook Desktop points
+to this verified cache copy. Native GUI startup and actual music are still pending.
+
+A headed MacBook Chrome guest created a normal private Jam room for the upcoming
+native **Copy web invite → Share** flow. No invitation arrived before its bounded
+wait expired: the original TimeoutError is retained, with logout200/state401 and
+zero capture requests. This is preparatory room evidence, not an invitation or
+audio pass. The Mini browser-guest harness is prepared but has not run. Its planned
+per-page Jabra hardware selection must be recorded as operator test setup; it is
+not evidence that the shipping site exposes an output-device picker.
+
+The exact documentation head `dc863c1a0910e4511f9db356541214a7bd049be5` and actual
+PR checkout `7210765dd1a5bd99f1d91e1ec3afdb0c8cc1380d` share tree
+`5e44020f099386ff8380c2c5e23cf9805a5c8c21`. Both terminal jobs passed2,061 units
+in137 files,763 main browser cases and separate34/34 path checks without failure
+or flaky summaries; both Pages jobs skipped. The
+[exact CI receipt](../pr-assets/beta-collaboration/20261104/direct-private-delivery/hardware/website202-dc863-ci.json)
+qualifies that documentation tree, not a later push or physical music.
+
 ## Provider readiness and next actions
 
 Read-only dashboard inspection verified actual successful, unfiltered,
@@ -242,14 +295,16 @@ The current ordered checklist is:
    private target and normal platform trust. Do not rebuild for 640's changelog
    or rerun unchanged successful tests. Preserve all earlier failures. Later
    documentation pushes need their own normal CI;6fb's evidence stays separate.
-2. Connect a physical USB headset or input/interface plus headphones to the Mini.
-   The Mini currently exposes BlackHole virtual I/O and built-in speakers; do not
-   capture shared system audio under microphone-only consent. Select devices in
-   WebJam without changing shared global routing. The Intel MacBook is online,
-   verified by its user-confirmed SSH host fingerprint, with physical headphones
-   and microphone. Jeff approved bounded Mini/MacBook microphone trials, with
-   headphones and no recording. Windows audio readiness is still unconfirmed.
-   Demonstrate actual
+2. Jeff opens **WebJam Private Demo** on the MacBook Desktop and confirms the
+   Music/Host/Join screen before starting another bounded trial. Use its internal
+   microphone and wired headphones as native host; use the Mini's real Jabra
+   microphone/headphones as browser guest. Preserve the failed ARM-native route
+   and verify each actual physical route before counting audio. The first
+   publisher is terminal; prepare a new normal private Jam-room session only
+   after Jeff is ready. The intended flow is native **Web Join → Allow a web
+   guest → Copy web invite**, then the normal website **Share / Join in browser**.
+   Jeff approved Mini/MacBook microphones with headphones and no recording.
+   Windows audio readiness is still unconfirmed. Demonstrate actual
    reciprocal ARM/Intel/Windows music and a separate-network pair: one native host
    and one browser guest, at most 10 minutes per trial. Record hearing, dropouts,
    interruption, Stop/leave and recovery. **Wi-Fi first**, then a separate Ethernet
@@ -278,8 +333,8 @@ package/CI checks do not substitute for actual reciprocal music.
 4. Jeff can use **Moderator sign-in**, complete his normal email verification,
    then **Open moderation panel**. Find the exact5ca199 report above; dismiss
    only that report and confirm it disappears. Other guests get no staff access.
-5. Music requires the first two remaining actions above. Once qualified, use the
-   matched ARM Mac package as native Music host, allow Web Join intentionally,
+5. Music requires the first two remaining actions above. Once the MacBook door is confirmed, use the
+   matched Intel Mac package as native Music host, allow Web Join intentionally,
    and share its complete generated invitation through the private Jam room.
    Use Intel/Windows browser guests in separate bounded trials with headphones
    and capture consent. Never substitute a hand-built invitation or claim a

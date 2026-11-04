@@ -1,0 +1,19 @@
+{
+  "publisher": {
+    "at": "2026-11-04T20:22:13.310Z",
+    "scope": "MacBook normal private Jam room publisher; browser capture prohibited; native music independently bounded",
+    "recording": false,
+    "captureRequests": 0,
+    "status": "failed",
+    "browser": "157.0.8103.38",
+    "failureType": "TimeoutError",
+    "logoutStatus": 200,
+    "stateAfterLogout": 401,
+    "completedAt": "2026-11-04T20:30:20.188Z",
+    "resourceGuardPassed": true
+  },
+  "scope": "Actual headed Chrome private Jam room creation on Intel MacBook, before native hosting. Human web invitation was not published before its eight-minute wait expired. Original TimeoutError retained; logout200/state401 and zero capture requests.",
+  "nativeHostGuiConfirmation": "Pending user opening the verified MacBook shortcut and leaving Music/Host/Join visible",
+  "miniBrowserGuestAutomation": "Prepared and syntax checked; not executed and not audio proof",
+  "wifiScope": "Mini default route was HP dock Ethernet at earlier inspection; after user unplugged it,19:57 inspection confirmed en1/Wi-Fi. Earlier18:44 chat proves MacBook Wi-Fi; Mini route was not measured during that earlier chat."
+}
