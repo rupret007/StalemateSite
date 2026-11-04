@@ -234,6 +234,9 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .jam-actions, .jam-paste { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .jam-actions .btn { flex: 1 1 145px; min-width: 0; max-width: 260px; padding-inline: 10px; overflow-wrap: anywhere; }
 .jam-actions [data-jam-wait] { flex-basis: 100%; }
+.jam-actions [data-jam-invite-copy] { border-color: var(--lime); background: #242f1c; color: var(--lime); font-weight: 550; }
+.jam-invite-qr { flex-basis: 100%; display: grid; justify-items: start; gap: 6px; margin-top: 4px; }
+.jam-invite-qr canvas { display: block; width: min(200px, 100%); height: auto; background: #f4f0e6; border: 1px solid var(--line); border-radius: 4px; }
 .jam-paste { margin-top: 10px; }
 .jam-paste .small { flex-basis: 100%; margin: 0; }
 [data-jam-share-status]:empty { display: none; }
