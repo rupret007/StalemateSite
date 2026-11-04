@@ -1,5 +1,46 @@
 # WebJam / Hang Out — Cursor continuation
 
+**Latest November4 correction — read before retrying music:**
+[IRC workspace204](https://github.com/rupret007/StalemateSite/pull/204)
+(`59ecad26157f558837144035905641a78d4c6ded`) uses Halloy/mIRC interaction cues,
+compact full-viewport chat, explicit fullscreen and concise quiet-room wording.
+23 local browser checks/18 units pass; desktop and375/390 screenshots are
+committed. Halloy is native Rust/Iced GPL-3.0; no source/assets were copied.
+Own CI/private delivery are pending; the private Worker is still c0586c29/de2.
+
+**Do not repeat the old e101 browser-music attempt.** The physical Intel app
+started native audio; a PID-bound read-only CoreAudio observation confirmed
+MacBook microphone and wired headphones at48kHz. Browser invite preparation
+failed. Inspection found the actual app missing its custom Opus dylib, while
+system Opus lacked the custom symbols. Jeff ended the session; no native audio
+children remained. [Native430](https://github.com/rupret007/webjam/pull/430),
+`60598d513eb8ef6febbd1201e3401076eec86352`, requires/builds the Mac codec and
+executes actual bundle ABI checks in packaging, adds visible invite/copy/end
+buttons and safe persistent failures. Local120 focused plus109 existing
+profile/offline/compact cases pass. Source is pushed; own CI, fresh packages,
+actual bundle ABI execution and reciprocal music remain pending.
+
+The normal website room-invitation journey passed on both physical Macs before
+that music attempt: host /invite, guest acceptance, reciprocal room chat and
+both logout200/state401 with zero capture requests. In the later music attempt,
+the publisher again logged out200/state401 with zero captures; the Mini guest
+helper exited on an unhandled popup-wait rejection and produced no final receipt.
+Do not claim its logout/track cleanup was qualified. Original failure is retained.
+Corrected, unrun helpers require an existing enabled Join button, handle popup
+and click together and persist a pre-close cleanup snapshot. Owner-only local
+checkpoint: private-beta-delivery-20261104/.local/demo-progress/
+direct-delivery-checkpoint-nov04.json, key halloyWorkspaceAndCodecFollowup.
+
+Paint Along: website203/cb81e11 normal test job126863491878 passed at actual PR
+checkout9d13598; Pages skipped. Native429/4a360de main job126871111989 passes,
+but its separate browser e2e126871110798 was cancelled while installing
+Playwright OS dependencies, so **all CI is not green**. Retained terminal logs
+are owner-only in webjam-demo-readiness/.local/demo-progress. Do not merge or
+claim that cancelled job passed. Normal host invitation, music audibility,
+ARM-native/Windows/separate-network scope, Ethernet comparison and Jeff's exact
+current report dismissal remain distinct requirements. Existing AI/media and
+public-launch holds are unchanged. All62 requirements remain intact.
+
 **Current direct delivery:** [November4 delivered beta, corrected packages and hardware findings](hangout-internal/HANGOUT_DIRECT_PRIVATE_DELIVERY_20261104.md) is the current checklist. Website201/de2 runs privately as `c0586c29`; separate web TURN secrets are encrypted in issuer `60e3f182`. Native428 merged as `12d939af`; its562-module CI passes12,911 cases/60 skips. One corrected four-platform cohort41886309202/e101465 is verified; do not rebuild for later changelog-only640. Actual cross-entry chat/drawing/layout/reconnect remain qualified at their recorded scopes. **Music remains unqualified:** two ARM-native Jabra Bluetooth attempts fell back to BlackHole and were stopped without a browser guest. The identical Intel archive passes normal signature verification on the physical MacBook in its private cache; a Desktop copy failed because of extra Finder/file-provider metadata and is preserved. Desktop shortcut **WebJam Private Demo** points to the verified copy. Next: Jeff opens that native MacBook app at Music/Host/Join; then test its internal mic/wired headphones as host and the Mini as browser guest. The initial private Jam-room publisher timed out waiting for the human invite and logged out normally; do not call it live or restart it until Jeff is ready. All62 outcomes and original failures remain intact.
 
 **Application evidence packet:** [November4 scoped delivery evidence](hangout-internal/HANGOUT_PRIVATE_APPLICATION_PACKET_20261104.md) records qualified201 CI, the actual downloaded toolkit, public/private boundary and historical-draft reconciliation. Both full201 jobs pass2,061 units/763 main browser cases without retries; Pages deployments skipped. Browser `lobby.js` is in the broad source inventory, not the actual native bundle; no extra workflow approval is created. Private delivery and reciprocal music remain separate.
