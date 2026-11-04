@@ -1,54 +1,84 @@
 # WebJam / Hang Out — Cursor continuation
 
-**Current resume point, November4 at23:10UTC — source fixes, not a new deployment:**
-Native429 is merged as395c3aa after its one targeted browser retry passed. The
-current packaging/invite correction is [430](https://github.com/rupret007/webjam/pull/430)
-`0d474942978d54176f63f527dc2fc150eb7933c5`, CI41930581200. Its original605
-Notes/changelog failures and6f Conversation/lobby failures were reproduced and
-retained. Corrections preserve Notes space and show direct invitation controls
-only when an owned Music host permits them, retaining error/cleanup actions.
-All152 selected Qt/Notes/control cases and45 subtests now pass locally; current
-main CI still needs qualification. The custom bundled codec still needs actual
-packaging/ABI execution before any browser-music retry.
+**Current resume point, November4 at23:33UTC — qualified source fixes, not new delivery:**
+
+Native [430](https://github.com/rupret007/webjam/pull/430) is **MERGED** as
+`a62795f78f7b77c909e6d6bc79b7fa7e6529020c`. Its whole tree matches reviewed
+`0d474942978d54176f63f527dc2fc150eb7933c5` and actual PR checkout696234a.
+Full CI41930581200 passes all563 tracked modules once:12,929 passed/60 existing
+skips, plus the applicable integration, transport, Windows and iOS checks.
+Separate browser and Worker workflows also pass. Original605 Notes/changelog
+and6f Conversation failures were reproduced and retained; their product fixes
+preserve Notes space and owned-host invitation/error/cleanup controls. The Mac
+package now requires/builds its custom Opus codec and verifies the actual bundle
+ABI during packaging. **A new package/ABI execution is still required**; never
+retry olde101 as though this source fix were installed.
 
 The requested afro mark, **Grandeur of Summer first**, four official Bob Ross
-picks/custom link and optional official kit/materials help are pushed separately:
-[native431](https://github.com/rupret007/webjam/pull/431),
-`0335084492454f5ca570b9f72526cf0f533434d1`, stacked on430, CI41930843664;
-[website205](https://github.com/rupret007/StalemateSite/pull/205),
-`1903b5d661a2ee3ccc4ffe7afb230b3e183e85e6`, stacked on204. The reused worktrees
-are **WebJam/.local/paint-along-lessons-20261104** and
-**StalemateSite/.local/paint-along-links-20261104**, both now on branch
-`codex/paint-together-start-20261104`; do not assume their old branch names.
-Native187 affected cases pass in normal per-file processes; an earlier combined
-Qt batch's one visibility failure remains recorded. Browser5 units/4 open-room/
-4 added375/390 cases pass. Source entry and materials captures were inspected.
-Full prompt/artifact hashes and primary resources are in each new starter note.
+picks/custom link and optional official kit/material help are in
+[native431](https://github.com/rupret007/webjam/pull/431), current
+`4c4dec3d8b53e4951116ed28de8060d0c92a3ed1`, now based on master. This brings
+forward430's normal merge without changing49d983d's whole tree
+`edc7a804a7ca8eacb5072ce01ee1a77ba6c31ecd`. Current main CI41934363659/
+job126939271323 is running; own current browser CI also remains required.
+Original033 CI failed8 existing prepared-copy cases because the materials-help
+row clipped the compact guest guidance by5px. The failures reproduced locally;
+compact embedded spacing now preserves the entire guidance and copy action.
+All326 cases in17 affected modules pass in fresh per-file processes; two compact
+source renders were inspected. Earlier187-case and combined-batch observations
+retain their separate scopes; no assertion, control or privacy check was removed.
 
-The workspace parent is now [204](https://github.com/rupret007/StalemateSite/pull/204)
-`d2901e2a2b31a56589cf4ececb84358015fa5f0f`, PR CI41929472584. Original59ecad2
-full source CI passed775 cases and failed2 existing320×256 cases (also on their
-original retries). Compact header controls and input focus scroll margin correct
-those failures without weakening their assertions;18 local workspace/reflow
-checks pass. Current full CI remains required. Do not deploy the old59 head.
+Website [205](https://github.com/rupret007/StalemateSite/pull/205) is now
+`11dee5b4439a41f4483fc262f4e537f98d3e30f3`, stacked on204. PR/source CI
+41932426997/41932416346 are running. Its first1903 CI failed9 cases with obsolete
+partial lesson test doubles plus a privacy check on this artwork note. The
+fixtures now load the real catalogue and the note omits the private route;
+all98 affected unit cases pass unchanged. Four existing room journeys and four
+new375/390 Chromium/WebKit guide/icon checks passed locally; source captures were
+inspected. Actual PR checkoutb8d3a25 has the identical whole tree8095f072.
 
-All four actual YouTube picks played on two real provider players in the local
-web app, with advancing/unmuted timelines and zero captures. That is not physical
-hearing, native-player or hosted proof. The installed MacBook app is still old.
-Private beta remains c0586c29/de2, issuer60e3f182; **no new deployment, physical
-trial or package cohort** occurred in this continuation. The matched-current
-private config/dry run was prepared, preserving the exact WebJam origin; final
-assets/config/rollback must be revalidated on the finally qualified source.
-Never overwrite WEBJAM_WEB_ORIGINS with the tracked beta config's empty default.
+Workspace parent [204](https://github.com/rupret007/StalemateSite/pull/204)
+`d2901e2a2b31a56589cf4ececb84358015fa5f0f` has qualified PR CI41929472584:
+2,061 units,777 main browser cases and separate34 root/34 project-path checks,
+without retries/flaky summaries. Source CI41929461974 is still pending. Actual
+PR checkout6871d19 has the identical whole tree4863945d. Original59ecad2's two
+short-window failures and retries are retained; compact header controls and input
+scroll margin fix them without loosening assertions.203/cb81 also has both full
+CI runs green. Keep website merges on private branches, never public navigation.
 
-Next: finish the current normal CI heads, then one matching private cohort with
-all accepted fixes and actual bundled-codec checks. Preserve original failures,
-public/AI/media holds and all62 outcomes. Refresh account-wide headroom before
-live music. Do not stop the user's independent Art session. Only Jeff disposes
-the current exact synthetic report. Physical ARM/Intel/Windows, separate network,
-Ethernet comparison and remaining accessibility/legal/capacity outcomes are open.
-The owner-only direct-delivery checkpoint has the fuller current state under
-currentPaintTogetherAndDeliveryNov04. Older dated statuses below retain scope.
+Reused worktrees: **WebJam/.local/paint-along-lessons-20261104** and
+**StalemateSite/.local/paint-along-links-20261104**, both on
+`codex/paint-together-start-20261104`. Parent workspace WT is
+**StalemateSite/.local/mirc-workspace-20261104**. Do not assume old branch names.
+
+A new69-asset private package/dry run at11dee5b passed. Read-only Cloudflare
+revalidation confirms all plain variables, secret binding names, classes and
+namespace IDs match current c0586c29. Config/manifest hashes are in the owner-only
+`paint-along-links-20261104/.local/private-delivery-11dee5b/preflight.json`.
+**No new deployment or private native cohort exists yet.** Before actual delivery,
+finish exact-head CI and freshly reconcile live configuration/rollback. Never
+apply the tracked empty WEBJAM_WEB_ORIGINS over the approved private music origin.
+Private beta remains c0586c29/de2; issuer remains60e3f182. AI and separate Hang Out
+chat/media TURN stay off. Keep every namespace, ledger, session key and report.
+
+All4 real YouTube picks played on two local real-provider players, with advancing
+unmuted timelines and0 captures. This is not physical hearing, native playback
+or hosted proof. MacBook verified SSH/resources pass at23:24UTC: x86_64/28GiB
+free. Its independently opened translocated WebJam/Jamulus session is running;
+leave it untouched. No agent physical trial is active. Hardware questions are
+pending for Mini USB audio and a real Windows guest; don't buy anything.
+
+Next: finish current normal CI, merge eligible application PRs, produce exactly
+one matching four-platform private cohort with actual bundled-codec/target/trust
+checks, then deliver the qualified69-asset site privately. Refresh account-wide
+headroom before bounded physical music. Required ARM/Intel/Windows, separate
+network, Ethernet comparison, human audibility, current exact report disposition
+and remaining accessibility/legal/capacity outcomes stay open. Only Jeff disposes
+reports. Preserve all62 outcomes and original failures; no StoryPool/Karen/core,
+public launch or signing enrollment. The owner-only direct-delivery checkpoint's
+currentPaintTogetherAndDeliveryNov04 section has fuller receipts/current jobs.
+
+## Earlier November4 observations — historical source scopes
 
 **Latest November4 correction — read before retrying music:**
 [IRC workspace204](https://github.com/rupret007/StalemateSite/pull/204)
