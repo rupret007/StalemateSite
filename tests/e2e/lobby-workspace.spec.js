@@ -1,0 +1,75 @@
+const { randomUUID } = require('node:crypto');
+const { test, expect } = require('@playwright/test');
+const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+
+async function enter(page, baseURL) {
+    const relay = hangoutRelayWsBase(baseURL, `workspace-${randomUUID()}`);
+    await page.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+    await page.fill('[data-nick]', 'WorkspaceFan');
+    await page.click('[data-enter]');
+    await expect(page.locator('[data-connection]')).toHaveText('Connected');
+}
+
+for (const [width, height] of [[1024, 768], [1440, 900], [1920, 1080], [375, 812], [390, 844]]) {
+    test(`workspace fills ${width}x${height} and keeps the composer visible`, async ({ page, baseURL }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await enter(page, baseURL);
+        const app = await page.locator('[data-app]').boundingBox();
+        expect(app.x).toBe(0);
+        expect(Math.abs(app.width - width)).toBeLessThanOrEqual(1);
+        expect(Math.abs(app.y + app.height - height)).toBeLessThanOrEqual(1);
+        const send = await page.locator('[data-send]').boundingBox();
+        expect(send.x).toBeGreaterThanOrEqual(0);
+        expect(send.x + send.width).toBeLessThanOrEqual(width);
+        expect(send.y + send.height).toBeLessThanOrEqual(height);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+        if (width > 900) {
+            await expect(page.locator('[data-pane="rooms"]')).toBeVisible();
+            await expect(page.locator('[data-pane="people"]')).toBeVisible();
+            const chat = await page.locator('[data-pane="chat"]').boundingBox();
+            const buffer = await page.locator('[data-buffer]').boundingBox();
+            expect(chat.width).toBeGreaterThan(width * 0.58);
+            expect(buffer.height).toBeGreaterThan(height * 0.35);
+        } else {
+            expect(await page.locator('[data-text]').evaluate(el => getComputedStyle(el).fontSize)).toBe('16px');
+        }
+        await page.screenshot({ path: testInfo.outputPath(`workspace-${width}x${height}.png`), animations: 'disabled' });
+    });
+}
+
+test('fullscreen rejection gives recovery and preserves the unsent message', async ({ page, baseURL }) => {
+    await page.addInitScript(() => {
+        Object.defineProperty(document, 'fullscreenEnabled', { value: true });
+        // Init scripts run before documentElement exists. Patch the prototype
+        // so this fixture actually exercises denial instead of entering fullscreen.
+        Element.prototype.requestFullscreen = async () => { throw new DOMException('Denied by browser policy', 'NotAllowedError'); };
+    });
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await enter(page, baseURL);
+    await page.fill('[data-text]', 'An unsent draft');
+    await page.locator('[data-fullscreen]').click();
+    await expect(page.locator('[data-toast]')).toContainText('Maximize this browser window');
+    await expect(page.locator('[data-fullscreen]')).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('[data-text]')).toHaveValue('An unsent draft');
+    await expect(page.locator('[data-connection]')).toHaveText('Connected');
+    expect(errors).toEqual([]);
+});
+
+test('fullscreen uses the browser API when available and reflects exit', async ({ page, baseURL }) => {
+    await enter(page, baseURL);
+    const supported = await page.evaluate(() => Boolean(document.fullscreenEnabled && document.documentElement.requestFullscreen));
+    const button = page.locator('[data-fullscreen]');
+    if (!supported) {
+        await expect(button).toBeHidden();
+        return; // Qualifies the unsupported UI, not a fullscreen success.
+    }
+    await page.fill('[data-text]', 'Keep this draft through fullscreen');
+    await button.click();
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement === document.documentElement)).toBe(true);
+    await expect(button).toHaveText('Exit full screen');
+    await button.click();
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement === null)).toBe(true);
+    await expect(button).toHaveText('Full screen');
+    await expect(page.locator('[data-text]')).toHaveValue('Keep this draft through fullscreen');
+});
