@@ -37,10 +37,13 @@ Current ordered checklist:
    its result for changed source. Preserve the selected stack and Grok branches;
    no merge to auto-publishing website main.
 2. Hand the exact qualified website/build/config/rollback packet to the existing
-   infrastructure owner. This follow-up changeslobby.js; the older165-file runtime
-   input-equivalence receipt for0f does not qualify it. The runtime workflow's
-   path filters omitlobby.js and have no manual dispatch. Request an owner
-   coverage decision without editing workflow YAML or forcing unrelated changes.
+   infrastructure owner. Only browser `lobby.js` differs in the broad165-file
+   inventory; the other164 records and all native/backend execution inputs match
+   qualified551. That broad inventory is not the native bundle catalogue, which
+   excludes browser `lobby.js`. The configured runtime workflow does not trigger
+   for this UI-only change. No extra workflow approval or forced run is required
+   by this finding. Qualify201's own frontend CI; retain551's11 actual runtime
+   modes at their original scope, without claiming a new201 runtime execution.
 3. Obtain actual combined billing-period headroom, intended separate web TURN
    credential/origin bindings and normal private delivery/trust/rollback evidence.
    A sent request or old Free-plan observation is not execution or entitlement.

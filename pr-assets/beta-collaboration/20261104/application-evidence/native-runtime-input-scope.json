@@ -1,0 +1,31 @@
+{
+  "at": "2026-11-04T06:14:33.531849+00:00",
+  "qualifiedRuntimeSource": "551e669f45ef06ceee9e875cc4ac220ef2b75b9d",
+  "websiteCandidate": "de2b01725925d2f78ee21af33f68f3eb4eb95407",
+  "inventoryFiles": 165,
+  "unchangedInventoryFiles": 164,
+  "changedInventoryFiles": [
+    "r/45662413410ed051/lobby/lobby.js"
+  ],
+  "inventoryRoots": [
+    ".github/workflows/",
+    "hangout-worker/",
+    "tests/runtime/",
+    "scripts/",
+    "r/"
+  ],
+  "explicitInputs": [
+    "hangout-internal/HANGOUT_ACCEPTANCE_REQUIREMENTS.md",
+    "hangout-internal/HANGOUT_INCIDENT_SOURCES.md",
+    "hangout-internal/HANGOUT_PRODUCTION_PARTICIPATION.md",
+    "package-lock.json",
+    "package.json"
+  ],
+  "nativeInputCatalogue": "tests/runtime/lobby-effects/source-catalogue.mjs:NATIVE_LOBBY_INPUTS",
+  "actualNativeCatalogueContainsBrowserLobbyJS": false,
+  "nativeFixturesRunnersBackendScriptsDependencyLocksAndWorkflowUnchanged": true,
+  "workflowPathFiltersExcludeBrowserOnlyUIAsConfigured": true,
+  "currentFrontendCIStillRequired": true,
+  "scope": "All11 actual runtime modes ran in551 CI.201 has unchanged native/backend execution inputs and a separately tested browser UI change. This is source/input equivalence, not a new201 runtime/provider/deployment pass. The broad r/** inventory is not the native bundle catalogue.",
+  "extraWorkflowApprovalRequired": false
+}
