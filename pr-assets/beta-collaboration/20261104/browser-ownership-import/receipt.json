@@ -22,7 +22,14 @@
     "focusedBrowserCases": 22,
     "browserRetries": 0,
     "initialOwnershipRegressionsFailed": 8,
-    "guarded": true
+    "guarded": true,
+    "separateBandJourneyCases": 2,
+    "bandJourneyClickObserver": {
+      "initialLowerBoundFailures": 2,
+      "minTrustedClicksFromEntryThroughRoomJoin": 3,
+      "maxTrustedClicksFromEntryThroughRoomJoin": 4,
+      "scope": "Trusted DOM clicks across navigation, fixture band entry/local chat/jam invitation then mocked browser enrollment; not whole-music click budget or physical audio."
+    }
   },
   "scope": "Source/provenance/local packaging and mocked-browser recovery only. Screenshots are scrolled375/390 Retry views, not full-page accessibility or physical iPhone/audio proof. No provider/deployment/public launch.",
   "fullWebsiteCI": "pending",
@@ -51,6 +58,21 @@
       "label": "website-ownership-beta-package-nov04",
       "exitCode": 0,
       "logSha256": "074a41d888062c77cd519fdf52af7f3e2c01e53d1b07fd0c2bf9466045aba832"
+    },
+    {
+      "label": "band-journey-click-observer-red-nov04",
+      "exitCode": 1,
+      "logSha256": "1867d904fb5862ba03d11f18dd4f3fc6ec25714c339246a3fe64e340d4d31a52"
+    },
+    {
+      "label": "band-journey-click-observer-green-nov04",
+      "exitCode": 0,
+      "logSha256": "aba6d2755acbe4f930083764c879320774da55df53288fb90188d7a1a49714d6"
+    },
+    {
+      "label": "band-journey-click-observer-final-nov04",
+      "exitCode": 0,
+      "logSha256": "1e9f1b1ccac7624a9a427ab467555d40e0810c04b45742d5eb07c6090586f6ae"
     }
   ]
 }

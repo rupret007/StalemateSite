@@ -33,6 +33,14 @@ files passed locally, including finite asset graph, hidden-navigation and
 public packaging guards. These checks use synthetic capture and mocked
 provider/session failures. They do not establish real enrollment or music.
 
+The separate two-visitor band journey also passes in Chromium and WebKit on
+this assembled runtime. It navigates the fixture band entrance, sends actual
+local-relay chat, creates/invites into a jam and opens mocked browser Web Join.
+Its former page-event click observer always returned zero; two new lower-bound
+failures reproduced that measurement defect. A trusted DOM click observer across
+navigation now verifies three to four clicks from entry through room join.
+That budget excludes the later Web Join setup and is not a physical-audio claim.
+
 [Sanitized receipt and four reviewed phone captures](../pr-assets/beta-collaboration/20261104/browser-ownership-import/receipt.json).
 The captures are scrolled viewport views after explicit Retry, with the Retry
 control visible; they are not full-page accessibility or physical iPhone proof.
