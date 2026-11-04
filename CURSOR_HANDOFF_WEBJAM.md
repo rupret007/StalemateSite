@@ -1,5 +1,7 @@
 # WebJam / Hang Out — Cursor continuation
 
+**Newer application checkpoint:** read [November4 private demo progress](hangout-internal/HANGOUT_PRIVATE_DEMO_PROGRESS_20261104.md) first for native423/424, website198, actual guest chat/drawing and the remaining music/deployment gates. This checkpoint is source/evidence only; no public launch or new deployment is implied.
+
 Current application checkpoint: October 31, 2026. Start with the
 [demo checkpoint](hangout-internal/HANGOUT_DEMO_CHECKPOINT.md) and the receipts
 linked below. Older dated sections retain their original evidence and limits;
