@@ -69,3 +69,17 @@ All98 cases in the affected watch-controls, media-client, hidden-room and
 catalogue modules pass locally. No playback, host-permission, moderation or
 privacy assertion was relaxed. The original CI log is retained locally with
 SHA256 b35b994b04bf2be3bcc24465452cc01f9887ccdb8960a9e89114331bc31042d5.
+
+The next source CI at11dee5b passed2,062 unit cases and779 browser cases but
+failed both375/390 camera-recovery cases, including their original retries.
+Their fold-control locator selected every descendant summary, including the
+new materials guide. Both failures reproduced locally. The locator now selects
+the activity's direct summary, matching its original intent; every camera
+permission, explicit retry, local-off, complete-status and chat-continuity
+assertion remains intact. Six focused browser cases now pass with zero retries:
+the two camera-recovery cases plus four Chromium/WebKit starter-guide cases.
+The original source log126932364396 is retained with SHA256
+13b80d3ff3ad5f49aa80f4aa3da46723f0852d105d5e5c18aa29e0284b1df45a.
+This correction changes tests and this note only. Runtime/package bytes and the
+existing69-asset private dry-run observation remain at their original scope;
+the corrected exact source still requires its normal full CI before delivery.
