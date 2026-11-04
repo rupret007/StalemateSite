@@ -473,6 +473,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .brand { flex: none; gap: 8px; }
   .brand b { font-size: 10px; white-space: nowrap; }
   .connection-tools { gap: 6px; }
+  .connection-tools button { min-height: 26px; padding: 3px 6px; font-size: 10px; }
   .entry-return { min-height: 26px; }
   .brand-mark { width: 26px; height: 26px; font-size: 23px; }
   .brand-caption, .lobby-welcome, .quick, .chat-status { display: none; }
@@ -487,7 +488,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .buffer { min-height: 0; padding-block: 1px; }
   .buffer li { padding-block: 0; }
   .say { position: sticky; bottom: 0; z-index: 1; margin-block: 4px; }
-  .say input { min-height: 36px; padding-block: 8px; }
+  .say input { min-height: 36px; padding-block: 8px; scroll-margin-bottom: 8px; }
   .say .btn { min-height: 32px; padding: 6px 8px; margin: 3px; }
   .toast { padding: 4px 12px; }
   .phonetabs { min-height: 44px; }
