@@ -1,0 +1,140 @@
+{
+  "at": "2026-11-04T08:33:14.708Z",
+  "source": "de2b01725925d2f78ee21af33f68f3eb4eb95407",
+  "runtime": "dbcaddf5-dd3f-48e3-9826-0d7998ffdbc0",
+  "scope": "Bounded live WebKit focus/geometry diagnostic; no room creation, messages, media or staff actions",
+  "cases": [
+    {
+      "width": 375,
+      "tab": {
+        "width": 375,
+        "pageWidth": 375,
+        "bodyWidth": 375,
+        "fontSize": 16,
+        "input": {
+          "left": 46,
+          "right": 294,
+          "bottom": 758
+        },
+        "send": {
+          "left": 299,
+          "right": 357,
+          "bottom": 752,
+          "disabled": false
+        },
+        "active": {
+          "tag": "BODY",
+          "id": "",
+          "isSend": false,
+          "isInput": false
+        }
+      },
+      "altTab": {
+        "width": 375,
+        "pageWidth": 375,
+        "bodyWidth": 375,
+        "fontSize": 16,
+        "input": {
+          "left": 46,
+          "right": 294,
+          "bottom": 758
+        },
+        "send": {
+          "left": 299,
+          "right": 357,
+          "bottom": 752,
+          "disabled": false
+        },
+        "active": {
+          "tag": "BUTTON",
+          "id": "",
+          "isSend": true,
+          "isInput": false
+        }
+      }
+    },
+    {
+      "width": 390,
+      "tab": {
+        "width": 390,
+        "pageWidth": 390,
+        "bodyWidth": 390,
+        "fontSize": 16,
+        "input": {
+          "left": 46,
+          "right": 309,
+          "bottom": 758
+        },
+        "send": {
+          "left": 314,
+          "right": 372,
+          "bottom": 752,
+          "disabled": false
+        },
+        "active": {
+          "tag": "BODY",
+          "id": "",
+          "isSend": false,
+          "isInput": false
+        }
+      },
+      "altTab": {
+        "width": 390,
+        "pageWidth": 390,
+        "bodyWidth": 390,
+        "fontSize": 16,
+        "input": {
+          "left": 46,
+          "right": 309,
+          "bottom": 758
+        },
+        "send": {
+          "left": 314,
+          "right": 372,
+          "bottom": 752,
+          "disabled": false
+        },
+        "active": {
+          "tag": "BUTTON",
+          "id": "",
+          "isSend": true,
+          "isInput": false
+        }
+      }
+    }
+  ],
+  "anonymousStatuses": [
+    {
+      "path": "/beta/state",
+      "status": 401
+    },
+    {
+      "path": "/join/",
+      "status": 401
+    },
+    {
+      "path": "/r/45662413410ed051/lobby/lobby.js",
+      "status": 401
+    }
+  ],
+  "assets": [
+    {
+      "path": "r/45662413410ed051/lobby/lobby.js",
+      "sha256": "235978288e197c1a9aa6723e9aaa509c646467f7ced76b461b3c3b88ddd3667e"
+    },
+    {
+      "path": "r/45662413410ed051/lobby/lobby.css",
+      "sha256": "31e2fb8db3b52ae181c9fe06350f63533dc3791540fa42f0eb4b5da88b16cc37"
+    },
+    {
+      "path": "join/app.js",
+      "sha256": "3fa2127c8c99f0a7c6bc1e49545a1a94c9da2e7839f739df290d846bc51aa4a3"
+    },
+    {
+      "path": "join/session.js",
+      "sha256": "eb2a60f3de58485deb195bb6d9c79a6d58e11a476482fe2ea30ce5686df88900"
+    }
+  ],
+  "ok": true,
+  "logoutStatus": 200
+}

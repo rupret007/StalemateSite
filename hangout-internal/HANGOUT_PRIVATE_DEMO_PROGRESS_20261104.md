@@ -1,6 +1,10 @@
 # Private demo checkpoint — November 4, 2026
 
-## Current continuation — Host tools follow-up
+## Current continuation — Direct delivery
+
+The [direct-delivery note and single ordered checklist](HANGOUT_DIRECT_PRIVATE_DELIVERY_20261104.md) are current. Jeff superseded the StoryPool delivery handoff. Website201 now runs privately as `dbcaddf5`, with actual guest chat/drawing/source-badge/privacy/mobile proof. The matching native cohort41798291653 is running; package and physical music scopes remain separate. All62 requirements are preserved.
+
+## Earlier continuation — Host tools follow-up (historical)
 
 This section supersedes pending/current statements in the earlier observation
 below. The full goal is incomplete; all62 requirements remain unchanged.

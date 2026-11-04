@@ -1,5 +1,7 @@
 # Private application evidence and delivery packet
 
+**Current delivery:** [Direct-delivery continuation](HANGOUT_DIRECT_PRIVATE_DELIVERY_20261104.md) supersedes earlier delivery ownership and pending-deployment statements below. Website201 is now deployed privately as `dbcaddf5`; all effective bindings and namespaces were preserved. Native cohort41798291653 is separate, and actual music remains unqualified.
+
 Prepared November4. This packet adds independently scoped observations to the
 [current checklist](HANGOUT_PRIVATE_DEMO_PROGRESS_20261104.md). It grants no
 deployment, provider activation or public-launch approval. All62 requirements
@@ -42,8 +44,8 @@ The earlier note overstated this as an additional workflow dependency. No extra
 workflow approval, forced dispatch or YAML change is required by that finding.
 Qualify the changed UI with201's own frontend CI. Retain all11 actual551 runtime
 modes at their original source/input scope; do not claim a new201 runtime run.
-The existing owner received this correction. Actual deployment/build/provider
-work remains that owner's responsibility.
+The existing owner received this correction. The earlier deployment/build/provider assignment is superseded: this chat now
+owns WebJam delivery directly; StoryPool core remains outside its scope.
 
 ## Downloaded entry-toolkit qualification
 
@@ -81,8 +83,8 @@ preserved. Their descriptions identify carried-forward, superseded and unique
 historical content. The two dated193 documents are not falsely claimed imported;
 their older source/provider statements must not replace the current guidance.
 
-Next: obtain the owner's normal matching private build/config/headroom/trust/
-deployment/rollback evidence, then run the
+Next: follow the current direct-delivery checklist for the matching private
+cohort, remaining credential setup and device readiness, then run the
 approved one-host/one-browser trials with current capture/headphone readiness.
 Require reciprocal human hearing on ARM/Intel/Windows and a separate-network
 pair; preserve Linux and unsigned native Windows gaps. Keep AI, separate Hang
