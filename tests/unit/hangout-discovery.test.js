@@ -206,7 +206,8 @@ describe('quiet visits and confirmed gatherings', () => {
         expect(quiet.headline).toMatch(/quiet/);
         expect(quiet.welcomeTitle).toMatch(/First one here/);
         expect(quiet.detail).toMatch(/start a room/);
-        expect(quiet.detail).toMatch(/No confirmed gathering was supplied/);
+        expect(quiet.gatheringStatus).toBe('none');
+        expect(quiet.gathering).toBeNull();
         expect(quiet.detail).not.toMatch(/active|talking now|band is here/);
         expect(quiet.quietPrompt).toEqual(QUIET_PROMPT);
         expect(quiet.creation).toEqual({ title: 'Paper birds <ink>', detail: 'A shared drawing.', room: '#art-birds' });
@@ -216,12 +217,15 @@ describe('quiet visits and confirmed gatherings', () => {
         expect(view.quietPromptDraft).toBe(QUIET_PROMPT.draft);
         expect(view.creationTitle).toBe('Paper birds <ink>');
         expect(view.creationDetail).toBe('A shared drawing. It was made in #art-birds.');
-        expect(view.gatheringActivity).toMatch(/does not invent a time/);
-        expect(view.gatheringActivity).toMatch(/does not require a band member/);
+        expect(view.gatheringActivity).toMatch(/Nothing scheduled yet/);
+        expect(view.gatheringActivity).toMatch(/Anyone can host/);
+        expect(view.gatheringActivity).toMatch(/no band member needs to be here/);
+        expect(view.gatheringWhen).toBe('');
+        expect(view.showSave).toBe(false);
         expect(visit({ creation: { approved: false, title: 'Nope', detail: 'Hidden.' } }).creation).toBeNull();
         expect(visit({ creation: { approved: true, title: 'Bad\nline', detail: 'Hidden.' } }).creation).toBeNull();
         expect(visit({ creation: { approved: true, title: 'Named', detail: 'Hidden.', room: 'art' } }).creation).toBeNull();
-        expect(visitView(visit({ creation: null })).creationMissing).toMatch(/No approved past creation was supplied/);
+        expect(visitView(visit({ creation: null })).creationMissing).toBe('No past creations shared yet.');
         const busy = visit({ channel: { names: [visitor('MeHere'), visitor('Alpha')] }, creation: past, gathering: confirmed() });
         expect(busy.quiet).toBe(false);
         expect(busy.creation).toBeNull();

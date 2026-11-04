@@ -311,6 +311,33 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .welcome-symbol { display: none; }
   .buffer { padding-inline: 16px; }
 }
+/* Desktop workspace: compact channel navigation and chrome reserve the window
+   for the transcript. Inspired by mIRC and Halloy's single-pane workflow;
+   the existing channel controls, focus model and received-session buffer stay. */
+@media (min-width: 901px) {
+  .irc { width: 100%; grid-template-columns: 220px minmax(0, 1fr) 180px; }
+  .titlebar { min-height: 48px; padding: 7px 14px; gap: 12px; }
+  .title-extra { font-size: 11px; padding-left: 12px; margin-left: 4px; }
+  .rooms, .people { padding: 12px 10px; }
+  .channel-home { padding: 8px 10px; }
+  .presence { padding: 10px 0; margin-bottom: 10px; }
+  .tiles { grid-template-columns: 1fr; gap: 4px; }
+  .tile, .tile-chat { grid-column: auto; grid-template-columns: 22px minmax(0, 1fr); gap: 2px 8px; min-height: 48px; padding: 7px 8px; }
+  .tile > b { grid-row: 1 / span 2; align-self: center; }
+  .tile strong { font-size: 12px; }
+  .tile span { grid-column: 2; line-height: 1.35; }
+  .tabs { min-height: 36px; padding: 4px 8px 0; gap: 2px; }
+  .tabs button { min-height: 32px; padding: 6px 10px; }
+  .topic { min-height: 30px; padding: 7px 14px; }
+  .lobby-welcome { margin: 12px 14px 4px; padding: 12px; gap: 10px; }
+  .welcome-symbol { display: none; }
+  .lobby-welcome p { margin-bottom: 8px; }
+  .buffer { padding: 12px 16px; font-size: 14px; line-height: 1.55; }
+  .quick { padding: 6px 14px 0; }
+  .say { margin: 8px 14px 0; }
+  .chat-status { padding: 6px 16px 8px; }
+  .people h2 { margin-bottom: 10px; }
+}
 @media (max-width: 900px) {
   .titlebar { min-height: 60px; padding: 10px 16px; }
   .title-extra { display: none; }

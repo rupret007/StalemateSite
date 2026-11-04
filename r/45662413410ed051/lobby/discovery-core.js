@@ -232,9 +232,7 @@
         const quiet = known && summary.others === 0;
         const detail = shown
             ? `${summary.detail} Next confirmed gathering: ${shown.host}, ${shown.timing.toLowerCase()}, ${shown.localStart} to ${shown.localEnd}. ${shown.activityLabel}`
-            : quiet
-                ? `${summary.detail} No confirmed gathering was supplied. Anyone visiting can host one.`
-                : summary.detail;
+            : summary.detail;
         return Object.freeze({
             connection: 'connected',
             quiet,
@@ -275,14 +273,14 @@
             gatheringWhen: confirmed ? `${visit.gathering.timing}: ${visit.gathering.localStart} to ${visit.gathering.localEnd}${visit.gathering.timeZoneAssumed ? ' (shown in UTC)' : ''}` : '',
             gatheringActivity: confirmed
                 ? visit.gathering.activityLabel
-                : none ? 'No confirmed gathering was supplied. Anyone visiting can host one. This screen does not invent a time or a weekly cadence, and it does not require a band member to be present.' : '',
+                : none ? 'Nothing scheduled yet. Anyone can host; no band member needs to be here.' : '',
             gatheringNote: confirmed ? visit.gathering.note : '',
             showSave: confirmed,
             showCreation: quiet,
             creationHeading: past ? 'Approved past creation' : 'Past creation',
             creationTitle: past ? past.title : '',
             creationDetail: past ? (past.room ? `${past.detail} It was made in ${past.room}.` : past.detail) : '',
-            creationMissing: quiet && !past ? 'No approved past creation was supplied for this quiet visit.' : '',
+            creationMissing: quiet && !past ? 'No past creations shared yet.' : '',
             showQuietPrompt: !!(visit && visit.quietPrompt),
             quietPromptLabel: visit && visit.quietPrompt ? visit.quietPrompt.label : '',
             quietPromptDraft: visit && visit.quietPrompt ? visit.quietPrompt.draft : ''

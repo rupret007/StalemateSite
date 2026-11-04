@@ -1,0 +1,53 @@
+{
+  "scope": "Local test server only; not deployed evidence or a physical iPhone",
+  "shots": [
+    {
+      "browser": "chromium",
+      "viewport": "1440x900",
+      "path": "chromium-1440x900.png",
+      "sha256": "f9446c74d884dcab21ef2a641e23803318c042164fbd433f6c8137e95da76fce"
+    },
+    {
+      "browser": "chromium",
+      "viewport": "1920x1080",
+      "path": "chromium-1920x1080.png",
+      "sha256": "96ba5258f5e9a783bb6654df49545232b04c387e1df4294205467067609643ff"
+    },
+    {
+      "browser": "chromium",
+      "viewport": "375x812",
+      "path": "chromium-375x812.png",
+      "sha256": "68795c1b8616fbea7be4617b4c747f25804c27b880360ed2e997e8f235c05403"
+    },
+    {
+      "browser": "chromium",
+      "viewport": "390x844",
+      "path": "chromium-390x844.png",
+      "sha256": "17a0ee9f46647359033cf05952fbb8a0f416d266e50b41bd5f27720fe7d976f6"
+    },
+    {
+      "browser": "webkit-community",
+      "viewport": "1440x900",
+      "path": "webkit-community-1440x900.png",
+      "sha256": "06969951109144a1b56c240e3cec76e818eb0616a9d74b0d5f223d6495976744"
+    },
+    {
+      "browser": "webkit-community",
+      "viewport": "1920x1080",
+      "path": "webkit-community-1920x1080.png",
+      "sha256": "628952a8d47c011c275de66610bf52d76e55697c435e90abc0dbd46830eb2692"
+    },
+    {
+      "browser": "webkit-community",
+      "viewport": "375x812",
+      "path": "webkit-community-375x812.png",
+      "sha256": "2d204f6bae5b3f8dcd155678ffc84ec25bb0f8873ae27f4b9306885ea0ba606f"
+    },
+    {
+      "browser": "webkit-community",
+      "viewport": "390x844",
+      "path": "webkit-community-390x844.png",
+      "sha256": "1e015922eb2749d049f1382879089de421618e9e45daccc423fd53627fd58dfb"
+    }
+  ]
+}

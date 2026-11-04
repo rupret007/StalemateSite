@@ -103,7 +103,7 @@ test('IRC conversation leads into an existing room; drafts and mentions survive 
         await expect(visitor.locator('[data-presence-title]')).toContainText('other visitor');
         await expect(visitor.locator('[data-quiet-prompt]')).toBeHidden();
         await expect(visitor.locator('[data-creation]')).toBeHidden();
-        await expect(visitor.locator('[data-gathering-activity]')).toContainText('No confirmed gathering was supplied');
+        await expect(visitor.locator('[data-gathering-activity]')).toContainText('Nothing scheduled yet');
         await visitor.click('[data-prompt="Hey everyone, I’m new here. "]');
         await expect(visitor.locator('[data-text]')).toHaveValue('Hey everyone, I’m new here. ');
         await expect(host.locator('[data-buffer]')).not.toContainText('Hey everyone, I’m new here.');
@@ -178,11 +178,12 @@ test('a quiet visit shows no invented gathering and drafts a prompt without send
         await expect(page.locator('[data-presence-title]')).toHaveText('It is quiet in #stalemate');
         await expect(page.locator('[data-lobby-count]')).toHaveText('1 here · chat');
         await expect(page.locator('[data-welcome-title]')).toHaveText('First one here? Make yourself at home.');
-        await expect(page.locator('[data-presence-detail]')).toContainText('No confirmed gathering was supplied');
+        await expect(page.locator('[data-gathering-activity]')).toContainText('Nothing scheduled yet');
         await expect(page.locator('[data-presence-detail]')).not.toContainText('band is here');
-        await expect(page.locator('[data-gathering-activity]')).toContainText('does not invent a time');
+        await expect(page.locator('[data-gathering-activity]')).toContainText('Anyone can host; no band member needs to be here');
+        await expect(page.locator('[data-gathering-when]')).toBeEmpty();
         await expect(page.locator('[data-gathering-save]')).toBeHidden();
-        await expect(page.locator('[data-creation-detail]')).toContainText('No approved past creation was supplied');
+        await expect(page.locator('[data-creation-detail]')).toContainText('No past creations shared yet');
         await expect(page.locator('[data-quiet-prompt]')).toBeVisible();
         await page.click('[data-quiet-prompt]');
         await expect(page.locator('[data-text]')).toHaveValue('One line is enough, and no gear is needed: what should we make together? ');

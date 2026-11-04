@@ -7,6 +7,24 @@ import { createEntrySharing } from './entry-sharing.mjs';
     'use strict';
     const $ = (s, el = document) => el.querySelector(s);
     const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+    const fullscreenButton = $('[data-fullscreen]');
+    if (fullscreenButton && document.fullscreenEnabled && document.documentElement.requestFullscreen) {
+        fullscreenButton.hidden = false;
+        const reflectFullscreen = () => {
+            const active = document.fullscreenElement === document.documentElement;
+            fullscreenButton.textContent = active ? 'Exit full screen' : 'Full screen';
+            fullscreenButton.setAttribute('aria-pressed', String(active));
+        };
+        document.addEventListener('fullscreenchange', reflectFullscreen);
+        fullscreenButton.addEventListener('click', async () => {
+            try {
+                if (document.fullscreenElement === document.documentElement) await document.exitFullscreen();
+                else await document.documentElement.requestFullscreen();
+            } catch {
+                toast('Full screen is unavailable here. Maximize this browser window to use more space.');
+            } finally { reflectFullscreen(); }
+        });
+    }
     const Discovery = window.HangoutDiscovery;
     const params = new URLSearchParams(location.search);
     const readTab = key => { try { return sessionStorage.getItem(key); } catch { return null; } };
