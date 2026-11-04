@@ -79,3 +79,19 @@ are retained locally; no product failure is relabeled.
 This branch stacks on Paint Along203/cb81e11. It does not merge to public main,
 deploy the beta, enable media/AI, or change the62 acceptance requirements.
 Its own normal GitHub CI and private delivery remain pending.
+
+## Full-CI reflow correction
+
+The first59ecad2 source job126901925384 passed775 browser cases but failed
+the existing320×256 composer and ended-session keyboard checks (including
+their original retries). Local runs reproduced both failures. With a return
+link plus the new fullscreen action, the short-window header could wrap;
+input focus exposed the input itself while the form border extended1px
+beyond the viewport. Compact header controls now match the existing26px
+short-window action size, and an8px input scroll margin reserves the form
+edge during native focus scrolling. No geometry threshold or test was weakened.
+The four targeted Chromium cases now pass. The broader18-case local run also
+passes:14 workspace cases across Chromium/WebKit plus those four Chromium
+reflow/recovery cases. WebKit deep-zoom is not claimed by that selection. The
+corrected head still requires its own normal CI.
+Original contexts/screenshots and the decoded CI log are retained privately.
