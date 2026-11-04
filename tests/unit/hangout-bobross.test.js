@@ -8,6 +8,13 @@ const B = require('../../r/45662413410ed051/bob-ross.js');
 const H = require('../../r/45662413410ed051/sync-core.js');
 
 describe('Bob Ross Paint-Along data', () => {
+    it('offers four starter picks with Grandeur first without replacing the larger catalogue', () => {
+        expect(B.STARTER_EPISODES.map(ep => ep.id)).toEqual(['mT0RNrTDHkI', 'oh5p5f5_-7A', 'vgbMONXc9Cs', 'sS-hNYgDUak']);
+        expect(B.DEFAULT_LESSON).toBe(B.STARTER_EPISODES[0]);
+        expect(B.label(B.DEFAULT_LESSON)).toMatch(/Start here.*One-hour special/);
+        expect(B.findEpisode('mT0RNrTDHkI')).toBe(B.DEFAULT_LESSON);
+        for (const ep of B.STARTER_EPISODES) expect(H.parseYouTubeId(ep.id)).toBe(ep.id);
+    });
     it('ships 10-12 unique, well-formed episodes with season/episode and a one-liner', () => {
         expect(B.EPISODES.length).toBeGreaterThanOrEqual(10);
         expect(B.EPISODES.length).toBeLessThanOrEqual(12);

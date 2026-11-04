@@ -22,6 +22,7 @@
             load: $('[data-act-load]'),
             url: $('[data-act-url]'),
             bobPicks: $('[data-bob-picks]'),
+            paintStart: $('[data-paint-start]'),
             tiles: $('[data-act-tiles]'), relayStatus: $('[data-act-relay-status]')
         };
         const state = {
@@ -222,12 +223,13 @@
             ui.video.hidden = !video;
             ui.load.hidden = !video;
             ui.bobPicks.hidden = chan.kind !== 'bobross';
+            ui.paintStart.hidden = chan.kind !== 'bobross';
             if (paint) setupCanvas();
             if (video) setupVideoUi();
             if (act) ingestSnap(act);
             syncNames(chan);
             if (video && chan.kind === 'bobross' && isOp() && !state.room.video) {
-                const ep = BOB.EPISODES[2];
+                const ep = BOB.DEFAULT_LESSON;
                 hostVideo({ kind: 'yt', id: ep.id }, true, 0);
             }
         }
@@ -398,7 +400,7 @@
         function setupVideoUi() {
             if (ui.bobPicks.dataset.ready) return;
             ui.bobPicks.dataset.ready = '1';
-            BOB.EPISODES.slice(0, 6).forEach((ep) => {
+            BOB.STARTER_EPISODES.forEach((ep) => {
                 const b = document.createElement('button');
                 b.type = 'button';
                 b.className = 'btn btn--small';

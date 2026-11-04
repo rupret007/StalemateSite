@@ -171,7 +171,15 @@ test('bob ross room: curated episodes and custom lesson links sync beside the sh
     await host.click('[data-start="bobross"]');
     await expect(host.locator('[data-act-canvas]')).toBeVisible();
     await expect(host.locator('[data-bob-picks]')).toBeVisible();
-    await expect.poll(() => host.evaluate(() => window.__lobbyRoom.state.room.video?.source?.id)).toBeTruthy();
+    await expect.poll(() => host.evaluate(() => window.__lobbyRoom.state.room.video?.source?.id)).toBe('mT0RNrTDHkI');
+    await expect(host.locator('[data-bob-picks] button')).toHaveCount(4);
+    await expect(host.locator('[data-bob-picks] button').first()).toContainText('The Grandeur of Summer');
+    const guide = host.locator('[data-paint-start]');
+    await expect(guide).toBeVisible();
+    await guide.locator('summary').click();
+    await expect(guide).toContainText('The kit is optional');
+    await expect(guide.locator('a').first()).toHaveAttribute('href', 'https://www.bobross.com/bob-ross-master-paint-set/');
+    await expect(guide.locator('a').first()).toHaveAttribute('rel', 'noopener noreferrer');
     await host.getByRole('button', { name: 'S7 E11 · Grey Winter', exact: true }).click();
     await expect.poll(() => host.evaluate(() => window.__lobbyRoom.state.room.video?.source?.id)).toBe('sS-hNYgDUak');
     const guest = await fan(browser, 'BobGuest');

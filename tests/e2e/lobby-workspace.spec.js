@@ -73,3 +73,36 @@ test('fullscreen uses the browser API when available and reflects exit', async (
     await expect(button).toHaveText('Full screen');
     await expect(page.locator('[data-text]')).toHaveValue('Keep this draft through fullscreen');
 });
+
+for (const width of [375, 390]) {
+    test(`paint starter icon, lesson picks and materials fit ${width}px`, async ({ page, baseURL }, testInfo) => {
+        await page.setViewportSize({ width, height: 844 });
+        await page.route(/youtube\.com|ytimg|googlevideo/, route => route.abort());
+        await page.route('https://www.youtube.com/iframe_api', route => route.fulfill({
+            path: require('node:path').join(__dirname, 'support/fake-youtube.js'), contentType: 'text/javascript'
+        }));
+        await enter(page, baseURL);
+        await page.click('[data-show="rooms"]');
+        const icon = page.locator('[data-start="bobross"] img');
+        await icon.scrollIntoViewIfNeeded();
+        await expect.poll(() => icon.evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
+        await page.screenshot({ path: testInfo.outputPath(`paint-entry-${width}.png`), animations: 'disabled' });
+        await page.click('[data-start="bobross"]');
+        await expect(page.locator('[data-bob-picks] button')).toHaveCount(4);
+        await expect(page.locator('[data-bob-picks] button').first()).toContainText('The Grandeur of Summer');
+        const guide = page.locator('[data-paint-start]');
+        await guide.locator('summary').click();
+        await guide.scrollIntoViewIfNeeded();
+        await expect(guide).toContainText('kit is optional');
+        const link = guide.locator('a').first();
+        await link.focus();
+        await expect(link).toBeFocused();
+        await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+        const send = await page.locator('[data-send]').boundingBox();
+        expect(send.x + send.width).toBeLessThanOrEqual(width);
+        expect(send.y + send.height).toBeLessThanOrEqual(844);
+        expect(await page.locator('[data-text]').evaluate(input => getComputedStyle(input).fontSize)).toBe('16px');
+        await page.screenshot({ path: testInfo.outputPath(`paint-materials-${width}.png`), animations: 'disabled' });
+    });
+}
