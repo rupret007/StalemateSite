@@ -220,7 +220,7 @@
             const video = chan.kind === 'bobross' || chan.kind === 'watch';
             ui.paint.hidden = !paint;
             ui.video.hidden = !video;
-            ui.load.hidden = chan.kind !== 'watch';
+            ui.load.hidden = !video;
             ui.bobPicks.hidden = chan.kind !== 'bobross';
             if (paint) setupCanvas();
             if (video) setupVideoUi();

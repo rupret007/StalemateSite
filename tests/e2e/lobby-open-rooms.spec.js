@@ -166,11 +166,24 @@ test('watch source changes wait for one player and a canceled room cannot start 
     }
 });
 
-test('bob ross room: headline episode and paint canvas appear for host', async ({ browser }) => {
+test('bob ross room: curated episodes and custom lesson links sync beside the shared canvas', async ({ browser }) => {
     const host = await fan(browser, 'BobHost');
     await host.click('[data-start="bobross"]');
     await expect(host.locator('[data-act-canvas]')).toBeVisible();
     await expect(host.locator('[data-bob-picks]')).toBeVisible();
     await expect.poll(() => host.evaluate(() => window.__lobbyRoom.state.room.video?.source?.id)).toBeTruthy();
+    await host.getByRole('button', { name: 'S7 E11 · Grey Winter', exact: true }).click();
+    await expect.poll(() => host.evaluate(() => window.__lobbyRoom.state.room.video?.source?.id)).toBe('sS-hNYgDUak');
+    const guest = await fan(browser, 'BobGuest');
+    const room = await host.evaluate(() => window.__lobby.active);
+    await guest.evaluate((r) => window.__lobby.cmd('join', [r]), room);
+    await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-video-id', 'sS-hNYgDUak');
+    await expect(host.locator('[data-act-url]')).toBeVisible();
+    await host.fill('[data-act-url]', 'https://youtu.be/vgbMONXc9Cs');
+    await host.press('[data-act-url]', 'Enter');
+    await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-video-id', 'vgbMONXc9Cs');
+    await expect(guest.locator('[data-act-canvas]')).toBeVisible();
+    await expect(guest.locator('[data-act-url]')).toBeHidden();
+    await guest.context().close();
     await host.context().close();
 });
