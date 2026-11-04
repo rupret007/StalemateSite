@@ -33,7 +33,7 @@ neutral rendering in every native icon state. The browser version is a lossless
 WebP encoding; decoded RGBA pixels were compared exactly with the source PNG.
 
 - Native PNG: `webjam_qt/theme/assets/paint_along_mark.png`
-- Browser WebP: `r/45662413410ed051/paint-together-afro.webp`
+- Browser WebP: `paint-together-afro.webp` in the private room runtime directory.
 - PNG SHA256: `2b22a624c31ff2ea200f70380cdd6d4455e19b23448a90d138889d02b700e7cf`
 - WebP SHA256: `304cfcfe00d136cc577d7824e32fd0e8945f598e9680b043ee08c5ad4d12ed8d`
 - 1261×1247 pixels with alpha; PNG1,435,466 bytes / WebP852,272 bytes.
@@ -54,6 +54,18 @@ Five catalogue/starter unit cases and all four existing open-room browser cases
 pass. Four additional375/390 cases pass in Chromium and WebKit, checking the
 loaded icon, four picks, focusable optional links, page containment, visible Send
 and16px input. These use the offline YouTube fixture; the separate real-provider
-observations retain their own scope. Screenshots are stored with the local test
-results and require visual review before qualification. This branch stacks on
+observations retain their own scope. Local screenshots of the375px Chromium entry
+and390px WebKit expanded guide were inspected: links remain readable and the
+composer is retained while the activity pane scrolls. This branch stacks on
 IRC workspace204 and needs its own full CI and private delivery.
+
+The first full PR CI at1903b5d failed ten unit cases in job126926697884:
+nine playback/media cases still supplied an old partial BobRoss test double,
+and the privacy check rejected a private route in this artwork note. The nine
+fixture failures reproduced locally before correction. Those fixtures now load
+the actual catalogue module rather than duplicating its growing interface.
+The note uses only the asset filename; the privacy rule remains unchanged.
+All98 cases in the affected watch-controls, media-client, hidden-room and
+catalogue modules pass locally. No playback, host-permission, moderation or
+privacy assertion was relaxed. The original CI log is retained locally with
+SHA256 b35b994b04bf2be3bcc24465452cc01f9887ccdb8960a9e89114331bc31042d5.
