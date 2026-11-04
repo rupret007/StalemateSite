@@ -1,6 +1,6 @@
 # Private application evidence and delivery packet
 
-**Current delivery:** [Direct-delivery continuation](HANGOUT_DIRECT_PRIVATE_DELIVERY_20261104.md) supersedes earlier delivery ownership and pending-deployment statements below. Website201 is now deployed privately as `dbcaddf5`; all effective bindings and namespaces were preserved. Native cohort41798291653 is separate, and actual music remains unqualified.
+**Current delivery:** [Direct-delivery continuation](HANGOUT_DIRECT_PRIVATE_DELIVERY_20261104.md) supersedes earlier delivery ownership and pending-deployment statements below. Website201 now runs privately as `c0586c29`; only the approved music origin changed, preserving all other bindings, namespaces and assets. Separate browser secrets are installed and issuer API preflight passes. Actual two-Mac Wi-Fi chat passes. Native428 merged as `12d939af`, fixing both HTTP clients; corrected private cohort 41886309202 uses `e101465`. Actual reciprocal music remains unqualified.
 
 Prepared November4. This packet adds independently scoped observations to the
 [current checklist](HANGOUT_PRIVATE_DEMO_PROGRESS_20261104.md). It grants no
@@ -12,10 +12,11 @@ and their [full audit](HANGOUT_ACCEPTANCE_AUDIT_20261031.md) remain binding.
 | Artifact | Identity | Evidence boundary |
 | --- | --- | --- |
 | Website application | [PR201](https://github.com/rupret007/StalemateSite/pull/201), `de2b01725925d2f78ee21af33f68f3eb4eb95407` | Both full CI jobs pass2,061 units/137files and763 main browser cases without retries. Local focused moderation and375/390 captures also pass. Pages deployments skipped. |
-| Native runtime | Reviewed0d995cd / mergede9dc799 from [424](https://github.com/rupret007/webjam/pull/424) | All6 required checks; all561 Python modules once,12,909 passed/60 existing skips. Source/CI only. |
+| Corrected native runtime | Reviewed640fa3c / merge12d939af from [428](https://github.com/rupret007/webjam/pull/428) | All6 required checks; all 562 Python modules once,12,911 passed/60 existing skips. Both corrected source clients receive204 from the live mailbox. Source/API and physical music remain distinct. |
 | Music worksheet | Reviewedc86d515 / mergef09cead from [425](https://github.com/rupret007/webjam/pull/425) | Documentation only; qualified separately. No runtime rebuild is warranted solely by this worksheet. |
-| Current private packages | d3ea7c5 / run41798291653 | All four actual archives verified; both Mac signatures pass, ARM first-screen startup/normal close preserves settings. See the direct-delivery note; no physical music is qualified. |
-| Current private service | `https://stalemate-hangout-beta.jeffstory007.workers.dev/beta/` | Website201/de2b017 runs as dbcaddf5, with scoped chat, drawing, responsive layout, reconnect, fresh history and logout/revocation observations. |
+| Corrected private package cohort | e101465 / run41886309202 | Exactly one private build of the HTTP correction; later640 adds only its changelog fragment. See the direct-delivery note and current archive receipts; do not use old d3 packages as fixed-build proof. |
+| Earlier private packages | d3ea7c5 / run41798291653 | All four actual archives verified; both Mac signatures pass, ARM startup/Join recovery/normal close preserves settings. These archives lack428's HTTP correction. |
+| Current private service | `https://stalemate-hangout-beta.jeffstory007.workers.dev/beta/` | Website201/de2b017 runs as c0586c29. Actual two-physical-Mac Wi-Fi chat, cross-entry badges, fresh history,375/390 layout and logout add to the earlier scoped browser observations. No media was captured. |
 
 This evidence-only follow-up changes documentation/receipts, not application
 runtime. Its branch is`codex/private-demo-evidence-20261104`; its documentation
@@ -83,8 +84,8 @@ preserved. Their descriptions identify carried-forward, superseded and unique
 historical content. The two dated193 documents are not falsely claimed imported;
 their older source/provider statements must not replace the current guidance.
 
-Next: follow the current direct-delivery checklist for the matching private
-cohort, remaining credential setup and device readiness, then run the
+Next: follow the current direct-delivery checklist for the corrected private
+cohort and physical device readiness, then run the
 approved one-host/one-browser trials with current capture/headphone readiness.
 Require reciprocal human hearing on ARM/Intel/Windows and a separate-network
 pair; preserve Linux and unsigned native Windows gaps. Keep AI, separate Hang

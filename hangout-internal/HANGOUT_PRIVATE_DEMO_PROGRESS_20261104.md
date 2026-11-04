@@ -2,12 +2,12 @@
 
 ## Current continuation — Direct delivery
 
-The [direct-delivery note and single ordered checklist](HANGOUT_DIRECT_PRIVATE_DELIVERY_20261104.md) are current. Jeff superseded the StoryPool delivery handoff. Website201 now runs privately as `dbcaddf5`, with actual guest chat/drawing/source-badge/privacy/mobile/reconnect proof. Matching native cohort41798291653 passed all four platforms; downloaded archives and both Mac signatures are verified, and actual ARM startup/normal close preserved settings. Physical music remains unqualified. All62 requirements are preserved.
+The [direct-delivery note and single ordered checklist](HANGOUT_DIRECT_PRIVATE_DELIVERY_20261104.md) are current. Jeff superseded the StoryPool delivery handoff. Website201 now runs privately as `c0586c29`, with its approved music origin and separate encrypted TURN credentials in issuer `60e3f182`. Actual ARM Mini/Intel MacBook Wi-Fi chat passes, including fresh history, entry badges,375/390 layout and logout. Native428 fixed the reproduced Cloudflare1010 HTTP identity blocker and merged as `12d939af`; exact CI passed 12,911 cases across562 tracked modules, with 60 skips. One corrected private cohort 41886309202 is pinned to `e101465`; older 41798291653/d3 packages remain historical and lack this fix. Physical music remains unqualified. The Mini still needs physical headphones/input. All62 requirements are preserved.
 
 ## Earlier continuation — Host tools follow-up (historical)
 
 This section supersedes pending/current statements in the earlier observation
-below. The full goal is incomplete; all62 requirements remain unchanged.
+below. The full goal is incomplete; all 62 requirements remain unchanged.
 
 - Native423/424 are qualified and normally merged. Combined reviewed source
   `0d995cd79d2a7bf95dbbafcbafbb0618e0762a71` merged as
@@ -60,7 +60,7 @@ Current ordered checklist:
    ARM/Intel/Windows music plus a separate-network pair through qualified normal
    packages. Preserve Linux and unsigned native Windows gaps. Approved trials are
    one native host/one browser guest, at most10 minutes each after the gates.
-5. Keep all62 outcomes and the full audit's hosted/accessibility/capacity/legal
+5. Keep all 62 outcomes and the full audit's hosted/accessibility/capacity/legal
    gaps explicit. Only Jeff disposes current synthetic report289035. Preserve
    the original FAILED eight-hour observer; no new eight-hour pass is claimed.
 

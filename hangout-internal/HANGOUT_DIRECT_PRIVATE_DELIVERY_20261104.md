@@ -12,17 +12,24 @@ remain unchanged.
 
 Qualified application source `de2b01725925d2f78ee21af33f68f3eb4eb95407`
 (website PR201) now runs on the existing invitation-protected beta as Worker
-`dbcaddf5-dd3f-48e3-9826-0d7998ffdbc0`.
+`c0586c29-3d43-4ffa-96e4-646b9e7dde06`. The approved music-origin configuration
+was applied at 18:07 UTC; all 68 assets remain identical to201. Its immediate
+rollback is `dbcaddf5-dd3f-48e3-9826-0d7998ffdbc0`.
 
 Private address: <https://stalemate-hangout-beta.jeffstory007.workers.dev/beta/>.
 The invitation remains in the owner-only local note, not this document.
 
-The previous version `a9724702-3ce5-418a-bbd4-950f2e169c9e` is the recorded
-rollback target. Before deployment, every plain variable matched the live
+For the earlier 08:28 delivery of `dbcaddf5`, the previous version
+`a9724702-3ce5-418a-bbd4-950f2e169c9e` remains its recorded rollback target.
+Before that delivery, every plain variable matched the live
 configuration. After deployment, all effective bindings, secret binding names,
 Durable Object namespace IDs and runtime settings were identical. Existing
 legacy session authority, sessions, keys, ledgers and reports were preserved;
-no authority migration or provider activation occurred.
+no authority migration or provider activation occurred in that deployment.
+The separately approved18:07 music configuration changed only
+`WEBJAM_WEB_ORIGINS`; all other bindings, secret names, namespace IDs, sessions,
+reports and runtime settings remain identical. AI and the separate Hang Out
+chat/media TURN remain off.
 
 All 68 packaged asset files matched source. Authenticated reads also verified
 served lobby JavaScript/CSS and Web Join app/session bytes against source.
@@ -75,7 +82,75 @@ dismiss “Private demo acceptance report test only November four 5ca199”**
 reports, including older synthetic reports, unchanged. Earlier human dismissals
 do not qualify this report's current review.
 
-## One matching native package cohort
+## Actual physical Wi-Fi chat and corrected native package cohort
+
+At 18:44 UTC, installed Chrome on the ARM Mini and Intel MacBook exchanged real
+ordinary-channel messages through the private service. They used the Stalemate
+and Rad Dad entrances, displayed both badges, and the later MacBook visitor saw
+no earlier channel text. Both normal logouts returned200 and subsequent state
+requests returned401. Capture requests were zero. Tailscale/SSH carried test
+administration; website traffic used the normal Internet route. The MacBook's
+default network interface was Wi-Fi. This does not establish an off-site pair.
+
+The MacBook's actual Chrome 375/390 viewport captures were visually inspected:
+page/body stayed contained, input text was16px, and input/Send remained visible.
+These are viewport tests on physical Intel hardware, not physical iPhone tests.
+See the [afternoon receipts and captures](../pr-assets/beta-collaboration/20261104/direct-private-delivery/afternoon/receipt.json).
+
+Live testing then reproduced a real music-setup blocker on both Macs: the
+default Python HTTP identity received Cloudflare 403/error1010. Honest WebJam
+and Go identities received 204 for the same nonexistent mailbox. Native
+[PR428](https://github.com/rupret007/webjam/pull/428) sets `User-Agent: WebJam`
+on both production HTTP mailbox clients. Cloudflare's
+[workers.dev1010 guidance](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1010/)
+supports a descriptive application identity. No server security protection,
+certificate verification, redirect policy or response validation was weakened.
+
+Both new regression cases fail on the parent;105 focused cases pass after the
+fix. Both corrected production source clients receive204 from the live service.
+An initial broader local run retained four failures from a missing pinned
+WebSocket dependency; installing that dependency only in this worktree produced
+the105-case pass. No global environment or shared cache was repaired/deleted.
+
+Reviewed head `640fa3c5ae44f9caaca47c8ec35510880c673ecc` and actual CI checkout
+`bffdf9437be8063c318a5ce856a4c0a2123de7cd` share whole tree
+`fa148576d2c64d23250e53f20a76ff99947ab3f3`. All six required checks passed;
+all 562 tracked Python modules ran once: 12,911 passed and 60 existing skips.
+PR428 merged normally as `12d939af29ae2b28f8d25cd21186d8c2d1eb8927`.
+Its original missing-changelog CI failure is retained;640 adds only that fragment.
+
+Exactly one corrected private cohort,
+[41886309202](https://github.com/rupret007/webjam/actions/runs/41886309202),
+uses actual source `e101465df5d204809619aafc8b65fd7925950e8a`. Its main CI
+independently ran the same 562-module loop:12,911 passed / 60 skipped, and both
+real Jamulus integrations passed. This build contains the runtime correction;
+later640 and merge12d add no further runtime inputs. Do not dispatch another
+cohort for the changelog, relabel e101 archives as640/12d, or use old d3 archives
+as proof of the correction. The run completed with16 successful and6 skipped
+jobs. All four actual archives matched GitHub's digest and size, embedded e101
+private-beta target and expected executable architecture. Both Mac bundles pass
+normal deep/strict ad-hoc signature verification. The
+[afternoon package receipt](../pr-assets/beta-collaboration/20261104/direct-private-delivery/afternoon/native-fixed-packages.json)
+records each actual archive and verification boundary:
+
+| Platform | Actions artifact | Actual executable | Qualification boundary |
+| --- | --- | --- | --- |
+| ARM Mac |13353961921 |Mach-O arm64 |Deep/strict signature; actual startup, Join recovery and normal close |
+| Intel Mac |13353864438 |Mach-O x86-64 |Deep/strict signature; no physical native launch or audio claimed |
+| Windows |13354401820 |PE x86-64 |Verified unsigned test archive; physical installation/audio unqualified |
+| Linux |13354580740 |ELF64 x86-64 |Verified archive; physical installation/audio unqualified |
+
+Windows remains an unsigned private test
+build; no public tag/release or platform trust bypass is authorized.
+
+The corrected ARM archive's digest, source/private target, arm64 executable and
+deep/strict ad-hoc signature pass. Its actual native Join screen refused a
+malformed non-secret invitation with visible/accessibility feedback; editing
+cleared the error, Return restored it, and Back returned to Music/Art. Normal
+Close left no owned process and preserved saved config/mix content and mtime.
+Host/capture never started. This is frozen-app recovery proof, not live music.
+
+## Earlier d3 native package cohort — retained scope
 
 [Run41798291653](https://github.com/rupret007/webjam/actions/runs/41798291653)
 uses merged source `d3ea7c55b95b155e355d96d59491eb704d895bd2` on the dedicated
@@ -114,11 +189,11 @@ verifier requires one regular canonical manifest and validates all aliases,
 paths, source and target against the unchanged archive. It does not remove an
 application check or alter a package to make it pass.
 
-Documentation head3d7edb1 and actual PR checkoutdc3707c share whole tree
-`ec04816c18bf3f68de0be29e41d2ec5397b108da`. Both full CI jobs passed2,061 units
-in137 files,763 main browser cases and separate34/34 deployment-path checks,
+Documentation head 6fb7653 and actual PR checkout b854cea share whole tree
+`0acaadf85a3ce063dd11515f0ebb4c108cbaab90`. Both full CI jobs passed 2,061 units
+in 137 files, 763 main browser cases and separate 34/34 deployment-path checks,
 without retry/flaky summaries; Pages jobs skipped. See the
-[source-bound qualification](../pr-assets/beta-collaboration/20261104/direct-private-delivery/completion/website202-ci.json).
+[source-bound qualification](../pr-assets/beta-collaboration/20261104/direct-private-delivery/afternoon/website202-6fb-ci.json).
 These are the previous documentation head's results, not automatic qualification
 of a later documentation push or physical music.
 
@@ -134,38 +209,59 @@ limits. A chart saying No data alone does not establish zero usage. Primary
 references: [Realtime pricing](https://developers.cloudflare.com/realtime/sfu/platform/pricing/)
 and [billing-period reporting](https://developers.cloudflare.com/billing/manage/billable-usage/).
 
-Current issuer version `e7cda1bb-be95-4824-a363-924ff6f2948b` has its existing
-account analytics binding but no separate browser TURN secret pair. The
-`webjam-private-web` creation form is prepared. Browser-use policy requires
-confirmation immediately before creating persistent security credentials; that
-specific creation/installation question is pending. No key was created, copied,
-printed or committed. The expected CLI vault is locked and no temporary session
-handoff exists; no unlock was attempted.
+Jeff explicitly approved the separate `webjam-private-web` application and
+installation in the existing `webjam-turn-credentials` Worker. Both new bindings,
+`WEB_TURN_KEY_ID` and `WEB_TURN_KEY_API_TOKEN`, are stored as encrypted secrets.
+Existing desktop/account secrets were preserved. Full credential values were
+neither printed nor committed. No vault unlock, purchase or plan upgrade was needed.
 
-Both owner-only proposed issuer and beta music configurations bundled successfully
-in normal Wrangler dry runs. Neither was applied. The issuer proposal preserves
-existing desktop/account bindings and adds the reviewed exact private origin;
-the beta proposal changes only `WEBJAM_WEB_ORIGINS`. Existing namespaces,
-sessions, ledgers and reports remain intact. Dry runs are configuration evidence,
-not active credentials or a working music route.
+Secret-only version `0293048a-6440-4e31-ad41-85b3d8f4074b` precedes the actual
+issuer configuration version `60e3f182-2d11-4740-b89a-74377778766d`; it is the
+issuer rollback. Normal Wrangler deployments preserved variables/secrets and
+added only four reviewed issuer variables: exact origin list, production mode,
+3,000 daily web requests and 200 GB web monthly cap. Existing desktop 800 GB cap,
+600-second TTL, quotas, namespaces and runtime settings remain unchanged.
+
+Fresh successful account-wide TURN/SFU GraphQL responses at 17:56/17:58 UTC cover
+the observed billing period to date, with one account, no app/key filter, no
+errors and no usage groups. This supports a bounded-trial headroom inference at
+observation, not a provider spending guarantee. Recheck before actual media.
+
+Actual protected-browser CORS/invalid-request handling passed. Separate live API
+checks with an honest application identity returned 204 for both exact allowed
+origins and 403/no allow header for an unknown origin. One random syntactically
+valid test-session request issued a 600-second/256 MiB web credential document,
+without recording its values or creating any relay allocation. It expired before
+18:44. This does not prove a real native invitation, authenticated host ownership,
+relay performance or music. The original Python edge rejection remains distinct
+from the actual Worker-level CORS denial.
 
 The current ordered checklist is:
 
-1. After the pending credential confirmation, complete the reviewed separate
-   browser-key/issuer/exact-origin setup directly here, preserving existing
-   desktop secrets, state and limits. Keep AI and separate Hang Out media TURN off.
-2. Obtain current device/headphone/capture readiness. At10:05UTC the Intel
-   MacBook is offline on Tailscale and Windows NucBox is online; online status
-   does not establish consent, headphones, remote access or audio readiness.
+1. Use the verified e101 package cohort above, preserving exact source/digests,
+   private target and normal platform trust. Do not rebuild for 640's changelog
+   or rerun unchanged successful tests. Preserve all earlier failures. Later
+   documentation pushes need their own normal CI;6fb's evidence stays separate.
+2. Connect a physical USB headset or input/interface plus headphones to the Mini.
+   The Mini currently exposes BlackHole virtual I/O and built-in speakers; do not
+   capture shared system audio under microphone-only consent. Select devices in
+   WebJam without changing shared global routing. The Intel MacBook is online,
+   verified by its user-confirmed SSH host fingerprint, with physical headphones
+   and microphone. Jeff approved bounded Mini/MacBook microphone trials, with
+   headphones and no recording. Windows audio readiness is still unconfirmed.
    Demonstrate actual
    reciprocal ARM/Intel/Windows music and a separate-network pair: one native host
-   and one browser guest, at most10 minutes per trial. Record hearing, dropouts,
-   interruption, Stop/leave and recovery. Synthetic audio, WSL and same-machine
+   and one browser guest, at most 10 minutes per trial. Record hearing, dropouts,
+   interruption, Stop/leave and recovery. **Wi-Fi first**, then a separate Ethernet
+   comparison; do not substitute wired results for the primary wireless journey.
+   Synthetic audio, WSL and same-machine
    echo do not qualify. If a human check is unavailable overnight, leave the
    shortest precise morning action without inventing a pass.
-3. Complete only Jeff's current synthetic-report review through normal access;
+3. Remove only the temporary MacBook test key and owned test sessions/processes
+   after device testing; do not alter other keys, services or system settings.
+4. Complete only Jeff's current synthetic-report review through normal access;
    leave unrelated reports unchanged. Preserve all remaining accessibility,
-   hosted-capacity, all-ages, legal/operator and other62-outcome audit gaps.
+   hosted-capacity, all-ages, legal/operator and other 62-outcome audit gaps.
 
 Overall private music demo readiness remains UNPROVEN. Delivered chat and
 package/CI checks do not substitute for actual reciprocal music.
