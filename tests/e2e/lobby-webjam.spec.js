@@ -1,6 +1,7 @@
 // The site relays the app's invitation unchanged. WebJam owns parsing and admission.
 const { test, expect } = require('@playwright/test');
 const { randomUUID } = require('node:crypto');
+const jsQR = require('jsqr');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 // Full clipboard format from WebJam build_invite_message and direct_stun_invite.
 // This opaque transport fixture is never sent to a WebJam service.
@@ -251,8 +252,8 @@ test('a cached browser Join action stays inactive after local Stop when server w
     } finally { await f.close(); }
 });
 
-test('copy invite link and QR encode the shared browser invitation', async ({ browser, baseURL }) => {
-    const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });
+for (const width of [375, 390]) test(`copy invite link and QR encode the shared browser invitation at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+    const f = await browserRoom(browser, baseURL, true, { width, height: 844 });
     try {
         const host = await f.join('QrHost');
         await host.click('[data-show="rooms"]');
@@ -265,18 +266,47 @@ test('copy invite link and QR encode the shared browser invitation', async ({ br
         await host.click('[data-jam-invite-qr-toggle]');
         const canvas = host.locator('[data-jam-invite-qr]');
         await expect(canvas).toBeVisible();
-        await expect(canvas).toHaveAttribute('data-invite-url', WEB_INVITE);
-        expect(await canvas.evaluate((node) => {
-            const ctx = node.getContext('2d');
-            const { data, width, height } = ctx.getImageData(0, 0, node.width, node.height);
-            let dark = 0;
-            for (let i = 0; i < data.length; i += 4) if (data[i] < 32) dark += 1;
-            return dark > width * height * 0.05;
+        await expect.poll(() => canvas.evaluate(node => {
+            const rect = node.getBoundingClientRect(), panel = node.closest('[data-jam]').getBoundingClientRect();
+            return rect.top >= Math.max(0, panel.top) && rect.bottom <= Math.min(innerHeight, panel.bottom)
+                && rect.left >= 0 && rect.right <= innerWidth;
         })).toBe(true);
+        for (const selector of ['[data-text]', '[data-send]']) {
+            expect(await host.locator(selector).evaluate(node => {
+                const rect = node.getBoundingClientRect();
+                return rect.top >= 0 && rect.bottom <= innerHeight && rect.left >= 0 && rect.right <= innerWidth;
+            })).toBe(true);
+        }
+        const pixels = await canvas.evaluate(node => {
+            const { data, width, height } = node.getContext('2d').getImageData(0, 0, node.width, node.height);
+            return { data: Array.from(data), width, height };
+        });
+        const decoded = jsQR(new Uint8ClampedArray(pixels.data), pixels.width, pixels.height);
+        expect(decoded?.data).toBe(WEB_INVITE);
+        const modules = 17 + 4 * decoded.version;
+        expect(pixels.width % (modules + 8)).toBe(0);
+        const quiet = 4 * pixels.width / (modules + 8);
+        for (let y = 0; y < pixels.height; y++) for (let x = 0; x < pixels.width; x++) {
+            if (x >= quiet && y >= quiet && x < pixels.width - quiet && y < pixels.height - quiet) continue;
+            expect(pixels.data[(y * pixels.width + x) * 4]).toBeGreaterThan(200);
+        }
+        await expect(canvas).not.toHaveAttribute('data-invite-url');
+        expect(await host.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await host.screenshot({ path: testInfo.outputPath(`qr-${width}.png`), fullPage: true });
+        await host.click('[data-jam-invite-qr-toggle]');
+        expect(await canvas.evaluate(node => node.getContext('2d').getImageData(0, 0, node.width, node.height).data.every(value => value === 0))).toBe(true);
+        await host.click('[data-jam-invite-qr-toggle]');
         await host.evaluate(() => { navigator.clipboard.writeText = async () => { throw new Error('blocked'); }; });
         await host.click('[data-jam-invite-copy]');
         await expect(host.locator('[data-jam-invite-copy-value]')).toBeVisible();
         await expect(host.locator('[data-jam-invite-copy-value]')).toHaveValue(WEB_INVITE);
+        await host.fill('[data-text]', '/part');
+        await host.press('[data-text]', 'Enter');
+        await expect(host.locator('[data-jam-invite-qr-panel]')).toBeHidden();
+        await expect(canvas).not.toHaveAttribute('data-invite-url');
+        expect(await canvas.evaluate(node => node.getContext('2d').getImageData(0, 0, node.width, node.height).data.every(value => value === 0))).toBe(true);
+        await expect(host.locator('[data-jam-invite-copy-value]')).toHaveValue('');
+
     } finally { await f.close(); }
 });
 

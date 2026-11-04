@@ -70,7 +70,8 @@ async function lobbyContext(browser, baseURL, { trackClicks = false, webJoinFixt
     return { page, context, clicks: () => clicks };
 }
 
-test.use({ launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } });
+// The isolated guest context provides its own synthetic MediaStream.
+// Chromium-only launch switches prevent Linux WebKit from starting.
 
 test('Stalemate entry through jam room to connected browser Web Join with few bandmate clicks', async ({ browser, baseURL }) => {
     const { communityIntegration, communityJoinLink } = await import('../../hangout-worker/src/community-integration.mjs');

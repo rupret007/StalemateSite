@@ -1175,6 +1175,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         $('[data-jam-invite-copy-fallback]').hidden = true; $('[data-jam-invite-copy-value]').value = '';
         $('[data-jam-invite-qr-toggle]').hidden = true;
         $('[data-jam-invite-qr-panel]').hidden = true;
+        clearJamInviteQr();
         $('[data-jam-invite-qr-toggle]').setAttribute('aria-expanded', 'false');
         $('[data-jam-invite-qr-toggle]').textContent = 'Show QR code';
         $('[data-jam-link]').value = ''; $('[data-jam-form]').hidden = true;
@@ -1190,7 +1191,13 @@ import { createEntrySharing } from './entry-sharing.mjs';
         app.pendingRoomJoin = '';
         cmd('join', [room]);
     }
+    function clearJamInviteQr() {
+        const canvas = $('[data-jam-invite-qr]');
+        canvas.width = canvas.width; // Reset the backing bitmap and drawing state.
+        canvas.removeAttribute('data-invite-url');
+    }
     function drawJamInviteQr(link) {
+        clearJamInviteQr();
         const canvas = $('[data-jam-invite-qr]');
         if (!link || !window.HangoutQrLite?.draw) { canvas.removeAttribute('data-invite-url'); return; }
         window.HangoutQrLite.draw(canvas, link);
@@ -1252,6 +1259,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         $('[data-jam-invite-copy]').hidden = !browserLink;
         $('[data-jam-invite-qr-toggle]').hidden = !browserLink;
         if (!browserLink) {
+            clearJamInviteQr();
             $('[data-jam-invite-qr-panel]').hidden = true;
             $('[data-jam-invite-qr-toggle]').setAttribute('aria-expanded', 'false');
             $('[data-jam-invite-qr-toggle]').textContent = 'Show QR code';
@@ -1901,7 +1909,16 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const toggle = $('[data-jam-invite-qr-toggle]');
         toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
         toggle.textContent = open ? 'Hide QR code' : 'Show QR code';
-        if (open) drawJamInviteQr(link);
+        if (open) {
+            drawJamInviteQr(link);
+            // Reveal the complete code inside this pane, without scrolling
+            // the page or moving the message composer off screen.
+            const scroller = $('[data-jam]');
+            const bounds = scroller.getBoundingClientRect();
+            const bottom = bounds.top + scroller.clientTop + scroller.clientHeight;
+            const code = $('[data-jam-invite-qr]').getBoundingClientRect();
+            scroller.scrollTop += Math.max(0, code.bottom - bottom + 1);
+        } else clearJamInviteQr();
     });
 
     function show(pane) {
