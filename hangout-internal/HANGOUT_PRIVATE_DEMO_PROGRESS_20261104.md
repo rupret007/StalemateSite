@@ -11,10 +11,19 @@ hold was changed. StoryPool 10-21-26 retains infrastructure/deployment ownership
 
 | Work | Exact source | Current qualification |
 | --- | --- | --- |
-| Website selected candidate, draft [198](https://github.com/rupret007/StalemateSite/pull/198), stacked on197/196 | `551e669f45ef06ceee9e875cc4ac220ef2b75b9d` | 2,057 local units; scoped Chromium/WebKit/phone proofs in the invitation note. Workerd recovery CI passed; both full test jobs still running at the last observation. No merge to auto-publishing main. |
+| Website selected candidate, draft [198](https://github.com/rupret007/StalemateSite/pull/198), stacked on197/196 | `551e669f45ef06ceee9e875cc4ac220ef2b75b9d` | Both current-head CI test jobs passed:2,057 units/137 files and735 main browser cases each, without retries. All11 workerd groups passed; Pages deployments skipped. No merge to auto-publishing main. |
 | Native [422](https://github.com/rupret007/webjam/pull/422), merged | `8b5a37fddb99ac3b72ad88952eb1321e23b5ea65` | All six required checks passed. All559 Python modules ran once:12,887 passed/60 skipped. This does not qualify a new package or actual music. |
 | Browser ownership draft [423](https://github.com/rupret007/webjam/pull/423) | `01ffdc8b1162dc5ee511de567a86705f305559b6` | 25 local Node tests;28 focused browser cases without retries. Actual Linux Web Join CI passed34 cases; full native test job still running. |
 | Native lifecycle draft [424](https://github.com/rupret007/webjam/pull/424) | `8c3dd2c7819b991d75e21ae4356e0e263e7e4641` | 31 focused tests plus2 subtests,159 existing launch/recovery/RPC cases in eight fresh interpreters, Ruff passed. New current-head CI remains required. |
+
+[Website198 CI qualification](../pr-assets/beta-collaboration/20261104/private-guest-journeys/website-ci.json)
+binds merge checkout `ba1ba5ae2ed6b39f950c7bfb7deebba7bf320f5e` and reviewed
+head551e669 to whole tree `78c2b68ac335a8ef1b68a537e106cd7724bc06c0`.
+Each test job also ran separate34/34 root/project-path browser checks; those
+overlap and must not be summed. No failure/flaky/retry markers were found.
+All11 actual local workerd/SQLite groups passed, including the explicit eighth
+provider-start mode. Its callback-only boundary made zero provider network
+requests; it does not qualify provider activation or hosted capacity.
 
 PR423's actual CI checkout `17698bd0cc2b48d9657f9d2fad4fa5ebdb650e3c`
 and reviewed head share whole tree `d1f1fe6559d9931d57a460dfc913de753122c1ca`.
@@ -78,7 +87,7 @@ per-remote-player and actual audible delay remain unqualified.
 
 ## Next required work
 
-1. Qualify current-head website198 and native423/424 CI; keep original failures
+1. Qualify current-head native423/424 CI; retain qualified website198 evidence and original failures
    and skipped/physical scopes. Do not restart live jobs because polling times out.
 2. Repin the qualified browser runtime into one website candidate; verify finite
    packaging/provenance, mic denial, capture cleanup, Retry and phone recovery.
