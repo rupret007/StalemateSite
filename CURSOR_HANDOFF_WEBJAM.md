@@ -1,5 +1,7 @@
 # WebJam / Hang Out — Cursor continuation
 
+**Latest browser integration candidate:** read [the November4 ownership import](hangout-internal/HANGOUT_BROWSER_OWNERSHIP_IMPORT_20261104.md) for the exact merged-native423 runtime, website regression evidence and the remaining private-delivery/music gates. Its own website CI remains required.
+
 **Newer application checkpoint:** read [November4 private demo progress](hangout-internal/HANGOUT_PRIVATE_DEMO_PROGRESS_20261104.md) first for native423/424, website198, actual guest chat/drawing and the remaining music/deployment gates. This checkpoint is source/evidence only; no public launch or new deployment is implied.
 
 Current application checkpoint: October 31, 2026. Start with the

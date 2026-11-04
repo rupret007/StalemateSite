@@ -100,3 +100,116 @@ for (const width of [375, 390]) {
         });
     }
 }
+
+// Ownership regressions exercise the shipped module through the website URL.
+// Adapted from WebJam failure-recovery.spec.js at01ffdc8 (MIT; see join/LICENSE).
+async function openOwnedInvitation(page, width = 390) {
+  await page.setViewportSize({ width, height: 844 });
+  await page.clock.install();
+  await page.addInitScript(() => {
+    window.captureTracks = [];
+    const nativeContext = window.AudioContext;
+    window.audioContexts = [];
+    window.AudioContext = class extends nativeContext {
+      constructor(...args) { super(...args); window.audioContexts.push(this); }
+    };
+    Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), 'getUserMedia', {
+      configurable: true,
+      value: async () => {
+        // Synthetic silent audio only; never request the tester's microphone.
+        const context = new AudioContext();
+        const stream = context.createMediaStreamDestination().stream;
+        for (const track of stream.getTracks()) {
+          const stop = track.stop.bind(track);
+          track.stop = () => { stop(); context.close().catch(() => {}); };
+          window.captureTracks.push(track);
+        }
+        return stream;
+      }
+    });
+  });
+  const expires = Math.floor(Date.now() / 1000) + 300;
+  // Local test-only capability, with no corresponding host or mailbox.
+  await page.goto(`/join/#k=${Buffer.alloc(32, 17).toString('base64url')}&s=${'22'.repeat(32)}&g=1&e=${expires}`);
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Skip check' }).click();
+}
+
+for (const outcome of ['rejoining', 'failed']) {
+  test(`retired enrollment callbacks preserve the ${outcome} attempt`, async ({ page }) => {
+    await page.route('**/join/session.js', route => route.fulfill({ contentType: 'text/javascript', body: `
+      export class WebJoinSession {
+        constructor(options) { this.options = options; this.id = (window.pendingSessions ??= []).push(this); }
+        join() {
+          this.options.onStatus('Attempt ' + this.id + ' pending.');
+          return new Promise(resolve => { this.finish = () => {
+            this.options.onStatus('Stale completed enrollment.'); this.options.onLatency(999);
+            this.options.onError(new Error('Stale enrollment error.')); resolve();
+          }; });
+        }
+        close() { this.closed = true; this.options.stream.getTracks().forEach(t => t.stop()); }
+      }` }));
+    await openOwnedInvitation(page);
+    const join = page.getByRole('button', { name: 'Join with microphone', exact: true });
+    const leave = page.getByRole('button', { name: 'Leave session', exact: true });
+    await join.click(); await expect(page.locator('#status')).toHaveText('Attempt 1 pending.');
+    await leave.click(); await join.click();
+    await expect(page.locator('#status')).toHaveText('Attempt 2 pending.');
+    if (outcome === 'failed') await page.evaluate(() => pendingSessions[1].options.onError(new Error('Current enrollment failed.')));
+    await page.evaluate(() => pendingSessions[0].finish());
+    await expect(page.locator('#status')).toHaveText(outcome === 'failed' ? 'Current enrollment failed.' : 'Attempt 2 pending.');
+    await expect(page.locator('#latency')).not.toContainText('999');
+    if (outcome === 'failed') await expect(page.locator('#retry')).toBeVisible();
+    else { expect(await page.evaluate(() => !!pendingSessions[1].closed)).toBe(false); await leave.click(); }
+    expect(await page.evaluate(() => captureTracks.every(track => track.readyState === 'ended'))).toBe(true);
+  });
+}
+
+test('a retired initial resume cannot enable Join while the next resume is pending', async ({ page }) => {
+  await openOwnedInvitation(page);
+  await page.evaluate(() => {
+    window.pendingResumes = [];
+    const nativeResume = AudioContext.prototype.resume;
+    AudioContext.prototype.resume = function () {
+      // Delay the JS completion, preserving WebKit's real context lifecycle.
+      const resumed = nativeResume.call(this);
+      resumed.catch(() => {});
+      return new Promise((resolve, reject) => pendingResumes.push(() => resumed.then(resolve, reject)));
+    };
+  });
+  const join = page.getByRole('button', { name: 'Join with microphone', exact: true });
+  await join.click(); await expect.poll(() => page.evaluate(() => pendingResumes.length)).toBe(1);
+  await expect(page.locator('#check-mic')).toBeDisabled();
+  await page.getByRole('button', { name: 'Leave session', exact: true }).click();
+  await join.click(); await expect.poll(() => page.evaluate(() => pendingResumes.length)).toBe(2);
+  await page.evaluate(() => pendingResumes[0]());
+  await expect(join).toBeDisabled();
+  await page.getByRole('button', { name: 'Leave session', exact: true }).click();
+  await page.evaluate(() => pendingResumes[1]());
+  await expect.poll(() => page.evaluate(() => audioContexts.every(context => context.state === 'closed'))).toBe(true);
+});
+
+test('capture arriving after Leave releases only its own tracks during the next Join', async ({ page }) => {
+  await openOwnedInvitation(page);
+  await page.evaluate(() => {
+    window.pendingCaptures = [];
+    const capture = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = async () => {
+      const stream = await capture();
+      return new Promise(resolve => pendingCaptures.push(() => resolve(stream)));
+    };
+  });
+  const join = page.getByRole('button', { name: 'Join with microphone', exact: true });
+  const leave = page.getByRole('button', { name: 'Leave session', exact: true });
+  await join.click(); await expect.poll(() => page.evaluate(() => pendingCaptures.length)).toBe(1);
+  await leave.click(); await join.click();
+  await expect.poll(() => page.evaluate(() => pendingCaptures.length)).toBe(2);
+  await page.evaluate(() => pendingCaptures[0]());
+  await expect.poll(() => page.evaluate(() => captureTracks[0].readyState)).toBe('ended');
+  expect(await page.evaluate(() => captureTracks[1].readyState)).toBe('live');
+  await expect(join).toBeDisabled();
+  await expect(page.locator('#status')).toHaveText('Allow microphone access to play with your host.');
+  await leave.click(); await page.evaluate(() => pendingCaptures[1]());
+  await expect.poll(() => page.evaluate(() => captureTracks.every(track => track.readyState === 'ended'))).toBe(true);
+  await expect.poll(() => page.evaluate(() => audioContexts.every(context => context.state === 'closed'))).toBe(true);
+});
