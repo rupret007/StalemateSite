@@ -1,5 +1,55 @@
 # WebJam / Hang Out — Cursor continuation
 
+**Current resume point, November4 at23:10UTC — source fixes, not a new deployment:**
+Native429 is merged as395c3aa after its one targeted browser retry passed. The
+current packaging/invite correction is [430](https://github.com/rupret007/webjam/pull/430)
+`0d474942978d54176f63f527dc2fc150eb7933c5`, CI41930581200. Its original605
+Notes/changelog failures and6f Conversation/lobby failures were reproduced and
+retained. Corrections preserve Notes space and show direct invitation controls
+only when an owned Music host permits them, retaining error/cleanup actions.
+All152 selected Qt/Notes/control cases and45 subtests now pass locally; current
+main CI still needs qualification. The custom bundled codec still needs actual
+packaging/ABI execution before any browser-music retry.
+
+The requested afro mark, **Grandeur of Summer first**, four official Bob Ross
+picks/custom link and optional official kit/materials help are pushed separately:
+[native431](https://github.com/rupret007/webjam/pull/431),
+`0335084492454f5ca570b9f72526cf0f533434d1`, stacked on430, CI41930843664;
+[website205](https://github.com/rupret007/StalemateSite/pull/205),
+`1903b5d661a2ee3ccc4ffe7afb230b3e183e85e6`, stacked on204. The reused worktrees
+are **WebJam/.local/paint-along-lessons-20261104** and
+**StalemateSite/.local/paint-along-links-20261104**, both now on branch
+`codex/paint-together-start-20261104`; do not assume their old branch names.
+Native187 affected cases pass in normal per-file processes; an earlier combined
+Qt batch's one visibility failure remains recorded. Browser5 units/4 open-room/
+4 added375/390 cases pass. Source entry and materials captures were inspected.
+Full prompt/artifact hashes and primary resources are in each new starter note.
+
+The workspace parent is now [204](https://github.com/rupret007/StalemateSite/pull/204)
+`d2901e2a2b31a56589cf4ececb84358015fa5f0f`, PR CI41929472584. Original59ecad2
+full source CI passed775 cases and failed2 existing320×256 cases (also on their
+original retries). Compact header controls and input focus scroll margin correct
+those failures without weakening their assertions;18 local workspace/reflow
+checks pass. Current full CI remains required. Do not deploy the old59 head.
+
+All four actual YouTube picks played on two real provider players in the local
+web app, with advancing/unmuted timelines and zero captures. That is not physical
+hearing, native-player or hosted proof. The installed MacBook app is still old.
+Private beta remains c0586c29/de2, issuer60e3f182; **no new deployment, physical
+trial or package cohort** occurred in this continuation. The matched-current
+private config/dry run was prepared, preserving the exact WebJam origin; final
+assets/config/rollback must be revalidated on the finally qualified source.
+Never overwrite WEBJAM_WEB_ORIGINS with the tracked beta config's empty default.
+
+Next: finish the current normal CI heads, then one matching private cohort with
+all accepted fixes and actual bundled-codec checks. Preserve original failures,
+public/AI/media holds and all62 outcomes. Refresh account-wide headroom before
+live music. Do not stop the user's independent Art session. Only Jeff disposes
+the current exact synthetic report. Physical ARM/Intel/Windows, separate network,
+Ethernet comparison and remaining accessibility/legal/capacity outcomes are open.
+The owner-only direct-delivery checkpoint has the fuller current state under
+currentPaintTogetherAndDeliveryNov04. Older dated statuses below retain scope.
+
 **Latest November4 correction — read before retrying music:**
 [IRC workspace204](https://github.com/rupret007/StalemateSite/pull/204)
 (`59ecad26157f558837144035905641a78d4c6ded`) uses Halloy/mIRC interaction cues,
