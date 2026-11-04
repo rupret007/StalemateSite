@@ -1,0 +1,31 @@
+{
+  "scope": "Actual existing private beta at the observation timestamps; no refreshed Worker/source identity, new candidate deployment, media or physical music claim.",
+  "all62CanonicalRequirementsSha256": "3d5db107977f652a1bd51286c02657aaff70c9c3590adb876e03f6d909679999",
+  "chat": {
+    "at": "2026-11-04T03:48:32.946Z",
+    "independentGuests": 3,
+    "lobbyExchange": true,
+    "guestChannelExchange": true,
+    "freshJoinPrivacy": true,
+    "outsiderStateStatus": 401,
+    "captureRequests": 0,
+    "ok": true
+  },
+  "chatLogSha256": "1d86f0aa8570c5f0d572640535c66d82556c087abdf5924967aaf27fe0f39ca6",
+  "chatCleanupScope": "Logout requests attempted; HTTP statuses were not asserted in that run. Contexts closed.",
+  "drawing": {
+    "at": "2026-11-04T04:16:11.313Z",
+    "uniqueGuestArtRoom": true,
+    "chromiumToWebKit": true,
+    "webKitToChromium": true,
+    "phoneLayout375390": true,
+    "captureRequests": 0,
+    "leftArtRoom": true,
+    "logout200AndState401": true,
+    "ok": true
+  },
+  "drawingLogSha256": "cf467904fa726c84f5aa97834f362bb3247ca897d27076747c12a11cdb84014d",
+  "drawingProof": "Separate Chromium/WebKit guests, accepted incoming stroke events and changed counterpart canvas pixels both ways, then ordinary room leave and logout200/state401.",
+  "retainedFailures": "Original eight-hour observer and intermediate CI/local failures remain unchanged.",
+  "fullGoalComplete": false
+}
