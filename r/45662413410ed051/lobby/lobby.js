@@ -1225,7 +1225,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         $('[data-jam-wait]').hidden = shared; $('[data-jam-copy]').hidden = !next.invitation;
         const web = $('[data-jam-web]'); web.disabled = !next.webReady;
         web.textContent = web.disabled ? 'Browser join unavailable' : 'Join in browser';
-        web.title = web.disabled ? 'The host has not shared an approved browser invitation' : 'Open the host’s browser invitation; headphones and audio consent are required there';
+        web.title = web.disabled ? 'Your host has not shared an approved browser invite yet' : 'Open the host’s browser invitation; headphones and audio consent are required there';
         const context = jamContext;
         web.onclick = () => {
             if (jamContext === context && currentJam() === context.room && context.webReady && /^https:\/\//.test(context.web))
