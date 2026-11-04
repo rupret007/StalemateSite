@@ -1,0 +1,56 @@
+{
+  "upstreamReviewedCommit": "01ffdc8b1162dc5ee511de567a86705f305559b6",
+  "upstreamPR": "https://github.com/rupret007/webjam/pull/423",
+  "upstreamMergedCommit": "d814a47894dcdb5f954ca557496611a28c107d95",
+  "upstreamWholeTree": "d1f1fe6559d9931d57a460dfc913de753122c1ca",
+  "qualification": {
+    "nativeOrderedPythonModules": 559,
+    "nativePassed": 12887,
+    "nativeExistingSkipped": 60,
+    "nodeUnits": 25,
+    "workerUnits": 74,
+    "linuxWebJoinCases": 34,
+    "all6RequiredChecksPassed": true
+  },
+  "runtimeFiles": 13,
+  "allUpstreamShippedHashesEqual": true,
+  "privateBetaPackageJoinFiles": 14,
+  "privateBetaPackageBytesMatch": true,
+  "localWebsite": {
+    "unitCases": 2057,
+    "unitFiles": 137,
+    "focusedBrowserCases": 22,
+    "browserRetries": 0,
+    "initialOwnershipRegressionsFailed": 8,
+    "guarded": true
+  },
+  "scope": "Source/provenance/local packaging and mocked-browser recovery only. Screenshots are scrolled375/390 Retry views, not full-page accessibility or physical iPhone/audio proof. No provider/deployment/public launch.",
+  "fullWebsiteCI": "pending",
+  "logs": [
+    {
+      "label": "website-ownership-import-red-nov04",
+      "exitCode": 1,
+      "logSha256": "e0898271877d764fab014182aa8e0ed6a37310fab768df3c723d1ddf2ce5fd24"
+    },
+    {
+      "label": "website-ownership-import-units-nov04",
+      "exitCode": 0,
+      "logSha256": "10c481e33e658657af52a99f0d6ab94b9ba2bfe288ce1b0fcfd876db8cd77947"
+    },
+    {
+      "label": "website-ownership-import-green-nov04",
+      "exitCode": 0,
+      "logSha256": "6a6da74c7323e295151f40b911349d21392a19f7ff63d40101b4c60f11f3e252"
+    },
+    {
+      "label": "website-ownership-full-units-nov04",
+      "exitCode": 0,
+      "logSha256": "91dbf018e5912c7a0e0ccaf6497d40a9f9e7b86603fc1d28db79522dfbb30b12"
+    },
+    {
+      "label": "website-ownership-beta-package-nov04",
+      "exitCode": 0,
+      "logSha256": "074a41d888062c77cd519fdf52af7f3e2c01e53d1b07fd0c2bf9466045aba832"
+    }
+  ]
+}

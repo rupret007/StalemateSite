@@ -7,6 +7,8 @@ adds newer evidence; it does not convert source, fixtures or CI into physical
 music or public-launch readiness. No public band navigation, provider or release
 hold was changed. StoryPool 10-21-26 retains infrastructure/deployment ownership.
 
+The newer [browser ownership integration](HANGOUT_BROWSER_OWNERSHIP_IMPORT_20261104.md) supersedes the earlier browser pin below; its own website CI remains required. Native423 is now qualified and merged asd814a47894dcdb5f954ca557496611a28c107d95. Native424 incorporates that merge and awaits new combined-head CI. The table retains its recorded earlier revision scopes.
+
 ## Application revisions
 
 | Work | Exact source | Current qualification |
