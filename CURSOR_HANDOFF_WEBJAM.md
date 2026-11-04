@@ -1,5 +1,7 @@
 # WebJam / Hang Out — Cursor continuation
 
+**Resume from the Host tools follow-up:** the [current checklist](hangout-internal/HANGOUT_PRIVATE_DEMO_PROGRESS_20261104.md#current-continuation--host-tools-follow-up) supersedes older pending statuses. Native423/424 and worksheet425 are qualified/merged. Website200 had one original CI flake; the [deterministic metadata-race fix](hangout-internal/HANGOUT_OWNER_TOOLS_METADATA_20261104.md) is on its own application branch. Keep source/CI/package/hosted/physical evidence separate; no public launch or new delivery is implied.
+
 **Latest browser integration candidate:** read [the November4 ownership import](hangout-internal/HANGOUT_BROWSER_OWNERSHIP_IMPORT_20261104.md) for the exact merged-native423 runtime, website regression evidence and the remaining private-delivery/music gates. Its own website CI remains required.
 
 **Newer application checkpoint:** read [November4 private demo progress](hangout-internal/HANGOUT_PRIVATE_DEMO_PROGRESS_20261104.md) first for native423/424, website198, actual guest chat/drawing and the remaining music/deployment gates. This checkpoint is source/evidence only; no public launch or new deployment is implied.
