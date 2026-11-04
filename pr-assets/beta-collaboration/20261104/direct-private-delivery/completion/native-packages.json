@@ -1,0 +1,184 @@
+{
+  "at": "2026-11-04T09:17:34.095901+00:00",
+  "source": "d3ea7c55b95b155e355d96d59491eb704d895bd2",
+  "runId": 41798291653,
+  "conclusion": "success",
+  "jobCounts": {
+    "success": 16,
+    "skipped": 6,
+    "failure": 0
+  },
+  "packages": [
+    {
+      "name": "webjam-macos-arm64",
+      "inspection": {
+        "at": "2026-11-04T08:57:49.908842+00:00",
+        "runId": 41798291653,
+        "source": "d3ea7c55b95b155e355d96d59491eb704d895bd2",
+        "artifactId": 13308123307,
+        "actionsArchiveSha256": "b7abd792d87143de1b06a8a58f17fbc6ac367145372c864c9dac5a9555fcd4e1",
+        "innerZip": "WebJam-macos-arm64-ADHOC-TEST-ONLY.zip",
+        "innerBytes": 229066810,
+        "innerSha256": "aaa09ccf7367a159a98a1b0a1ecdbfff8c63419e58a1db0f96db904d5c7138ce",
+        "members": 1166,
+        "symlinksCheckedForOutputEscape": 215,
+        "privateTargetManifest": {
+          "build": "d3ea7c55b95b155e355d96d59491eb704d895bd2",
+          "target": "private-beta",
+          "version": 1
+        },
+        "relevantMetadataMembers": [
+          "Pocket Stage iPhone Setup/PocketStage/Info.plist",
+          "WebJam.app/Contents/Info.plist"
+        ],
+        "notarizationClaimed": false,
+        "captureOrMusicStarted": false
+      },
+      "download": {
+        "at": "2026-11-04T08:54:38.442017+00:00",
+        "runId": 41798291653,
+        "artifactId": 13308123307,
+        "state": "DOWNLOAD_DIGEST_VERIFIED",
+        "actualBytes": 456616335,
+        "actualSha256": "b7abd792d87143de1b06a8a58f17fbc6ac367145372c864c9dac5a9555fcd4e1",
+        "expectedDigest": "sha256:b7abd792d87143de1b06a8a58f17fbc6ac367145372c864c9dac5a9555fcd4e1",
+        "expectedSource": "d3ea7c55b95b155e355d96d59491eb704d895bd2"
+      },
+      "signature": {
+        "bundleIdentifier": "com.webjam.app",
+        "bundleVersion": "0.29.0",
+        "executableArchitecture": "Mach-O 64-bit executable arm64",
+        "codesignDeepStrictExitCode": 0,
+        "signingKind": "ad-hoc private test build",
+        "notarizationClaimed": false,
+        "gatekeeperOrQuarantineChanged": false
+      }
+    },
+    {
+      "name": "webjam-macos-x64",
+      "inspection": {
+        "at": "2026-11-04T09:22:50.219288+00:00",
+        "runId": 41798291653,
+        "source": "d3ea7c55b95b155e355d96d59491eb704d895bd2",
+        "artifactId": 13310245250,
+        "name": "webjam-macos-x64",
+        "actionsArchiveSha256": "0c098819c93087178f6a54ca4fff5c0faf3a063d1da8a2bcf81ef2b368ab0658",
+        "innerZip": "WebJam-macos-x64-ADHOC-TEST-ONLY.zip",
+        "innerBytes": 236578182,
+        "innerSha256": "9a3646f51f94dbbc3b626370c083c9267cdfd860425109f8b34a4a37e60c0c08",
+        "members": 1165,
+        "symlinksCheckedForOutputEscape": 215,
+        "privateTargetManifest": {
+          "build": "d3ea7c55b95b155e355d96d59491eb704d895bd2",
+          "target": "private-beta",
+          "version": 1
+        },
+        "canonicalManifestPath": "WebJam.app/Contents/Resources/webjam-web-join-target.json",
+        "validatedManifestAliases": [
+          {
+            "path": "WebJam.app/Contents/Frameworks/webjam-web-join-target.json",
+            "target": "../Resources/webjam-web-join-target.json"
+          }
+        ],
+        "originalVerifierFailureRetained": true,
+        "executableArchitecture": "Mach-O x86-64",
+        "actualPlatformInstallationOrAudioClaimed": false,
+        "platformTrustBypassed": false
+      },
+      "download": {
+        "at": "2026-11-04T09:17:31.571807+00:00",
+        "runId": 41798291653,
+        "artifactId": 13310245250,
+        "state": "DOWNLOAD_DIGEST_VERIFIED",
+        "actualBytes": 471548250,
+        "actualSha256": "0c098819c93087178f6a54ca4fff5c0faf3a063d1da8a2bcf81ef2b368ab0658",
+        "expectedDigest": "sha256:0c098819c93087178f6a54ca4fff5c0faf3a063d1da8a2bcf81ef2b368ab0658",
+        "expectedSource": "d3ea7c55b95b155e355d96d59491eb704d895bd2"
+      },
+      "signature": {
+        "bundleIdentifier": "com.webjam.app",
+        "bundleVersion": "0.29.0",
+        "executableArchitecture": "Mach-O 64-bit executable x86_64",
+        "codesignDeepStrictExitCode": 0,
+        "signingKind": "ad-hoc private test build",
+        "notarizationClaimed": false,
+        "gatekeeperOrQuarantineChanged": false
+      }
+    },
+    {
+      "name": "webjam-windows-x64",
+      "inspection": {
+        "at": "2026-11-04T09:13:13.320954+00:00",
+        "runId": 41798291653,
+        "source": "d3ea7c55b95b155e355d96d59491eb704d895bd2",
+        "artifactId": 13309440164,
+        "name": "webjam-windows-x64",
+        "actionsArchiveSha256": "091b53374c8651dabbfb62d6ced4baa07b44151506fa1afb7fc5170f9bbfde60",
+        "innerZip": "WebJam-windows-x64-UNSIGNED-TEST-ONLY.zip",
+        "innerBytes": 344615302,
+        "innerSha256": "59414caf5f09707baadde2ca5a6fa6600b174789fff925b4548f646ee3cce542",
+        "members": 3423,
+        "symlinksCheckedForOutputEscape": 0,
+        "privateTargetManifest": {
+          "build": "d3ea7c55b95b155e355d96d59491eb704d895bd2",
+          "target": "private-beta",
+          "version": 1
+        },
+        "executableArchitecture": "PE x86-64",
+        "actualPlatformInstallationOrAudioClaimed": false,
+        "platformTrustBypassed": false
+      },
+      "download": {
+        "at": "2026-11-04T09:09:28.661008+00:00",
+        "runId": 41798291653,
+        "artifactId": 13309440164,
+        "state": "DOWNLOAD_DIGEST_VERIFIED",
+        "actualBytes": 610991783,
+        "actualSha256": "091b53374c8651dabbfb62d6ced4baa07b44151506fa1afb7fc5170f9bbfde60",
+        "expectedDigest": "sha256:091b53374c8651dabbfb62d6ced4baa07b44151506fa1afb7fc5170f9bbfde60",
+        "expectedSource": "d3ea7c55b95b155e355d96d59491eb704d895bd2"
+      }
+    },
+    {
+      "name": "webjam-linux-x64",
+      "inspection": {
+        "at": "2026-11-04T09:07:35.021037+00:00",
+        "runId": 41798291653,
+        "source": "d3ea7c55b95b155e355d96d59491eb704d895bd2",
+        "artifactId": 13308581107,
+        "name": "webjam-linux-x64",
+        "actionsArchiveSha256": "c2ca062b8ad788c85caca09e535751d3367e90748bf33058daa06cc25124f2ed",
+        "innerZip": "WebJam-linux-x64.zip",
+        "innerBytes": 462014935,
+        "innerSha256": "a68a9784cc58b9452e9823f3474b5eab2dd401b8329e860ed7f90d8cca2db632",
+        "members": 3622,
+        "symlinksCheckedForOutputEscape": 0,
+        "privateTargetManifest": {
+          "build": "d3ea7c55b95b155e355d96d59491eb704d895bd2",
+          "target": "private-beta",
+          "version": 1
+        },
+        "executableArchitecture": "ELF64 x86-64",
+        "actualPlatformInstallationOrAudioClaimed": false,
+        "platformTrustBypassed": false
+      },
+      "download": {
+        "at": "2026-11-04T09:03:12.533778+00:00",
+        "runId": 41798291653,
+        "artifactId": 13308581107,
+        "state": "DOWNLOAD_DIGEST_VERIFIED",
+        "actualBytes": 457758255,
+        "actualSha256": "c2ca062b8ad788c85caca09e535751d3367e90748bf33058daa06cc25124f2ed",
+        "expectedDigest": "sha256:c2ca062b8ad788c85caca09e535751d3367e90748bf33058daa06cc25124f2ed",
+        "expectedSource": "d3ea7c55b95b155e355d96d59491eb704d895bd2"
+      }
+    }
+  ],
+  "physicalMusicQualified": false,
+  "originalIntelVerifierFailure": {
+    "retained": true,
+    "reason": "Original generic verifier incorrectly counted the canonical manifest and a legitimate PyInstaller alias as two manifests. Corrected verifier requires one regular canonical manifest and validates every alias/escape/source/target. Archive bytes unchanged.",
+    "logSha256": "c179af20ca568fc1d52420c30e24fbda9b054d79cd1b3cef451b444c9bdbf28f"
+  },
+  "qualifiedAt": "2026-11-04T10:07:40.314743+00:00"
+}

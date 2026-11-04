@@ -14,8 +14,8 @@ and their [full audit](HANGOUT_ACCEPTANCE_AUDIT_20261031.md) remain binding.
 | Website application | [PR201](https://github.com/rupret007/StalemateSite/pull/201), `de2b01725925d2f78ee21af33f68f3eb4eb95407` | Both full CI jobs pass2,061 units/137files and763 main browser cases without retries. Local focused moderation and375/390 captures also pass. Pages deployments skipped. |
 | Native runtime | Reviewed0d995cd / mergede9dc799 from [424](https://github.com/rupret007/webjam/pull/424) | All6 required checks; all561 Python modules once,12,909 passed/60 existing skips. Source/CI only. |
 | Music worksheet | Reviewedc86d515 / mergef09cead from [425](https://github.com/rupret007/webjam/pull/425) | Documentation only; qualified separately. No runtime rebuild is warranted solely by this worksheet. |
-| Last qualified private packages | bf24e7d / run41193954131 | Earlier actual ARM identity/GUI/idle transport observations, not the new native runtime or real music. |
-| Existing private service | `https://stalemate-hangout-beta.jeffstory007.workers.dev/beta/` | Earlier actual guest chat/drawing and current outsider401 observations; no claim201 is deployed. |
+| Current private packages | d3ea7c5 / run41798291653 | All four actual archives verified; both Mac signatures pass, ARM first-screen startup/normal close preserves settings. See the direct-delivery note; no physical music is qualified. |
+| Current private service | `https://stalemate-hangout-beta.jeffstory007.workers.dev/beta/` | Website201/de2b017 runs as dbcaddf5, with scoped chat, drawing, responsive layout, reconnect, fresh history and logout/revocation observations. |
 
 This evidence-only follow-up changes documentation/receipts, not application
 runtime. Its branch is`codex/private-demo-evidence-20261104`; its documentation

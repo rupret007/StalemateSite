@@ -2,7 +2,7 @@
 
 ## Current continuation — Direct delivery
 
-The [direct-delivery note and single ordered checklist](HANGOUT_DIRECT_PRIVATE_DELIVERY_20261104.md) are current. Jeff superseded the StoryPool delivery handoff. Website201 now runs privately as `dbcaddf5`, with actual guest chat/drawing/source-badge/privacy/mobile proof. The matching native cohort41798291653 is running; package and physical music scopes remain separate. All62 requirements are preserved.
+The [direct-delivery note and single ordered checklist](HANGOUT_DIRECT_PRIVATE_DELIVERY_20261104.md) are current. Jeff superseded the StoryPool delivery handoff. Website201 now runs privately as `dbcaddf5`, with actual guest chat/drawing/source-badge/privacy/mobile/reconnect proof. Matching native cohort41798291653 passed all four platforms; downloaded archives and both Mac signatures are verified, and actual ARM startup/normal close preserved settings. Physical music remains unqualified. All62 requirements are preserved.
 
 ## Earlier continuation — Host tools follow-up (historical)
 

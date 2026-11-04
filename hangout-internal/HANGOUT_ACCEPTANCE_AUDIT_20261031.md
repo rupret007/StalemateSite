@@ -1,5 +1,12 @@
 # Shared-community acceptance audit
 
+**Later evidence:** the [November4 direct-delivery checklist](HANGOUT_DIRECT_PRIVATE_DELIVERY_20261104.md)
+records the newer private website, all four actual package checks, reconnect and
+report acknowledgement. The rows below retain their October31 evidence scopes
+and unresolved requirements; historical revisions, guards and pending actions
+must not replace the newer checklist. All62 requirements remain unchanged and
+physical music/public-launch readiness remain unproven.
+
 Recorded October 31, 2026. The full goal remains incomplete. This audit accounts
 for every ID in the unchanged [62 original requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md).
 Each row identifies the evidence scope and remaining proof or boundary. It does
