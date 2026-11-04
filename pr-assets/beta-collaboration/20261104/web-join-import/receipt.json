@@ -1,0 +1,21 @@
+{
+  "upstream": "176103ade7658a76cdb36231c25359c7c6541ee3",
+  "localBrowserCasesPassed": 16,
+  "browsers": [
+    "Chromium",
+    "WebKit"
+  ],
+  "caseRetries": 0,
+  "localAssetAndPublicPackagingCasesPassed": 8,
+  "physicalAudioQualified": false,
+  "deployed": false,
+  "initialBrowserRun": {
+    "passed": 12,
+    "failed": 4,
+    "reason": "New denial assertion expected is blocked; actual existing capture guidance says was blocked. Corrected wording assertion after reading retained traces; no production change."
+  },
+  "screenshots": {
+    "webkit-390.png": "779fd6dcaadb18a305c4d8ef10a5b7bb04268ff6ad5950265ea7cd3d65de1207",
+    "webkit-375.png": "e60842e8fc2ea18c93e7b6befaf1ba25423035b4f75ea04c753319dfd1ee9704"
+  }
+}

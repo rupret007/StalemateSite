@@ -127,6 +127,7 @@ test('Stalemate entry through jam room to connected browser Web Join with few ba
         const joinPage = await joinPopup;
         await expect(joinPage).toHaveURL(/webjam\.example\/join\/#/);
         await expect(joinPage.locator('h1')).toContainText('Join your band');
+        await joinPage.getByRole('button', { name: 'Skip check', exact: true }).click();
         await joinPage.getByRole('checkbox').check();
         await joinPage.getByRole('button', { name: 'Join with microphone', exact: true }).click();
         await expect(joinPage.locator('#status')).toContainText('Connected — Web Join');
