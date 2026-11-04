@@ -9,16 +9,25 @@ and their [full audit](HANGOUT_ACCEPTANCE_AUDIT_20261031.md) remain binding.
 
 | Artifact | Identity | Evidence boundary |
 | --- | --- | --- |
-| Website application | [PR201](https://github.com/rupret007/StalemateSite/pull/201), `de2b01725925d2f78ee21af33f68f3eb4eb95407` | Host tools race fixed; local2,061 units and8 Chromium/WebKit moderation journeys pass. Its own two full CI jobs are still running at packet preparation. |
+| Website application | [PR201](https://github.com/rupret007/StalemateSite/pull/201), `de2b01725925d2f78ee21af33f68f3eb4eb95407` | Both full CI jobs pass2,061 units/137files and763 main browser cases without retries. Local focused moderation and375/390 captures also pass. Pages deployments skipped. |
 | Native runtime | Reviewed0d995cd / mergede9dc799 from [424](https://github.com/rupret007/webjam/pull/424) | All6 required checks; all561 Python modules once,12,909 passed/60 existing skips. Source/CI only. |
 | Music worksheet | Reviewedc86d515 / mergef09cead from [425](https://github.com/rupret007/webjam/pull/425) | Documentation only; qualified separately. No runtime rebuild is warranted solely by this worksheet. |
 | Last qualified private packages | bf24e7d / run41193954131 | Earlier actual ARM identity/GUI/idle transport observations, not the new native runtime or real music. |
 | Existing private service | `https://stalemate-hangout-beta.jeffstory007.workers.dev/beta/` | Earlier actual guest chat/drawing and current outsider401 observations; no claim201 is deployed. |
 
 This evidence-only follow-up changes documentation/receipts, not application
-runtime. Its branch is`codex/private-demo-evidence-20261104`; keep the tested201
-head fixed while its existing jobs finish. Dated sections retain their original
-source scopes. Do not relabel an older package or retry as a new result.
+runtime. Its branch is`codex/private-demo-evidence-20261104`; its documentation
+checks remain separate from201's qualified runtime. Dated sections retain their
+original source scopes. Do not relabel an older package or retry as a new result.
+
+[Final website201 qualification](../pr-assets/beta-collaboration/20261104/application-evidence/website201-ci.json)
+binds reviewedde2b017 and actual PR checkoutf879b6e to whole tree
+`9067a7369085df48c54346c4f5d1c7b5bef9725e`. Source job126413016948/run41781236419
+and PR job126413107105/run41781264325 each passed2,061 units/137files,763 main
+browser cases and separate34/34 root/project-path checks. Overlapping checks
+are not summed. Neither log has retry/flaky/failure summaries. Original200's
+one flaky case and its first failure remain recorded, not relabeled. Both
+Pages deploy jobs were skipped; no private deployment is established by CI.
 
 ## Native runtime scope correction
 
@@ -72,8 +81,8 @@ preserved. Their descriptions identify carried-forward, superseded and unique
 historical content. The two dated193 documents are not falsely claimed imported;
 their older source/provider statements must not replace the current guidance.
 
-Next: qualify201's current frontend CI, obtain the owner's normal matching
-private build/config/headroom/trust/deployment/rollback evidence, and run the
+Next: obtain the owner's normal matching private build/config/headroom/trust/
+deployment/rollback evidence, then run the
 approved one-host/one-browser trials with current capture/headphone readiness.
 Require reciprocal human hearing on ARM/Intel/Windows and a separate-network
 pair; preserve Linux and unsigned native Windows gaps. Keep AI, separate Hang

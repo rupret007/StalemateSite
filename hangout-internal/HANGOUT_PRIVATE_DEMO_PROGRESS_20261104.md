@@ -25,7 +25,12 @@ below. The full goal is incomplete; all62 requirements remain unchanged.
   fixes the reproduced dialog race. See
   [Host tools evidence](HANGOUT_OWNER_TOOLS_METADATA_20261104.md).
   Local2,061 units/137files and eight Chromium/WebKit moderation journeys pass
-  without retries. Own current-head CI remains required; no deployment is claimed.
+  without retries. Both current-head full CI jobs now pass2,061 units/137files
+  and763 main browser cases without retries. Reviewedde2b017 and actual checkout
+  f879b6e share tree9067a7369085df48c54346c4f5d1c7b5bef9725e. Separate34/34
+  root/project-path checks overlap and are not summed. Pages deployments skipped;
+  no private delivery or physical music is claimed. See the
+  [final evidence packet](HANGOUT_PRIVATE_APPLICATION_PACKET_20261104.md).
 - Exact browser pin01ffdc8 and its13 runtime/license files remain unchanged.
   A native private build request was delivered to StoryPool10-21-26; execution
   has not been observed here. Last qualified packages remainbf24e7d/run41193954131.
@@ -33,16 +38,16 @@ below. The full goal is incomplete; all62 requirements remain unchanged.
 
 Current ordered checklist:
 
-1. Qualify the Host tools follow-up's own CI. Do not call200 retry-free or reuse
-   its result for changed source. Preserve the selected stack and Grok branches;
-   no merge to auto-publishing website main.
+1. Preserve201's qualified exact application head and the selected stack/Grok
+   branches. Do not call200 retry-free or turn current source/CI into a package
+   or deployment claim. No merge to auto-publishing website main.
 2. Hand the exact qualified website/build/config/rollback packet to the existing
    infrastructure owner. Only browser `lobby.js` differs in the broad165-file
    inventory; the other164 records and all native/backend execution inputs match
    qualified551. That broad inventory is not the native bundle catalogue, which
    excludes browser `lobby.js`. The configured runtime workflow does not trigger
    for this UI-only change. No extra workflow approval or forced run is required
-   by this finding. Qualify201's own frontend CI; retain551's11 actual runtime
+   by this finding. Retain201's qualified frontend CI and551's11 actual runtime
    modes at their original scope, without claiming a new201 runtime execution.
 3. Obtain actual combined billing-period headroom, intended separate web TURN
    credential/origin bindings and normal private delivery/trust/rollback evidence.

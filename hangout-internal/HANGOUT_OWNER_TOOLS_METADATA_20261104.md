@@ -36,8 +36,11 @@ The WebKit project now explicitly includes this existing moderation file.
 
 Phone captures and sanitized log/hash receipts are under
 [`owner-tools-metadata`](../pr-assets/beta-collaboration/20261104/owner-tools-metadata/receipt.json).
-Own website current-head CI remains required. No private deployment, provider
-activation, native package, public-navigation or release change was performed.
+Both full201 CI jobs now pass2,061 units/137files and763 main browser cases
+without retries; actual reviewed/PR checkout trees match. See the
+[final evidence packet](HANGOUT_PRIVATE_APPLICATION_PACKET_20261104.md).
+No private deployment, provider activation, native package, public-navigation
+or release change was performed.
 
 The old165-file runtime-equivalence receipt compares551e669 with0f236aa only.
 In201 only browser `lobby.js` differs in that broad inventory; the other164
@@ -46,7 +49,7 @@ inventory included all `r/**`; it is not the native bundle catalogue.
 `NATIVE_LOBBY_INPUTS` and the native fixtures do not import browser `lobby.js`.
 The runtime workflow's configured filter excludes this UI-only path. This
 finding requires no extra workflow approval, YAML change or forced run.
-Qualify the changed browser UI in201's own frontend CI and retain551's actual
+Retain the changed browser UI's qualified201 frontend CI and551's actual
 11-mode backend/runtime evidence at its original source/input scope. Source
 equivalence is not a new201 runtime/provider/deployment execution claim.
 
