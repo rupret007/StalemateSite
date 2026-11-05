@@ -79,6 +79,13 @@ describe('real invitation-only beta boundary', () => {
             for (const method of ['GET', 'HEAD']) expect((await betaFetch(request(path, { method }), config, deps)).status).toBe(401);
         }
         expect(config.ASSETS.fetch).not.toHaveBeenCalled();
+        const entrance = await betaFetch(request('/join/'), config, deps);
+        expect(entrance.headers.get('Content-Type')).toContain('text/html');
+        expect(entrance.headers.get('Permissions-Policy')).toContain('microphone=()');
+        expect(await entrance.text()).toContain('href="/beta/" target="_blank" rel="noopener noreferrer"');
+        expect(await (await betaFetch(request('/join/', { method: 'HEAD' }), config, deps)).text()).toBe('');
+        expect((await betaFetch(request('/join/app.js'), config, deps)).headers.get('Content-Type')).toContain('text/plain');
+        expect(config.ASSETS.fetch).not.toHaveBeenCalled();
         const cookie = await unlock(config);
         for (const path of ['/join/', '/join/app.js', '/%6aoin/index.html']) {
             const result = await betaFetch(request(path, { cookie }), config, deps);
