@@ -16,6 +16,23 @@ export { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget };
 const ROOT = '/r/45662413410ed051/';
 const CSP = "default-src 'self'; script-src 'self' https://challenges.cloudflare.com https://www.youtube.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' wss: https://challenges.cloudflare.com https://www.youtube.com https://*.googlevideo.com; img-src 'self' data: blob: https://i.ytimg.com; media-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 const WEB_JOIN_CSP = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' https://webjam-turn-credentials.jeffstory007.workers.dev; media-src 'self' blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+const WEB_JOIN_ENTRANCE = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enter Hang Out to join WebJam</title>
+<link rel="stylesheet" href="/beta/style.css">
+</head>
+<body>
+<main>
+<h1>Enter Hang Out to join WebJam</h1>
+<p>Open Hang Out in a new tab and enter the invitation code from your host.</p>
+<p><a href="/beta/" target="_blank" rel="noopener noreferrer">Open Hang Out in a new tab</a></p>
+<p>When your invitation is accepted, return to this tab and reload to join the music session.</p>
+</main>
+</body>
+</html>`;
 const headers = { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow, noarchive, nosnippet', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': CSP };
 const reply = (body, status = 200, type = 'text/plain; charset=utf-8', extra = {}) => new Response(body, { status, headers: { ...headers, 'Content-Type': type, ...extra } });
 const json = (body, status = 200, extra = {}) => reply(JSON.stringify(body), status, 'application/json; charset=utf-8', extra);
@@ -234,7 +251,15 @@ async function betaRequest(request, env, deps = {}) {
         return json({ error: 'Unknown request.' }, 404);
     }
     const session = await betaSession(request, env);
-    if (!session) return reply('Private invitation required. Open your invitation link.', 401);
+    if (!session) {
+        if (['GET', 'HEAD'].includes(request.method) && ['/join', '/join/', '/join/index.html'].includes(assetPath)) {
+            return reply(request.method === 'HEAD' ? null : WEB_JOIN_ENTRANCE, 401, 'text/html; charset=utf-8', {
+                'Content-Security-Policy': "default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+                'Permissions-Policy': 'camera=(), geolocation=(), microphone=()',
+            });
+        }
+        return reply('Private invitation required. Open your invitation link.', 401);
+    }
     if (url.pathname === '/beta/participation') {
         if (!lobbyParticipationMode(env)) return json({ error: 'Unknown request.' }, 404);
         if (request.method !== 'GET' || url.search) return json({ error: 'GET without parameters required.' }, 400);
