@@ -1,6 +1,22 @@
 # Private application evidence and delivery packet
 
-**Current delivery:** [Direct-delivery continuation](HANGOUT_DIRECT_PRIVATE_DELIVERY_20261104.md) supersedes earlier delivery ownership and pending-deployment statements below. Website201 now runs privately as `c0586c29`; only the approved music origin changed, preserving all other bindings, namespaces and assets. Separate browser secrets are installed and issuer API preflight passes. Actual two-Mac chat passes; MacBook Wi-Fi was measured, and Mini Wi-Fi was confirmed later. Native428 merged as `12d939af`, fixing both HTTP clients; corrected private cohort 41886309202 uses `e101465`. Actual reciprocal music remains unqualified. Read the direct-delivery hardware findings: two ARM-native Jabra attempts fell back to BlackHole; the verified Intel cache copy is staged for MacBook hosting. Its first Desktop verification failure is preserved, and its normal cache/shortcut verification passes. The bounded room publisher timed out before invite sharing; native MacBook GUI confirmation is pending.
+**Current delivery, November5 at01:06UTC (November4 locally):** The
+[current handoff](../CURSOR_HANDOFF_WEBJAM.md) supersedes older delivery ownership,
+package and pending-deployment statements below. Website205/sourcea04 runs
+privately as9a558aff, preserving all bindings/namespaces and approved music origin.
+Delivered Chromium/WebKit chat, drawing,375/390 layouts, guide, reconnect and
+logout/revocation checks pass. Native430/431 are merged and the single private
+cohort41938592196/source4c4 is successful; all four actual archives are verified.
+Both Mac bundled-codec CI executions match the downloaded libraries. ARM normal
+startup/chooser/close and local codec execution pass; the Intel MacBook cache copy
+has verified source/architecture/signature, with its older user Art session left
+untouched. These are scoped package/UI observations, not reciprocal music.
+Actual audio, human hearing, Windows access, separate-network trials and the
+remaining62 outcomes stay open. AI and separate Hang Out chat/media TURN stay off;
+no StoryPool/Karen dispatch or public launch. The
+[earlier direct-delivery continuation](HANGOUT_DIRECT_PRIVATE_DELIVERY_20261104.md)
+retains original failures and hardware findings; do not retry its olde101 package
+as though it contains the codec fix.
 
 Prepared November4. This packet adds independently scoped observations to the
 [current checklist](HANGOUT_PRIVATE_DEMO_PROGRESS_20261104.md). It grants no

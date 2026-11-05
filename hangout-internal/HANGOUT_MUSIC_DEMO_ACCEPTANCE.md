@@ -13,12 +13,16 @@ This permission does not enable AI, Hang Out's separate chat/media TURN, public
 navigation, purchases, signing enrollment or any trust/age/consent bypass.
 
 Native430/431 are merged; reviewed4c4dec3 and merge598bef0 have identical trees.
-One matching four-platform private build is running as
+One matching four-platform private build completed successfully as
 [41938592196](https://github.com/rupret007/webjam/actions/runs/41938592196).
 Do not dispatch another. The olde101 Mac package lacks the custom Opus codec
 and must not be retried as if the fix were installed. New package identity,
-bundled-codec execution, normal platform trust and physical audio still require
-their own observations. Websitea04's full CI now passes and the private Worker
+bundled-codec execution, normal platform trust and physical audio retain
+their own observations. All four actual archives are now verified; both Mac
+package-CI codec executions match their archive libraries. ARM normal startup
+and local codec execution pass; the verified Intel app is staged without
+stopping the user's existing Art session. Reciprocal physical audio is still
+unqualified. Websitea04's full CI now passes and the private Worker
 is9a558aff; its hosted checks are recorded separately in the current handoff.
 Source, hosted UI and music stay separate.
 

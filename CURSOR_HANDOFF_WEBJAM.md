@@ -1,6 +1,54 @@
 # WebJam / Hang Out — Cursor continuation
 
-**Current resume point, November5 at00:48UTC (November4 locally):**
+**Current resume point, November5 at01:06UTC (November4 locally):**
+
+The one native private cohort41938592196/source4c4 is now **SUCCESS**. All four
+actual downloaded archives are verified, with source/private-target manifests,
+executable architectures, archive/payload hashes and safe aliases. See the
+[sanitized package receipt](pr-assets/beta-collaboration/20261104/direct-private-delivery/current-cohort-4c4.json).
+Both Mac codec executions in their actual package CI logs match the downloaded
+library hashes: ARM29362a8d and Intel05677169. ARM also ran the extracted codec
+locally, round-tripping128-frame Jamulus and960-frame browser formats at48kHz,
+without devices/network. This closes the earlier missing-codec package finding;
+it does **not** qualify human hearing or reciprocal music.
+
+The ARM app is staged under the Mini's Library/Caches/WebJam/private-demo-4c4-20261104/arm64.
+Its deep/strict signature passes. Normal Launch Services opening succeeded;
+the actual chooser displays the new afro mark and “Paint with Bob Ross or bring
+your own YouTube lesson.” Music selection was restored and Window Close exited
+all owned processes normally; Host/Join were not clicked. Separate read-only
+`spctl` assessment rejected the ad-hoc/unnotarized app. Retain that result even
+though normal local opening worked; do not claim Gatekeeper/notarization approval,
+strip quarantine or re-sign an installed app.
+
+The exact Intel app is staged in the MacBook's corresponding cache underintel.
+Verified SSH transfer, package hash, actual deep/strict signature, x86-64,
+source/private destination and codec hash pass on the physical MacBook. Its older
+independent Art session remains open and untouched; the new app was not launched.
+One pending question asks Jeff to End Session/quit the old app normally when
+ready, leaving his wired headphones connected. Do not stop that user session,
+launch a competing profile or press Host before trial readiness is reconciled.
+Mini usable physical48kHz input and real Windows guest/headphone access are still
+pending the previously sent hardware questions. Keep one host/one guest,<=10min,
+no recording, Wi-Fi first and later Ethernet/separate-network comparisons.
+
+Only owned current-cohort archives/inspection receipts were moved to the external
+Hoser drive after every copied file's SHA/size matched. The old worktree artifact
+directory is a symlink to the verified external folder; keep the drive mounted.
+This preserved the Windows extractor's initial15GiB-reserve refusal and allowed
+inspection on the new volume without another download/build. No user art, shared
+services, credentials or unrelated data were moved or deleted. Internal reserve
+was15.86GiB immediately afterward; recheck resources before each heavy step.
+
+At01:02UTC fresh rolling30d, unfiltered account-wide TURN and SFU API responses
+both return HTTP200/no errors/empty groups. This is not an exact zero-use or
+spending guarantee. Current dashboard shows the Realtime subscription renewing
+November15 and billing cycle October15–November14; billable usage also says
+no data. Keep that uncertainty and reconcile actual allowance/headroom before
+capture, rather than reusing a prior zero-use inference. No media, purchase,
+provider activation or credential change occurred in this continuation.
+
+**Website delivery and hosted checks, through00:48UTC:**
 
 Website205 is **merged privately** as `cea9220fbd675a1af9a29df87435dde0bff92380`.
 Reviewed source `a04db4b8ebaeb654b945128230a176229a47cc98`, actual PR checkout
@@ -19,7 +67,10 @@ Actual hosted Chromium and WebKit observations through00:47:53UTC demonstrate375
 kit links, badge privacy, no pre-join/reconnect backlog and normal owned-room
 closure. Both engines pass desktop1440×900 coverage and320×256 focused composer
 containment. Screenshots of the expanded guide, canvas and short composer were
-visually inspected. Two real Chromium Grandeur provider players advanced unmuted; this is browser
+visually inspected. Five inspected captures and a source/runtime-bound receipt
+are committed in [current-paint-guide](pr-assets/beta-collaboration/20261104/direct-private-delivery/current-paint-guide/receipt.json),
+including375/390 Chromium/WebKit and the1440px IRC workspace.
+Two real Chromium Grandeur provider players advanced unmuted; this is browser
 timeline evidence, not physical hearing or native music. All six changed assets
 match source bytes after the existing beta HTML transformations. Both visitors
 per engine logged out200; copied cookies fail asset/state/socket replay401, with zero
@@ -41,7 +92,9 @@ revocation was not confirmed. No browser identity, socket, room, capture or repo
 was created by that diagnostic. Do not call its cleanup a pass or revoke unrelated
 sessions to clean it up.
 
-The **same** native build41938592196/source4c4 is still the only requested cohort.
+At the earlier00:45UTC checkpoint the **same** native build41938592196/source4c4
+was still running. This paragraph is historical; the qualified receipt above
+supersedes its pending archive status.
 At00:45UTC Linux, Windows and ARM builders passed; Intel was packaging. The actual
 Linux archive has been downloaded and verified for SHA/source/private target,
 safe paths and ELF x86-64. Other archives, Mac bundled-codec ABI/hash agreement,
