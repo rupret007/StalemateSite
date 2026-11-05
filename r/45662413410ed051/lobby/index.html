@@ -86,7 +86,7 @@
                 <button class="tile tile-chat" type="button" data-start="chat"><b aria-hidden="true">#</b><strong>Start a chat channel</strong><span>Your name. Your corner of the internet.</span></button>
                 <button class="tile" type="button" data-start="art"><b aria-hidden="true">✎</b><strong>Draw together</strong><span>One canvas. Everyone’s ideas.</span></button>
                 <button class="tile" type="button" data-start="watch"><b aria-hidden="true">▷</b><strong>Watch together</strong><span>Same video. Same moment.</span></button>
-                <button class="tile" type="button" data-start="bobross"><b aria-hidden="true">◒</b><strong>Paint along</strong><span>Pick Bob Ross or bring a YouTube lesson. Paint together.</span></button>
+                <button class="tile" type="button" data-start="bobross"><b aria-hidden="true"><img class="paint-together-mark" src="../paint-together-afro.webp" width="28" height="28" alt="" loading="lazy"></b><strong>Paint along</strong><span>Pick Bob Ross or bring a YouTube lesson. Paint together.</span></button>
                 <button class="tile" type="button" data-start="jam"><b aria-hidden="true">≋</b><strong>Jam (WebJam)</strong><span>Bring a riff. Find your band.</span></button>
             </div>
             <details class="room-details"><summary>About hosting &amp; keeping a room</summary><p class="small">Anyone can host a temporary room. Sign in with email to keep its name across visits. Registered rooms expire after 90 days without an owner or verified co-host visit. You can stay in #stalemate while a room is open. Cameras are always optional.</p></details>
@@ -187,6 +187,12 @@
                             <button class="btn btn--small" type="submit">Load</button>
                         </form>
                         <div class="bob-picks op-only" data-bob-picks></div>
+                        <details class="paint-start" data-paint-start hidden>
+                            <summary>Getting started · kit and materials</summary>
+                            <p>Start with <b>The Grandeur of Summer</b>. Watch, sketch, or paint with what you have.</p>
+                            <p>For Bob Ross’s oil-painting method, check the lesson’s materials. The kit is optional.</p>
+                            <p><a href="https://www.bobross.com/bob-ross-master-paint-set/" target="_blank" rel="noopener noreferrer">Official Master Paint Set and materials list ↗</a><br><a href="https://www.bobross.com/painting-supplies/" target="_blank" rel="noopener noreferrer">Paints, brushes and tools ↗</a></p>
+                        </details>
                     </div>
                     <div class="act-paint" data-act-paint hidden>
                         <canvas data-act-canvas width="600" height="360" aria-label="Shared paint canvas"></canvas>

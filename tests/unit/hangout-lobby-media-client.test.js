@@ -8,6 +8,7 @@ import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 const root = '../../r/45662413410ed051/';
 const html = readFileSync(new URL(`${root}lobby/index.html`, import.meta.url), 'utf8');
 const core = readFileSync(new URL(`${root}sync-core.js`, import.meta.url), 'utf8');
+const lessons = readFileSync(new URL(`${root}bob-ross.js`, import.meta.url), 'utf8');
 const client = readFileSync(new URL(`${root}lobby/lobby-room.js`, import.meta.url), 'utf8');
 const windows = [];
 afterEach(() => { for (const dom of windows.splice(0)) dom.window.close(); });
@@ -27,7 +28,7 @@ async function fixture({ inboundBeforeCapture = false, holdCapture = false, rece
     window.HangoutVideo = { isPhoneDevice: () => false };
     const selectVideo = vi.fn(async () => ({ getCurrentTime: () => 0, getPlayerState: () => 2, seekTo() {}, playVideo() {}, pauseVideo() {} }));
     window.HangoutYouTube = { create: () => ({ cancel() {}, select: selectVideo }) };
-    window.BobRoss = { EPISODES: [], label: () => '' };
+    window.eval(lessons);
     window.MediaStream = class { tracks = []; addTrack(track) { this.tracks.push(track); } getTracks() { return this.tracks; } getVideoTracks() { return this.tracks; } };
     const localTrack = { stop: vi.fn(), kind: 'video' }, stream = new window.MediaStream(); stream.addTrack(localTrack);
     const heldCapture = deferred(), heldIce = deferred(); let captureAttempts = 0, iceAttempts = 0;

@@ -265,6 +265,10 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .act-load { display: flex; gap: 6px; margin-top: 9px; }
 .act-load input { min-height: 36px; font-size: 12px; }
 .bob-picks { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.paint-together-mark { display: block; max-width: 100%; object-fit: contain; }
+.paint-start { margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 4px; font-size: 13px; overflow-wrap: anywhere; }
+.paint-start summary { cursor: pointer; }
+.paint-start p { margin: 8px 0 0; line-height: 1.5; }
 .activity-label { display: flex; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
 .activity-camera-count { color: var(--muted); }
 .act-camera-strip { --camera-tile-width: 128px; grid-column: 1 / -1; min-width: 0; max-width: 100%; }
