@@ -1,6 +1,75 @@
 # WebJam / Hang Out — Cursor continuation
 
-**Current resume point, November5 at00:05UTC (November4 locally) — qualified source fixes, not new delivery:**
+**Current resume point, November5 at00:48UTC (November4 locally):**
+
+Website205 is **merged privately** as `cea9220fbd675a1af9a29df87435dde0bff92380`.
+Reviewed source `a04db4b8ebaeb654b945128230a176229a47cc98`, actual PR checkout
+`a343513c7076bc566cdb7691f6533e137a6a8c7a` and the merge have identical trees.
+Both current full CI jobs pass2,062 units,781 main browser cases and34+34
+root/project-path cases, without retries or flaky summaries. The source has
+been delivered to the existing private Worker as
+`9a558aff-138e-44d3-8a25-5233002ef8f7`; rollback is
+`c0586c29-3d43-4ffa-96e4-646b9e7dde06`. Read-only verification confirms all
+plain variables, namespace IDs and secret binding names are preserved, including
+the approved WebJam music origin. AI and separate Hang Out chat/media TURN remain
+off. Issuer remains60e3f182. Public main/navigation remain untouched.
+
+Actual hosted Chromium and WebKit observations through00:47:53UTC demonstrate375/390 containment,
+16px input, reciprocal chat/drawing, Grandeur-first/four picks, optional official
+kit links, badge privacy, no pre-join/reconnect backlog and normal owned-room
+closure. Both engines pass desktop1440×900 coverage and320×256 focused composer
+containment. Screenshots of the expanded guide, canvas and short composer were
+visually inspected. Two real Chromium Grandeur provider players advanced unmuted; this is browser
+timeline evidence, not physical hearing or native music. All six changed assets
+match source bytes after the existing beta HTML transformations. Both visitors
+per engine logged out200; copied cookies fail asset/state/socket replay401, with zero
+capture requests, page errors or new reports. The third scoped attempt passes
+both complete journeys. WebKit external providers were intentionally blocked;
+it proves layout/chat/drawing, not YouTube playback. The original second attempt
+still **failed** its desktop assertion because the harness incorrectly expected
+the main workspace alone to include the separate59px titlebar. The correction
+checks header+workspace contiguous coverage, preserving full-height intent.
+No application bytes, geometry thresholds or camera safeguards changed. A fresh
+read-only deployment/binding check at00:48:29UTC confirms9a558aff remains current
+after these hosted tests, with the same preserved configuration.
+
+Keep the initial raw-HTML comparison failure and the second desktop-assertion
+failure. The separate API-only asset diagnostic confirms five raw assets match;
+HTML requires the existing server rewrites. Its logout request omitted the JSON
+body and returned403; its request context was discarded and server-side session
+revocation was not confirmed. No browser identity, socket, room, capture or report
+was created by that diagnostic. Do not call its cleanup a pass or revoke unrelated
+sessions to clean it up.
+
+The **same** native build41938592196/source4c4 is still the only requested cohort.
+At00:45UTC Linux, Windows and ARM builders passed; Intel was packaging. The actual
+Linux archive has been downloaded and verified for SHA/source/private target,
+safe paths and ELF x86-64. Other archives, Mac bundled-codec ABI/hash agreement,
+normal signatures and all physical music observations remain separate pending
+checks. Do not dispatch another build or stop the user's independent Art session.
+
+### Booklet reference and beginner supplies
+
+Jeff's latest photo shows the **Master Paint Set — English Instructions** cover,
+labelled **Mountain Summit**, with its materials list. Treat it as reference
+context; do not publish the photo or invent instructions from unshown pages.
+The official [Master Paint Set](https://www.bobross.com/bob-ross-master-paint-set/)
+page was checked again November4 and lists the matching Mountain Summit guide.
+Grandeur-first remains Candace's recommendation for this community, not a claim
+that this photographed cover instructs people to start with that video.
+
+The optional in-app getting-started section links to that official kit/materials
+page and [painting supplies](https://www.bobross.com/painting-supplies/). Keep it
+collapsed initially, with no automatic shopping, provider playback or capture.
+For any fuller beginner checklist, distinguish the eight oil colors and Liquid
+White from the1-inch/2-inch brushes, fan/liner brushes and painting knife; consult
+the selected lesson for its exact materials. Canvas, palette, workspace and
+cleaning arrangements also need checking rather than assuming every kit includes
+them. People can participate with digital tools, their own supplies or sketching;
+buying a branded kit must not become an entry requirement. Do not silently add a
+new purchase flow or change native reference-audio behavior.
+
+**Earlier checkpoint, November5 at00:05UTC — retained historical evidence:**
 
 Native [430](https://github.com/rupret007/webjam/pull/430) is **MERGED** as
 `a62795f78f7b77c909e6d6bc79b7fa7e6529020c`. Its whole tree matches reviewed
