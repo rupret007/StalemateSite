@@ -1,6 +1,276 @@
 # WebJam / Hang Out — Cursor continuation
 
-**Resume from the Host tools follow-up:** the [current checklist](hangout-internal/HANGOUT_PRIVATE_DEMO_PROGRESS_20261104.md#current-continuation--host-tools-follow-up) supersedes older pending statuses. Native423/424 and worksheet425 are qualified/merged. Website200 had one original CI flake; the [deterministic metadata-race fix](hangout-internal/HANGOUT_OWNER_TOOLS_METADATA_20261104.md) is on its own application branch. Keep source/CI/package/hosted/physical evidence separate; no public launch or new delivery is implied.
+**Current resume point, November5 at01:06UTC (November4 locally):**
+
+The one native private cohort41938592196/source4c4 is now **SUCCESS**. All four
+actual downloaded archives are verified, with source/private-target manifests,
+executable architectures, archive/payload hashes and safe aliases. See the
+[sanitized package receipt](pr-assets/beta-collaboration/20261104/direct-private-delivery/current-cohort-4c4.json).
+Both Mac codec executions in their actual package CI logs match the downloaded
+library hashes: ARM29362a8d and Intel05677169. ARM also ran the extracted codec
+locally, round-tripping128-frame Jamulus and960-frame browser formats at48kHz,
+without devices/network. This closes the earlier missing-codec package finding;
+it does **not** qualify human hearing or reciprocal music.
+
+The ARM app is staged under the Mini's Library/Caches/WebJam/private-demo-4c4-20261104/arm64.
+Its deep/strict signature passes. Normal Launch Services opening succeeded;
+the actual chooser displays the new afro mark and “Paint with Bob Ross or bring
+your own YouTube lesson.” Music selection was restored and Window Close exited
+all owned processes normally; Host/Join were not clicked. Separate read-only
+`spctl` assessment rejected the ad-hoc/unnotarized app. Retain that result even
+though normal local opening worked; do not claim Gatekeeper/notarization approval,
+strip quarantine or re-sign an installed app.
+
+The exact Intel app is staged in the MacBook's corresponding cache underintel.
+Verified SSH transfer, package hash, actual deep/strict signature, x86-64,
+source/private destination and codec hash pass on the physical MacBook. Its older
+independent Art session remains open and untouched; the new app was not launched.
+One pending question asks Jeff to End Session/quit the old app normally when
+ready, leaving his wired headphones connected. Do not stop that user session,
+launch a competing profile or press Host before trial readiness is reconciled.
+Mini usable physical48kHz input and real Windows guest/headphone access are still
+pending the previously sent hardware questions. Keep one host/one guest,<=10min,
+no recording, Wi-Fi first and later Ethernet/separate-network comparisons.
+
+Only owned current-cohort archives/inspection receipts were moved to the external
+Hoser drive after every copied file's SHA/size matched. The old worktree artifact
+directory is a symlink to the verified external folder; keep the drive mounted.
+This preserved the Windows extractor's initial15GiB-reserve refusal and allowed
+inspection on the new volume without another download/build. No user art, shared
+services, credentials or unrelated data were moved or deleted. Internal reserve
+was15.86GiB immediately afterward; recheck resources before each heavy step.
+
+At01:02UTC fresh rolling30d, unfiltered account-wide TURN and SFU API responses
+both return HTTP200/no errors/empty groups. This is not an exact zero-use or
+spending guarantee. Current dashboard shows the Realtime subscription renewing
+November15 and billing cycle October15–November14; billable usage also says
+no data. Keep that uncertainty and reconcile actual allowance/headroom before
+capture, rather than reusing a prior zero-use inference. No media, purchase,
+provider activation or credential change occurred in this continuation.
+
+**Website delivery and hosted checks, through00:48UTC:**
+
+Website205 is **merged privately** as `cea9220fbd675a1af9a29df87435dde0bff92380`.
+Reviewed source `a04db4b8ebaeb654b945128230a176229a47cc98`, actual PR checkout
+`a343513c7076bc566cdb7691f6533e137a6a8c7a` and the merge have identical trees.
+Both current full CI jobs pass2,062 units,781 main browser cases and34+34
+root/project-path cases, without retries or flaky summaries. The source has
+been delivered to the existing private Worker as
+`9a558aff-138e-44d3-8a25-5233002ef8f7`; rollback is
+`c0586c29-3d43-4ffa-96e4-646b9e7dde06`. Read-only verification confirms all
+plain variables, namespace IDs and secret binding names are preserved, including
+the approved WebJam music origin. AI and separate Hang Out chat/media TURN remain
+off. Issuer remains60e3f182. Public main/navigation remain untouched.
+
+Actual hosted Chromium and WebKit observations through00:47:53UTC demonstrate375/390 containment,
+16px input, reciprocal chat/drawing, Grandeur-first/four picks, optional official
+kit links, badge privacy, no pre-join/reconnect backlog and normal owned-room
+closure. Both engines pass desktop1440×900 coverage and320×256 focused composer
+containment. Screenshots of the expanded guide, canvas and short composer were
+visually inspected. Five inspected captures and a source/runtime-bound receipt
+are committed in [current-paint-guide](pr-assets/beta-collaboration/20261104/direct-private-delivery/current-paint-guide/receipt.json),
+including375/390 Chromium/WebKit and the1440px IRC workspace.
+Two real Chromium Grandeur provider players advanced unmuted; this is browser
+timeline evidence, not physical hearing or native music. All six changed assets
+match source bytes after the existing beta HTML transformations. Both visitors
+per engine logged out200; copied cookies fail asset/state/socket replay401, with zero
+capture requests, page errors or new reports. The third scoped attempt passes
+both complete journeys. WebKit external providers were intentionally blocked;
+it proves layout/chat/drawing, not YouTube playback. The original second attempt
+still **failed** its desktop assertion because the harness incorrectly expected
+the main workspace alone to include the separate59px titlebar. The correction
+checks header+workspace contiguous coverage, preserving full-height intent.
+No application bytes, geometry thresholds or camera safeguards changed. A fresh
+read-only deployment/binding check at00:48:29UTC confirms9a558aff remains current
+after these hosted tests, with the same preserved configuration.
+
+Keep the initial raw-HTML comparison failure and the second desktop-assertion
+failure. The separate API-only asset diagnostic confirms five raw assets match;
+HTML requires the existing server rewrites. Its logout request omitted the JSON
+body and returned403; its request context was discarded and server-side session
+revocation was not confirmed. No browser identity, socket, room, capture or report
+was created by that diagnostic. Do not call its cleanup a pass or revoke unrelated
+sessions to clean it up.
+
+At the earlier00:45UTC checkpoint the **same** native build41938592196/source4c4
+was still running. This paragraph is historical; the qualified receipt above
+supersedes its pending archive status.
+At00:45UTC Linux, Windows and ARM builders passed; Intel was packaging. The actual
+Linux archive has been downloaded and verified for SHA/source/private target,
+safe paths and ELF x86-64. Other archives, Mac bundled-codec ABI/hash agreement,
+normal signatures and all physical music observations remain separate pending
+checks. Do not dispatch another build or stop the user's independent Art session.
+
+### Booklet reference and beginner supplies
+
+Jeff's latest photo shows the **Master Paint Set — English Instructions** cover,
+labelled **Mountain Summit**, with its materials list. Treat it as reference
+context; do not publish the photo or invent instructions from unshown pages.
+The official [Master Paint Set](https://www.bobross.com/bob-ross-master-paint-set/)
+page was checked again November4 and lists the matching Mountain Summit guide.
+Grandeur-first remains Candace's recommendation for this community, not a claim
+that this photographed cover instructs people to start with that video.
+
+The optional in-app getting-started section links to that official kit/materials
+page and [painting supplies](https://www.bobross.com/painting-supplies/). Keep it
+collapsed initially, with no automatic shopping, provider playback or capture.
+For any fuller beginner checklist, distinguish the eight oil colors and Liquid
+White from the1-inch/2-inch brushes, fan/liner brushes and painting knife; consult
+the selected lesson for its exact materials. Canvas, palette, workspace and
+cleaning arrangements also need checking rather than assuming every kit includes
+them. People can participate with digital tools, their own supplies or sketching;
+buying a branded kit must not become an entry requirement. Do not silently add a
+new purchase flow or change native reference-audio behavior.
+
+**Earlier checkpoint, November5 at00:05UTC — retained historical evidence:**
+
+Native [430](https://github.com/rupret007/webjam/pull/430) is **MERGED** as
+`a62795f78f7b77c909e6d6bc79b7fa7e6529020c`. Its whole tree matches reviewed
+`0d474942978d54176f63f527dc2fc150eb7933c5` and actual PR checkout696234a.
+Full CI41930581200 passes all563 tracked modules once:12,929 passed/60 existing
+skips, plus the applicable integration, transport, Windows and iOS checks.
+Separate browser and Worker workflows also pass. Original605 Notes/changelog
+and6f Conversation failures were reproduced and retained; their product fixes
+preserve Notes space and owned-host invitation/error/cleanup controls. The Mac
+package now requires/builds its custom Opus codec and verifies the actual bundle
+ABI during packaging. **A new package/ABI execution is still required**; never
+retry olde101 as though this source fix were installed.
+
+The requested afro mark, **Grandeur of Summer first**, four official Bob Ross
+picks/custom link and optional official kit/material help are in
+[native431](https://github.com/rupret007/webjam/pull/431), reviewed
+`4c4dec3d8b53e4951116ed28de8060d0c92a3ed1`, now **MERGED** as
+`598bef0a7ce4be9742fddbb5b90985412bbc7cfd`. This brings
+forward430's normal merge without changing49d983d's whole tree
+`edc7a804a7ca8eacb5072ce01ee1a77ba6c31ecd`. Full CI41934363659/
+job126939271323 passes all563 modules once:12,930 passed/60 existing skips.
+All applicable checks pass, including both integration versions. Browser CI
+41934363700 passes34 browser,74 Worker and25 browser-unit cases. Actual PR
+checkout2d8547e7, reviewed source and merged598 have identical whole treeedc7a804.
+Original033 CI failed8 existing prepared-copy cases because the materials-help
+row clipped the compact guest guidance by5px. The failures reproduced locally;
+compact embedded spacing now preserves the entire guidance and copy action.
+All326 cases in17 affected modules pass in fresh per-file processes; two compact
+source renders were inspected. Earlier187-case and combined-batch observations
+retain their separate scopes; no assertion, control or privacy check was removed.
+
+Website [205](https://github.com/rupret007/StalemateSite/pull/205) is now
+`a04db4b8ebaeb654b945128230a176229a47cc98`, based on the private
+`codex/owner-tools-late-metadata-20261104` branch. Current PR/source CI
+41937067973/41937061770, jobs126948097928/126948075122, are running.
+First1903 CI failed9 obsolete catalogue doubles plus a privacy check;98 affected
+units pass after correction. Both11dee5b full runs then passed2,062 units and
+779 browser cases but failed2 camera-fold selectors, including their retries.
+The new nested materials summary made an old broad locator ambiguous. Both
+failures reproduced; selecting the activity's direct summary preserves every
+camera consent/retry/local-off/status/chat assertion. Six focused cases pass
+with0 retries. **Only tests and documentation changed from11 to a04**; all69
+packaging inputs/runtime bytes are identical. Original failures/logs remain.
+The actual current source still needs full CI; do not claim11's failed runs pass.
+
+Workspace parent [204](https://github.com/rupret007/StalemateSite/pull/204)
+`d2901e2a2b31a56589cf4ececb84358015fa5f0f` is **MERGED privately** as
+`d0cce486399c975a76dc21e96df2a00918fd2102`. PR CI41929472584 and source
+CI41929461974 both pass:
+2,061 units,777 main browser cases and separate34 root/34 project-path checks,
+without retries/flaky summaries. Actual
+PR checkout6871d19 has the identical whole tree4863945d. Original59ecad2's two
+short-window failures and retries are retained; compact header controls and input
+scroll margin fix them without loosening assertions.203/cb81 also has both full
+CI runs green and is merged privately asb67e353. The integration branch is
+`codex/owner-tools-late-metadata-20261104`; public main/navigation are untouched.
+
+Reused worktrees: **WebJam/.local/paint-along-lessons-20261104** and
+**StalemateSite/.local/paint-along-links-20261104**, both on
+`codex/paint-together-start-20261104`. Parent workspace WT is
+**StalemateSite/.local/mirc-workspace-20261104**. Do not assume old branch names.
+
+A new69-asset private package/dry run at11dee5b passed. Read-only Cloudflare
+revalidation confirms all plain variables, secret binding names, classes and
+namespace IDs match current c0586c29. Config/manifest hashes are in the owner-only
+`paint-along-links-20261104/.local/private-delivery-11dee5b/preflight.json`.
+**No new website deployment exists yet.** The current candidate.json pins a04;
+the prepared11 assets remain usable only after proving their input equality and
+qualifying a04. Exactly one new native private cohort was requested after the
+resource guard reopened: [41938592196](https://github.com/rupret007/webjam/actions/runs/41938592196),
+source4c4dec3, branch`codex/paint-together-start-20261104`, queued at00:04UTC.
+Inputs: final_build=true, web_join_target=private-beta; signing rehearsals,
+manual certifications and extra quarantined evidence off. **Do not dispatch
+another cohort.** No package, actual bundled-codec or physical pass is claimed.
+Before actual delivery,
+finish exact-head CI and freshly reconcile live configuration/rollback. Never
+apply the tracked empty WEBJAM_WEB_ORIGINS over the approved private music origin.
+Private beta remains c0586c29/de2; issuer remains60e3f182. AI and separate Hang Out
+chat/media TURN stay off. Keep every namespace, ledger, session key and report.
+
+All4 real YouTube picks played on two local real-provider players, with advancing
+unmuted timelines and0 captures. This is not physical hearing, native playback
+or hosted proof. MacBook verified SSH/resources pass at23:24UTC: x86_64/28GiB
+free. Its independently opened translocated WebJam/Jamulus session was observed
+running then; leave it untouched and re-check before a new trial. No agent physical trial is active. Hardware questions are
+pending for Mini USB audio and a real Windows guest; don't buy anything.
+
+Next: monitor existing41938592196 and currenta04 CI. Verify the actual four
+archives, bundled codec ABI/target/signatures and private destination before
+staging new Mac apps. Merge eligible private application PRs and deliver the
+qualified69-asset site after fresh configuration/rollback reconciliation. Refresh account-wide
+headroom before bounded physical music. Required ARM/Intel/Windows, separate
+network, Ethernet comparison, human audibility, current exact report disposition
+and remaining accessibility/legal/capacity outcomes stay open. Only Jeff disposes
+reports. Preserve all62 outcomes and original failures; no StoryPool/Karen/core,
+public launch or signing enrollment. The owner-only direct-delivery checkpoint's
+currentPaintTogetherAndDeliveryNov04 section has fuller receipts/current jobs.
+
+## Earlier November4 observations — historical source scopes
+
+**Latest November4 correction — read before retrying music:**
+[IRC workspace204](https://github.com/rupret007/StalemateSite/pull/204)
+(`59ecad26157f558837144035905641a78d4c6ded`) uses Halloy/mIRC interaction cues,
+compact full-viewport chat, explicit fullscreen and concise quiet-room wording.
+23 local browser checks/18 units pass; desktop and375/390 screenshots are
+committed. Halloy is native Rust/Iced GPL-3.0; no source/assets were copied.
+Own CI/private delivery are pending; the private Worker is still c0586c29/de2.
+
+**Do not repeat the old e101 browser-music attempt.** The physical Intel app
+started native audio; a PID-bound read-only CoreAudio observation confirmed
+MacBook microphone and wired headphones at48kHz. Browser invite preparation
+failed. Inspection found the actual app missing its custom Opus dylib, while
+system Opus lacked the custom symbols. Jeff ended the session; no native audio
+children remained. [Native430](https://github.com/rupret007/webjam/pull/430),
+`60598d513eb8ef6febbd1201e3401076eec86352`, requires/builds the Mac codec and
+executes actual bundle ABI checks in packaging, adds visible invite/copy/end
+buttons and safe persistent failures. Local120 focused plus109 existing
+profile/offline/compact cases pass. Source is pushed; own CI, fresh packages,
+actual bundle ABI execution and reciprocal music remain pending.
+
+The normal website room-invitation journey passed on both physical Macs before
+that music attempt: host /invite, guest acceptance, reciprocal room chat and
+both logout200/state401 with zero capture requests. In the later music attempt,
+the publisher again logged out200/state401 with zero captures; the Mini guest
+helper exited on an unhandled popup-wait rejection and produced no final receipt.
+Do not claim its logout/track cleanup was qualified. Original failure is retained.
+Corrected, unrun helpers require an existing enabled Join button, handle popup
+and click together and persist a pre-close cleanup snapshot. Owner-only local
+checkpoint: private-beta-delivery-20261104/.local/demo-progress/
+direct-delivery-checkpoint-nov04.json, key halloyWorkspaceAndCodecFollowup.
+
+Paint Along: website203/cb81e11 normal test job126863491878 passed at actual PR
+checkout9d13598; Pages skipped. Native429/4a360de main job126871111989 passes,
+but its separate browser e2e126871110798 was cancelled while installing
+Playwright OS dependencies, so **all CI is not green**. Retained terminal logs
+are owner-only in webjam-demo-readiness/.local/demo-progress. Do not merge or
+claim that cancelled job passed. Normal host invitation, music audibility,
+ARM-native/Windows/separate-network scope, Ethernet comparison and Jeff's exact
+current report dismissal remain distinct requirements. Existing AI/media and
+public-launch holds are unchanged. All62 requirements remain intact.
+
+**Current direct delivery:** [November4 delivered beta, corrected packages and hardware findings](hangout-internal/HANGOUT_DIRECT_PRIVATE_DELIVERY_20261104.md) is the current checklist. Website201/de2 runs privately as `c0586c29`; separate web TURN secrets are encrypted in issuer `60e3f182`. Native428 merged as `12d939af`; its562-module CI passes12,911 cases/60 skips. One corrected four-platform cohort41886309202/e101465 is verified; do not rebuild for later changelog-only640. Actual cross-entry chat/drawing/layout/reconnect remain qualified at their recorded scopes. **Music remains unqualified:** two ARM-native Jabra Bluetooth attempts fell back to BlackHole and were stopped without a browser guest. The identical Intel archive passes normal signature verification on the physical MacBook in its private cache; a Desktop copy failed because of extra Finder/file-provider metadata and is preserved. Desktop shortcut **WebJam Private Demo** points to the verified copy. Next: Jeff opens that native MacBook app at Music/Host/Join; then test its internal mic/wired headphones as host and the Mini as browser guest. The initial private Jam-room publisher timed out waiting for the human invite and logged out normally; do not call it live or restart it until Jeff is ready. All62 outcomes and original failures remain intact.
+
+**Application evidence packet:** [November4 scoped delivery evidence](hangout-internal/HANGOUT_PRIVATE_APPLICATION_PACKET_20261104.md) records qualified201 CI, the actual downloaded toolkit, public/private boundary and historical-draft reconciliation. Both full201 jobs pass2,061 units/763 main browser cases without retries; Pages deployments skipped. Browser `lobby.js` is in the broad source inventory, not the actual native bundle; no extra workflow approval is created. Private delivery and reciprocal music remain separate.
+
+## Earlier checkpoints — historical revision scopes
+
+**Resume from the Host tools follow-up:** the [current checklist](hangout-internal/HANGOUT_PRIVATE_DEMO_PROGRESS_20261104.md#earlier-continuation--host-tools-follow-up-historical) supersedes older pending statuses. Native423/424 and worksheet425 are qualified/merged. Website200 had one original CI flake; the [deterministic metadata-race fix](hangout-internal/HANGOUT_OWNER_TOOLS_METADATA_20261104.md) is on its own application branch. Keep source/CI/package/hosted/physical evidence separate; no public launch or new delivery is implied.
 
 **Latest browser integration candidate:** read [the November4 ownership import](hangout-internal/HANGOUT_BROWSER_OWNERSHIP_IMPORT_20261104.md) for the exact merged-native423 runtime, website regression evidence and the remaining private-delivery/music gates. Its own website CI remains required.
 

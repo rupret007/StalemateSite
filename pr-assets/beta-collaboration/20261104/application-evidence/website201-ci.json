@@ -1,0 +1,52 @@
+{
+  "at": "2026-11-04T06:29:00.174260+00:00",
+  "reviewedHead": "de2b01725925d2f78ee21af33f68f3eb4eb95407",
+  "jobs": [
+    {
+      "jobId": 126413016948,
+      "runId": 41781236419,
+      "actualCheckout": "de2b01725925d2f78ee21af33f68f3eb4eb95407",
+      "units": 2061,
+      "unitFiles": 137,
+      "mainBrowserCases": 763,
+      "separateRootProjectCases": [
+        34,
+        34
+      ],
+      "retryMarkers": 0,
+      "failureOrFlakySummaries": 0,
+      "doNotSumOverlappingSuites": true,
+      "logBytes": 330178,
+      "logSha256": "1888e4b50c2dfea8ad11e8b61aab6d7ea7bfa7f5e5c3dfbe3f29a1617661aaa9"
+    },
+    {
+      "jobId": 126413107105,
+      "runId": 41781264325,
+      "actualCheckout": "f879b6e397d3f67a9f471a43fdcfb840cc392284",
+      "units": 2061,
+      "unitFiles": 137,
+      "mainBrowserCases": 763,
+      "separateRootProjectCases": [
+        34,
+        34
+      ],
+      "retryMarkers": 0,
+      "failureOrFlakySummaries": 0,
+      "doNotSumOverlappingSuites": true,
+      "logBytes": 330019,
+      "logSha256": "da4089ccd90428ef8fa8c7c2d126cea0bfdbba43e24e9b65a53bdee8708d3be6"
+    }
+  ],
+  "actualCheckoutWholeTreesStillRequireVerification": false,
+  "publicDeploymentClaimed": false,
+  "providerOrMusicQualified": false,
+  "all62Preserved": true,
+  "wholeTree": "9067a7369085df48c54346c4f5d1c7b5bef9725e",
+  "wholeTreeVerifiedForBothActualCheckoutsAndReviewedHead": true,
+  "terminalChecks": {
+    "success": 2,
+    "skippedPagesDeployments": 2,
+    "failure": 0
+  },
+  "qualificationScope": "FrontendCI on exact reviewed and tree-identical PR checkout. Native/backend execution inputs remain source-identical to551 all11-mode proof; no new201 native workflow, private delivery, provider or music pass is claimed."
+}

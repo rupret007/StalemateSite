@@ -1,9 +1,13 @@
 # Private demo checkpoint — November 4, 2026
 
-## Current continuation — Host tools follow-up
+## Current continuation — Direct delivery
+
+The [direct-delivery note and single ordered checklist](HANGOUT_DIRECT_PRIVATE_DELIVERY_20261104.md) are current. Jeff superseded the StoryPool delivery handoff. Website201 now runs privately as `c0586c29`, with its approved music origin and separate encrypted TURN credentials in issuer `60e3f182`. Actual ARM Mini/Intel MacBook Wi-Fi chat passes, including fresh history, entry badges,375/390 layout and logout. Native428 fixed the reproduced Cloudflare1010 HTTP identity blocker and merged as `12d939af`; exact CI passed 12,911 cases across562 tracked modules, with 60 skips. One corrected private cohort 41886309202 is pinned to `e101465`; older 41798291653/d3 packages remain historical and lack this fix. Physical music remains unqualified. The Mini now has a Jabra headset, but both ARM-native attempts fell back to BlackHole and were stopped. The physical MacBook Intel cache/shortcut installation passes normal signature verification after preserving a Desktop-metadata failure. Native MacBook GUI confirmation and real browser audio remain pending. All62 requirements are preserved.
+
+## Earlier continuation — Host tools follow-up (historical)
 
 This section supersedes pending/current statements in the earlier observation
-below. The full goal is incomplete; all62 requirements remain unchanged.
+below. The full goal is incomplete; all 62 requirements remain unchanged.
 
 - Native423/424 are qualified and normally merged. Combined reviewed source
   `0d995cd79d2a7bf95dbbafcbafbb0618e0762a71` merged as
@@ -25,7 +29,12 @@ below. The full goal is incomplete; all62 requirements remain unchanged.
   fixes the reproduced dialog race. See
   [Host tools evidence](HANGOUT_OWNER_TOOLS_METADATA_20261104.md).
   Local2,061 units/137files and eight Chromium/WebKit moderation journeys pass
-  without retries. Own current-head CI remains required; no deployment is claimed.
+  without retries. Both current-head full CI jobs now pass2,061 units/137files
+  and763 main browser cases without retries. Reviewedde2b017 and actual checkout
+  f879b6e share tree9067a7369085df48c54346c4f5d1c7b5bef9725e. Separate34/34
+  root/project-path checks overlap and are not summed. Pages deployments skipped;
+  no private delivery or physical music is claimed. See the
+  [final evidence packet](HANGOUT_PRIVATE_APPLICATION_PACKET_20261104.md).
 - Exact browser pin01ffdc8 and its13 runtime/license files remain unchanged.
   A native private build request was delivered to StoryPool10-21-26; execution
   has not been observed here. Last qualified packages remainbf24e7d/run41193954131.
@@ -33,14 +42,17 @@ below. The full goal is incomplete; all62 requirements remain unchanged.
 
 Current ordered checklist:
 
-1. Qualify the Host tools follow-up's own CI. Do not call200 retry-free or reuse
-   its result for changed source. Preserve the selected stack and Grok branches;
-   no merge to auto-publishing website main.
+1. Preserve201's qualified exact application head and the selected stack/Grok
+   branches. Do not call200 retry-free or turn current source/CI into a package
+   or deployment claim. No merge to auto-publishing website main.
 2. Hand the exact qualified website/build/config/rollback packet to the existing
-   infrastructure owner. This follow-up changeslobby.js; the older165-file runtime
-   input-equivalence receipt for0f does not qualify it. The runtime workflow's
-   path filters omitlobby.js and have no manual dispatch. Request an owner
-   coverage decision without editing workflow YAML or forcing unrelated changes.
+   infrastructure owner. Only browser `lobby.js` differs in the broad165-file
+   inventory; the other164 records and all native/backend execution inputs match
+   qualified551. That broad inventory is not the native bundle catalogue, which
+   excludes browser `lobby.js`. The configured runtime workflow does not trigger
+   for this UI-only change. No extra workflow approval or forced run is required
+   by this finding. Retain201's qualified frontend CI and551's11 actual runtime
+   modes at their original scope, without claiming a new201 runtime execution.
 3. Obtain actual combined billing-period headroom, intended separate web TURN
    credential/origin bindings and normal private delivery/trust/rollback evidence.
    A sent request or old Free-plan observation is not execution or entitlement.
@@ -48,7 +60,7 @@ Current ordered checklist:
    ARM/Intel/Windows music plus a separate-network pair through qualified normal
    packages. Preserve Linux and unsigned native Windows gaps. Approved trials are
    one native host/one browser guest, at most10 minutes each after the gates.
-5. Keep all62 outcomes and the full audit's hosted/accessibility/capacity/legal
+5. Keep all 62 outcomes and the full audit's hosted/accessibility/capacity/legal
    gaps explicit. Only Jeff disposes current synthetic report289035. Preserve
    the original FAILED eight-hour observer; no new eight-hour pass is claimed.
 

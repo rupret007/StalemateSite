@@ -1,0 +1,78 @@
+{
+  "at": "2026-11-04T20:35:06.017053+00:00",
+  "source": "e101465df5d204809619aafc8b65fd7925950e8a",
+  "firstAttempt": {
+    "at": "2026-11-04T19:46:45.553334+00:00",
+    "source": "e101465df5d204809619aafc8b65fd7925950e8a",
+    "result": "FAILED_FIRST_PHYSICAL_HOST_ATTEMPT",
+    "observedNativeRoute": "in: BlackHole16ch/out: Jabra Evolve75; disconnected before any browser guest/invite publication",
+    "observedNativeRecovery": "Disconnecting Jamulus while WebJam session remained active caused it to restart (96091 ->96400); user also observed restart",
+    "stop": "Normal End Session plus Yes; UI Start Session/Audio Stopped; no owned engine/sidecar/server processes remain",
+    "ownedProcessesAfter": [
+      {
+        "pid": 95877,
+        "parent": 1,
+        "executableName": "WebJam"
+      }
+    ],
+    "nativeProfileSelectorAfter": "in: BlackHole 16ch/out: Jabra Evolve 75",
+    "browserGuestStarted": false,
+    "remoteGuestConnected": false,
+    "recordingStartedByTest": false,
+    "actualReciprocalMusicQualified": false,
+    "followup": "Select explicit physical input/output inside dedicated Jamulus profile while disconnected and without an active WebJam host; do not alter system routing or unrelated Jamulus settings"
+  },
+  "secondAttempt": {
+    "at": "2026-11-04T20:01:14.686987+00:00",
+    "source": "e101465df5d204809619aafc8b65fd7925950e8a",
+    "result": "FAILED_EXPLICIT_BLUETOOTH_NATIVE_ROUTE_RETRY",
+    "normalStartSessionUsed": true,
+    "explicitDedicatedProfilePreparation": "explicit-headset-profile-preparation.json",
+    "actualNativeUiRoute": "in: BlackHole16ch/out: JabraEvolve75 despite explicit physical pair",
+    "remoteGuestConnected": false,
+    "browserMicrophoneStarted": false,
+    "recordingStartedByTest": false,
+    "normalEndSessionThenYes": true,
+    "uiFinalState": "Start Session; Audio Stopped; Not Connected",
+    "ownedProcessesAfter": [
+      {
+        "pid": 95877,
+        "name": "WebJam"
+      }
+    ],
+    "musicQualified": false,
+    "nextAction": "Qualified Intel MacBook native host using internal mic/wired headphones; Mini real browser guest with headset, preserving unsupported ARM-native Bluetooth path as a gap"
+  },
+  "operatorProfilePreparation": {
+    "at": "2026-11-04T19:56:03.524314+00:00",
+    "purpose": "Explicit real physical device selection for the next normal app trial",
+    "onlyEditedDedicatedWebJamProfile": true,
+    "onlyXmlFieldChanged": "auddev_base64",
+    "beforeSelector": "in: BlackHole 16ch/out: Jabra Evolve 75",
+    "afterSelector": "in: Jabra Evolve 75/out: Jabra Evolve 75",
+    "beforeSha256": "1aadca93da9fe8fb051e471f96be2b2c822fdfbf85a055c658726a08a5d6bf16",
+    "afterSha256": "729ca2da6ca2bde10b44ca93a51659b775f2effd3e073da57aa5d5b10c678362",
+    "otherBytesIdentical": true,
+    "regularJamulusProfileNotEdited": true,
+    "systemAudioRoutingNotChanged": true,
+    "mediaNotRunningDuringChange": true,
+    "nextTrialStillRequired": true,
+    "resourceGuardPassed": true
+  },
+  "scope": "Two failed real ARM-native host attempts, no browser music guest and no requested recording; normal End Session cleanup verified",
+  "causeQualification": "The observed fallback is reproduced; the precise driver/application cause is not proven. No Bluetooth-native success is claimed.",
+  "auxiliaryCrash": {
+    "process": "Jamulus",
+    "report": "Jamulus-2026-11-04-135320.ips",
+    "pid": 97153,
+    "signal": "SIGABRT",
+    "observedSymbols": [
+      "malloc_vreport",
+      "malloc_zone_error",
+      "free_tiny_botch",
+      "AppleUnifiedLogger::messageHandler"
+    ],
+    "context": "Auxiliary app reopened without the managed-profile arguments; user dismissed unavailable-device warning; crash report observed after quit. Exact cause and regular-profile byte preservation are unqualified. This is not proof that the parent WebJam app crashed."
+  },
+  "scopeClarification": "No browser invitation was shared into a website room and no browser guest joined. Ordinary desktop hosting may publish its own encrypted native mailbox offer; the earlier first-attempt wording does not establish absence of that normal native signaling."
+}

@@ -1,5 +1,42 @@
 # Required live-music acceptance for the shared community
 
+## Current private-trial authorization
+
+Read the [current handoff](../CURSOR_HANDOFF_WEBJAM.md) before the historical
+package references below. Jeff has authorized the separate private WebJam web
+TURN setup and the bounded native-host/browser-guest trials. That decision is
+already made; do not ask him to lift the same hold again. The approved separate
+web credentials and exact private origin are deployed, with desktop credentials,
+sessions, namespace IDs and ledgers preserved. Fresh account-wide SFU/TURN
+entitlement, usage/headroom and resource checks remain necessary before media.
+This permission does not enable AI, Hang Out's separate chat/media TURN, public
+navigation, purchases, signing enrollment or any trust/age/consent bypass.
+
+Native430/431 are merged; reviewed4c4dec3 and merge598bef0 have identical trees.
+One matching four-platform private build completed successfully as
+[41938592196](https://github.com/rupret007/webjam/actions/runs/41938592196).
+Do not dispatch another. The olde101 Mac package lacks the custom Opus codec
+and must not be retried as if the fix were installed. New package identity,
+bundled-codec execution, normal platform trust and physical audio retain
+their own observations. All four actual archives are now verified; both Mac
+package-CI codec executions match their archive libraries. ARM normal startup
+and local codec execution pass; the verified Intel app is staged without
+stopping the user's existing Art session. Reciprocal physical audio is still
+unqualified. Websitea04's full CI now passes and the private Worker
+is9a558aff; its hosted checks are recorded separately in the current handoff.
+Source, hosted UI and music stay separate.
+
+Each physical trial remains one native host and one browser guest for at most
+ten minutes, with capture consent, headphones and no recording. Honor Jeff's
+requested Wi-Fi-first order; Ethernet is a later comparison. Do not stop an
+independently opened Art session as though it belonged to a bounded test.
+Only Jeff disposes moderation reports. Actual Windows browser/device access and
+headphone/microphone readiness remain unconfirmed; an online Windows tailnet
+peer or WSL process is not Windows audio evidence. The platform, separate-network,
+interruption/Stop and human-hearing requirements below remain unchanged.
+
+## Original requirements and historical evidence
+
 Jeff clarified on October 28, 2026 that live WebJam music is a required part of
 this project and the finished private demo for Che. Preserve all 62 original
 acceptance outcomes. Chat, drawing, watch rooms and room hosting are browser
@@ -104,10 +141,12 @@ historical evidence and trust gaps, not a current package selection.
   temporary MacBook test keys were removed after testing. Jeff's testing
   authorization persists; authentication may need to be re-established through
   the approved access path. Recheck availability before physical trials.
-- Keep AI, TURN/vault activation, current age/camera/consent safeguards, platform
-  trust and release holds unchanged. Do not bypass signature checks or purchase
-  signing services. If the approved secure music route needs an external action,
-  identify that dependency and hand it to its owner.
+- Keep AI, separate Hang Out chat/media TURN, current age/camera/consent
+  safeguards, platform trust and release holds unchanged. The narrowly approved
+  private WebJam activation is described above; it does not release other holds.
+  Do not bypass signature checks or purchase signing services. If the approved
+  secure music route needs an external action, identify that dependency and
+  hand it to its owner.
 
 Every unperformed or failed music row stays pending/failed. Browser community
 proof is valuable progress, but does not complete the required live-music demo
