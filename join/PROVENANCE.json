@@ -1,19 +1,19 @@
 {
   "repository": "https://github.com/rupret007/webjam",
-  "commit": "23fda193e944aa5f04c2c3fefeb67a876afd7c1e",
-  "sourcePR": "https://github.com/rupret007/webjam/pull/435",
+  "commit": "8b6f81c70105158581b6654e1d2ad90d5ae08307",
+  "sourcePR": "https://github.com/rupret007/webjam/pull/436",
   "license": "MIT",
   "modifications": {},
   "files": {
     "app.js": {
       "source": "web/join/app.js",
-      "upstreamSha256": "1c5e1e56daea8cbaf4b3e10f5d03d63d89e652f266930b75f554033b9993eb4f",
-      "shippedSha256": "1c5e1e56daea8cbaf4b3e10f5d03d63d89e652f266930b75f554033b9993eb4f"
+      "upstreamSha256": "256bf35ddc2b561858d0ac1a845114975fa82ebc99ac7a1d1f708a096637bd04",
+      "shippedSha256": "256bf35ddc2b561858d0ac1a845114975fa82ebc99ac7a1d1f708a096637bd04"
     },
     "audio.js": {
       "source": "web/join/audio.js",
-      "upstreamSha256": "8bf3fd3b169492c02e21e12d0c09d818c383b1a67991d64cf35f8948ebf63284",
-      "shippedSha256": "8bf3fd3b169492c02e21e12d0c09d818c383b1a67991d64cf35f8948ebf63284"
+      "upstreamSha256": "16a8bc8be51bf4a39ebd6c79aa2f0135f6422fc81f96d4f2bae0ed9c5cc34f10",
+      "shippedSha256": "16a8bc8be51bf4a39ebd6c79aa2f0135f6422fc81f96d4f2bae0ed9c5cc34f10"
     },
     "config.js": {
       "source": "web/join/config.js",
@@ -32,8 +32,8 @@
     },
     "index.html": {
       "source": "web/join/index.html",
-      "upstreamSha256": "6acbbbb12d791955e8997d4e389476b074cd36f6372614c5251fdfef5f0dbb10",
-      "shippedSha256": "6acbbbb12d791955e8997d4e389476b074cd36f6372614c5251fdfef5f0dbb10"
+      "upstreamSha256": "e99393d5e9b4c64816f345dd938589e89d00ada8a57154ab677d8a271afa7f40",
+      "shippedSha256": "e99393d5e9b4c64816f345dd938589e89d00ada8a57154ab677d8a271afa7f40"
     },
     "mailbox.js": {
       "source": "web/join/mailbox.js",
@@ -47,8 +47,8 @@
     },
     "prejoin.js": {
       "source": "web/join/prejoin.js",
-      "upstreamSha256": "8db50c21110635c9d9ff1f86d37dbdc7107ceaf78a38378f449bcf17e4b9f3ba",
-      "shippedSha256": "8db50c21110635c9d9ff1f86d37dbdc7107ceaf78a38378f449bcf17e4b9f3ba"
+      "upstreamSha256": "4d07cefa26827c249d561e87b7a9bded01f84136b418ce62c61b4076fd7e6f95",
+      "shippedSha256": "4d07cefa26827c249d561e87b7a9bded01f84136b418ce62c61b4076fd7e6f95"
     },
     "session.js": {
       "source": "web/join/session.js",
@@ -57,8 +57,8 @@
     },
     "style.css": {
       "source": "web/join/style.css",
-      "upstreamSha256": "589e6e72f5fcd9970b7ba32a64f4b7336ce5fc880f276c709d62093a5e966f93",
-      "shippedSha256": "589e6e72f5fcd9970b7ba32a64f4b7336ce5fc880f276c709d62093a5e966f93"
+      "upstreamSha256": "8ca53e1027749f97e2f74b1cc38edf9f84a14021005dfd9c2b933469f76fa8b3",
+      "shippedSha256": "8ca53e1027749f97e2f74b1cc38edf9f84a14021005dfd9c2b933469f76fa8b3"
     },
     "_headers": {
       "source": "web/join/_headers",

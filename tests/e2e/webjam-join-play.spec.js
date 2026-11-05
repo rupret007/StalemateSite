@@ -17,7 +17,7 @@ test('the website serves Web Join with its complete module graph and no capture 
 for (const width of [375, 390]) {
     test(`the website preserves fragment privacy and recovers provider failure at ${width}px`, async ({ page, baseURL }, testInfo) => {
         const external = [], requests = [];
-        await page.setViewportSize({ width, height: 844 });
+        await page.setViewportSize({ width, height: width === 375 ? 667 : 844 });
         await page.addInitScript(() => {
             window.captureTracks = []; window.captureCount = 0;
             Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), 'getUserMedia', {
@@ -28,6 +28,7 @@ for (const width of [375, 390]) {
                     for (const track of stream.getTracks()) {
                         const stop = track.stop.bind(track);
                         track.stop = () => { stop(); context.close().catch(() => {}); };
+                        track.getSettings = () => ({ channelCount: 1, sampleRate: 16000 });
                         window.captureTracks.push(track);
                     }
                     return stream;
@@ -47,13 +48,21 @@ for (const width of [375, 390]) {
         await expect(page.locator('#status')).toContainText('Your host invited you');
         expect(await page.evaluate(() => window.captureCount)).toBe(0);
         expect(external).toEqual([]);
+        const join = page.getByRole('button', { name: 'Join with microphone', exact: true });
+        await expect(join).toBeInViewport({ ratio: 1 });
         await page.getByRole('button', { name: 'Skip check', exact: true }).click();
         await page.getByRole('checkbox').check();
-        const join = page.getByRole('button', { name: 'Join with microphone', exact: true });
         await expect(join).toBeEnabled();
+        await expect(join).toBeInViewport({ ratio: 1 });
         expect(await page.evaluate(() => window.captureCount)).toBe(0);
         await join.click();
         await expect(page.locator('#status')).toContainText('Web Join is unavailable');
+        await expect(page.getByText('Your mic is using voice-quality audio.')).toBeVisible();
+        await expect(page.locator('#warnings')).toBeHidden();
+        await page.getByText('Audio details', { exact: true }).click();
+        await expect(page.locator('#warnings')).toContainText('sampleRate: requested 48000, actual 16000');
+        await expect(page.locator('#warnings')).toBeVisible();
+        await page.getByText('Audio details', { exact: true }).click();
         await expect(join).toBeHidden();
         await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
         await expect(page.getByRole('button', { name: 'Leave session', exact: true })).toBeHidden();
