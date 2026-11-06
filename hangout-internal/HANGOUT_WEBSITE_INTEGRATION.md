@@ -29,12 +29,26 @@ listening session.
 | --- | --- |
 | Hosted private branded entrances | Generated Stalemate and Rad Dad links on two local test pages reached the same hosted beta. Fresh Chromium contexts at 1280px and 390px reached the lobby in 2.0s and 1.5s in one run, including automated invitation entry. A later guest saw no earlier chat. The shared chat showed the Rad Dad badge. Both guests joined the same temporary Art room through the visible controls, a canvas stroke propagated, and both beta logouts succeeded. |
 | Local browser checks on the matching site tree | 42 Chromium and WebKit cases passed. They cover mobile layout, shared entry, badge withdrawal, room creation, report review, Ignore/Block, fixture-verified ownership, reconnect and expired-session recovery. |
+| Local room and lobby capacity | The 50- and 150-client synthetic workloads passed, along with three nine-browser trials against the eight-person Art-room limit. See [load and recovery qualification](HANGOUT_SCALE_QUALIFICATION.md) for timings and the remaining hosted tests. |
+| Paint Along and Webex | Two private hosted Chromium visitors played the featured YouTube episode and saw the same room canvas. On loopback with the real YouTube IFrame API, pause and resume propagated and a custom lesson URL played in both browsers. Hosted playback controls still need qualification. Native Paint Along and Webex control tests passed locally. An actual Webex meeting and its audio handoff still need verification. |
 | Windows Word and browser entry | The exact handout opened in Word. Its link and manual code admitted guests in separate Windows Chrome profiles. Hosted checks also covered mic denial, early entry and expired-link recovery. |
 | Music release gate | Earlier live runs exchanged generated audio. Human speech and a short musical passage on the staged build, live shared WAV playback, and a second-network check remain pending. The private relay returned a quota-cap response. |
 
 The [October 31 application receipt](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md)
 preserves earlier deployment and native evidence. Use the November 6 identities
 above for the receiving website session.
+
+| Platform | Verified for this candidate | Remaining music evidence |
+| --- | --- | --- |
+| Intel Mac | Packaged build and local WAV/MP3 playback on the MacBook | Live host with Windows Chrome on the staged build, including speech, music and shared WAV |
+| Apple Silicon Mac | Packaged build and local WAV/MP3 playback on the Mini | Attended native Music host with the selected physical audio route |
+| Windows x64 | Native CI package, browser entry and mic-permission recovery on Windows Chrome | Physical browser listening with the current host; native remote Join requires a trusted signed build |
+| Linux x64 | Native CI package | Attended installation, native remote Join and audio |
+
+Use the [moderator guide](HANGOUT_MODERATOR_GUIDE.md) for queue coverage and
+recovery. The [privacy and incident handoff](HANGOUT_PRIVACY_AND_INCIDENTS.md)
+records the Texas operators' unresolved public-launch decisions, including
+all-ages participation, selected-evidence retention and incident coverage.
 
 The preceding `codex/webjam-native-ci-20261030`, based on PR169 head
 `43457849374bfa00e68fcf3f224954e3f3832026`, added the separate eighth provider-start
