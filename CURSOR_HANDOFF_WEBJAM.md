@@ -1,6 +1,12 @@
 # WebJam / Hang Out — Cursor continuation
 
-**Current resume point, November5 at01:06UTC (November4 locally):**
+**November 6 resume point.** Start with the
+[website integration and private candidate guide](hangout-internal/HANGOUT_WEBSITE_INTEGRATION.md).
+It identifies the currently staged build and private Worker, the Stalemate,
+Rad Dad and neutral partner entrance checks, and the remaining live music and
+release gates. Use its revisions for new work.
+
+**Historical checkpoint, November 5 at 01:06 UTC (November 4 locally):**
 
 The one native private cohort41938592196/source4c4 is now **SUCCESS**. All four
 actual downloaded archives are verified, with source/private-target manifests,
