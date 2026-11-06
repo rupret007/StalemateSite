@@ -1893,7 +1893,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const c = currentJam(), input = $('[data-jam-link]');
         if (!c || jamContext?.room !== c || !jamContext.host || !amOp(c)) { clearPendingJamShare(); input.value = ''; return; }
         if (pendingJamShare?.requestId) return; // requestSubmit() must respect the same one-in-flight bound.
-        // Copy web invite produces one HTTPS URL. Only route that explicit
+        // Copy browser invite produces one HTTPS URL. Only route that explicit
         // paste to the existing server-gated browser hook; keep complete
         // desktop invitations, including sealed replies, byte-for-byte.
         const value = input.value, web = /^https:\/\//i.test(value.trim());
