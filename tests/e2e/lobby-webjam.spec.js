@@ -123,6 +123,7 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         await host.click('[data-show="rooms"]');
         await host.click('[data-start="jam"]');
         await expect(host.locator('[data-jam]')).toBeVisible();
+        await expect(host.getByRole('textbox', { name: 'WebJam invitation' })).toHaveAccessibleDescription(/In WebJam, click Copy browser invite/);
         const channel = await host.evaluate(() => __lobby.active);
         await host.evaluate(() => __lobby.cmd('invite', ['BrowserGuest']));
         await guest.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
