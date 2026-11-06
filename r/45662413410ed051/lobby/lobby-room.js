@@ -411,10 +411,15 @@
             ui.load.addEventListener('submit', (e) => {
                 e.preventDefault();
                 const id = H.parseYouTubeId(ui.url.value);
-                if (!id) return;
+                if (!id) {
+                    ui.url.setCustomValidity('Enter a YouTube video link or video ID.');
+                    ui.url.reportValidity();
+                    return;
+                }
                 ui.url.value = '';
                 hostVideo({ kind: 'yt', id }, true, 0);
             });
+            ui.url.addEventListener('input', () => ui.url.setCustomValidity(''));
             ui.tap.addEventListener('click', () => syncToState(true, true));
         }
 

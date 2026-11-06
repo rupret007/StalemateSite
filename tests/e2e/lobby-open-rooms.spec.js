@@ -186,9 +186,14 @@ test('bob ross room: curated episodes and custom lesson links sync beside the sh
     const room = await host.evaluate(() => window.__lobby.active);
     await guest.evaluate((r) => window.__lobby.cmd('join', [r]), room);
     await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-video-id', 'sS-hNYgDUak');
-    await expect(host.locator('[data-act-url]')).toBeVisible();
-    await host.fill('[data-act-url]', 'https://youtu.be/vgbMONXc9Cs');
-    await host.press('[data-act-url]', 'Enter');
+    const lesson = host.getByRole('textbox', { name: 'YouTube URL' });
+    await lesson.fill('https://example.com/lesson');
+    await lesson.press('Enter');
+    await expect(lesson).toHaveJSProperty('validationMessage', 'Enter a YouTube video link or video ID.');
+    await expect(lesson).toHaveValue('https://example.com/lesson');
+    await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-video-id', 'sS-hNYgDUak');
+    await lesson.fill('https://youtu.be/vgbMONXc9Cs');
+    await lesson.press('Enter');
     await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-video-id', 'vgbMONXc9Cs');
     await expect(guest.locator('[data-act-canvas]')).toBeVisible();
     await expect(guest.locator('[data-act-url]')).toBeHidden();
