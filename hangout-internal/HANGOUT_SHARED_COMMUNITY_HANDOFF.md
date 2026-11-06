@@ -1,5 +1,9 @@
 # Shared-community integration and release handoff
 
+For the November 6 private build and the hosted Stalemate and Rad Dad entry
+checks, start with the [website integration guide](HANGOUT_WEBSITE_INTEGRATION.md).
+Use that guide for current setup, rollback and support steps.
+
 Current continuation, October 31: start with the
 [website integration guide](HANGOUT_WEBSITE_INTEGRATION.md) and
 [current private evidence](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md). Private

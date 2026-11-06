@@ -10,24 +10,31 @@ approval or evidence that a live website contains the candidate.
 
 ## Select one tested candidate
 
-The current protected private website uses application source
-`4ed1525c84f48173077f506261cb5acd19e3c1dc`, tree
-`2144677d638fee4b078a18e75892db9d75c6acdc`, matched to Worker version
-`a9724702-3ce5-418a-bbd4-950f2e169c9e`. Its current site CI, hosted mobile/short
-layout, logout and read-only health evidence are in the
-[dated application receipt](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md).
-Only chat CSS changed since the preceding source96/runtime629. That older
-source retains the broader hosted chat/drawing proof and original failed
-eight-hour observer, with its separate predicate diagnosis and ending identity.
-The explicit eighth provider-start CI mode used inert callbacks; it does not
-prove music or activate providers. Keep settings, keys, namespaces and release
-holds intact. Documentation/toolkit-only merges do not change the live app.
+On November 6, the protected private website served Worker version
+`50c62fa6-676c-4c1a-888f-ae4ceb74a3be` at 100% of deployment
+`3186f5ce-3da2-4459-8413-f78ddb16de76`. Application source
+`7c6a77cddcb882b9368b3bb2dff4405298135979` and the merge of
+[site PR #210](https://github.com/rupret007/StalemateSite/pull/210) have the
+same tree, `588509579d6a95d089a3207eea4a2f4d9ab70a12`.
 
-Current native source is `bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35`. All four
-matching private builds succeeded; actual ARM package identity, normal GUI and
-idle transport checks are in the dated receipt above. Actual browser invitation,
-installation and reciprocal ARM/Intel/Windows music remain required. Keep those
-proof scopes distinct and use these identities before historical branches below.
+The private native packages come from
+`76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c`. All four targets passed the
+[private package run](https://github.com/rupret007/webjam/actions/runs/42169901070).
+The staged Intel MacBook and Apple Silicon packages both passed signature,
+build identity and local audio-file checks. Use the separate evidence below
+for hosted guest journeys and for work that still needs an operator or a real
+listening session.
+
+| Evidence | November 6 result |
+| --- | --- |
+| Hosted private branded entrances | Generated Stalemate and Rad Dad links on two local test pages reached the same hosted beta. Fresh Chromium contexts at 1280px and 390px reached the lobby in 2.0s and 1.5s in one run, including automated invitation entry. A later guest saw no earlier chat. The shared chat showed the Rad Dad badge. Both guests joined the same temporary Art room through the visible controls, a canvas stroke propagated, and both beta logouts succeeded. |
+| Local browser checks on the matching site tree | 42 Chromium and WebKit cases passed. They cover mobile layout, shared entry, badge withdrawal, room creation, report review, Ignore/Block, fixture-verified ownership, reconnect and expired-session recovery. |
+| Windows Word and browser entry | The exact handout opened in Word. Its link and manual code admitted guests in separate Windows Chrome profiles. Hosted checks also covered mic denial, early entry and expired-link recovery. |
+| Music release gate | Earlier live runs exchanged generated audio. Human speech and a short musical passage on the staged build, live shared WAV playback, and a second-network check remain pending. The private relay returned a quota-cap response. |
+
+The [October 31 application receipt](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md)
+preserves earlier deployment and native evidence. Use the November 6 identities
+above for the receiving website session.
 
 The preceding `codex/webjam-native-ci-20261030`, based on PR169 head
 `43457849374bfa00e68fcf3f224954e3f3832026`, added the separate eighth provider-start
