@@ -10,24 +10,49 @@ approval or evidence that a live website contains the candidate.
 
 ## Select one tested candidate
 
-The current protected private website uses application source
-`4ed1525c84f48173077f506261cb5acd19e3c1dc`, tree
-`2144677d638fee4b078a18e75892db9d75c6acdc`, matched to Worker version
-`a9724702-3ce5-418a-bbd4-950f2e169c9e`. Its current site CI, hosted mobile/short
-layout, logout and read-only health evidence are in the
-[dated application receipt](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md).
-Only chat CSS changed since the preceding source96/runtime629. That older
-source retains the broader hosted chat/drawing proof and original failed
-eight-hour observer, with its separate predicate diagnosis and ending identity.
-The explicit eighth provider-start CI mode used inert callbacks; it does not
-prove music or activate providers. Keep settings, keys, namespaces and release
-holds intact. Documentation/toolkit-only merges do not change the live app.
+On November 6, the protected private website served Worker version
+`50c62fa6-676c-4c1a-888f-ae4ceb74a3be` at 100% of deployment
+`3186f5ce-3da2-4459-8413-f78ddb16de76`. Application source
+`7c6a77cddcb882b9368b3bb2dff4405298135979` and the merge of
+[site PR #210](https://github.com/rupret007/StalemateSite/pull/210) have the
+same tree, `588509579d6a95d089a3207eea4a2f4d9ab70a12`.
 
-Current native source is `bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35`. All four
-matching private builds succeeded; actual ARM package identity, normal GUI and
-idle transport checks are in the dated receipt above. Actual browser invitation,
-installation and reciprocal ARM/Intel/Windows music remain required. Keep those
-proof scopes distinct and use these identities before historical branches below.
+The private native packages come from
+`76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c`. All four targets passed the
+[private package run](https://github.com/rupret007/webjam/actions/runs/42169901070).
+The staged Intel MacBook and Apple Silicon packages both passed signature,
+build identity and local audio-file checks. The
+[installer guide](HANGOUT_WEBJAM_INSTALLERS.md) binds all four downloads to
+the exact source, artifact IDs and checksums. The relay-limit explanation in
+[WebJam PR #444](https://github.com/rupret007/webjam/pull/444) merged later as
+`7ab74ddfc8b0fcc26731ea477395c85972fc0651`. The staged packages still use the
+source above. The merged change explains the refusal without raising quotas.
+
+| Evidence | November 6 result |
+| --- | --- |
+| Hosted private branded entrances | Generated Stalemate and Rad Dad links on two local test pages reached the same hosted beta. Fresh Chromium contexts at 1280px and 390px reached the lobby in 2.0s and 1.5s in one run, including automated invitation entry. A later guest saw no earlier chat. The shared chat showed the Rad Dad badge. Both guests joined the same temporary Art room through the visible controls, a canvas stroke propagated, and both beta logouts succeeded. |
+| Hosted neutral partner entrance | A plain link on a third loopback test site reached the same private lobby as the Rad Dad link. Ordinary guests exchanged chat. Hiding the Rad Dad badge removed it from People and new messages, preserved the prior message and the approved return link, and left both roles unchanged. Both logged out. Optional third-site branding still requires operator review. |
+| Local browser checks on the matching site tree | 42 Chromium and WebKit cases passed. They cover mobile layout, shared entry, badge withdrawal, room creation, report review, Ignore/Block, fixture-verified ownership, reconnect and expired-session recovery. |
+| Local room and lobby capacity | The 50- and 150-client synthetic workloads passed, along with three nine-browser trials against the eight-person Art-room limit. See [load and recovery qualification](HANGOUT_SCALE_QUALIFICATION.md) for timings and the remaining hosted tests. |
+| Paint Along and Webex | Two private hosted Chromium visitors played the featured YouTube episode and saw the same room canvas. On loopback with the real YouTube IFrame API, pause and resume propagated and a custom lesson URL played in both browsers. Hosted playback controls still need qualification. Native Paint Along and Webex control tests passed locally. An actual Webex meeting and its audio handoff still need verification. |
+| Windows Word and browser entry | The exact handout opened in Word. Its link and manual code admitted guests in separate Windows Chrome profiles. Hosted checks also covered mic denial, early entry and expired-link recovery. |
+| Music release gate | Earlier live runs exchanged generated audio. Human speech and a short musical passage on the staged build, live shared WAV playback, and a second-network check remain pending. The private relay returned a quota-cap response. |
+
+The [October 31 application receipt](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md)
+preserves earlier deployment and native evidence. Use the November 6 identities
+above for the receiving website session.
+
+| Platform | Verified for this candidate | Remaining music evidence |
+| --- | --- | --- |
+| Intel Mac | Packaged build and local WAV/MP3 playback on the MacBook | Live host with Windows Chrome on the staged build, including speech, music and shared WAV |
+| Apple Silicon Mac | Packaged build and local WAV/MP3 playback on the Mini. Candidate source passed both read-only Shared Track checks with the actual 48 kHz BlackHole 16ch device. | Attended native Music host with the selected physical audio route and audible Shared Track at a second device |
+| Windows x64 | Verified downloadable package, native CI Setup install/launch/uninstall, browser entry and mic-permission recovery on Windows Chrome | Physical browser listening with the current host; native remote Join requires a trusted signed build |
+| Linux x64 | Verified downloadable package and native CI packaged client/Reference Studio smoke | Attended installation, native remote Join and audio |
+
+Use the [moderator guide](HANGOUT_MODERATOR_GUIDE.md) for queue coverage and
+recovery. The [privacy and incident handoff](HANGOUT_PRIVACY_AND_INCIDENTS.md)
+records the Texas operators' unresolved public-launch decisions, including
+all-ages participation, selected-evidence retention and incident coverage.
 
 The preceding `codex/webjam-native-ci-20261030`, based on PR169 head
 `43457849374bfa00e68fcf3f224954e3f3832026`, added the separate eighth provider-start

@@ -1,5 +1,34 @@
 # WebJam packages for the community beta
 
+## November 6 private candidate
+
+Use [Actions run 42169901070](https://github.com/rupret007/webjam/actions/runs/42169901070),
+attempt 1, source `76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c`. Download the
+named CI artifact into a separate directory. The downloaded Actions archives
+matched GitHub's reported sizes and SHA-256 digests. Each portable payload
+below was checked for safe paths, target architecture, and the same embedded
+build ID and `private-beta` destination.
+
+| Platform | Actions artifact ID | Portable ZIP SHA-256 |
+| --- | ---: | --- |
+| Apple Silicon Mac | 13481712610 | `39dc750c1da4b0d5ba1d6e66a57a77f2cd947e9ae957212add5e97798f529a72` |
+| Intel Mac | 13482383259 | `96436bdd3e016499401bba8bea2a139e2b0c4ca85216a20a823adff68d7338cd` |
+| Windows x64 | 13481353996 | `588063c917c9f6934a646a41029168776654dbefbda667ea4ac1d56c47619fc4` |
+| Linux x64 | 13482071238 | `c14581b39a7a3d07a2d4b9db3f0386e0038a03f3f008bc3afe0531d276fa01f8` |
+
+The Windows checksum manifest also matched the unsigned Setup EXE
+`2ae21890e2507c26fe021358e55f8724ad3002790058fff47512347e859cab34`.
+The [Windows CI job](https://github.com/rupret007/webjam/actions/runs/42169901070/job/127741545757)
+passed frozen-app verification and Setup install, launch and uninstall. Its
+unsigned transport still cannot use native remote Join. The
+[Linux CI job](https://github.com/rupret007/webjam/actions/runs/42169901070/job/127741545871)
+passed the packaged client smoke with a local dummy JACK graph and the frozen
+Reference Studio smoke. The Mac packages passed local audio-file checks on
+both architectures. See the [current integration guide](HANGOUT_WEBSITE_INTEGRATION.md)
+for the remaining live-audio and user-device checks.
+
+## Historical October 19 assessment
+
 **Historical package assessment, checked October 19, 2026 UTC:** the results and
 hashes below belong to WebJam source
 `5effbc58db706254f8ca8b52de4a0520c482294a`, build run `39197407138`. All four
