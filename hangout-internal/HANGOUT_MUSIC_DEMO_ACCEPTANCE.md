@@ -12,28 +12,52 @@ entitlement, usage/headroom and resource checks remain necessary before media.
 This permission does not enable AI, Hang Out's separate chat/media TURN, public
 navigation, purchases, signing enrollment or any trust/age/consent bypass.
 
-Native430/431 are merged; reviewed4c4dec3 and merge598bef0 have identical trees.
-One matching four-platform private build completed successfully as
-[41938592196](https://github.com/rupret007/webjam/actions/runs/41938592196).
-Do not dispatch another. The olde101 Mac package lacks the custom Opus codec
-and must not be retried as if the fix were installed. New package identity,
-bundled-codec execution, normal platform trust and physical audio retain
-their own observations. All four actual archives are now verified; both Mac
-package-CI codec executions match their archive libraries. ARM normal startup
-and local codec execution pass; the verified Intel app is staged without
-stopping the user's existing Art session. Reciprocal physical audio is still
-unqualified. Websitea04's full CI now passes and the private Worker
-is9a558aff; its hosted checks are recorded separately in the current handoff.
-Source, hosted UI and music stay separate.
+Use the [November 6 website and package identities](HANGOUT_WEBSITE_INTEGRATION.md)
+for the current trial. The four verified archives come from source
+`76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c`. Build labels alone are insufficient.
+Older package and deployment receipts below describe their own candidates.
 
 Each physical trial remains one native host and one browser guest for at most
 ten minutes, with capture consent, headphones and no recording. Honor Jeff's
 requested Wi-Fi-first order; Ethernet is a later comparison. Do not stop an
 independently opened Art session as though it belonged to a bounded test.
-Only Jeff disposes moderation reports. Actual Windows browser/device access and
-headphone/microphone readiness remain unconfirmed; an online Windows tailnet
-peer or WSL process is not Windows audio evidence. The platform, separate-network,
-interruption/Stop and human-hearing requirements below remain unchanged.
+Only Jeff disposes moderation reports. Actual headphone and microphone use on
+Windows still needs the participant's confirmation.
+
+## November 6 listening sequence
+
+1. Wait for the approved generated-audio retry to finish and obtain fresh
+   provider headroom. For speech and live music, use the staged Intel MacBook
+   as host and the prepared Windows Chrome guest. The MacBook reported its
+   built-in mic and wired headphones at 48 kHz. Windows Chrome reported that
+   mic permission would prompt. The device checks opened no capture.
+2. From the native Music room, choose **Copy browser invite** and share it in
+   the private Jam room. On Windows, choose **Check microphone**. If the
+   default input is wrong, select the intended device and check it. Confirm
+   headphones and choose **Join with microphone**. Each person speaks and
+   confirms hearing the other, then the host plays a short musical phrase.
+   Record elapsed time from sharing the invite and from pressing Join to
+   hearing in both directions.
+3. Use the staged Apple Silicon Mini for the shared WAV. Its 48 kHz BlackHole
+   16ch device passed read-only eligibility. Connect a physical input and
+   headphones before hosting so the primary Jamulus route stays separate from
+   the backing track. Load the WAV in **Shared Track**, choose **Recheck Route**
+   and then **Play**. Have the Windows guest confirm the track and a live
+   microphone or instrument are audible in the same mix.
+4. Record audible drops separately from packet loss and the browser's estimated
+   listening delay, which excludes capture and host-bridge delay. Exercise
+   **Leave session**, then join on a fresh invite. Repeat from a second network
+   when available and within the approved limits. Retain only times, outcomes
+   and sanitized diagnostics. Test the actual Webex meeting and audio switch
+   separately with consenting participants.
+
+Historical generated-audio runs on `70394230e6d685aa2f7fb19806fe0318e01f5606`
+showed 54–79 ms estimated browser listening delay, zero inbound packets lost
+and zero disconnected sampling windows across four trials. The longest trial
+ran for 60 seconds. Those runs used the Intel MacBook and Windows Chrome and
+prove synthetic transport only. They leave the checks above pending.
+The current Shared Track loader accepted the actual test WAV on the Mini
+(40 seconds, stereo, 48 kHz) and closed before starting playback or capture.
 
 ## Original requirements and historical evidence
 

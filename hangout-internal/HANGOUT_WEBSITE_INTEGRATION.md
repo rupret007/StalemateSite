@@ -34,7 +34,7 @@ source above. The merged change explains the refusal without raising quotas.
 | Hosted neutral partner entrance | A plain link on a third loopback test site reached the same private lobby as the Rad Dad link. Ordinary guests exchanged chat. Hiding the Rad Dad badge removed it from People and new messages, preserved the prior message and the approved return link, and left both roles unchanged. Both logged out. Optional third-site branding still requires operator review. |
 | Local browser checks on the matching site tree | 42 Chromium and WebKit cases passed. They cover mobile layout, shared entry, badge withdrawal, room creation, report review, Ignore/Block, fixture-verified ownership, reconnect and expired-session recovery. |
 | Local room and lobby capacity | The 50- and 150-client synthetic workloads passed, along with three nine-browser trials against the eight-person Art-room limit. See [load and recovery qualification](HANGOUT_SCALE_QUALIFICATION.md) for timings and the remaining hosted tests. |
-| Paint Along and Webex | Two private hosted Chromium visitors played the featured YouTube episode and saw the same room canvas. On loopback with the real YouTube IFrame API, pause and resume propagated and a custom lesson URL played in both browsers. Hosted playback controls still need qualification. Native Paint Along and Webex control tests passed locally. An actual Webex meeting and its audio handoff still need verification. |
+| Paint Along and Webex | Two private hosted Chromium visitors shared the canvas and played the featured YouTube lesson. The host clicked the embedded player to pause, and the guest followed pause and resume. Both played a different lesson loaded through the custom URL form. Both logged out. The served room/player scripts matched the pinned site source above. Native Webex controls passed locally. An actual Webex meeting and its audio handoff still need verification. |
 | Windows Word and browser entry | The exact handout opened in Word. Its link and manual code admitted guests in separate Windows Chrome profiles. Hosted checks also covered mic denial, early entry and expired-link recovery. |
 | Music release gate | Earlier live runs exchanged generated audio. Human speech and a short musical passage on the staged build, live shared WAV playback, and a second-network check remain pending. The private relay returned a quota-cap response. |
 
@@ -44,10 +44,14 @@ above for the receiving website session.
 
 | Platform | Verified for this candidate | Remaining music evidence |
 | --- | --- | --- |
-| Intel Mac | Packaged build and local WAV/MP3 playback on the MacBook | Live host with Windows Chrome on the staged build, including speech, music and shared WAV |
+| Intel Mac | Packaged build and local WAV/MP3 playback on the MacBook | Live host with Windows Chrome on the staged build, including speech and a musical passage |
 | Apple Silicon Mac | Packaged build and local WAV/MP3 playback on the Mini. Candidate source passed both read-only Shared Track checks with the actual 48 kHz BlackHole 16ch device. | Attended native Music host with the selected physical audio route and audible Shared Track at a second device |
 | Windows x64 | Verified downloadable package, native CI Setup install/launch/uninstall, browser entry and mic-permission recovery on Windows Chrome | Physical browser listening with the current host; native remote Join requires a trusted signed build |
 | Linux x64 | Verified downloadable package and native CI packaged client/Reference Studio smoke | Attended installation, native remote Join and audio |
+
+Use the [November 6 listening sequence](HANGOUT_MUSIC_DEMO_ACCEPTANCE.md#november-6-listening-sequence)
+for device setup, measurement and release evidence. The Intel MacBook handles
+the first live trial. The Apple Silicon Mini has the Shared Track virtual route.
 
 Use the [moderator guide](HANGOUT_MODERATOR_GUIDE.md) for queue coverage and
 recovery. The [privacy and incident handoff](HANGOUT_PRIVACY_AND_INCIDENTS.md)
