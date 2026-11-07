@@ -1,0 +1,29 @@
+{
+  "desktopReadOnly": [
+    {
+      "name": "WebJam Private Band Demo",
+      "exists": false
+    },
+    {
+      "name": "WebJam Private Band Demo.app",
+      "exists": true,
+      "symlink": true,
+      "regularFile": false,
+      "directory": true,
+      "linkTarget": "~/Library/Caches/WebJam/private-demo-87bc74f-20261105/intel/WebJam.app"
+    },
+    {
+      "name": "WebJam Private Band Demo.alias",
+      "exists": false
+    }
+  ],
+  "userApplicationsTarget": {
+    "path": "~/Applications/WebJam Private Band Demo.app",
+    "exists": false,
+    "symlink": false
+  },
+  "launchedApp": false,
+  "physicalCapture": false,
+  "privacyPermissionChanged": false,
+  "at": "2026-11-07T15:37:10.745254+00:00"
+}
