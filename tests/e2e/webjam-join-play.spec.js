@@ -40,7 +40,10 @@ for (const width of [375, 390]) {
             const address = new URL(route.request().url());
             if (address.origin === baseURL) return route.continue();
             external.push(address.href);
-            if (address.origin === 'https://webjam-turn-credentials.jeffstory007.workers.dev') return route.fulfill({ status: 503, body: 'unavailable' });
+            if (address.origin === 'https://webjam-turn-credentials.jeffstory007.workers.dev') {
+                if (external.length === 1) return route.fulfill({ status: 503, body: 'unavailable' });
+                return route.fulfill({ status: 429, json: { error: 'cap' } });
+            }
             return route.abort();
         });
         const capability = Buffer.alloc(32, 17).toString('base64url'), session = '22'.repeat(32);
@@ -69,7 +72,9 @@ for (const width of [375, 390]) {
         expect(await page.evaluate(() => captureTracks.length > 0 && captureTracks.every(track => track.readyState === 'ended'))).toBe(true);
         expect(external).toHaveLength(1);
         await page.getByRole('button', { name: 'Retry', exact: true }).click();
-        await expect(page.locator('#status')).toContainText('Web Join is unavailable');
+        await expect(page.locator('#status')).toHaveText('Web Join reached a usage limit.');
+        await expect(page.locator('#error-hint')).toContainText('Ask for a new browser invite');
+        await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeHidden();
         await expect.poll(() => page.evaluate(() => window.captureCount)).toBe(2);
         expect(await page.evaluate(() => captureTracks.every(track => track.readyState === 'ended'))).toBe(true);
         expect(external).toHaveLength(2);
