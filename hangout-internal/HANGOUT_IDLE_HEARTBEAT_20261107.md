@@ -46,8 +46,17 @@ The implementation is isolated from the original C227 observer. Do not update
 that environment while its expiry experiment remains live. The earlier Web Join
 cleanup candidate and its CI are separate evidence; they do not test this change.
 
-Focused tests cover negotiation, idle/busy/undrained output, timer teardown,
-shared rate and pending limits, duplicate ACKs, request-budget refusal and expired
-identity. Browser wiring, ordinary application CI, actual hosted behavior and
-quiet-session observations still require their own evidence before delivery.
+The [source-bound evidence packet](../pr-assets/beta-collaboration/20261107/lobby-idle-heartbeat/receipt.json)
+records 53 focused units and four SDK WebKit page checks. Browser tests use explicit
+WebSocket fixtures and virtual browser timers. A separate native Worker fixture
+sent 26 metered pings; real alarms closed both synthetic short-lived visitors
+18 ms after expiry, and identical expired cookies received HTTP 401. The healthy
+visitor still responded. Production TTL and the original hosted observer were
+unchanged; owned fixture processes/listeners were independently checked afterward.
+
+This covers negotiation, idle/busy/undrained output, timer teardown, shared rate
+and pending limits, duplicate ACKs, request-budget refusal and expiry. Ordinary
+exact-head application CI, actual hosted behavior and quiet-session observations
+still require their own evidence before delivery. Local Worker results do not
+qualify native music or a new native-provider CI mode.
 All 62 acceptance requirements and public-launch holds remain in force.
