@@ -12,7 +12,7 @@ entitlement, usage/headroom and resource checks remain necessary before media.
 This permission does not enable AI, Hang Out's separate chat/media TURN, public
 navigation, purchases, signing enrollment or any trust/age/consent bypass.
 
-Use the [November 6 website and package identities](HANGOUT_WEBSITE_INTEGRATION.md)
+Use the [current website and package identities](HANGOUT_WEBSITE_INTEGRATION.md)
 for the current trial. The four verified archives come from source
 `76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c`. Build labels alone are insufficient.
 Older package and deployment receipts below describe their own candidates.
@@ -26,8 +26,16 @@ Windows still needs the participant's confirmation.
 
 ## November 6 listening sequence
 
-1. Wait for the approved generated-audio retry to finish and obtain fresh
-   provider headroom. For speech and live music, use the staged Intel MacBook
+The earlier generated-audio retry stopped at its machine/idle guard; it is not
+a running trial to wait on. November 7 account headroom and website observations
+are recorded in the [private release receipt](HANGOUT_PRIVATE_RC_20261106.md).
+They do not demonstrate issuer-cap recovery or replace current device and
+capture readiness. Do not close an independently opened app or bypass the
+existing idle guard to force the retry.
+
+1. Recheck actual device/process readiness and obtain fresh provider headroom.
+   No capture or native-host test is currently running from this checklist.
+   For speech and live music, use the staged Intel MacBook
    as host and the prepared Windows Chrome guest. The MacBook reported its
    built-in mic and wired headphones at 48 kHz. Windows Chrome reported that
    mic permission would prompt. The device checks opened no capture.
