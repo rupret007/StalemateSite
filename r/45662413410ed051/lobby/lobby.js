@@ -3,6 +3,7 @@
 import { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff, readEntryHandoff, KEEP_ROOM_INTENT_KEY, KEEP_ROOM_INTENT_TTL, keepRoomIntent, consumeKeepRoomIntent } from '../entry-sites.mjs';
 import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
+import { createIdleHeartbeat } from './idle-heartbeat.mjs';
 (() => {
     'use strict';
     const $ = (s, el = document) => el.querySelector(s);
@@ -595,10 +596,11 @@ import { createEntrySharing } from './entry-sharing.mjs';
         if (app.ws) { app.ws.onclose = null; app.ws.onmessage = null; app.ws.close(1000); }
         const ws = new WebSocket(`${relayBase}/${ownerSession ? 'lobby-owner' : 'lobby'}?${q}`);
         app.ws = ws;
+        const heartbeat = createIdleHeartbeat(ws, () => attempt === connectionAttempt && app.ws === ws);
         let opened = false;
         let sessionNick = nick;
         let ackTimer, ackSeq = 0, ackFrames = 0, ackSentAt = -Infinity;
-        cancelTransportAck = () => { clearTimeout(ackTimer); ackTimer = null; ackFrames = 0; };
+        cancelTransportAck = () => { clearTimeout(ackTimer); ackTimer = null; ackFrames = 0; heartbeat.stop(); };
         const flushAck = () => {
             clearTimeout(ackTimer); ackTimer = null;
             if (attempt === connectionAttempt && ws.readyState === 1 && ackFrames) {
@@ -616,8 +618,10 @@ import { createEntrySharing } from './entry-sharing.mjs';
             if (attempt !== connectionAttempt) return;
             let m; try { m = JSON.parse(e.data); } catch (err) { return; }
             if (!m || typeof m !== 'object') return;
+            heartbeat.received();
+            if (m.t === 'hello') heartbeat.negotiate(m.features?.transportPing);
             if (m.t === 'welcome') sessionNick = m.nick;
-            handle(m, sessionNick);
+            if (m.t !== 'transport-pong') handle(m, sessionNick);
             if (Number.isSafeInteger(m.transportSeq) && m.transportSeq > 0) {
                 ackSeq = Math.max(ackSeq, m.transportSeq); ackFrames += 1;
                 if (ackFrames >= 8) flushAck();

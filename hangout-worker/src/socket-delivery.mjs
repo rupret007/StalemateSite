@@ -141,6 +141,22 @@ export function createSocketDelivery({ readState, writeState, onClosed = () => {
             stats.controlFrames += 1;
             return true;
         },
+        heartbeat(ws) {
+            const state = current(ws);
+            if (!state) return false;
+            if (!state.enabled) return stop(ws, 4400, 'transport negotiation required');
+            const time = now(), control = state.control;
+            const tokens = Math.min(limits.ackBurst, control.tokens + Math.max(0, time - control.last) * limits.ackPerSecond / 1000);
+            if (tokens < 1 || control.count >= limits.ackPerConnection) {
+                return stop(ws, 4429, 'delivery control allowance reached; reconnect', 'controlCloses');
+            }
+            // Share the existing rate/lifetime bound. A ping cannot reset the
+            // duplicate-ACK counter or release any unacknowledged delivery credit.
+            if (!save(ws, { ...state, control: { ...control, last: Math.max(time, control.last),
+                tokens: tokens - 1, count: control.count + 1 } })) return false;
+            stats.controlFrames += 1;
+            return delivery.send(ws, { t: 'transport-pong' });
+        },
         send(ws, payload) {
             const state = current(ws);
             if (!state) return false;
