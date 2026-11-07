@@ -685,7 +685,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         $('[data-sheet-buttons]').replaceChildren(); $('[data-palette-buttons]').replaceChildren();
         $('[data-adult]').checked = false;
         document.body.classList.remove('is-band', 'am-op');
-        announcements.replace(() => $('[data-buffer]').replaceChildren());
+        announcements.replace(() => $('[data-chat-lines]').replaceChildren());
         setConnection('ended'); drawTabs(); drawChan();
         $('[data-text]').readOnly = true;
         const ended = reason === 'left' ? 'You left this chat. Your sign-in and any recorded sharing withdrawal have not been changed.' : reason === 'admission'
@@ -1048,6 +1048,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     function resetPendingReports() { for (const id of [...pendingReports.keys()]) finishReport(id, false); }
     function appendLine(l) {
         const buf = $('[data-buffer]');
+        const lines = $('[data-chat-lines]');
         const li = document.createElement('li');
         if (l.id) li.dataset.id = l.id;
         const ts = document.createElement('span'); ts.className = 'ts'; ts.textContent = hhmm(l.ts); li.append(ts, ' ');
@@ -1088,8 +1089,8 @@ import { createEntrySharing } from './entry-sharing.mjs';
             if (l.me) li.classList.add('act');
         }
         const stick = buf.scrollHeight - buf.scrollTop - buf.clientHeight < 60;
-        buf.append(li);
-        while (buf.children.length > 300) buf.firstChild.remove();
+        lines.append(li);
+        while (lines.children.length > 300) lines.firstChild.remove();
         if (stick) buf.scrollTop = buf.scrollHeight;
         else if (!replaying && !l.event) { belowFold += 1; drawNewMessages(); }
     }
@@ -1115,7 +1116,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         if (c) { c.unread = 0; c.mentions = 0; }
         belowFold = 0; drawNewMessages(); replaying = true;
         announcements.replace(() => {
-            $('[data-buffer]').replaceChildren();
+            $('[data-chat-lines]').replaceChildren();
             (c ? c.lines : []).forEach(appendLine);
         });
         replaying = false;

@@ -23,21 +23,21 @@
         <a class="btn" data-session-reentry href="/beta/" hidden>Return to invitation</a>
     </section>
 
-    <section class="gate" data-gate>
+    <main class="gate" data-gate>
         <div class="gate-layout">
           <div class="gate-intro">
             <p class="eyebrow">OFF THE STAGE. INTO THE CONVERSATION.</p>
             <h1>#stalemate</h1>
             <p class="gate-headline">Start with a hello.<br>See what happens.</p>
             <p class="lede" data-gate-copy>Talk about whatever. Find your people. Draw, watch or jam together. Guest access. No account needed.</p>
-            <div class="gate-features" aria-label="Ways to hang out"><span><b>#</b> Open channels</span><span><b>↗</b> Creative rooms</span><span><b>@</b> Anyone can host</span></div>
+            <div class="gate-features" role="group" aria-label="Ways to hang out"><span><b>#</b> Open channels</span><span><b>↗</b> Creative rooms</span><span><b>@</b> Anyone can host</span></div>
             <p class="gate-command"><span aria-hidden="true">&gt;</span> /join #stalemate<span class="terminal-cursor" aria-hidden="true">_</span></p>
           </div>
           <div class="gate-card">
             <div class="window-chrome"><span><i aria-hidden="true"></i> CONNECT TO THE COMMUNITY</span><span aria-hidden="true">↵</span></div>
             <h2>Pick a name. Pull up a chair.</h2>
             <label class="nickrow">Your nick
-                <span class="nickbox"><input data-nick maxlength="20" autocomplete="off" spellcheck="false" aria-label="Your nick" placeholder="Type a nickname… or roll one →"><button class="btn btn--ghost dice" type="button" data-reroll aria-label="Make me a random fun nickname" title="Make me a random fun nickname">🎲 Make me a name</button></span>
+                <span class="nickbox"><input data-nick maxlength="20" autocomplete="off" spellcheck="false" aria-label="Your nick" placeholder="Type a nickname… or roll one →"><button class="btn btn--ghost dice" type="button" data-reroll aria-label="Make me a name — random fun nickname" title="Make me a random fun nickname">🎲 Make me a name</button></span>
             </label>
             <p class="small gate-hint">Remembered on this device, not reserved. Camera &amp; mic stay off.</p>
             <div class="entry-choice" data-entry-context hidden><label><input type="checkbox" data-entry-share checked> Show <span data-entry-label></span> beside my name</label><p class="small">Your entrance, not a verified identity. You can hide it in People.</p></div>
@@ -50,9 +50,10 @@
             <p class="status" data-gate-status role="status"></p>
           </div>
         </div>
-    </section>
+    </main>
 
     <main class="irc" data-app hidden>
+        <h1 class="sr-only">Community chat</h1>
         <aside class="pane rooms" data-pane="rooms" aria-label="Rooms">
             <button class="channel-home" type="button" data-lobby-home><b>#stalemate</b><span data-lobby-count>The main conversation</span></button>
             <section class="presence" aria-label="Lobby presence">
@@ -204,7 +205,7 @@
                 </div>
             </details>
             <p class="small" data-act-relay-status role="status"></p>
-            <ol class="buffer" data-buffer role="log" aria-label="Conversation" aria-live="polite" aria-relevant="additions" aria-atomic="false"></ol>
+            <div class="buffer" data-buffer role="log" aria-label="Conversation" aria-live="polite" aria-relevant="additions" aria-atomic="false"><ol class="buffer-lines" data-chat-lines role="list" aria-label="Messages"></ol></div>
             <button class="jump-new" data-new-messages type="button" hidden>New messages ↓</button>
             <div class="pmreq" data-pmreqs></div>
             <div class="quick" data-quick>

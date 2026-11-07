@@ -171,6 +171,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .message-recovery .saved-message-text { white-space: pre-wrap; color: var(--cream); }
 [data-message-copy-text] { width: 100%; min-width: 0; max-width: 100%; font: 16px/1.5 var(--mono); }
 .buffer { flex: 1; min-height: 100px; margin: 0; padding: 14px 24px; list-style: none; overflow-y: auto; color: #e1e4d9; font: 12px/1.85 var(--mono); overflow-wrap: anywhere; scrollbar-width: thin; scrollbar-color: #465144 transparent; }
+.buffer-lines { margin: 0; padding: 0; list-style: none; }
 .buffer li { padding: 2px 5px; border-left: 2px solid transparent; }
 .buffer li:hover { background: #ffffff03; }
 .buffer .mention { background: #2b2719; border-left-color: var(--amber); }
