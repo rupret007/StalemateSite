@@ -1,0 +1,21 @@
+{
+  "status": "execution_failed",
+  "states": 28,
+  "errors": [
+    {
+      "browser": "chromium",
+      "width": 375,
+      "type": "TimeoutError",
+      "message": "locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-start=chat]')\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" data-start=\"chat\" class"
+    },
+    {
+      "browser": "webkit",
+      "width": 375,
+      "type": "TimeoutError",
+      "message": "locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-start=chat]')\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" data-start=\"chat\" class"
+    }
+  ],
+  "captureRequests": 0,
+  "completedAt": "2026-11-07T05:03:00.754Z",
+  "interpretation": "First attempt stopped two mobile flows at a hidden Rooms-pane dialog opener; retained and corrected harness navigation, no production workaround"
+}

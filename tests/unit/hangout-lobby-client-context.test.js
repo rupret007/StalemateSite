@@ -245,4 +245,25 @@ describe('browser client privacy and bounded delivery wiring', () => {
         choice.click(); join('#our-room'); paint(); paint(); expect(log.getAttribute('aria-live')).toBe('off');
         expect(log.getAttribute('role')).toBe('log'); expect(log.getAttribute('aria-label')).toBe('Conversation');
     });
+    it('bounds and clears messages without removing their list or the live-region preference', async () => {
+        const { window, ws, welcome, join, paint } = await visitor(); welcome(); join(); paint(); paint();
+        const log = window.document.querySelector('[data-buffer]');
+        const messages = log.querySelector('[role="list"][aria-label="Messages"]');
+        expect(messages).not.toBeNull();
+        for (let index = 0; index < 305; index++)
+            ws.receive({ t: 'line', id: `bounded-${index}`, ch: '#stalemate', from: 'Friend', text: `Bounded line ${index}` });
+        expect(messages.children).toHaveLength(300);
+        expect(messages.firstElementChild.textContent).toContain('Bounded line 5');
+        expect(messages.lastElementChild.textContent).toContain('Bounded line 304');
+        expect([...messages.children].every(item => item.tagName === 'LI')).toBe(true);
+        window.document.querySelector('[data-chat-announcements]').click();
+        join('#another-room'); paint(); paint();
+        expect(log.querySelector('[role="list"]')).toBe(messages);
+        expect(messages.children).toHaveLength(0);
+        expect(log.getAttribute('aria-live')).toBe('off');
+        ws.close(4401);
+        expect(log.querySelector('[role="list"]')).toBe(messages);
+        expect(messages.children).toHaveLength(0);
+        expect(log.getAttribute('aria-live')).toBe('off');
+    });
 });

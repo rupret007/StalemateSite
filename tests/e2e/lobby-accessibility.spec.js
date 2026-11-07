@@ -80,6 +80,30 @@ function contained(geometry) {
     expect(log.height).toBeGreaterThanOrEqual(log.lineHeight + log.verticalPadding);
 }
 
+for (const width of [375, 1440]) test(`landmarks, visible nickname label and message-list semantics at ${width}px`, async ({ browser, baseURL }) => {
+    const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: 'reduce' });
+    try {
+        const page = await context.newPage();
+        await page.route(/youtube\.com|ytimg|googlevideo|goatcounter/, route => route.abort());
+        const relay = hangoutRelayWsBase(baseURL, `semantics-${randomUUID()}`);
+        await page.goto(`${ROOT}?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+        await expect(page.getByRole('main')).toHaveCount(1);
+        await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toHaveText('#stalemate');
+        await expect(page.getByRole('group', { name: 'Ways to hang out' })).toContainText('Anyone can host');
+        const randomName = page.getByRole('button', { name: /^Make me a name/ });
+        await expect(randomName).toBeVisible();
+        await randomName.click(); await expect(page.locator('[data-nick]')).not.toHaveValue('');
+        await page.locator('[data-nick]').fill(`SemanticGuest${width}`); await page.locator('[data-enter]').click();
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        await expect(page.getByRole('main')).toHaveCount(1);
+        await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toHaveText('Community chat');
+        await send(page, 'A message in the accessible conversation');
+        const conversation = page.getByRole('log', { name: 'Conversation' });
+        await expect(conversation.getByRole('list', { name: 'Messages' })).toContainText('A message in the accessible conversation');
+        await expect(conversation.getByRole('listitem').filter({ hasText: 'A message in the accessible conversation' })).toHaveCount(1);
+    } finally { await context.close(); }
+});
+
 test('keyboard guest can join, recover a named-room error, chat, navigate tabs and leave host dialogs', async ({ browser, baseURL }, testInfo) => {
     const visitor = await guest(browser, baseURL, 'KeyboardVisitor', { width: 1280, height: 900 });
     const { page } = visitor;

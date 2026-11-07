@@ -210,7 +210,7 @@ describe('private caller sharing controls in the actual browser client', () => {
         expect(ws.sent.filter(frame => frame.t === 'cmd' && frame.name === 'block')).toEqual([{ t: 'cmd', name: 'block', args: ['Friend'], ch: '#stalemate', roomInstance: 'a'.repeat(32), personContext: 1, personPeer: 'friend-socket' }]);
         get('[data-sharing-leave]').click(); get('[data-sharing-leave]').click();
         expect(closes).toEqual([[1000, 'Left chat']]); expect(ws.onclose).toBeNull(); expect(ws.onmessage).toBeNull();
-        expect(window.__lobby.chans.size).toBe(0); expect(window.__lobby.pms.size).toBe(0); expect(get('[data-buffer]').children).toHaveLength(0);
+        expect(window.__lobby.chans.size).toBe(0); expect(window.__lobby.pms.size).toBe(0); expect(get('[data-chat-lines]').children).toHaveLength(0);
         expect(get('[data-session-reason]').textContent).toContain('You left this chat'); expect(get('[data-session-reason]').textContent).not.toContain('expired');
         release(Response.json({ error: 'Synthetic pending request ended' }, { status: 503 }));
         await vi.waitFor(() => expect(get('[data-sharing-check]').disabled).toBe(false)); flush(1000);
