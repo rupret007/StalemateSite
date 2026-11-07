@@ -1,0 +1,46 @@
+{
+  "at": "2026-11-07T05:11:55.154228+00:00",
+  "base": "981b88dce3b579b8d0fedae4daf4095177817a26",
+  "baselineRuntimeSource": "b61bb416d7af39d2fe3a41529ddd65520e5305ca",
+  "baselineStates": 36,
+  "candidateStates": 36,
+  "baselineViolationRules": [
+    "aria-allowed-role",
+    "label-content-name-mismatch",
+    "landmark-one-main",
+    "listitem",
+    "page-has-heading-one",
+    "region"
+  ],
+  "candidateAutomatedViolationCount": 0,
+  "candidateIncompleteRules": [
+    "color-contrast",
+    "label-content-name-mismatch"
+  ],
+  "unitChecks": 59,
+  "keyboardAndSmallViewportChecks": 6,
+  "workspaceChecks": 5,
+  "browserRetries": 0,
+  "screenshotsVisuallyInspected": true,
+  "physicalCapture": false,
+  "liveBetaUsed": false,
+  "fullWcagConformance": false,
+  "screenReaderSpeechQualified": false,
+  "runtimeFilesSha256": {
+    "index.html": "991c8b0462b3ebcdb77692be2a96e55640f9d099e46a3c4ca50acd192b65dc48",
+    "lobby.js": "817d415ce8082d127d1b4c2a8a89afdfc9e6fef863d9bb47203b2f2ca34a68d3",
+    "lobby.css": "6a158948c849993bb4dd56ffa56c87b1cbc00c923f50ac1522132047984680f5"
+  },
+  "initialAuditRunRetained": true,
+  "initialAuditIssue": "Mobile dialog opener was hidden until navigating to Rooms; corrected harness navigation, retained first failed run",
+  "files": {
+    "workspace-1440.png": "dc5e67833dfa109467410a67631099c2b1fd3c5c34feca5876ef78a15979ab95",
+    "workspace-375.png": "140f5ee1a49a46727653688a9bae6a91c06c14a29074d73948ae4dd29c39ce82",
+    "baseline-audit.json": "441d977b3400d8fc6124f82d6f88ce886457ce0eef02bf4f2093f6fc25753894",
+    "initial-attempt.json": "7e90b8e2f112e7f45942d100aa41f8d1a5edeeef02ddae4f6669c865a41824d5",
+    "audit-tool.json": "3bb97f4ac8acac722c0e0c4470327feb43ed846062d99bce8b15ab8eaa15b873",
+    "workspace-390.png": "d70c28b371fe1cbaded68e98927b2f05c4a51a443120e4e64d45fdeb5b1c64e0",
+    "candidate-audit.json": "7bc79577409305000b8ec4b1cf5f294ed24e4a59d0b9ea85d2c2baef33ff2936"
+  },
+  "finalFeatureGroupRecheckPassed": true
+}

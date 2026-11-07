@@ -16,28 +16,28 @@
     <link rel="stylesheet" href="lobby.css">
 </head>
 <body>
-    <header class="titlebar"><div class="brand"><span class="brand-mark" aria-hidden="true">#</span><span><b>HANG OUT</b><span class="brand-caption">IRC / COMMUNITY</span></span><span class="title-extra">A place to hang out.</span></div><div class="connection-tools"><a class="entry-return" data-entry-return hidden></a><span class="connection" data-connection role="status" data-state="offline">Not connected</span><button type="button" data-reconnect hidden>Try again</button></div></header>
+    <header class="titlebar"><div class="brand"><span class="brand-mark" aria-hidden="true">#</span><span><b>HANG OUT</b><span class="brand-caption">IRC / COMMUNITY</span></span><span class="title-extra">A place to hang out.</span></div><div class="connection-tools"><a class="entry-return" data-entry-return hidden></a><span class="connection" data-connection role="status" data-state="offline">Not connected</span><button type="button" data-fullscreen aria-pressed="false" hidden>Full screen</button><button type="button" data-reconnect hidden>Try again</button></div></header>
 
     <section class="session-ended" data-session-ended hidden aria-labelledby="session-ended-title">
         <div><h2 id="session-ended-title" tabindex="-1">Session ended</h2><p data-session-reason role="status"></p><p class="small">Your current unsent message stays below for copying. Leaving this page clears unsent drafts; they are never sent automatically.</p></div>
         <a class="btn" data-session-reentry href="/beta/" hidden>Return to invitation</a>
     </section>
 
-    <section class="gate" data-gate>
+    <main class="gate" data-gate>
         <div class="gate-layout">
           <div class="gate-intro">
             <p class="eyebrow">OFF THE STAGE. INTO THE CONVERSATION.</p>
             <h1>#stalemate</h1>
             <p class="gate-headline">Start with a hello.<br>See what happens.</p>
             <p class="lede" data-gate-copy>Talk about whatever. Find your people. Draw, watch or jam together. Guest access. No account needed.</p>
-            <div class="gate-features" aria-label="Ways to hang out"><span><b>#</b> Open channels</span><span><b>↗</b> Creative rooms</span><span><b>@</b> Anyone can host</span></div>
+            <div class="gate-features" role="group" aria-label="Ways to hang out"><span><b>#</b> Open channels</span><span><b>↗</b> Creative rooms</span><span><b>@</b> Anyone can host</span></div>
             <p class="gate-command"><span aria-hidden="true">&gt;</span> /join #stalemate<span class="terminal-cursor" aria-hidden="true">_</span></p>
           </div>
           <div class="gate-card">
             <div class="window-chrome"><span><i aria-hidden="true"></i> CONNECT TO THE COMMUNITY</span><span aria-hidden="true">↵</span></div>
             <h2>Pick a name. Pull up a chair.</h2>
             <label class="nickrow">Your nick
-                <span class="nickbox"><input data-nick maxlength="20" autocomplete="off" spellcheck="false" aria-label="Your nick" placeholder="Type a nickname… or roll one →"><button class="btn btn--ghost dice" type="button" data-reroll aria-label="Make me a random fun nickname" title="Make me a random fun nickname">🎲 Make me a name</button></span>
+                <span class="nickbox"><input data-nick maxlength="20" autocomplete="off" spellcheck="false" aria-label="Your nick" placeholder="Type a nickname… or roll one →"><button class="btn btn--ghost dice" type="button" data-reroll aria-label="Make me a name — random fun nickname" title="Make me a random fun nickname">🎲 Make me a name</button></span>
             </label>
             <p class="small gate-hint">Remembered on this device, not reserved. Camera &amp; mic stay off.</p>
             <div class="entry-choice" data-entry-context hidden><label><input type="checkbox" data-entry-share checked> Show <span data-entry-label></span> beside my name</label><p class="small">Your entrance, not a verified identity. You can hide it in People.</p></div>
@@ -50,9 +50,10 @@
             <p class="status" data-gate-status role="status"></p>
           </div>
         </div>
-    </section>
+    </main>
 
     <main class="irc" data-app hidden>
+        <h1 class="sr-only">Community chat</h1>
         <aside class="pane rooms" data-pane="rooms" aria-label="Rooms">
             <button class="channel-home" type="button" data-lobby-home><b>#stalemate</b><span data-lobby-count>The main conversation</span></button>
             <section class="presence" aria-label="Lobby presence">
@@ -86,7 +87,7 @@
                 <button class="tile tile-chat" type="button" data-start="chat"><b aria-hidden="true">#</b><strong>Start a chat channel</strong><span>Your name. Your corner of the internet.</span></button>
                 <button class="tile" type="button" data-start="art"><b aria-hidden="true">✎</b><strong>Draw together</strong><span>One canvas. Everyone’s ideas.</span></button>
                 <button class="tile" type="button" data-start="watch"><b aria-hidden="true">▷</b><strong>Watch together</strong><span>Same video. Same moment.</span></button>
-                <button class="tile" type="button" data-start="bobross"><b aria-hidden="true">◒</b><strong>Paint along</strong><span>Bob Ross + a shared canvas.</span></button>
+                <button class="tile" type="button" data-start="bobross"><b aria-hidden="true"><img class="paint-together-mark" src="../paint-together-afro.webp" width="28" height="28" alt="" loading="lazy"></b><strong>Paint along</strong><span>Pick Bob Ross or bring a YouTube lesson. Paint together.</span></button>
                 <button class="tile" type="button" data-start="jam"><b aria-hidden="true">≋</b><strong>Jam (WebJam)</strong><span>Bring a riff. Find your band.</span></button>
             </div>
             <details class="room-details"><summary>About hosting &amp; keeping a room</summary><p class="small">Anyone can host a temporary room. Sign in with email to keep its name across visits. Registered rooms expire after 90 days without an owner or verified co-host visit. You can stay in #stalemate while a room is open. Cameras are always optional.</p></details>
@@ -159,14 +160,14 @@
                 <form class="jam-paste op-only" data-jam-form>
                     <textarea data-jam-link placeholder="Paste a full desktop invite or browser link" aria-label="WebJam invitation" aria-describedby="jam-share-help" autocomplete="off" spellcheck="false" maxlength="8192" rows="2"></textarea>
                     <button class="btn btn--small" type="submit">Share</button>
-                    <p class="small" id="jam-share-help">Paste the full desktop invite or one approved browser link.</p>
+                    <p class="small" id="jam-share-help">In WebJam, click <strong>Copy browser invite</strong> for a browser guest, or copy the full desktop invite.</p>
                     <p class="small" data-jam-share-status role="status"></p>
                 </form>
                 <details class="jam-setup" data-jam-help>
                     <summary>Setup &amp; invitation help</summary>
                     <p>Use the beta app supplied by your host; the public download may reject this invitation. WebJam connects through a desktop host using Jamulus. Ethernet is recommended; actual delay and dropouts depend on the devices and network.</p>
                     <p>On a computer, copy the invite, open WebJam, choose Join, and paste it there. Opening the app directly is supported on Mac; Windows and Linux require pasting private invites. Phones can use this room’s chat while music runs on a computer.</p>
-                    <p>Hosting: paste the entire Copy Invite message. For browser guests, in the host app choose Web Join → Allow a web guest, then Copy web invite. Share that link here. Browser joining stays unavailable until an approved invitation is shared. Sharing an invite does not turn on your microphone.</p>
+                    <p>Hosting a browser guest: in WebJam’s Music room, click <strong>Copy browser invite</strong>. Wait for <strong>Link copied</strong>, then paste the link above and click <strong>Share</strong>. Keep the Music session open. For desktop guests, paste the entire Copy Invite message instead. Sharing an invite does not turn on your microphone.</p>
                     <p>Invites may expire or admit one guest; ask the host for a fresh one if needed. A rejected paste stays editable while you remain this room’s connected host. Leaving the room or stopping locally clears its controls; it does not revoke an invitation already copied. End the music session or remove the guest in the host app when needed.</p>
                 </details>
             </div>
@@ -187,6 +188,12 @@
                             <button class="btn btn--small" type="submit">Load</button>
                         </form>
                         <div class="bob-picks op-only" data-bob-picks></div>
+                        <details class="paint-start" data-paint-start hidden>
+                            <summary>Getting started · kit and materials</summary>
+                            <p>Start with <b>The Grandeur of Summer</b>. Watch, sketch, or paint with what you have.</p>
+                            <p>For Bob Ross’s oil-painting method, check the lesson’s materials. The kit is optional.</p>
+                            <p><a href="https://www.bobross.com/bob-ross-master-paint-set/" target="_blank" rel="noopener noreferrer">Official Master Paint Set and materials list ↗</a><br><a href="https://www.bobross.com/painting-supplies/" target="_blank" rel="noopener noreferrer">Paints, brushes and tools ↗</a></p>
+                        </details>
                     </div>
                     <div class="act-paint" data-act-paint hidden>
                         <canvas data-act-canvas width="600" height="360" aria-label="Shared paint canvas"></canvas>
@@ -198,7 +205,7 @@
                 </div>
             </details>
             <p class="small" data-act-relay-status role="status"></p>
-            <ol class="buffer" data-buffer role="log" aria-label="Conversation" aria-live="polite" aria-relevant="additions" aria-atomic="false"></ol>
+            <div class="buffer" data-buffer role="log" aria-label="Conversation" aria-live="polite" aria-relevant="additions" aria-atomic="false"><ol class="buffer-lines" data-chat-lines role="list" aria-label="Messages"></ol></div>
             <button class="jump-new" data-new-messages type="button" hidden>New messages ↓</button>
             <div class="pmreq" data-pmreqs></div>
             <div class="quick" data-quick>

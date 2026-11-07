@@ -247,6 +247,61 @@ describe('beta session revocation across private rooms and lobby', () => {
 });
 
 describe('private socket expiry, hibernation and cost caps', () => {
+    it('schedules idle lobby maintenance no later than the existing guest deadline', async () => {
+        const h = harness(), a = await guest(h);
+        expect((await betaFetch(request(`/lobby?preview=${PREVIEW}`, { cookie: a.cookie, upgrade: true }), h.env)).status).toBe(101);
+        vi.setSystemTime(a.access.exp - 10000);
+        await h.lobby().alarm();
+        expect(await h.lobbyState.storage.getAlarm()).toBeLessThanOrEqual(a.access.exp);
+    });
+    it('brings a late lobby alarm forward when the same guest reconnects near expiry', async () => {
+        const h = harness(), a = await guest(h);
+        const connect = () => betaFetch(request(`/lobby?preview=${PREVIEW}`, { cookie: a.cookie, upgrade: true }), h.env);
+        expect((await connect()).status).toBe(101);
+        await h.lobby().webSocketClose(h.lobbyState.getWebSockets()[0], 1000);
+        vi.setSystemTime(a.access.exp - 10000);
+        await h.lobbyState.storage.setAlarm(a.access.exp + 50000);
+        expect((await connect()).status).toBe(101);
+        expect(h.lobbyState.getWebSockets()[0].deserializeAttachment().expiresAt).toBe(a.access.exp);
+        expect(await h.lobbyState.storage.getAlarm()).toBeLessThanOrEqual(a.access.exp);
+    });
+    it('brings a late lobby alarm forward when a live binding is restored near expiry', async () => {
+        const h = harness(), a = await guest(h);
+        expect((await betaFetch(request(`/lobby?preview=${PREVIEW}`, { cookie: a.cookie, upgrade: true }), h.env)).status).toBe(101);
+        await h.lobby().webSocketMessage(h.lobbyState.getWebSockets()[0], JSON.stringify({ t: 'hello', nick: 'AlarmRestore', age13: true, transport: 1 }));
+        expect(h.lobbyState.values.get('sessions').connections).toEqual(expect.arrayContaining([expect.objectContaining({ nick: 'AlarmRestore' })]));
+        vi.setSystemTime(a.access.exp - 10000);
+        await h.lobbyState.storage.setAlarm(a.access.exp + 50000);
+        const reopened = new HangoutLobby(h.lobbyState, h.env);
+        await reopened.ready;
+        expect(h.lobbyState.getWebSockets()[0].readyState).toBe(1);
+        expect(await h.lobbyState.storage.getAlarm()).toBeLessThanOrEqual(a.access.exp);
+    });
+    it('keeps an earlier lobby alarm and schedules future maintenance after expiry', async () => {
+        const h = harness(), a = await guest(h);
+        expect((await betaFetch(request(`/lobby?preview=${PREVIEW}`, { cookie: a.cookie, upgrade: true }), h.env)).status).toBe(101);
+        const first = h.lobbyState.getWebSockets()[0];
+        vi.setSystemTime(a.access.exp - 10000);
+        const earlier = Date.now() + 1000;
+        await h.lobbyState.storage.setAlarm(earlier);
+        expect((await betaFetch(request(`/lobby?preview=${PREVIEW}`, { cookie: a.cookie, upgrade: true }), h.env)).status).toBe(101);
+        expect(await h.lobbyState.storage.getAlarm()).toBe(earlier);
+        vi.setSystemTime(a.access.exp + 1);
+        await h.lobby().alarm();
+        expect(first.closed.code).toBe(4401);
+        expect(h.lobbyState.getWebSockets()).toHaveLength(0);
+        expect(await h.lobbyState.storage.getAlarm()).toBeGreaterThan(Date.now());
+    });
+    it('does not complete lobby admission if recording its earlier expiry alarm fails', async () => {
+        const h = harness(), a = await guest(h);
+        await h.lobby().ready;
+        vi.setSystemTime(a.access.exp - 10000);
+        await h.lobbyState.storage.setAlarm(a.access.exp + 50000);
+        vi.spyOn(h.lobbyState.storage, 'setAlarm').mockRejectedValueOnce(Error('alarm unavailable'));
+        const response = await betaFetch(request(`/lobby?preview=${PREVIEW}`, { cookie: a.cookie, upgrade: true }), h.env);
+        expect(response.status).toBe(503);
+        expect(h.lobbyState.sockets.size).toBe(0);
+    });
     it('expires an idle socket by alarm and refuses old cookie admission', async () => {
         const h = harness(), a = await guest(h), ws = await join(h, a);
         vi.setSystemTime(a.access.exp + 1);

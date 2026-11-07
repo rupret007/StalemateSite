@@ -1,0 +1,48 @@
+{
+  "proof": {
+    "state": "LOCAL_PREVIEW_OF_EXACT_RECOVERY_RESPONSE_AND_STYLESHEET_COMPLETE",
+    "scope": "Local Node betaFetch with uninvited fixture configuration; not deployed proof or real identity. No provider, capture, recorder or actual private invitation.",
+    "sourceFileSha256": "ad6d0623e88c1ae0390bed2ce9a19db13b92a97544083d62f5bfa6559b719000",
+    "documentSha256": "99ec40843a7f09691021c6104348b1f3dd83471b08d0e23dfca0b972a6630a85",
+    "stylesheetSha256": "e863c5c2f8bd1b1bbebe82906c620845922e069d8b41e4e5e6c3ebe8c702371f",
+    "captures": [
+      {
+        "width": 375,
+        "geometry": {
+          "viewport": 375,
+          "pageWidth": 375,
+          "left": 16,
+          "right": 359,
+          "height": 48.390625
+        },
+        "a11y": {
+          "violations": [],
+          "incomplete": []
+        },
+        "imageSha256": "593b6a716d42170454170321c9e5c24f4289459bc9beb3fb6c5b964529ae7e75",
+        "captureRequests": 0
+      },
+      {
+        "width": 390,
+        "geometry": {
+          "viewport": 390,
+          "pageWidth": 390,
+          "left": 16,
+          "right": 374,
+          "height": 48.390625
+        },
+        "a11y": {
+          "violations": [],
+          "incomplete": []
+        },
+        "imageSha256": "c10f7b6e5812c971fa7145fadb7d2d2695f79be6ecd814f74fa9aac29a6abd8f",
+        "captureRequests": 0
+      }
+    ],
+    "allOwnedBrowserAndFixtureServerClosed": true,
+    "physicalCapture": false,
+    "providerCredentials": false,
+    "actualPrivateDeploymentChanged": false
+  },
+  "at": "2026-11-07T14:37:32.146433+00:00"
+}

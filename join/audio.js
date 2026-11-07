@@ -13,18 +13,20 @@ export function constraintWarnings(settings) {
   });
 }
 
-export async function acquireMusicStream(mediaDevices) {
+export async function acquireMusicStream(mediaDevices, deviceId = "") {
   let stream;
   let fallback = false;
+  const device = deviceId ? { deviceId: { exact: deviceId } } : {};
   try {
-    stream = await mediaDevices.getUserMedia({ video: false, audio: { ...MUSIC_CONSTRAINTS } });
+    stream = await mediaDevices.getUserMedia({ video: false, audio: { ...MUSIC_CONSTRAINTS, ...device } });
   } catch (error) {
     if (error.name === "NotAllowedError") {
-      throw new Error("Microphone access was blocked. Allow the mic in your browser settings, then tap Join again.");
+      throw new Error("Microphone access was blocked. Allow the mic in your browser settings, then tap Join again.", { cause: error });
     }
     if (!["OverconstrainedError", "NotSupportedError"].includes(error.name)) throw error;
+    if (error.constraint === "deviceId") throw error;
     fallback = true;
-    stream = await mediaDevices.getUserMedia({ video: false, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    stream = await mediaDevices.getUserMedia({ video: false, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, ...device } });
   }
   const tracks = stream.getAudioTracks();
   if (tracks.length !== 1) {
@@ -32,7 +34,6 @@ export async function acquireMusicStream(mediaDevices) {
     throw new Error("A single audio input is required");
   }
   const settings = tracks[0].getSettings();
-  console.info("Web Join audio settings", settings);
   return { stream, warnings: [...(fallback ? ["Your browser needed simpler microphone constraints."] : []), ...constraintWarnings(settings)] };
 }
 
@@ -125,6 +126,17 @@ export function applyAdaptiveReceiverTarget(receiver, adaptation) {
   if (!receiver || !adaptation || !Number.isFinite(adaptation.targetMs)) return adaptation;
   tuneReceiver(receiver, adaptation.targetMs);
   return adaptation;
+}
+
+export function connectionRoute(stats, selectedPairId) {
+  const pair = stats.get(selectedPairId);
+  if (pair?.type !== "candidate-pair" || pair.state !== "succeeded") return null;
+  const local = stats.get(pair.localCandidateId);
+  const remote = stats.get(pair.remoteCandidateId);
+  const types = [local?.candidateType, remote?.candidateType];
+  if (types.includes("relay")) return "relayed";
+  // A peer-reflexive address learned during checks has no advertised origin.
+  return types.every(type => type === "host" || type === "srflx") ? "direct" : null;
 }
 
 export function latencyMs(stats, baseLatency = 0) {

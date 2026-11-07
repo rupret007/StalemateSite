@@ -1,0 +1,12 @@
+{
+  "state": "ORIGINAL_REMOTE_BROWSER_PROOF_HASH_AND_EXIT_VERIFIED",
+  "proofSha256": "f8d71e0828e4666be273b69db2e3c71e5881b4d149eead4e0caff2cb79b4aec3",
+  "ownLinuxHarnessProcessesRemaining": [],
+  "physicalCapture": false,
+  "at": "2026-11-07T11:54:41.904442+00:00",
+  "postcheckReceipt": "live-postcheck-full-wav.json",
+  "nativeIdleAnd32SourceHashesReconfirmed": true,
+  "allVersionsAndSettingsUnchanged": true,
+  "original20SecondFailurePreserved": true,
+  "scope": "Generated packaged-components/real public service transport only; not physical hearing, actual Shared Track sender, desktop GUI, Webex or second network"
+}

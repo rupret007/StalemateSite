@@ -7,7 +7,7 @@ import {
   micCheckFailure,
   startMicLevelMonitor,
 } from "./prejoin.js";
-import { applyJoinFailure, clearJoinFailure, mapJoinError } from "./errors.js";
+import { JOIN_SIGNAL, applyJoinFailure, clearJoinFailure, mapJoinError } from "./errors.js";
 
 const $ = (id) => document.getElementById(id);
 const failureElements = () => ({
@@ -30,20 +30,72 @@ let micHeard = false;
 let checkSkipped = false;
 let checkRunning = false;
 let prejoinAbort;
+let accessTimer = null;
+
+function clearAccessTime() {
+  clearInterval(accessTimer);
+  accessTimer = null;
+  $("access-window").hidden = true;
+  $("access-time").textContent = "";
+  $("access-warning").textContent = "";
+  $("access-warning").hidden = true;
+}
+
+function showAccessTime(expiresAt, isCurrent) {
+  clearAccessTime();
+  if (!Number.isFinite(expiresAt) || expiresAt <= 0) return;
+  const update = () => {
+    if (!isCurrent()) { clearAccessTime(); return false; }
+    const seconds = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+    const minutes = Math.floor(seconds / 60);
+    const remainder = String(seconds % 60).padStart(2, "0");
+    $("access-time").textContent = `Browser access ends in ${minutes}:${remainder}.`;
+    const warning = seconds === 0
+      ? "Browser access has ended. Ask your host for a fresh invite."
+      : seconds <= 60
+        ? "Less than a minute of browser access remains. Ask your host for a fresh invite to continue."
+        : "";
+    // Announce each warning once, rather than reading every countdown tick.
+    if ($("access-warning").textContent !== warning) $("access-warning").textContent = warning;
+    $("access-warning").hidden = !warning;
+    $("access-window").hidden = false;
+    return true;
+  };
+  if (update()) accessTimer = setInterval(update, 1000);
+}
 
 try {
   invite = readInvite(location.hash);
-  clearJoinFailure(
-    failureElements(),
-    "Your host invited you. Check your microphone, confirm headphones, then join.",
-  );
-  $("prejoin").hidden = false;
+  clearJoinFailure(failureElements(), "Your host invited you to join.");
 } catch (error) {
   const view = mapJoinError(error);
   view.showRetry = false;
   applyJoinFailure(view, failureElements());
   $("status").dataset.failure = "true";
-  $("prejoin").hidden = true;
+}
+
+function showAudioSettings(stream, warnings = []) {
+  const sampleRate = stream?.getAudioTracks()[0]?.getSettings().sampleRate;
+  $("audio-quality").textContent =
+    sampleRate > 0 && sampleRate < 32000
+      ? "Your mic is using voice-quality audio. Music may sound less clear."
+      : "";
+  $("warnings").textContent = warnings.join("\n");
+}
+
+async function showMicDevices(track, signal) {
+  const source = $("mic-source");
+  source.textContent = track.label ? `Using ${track.label}` : "Microphone connected.";
+  source.hidden = false;
+  const devices = await navigator.mediaDevices.enumerateDevices().catch(() => []);
+  if (signal.aborted) return;
+  const choices = devices.filter(device => device.kind === "audioinput" && device.label &&
+    device.deviceId && !["default", "communications"].includes(device.deviceId));
+  const select = $("mic-device");
+  const selected = select.value;
+  select.replaceChildren(new Option("Browser default", ""), ...choices.map(device => new Option(device.label, device.deviceId)));
+  if (choices.some(device => device.deviceId === selected)) select.value = selected;
+  $("mic-picker").hidden = choices.length < 2;
 }
 
 function stopMicMonitoring(clearHeard = false) {
@@ -60,7 +112,10 @@ function stopMicMonitoring(clearHeard = false) {
   if (clearHeard) {
     micHeard = false;
     $("mic-heard").hidden = true;
+    showAudioSettings();
   }
+  $("mic-progress").textContent = "";
+  $("mic-source").hidden = true;
   $("mic-error").textContent = "";
   $("mic-retry").hidden = true;
   $("check-mic").disabled = checkSkipped || micHeard;
@@ -71,6 +126,13 @@ function resetMicCheck() {
   $("check-mic").disabled = false;
 }
 
+function watchMicrophone(track, signal, onLost) {
+  track.addEventListener("ended", onLost, { once: true, signal });
+  if (track.readyState === "live") return true;
+  onLost();
+  return false;
+}
+
 function joinReady() {
   if (!invite || starting || session) return false;
   if (checkSkipped) return $("headphones").checked;
@@ -78,14 +140,17 @@ function joinReady() {
 }
 
 const refresh = () => {
+  $("prejoin").hidden = !invite || starting || !!session;
   $("join").disabled = !joinReady();
   $("skip-check").disabled = !invite || starting || !!session || checkSkipped;
+  $("mic-device").disabled = starting || !!session || checkRunning;
   $("check-mic").disabled =
     !invite || starting || !!session || checkRunning || checkSkipped || micHeard || !!stopMeter;
 };
 
 function showMicError(error) {
-  const failure = micCheckFailure(error);
+  const failure = micCheckFailure(error?.cause ?? error);
+  $("mic-progress").textContent = "";
   $("mic-error").textContent = failure.message;
   $("mic-retry").hidden = !failure.showRetry;
   $("check-mic").disabled = false;
@@ -97,7 +162,7 @@ async function runMicCheck() {
   if (!invite || checkRunning || starting || session) return;
   resetMicCheck();
   checkRunning = true;
-  $("check-mic").disabled = true;
+  refresh();
   $("mic-error").textContent = "";
   prejoinAbort = new AbortController();
   const { signal } = prejoinAbort;
@@ -107,15 +172,23 @@ async function runMicCheck() {
     }
     await context.resume();
     if (signal.aborted) return;
-    $("status").textContent = "Allow microphone access so we can check your level.";
-    const capture = await beginMicCheck(navigator.mediaDevices);
+    $("mic-progress").textContent = "Allow microphone access in your browser.";
+    const capture = await beginMicCheck(navigator.mediaDevices, $("mic-device").value);
     if (signal.aborted) {
       capture.stream.getTracks().forEach((track) => track.stop());
       return;
     }
     prejoinStream = capture.stream;
     prejoinWarnings = capture.warnings;
-    $("status").textContent = "Play or speak into your mic. We’ll tell you when we hear you.";
+    const track = prejoinStream.getAudioTracks()[0];
+    if (!watchMicrophone(track, signal, () => {
+      stopMicMonitoring(true);
+      $("mic-device").value = "";
+      showMicError(new Error("Microphone disconnected. Reconnect it or choose another input, then try again."));
+    })) return;
+    showAudioSettings(prejoinStream, prejoinWarnings);
+    void showMicDevices(track, signal);
+    $("mic-progress").textContent = "Speak or play a note to check your level.";
     stopMeter = startMicLevelMonitor({
       audioContext: context,
       stream: prejoinStream,
@@ -129,6 +202,7 @@ async function runMicCheck() {
       onHeard: () => {
         if (signal.aborted) return;
         micHeard = true;
+        $("mic-progress").textContent = "";
         $("mic-heard").hidden = false;
         refresh();
       },
@@ -144,15 +218,20 @@ async function runMicCheck() {
 $("headphones").addEventListener("change", refresh);
 $("check-mic").addEventListener("click", () => runMicCheck());
 $("mic-retry").addEventListener("click", () => runMicCheck());
+$("mic-device").addEventListener("change", () => {
+  checkSkipped = false;
+  void runMicCheck();
+});
 $("skip-check").addEventListener("click", () => {
   if (!invite || session || checkSkipped) return;
   resetMicCheck();
   checkSkipped = true;
-  $("status").textContent = "Check skipped. Confirm headphones, then join when ready.";
+  $("mic-progress").textContent = "Mic check skipped. Your browser may ask for access when you join.";
   refresh();
 });
 
 function leave(message = "You left the session.", error) {
+  clearAccessTime();
   activeAttempt?.abort();
   activeAttempt = null;
   session?.close();
@@ -164,9 +243,15 @@ function leave(message = "You left the session.", error) {
   context?.close().catch(() => {});
   context = null;
   $("leave").hidden = true;
+  $("connection-route").hidden = true;
+  $("latency").textContent = "Listening delay is estimated after you connect.";
   const elements = failureElements();
   if (error) {
-    applyJoinFailure(mapJoinError(error), elements);
+    const view = mapJoinError(error);
+    if (view.needsFreshInvite && !view.showRetry) {
+      invite = undefined;
+    }
+    applyJoinFailure(view, elements);
     elements.status.dataset.failure = "true";
   } else {
     delete elements.status.dataset.failure;
@@ -196,19 +281,24 @@ async function startJoin() {
     if (prejoinStream?.getAudioTracks().some((track) => track.readyState === "live")) {
       stream = prejoinStream;
       prejoinStream = null;
+      prejoinAbort?.abort();
+      prejoinAbort = null;
       stopMeter?.();
       stopMeter = null;
-      $("warnings").textContent = prejoinWarnings.join("\n");
+      showAudioSettings(stream, prejoinWarnings);
     } else {
       $("status").textContent = "Allow microphone access to play with your host.";
-      const capture = await acquireMusicStream(navigator.mediaDevices);
+      const capture = await acquireMusicStream(navigator.mediaDevices, $("mic-device").value);
       stream = capture.stream;
       if (!isCurrent()) {
         stream.getTracks().forEach((track) => track.stop());
         return;
       }
-      $("warnings").textContent = capture.warnings.join("\n");
+      showAudioSettings(stream, capture.warnings);
     }
+    if (!watchMicrophone(stream.getAudioTracks()[0], attempt.signal, () => {
+      leave(undefined, new Error(JOIN_SIGNAL.MICROPHONE_ENDED));
+    })) return;
     const joinedSession = new WebJoinSession({
       origin: RELAY_ORIGIN,
       invite,
@@ -224,6 +314,12 @@ async function startJoin() {
           milliseconds === null
             ? "Estimated listening delay: unavailable in this browser."
             : `Estimated listening delay: ${Math.round(milliseconds)} ms (network + playback; excludes capture and host bridge).`;
+      },
+      onRoute: (route) => {
+        if (!isCurrent()) return;
+        const indicator = $("connection-route");
+        if (route) indicator.textContent = route === "relayed" ? "Relayed connection" : "Direct connection";
+        indicator.hidden = route === null;
       },
       onTrack: (remote) => {
         if (!isCurrent()) return;
@@ -241,7 +337,10 @@ async function startJoin() {
     session = joinedSession;
     await joinedSession.join();
     if (!isCurrent()) return;
+    showAccessTime(joinedSession.accessExpiresAt, isCurrent);
     clearJoinFailure(failureElements(), $("status").textContent);
+    $("join").hidden = true;
+    $("leave").focus({ preventScroll: true });
     starting = false;
     refresh();
   } catch (error) {
@@ -273,6 +372,7 @@ $("retry").addEventListener("click", () => {
   void startJoin();
 });
 $("leave").addEventListener("click", () => leave());
+window.addEventListener("hashchange", () => window.location.reload());
 window.addEventListener("pagehide", () => leave());
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && context?.state === "suspended") {

@@ -1,0 +1,52 @@
+{
+  "at": "2026-11-04T20:12:29.759511+00:00",
+  "head": "dc863c1a0910e4511f9db356541214a7bd049be5",
+  "headTree": "5e44020f099386ff8380c2c5e23cf9805a5c8c21",
+  "actualPrCheckout": "7210765dd1a5bd99f1d91e1ec3afdb0c8cc1380d",
+  "actualPrTreeVerifiedViaGitHub": "5e44020f099386ff8380c2c5e23cf9805a5c8c21",
+  "jobs": [
+    {
+      "kind": "source",
+      "runId": 41895455726,
+      "jobId": 126803637212,
+      "checkout": "dc863c1a0910e4511f9db356541214a7bd049be5",
+      "unitFiles": 137,
+      "unitPasses": 2061,
+      "mainBrowserPasses": 763,
+      "separateDeploymentPathPasses": [
+        34,
+        34
+      ],
+      "retryOrFlakySummary": false,
+      "logSha256": "89ed9fb2f3c9ad4c481de05c53eaf7cf6c769704ba59eca8fb2d66e27a3ec852",
+      "logBytes": 322521
+    },
+    {
+      "kind": "pr",
+      "runId": 41895465470,
+      "jobId": 126803673249,
+      "checkout": "7210765dd1a5bd99f1d91e1ec3afdb0c8cc1380d",
+      "unitFiles": 137,
+      "unitPasses": 2061,
+      "mainBrowserPasses": 763,
+      "separateDeploymentPathPasses": [
+        34,
+        34
+      ],
+      "retryOrFlakySummary": false,
+      "logSha256": "23d4d9327064ae3ccc7fde0cf0ff667e0209b0160145937c8be1c6ef493395e7",
+      "logBytes": 321870
+    }
+  ],
+  "pagesJobs": [
+    {
+      "id": 126820840529,
+      "conclusion": "skipped"
+    },
+    {
+      "id": 126820466476,
+      "conclusion": "skipped"
+    }
+  ],
+  "scope": "Exact dc863 documentation head CI only; appde2/c058 and physicalmusic separately scoped"
+}

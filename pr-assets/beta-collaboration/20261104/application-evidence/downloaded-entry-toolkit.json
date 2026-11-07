@@ -1,0 +1,85 @@
+{
+  "at": "2026-11-04T05:49:41.259094+00:00",
+  "artifactId": 13295008190,
+  "workflowRun": 41768979409,
+  "artifactBytes": 8619,
+  "artifactSha256": "1d925e7d8d84d552e76122d8eb91441abcb6550244eb8d255a21ec2239950329",
+  "expiresAt": "2026-11-11T04:16:26Z",
+  "sourceCommit": "551e669f45ef06ceee9e875cc4ac220ef2b75b9d",
+  "reviewedHead": "551e669f45ef06ceee9e875cc4ac220ef2b75b9d",
+  "currentCandidate": "de2b01725925d2f78ee21af33f68f3eb4eb95407",
+  "files": [
+    {
+      "path": "LICENSE-NOTICE.txt",
+      "bytes": 268,
+      "sha256": "e755e359983e3d2c229078afc077bd0c2008dae7d2149ba3dd8f333506722f0e"
+    },
+    {
+      "path": "README.md",
+      "bytes": 1271,
+      "sha256": "a5cd02d7eae2f30c36a1cb33e1352cd579229143f09407fc00571e120ad2abc1"
+    },
+    {
+      "path": "community-integration.example.json",
+      "bytes": 737,
+      "sha256": "6529eaa61f871914f577355e89db7c2ccd61e34ebe6ca541c751a1f5a25287c9"
+    },
+    {
+      "path": "lib/community-integration.mjs",
+      "bytes": 6861,
+      "sha256": "61daf686212af934425e44aaa0bf10b2b6a88d1f0802a924c4dbc7e63a196f7b"
+    },
+    {
+      "path": "lib/entry-sites.mjs",
+      "bytes": 5124,
+      "sha256": "af76f0cccec4e7bdffdb8f01574d71bf5d7a5a6dee738bfc5fd4169942e157fb"
+    },
+    {
+      "path": "neutral-link.html",
+      "bytes": 157,
+      "sha256": "dcea93f8d72a247cf9d4b243c775f7ef474f9cdb0e41fc6d85a7bbde58056194"
+    },
+    {
+      "path": "scripts/package-community-entry.mjs",
+      "bytes": 2735,
+      "sha256": "46c4d1d75f8bc78291692d29a9089744f13a78a0b220c2777fa9ac3e874f792d"
+    }
+  ],
+  "inputComparisons": [
+    {
+      "name": "registration-example",
+      "sha256": "0170b5a23d6faaf661d99c990f9888c199633d8af3f785ffdea4a219e71a5d9b",
+      "currentCandidateBytesEqual": true
+    },
+    {
+      "name": "integration-contract",
+      "sha256": "5ea48d0d88c3b1e766d72e9e32e9573b3c23b529643a74b3091ffaf1308d3221",
+      "currentCandidateBytesEqual": true
+    },
+    {
+      "name": "entry-registry",
+      "sha256": "af76f0cccec4e7bdffdb8f01574d71bf5d7a5a6dee738bfc5fd4169942e157fb",
+      "currentCandidateBytesEqual": true
+    },
+    {
+      "name": "entry-link-builder",
+      "sha256": "12cb470deb3f7509fcde4c6a459698d6a27ee5f2482c183be55a7e23fe3ed2eb",
+      "currentCandidateBytesEqual": true
+    },
+    {
+      "name": "hangout-worker/tools/package-community-toolkit.mjs",
+      "sha256": "2bd4bb305578cc8a97d5023c810e675e9d995d491084685bfd755db5ccb3ffa5",
+      "currentCandidateBytesEqual": true
+    }
+  ],
+  "exactEightFileArchive": true,
+  "allPayloadHashesVerified": true,
+  "bothFixedImportRelocationsVerified": true,
+  "examplesDisabledAndUnverified": true,
+  "extractedBuilderStandalonePass": true,
+  "existingOutputPreservedOnRefusal": true,
+  "licenseFiles": [],
+  "licensePermissionResolved": false,
+  "initialVerifierFailure": "Expected merge-checkout SHA rather than actual artifact source head; original assertion/log retained, no artifact redownload",
+  "scope": "Actual downloaded198 toolkit; selected input bytes equal201. No claim201 artifact exists or application was deployed. DomainVerified flags are local CLI fixture assertions, not DNS/domain/registration evidence. No site modified."
+}

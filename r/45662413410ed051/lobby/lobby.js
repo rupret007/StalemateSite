@@ -7,6 +7,24 @@ import { createEntrySharing } from './entry-sharing.mjs';
     'use strict';
     const $ = (s, el = document) => el.querySelector(s);
     const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+    const fullscreenButton = $('[data-fullscreen]');
+    if (fullscreenButton && document.fullscreenEnabled && document.documentElement.requestFullscreen) {
+        fullscreenButton.hidden = false;
+        const reflectFullscreen = () => {
+            const active = document.fullscreenElement === document.documentElement;
+            fullscreenButton.textContent = active ? 'Exit full screen' : 'Full screen';
+            fullscreenButton.setAttribute('aria-pressed', String(active));
+        };
+        document.addEventListener('fullscreenchange', reflectFullscreen);
+        fullscreenButton.addEventListener('click', async () => {
+            try {
+                if (document.fullscreenElement === document.documentElement) await document.exitFullscreen();
+                else await document.documentElement.requestFullscreen();
+            } catch {
+                toast('Full screen is unavailable here. Maximize this browser window to use more space.');
+            } finally { reflectFullscreen(); }
+        });
+    }
     const Discovery = window.HangoutDiscovery;
     const params = new URLSearchParams(location.search);
     const readTab = key => { try { return sessionStorage.getItem(key); } catch { return null; } };
@@ -29,6 +47,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     let shareEntry = handoff?.share !== false;
     let entrySourcesSupported = null;
     let privateMessageContextSupported = false, privateMessagePeersSupported = false, personTargetsSupported = false;
+    let paletteContext = null;
     let keepSupported = false, keepReturnChecked = false, pendingKeep = null, keepTimer;
     // With an older server, only commands with an explicit target or global
     // meaning are safe in a private tab. Its channel fallback cannot route PM
@@ -551,7 +570,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             app.pendingChannel = '';
             $('[data-channel-error]').textContent = 'Connection lost. Reconnect and try this channel again.';
         }
-        drawCommunity(); drawRooms(); drawMessageRecovery();
+        drawCommunity(); drawRooms(); drawMessageRecovery(); refreshPaletteCohosts();
     }
     let cancelTransportAck = () => {};
     async function connect(nick) {
@@ -666,7 +685,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         $('[data-sheet-buttons]').replaceChildren(); $('[data-palette-buttons]').replaceChildren();
         $('[data-adult]').checked = false;
         document.body.classList.remove('is-band', 'am-op');
-        announcements.replace(() => $('[data-buffer]').replaceChildren());
+        announcements.replace(() => $('[data-chat-lines]').replaceChildren());
         setConnection('ended'); drawTabs(); drawChan();
         $('[data-text]').readOnly = true;
         const ended = reason === 'left' ? 'You left this chat. Your sign-in and any recorded sharing withdrawal have not been changed.' : reason === 'admission'
@@ -798,7 +817,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         case 'report-status': if (m.submitted === true) finishReport(m.id, true); break;
         case 'message-result': messageResult(m); break;
         case 'jam-share-result': jamShareResult(m); break;
-        case 'ownership': { const c = store(m.ch); if (c) c.cohosts = m.cohosts; break; }
+        case 'ownership': { const c = store(m.ch); if (c) c.cohosts = m.cohosts; refreshPaletteCohosts(); break; }
         case 'owner-offer': toast(`${m.by} offered you ownership of ${m.ch}`, [['Accept ownership', () => { if (confirm(`Accept ownership of ${m.ch}?`)) cmd('acceptowner', [], m.ch); }]]); break;
         case 'sharing-stopped':
             sharingConfirmation++; sharingCleanup = 'confirmed';
@@ -1029,6 +1048,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     function resetPendingReports() { for (const id of [...pendingReports.keys()]) finishReport(id, false); }
     function appendLine(l) {
         const buf = $('[data-buffer]');
+        const lines = $('[data-chat-lines]');
         const li = document.createElement('li');
         if (l.id) li.dataset.id = l.id;
         const ts = document.createElement('span'); ts.className = 'ts'; ts.textContent = hhmm(l.ts); li.append(ts, ' ');
@@ -1069,8 +1089,8 @@ import { createEntrySharing } from './entry-sharing.mjs';
             if (l.me) li.classList.add('act');
         }
         const stick = buf.scrollHeight - buf.scrollTop - buf.clientHeight < 60;
-        buf.append(li);
-        while (buf.children.length > 300) buf.firstChild.remove();
+        lines.append(li);
+        while (lines.children.length > 300) lines.firstChild.remove();
         if (stick) buf.scrollTop = buf.scrollHeight;
         else if (!replaying && !l.event) { belowFold += 1; drawNewMessages(); }
     }
@@ -1096,7 +1116,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         if (c) { c.unread = 0; c.mentions = 0; }
         belowFold = 0; drawNewMessages(); replaying = true;
         announcements.replace(() => {
-            $('[data-buffer]').replaceChildren();
+            $('[data-chat-lines]').replaceChildren();
             (c ? c.lines : []).forEach(appendLine);
         });
         replaying = false;
@@ -1275,6 +1295,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
     }
     function drawChan() {
         drawKeepPrompt();
+        refreshPaletteCohosts();
         const key = app.active;
         const c = store(key);
         const isPm = key.startsWith('pm:');
@@ -1695,10 +1716,44 @@ import { createEntrySharing } from './entry-sharing.mjs';
         }
         return text.split(' ');
     }
+    function paletteCohosts(origin) {
+        const current = origin && app.chans.get(origin.channel);
+        return origin?.ops && paletteContext === origin && $('[data-palette]').open && connectionState === 'connected'
+            && personTargetsSupported && app.active === origin.channel && roomNonce(origin.instance) && current?.keepRef === origin.instance
+            && current.names?.some(n => n.nick === app.me && n.owner) && Array.isArray(current.cohosts) ? current.cohosts : [];
+    }
+    function refreshPaletteCohosts() {
+        const box = $('[data-palette-buttons]'), origin = paletteContext;
+        const existing = new Map($$('[data-cohost-account]', box).map(button => [button.dataset.cohostAccount, button]));
+        const focused = document.activeElement;
+        for (const host of paletteCohosts(origin)) {
+            let button = existing.get(host.id);
+            if (!button) {
+                button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn--small';
+                button.dataset.cohostAccount = host.id;
+                button.addEventListener('click', () => {
+                    const currentHost = paletteCohosts(origin).find(current => current.id === host.id);
+                    if (!button.isConnected || !currentHost) return toast('That room or co-host changed. Choose current Host tools before trying again.');
+                    if (!confirm(`Remove ${currentHost.label} as a verified co-host?`)) return;
+                    if (!paletteCohosts(origin).some(current => current.id === host.id)) return toast('That room or co-host changed. Choose current Host tools before trying again.');
+                    if (send({ t: 'cmd', name: 'cohost', args: ['remove', host.id], ch: origin.channel, roomInstance: origin.instance, cohostAccount: true })) $('[data-palette]').close();
+                    else toast('Co-host removal was not sent. Reconnect before trying again.');
+                });
+                box.append(button);
+            }
+            button.textContent = `Remove verified co-host: ${host.label}`;
+            existing.delete(host.id);
+        }
+        for (const button of existing.values()) button.remove();
+        // Keep every surviving command's DOM identity and focus. If a focused
+        // co-host action was retired, return focus inside the still-open dialog.
+        if (existing.size && [...existing.values()].includes(focused) && $('[data-palette]').open)
+            (box.querySelector('button') || $('[data-palette-close]')).focus();
+    }
     function openPalette(ops) {
         const box = $('[data-palette-buttons]');
         const current = store(app.active);
-        const origin = { channel: app.active, instance: current?.keepRef };
+        const origin = paletteContext = { channel: app.active, instance: current?.keepRef, ops };
         const owner = current?.names?.find((n) => n.nick === app.me)?.owner;
         box.replaceChildren();
         for (const [label, name, ask, fixed] of (ops ? OP_PALETTE : PALETTE)) {
@@ -1722,21 +1777,13 @@ import { createEntrySharing } from './entry-sharing.mjs';
             });
             box.append(b);
         }
-        if (ops && owner) for (const host of current.cohosts || []) {
-            const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--small'; b.textContent = `Remove verified co-host: ${host.label}`;
-            b.disabled = !personTargetsSupported || !roomNonce(origin.instance);
-            b.addEventListener('click', () => {
-                if (!confirm(`Remove ${host.label} as a verified co-host?`)) return;
-                if (!personTargetsSupported || !roomNonce(origin.instance) || app.chans.get(origin.channel)?.keepRef !== origin.instance) return toast('That room changed. Choose current Host tools before trying again.');
-                if (send({ t: 'cmd', name: 'cohost', args: ['remove', host.id], ch: origin.channel, roomInstance: origin.instance, cohostAccount: true })) $('[data-palette]').close();
-                else toast('Co-host removal was not sent. Reconnect before trying again.');
-            }); box.append(b);
-        }
         $('[data-palette]').showModal();
+        refreshPaletteCohosts();
     }
     $('[data-palette-open]').addEventListener('click', () => openPalette(false));
     $('[data-roomtools]').addEventListener('click', () => openPalette(true));
     $('[data-palette-close]').addEventListener('click', () => $('[data-palette]').close());
+    $('[data-palette]').addEventListener('close', () => { if (!$('[data-palette]').open) paletteContext = null; });
 
     let inviteInstance = '', invitePeople = new Map();
     function closeInviteDialog() {
@@ -1847,7 +1894,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         const c = currentJam(), input = $('[data-jam-link]');
         if (!c || jamContext?.room !== c || !jamContext.host || !amOp(c)) { clearPendingJamShare(); input.value = ''; return; }
         if (pendingJamShare?.requestId) return; // requestSubmit() must respect the same one-in-flight bound.
-        // Copy web invite produces one HTTPS URL. Only route that explicit
+        // Copy browser invite produces one HTTPS URL. Only route that explicit
         // paste to the existing server-gated browser hook; keep complete
         // desktop invitations, including sealed replies, byte-for-byte.
         const value = input.value, web = /^https:\/\//i.test(value.trim());

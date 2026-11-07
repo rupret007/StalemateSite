@@ -47,6 +47,51 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }) {
 }
 
 describe('browser client privacy and bounded delivery wiring', () => {
+    async function ownerPalette(cohosts = []) {
+        const view = await visitor('stalemate', { entrySources: 1, personTargets: 1 });
+        const { window, ws, welcome } = view;
+        // Only the dialog surface is substituted; the real client receives
+        // ordered socket frames and builds/sends its own Host tools commands.
+        window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+        window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event('close')); };
+        window.confirm = vi.fn(() => true);
+        welcome();
+        const channel = { name: '#owned', kind: 'chat', persistent: true, keepRef: 'a'.repeat(32), modes: {}, count: 1, cohosts,
+            names: [{ nick: 'Viewer', prefix: '@', owner: true }] };
+        ws.receive({ t: 'join', ch: channel });
+        window.document.querySelector('[data-roomtools]').click();
+        const palette = window.document.querySelector('[data-palette]');
+        return { ...view, channel, palette, buttons: () => [...palette.querySelectorAll('button')],
+            ownership: cohosts => ws.receive({ t: 'ownership', ch: channel.name, cohosts }) };
+    }
+    it('reconciles named co-host actions without replacing focused controls or leaking them into slash commands', async () => {
+        const { window, ws, palette, buttons, ownership } = await ownerPalette();
+        const invite = buttons().find(button => button.textContent === 'Invite guest'); invite.focus();
+        ownership([{ id: 'account-one', label: 'FirstCoHost' }]);
+        const remove = buttons().find(button => button.textContent === 'Remove verified co-host: FirstCoHost');
+        expect(remove).toBeDefined(); expect(window.document.activeElement).toBe(invite);
+        remove.focus();
+        ownership([{ id: 'account-one', label: 'RenamedCoHost' }]);
+        expect(buttons().find(button => button.textContent === 'Remove verified co-host: RenamedCoHost')).toBe(remove);
+        expect(window.document.activeElement).toBe(remove);
+        ownership([]);
+        expect(remove.isConnected).toBe(false); expect(window.document.activeElement).toBe(invite);
+        const sent = ws.sent.length; remove.click(); expect(ws.sent).toHaveLength(sent);
+        palette.close();
+        window.document.querySelector('[data-palette-open]').click();
+        ownership([{ id: 'account-two', label: 'OtherCoHost' }]);
+        expect(buttons().some(button => button.textContent.startsWith('Remove verified co-host'))).toBe(false);
+    });
+    it.each(['owner revoked', 'room replaced', 'disconnected'])('retires open named co-host controls when %s', async reason => {
+        const { ws, channel, buttons } = await ownerPalette([{ id: 'account-one', label: 'FirstCoHost' }]);
+        const remove = buttons().find(button => button.textContent === 'Remove verified co-host: FirstCoHost');
+        expect(remove).toBeDefined();
+        if (reason === 'disconnected') ws.close(1000);
+        else ws.receive({ t: 'chan', ch: { ...channel, ...(reason === 'room replaced' ? { keepRef: 'b'.repeat(32) }
+            : { names: [{ nick: 'Viewer', prefix: '', owner: false }] }) } });
+        expect(remove.isConnected).toBe(false);
+        const sent = ws.sent.length; remove.click(); expect(ws.sent).toHaveLength(sent);
+    });
     it('waits for confirmation of the latest privacy choice before any post-welcome user message', async () => {
         const { window, ws, welcome, join } = await visitor('rad-dad');
         expect(ws.sent[0]).toMatchObject({ t: 'hello', entrySource: 'rad-dad', transport: 1 });
@@ -199,5 +244,26 @@ describe('browser client privacy and bounded delivery wiring', () => {
         expect(choice.checked).toBe(true); expect(choice.closest('label').textContent).toContain('Announce new chat messages');
         choice.click(); join('#our-room'); paint(); paint(); expect(log.getAttribute('aria-live')).toBe('off');
         expect(log.getAttribute('role')).toBe('log'); expect(log.getAttribute('aria-label')).toBe('Conversation');
+    });
+    it('bounds and clears messages without removing their list or the live-region preference', async () => {
+        const { window, ws, welcome, join, paint } = await visitor(); welcome(); join(); paint(); paint();
+        const log = window.document.querySelector('[data-buffer]');
+        const messages = log.querySelector('[role="list"][aria-label="Messages"]');
+        expect(messages).not.toBeNull();
+        for (let index = 0; index < 305; index++)
+            ws.receive({ t: 'line', id: `bounded-${index}`, ch: '#stalemate', from: 'Friend', text: `Bounded line ${index}` });
+        expect(messages.children).toHaveLength(300);
+        expect(messages.firstElementChild.textContent).toContain('Bounded line 5');
+        expect(messages.lastElementChild.textContent).toContain('Bounded line 304');
+        expect([...messages.children].every(item => item.tagName === 'LI')).toBe(true);
+        window.document.querySelector('[data-chat-announcements]').click();
+        join('#another-room'); paint(); paint();
+        expect(log.querySelector('[role="list"]')).toBe(messages);
+        expect(messages.children).toHaveLength(0);
+        expect(log.getAttribute('aria-live')).toBe('off');
+        ws.close(4401);
+        expect(log.querySelector('[role="list"]')).toBe(messages);
+        expect(messages.children).toHaveLength(0);
+        expect(log.getAttribute('aria-live')).toBe('off');
     });
 });

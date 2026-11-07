@@ -22,6 +22,7 @@
             load: $('[data-act-load]'),
             url: $('[data-act-url]'),
             bobPicks: $('[data-bob-picks]'),
+            paintStart: $('[data-paint-start]'),
             tiles: $('[data-act-tiles]'), relayStatus: $('[data-act-relay-status]')
         };
         const state = {
@@ -220,14 +221,15 @@
             const video = chan.kind === 'bobross' || chan.kind === 'watch';
             ui.paint.hidden = !paint;
             ui.video.hidden = !video;
-            ui.load.hidden = chan.kind !== 'watch';
+            ui.load.hidden = !video;
             ui.bobPicks.hidden = chan.kind !== 'bobross';
+            ui.paintStart.hidden = chan.kind !== 'bobross';
             if (paint) setupCanvas();
             if (video) setupVideoUi();
             if (act) ingestSnap(act);
             syncNames(chan);
             if (video && chan.kind === 'bobross' && isOp() && !state.room.video) {
-                const ep = BOB.EPISODES[2];
+                const ep = BOB.DEFAULT_LESSON;
                 hostVideo({ kind: 'yt', id: ep.id }, true, 0);
             }
         }
@@ -398,7 +400,7 @@
         function setupVideoUi() {
             if (ui.bobPicks.dataset.ready) return;
             ui.bobPicks.dataset.ready = '1';
-            BOB.EPISODES.slice(0, 6).forEach((ep) => {
+            BOB.STARTER_EPISODES.forEach((ep) => {
                 const b = document.createElement('button');
                 b.type = 'button';
                 b.className = 'btn btn--small';
@@ -409,10 +411,15 @@
             ui.load.addEventListener('submit', (e) => {
                 e.preventDefault();
                 const id = H.parseYouTubeId(ui.url.value);
-                if (!id) return;
+                if (!id) {
+                    ui.url.setCustomValidity('Enter a YouTube video link or video ID.');
+                    ui.url.reportValidity();
+                    return;
+                }
                 ui.url.value = '';
                 hostVideo({ kind: 'yt', id }, true, 0);
             });
+            ui.url.addEventListener('input', () => ui.url.setCustomValidity(''));
             ui.tap.addEventListener('click', () => syncToState(true, true));
         }
 

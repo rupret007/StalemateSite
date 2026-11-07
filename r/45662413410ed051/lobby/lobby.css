@@ -171,6 +171,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .message-recovery .saved-message-text { white-space: pre-wrap; color: var(--cream); }
 [data-message-copy-text] { width: 100%; min-width: 0; max-width: 100%; font: 16px/1.5 var(--mono); }
 .buffer { flex: 1; min-height: 100px; margin: 0; padding: 14px 24px; list-style: none; overflow-y: auto; color: #e1e4d9; font: 12px/1.85 var(--mono); overflow-wrap: anywhere; scrollbar-width: thin; scrollbar-color: #465144 transparent; }
+.buffer-lines { margin: 0; padding: 0; list-style: none; }
 .buffer li { padding: 2px 5px; border-left: 2px solid transparent; }
 .buffer li:hover { background: #ffffff03; }
 .buffer .mention { background: #2b2719; border-left-color: var(--amber); }
@@ -265,6 +266,10 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .act-load { display: flex; gap: 6px; margin-top: 9px; }
 .act-load input { min-height: 36px; font-size: 12px; }
 .bob-picks { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.paint-together-mark { display: block; max-width: 100%; object-fit: contain; }
+.paint-start { margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 4px; font-size: 13px; overflow-wrap: anywhere; }
+.paint-start summary { cursor: pointer; }
+.paint-start p { margin: 8px 0 0; line-height: 1.5; }
 .activity-label { display: flex; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
 .activity-camera-count { color: var(--muted); }
 .act-camera-strip { --camera-tile-width: 128px; grid-column: 1 / -1; min-width: 0; max-width: 100%; }
@@ -310,6 +315,33 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .lobby-welcome { margin: 16px; padding: 14px; gap: 10px; }
   .welcome-symbol { display: none; }
   .buffer { padding-inline: 16px; }
+}
+/* Desktop workspace: compact channel navigation and chrome reserve the window
+   for the transcript. Inspired by mIRC and Halloy's single-pane workflow;
+   the existing channel controls, focus model and received-session buffer stay. */
+@media (min-width: 901px) {
+  .irc { width: 100%; grid-template-columns: 220px minmax(0, 1fr) 180px; }
+  .titlebar { min-height: 48px; padding: 7px 14px; gap: 12px; }
+  .title-extra { font-size: 11px; padding-left: 12px; margin-left: 4px; }
+  .rooms, .people { padding: 12px 10px; }
+  .channel-home { padding: 8px 10px; }
+  .presence { padding: 10px 0; margin-bottom: 10px; }
+  .tiles { grid-template-columns: 1fr; gap: 4px; }
+  .tile, .tile-chat { grid-column: auto; grid-template-columns: 22px minmax(0, 1fr); gap: 2px 8px; min-height: 48px; padding: 7px 8px; }
+  .tile > b { grid-row: 1 / span 2; align-self: center; }
+  .tile strong { font-size: 12px; }
+  .tile span { grid-column: 2; line-height: 1.35; }
+  .tabs { min-height: 36px; padding: 4px 8px 0; gap: 2px; }
+  .tabs button { min-height: 32px; padding: 6px 10px; }
+  .topic { min-height: 30px; padding: 7px 14px; }
+  .lobby-welcome { margin: 12px 14px 4px; padding: 12px; gap: 10px; }
+  .welcome-symbol { display: none; }
+  .lobby-welcome p { margin-bottom: 8px; }
+  .buffer { padding: 12px 16px; font-size: 14px; line-height: 1.55; }
+  .quick { padding: 6px 14px 0; }
+  .say { margin: 8px 14px 0; }
+  .chat-status { padding: 6px 16px 8px; }
+  .people h2 { margin-bottom: 10px; }
 }
 @media (max-width: 900px) {
   .titlebar { min-height: 60px; padding: 10px 16px; }
@@ -442,6 +474,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .brand { flex: none; gap: 8px; }
   .brand b { font-size: 10px; white-space: nowrap; }
   .connection-tools { gap: 6px; }
+  .connection-tools button { min-height: 26px; padding: 3px 6px; font-size: 10px; }
   .entry-return { min-height: 26px; }
   .brand-mark { width: 26px; height: 26px; font-size: 23px; }
   .brand-caption, .lobby-welcome, .quick, .chat-status { display: none; }
@@ -456,7 +489,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .buffer { min-height: 0; padding-block: 1px; }
   .buffer li { padding-block: 0; }
   .say { position: sticky; bottom: 0; z-index: 1; margin-block: 4px; }
-  .say input { min-height: 36px; padding-block: 8px; }
+  .say input { min-height: 36px; padding-block: 8px; scroll-margin-bottom: 8px; }
   .say .btn { min-height: 32px; padding: 6px 8px; margin: 3px; }
   .toast { padding: 4px 12px; }
   .phonetabs { min-height: 44px; }
