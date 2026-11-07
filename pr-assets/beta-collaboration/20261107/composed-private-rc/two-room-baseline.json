@@ -1,0 +1,128 @@
+{
+  "startedAt": "2026-11-07T05:13:30.190Z",
+  "source": "b61bb416d7af39d2fe3a41529ddd65520e5305ca",
+  "version": "75655a50-9e13-4966-bb68-22b45a230c1d",
+  "scope": "Eight independent browser guests, two four-person temporary Art rooms, four chat rounds, one Mac and one Internet connection; no physical media or larger capacity claim",
+  "guards": [
+    {
+      "load": 5.724609375,
+      "swapPercent": 76.8005859375,
+      "freeGiB": 16.157756805419922
+    },
+    {
+      "load": 5.724609375,
+      "swapPercent": 76.8005859375,
+      "freeGiB": 16.156570434570312
+    },
+    {
+      "load": 5.90673828125,
+      "swapPercent": 76.8005859375,
+      "freeGiB": 16.15610122680664
+    },
+    {
+      "load": 5.90673828125,
+      "swapPercent": 76.8005859375,
+      "freeGiB": 16.155109405517578
+    },
+    {
+      "load": 5.90673828125,
+      "swapPercent": 76.8005859375,
+      "freeGiB": 16.15500259399414
+    },
+    {
+      "load": 5.90673828125,
+      "swapPercent": 76.8005859375,
+      "freeGiB": 16.154640197753906
+    },
+    {
+      "load": 5.75390625,
+      "swapPercent": 76.8005859375,
+      "freeGiB": 16.15374755859375
+    },
+    {
+      "load": 5.75390625,
+      "swapPercent": 76.8005859375,
+      "freeGiB": 16.151268005371094
+    },
+    {
+      "load": 5.75390625,
+      "swapPercent": 76.8005859375,
+      "freeGiB": 16.151264190673828
+    },
+    {
+      "load": 5.75390625,
+      "swapPercent": 76.8005859375,
+      "freeGiB": 16.151302337646484
+    },
+    {
+      "load": 5.453125,
+      "swapPercent": 76.8005859375,
+      "freeGiB": 16.147621154785156
+    },
+    {
+      "load": 5.33642578125,
+      "swapPercent": 76.8005859375,
+      "freeGiB": 16.145381927490234
+    },
+    {
+      "load": 5.30908203125,
+      "swapPercent": 76.8005859375,
+      "freeGiB": 16.15453338623047
+    }
+  ],
+  "logout": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+  ],
+  "stateAfterLogout": [
+    401,
+    401,
+    401,
+    401,
+    401,
+    401,
+    401,
+    401
+  ],
+  "roomsClosed": [
+    true,
+    true
+  ],
+  "captureRequests": 0,
+  "admissionStatuses": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+  ],
+  "crossRoomDeliveries": 0,
+  "duplicateDeliveries": 0,
+  "setupMs": 10877,
+  "roomCounts": [
+    4,
+    4
+  ],
+  "roomLimit": 8,
+  "workloadMs": 10456,
+  "messages": 32,
+  "deliveries": 128,
+  "expectedDeliveries": 128,
+  "peerDeliveryMs": {
+    "samples": 96,
+    "p50": 58,
+    "p95": 82,
+    "max": 88
+  },
+  "status": "passed",
+  "completedAt": "2026-11-07T05:13:53.727Z"
+}

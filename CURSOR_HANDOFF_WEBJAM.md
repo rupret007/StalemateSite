@@ -6,14 +6,20 @@ It identifies the currently staged build and private Worker, the Stalemate,
 Rad Dad and neutral partner entrance checks, and the remaining live music and
 release gates. Use its revisions for new work.
 
-The current [private release receipt](hangout-internal/HANGOUT_PRIVATE_RC_20261106.md)
-pins hosted application `b61bb416d7af39d2fe3a41529ddd65520e5305ca` to private Worker
-version `75655a50-9e13-4966-bb68-22b45a230c1d`. Complete hosted Chromium and WebKit
-journeys and the bounded eight-person chat workload passed. Physical music,
-Shared Track mixing, second-network and real Webex acceptance remain pending.
-Native packages remain source `76b1fd7`; WebJam's later relay reset-hint merge
-`e735a04` is not deployed or imported into this hosted candidate. Use direct
-application CI here, without StoryPool. Preserve the historical evidence below.
+The current [private release receipt](hangout-internal/HANGOUT_PRIVATE_RC_20261107.md)
+pins reviewed application `b35e5fcf5904eb99e17de653ddd2234e553bbada`, merged as
+`45fc36450e0542559818897cf7c200f0a346fd0e`, to private Worker version
+`33862058-10a5-4a6f-9659-38841d70292f`. Both direct CI runs passed, all deployed
+source modules matched, and actual Mac/Windows browser chat, reconnect, mobile
+layout and copied-cookie logout checks passed. Use the receipt's separate
+WebKit resource-guard stop; earlier complete journeys and eight-person/two-room workloads
+remain evidence for their original runtime. Physical music, shared-track mixing,
+second-network and real Webex acceptance remain pending. Native packages stay
+at `76b1fd7`; reset-hint merge `e735a04` is now imported and deployed to the
+private issuer as `4db649fa-a465-44b4-8487-414987b3a660`. One mailbox admission
+passed without media or a TURN mint; full live music recovery remains unverified.
+Use direct application CI here, without StoryPool or Karen. Preserve the
+historical evidence below and all 62 original requirements.
 
 **Historical checkpoint, November 5 at 01:06 UTC (November 4 locally):**
 

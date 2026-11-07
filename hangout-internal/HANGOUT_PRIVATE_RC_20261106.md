@@ -1,5 +1,9 @@
 # Private candidate delivery — November 6, 2026
 
+**Historical checkpoint.** The [November 7 receipt](HANGOUT_PRIVATE_RC_20261107.md)
+supersedes the current deployment and issuer identities below. Preserve these
+earlier observations and failures with their original source/version scope.
+
 The existing invitation-only beta now runs application source
 `b61bb416d7af39d2fe3a41529ddd65520e5305ca` as Worker version
 `75655a50-9e13-4966-bb68-22b45a230c1d`, deployment

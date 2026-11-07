@@ -1,0 +1,24 @@
+{
+  "at": "2026-11-07T05:58:23.542243+00:00",
+  "head": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "merge": "45fc36450e0542559818897cf7c200f0a346fd0e",
+  "bothRunsPassed": true,
+  "runs": [
+    42342523061,
+    42342518672
+  ],
+  "jobs": [
+    128313119783,
+    128313105776
+  ],
+  "eachRun": {
+    "unitFiles": 137,
+    "unitChecks": 2063,
+    "browserChecks": 813,
+    "rootSmoke": 34,
+    "projectSmoke": 34,
+    "retryOrFlakySummary": false
+  },
+  "pagesDeploy": "skipped",
+  "storyPoolUsed": false
+}
