@@ -10,6 +10,27 @@ approval or evidence that a live website contains the candidate.
 
 ## Select one tested candidate
 
+**Current private candidate, November 7 UTC:** application
+`b61bb416d7af39d2fe3a41529ddd65520e5305ca`, tree
+`8507d85db2ed354ddfc1710f861c07d5d112063a`, serves private Worker version
+`75655a50-9e13-4966-bb68-22b45a230c1d` in deployment
+`e01f4ed8-b966-42e8-bb50-631ef1a8f515` at 100%. The previous version
+`50c62fa6-676c-4c1a-888f-ae4ceb74a3be` is retained for controlled rollback.
+No public website or navigation was changed. The
+[current private release receipt](HANGOUT_PRIVATE_RC_20261106.md) records full
+hosted Chromium/WebKit journeys, 375/390px containment, logout revocation and
+an eight-person room workload. These results qualify those website journeys,
+not physical music, larger capacity or public launch.
+
+The native packages below remain source `76b1fd7`. WebJam's later reset-hint
+merge `e735a048de82e26c424e31964a30f1dfbd548df9` passed direct application CI,
+but is not in this website candidate or the live relay issuer. Do not assume
+a merged source change has been delivered. Refresh provider headroom before
+any bounded media trial and retain all existing quotas and capture safeguards.
+
+**Earlier November 6 observations:** the following revisions and table retain
+their original scope. Use the current receipt above for new delivery work.
+
 On November 6, the protected private website served Worker version
 `50c62fa6-676c-4c1a-888f-ae4ceb74a3be` at 100% of deployment
 `3186f5ce-3da2-4459-8413-f78ddb16de76`. Application source

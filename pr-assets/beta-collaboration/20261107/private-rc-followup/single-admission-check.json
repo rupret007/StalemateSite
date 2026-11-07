@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-07T04:17:12.222Z",
+  "scope": "One diagnostic admission request; no browser room or media",
+  "requestCount": 1,
+  "limitsChanged": false,
+  "httpStatus": 200,
+  "retryAfter": null,
+  "cloudflare1010": false,
+  "ok": true,
+  "logoutStatus": 200,
+  "stateAfterLogout": 401
+}
