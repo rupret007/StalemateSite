@@ -28,13 +28,21 @@ navigation has not been changed. Invitations and credentials are not included.
 **Prepared browser update:** this branch imports the access countdown from
 [WebJam PR #450](https://github.com/rupret007/webjam/pull/450), source
 `1b0c4f56399843747e82655c0d7a994290b54127`, with all thirteen provenance records
-verified. Only four runtime files changed: Join HTML, CSS, app and session code.
+verified. That import changed four runtime files: Join HTML, CSS, app and session code.
 The connected page shows this browser's access deadline, gives one final-minute
 warning, and offers Leave with keyboard focus. Host shutdown may happen sooner.
 Existing expiry/shutdown and provider policies are unchanged. This is prepared
 source, not a deployment claim; the live identities below remain separate.
 The real eight-hour expiry observer is still pending on the unchanged private
 runtime. Do not substitute a clock-controlled UI fixture for that observation.
+
+**Prepared lobby recovery:** a normal logged-out browser opening a saved lobby
+URL currently receives plain 401 text without a recovery link. This source adds
+a 401 invitation page for known lobby-document GET/HEAD paths. It sets no cookie,
+serves no protected asset and keeps API, code and websocket denials intact. The
+[before/local-preview packet](../pr-assets/beta-collaboration/20261107/cold-lobby-recovery/receipt.json)
+separates the observed live response from local regression tests and inspected
+375px/390px previews. This source change is not yet a private deployment claim.
 
 ## Exact delivery
 
