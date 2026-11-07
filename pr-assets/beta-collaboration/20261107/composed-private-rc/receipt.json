@@ -1,0 +1,19 @@
+{
+  "candidate": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "merge": "45fc36450e0542559818897cf7c200f0a346fd0e",
+  "privateVersion": "33862058-10a5-4a6f-9659-38841d70292f",
+  "proofScope": "Current private Mac/Windows browser baseline; current full WebKit stopped before browser at resource guard. Prior two-room workload remains baseline-only. Physical music/Webex/shared-track acceptance pending.",
+  "goalComplete": false,
+  "files": {
+    "webkit-guard-stop.json": "fdfa167df11da1b7a3992cb29d957e2d5e4bdd5bb21b22220550f926152d27ea",
+    "source-readback.json": "990068b1ca28344b59b1504f65558d1f4767a906588e2be4e5e9f553f7186d65",
+    "ci.json": "12897b19892c664be863e687af900bddfdcf5cdafdaf2b3d14deb1c004341e1e",
+    "delivery.json": "71d52b0eb717f4df3eb8b2b31963c90fe0c4f0b66b023580581ce5098505cc42",
+    "community-entry-toolkit-b35e5fc.zip": "07bdb02a673b36dbcfcf061e57645b5e2d7159484e31d27a4cb4084616c732b1",
+    "mac-windows.json": "98f9f4fbdde90c12fc9bdf83c0557c77f2b61a439757159d4fbcee09d6bdd75e",
+    "mailbox-admission.json": "16a99ebbaa175b868a2c03cc78c98797e4c079d3cb9f9323d6db3f04b27a0427",
+    "entry-toolkit-archive.json": "6626f72d13e272f12329edd0c13c131d7f68c6c8e05f0aabda083fd01ec9ee45",
+    "issuer-delivery.json": "aee962fb01175253f8822e2ab3893e836bb88f03e278ba8fad0923261fbca6c3",
+    "two-room-baseline.json": "bad66d149553a5aec9daa81159d0a325a909babc6178b2febab3c4b5d25cc820"
+  }
+}

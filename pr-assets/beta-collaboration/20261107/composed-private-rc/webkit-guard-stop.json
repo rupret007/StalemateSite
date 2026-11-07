@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-07T06:02:55.936516+00:00",
+  "notBefore": "2026-11-07T06:14:53.727000+00:00",
+  "source": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "version": "33862058-10a5-4a6f-9659-38841d70292f",
+  "state": "RESOURCE_GUARD_CLOSED_NO_BROWSER_STARTED",
+  "attempts": 0,
+  "microphoneAllowed": false,
+  "relayAllowed": false,
+  "storyPoolUsed": false,
+  "interpretation": "Not a browser pass or production failure. No browser started; current full WebKit Art/Jam proof remains pending."
+}

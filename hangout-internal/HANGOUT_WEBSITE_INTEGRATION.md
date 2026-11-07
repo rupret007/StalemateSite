@@ -11,22 +11,27 @@ approval or evidence that a live website contains the candidate.
 ## Select one tested candidate
 
 **Current private candidate, November 7 UTC:** application
-`b61bb416d7af39d2fe3a41529ddd65520e5305ca`, tree
-`8507d85db2ed354ddfc1710f861c07d5d112063a`, serves private Worker version
-`75655a50-9e13-4966-bb68-22b45a230c1d` in deployment
-`e01f4ed8-b966-42e8-bb50-631ef1a8f515` at 100%. The previous version
-`50c62fa6-676c-4c1a-888f-ae4ceb74a3be` is retained for controlled rollback.
+`b35e5fcf5904eb99e17de653ddd2234e553bbada`, merged as
+`45fc36450e0542559818897cf7c200f0a346fd0e`, has tree
+`5d12703740f48136ed905752ffc4642bd0e6b9c9` and serves private Worker version
+`33862058-10a5-4a6f-9659-38841d70292f` in deployment
+`f6cc2976-c845-4ca2-89b3-fa930347a16f` at 100%. The previous version
+`75655a50-9e13-4966-bb68-22b45a230c1d` is retained for controlled rollback.
 No public website or navigation was changed. The
-[current private release receipt](HANGOUT_PRIVATE_RC_20261106.md) records full
-hosted Chromium/WebKit journeys, 375/390px containment, logout revocation and
-an eight-person room workload. These results qualify those website journeys,
-not physical music, larger capacity or public launch.
+[current private release receipt](HANGOUT_PRIVATE_RC_20261107.md) records direct
+exact-head CI, source/configuration readback and current actual Mac/Windows
+browser journeys, with 375/390px containment and logout revocation. It keeps
+current WebKit status and the earlier eight-person/two-room workload evidence
+separate. These results do not qualify physical music, larger capacity or
+public launch.
 
 The native packages below remain source `76b1fd7`. WebJam's later reset-hint
 merge `e735a048de82e26c424e31964a30f1dfbd548df9` passed direct application CI,
-but is not in this website candidate or the live relay issuer. Do not assume
-a merged source change has been delivered. Refresh provider headroom before
-any bounded media trial and retain all existing quotas and capture safeguards.
+is imported into this candidate, and is deployed separately to issuer version
+`4db649fa-a465-44b4-8487-414987b3a660`. One ordinary web mailbox GET passed;
+credential minting and a full current live music session were not exercised.
+Refresh provider headroom before any bounded media trial and retain all existing
+quotas and capture safeguards. The native package revision remains separate.
 
 **Earlier November 6 observations:** the following revisions and table retain
 their original scope. Use the current receipt above for new delivery work.

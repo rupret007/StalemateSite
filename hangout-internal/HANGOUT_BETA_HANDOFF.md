@@ -1,7 +1,7 @@
 # Invitation-only community beta handoff
 
 For the current private delivery, exact runtime and scoped hosted journeys, see
-the [November 6 candidate receipt](HANGOUT_PRIVATE_RC_20261106.md). Application
+the [November 7 candidate receipt](HANGOUT_PRIVATE_RC_20261107.md). Application
 CI and private delivery proceed directly in this session at Jeff's instruction;
 older pending/Karen statements below retain their historical scope.
 
@@ -122,9 +122,11 @@ provider connectivity by disabling signature or route-specific audience checks.
 The original natural eight-hour expiry observation started October 19 at 08:00
 UTC, with expiry at 16:00 UTC. Keep the hosted source, runtime, configuration,
 invitation and identity keys unchanged until that original job has a recorded
-terminal result; reaching 16:00 alone is not confirmation. New fixes are
-prepared for review, not deployed. Complete the required human/Karen review and
-release acceptance before deploying them.
+terminal result; reaching 16:00 alone is not confirmation. This paragraph records
+an October 19 observation, not a new release instruction. Jeff subsequently
+assigned application review, CI and private delivery directly to this session,
+without StoryPool/Karen. For new work, use reviewed current source and actual
+GitHub Actions results, reconcile live settings and preserve existing holds.
 
 Use a clean, isolated checkout of the reviewed release commit. Before building,
 record the effective active configuration privately and reconcile it with the
