@@ -1,0 +1,23 @@
+{
+  "websiteSource": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "websiteVersion": "33862058-10a5-4a6f-9659-38841d70292f",
+  "issuerVersion": "4db649fa-a465-44b4-8487-414987b3a660",
+  "sdkVersion": "1.64.1",
+  "webkitEndpoint": "Intel MacBook, macOS 15.7.9, headless WebKit 27.2",
+  "windowsEndpoint": "NucBox, Windows 11, headed Chrome 156.0.8078.80",
+  "screenshotsVisuallyInspected": [
+    375,
+    390
+  ],
+  "physicalMicrophonesOrCamerasOpened": false,
+  "physicalHearingQualified": false,
+  "fullMusicRecoveryVerified": false,
+  "goalComplete": false,
+  "files": {
+    "windows-paint-provider.json": "e73c304f3d8a02c7cbc86b9a5ea047c9c63627ac11a0c0e5a2e6a309bf80135c",
+    "intel-webkit.json": "1e534225125823ea55770de88a5bcfe6955829432774b45f5188a8b6c4dcb86d",
+    "webkit-390.png": "042e8155f2fa85e9e62fa2e30031ab89b949911957422c184e10fddfe935f5ba",
+    "webkit-375.png": "b8a848f9b5e4ba50bf5274ec45319a011a83a162ff54e37c18f98b1ed5b93ba6",
+    "web-credential-preflight.json": "f303363ee4c9eb36d4a79d2b70f845241faa7d87354557218561323d69a38a27"
+  }
+}
