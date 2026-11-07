@@ -1,5 +1,10 @@
 # Invitation-only community beta handoff
 
+For the current private delivery, exact runtime and scoped hosted journeys, see
+the [November 6 candidate receipt](HANGOUT_PRIVATE_RC_20261106.md). Application
+CI and private delivery proceed directly in this session at Jeff's instruction;
+older pending/Karen statements below retain their historical scope.
+
 This is the readiness track for real visitors. The earlier `/pilot/` deployment
 remains a separate demonstration with synthetic roles. Passing that demonstration
 does not verify email ownership or staff authentication for this beta.
