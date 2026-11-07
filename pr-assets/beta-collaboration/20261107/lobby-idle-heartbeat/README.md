@@ -35,3 +35,8 @@ Webex proof, actual music qualification, new native-provider CI mode, or public
 launch is claimed. Ordinary exact-head application CI and hosted qualification
 remain required. Three existing hosted interruptions recovered in roughly 1.2s;
 this change does not yet establish their cause or prove that they are eliminated.
+
+The initial exact-head runtime CI failure is retained in `initial-runtime-ci.json`.
+Its greeting expectation lacked the new numeric capability; only that expected
+field was added. The failed runs remain failures. The corrected head requires
+new normal CI, not a rerun of the unchanged failed head.

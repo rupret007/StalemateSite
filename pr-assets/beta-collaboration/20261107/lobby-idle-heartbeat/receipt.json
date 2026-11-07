@@ -8,8 +8,9 @@
     "r/45662413410ed051/lobby/idle-heartbeat.mjs": "aef5c3174176c88d992890016d0b94f632071b44c140d82218908da7286ce220"
   },
   "payloadSha256": {
+    "initial-runtime-ci.json": "b51e1ea6d89c28bfc74f946847e1e022eb9b7e200abf0316187cca49dcc4f7fb",
     "runner.mjs": "0e4e56ab88748b5f85578234504bd5eb970d63360be20a9690d2a9b0960723bc",
-    "README.md": "66df677a4fbe6779c2a723000df465dab4f0d18e2759b38fa5b379c69d6cc4f7",
+    "README.md": "2fe9e5ffbde0c4f183a31f14a5df9d9f75eb85fef1416e9c07cd5366ae230a4a",
     "unit.json": "2ae6f65f926820fcfcca9afcff4e558b72db457f45ce0ed4e4be4c6635f39612",
     "fixture-worker.mjs": "e2f1cc96991b0e47b71d4e140316b57685b444d9c3babd3fd32300ca09d5e5d3",
     "worker-runtime.json": "139491d065a3dc2908efb891c1d664f36b2c7b0c8a26db4b4264a41c9ae6172a",
