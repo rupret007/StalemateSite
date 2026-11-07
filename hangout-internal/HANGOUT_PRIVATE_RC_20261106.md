@@ -74,6 +74,8 @@ passed the first nine stages, through drawing and room-host permissions. It
 then stopped at Jam creation. Chromium had created two rooms and WebKit had
 created a third; the unchanged service permits three new rooms per IP per hour.
 The complete WebKit run remains **failed**, not relabeled as a full pass.
+The subsequent full run below is separate evidence after the ordinary room
+allowance became available again.
 
 A separate [WebKit guard/revocation check](../pr-assets/beta-collaboration/20261106/private-rc/hosted-webkit-quota-and-logout.json)
 confirmed the exact server explanation, “Too many new rooms from your connection
@@ -93,6 +95,73 @@ They exposed an incorrect expected asset count, the dynamic-HTML digest
 assumption and test messages sent inside the existing slow-mode window.
 No production code changed to make these assertions pass.
 
+## Subsequent verification — November 7 UTC
+
+The candidate and private Worker version above stayed unchanged. After waiting
+for the existing room-creation window, one guarded
+[WebKit run](../pr-assets/beta-collaboration/20261107/private-rc-followup/hosted-webkit-completed.json)
+passed all eleven stages at 04:12 UTC, including Jam invitation sharing and
+copied-cookie revocation. It did not request a microphone or relay credentials.
+Its 375/390px measurements again showed contained page/composer width and 16px
+inputs. Setup samples were 2,777/886ms and manual reconnect was 306ms; these are
+single website observations on one Mac. The earlier failed run remains retained.
+
+A [bounded room workload](../pr-assets/beta-collaboration/20261107/private-rc-followup/room-workload-browser-entry.json)
+then used normal browser invitation entry in nine independent Chromium contexts,
+alternating Stalemate and Rad Dad. It reused the empty QA Art room identified by
+the preceding run's synthetic topic, with ordinary guest permissions. No new
+room, privileged identity or guard override was needed.
+
+Eight guests exchanged four rounds of chat: 32 submitted messages and all 256
+expected in-room deliveries, including the senders' echoes. There were 224 peer
+delivery samples, with median 84ms, p95 118ms and maximum 118ms. These measure
+automation submission through receipt in another browser context on one Mac and
+one normal Internet connection. They include automation/rendering overhead and
+do not establish music latency, multiple-household behavior, a service-level
+target or a larger deployment capacity.
+
+The ninth admitted guest was refused entry by the existing eight-person room
+limit and remained in the lobby. All nine logouts returned 200; all nine later
+state requests returned 401. Capture requests were zero. The test stayed below
+the existing machine resource thresholds throughout.
+
+The [first workload attempt](../pr-assets/beta-collaboration/20261107/private-rc-followup/room-workload-first-attempt.json)
+remains failed: its API-admission variant stopped before the fourth guest and
+did not record the failing HTTP status. Its three admitted guests all logged
+out and then received 401. Do not assign that failure to a specific quota or
+provider. A later [single admission check](../pr-assets/beta-collaboration/20261107/private-rc-followup/single-admission-check.json)
+succeeded and logged out normally. The
+[read-only health check](../pr-assets/beta-collaboration/20261107/private-rc-followup/read-only-health.json)
+reported ready/open service, healthy storage and usage below the monitored
+application limits. It describes that later observation, not the earlier fault.
+
+The [account usage observation](../pr-assets/beta-collaboration/20261107/private-rc-followup/realtime-usage-headroom.json)
+also resolves the earlier account-headroom gap for the approved bounded music
+trials. Actual signed-in Cloudflare billing showed the first 1,000GB included,
+usage within that tier and $0 current/projected usage cost for the October 15–
+November 14 cycle. Its combined usage display rounds to 0GB; it is not literal
+zero traffic. Account-wide TURN analytics showed 6.4MB egress / 9.07MB ingress
+over 30 days. SFU had no applications and reported “No data,” which is not
+relabeled as a measured zero-byte aggregate. Refresh these observations before
+a later media trial. No subscription, credential, cap or activation changed.
+
+Request allowances remain distinct from bandwidth: the live issuer also has a
+200-request daily source-prefix allowance and a separate 3,000-request web
+allowance. These observations do not identify which cap caused the older relay
+error. [WebJam PR #449](https://github.com/rupret007/webjam/pull/449) adds daily
+reset hints without changing limits. It merged as
+`e735a048de82e26c424e31964a30f1dfbd548df9` after direct GitHub Actions checks
+passed for head `ec4bfdfa705b7ba32707fe26174265c77dae2e7a` (17 successful,
+8 intentionally skipped release/manual jobs). It is not part of this deployed
+candidate or the live issuer; those still need their own reviewed delivery.
+
+The original local macOS WebKit audio-cleanup assertion is separately tracked
+in [issue #448](https://github.com/rupret007/webjam/issues/448). Diagnostics observed
+a completed close promise followed by a stale-looking running state and an
+uninitialized audio-destination error. Keep that scope separate from the
+successful hosted WebKit chat run, Linux CI, physical Safari audio and microphone
+resource qualification. No cleanup assertion was relaxed.
+
 ## Evidence boundaries and next steps
 
 The [receipt](../pr-assets/beta-collaboration/20261106/private-rc/receipt.json)
@@ -105,9 +174,10 @@ Current physical speech/music, a second network, actual shared-mix WAV/MP3,
 real Webex video/audio switching and remaining platform acceptance are pending.
 At this check the Intel MacBook still had WebJam open and Jeff was away;
 no process was stopped and no microphone session was started. Account-wide
-relay headroom and the existing cap recovery also require their own current
-qualification. Native source/package `76b1fd7` remains separate from this
-website/browser import and has not been replaced by this delivery.
+headroom was subsequently qualified above; actual issuer-cap recovery and the
+remaining live media journeys still need verification. Native source/package
+`76b1fd7` remains separate from this website/browser import and has not been
+replaced by this delivery.
 
 Real Access email admission, registered-room recovery and human moderation
 retain their earlier live evidence and current outstanding scopes. Locally
