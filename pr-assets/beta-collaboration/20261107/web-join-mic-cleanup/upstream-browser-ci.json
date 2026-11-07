@@ -1,0 +1,62 @@
+{
+  "observedAt": "2026-11-07T21:15:26.127696+00:00",
+  "head": "5dde45d2e841fd19ff9c1fd055f88520fbf778e4",
+  "run": 42414675246,
+  "source": "Complete raw GitHub job logs",
+  "jobs": [
+    {
+      "job": 128530059363,
+      "sha256": "32f0e3fbe26f1e346b99312e6d67ec87edc094fd85e23046523dd1232a3fc59b",
+      "bytes": 147318,
+      "counts": [
+        "2026-11-07T21:13:44.7228882Z   57 passed (53.2s)"
+      ],
+      "failureOrRetrySummaries": [],
+      "checkout": [
+        "2026-11-07T21:11:42.1755796Z ##[group]Checking out the ref",
+        "2026-11-07T21:11:42.3629588Z HEAD is now at 0c4bf73 Merge 5dde45d2e841fd19ff9c1fd055f88520fbf778e4 into f5c53f37c2099dc2ea8213815e67e37ea73c83bb",
+        "2026-11-07T21:11:42.3693498Z [command]/usr/bin/git log -1 --format=%H",
+        "2026-11-07T21:11:42.3767585Z 0c4bf73c4312d807c336c2c91ac677950a3cb481"
+      ]
+    },
+    {
+      "job": 128530059083,
+      "sha256": "79a72f3b79830d4a8c29eb56155f6aa4d51f62a1d0a309987813e92376f0556a",
+      "bytes": 62966,
+      "counts": [
+        "2026-11-07T21:11:50.7912447Z # tests 75",
+        "2026-11-07T21:11:50.7912677Z # pass 75",
+        "2026-11-07T21:11:50.7912789Z # fail 0",
+        "2026-11-07T21:11:50.7912903Z # cancelled 0",
+        "2026-11-07T21:11:50.7913020Z # skipped 0",
+        "2026-11-07T21:11:50.7913136Z # todo 0",
+        "2026-11-07T21:11:51.6634786Z # tests 40",
+        "2026-11-07T21:11:51.6635013Z # pass 40",
+        "2026-11-07T21:11:51.6635124Z # fail 0",
+        "2026-11-07T21:11:51.6635238Z # cancelled 0",
+        "2026-11-07T21:11:51.6635358Z # skipped 0",
+        "2026-11-07T21:11:51.6635473Z # todo 0"
+      ],
+      "failureOrRetrySummaries": [],
+      "checkout": [
+        "2026-11-07T21:11:39.7333175Z ##[group]Checking out the ref",
+        "2026-11-07T21:11:39.9117553Z HEAD is now at 0c4bf73 Merge 5dde45d2e841fd19ff9c1fd055f88520fbf778e4 into f5c53f37c2099dc2ea8213815e67e37ea73c83bb",
+        "2026-11-07T21:11:39.9174221Z [command]/usr/bin/git log -1 --format=%H",
+        "2026-11-07T21:11:39.9211654Z 0c4bf73c4312d807c336c2c91ac677950a3cb481"
+      ]
+    }
+  ],
+  "mainAppCiStillRequired": false,
+  "actualCiCheckout": {
+    "sha": "0c4bf73c4312d807c336c2c91ac677950a3cb481",
+    "tree": "13a8bbffb9193c5cc57cfe95dba625d4979ce924",
+    "parents": [
+      "f5c53f37c2099dc2ea8213815e67e37ea73c83bb",
+      "5dde45d2e841fd19ff9c1fd055f88520fbf778e4"
+    ],
+    "equalsReviewedWholeHeadTree": true,
+    "at": "2026-11-07T21:16:50.975264+00:00"
+  },
+  "allThreeNormalRunsPassed": true,
+  "mainApplicationReview": "upstream-application-ci.json"
+}

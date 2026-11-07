@@ -1,0 +1,440 @@
+{
+  "at": "2026-11-07T21:43:18.201025+00:00",
+  "source": "5dde45d2e841fd19ff9c1fd055f88520fbf778e4",
+  "engine": {
+    "engine": "27.2",
+    "browserName": "webkit",
+    "node": "v26.12.0",
+    "arch": "arm64",
+    "sdk": "1.64.1",
+    "physicalCapture": false
+  },
+  "macOS": "15.8.2",
+  "sdkExecutableArchitectures": [
+    {
+      "executable": "com.apple.WebKit.Networking.Development",
+      "architectures": "arm64"
+    },
+    {
+      "executable": "com.apple.WebKit.WebContent.CaptivePortal.Development",
+      "architectures": "arm64"
+    },
+    {
+      "executable": "com.apple.WebKit.WebContent.Development",
+      "architectures": "arm64"
+    },
+    {
+      "executable": "com.apple.WebKit.WebContent.Development.Development",
+      "architectures": "arm64"
+    },
+    {
+      "executable": "com.apple.WebKit.Model.Development",
+      "architectures": "arm64"
+    },
+    {
+      "executable": "Playwright",
+      "architectures": "arm64"
+    },
+    {
+      "executable": "com.apple.WebKit.GPU.Development",
+      "architectures": "arm64"
+    },
+    {
+      "executable": "com.apple.WebKit.WebContent.EnhancedSecurity.Development",
+      "architectures": "arm64"
+    }
+  ],
+  "stats": {
+    "startTime": "2026-11-07T21:39:35.746Z",
+    "duration": 14432.18,
+    "expected": 24,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "unitSummary": [
+    "\u2139 tests 40",
+    "\u2139 pass 40",
+    "\u2139 fail 0",
+    "\u2139 cancelled 0",
+    "\u2139 skipped 0",
+    "\u2139 todo 0"
+  ],
+  "unitLogSha256": "f065788d99e8da4e5892784bc9e983af4307610f11ac9622e944635c0624768c",
+  "sourceReadback": {
+    ".gitignore": {
+      "upstreamSha256": "9a2867f8f8984ba6446808bb19a144f6e222cb11ada3d6a5f7bc052372dc6d3e",
+      "testedSha256": "9a2867f8f8984ba6446808bb19a144f6e222cb11ada3d6a5f7bc052372dc6d3e",
+      "metadataHookOnly": false
+    },
+    "README.md": {
+      "upstreamSha256": "4a14945c3a9f989c9c46c0c1c8c6ab00ff328413d3fd51b2ed4976eb3dc63d2b",
+      "testedSha256": "4a14945c3a9f989c9c46c0c1c8c6ab00ff328413d3fd51b2ed4976eb3dc63d2b",
+      "metadataHookOnly": false
+    },
+    "_headers": {
+      "upstreamSha256": "4877e052aaf7cec4f51f758614100e3291942fda0c8741209231b5386fd45b43",
+      "testedSha256": "4877e052aaf7cec4f51f758614100e3291942fda0c8741209231b5386fd45b43",
+      "metadataHookOnly": false
+    },
+    "app.js": {
+      "upstreamSha256": "990d454aebd785661388f0b1e0e829a32bd00185a7fdb482dc625dd05b62f25f",
+      "testedSha256": "990d454aebd785661388f0b1e0e829a32bd00185a7fdb482dc625dd05b62f25f",
+      "metadataHookOnly": false
+    },
+    "audio.js": {
+      "upstreamSha256": "b08d16ad514606206754dd926a231ee35f7aca3e6450ad0f40ee516a9bf5d04b",
+      "testedSha256": "b08d16ad514606206754dd926a231ee35f7aca3e6450ad0f40ee516a9bf5d04b",
+      "metadataHookOnly": false
+    },
+    "config.js": {
+      "upstreamSha256": "f0e6dabeff031994670126b6c2008d645aeda58cd3a1fb87513a2f0418b0ccfd",
+      "testedSha256": "f0e6dabeff031994670126b6c2008d645aeda58cd3a1fb87513a2f0418b0ccfd",
+      "metadataHookOnly": false
+    },
+    "crypto.js": {
+      "upstreamSha256": "9f4cdfb4a34606df5cf7181523a16d8317071c5c1d283d20b2fdf95c432c4fc8",
+      "testedSha256": "9f4cdfb4a34606df5cf7181523a16d8317071c5c1d283d20b2fdf95c432c4fc8",
+      "metadataHookOnly": false
+    },
+    "errors.js": {
+      "upstreamSha256": "e20c4eb68da2f22991cc25ed3d8fb94756a71aaf9222e9a6834916e362a8f3f6",
+      "testedSha256": "e20c4eb68da2f22991cc25ed3d8fb94756a71aaf9222e9a6834916e362a8f3f6",
+      "metadataHookOnly": false
+    },
+    "index.html": {
+      "upstreamSha256": "7c43dd28e955dbe54c221924c11137ad65669cf2ff6975bb9f46077ddb960a3e",
+      "testedSha256": "7c43dd28e955dbe54c221924c11137ad65669cf2ff6975bb9f46077ddb960a3e",
+      "metadataHookOnly": false
+    },
+    "mailbox.js": {
+      "upstreamSha256": "b419f8d69c2f57a6668a9c05b638780a0d3c4e68fff03f3fbc3f48709c387cb2",
+      "testedSha256": "b419f8d69c2f57a6668a9c05b638780a0d3c4e68fff03f3fbc3f48709c387cb2",
+      "metadataHookOnly": false
+    },
+    "package-lock.json": {
+      "upstreamSha256": "86b1ee78fbedd88f3ec262deca993fcadcc95bff1c12be327158a2bbe748afd0",
+      "testedSha256": "86b1ee78fbedd88f3ec262deca993fcadcc95bff1c12be327158a2bbe748afd0",
+      "metadataHookOnly": false
+    },
+    "package.json": {
+      "upstreamSha256": "c1e8fa441e9bb22bc01dca2b1d6b4d18de110be140ea0977eea130b417891b2f",
+      "testedSha256": "c1e8fa441e9bb22bc01dca2b1d6b4d18de110be140ea0977eea130b417891b2f",
+      "metadataHookOnly": false
+    },
+    "playwright.config.js": {
+      "upstreamSha256": "72f5e17fdcbd6351b71382793b9656309c896fb7fb7d807cac8be992c2c44b1b",
+      "testedSha256": "72f5e17fdcbd6351b71382793b9656309c896fb7fb7d807cac8be992c2c44b1b",
+      "metadataHookOnly": false
+    },
+    "policy.js": {
+      "upstreamSha256": "3e89bf3cee36d7dccf5c8bb4716093661a3f35f8ddace58dbcef14a12c196658",
+      "testedSha256": "3e89bf3cee36d7dccf5c8bb4716093661a3f35f8ddace58dbcef14a12c196658",
+      "metadataHookOnly": false
+    },
+    "prejoin.js": {
+      "upstreamSha256": "9852946eeb450f76a0679da214b4e6b73d193055bc79a5b74b7a97b09198212d",
+      "testedSha256": "9852946eeb450f76a0679da214b4e6b73d193055bc79a5b74b7a97b09198212d",
+      "metadataHookOnly": false
+    },
+    "session.js": {
+      "upstreamSha256": "1855ed9acb576cad13230f1a422578c848af35173887a9c797209689d2d3d044",
+      "testedSha256": "1855ed9acb576cad13230f1a422578c848af35173887a9c797209689d2d3d044",
+      "metadataHookOnly": false
+    },
+    "style.css": {
+      "upstreamSha256": "af2689b995cefcc4cb67377d5dbddcd7824aff764c1fd32e4117dc6ae4217369",
+      "testedSha256": "af2689b995cefcc4cb67377d5dbddcd7824aff764c1fd32e4117dc6ae4217369",
+      "metadataHookOnly": false
+    },
+    "test/audio-close.test.js": {
+      "upstreamSha256": "ee7d458eb25123d910da0a11e704a45055d8c237bad808c554e3e1889ceb4261",
+      "testedSha256": "ee7d458eb25123d910da0a11e704a45055d8c237bad808c554e3e1889ceb4261",
+      "metadataHookOnly": false
+    },
+    "test/core.test.js": {
+      "upstreamSha256": "ad27c3210afda9dfd2331f73dfbde20bd5521545d7b6fe3cce18026586f5e39c",
+      "testedSha256": "ad27c3210afda9dfd2331f73dfbde20bd5521545d7b6fe3cce18026586f5e39c",
+      "metadataHookOnly": false
+    },
+    "test/e2e/access-window.spec.js": {
+      "upstreamSha256": "e72e1ad768fb64ae722fbb020c475fd771c31aebc9831fa48fa1ce9e892c396f",
+      "testedSha256": "0dad2296fca58a02a064b301ddf3af2acb31e7577f0e12e93c8bb834e194a03d",
+      "metadataHookOnly": true
+    },
+    "test/e2e/failure-recovery.spec.js": {
+      "upstreamSha256": "004861218921b44ffc481b0162586a49865a5e75a2d871e196e72f71a72ba797",
+      "testedSha256": "0fad9eccfe7bd4dcc047a34af842d1abd53786b2db9185f8daa5fc894b7242f3",
+      "metadataHookOnly": true
+    },
+    "test/e2e/join.spec.js": {
+      "upstreamSha256": "5812bc0e23b43d0ac7d6d2e917f95cc42efa97ae3d111119e356a5d0d6df5d80",
+      "testedSha256": "5812bc0e23b43d0ac7d6d2e917f95cc42efa97ae3d111119e356a5d0d6df5d80",
+      "metadataHookOnly": false
+    },
+    "test/e2e/mic-error-cleanup.spec.js": {
+      "upstreamSha256": "65c130529cd6e2aa2a101fa0784590f5f8ae5d56c60253452219755afd8729e9",
+      "testedSha256": "1f96519f6670588dba6afb1558da82d1c93167df23c0922ec3ccb222e0a6628c",
+      "metadataHookOnly": true
+    },
+    "test/e2e/prejoin.spec.js": {
+      "upstreamSha256": "dc1f8640565982b0871f9cd638bcee4fb612a842e543a12b690336346b05e233",
+      "testedSha256": "dc1f8640565982b0871f9cd638bcee4fb612a842e543a12b690336346b05e233",
+      "metadataHookOnly": false
+    },
+    "test/e2e/server.js": {
+      "upstreamSha256": "2697cd6f3c20deb7d3c6e8149b98389aa21b9315445c6329eda4b5b472ffa723",
+      "testedSha256": "2697cd6f3c20deb7d3c6e8149b98389aa21b9315445c6329eda4b5b472ffa723",
+      "metadataHookOnly": false
+    },
+    "test/errors.test.js": {
+      "upstreamSha256": "4a602adde3f2dab945350700815e9e6111fb32d5b0cf517b9cf4a5c36da7cde5",
+      "testedSha256": "4a602adde3f2dab945350700815e9e6111fb32d5b0cf517b9cf4a5c36da7cde5",
+      "metadataHookOnly": false
+    },
+    "test/evidence/mic-error-cleanup-20261107.json": {
+      "upstreamSha256": "00a9c8e24c7e1a4d128c4b9c30fe164cf564bcaed14a3f62d2048b297dec88ce",
+      "testedSha256": "00a9c8e24c7e1a4d128c4b9c30fe164cf564bcaed14a3f62d2048b297dec88ce",
+      "metadataHookOnly": false
+    },
+    "test/evidence/webkit-close-order-20261107.json": {
+      "upstreamSha256": "b735e7f2ced3c66526fd361ea891f9673f886bb4db4565449a1e4be313db8eb9",
+      "testedSha256": "b735e7f2ced3c66526fd361ea891f9673f886bb4db4565449a1e4be313db8eb9",
+      "metadataHookOnly": false
+    },
+    "test/evidence/webkit-close-order-20261107.md": {
+      "upstreamSha256": "a6f807ed53f4f2fa5ab16fc67765898f2689dd6af4cb92610d789d22eb3e8c17",
+      "testedSha256": "a6f807ed53f4f2fa5ab16fc67765898f2689dd6af4cb92610d789d22eb3e8c17",
+      "metadataHookOnly": false
+    },
+    "test/prejoin.test.js": {
+      "upstreamSha256": "bb34b8890de933ba3a4893a25bfb740d444d14a80a2817dc31826ed2e80877a1",
+      "testedSha256": "bb34b8890de933ba3a4893a25bfb740d444d14a80a2817dc31826ed2e80877a1",
+      "metadataHookOnly": false
+    },
+    "test/session-ownership.test.js": {
+      "upstreamSha256": "c13bcf5e46511d560c48ef46e3c7cbbf53cb0cd0ca8a983303cd7488c9ea269b",
+      "testedSha256": "c13bcf5e46511d560c48ef46e3c7cbbf53cb0cd0ca8a983303cd7488c9ea269b",
+      "metadataHookOnly": false
+    },
+    "test/vectors.json": {
+      "upstreamSha256": "1e187fc90a43a117ba0190c4a21e80625d2fa3790453076bbfd91b43b622b0cc",
+      "testedSha256": "1e187fc90a43a117ba0190c4a21e80625d2fa3790453076bbfd91b43b622b0cc",
+      "metadataHookOnly": false
+    }
+  },
+  "cases": [
+    {
+      "title": "access time is visible, warns once near expiry, and stops updating on Leave",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a fresh attempt has its own access window and a host-end error clears it",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "losing the checked microphone clears Join readiness until a deliberate recheck",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "losing an enrolled microphone closes the audio session after passing the mic check",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "losing an enrolled microphone closes the audio session after skipping the mic check",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a closed enrolled session releases audio and asks for a new invitation",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a relay timeout releases audio and permits an explicit retry at 375px",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a relay timeout releases audio and permits an explicit retry at 390px",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a confirmed relay cap closes guest audio and asks for a fresh invite (daily reset hint: false)",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a confirmed relay cap closes guest audio and asks for a fresh invite (daily reset hint: true)",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "Leave during a stalled fetch stays a deliberate exit, then allows another Join",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a late playback rejection preserves a deliberate Leave",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a late playback rejection preserves the next Join",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a late playback rejection preserves cleanup for the active Join",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a late audio-resume rejection preserves a deliberate Leave",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a late audio-resume rejection preserves the next Join",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a late audio-resume rejection preserves cleanup for the active Join",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "retired enrollment callbacks preserve the rejoining attempt",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "retired enrollment callbacks preserve the failed attempt",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a retired initial resume cannot enable Join while the next resume is pending",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "capture arriving after Leave releases only its own tracks during the next Join",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a NotAllowedError microphone check closes audio before an explicit retry",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a NotFoundError microphone check closes audio before an explicit retry",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "input-meter startup failure stops acquired capture and closes application audio",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    }
+  ],
+  "reportSha256": "b1034c76261c9a99c40d61cbf945646892f426d07578e642303872a53727ea48",
+  "logSha256": "12d04850bfe61894b6da364e1f157b61eacd873f8c612f1c4b8ea7ac90c5e138",
+  "metadataHookSha256": "4b454a5ee6914e2a33ee841fbb06c6d45b6ebdf69fc64cb2b61a450b353a8070",
+  "strictAssertionsUnchanged": true,
+  "metadataOnlyHookAddedToThreeSpecs": true,
+  "guardBefore": {
+    "at": "2026-11-07T21:39:34.216912+00:00",
+    "load1m": 2.86279296875,
+    "swapPercent": 74.24625651041666,
+    "freeGiB": 16.843303680419922,
+    "passed": true
+  },
+  "guardAtLaunch": {
+    "at": "2026-11-07T21:39:35.479744+00:00",
+    "load1m": 2.86279296875,
+    "swapPercent": 74.24625651041666,
+    "freeGiB": 16.84276580810547,
+    "passed": true
+  },
+  "guardAfter": {
+    "at": "2026-11-07T21:39:50.198940+00:00",
+    "load1m": 2.75732421875,
+    "swapPercent": 74.11604817708333,
+    "freeGiB": 16.843647003173828,
+    "passed": true
+  },
+  "ownedRunnerGone": true,
+  "loopbackListenerGone": true,
+  "remainingSdkWebKitEnginePids": [],
+  "physicalCapture": false,
+  "providers": false,
+  "recordings": false,
+  "unusedGoBridgeOmitted": true,
+  "notPhysicalSafariOrSystemResourceQualification": true,
+  "diagnosticConfiguration": {
+    "staticOrigin": "http://127.0.0.1:4174",
+    "workers": 1,
+    "retries": 0,
+    "perTestTimeoutMs": 30000,
+    "expectTimeoutMs": 10000,
+    "globalDeadlineMs": 180000,
+    "physicalPermissions": [],
+    "unusedGoBridgeStarted": false
+  }
+}
