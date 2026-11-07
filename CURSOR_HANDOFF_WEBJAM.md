@@ -36,6 +36,13 @@ scope and next attended setup; all own native processes are stopped.
 Use direct application CI here, without StoryPool or Karen. Preserve the
 historical evidence below and all 62 original requirements.
 
+The [overnight follow-up](hangout-internal/HANGOUT_OVERNIGHT_CHECKS_20261107.md)
+adds current hosted keyboard/reflow and nine-guest/three-room evidence, retaining
+the initial keyboard and summary-parser failures. The refreshed
+[music acceptance sequence](hangout-internal/HANGOUT_MUSIC_DEMO_ACCEPTANCE.md#current-listening-sequence--november-7)
+separates actual sender/hardware work from generated audio. These are application
+evidence updates; the real eight-hour expiry run still has its original scope.
+
 **Historical checkpoint, November 5 at 01:06 UTC (November 4 locally):**
 
 The one native private cohort41938592196/source4c4 is now **SUCCESS**. All four

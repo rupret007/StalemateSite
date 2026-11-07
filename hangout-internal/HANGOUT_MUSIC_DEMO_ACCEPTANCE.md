@@ -18,13 +18,73 @@ for the current trial. The four verified archives come from source
 Older package and deployment receipts below describe their own candidates.
 
 Each physical trial remains one native host and one browser guest for at most
-ten minutes, with capture consent, headphones and no recording. Honor Jeff's
-requested Wi-Fi-first order; Ethernet is a later comparison. Do not stop an
-independently opened Art session as though it belonged to a bounded test.
+ten minutes, with capture consent, headphones and no recording. Retain the
+earlier Wi-Fi-first results at their original revisions; the currently prepared
+MacBook route uses dock Ethernet. Keep wired, Wi-Fi and second-network evidence
+separate. Do not stop an independently opened Art session as though it belonged
+to a bounded test.
 Only Jeff disposes moderation reports. Actual headphone and microphone use on
 Windows still needs the participant's confirmation.
 
-## November 6 listening sequence
+## Current listening sequence — November 7
+
+Use the [current private receipt](HANGOUT_PRIVATE_RC_20261107.md), not an older
+package's version label. Native packages remain source `76b1fd7`; the protected
+website remains source `b35e5fc` / version `33862058`. The browser countdown from
+WebJam PR #450 is a separately reviewed change; identify its actual website
+import/delivery before claiming a visitor can see it.
+
+The current generated Mac-to-Windows trial passed audio transport both ways,
+40-second synthetic WAV chord detection, a fresh invitation and shutdown. It
+used verified packaged components and production admission, with no physical
+capture. It did **not** exercise the desktop Shared Track sender or qualify
+human hearing, instruments, Webex or a second network. The original relay-cap
+record is preserved; normal subsequent admission is not permission to reset a
+ledger or change a limit. The earlier account-usage observation must be
+refreshed before another media trial.
+
+1. Confirm the Intel MacBook is awake on the intended network, the verified
+   native build is selected, and headphones are connected. Begin with the
+   built-in mic if instruments are not yet connected. On Windows, confirm the
+   intended headset/interface and mic permission. Obtain fresh resource and
+   account headroom checks before starting a bounded trial.
+2. The **host** uses native WebJam: Music → Host → Start Session if shown.
+   Choose **Invite a browser guest** and copy the fresh browser invitation into
+   the private Jam room's invitation field, then Share. The **Windows guest**
+   uses Chrome, checks the selected microphone and headphones, then chooses
+   **Join with microphone**. The guest needs no native WebJam or BlackHole
+   installation. Keep private links out of logs, documents and public channels.
+3. Confirm speech in both directions, then a short musical passage. For the
+   actual band setup, confirm the SSL 2+ guitar/vocal inputs and Che's actual
+   Roland/interface route before testing them. Record setup time, audible
+   dropouts and the limitations of the displayed listening-delay estimate.
+   A moving meter or generated transport pass cannot replace this step.
+4. For **Shared Track on the Intel host**, its last read-only route scan found
+   no official BlackHole 16ch/64ch route. A verified official installer and the
+   original 40-second Test Chords WAV are staged in
+   `~/Library/Caches/WebJam/shared-track-setup-20261107/`. Installation was not
+   performed overnight. Save work, close audio apps and complete any installer
+   administrator prompt locally. Wait for the real expiry observer to finish
+   before any restart. Recheck the exact official 48kHz route normally; do not
+   select BlackHole as the physical mic/headphones or enable a proof override.
+   The Mini's earlier read-only route pass remains a different machine/result.
+5. Load the WAV in Shared Track, verify its route, then Play. The second person
+   must hear the backing track and a live input in the same mix. Check MP3 with
+   the packaged decoder too. Decoder and synthetic WAV passes alone do not
+   qualify this actual sender. Stop playback and leave/end the session normally.
+6. Test a real Webex video meeting and exclusive audio switching with consenting
+   participants and no recording. Repeat a bounded music trial from a second
+   network when available. Keep these outcomes separate from same-household
+   transport. Existing caps and all release/trust holds remain in force.
+
+The [overnight evidence note](HANGOUT_OVERNIGHT_CHECKS_20261107.md) separates new
+hosted chat/layout tests from these remaining attended music gates. No new
+question or physical capture is needed while Jeff is sleeping.
+
+## Historical November 6 listening sequence
+
+The plan below is retained as that day's checkpoint. Its pending statements and
+package references do not supersede the current sequence above.
 
 The earlier generated-audio retry stopped at its machine/idle guard; it is not
 a running trial to wait on. November 7 account headroom and website observations

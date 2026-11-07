@@ -234,6 +234,19 @@ separate. The [receipt](../pr-assets/beta-collaboration/20261107/overnight-recov
 pins these files to source `b35e5fc` / version `33862058`, rather than claiming
 they were run on the prepared countdown update.
 
+## Additional hosted keyboard and many-room evidence
+
+The [overnight follow-up](HANGOUT_OVERNIGHT_CHECKS_20261107.md) records actual
+keyboard entry/error recovery and four responsive layouts on this same hosted
+version. A separate nine-guest workload used three three-person Art rooms:
+36 messages produced all 108 expected deliveries, with no cross-room or duplicate
+copies. The three rooms closed and all nine copied cookies were denied after
+logout. These are bounded single-Mac/household browser observations, not media,
+large capacity, full accessibility or qualification of a later countdown
+runtime. Original plain-Tab failures and the controller's post-run summary error
+are retained alongside the successful outcomes. The long expiry run remains
+pending and unchanged.
+
 ## Current Windows Paint Along
 
 Two ordinary Windows Chrome guests also passed
