@@ -1,0 +1,22 @@
+{
+  "at": "2026-11-07T13:38:15.454855+00:00",
+  "state": "INDEPENDENT_AXE_PROOF_HASH_HARNESS_AND_OWNED_NODE_EXIT_VERIFIED",
+  "remoteProofSha256": "5fa0cf257ae16d8babac10cbb982f0f74e7564f6451c569d2c01132843db1baa",
+  "harnessSha256": "963249c33f706eedee6ca2a77c687dadbac0a831de6833a0c103617bde5710f5",
+  "all8ScreensScanned": true,
+  "automatedViolationRules": [],
+  "incompleteRulesRetained": [
+    "color-contrast",
+    "label-content-name-mismatch"
+  ],
+  "ordinaryGuests": 1,
+  "physicalCaptureRequests": 0,
+  "logout": [
+    200
+  ],
+  "copiedCookieAfterLogout": 401,
+  "allOwnedBrowserResourcesClosed": true,
+  "originalOwnedNodeCommandRemaining": false,
+  "fullWcagOrScreenReaderQualification": false,
+  "privateVersionsAndAllSettingsUnchanged": true
+}

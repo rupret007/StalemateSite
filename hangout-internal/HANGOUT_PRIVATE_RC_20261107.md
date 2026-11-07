@@ -2,6 +2,12 @@
 
 **The private website is delivered; the overall release candidate remains pending.**
 
+The [entrance, accessibility, decoder and report checkpoint](HANGOUT_ACCEPTANCE_CHECKPOINT_20261107.md)
+adds hosted neutral linking, badge privacy, eight automated accessibility states
+and an acknowledged harmless report. It separately reuses the four-target
+packaged MP3 decoder CI. Human report review, actual Shared Track, physical
+listening, assistive-technology and real-expiry outcomes remain distinct.
+
 The [Linux browser and generated-music checkpoint](HANGOUT_LINUX_BROWSER_MUSIC_20261107.md)
 adds twelve current hosted stages and complete forty-second generated
 Intel-to-Linux and ARM-to-Linux transport trials on the versions below. The ARM

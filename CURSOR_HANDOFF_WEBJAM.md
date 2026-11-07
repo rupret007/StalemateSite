@@ -1,5 +1,13 @@
 # WebJam / Hang Out — Cursor continuation
 
+The [entrance, accessibility, decoder and report checkpoint](hangout-internal/HANGOUT_ACCEPTANCE_CHECKPOINT_20261107.md)
+adds actual neutral-third-site linking, badge privacy, eight hosted axe screens
+and one harmless report submission on the unchanged private runtime. It also
+qualifies retained packaged MP3 CI without repeating it. Human report review,
+physical music, Shared Track, a second network and full accessibility remain
+pending. The unique harmless-report lookup text stays in the owner's local
+receipt; do not duplicate the report or touch unrelated reports.
+
 **November 7 UTC resume point.** Start with the
 [website integration and private candidate guide](hangout-internal/HANGOUT_WEBSITE_INTEGRATION.md).
 It identifies the currently staged build and private Worker, the Stalemate,
