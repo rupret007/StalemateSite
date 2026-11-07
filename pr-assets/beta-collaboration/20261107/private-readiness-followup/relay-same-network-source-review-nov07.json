@@ -1,0 +1,81 @@
+{
+  "at": "2026-11-07T15:09:20.003354+00:00",
+  "scope": "Immutable source and standards review. No new connection, provider request, router, network, security or limit change. Does not diagnose the particular router or prove a new route.",
+  "nativeSource": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "browserSource": "1b0c4f56399843747e82655c0d7a994290b54127",
+  "sitePreparedSource": "dbbfdb4490d7c493094e9fdf8a32c63e9715c027",
+  "issuerSource": "e735a048de82e26c424e31964a30f1dfbd548df9",
+  "sourceChecks": [
+    {
+      "path": "transport/internal/webjoin/candidate.go",
+      "sha256": "4468f3ec013fae1f306deb2aae0aae704cef8e6453634768a1c2e28c40ee3a5c",
+      "native76EqualsBrowser1b": true
+    },
+    {
+      "path": "transport/internal/webjoin/endpoint.go",
+      "sha256": "3a1100ca008edae0f092dac4de48c33e870b85482642a5d0f52687a75365a360",
+      "native76EqualsBrowser1b": true
+    },
+    {
+      "path": "web/join/policy.js",
+      "sha256": "3e89bf3cee36d7dccf5c8bb4716093661a3f35f8ddace58dbcef14a12c196658",
+      "native76EqualsBrowser1b": true,
+      "site231PayloadByteExact": true
+    },
+    {
+      "path": "web/join/mailbox.js",
+      "native76Sha256": "ee387e616630cba550844940e77631d98b4a19d4aa1c8b7ee5efb12a2170e541",
+      "browser1bSha256": "b419f8d69c2f57a6668a9c05b638780a0d3c4e68fff03f3fbc3f48709c387cb2",
+      "changedOnlyReviewedCapErrorHandling": true,
+      "credentialsMethodAndFollowingBodyByteExact": true,
+      "site231PayloadByteExactToBrowser1b": true
+    }
+  ],
+  "issuerSourceChecks": [
+    {
+      "source": "e735a048de82e26c424e31964a30f1dfbd548df9",
+      "path": "deploy/relay/cloudflare-worker/src/worker.js",
+      "sha256": "9f1758648ee8c9b110448317388624fd555e29d77012824e38bcce4640e69771"
+    },
+    {
+      "source": "e735a048de82e26c424e31964a30f1dfbd548df9",
+      "path": "deploy/relay/cloudflare-worker/src/quota.js",
+      "sha256": "17f1975a5425598871c966cef5055f6dbc37b4806fc9098cd8e6581c552c02af"
+    },
+    {
+      "source": "e735a048de82e26c424e31964a30f1dfbd548df9",
+      "path": "deploy/relay/cloudflare-worker/src/policy.js",
+      "sha256": "3207912f23c10f3469e9cdcc7b5f70e1deed03499f0f1509ca1e4a966df8a28f"
+    }
+  ],
+  "firstSourceReviewAssumptionStopPreserved": "relay-source-review-first-assertion-stop-nov07.json",
+  "findings": [
+    "Browser requests iceTransportPolicy all, but both clients enforce a narrower public IPv4 srflx and reviewed TURN policy. Private, host, mDNS and IPv6 paths are not usable production candidates.",
+    "Native production ICETransportPolicyNoHost, public remote-IP filter and long peer-reflexive acceptance wait reinforce that boundary. The test-only lab path is not a production LAN mode.",
+    "Same Wi-Fi or Ethernet does not promise direct private-LAN audio. The recorded relay/srflx pairs are compatible with this policy. A failed public direct route may involve NAT hairpinning or another topology factor; the exact cause is not established.",
+    "Both endpoints obtain normal issuer credentials before negotiation. Direct selection does not bypass issuer admission or its operation, rate and monthly-usage checks. Mint/mailbox operation counters and actual TURN ingress/egress are different measurements; a daily operation cap is not necessarily exhausted media bandwidth.",
+    "Browser transport-byte and credential-TTL limits apply even when a public direct pair is selected. These safety/session limits do not directly measure billed TURN egress.",
+    "No port forwarding, lab mode, private-address expansion, quota reset or provider activation is proposed. Any trusted-LAN or staged STUN/TURN design needs a separate compatibility and security review; it is not implemented by this note."
+  ],
+  "primarySources": [
+    {
+      "url": "https://www.w3.org/TR/webrtc/#rtcicetransportpolicy-enum",
+      "supports": "all permits candidate types subject to filtering; relay is a separate restriction"
+    },
+    {
+      "url": "https://www.rfc-editor.org/rfc/rfc8445.html#section-5.1.2",
+      "supports": "Priorities and connectivity checks determine the selected pair; relay gathering does not prove selected relay traffic"
+    },
+    {
+      "url": "https://www.rfc-editor.org/rfc/rfc5128.html#section-2.10",
+      "supports": "Same-NAT public endpoints can depend on hairpinning; no diagnosis of this router"
+    },
+    {
+      "url": "https://developers.cloudflare.com/realtime/turn/faq/",
+      "supports": "Provider TURN listener addresses; allocation allowlist remains a separately reviewed app policy"
+    }
+  ],
+  "newTestsRun": false,
+  "currentHostedCandidateChanged": false,
+  "physicalCapture": false
+}

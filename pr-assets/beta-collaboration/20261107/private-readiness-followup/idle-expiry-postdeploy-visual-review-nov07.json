@@ -1,0 +1,34 @@
+{
+  "state": "FOUR_POSTDEPLOY_SCREENSHOTS_VISUALLY_REVIEWED",
+  "images": [
+    {
+      "name": "hosted-chromium-375-d8c08fb-nov07.png",
+      "sha256": "cb24d00c3c85118e554e6272d8b8a69a9026b43a6f61cf3147120a6d89f0dd2a",
+      "bytes": 70662
+    },
+    {
+      "name": "hosted-chromium-390-d8c08fb-nov07.png",
+      "sha256": "3e7f7aaf18d6a101b51a95640ca836f5977b27043b5330a2f20893036f1c89e6",
+      "bytes": 71170
+    },
+    {
+      "name": "idle-expiry-anonymous-lobby-recovery-375-nov07.png",
+      "sha256": "593b6a716d42170454170321c9e5c24f4289459bc9beb3fb6c5b964529ae7e75",
+      "bytes": 22823
+    },
+    {
+      "name": "idle-expiry-anonymous-lobby-recovery-390-nov07.png",
+      "sha256": "c10f7b6e5812c971fa7145fadb7d2d2695f79be6ecd814f74fa9aac29a6abd8f",
+      "bytes": 22910
+    }
+  ],
+  "physicalDeviceScreenshots": false,
+  "source": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+  "version": "c2271048-aaa3-4649-8e9e-48dd46212da5",
+  "reviewedAt": "2026-11-07T17:18:01.026428+00:00",
+  "findings": {
+    "chat": "At375/390px welcome and message text wrap, input/Send visible,16px input; starter buttons scroll only within their card, action chips stay within row; bottom tabs fit. Only synthetic QA content shown.",
+    "recovery": "Both375/390px layouts have readable wrapped text, full visible48px invitation button and clear keyboard focus. No horizontal overflow.",
+    "limits": "Headless Chromium on Linux, not physical iPhone/Safari or screen-reader qualification."
+  }
+}

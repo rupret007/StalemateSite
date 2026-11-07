@@ -1,0 +1,33 @@
+{
+  "state": "PASSED_COUNTDOWN_HOSTED_LINUX_JOURNEYS_NO_PHYSICAL_AUDIO_OR_DISPLAY_QUALIFICATION",
+  "startedAt": "2026-11-07T17:15:33.924540+00:00",
+  "source": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+  "version": "c2271048-aaa3-4649-8e9e-48dd46212da5",
+  "runtimeBefore": {
+    "deployment": "1a83f7e5-7ed1-4aa7-8af5-bd68fb6a8fcf",
+    "version": "c2271048-aaa3-4649-8e9e-48dd46212da5",
+    "at100Percent": true
+  },
+  "headlessLinuxOnWsl": true,
+  "physicalCapture": false,
+  "providerCredentials": false,
+  "harnessSha256": "c411de0ec7999bdc4789343e6e1d00d874b4277422b2767f2fb10988959a1fdf",
+  "originalIntelHarnessAssertionsRetained": true,
+  "sandboxRequired": true,
+  "storyPoolChanged": false,
+  "exitCode": 0,
+  "proof": "idle-expiry-hosted-linux-nov07.json",
+  "remoteProofSha256": "26bf967a1c12bb373ead9714082e1439e1a71379261be25ba22b3ae3f9bbdb60",
+  "screenshotPaths": [
+    "/home/rupret/.cache/WebJam/linux-browser-20261107/.local/hosted-chromium-375-d8c08fb-nov07.png",
+    "/home/rupret/.cache/WebJam/linux-browser-20261107/.local/hosted-chromium-390-d8c08fb-nov07.png"
+  ],
+  "stagesPassed": 12,
+  "captureRequests": 0,
+  "runtimeAfter": {
+    "deployment": "1a83f7e5-7ed1-4aa7-8af5-bd68fb6a8fcf",
+    "version": "c2271048-aaa3-4649-8e9e-48dd46212da5",
+    "at100Percent": true
+  },
+  "completedAt": "2026-11-07T17:15:46.505999+00:00"
+}

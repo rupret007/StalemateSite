@@ -1,0 +1,30 @@
+{
+  "state": "NATIVE_PREPARATION_STOPPED_INSPECT_SAME_FILES_AND_LOGS_NO_RETRY",
+  "startedAt": "2026-11-07T16:40:15.518329+00:00",
+  "nativeTestStarted": false,
+  "physicalCapture": false,
+  "deployedRuntimeChanged": false,
+  "result": {
+    "state": "NATIVE_PREPARATION_STOPPED_INSPECT_SAME_FILES_AND_LOGS_NO_RETRY",
+    "startedAt": "2026-11-07T16:40:20.568724+00:00",
+    "guardBefore": {
+      "load1": 0.20751953125,
+      "memoryAvailableGiB": 14.470222473144531,
+      "swapPercent": 14.917182922363281,
+      "freeGiB": 722.4005317687988
+    },
+    "nodeVersion": "v24.22.2",
+    "nodeArchiveSha256": "361718c444e49af2ca5a110c83ba6a8901143f23ab285ebbef0341f391f482a9",
+    "applicationFilesChangedBetweenSnapshots": [
+      "hangout-worker/src/lobby-do.mjs"
+    ],
+    "nativeTestStarted": false,
+    "physicalCapture": false,
+    "providerCredentials": false,
+    "installScriptsEnabled": false,
+    "globalPackagesOrServicesChanged": false,
+    "failureType": "AssertionError",
+    "completedAt": "2026-11-07T16:40:22.470207+00:00"
+  },
+  "completedAt": "2026-11-07T16:40:18.171921+00:00"
+}
