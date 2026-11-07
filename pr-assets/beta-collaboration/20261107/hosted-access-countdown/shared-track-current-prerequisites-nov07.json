@@ -1,0 +1,42 @@
+{
+  "state": "READ_ONLY_ACTUAL_SHARED_TRACK_PREREQUISITES_RECORDED_NOT_PLAYBACK_PROOF",
+  "at": "2026-11-07T17:43:09.007626+00:00",
+  "nativeSource": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "intel": {
+    "at": "2026-11-07T17:43:08.902030+00:00",
+    "endpoint": "Intel MacBook",
+    "guard": {
+      "load": 1.78662109375,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.41162109375
+    },
+    "recognizedGenericDeviceNames": [
+      "External Headphones",
+      "MacBook Pro Microphone",
+      "MacBook Pro Speakers"
+    ],
+    "official16Or64DeviceNamePresent": false,
+    "officialInstallerStagedSha256": "57254e2f76cd40db7f3f715238b1a2cb2bd08819d38abf4087f2944f71a3641a",
+    "installerRun": false,
+    "physicalCaptureOpened": false,
+    "webjamGuiRunning": false,
+    "sourceOfDeviceInventory": "Read-only system_profiler; no raw inventory or device identifiers retained",
+    "deviceNamePresenceIsNotRouteCertification": true
+  },
+  "mini": {
+    "at": "2026-11-07T17:43:08.910130+00:00",
+    "load": 4.0859375,
+    "swapPercent": 85.22578125000001,
+    "freeGiB": 17.037559509277344,
+    "heavyNativeTestGuardPassed": false
+  },
+  "senderSourceByteExactThroughCurrentWebJamHead": {
+    "services/reference_track_backend.py": true,
+    "core/reference_track.py": true,
+    "webjam_qt/windows/reference_track.py": true
+  },
+  "physicalCapture": false,
+  "newQuestionWhileUserAsleep": false,
+  "noPhysicalPilotOrDriverInstallationAttempted": true,
+  "remainingBoundary": "Existing Mac sender requires official certified route plus live owned primary/backing process isolation and physical audibility. Generated participant/WAV transport does not qualify actual desktop sender. No test-only route-certification override is allowed."
+}

@@ -1,0 +1,99 @@
+{
+  "state": "PASSED_ACTUAL_WINDOWS_CHROME_JOURNEYS_PROCESS_READBACK_PENDING",
+  "startedAt": "2026-11-07T18:37:47.778Z",
+  "source": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+  "version": "c2271048-aaa3-4649-8e9e-48dd46212da5",
+  "endpoint": "Windows11 NucBox installed Google Chrome, own isolated QA profile; two ordinary browser guests",
+  "physicalCapture": false,
+  "providerCredentialsMinted": false,
+  "newRooms": 0,
+  "checks": [
+    "Anonymous state and protected code stay denied",
+    "Both branded entrances admit ordinary guests; later join starts fresh",
+    "Reciprocal chat displays source badges without granting roles",
+    "Thirteen actual Windows browser runtime hashes match the private repair",
+    "375px and390px contain chat, input and Send with16px input",
+    "Windows reconnect preserves a private draft and resets scrollback",
+    "Simulated mic denial gives Try again without physical capture or provider issuance"
+  ],
+  "logout": [
+    {
+      "logout": 200,
+      "copiedCookie": 401,
+      "protectedCode": 401
+    },
+    {
+      "logout": 200,
+      "copiedCookie": 401,
+      "protectedCode": 401
+    }
+  ],
+  "roles": [
+    {
+      "site": "stalemate",
+      "kind": "guest",
+      "role": "fan"
+    },
+    {
+      "site": "rad-dad",
+      "kind": "guest",
+      "role": "fan"
+    }
+  ],
+  "allOwnedBrowserContextsClosed": true,
+  "browserVersion": "156.0.8078.80",
+  "assets": [
+    "join/index.html",
+    "join/policy.js",
+    "join/session.js",
+    "join/config.js",
+    "join/audio.js",
+    "join/errors.js",
+    "join/style.css",
+    "join/prejoin.js",
+    "join/crypto.js",
+    "join/mailbox.js",
+    "join/app.js",
+    "r/45662413410ed051/lobby/lobby.css",
+    "r/45662413410ed051/lobby/lobby.js"
+  ],
+  "mobile": [
+    {
+      "width": 375,
+      "pageWidth": 375,
+      "inputLeft": 46,
+      "inputRight": 294,
+      "sendLeft": 299,
+      "sendRight": 357,
+      "fontSize": "16px",
+      "screenshot": "windows-c227-375.png",
+      "sha256": "abec6c8d981238be8f496d505de4bf5a58d8053254b3aa2606ff108d19bbf943"
+    },
+    {
+      "width": 390,
+      "pageWidth": 390,
+      "inputLeft": 46,
+      "inputRight": 309,
+      "sendLeft": 314,
+      "sendRight": 372,
+      "fontSize": "16px",
+      "screenshot": "windows-c227-390.png",
+      "sha256": "fbb3cf12481bcc1bbf8ddc8c35e01283ae5ad175120c72ba598bfce57be806c7"
+    }
+  ],
+  "reconnectMs": 268,
+  "simulatedMicDenials": 1,
+  "setupMs": [
+    {
+      "site": "stalemate",
+      "ms": 1755
+    },
+    {
+      "site": "rad-dad",
+      "ms": 1312
+    }
+  ],
+  "initialOwnedBlankPagesPreservedBeforeBrowserClose": true,
+  "ownedBrowserCloseRequested": true,
+  "completedAt": "2026-11-07T18:37:57.410Z"
+}

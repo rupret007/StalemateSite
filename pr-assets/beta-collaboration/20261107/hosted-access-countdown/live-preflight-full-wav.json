@@ -1,0 +1,16 @@
+{
+  "state": "STOPPED_INSPECT_PRIVATE_MEDIA_PREFLIGHT_NO_TRIAL",
+  "startedAt": "2026-11-07T17:27:03.801326+00:00",
+  "readOnly": true,
+  "versions": {
+    "stalemate-hangout-beta": "c2271048-aaa3-4649-8e9e-48dd46212da5",
+    "webjam-turn-credentials": "4db649fa-a465-44b4-8487-414987b3a660"
+  },
+  "allLiveSettingsMatchExistingBaselines": true,
+  "capMarkerSha256": "455ed66975e47e2838d47c2026ebd57e287721d9ad7f09922c72c64b50e35150",
+  "physicalCapture": false,
+  "providerCredentialsMinted": false,
+  "storyPoolChanged": false,
+  "failureType": "AssertionError",
+  "completedAt": "2026-11-07T17:27:04.106232+00:00"
+}

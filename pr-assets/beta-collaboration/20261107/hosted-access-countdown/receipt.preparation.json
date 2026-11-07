@@ -1,0 +1,156 @@
+{
+  "at": "2026-11-07T17:45:39.351746+00:00",
+  "scope": "Completed generated40second Intel-to-Linux media/countdown plus current delivered MacWebKit12-stage and WindowsChrome7-stage browser checks; distinct from actual Shared Track, physical listening and still-running real8h expiry",
+  "websiteSource": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+  "websiteVersion": "c2271048-aaa3-4649-8e9e-48dd46212da5",
+  "nativeSource": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "issuerVersion": "4db649fa-a465-44b4-8487-414987b3a660",
+  "releaseCandidateReady": false,
+  "originalEightHourFailureNotChanged": true,
+  "repairedActualEightHourResult": "RUNNING_NOT_PASSED",
+  "physicalCapture": false,
+  "actualDesktopSharedTrackSender": false,
+  "humanHearingQualified": false,
+  "payloads": {
+    "current-generated-linux-media-full-wav.json": {
+      "sha256": "0d6362384745e9e003b386bbae0c890570b912fd59b85d147724f8d3fc602bce",
+      "originalSha256": "0d6362384745e9e003b386bbae0c890570b912fd59b85d147724f8d3fc602bce",
+      "transform": "exact bytes"
+    },
+    "browser-trial-full-wav.cjs": {
+      "sha256": "fb18902f252203775e111b93c5810f7a4fe440d1f21311bb66ded6cc2718eedf",
+      "originalSha256": "fb18902f252203775e111b93c5810f7a4fe440d1f21311bb66ded6cc2718eedf",
+      "transform": "exact bytes"
+    },
+    "independent-readback.json": {
+      "sha256": "b1f712d0ff58a0090a87f15a6a4dff9031ff039078e0c792b99e2ae9477d47d0",
+      "originalSha256": "b1f712d0ff58a0090a87f15a6a4dff9031ff039078e0c792b99e2ae9477d47d0",
+      "transform": "exact bytes"
+    },
+    "connected-countdown-visual-review.json": {
+      "sha256": "376285265a18af5971833a2a8f457de3a1eaf6ea06727864c23d0c66c49ce375",
+      "originalSha256": "376285265a18af5971833a2a8f457de3a1eaf6ea06727864c23d0c66c49ce375",
+      "transform": "exact bytes"
+    },
+    "live-preflight-full-wav.json": {
+      "sha256": "ea88328c0350f6f95959e3c3e4d6eac2be1ae89895c42fe1cc3da6675640560d",
+      "originalSha256": "3e4c3986fab7560d7e73c26d4ce36864250aec7c16d9d49c54293f116180bec0",
+      "transform": "JSON reserialized; omitted billingObservation, usage; original remains owner-only"
+    },
+    "live-preflight-continued-full-wav.json": {
+      "sha256": "38348f41bebad9afa0575bc51730a4d9b45967a7f09c35573118f2070d58c7fc",
+      "originalSha256": "6e17e96afd97e042c2c027bf215997545f1fc1f81313d907939aa227eceb0982",
+      "transform": "JSON reserialized; omitted billingObservation, usage; original remains owner-only"
+    },
+    "live-postcheck-full-wav.json": {
+      "sha256": "7d279736b4bb81507e2695ae6dddc681665615922e26e3a104826b51d5044627",
+      "originalSha256": "9c504d0202ba3040618c5ec095772c3e82fba1c35ba66a07d4d85e4a14e53301",
+      "transform": "JSON reserialized; omitted billingObservation, usage; original remains owner-only"
+    },
+    "analytics-sfu-preflight-diagnostic.json": {
+      "sha256": "64da4bc164e16b8ff431061d9c4d6048a59e2caaecbbc945e8310fbbbeec8234",
+      "originalSha256": "64da4bc164e16b8ff431061d9c4d6048a59e2caaecbbc945e8310fbbbeec8234",
+      "transform": "exact bytes"
+    },
+    "analytics-response-shape.json": {
+      "sha256": "b8edc7a377d15fa518c7c6e18119911885244f2be99ebc561a9b1f38d4fba8cb",
+      "originalSha256": "f54a3a436f44c3d44c592be0c374a41a9291e8e30e6beb27e80d73c394cb069f",
+      "transform": "JSON reserialized; omitted datasets; original remains owner-only"
+    },
+    "shared-track-current-prerequisites-nov07.json": {
+      "sha256": "be982200ee739f78936b301f913ae3995308ecb21b9854fb43326989fc30c01c",
+      "originalSha256": "be982200ee739f78936b301f913ae3995308ecb21b9854fb43326989fc30c01c",
+      "transform": "exact bytes"
+    },
+    "connected-countdown.png": {
+      "sha256": "db38077baa783ca544480aa692464c5e3378238afcfbf3c69b30457db74a9e11",
+      "originalSha256": "db38077baa783ca544480aa692464c5e3378238afcfbf3c69b30457db74a9e11",
+      "transform": "exact bytes"
+    },
+    "mac-webkit-current.json": {
+      "sha256": "26627ca3a77ff99ae1161a41bbe867c302cd71e19258db3216d02c70599f9e69",
+      "originalSha256": "26627ca3a77ff99ae1161a41bbe867c302cd71e19258db3216d02c70599f9e69",
+      "transform": "exact bytes"
+    },
+    "mac-webkit-harness.cjs": {
+      "sha256": "b88b0c9be428c937a270cd04f2a2367a878bcc00805c10deeab3c40d3d9daede",
+      "originalSha256": "b88b0c9be428c937a270cd04f2a2367a878bcc00805c10deeab3c40d3d9daede",
+      "transform": "exact bytes"
+    },
+    "mac-webkit-independent-readback.json": {
+      "sha256": "b954d0313d13e65c0aec1ce6d0e1085c8696417f9146c2ff7fe0b9ddb159a340",
+      "originalSha256": "ba1a1fa5a8edce0dfc3a820637f986366e6f328efeb82eeb2eb7cda2bfa7af58",
+      "transform": "JSON reserialized; omitted duplicated proof; unabridged original remains owner-only"
+    },
+    "mac-webkit-375.png": {
+      "sha256": "3722580138ebaa0c49aae4869dafc7d8f4a6f4e1a7dfae4bdd356b94edaa26cf",
+      "originalSha256": "3722580138ebaa0c49aae4869dafc7d8f4a6f4e1a7dfae4bdd356b94edaa26cf",
+      "transform": "exact bytes"
+    },
+    "mac-webkit-390.png": {
+      "sha256": "dcedbeae8acc0cf5b2d1f98252495e3d4d112f1e6d6f5de9353f0266d4ebe137",
+      "originalSha256": "dcedbeae8acc0cf5b2d1f98252495e3d4d112f1e6d6f5de9353f0266d4ebe137",
+      "transform": "exact bytes"
+    },
+    "windows-chrome-current.json": {
+      "sha256": "ce00dcaefcada9cbf6ba812753abcc7e01abc1f1565b777bca065713ea4fb706",
+      "originalSha256": "ce00dcaefcada9cbf6ba812753abcc7e01abc1f1565b777bca065713ea4fb706",
+      "transform": "exact bytes"
+    },
+    "windows-chrome-harness.cjs": {
+      "sha256": "262e2d7ac6a0cd400c7d4b0729504ed22b769eb78b40c69646c85b748103e0e7",
+      "originalSha256": "262e2d7ac6a0cd400c7d4b0729504ed22b769eb78b40c69646c85b748103e0e7",
+      "transform": "exact bytes"
+    },
+    "windows-chrome-independent-readback.json": {
+      "sha256": "fd48f3dc0ec5f9dbae075d1549229affeb21340b8cc69af3c2cec2d09f18399f",
+      "originalSha256": "7bde97531c676101e9ed1c1e0282d318dc62564da1cbc4b122d941db3416e5b6",
+      "transform": "JSON reserialized; omitted duplicated proof; unabridged original remains owner-only"
+    },
+    "windows-controller-original-stop.json": {
+      "sha256": "2070f43955fe86673bbb1777e8781c771e3018838c20c449607ef46f132345fe",
+      "originalSha256": "2070f43955fe86673bbb1777e8781c771e3018838c20c449607ef46f132345fe",
+      "transform": "exact bytes"
+    },
+    "windows-controller-original-readback.json": {
+      "sha256": "6874b7e0ef33605e5baeccb8605dbc603c18364bba287907220c8d267e5f18f0",
+      "originalSha256": "6874b7e0ef33605e5baeccb8605dbc603c18364bba287907220c8d267e5f18f0",
+      "transform": "exact bytes"
+    },
+    "windows-preparation-stop-readback.json": {
+      "sha256": "dcbb1a43768880e5966d126749f23c0b7bc5fed3a5eeea316fe3ff9cb4d9f8ea",
+      "originalSha256": "dcbb1a43768880e5966d126749f23c0b7bc5fed3a5eeea316fe3ff9cb4d9f8ea",
+      "transform": "exact bytes"
+    },
+    "windows-primary-renderer-diagnostic.json": {
+      "sha256": "e10a5a7c174a0840fa3d6f7ecfa792618ca8f87713ae36994c96550d00137805",
+      "originalSha256": "067b13d87a97f4068041069ba357a05fca71edfb3fb7c350afbc29109b845342",
+      "transform": "Removed redundant terminal blank line; otherwise exact bytes; original remains owner-only"
+    },
+    "windows-chrome-375.png": {
+      "sha256": "abec6c8d981238be8f496d505de4bf5a58d8053254b3aa2606ff108d19bbf943",
+      "originalSha256": "abec6c8d981238be8f496d505de4bf5a58d8053254b3aa2606ff108d19bbf943",
+      "transform": "exact bytes"
+    },
+    "windows-chrome-390.png": {
+      "sha256": "fbb3cf12481bcc1bbf8ddc8c35e01283ae5ad175120c72ba598bfce57be806c7",
+      "originalSha256": "fbb3cf12481bcc1bbf8ddc8c35e01283ae5ad175120c72ba598bfce57be806c7",
+      "transform": "exact bytes"
+    },
+    "current-browser-visual-review.json": {
+      "sha256": "296e01f24c9a15aa880989ab4778ccac82d63c71cd8bb15579fdc2d84ec6e373",
+      "originalSha256": "296e01f24c9a15aa880989ab4778ccac82d63c71cd8bb15579fdc2d84ec6e373",
+      "transform": "exact bytes"
+    },
+    "community-entry-toolkit-current-input-readback.json": {
+      "sha256": "ebcdf159e02ea979312f3a6231dc0cfaccb340b1b8cc397a1e3ad3db9dc1600e",
+      "originalSha256": "ebcdf159e02ea979312f3a6231dc0cfaccb340b1b8cc397a1e3ad3db9dc1600e",
+      "transform": "exact bytes; new read-only current-input qualification"
+    }
+  },
+  "updatedAt": "2026-11-07T18:50:36.134335+00:00",
+  "currentBrowserEndpoints": {
+    "intelWebKit": "27.2 on macOS15.7.9;12stages;reconnect329ms;no physical capture",
+    "windowsChrome": "156.0.8078.80 on Windows11;7stages;reconnect268ms;one simulated mic denial;no physical capture"
+  }
+}

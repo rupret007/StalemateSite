@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-07T17:29:21.041513+00:00",
+  "physicalCapture": false,
+  "trialStarted": false,
+  "providerCredentialsMinted": false,
+  "originalFailedPreflightPreserved": true,
+  "query": "Only the SFU dataset not retained by the stopped original preflight",
+  "errorCount": 0,
+  "errors": [],
+  "accountsCount": 1,
+  "rows": [
+    []
+  ],
+  "state": "READ_ONLY_SFU_RESPONSE_RECORDED_NO_TRIAL"
+}
