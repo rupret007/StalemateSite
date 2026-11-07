@@ -72,9 +72,11 @@ refreshed before another media trial.
    must hear the backing track and a live input in the same mix. Check MP3 with
    the packaged decoder too. Decoder and synthetic WAV passes alone do not
    qualify this actual sender. Stop playback and leave/end the session normally.
-6. Test a real Webex video meeting and exclusive audio switching with consenting
-   participants and no recording. Repeat a bounded music trial from a second
-   network when available. Keep these outcomes separate from same-household
+6. Test a real Webex video meeting and the
+   [attended manual audio handoff](HANGOUT_WEBEX_AUDIO_HANDOFF.md) with consenting
+   participants and no recording. The current integration opens the external
+   meeting; automatic cross-app muting/switching is not implemented. Repeat a
+   bounded music trial from a second network when available. Keep these outcomes separate from same-household
    transport. Existing caps and all release/trust holds remain in force.
 
 The [overnight evidence note](HANGOUT_OVERNIGHT_CHECKS_20261107.md) separates new
