@@ -1,0 +1,62 @@
+{
+  "state": "FIXED_LOCAL_CHECKS_FAILED_INSPECT_ORIGINAL_NO_RETRY",
+  "startedAt": "2026-11-07T16:22:12.107064+00:00",
+  "real8HourExpiryQualified": false,
+  "physicalCapture": false,
+  "deployedRuntimeChanged": false,
+  "result": {
+    "state": "FIXED_LOCAL_CHECKS_FAILED_INSPECT_ORIGINAL_NO_RETRY",
+    "base": "32d3cdb5571e5c3d1e06eb99dde214ff6b282c89",
+    "guardBefore": {
+      "load1": 0.05029296875,
+      "memoryAvailableGiB": 14.452507019042969,
+      "swapPercent": 14.824247360229492,
+      "freeGiB": 722.4012603759766
+    },
+    "startedAt": "2026-11-07T16:22:17.002118+00:00",
+    "physicalCapture": false,
+    "providerCredentials": false,
+    "deployedRuntimeChanged": false,
+    "real8HourExpiryQualified": false,
+    "changedProductionFiles": [
+      "hangout-worker/src/lobby-do.mjs"
+    ],
+    "sourceHashes": {
+      "hangout-worker/src/lobby-do.mjs": "7eddf4c4b2ce4166fbe45eeb1d9c98dc731ef6bf7b5cc82ebbcc29fdb76d0732",
+      "hangout-worker/tests/beta-lifecycle.test.js": "fb7b4df51ac4d04f7de1d3fae8a4a6b0fedced86efa44b0e330b6435537c1b7a",
+      "hangout-worker/tests/beta.test.js": "1efacaa79a8f94b54d3852353fa1d002948a307303c915cba7bf5f5e1f7a8f24",
+      "hangout-worker/tests/lobby-session-integration.test.js": "34d87ca454cc0ddbbf623443efcdb34f5a44e691b4f92e08a0538920ccac045c",
+      "tests/support/durable-record-sqlite.mjs": "56951f7384e4a492be7320c5b90b0b9b6d6661bde923b907589bf0474d28118b"
+    },
+    "guardBeforeTests": {
+      "load1": 0.05029296875,
+      "memoryAvailableGiB": 14.452274322509766,
+      "swapPercent": 14.824247360229492,
+      "freeGiB": 722.4011421203613
+    },
+    "testFiles": [
+      "hangout-worker/tests/beta-lifecycle.test.js",
+      "hangout-worker/tests/beta.test.js",
+      "hangout-worker/tests/lobby-session-integration.test.js"
+    ],
+    "unitExitCode": 1,
+    "summary": [
+      " Test Files  1 failed | 2 passed (3)",
+      "      Tests  1 failed | 97 passed (98)",
+      "   Duration  4.29s (transform 712ms, setup 0ms, import 1.02s, tests 4.19s, environment 0ms)",
+      "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af",
+      " FAIL  hangout-worker/tests/beta.test.js > beta product bootstrapping > ships a separate guarded beta configuration with no provider secrets or synthetic identity controls",
+      "Error: ENOENT: no such file or directory, open '<owned-qa-cache>/idle-expiry-deadline-20261107/hangout-worker/wrangler.beta.toml'"
+    ],
+    "all46StagedInputsStillMatch": true,
+    "logSha256": "13943bd39a1cb234ef62b12db6c755ebfae06f6109eef2217bee598e1a1398ce",
+    "guardAfter": {
+      "load1": 0.28662109375,
+      "memoryAvailableGiB": 14.467132568359375,
+      "swapPercent": 14.824247360229492,
+      "freeGiB": 722.4011306762695
+    },
+    "completedAt": "2026-11-07T16:22:21.574711+00:00"
+  },
+  "completedAt": "2026-11-07T16:22:17.353832+00:00"
+}

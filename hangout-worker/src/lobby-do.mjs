@@ -418,7 +418,25 @@ export class HangoutLobby {
         if (recovered) this.engine.restoreLog(recovered.state.modlog);
         else { const logs = await state.storage.list({ prefix: 'log:', reverse: true, limit: 2000 }); this.engine.restoreLog([...logs.values()].reverse()); }
         if (this.authorityMode) { await this.authority.schedule(); this.privateQueueActor = null; }
-        else if (!(await state.storage.getAlarm())) await state.storage.setAlarm(Date.now() + 60 * 1000);
+        else await this.scheduleLegacyAlarm();
+    }
+
+    async scheduleLegacyAlarm(expiresAt, afterAlarm = false) {
+        const now = Date.now();
+        let next = now + 60000;
+        const include = value => { if (Number.isFinite(value)) next = Math.min(next, Math.max(now, value)); };
+        if (expiresAt === undefined) {
+            for (const ws of this.state.getWebSockets()) {
+                if (ws.readyState === 3 || this.closedSockets?.has(ws)) continue;
+                const attachment = ws.deserializeAttachment() || {};
+                if (!attachment.sessionEnded && !attachment.betaEnded) include(attachment.expiresAt);
+            }
+        } else include(expiresAt);
+        const current = await this.state.storage.getAlarm();
+        // Admission must not postpone an existing due alarm. After an alarm
+        // fires, its old deadline is consumed; retain only a future earlier one.
+        if (Number.isFinite(current) && (!afterAlarm || current > now)) next = Math.min(next, current);
+        if (afterAlarm || current !== next) await this.state.storage.setAlarm(next);
     }
 
     bindingLive(value) {
@@ -834,7 +852,7 @@ export class HangoutLobby {
             }
             await this.engine.tick(); await this.pruneLogs();
             await this.refreshPrivateReports();
-            await this.state.storage.setAlarm(Date.now() + 60000);
+            await this.scheduleLegacyAlarm(undefined, true);
         });
     }
     async fetch(request) {
@@ -885,6 +903,10 @@ export class HangoutLobby {
         if (!identity || !identity.dev) return new Response('no', { status: 400 });
         if (socketIdentityInvalid(identity, this.env)) return new Response('session required', { status: 403 });
         if (this.env.HANGOUT_BETA_MODE === 'protected' && !await this.sessionActive(identity)) return new Response('beta session required', { status: 403 });
+        if (!this.authorityMode) {
+            try { await this.scheduleLegacyAlarm(identity.expiresAt ?? null); }
+            catch { return new Response('community admission unavailable', { status: 503 }); }
+        }
         if (socketIdentityInvalid(identity, this.env)) return new Response('session required', { status: 403 });
         const id = `c${crypto.randomUUID().replaceAll('-', '')}`;
         let trusted = { ...identity, id };
