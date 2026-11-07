@@ -1,5 +1,10 @@
 # Required live-music acceptance for the shared community
 
+The [November 7 acceptance checkpoint](HANGOUT_ACCEPTANCE_CHECKPOINT_20261107.md#reuse-packaged-mp3-evidence)
+qualifies retained packaged MP3 decoding/streaming CI on all four native targets
+at `76b1fd7`. Reuse that result; it does not replace the live Shared Track mix,
+physical listening, release trust or the separate native provider-start mode.
+
 ## Current private-trial authorization
 
 Read the [current handoff](../CURSOR_HANDOFF_WEBJAM.md) before the historical
