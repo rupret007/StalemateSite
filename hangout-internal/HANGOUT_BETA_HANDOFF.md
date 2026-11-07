@@ -129,6 +129,14 @@ allowlists, Access audiences, provider enable flags and usage caps. Never reduce
 or reuse an invitation version; keep AI/TURN disabled until accepted. Preserve
 remote secrets, especially the stable `HANGOUT_HMAC_KEY`, and DO bindings.
 
+The existing `stalemate-hangout-beta` deployment has one approved
+`WEBJAM_WEB_ORIGINS` entry, `https://stalemate-hangout-beta.jeffstory007.workers.dev`.
+The checked-in config defaults that variable to empty. A deploy with the empty
+value blocks sharing browser music invites. Recheck the active Worker version
+and origin before using the commands below. If the live value differs, stop
+and reconcile it with the deployment owner. Preserve the separate WebJam issuer
+and its existing CORS, credentials and quota policy.
+
 Run from that checkout's repository root. Use the beta config explicitly for
 every Wrangler command; the existing vault-upload script targets the main
 Worker and is not a beta deploy command. The following commands do not grant
@@ -140,7 +148,9 @@ npm run test:install-browsers
 npm run test:unit
 npm run test:e2e
 npm run package:beta
-npx --yes wrangler@4.151.1 deploy --config hangout-worker/wrangler.beta.toml --dry-run
+webjam_beta_origin='https://stalemate-hangout-beta.jeffstory007.workers.dev'
+npx --yes wrangler@4.151.1 deploy --config hangout-worker/wrangler.beta.toml \
+  --dry-run --keep-vars --var "WEBJAM_WEB_ORIGINS:$webjam_beta_origin"
 ```
 
 The existing beta secrets are already provisioned; do not replace them as part
@@ -153,9 +163,17 @@ deployment without them fails closed. Provider secrets are optional only while
 their corresponding features remain explicitly disabled.
 
 ```sh
-npx --yes wrangler@4.151.1 deploy --config hangout-worker/wrangler.beta.toml
+webjam_beta_origin='https://stalemate-hangout-beta.jeffstory007.workers.dev'
+npx --yes wrangler@4.151.1 deploy --config hangout-worker/wrangler.beta.toml \
+  --keep-vars --var "WEBJAM_WEB_ORIGINS:$webjam_beta_origin"
 npx --yes wrangler@4.151.1 deployments list --config hangout-worker/wrangler.beta.toml
 ```
+
+After the private deployment, verify that the active version retained the
+approved origin, invitation version, secret bindings and existing Durable Object
+namespace IDs. Verify both branded entrances and browser invitation sharing.
+Keep the previous private version ID for rollback through the deployment owner's
+procedure, with the same bindings and matching client assets.
 
 Record the resulting version, source commit, configuration and test receipt in
 the readiness assessment. Keep the private invitation out of that assessment.
@@ -178,10 +196,11 @@ and never grants a staff role.
    Acceptance still requires that account to be in the room. Older code that
    omits the optional offer metadata can discard a pending offer on its next
    write; reissue it after recovery rather than treating it as completed.
-4. For WebJam music, share the complete **Copy Invite** message and paste the
-   complete message into desktop WebJam's **Join** dialog. A phone can use room
-   chat; no browser audio client is promised. See the
-   [native handoff evidence and remaining limits](HANGOUT_COLLABORATION_BETA.md).
+4. For desktop WebJam, share the complete **Copy Invite** message for the desktop
+   **Join** dialog. For a browser guest in the approved private beta, the Mac
+   host uses **Copy browser invite** and shares it in the Jam room. The guest
+   checks the mic, confirms headphones and chooses **Join with microphone**.
+   See the [listening checks and remaining limits](HANGOUT_MUSIC_DEMO_ACCEPTANCE.md).
 5. In the lobby and its channels, use a message's report button for abuse. A
    check mark means the server confirmed durable submission to community staff.
    The currently hosted encrypted private-room page still has the older
