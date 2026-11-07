@@ -6,6 +6,15 @@ It identifies the currently staged build and private Worker, the Stalemate,
 Rad Dad and neutral partner entrance checks, and the remaining live music and
 release gates. Use its revisions for new work.
 
+The [Linux browser and generated-music checkpoint](hangout-internal/HANGOUT_LINUX_BROWSER_MUSIC_20261107.md)
+adds twelve actual hosted Linux stages and complete forty-second generated
+Intel-to-Linux and ARM-to-Linux audio trials, including the original short-fixture
+failure and its diagnosed correction. The ARM trial passed all thirteen resource
+samples; a later native-import postcheck stopped at the unchanged resource guard
+and remains unqualified. Physical listening and Shared Track's desktop sender
+remain pending. The [Webex handoff guide](hangout-internal/HANGOUT_WEBEX_AUDIO_HANDOFF.md)
+separates existing external controls from the unimplemented automatic switch.
+
 This branch also contains a prepared Web Join access countdown, pinned to
 WebJam PR #450 / `1b0c4f5`. It has not replaced the live private runtime.
 The current receipt separately records the new five-guest hosted reconnect

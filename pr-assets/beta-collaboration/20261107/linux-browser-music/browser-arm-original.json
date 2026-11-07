@@ -1,0 +1,52 @@
+{
+  "reusesCorrectedFull40SecondFixture": true,
+  "nativeHostArchitecture": "arm64",
+  "fullOriginalWavDuration": true,
+  "state": "PASSED_GENERATED_LINUX_BROWSER_MEDIA_PENDING_NATIVE_AND_LOGOUT_READBACK",
+  "startedAt": "2026-11-07T12:28:48.629Z",
+  "platform": "Ubuntu26.04.1 x86_64/WSL2 Linux Chromium",
+  "generatedAudioOnly": true,
+  "physicalCapture": false,
+  "recording": false,
+  "actualSharedTrackSender": false,
+  "humanHearingQualified": false,
+  "sandboxRequired": true,
+  "browserOutputMuted": true,
+  "generatedMicrophoneFixtureOnly": true,
+  "automatedHeadphoneCheckboxForMutedGeneratedSignalsOnly": true,
+  "browserVersion": "156.0.8078.4",
+  "ordinaryGuestAdmission": true,
+  "runtimeAssetHashesMatched": 13,
+  "generatedMicDetectionMs": 151,
+  "connectFromJoinClickMs": 8477,
+  "browser": {
+    "elapsedMs": 40050,
+    "toneWindows": 160,
+    "disconnectedWindows": 0,
+    "musicalWindows": {
+      "E": 53,
+      "G": 53,
+      "A": 53
+    },
+    "seconds": 40,
+    "state": "connected",
+    "delayMs": 57,
+    "packetsSent": 2051,
+    "packetsReceived": 2003,
+    "lost": 0,
+    "path": [
+      "relay",
+      "srflx"
+    ]
+  },
+  "generatedResourcesClosed": true,
+  "fixtureCounts": {
+    "generatedCaptureRequests": 1,
+    "displayCaptureRequests": 0
+  },
+  "logoutStatus": 200,
+  "originalAfterLogout": 401,
+  "copiedCookieAfterLogout": 401,
+  "allOwnedBrowserResourcesClosed": true,
+  "completedAt": "2026-11-07T12:29:40.382Z"
+}

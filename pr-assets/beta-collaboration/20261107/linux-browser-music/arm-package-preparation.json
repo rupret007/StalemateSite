@@ -1,0 +1,55 @@
+{
+  "state": "ARM32_FILES_AND_VERIFIED_PACKAGE_PREPARED_WAV_AND_IDLE_IMPORT_PENDING",
+  "startedAt": "2026-11-07T12:09:13.777021+00:00",
+  "guardBefore": {
+    "load1": 3.45068359375,
+    "swapPercent": 77.58671875,
+    "freeGiB": 18.27
+  },
+  "physicalCapture": false,
+  "providerCredentials": false,
+  "sourceAppChanged": false,
+  "globalServicesChanged": false,
+  "externalDriveWrites": false,
+  "innerArchiveSha256": "39dc750c1da4b0d5ba1d6e66a57a77f2cd947e9ae957212add5e97798f529a72",
+  "source": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "bundledCodecSha256": "aec339bec2255398f57da77c4eb72d8eeb24645ba581f9112756ff473feb23a4",
+  "deepStrictCodesignExitCode": 0,
+  "embeddedPrivateTargetVerified": true,
+  "adHocIsNotGatekeeperOrNotarizationQualification": true,
+  "stagedFiles": 32,
+  "productionSourceFilesByteExact": 29,
+  "fixtureOnlyTargetAdaptations": [
+    "packaged-bootstrap.py",
+    "packaged-two-party-mixer.py",
+    "qualified-codec-sha256"
+  ],
+  "allTrustAnd155SecondDeadlineChecksRetained": true,
+  "completedAt": "2026-11-07T12:09:15.601208+00:00",
+  "executedComponentsAndFabricTrustManifestMatchVerifiedArchive": [
+    {
+      "component": "Contents/MacOS/webjam-fabric",
+      "sha256": "beee6768d897465f5dcc31d71659cebed839e0cfca1d5f0e51fda287900e3622",
+      "matchesVerifiedArchive": true
+    },
+    {
+      "component": "Contents/Resources/JamulusServer.app/Contents/MacOS/JamulusServer",
+      "sha256": "76072fa5a788492fc25d964a934cf5835f68be2cbfae225ecab05b0201ad0502",
+      "matchesVerifiedArchive": true
+    },
+    {
+      "component": "Contents/Frameworks/libwebjoin_opus.dylib",
+      "sha256": "aec339bec2255398f57da77c4eb72d8eeb24645ba581f9112756ff473feb23a4",
+      "matchesVerifiedArchive": true
+    },
+    {
+      "component": "Contents/Resources/webjam-fabric.sha256",
+      "sha256": "2c30aa7fa72f7bc2da7f4c0889bc56ba6986a333fd2e48e66ac2e945645426e1",
+      "matchesVerifiedArchive": true
+    }
+  ],
+  "publicExcerpt": {
+    "omission": "local executable bundle path only; original retained",
+    "originalSourceSha256": "2f700b9d2a74cda45b97cb9c34e1613051e2bd8246287f08d9aede17f56ccc4f"
+  }
+}
