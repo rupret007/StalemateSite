@@ -2,6 +2,21 @@
 
 **The private website is delivered; the overall release candidate remains pending.**
 
+The [private expiry repair checkpoint](HANGOUT_PRIVATE_REPAIR_20261107.md) is the
+current delivery: source `d8c08fb88b94429f03d13d9beaf01d8ffd301e1a`, website version
+`c2271048-aaa3-4649-8e9e-48dd46212da5`, merge
+`bfe0365eaef183cc282aaed38aecfecc7f0b84d0`. Exact-head CI, deployed source/settings,
+one guest across the update, twelve post-update hosted stages and inspected
+375px/390px chat/recovery screenshots passed. The new full-duration repaired
+expiry test is running until its original November 8, 01:16:36.764 UTC deadline;
+it is not passed. The earlier eight-hour failure remains failed.
+
+**Historical baseline below:** except where explicitly linked to the new repair
+checkpoint, the identities and demonstrated journeys below describe the previous
+`b35e5fc` / `33862058` deployment. They are retained baseline evidence and are not
+being relabeled as tests of the newer deployment. The repair checkpoint is the
+authoritative current version and remaining-work summary.
+
 The [entrance, accessibility, decoder and report checkpoint](HANGOUT_ACCEPTANCE_CHECKPOINT_20261107.md)
 adds hosted neutral linking, badge privacy, eight automated accessibility states
 and an acknowledged harmless report. It separately reuses the four-target
@@ -25,7 +40,7 @@ The invitation-only address is
 Stalemate and Rad Dad remain two entrances to the same service. Public band
 navigation has not been changed. Invitations and credentials are not included.
 
-**Prepared browser update:** this branch imports the access countdown from
+**Browser update prepared at the earlier baseline:** this branch imports the access countdown from
 [WebJam PR #450](https://github.com/rupret007/webjam/pull/450), source
 `1b0c4f56399843747e82655c0d7a994290b54127`, with all thirteen provenance records
 verified. That import changed four runtime files: Join HTML, CSS, app and session code.
@@ -33,10 +48,45 @@ The connected page shows this browser's access deadline, gives one final-minute
 warning, and offers Leave with keyboard focus. Host shutdown may happen sooner.
 Existing expiry/shutdown and provider policies are unchanged. This is prepared
 source, not a deployment claim; the live identities below remain separate.
-The real eight-hour expiry observer is still pending on the unchanged private
-runtime. Do not substitute a clock-controlled UI fixture for that observation.
+The [actual eight-hour observation](../pr-assets/beta-collaboration/20261107/private-readiness-followup/hosted-natural-expiry-current-nov07.json)
+ended with a failed terminal UI/socket assertion: the quiet guest still showed
+connected roughly 47 seconds after its original expiry. Cleanup's HTTP request
+returned 401. The same-expired-token replay and protected-code assertions were
+not reached, so neither a complete expiry pass nor an authentication bypass is
+established. Five spontaneous 1006 closes had recovered during the wait; this
+was not uninterrupted uptime.
 
-**Prepared lobby recovery:** a normal logged-out browser opening a saved lobby
+The [independent cleanup readback](../pr-assets/beta-collaboration/20261107/private-readiness-followup/natural-expiry-failure-independent-cleanup-readback-nov07.json)
+matched the original remote proof/harness, found its Node and idle assertion
+gone, and confirmed unchanged website/issuer versions and settings. The
+[failed finalizer](../pr-assets/beta-collaboration/20261107/private-readiness-followup/natural-expiry-readonly-finalizer-nov07.json)
+is retained. The old prepared delivery controllers remain unexecuted and blocked by
+that failed observation. [PR #232](https://github.com/rupret007/StalemateSite/pull/232),
+head `d8c08fb88b94429f03d13d9beaf01d8ffd301e1a`, schedules the legacy
+lobby alarm at the earliest access deadline while retaining earlier maintenance.
+It also refuses admission if the deadline cannot be stored. The five new
+lifecycle regressions passed; the later repair checkpoint records its completed
+exact-head application CI and private delivery.
+
+A separate [controlled native runtime proof](../pr-assets/beta-collaboration/20261107/private-readiness-followup/idle-expiry-native-runtime-crypto-import-controller-nov07.json)
+used actual local workerd timers, an unmodified eight-hour production TTL and a
+fixture-only ten-second synthetic guest. The old source scheduled expiry
+49,954ms late and remained connected at the quiet checkpoint. The fixed source
+scheduled the exact deadline and automatically delivered close 4401 after 49ms.
+Both sources rejected the identical expired signed cookie at `/beta/state` and
+`/join/app.js`, and the healthy guest still answered. No manual alarm call,
+clock advance, provider request, physical capture or leftover owned process was
+used. This local result does not establish hosted eight-hour behavior. Preserve
+the initial archive-layout validation stop and initial fixture import assertion
+stop; neither started a native trial. The subsequent private repair was reviewed and
+qualified independently, with its own separate real-duration observation now
+running as recorded in the repair checkpoint.
+The [compile-only preparation](../pr-assets/beta-collaboration/20261107/private-readiness-followup/idle-expiry-private-candidate-preparation-nov07.json)
+matched all 111 source/asset inputs and found exactly two reviewed server module
+changes among 66; that compile step did not deploy the repair. Later delivery
+and actual post-update checks are recorded separately in the repair checkpoint.
+
+**Lobby recovery prepared at the earlier baseline:** a normal logged-out browser opening a saved lobby
 URL currently receives plain 401 text without a recovery link. This source adds
 a 401 invitation page for known lobby-document GET/HEAD paths. It sets no cookie,
 serves no protected asset and keeps API, code and websocket denials intact. The
@@ -44,7 +94,7 @@ serves no protected asset and keeps API, code and websocket denials intact. The
 separates the observed live response from local regression tests and inspected
 375px/390px previews. This source change is not yet a private deployment claim.
 
-## Exact delivery
+## Earlier baseline delivery
 
 | Component | Observed revision or deployment |
 | --- | --- |
@@ -83,7 +133,7 @@ and [source readback](../pr-assets/beta-collaboration/20261107/composed-private-
 The issuer's five reviewed sources and unchanged effective settings were
 verified separately; its response hint changes no quota, ledger or credential.
 
-## Demonstrated journeys and boundaries
+## Earlier baseline journeys and boundaries
 
 The [current Mac/Windows proof](../pr-assets/beta-collaboration/20261107/composed-private-rc/mac-windows.json)
 used ordinary hosted HTTP/WebSockets from Mac Chromium and actual Windows 11
@@ -217,6 +267,33 @@ and [WebRTC specification](https://www.w3.org/TR/webrtc/). A future LAN optimiza
 needs an explicitly reviewed address/privacy policy, authenticated destination
 checks and negative tests; changing production filtering to the lab policy
 would remove existing protections. No network policy or port forwarding changed.
+
+The [pinned source reread](../pr-assets/beta-collaboration/20261107/private-readiness-followup/relay-same-network-source-review-nov07.json)
+also confirms both endpoints request normal issuer credentials before selecting
+the connection. A direct path does not bypass issuer admission, daily operation
+counters or the session's credential lifetime and transport-byte guard. Those
+limits are distinct from actual provider TURN ingress/egress; a daily operation
+cap does not by itself establish exhausted media bandwidth. The
+[IETF hairpinning description](https://www.rfc-editor.org/rfc/rfc5128.html#section-2.10)
+explains one possible same-NAT constraint, without diagnosing this router.
+
+### Selecting the verified MacBook demo
+
+The [Desktop shortcut readback](../pr-assets/beta-collaboration/20261107/private-readiness-followup/macbook-desktop-shortcut-current-canonical-layout-nov07.json)
+found the named demo still pointing at the older `87bc74f` package. With no
+WebJam app running, its owned symlink was changed atomically to the verified
+`76b1fd7` bundle. The canonical regular private-target manifest, expected codec
+hash and deep strict code signature were rechecked. No app, microphone or
+camera was opened; this is not new listening, Gatekeeper or notarization
+acceptance. Use **WebJam Private Band Demo on the MacBook Desktop** for that
+package; an older Dock shortcut is not this proof.
+
+The [first shortcut preparation](../pr-assets/beta-collaboration/20261107/private-readiness-followup/macbook-desktop-shortcut-current-nov07.json)
+stopped before changing the link because it assumed only one manifest path.
+The [layout review](../pr-assets/beta-collaboration/20261107/private-readiness-followup/macbook-current-package-layout-review-nov07.json)
+identified PyInstaller's canonical Resources file and Frameworks alias. The
+corrected check uses the same canonical regular-file choice as production;
+the final-symlink refusal and app's trust rules were not relaxed.
 
 ## Hosted recovery and delivery-pressure checks
 

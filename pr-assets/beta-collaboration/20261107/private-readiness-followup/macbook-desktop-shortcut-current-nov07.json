@@ -1,0 +1,20 @@
+{
+  "state": "STOPPED_INSPECT_SAME_SHORTCUT_OPERATION_NO_BYPASS",
+  "source": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "at": "2026-11-07T15:38:07.002889+00:00",
+  "oldTarget": "~/Library/Caches/WebJam/private-demo-87bc74f-20261105/intel/WebJam.app",
+  "newTarget": "~/Library/Caches/WebJam/private-demo-76b1fd7-20261105/intel/WebJam.app",
+  "launchedApp": false,
+  "physicalCapture": false,
+  "privacyPermissionChanged": false,
+  "signatureOrTrustBypass": false,
+  "originalExpiryObserverChanged": false,
+  "shortcutChanged": false,
+  "guardBefore": {
+    "load": 1.66748046875,
+    "swapPercent": 5.322265625,
+    "freeGiB": 21.464290618896484
+  },
+  "nativeWebJamAppPidsBefore": [],
+  "failureType": "AssertionError"
+}
