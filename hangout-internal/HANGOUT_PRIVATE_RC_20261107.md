@@ -1,6 +1,15 @@
 # Current private candidate — November 7, 2026 UTC
 
 **The private website is delivered; the overall release candidate remains pending.**
+
+The [Linux browser and generated-music checkpoint](HANGOUT_LINUX_BROWSER_MUSIC_20261107.md)
+adds twelve current hosted stages and complete forty-second generated
+Intel-to-Linux and ARM-to-Linux transport trials on the versions below. The ARM
+trial passed all thirteen resource samples; a later native-import postcheck
+stopped at the unchanged resource guard and remains unqualified. Physical listening,
+instruments, the desktop Shared Track sender and a second network remain
+separate requirements. Its retained first twenty-second failure was a test
+duration error: the original WAV's third chord starts after twenty-six seconds.
 Use this checkpoint instead of the earlier candidate identities. Preserve all
 [62 acceptance requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md), their original
 outcomes and the distinctions between generated tests and real listening.

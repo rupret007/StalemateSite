@@ -1,0 +1,179 @@
+{
+  "state": "PASSED_GENERATED_ARM_LINUX_MEDIA_NORMAL_ISSUANCE_AND_CLEANUP",
+  "startedAt": "2026-11-07T12:28:31.465887+00:00",
+  "nativeSource": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "websiteSource": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "privateVersion": "33862058-10a5-4a6f-9659-38841d70292f",
+  "issuerVersion": "4db649fa-a465-44b4-8487-414987b3a660",
+  "host": "AppleSilicon MacMini arm64 verified package components and tracked services; not desktop GUI",
+  "guest": "Sandboxed Linux Chromium under Ubuntu26.04.1/WSL2; not physical Linux audio/display",
+  "generatedAudioOnly": true,
+  "physicalCapture": false,
+  "recording": false,
+  "actualSharedTrackSender": false,
+  "humanHearingQualified": false,
+  "trialSeconds": 40,
+  "originalNativeDeadlineSeconds": 155,
+  "capMarkerSha256Before": "455ed66975e47e2838d47c2026ebd57e287721d9ad7f09922c72c64b50e35150",
+  "billingObservationAt": "2026-11-07T12:15:31.681584+00:00",
+  "sourceFilesVerifiedBeforeTrial": 32,
+  "storyPoolChanged": false,
+  "turnOrQuotaSettingsChanged": false,
+  "reusesCorrectedFull40SecondFixture": true,
+  "fixtureTimelineVerifiedReadOnly": true,
+  "allThreeChordThresholdsRetained": true,
+  "ownNativeProcessPid": 57700,
+  "nativeProductionCredentialPreparationPassed": true,
+  "browserHarnessSha256": "cc0d377e0adb4e5e860f8fbfced5b3f8f95bd1710a9e6304a8539b47f13ef34c",
+  "browser": {
+    "reusesCorrectedFull40SecondFixture": true,
+    "nativeHostArchitecture": "arm64",
+    "fullOriginalWavDuration": true,
+    "state": "PASSED_GENERATED_LINUX_BROWSER_MEDIA_PENDING_NATIVE_AND_LOGOUT_READBACK",
+    "startedAt": "2026-11-07T12:28:48.629Z",
+    "platform": "Ubuntu26.04.1 x86_64/WSL2 Linux Chromium",
+    "generatedAudioOnly": true,
+    "physicalCapture": false,
+    "recording": false,
+    "actualSharedTrackSender": false,
+    "humanHearingQualified": false,
+    "sandboxRequired": true,
+    "browserOutputMuted": true,
+    "generatedMicrophoneFixtureOnly": true,
+    "automatedHeadphoneCheckboxForMutedGeneratedSignalsOnly": true,
+    "browserVersion": "156.0.8078.4",
+    "ordinaryGuestAdmission": true,
+    "runtimeAssetHashesMatched": 13,
+    "generatedMicDetectionMs": 151,
+    "connectFromJoinClickMs": 8477,
+    "browser": {
+      "elapsedMs": 40050,
+      "toneWindows": 160,
+      "disconnectedWindows": 0,
+      "musicalWindows": {
+        "E": 53,
+        "G": 53,
+        "A": 53
+      },
+      "seconds": 40,
+      "state": "connected",
+      "delayMs": 57,
+      "packetsSent": 2051,
+      "packetsReceived": 2003,
+      "lost": 0,
+      "path": [
+        "relay",
+        "srflx"
+      ]
+    },
+    "generatedResourcesClosed": true,
+    "fixtureCounts": {
+      "generatedCaptureRequests": 1,
+      "displayCaptureRequests": 0
+    },
+    "logoutStatus": 200,
+    "originalAfterLogout": 401,
+    "copiedCookieAfterLogout": 401,
+    "allOwnedBrowserResourcesClosed": true,
+    "completedAt": "2026-11-07T12:29:40.382Z"
+  },
+  "browserExitCode": 0,
+  "remoteBrowserProofSha256": "f0deda6fe38b4c2af51411c6cd4340c7c596c357b387d91f59e89b30317cc1f5",
+  "nativeProcessExitCode": 0,
+  "native": {
+    "wavFramesSent": 1947840,
+    "secondMixerParticipantReady": true,
+    "guestToneAtNativeParticipant": true,
+    "hostBeforeStop": "closed",
+    "fabricStopped": true,
+    "fixtureClosed": true,
+    "mixerStopped": true,
+    "secondMixerBridgeStopped": true,
+    "toneThreadStopped": true,
+    "bridgeReason": "endpoint closed",
+    "generatedGuestToneWindows": 400
+  },
+  "periodicResourceChecks": [
+    {
+      "at": "2026-11-07T12:28:36.490807+00:00",
+      "load1": 4.89697265625,
+      "swapPercent": 78.182421875,
+      "freeGiB": 17.82
+    },
+    {
+      "at": "2026-11-07T12:28:41.506042+00:00",
+      "load1": 4.82470703125,
+      "swapPercent": 78.182421875,
+      "freeGiB": 17.82
+    },
+    {
+      "at": "2026-11-07T12:28:46.518705+00:00",
+      "load1": 4.83837890625,
+      "swapPercent": 78.182421875,
+      "freeGiB": 17.8
+    },
+    {
+      "at": "2026-11-07T12:28:51.534157+00:00",
+      "load1": 4.85107421875,
+      "swapPercent": 78.182421875,
+      "freeGiB": 17.8
+    },
+    {
+      "at": "2026-11-07T12:28:56.541928+00:00",
+      "load1": 4.70263671875,
+      "swapPercent": 78.182421875,
+      "freeGiB": 17.8
+    },
+    {
+      "at": "2026-11-07T12:29:01.551602+00:00",
+      "load1": 4.56591796875,
+      "swapPercent": 78.026171875,
+      "freeGiB": 17.8
+    },
+    {
+      "at": "2026-11-07T12:29:06.567218+00:00",
+      "load1": 4.2802734375,
+      "swapPercent": 78.026171875,
+      "freeGiB": 17.8
+    },
+    {
+      "at": "2026-11-07T12:29:11.585574+00:00",
+      "load1": 4.177734375,
+      "swapPercent": 78.026171875,
+      "freeGiB": 17.8
+    },
+    {
+      "at": "2026-11-07T12:29:16.604730+00:00",
+      "load1": 3.9228515625,
+      "swapPercent": 78.026171875,
+      "freeGiB": 17.8
+    },
+    {
+      "at": "2026-11-07T12:29:21.621930+00:00",
+      "load1": 3.6884765625,
+      "swapPercent": 78.026171875,
+      "freeGiB": 17.8
+    },
+    {
+      "at": "2026-11-07T12:29:26.636417+00:00",
+      "load1": 3.87353515625,
+      "swapPercent": 78.026171875,
+      "freeGiB": 17.8
+    },
+    {
+      "at": "2026-11-07T12:29:31.654028+00:00",
+      "load1": 3.64306640625,
+      "swapPercent": 78.026171875,
+      "freeGiB": 17.8
+    },
+    {
+      "at": "2026-11-07T12:29:36.668824+00:00",
+      "load1": 3.75146484375,
+      "swapPercent": 78.026171875,
+      "freeGiB": 17.8
+    }
+  ],
+  "resourceGuardClosedDuringTrial": false,
+  "capMarkerUnchanged": true,
+  "completedAt": "2026-11-07T12:29:37.520736+00:00"
+}
