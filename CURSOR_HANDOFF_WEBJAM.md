@@ -12,12 +12,15 @@ pins reviewed application `b35e5fcf5904eb99e17de653ddd2234e553bbada`, merged as
 `33862058-10a5-4a6f-9659-38841d70292f`. Both direct CI runs passed, all deployed
 source modules matched, and actual Mac/Windows browser chat, reconnect, mobile
 layout and copied-cookie logout checks passed. Use the receipt's separate
-WebKit resource-guard stop; earlier complete journeys and eight-person/two-room workloads
+completed Intel WebKit journey; earlier eight-person/two-room workloads
 remain evidence for their original runtime. Physical music, shared-track mixing,
 second-network and real Webex acceptance remain pending. Native packages stay
 at `76b1fd7`; reset-hint merge `e735a04` is now imported and deployed to the
 private issuer as `4db649fa-a465-44b4-8487-414987b3a660`. One mailbox admission
-passed without media or a TURN mint; full live music recovery remains unverified.
+passed; a later normal client preflight also obtained valid web credentials
+without capture or a media connection. Real Windows Paint Along provider/control
+checks passed with browser output muted. Full live music recovery remains
+unverified.
 Use direct application CI here, without StoryPool or Karen. Preserve the
 historical evidence below and all 62 original requirements.
 

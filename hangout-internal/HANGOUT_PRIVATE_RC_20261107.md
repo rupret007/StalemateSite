@@ -76,15 +76,29 @@ Single setup observations were 1,371ms on Mac and 1,176ms on Windows. These
 include automation/controller overhead, use one household/network and are
 neither audio latency nor a service-level guarantee.
 
-The scheduled current-version WebKit Art/Jam run waited for the ordinary room
-allowance, then [stopped before opening a browser](../pr-assets/beta-collaboration/20261107/composed-private-rc/webkit-guard-stop.json)
-at the unchanged resource guard. A subsequent read observed 4,144.19/5,120MB
-swap (80.94%), above the existing 80% threshold; load and disk were within their
-limits. This is neither a browser pass nor a production defect. Keep the first
-stop receipt and recheck actual resources before one later attempt. The full
-current WebKit journey remains pending; do not substitute the earlier complete
-run's version. The [November 6 receipt](HANGOUT_PRIVATE_RC_20261106.md) remains
-historical.
+A subsequent [complete Intel WebKit run](../pr-assets/beta-collaboration/20261107/current-journeys/intel-webkit.json)
+passed all twelve stages on this exact deployment, including both entrances,
+13 runtime payload hashes, fresh scrollback/reconnect, drawing, host/guest
+permission separation, Jam invitation sharing, normal closure of both own rooms
+and copied-cookie logout rejection. Setup samples were 1,671/906ms and manual
+reconnect 208ms. Capture requests were zero. These are individual browser
+observations, not audio latency.
+
+The unchanged Mini resource guard had stopped the first scheduled attempt
+[before browser launch](../pr-assets/beta-collaboration/20261107/composed-private-rc/webkit-guard-stop.json).
+It remains stopped; the later run used the Intel laptop's independently passing
+resource guard (load below 2, swap 5.32%, over 21GiB free). QA SDK 1.64.1 and its
+WebKit runtime were isolated in an app-owned cache. No shared installation,
+StoryPool service or OS security setting changed. Preserve the initial SDK
+preparation's missing-Node-PATH failure and its corrected child-process PATH;
+the first failed preparation was not counted as a browser pass.
+
+The new [375px](../pr-assets/beta-collaboration/20261107/current-journeys/webkit-375.png)
+and [390px](../pr-assets/beta-collaboration/20261107/current-journeys/webkit-390.png)
+captures were visually inspected. Page width stayed at the viewport width,
+input/Send remained visible and input text was 16px. The named message list and
+one visible main landmark passed. This is headless WebKit 27.2 on macOS 15.7.9,
+not physical Safari/iPhone or screen-reader qualification.
 
 The [two-room workload](../pr-assets/beta-collaboration/20261107/composed-private-rc/two-room-baseline.json)
 ran on prior `b61bb41` before this delivery: eight ordinary guests in two rooms,
@@ -96,11 +110,42 @@ distributed capacity. The unchanged backend makes it relevant baseline evidence,
 not a repeated load qualification of the new UI.
 
 One [current web mailbox admission](../pr-assets/beta-collaboration/20261107/composed-private-rc/mailbox-admission.json)
-returned empty HTTP 204 with no-store from the real protected Join origin.
-It consumed one normal admission request. No host offer, TURN mint or media
-occurred, and the existing hold file stayed unchanged. This proves mailbox
-admission at that time, not full Web Join recovery, monthly credential headroom
-or which budget caused the older quota error.
+returned empty HTTP 204 with no-store. Later, a separate
+[credential preflight](../pr-assets/beta-collaboration/20261107/current-journeys/web-credential-preflight.json)
+called the deployed Mailbox client's normal credentials method in actual Windows
+Chrome, using a fresh unused synthetic invitation context. Its one request
+returned a validated web-scoped two-server bundle, 600-second TTL and the normal
+256MiB admission budget. The normal endpoint enforces its current request and
+monthly usage policies. Values stayed in browser memory and were discarded with
+the context; no credentials were printed or stored. Logout returned 200 and
+copied-cookie replay 401. The existing hold file remained unchanged.
+
+This confirms current web credential issuance, beyond the earlier mailbox-only
+probe. No host offer, peer connection or media ran. It does not establish which
+budget caused the older error, successful ICE/media, native desktop-key issuance,
+full music recovery or an account-wide spending guarantee. Recheck normal
+headroom and admission before any later bounded media trial; change no limits.
+
+## Current Windows Paint Along
+
+Two ordinary Windows Chrome guests also passed
+[real hosted Paint Along](../pr-assets/beta-collaboration/20261107/current-journeys/windows-paint-provider.json):
+private room creation/invitation, shared drawing, a hidden guest clear control,
+four Bob Ross choices with Grandeur of Summer first, and optional official
+materials links. Both actual YouTube timelines advanced by more than 2.5 seconds;
+host pause/resume propagated and a pasted custom lesson played on both pages.
+No fake provider was used. The browser's output was muted with `--mute-audio`,
+so this is timeline/control evidence, not a hearing test. Physical capture was
+blocked. The own room closed and both logouts returned 200.
+
+Across 159 third-party HTTP requests, no known invitation or first-party cookie
+value matched the checked URL, body or referrer. This is a scoped check of those
+fields, not blanket privacy certification or every header/protocol. The separate
+browser profile used the installed Google-signed Chrome, loopback-only control,
+no fake device/permission or security-disable flags, and endpoint resource checks.
+The first launcher lookup had malformed path separators; the retained failure
+was corrected by resolving the registered, signature-verified Chrome path. No
+browser installation or OS security change was needed.
 
 ## Remaining release work
 
@@ -109,9 +154,14 @@ the successful automated checks above cannot close these gates:
 
 1. Current Mac native host to physical Windows Chrome guest: clear speech both
    ways, a short musical passage, leave/rejoin and measured dropout/latency.
-   The MacBook's older app was still open at the 06:04 UTC read-only check;
-   no app was stopped or competing session launched. When Jeff returns, quit
-   the old app normally, then verify the staged package and actual audio route.
+   Jeff closed the older app. The exact staged Intel `76b1fd7` package and
+   codec hash/signature were rechecked; normal launch opened it at idle. Its
+   default route is the built-in mono mic and external wired headphones.
+   No audio children or capture were observed. OS assistive automation is
+   unavailable, and a normal AppleEvent quit returned User canceled; no force
+   termination or permission override was used. When Jeff is awake, two initial
+   desktop actions may still need him: start Music and copy its fresh browser
+   invitation. Keep unattended physical capture off.
 2. Audible shared WAV/MP3 mix on a second device. Local decoder/generated-mix
    success does not prove that the physical input plus backing track reaches it.
 3. Second-network comparison when available; current same-household results

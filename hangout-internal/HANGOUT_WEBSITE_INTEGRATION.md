@@ -21,15 +21,16 @@ No public website or navigation was changed. The
 [current private release receipt](HANGOUT_PRIVATE_RC_20261107.md) records direct
 exact-head CI, source/configuration readback and current actual Mac/Windows
 browser journeys, with 375/390px containment and logout revocation. It keeps
-current WebKit status and the earlier eight-person/two-room workload evidence
-separate. These results do not qualify physical music, larger capacity or
+completed current Intel WebKit journey and the earlier eight-person/two-room
+workload evidence separate. These results do not qualify physical music, larger capacity or
 public launch.
 
 The native packages below remain source `76b1fd7`. WebJam's later reset-hint
 merge `e735a048de82e26c424e31964a30f1dfbd548df9` passed direct application CI,
 is imported into this candidate, and is deployed separately to issuer version
-`4db649fa-a465-44b4-8487-414987b3a660`. One ordinary web mailbox GET passed;
-credential minting and a full current live music session were not exercised.
+`4db649fa-a465-44b4-8487-414987b3a660`. One ordinary web mailbox GET and a later normal web credential preflight
+passed, without capture or media. The full current live music session remains
+unverified.
 Refresh provider headroom before any bounded media trial and retain all existing
 quotas and capture safeguards. The native package revision remains separate.
 
