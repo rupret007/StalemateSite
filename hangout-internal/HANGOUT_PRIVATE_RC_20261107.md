@@ -126,6 +126,64 @@ budget caused the older error, successful ICE/media, native desktop-key issuance
 full music recovery or an account-wide spending guarantee. Recheck normal
 headroom and admission before any later bounded media trial; change no limits.
 
+## Current unattended Mac/Windows media proof
+
+The subsequent [generated-media trial](../pr-assets/beta-collaboration/20261107/generated-media/mac-windows-generated-media.json)
+passed between the physical Intel MacBook and actual Windows Chrome from
+07:23:44 to 07:25:24 UTC. The host used exact tracked `76b1fd7` Web Join service
+code and the verified package's fabric, Jamulus server and Opus codec. It did
+not drive the packaged desktop UI. Native signature, build, component hashes,
+normal production credential preparation and ordinary private guest admission
+remained enforced. No test credential endpoint or lab candidate policy was used.
+
+| Trial | Windows observations | Native return observation | End/cleanup |
+| --- | --- | --- | --- |
+| 40 seconds; measured 40,419ms | 160/160 beacon windows; each E/G/A WAV band in 53 windows; 2,021 received / 2,070 sent packets; reported lost 0; no disconnected windows | Generated browser tone detected in 403 windows | Host end displayed fresh-invite guidance; streams, contexts, peers, native owners and mixer stopped |
+| Fresh host/invite; 8 seconds; measured 8,141ms | 32/32 beacon windows; 407 received / 435 sent packets; reported lost 0; no disconnected windows | Generated browser tone detected in 83 windows | Normal browser Leave; all owners stopped |
+
+Both selected pairs were Windows-local `relay` / remote `srflx`. The displayed
+listening-delay estimates were 46ms and 44ms. These exclude capture and the host
+bridge and are not measured instrument-to-ear delay. The browser's output was
+muted, its input was generated, and the native peer used original generated
+tones/WAV data. There was no physical capture or recording. The WAV was mixed
+by a synthetic Jamulus participant; the application's Shared Track sender
+backend and physical instruments were not exercised. Human music acceptance
+remains pending. See the [fixture/asset receipt](../pr-assets/beta-collaboration/20261107/generated-media/receipt.json).
+
+The [fresh provider check](../pr-assets/beta-collaboration/20261107/generated-media/provider-preflight.json)
+confirmed both active versions and unchanged effective settings before media.
+The signed-in [billing observation](../pr-assets/beta-collaboration/20261107/generated-media/billing-headroom.json)
+displayed 0.01GB of 1,000GB included and $0 current/projected cost. Those rounded
+values are a point-in-time headroom observation, not a spending guarantee.
+Normal native credential preparation succeeded before each browser joined.
+The prior cap marker was retained byte-for-byte; no limit or hold was deleted,
+reset or overridden. This proves this admission succeeded, not which budget
+caused the older failure or that a future cap cannot recur.
+
+All disposable browser contexts logged out/closed. A subsequent Mac process
+scan found zero WebJam/Jamulus/fabric or fixture-controller processes. The owned
+idle test GUI had earlier declined normal AppleEvent quit; it was stopped with
+SIGTERM only after verifying its exact PID, owner, source, launch age, no network
+sockets and no audio children. That cleanup is not a normal-UI-quit pass. No
+older user session, OS security setting or shared service was changed.
+
+### Same-network relay limitation
+
+At pinned native `76b1fd7`, `transport/internal/webjoin/endpoint.go` uses
+`ICETransportPolicyNoHost`, IPv4 UDP and a remote public-address filter;
+`candidate.go` permits public `srflx` and reviewed relay allocations. The browser
+uses `iceTransportPolicy: "all"`, then filters its sealed signaling. Private LAN
+and Tailscale candidates are therefore excluded in this production Web Join
+path. Same-router placement does not guarantee a direct path. Both actual
+trials selected a relay; no router NAT-hairpin diagnosis follows from that alone.
+
+This matches the candidate-policy distinction in the
+[Pion policy source](https://github.com/pion/webrtc/blob/main/icetransportpolicy.go)
+and [WebRTC specification](https://www.w3.org/TR/webrtc/). A future LAN optimization
+needs an explicitly reviewed address/privacy policy, authenticated destination
+checks and negative tests; changing production filtering to the lab policy
+would remove existing protections. No network policy or port forwarding changed.
+
 ## Current Windows Paint Along
 
 Two ordinary Windows Chrome guests also passed
@@ -154,16 +212,25 @@ the successful automated checks above cannot close these gates:
 
 1. Current Mac native host to physical Windows Chrome guest: clear speech both
    ways, a short musical passage, leave/rejoin and measured dropout/latency.
-   Jeff closed the older app. The exact staged Intel `76b1fd7` package and
-   codec hash/signature were rechecked; normal launch opened it at idle. Its
-   default route is the built-in mono mic and external wired headphones.
-   No audio children or capture were observed. OS assistive automation is
-   unavailable, and a normal AppleEvent quit returned User canceled; no force
-   termination or permission override was used. When Jeff is awake, two initial
-   desktop actions may still need him: start Music and copy its fresh browser
-   invitation. Keep unattended physical capture off.
+   The current generated service/component trials above passed. The exact staged
+   Intel `76b1fd7` package and codec hash/signature were also rechecked, but its
+   desktop physical-audio journey still needs attended acceptance. OS assistive
+   automation is unavailable. When Jeff is awake, initial desktop actions may
+   still need him: start Music and copy its fresh browser invitation. All own
+   native processes are stopped. Keep unattended physical capture off.
 2. Audible shared WAV/MP3 mix on a second device. Local decoder/generated-mix
    success does not prove that the physical input plus backing track reaches it.
+   The current [read-only Mac route preflight](../pr-assets/beta-collaboration/20261107/generated-media/shared-track-route-preflight.json)
+   found no official BlackHole 16ch/64ch device. That prerequisite is absent,
+   rather than a proven sender failure. The shipped backend requires the exact
+   official UID/name/channel contract at 48kHz. Before an attended sender trial,
+   install the official 16ch driver on the host and recheck the route; 2ch and
+   renamed aggregates are rejected. The vendor's
+   [installation guide](https://github.com/ExistentialAudio/BlackHole/wiki/Installation)
+   requires closing audio applications and installing the package. No driver
+   installation, device/default change, audio-service restart or reboot was
+   performed while Jeff slept. This is not a requirement for ordinary browser
+   guests or for hearing another participant's mix.
 3. Second-network comparison when available; current same-household results
    are not Internet-distance rehearsal evidence.
 4. Real Webex video and exclusive audio switching, with no recording. Local

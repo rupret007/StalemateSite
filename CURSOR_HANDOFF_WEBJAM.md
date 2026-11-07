@@ -20,7 +20,12 @@ private issuer as `4db649fa-a465-44b4-8487-414987b3a660`. One mailbox admission
 passed; a later normal client preflight also obtained valid web credentials
 without capture or a media connection. Real Windows Paint Along provider/control
 checks passed with browser output muted. Full live music recovery remains
-unverified.
+unverified for physical instruments. Subsequent current generated Mac-to-Windows
+media trials passed, including audio both ways, WAV chord detection, a fresh
+invite, host end and browser Leave cleanup. No physical capture or desktop
+Shared Track sender ran. The read-only host scan found no official BlackHole
+16ch/64ch route required for that sender. The current receipt gives the exact
+scope and next attended setup; all own native processes are stopped.
 Use direct application CI here, without StoryPool or Karen. Preserve the
 historical evidence below and all 62 original requirements.
 

@@ -29,8 +29,12 @@ The native packages below remain source `76b1fd7`. WebJam's later reset-hint
 merge `e735a048de82e26c424e31964a30f1dfbd548df9` passed direct application CI,
 is imported into this candidate, and is deployed separately to issuer version
 `4db649fa-a465-44b4-8487-414987b3a660`. One ordinary web mailbox GET and a later normal web credential preflight
-passed, without capture or media. The full current live music session remains
-unverified.
+passed, without capture or media. Later bounded generated-audio Mac/Windows
+trials passed with the current native service/package components, including a
+generated WAV mixed by a synthetic Jamulus peer and complete shutdown. The
+desktop UI, physical music and Shared Track sender remain unqualified. The host
+lacks the official BlackHole 16ch/64ch route needed for that sender; see the
+current receipt for the attended prerequisite and same-network relay policy.
 Refresh provider headroom before any bounded media trial and retain all existing
 quotas and capture safeguards. The native package revision remains separate.
 
