@@ -1,10 +1,19 @@
 # WebJam / Hang Out — Cursor continuation
 
-**November 6 resume point.** Start with the
+**November 7 UTC resume point.** Start with the
 [website integration and private candidate guide](hangout-internal/HANGOUT_WEBSITE_INTEGRATION.md).
 It identifies the currently staged build and private Worker, the Stalemate,
 Rad Dad and neutral partner entrance checks, and the remaining live music and
 release gates. Use its revisions for new work.
+
+The current [private release receipt](hangout-internal/HANGOUT_PRIVATE_RC_20261106.md)
+pins hosted application `b61bb416d7af39d2fe3a41529ddd65520e5305ca` to private Worker
+version `75655a50-9e13-4966-bb68-22b45a230c1d`. Complete hosted Chromium and WebKit
+journeys and the bounded eight-person chat workload passed. Physical music,
+Shared Track mixing, second-network and real Webex acceptance remain pending.
+Native packages remain source `76b1fd7`; WebJam's later relay reset-hint merge
+`e735a04` is not deployed or imported into this hosted candidate. Use direct
+application CI here, without StoryPool. Preserve the historical evidence below.
 
 **Historical checkpoint, November 5 at 01:06 UTC (November 4 locally):**
 
