@@ -10,6 +10,17 @@ The invitation-only address is
 Stalemate and Rad Dad remain two entrances to the same service. Public band
 navigation has not been changed. Invitations and credentials are not included.
 
+**Prepared browser update:** this branch imports the access countdown from
+[WebJam PR #450](https://github.com/rupret007/webjam/pull/450), source
+`1b0c4f56399843747e82655c0d7a994290b54127`, with all thirteen provenance records
+verified. Only four runtime files changed: Join HTML, CSS, app and session code.
+The connected page shows this browser's access deadline, gives one final-minute
+warning, and offers Leave with keyboard focus. Host shutdown may happen sooner.
+Existing expiry/shutdown and provider policies are unchanged. This is prepared
+source, not a deployment claim; the live identities below remain separate.
+The real eight-hour expiry observer is still pending on the unchanged private
+runtime. Do not substitute a clock-controlled UI fixture for that observation.
+
 ## Exact delivery
 
 | Component | Observed revision or deployment |
@@ -183,6 +194,45 @@ and [WebRTC specification](https://www.w3.org/TR/webrtc/). A future LAN optimiza
 needs an explicitly reviewed address/privacy policy, authenticated destination
 checks and negative tests; changing production filtering to the lab policy
 would remove existing protections. No network policy or port forwarding changed.
+
+## Hosted recovery and delivery-pressure checks
+
+The [five-guest private-room run](../pr-assets/beta-collaboration/20261107/overnight-recovery/five-guest-reconnect.json)
+passed on the live version below the delivery table: five ordinary WebKit guests,
+one keyed/invite-only QA room, and three simultaneous client-initiated socket
+closes with code 4000. Automatic reconnect assigned fresh identities in 1,408ms.
+Explicit room rejoin retained founder controls and the founder's unsent private
+draft, without sending it or moving it into the lobby. Earlier received text
+was absent after reconnect. A fresh line appeared once per guest. The own room
+closed; all five normal logouts returned 200 and copied cookies went from 200
+before logout to 401 afterward. This is controlled socket-recovery evidence,
+not an unannounced TCP outage or a sixteen-client hosted storm.
+
+The [original](../pr-assets/beta-collaboration/20261107/overnight-recovery/first-originless-cleanup.json)
+and [second](../pr-assets/beta-collaboration/20261107/overnight-recovery/second-nonjson-cleanup.json)
+attempts remain failures: all recovery stages passed, but cleanup returned 403.
+The first runner omitted exact Origin and JSON; the second used browser fetch
+but still omitted JSON. The service correctly retained its request protections
+and did not revoke those tokens. Both rooms/contexts closed. The corrected run
+used normal same-origin JSON logout; no service rule or assertion was relaxed.
+See the [harness correction record](../pr-assets/beta-collaboration/20261107/overnight-recovery/harness-corrections.json).
+
+In the separate [acknowledgement-stall probe](../pr-assets/beta-collaboration/20261107/overnight-recovery/ack-stall.json),
+two ordinary guests waited through the existing two-minute PM gate and accepted
+their synthetic private conversation. Only one test browser then suppressed its
+application delivery acknowledgements. After 129 paced private-message attempts,
+it had received 128 sequenced frames and the service closed it with 4413. It
+remained paused rather than reconnecting automatically. The healthy peer stayed
+connected and received a fresh ordinary help response. Both logouts returned
+200; owned contexts closed. No physical capture, provider credential issuance,
+new room, quota change or other person's PM content was involved.
+
+This qualifies the exercised hosted application-credit boundary and isolation.
+The receiving browser still drained its network socket; physical slow TCP,
+browser suspension, larger capacity and deployed hibernation/restart remain
+separate. The [receipt](../pr-assets/beta-collaboration/20261107/overnight-recovery/receipt.json)
+pins these files to source `b35e5fc` / version `33862058`, rather than claiming
+they were run on the prepared countdown update.
 
 ## Current Windows Paint Along
 

@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-07T07:50:58.894782+00:00",
+  "initialAttempt": "Five recovery stages passed; originless/non-JSON logout API request correctly returned403",
+  "secondAttempt": "Five recovery stages passed; browser logout fetch still omitted JSON content type/body and correctly returned403; copied cookies remained valid",
+  "authoritativeContract": "hangout-worker/src/beta-entry.mjs:226 requires exact Origin and application/json for all beta POSTs",
+  "normalClient": "beta-entry.mjs CLIENT accessPost uses application/json and JSON.stringify(body)",
+  "correction": "Use browser fetch with JSON headers and empty JSON object, without changing the service",
+  "originalFailuresPreserved": true,
+  "roomAndGuestLimitsUnchanged": true,
+  "priorTwoOwnRoomsClosed": true,
+  "nextAttemptCount": 1
+}

@@ -1,0 +1,38 @@
+{
+  "websiteSource": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "websiteVersion": "33862058-10a5-4a6f-9659-38841d70292f",
+  "sourceScope": "Hosted chat/PM backend and lobby; browser Join countdown candidate was not deployed during these tests",
+  "fiveGuestReconnect": {
+    "passed": true,
+    "simultaneousOwnSocketCloses": 3,
+    "closeCode": 4000,
+    "reconnectMs": 1408,
+    "founderPowerPreserved": true,
+    "privateDraftPreservedWithoutSendingOrMovingToLobby": true,
+    "freshHistory": true,
+    "allFiveCopiedCookiesDeniedAfterLogout": true,
+    "unannouncedTcpLossQualified": false
+  },
+  "ackStall": {
+    "passed": true,
+    "guests": 2,
+    "pmGateWaitMs": 130036,
+    "messagesAttemptedAfterStall": 129,
+    "sequencedFramesAfterStall": 128,
+    "stalledCloseCode": 4413,
+    "healthyPeerCloses": 0,
+    "healthyPeerFreshResponse": true,
+    "physicalSlowTcpQualified": false
+  },
+  "initialCleanupFailuresPreserved": true,
+  "newRoomOrGuestLimitsChanged": false,
+  "physicalCapture": false,
+  "providerCredentialsMinted": false,
+  "files": {
+    "ack-stall.json": "4499259fbfd4512528c97183b46cc1e363f28c83974fdff596f52f84981ae809",
+    "first-originless-cleanup.json": "15bed02067ab8c05b3d6d52add7a31b650a871f092009d205b850d7d001d2db9",
+    "five-guest-reconnect.json": "dc7d49d8cc8dfe2ad93b49104199932f42ba092a72d530f02f13bb03c9cd8667",
+    "harness-corrections.json": "ea0c9af65df22cbc96932dcfbb6346bf3ef1a4476449c58c02ec3949e7530028",
+    "second-nonjson-cleanup.json": "f3f461b4044f550c1e08b3335c1cda7d0a2a6a4f7fdd0eec1226f29c3fbf498e"
+  }
+}

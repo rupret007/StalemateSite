@@ -6,6 +6,13 @@ It identifies the currently staged build and private Worker, the Stalemate,
 Rad Dad and neutral partner entrance checks, and the remaining live music and
 release gates. Use its revisions for new work.
 
+This branch also contains a prepared Web Join access countdown, pinned to
+WebJam PR #450 / `1b0c4f5`. It has not replaced the live private runtime.
+The current receipt separately records the new five-guest hosted reconnect
+and acknowledgement-stall checks on `b35e5fc`, including their original failed
+cleanup requests and the corrected complete pass. Keep these scopes separate
+from the still-running eight-hour observer and any later deployment.
+
 The current [private release receipt](hangout-internal/HANGOUT_PRIVATE_RC_20261107.md)
 pins reviewed application `b35e5fcf5904eb99e17de653ddd2234e553bbada`, merged as
 `45fc36450e0542559818897cf7c200f0a346fd0e`, to private Worker version
