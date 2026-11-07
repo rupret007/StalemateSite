@@ -1,0 +1,30 @@
+{
+  "state": "ALL_LOCAL_UNIT_TESTS_PASSED_AFTER_REAL_FIXTURE_MODULE_IMPORT",
+  "tests": 2091,
+  "files": 138,
+  "workers": 1,
+  "fileParallelism": false,
+  "logSha256": "1b6294c9c69fa5167a27467c564fe2357e7cd6c8925d002ef3ecfce18b0bb2c6",
+  "runtimeSourceRevision": "ec1b4a09d6c375433aedb33f56c3deb9590350ac",
+  "fixtureFileSha256": {
+    "tests/unit/hangout-lobby-client-context.test.js": "84c63a4be934cb89c43c5eeb85caad4381e4789e22814ebbde58e4d619e8b3ac",
+    "tests/unit/hangout-beta-entry-context.test.js": "98e53c862895a2370512b82460cd27ff611a99d04f9f7bba4616cb29a5f2fcf6",
+    "tests/unit/hangout-keep-signin.test.js": "334814f229bf7544a3e0a09989f52c6fa838274b34014369b948fc9ad129ebc7",
+    "tests/unit/hangout-message-recovery-client.test.js": "cc085d20ad35a86fe448beeabfe4eed7d86664b14e7179b7146b9facb78fdc79",
+    "tests/unit/hangout-sharing-controls-client.test.js": "49f83fcd6e9c5205f4027eb6291b733bb373876214018c67c07533865a89a0b6"
+  },
+  "firstLocalFullRun": {
+    "state": "INCOMPLETE_SPARSE_CHECKOUT_REQUIRED_FIXTURES_MISSING",
+    "filesFailed": 28,
+    "filesPassed": 110,
+    "testsFailed": 27,
+    "testsPassed": 1958,
+    "retainedLogSha256": "013ac23028b9c7f9c241acfc7aa9b57ddbeb526f0ad29937958e05a2674e93cd",
+    "correction": "Complete only the isolated application checkout from Git; preserve all assertions and guard thresholds."
+  },
+  "unhandledErrorsObserved": false,
+  "productionCodeChangedForFixtureCorrection": false,
+  "originalExpiryObserverChanged": false,
+  "physicalCapture": false,
+  "providerCalls": false
+}

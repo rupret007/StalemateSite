@@ -6,6 +6,7 @@ import { betaFetch } from '../../hangout-worker/src/beta-entry.mjs';
 import * as entryFunctions from '../../r/45662413410ed051/entry-sites.mjs';
 import { BetaSessions } from '../../hangout-worker/src/beta-sessions.mjs';
 import { createEntrySharing } from '../../r/45662413410ed051/lobby/entry-sharing.mjs';
+import { createIdleHeartbeat } from '../../r/45662413410ed051/lobby/idle-heartbeat.mjs';
 import { createChatAnnouncements } from '../../r/45662413410ed051/lobby/chat-announcements.mjs';
 
 const root = '/r/45662413410ed051/';
@@ -162,7 +163,7 @@ describe('optional storage in the actual private beta client', () => {
                 };
                 window.eval(await bootstrap.text());
                 expect(window.HangoutEntrySites).toContainEqual({ id: 'makers', label: 'Makers' });
-                window.HangoutClientTestModules = { ...entryFunctions, createEntrySharing, createChatAnnouncements };
+                window.HangoutClientTestModules = { ...entryFunctions, createEntrySharing, createIdleHeartbeat, createChatAnnouncements };
                 window.eval(discovery);
                 const imports = [...client.matchAll(/^import \{([^}]+)\} from '[^']+';/gm)].map(match => match[1]).join(',');
                 window.eval(`const {${imports}} = window.HangoutClientTestModules;\n${client.replace(/^import .*$/gm, '')}`);

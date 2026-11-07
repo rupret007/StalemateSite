@@ -40,3 +40,10 @@ The initial exact-head runtime CI failure is retained in `initial-runtime-ci.jso
 Its greeting expectation lacked the new numeric capability; only that expected
 field was added. The failed runs remain failures. The corrected head requires
 new normal CI, not a rerun of the unchanged failed head.
+
+`client-fixture-ci-correction.json` retains the next head: both existing Worker
+runtime CI runs passed, while both main CI runs caught five jsdom environments
+missing the real keepalive module. `full-local-unit.json` records all 2,091
+units passing after that module was supplied. The first local broad run used an
+incomplete sparse checkout; its missing-fixture result is preserved separately.
+New exact-head normal CI remains required after these fixture corrections.
