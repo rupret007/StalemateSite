@@ -1,0 +1,17 @@
+{
+  "state": "STOPPED_INSPECT_ORIGINAL_WINDOWS_CHECK_NO_RETRY",
+  "startedAt": "2026-11-07T18:26:51.569914+00:00",
+  "source": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+  "version": "c2271048-aaa3-4649-8e9e-48dd46212da5",
+  "runtimeBefore": {
+    "deployment": "1a83f7e5-7ed1-4aa7-8af5-bd68fb6a8fcf",
+    "version": "c2271048-aaa3-4649-8e9e-48dd46212da5"
+  },
+  "harnessSha256": "262e2d7ac6a0cd400c7d4b0729504ed22b769eb78b40c69646c85b748103e0e7",
+  "physicalCapture": false,
+  "newRooms": 0,
+  "providerCredentials": false,
+  "storyPoolUsed": false,
+  "failureType": "JSONDecodeError",
+  "completedAt": "2026-11-07T18:26:51.646156+00:00"
+}

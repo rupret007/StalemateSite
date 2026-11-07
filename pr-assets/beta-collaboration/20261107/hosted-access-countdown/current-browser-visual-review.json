@@ -1,0 +1,37 @@
+{
+  "state": "FOUR_CURRENT_PRIVATE_BROWSER_SCREENSHOTS_VISUALLY_REVIEWED",
+  "at": "2026-11-07T18:39:34.902543+00:00",
+  "websiteSource": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+  "websiteVersion": "c2271048-aaa3-4649-8e9e-48dd46212da5",
+  "images": [
+    {
+      "file": "hosted-webkit-375-c227104-nov07.png",
+      "sha256": "3722580138ebaa0c49aae4869dafc7d8f4a6f4e1a7dfae4bdd356b94edaa26cf"
+    },
+    {
+      "file": "hosted-webkit-390-c227104-nov07.png",
+      "sha256": "dcedbeae8acc0cf5b2d1f98252495e3d4d112f1e6d6f5de9353f0266d4ebe137"
+    },
+    {
+      "file": "windows-c227-chat-check-20261107/windows-c227-375.png",
+      "sha256": "abec6c8d981238be8f496d505de4bf5a58d8053254b3aa2606ff108d19bbf943"
+    },
+    {
+      "file": "windows-c227-chat-check-20261107/windows-c227-390.png",
+      "sha256": "fbb3cf12481bcc1bbf8ddc8c35e01283ae5ad175120c72ba598bfce57be806c7"
+    }
+  ],
+  "observed": [
+    "No page horizontal clipping at375px or390px; welcome and chat lines wrap",
+    "Starter and action strips remain within their own horizontally scrolling rows; their offscreen options are not all visible simultaneously",
+    "Input and Send stay inside the viewport; input16px separately asserted by browser measurement",
+    "Connected indicator, arrival-site backlink and bottom navigation remain legible",
+    "Screenshots contain only harmless synthetic test chat, no invite or credentials"
+  ],
+  "limits": [
+    "Desktop browser viewport checks, not physical iPhone keyboard or touch interaction",
+    "No screen-reader/assistive-technology conformance claim",
+    "No live microphones, camera, physical listening or provider issuance"
+  ],
+  "releaseCandidateReady": false
+}

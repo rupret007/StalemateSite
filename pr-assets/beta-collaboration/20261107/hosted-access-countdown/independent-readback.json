@@ -1,0 +1,9 @@
+{
+  "state": "EXACT_BROWSER_PROOF_HARNESS_AND_OWNED_PROCESS_CLEANUP_VERIFIED",
+  "proofSha256": "8b4e82d74f8988945f18f41ea5d414ce15a8cc9e828f9db368f8c837d62d61d5",
+  "harnessSha256": "fb18902f252203775e111b93c5810f7a4fe440d1f21311bb66ded6cc2718eedf",
+  "ownedProcessesRemaining": [],
+  "screenshotSha256": "db38077baa783ca544480aa692464c5e3378238afcfbf3c69b30457db74a9e11",
+  "at": "2026-11-07T17:33:02.995493+00:00",
+  "visualReviewPending": true
+}
