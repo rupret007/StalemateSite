@@ -1,0 +1,176 @@
+{
+  "startedAt": "2026-11-07T09:16:48.710Z",
+  "source": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "version": "33862058-10a5-4a6f-9659-38841d70292f",
+  "scope": "Actual protected Worker: nine independent WebKit guests, three three-person temporary Art rooms, four paced chat rounds; one Intel Mac and one household; not large distributed capacity or media proof",
+  "guards": [
+    {
+      "load": 2.11767578125,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.860389709472656
+    },
+    {
+      "load": 2.11767578125,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.860389709472656
+    },
+    {
+      "load": 2.02783203125,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.860332489013672
+    },
+    {
+      "load": 2.02783203125,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.860183715820312
+    },
+    {
+      "load": 2.02783203125,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.860198974609375
+    },
+    {
+      "load": 2.185546875,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.860149383544922
+    },
+    {
+      "load": 2.185546875,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.860126495361328
+    },
+    {
+      "load": 2.185546875,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.860061645507812
+    },
+    {
+      "load": 2.185546875,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.85999298095703
+    },
+    {
+      "load": 2.49072265625,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.859024047851562
+    },
+    {
+      "load": 2.49072265625,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.85879898071289
+    },
+    {
+      "load": 2.37109375,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.858753204345703
+    },
+    {
+      "load": 2.37109375,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.85873794555664
+    },
+    {
+      "load": 2.26123046875,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.85873031616211
+    }
+  ],
+  "logout": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+  ],
+  "stateAfterLogout": [
+    401,
+    401,
+    401,
+    401,
+    401,
+    401,
+    401,
+    401,
+    401
+  ],
+  "copiedCookieChecks": [
+    {
+      "before": 200,
+      "after": 401
+    },
+    {
+      "before": 200,
+      "after": 401
+    },
+    {
+      "before": 200,
+      "after": 401
+    },
+    {
+      "before": 200,
+      "after": 401
+    },
+    {
+      "before": 200,
+      "after": 401
+    },
+    {
+      "before": 200,
+      "after": 401
+    },
+    {
+      "before": 200,
+      "after": 401
+    },
+    {
+      "before": 200,
+      "after": 401
+    },
+    {
+      "before": 200,
+      "after": 401
+    }
+  ],
+  "roomsClosed": [
+    true,
+    true,
+    true
+  ],
+  "captureRequests": 0,
+  "admissionStatuses": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+  ],
+  "crossRoomDeliveries": 0,
+  "duplicateDeliveries": 0,
+  "setupMs": 13236,
+  "roomCounts": [
+    3,
+    3,
+    3
+  ],
+  "roomLimit": 8,
+  "workloadMs": 10851,
+  "messages": 36,
+  "deliveries": 108,
+  "expectedDeliveries": 108,
+  "peerDeliveryMs": {
+    "samples": 72,
+    "p50": 62,
+    "p95": 72,
+    "max": 73
+  },
+  "status": "passed",
+  "completedAt": "2026-11-07T09:17:16.056Z"
+}
