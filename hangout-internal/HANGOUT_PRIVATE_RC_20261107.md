@@ -296,8 +296,12 @@ the successful automated checks above cannot close these gates:
    guests or for hearing another participant's mix.
 3. Second-network comparison when available; current same-household results
    are not Internet-distance rehearsal evidence.
-4. Real Webex video and exclusive audio switching, with no recording. Local
-   controls/fixtures are not a real meeting or browser SDK qualification.
+4. Real Webex video and an
+   [attended manual audio handoff](HANGOUT_WEBEX_AUDIO_HANDOFF.md), with no
+   recording. The current integration opens an external meeting and can bring
+   verified native Webex forward on Mac. Automatic cross-app muting/switching
+   and an embedded browser meeting are not implemented. Local controls/fixtures
+   are not a real meeting or browser SDK qualification.
 5. Remaining platform and accessibility acceptance. Native Intel/ARM packages
    are separate from browser support. Windows native remote Join still needs
    appropriate trusted signing; no signing purchase is authorized. Linux physical
