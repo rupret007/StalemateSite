@@ -17,6 +17,20 @@ On November 6, the protected private website served Worker version
 [site PR #210](https://github.com/rupret007/StalemateSite/pull/210) have the
 same tree, `588509579d6a95d089a3207eea4a2f4d9ab70a12`.
 
+The tested application candidate advanced to `54cf2799c34ffcc344d9fedd72b05e047897d6ef`
+on the private beta branch. [Site PR #216](https://github.com/rupret007/StalemateSite/pull/216)
+added the browser's Direct connection or Relayed connection indicator, following
+[WebJam PR #446](https://github.com/rupret007/webjam/pull/446). The candidate passed
+both website CI jobs and all 69 packaged files matched the merged source.
+The served deployment identity above remains the last hosted verification.
+
+The guest recovery update from [WebJam PR #447](https://github.com/rupret007/webjam/pull/447)
+distinguishes a confirmed usage cap from a temporary outage. A local relay Worker
+fixture used one shared daily request across the mailbox and credential routes.
+It denied issuance before UTC midnight, resumed it after midnight, and denied
+the next request at the new day's cap. The fixture used mocked provider calls.
+Live relay recovery still requires a separate private trial.
+
 The private native packages come from
 `76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c`. All four targets passed the
 [private package run](https://github.com/rupret007/webjam/actions/runs/42169901070).
