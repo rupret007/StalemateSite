@@ -9,6 +9,7 @@ declare the overall private release candidate complete.
 - [Mac and Windows browser checks, ownership and retained setup stops](../../../../hangout-internal/HANGOUT_CURRENT_BROWSER_CHECKS_20261107.md)
 - [Actual Shared Track prerequisite and next listening check](../../../../hangout-internal/HANGOUT_SHARED_TRACK_NEXT_CHECK_20261107.md)
 - [Preparation manifest and declared public excerpts](receipt.preparation.json)
+- [Existing entry-toolkit payloads and current-source input readback](community-entry-toolkit-current-input-readback.json)
 
 The forty-second Intel-to-Linux generated trial and its connected countdown
 passed. Current Intel WebKit and actual Windows Chrome browser checks also
@@ -16,6 +17,12 @@ passed; their capture APIs were blocked/intercepted. The Windows mic-denial case
 is simulated. Four current browser screenshots were visually inspected at
 375px/390px. These are separate observations and cannot be combined into an
 unperformed physical Mac-to-Windows music or desktop Shared Track test.
+
+The existing entry ZIP was also read in memory: all eight members and seven
+manifested payloads matched, and all five exporter/source inputs remain identical
+at the current repair source. Its original `b35e5fc` manifest and archive were
+not changed. This qualifies reuse of that finite link toolkit, not a complete
+application distribution or a published band-site navigation change.
 
 The original failed real eight-hour observation remains failed in the earlier
 repair packet. A distinct real-duration observation of the repaired deployment

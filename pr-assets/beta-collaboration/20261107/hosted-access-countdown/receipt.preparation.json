@@ -141,9 +141,14 @@
       "sha256": "296e01f24c9a15aa880989ab4778ccac82d63c71cd8bb15579fdc2d84ec6e373",
       "originalSha256": "296e01f24c9a15aa880989ab4778ccac82d63c71cd8bb15579fdc2d84ec6e373",
       "transform": "exact bytes"
+    },
+    "community-entry-toolkit-current-input-readback.json": {
+      "sha256": "ebcdf159e02ea979312f3a6231dc0cfaccb340b1b8cc397a1e3ad3db9dc1600e",
+      "originalSha256": "ebcdf159e02ea979312f3a6231dc0cfaccb340b1b8cc397a1e3ad3db9dc1600e",
+      "transform": "exact bytes; new read-only current-input qualification"
     }
   },
-  "updatedAt": "2026-11-07T18:40:14.006100+00:00",
+  "updatedAt": "2026-11-07T18:50:36.134335+00:00",
   "currentBrowserEndpoints": {
     "intelWebKit": "27.2 on macOS15.7.9;12stages;reconnect329ms;no physical capture",
     "windowsChrome": "156.0.8078.80 on Windows11;7stages;reconnect268ms;one simulated mic denial;no physical capture"

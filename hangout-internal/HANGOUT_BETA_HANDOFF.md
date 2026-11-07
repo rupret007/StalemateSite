@@ -1,7 +1,11 @@
 # Invitation-only community beta handoff
 
 For the current private delivery, exact runtime and scoped hosted journeys, see
-the [November 7 candidate receipt](HANGOUT_PRIVATE_RC_20261107.md). Application
+the [November 7 repair receipt](HANGOUT_PRIVATE_REPAIR_20261107.md) and
+[current Mac/Windows browser checks](HANGOUT_CURRENT_BROWSER_CHECKS_20261107.md).
+The [earlier candidate receipt](HANGOUT_PRIVATE_RC_20261107.md) retains its
+explicitly historical baseline. Dated runtime statements below are not the
+current deployment identity. Application
 CI and private delivery proceed directly in this session at Jeff's instruction;
 older pending/Karen statements below retain their historical scope.
 
@@ -128,6 +132,13 @@ assigned application review, CI and private delivery directly to this session,
 without StoryPool/Karen. For new work, use reviewed current source and actual
 GitHub Actions results, reconcile live settings and preserve existing holds.
 
+The distinct repaired observation on version
+`c2271048-aaa3-4649-8e9e-48dd46212da5` is now running toward its original
+November 8, 2026, 01:16:36.764 UTC expiry. Do not update that runtime or its
+configuration during the observation. It is not yet a PASS. Preparing Stalemate
+and Rad Dad entrance links to that existing community requires no backend
+deployment. Public navigation remains unchanged until release readiness.
+
 Use a clean, isolated checkout of the reviewed release commit. Before building,
 record the effective active configuration privately and reconcile it with the
 candidate beta config. Tracked defaults are not a backup of live settings.
@@ -144,10 +155,43 @@ and origin before using the commands below. If the live value differs, stop
 and reconcile it with the deployment owner. Preserve the separate WebJam issuer
 and its existing CORS, credentials and quota policy.
 
+Preserve **every active plain setting**, not only that origin. The reviewed
+November 7 delivery carried all seventeen `plain_text` binding values explicitly
+and checked secret binding names, namespace IDs and the remaining effective
+settings afterward. Re-read the full active set before future work; seventeen
+is an observation, not permission to drop a newly added setting. Tracked values
+can override operator state even with `--keep-vars`. A command that overrides
+only `WEBJAM_WEB_ORIGINS` is therefore not the complete release specification.
+
+For a later private release, the normal application delivery procedure must:
+
+1. Record the reviewed head, passing matching CI, active version/settings and
+   compatible rollback candidate privately. Resolve any new operator change
+   against the intended release before proceeding.
+2. Supply every reconciled existing plain value as a separate `--var` argument
+   to the pinned Wrangler process, alongside `--keep-vars` and the explicit beta
+   config. Use an argument array, preserving empty strings and structured JSON
+   exactly; do not concatenate values into shell code. Secrets never enter that
+   array or the plain-values file.
+3. Inspect the dry run of that complete specification and its matched packaged
+   inputs. Keep its output private because plain settings can contain staff
+   emails or Access audience identifiers. A successful dry run is not delivery.
+4. Recheck the active deployment/settings before the normal delivery step;
+   reconcile intervening changes rather than overwriting them. After delivery,
+   independently compare source/served assets, every effective setting, secret
+   binding name and namespace ID, then run the scoped hosted journeys.
+
+Cloudflare documents that [`--var` overrides matching configuration values](https://developers.cloudflare.com/workers/wrangler/commands/workers/)
+and that deployment/configuration can affect dashboard settings. The project's
+observed preservation check above adds the explicit all-current-values rule.
+This is not a new approval gate, secret rotation or permission to lift a hold.
+
 Run from that checkout's repository root. Use the beta config explicitly for
 every Wrangler command; the existing vault-upload script targets the main
-Worker and is not a beta deploy command. The following commands do not grant
-release approval or lift an incident pause.
+Worker and is not a beta deploy command. Reuse valid exact-head CI rather than
+repeating it without a change. If local checks are needed, run the following
+only with normal resource guards open; they build/test and list deployments,
+and do not activate a new version.
 
 ```sh
 npm ci
@@ -155,9 +199,7 @@ npm run test:install-browsers
 npm run test:unit
 npm run test:e2e
 npm run package:beta
-webjam_beta_origin='https://stalemate-hangout-beta.jeffstory007.workers.dev'
-npx --yes wrangler@4.151.1 deploy --config hangout-worker/wrangler.beta.toml \
-  --dry-run --keep-vars --var "WEBJAM_WEB_ORIGINS:$webjam_beta_origin"
+npx --yes wrangler@4.151.1 deployments list --config hangout-worker/wrangler.beta.toml
 ```
 
 The existing beta secrets are already provisioned; do not replace them as part
@@ -169,12 +211,11 @@ hangout-worker/wrangler.beta.toml`. Do not put values in command arguments. A
 deployment without them fails closed. Provider secrets are optional only while
 their corresponding features remain explicitly disabled.
 
-```sh
-webjam_beta_origin='https://stalemate-hangout-beta.jeffstory007.workers.dev'
-npx --yes wrangler@4.151.1 deploy --config hangout-worker/wrangler.beta.toml \
-  --keep-vars --var "WEBJAM_WEB_ORIGINS:$webjam_beta_origin"
-npx --yes wrangler@4.151.1 deployments list --config hangout-worker/wrangler.beta.toml
-```
+No bare deploy command is supplied here: the active, reconciled configuration is
+part of the release input, and it cannot be represented by a stale single-origin
+example. Use the normal application delivery procedure above after any active
+observation/hold permits it. Do not upload the original main-Worker vault bundle
+or rotate stable beta secrets as a substitute.
 
 After the private deployment, verify that the active version retained the
 approved origin, invitation version, secret bindings and existing Durable Object

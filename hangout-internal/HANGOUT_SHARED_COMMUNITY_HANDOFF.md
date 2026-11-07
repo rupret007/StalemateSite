@@ -1,22 +1,28 @@
 # Shared-community integration and release handoff
 
-For the November 6 private build and the hosted Stalemate and Rad Dad entry
-checks, start with the [website integration guide](HANGOUT_WEBSITE_INTEGRATION.md).
-Use that guide for current setup, rollback and support steps.
+For the November 7 protected runtime and latest hosted Stalemate/Rad Dad entry
+checks, start with the [website integration guide](HANGOUT_WEBSITE_INTEGRATION.md)
+and [private repair receipt](HANGOUT_PRIVATE_REPAIR_20261107.md). The website is
+source `d8c08fb88b94429f03d13d9beaf01d8ffd301e1a`, version
+`c2271048-aaa3-4649-8e9e-48dd46212da5`; native packages remain source
+`76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c`. Use live readback before any
+future delivery. The real-duration repaired expiry observation and essential
+physical music checks remain pending; this is not a release admission.
 
-Current continuation, October 31: start with the
-[website integration guide](HANGOUT_WEBSITE_INTEGRATION.md) and
-[current private evidence](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md). Private
-source4ed/versiona972 and native sourcebf24 supersede the dated revisions below.
-The repository now supplies `hangout-worker/tools/package-community-toolkit.mjs` for the
+The repository supplies `hangout-worker/tools/package-community-toolkit.mjs` for the
 documented self-contained, committed-source entry toolkit. Its manifest binds
 the exported public files; the toolkit does not contain or deploy the full app.
 Jeff's October30 direction makes application code, project CI, docs and PRs
 independent of StoryPool/Karen. Shared core/services/operational state and all
 existing provider/trust/public-release holds remain outside these changes.
 The older ownership/review statements below are historical, not new gates.
+Adding the two entrance links does not require a community backend deployment.
+Preserve the immutable private version during the active expiry observation and
+leave public navigation unchanged until the release is ready.
 
-Application source assessment, October 25, 2026. This is a reviewable handoff to
+## Historical architecture baseline
+
+Application source assessment, October 25, 2026. This was a reviewable handoff to
 StoryPool 10-21-26, which owns core, Karen, deployments and shared operations. It
 does not execute a deployment, change a hold, choose a public launch date or
 claim legal/platform readiness. Read [the product/integration description](HANGOUT_SHARED_COMMUNITY.md)
