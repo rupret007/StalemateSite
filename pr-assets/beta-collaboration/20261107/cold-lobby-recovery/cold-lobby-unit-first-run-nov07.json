@@ -1,0 +1,42 @@
+{
+  "state": "COLD_LOBBY_UNIT_TEST_FAILED_INSPECT_ORIGINAL_NO_RETRY",
+  "startedAt": "2026-11-07T14:31:18.624203+00:00",
+  "guardBefore": {
+    "load1": 0.1025390625,
+    "memoryAvailableGiB": 14.440555572509766,
+    "swapPercent": 13.406753540039062,
+    "freeGiB": 722.7294654846191
+  },
+  "base": "ffe494fed634196a19a30c43c08ee5488a44de8f",
+  "sourceFiles": 43,
+  "physicalCapture": false,
+  "providerCredentials": false,
+  "globalConfigOrServicesChanged": false,
+  "installScriptsEnabled": false,
+  "npmCiExitCode": 0,
+  "guardBeforeTests": {
+    "load1": 0.1025390625,
+    "memoryAvailableGiB": 14.407093048095703,
+    "swapPercent": 13.406753540039062,
+    "freeGiB": 722.5834121704102
+  },
+  "unitExitCode": 1,
+  "unitSummary": [
+    " Test Files  1 failed (1)",
+    "   Duration  352ms (transform 185ms, setup 0ms, import 0ms, tests 0ms, environment 0ms)",
+    " FAIL  hangout-worker/tests/beta.test.js [ hangout-worker/tests/beta.test.js ]",
+    "Error: Cannot find module '../../r/45662413410ed051/sync-core.js' imported from <owned-qa-cache>/hangout-worker/src/lobby-act.mjs"
+  ],
+  "guardAfterTests": {
+    "load1": 0.1025390625,
+    "memoryAvailableGiB": 14.38897705078125,
+    "swapPercent": 13.406753540039062,
+    "freeGiB": 722.5833892822266
+  },
+  "sourceHashesStillMatch": true,
+  "completedAt": "2026-11-07T14:31:21.821099+00:00",
+  "publicExcerpt": {
+    "omission": "Absolute owned QA-cache path only; original retained",
+    "scope": "Import failed before any product assertions; missing shared source was added without changing product code or assertions."
+  }
+}

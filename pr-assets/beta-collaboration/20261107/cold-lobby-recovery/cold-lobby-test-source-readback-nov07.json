@@ -1,0 +1,15 @@
+{
+  "all44StagedSourceAndLockInputsStillMatch": true,
+  "filesVerified": 44,
+  "unitTestsStartedByReadback": false,
+  "browserOrProviderStarted": false,
+  "at": "2026-11-07T14:43:11.239308+00:00",
+  "parent": "ffe494fed634196a19a30c43c08ee5488a44de8f",
+  "changedSourceFiles": {
+    "hangout-worker/src/beta-entry.mjs": "ad6d0623e88c1ae0390bed2ce9a19db13b92a97544083d62f5bfa6559b719000",
+    "hangout-worker/tests/beta.test.js": "1efacaa79a8f94b54d3852353fa1d002948a307303c915cba7bf5f5e1f7a8f24"
+  },
+  "allOtherStagedInputsByteExactToParent": true,
+  "localPreviewSourceMatchesTestedSource": true,
+  "both375And390ScreenshotsVisuallyInspected": true
+}

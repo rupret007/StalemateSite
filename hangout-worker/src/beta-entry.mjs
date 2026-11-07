@@ -16,6 +16,23 @@ export { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget };
 const ROOT = '/r/45662413410ed051/';
 const CSP = "default-src 'self'; script-src 'self' https://challenges.cloudflare.com https://www.youtube.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' wss: https://challenges.cloudflare.com https://www.youtube.com https://*.googlevideo.com; img-src 'self' data: blob: https://i.ytimg.com; media-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 const WEB_JOIN_CSP = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' https://webjam-turn-credentials.jeffstory007.workers.dev; media-src 'self' blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+const LOBBY_ENTRANCE = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Private invitation required · Hang Out</title>
+<link rel="stylesheet" href="/beta/style.css">
+</head>
+<body>
+<main>
+<h1>Enter Hang Out</h1>
+<p>Use your private invitation to enter the community or return to a saved lobby bookmark.</p>
+<p><a class="button" href="/beta/">Enter invitation</a></p>
+<p>Camera and microphone stay off.</p>
+</main>
+</body>
+</html>`;
 const WEB_JOIN_ENTRANCE = `<!doctype html>
 <html lang="en">
 <head>
@@ -252,6 +269,13 @@ async function betaRequest(request, env, deps = {}) {
     }
     const session = await betaSession(request, env);
     if (!session) {
+        if (['GET', 'HEAD'].includes(request.method) && !request.headers.get('Upgrade')
+            && [`${ROOT}lobby`, `${ROOT}lobby/`, `${ROOT}lobby/index.html`].includes(assetPath)) {
+            return reply(request.method === 'HEAD' ? null : LOBBY_ENTRANCE, 401, 'text/html; charset=utf-8', {
+                'Content-Security-Policy': "default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+                'Permissions-Policy': 'camera=(), geolocation=(), microphone=()',
+            });
+        }
         if (['GET', 'HEAD'].includes(request.method) && ['/join', '/join/', '/join/index.html'].includes(assetPath)) {
             return reply(request.method === 'HEAD' ? null : WEB_JOIN_ENTRANCE, 401, 'text/html; charset=utf-8', {
                 'Content-Security-Policy': "default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
