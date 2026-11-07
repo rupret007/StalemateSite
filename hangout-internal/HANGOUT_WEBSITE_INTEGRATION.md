@@ -25,6 +25,15 @@ completed current Intel WebKit journey and the earlier eight-person/two-room
 workload evidence separate. These results do not qualify physical music, larger capacity or
 public launch.
 
+The prepared Join update in this branch is separately pinned to WebJam
+`1b0c4f56399843747e82655c0d7a994290b54127` / PR #450. It adds a browser-access
+clock and one-minute warning, and focuses Leave after connection. All thirteen
+copied files retain exact upstream hashes and the MIT notice. This import
+changes no backend, provider policy, native package, namespace or public site.
+Complete its own application CI and private delivery/readback before describing
+it as hosted. The current real-time expiry observer retains its original
+runtime and must finish or be explicitly recorded as interrupted.
+
 The native packages below remain source `76b1fd7`. WebJam's later reset-hint
 merge `e735a048de82e26c424e31964a30f1dfbd548df9` passed direct application CI,
 is imported into this candidate, and is deployed separately to issuer version

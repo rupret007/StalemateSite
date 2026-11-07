@@ -1,14 +1,14 @@
 {
   "repository": "https://github.com/rupret007/webjam",
-  "commit": "e735a048de82e26c424e31964a30f1dfbd548df9",
-  "sourcePR": "https://github.com/rupret007/webjam/pull/449",
+  "commit": "1b0c4f56399843747e82655c0d7a994290b54127",
+  "sourcePR": "https://github.com/rupret007/webjam/pull/450",
   "license": "MIT",
   "modifications": {},
   "files": {
     "app.js": {
       "source": "web/join/app.js",
-      "upstreamSha256": "91f8ef7bd8ed121eaeb17f31abb1c45a29f8168189f427eb1a73d9888131d3d5",
-      "shippedSha256": "91f8ef7bd8ed121eaeb17f31abb1c45a29f8168189f427eb1a73d9888131d3d5"
+      "upstreamSha256": "52fa8d275ad1c3efa0b428670c1e99a4db16a21f65f00ccc79124cf0db869596",
+      "shippedSha256": "52fa8d275ad1c3efa0b428670c1e99a4db16a21f65f00ccc79124cf0db869596"
     },
     "audio.js": {
       "source": "web/join/audio.js",
@@ -32,8 +32,8 @@
     },
     "index.html": {
       "source": "web/join/index.html",
-      "upstreamSha256": "feeb6dca1d68b233beca97cdee20ba031eab38c3dcd2f3d11bf0b322c9d57a32",
-      "shippedSha256": "feeb6dca1d68b233beca97cdee20ba031eab38c3dcd2f3d11bf0b322c9d57a32"
+      "upstreamSha256": "7c43dd28e955dbe54c221924c11137ad65669cf2ff6975bb9f46077ddb960a3e",
+      "shippedSha256": "7c43dd28e955dbe54c221924c11137ad65669cf2ff6975bb9f46077ddb960a3e"
     },
     "mailbox.js": {
       "source": "web/join/mailbox.js",
@@ -52,13 +52,13 @@
     },
     "session.js": {
       "source": "web/join/session.js",
-      "upstreamSha256": "a4853968d78c8cb77752cfffb1681d93587672e99967aed17360cac7f8a196a9",
-      "shippedSha256": "a4853968d78c8cb77752cfffb1681d93587672e99967aed17360cac7f8a196a9"
+      "upstreamSha256": "1855ed9acb576cad13230f1a422578c848af35173887a9c797209689d2d3d044",
+      "shippedSha256": "1855ed9acb576cad13230f1a422578c848af35173887a9c797209689d2d3d044"
     },
     "style.css": {
       "source": "web/join/style.css",
-      "upstreamSha256": "c67b53f021e74904f4141d1a28caebe2c06dbaef7d7ba0c6ce9f115ad110811e",
-      "shippedSha256": "c67b53f021e74904f4141d1a28caebe2c06dbaef7d7ba0c6ce9f115ad110811e"
+      "upstreamSha256": "af2689b995cefcc4cb67377d5dbddcd7824aff764c1fd32e4117dc6ae4217369",
+      "shippedSha256": "af2689b995cefcc4cb67377d5dbddcd7824aff764c1fd32e4117dc6ae4217369"
     },
     "_headers": {
       "source": "web/join/_headers",
