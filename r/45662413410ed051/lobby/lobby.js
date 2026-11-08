@@ -1203,6 +1203,7 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
         $('[data-jam-invite-qr-toggle]').setAttribute('aria-expanded', 'false');
         $('[data-jam-invite-qr-toggle]').textContent = 'Show QR code';
         $('[data-jam-link]').value = ''; $('[data-jam-form]').hidden = true;
+        $('[data-jam-host-steps]').hidden = true;
         $('[data-jam-wait]').hidden = false;
         const web = $('[data-jam-web]'); web.disabled = true; web.onclick = null; web.textContent = 'Browser join unavailable';
     }
@@ -1277,6 +1278,7 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
         if (/^webjam:\/\//.test(next.desktop)) desktop.setAttribute('href', next.desktop);
         else desktop.removeAttribute('href');
         const shared = !!(next.invitation || next.webReady);
+        $('[data-jam-host-steps]').hidden = !next.host || shared;
         $('[data-jam-actions]').hidden = next.host && !shared;
         $('[data-jam-wait]').hidden = shared; $('[data-jam-copy]').hidden = !next.invitation;
         const browserLink = browserInviteLink(next);
