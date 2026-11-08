@@ -1,0 +1,146 @@
+{
+  "scope": "Existing Windows Chrome local frontend previews; not deployed-candidate, physical-phone, media or complete accessibility evidence",
+  "candidateMerge": "844a32850d5a68c741b393e25b6ad11ba9b64890",
+  "candidateTree": "992a18759df2055d7b29fc5496fc2cda30305ce0",
+  "browserVersion": "156.0.8078.80",
+  "backendSource": "71bff2cd6a5e352492eb7aaa304385182b378652",
+  "backendVersion": "2c5c81e5-1aa4-4ea7-be69-cacda13c20e8",
+  "screenshots": [
+    {
+      "file": "host-375.png",
+      "sha256": "c5e3ac71353e51b532216279ab730b087b812af799033a278682bcd69e4dad4c",
+      "geometry": {
+        "width": 375,
+        "height": 812,
+        "documentWidth": 375,
+        "app": {
+          "x": 0,
+          "y": 111,
+          "width": 375,
+          "height": 701,
+          "font": "15px"
+        },
+        "buffer": {
+          "x": 0,
+          "y": 529,
+          "width": 375,
+          "height": 100,
+          "font": "14px"
+        },
+        "input": {
+          "x": 46,
+          "y": 679,
+          "width": 248,
+          "height": 48,
+          "font": "16px"
+        },
+        "send": {
+          "x": 299,
+          "y": 685,
+          "width": 58,
+          "height": 36,
+          "font": "11px"
+        },
+        "jamVisible": true,
+        "helpOpen": false,
+        "hostFormVisible": true,
+        "visibleHostSteps": true,
+        "platform": "A Mac hosts music in WebJam. Mac and Windows guests can join in a browser. Windows native music needs a signed build; this unsigned beta cannot join natively.",
+        "waitVisible": false,
+        "otherPeople": 0
+      },
+      "originalProofSha256": "7e11a87d7b8c0ae37d79e241ed7293280a296d0984fe1e288e63cf95138fc7e1",
+      "captureScope": "LOCAL CANDIDATE PREVIEW de08ef0 in normal Windows Chrome: three frontend response overrides over the unchanged protected 71b backend. NOT deployed candidate evidence; no media, native app or invitation publication",
+      "visuallyInspectedNoPrivateInvitesOrMeetingIdentifiers": true
+    },
+    {
+      "file": "host-390.png",
+      "sha256": "02dea7f3f30edc5898c0b74b1f9c0dc27e5f37e774275c93cf0c292a46e1a8f6",
+      "geometry": {
+        "width": 390,
+        "height": 844,
+        "documentWidth": 390,
+        "app": {
+          "x": 0,
+          "y": 111,
+          "width": 390,
+          "height": 733,
+          "font": "15px"
+        },
+        "buffer": {
+          "x": 0,
+          "y": 561,
+          "width": 390,
+          "height": 100,
+          "font": "14px"
+        },
+        "input": {
+          "x": 46,
+          "y": 711,
+          "width": 263,
+          "height": 48,
+          "font": "16px"
+        },
+        "send": {
+          "x": 314,
+          "y": 717,
+          "width": 58,
+          "height": 36,
+          "font": "11px"
+        },
+        "jamVisible": true,
+        "helpOpen": false,
+        "hostFormVisible": true,
+        "visibleHostSteps": true,
+        "platform": "A Mac hosts music in WebJam. Mac and Windows guests can join in a browser. Windows native music needs a signed build; this unsigned beta cannot join natively.",
+        "waitVisible": false,
+        "otherPeople": 0
+      },
+      "originalProofSha256": "7e11a87d7b8c0ae37d79e241ed7293280a296d0984fe1e288e63cf95138fc7e1",
+      "captureScope": "LOCAL CANDIDATE PREVIEW de08ef0 in normal Windows Chrome: three frontend response overrides over the unchanged protected 71b backend. NOT deployed candidate evidence; no media, native app or invitation publication",
+      "visuallyInspectedNoPrivateInvitesOrMeetingIdentifiers": true
+    },
+    {
+      "file": "composer-real-400-percent.png",
+      "sha256": "c431d216db63e397d3a3aeb019e770d711f0b4f486fa5abda17086c0de03fd76",
+      "geometry": {
+        "width": 320,
+        "height": 232,
+        "dpr": 4,
+        "documentWidth": 320,
+        "input": {
+          "x": 46,
+          "y": 183.25,
+          "width": 193.25,
+          "height": 46,
+          "font": "16px"
+        },
+        "send": {
+          "x": 242.25,
+          "y": 190.25,
+          "width": 58,
+          "height": 32,
+          "font": "11px"
+        },
+        "hostSteps": false,
+        "otherPeople": 0
+      },
+      "originalProofSha256": "b239c9f0d65bcbd0a8c683118734efdc8e3070ce33f61f738e13a84db2908190",
+      "captureScope": "Actual Chrome Appearance Page zoom UI in an owned temporary profile; local de08 candidate frontend overrides over unchanged private backend. Not deployed or full WCAG conformance evidence.",
+      "visuallyInspectedNoPrivateInvitesOrMeetingIdentifiers": true
+    }
+  ],
+  "sourceBinding": {
+    "sourceHtmlAndJsUnchangedSinceMobilePreview": true,
+    "responseHtmlIsTemplateOutputNotRawSource": true,
+    "real400PercentCssMatchesFinalMergedBytes": true,
+    "finalCssSha256": "e473caf86b50dc653641c0b388956005b8461c27ae98b5d055200c7792df1e7c",
+    "mobileCaptureSource": "de08ef0bc927ee420757251b15b70e49cb783917",
+    "laterCssChange": "10px Send scroll margin in existing short/narrow media query; mobile capture CSS predates this separate fix, real400 capture covers final CSS"
+  },
+  "captureRequests": 0,
+  "externalProviderRequests": 0,
+  "ownedResourcesDisposed": true,
+  "privateInvitesAndCredentialsExcluded": true,
+  "all62RequirementsSha256": "3d5db107977f652a1bd51286c02657aaff70c9c3590adb876e03f6d909679999"
+}

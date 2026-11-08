@@ -10,6 +10,18 @@ approval or evidence that a live website contains the candidate.
 
 ## Select one tested candidate
 
+The application branch now includes the merged UI work from #241/#242 at
+`844a32850d5a68c741b393e25b6ad11ba9b64890`, tree
+`992a18759df2055d7b29fc5496fc2cda30305ce0`. Its current-head source CI passed
+cleanly and actual Chrome previews verified host setup guidance and deep-zoom
+composer focus. It is **not deployed**: the 19:48 UTC readback still found the
+private runtime below. Use the
+[latest candidate matrix](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md#application-candidate)
+to distinguish source, packaging, delivered assets and physical acceptance.
+The receiving owner must re-read actual effective configuration and preserve
+all existing bindings, namespace IDs, secrets, origins, caps and holds before
+delivery. Public links remain unpublished while the release candidate is pending.
+
 **Current protected runtime, verified November 8 at 08:45 UTC; release candidate
 still pending:** website source `71bff2cd6a5e352492eb7aaa304385182b378652` /
 [PR 239](https://github.com/rupret007/StalemateSite/pull/239), merge
