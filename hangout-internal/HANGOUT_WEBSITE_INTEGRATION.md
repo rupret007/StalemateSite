@@ -10,23 +10,30 @@ approval or evidence that a live website contains the candidate.
 
 ## Select one tested candidate
 
-**Current protected runtime, verified November 8 UTC; release candidate still
-pending:** website source `ac9b82f42c8d6952193f5cbefbf11fc04816821d` /
-[PR 236](https://github.com/rupret007/StalemateSite/pull/236), merge
-`84e77d6d8513a4f8ecce713835b97aa3a547b66c`, identical reviewed/merged tree
-`7037bd7b5a4b32841af313402545256b5943053e`. Private Worker version
-`449fe7d2-0ac3-41b8-b622-fda2453b38db`, deployment
-`9c793eb0-60a9-4c45-91b1-76cf3918ed61`, was read back at 100% with exact code
-and preserved settings. The preceding C227 runtime has a completed real expiry
-baseline but lacks the new heartbeat and browser audio cleanup. The older
-`33862058` runtime has the known idle-expiry defect. Neither is a blind rollback
-recommendation; retain current source, keys, namespaces and effective controls.
+**Current protected runtime, verified November 8 at 08:45 UTC; release candidate
+still pending:** website source `71bff2cd6a5e352492eb7aaa304385182b378652` /
+[PR 239](https://github.com/rupret007/StalemateSite/pull/239), merge
+`76ccf7b14c5a13943e1750a56fac3d79611eb387`, reviewed/merged tree
+`3236c54ac2c0418e3d0469b717a38dadfbaf952c`. Private Worker version
+`2c5c81e5-1aa4-4ea7-be69-cacda13c20e8`, deployment
+`e75182dd-8ac7-484a-809b-a80f6a8ac52e`, was independently read back at 100%.
+The update only changes Web Join's initial invalid-link recovery and provenance.
+All backend source contents and actual Worker JavaScript bytes are unchanged
+from version 449; effective settings, namespaces, issuer and caps were preserved.
+Eight deployed Windows Chrome recovery/prejoin cases and screenshots at
+375/390px passed without capture or provider media. The broader lobby/music
+observations below retain their actual version 449 or earlier scopes.
+
+The preceding C227 runtime has a completed real expiry baseline but lacks the
+new heartbeat and browser audio cleanup. The older `33862058` runtime has the
+known idle-expiry defect. Neither is a blind rollback recommendation; retain
+current source, keys, namespaces and effective controls.
 
 Start with the [current readiness handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
-and its sanitized evidence packet. Current Intel SDK WebKit and actual Windows
+and its sanitized evidence packet. Earlier version 449 Intel SDK WebKit and actual Windows
 Chrome checks passed branded chat, 375/390px containment, draft-preserving
 reconnect and logout revocation; owned cleanup was independently verified.
-The current 110-minute heartbeat observation passed with ten ping/pong pairs
+The version 449 110-minute heartbeat observation passed with ten ping/pong pairs
 and no socket closures. Independent cleanup and a separate metadata readback
 are verified; the original postcheck failures remain in the evidence.
 The earlier [generated-media trial](HANGOUT_HOSTED_COUNTDOWN_PROOF_20261107.md)
@@ -36,8 +43,8 @@ accessibility or public readiness. All
 [62 requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md) remain in force.
 
 The browser-access clock and subsequent real WebKit audio-context teardown
-corrections are delivered from WebJam source
-`5dde45d2e841fd19ff9c1fd055f88520fbf778e4`, with the thirteen provenance
+corrections remain included in current WebJam source
+`84193760a0d10050a649d0872151c30637997c63`, with the thirteen provenance
 records and MIT notice retained. The earlier generated trial demonstrated the
 connected countdown on its own recorded source. The original repaired C227
 eight-hour observation is now terminal with expired-cookie denial and cleanup
@@ -50,7 +57,9 @@ The separate issuer remains source `e735a048de82e26c424e31964a30f1dfbd548df9`,
 version `4db649fa-a465-44b4-8487-414987b3a660`. Generated package-component
 trials are not desktop UI, physical listening or Shared Track proof. The
 [next Shared Track check](HANGOUT_SHARED_TRACK_NEXT_CHECK_20261107.md) records
-the missing official BlackHole 16ch/64ch route on the MacBook. Refresh normal
+the verified installed BlackHole 16ch/48 kHz device on the MacBook. Do not
+reinstall it. Active desktop routing and audible GUI Shared Track playback still
+need verification. Refresh normal
 provider headroom before any new bounded media trial and retain existing quotas,
 trust, capture and resource guards.
 
@@ -96,8 +105,10 @@ separate community backends.
 The existing [eight-file entry toolkit ZIP](../pr-assets/beta-collaboration/20261107/composed-private-rc/community-entry-toolkit-b35e5fc.zip)
 is reusable: [current input readback](../pr-assets/beta-collaboration/20261108/current-private-readiness/entry-toolkit-reuse.json)
 verified all seven manifested payloads, the eight-member archive and all five
-exporter/source inputs against deployed source `ac9b82f` and the recorded
-documentation checkpoint. Its own manifest remains correctly
+exporter/source inputs against source `ac9b82f` and the recorded documentation
+checkpoint. A [current-source readback](../pr-assets/beta-collaboration/20261108/invalid-invite-recovery/entry-toolkit-current-inputs.json)
+confirms those same five inputs and the existing archive remain byte-identical
+on deployed source `71bff2c`. Its own manifest remains correctly
 pinned to `b35e5fc`; it was not rewritten or relabeled. The toolkit contains
 finite link tooling, not the complete application, native builds or a private
 invitation. Optional registrations still start disabled and unverified.

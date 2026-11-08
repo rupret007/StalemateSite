@@ -3,6 +3,10 @@
   "source": "71bff2cd6a5e352492eb7aaa304385182b378652",
   "version": "2c5c81e5-1aa4-4ea7-be69-cacda13c20e8",
   "files": {
+    "entry-toolkit-current-inputs.json": {
+      "sha256": "6383b2efb467b565395085ed4a0625476ed81f97cd916dcf07ba6d29d745448d",
+      "bytes": 1514
+    },
     "hosted-proof.json": {
       "sha256": "ce43fe93495d4479c89d8e5afb81c0b3582195a2f25b45b789f46ae6937ae92f",
       "bytes": 2439

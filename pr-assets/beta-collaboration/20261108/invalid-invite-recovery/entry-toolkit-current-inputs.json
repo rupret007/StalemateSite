@@ -1,0 +1,38 @@
+{
+  "state": "EXISTING_ENTRY_ARCHIVE_AND_FIVE_CURRENT_SOURCE_INPUTS_UNCHANGED",
+  "source": "71bff2cd6a5e352492eb7aaa304385182b378652",
+  "earlierReadback": "../current-private-readiness/entry-toolkit-reuse.json",
+  "sourceInputs": [
+    {
+      "path": "hangout-internal/community-integration.example.json",
+      "sha256": "0170b5a23d6faaf661d99c990f9888c199633d8af3f785ffdea4a219e71a5d9b",
+      "bytes": 616
+    },
+    {
+      "path": "hangout-worker/src/community-integration.mjs",
+      "sha256": "5ea48d0d88c3b1e766d72e9e32e9573b3c23b529643a74b3091ffaf1308d3221",
+      "bytes": 6884
+    },
+    {
+      "path": "r/45662413410ed051/entry-sites.mjs",
+      "sha256": "af76f0cccec4e7bdffdb8f01574d71bf5d7a5a6dee738bfc5fd4169942e157fb",
+      "bytes": 5124
+    },
+    {
+      "path": "scripts/package-community-entry.mjs",
+      "sha256": "12cb470deb3f7509fcde4c6a459698d6a27ee5f2482c183be55a7e23fe3ed2eb",
+      "bytes": 2750
+    },
+    {
+      "path": "hangout-worker/tools/package-community-toolkit.mjs",
+      "bytes": 11057,
+      "sha256": "2bd4bb305578cc8a97d5023c810e675e9d995d491084685bfd755db5ccb3ffa5"
+    }
+  ],
+  "archivePath": "pr-assets/beta-collaboration/20261107/composed-private-rc/community-entry-toolkit-b35e5fc.zip",
+  "archiveSha256": "07bdb02a673b36dbcfcf061e57645b5e2d7159484e31d27a4cb4084616c732b1",
+  "archiveOriginalSource": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "archiveRewritten": false,
+  "packageExecuted": false,
+  "domainOwnershipOrLiveSiteNavigationQualified": false
+}
