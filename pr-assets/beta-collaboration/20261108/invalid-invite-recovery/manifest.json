@@ -1,0 +1,66 @@
+{
+  "state": "PRIVATE_RECOVERY_HOSTED_PASS_WITH_SCOPED_EVIDENCE",
+  "source": "71bff2cd6a5e352492eb7aaa304385182b378652",
+  "version": "2c5c81e5-1aa4-4ea7-be69-cacda13c20e8",
+  "files": {
+    "entry-toolkit-current-inputs.json": {
+      "sha256": "6383b2efb467b565395085ed4a0625476ed81f97cd916dcf07ba6d29d745448d",
+      "bytes": 1514
+    },
+    "hosted-proof.json": {
+      "sha256": "ce43fe93495d4479c89d8e5afb81c0b3582195a2f25b45b789f46ae6937ae92f",
+      "bytes": 2439
+    },
+    "independent-readback.json": {
+      "sha256": "74aae09097779f7359302920287c2b2c874fde9f4be9673f194a8f536ae87d21",
+      "bytes": 2413
+    },
+    "invite-recovery-expired-375-71b-nov08.png": {
+      "sha256": "57817e5f1a91b14b8dd0bd652bbce6f4e1188c110d07a3e5ca8767c47cb676f5",
+      "bytes": 17425
+    },
+    "invite-recovery-expired-390-71b-nov08.png": {
+      "sha256": "0e66005bcb25f3391f93237a846198489e02bda23dba157a3465c9961c266514",
+      "bytes": 17551
+    },
+    "invite-recovery-malformed-375-71b-nov08.png": {
+      "sha256": "0eb7445fcecc7d6df6b766c25544d9fd2b4c7cada2cea3ffe2448fd4986cd61b",
+      "bytes": 17268
+    },
+    "invite-recovery-malformed-390-71b-nov08.png": {
+      "sha256": "fd639677f08c02b888251c3dee81bd775f8a947aa20f1bc9d05b1c786cbe3e8d",
+      "bytes": 17327
+    },
+    "invite-recovery-missing-375-71b-nov08.png": {
+      "sha256": "0eb7445fcecc7d6df6b766c25544d9fd2b4c7cada2cea3ffe2448fd4986cd61b",
+      "bytes": 17268
+    },
+    "invite-recovery-missing-390-71b-nov08.png": {
+      "sha256": "fd639677f08c02b888251c3dee81bd775f8a947aa20f1bc9d05b1c786cbe3e8d",
+      "bytes": 17327
+    },
+    "invite-recovery-valid-375-71b-nov08.png": {
+      "sha256": "d6081c1d43404d641d22e20bbf536f6b0445b4fa778dd0f0a1a1c10f6725e82a",
+      "bytes": 22206
+    },
+    "invite-recovery-valid-390-71b-nov08.png": {
+      "sha256": "9ee10c0988198959960bbc523f94e54de5325edb487389d240c504110fff1659",
+      "bytes": 22442
+    },
+    "postflight.json": {
+      "sha256": "91dc15d2451670751f983dd429890192c77a093defaa8e8f624c24a095018d2c",
+      "bytes": 1042
+    },
+    "private-delivery-summary.json": {
+      "sha256": "4b473413e5eaf63ad8d36a038d1cd2d6a1570e3864f761baf30327252d0383f8",
+      "bytes": 2033
+    },
+    "provider-start-current-inputs.json": {
+      "sha256": "4b3172cd301bcb7e61d14f1e74f0c8a17686b2d89daa8d03ca01da697462a4f3",
+      "bytes": 8195
+    }
+  },
+  "secretsInvitesMeetingLinksRecordingsExcluded": true,
+  "originalFailuresAndEarlierProofsRetained": true,
+  "releaseCandidateReady": false
+}

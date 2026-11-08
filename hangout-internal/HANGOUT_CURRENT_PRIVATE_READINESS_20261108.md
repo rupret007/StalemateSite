@@ -6,10 +6,89 @@ pending.** This handoff records the private runtime delivered November 8 UTC
 [62 acceptance requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md). It is not a
 public-launch approval. The two public websites have not been changed.
 
-## Start here
+## Latest private update — November 8, 08:45 UTC
+
+The current private Worker is **`2c5c81e5-1aa4-4ea7-be69-cacda13c20e8`**,
+100% deployment `e75182dd-8ac7-484a-809b-a80f6a8ac52e`. Reviewed website
+source `71bff2cd6a5e352492eb7aaa304385182b378652` was merged through
+[PR 239](https://github.com/rupret007/StalemateSite/pull/239) as
+`76ccf7b14c5a13943e1750a56fac3d79611eb387`, tree
+`3236c54ac2c0418e3d0469b717a38dadfbaf952c`. Its Web Join import is exactly
+`84193760a0d10050a649d0872151c30637997c63` from
+[WebJam PR 453](https://github.com/rupret007/webjam/pull/453).
+
+This fixes a demonstrated dead end: an invalid invite previously told people to
+tap a hidden Retry control. It now asks for a fresh complete browser invitation
+and hides unusable Join/Retry/Leave and prejoin controls. A valid fresh link still
+shows the compact audio check with Join visible and disabled until its normal
+requirements are met. Parsing, cryptography and media behavior are unchanged.
+
+Both website CI runs passed **2,091 units / 138 files, 851 browser cases and
+34 + 34 smokes each**. The upstream browser CI passed **69 cases**; all three
+upstream exact-head runs passed. Full raw logs and actual source trees were
+reviewed before merging. Website/browser CI remains separate from the explicit
+workerd provider-start mode qualified below.
+
+The private update changed only `join/app.js` and its provenance. Its actual
+Worker JavaScript SHA256 remains
+`12280eb44c9893200a699badda53226b80ab8a5b5b953292bfacc7f843df3ee8`,
+and all 66 backend source contents match the earlier 449 baseline. Effective
+settings, namespaces, issuer and cap marker were independently rechecked after
+delivery. The Mini's compile/upload guard was closed, so the exact candidate was
+dry-built and delivered from a separate Windows application cache with its
+actual memory/disk, signed Node and Restricted-policy guards. No StoryPool,
+shared services, public site or guard override was involved.
+
+Installed Windows Chrome 156 verified all fourteen served runtime asset hashes,
+ordinary private guest admission, six missing/malformed/expired-link cases at
+375/390px, and two valid-link prejoin cases at those widths. All eight screenshots
+were read back by hash and visually inspected. Text wraps, no page overflow was
+observed, and valid Join remains fully visible. Capture requests and external
+requests were zero. Logout returned 200 and original/copied cookies then
+returned 401. A separate readback confirmed the owned process/listener/task gone
+and PowerShell still Restricted. See the
+[hash-bound recovery packet](../pr-assets/beta-collaboration/20261108/invalid-invite-recovery/manifest.json).
+
+**The release candidate is still pending.** The earlier full lobby, heartbeat and
+generated music evidence below remains scoped to version 449; do not relabel it
+as a new complete end-to-end test. The staged native package is still source
+`76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c`. Current human Mac-to-Windows
+speech/music, desktop WAV/MP3 Shared Track, Webex video/manual exclusive audio,
+and the remaining operator/platform checks below are not completed by this UI
+fix. Webex's existing Personal Room must still be confirmed through normal
+settings; no meeting or capture was started while Jeff slept.
+
+## Provider-start CI dependency resolved
+
+The originally requested command
+`npm run --silent test:lobby-session-runtime -- --participation --provider-start`
+actually ran in [CI run 42459839175](https://github.com/rupret007/StalemateSite/actions/runs/42459839175),
+job `128666554107`, on the equal-tree checkout of source `b504bd5`. Its full
+retained log and actual command/result were inspected. All **51 source entries**
+and **68 compiled bundle inputs** match current deployed source `71bff2c` and
+the matched installed dependency bytes. This is input-bound reuse of that real
+CI result, not a newly dispatched full-tree test on `71bff2c`.
+
+The mode proves the real workerd/SQLite owner, read-only transaction-before-start
+ordering, Stop/revoke refusal, held-response progress, callback-close fence and
+cold cleanup without replay. The first child was intentionally killed by the
+existing runner; recovery exited zero, owned processes were absent and temporary
+state was removed. Its two provider-start callbacks were inert. The separate
+egress-probe counter was **one intercepted/denied call**, then zero after cold
+recovery; do not relabel every counter as zero or claim external activation.
+
+The [source-bound receipt](../pr-assets/beta-collaboration/20261108/invalid-invite-recovery/provider-start-current-inputs.json)
+resolves the original eighth-mode request; older pending notes are historical.
+A description of an additional “frozen native-provider” test does not redefine
+that original command. This mode does **not** qualify frozen desktop audio,
+real provider activation, guardian/legal decisions, hearing, Webex, capacity or
+the other existing runtime modes by itself. Production AI remains off. Physical
+music, Shared Track and Webex acceptance are still pending as described below.
+
+## Earlier full lobby baseline — version 449
 
 The browser lobby is ready for further private evaluation. Actual Intel Mac
-WebKit and Windows Chrome checks on the current runtime passed chat, both
+WebKit and Windows Chrome checks on version 449 passed chat, both
 entrances, reconnect, mobile containment and logout. Music still needs the
 current Mac-host-to-Windows listening and instrument checks, desktop backing-track
 playback and actual Webex handoff. Earlier human listening and generated-audio
@@ -17,7 +96,7 @@ successes have different build/platform scopes and do not complete those checks.
 
 | Component | Exact identity |
 | --- | --- |
-| Reviewed website source, [PR 236](https://github.com/rupret007/StalemateSite/pull/236) | `ac9b82f42c8d6952193f5cbefbf11fc04816821d` |
+| Earlier reviewed website source, [PR 236](https://github.com/rupret007/StalemateSite/pull/236) | `ac9b82f42c8d6952193f5cbefbf11fc04816821d` |
 | Application branch merge | `84e77d6d8513a4f8ecce713835b97aa3a547b66c` |
 | Identical source/merge tree | `7037bd7b5a4b32841af313402545256b5943053e` |
 | Private Worker version | `449fe7d2-0ac3-41b8-b622-fda2453b38db` |
@@ -39,7 +118,7 @@ StoryPool, shared services, CI workflows, conductor state or shared operational
 files. Public release, AI, separate Hang Out chat/media TURN, trust controls,
 spending limits and existing provider holds remain unchanged.
 
-## Demonstrated results and their limits
+## Earlier version 449 results and their limits
 
 | Evidence | Actual result | What it does not prove |
 | --- | --- | --- |
@@ -97,7 +176,7 @@ authentication. Source regression and native short-expiry checks remain separate
 from the actual hosted observations. See
 [the heartbeat design](HANGOUT_IDLE_HEARTBEAT_20261107.md).
 
-## New overnight music and Webex results
+## Earlier version 449 music and Webex results
 
 A November 8 **current version 449 → installed Windows Chrome** generated-audio
 trial passed. Over 40.386 seconds the browser detected all 160 tone windows:
@@ -115,6 +194,15 @@ all 32 native fixture sources and the WAV unchanged, and the native fixture idle
 The screenshot was visually inspected. This used generated input, muted browser
 output and a synthetic mixer with packaged components: **no physical hearing,
 actual desktop Shared Track mix, instruments or Webex was qualified**.
+
+A separate Apple Silicon packaged-components → Windows Chrome generated trial
+also passed on version 449: 40.294 seconds, all 160 tone windows, zero reported
+lost packets and zero disconnected windows, with a native return tone. All
+thirteen periodic resource checks passed and owned cleanup was independently
+verified. Its displayed 75 ms estimate has the same limited timing boundary.
+This is transport evidence, not a desktop host, Shared Track or hearing result;
+the [sanitized PR 238 receipt](https://github.com/rupret007/StalemateSite/pull/238#issuecomment-6718684984)
+retains the exact source, proof hash and original preparation stop.
 
 The MacBook now has verified BlackHole 16ch at 48 kHz with physical built-in mic
 and wired headphones as defaults. Its staged package/signature matched. The

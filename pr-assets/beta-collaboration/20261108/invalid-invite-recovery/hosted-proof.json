@@ -1,0 +1,90 @@
+{
+  "state": "PASSED_HOSTED_INVALID_INVITE_RECOVERY_AND_VALID_PREJOIN_NO_MEDIA",
+  "startedAt": "2026-11-08T08:45:45.578Z",
+  "source": "71bff2cd6a5e352492eb7aaa304385182b378652",
+  "version": "2c5c81e5-1aa4-4ea7-be69-cacda13c20e8",
+  "physicalCapture": false,
+  "recording": false,
+  "providerCredentials": false,
+  "mediaSession": false,
+  "checks": [
+    {
+      "kind": "missing",
+      "width": 375,
+      "captureRequests": 0,
+      "pageWidth": 375,
+      "viewport": 375,
+      "hiddenControls": true,
+      "screenshot": "invite-recovery-missing-375-71b-nov08.png"
+    },
+    {
+      "kind": "malformed",
+      "width": 375,
+      "captureRequests": 0,
+      "pageWidth": 375,
+      "viewport": 375,
+      "hiddenControls": true,
+      "screenshot": "invite-recovery-malformed-375-71b-nov08.png"
+    },
+    {
+      "kind": "expired",
+      "width": 375,
+      "captureRequests": 0,
+      "pageWidth": 375,
+      "viewport": 375,
+      "hiddenControls": true,
+      "screenshot": "invite-recovery-expired-375-71b-nov08.png"
+    },
+    {
+      "kind": "valid-prejoin-only",
+      "width": 375,
+      "captureRequests": 0,
+      "joinVisibleAndDisabled": true,
+      "screenshot": "invite-recovery-valid-375-71b-nov08.png"
+    },
+    {
+      "kind": "missing",
+      "width": 390,
+      "captureRequests": 0,
+      "pageWidth": 390,
+      "viewport": 390,
+      "hiddenControls": true,
+      "screenshot": "invite-recovery-missing-390-71b-nov08.png"
+    },
+    {
+      "kind": "malformed",
+      "width": 390,
+      "captureRequests": 0,
+      "pageWidth": 390,
+      "viewport": 390,
+      "hiddenControls": true,
+      "screenshot": "invite-recovery-malformed-390-71b-nov08.png"
+    },
+    {
+      "kind": "expired",
+      "width": 390,
+      "captureRequests": 0,
+      "pageWidth": 390,
+      "viewport": 390,
+      "hiddenControls": true,
+      "screenshot": "invite-recovery-expired-390-71b-nov08.png"
+    },
+    {
+      "kind": "valid-prejoin-only",
+      "width": 390,
+      "captureRequests": 0,
+      "joinVisibleAndDisabled": true,
+      "screenshot": "invite-recovery-valid-390-71b-nov08.png"
+    }
+  ],
+  "browserVersion": "156.0.8078.80",
+  "ordinaryGuestAdmission": true,
+  "runtimeAssetHashesMatched": 14,
+  "externalRequests": 0,
+  "captureRequests": 0,
+  "logoutStatus": 200,
+  "afterLogout": 401,
+  "copiedCookieAfterLogout": 401,
+  "ownedChromeCloseRequested": true,
+  "completedAt": "2026-11-08T08:45:51.406Z"
+}
