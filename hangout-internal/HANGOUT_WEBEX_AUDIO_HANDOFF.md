@@ -28,8 +28,16 @@ found no supported Webex installation in its normal application locations.
 Neither Mac had a saved `webex_url` in its current WebJam settings. Do not
 assume the earlier Personal Room discussion configured these builds.
 
-Before the attended check, confirm the existing intended Personal Room link
-with Jeff and save it through normal application settings. Do not create a new
+At 09:48 UTC, normal Mini client navigation through the dedicated WebJam
+profile → Meetings → My Personal Room Information revealed the existing
+Personal Room. The current vendor signature was valid. One HTTPS Webex Personal
+Room link was validated without saving its URL, room number or host fields to
+evidence; the client was quit normally. No meeting, camera or microphone started.
+
+Before the attended check, recover that existing Personal Room through the same
+normal client UI and save only its meeting link through WebJam settings when
+resource guards permit. Do not ask Jeff for its private URL again. The discovery
+did not configure WebJam or prove a meeting join. Do not create a new
 meeting, publish the link, enroll an SDK, or buy a license for this test. Use the
 supported external app/browser offered by the meeting; a native Show Webex App
 control requires a verified installed client. The read-only checks launched no

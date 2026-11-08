@@ -6,7 +6,101 @@ pending.** This handoff records the private runtime delivered November 8 UTC
 [62 acceptance requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md). It is not a
 public-launch approval. The two public websites have not been changed.
 
-## Latest private update — November 8, 08:45 UTC
+## Application candidate
+
+**Checkpoint: November 8, 20:02 UTC; deployment readback 19:48 UTC.**
+
+The private application branch `codex/owner-tools-late-metadata-20261104` now
+contains [PR 241](https://github.com/rupret007/StalemateSite/pull/241) and
+[PR 242](https://github.com/rupret007/StalemateSite/pull/242), merged in order as
+`5bbddaa6a2d729cf9ae21b824c258e548ec8d516` and
+`844a32850d5a68c741b393e25b6ad11ba9b64890`. The final reviewed/merged tree is
+`992a18759df2055d7b29fc5496fc2cda30305ce0`. **These changes are not deployed.**
+
+The Jam room now shows two startup steps to its current host, followed by the
+invitation field and Share. It explains that Mac and Windows browser guests
+need no native installation. Guidance follows actual operator changes and
+hides after sharing. The second fix keeps the full message input visible when
+Tab moves focus to Send at deep browser zoom.
+
+Both current-head push and PR runs passed without retries: 2,091 unit tests in
+138 files, 853 browser cases for #241 / 854 for #242, and both 34-case smoke
+suites. Final source runs are
+[42511690738](https://github.com/rupret007/StalemateSite/actions/runs/42511690738)
+and [42511696731](https://github.com/rupret007/StalemateSite/actions/runs/42511696731).
+Actual checkout trees match the merged tree. Automatic final-branch run
+[42515682918](https://github.com/rupret007/StalemateSite/actions/runs/42515682918)
+was still running at this checkpoint. The intermediate #241 merge run was
+normally cancelled as superseded. Original test failures and retry evidence
+remain retained: the new host test initially sent an invite before Jam
+admission; it now waits for admitted host guidance.
+
+Installed Windows Chrome verified host layouts at 1440×900, 375×812 and
+390×844 and a separate guest at 390px using a local frontend preview over the
+protected backend. Real Chrome 400% Page zoom independently reproduced and
+fixed the keyboard focus defect at a 320×232 CSS viewport. The passing preview
+kept input bottom at 229.25px and Send at 222.25px, with no horizontal overflow.
+This is preview evidence, not deployed-candidate or physical-iPhone evidence.
+Owned rooms, guests, profiles and processes were cleaned up; no media capture
+or external provider request occurred.
+See the [source-bound screenshot manifest](../pr-assets/beta-collaboration/20261108/private-ui-candidate/manifest.json),
+[375px host](../pr-assets/beta-collaboration/20261108/private-ui-candidate/host-375.png),
+[390px host](../pr-assets/beta-collaboration/20261108/private-ui-candidate/host-390.png)
+and [actual 400% zoom](../pr-assets/beta-collaboration/20261108/private-ui-candidate/composer-real-400-percent.png).
+
+A read-only provider check at 19:48 UTC still found website version
+`2c5c81e5-1aa4-4ea7-be69-cacda13c20e8` and issuer version
+`4db649fa-a465-44b4-8487-414987b3a660`, each at 100%. WebJam's merged
+[issuer fix #454](https://github.com/rupret007/webjam/pull/454) still awaits
+the deployment owner. Before owner delivery, freshly reconcile actual effective
+settings, approved origins, bindings, namespaces, secrets, caps and holds;
+read back candidate assets afterward. Keep both public entrances unpublished.
+
+| Layer | Current qualification | Still required |
+| --- | --- | --- |
+| UI candidate | Merged source, clean CI and actual Chrome previews | Receiving-owner delivery and exact served-asset checks |
+| Native refresh | Private-beta source `533514d678c0e210c3e7817302605093d6a1e005`; 12,941 Python tests passed, 60 skipped | Finish platform trust/device checks before staging; Windows/Linux artifact downloads remain unverified |
+| Actual device candidate | Previously staged Intel/ARM packages remain source `76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c` | Current desktop GUI speech/music, Shared Track WAV/MP3 and route/hearing checks |
+| Webex | Existing dedicated Personal Room found through verified client UI | Save through WebJam settings; real video and manual exclusive-audio handoff |
+| Broader acceptance | Existing scoped lobby, Paint Along and generated-media results retained below | Outstanding physical, moderation, platform and public operator/legal requirements |
+
+The native refresh uses existing private-beta
+[run 42513422718](https://github.com/rupret007/webjam/actions/runs/42513422718).
+All four desktop packaging jobs passed, including their frozen lesson player
+and Reference Studio checks. The complete run concluded success on attempt 1.
+The Intel archive was independently downloaded and matched GitHub artifact
+`13631463876`, SHA256
+`523ebd3012c034247f9caecb4154df357e379fc2429b77e4a7684c09fc6b61f4`.
+Its nested application ZIP is SHA256
+`e4a16a1b5a6304d9287f4d3241ceb611dadd80d92faab7ba0dc38759a2858e66`.
+An isolated Windows cache check verified contained archive paths, source build ID,
+canonical private-beta manifest, target CPU, codec hash and transport/headless
+checksum manifests. The bundled installer helper bytes matched reviewed source;
+no helper or packaged executable ran. The original inspector rejected expected
+packaging extras and the standard two-field headless checksum format; its failed
+receipt was retained, and a separate read-only check verified the same saved
+archive without downloading it again. The ARM archive also matched GitHub artifact `13631806005`, SHA256
+`338f4d4596c28c4ced0eeef97631ee1b2396a9da661bcd156cb37f415b745ce6`;
+its nested ZIP is SHA256
+`f9460377ba6d4040ec8fab5860fe53b7512c6146969e6856be5f5f95363b52da`.
+The same build/target, path, architecture, source-helper and component checks
+passed there on the first attempt.
+Independent Mac signature checks, staging and physical acceptance remain pending.
+A separate readback verified both saved archives and parsed receipts, with
+resource guards passing before/after and PowerShell still Restricted. See
+[the sanitized artifact receipt](../pr-assets/beta-collaboration/20261108/private-ui-candidate/native-artifact-evidence.json).
+No installed application changed. Windows
+remains unsigned and trust-blocked for this device setup; its browser role
+needs no native install. Packaging does not prove live musical performance,
+desktop Shared Track audibility or an actual Webex meeting.
+
+All 62 acceptance requirements remain unchanged. MacBook onboard mic/speakers
+are authorized for low-volume checks, separately from headphone music
+acceptance. The Jabra is charging on the Mini. Resource and access checks still
+precede device sessions. StoryPool/Karen, shared infrastructure and deployment
+ownership remain outside this application session.
+
+## Latest deployed private update — November 8, 08:45 UTC
 
 The current private Worker is **`2c5c81e5-1aa4-4ea7-be69-cacda13c20e8`**,
 100% deployment `e75182dd-8ac7-484a-809b-a80f6a8ac52e`. Reviewed website
@@ -55,8 +149,9 @@ as a new complete end-to-end test. The staged native package is still source
 `76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c`. Current human Mac-to-Windows
 speech/music, desktop WAV/MP3 Shared Track, Webex video/manual exclusive audio,
 and the remaining operator/platform checks below are not completed by this UI
-fix. Webex's existing Personal Room must still be confirmed through normal
-settings; no meeting or capture was started while Jeff slept.
+fix. Webex's existing Personal Room was subsequently found through its normal
+client UI; saving it through WebJam settings and real meeting acceptance remain
+pending. No meeting or capture was started by that discovery.
 
 ## Provider-start CI dependency resolved
 
@@ -211,9 +306,11 @@ playback was proved. Virtual input devices were not counted as physical mics.
 
 Webex remains in scope. Verified clients were found on the Mini and Windows;
 the MacBook's production detector found no supported installation. Neither Mac
-had a saved meeting link. The existing link must be confirmed through normal
-settings before real video/manual audio-handoff acceptance. No meeting or
-capture was started while Jeff slept. See [the Webex handoff](HANGOUT_WEBEX_AUDIO_HANDOFF.md).
+had a saved meeting link at that inspection. At 09:48 UTC, the existing dedicated
+WebJam Personal Room was found in the signed Mini client's normal settings.
+The private link was excluded from evidence and has not been saved into WebJam.
+Recover it through that same UI when needed; do not ask Jeff for the URL again.
+No meeting or capture was started. See [the Webex handoff](HANGOUT_WEBEX_AUDIO_HANDOFF.md).
 
 Both private versions and effective settings matched in post-trial readback.
 That controller then stopped on an assertion at the TURN analytics HTTP 200;
@@ -248,7 +345,9 @@ bounded test and retain its exact build, route, result and teardown together.
    hear it at the remote guest, check level/mute, pause/restart and clean ending.
    Then check MP3 through the packaged decoder. Follow
    [the Shared Track setup guide](HANGOUT_SHARED_TRACK_NEXT_CHECK_20261107.md).
-3. **Webex:** confirm and save the intended existing meeting link first. After
+3. **Webex:** recover the already identified dedicated Personal Room through
+   the verified client's normal UI and save it through WebJam settings. Do not
+   request its private URL again or copy it into evidence. After
    baseline audio passes, open that meeting externally
    with explicit microphone/camera consent. Verify video and the documented
    manual switch between meeting audio and WebJam. Never play both paths at

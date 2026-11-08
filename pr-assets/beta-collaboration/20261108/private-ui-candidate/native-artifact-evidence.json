@@ -1,0 +1,91 @@
+{
+  "runId": 42513422718,
+  "attempt": 1,
+  "runConclusion": "success",
+  "source": "533514d678c0e210c3e7817302605093d6a1e005",
+  "pythonJob": {
+    "passed": 12941,
+    "skipped": 60,
+    "failed": 0,
+    "rawLogSha256": "cae6ee486f49d4d5b6f21220d9040a4bfb7d655aeb00806b5b6538205b831d56"
+  },
+  "allFourDesktopBuildJobsPassed": true,
+  "macArchives": [
+    {
+      "source": "533514d678c0e210c3e7817302605093d6a1e005",
+      "target": "macos-x64",
+      "artifactId": 13631463876,
+      "archiveBytes": 474640146,
+      "archiveSha256": "523ebd3012c034247f9caecb4154df357e379fc2429b77e4a7684c09fc6b61f4",
+      "innerZipSha256": "e4a16a1b5a6304d9287f4d3241ceb611dadd80d92faab7ba0dc38759a2858e66",
+      "buildIdMatched": true,
+      "privateTargetMatched": true,
+      "architectureMatched": true,
+      "containedPathsVerified": true,
+      "adHocCandidateInfoMatched": true,
+      "installerHelperSourceHashesMatched": true,
+      "installerHelpersExecuted": false,
+      "componentHashes": {
+        "Frameworks/libwebjoin_opus.dylib": "923cbbc602f2a1508c4fe7fbc45dc1d7f9b4e26c13225937af857b6fba1ceb8b",
+        "MacOS/webjam-fabric": "7c0b67b03be723a31412284ec47981480b20c355d432aee87ac3d00a150c96db",
+        "Resources/JamulusHeadlessClient.app/Contents/MacOS/JamulusHeadlessClient": "9db818f5a6d6b58df14c612fbb2307d2cfa263e64dc6dfb324d7f9d9061934b6"
+      },
+      "independentMacCodeSignatureCheckPending": true,
+      "physicalAcceptance": false
+    },
+    {
+      "source": "533514d678c0e210c3e7817302605093d6a1e005",
+      "target": "macos-arm64",
+      "artifactId": 13631806005,
+      "archiveBytes": 459674398,
+      "archiveSha256": "338f4d4596c28c4ced0eeef97631ee1b2396a9da661bcd156cb37f415b745ce6",
+      "innerZipSha256": "f9460377ba6d4040ec8fab5860fe53b7512c6146969e6856be5f5f95363b52da",
+      "buildIdMatched": true,
+      "privateTargetMatched": true,
+      "architectureMatched": true,
+      "containedPathsVerified": true,
+      "adHocCandidateInfoMatched": true,
+      "installerHelperSourceHashesMatched": true,
+      "installerHelpersExecuted": false,
+      "componentHashes": {
+        "Frameworks/libwebjoin_opus.dylib": "804e344f7f75a917bcc3e8cd148b56f5f973375e6d5d68497254e2d1f1da2c4b",
+        "MacOS/webjam-fabric": "ca3e7057d2591ff711af3b0bffd99e8df43dd607290e6fa73c04bc146fbcc057",
+        "Resources/JamulusHeadlessClient.app/Contents/MacOS/JamulusHeadlessClient": "d07f01720744725767da7f19ce3bce15623eca2aca6c725d8cd0118fa9a274a5"
+      },
+      "independentMacCodeSignatureCheckPending": true,
+      "physicalAcceptance": false
+    }
+  ],
+  "separateReadback": [
+    {
+      "target": "macos-x64",
+      "rawReceiptSha256": "f0d4308d95bdf55f748c2bda929b9b95785797d58c6a1cb427eecac914e4a78b",
+      "crlfLines": 53,
+      "parsedReceiptExactlyMatchesController": true,
+      "archiveSha256": "523ebd3012c034247f9caecb4154df357e379fc2429b77e4a7684c09fc6b61f4",
+      "innerZipSha256": "e4a16a1b5a6304d9287f4d3241ceb611dadd80d92faab7ba0dc38759a2858e66",
+      "sameArchivedBytes": true,
+      "installed": false
+    },
+    {
+      "target": "macos-arm64",
+      "rawReceiptSha256": "a926d72c5a9181c089412e895aa554773a813c2cfa16af057c07536c36e00e55",
+      "crlfLines": 53,
+      "parsedReceiptExactlyMatchesController": true,
+      "archiveSha256": "338f4d4596c28c4ced0eeef97631ee1b2396a9da661bcd156cb37f415b745ce6",
+      "innerZipSha256": "f9460377ba6d4040ec8fab5860fe53b7512c6146969e6856be5f5f95363b52da",
+      "sameArchivedBytes": true,
+      "installed": false
+    }
+  ],
+  "windowsGuardBeforeAfterPassed": true,
+  "windowsPowerShellRemainsRestricted": true,
+  "newPackagesInstalled": false,
+  "staged76Unchanged": true,
+  "scope": "Mac archive bytes and metadata in an isolated Windows application cache; no native executable launch or physical/media/meeting acceptance",
+  "originalFailuresRetained": {
+    "intelInitialInspector": "Expected bundle extras and hash-plus-filename checksum format were initially rejected; corrected separate read-only inspection reused saved bytes",
+    "firstSupplementalReadback": "Local assertion on remote nonzero exit; original remote stderr was not retained. LF-only expected receipt hashes differ from actual Windows CRLF records; corrected parsed-equality and actual archive hashes passed. No original failed result relabeled."
+  },
+  "archiveCache": "%LOCALAPPDATA%/WebJam/native533-artifact-check-20261108/"
+}
