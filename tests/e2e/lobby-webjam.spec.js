@@ -121,6 +121,8 @@ test('first-invite guidance follows current host power without opening setup hel
     try {
         const host = await f.join('SetupHost'), peer = await f.join('SetupPeer');
         await host.click('[data-start="jam"]');
+        // Commands target the admitted active channel, not a pending room join.
+        await expect(host.locator('[data-jam-host-steps]')).toBeVisible();
         await host.evaluate(() => __lobby.cmd('invite', ['SetupPeer']));
         await peer.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
         await expect(host.locator('[data-jam-host-steps]')).toBeInViewport();
