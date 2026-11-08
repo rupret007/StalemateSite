@@ -5,6 +5,16 @@ still pending.** All [62 requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md) remai
 unchanged. Public Stalemate and Rad Dad navigation, StoryPool, Karen, provider
 limits, release holds, AI and separate Hang Out media TURN were not changed.
 
+**Subsequent terminal result:** the original repaired C227 eight-hour observer
+completed at November 8, 01:16:39.482 UTC. Identical expired-cookie state and
+protected code returned 401, the socket ended with 4401, and owned cleanup was
+independently verified. Five abnormal closes with automatic recovery remain;
+this is not uninterrupted uptime. The table and running-test instructions below
+retain their earlier historical scope. A later reviewed private update is now
+version 449; use the [current handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
+for its exact identities, current browser results and remaining checks. Do not
+re-run the terminal observer or apply an old delivery preparation.
+
 ## Exact delivered version
 
 | Item | Verified identity |

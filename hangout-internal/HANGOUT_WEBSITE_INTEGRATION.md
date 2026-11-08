@@ -10,35 +10,40 @@ approval or evidence that a live website contains the candidate.
 
 ## Select one tested candidate
 
-**Current protected runtime, last verified November 7 at 18:37 UTC; release
-candidate still pending:** website source
-`d8c08fb88b94429f03d13d9beaf01d8ffd301e1a` / [PR #232](https://github.com/rupret007/StalemateSite/pull/232),
-merge `bfe0365eaef183cc282aaed38aecfecc7f0b84d0`, identical reviewed/merged tree
-`09012724c8600815f9df111faa4014f7aeb220d1`. It serves private Worker version
-`c2271048-aaa3-4649-8e9e-48dd46212da5`, deployment
-`1a83f7e5-7ed1-4aa7-8af5-bd68fb6a8fcf` at 100%. The previous website version
-`33862058-10a5-4a6f-9659-38841d70292f` is the recorded rollback candidate,
-subject to a fresh compatibility/settings check; it has the known idle-expiry
-defect and is not an equivalent qualified release.
+**Current protected runtime, verified November 8 UTC; release candidate still
+pending:** website source `ac9b82f42c8d6952193f5cbefbf11fc04816821d` /
+[PR 236](https://github.com/rupret007/StalemateSite/pull/236), merge
+`84e77d6d8513a4f8ecce713835b97aa3a547b66c`, identical reviewed/merged tree
+`7037bd7b5a4b32841af313402545256b5943053e`. Private Worker version
+`449fe7d2-0ac3-41b8-b622-fda2453b38db`, deployment
+`9c793eb0-60a9-4c45-91b1-76cf3918ed61`, was read back at 100% with exact code
+and preserved settings. The preceding C227 runtime has a completed real expiry
+baseline but lacks the new heartbeat and browser audio cleanup. The older
+`33862058` runtime has the known idle-expiry defect. Neither is a blind rollback
+recommendation; retain current source, keys, namespaces and effective controls.
 
-Start with the [private repair receipt](HANGOUT_PRIVATE_REPAIR_20261107.md).
-[Current Mac WebKit and actual Windows Chrome checks](HANGOUT_CURRENT_BROWSER_CHECKS_20261107.md)
-passed on this version, including branded chat, 375/390px containment,
-draft-preserving reconnect and logout revocation. A separate
-[connected-countdown/generated-media trial](HANGOUT_HOSTED_COUNTDOWN_PROOF_20261107.md)
-passed from the Intel host components to Linux Chromium. These scoped results
-do not prove physical Windows music, the desktop Shared Track sender, larger
-capacity, assistive technology or public readiness. All
+Start with the [current readiness handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
+and its sanitized evidence packet. Current Intel SDK WebKit and actual Windows
+Chrome checks passed branded chat, 375/390px containment, draft-preserving
+reconnect and logout revocation; owned cleanup was independently verified.
+The current 110-minute heartbeat observation passed with ten ping/pong pairs
+and no socket closures. Independent cleanup and a separate metadata readback
+are verified; the original postcheck failures remain in the evidence.
+The earlier [generated-media trial](HANGOUT_HOSTED_COUNTDOWN_PROOF_20261107.md)
+retains its C227/Intel-components-to-Linux scope. These results do not prove
+physical Windows music, desktop Shared Track, Webex video/manual handoff, full
+accessibility or public readiness. All
 [62 requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md) remain in force.
 
-The browser-access clock from WebJam
-`1b0c4f56399843747e82655c0d7a994290b54127` / PR #450 is now delivered here,
-with its thirteen provenance records and MIT notice retained. The separate
-generated trial demonstrated its connected countdown. The repaired lobby's real
-eight-hour observation is still running toward its original November 8,
-01:16:36.764 UTC expiry. Keep that exact runtime and its settings unchanged;
-elapsed time or a live process is not a terminal PASS. The original observation
-on the previous version failed and remains failed.
+The browser-access clock and subsequent real WebKit audio-context teardown
+corrections are delivered from WebJam source
+`5dde45d2e841fd19ff9c1fd055f88520fbf778e4`, with the thirteen provenance
+records and MIT notice retained. The earlier generated trial demonstrated the
+connected countdown on its own recorded source. The original repaired C227
+eight-hour observation is now terminal with expired-cookie denial and cleanup
+verified; five recovered interruptions prevent an uninterrupted-uptime claim.
+The preceding failed full-duration observation remains failed. Current-version
+heartbeat behavior has its own separate real-time observation.
 
 Native packages remain source `76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c`.
 The separate issuer remains source `e735a048de82e26c424e31964a30f1dfbd548df9`,
@@ -89,9 +94,10 @@ address must be qualified and substituted consistently rather than launching
 separate community backends.
 
 The existing [eight-file entry toolkit ZIP](../pr-assets/beta-collaboration/20261107/composed-private-rc/community-entry-toolkit-b35e5fc.zip)
-is reusable: [current input readback](../pr-assets/beta-collaboration/20261107/hosted-access-countdown/community-entry-toolkit-current-input-readback.json)
+is reusable: [current input readback](../pr-assets/beta-collaboration/20261108/current-private-readiness/entry-toolkit-reuse.json)
 verified all seven manifested payloads, the eight-member archive and all five
-exporter/source inputs against `d8c08fb`. Its own manifest remains correctly
+exporter/source inputs against deployed source `ac9b82f` and the recorded
+documentation checkpoint. Its own manifest remains correctly
 pinned to `b35e5fc`; it was not rewritten or relabeled. The toolkit contains
 finite link tooling, not the complete application, native builds or a private
 invitation. Optional registrations still start disabled and unverified.

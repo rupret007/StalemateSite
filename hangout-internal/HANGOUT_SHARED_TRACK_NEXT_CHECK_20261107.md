@@ -1,7 +1,7 @@
 # Shared Track: the next user check
 
-**Nothing needs to be done while Jeff is asleep.** The automated chat-expiry
-observation is running separately. Generated audio already passed through the
+**Nothing needs to be done while Jeff is asleep.** The unattended hosted
+heartbeat observation has finished; its browser and awake assertion are closed. Generated audio already passed through the
 private WebJam service; playing a song through the desktop Shared Track control
 still needs its own setup and listening check.
 
@@ -29,9 +29,8 @@ workaround.
 1. On the **MacBook**, open Finder → Go → Go to Folder and enter
    `~/Library/Caches/WebJam/shared-track-setup-20261107/`.
 2. Open `BlackHole16ch-0.7.1.pkg` and complete its normal installer prompts
-   locally. If it asks for a reboot, wait until the current unattended
-   observation has finished; its expected expiry is November 8,
-   01:16:36.764 UTC.
+   locally. The recorded heartbeat observer and independent cleanup have
+   finished. Save any other work before completing a requested reboot.
 3. Leave WebJam idle with the headphones connected and report that setup is
    ready. The next controlled session can collect device, process, transport
    and teardown logs together. Installing the driver does not prove playback
@@ -48,7 +47,7 @@ check comes afterward, with explicit microphone/camera choices. The current
 Webex integration opens the meeting externally; it does not automatically
 switch audio between the two apps.
 
-See the [current private repair](HANGOUT_PRIVATE_REPAIR_20261107.md) and
+See the [current readiness handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md) and
 [generated browser/countdown evidence](HANGOUT_HOSTED_COUNTDOWN_PROOF_20261107.md)
 for the exact builds and what automation has already demonstrated. This guide
 does not change the sender's route-certification or isolation checks.

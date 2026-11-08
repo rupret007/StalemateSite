@@ -1,0 +1,65 @@
+{
+  "state": "BOUNDED_HOSTED_KEEPALIVE_PASS_AND_INDEPENDENT_CLEANUP_VERIFIED",
+  "source": "ac9b82f42c8d6952193f5cbefbf11fc04816821d",
+  "version": "449fe7d2-0ac3-41b8-b622-fda2453b38db",
+  "harnessSha256": "c7059480b2511017e222e370f8a12a9ca368e1dc61a8b5c9008b70b85ac5eb64",
+  "originalProofSha256": "ebb5222cf2aa5b964d27ad621bbd65e349853756137894e614f15bd7f77112cd",
+  "readbackSha256": "dee1dc609ec59cefe28e4e86eb0bc3afecf2cd23f6cd7c9814a5dc0dc5f4e99b",
+  "proof": {
+    "state": "PASSED_BOUNDED_HOSTED_KEEPALIVE_NO_OBSERVED_CLOSE",
+    "startedAt": "2026-11-08T01:33:20.359Z",
+    "observationStartedAt": "2026-11-08T01:33:23.242Z",
+    "observationEndsAt": "2026-11-08T03:23:23.242Z",
+    "completedAt": "2026-11-08T03:23:23.527Z",
+    "observedDurationMs": 6600005,
+    "observedPingCount": 10,
+    "observedPongCount": 10,
+    "socketOpenCount": 1,
+    "socketCloseCount": 0,
+    "observedClosureCodes": [],
+    "logoutStatus": 200,
+    "allOwnedBrowserResourcesClosed": true,
+    "observerFinished": true,
+    "realTime": true,
+    "clockOrTtlChanged": false,
+    "physicalCapture": false,
+    "providerCredentials": false,
+    "recording": false,
+    "userContentRetained": false
+  },
+  "independentReadback": {
+    "state": "SAME_PROOF_HARNESS_AND_OWNED_PROCESS_CLEANUP_INDEPENDENTLY_VERIFIED",
+    "sameStructuredProof": true,
+    "remoteProofSha256": "ebb5222cf2aa5b964d27ad621bbd65e349853756137894e614f15bd7f77112cd",
+    "localProofSha256": "ebb5222cf2aa5b964d27ad621bbd65e349853756137894e614f15bd7f77112cd",
+    "harnessSha256": "c7059480b2511017e222e370f8a12a9ca368e1dc61a8b5c9008b70b85ac5eb64",
+    "ownedProcesses": [
+      {
+        "pid": 59818,
+        "pidPresent": false,
+        "originalOwnedCommandStillPresent": false
+      },
+      {
+        "pid": 59819,
+        "pidPresent": false,
+        "originalOwnedCommandStillPresent": false
+      }
+    ],
+    "ownedProcessReceipt": {
+      "nodePid": 59818,
+      "awakePid": 59819,
+      "boundedAwakeSeconds": 7200,
+      "startedAt": "2026-11-08T01:33:19.909748+00:00",
+      "nodeExitCode": 0,
+      "ownedAwakeExited": true,
+      "completedAt": "2026-11-08T03:23:23.539201+00:00"
+    },
+    "completedAt": "2026-11-08T03:24:12.833457+00:00"
+  },
+  "originalControllerState": "STOPPED_INSPECT_EXISTING_REMOTE_ATTEMPT_NO_RETRY",
+  "originalPostcheckFailure": "HTTPError",
+  "separateMetadataReadback": "keepalive-postcheck-recovery.json",
+  "originalEightHourReplaced": false,
+  "newEightHourClaimed": false,
+  "limits": "No observed socket closure within this110minute window. Not a cause assignment, all-network guarantee, eight-hour current-version observation, physical media or production capacity proof."
+}

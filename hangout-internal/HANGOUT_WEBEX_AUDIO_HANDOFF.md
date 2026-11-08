@@ -3,7 +3,7 @@
 WebJam carries the music through Jamulus and browser Web Join. An optional
 Webex meeting can provide video or conversation separately. The staged native
 source is `76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c`; use the
-[current release receipt](HANGOUT_PRIVATE_RC_20261107.md) for actual package and
+[current private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md) for actual package and
 website identities. This note does not qualify a real meeting.
 
 ## What the current application controls
