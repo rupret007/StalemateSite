@@ -492,7 +492,9 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .buffer li { padding-block: 0; }
   .say { position: sticky; bottom: 0; z-index: 1; margin-block: 4px; }
   .say input { min-height: 36px; padding-block: 8px; scroll-margin-bottom: 8px; }
-  .say .btn { min-height: 32px; padding: 6px 8px; margin: 3px; }
+  /* Send is shorter than its input. Leave room for the entire composer when
+     native focus scrolling brings the button into a deeply zoomed viewport. */
+  .say .btn { min-height: 32px; padding: 6px 8px; margin: 3px; scroll-margin-block: 10px; }
   .toast { padding: 4px 12px; }
   .phonetabs { min-height: 44px; }
   .phonetabs button { min-height: 44px; }

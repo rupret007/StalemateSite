@@ -234,6 +234,26 @@ for (const viewport of viewports) test(`${viewport.label}: long chat, error and 
     } finally { await visitor.close(); }
 });
 
+test('short deep-zoom equivalent: Tab to Send keeps the whole composer visible before and after sending', async ({ browser, baseURL }, testInfo) => {
+    // A real 1280px-wide Chrome window at 400% zoom leaves 320x232 CSS pixels
+    // below browser chrome. This is its layout regression, not a zoom claim.
+    const visitor = await guest(browser, baseURL, 'ShortZoomGuest', { width: 320, height: 232 }), { page } = visitor;
+    try {
+        await tabTo(page, page.getByRole('textbox', { name: 'Message', exact: true }));
+        const text = 'Keyboard composer stays visible at deep zoom.';
+        await page.keyboard.type(text); await page.keyboard.press('Tab');
+        await expect(page.locator('[data-send]')).toBeFocused();
+        const before = await composerGeometry(page);
+        await attachGeometry(testInfo, 'short-zoom-before-send', before);
+        await page.screenshot({ path: testInfo.outputPath('short-zoom-before-send.png') });
+        contained(before);
+        await page.keyboard.press('Space');
+        await expect(page.locator('[data-buffer]')).toContainText(text);
+        contained(await composerGeometry(page));
+        expect(visitor.errors).toEqual([]);
+    } finally { await visitor.close(); }
+});
+
 // A retained rejected message adds a separate scrollable recovery row. Deep
 // native Chrome zoom exposed clipping that the empty-recovery viewport probes
 // did not cover. These dimensions are local reflow regressions; native zoom
