@@ -19,6 +19,22 @@ Talkback, video-only or audience preferences do not establish automatic routing.
 The supported external path is documented in the native
 [meeting-platform guidance](https://github.com/rupret007/webjam/blob/76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c/WEBEX_AUDIO_MODES.md).
 
+## November 8 device readiness
+
+Read-only inspection using the staged source's production detector found a
+publisher-verified Webex **46.7.0.35472** on the Mini. Windows had a Cisco-signed
+Webex **45.6.1.32593** executable with a valid signature. The MacBook detector
+found no supported Webex installation in its normal application locations.
+Neither Mac had a saved `webex_url` in its current WebJam settings. Do not
+assume the earlier Personal Room discussion configured these builds.
+
+Before the attended check, confirm the existing intended Personal Room link
+with Jeff and save it through normal application settings. Do not create a new
+meeting, publish the link, enroll an SDK, or buy a license for this test. Use the
+supported external app/browser offered by the meeting; a native Show Webex App
+control requires a verified installed client. The read-only checks launched no
+meeting, microphone or camera and do not qualify video or audio switching.
+
 ## Attended manual handoff check
 
 This is an interim test procedure, not a completed one-button switching UX.

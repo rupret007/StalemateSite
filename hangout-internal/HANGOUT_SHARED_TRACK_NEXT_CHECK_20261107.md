@@ -18,23 +18,25 @@ route. The built-in mic and plugged-in headphones are available for the basic
 check; use the SSL 2+ and your connected instruments for the actual guitar/vocal
 test. BlackHole 2ch is not a substitute for this build's route.
 
-At the November 7 read-only check, the MacBook did not have a BlackHole 16ch/64ch
-device. The official 16ch installer was already downloaded and its exact hash
-matched the earlier verified package. It has **not** been installed. The Mini's
-native-test resource guard also remained closed, so it was not used as a
-workaround.
+On November 8, after Jeff installed the official driver and rebooted, a fresh
+read-only check verified **BlackHole 16ch: 16 inputs, 16 outputs, 48 kHz**. It was
+not the default device. The physical defaults were the MacBook microphone and
+wired External Headphones, both at 48 kHz. The exact staged native build and its
+strict signature matched. **Do not install BlackHole again.** These facts do not
+prove an active Jamulus process route or Shared Track playback.
 
 ## When you are awake
 
-1. On the **MacBook**, open Finder → Go → Go to Folder and enter
-   `~/Library/Caches/WebJam/shared-track-setup-20261107/`.
-2. Open `BlackHole16ch-0.7.1.pkg` and complete its normal installer prompts
-   locally. The recorded heartbeat observer and independent cleanup have
-   finished. Save any other work before completing a requested reboot.
-3. Leave WebJam idle with the headphones connected and report that setup is
-   ready. The next controlled session can collect device, process, transport
-   and teardown logs together. Installing the driver does not prove playback
-   or automatically start it.
+1. Keep the MacBook awake with wired headphones connected and WebJam idle.
+   The initial test can use its built-in mic; reconnect the SSL 2+ only for the
+   later guitar/vocal check with actual instruments attached.
+2. Use one bounded host/guest session after fresh resource, account-headroom,
+   admission and cap checks. Keep the primary musician input/output physical;
+   the backing-track client uses the separate BlackHole route. Collect actual
+   process-route evidence without overriding certification.
+3. In the desktop Shared Track control, choose the short rights-cleared WAV.
+   Stop if the route check fails; repeated clicks cannot supply missing process
+   evidence. Keep the error and logs from that attempt for diagnosis.
 
 The listening session needs a short rights-cleared WAV, the Mac host, and a
 Windows browser guest. We need to hear the backing track through the session,

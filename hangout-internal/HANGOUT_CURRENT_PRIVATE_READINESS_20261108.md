@@ -97,6 +97,48 @@ authentication. Source regression and native short-expiry checks remain separate
 from the actual hosted observations. See
 [the heartbeat design](HANGOUT_IDLE_HEARTBEAT_20261107.md).
 
+## New overnight music and Webex results
+
+A November 8 **current version 449 → installed Windows Chrome** generated-audio
+trial passed. Over 40.386 seconds the browser detected all 160 tone windows:
+54 E, 53 G and 53 A; it reported 2,083 packets received, 2,128 sent, zero lost and
+zero disconnected windows. The native participant detected the return tone.
+The path contained relay and server-reflexive candidates. The displayed 50 ms
+estimate excludes capture and the native bridge; it is not acoustic latency or
+proof of tight live rehearsal. Automated join-to-connected time was 14,125 ms;
+generated-mic detection took 1,190 ms. These are single samples.
+
+The countdown decreased normally, logout returned 200, and original/copied
+cookies then returned 401. Separate readback matched proof/harness hashes,
+confirmed owned Windows commands absent, port/task gone, policy Restricted,
+all 32 native fixture sources and the WAV unchanged, and the native fixture idle.
+The screenshot was visually inspected. This used generated input, muted browser
+output and a synthetic mixer with packaged components: **no physical hearing,
+actual desktop Shared Track mix, instruments or Webex was qualified**.
+
+The MacBook now has verified BlackHole 16ch at 48 kHz with physical built-in mic
+and wired headphones as defaults. Its staged package/signature matched. The
+production process-route API is available, but no active primary route or GUI
+playback was proved. Virtual input devices were not counted as physical mics.
+
+Webex remains in scope. Verified clients were found on the Mini and Windows;
+the MacBook's production detector found no supported installation. Neither Mac
+had a saved meeting link. The existing link must be confirmed through normal
+settings before real video/manual audio-handoff acceptance. No meeting or
+capture was started while Jeff slept. See [the Webex handoff](HANGOUT_WEBEX_AUDIO_HANDOFF.md).
+
+Both private versions and effective settings matched in post-trial readback.
+That controller then stopped on an assertion at the TURN analytics HTTP 200;
+the response body was not retained, so its cause remains unassigned. The
+original stop is preserved. A separate targeted analytics readback succeeded:
+9,661,248 egress / 13,992,416 ingress bytes for October 15–November 8. Empty SFU
+rows are not proof of zero usage or entitlement. The cap marker stayed unchanged;
+no media trial was repeated to repair evidence.
+
+[The new sanitized packet](../pr-assets/beta-collaboration/20261108/current-windows-music-webex/manifest.json)
+binds these results, limitations and the connected screenshot. Existing earlier
+failed trials and evidence remain intact. The release candidate is still pending.
+
 ## Shortest path to the remaining essential checks
 
 No action is needed while Jeff is asleep. Do not repeatedly restart sessions,
@@ -110,15 +152,16 @@ bounded test and retain its exact build, route, result and teardown together.
    both ways, then a short musical passage. For the actual band arrangement,
    use Jeff's SSL 2+ with guitar/vocal inputs and Che's drum interface when its
    model and channel mapping are known. An empty interface cannot prove music.
-2. **Desktop Shared Track:** install the already verified official BlackHole
-   16ch package normally on the MacBook when Jeff is awake. The recorded observer
-   and cleanup have finished; save other work before any requested reboot. Keep the real
-   musician input/output as the primary route. BlackHole supplies the separate
+2. **Desktop Shared Track:** BlackHole 16ch is now installed and verified at
+   48 kHz on the MacBook; do not reinstall it. Prove the active process route and
+   actual GUI playback when Jeff is awake. Keep the real musician input/output as
+   the primary route. BlackHole supplies the separate
    backing client, not the primary mic/guitar. Use a short rights-cleared WAV;
    hear it at the remote guest, check level/mute, pause/restart and clean ending.
    Then check MP3 through the packaged decoder. Follow
    [the Shared Track setup guide](HANGOUT_SHARED_TRACK_NEXT_CHECK_20261107.md).
-3. **Webex:** after baseline audio passes, open the existing meeting externally
+3. **Webex:** confirm and save the intended existing meeting link first. After
+   baseline audio passes, open that meeting externally
    with explicit microphone/camera consent. Verify video and the documented
    manual switch between meeting audio and WebJam. Never play both paths at
    once. There is no embedded web meeting or automatic cross-app mute. See
