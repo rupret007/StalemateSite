@@ -1,0 +1,28 @@
+{
+  "state": "INDEPENDENT_POST_HOSTED_CHECK_EXACT_PRIVATE_VERSION_BYTES_SETTINGS_ISSUER_CAP_AND_HEALTH_VERIFIED",
+  "at": "2026-11-08T08:48:16.437079+00:00",
+  "source": "71bff2cd6a5e352492eb7aaa304385182b378652",
+  "merge": "76ccf7b14c5a13943e1750a56fac3d79611eb387",
+  "version": "2c5c81e5-1aa4-4ea7-be69-cacda13c20e8",
+  "deployment": "e75182dd-8ac7-484a-809b-a80f6a8ac52e",
+  "workerJavaScriptSha256": "12280eb44c9893200a699badda53226b80ab8a5b5b953292bfacc7f843df3ee8",
+  "workerBytesUnchangedFrom449": true,
+  "all17ActualSettingsAndNamespacesPreserved": true,
+  "issuerVersion": "4db649fa-a465-44b4-8487-414987b3a660",
+  "issuerEffectiveSettingsUnchanged": true,
+  "originalRelayCapSha256": "455ed66975e47e2838d47c2026ebd57e287721d9ad7f09922c72c64b50e35150",
+  "service": {
+    "state": "ready",
+    "reasons": []
+  },
+  "admission": {
+    "state": "open",
+    "lock": "off",
+    "shield": false,
+    "lockAuto": false
+  },
+  "physicalCapture": false,
+  "providerMedia": false,
+  "storyPoolUsed": false,
+  "publicSitesChanged": false
+}
