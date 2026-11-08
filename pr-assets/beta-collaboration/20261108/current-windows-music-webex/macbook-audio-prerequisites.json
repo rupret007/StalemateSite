@@ -1,0 +1,52 @@
+{
+  "state": "READ_ONLY_DRIVER_AND_PHYSICAL_DEFAULT_METADATA_VERIFIED_SESSION_ROUTE_PENDING",
+  "observedAt": "2026-11-08T06:36:57.595060+00:00",
+  "source": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "receiptSha256": "22ab8215e1816f9613bde09b0f31eefc77080f8c87095e7f9eb73b7177e43bd0",
+  "devices": [
+    {
+      "name": "BlackHole 16ch",
+      "family": "blackhole",
+      "inputs": 16,
+      "outputs": 16,
+      "nominalRate": 48000.0,
+      "defaultInput": false,
+      "defaultOutput": false,
+      "officialBlackHoleUid": true
+    },
+    {
+      "name": "External Headphones",
+      "family": "builtin",
+      "inputs": 0,
+      "outputs": 2,
+      "nominalRate": 48000.0,
+      "defaultInput": false,
+      "defaultOutput": true,
+      "officialBlackHoleUid": false
+    },
+    {
+      "name": "MacBook Pro Microphone",
+      "family": "builtin",
+      "inputs": 1,
+      "outputs": 0,
+      "nominalRate": 48000.0,
+      "defaultInput": true,
+      "defaultOutput": false,
+      "officialBlackHoleUid": false
+    }
+  ],
+  "liveProcessRouteApiAvailable": true,
+  "actualPrimarySessionRouteProved": false,
+  "stagedAppPresent": true,
+  "desktopPointsToStagedBuild": true,
+  "strictCodeSignatureValid": true,
+  "stagedCdHash": "12a22157b32d0d2c2428cdeff41bce262a8e3ef4",
+  "opusCodecSha256": "1aa66cac089001ada2ca843d63a15b2f5cf602e390e5b7252046568e3c789d6f",
+  "buildIdMatchesStagedSource": true,
+  "audioStreamOpened": false,
+  "deviceSettingsChanged": false,
+  "appStarted": false,
+  "recording": false,
+  "nonBlackHoleInputsAreNotAllPhysical": true,
+  "interpretationReceiptSha256": "cc21f1ed3485f0e85f06b03f5db6ec325d575d1e22a1c5063031419f8dd1f67b"
+}
