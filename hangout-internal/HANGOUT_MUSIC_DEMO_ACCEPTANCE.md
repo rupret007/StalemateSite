@@ -7,8 +7,8 @@ physical listening, release trust or the separate native provider-start mode.
 
 ## Current private-trial authorization
 
-Read the [current handoff](../CURSOR_HANDOFF_WEBJAM.md) before the historical
-package references below. Jeff has authorized the separate private WebJam web
+Read the [current private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
+before the historical package references below. Jeff has authorized the separate private WebJam web
 TURN setup and the bounded native-host/browser-guest trials. That decision is
 already made; do not ask him to lift the same hold again. The approved separate
 web credentials and exact private origin are deployed, with desktop credentials,
@@ -33,11 +33,12 @@ Windows still needs the participant's confirmation.
 
 ## Current listening sequence — November 7
 
-Use the [current private receipt](HANGOUT_PRIVATE_RC_20261107.md), not an older
-package's version label. Native packages remain source `76b1fd7`; the protected
-website remains source `b35e5fc` / version `33862058`. The browser countdown from
-WebJam PR #450 is a separately reviewed change; identify its actual website
-import/delivery before claiming a visitor can see it.
+Use the [current private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
+for the source and delivered version. Native packages remain source `76b1fd7`;
+website source is `ac9b82f` / version `449fe7d2`, including the delivered
+browser countdown and subsequent audio-context teardown corrections. Do not
+read older package or generated-media evidence as physical listening on this
+newer browser runtime.
 
 The current generated Mac-to-Windows trial passed audio transport both ways,
 40-second synthetic WAV chord detection, a fresh invitation and shutdown. It
@@ -54,7 +55,8 @@ refreshed before another media trial.
    intended headset/interface and mic permission. Obtain fresh resource and
    account headroom checks before starting a bounded trial.
 2. The **host** uses native WebJam: Music → Host → Start Session if shown.
-   Choose **Invite a browser guest** and copy the fresh browser invitation into
+   Use the visible **Copy browser invite** control, wait for **Link copied**,
+   then paste the fresh browser invitation into
    the private Jam room's invitation field, then Share. The **Windows guest**
    uses Chrome, checks the selected microphone and headphones, then chooses
    **Join with microphone**. The guest needs no native WebJam or BlackHole
@@ -69,8 +71,9 @@ refreshed before another media trial.
    original 40-second Test Chords WAV are staged in
    `~/Library/Caches/WebJam/shared-track-setup-20261107/`. Installation was not
    performed overnight. Save work, close audio apps and complete any installer
-   administrator prompt locally. Wait for the real expiry observer to finish
-   before any restart. Recheck the exact official 48kHz route normally; do not
+   administrator prompt locally. The recorded heartbeat observer and cleanup
+   are finished; save other work before any requested restart.
+   Recheck the exact official 48kHz route normally; do not
    select BlackHole as the physical mic/headphones or enable a proof override.
    The Mini's earlier read-only route pass remains a different machine/result.
 5. Load the WAV in Shared Track, verify its route, then Play. The second person

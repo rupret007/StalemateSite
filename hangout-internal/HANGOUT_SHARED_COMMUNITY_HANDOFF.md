@@ -1,13 +1,18 @@
 # Shared-community integration and release handoff
 
-For the November 7 protected runtime and latest hosted Stalemate/Rad Dad entry
-checks, start with the [website integration guide](HANGOUT_WEBSITE_INTEGRATION.md)
-and [private repair receipt](HANGOUT_PRIVATE_REPAIR_20261107.md). The website is
-source `d8c08fb88b94429f03d13d9beaf01d8ffd301e1a`, version
-`c2271048-aaa3-4649-8e9e-48dd46212da5`; native packages remain source
-`76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c`. Use live readback before any
-future delivery. The real-duration repaired expiry observation and essential
-physical music checks remain pending; this is not a release admission.
+For the current private runtime, start with the
+[November 8 readiness handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
+and [website integration guide](HANGOUT_WEBSITE_INTEGRATION.md). Website source
+`ac9b82f42c8d6952193f5cbefbf11fc04816821d`, merge
+`84e77d6d8513a4f8ecce713835b97aa3a547b66c`, is delivered as private version
+`449fe7d2-0ac3-41b8-b622-fda2453b38db`. Native packages remain source
+`76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c`. Current Intel WebKit and Windows
+Chrome hosted journeys and independent cleanup passed. The previous C227 real
+eight-hour expiry also passed, with five recovered interruptions retained;
+it does not prove eight-hour behavior on 449. The separate 110-minute heartbeat
+observation passed with ten ping/pong pairs and no closures, with independent
+cleanup and separate metadata readback; original postcheck failures are retained. Essential physical music and
+operator checks remain pending. Revalidate live state before future delivery.
 
 The repository supplies `hangout-worker/tools/package-community-toolkit.mjs` for the
 documented self-contained, committed-source entry toolkit. Its manifest binds
@@ -17,8 +22,8 @@ independent of StoryPool/Karen. Shared core/services/operational state and all
 existing provider/trust/public-release holds remain outside these changes.
 The older ownership/review statements below are historical, not new gates.
 Adding the two entrance links does not require a community backend deployment.
-Preserve the immutable private version during the active expiry observation and
-leave public navigation unchanged until the release is ready.
+The recorded heartbeat observation is terminal; do not restart it. Keep public
+navigation unchanged until the release is ready.
 
 ## Historical architecture baseline
 

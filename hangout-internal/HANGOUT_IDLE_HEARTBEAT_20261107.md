@@ -1,5 +1,14 @@
 # Quiet lobby connections
 
+**Later qualification:** the original C227 eight-hour observer finished with
+expiry denial and cleanup verified, recording five recovered abnormal closes in
+total. The earlier observations below retain their pre-terminal scope. The
+reviewed heartbeat source is now deployed privately; current Mac and Windows
+browser journeys passed. Its separate 110-minute hosted observation passed with ten ping/pong pairs and
+zero observed closures. Independent cleanup and a separate final metadata read
+are verified; the original postcheck failures remain retained. Use the [current readiness handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
+for exact identities, scoped evidence and remaining release requirements.
+
 The original private C227 observer recorded three abnormal socket closures before
 22:47 UTC on November 7. Each socket reopened automatically after 1,197–1,259 ms.
 These are measured reopen gaps, not proof that messages were delivered during a

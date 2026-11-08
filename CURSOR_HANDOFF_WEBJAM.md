@@ -1,5 +1,32 @@
 # WebJam / Hang Out — Cursor continuation
 
+## Current resume point — November 8 UTC
+
+Start with [current private readiness](hangout-internal/HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md).
+Website source `ac9b82f42c8d6952193f5cbefbf11fc04816821d`, merge
+`84e77d6d8513a4f8ecce713835b97aa3a547b66c`, is delivered as private version
+`449fe7d2-0ac3-41b8-b622-fda2453b38db`. Current Intel SDK WebKit and Windows
+Chrome browser journeys, mobile captures and owned cleanup passed. The previous
+C227 real eight-hour expiry passed, with five recovered interruptions retained.
+The separate 110-minute heartbeat observation on 449 passed with ten ping/pong
+pairs and zero closures. Independent cleanup and a separate metadata readback
+are verified; the original metadata-controller/watcher failures remain recorded.
+Do not restart terminal tests.
+
+Native packages remain `76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c`. Physical
+Mac-to-Windows speech/music, actual desktop Shared Track, Webex/manual audio
+handoff and current human moderation remain pending. All 62 requirements and
+public-launch/provider/trust/resource holds remain unchanged. Continue isolated
+application work independently of StoryPool/Karen; do not modify shared core,
+services, workflows or operational files. The new handoff and its evidence
+packet identify exact results and shortest remaining actions.
+
+## Historical November 7 checkpoints
+
+The notes below retain their original source scopes. Their statements that a
+countdown is only prepared, a full-duration test is still running or version
+338 is current do not supersede the resume point above.
+
 The [entrance, accessibility, decoder and report checkpoint](hangout-internal/HANGOUT_ACCEPTANCE_CHECKPOINT_20261107.md)
 adds actual neutral-third-site linking, badge privacy, eight hosted axe screens
 and one harmless report submission on the unchanged private runtime. It also
