@@ -54,6 +54,10 @@
     "private-delivery-summary.json": {
       "sha256": "4b473413e5eaf63ad8d36a038d1cd2d6a1570e3864f761baf30327252d0383f8",
       "bytes": 2033
+    },
+    "provider-start-current-inputs.json": {
+      "sha256": "4b3172cd301bcb7e61d14f1e74f0c8a17686b2d89daa8d03ca01da697462a4f3",
+      "bytes": 8195
     }
   },
   "secretsInvitesMeetingLinksRecordingsExcluded": true,

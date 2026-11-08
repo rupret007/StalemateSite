@@ -26,8 +26,8 @@ requirements are met. Parsing, cryptography and media behavior are unchanged.
 Both website CI runs passed **2,091 units / 138 files, 851 browser cases and
 34 + 34 smokes each**. The upstream browser CI passed **69 cases**; all three
 upstream exact-head runs passed. Full raw logs and actual source trees were
-reviewed before merging. This is ordinary application CI, not proof of the
-separately requested eighth native provider-start CI mode.
+reviewed before merging. Website/browser CI remains separate from the explicit
+workerd provider-start mode qualified below.
 
 The private update changed only `join/app.js` and its provenance. Its actual
 Worker JavaScript SHA256 remains
@@ -57,6 +57,33 @@ speech/music, desktop WAV/MP3 Shared Track, Webex video/manual exclusive audio,
 and the remaining operator/platform checks below are not completed by this UI
 fix. Webex's existing Personal Room must still be confirmed through normal
 settings; no meeting or capture was started while Jeff slept.
+
+## Provider-start CI dependency resolved
+
+The originally requested command
+`npm run --silent test:lobby-session-runtime -- --participation --provider-start`
+actually ran in [CI run 42459839175](https://github.com/rupret007/StalemateSite/actions/runs/42459839175),
+job `128666554107`, on the equal-tree checkout of source `b504bd5`. Its full
+retained log and actual command/result were inspected. All **51 source entries**
+and **68 compiled bundle inputs** match current deployed source `71bff2c` and
+the matched installed dependency bytes. This is input-bound reuse of that real
+CI result, not a newly dispatched full-tree test on `71bff2c`.
+
+The mode proves the real workerd/SQLite owner, read-only transaction-before-start
+ordering, Stop/revoke refusal, held-response progress, callback-close fence and
+cold cleanup without replay. The first child was intentionally killed by the
+existing runner; recovery exited zero, owned processes were absent and temporary
+state was removed. Its two provider-start callbacks were inert. The separate
+egress-probe counter was **one intercepted/denied call**, then zero after cold
+recovery; do not relabel every counter as zero or claim external activation.
+
+The [source-bound receipt](../pr-assets/beta-collaboration/20261108/invalid-invite-recovery/provider-start-current-inputs.json)
+resolves the original eighth-mode request; older pending notes are historical.
+A description of an additional “frozen native-provider” test does not redefine
+that original command. This mode does **not** qualify frozen desktop audio,
+real provider activation, guardian/legal decisions, hearing, Webex, capacity or
+the other existing runtime modes by itself. Production AI remains off. Physical
+music, Shared Track and Webex acceptance are still pending as described below.
 
 ## Earlier full lobby baseline — version 449
 

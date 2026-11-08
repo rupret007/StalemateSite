@@ -41,6 +41,10 @@ retains its C227/Intel-components-to-Linux scope. These results do not prove
 physical Windows music, desktop Shared Track, Webex video/manual handoff, full
 accessibility or public readiness. All
 [62 requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md) remain in force.
+The original explicit eighth workerd provider-start CI command has already run;
+its 51 source entries and 68 bundle inputs match the current application inputs.
+See [the qualified receipt and limits](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md#provider-start-ci-dependency-resolved).
+It remains separate from frozen desktop audio and real provider/media use.
 
 The browser-access clock and subsequent real WebKit audio-context teardown
 corrections remain included in current WebJam source
