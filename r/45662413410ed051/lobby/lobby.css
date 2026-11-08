@@ -231,7 +231,9 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .jam { flex: 0 1 auto; min-height: 0; overflow: auto; max-height: 35dvh; padding: 16px 20px; background: #171e15; border-bottom: 1px solid #43543a; font-size: 12px; }
 .jam-title { margin: 0 0 4px; font-size: 14px; }
 .jam-note { margin: 0 0 6px; }
-.jam-platform { margin: 0 0 10px; }
+.jam-host-steps { margin: 0 0 8px; padding-left: 20px; overflow-wrap: anywhere; }
+.jam-host-steps strong { color: var(--cream); }
+.jam-platform { margin: 10px 0 0; }
 .jam-actions, .jam-paste { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .jam-actions .btn { flex: 1 1 145px; min-width: 0; max-width: 260px; padding-inline: 10px; overflow-wrap: anywhere; }
 .jam-actions [data-jam-wait] { flex-basis: 100%; }

@@ -116,6 +116,30 @@ const paste = async (page, value) => {
     await page.locator('[data-jam-form] button[type="submit"]').click();
 };
 
+test('first-invite guidance follows current host power without opening setup help', async ({ browser, baseURL }) => {
+    const f = await browserRoom(browser, baseURL, true, { width: 1440, height: 900 });
+    try {
+        const host = await f.join('SetupHost'), peer = await f.join('SetupPeer');
+        await host.click('[data-start="jam"]');
+        await host.evaluate(() => __lobby.cmd('invite', ['SetupPeer']));
+        await peer.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
+        await expect(host.locator('[data-jam-host-steps]')).toBeInViewport();
+        await expect(peer.locator('[data-jam-host-steps]')).toBeHidden();
+        await host.evaluate(() => __lobby.cmd('op', ['SetupPeer']));
+        await expect(peer.locator('[data-jam-host-steps]')).toBeVisible();
+        await peer.evaluate(() => __lobby.cmd('deop', ['SetupHost']));
+        await expect(host.locator('[data-jam-host-steps]')).toBeHidden();
+        await expect(host.locator('[data-jam-wait]')).toBeVisible();
+        await expect(host.locator('[data-jam-form]')).toBeHidden();
+        for (const page of [host, peer]) {
+            await expect(page.locator('[data-jam-help]')).not.toHaveAttribute('open');
+            expect(await page.evaluate(() => window.audioRequests)).toBe(0);
+            expect(await page.evaluate(() => window.browserOpens)).toEqual([]);
+        }
+        expect(f.external).toEqual([]);
+    } finally { await f.close(); }
+});
+
 for (const width of [375, 390]) test(`host can share desktop and browser invitations through the visible form at ${width}px`, async ({ browser, baseURL }, testInfo) => {
     const f = await browserRoom(browser, baseURL, true, { width, height: 844 });
     try {
@@ -123,18 +147,26 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         await host.click('[data-show="rooms"]');
         await host.click('[data-start="jam"]');
         await expect(host.locator('[data-jam]')).toBeVisible();
-        await expect(host.getByRole('textbox', { name: 'WebJam invitation' })).toHaveAccessibleDescription(/In WebJam, click Copy browser invite/);
+        // First-time hosts get their next steps without opening a help panel.
+        await expect(host.locator('[data-jam-help]')).not.toHaveAttribute('open');
+        await expect(host.locator('[data-jam-host-steps]')).toBeVisible();
+        await expect(host.locator('[data-jam-host-steps]')).toContainText('Music → Host');
+        await expect(host.getByRole('textbox', { name: 'WebJam invitation' })).toHaveAccessibleDescription(/Copy browser invite[\s\S]*Paste that link here and click Share/);
+        await expect(host.locator('[data-jam-form] button[type="submit"]')).toBeInViewport();
         const channel = await host.evaluate(() => __lobby.active);
         await host.evaluate(() => __lobby.cmd('invite', ['BrowserGuest']));
         await guest.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
         await expect(guest.locator('[data-jam]')).toBeVisible();
         await expect(guest.locator('[data-jam-web]')).toBeDisabled();
         await expect(guest.locator('[data-jam-form]')).toBeHidden();
+        await expect(guest.locator('[data-jam-host-steps]')).toBeHidden();
+        await expect(guest.locator('[data-jam-wait]')).toContainText('no app needed');
         await paste(host, INVITE);
         // Each socket confirms independently. A replacement announcement
         // clears an old editor; wait for the host's own confirmation before
         // typing the next invitation, even if the guest received it first.
         await expect(host.locator('[data-jam-copy]')).toBeVisible();
+        await expect(host.locator('[data-jam-host-steps]')).toBeHidden();
         await expect(guest.locator('[data-jam-copy]')).toBeVisible();
         await paste(host, ` \n${WEB_INVITE}\n `);
         await expect(host.locator('[data-jam-web]')).toBeEnabled();
@@ -157,6 +189,7 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
             // Platform limits must remain visible without expanding setup help.
             await expect(page.locator('[data-jam-platform]')).toBeVisible();
             await expect(page.locator('[data-jam-platform]')).toContainText('A Mac hosts music');
+            await expect(page.locator('[data-jam-platform]')).toContainText('Mac and Windows guests can join in a browser');
             await expect(page.locator('[data-jam-platform]')).toContainText('this unsigned beta cannot join natively');
             expect(await page.locator('#jam-title').evaluate(title => {
                 const panel = title.closest('[data-jam]').getBoundingClientRect(), rect = title.getBoundingClientRect();
@@ -198,6 +231,8 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         await expect(guest.locator('[data-jam-web]')).toBeDisabled();
         await expect(guest.locator('[data-jam-copy]')).toBeHidden();
         await expect(guest.locator('[data-jam-wait]')).toBeVisible();
+        await expect(host.locator('[data-jam-host-steps]')).toBeVisible();
+        await expect(guest.locator('[data-jam-host-steps]')).toBeHidden();
         expect(f.external).toEqual([]);
     } finally { await f.close(); }
 });
