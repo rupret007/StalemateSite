@@ -942,7 +942,8 @@ export class HangoutLobby {
         if (identity.devToken) this.delivery.send(pair[1], { t: 'device', token: identity.devToken });
         for (const frame of initialFrames) {
             if (frame.t === 'admin' && this.env.HANGOUT_BETA_MODE === 'protected') this.sendPrivateAdmin(pair[1], id, frame);
-            else this.delivery.send(pair[1], frame);
+            else this.delivery.send(pair[1], frame.t === 'hello'
+                ? { ...frame, features: { ...frame.features, transportPing: 1 } } : frame);
         }
         return new Response(null, { status: 101, webSocket: pair[0] });
         } catch {
@@ -969,12 +970,12 @@ export class HangoutLobby {
             if (typeof raw === 'string' && raw.length <= LOBBY_LIMITS.actFrameBytes) {
                 let control;
                 try { control = JSON.parse(raw); } catch { /* The engine refuses malformed application frames. */ }
-                if (control?.t === 'transport-ack') {
+                if (control?.t === 'transport-ack' || control?.t === 'transport-ping' && Object.keys(control).length === 1) {
                     if (!await this.controlBudget.take(ws, a.id)) {
                         const { entry } = closeTransport(this, ws, 4413, 'community control allowance unavailable');
                         return await retireClosed(this, entry, gate);
                     }
-                    return this.delivery.acknowledge(ws, control.seq);
+                    return control.t === 'transport-ping' ? this.delivery.heartbeat(ws) : this.delivery.acknowledge(ws, control.seq);
                 }
                 if (control?.t === 'hello' && !this.delivery.negotiate(ws, control.transport)) return;
             }

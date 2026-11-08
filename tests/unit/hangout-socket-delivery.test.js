@@ -11,6 +11,27 @@ function socket(bufferedAmount) {
 const limits = { frameBytes: 1024, pendingBytes: 2048, pendingFrames: 2, legacyFrames: 3 };
 
 describe('bounded socket delivery', () => {
+    it('bounds heartbeat replies inside the same unacknowledged delivery window', () => {
+        const ws = socket(), delivery = createSocketDelivery({ limits }); delivery.negotiate(ws, 1);
+        expect(delivery.heartbeat(ws)).toBe(true); expect(delivery.heartbeat(ws)).toBe(true);
+        expect(delivery.heartbeat(ws)).toBe(false);
+        expect(ws.frames).toEqual([{ t: 'transport-pong', transportSeq: 1 }, { t: 'transport-pong', transportSeq: 2 }]);
+        expect(ws.closed.code).toBe(4413);
+    });
+    it('shares the ACK rate allowance with pings and refuses unnegotiated pings', () => {
+        const delivery = createSocketDelivery({ limits: { ackBurst: 2 }, now: () => 0 }), ws = socket();
+        delivery.negotiate(ws, 1); delivery.send(ws, { t: 'notice' });
+        expect(delivery.acknowledge(ws, 1)).toBe(true); expect(delivery.heartbeat(ws)).toBe(true);
+        expect(delivery.heartbeat(ws)).toBe(false); expect(ws.closed.code).toBe(4429);
+        const older = socket(); expect(delivery.heartbeat(older)).toBe(false); expect(older.closed.code).toBe(4400);
+    });
+    it('does not use pings to reset duplicate-ACK protection or release message credit', () => {
+        const ws = socket(), delivery = createSocketDelivery({ limits: { duplicateAcks: 1 } });
+        delivery.negotiate(ws, 1); delivery.send(ws, { t: 'notice' }); delivery.acknowledge(ws, 1);
+        expect(delivery.acknowledge(ws, 1)).toBe(true); expect(delivery.heartbeat(ws)).toBe(true);
+        expect(delivery.snapshot().pendingFrames).toBe(1);
+        expect(delivery.acknowledge(ws, 1)).toBe(false); expect(ws.closed.code).toBe(4429);
+    });
     it('closes an unacknowledged reader without queuing message bodies or blocking other readers', () => {
         const retired = vi.fn(), delivery = createSocketDelivery({ limits, onClosed: retired });
         const slow = socket(), healthy = socket();

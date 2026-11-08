@@ -1,0 +1,25 @@
+{
+  "recordedAt": "2026-11-07T23:13:05.245870+00:00",
+  "runtimeSourceRevision": "ec1b4a09d6c375433aedb33f56c3deb9590350ac",
+  "runtimeSha256": {
+    "hangout-worker/src/lobby-do.mjs": "c536257ba7786ca15c574a185303213623aeef2b050ee14c435e8971ca9612ba",
+    "hangout-worker/src/socket-delivery.mjs": "f3950396591f0f84dcb474bc2f0c4bc9b470d215e63d683da5f4543f57fec220",
+    "r/45662413410ed051/lobby/lobby.js": "37a6a267aee62080caff7745794a68993aac3ab0f42b2b452b5b58985d5e30f9",
+    "r/45662413410ed051/lobby/idle-heartbeat.mjs": "aef5c3174176c88d992890016d0b94f632071b44c140d82218908da7286ce220"
+  },
+  "payloadSha256": {
+    "full-local-unit.json": "3ab33194178268a2ed2190e514e093c994b2986b425a9bf06c06cbfba1662273",
+    "initial-runtime-ci.json": "b51e1ea6d89c28bfc74f946847e1e022eb9b7e200abf0316187cca49dcc4f7fb",
+    "client-fixture-ci-correction.json": "ac5c30eb52c9e6ba31ceab38a88b40b1116722fb7f7be9de2253334e6b2c226d",
+    "runner.mjs": "0e4e56ab88748b5f85578234504bd5eb970d63360be20a9690d2a9b0960723bc",
+    "README.md": "60d130c13c1a061cd9364108e3df0f532adf3b02c9c1533a4ba06384ec8bab3d",
+    "unit.json": "2ae6f65f926820fcfcca9afcff4e558b72db457f45ce0ed4e4be4c6635f39612",
+    "fixture-worker.mjs": "e2f1cc96991b0e47b71d4e140316b57685b444d9c3babd3fd32300ca09d5e5d3",
+    "worker-runtime.json": "139491d065a3dc2908efb891c1d664f36b2c7b0c8a26db4b4264a41c9ae6172a",
+    "browser.json": "66b80408a4f8ab500188a4004ad957dee5b1557763c6042fac09b94910cda745"
+  },
+  "scope": "Local source, unit, browser protocol fixture and native Worker proof; no hosted/private deployment or full-release qualification.",
+  "all62RequirementsPreserved": true,
+  "normalExactHeadCiPending": true,
+  "releaseCandidateReady": false
+}
