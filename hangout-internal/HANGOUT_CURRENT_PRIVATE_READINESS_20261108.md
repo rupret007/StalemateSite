@@ -95,16 +95,39 @@ application/device test guards must not be silently replaced by that gate.
 [WebJam #458](https://github.com/rupret007/webjam/pull/458) merged as
 `de89a1e95f03c302f3a6c47aa8ac2f4956e620b2` after normal CI and corrects the
 meeting-audio documentation. It changes no native runtime. The subsequent
-[panel-copy fix #459](https://github.com/rupret007/webjam/pull/459) is under
-review; use that PR's current head and checks for its changing source status.
-It is not in the installed 533 package. The review retains the original stale
-Art-to-Music and audit-test wording failures and their corrections, with the
-focused Music/Art/lesson and audit results. A passing main suite does not waive
-the required Jamulus integration and package-input checks: HTTP 504 failures
-while fetching official pinned assets are download failures, not integration
-passes. Keep their original results and wait for upstream recovery before a
-bounded retry; never replace hashes, weaken verification or assume the old
-installed package contains the pending source fix.
+[panel-copy fix #459](https://github.com/rupret007/webjam/pull/459) merged as
+`e7e0b46d1bcbd57bd429a4f73d6f49260bbe72dd`, from reviewed head
+`256e13480eb07836e81b0577902580b06e2e9f5e`. Its final source CI passed
+12,955 Python tests, 69 browser tests and both real Jamulus integration suites.
+It is not in the selected 533 package. The review retains the original stale
+Art-to-Music and audit-test wording failures and their corrections, alongside
+the focused results. Initial source CI download failures were retained too;
+full GETs and pinned hashes established upstream recovery before bounded
+failed-job retries passed. Those source checks are complete and should not be
+repeated. They do not establish that the selected app contains the new fix.
+
+The private artifact run `42575447417` builds that exact 256 head with the
+private-beta target, signing/certification off and no public release. Windows,
+Apple Silicon and Linux packaging passed. Intel packaging stopped at the pinned
+Jamulus 3.12.2 disk-image download with HTTP 504; an independent full GET also
+returned 504. No retry has been admitted without upstream recovery. Preserve
+the successful jobs and original failure; never weaken the asset pin.
+The actual Apple Silicon archive passed local exact source/target, component
+checksum, architecture and deep/strict/all-architectures signature checks in
+an isolated cache. No installer, app, media or quarantine override was run.
+Two local inspector stops (an app-only archive expectation and an unavailable
+metadata API) were corrected against the same downloaded/extracted bytes;
+their original receipts remain retained. None is a physical host or hearing
+pass, and the selected demo has not changed.
+
+The [concrete website entry package](HANGOUT_WEBSITE_ENTRY_HANDOFF_20261109.md)
+is now available for the receiving website session, with its downloaded CI
+artifact and independently checked source/payload hashes. Both public
+entrances remain unpublished. The separate command-line frontend readback
+stopped before admission at Cloudflare 403/error 1010, and opening the raw
+script as a browser document was blocked by the client. Neither protection was
+bypassed. The normal browser prejoin remains admitted, but raw served
+JavaScript/stylesheet HTTP hashes are still unverified.
 
 All 62 requirements remain in force, including Art/Bob Ross/Grandeur-first and
 custom YouTube, mobile/accessibility, capacity, platform, moderation and public
