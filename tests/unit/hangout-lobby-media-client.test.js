@@ -10,6 +10,7 @@ const html = readFileSync(new URL(`${root}lobby/index.html`, import.meta.url), '
 const core = readFileSync(new URL(`${root}sync-core.js`, import.meta.url), 'utf8');
 const lessons = readFileSync(new URL(`${root}bob-ross.js`, import.meta.url), 'utf8');
 const client = readFileSync(new URL(`${root}lobby/lobby-room.js`, import.meta.url), 'utf8');
+const youtube = readFileSync(new URL(`${root}youtube-player.js`, import.meta.url), 'utf8');
 const windows = [];
 afterEach(() => { for (const dom of windows.splice(0)) dom.window.close(); });
 const deferred = () => { let resolve, reject; return { promise: new Promise((done, fail) => { resolve = done; reject = fail; }), resolve: value => resolve(value), reject: error => reject(error) }; };
@@ -27,7 +28,8 @@ async function fixture({ inboundBeforeCapture = false, holdCapture = false, rece
     window.HTMLCanvasElement.prototype.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1200, height: 720 });
     window.HangoutVideo = { isPhoneDevice: () => false };
     const selectVideo = vi.fn(async () => ({ getCurrentTime: () => 0, getPlayerState: () => 2, seekTo() {}, playVideo() {}, pauseVideo() {} }));
-    window.HangoutYouTube = { create: () => ({ cancel() {}, select: selectVideo }) };
+    window.eval(youtube);
+    window.HangoutYouTube.create = () => ({ cancel() {}, select: selectVideo });
     window.eval(lessons);
     window.MediaStream = class { tracks = []; addTrack(track) { this.tracks.push(track); } getTracks() { return this.tracks; } getVideoTracks() { return this.tracks; } };
     const localTrack = { stop: vi.fn(), kind: 'video' }, stream = new window.MediaStream(); stream.addTrack(localTrack);
