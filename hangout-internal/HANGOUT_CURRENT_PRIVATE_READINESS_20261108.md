@@ -4,7 +4,7 @@
 acceptance is still pending.** The latest checkpoint below supersedes older
 runtime and ownership statements. This handoff preserves all
 [62 acceptance requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md). It is not a
-public-launch approval. The two public websites have not been changed.
+public-launch approval. This work leaves both public websites unchanged.
 
 ## Latest delivery and rehearsal checkpoint — November 9
 
@@ -70,12 +70,16 @@ application/device test guards must not be silently replaced by that gate.
 [WebJam #458](https://github.com/rupret007/webjam/pull/458) merged as
 `de89a1e95f03c302f3a6c47aa8ac2f4956e620b2` after normal CI and corrects the
 meeting-audio documentation. It changes no native runtime. The subsequent
-[panel-copy fix #459](https://github.com/rupret007/webjam/pull/459), head
-`f12deb222cd96848b09b9b0a8134d31d5ee04f76`, passed 232 focused source tests;
-normal CI and merge were pending when this section was written. It is not in
-the installed 533 package. The first focused run's stale Art-to-Music wording
-assertion remains recorded; its corrected contract and the surrounding
-Music/Art/lesson checks passed on the next changed test input.
+[panel-copy fix #459](https://github.com/rupret007/webjam/pull/459) is under
+review; use that PR's current head and checks for its changing source status.
+It is not in the installed 533 package. The review retains the original stale
+Art-to-Music and audit-test wording failures and their corrections, with the
+focused Music/Art/lesson and audit results. A passing main suite does not waive
+the required Jamulus integration and package-input checks: HTTP 504 failures
+while fetching official pinned assets are download failures, not integration
+passes. Keep their original results and wait for upstream recovery before a
+bounded retry; never replace hashes, weaken verification or assume the old
+installed package contains the pending source fix.
 
 All 62 requirements remain in force, including Art/Bob Ross/Grandeur-first and
 custom YouTube, mobile/accessibility, capacity, platform, moderation and public
