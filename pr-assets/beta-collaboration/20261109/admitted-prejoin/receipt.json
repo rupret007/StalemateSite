@@ -1,0 +1,67 @@
+{
+  "schema": "webjam-admitted-prejoin-evidence-v1",
+  "observedAt": "2026-11-09T06:33:11.298135+00:00",
+  "runtimeSource": "c83dfaff1fe924ea0a70cfc902731234113f0c09",
+  "privateVersion": "49f19821-e3cf-4699-8698-3dd3f446ca3b",
+  "normalExistingInvitationAccepted": {
+    "Chrome": true,
+    "Safari": true,
+    "newInvitationKeyOrProviderCredentialCreated": false,
+    "ordinarySessionCookiesIssuedBySite": true,
+    "invitationAndCookieValuesIncluded": false
+  },
+  "entryChoices": {
+    "Chrome": "via Stalemate, Back to Stalemate",
+    "Safari": "via Rad Dad, Back to Rad Dad",
+    "sameLobbyPath": "/r/45662413410ed051/lobby/",
+    "bothPreparedAsOrdinaryGuests": true,
+    "sourceChoiceIsNotVerifiedIdentity": true
+  },
+  "screenshots": [
+    {
+      "path": "prejoin-375.jpg",
+      "width": 375,
+      "height": 812,
+      "format": "JPEG",
+      "sha256": "519d543d116deeedf59cf6dfbe0d2bf7a9d0f72d041fd4ddd53d21343dc8b7b8",
+      "scope": "actual deployed Chrome prejoin, not joined chat or physical iPhone",
+      "observedPageWidth": 375,
+      "nickFontPx": 16,
+      "horizontalPageOverflow": false
+    },
+    {
+      "path": "prejoin-390.jpg",
+      "width": 390,
+      "height": 844,
+      "format": "JPEG",
+      "sha256": "1fa8c8ab925b6e42cd2840ee7da9c4063fc4ad4484da047c60538c3768f62836",
+      "scope": "actual deployed Chrome prejoin, not joined chat or physical iPhone",
+      "observedPageWidth": 390,
+      "nickFontPx": 16,
+      "horizontalPageOverflow": false
+    }
+  ],
+  "stylesheetExportQualification": {
+    "path": "/r/45662413410ed051/lobby/lobby.css",
+    "rawExportSha256": "dc356353daf5bb9b006c8a0889cc19df5d9cb43ff0291202c7f4b0cd8688a96a",
+    "reviewedAndRecoveredSha256": "e473caf86b50dc653641c0b388956005b8461c27ae98b5d055200c7792df1e7c",
+    "exportTransform": "UTF8 original decoded as Windows1252 then re-encoded UTF8; exactly reversed by exportedText.encode(cp1252)",
+    "allOtherBytesExact": true,
+    "actualChromeDom": {
+      "documentEncoding": "UTF-8",
+      "dicePseudoContent": "⚄",
+      "activityTogglePseudoContent": "Hide activity −"
+    },
+    "rawHttpResponseBytesNotCaptured": true
+  },
+  "faviconRawBytesMatchReviewed": true,
+  "pending": [
+    "guest agreement approval",
+    "joined lobby/socket and cross-entry messaging",
+    "joined composer/chips mobile checks",
+    "raw JavaScript response hashes",
+    "current Music/Shared Track/Webex and remaining62 outcomes"
+  ],
+  "noChatJoinedOrMediaStarted": true,
+  "scope": "Actual delivered prejoin, not physical iPhone, joined chat, audio/hearing or public-launch acceptance."
+}

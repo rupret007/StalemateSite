@@ -1,5 +1,12 @@
 # Website integration: one shared Hang Out
 
+**Latest checkpoint, November 9:** reviewed runtime `c83dfaff` is delivered
+privately as version `49f19821-e3cf-4699-8698-3dd3f446ca3b`; the issuer remains
+`fd37578f`. Use the [current delivery and rehearsal checkpoint](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
+before the dated observations below. Ordinary admitted entry and current
+Music/Shared Track/Webex acceptance are still pending. This session owns private
+application delivery independently of StoryPool. Public links remain unpublished.
+
 Use this short guide to prepare the receiving owner's release. This application
 session supplies source, tests and integration assets. Following Jeff's October30
 clarification, application code, project CI and application PRs proceed here
