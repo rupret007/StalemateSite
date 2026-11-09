@@ -6,7 +6,64 @@ pending.** This handoff records the private runtime delivered November 8 UTC
 [62 acceptance requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md). It is not a
 public-launch approval. The two public websites have not been changed.
 
-## Application candidate
+## Latest device and delivery checkpoint — November 9, 00:57 UTC
+
+This checkpoint supersedes the older device/setup statements below. The earlier
+sections remain dated evidence; they are not instructions to repeat completed
+downloads, install helpers, GUI checks or CI.
+
+| Layer | Verified current state | Next required evidence |
+| --- | --- | --- |
+| Reviewed private website | PR 243 merged as `c83dfaff1fe924ea0a70cfc902731234113f0c09`, tree `7ca20bdcda674a4c70601ec1ff68708a50da8431`; UI fixes and source-bound screenshots retained | Receiving-owner private delivery, effective-configuration preservation and served-asset readback |
+| Actual private website | Version `2c5c81e5-1aa4-4ea7-be69-cacda13c20e8`, deployment `e75182dd-8ac7-484a-809b-a80f6a8ac52e`, 100% at 00:57 UTC | The reviewed UI candidate is still not delivered at this readback |
+| Actual private issuer | Version `4db649fa-a465-44b4-8487-414987b3a660`, deployment `618e7517-42e1-422a-8449-5d04a2ecada0`, 100% | Receiving owner delivers merged WebJam #454 (`da47b27b164d0114480c76c6f5280c1669128a7c`) through its normal private path |
+| Installed Intel demo | Package source `533514d678c0e210c3e7817302605093d6a1e005`; Desktop demo selection, strict nested Mac signatures and real GUI invitation recovery verified | Current Mac-to-Windows speech/music, actual Shared Track WAV/MP3 and Webex handoff |
+| Apple Silicon package | The existing 533 ARM archive passed actual Mac signature/component checks and is saved in the MacBook cache | ARM installation/host role under an admitted resource guard; no execution on the Intel Mac is claimed |
+
+MacBook Accessibility now works. The installed Intel GUI rejected a genuinely
+malformed invitation, displayed recovery guidance, masked input, cleared it on
+Back and restored Host/Join. That successful check requested no media or
+clipboard access. Its report SHA256 is
+`e5f9bc23ce76fa46ef9d6e67e2a5df6d14aedb654ef0c5fa704ba8ce0d750c09`.
+The original DNS-shaped dummy was a valid legacy endpoint and did start a join
+attempt before timing out; it is not an invalid-invitation or media-free pass.
+Whether capture briefly opened during that original attempt was not proved.
+
+The reusable developer checker merged in
+[WebJam #456](https://github.com/rupret007/webjam/pull/456).
+[Follow-up #457](https://github.com/rupret007/webjam/pull/457) merged as
+`b012a01b28a6939d69f1bdacbc56ec7f1cba03a1`: an existing report is preserved
+without a path-bearing traceback, and invalid PID failures produce a complete
+STOPPED report. Its eight focused tests and the actual installed-GUI check
+passed. Normal CI on tested checkout `642a74578bb5735def6be342f3bb60f5ab2a0685`,
+tree `7c3e1b158b431a164f34e3b06dc6765630459555`, passed 12,949 Python tests
+(60 skipped, 564 isolated module groups), 69 browser tests and both real
+Jamulus 3.12.2/3.12.3 integrations (11 RPC plus 7 boundary cases each), along
+with the normal Worker, security and diagnostic checks. Both PRs change QA
+tooling/documentation, not the native runtime: **do not rebuild 533 for them**.
+
+Jeff subsequently quit an unexpected Music session. At 00:54 UTC, SSH process
+readback found no WebJam, Jamulus or JamulusServer remaining on the MacBook.
+The earlier session's owner is unconfirmed. This cleanup is not a listening,
+Shared Track or meeting pass; leave the application stopped until the next
+qualified trial.
+
+The existing account entitlement API returned `calls.enabled=true`, but no
+numeric allowance/headroom. The billing-usage API returned 403 with the existing
+credential. Neither result establishes room for another media trial. The
+existing relay-cap marker is unchanged. The Mini guard is still closed
+(00:57 UTC: swap 87.565%, root free 16.133 GiB); no guard was relaxed.
+Jeff forwarded the [private delivery handoff](https://github.com/rupret007/StalemateSite/pull/243#issuecomment-6728954777)
+to Grok. Owner acceptance and delivery still require actual readback; forwarding
+alone is not deployment evidence. Preserve settings, secrets, namespaces,
+origins, caps and holds; do not infer current configuration from defaults.
+
+The release candidate remains pending. All 62 requirements, current physical
+audio/video and Shared Track acceptance, platform/accessibility/capacity work,
+and public operator/legal decisions retain their original scope. Source CI,
+generated audio and historical human results do not replace these outcomes.
+
+## Earlier application candidate — November 8, 20:02 UTC
 
 **Checkpoint: November 8, 20:02 UTC; deployment readback 19:48 UTC.**
 
