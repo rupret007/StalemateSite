@@ -19,5 +19,14 @@
     "private-entry-chromium-390.png": "55eab295580082549e956ab62f5eebebc2cd23e193ec082baadccae7ebefbb3d",
     "private-entry-webkit-community-375.png": "a1b98fa9092425e43f1c4bc3871080067d74e31a4a5e96ed5cd94fc169b7a655",
     "private-entry-webkit-community-390.png": "859ed47262585bfbecde216f320147358252ccd5938df515edd21cbf40fc6539"
+  },
+  "moderationJourneyTests": 1,
+  "originalCiOutcome": {
+    "head": "d2fd6f42250cf77dc2869ed40af6a450c116e929",
+    "run": 42711461857,
+    "unitPassed": 2102,
+    "browserPassed": 859,
+    "browserFailed": 1,
+    "failure": "Existing moderation journey expected the old rejected-upgrade wording; both expectations updated, selected-person restrictions and unban assertions preserved."
   }
 }

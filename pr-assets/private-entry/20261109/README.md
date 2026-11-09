@@ -26,8 +26,17 @@ permissions, source-sharing preferences and public entrances are unchanged.
   at 375/390 px and a 503 outage. Tests reject the WebSocket upgrade through
   the real loopback HTTP handler; `/beta/state` is a named fixture.
 - Existing Chromium guest and verified-owner refused-reconnect cases both pass.
+- The full Chromium moderation journey passes: a selected-person ban still
+  blocks the original identity, allows an unrelated device on the same address,
+  and removes only the selected stored rule while another ban remains active.
 - Screenshots were visually inspected; the recovery link wraps inside the page
   and opens through keyboard activation. Hashes are in `evidence.json`.
+
+The initial CI run on `d2fd6f4` passed all 2,102 unit tests and 859 browser tests;
+one existing moderation journey failed because it expected the old admission
+wording. Both wording expectations were updated without changing its restrictions
+or unban checks. That complete journey then passed locally. Full CI on the new
+PR head must pass before merge; these earlier counts are historical evidence.
 
 These checks do not prove live cookie expiration, current native audio, Webex,
 full accessibility or all 62 acceptance requirements. The private runtime is
@@ -39,4 +48,5 @@ Reproduce from the repository root after installing the normal dependencies:
 npx vitest run --project unit tests/unit/hangout-lobby-client-context.test.js --maxWorkers=1 --no-file-parallelism
 STALEMATE_TEST_PORT=4539 CI=1 npx playwright test tests/e2e/lobby-private-entry.spec.js --project=chromium --project=webkit-community --workers=1 --retries=0
 STALEMATE_TEST_PORT=4539 CI=1 npx playwright test tests/e2e/lobby-guest-journeys.spec.js --project=chromium --workers=1 --retries=0 --grep 'refused reconnect'
+STALEMATE_TEST_PORT=4539 CI=1 npx playwright test tests/e2e/lobby.spec.js --project=chromium --workers=1 --retries=0 --grep 'three fans'
 ```
