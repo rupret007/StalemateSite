@@ -1,14 +1,90 @@
 # Private release candidate: current handoff
 
-**The application has made measurable progress, but the release candidate is
-pending.** This handoff records the private runtime delivered November 8 UTC
-(November 7 in Texas). It preserves all
+**The reviewed private website update is delivered; full band rehearsal
+acceptance is still pending.** The latest checkpoint below supersedes older
+runtime and ownership statements. This handoff preserves all
 [62 acceptance requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md). It is not a
 public-launch approval. The two public websites have not been changed.
 
-## Latest device and delivery checkpoint — November 9, 00:57 UTC
+## Latest delivery and rehearsal checkpoint — November 9
 
-This checkpoint supersedes the older device/setup statements below. The earlier
+This WebJam session owns independent application work, normal GitHub CI/PRs and
+remaining private delivery/testing. Jeff explicitly kept StoryPool separate:
+do not route this work through its bus, Karen, conductor or shared services.
+Earlier Grok-delivery and Dot-ACK instructions below are historical. Resource,
+trust, configuration, privacy, spending and existing release/provider holds
+remain binding.
+
+| Layer | Observed evidence | What it does not prove |
+| --- | --- | --- |
+| Private website | Reviewed runtime `c83dfaff1fe924ea0a70cfc902731234113f0c09` now serves as version `49f19821-e3cf-4699-8698-3dd3f446ca3b` at 100%, deployment `113a1d31-e071-40f1-9101-6f45918a8a85`; `f19dbee75842ddde59594dcd45fd9305af0cba71` adds readiness documentation only | Normal admitted browser journey, served frontend assets and current media acceptance remain pending |
+| Worker/configuration preservation | Downloaded serving Worker SHA256 `9fefc1a13eaecb138be633e85d19039c15969f7066b7e71b6123636858493b78` matches the qualified bundle. All 17 plain variables, five secret-binding names, five Durable Object namespace IDs, asset binding, runtime and effective service settings were compared with the private live snapshot | `--keep-vars` alone would not establish these comparisons; no secret values belong in this repository |
+| Private issuer | `fd37578f-13cd-4fce-b557-35c0d962ef9d` remains at 100%, deployment `77728fdf-5fb7-4a8a-bdf5-b6a7467f0bf3`; the one completed 405/204/403 qualification has receipt SHA256 `c209b961bd8b64e7b2e812c00e33f0f9623f7d2e45fee06ecd992fe2f5b6584e` | Do not rerun completed issuer negatives or mint test credentials |
+| Rollback | Previous site `2c5c81e5-1aa4-4ea7-be69-cacda13c20e8` and issuer `4db649fa-a465-44b4-8487-414987b3a660` are retained; no rollback was needed | A later rollback still needs the normal guard and effective-configuration preservation checks |
+| Intel and Apple Silicon apps | Actual package source remains `533514d678c0e210c3e7817302605093d6a1e005`. Both Mac archives passed strict nested signature checks; installed Intel and Mini startup/invalid-invite recovery were exercised | Ad-hoc signatures are not notarization or Windows trust proof; current ARM hosting and current physical music remain unverified |
+| Shared Track | The actual ARM GUI loaded the rights-cleared WAV, replaced it with MP3, displayed 48 kHz/stereo/40 seconds and removed it. Play/pause/restart/seek correctly stayed locked without a verified live primary route | File decoding and locked controls are not live playback, remote hearing, mix/level/mute or transport-control proof |
+| MacBook readiness | At 05:18 UTC it was reachable, with 24.4 GiB free, zero swap, load 2.65 and no WebJam/Jamulus components. Default built-in microphone and wired External Headphones were both 48 kHz; BlackHole 16ch was present at 48 kHz | Device availability does not certify the active primary/backing routes; do not reinstall BlackHole |
+| Webex | The verified Mini client supplied the existing Personal Room. Its link was saved through normal WebJam Settings and survived reopening, with the musician name unchanged; no meeting opened | Only the Mini preference was qualified. MacBook setup, actual video/speech and the exclusive audio handoff still need the attended check |
+| Ordinary private entry | Normal Chrome currently shows the invitation form; Jeff has been asked to enter his existing invitation locally | No admitted-session pass is claimed. Do not post invitations, invent cookies or weaken admission to get a green result |
+
+The serving Worker differs from the previously qualified backend only by the
+removed source-map footer; all other bytes match. The earlier config-location
+and raw-hash expectation stops remain recorded as stops. They were qualified
+against the saved artifacts, not relabeled as initial passes. The 70-file
+protected asset manifest has SHA256
+`4bd4a075d66d8ad7f2cd4f4e596b41a29418153015bef4927f2d7af62abdf2f1`.
+Private operational receipts remain in the application workspace; never commit
+their raw configuration, provider output or private links.
+The [sanitized delivery receipt](../pr-assets/beta-collaboration/20261109/private-delivery/receipt.json)
+records the exact serving identities, code/configuration comparisons and guard
+summary without those private values. It explicitly leaves admitted-user and
+media acceptance pending.
+
+Billing admission for October 15–November 14 reported 1,000 GB included, 0.01 GB
+used and $0, with the 800/200 caps and relay-cap hold unchanged. Approximately
+999.99 GB unused is a derived, rounded figure, not an exact real-time balance or
+a future-cost guarantee. Fresh applicable headroom, resource and hold checks
+are still required before a bounded media trial. The approved private Mini
+delivery gate is swap below 90%, load below 10 and at least 15 GiB free; stricter
+application/device test guards must not be silently replaced by that gate.
+
+### Next essential band journey
+
+1. Enter using the existing invitation, choose a nickname and check ordinary
+   IRC chat, source badges and room creation on the delivered frontend.
+2. Use one Mac native host and one Windows browser guest for at most ten
+   minutes after normal admission checks. Verify two-way speech/music,
+   leave/rejoin/recovery and cleanup. Che does not need the desktop client to
+   join as a browser guest; native Windows trust remains a separate question.
+3. Exercise actual WAV then MP3 Shared Track playback through its certified
+   separate BlackHole route, while the primary input/output remain physical.
+   Verify audible backing plus musician mix, levels/mute, pause/restart and
+   cleanup. Generated tones and offline decoding do not substitute for hearing.
+4. Test Webex video and the manual Music → conversation → Music handoff with
+   consenting participants and no recording. Disconnect meeting audio at both
+   ends while playing; microphone mute alone can leave meeting playback on.
+   Leave/end Music before connecting meeting audio. Disconnect meeting audio
+   before returning, then create a fresh Music invitation. WebJam does not
+   control or verify the external meeting's audio state.
+
+[WebJam #458](https://github.com/rupret007/webjam/pull/458) merged as
+`de89a1e95f03c302f3a6c47aa8ac2f4956e620b2` after normal CI and corrects the
+meeting-audio documentation. It changes no native runtime. The subsequent
+[panel-copy fix #459](https://github.com/rupret007/webjam/pull/459), head
+`f12deb222cd96848b09b9b0a8134d31d5ee04f76`, passed 232 focused source tests;
+normal CI and merge were pending when this section was written. It is not in
+the installed 533 package. The first focused run's stale Art-to-Music wording
+assertion remains recorded; its corrected contract and the surrounding
+Music/Art/lesson checks passed on the next changed test input.
+
+All 62 requirements remain in force, including Art/Bob Ross/Grandeur-first and
+custom YouTube, mobile/accessibility, capacity, platform, moderation and public
+operator/legal work. A successful private rehearsal will not itself complete
+those broader outcomes. Keep both public entrances unpublished.
+
+## Historical device and delivery checkpoint — November 9, 00:57 UTC
+
+At the time, this checkpoint superseded the older device/setup statements below. The earlier
 sections remain dated evidence; they are not instructions to repeat completed
 downloads, install helpers, GUI checks or CI.
 

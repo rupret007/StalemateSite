@@ -2,9 +2,16 @@
 
 WebJam carries the music through Jamulus and browser Web Join. An optional
 Webex meeting can provide video or conversation separately. The staged native
-source is `76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c`; use the
+source is `533514d678c0e210c3e7817302605093d6a1e005`; use the
 [current private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md) for actual package and
 website identities. This note does not qualify a real meeting.
+
+**November 9 update:** the existing Personal Room was saved through normal
+Settings in the verified Mini build and remained correct after reopening, with
+the musician name unchanged. Only the Mini preference was qualified; MacBook
+setup and the attended meeting checks remain pending. Do not recover the same
+private URL again merely because the historical readiness notes below predate
+that setup. Private links and room numbers stay out of repository evidence.
 
 ## What the current application controls
 
