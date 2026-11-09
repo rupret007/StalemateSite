@@ -17,7 +17,7 @@ remain binding.
 
 | Layer | Observed evidence | What it does not prove |
 | --- | --- | --- |
-| Private website | Reviewed runtime `c83dfaff1fe924ea0a70cfc902731234113f0c09` now serves as version `49f19821-e3cf-4699-8698-3dd3f446ca3b` at 100%, deployment `113a1d31-e071-40f1-9101-6f45918a8a85`; `f19dbee75842ddde59594dcd45fd9305af0cba71` adds readiness documentation only | Normal admitted browser journey, served frontend assets and current media acceptance remain pending |
+| Private website | Reviewed runtime `c83dfaff1fe924ea0a70cfc902731234113f0c09` now serves as version `49f19821-e3cf-4699-8698-3dd3f446ca3b` at 100%, deployment `113a1d31-e071-40f1-9101-6f45918a8a85`; `f19dbee75842ddde59594dcd45fd9305af0cba71` adds readiness documentation only | Normal invitation admission and the current prejoin screens are now qualified below; joined chat, remaining frontend readback and media are pending |
 | Worker/configuration preservation | Downloaded serving Worker SHA256 `9fefc1a13eaecb138be633e85d19039c15969f7066b7e71b6123636858493b78` matches the qualified bundle. All 17 plain variables, five secret-binding names, five Durable Object namespace IDs, asset binding, runtime and effective service settings were compared with the private live snapshot | `--keep-vars` alone would not establish these comparisons; no secret values belong in this repository |
 | Private issuer | `fd37578f-13cd-4fce-b557-35c0d962ef9d` remains at 100%, deployment `77728fdf-5fb7-4a8a-bdf5-b6a7467f0bf3`; the one completed 405/204/403 qualification has receipt SHA256 `c209b961bd8b64e7b2e812c00e33f0f9623f7d2e45fee06ecd992fe2f5b6584e` | Do not rerun completed issuer negatives or mint test credentials |
 | Rollback | Previous site `2c5c81e5-1aa4-4ea7-be69-cacda13c20e8` and issuer `4db649fa-a465-44b4-8487-414987b3a660` are retained; no rollback was needed | A later rollback still needs the normal guard and effective-configuration preservation checks |
@@ -25,7 +25,7 @@ remain binding.
 | Shared Track | The actual ARM GUI loaded the rights-cleared WAV, replaced it with MP3, displayed 48 kHz/stereo/40 seconds and removed it. Play/pause/restart/seek correctly stayed locked without a verified live primary route | File decoding and locked controls are not live playback, remote hearing, mix/level/mute or transport-control proof |
 | MacBook readiness | At 05:18 UTC it was reachable, with 24.4 GiB free, zero swap, load 2.65 and no WebJam/Jamulus components. Default built-in microphone and wired External Headphones were both 48 kHz; BlackHole 16ch was present at 48 kHz | Device availability does not certify the active primary/backing routes; do not reinstall BlackHole |
 | Webex | The verified Mini client supplied the existing Personal Room. Its link was saved through normal WebJam Settings and survived reopening, with the musician name unchanged; no meeting opened | Only the Mini preference was qualified. MacBook setup, actual video/speech and the exclusive audio handoff still need the attended check |
-| Ordinary private entry | Normal Chrome currently shows the invitation form; Jeff has been asked to enter his existing invitation locally | No admitted-session pass is claimed. Do not post invitations, invent cookies or weaken admission to get a green result |
+| Ordinary private entry | The existing local invitation bookmark was opened normally in Safari and Chrome; both accepted it without email or a new invitation key. Both reached the same lobby path with their Stalemate/Rad Dad source choices and return links | The agreement click is awaiting action-time approval for two test guests. Neither has joined the chat/socket or started media; no full newcomer journey is claimed |
 
 The serving Worker differs from the previously qualified backend only by the
 removed source-map footer; all other bytes match. The earlier config-location
@@ -39,6 +39,31 @@ The [sanitized delivery receipt](../pr-assets/beta-collaboration/20261109/privat
 records the exact serving identities, code/configuration comparisons and guard
 summary without those private values. It explicitly leaves admitted-user and
 media acceptance pending.
+
+### Current admitted prejoin and mobile evidence
+
+The [sanitized prejoin receipt](../pr-assets/beta-collaboration/20261109/admitted-prejoin/receipt.json)
+binds actual 375×812 and 390×844 Chrome screenshots to the delivered candidate.
+Both had page width equal to viewport width, contained nickname controls and a
+16px nickname input. This is prejoin reflow evidence, not a physical iPhone,
+joined message composer/chips, chat or media pass. The source choices remained
+ordinary guest context, not verified identity. No agreement, chat connection,
+microphone or camera was activated by these checks.
+
+| 375px | 390px |
+| --- | --- |
+| ![Delivered guest entry at 375px](../pr-assets/beta-collaboration/20261109/admitted-prejoin/prejoin-375.jpg) | ![Delivered guest entry at 390px](../pr-assets/beta-collaboration/20261109/admitted-prejoin/prejoin-390.jpg) |
+
+The browser-exported favicon matched reviewed bytes exactly. The stylesheet
+export initially differed: the export tool had decoded UTF-8 as Windows-1252
+and re-encoded it. Reversing that transformation reproduced the reviewed CSS
+byte for byte, and the actual browser rendered the Unicode glyphs correctly in
+UTF-8. The original mismatch is retained separately; this qualification is not
+a raw HTTP stylesheet-byte capture. Raw JavaScript response hashes are still
+unverified by this browser export. A first viewport request targeted a different
+window that remained 1200px wide; its desktop image is retained locally and is
+not counted as mobile evidence. The corrected controlled tab reported the
+requested widths before the two mobile captures; its override was reset.
 
 Billing admission for October 15–November 14 reported 1,000 GB included, 0.01 GB
 used and $0, with the 800/200 caps and relay-cap hold unchanged. Approximately
