@@ -1,0 +1,23 @@
+{
+  "base": "20e1f01494abe4da253f824803a7f5f7e0965bb0",
+  "scope": "Local real lobby client and loopback HTTP upgrade refusal; private state statuses are explicit fixtures, not real expired cookies or deployed acceptance.",
+  "focusedClientTests": 32,
+  "localBrowserTests": 6,
+  "existingReconnectTests": 2,
+  "browsers": [
+    "chromium",
+    "webkit-community"
+  ],
+  "widths": [
+    375,
+    390
+  ],
+  "liveDeliveryClaimed": false,
+  "mediaStarted": false,
+  "screenshots": {
+    "private-entry-chromium-375.png": "dac237f089ab13423c778b1b560f9888cde674504691fca1fb972e7871bff7c7",
+    "private-entry-chromium-390.png": "55eab295580082549e956ab62f5eebebc2cd23e193ec082baadccae7ebefbb3d",
+    "private-entry-webkit-community-375.png": "a1b98fa9092425e43f1c4bc3871080067d74e31a4a5e96ed5cd94fc169b7a655",
+    "private-entry-webkit-community-390.png": "859ed47262585bfbecde216f320147358252ccd5938df515edd21cbf40fc6539"
+  }
+}
