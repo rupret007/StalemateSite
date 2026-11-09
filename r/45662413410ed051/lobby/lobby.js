@@ -574,12 +574,41 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
         drawCommunity(); drawRooms(); drawMessageRecovery(); refreshPaletteCohosts();
     }
     let cancelTransportAck = () => {};
+    let cancelEntryCheck = () => {}, pageLeaving = false;
+    window.addEventListener('pagehide', () => { pageLeaving = true; cancelEntryCheck(); });
+    window.addEventListener('pageshow', () => { pageLeaving = false; });
+    function privateAccessMissing() {
+        cancelEntryCheck();
+        return new Promise((resolve) => {
+            const controller = new AbortController();
+            let settled = false;
+            const finish = (missing) => {
+                if (settled) return;
+                settled = true; clearTimeout(timer); controller.abort();
+                if (cancelEntryCheck === cancel) cancelEntryCheck = () => {};
+                resolve(missing);
+            };
+            const cancel = () => finish(false);
+            const timer = setTimeout(cancel, 3000);
+            cancelEntryCheck = cancel;
+            // WebSocket handshake failures hide their HTTP status. Probe only
+            // the protected shell's own read-only endpoint, without retrying,
+            // following redirects, refreshing access or exposing credentials.
+            try {
+                fetch('/beta/state', { credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal: controller.signal })
+                    .then((response) => finish(response.status === 401), cancel);
+            } catch { cancel(); }
+        });
+    }
     async function connect(nick) {
         if (sessionEnded && betaShell) return;
         if (savedMessages.size && !confirm('A saved message may already have arrived. Reconnecting clears every saved copy in this tab. Copy any text you need first. Reconnect and clear the copies?')) return;
         clearMessageRecovery(); messageResultsSupported = false;
         sessionEnded = false; $('[data-session-ended]').hidden = true; $('[data-text]').readOnly = false;
         const attempt = ++connectionAttempt;
+        cancelEntryCheck();
+        const privateEntry = $('[data-gate-private-entry]');
+        if (privateEntry) privateEntry.hidden = true;
         cancelTransportAck();
         entrySharing.disconnect();
         privateMessageContextSupported = false; keepSupported = false;
@@ -628,7 +657,7 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
                 else if (!ackTimer) ackTimer = setTimeout(flushAck, 50);
             }
         };
-        ws.onclose = (e) => {
+        ws.onclose = async (e) => {
             if (attempt !== connectionAttempt) return;
             cancelTransportAck();
             entrySharing.disconnect();
@@ -639,13 +668,23 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
             setConnection('offline');
             if (roomApi) roomApi.onLeave();
             if (e.code === 4401) return endSession();
+            if (!opened && betaShell && !pageLeaving) {
+                const missing = await privateAccessMissing();
+                if (attempt !== connectionAttempt || app.ws !== ws || sessionEnded || pageLeaving) return;
+                if (missing) {
+                    if (app.me) return endSession('private-access');
+                    gateStatus('Your private access needs renewal. Reopen your invitation link or enter its code.');
+                    if (privateEntry) privateEntry.hidden = false;
+                    return;
+                }
+            }
             if (!opened && app.me) return endSession('admission');
             if (ownerSession && !opened) {
                 $('[data-gate]').hidden = false; $('[data-app]').hidden = true;
                 $('[data-gate-guest]').hidden = false;
                 return gateStatus('Email sign-in is unavailable or expired. Sign in again to manage your rooms, or continue as a guest.');
             }
-            if (!opened) return gateStatus('Couldn’t get in. Maybe it’s full, locked, or you got the boot. Try again in a bit.');
+            if (!opened) return gateStatus('Couldn’t connect. Try again shortly, or ask the host if this continues.');
             if (savedMessages.size) {
                 clearTimeout(retryTimer);
                 gateStatus('A message may have arrived. Copy or discard saved text, then choose Try again. Reconnecting clears saved copies.');
@@ -671,6 +710,7 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
             : endedPmLabel?.key === app.active ? endedPmLabel : null;
         clearMessageRecovery(); messageResultsSupported = false;
         sessionEnded = true; connectionAttempt++;
+        cancelEntryCheck();
         clearTimeout(retryTimer); cancelTransportAck();
         // Keep the unsent text under its original channel/PM key. Never move a
         // private draft into #stalemate or persist it during re-authentication.
@@ -692,7 +732,8 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
         announcements.replace(() => $('[data-chat-lines]').replaceChildren());
         setConnection('ended'); drawTabs(); drawChan();
         $('[data-text]').readOnly = true;
-        const ended = reason === 'left' ? 'You left this chat. Your sign-in and any recorded sharing withdrawal have not been changed.' : reason === 'admission'
+        const ended = reason === 'private-access' ? 'Your private community access needs renewal.'
+            : reason === 'left' ? 'You left this chat. Your sign-in and any recorded sharing withdrawal have not been changed.' : reason === 'admission'
             ? 'Couldn’t reconnect. The service may be unavailable or your sign-in may have expired.'
             : wasVerified ? 'Your verified sign-in expired or was revoked.' : 'Your guest session expired or was revoked.';
         const next = reason === 'left' ? 'Return to the community to start a new chat session.' : betaShell

@@ -134,7 +134,7 @@ test('three fans + a band op: chat, /me, slap button, filters, PM accept-first, 
     await blockedRetry.goto(lobbyUrl());
     await blockedRetry.fill('[data-nick]', 'OriginalRetry');
     await blockedRetry.click('[data-enter]');
-    await expect(blockedRetry.locator('[data-gate-status]')).toContainText('Couldn’t get in');
+    await expect(blockedRetry.locator('[data-gate-status]')).toContainText('Couldn’t connect');
     // Keep a distinct restriction while removing only the original's stored
     // rule; the panel must neither unban by a reused label nor clear all bans.
     await admin.click('[data-tab="people"]');
@@ -154,7 +154,7 @@ test('three fans + a band op: chat, /me, slap button, filters, PM accept-first, 
     await unrelatedRetry.goto(lobbyUrl());
     await unrelatedRetry.fill('[data-nick]', 'OtherRetry');
     await unrelatedRetry.click('[data-enter]');
-    await expect(unrelatedRetry.locator('[data-gate-status]')).toContainText('Couldn’t get in');
+    await expect(unrelatedRetry.locator('[data-gate-status]')).toContainText('Couldn’t connect');
     for (const p of [a, b]) expect(p.errors).toEqual([]);
 });
 
