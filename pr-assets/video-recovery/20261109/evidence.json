@@ -1,0 +1,19 @@
+{
+  "base": "20e1f01494abe4da253f824803a7f5f7e0965bb0",
+  "scope": "Offline provider fixtures against actual Watch/private-room clients and real loopback relay; no real YouTube/media acceptance",
+  "loaderBrowserCasesPassed": 25,
+  "privacyBrowserCasesPassed": 2,
+  "relatedUnitCasesPassed": 97,
+  "phoneWidths": [
+    375,
+    390
+  ],
+  "phoneKeyboardToChooserAndAlternativeSharedVideoPassed": true,
+  "timeoutsAndPermissionsUnchanged": true,
+  "deployed": false,
+  "liveChromeConnectionStillUnqualified": true,
+  "screenshots": {
+    "video-failure-375.png": "45513ec27e239b14d3732745b056d13804905633e3c8e9f0b3094fa5ffd019c6",
+    "video-failure-390.png": "01fb7bb4d78f47e03ad65849b6b13eb9c000d9d73230b3b9102b26a94e4b4693"
+  }
+}

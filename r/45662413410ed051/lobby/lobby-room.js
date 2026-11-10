@@ -34,7 +34,7 @@
         const youtube = window.HangoutYouTube.create({
             getElement: () => ui.yt, setElement: (element) => { ui.yt = element; },
             onStateChange: onYtState, onAutoplayBlocked: onYtAutoplayBlocked,
-            onError: () => videoFailure(player.key)
+            onError: (error) => videoFailure(player.key, error)
         });
         let videoPublishTimer;
         let live = null;
@@ -423,11 +423,11 @@
             ui.tap.addEventListener('click', () => syncToState(true, true));
         }
 
-        function videoFailure(key) {
+        function videoFailure(key, error) {
             if (!state.ch || player.key !== key) return;
             player.yt = null; player.readyKey = ''; player.failedKey = key; player.autoplayBlocked = false;
             player.seenPlaying = false; player.playPending = false;
-            ui.videoStatus.textContent = 'YouTube couldn’t load. Retry video when you’re ready.';
+            ui.videoStatus.textContent = window.HangoutYouTube.failureMessage(error, { canChooseVideo: Boolean(isOp()) });
             ui.videoStatus.hidden = false;
             ui.tap.textContent = 'Retry video'; ui.tap.hidden = false;
         }
@@ -457,8 +457,8 @@
                     player.yt = instance; player.readyKey = key;
                     ui.videoStatus.hidden = true; ui.videoStatus.textContent = '';
                     return true;
-                } catch (_) {
-                    if (generation === roomGeneration) videoFailure(key);
+                } catch (error) {
+                    if (generation === roomGeneration) videoFailure(key, error);
                     return false;
                 }
             })();
