@@ -18,7 +18,8 @@ async function fixture({ startsPlaying = true, sharedPlaying = true } = {}) {
     const player = { getCurrentTime: () => pos, getPlayerState: () => playing ? 1 : 2,
         seekTo(value) { pos = value; }, playVideo() { if (startsPlaying) { playing = true; callbacks.onStateChange({ target: player, data: 1 }); } },
         pauseVideo() { playing = false; callbacks.onStateChange({ target: player, data: 2 }); } };
-    w.HangoutYouTube = { create: options => { callbacks = options; return { select: async () => player, cancel() {} }; } };
+    w.eval(read('youtube-player.js'));
+    w.HangoutYouTube.create = options => { callbacks = options; return { select: async () => player, cancel() {} }; };
     w.eval(read('sync-core.js')); w.eval(read('lobby/lobby-room.js'));
     const app = { me: 'Host', active: '#watch-controls', band: false, chans: new Map() };
     const room = w.LobbyRoom.attach({ app, send: message => { sent.push(structuredClone(message)); return true; }, $: selector => w.document.querySelector(selector), turnUrl: '' });

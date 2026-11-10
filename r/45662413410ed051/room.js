@@ -1262,14 +1262,14 @@
     const youtube = win.HangoutYouTube.create({
         getElement: () => ui.yt, setElement: (element) => { ui.yt = element; },
         onStateChange: onYtState, onAutoplayBlocked: onYtAutoplayBlocked,
-        onError: () => videoFailure(player.currentKey)
+        onError: (error) => videoFailure(player.currentKey, error)
     });
 
-    function videoFailure(key) {
+    function videoFailure(key, error) {
         if (app.ended || player.currentKey !== key || player.kind !== 'yt') return;
         player.yt = null; player.readyKey = ''; player.failedKey = key; player.autoplayBlocked = false;
         player.seenPlaying = false; player.playPending = false;
-        ui.videoStatus.textContent = 'YouTube couldn’t load. Retry video when you’re ready.';
+        ui.videoStatus.textContent = win.HangoutYouTube.failureMessage(error, { canChooseVideo: Boolean(app.isHost) });
         ui.videoStatus.hidden = false;
         ui.tap.textContent = 'Retry video'; ui.tap.hidden = false;
     }
@@ -1311,7 +1311,7 @@
                 player.yt = instance; player.readyKey = key;
                 ui.videoStatus.hidden = true; ui.videoStatus.textContent = '';
                 return true;
-            } catch (_) { videoFailure(key); return false; }
+            } catch (error) { videoFailure(key, error); return false; }
         })();
         player.loading = loading;
         try { return await loading; }

@@ -3,6 +3,40 @@
     'use strict';
     const DEADLINE = 15000;
 
+    function failure(reason) {
+        const error = new Error('YouTube player unavailable');
+        error.videoReason = reason;
+        return error;
+    }
+
+    function providerFailure(code) {
+        switch (code) {
+        case 100: return failure('unavailable');
+        case 101: case 150: return failure('embed-restricted');
+        case 153: return failure('client-identity');
+        default: return failure('video-error');
+        }
+    }
+
+    function failureMessage(error, { canChooseVideo = false } = {}) {
+        let next;
+        switch (error?.videoReason) {
+        case 'api-unavailable': case 'api-timeout':
+            next = 'Couldn’t reach YouTube. Check your connection, then retry.'; break;
+        case 'player-timeout':
+            next = 'The video player didn’t finish connecting. Retry video when you’re ready.'; break;
+        case 'unavailable': case 'embed-restricted':
+            next = error.videoReason === 'unavailable' ? 'This video is unavailable.' : 'This video doesn’t allow playback inside a room.';
+            next += canChooseVideo ? ' Choose another video.' : ' Ask the host to choose another video.'; break;
+        case 'client-identity':
+            next = 'YouTube couldn’t verify this video player. Try again later.'; break;
+        default: next = 'Retry video when you’re ready.';
+        }
+        // Only fixed, allowlisted descriptions reach the UI. Provider errors
+        // and thrown messages may include private page URLs or invitation data.
+        return 'YouTube couldn’t load. ' + next;
+    }
+
     function create(options) {
         let apiAttempt = null, current = null;
 
@@ -28,8 +62,8 @@
                     if (window.YT?.Player) done();
                 };
                 window.onYouTubeIframeAPIReady = ready;
-                script.onerror = () => done(new Error('YouTube script unavailable'));
-                timer = setTimeout(() => done(new Error('YouTube script timed out')), DEADLINE);
+                script.onerror = () => done(failure('api-unavailable'));
+                timer = setTimeout(() => done(failure('api-timeout')), DEADLINE);
                 try {
                     script.src = 'https://www.youtube.com/iframe_api';
                     document.head.append(script);
@@ -84,7 +118,7 @@
                         frame.src = `https://www.youtube.com/embed/${encodeURIComponent(id)}?${query}`;
                         options.getElement().replaceWith(frame);
                         options.setElement(frame);
-                        record.timer = setTimeout(() => reject(new Error('YouTube player timed out')), DEADLINE);
+                        record.timer = setTimeout(() => reject(failure('player-timeout')), DEADLINE);
                         record.instance = new YT.Player(frame, { events: {
                             onReady: (event) => {
                                 if (!record.active) return;
@@ -92,12 +126,13 @@
                                 record.ready = true;
                                 resolve(event.target);
                             },
-                            onError: () => {
+                            onError: (event) => {
                                 if (!record.active) return;
-                                if (!record.ready) reject(new Error('YouTube video unavailable'));
+                                const error = providerFailure(event?.data);
+                                if (!record.ready) reject(error);
                                 else {
                                     retire(record); current = null;
-                                    options.onError();
+                                    options.onError(error);
                                 }
                             },
                             onStateChange: (event) => { if (record.active && record.ready) options.onStateChange(event); },
@@ -127,5 +162,5 @@
         return { select, cancel };
     }
 
-    window.HangoutYouTube = { create };
+    window.HangoutYouTube = { create, failureMessage };
 })();
