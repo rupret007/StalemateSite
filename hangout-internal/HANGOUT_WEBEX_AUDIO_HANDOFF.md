@@ -1,8 +1,9 @@
 # Webex companion: current behavior and acceptance
 
 WebJam carries the music through Jamulus and browser Web Join. An optional
-Webex meeting can provide video or conversation separately. The staged native
-source is `533514d678c0e210c3e7817302605093d6a1e005`; use the
+Webex meeting can provide video or conversation separately. The current qualified native
+candidate source is `ae49c915070f2951db9ff441c23c7f0a9d90ce1b`; existing Desktop
+selections were preserved and may still open older builds. Use the
 [current private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md) for actual package and
 website identities. This note does not qualify a real meeting.
 
@@ -41,10 +42,12 @@ Personal Room. The current vendor signature was valid. One HTTPS Webex Personal
 Room link was validated without saving its URL, room number or host fields to
 evidence; the client was quit normally. No meeting, camera or microphone started.
 
-Before the attended check, recover that existing Personal Room through the same
-normal client UI and save only its meeting link through WebJam settings when
-resource guards permit. Do not ask Jeff for its private URL again. The discovery
-did not configure WebJam or prove a meeting join. Do not create a new
+That November 8 discovery did not configure WebJam or prove a meeting join.
+The November 9 Mini setup above supersedes its missing-preference state: do not
+recover or re-enter the Mini link again just because this dated section exists.
+MacBook setup remains unqualified; use normal existing-client/browser navigation
+and save only the validated existing meeting link when the device/resource gates
+permit. Do not ask Jeff to paste the private URL into chat. Do not create a new
 meeting, publish the link, enroll an SDK, or buy a license for this test. Use the
 supported external app/browser offered by the meeting; a native Show Webex App
 control requires a verified installed client. The read-only checks launched no

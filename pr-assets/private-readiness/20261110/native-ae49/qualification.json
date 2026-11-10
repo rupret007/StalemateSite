@@ -1,0 +1,174 @@
+{
+  "observedThroughUtc": "2026-11-10T21:10:33Z",
+  "source": "ae49c915070f2951db9ff441c23c7f0a9d90ce1b",
+  "mergedNative": "3eb71e9892e72062ea6991ccd76a8805f85497a1",
+  "reviewedAndMergedTree": "50596d2a1e2e18b19832ee8da89faaee86fe8916",
+  "nativePr": 468,
+  "sourceCi": {
+    "runs": [
+      42888022605,
+      42888022693,
+      42888022735
+    ],
+    "applicationPassed": 12985,
+    "existingSkips": 60,
+    "trackedModulesExecutedOnce": 567,
+    "startupCasesPassed": 9,
+    "webJoinUnitPassed": 44,
+    "workerUnitPassed": 87,
+    "browserPassed": 69,
+    "bothMacUnchangedWorkspaceGates": {
+      "passed": 204,
+      "existingSkips": 12,
+      "referenceStudioPassed": 34
+    }
+  },
+  "packaging": {
+    "run": 42888556613,
+    "finalAttempt": 2,
+    "allFourDesktopJobsPassed": true,
+    "attempt1IntelFailure": "Pinned Opus download: curl TLS EOF35, after workspace and headless build passed",
+    "failedJobsOnlyRetrySucceeded": true,
+    "tlsChecksumSourceInputsAndSuccessfulBuildsUnchanged": true,
+    "fullLogsRetainedAndReviewed": true
+  },
+  "targets": {
+    "macos-arm64": {
+      "artifactId": 13798543646,
+      "outerBytes": 459632300,
+      "outerSha256": "d6f0e74fa9f02b49cf6bf8b917306f8eb96505d188f2c09a4db8ec0e58bcdb98",
+      "innerSha256": "f898ca772f3890a88ef651c3b7f6d06e1bba69737b8d7ba52ef4332ddc5dea07",
+      "architecture": "arm64",
+      "archivePathCrcSourcePrivateTargetAndComponentHashesPassed": true,
+      "licenseEntriesChecked": 11,
+      "generatedNoticeHashes": {
+        "THIRD_PARTY_NOTICES_RUNTIME.md": "4e8624ad65ede73a90f88cccdbd1bdb75db77a9f5e1493b049a69f90223bae45",
+        "WebJam-runtime-sbom.cdx.json": "375530b8d1a585a9a259b8574c0b913f9df76961efb16dde3a67c1e293f56838"
+      },
+      "fiveStrictSignatureChecks": {
+        "app": {
+          "deepStrictAllArchitecturesValid": true,
+          "cdHash": "b8caf8982021f4d2c45e84dd278c1e80212d9dea",
+          "adHoc": true
+        },
+        "fabric": {
+          "deepStrictAllArchitecturesValid": true,
+          "cdHash": "61a675c88dd3057a64833ffa238feb2d3fc0cdf7",
+          "adHoc": true
+        },
+        "jamulus": {
+          "deepStrictAllArchitecturesValid": true,
+          "cdHash": "9ca4bf1da75eba4ed8f409a7d6d0a3918e50ac3c",
+          "adHoc": true
+        },
+        "server": {
+          "deepStrictAllArchitecturesValid": true,
+          "cdHash": "5348ef5f8ad27419353e015329d831842337e0b9",
+          "adHoc": true
+        },
+        "headless": {
+          "deepStrictAllArchitecturesValid": true,
+          "cdHash": "8c78aab3d790e80d3fb0a7db0e435b90a0ae8f62",
+          "adHoc": true
+        }
+      },
+      "trust": "ad-hoc, not notarized",
+      "nativeGui": "startup and enabled native Quit observed on ARM",
+      "physicalMusicSharedTrackWebexAcceptance": false
+    },
+    "macos-x64": {
+      "artifactId": 13802148426,
+      "outerBytes": 474653779,
+      "outerSha256": "1f95299a31a5ad86a74a42a601d8d8497fdc9017e28c900153cc0e7e1a2d8470",
+      "innerSha256": "c9cdff83f3aba9cb906c348dc386059e28356f87964114d67aae0446cdd99600",
+      "architecture": "x86_64",
+      "archivePathCrcSourcePrivateTargetAndComponentHashesPassed": true,
+      "licenseEntriesChecked": 11,
+      "generatedNoticeHashes": {
+        "THIRD_PARTY_NOTICES_RUNTIME.md": "4e8624ad65ede73a90f88cccdbd1bdb75db77a9f5e1493b049a69f90223bae45",
+        "WebJam-runtime-sbom.cdx.json": "375530b8d1a585a9a259b8574c0b913f9df76961efb16dde3a67c1e293f56838"
+      },
+      "fiveStrictSignatureChecks": {
+        "app": {
+          "deepStrictAllArchitecturesValid": true,
+          "cdHash": "2bee04497aeecaae34977030137a51c544f93662",
+          "adHoc": true
+        },
+        "fabric": {
+          "deepStrictAllArchitecturesValid": true,
+          "cdHash": "9b372b0af3e1189e9c36400167e12e0cf992bc28",
+          "adHoc": true
+        },
+        "jamulus": {
+          "deepStrictAllArchitecturesValid": true,
+          "cdHash": "aa124508a6d44d0a3b59458210236337edacbe36",
+          "adHoc": true
+        },
+        "server": {
+          "deepStrictAllArchitecturesValid": true,
+          "cdHash": "e44a80a487a0cd454a4cb78cdcf03c61b9f21ca7",
+          "adHoc": true
+        },
+        "headless": {
+          "deepStrictAllArchitecturesValid": true,
+          "cdHash": "2dec105bbaab9c1445ccce954d6cf86869d1720e",
+          "adHoc": true
+        }
+      },
+      "trust": "ad-hoc, not notarized",
+      "nativeGui": "not locally executed",
+      "physicalMusicSharedTrackWebexAcceptance": false
+    },
+    "windows-x64": {
+      "artifactId": 13799612810,
+      "outerBytes": 613291008,
+      "outerSha256": "e9dd6b314dc6364535a4a1ecdd57b3d7e0119c7a5f297b52df16547b40d72d16",
+      "innerSha256": "ad2a00541bdc0256cb2bd7c95bbe492b538d597c37c0c4da659dc3078685b819",
+      "setupSha256": "5a5e60446dfcb304eb9acfbe3a5e1948f357117bd4a37bc0b644472b6069dfac",
+      "staticArchiveChecksPassed": true,
+      "licenseEntriesChecked": 11,
+      "hostedInstallLaunchUninstallPassed": true,
+      "locallyExecuted": false,
+      "trust": "unsigned test-only",
+      "physicalMusicSharedTrackWebexAcceptance": false
+    },
+    "linux-x64": {
+      "artifactId": 13799986040,
+      "outerBytes": 458991518,
+      "outerSha256": "ed15cc7dfc922856a1facae8b2ef190d646359a28724f8e7304a29b80c2175a7",
+      "hostedBuildAndFrozenWorkflowChecksPassed": true,
+      "currentArchiveLocallyInspected": false,
+      "locallyExecuted": false,
+      "physicalMusicSharedTrackWebexAcceptance": false
+    }
+  },
+  "observedUi": {
+    "method": "Actual packaged ARM UI through CUA; not human listening",
+    "startupAndEnabledNativeQuitPassed": true,
+    "screenshot": {
+      "file": "arm-idle-startup.jpg",
+      "sha256": "1b9f766eed0b3ae090d61d804f1cd5d67061f114e4a834c88fe2e3518b6f0466"
+    },
+    "quitAx": {
+      "file": "arm-native-quit.ax.txt",
+      "sha256": "a9a27d6a68dbabd1bd6a5ec7455b51939f280990fbb78534af749dc0c5ae0181"
+    },
+    "laterJoinProbe": "A test string was accepted as a manual hostname and requested audio startup. Leave was requested immediately; Stopped/NotConnected and final process exit were observed. This is neither malformed-invite rejection nor a successful music trial. Observer-induced app relaunch means in-process return and workspace native Quit remain unqualified.",
+    "settingsCleanup": "Only the saved test hostname was replaced by loopback after preserving a private recovery copy. Other post-attempt preferences were preserved; exact pre-test connection/role state was unavailable.",
+    "historicalCaptureAndNetworkAbsenceNotProven": true
+  },
+  "unchangedBoundaries": {
+    "publicSiteEntrances": true,
+    "privateSiteAndIssuer": true,
+    "capsHoldsRecordingAndAi": true,
+    "desktopSelections": true
+  },
+  "remaining": [
+    "Current admitted guest and moderator journeys",
+    "Intel and ARM host to Windows browser speech/music, leave/rejoin/recovery and second-network evidence",
+    "Actual WAV then MP3 Shared Track mixed with physical input, separate existing BlackHole route and playback controls",
+    "Webex normal PMR setup, video/join/leave and exclusive manual audio handoff",
+    "Physical platform, screen-reader/mobile/zoom, realistic capacity and all-ages/operator/legal outcomes in the 62-requirement matrix"
+  ],
+  "goalComplete": false
+}
