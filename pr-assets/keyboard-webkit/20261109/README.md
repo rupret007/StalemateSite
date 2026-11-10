@@ -35,3 +35,29 @@ output although Option-Tab and normal visible actions worked. Its cause is not
 proved; it is not treated as a reason to replace native dialogs or weaken modal
 behavior. Actual Chrome/Safari PM consent/delivery/blocking checks were retained
 as private local evidence, separately from these distributable fixtures.
+
+## Playback-status defect found by full CI
+
+The first push at62996c4 passed890 browser cases, but its separate PR run failed
+one iPhone15ProMax playback case and marked the same iPhone15 case flaky.
+The retained original trace showed real audio advancing from3.45s to10.57s
+while a later network `stalled` event replaced its confirmed playing label with
+Loading. WebKit reported readyState2 despite a fully buffered track.
+
+The player now uses `waiting` for actual playback buffering. A stalled network
+fetch alone neither promotes loading to playing nor demotes confirmed playback.
+The HTML media standard distinguishes these events; mute, pause, visibility,
+seek-progress checks and playback/retry calls are unchanged. Existing browser
+assertions, five-second expectations and retry policy were not relaxed.
+
+The new readyState2 regression failed on the original implementation; all13
+related unit tests passed after the correction. The unchanged real-media
+playback/persistence/mute/hidden-tab journey then passed twice in each of
+Chromium and WebKit iPhoneSE/15/15ProMax (8cases, no retries). These are automated
+browser results, not physical iPhone hearing or WebJam Shared Track qualification.
+
+Before this playback change, a detached merge of the keyboard fix with current
+private base8b4c2db passed101 related unit and85 Chromium/WebKit keyboard/video
+recovery cases. That combined-tree result is distinct from the later head’s CI.
+
+Reference: [HTML media events](https://html.spec.whatwg.org/multipage/media.html#mediaevents).

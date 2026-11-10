@@ -40,5 +40,24 @@
   ],
   "nativeSafariComparison": "Option-Tab reached the visible PM button in actual Safari. Missing native AX output remains a separate unresolved observation; no blanket screen-reader pass.",
   "relatedUnitTests": "93 cases passed across actual-client context, message recovery, keep-signin and sharing-controls suites",
-  "visualReview": "Inspected current Chromium375 and320 plus WebKit390 and320 screenshots; composer/Send visible, long words wrap; short viewport uses vertical scrolling."
+  "visualReview": "Inspected current Chromium375 and320 plus WebKit390 and320 screenshots; composer/Send visible, long words wrap; short viewport uses vertical scrolling.",
+  "subsequentPlaybackFinding": {
+    "originalHead": "62996c4a021ec321090a1f700636dd1f23d49a70",
+    "originalPrRun": 42724920672,
+    "originalArtifact": 13724321991,
+    "originalResult": "888browserpassed,1failed,1flaky; no rerun",
+    "cause": "network stalled event demoted confirmed advancing playback at readyState2",
+    "unitRegression": "Original1failed/4passed; corrected13passed across2files",
+    "realMediaBrowser": "8passed:2 repetitions each Chromium+WebKit iPhoneSE/15/15ProMax; retries0, existing expectations unchanged",
+    "reference": "https://html.spec.whatwg.org/multipage/media.html#mediaevents",
+    "privateProviderOrPhysicalHearingProof": false
+  },
+  "currentBaseUnionBeforePlaybackChange": {
+    "base": "8b4c2db7975d6bbf048f39a90540059f7ab0865e",
+    "keyboardHead": "62996c4a021ec321090a1f700636dd1f23d49a70",
+    "commit": "7626bfaeeab917f7ff85b821c86f71e265ba0784",
+    "tree": "de97faed5c49e825b5a3b5fd1d73fa2fabae863b",
+    "unitPassed": 101,
+    "browserPassed": 85
+  }
 }
