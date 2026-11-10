@@ -6,30 +6,28 @@ band rehearsal is not yet qualified.** Music, actual Shared Track mixing and
 Webex video/audio handoff remain essential acceptance work, not optional extras.
 Both public websites and their navigation remain unchanged.
 
-The reviewed private frontend was delivered on November 10 at 14:56 UTC.
-The [delivery receipt and screenshots](../pr-assets/private-readiness/20261110/private-delivery/README.md)
-separate its configuration, actual served bytes and prejoin proof from remaining
-joined-chat and physical-media acceptance. Read this page for the current
-handoff. An earlier checkpoint is preserved byte for byte in the
-[dated history](HANGOUT_PRIVATE_READINESS_HISTORY_20261110_BEFORE_AUDIO_STATS.md);
-it is not an instruction to repeat completed downloads, helpers, observations or CI.
-All [62 original requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md) remain intact.
-The [evidence matrix](HANGOUT_ACCEPTANCE_EVIDENCE_20261109.md) records their limits.
+The browser audio-check update reached the private site on November 10 at
+22:35 UTC. The [release evidence](../pr-assets/private-readiness/20261110/readiness-release/qualification.json)
+records the served version, CI, keyboard and zoom checks, and current Linux
+archive inspection. The [earlier delivery receipt](../pr-assets/private-readiness/20261110/private-delivery/README.md)
+retains the afternoon rollout and screenshots. The [dated history](HANGOUT_PRIVATE_READINESS_HISTORY_20261110_BEFORE_AUDIO_STATS.md)
+preserves the previous checkpoint. The [evidence matrix](HANGOUT_ACCEPTANCE_EVIDENCE_20261109.md)
+tracks all [62 original requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md).
 
 ## Source, serving state and evidence
 
 | Layer | Qualified evidence | Still required |
 | --- | --- | --- |
-| Last verified private website | Reviewed frontend `d53ff7f87070dad7acf0183b0e1f63181b242c6c` (merged runtime `11c9d1f8`) now serves as version `2b205a24-392c-4cdb-9d0b-daaf8c065d0b` at 100%, deployment `580bce86-7e17-4511-a866-7f2073ba69eb`. Backend source remains `c83dfaff`; module SHA256 `9fefc1a13eaecb138be633e85d19039c15969f7066b7e71b6123636858493b78` and all 28 bindings, namespace IDs, runtime and effective service settings match the live baseline. All 31 checked static JS/MJS/CSS/SVG files matched reviewed bytes. | Existing invitation admission, nickname prejoin and missing-Music-invite refusal were observed in Chrome. Guest agreement, current joined-chat/media/recovery and other device outcomes remain pending. The 31-file readback does not claim all 70 assets. |
-| New application source | Website [PR253](https://github.com/rupret007/StalemateSite/pull/253) merged privately as `11c9d1f8e73233eeaf601a1fef304b57568ae639`, tree `09d02dc9df44dc62ceeb56658dc0fbc8354be051`. Both source CI runs 42774481695/42774439018 passed 2,110 unit tests, 904 browser cases and 34 root plus 34 project-path checks. Full logs and tested/merged tree equality were reviewed. [Sanitized current-source receipt](../pr-assets/private-readiness/20261110/current-source-qualification.json). | The reviewed assets are now privately delivered. Source/CI and served-byte proof do not establish their complete joined-chat, physical audio, meeting or recovery behavior. |
+| Last verified private website | Frontend merge `7a5486a90c4a64e9b0431959e1e2ffd05b0bf55f` serves as version `31f8271c-27d9-4d52-ab33-23884c79bae9` at 100%, deployment `270923f6-49ab-4f09-babc-f8101334df25`. The `c83dfaff` Worker, all 28 bindings, namespace IDs and effective settings matched the prior private version. The admitted readback matched 33 files, including all four changed files. Logout returned 200 and the next session check returned 401. | The live missing-invite screen showed the full-link recovery instructions. The guest agreement, joined chat and attended media checks remain pending. |
+| Current application source | Website [PR257](https://github.com/rupret007/StalemateSite/pull/257) mirrors 13 upstream files from [WebJam PR469](https://github.com/rupret007/webjam/pull/469). Both website CI runs passed 2,110 unit tests, 904 browser cases, and 34 root plus 34 project-path checks. The tested tree `939ba09e7d2eeb2fad54e6c7aab325739969a7b5` matches the merge. | Current physical input, meeting and connected recovery need attended checks. |
 | Keyboard/playback correction | PR249 merged as `ce319fd73ad12cf43cd67cb96276302698d07d6c`. Its current-head and combined-private CI passed. Full CI originally exposed a network-stalled/playback-status defect; the corrected regression and unchanged real-media browser trials passed. Original failures/traces are retained. | Qualify current delivered keyboard/playback journeys. Neither responsive viewports nor real browser media decoding prove physical iOS or VoiceOver. |
-| Current native packages | Exact source `ae49c915070f2951db9ff441c23c7f0a9d90ce1b` completed all four desktop jobs in [run 42888556613](https://github.com/rupret007/webjam/actions/runs/42888556613), final attempt 2. Actual ARM, Intel and Windows archives independently passed source/private-beta, paths/CRC, architecture, component, generated-notice and eleven-license checks. Both Macs passed five strict signature checks; Windows Setup/ZIP checksums and hosted install/start/uninstall passed. [Current receipt and ARM screenshot](../pr-assets/private-readiness/20261110/native-ae49/README.md). | Actual ARM idle startup and enabled native Quit were observed. Intel remains cache-only; Windows was not locally executed. Current Linux has hosted CI evidence, not a separate local archive inspection. Desktop selections were preserved and may still open older builds. Ad-hoc is not notarization; Windows remains unsigned test-only. No current physical Music/Shared Track/Webex pass. |
+| Current native packages | Exact source `ae49c915070f2951db9ff441c23c7f0a9d90ce1b` completed four desktop jobs in [run 42888556613](https://github.com/rupret007/webjam/actions/runs/42888556613), final attempt 2. All four actual archives passed source, private target, paths/CRC, architecture, component, generated-notice and eleven-license checks. Both Macs passed five strict signature checks. Windows Setup/ZIP checksums and hosted install/start/uninstall passed. [ARM startup and earlier archive evidence](../pr-assets/private-readiness/20261110/native-ae49/README.md). | ARM idle startup and native Quit were observed. Local Intel startup, Windows and Linux execution, publisher trust and physical media remain open. Existing desktop shortcuts may still open older builds. |
 | Prior native package baseline | Older `67c7ef08e515c84eb2b0736c474ec2c4b0c21682` and its all-four-archive checks remain in the [unchanged prior receipt](../pr-assets/private-readiness/20261110/README.md). | Its idle UI/Command-Q and disabled native-menu observation remain historical. Do not relabel it AE49 or replay completed checks. |
 | Native fixes and CI | [WebJam PR468](https://github.com/rupret007/webjam/pull/468) merged as `3eb71e9892e72062ea6991ccd76a8805f85497a1`; actual tree `50596d2a1e2e18b19832ee8da89faaee86fe8916` equals reviewed AE49 and tested synthetic merge. Startup workaround is Cocoa-only; macOS offscreen keeps modal completion. All nine focused startup cases pass; full source CI passed 12,985 tests, 60 existing skips and all 567 modules exactly once. Both unchanged Mac workspace gates passed 204 cases with 12 existing skips, plus 34 Reference Studio cases. | Intel attempt 1 failed at pinned Opus download with TLS EOF35 after passing the workspace gate; one failed-jobs-only retry succeeded without changing security checks or source. Source/generated tests do not prove physical media. Later misclassified hostname/observer-relaunch probes are explicitly unqualified in the current receipt. |
 | Selected audio connection | Upstream [WebJam PR466](https://github.com/rupret007/webjam/pull/466), reviewed head `098c57250b5ed2b97c233d7e843f5c5d1297a9e8`, merged as `01804299f3940f243b06f88749d488e03f08cf5c`. Delay and receiver adaptation now use the actual selected transport pair rather than a retired pair encountered last. Four regressions failed before the fix. Completed CI passed 44 Web Join unit cases, 69 browser cases, 87 Worker cases and 12,976 application tests with 60 existing skips across 566 modules. The website mirrors the reviewed audio bytes and provenance. | This browser JavaScript fix does not change the native host runtime or relabel existing native packages. Physical latency, acoustic listening, LAN routing and relay admission still need their own evidence. |
-| Current application provider-start CI | [Run 42780185842](https://github.com/rupret007/StalemateSite/actions/runs/42780185842), job 129708072371, completed the actual `--participation --provider-start` application/workerd mode. Its tested synthetic tree equals current website `11c9d1f8`. All 15 recorded mode/install/audit exits were zero; 49 tracked provider-start inputs and 50 workflow-declared inputs were checked separately. Owner/start ordering, duplicate start, Stop/revoke/close fencing and owned cleanup passed. | This is current application/workerd CI evidence, not native desktop/media, real guardian decisions, hosted capacity, provider activation or private delivery. The evidence explicitly leaves those outcomes unqualified. |
+| Earlier application provider-start CI | [Run 42780185842](https://github.com/rupret007/StalemateSite/actions/runs/42780185842), job 129708072371, completed the actual `--participation --provider-start` application/workerd mode against website revision `11c9d1f8`. All 15 recorded mode/install/audit exits were zero. Owner/start ordering, duplicate start, Stop/revoke/close fencing and owned cleanup passed. | Real guardian decisions, hosted capacity and media acceptance remain open. |
 | Issuer | Last verified `fd37578f-13cd-4fce-b557-35c0d962ef9d` at100%; completed405/204/403 negatives have receiptc209b961. | Reuse that completed result; do not rerun it or mint test credentials. The existing cap/hold and fresh account headroom still govern trials. |
-| Rollback | Immediate prior site `49f19821-e3cf-4699-8698-3dd3f446ca3b` and original site `2c5c81e5-1aa4-4ea7-be69-cacda13c20e8` are retained; issuer rollback `4db649fa` remains available. No rollback was needed. | Any later rollback/update needs fresh guards, exact actual configuration preservation and restored serving/configuration verification; never replay completed helpers. |
+| Rollback | Use `2b205a24-392c-4cdb-9d0b-daaf8c065d0b` for the immediate private-site rollback. Prior version `49f19821`, original version `2c5c81e5` and issuer rollback `4db649fa` were available at the release check. | Recheck the guards and compare serving state and effective configuration after a rollback. |
 
 The [sanitized live receipt and screenshots](../pr-assets/private-readiness/20261109/README.md)
 cover actual Mac Chrome/Safari observations on c83:
@@ -95,15 +93,11 @@ variable, secret binding, namespace/stable ID, exact origin, admission control,
 cap and hold. Defaults and `--keep-vars` alone are insufficient. Require reviewed
 source/CI, current resource/headroom checks, ready rollback, exact served hashes,
 configuration comparison and a normally admitted private session afterward.
-The prepared 70-asset candidate contains 25,791,406 bytes and was built at reviewed
-source `d53ff7f87070dad7acf0183b0e1f63181b242c6c`. Every actual output byte matches
-merged `11c9d1f8`; its Worker remains equal to recorded serving c83. Two assets
-changed from the older f098 candidate, and seven differ from recorded c83. Preserve
-the immutable d53 build identity. The frozen live config and exact c83 backend
-were retained; only the asset
-directory was overridden for the inactive upload. The guarded switch and 31
-served-file checks are qualified separately in the delivery receipt. Earlier
-f098 and PR247-only packages remain historical.
+The 22:35 UTC rollout used 70 reviewed assets and the exact c83 Worker. It
+changed the Web Join HTML, JavaScript, stylesheet and provenance record. The
+other 66 staged assets matched the afternoon package byte for byte. The
+inactive version passed the configuration comparison before the traffic switch.
+The served-byte check sampled 33 files through ordinary guest admission.
 The current eight-file entry toolkit was also verified from the actual CI archive;
 its manifest is source evidence, not public integration or deployment proof. Its
 redistribution-license qualification remains explicitly unfinished.
@@ -111,9 +105,9 @@ redistribution-license qualification remains explicitly unfinished.
 ## Remaining band journey
 
 1. Use the current AE49 package identities above. All four hosted desktop builds
-   passed; actual ARM/Intel/Windows archive checks and ARM idle startup/native
-   Quit have separate evidence. Intel has not been locally opened, Windows has
-   not been locally executed, and current Linux has hosted CI evidence only.
+   passed. Actual archive inspection covers all four packages, and ARM idle
+   startup and native Quit have local evidence. Intel startup and local Windows
+   and Linux execution still need their own checks.
    Select the appropriate candidate through normal Finder/UI after fresh trust,
    device/resource and existing provider/release checks. Existing Desktop
    selections were preserved; a familiar icon may open an older build. Do not
@@ -153,9 +147,10 @@ Windows native Music hosting/trust remain explicit gaps, not renamed passes.
 
 Fresh moderator email sign-in is also needed for current human report review and
 revocation checks. No new synthetic report was created while that sign-in was
-unavailable; only Jeff disposes moderation reports. VoiceOver/NVDA, physical
-mobile/zoom, current platform media, realistic hosted capacity and all-ages/
-operator/legal outcomes remain unqualified where the matrix says so. The current
+unavailable; only Jeff disposes moderation reports. Chrome keyboard focus and 200%/400% reflow were observed on the disconnected
+nickname screen before the evening rollout. The evidence matrix keeps joined
+chat, VoiceOver/NVDA, physical mobile, current platform media, realistic hosted
+capacity and all-ages/operator/legal work open. The current
 private13+ / camera18+ guards remain; this is not public or all-ages launch approval.
 
 The [concrete entry toolkit](HANGOUT_WEBSITE_ENTRY_HANDOFF_20261109.md) remains
