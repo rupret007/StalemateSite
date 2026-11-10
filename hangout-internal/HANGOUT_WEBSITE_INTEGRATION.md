@@ -1,11 +1,15 @@
 # Website integration: one shared Hang Out
 
-**Latest checkpoint, November 9:** reviewed runtime `c83dfaff` is delivered
-privately as version `49f19821-e3cf-4699-8698-3dd3f446ca3b`; the issuer remains
-`fd37578f`. Use the [current delivery and rehearsal checkpoint](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
-before the dated observations below. Ordinary admitted entry and current
-Music/Shared Track/Webex acceptance are still pending. This session owns private
-application delivery independently of StoryPool. Public links remain unpublished.
+**Latest checkpoint, November 10:** reviewed frontend `d53ff7f` (merged runtime
+`11c9d1f8`) is privately delivered as version
+`2b205a24-392c-4cdb-9d0b-daaf8c065d0b`; backend source remains `c83dfaff` and the
+issuer remains `fd37578f`. All 28 bindings and effective settings were preserved;
+31 checked served files match reviewed bytes. Existing invitation/prejoin and
+missing-Music-invite guidance work; current joined chat and Music/Shared Track/
+Webex acceptance remain pending. Use the [current readiness handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
+and [sanitized delivery receipt](../pr-assets/private-readiness/20261110/private-delivery/README.md).
+This session owns private application delivery independently of StoryPool.
+Public links remain unpublished.
 
 Use this short guide to prepare the receiving owner's release. This application
 session supplies source, tests and integration assets. Following Jeff's October30
@@ -15,7 +19,11 @@ operational files remain outside this task. Existing GitHub protections and
 security/provider/release holds still apply. This document is not release
 approval or evidence that a live website contains the candidate.
 
-## Select one tested candidate
+## Historical November 8 candidate and runtime
+
+The source, package, issuer and pending-delivery statements in this section are
+dated November 8 history. They do not supersede the current checkpoint above or
+instruct a rollback, reinstall, delivery retry or new provider activation.
 
 The application branch now includes the merged UI work from #241/#242 at
 `844a32850d5a68c741b393e25b6ad11ba9b64890`, tree
@@ -23,7 +31,7 @@ The application branch now includes the merged UI work from #241/#242 at
 cleanly and actual Chrome previews verified host setup guidance and deep-zoom
 composer focus. It is **not deployed**: the 19:48 UTC readback still found the
 private runtime below. Use the
-[latest candidate matrix](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md#application-candidate)
+[latest candidate matrix](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md#source-serving-state-and-evidence)
 to distinguish source, packaging, delivered assets and physical acceptance.
 The receiving owner must re-read actual effective configuration and preserve
 all existing bindings, namespace IDs, secrets, origins, caps and holds before
@@ -62,7 +70,7 @@ accessibility or public readiness. All
 [62 requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md) remain in force.
 The original explicit eighth workerd provider-start CI command has already run;
 its 51 source entries and 68 bundle inputs match the current application inputs.
-See [the qualified receipt and limits](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md#provider-start-ci-dependency-resolved).
+See [the qualified receipt and limits](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md#source-serving-state-and-evidence).
 It remains separate from frozen desktop audio and real provider/media use.
 
 The browser-access clock and subsequent real WebKit audio-context teardown
