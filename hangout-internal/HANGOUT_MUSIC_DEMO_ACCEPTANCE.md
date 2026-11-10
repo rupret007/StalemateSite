@@ -19,7 +19,8 @@ navigation, purchases, signing enrollment or any trust/age/consent bypass.
 
 Use the [current website and package identities](HANGOUT_WEBSITE_INTEGRATION.md)
 for the current trial. The four verified archives come from source
-`76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c`. Build labels alone are insufficient.
+`67c7ef08e515c84eb2b0736c474ec2c4b0c21682`; only the ARM idle UI has current local
+execution evidence. Build labels alone are insufficient.
 Older package and deployment receipts below describe their own candidates.
 
 Each physical trial remains one native host and one browser guest for at most
@@ -31,23 +32,26 @@ to a bounded test.
 Only Jeff disposes moderation reports. Actual headphone and microphone use on
 Windows still needs the participant's confirmation.
 
-## Current listening sequence — November 7
+## Current listening sequence — November 10
 
 Use the [current private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
-for the source and delivered version. Native packages remain source `76b1fd7`;
-website source is `ac9b82f` / version `449fe7d2`, including the delivered
-browser countdown and subsequent audio-context teardown corrections. Do not
-read older package or generated-media evidence as physical listening on this
-newer browser runtime.
+for the source and delivered version. Native packages are source `67c7ef0`;
+reviewed frontend `d53ff7f` / merged `11c9d1f8` now serves privately as version
+`2b205a24`, with the existing c83 backend and issuer `fd37578f` unchanged. The
+[delivery receipt](../pr-assets/private-readiness/20261110/private-delivery/README.md)
+qualifies 31 served static files and Chrome invitation/prejoin observations;
+it does not qualify physical listening on this runtime.
 
-The current generated Mac-to-Windows trial passed audio transport both ways,
-40-second synthetic WAV chord detection, a fresh invitation and shutdown. It
-used verified packaged components and production admission, with no physical
-capture. It did **not** exercise the desktop Shared Track sender or qualify
-human hearing, instruments, Webex or a second network. The original relay-cap
-record is preserved; normal subsequent admission is not permission to reset a
-ledger or change a limit. The earlier account-usage observation must be
-refreshed before another media trial.
+The earlier generated Mac-to-Windows trial passed transport both ways,
+40-second synthetic WAV chord detection, a fresh invitation and shutdown at its
+recorded older revisions. It did not exercise the desktop Shared Track sender or
+qualify human hearing, instruments, Webex or a second network. The original
+local relay-cap record was later found missing; Jeff approved only the narrowly
+scoped continuity replacement, with fresh v4 gates. It was not recreated and no
+ledger, cap or other hold was reset. Refresh account/resource/device checks before
+another bounded trial; do not replay completed generated tests as new listening
+proof. The native GUI gate remains swap below 80%, separately from the 90%
+application delivery gate.
 
 1. Confirm the Intel MacBook is awake on the intended network, the verified
    native build is selected, and headphones are connected. Begin with the
@@ -66,16 +70,15 @@ refreshed before another media trial.
    Roland/interface route before testing them. Record setup time, audible
    dropouts and the limitations of the displayed listening-delay estimate.
    A moving meter or generated transport pass cannot replace this step.
-4. For **Shared Track on the Intel host**, its last read-only route scan found
-   no official BlackHole 16ch/64ch route. A verified official installer and the
-   original 40-second Test Chords WAV are staged in
-   `~/Library/Caches/WebJam/shared-track-setup-20261107/`. Installation was not
-   performed overnight. Save work, close audio apps and complete any installer
-   administrator prompt locally. The recorded heartbeat observer and cleanup
-   are finished; save other work before any requested restart.
-   Recheck the exact official 48kHz route normally; do not
-   select BlackHole as the physical mic/headphones or enable a proof override.
-   The Mini's earlier read-only route pass remains a different machine/result.
+4. For **Shared Track on the Intel host**, BlackHole 16ch/48 kHz was already
+   installed and read-only eligibility was verified in the later
+   [route checkpoint](HANGOUT_SHARED_TRACK_NEXT_CHECK_20261107.md). **Do not
+   reinstall it from the older staged installer.** Recheck the current exact
+   route normally while the app is idle. Keep the physical mic/headphone route
+   separate; never select BlackHole as the primary physical device or enable a
+   proof override. The retained 40-second Test Chords WAV is an existing test
+   asset, not a recording or current desktop mix result. The Mini's route check
+   remains a separate machine/result.
 5. Load the WAV in Shared Track, verify its route, then Play. The second person
    must hear the backing track and a live input in the same mix. Check MP3 with
    the packaged decoder too. Decoder and synthetic WAV passes alone do not

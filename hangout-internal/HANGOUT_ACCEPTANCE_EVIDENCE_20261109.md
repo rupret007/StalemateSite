@@ -2,8 +2,9 @@
 
 This is a scoped evidence index, not62 completed checkboxes. The original outcomes
 are copied verbatim for review; the canonical requirements file remains unchanged.
-`L` means an actual UI observation at its stated revision (browser rows are c83;
-native67 idle results are labelled separately); `C` completed CI or local
+`L` means an actual UI observation at its stated revision (historical browser
+journey rows are c83; November 10 d53 prejoin/refusal and native67 idle results
+are labelled separately); `C` completed CI or local
 framework tests at their recorded revision; `S` source/static/package/document
 review; `G` generated/simulator evidence; `H` explicit human feedback; `U` unqualified.
 One evidence class does not substitute for another or extend to a different revision.
@@ -18,7 +19,11 @@ The [current-source qualification](../pr-assets/private-readiness/20261110/curre
 adds merged website PR253 and upstream WebJam PR466, the prepared d53 package,
 and actual current-tree application/workerd provider-start CI. It does not mark
 any live Music, Shared Track, Webex, legal or newcomer outcome complete.
-The 62 original ID/outcome cells below remain byte-for-byte unchanged.
+The [November 10 private delivery receipt](../pr-assets/private-readiness/20261110/private-delivery/README.md)
+adds current configuration/rollback preservation, 31 exact served static files,
+Chrome invitation/prejoin and missing-Music-invite refusal. It is not current
+joined-chat, physical media or full recovery acceptance. The 62 original
+ID/outcome cells below remain byte-for-byte unchanged.
 
 | ID | Original required outcome | Evidence and scope | Still required / limit |
 | --- | --- | --- | --- |
@@ -28,7 +33,7 @@ The 62 original ID/outcome cells below remain byte-for-byte unchanged.
 | F4 | IRC channels, commands, presence, room/host controls and welcoming quiet rooms | **L,C** — Live topic/+m commands, presence, quiet-room copy and discovery; broader command tests. | Remaining host handoff/kick/ban and current-platform newcomer journeys. |
 | F5 | Chat begins at join; connected-session scrollback only | **L,C** — A fresh join excluded earlier authored text; the connected guest retained its own scrollback. | Current logout/revocation and failure boundaries; narrow evidence exceptions remain separate. |
 | F6 | Research current primary sources, read product/evidence docs and revalidate repository/release state | **S** — Current source/tree/CI review plus primary YouTube, Apple and WebKit research; dated receipts retained. | Refresh relevant external state before release; outstanding legal/provider/device facts remain outstanding. |
-| F7 | Implement small, reviewable changes; finish usable core before expanding scope | **S,C** — Small reviewed website PRs #247–#251 merged privately; native PRs `#462–#465` merged; current `67c7ef0` four-target build and actual archive verification completed. | Finish essential Music/SharedTrack/Webex and guarded private delivery rather than add unrelated features. |
+| F7 | Implement small, reviewable changes; finish usable core before expanding scope | **S,C** — Small reviewed website PRs #247–#251 merged privately; native PRs `#462–#465` merged; current `67c7ef0` four-target build and actual archive verification completed. | Private frontend delivery is qualified; finish essential Music/SharedTrack/Webex and newcomer outcomes rather than add unrelated features. |
 | A1 | Both websites open one shared community address with return navigation | **L,S** — Both private entry contexts reached one address with return context; concrete entry toolkit retained. | Receiving website integration remains staged; public navigation deliberately unpublished. |
 | A2 | Small “via Stalemate”/“via Rad Dad” beside names/messages and in People | **L,C** — Source badge shown on new messages and in People in actual cross-entry checks. | Retest remaining platforms and preserve source semantics through delivery. |
 | A3 | Badge can be hidden; direct, unknown and repeated source values are neutral | **L,C** — Actual hide/show; source tests cover neutral/invalid entrance values. Earlier message badges are not retroactively erased. | Current third-site/direct-input and privacy-boundary journey beyond the observed Mac check. |
@@ -44,13 +49,13 @@ The 62 original ID/outcome cells below remain byte-for-byte unchanged.
 | E5 | Safe public package; no repository/private-file copy or output overwrite | **S,C** — Reviewed package: exact8-file allowlist,7 payloads and matching source/payload hashes. | Preserve safe-output/overwrite checks and settle redistribution/license scope before external reuse. |
 | E6 | Federation stays outside this requirement | **S** — Federation remains outside this scope; entry context is not federation. | Do not substitute federation work for unfinished private-use requirements. |
 | D1 | Accessible retro IRC design, refined typography/navigation/presence | **L,S** — Actual three-pane retro IRC workspace and refined phone fixtures; native screenshot retained. | Broader newcomer/usability review, platform and assistive-technology qualification. |
-| D2 | Clear connection, sign-in, loading and error/retry states | **L,C,S** — Live truthful refusal/draft states; merged247 admission,248 video recovery and249 composer/playback corrections; combined ba8 CI passed. | Guarded delivery and current live recovery for those new candidates. |
+| D2 | Clear connection, sign-in, loading and error/retry states | **L,C,S** — Live truthful refusal/draft states; merged247 admission,248 video recovery and249 composer/playback corrections; combined ba8 CI passed. | Current delivered assets are qualified; joined-chat and remaining live failure/recovery still need observation. |
 | D3 | Welcoming quiet rooms, room discovery and simple creation/join/switch/leave | **L,C** — Quiet lobby, directory, guest creation/join and host closure observed. | Remaining activity/room recovery/host-transfer paths and uncoached newcomer use. |
-| D4 | Keyboard navigation and focus | **L,C** — Actual Safari Option-Tab/PM action; PR #249 keyboard checks. Actual ARM `67c7ef0` idle Command-Q exited twice; current source regressions passed. | Private delivery, physical/assistive coverage and the startup native-menu Quit item reported disabled remain unresolved. |
+| D4 | Keyboard navigation and focus | **L,C** — Actual Safari Option-Tab/PM action; PR #249 keyboard checks. Actual ARM `67c7ef0` idle Command-Q exited twice; current source regressions passed. | Private frontend delivery is qualified; physical/assistive coverage and the startup native-menu Quit item reported disabled remain unresolved. |
 | D5 | Screen-reader behavior | **L,C,S** — ARIA/log semantics and announcement controls exist; native member-dialog AX omission recorded. | Actual VoiceOver/NVDA behavior and the unresolved Safari AX observation; no speech pass claimed. |
 | D6 | Zoom/reflow and WCAG 2.2 AA | **C,S** — 249 responsive/zoom-equivalent cases include320x256 and strict composer bounds. | Actual browser zoom, assistive technology and full WCAG2.2AA assessment, beyond viewport fixtures. |
 | D7 | Reduced-motion preference | **C,S** — Reduced-motion CSS and enabled reduced-motion fixtures retained. | Verify remaining actual browser/OS preference behavior; no broad accessibility certification. |
-| D8 | 375/390px screenshots, no page overflow, input/Send visible, iOS inputs 16px | **C,L** — 375/390px prejoin deployed evidence plus joined249 fixtures; 16px fields, contained composer/Send. | Deliver249 and qualify actual phone/keyboard behavior; responsive emulation is not physical iOS. |
+| D8 | 375/390px screenshots, no page overflow, input/Send visible, iOS inputs 16px | **C,L** — 375/390px prejoin deployed evidence plus joined249 fixtures; 16px fields, contained composer/Send. | 249 assets are privately delivered; qualify actual phone/keyboard behavior. Responsive emulation is not physical iOS. |
 | D9 | Starter/action rows contain themselves and text wraps | **C,S** — Current fixture geometry/screenshots cover wrapping text and self-contained starter/action rows. | Current delivered/physical-device checks, including unusually long text and controls. |
 | D10 | Cameras/microphones remain opt-in | **L,C** — No camera/microphone started in the live chat/creative/PM checks; media remains opt-in. | Fresh consent, stop/revoke and device checks before remaining Music/Webex trials. |
 | D11 | Review reused components for license and security | **S,C** — Current `67c7ef0` actual archives match generated notices and all 11 pinned license entries, including the formerly missing own-MIT copy. No Halloy code copied. | Complete relevant license/security review. Archive checks do not certify legal compliance or license the separate website toolkit for redistribution. |
@@ -78,9 +83,9 @@ The 62 original ID/outcome cells below remain byte-for-byte unchanged.
 | V2 | Ordinary visitors create/join creative rooms and collaborate | **L** — Actual ordinary guests hosted/joined Draw/Paint/chat and collaborated. | Current native Music/SharedTrack/Webex and other original creative/platform outcomes. |
 | V3 | Reporting and moderator review work across entries | **C,S** — Earlier report-review receipts retained at their own revisions; current owner login requires email sign-in. | Current cross-entry report and human review; no new report created while reviewer unavailable. |
 | V4 | Fresh-join privacy, logout/revocation and role isolation | **L,C** — Live fresh-join privacy, guest topic denial, PM consent/block and local closed draft. | Current live logout/revocation, account ownership and full role isolation. |
-| V5 | Failures/recovery are clear and truthful | **L,C,S** — Live refusal/draft recovery;247/248/249 fixes merged and combined ba8 CI passed. | Delivered-candidate failure/recovery and remaining media handoff checks. |
+| V5 | Failures/recovery are clear and truthful | **L,C,S** — Live refusal/draft recovery;247/248/249 fixes merged and combined ba8 CI passed. | Current missing-Music-invite refusal is observed; connected recovery and remaining media handoff checks are pending. |
 | V6 | Mac, Windows and Linux support qualified honestly | **C,S,L** — All four `67c7ef0` packages built and actual archives checked; both Mac signature sets passed; ARM `67c7ef0` idle UI and Command-Q observed. | Current physical media roles/devices and publisher trust remain unqualified; Mac ad-hoc is not notarization, Windows unsigned, and no native hosting equivalence is claimed. |
-| V7 | Deliver source, tests, screenshots and small PRs | **S,C,L** — Reviewed website PRs #247–#251 and native PRs `#462–#465`, source CI, scoped current `67c7ef0` archive evidence and actual ARM idle screenshots retained. | Finish guarded private delivery and current media/newcomer journeys; native menu Quit remains unqualified. |
+| V7 | Deliver source, tests, screenshots and small PRs | **S,C,L** — Reviewed website PRs #247–#251 and native PRs `#462–#465`, source CI, scoped current `67c7ef0` archive evidence and actual ARM idle screenshots retained. | Private frontend delivery is qualified; current media/newcomer journeys and native menu Quit remain unqualified. |
 | V8 | Deliver integration instructions and a clean concrete package | **S,C** — Concrete entry toolkit, setup/support and restore/rollback guidance retained. | Receiving-site integration review, remaining package/license/platform qualification. |
 | V9 | Deliver a migration/rollback plan with remaining dependencies | **S** — Existing migration/rollback identities, configuration requirements and exact dependency stops documented. | Fresh gated rollback readiness and effective-config preservation for any later switch. |
 | V10 | Completion requires observed application journeys and concrete integration package, with unverified work explicit | **L,S,C,G,H,U** — Observed browser journeys and concrete package now exist; evidence layers remain distinct. | All original outcomes still need appropriate proof; uncoached essential private band journeys remain unfinished. |

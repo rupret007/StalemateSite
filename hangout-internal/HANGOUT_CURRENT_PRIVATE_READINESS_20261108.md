@@ -6,9 +6,13 @@ band rehearsal is not yet qualified.** Music, actual Shared Track mixing and
 Webex video/audio handoff remain essential acceptance work, not optional extras.
 Both public websites and their navigation remain unchanged.
 
-Read this page for the current handoff. The previous page is preserved byte for
-byte in the [dated history](HANGOUT_PRIVATE_READINESS_HISTORY_20261110_BEFORE_AUDIO_STATS.md); it is
-not an instruction to repeat completed downloads, helpers, observations or CI.
+The reviewed private frontend was delivered on November 10 at 14:56 UTC.
+The [delivery receipt and screenshots](../pr-assets/private-readiness/20261110/private-delivery/README.md)
+separate its configuration, actual served bytes and prejoin proof from remaining
+joined-chat and physical-media acceptance. Read this page for the current
+handoff. An earlier checkpoint is preserved byte for byte in the
+[dated history](HANGOUT_PRIVATE_READINESS_HISTORY_20261110_BEFORE_AUDIO_STATS.md);
+it is not an instruction to repeat completed downloads, helpers, observations or CI.
 All [62 original requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md) remain intact.
 The [evidence matrix](HANGOUT_ACCEPTANCE_EVIDENCE_20261109.md) records their limits.
 
@@ -16,15 +20,15 @@ The [evidence matrix](HANGOUT_ACCEPTANCE_EVIDENCE_20261109.md) records their lim
 
 | Layer | Qualified evidence | Still required |
 | --- | --- | --- |
-| Last verified private website | Runtime `c83dfaff1fe924ea0a70cfc902731234113f0c09`, serving version `49f19821-e3cf-4699-8698-3dd3f446ca3b`. The serving Worker and effective variables/binding names, namespace IDs, origins and controls matched the preserved live snapshot. Normal browser response saves also matched the reviewed lobby JavaScript and CSS. | No new provider readback after the later hold-continuity stop. Newer application changes are not assumed deployed. |
-| New application source | Website [PR253](https://github.com/rupret007/StalemateSite/pull/253) merged privately as `11c9d1f8e73233eeaf601a1fef304b57568ae639`, tree `09d02dc9df44dc62ceeb56658dc0fbc8354be051`. Both source CI runs 42774481695/42774439018 passed 2,110 unit tests, 904 browser cases and 34 root plus 34 project-path checks. Full logs and tested/merged tree equality were reviewed. [Sanitized current-source receipt](../pr-assets/private-readiness/20261110/current-source-qualification.json). | Guarded private delivery remains pending. Selected-path audio statistics, private-entry renewal, video-failure guidance and composer/playback corrections are not live acceptance claims yet. |
-| Keyboard/playback correction | PR249 merged as `ce319fd73ad12cf43cd67cb96276302698d07d6c`. Its current-head and combined-private CI passed. Full CI originally exposed a network-stalled/playback-status defect; the corrected regression and unchanged real-media browser trials passed. Original failures/traces are retained. | Qualify the eventual delivered candidate. Neither responsive viewports nor real browser media decoding prove physical iOS or VoiceOver. |
+| Last verified private website | Reviewed frontend `d53ff7f87070dad7acf0183b0e1f63181b242c6c` (merged runtime `11c9d1f8`) now serves as version `2b205a24-392c-4cdb-9d0b-daaf8c065d0b` at 100%, deployment `580bce86-7e17-4511-a866-7f2073ba69eb`. Backend source remains `c83dfaff`; module SHA256 `9fefc1a13eaecb138be633e85d19039c15969f7066b7e71b6123636858493b78` and all 28 bindings, namespace IDs, runtime and effective service settings match the live baseline. All 31 checked static JS/MJS/CSS/SVG files matched reviewed bytes. | Existing invitation admission, nickname prejoin and missing-Music-invite refusal were observed in Chrome. Guest agreement, current joined-chat/media/recovery and other device outcomes remain pending. The 31-file readback does not claim all 70 assets. |
+| New application source | Website [PR253](https://github.com/rupret007/StalemateSite/pull/253) merged privately as `11c9d1f8e73233eeaf601a1fef304b57568ae639`, tree `09d02dc9df44dc62ceeb56658dc0fbc8354be051`. Both source CI runs 42774481695/42774439018 passed 2,110 unit tests, 904 browser cases and 34 root plus 34 project-path checks. Full logs and tested/merged tree equality were reviewed. [Sanitized current-source receipt](../pr-assets/private-readiness/20261110/current-source-qualification.json). | The reviewed assets are now privately delivered. Source/CI and served-byte proof do not establish their complete joined-chat, physical audio, meeting or recovery behavior. |
+| Keyboard/playback correction | PR249 merged as `ce319fd73ad12cf43cd67cb96276302698d07d6c`. Its current-head and combined-private CI passed. Full CI originally exposed a network-stalled/playback-status defect; the corrected regression and unchanged real-media browser trials passed. Original failures/traces are retained. | Qualify current delivered keyboard/playback journeys. Neither responsive viewports nor real browser media decoding prove physical iOS or VoiceOver. |
 | Native packages | Exact source `67c7ef08e515c84eb2b0736c474ec2c4b0c21682` built all four desktop targets in [run 42761983020](https://github.com/rupret007/webjam/actions/runs/42761983020). All four actual archives passed source/private-beta, paths/CRC, architecture, component, generated-notice and all 11 pinned license checks. Both Mac bundles passed five strict signature checks; Windows Setup/ZIP checksums and hosted install/start/uninstall passed. [Package receipt and screenshots](../pr-assets/private-readiness/20261110/README.md). | Fresh Mini Desktop selection points to an older `4c4` cache, not the separately qualified `67c7ef0`; it was preserved. MacBook selection is not freshly verified. Only ARM `67c7ef0` idle Music/Art and Command-Q exit were locally observed. Intel/Windows/Linux `67c7ef0` were not locally executed. Native menu Quit remains unqualified. Mac ad-hoc is not notarization; Windows is unsigned. No current physical Music or meeting proof. |
 | Native fixes and CI | WebJam PRs `#462–#465` are merged; exact `67c7ef0` source tree `1e0126b23cc309159ca2e4bb92c0d96ad7083f3a` matches merged native revision `7b6e6612a99518f28aff93d36b29698be86d57ea`. Current private build passed 12,976 unit tests, 60 existing skips and 566 modules, plus 11 RPC and 7 generated JACK boundary cases for each pinned Jamulus version (3.12.2 and 3.12.3), and all four package jobs. It includes meeting-audio guidance, restored lesson/Conversation context, dialog-owned Quit shortcut and own-license packaging. | Older `7153994` and `6b89ddd` packages remain distinct historical sources. Source tests and generated JACK cases do not prove physical Music/Shared Track/Webex. Current ARM idle screenshots do not resolve the native menu Quit limitation or VoiceOver. |
 | Selected audio connection | Upstream [WebJam PR466](https://github.com/rupret007/webjam/pull/466), reviewed head `098c57250b5ed2b97c233d7e843f5c5d1297a9e8`, merged as `01804299f3940f243b06f88749d488e03f08cf5c`. Delay and receiver adaptation now use the actual selected transport pair rather than a retired pair encountered last. Four regressions failed before the fix. Completed CI passed 44 Web Join unit cases, 69 browser cases, 87 Worker cases and 12,976 application tests with 60 existing skips across 566 modules. The website mirrors the reviewed audio bytes and provenance. | This browser JavaScript fix does not change the native host runtime or relabel existing native packages. Physical latency, acoustic listening, LAN routing and relay admission still need their own evidence. |
 | Current application provider-start CI | [Run 42780185842](https://github.com/rupret007/StalemateSite/actions/runs/42780185842), job 129708072371, completed the actual `--participation --provider-start` application/workerd mode. Its tested synthetic tree equals current website `11c9d1f8`. All 15 recorded mode/install/audit exits were zero; 49 tracked provider-start inputs and 50 workflow-declared inputs were checked separately. Owner/start ordering, duplicate start, Stop/revoke/close fencing and owned cleanup passed. | This is current application/workerd CI evidence, not native desktop/media, real guardian decisions, hosted capacity, provider activation or private delivery. The evidence explicitly leaves those outcomes unqualified. |
 | Issuer | Last verified `fd37578f-13cd-4fce-b557-35c0d962ef9d` at100%; completed405/204/403 negatives have receiptc209b961. | Reuse that completed result; do not rerun it or mint test credentials. The existing cap/hold and fresh account headroom still govern trials. |
-| Rollback | Retained site2c5c81e5 and issuer4db649fa; the completed c83 delivery needed no rollback. | A new delivery must preserve actual live configuration and stable IDs and verify its rollback path before any switch. |
+| Rollback | Immediate prior site `49f19821-e3cf-4699-8698-3dd3f446ca3b` and original site `2c5c81e5-1aa4-4ea7-be69-cacda13c20e8` are retained; issuer rollback `4db649fa` remains available. No rollback was needed. | Any later rollback/update needs fresh guards, exact actual configuration preservation and restored serving/configuration verification; never replay completed helpers. |
 
 The [sanitized live receipt and screenshots](../pr-assets/private-readiness/20261109/README.md)
 cover actual Mac Chrome/Safari observations on c83:
@@ -57,13 +61,19 @@ through Karen, the bus, conductor, installed infrastructure checkouts or shared
 services. Public entry links, AI, recording, separate Hang Out media TURN,
 permissions, caps and existing release/provider holds stay unchanged.
 
-Private delivery stopped before provider authentication/API/upload/switch because
-the recorded relay-cap hold marker is missing. A bounded search found no matching
-backup. The one-time owner continuity proposal remains unanswered; it would replace
-only the lost-file prerequisite with explicit owner continuity and fresh existing
-v4 checks. It has not been executed. Do not recreate the original marker, reset
-counters/caps, expand permissions or waive another hold. A provider quota refusal,
-configuration mismatch, resource failure or any other failed gate still stops work.
+Jeff approved the one-time continuity proposal for the missing local relay-cap
+record. It substituted only that file's presence/hash proof; the missing marker
+was not recreated and no counter, cap, permission or other hold was reset. Fresh
+v4 snapshot, resource, billing/headroom, version, configuration and rollback
+checks passed before the private upload and switch. A first read-only GraphQL
+budget refusal was preserved; after its normal five-minute cooldown, one reduced
+UTC-month query succeeded without a reset. Current-period billing displayed
+1,000 GB included, 0.01 GB used and $0; 999.99 GB unused is derived at displayed
+precision, not an exact real-time balance or future-cost guarantee. Whole-account
+UTC-month TURN usage was 25,089,204 bytes, a conservative upper bound below both
+unchanged 800/200 GB caps. These are dated admission facts, not perpetual trial
+permission. Any fresh quota refusal, configuration mismatch, resource failure or
+other failed gate still stops work.
 
 The application resource gate remains swap below 90%, load below 10 and disk at
 least 15 GiB; the stricter 80% native-GUI gate is separate. Fresh checks are required.
@@ -88,8 +98,11 @@ The prepared 70-asset candidate contains 25,791,406 bytes and was built at revie
 source `d53ff7f87070dad7acf0183b0e1f63181b242c6c`. Every actual output byte matches
 merged `11c9d1f8`; its Worker remains equal to recorded serving c83. Two assets
 changed from the older f098 candidate, and seven differ from recorded c83. Preserve
-the immutable d53 build identity. This is offline preparation, not admission,
-upload or delivery. Earlier f098 and PR247-only packages remain historical.
+the immutable d53 build identity. The frozen live config and exact c83 backend
+were retained; only the asset
+directory was overridden for the inactive upload. The guarded switch and 31
+served-file checks are qualified separately in the delivery receipt. Earlier
+f098 and PR247-only packages remain historical.
 The current eight-file entry toolkit was also verified from the actual CI archive;
 its manifest is source evidence, not public integration or deployment proof. Its
 redistribution-license qualification remains explicitly unfinished.
