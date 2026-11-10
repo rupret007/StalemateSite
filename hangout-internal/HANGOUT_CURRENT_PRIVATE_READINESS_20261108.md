@@ -17,9 +17,10 @@ The [evidence matrix](HANGOUT_ACCEPTANCE_EVIDENCE_20261109.md) records their lim
 | Layer | Qualified evidence | Still required |
 | --- | --- | --- |
 | Last verified private website | Runtime `c83dfaff1fe924ea0a70cfc902731234113f0c09`, serving version `49f19821-e3cf-4699-8698-3dd3f446ca3b`. The serving Worker and effective variables/binding names, namespace IDs, origins and controls matched the preserved live snapshot. Normal browser response saves also matched the reviewed lobby JavaScript and CSS. | No new provider readback after the later hold-continuity stop. Newer application changes are not assumed deployed. |
-| New application source | PR247 merged as `981615899537f95ff1ab351818a19bc3e8771262`; PR248 merged as `8b4c2db7975d6bbf048f39a90540059f7ab0865e`. The combined tree matched review; 129 focused unit and 31 browser cases passed. | Final combined CI and guarded private delivery. Private-entry renewal and specific YouTube failure guidance are not live acceptance claims yet. |
-| Keyboard candidate | PR249 source `62996c4a021ec321090a1f700636dd1f23d49a70`: 60 Chromium/WebKit keyboard/layout and 93 actual-client unit cases passed locally, with 375/390px screenshots. | Inspect its exact-head CI, qualify against the latest private branch, merge normally and verify the eventual delivered candidate. Responsive viewports are not physical iOS or VoiceOver. |
+| New application source | PR247 merged as `981615899537f95ff1ab351818a19bc3e8771262`; PR248 merged as `8b4c2db7975d6bbf048f39a90540059f7ab0865e`. The combined tree matched review; 129 focused unit and 31 browser cases passed. | Combined private-base CI42725652003 passed2102unit,874browser and34root+34project-path checks. Guarded private delivery remains pending. Private-entry renewal and specific YouTube failure guidance are not live acceptance claims yet. |
+| Keyboard/playback candidate | PR249 source `f098d4c970540c56279f310f8591bb22a604c142` includes current private base8b4c2db. Original60 keyboard/layout and93unit cases passed; the detached current-base union passed101unit and85browser cases. Full CI found a separate network-stalled/playback-status defect; the corrected regression passed13unit and8 unchanged real-media browser trials. Original failures/traces are retained. | Inspect fresh exact-head CI, merge normally and qualify the delivered candidate. Neither responsive viewports nor real browser media decoding prove physical iOS or VoiceOver. |
 | Native packages | Exact source `6b89dddbb4c2ff8e8b43b1d9546b0fcca00b2471` built successfully for Intel Mac, ARM Mac, Windows and Linux in run42589169316. All four archives passed their scoped static checks; Mac nested signatures were strict/deep/all-architectures valid. | The selected Desktop demos still point to source533514d. The verified6b caches are not current GUI, physical Music or meeting proof. Mac ad-hoc signatures are not notarization; Windows remains unsigned. |
+| Native guidance correction | WebJam PR462 source `91caaba6520df3f0532363109a629787fcd83182` consistently requires full meeting-audio disconnection for Music. It also isolates three signature-metadata tests from PortAudio initialization; device/topology/UID assertions remain intact. Focused142 tests plus12subtests passed locally. | Current exact-head CI, normal review/merge and any needed new private package. Existing6b caches do **not** contain this correction; do not relabel them. No current physical Music/Shared Track/Webex claim. |
 | Issuer | Last verified `fd37578f-13cd-4fce-b557-35c0d962ef9d` at100%; completed405/204/403 negatives have receiptc209b961. | Reuse that completed result; do not rerun it or mint test credentials. The existing cap/hold and fresh account headroom still govern trials. |
 | Rollback | Retained site2c5c81e5 and issuer4db649fa; the completed c83 delivery needed no rollback. | A new delivery must preserve actual live configuration and stable IDs and verify its rollback path before any switch. |
 
@@ -57,8 +58,10 @@ permissions, caps and existing release/provider holds stay unchanged.
 Private delivery stopped before provider authentication/API/upload/switch because
 the recorded relay-cap hold marker is missing. A bounded search found no matching
 backup. Do not recreate/reset/waive it. Genuine continuity or an owner resolution
-is required. The Mini also fell below its15GiB free-disk floor. The application
-resource gate remains swap below90%, load below10 and disk at least15GiB;
+is required. The Mini also fell below its15GiB free-disk floor, then later passed a fresh
+resource readback before local tests resumed. That positive change has no
+attributed cause and does not waive the missing hold. The application resource
+gate remains swap below90%, load below10 and disk at least15GiB;
 the stricter80% native-GUI gate is separate. Fresh checks are required before use.
 
 Five verified archive files were offloaded to the existing external drive with
@@ -78,8 +81,9 @@ The old PR247-only prepared assets are not a combined release candidate.
 
 ## Remaining band journey
 
-1. Select the verified current native app using normal Finder/UI under fresh
-   trust and device/resource checks. Do not bypass macOS privacy or quarantine,
+1. Require the reviewed native guidance correction above before selecting a
+   newly qualified current app. Use normal Finder/UI under fresh trust and
+   device/resource checks; existing6b caches are historical package evidence. Do not bypass macOS privacy or quarantine,
    stop an independently opened session, or count a cached archive as a launch.
 2. Use one Mac native Music host and one Windows Chrome guest for at most ten
    minutes, with participant consent, headphones and no recording. The host
@@ -91,6 +95,9 @@ The old PR247-only prepared assets are not a combined release candidate.
    the separate existing BlackHole16ch48k backing route. Hear backing plus live
    input together; check levels/mute, pause/restart/seek and stopping. Earlier
    file decoding, locked controls and generated tones do not establish this mix.
+   The current sender backend is Mac-only; Windows/Linux cannot send Shared Track
+   until their routing isolation is qualified. A Windows browser guest can be the
+   listening/playing participant; that full Mac-host-to-Windows mix is still pending.
 4. Set up the existing WebJam Personal Room normally on each participating
    device. Verify real Webex join, video, leave and Music→conversation→Music.
    WebJam opens the external meeting; it does not control or verify its audio.
