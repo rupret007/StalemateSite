@@ -1,0 +1,130 @@
+{
+  "asOf": "2026-11-09 America/Chicago",
+  "source": "7153994c0a9db0ac5faccc11e51978583e56302b",
+  "sourceMerge": "cf527697941ae989e72053ee50362fef497318eb",
+  "buildRun": 42740471963,
+  "buildRunUrl": "https://github.com/rupret007/webjam/actions/runs/42740471963",
+  "allFourBuildJobsSucceeded": true,
+  "webJoinTarget": "private-beta",
+  "packages": {
+    "macos-arm64": {
+      "artifactId": 13730018590,
+      "staticPassed": true,
+      "innerSha256": "b1be0b57db6e6d940cd928871eba643be0e6a9e517c22d418416f80609a03a1e",
+      "archiveEntries": 1171,
+      "expandedBytes": 461716894,
+      "mainArchitectures": [
+        "arm64"
+      ],
+      "nestedStrictAllArchitectureSignaturesPassed": true,
+      "notarized": false,
+      "localExecution": "idle startup only",
+      "physicalMediaQualified": false
+    },
+    "macos-x64": {
+      "artifactId": 13732015599,
+      "staticPassed": true,
+      "innerSha256": "7777a29b36a03186cbc776fa8c1b6429afacbced7885ab7fcde53111b54e58e4",
+      "archiveEntries": 1170,
+      "expandedBytes": 473076093,
+      "mainArchitectures": [
+        "x86_64"
+      ],
+      "nestedStrictAllArchitectureSignaturesPassed": true,
+      "notarized": false,
+      "localExecution": "none",
+      "physicalMediaQualified": false
+    },
+    "windows-x64": {
+      "artifact": 13731535307,
+      "outerBytes": 613257737,
+      "outerSha256": "30c8d86bcc898b46b6ba16d7ff0a13ee9a184bd0d1da1b0a90a9823b7dd0a232",
+      "innerBytes": 345809128,
+      "innerSha256": "7e4510b96cac9ea77262d880407f7983f28bef5457300e8a5f7693e3f3ff27c1",
+      "entries": 3423,
+      "expandedBytes": 770844517,
+      "allMembersCrcValid": true,
+      "pathAndSymlinkChecksPassed": true,
+      "mainArchitecture": "PE-x86_64",
+      "fabricSha256": "8380182ce9bda94748d54dac4db2f82e1a535a096b862ec28627429a00188a39",
+      "windowsChecksumManifestVerified": true,
+      "appOrInstallerExecuted": false,
+      "staticPassed": true,
+      "physicalMediaQualified": false,
+      "localExecution": "none",
+      "setupSha256": "006a696da53c2fc7dde8a552ad5daaee92d4044e3d89ca91dfeaea16fbab2825",
+      "publisherTrustQualified": false
+    },
+    "linux-x64": {
+      "artifact": 13731125160,
+      "outerBytes": 458986930,
+      "outerSha256": "9944463b7e222abe1725e4b99bd537e9bb23d0c2e2b4807c7ba338f0b62301e8",
+      "innerBytes": 463243292,
+      "innerSha256": "5625b657804510895e598d93e5cbabea186a892e22e34a403c9bcc29e01ec42b",
+      "entries": 3622,
+      "expandedBytes": 1160481728,
+      "allMembersCrcValid": true,
+      "pathAndSymlinkChecksPassed": true,
+      "mainArchitecture": "ELF64-x86_64",
+      "fabricSha256": "dc78547af80183216e9782b73c54b2241842fa049cc4541370d774340d9b3c24",
+      "windowsChecksumManifestVerified": false,
+      "appOrInstallerExecuted": false,
+      "staticPassed": true,
+      "physicalMediaQualified": false,
+      "localExecution": "none"
+    }
+  },
+  "desktopSelectionChanged": false,
+  "localPhysicalMusicSharedTrackOrWebexQualified": false,
+  "publicLaunchOrReleasePermissionGranted": false,
+  "archiveCheckSafety": "Download locators, account credentials, host addresses and local configuration are excluded. Static downloads used existing validated TLS and resource guards.",
+  "scopeLimits": [
+    "Hosted producer/frozen checks are distinct from local archive inspection and physical media journeys.",
+    "Local ARM idle startup is not a live Music, Shared Track, Webex or screen-reader pass.",
+    "Mac signatures are ad-hoc, not notarized; Windows is unsigned test-only.",
+    "Linux system Opus and Windows archive provenance do not qualify native browser hosting.",
+    "Existing holds, caps, consent and release prerequisites remain unchanged."
+  ],
+  "sourceCi": {
+    "unitPassed": 12971,
+    "existingSkips": 60,
+    "uniqueModules": 565,
+    "browserPassed": 69,
+    "pinnedJamulusVersions": [
+      "3.12.2",
+      "3.12.3"
+    ],
+    "rpcEach": 11,
+    "generatedJackEach": 7,
+    "postMergeRuns": [
+      42740336544,
+      42740336227,
+      42740336633,
+      42740336730
+    ]
+  },
+  "screenshots": {
+    "idle-music-715.png": {
+      "bytes": 30387,
+      "sha256": "ef41447acc8474a9bb384f36906e0a139c218b1e7d4f476b6357435380f0b730"
+    },
+    "idle-art-715.png": {
+      "bytes": 46796,
+      "sha256": "eb00a55a4f2e6fb4daa50ff6885bbe3ec42e78e89c56560d97716ed95d89f380"
+    }
+  },
+  "armIdleObservation": {
+    "musicStartScreenObserved": true,
+    "artMakeTogetherAndPaintAlongObserved": true,
+    "matchingFroIconsObserved": true,
+    "hostOrJoinPressed": false,
+    "microphoneCameraRecordOrProviderActivationRequested": false,
+    "normalWindowCloseExitedApp": true,
+    "desktopShortcutChanged": false,
+    "quitMenuObservedDisabledAtStartup": true,
+    "commandQIssueCauseQualified": false,
+    "physicalAudioWebexOrLessonPlaybackQualified": false,
+    "voiceOverQualified": false,
+    "caveat": "Quit menu was disabled at startup; the cause and Command-Q behavior remain unqualified. Normal window close exited the app. No crash is inferred."
+  }
+}
