@@ -1,0 +1,44 @@
+{
+  "at": "2026-11-09T23:58:58.000046+00:00",
+  "base": "981615899537f95ff1ab351818a19bc3e8771262",
+  "scope": "Offline Chromium and macOS WebKit, actual application keyboard events plus local relay; not native VoiceOver, physical iPhone, hosted candidate delivery or Music/Webex proof",
+  "before": "Full cross-engine suite:57 passed,3 failed. WebKit one-pixel composer clipping at320x256; two native-scroll tests assumed the already-visible Copy button had to scroll. An earlier three-case probe stopped at default Tab skipping join, before any modal assertion.",
+  "failedApproachRetained": "A4px sticky CSS inset did not fix the clipping; reverted completely.",
+  "fix": "Only in <=900x450 viewport, after native composer focus, one coalesced animation-frame check reveals the full composer if vertically clipped. No focus/draft changes; canceled on pagehide; ordinary visible layout untouched.",
+  "tests": "60 keyboard/accessibility browser cases passed across Chromium and WebKit after the final fix. Related unit validation tracked in PR.",
+  "all62UnchangedSha256": "3d5db107977f652a1bd51286c02657aaff70c9c3590adb876e03f6d909679999",
+  "sharedIntentAuthMediaCapsHoldsPublicEntrancesUnchanged": true,
+  "screenshots": {
+    "chromium-375.png": {
+      "sha256": "2ab4d8a96d84dec9e33368dd932961b7b84ad2c43aae41e970e5a50210e8467d",
+      "bytes": 64010
+    },
+    "webkit-community-375.png": {
+      "sha256": "c639f4a18a0333d6c5629c838ec4b245e54b4b7d8c51053985627944fda0dbc0",
+      "bytes": 92996
+    },
+    "chromium-390.png": {
+      "sha256": "1ed3681fbb9b5b02cd511805c6675e2bce50ffdadc6da4788ef945102dd78714",
+      "bytes": 67689
+    },
+    "webkit-community-390.png": {
+      "sha256": "d61eaf15848d055aa9e7f43bcbd89c82a2db797f7b1029524139a061b6bcf3e2",
+      "bytes": 93413
+    },
+    "chromium-320.png": {
+      "sha256": "d4c8534b2a06bd11046b14d01ed617691024da9767d95e3697f21a021f3120d6",
+      "bytes": 19672
+    },
+    "webkit-community-320.png": {
+      "sha256": "3b29ecdbe0309a6eb5b8a0e82a8865818e5187a5df3204532e376b9805a01dec",
+      "bytes": 25738
+    }
+  },
+  "sources": [
+    "https://support.apple.com/en-lamr/guide/safari/cpsh003/mac",
+    "https://webkit.org/blog/12209/introducing-the-dialog-element/"
+  ],
+  "nativeSafariComparison": "Option-Tab reached the visible PM button in actual Safari. Missing native AX output remains a separate unresolved observation; no blanket screen-reader pass.",
+  "relatedUnitTests": "93 cases passed across actual-client context, message recovery, keep-signin and sharing-controls suites",
+  "visualReview": "Inspected current Chromium375 and320 plus WebKit390 and320 screenshots; composer/Send visible, long words wrap; short viewport uses vertical scrolling."
+}

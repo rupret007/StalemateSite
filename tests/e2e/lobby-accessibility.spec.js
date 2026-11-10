@@ -7,11 +7,18 @@ const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 const ROOT = '/r/45662413410ed051/lobby/';
 
+// Safari's default keyboard navigation skips buttons with plain Tab. Exercise
+// its documented Option-Tab path on macOS, without changing user preferences.
+// Linux/Windows and Chromium retain their ordinary Tab sequence.
+function tabKey(page, reverse = false) {
+    const option = process.platform === 'darwin' && page.context().browser()?.browserType().name() === 'webkit';
+    return `${option ? 'Alt+' : ''}${reverse ? 'Shift+' : ''}Tab`;
+}
 async function tabTo(page, target) {
     await expect(target).toBeVisible();
     for (let i = 0; i < 90; i += 1) {
         if (await target.evaluate(element => element === document.activeElement)) return;
-        await page.keyboard.press('Tab');
+        await page.keyboard.press(tabKey(page));
     }
     throw new Error('Visible control was not reachable through the actual Tab sequence');
 }
@@ -241,7 +248,7 @@ test('short deep-zoom equivalent: Tab to Send keeps the whole composer visible b
     try {
         await tabTo(page, page.getByRole('textbox', { name: 'Message', exact: true }));
         const text = 'Keyboard composer stays visible at deep zoom.';
-        await page.keyboard.type(text); await page.keyboard.press('Tab');
+        await page.keyboard.type(text); await page.keyboard.press(tabKey(page));
         await expect(page.locator('[data-send]')).toBeFocused();
         const before = await composerGeometry(page);
         await attachGeometry(testInfo, 'short-zoom-before-send', before);
@@ -269,7 +276,7 @@ for (const viewport of [{ width: 300, height: 299 }, { width: 320, height: 256 }
         await delay(3100);
         await tabTo(page, page.getByRole('textbox', { name: 'Message', exact: true }));
         const text = 'The composer and Send remain usable with a saved message copy.';
-        await page.keyboard.type(text); await page.keyboard.press('Tab');
+        await page.keyboard.type(text); await page.keyboard.press(tabKey(page));
         await expect(page.locator('[data-send]')).toBeFocused();
         await page.keyboard.press('Space');
         await expect(page.locator('[data-buffer]')).toContainText(text);
@@ -326,7 +333,7 @@ test('a focused status survives its dismiss timer and dismisses after keyboard f
         // decouple WebSocket/ACK timers from the real local relay's clock.
         await visitor.page.waitForTimeout(4200);
         await expect(status).toBeVisible(); await expect(status).toBeFocused();
-        await visitor.page.keyboard.press('Tab');
+        await visitor.page.keyboard.press(tabKey(visitor.page));
         await expect(status).not.toBeFocused(); await expect(status).toBeHidden({ timeout: 5000 });
     } finally { await visitor.close(); }
 });
@@ -672,8 +679,15 @@ for (const width of [375, 390]) test(`short Jam instructions and manual invite c
         expect(await fallback.evaluate(input => input.selectionEnd - input.selectionStart)).toBe(invitation.length);
         expect(await page.evaluate(() => window.__shortJamClipboardRefusals)).toBe(1);
         const manualCopy = await composerGeometry(page);
-        const beforeNativeTab = await page.locator('[data-jam]').evaluate(panel => ({ scrollTop: panel.scrollTop, scrollHeight: panel.scrollHeight, clientHeight: panel.clientHeight }));
-        await attachGeometry(testInfo, `short-jam-manual-copy-${width}`, { ...manualCopy, jam: beforeNativeTab });
+        // First retain the natural fallback layout. Then scroll the panel past
+        // Copy invite without changing focus, so Shift-Tab must actually reveal
+        // it in either engine (WebKit may leave it visible in its initial view).
+        const naturalCopyScroll = await page.locator('[data-jam]').evaluate(panel => ({ scrollTop: panel.scrollTop, scrollHeight: panel.scrollHeight, clientHeight: panel.clientHeight }));
+        const beforeNativeTab = await page.locator('[data-jam]').evaluate(panel => {
+            panel.scrollTop = panel.scrollHeight;
+            return { scrollTop: panel.scrollTop, scrollHeight: panel.scrollHeight, clientHeight: panel.clientHeight };
+        });
+        await attachGeometry(testInfo, `short-jam-manual-copy-${width}`, { ...manualCopy, jam: naturalCopyScroll, keyboardScrollStart: beforeNativeTab });
         await page.screenshot({ path: testInfo.outputPath(`short-jam-manual-copy-${width}.png`), fullPage: true });
 
         // These first containment checks use the snapshots taken without a
@@ -681,7 +695,7 @@ for (const width of [375, 390]) test(`short Jam instructions and manual invite c
         contained(standard); contained(manualCopy);
         expect(standard.fontSize).toBe('16px'); expect(manualCopy.fontSize).toBe('16px');
         expect(beforeNativeTab.scrollHeight).toBeGreaterThan(beforeNativeTab.clientHeight);
-        await page.keyboard.press('Shift+Tab'); await expect(copy).toBeFocused();
+        await page.keyboard.press(tabKey(page, true)); await expect(copy).toBeFocused();
         const afterNativeTab = await copy.evaluate(button => {
             const panel = button.closest('[data-jam]'), r = button.getBoundingClientRect(), p = panel.getBoundingClientRect();
             const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
