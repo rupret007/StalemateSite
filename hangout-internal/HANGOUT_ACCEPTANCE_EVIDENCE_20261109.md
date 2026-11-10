@@ -14,6 +14,12 @@ and [screenshots](../pr-assets/private-readiness/20261109/README.md) are sanitiz
 CI for a candidate is not a deployed or physical media pass. All pending facts below
 remain pending even when a related source test passes.
 
+The [current-source qualification](../pr-assets/private-readiness/20261110/current-source-qualification.json)
+adds merged website PR253 and upstream WebJam PR466, the prepared d53 package,
+and actual current-tree application/workerd provider-start CI. It does not mark
+any live Music, Shared Track, Webex, legal or newcomer outcome complete.
+The 62 original ID/outcome cells below remain byte-for-byte unchanged.
+
 | ID | Original required outcome | Evidence and scope | Still required / limit |
 | --- | --- | --- | --- |
 | F1 | One community, with shared people, channels, rooms, identity and moderation; no brand silos | **L,S** — Shared lobby, people, room discovery and text across the two entry contexts; one source moderation service. | Current cross-entry human moderator review and broader platform journeys. |

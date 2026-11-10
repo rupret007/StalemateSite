@@ -7,7 +7,7 @@ Webex video/audio handoff remain essential acceptance work, not optional extras.
 Both public websites and their navigation remain unchanged.
 
 Read this page for the current handoff. The previous page is preserved byte for
-byte in the [dated history](HANGOUT_PRIVATE_READINESS_HISTORY_20261110.md); it is
+byte in the [dated history](HANGOUT_PRIVATE_READINESS_HISTORY_20261110_BEFORE_AUDIO_STATS.md); it is
 not an instruction to repeat completed downloads, helpers, observations or CI.
 All [62 original requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md) remain intact.
 The [evidence matrix](HANGOUT_ACCEPTANCE_EVIDENCE_20261109.md) records their limits.
@@ -17,10 +17,12 @@ The [evidence matrix](HANGOUT_ACCEPTANCE_EVIDENCE_20261109.md) records their lim
 | Layer | Qualified evidence | Still required |
 | --- | --- | --- |
 | Last verified private website | Runtime `c83dfaff1fe924ea0a70cfc902731234113f0c09`, serving version `49f19821-e3cf-4699-8698-3dd3f446ca3b`. The serving Worker and effective variables/binding names, namespace IDs, origins and controls matched the preserved live snapshot. Normal browser response saves also matched the reviewed lobby JavaScript and CSS. | No new provider readback after the later hold-continuity stop. Newer application changes are not assumed deployed. |
-| New application source | PRs #247–#251 merged privately as `1159c8e6f7e888534399d2a13e9eabc291a1806b`, reviewed tree `88e1568a36bb76c87af0d8cd7f2ff33bae076fd0`. Both #251 source CI runs 42752646548/42752641391 passed 2,104 unit tests, 904 browser cases and 34 root plus 34 project-path checks; actual tested/merged trees and full logs were reviewed. This refresh adds evidence only. | Guarded private delivery remains pending. Private-entry renewal, video-failure guidance and short-composer/playback corrections are not live acceptance claims yet. |
+| New application source | Website [PR253](https://github.com/rupret007/StalemateSite/pull/253) merged privately as `11c9d1f8e73233eeaf601a1fef304b57568ae639`, tree `09d02dc9df44dc62ceeb56658dc0fbc8354be051`. Both source CI runs 42774481695/42774439018 passed 2,110 unit tests, 904 browser cases and 34 root plus 34 project-path checks. Full logs and tested/merged tree equality were reviewed. [Sanitized current-source receipt](../pr-assets/private-readiness/20261110/current-source-qualification.json). | Guarded private delivery remains pending. Selected-path audio statistics, private-entry renewal, video-failure guidance and composer/playback corrections are not live acceptance claims yet. |
 | Keyboard/playback correction | PR249 merged as `ce319fd73ad12cf43cd67cb96276302698d07d6c`. Its current-head and combined-private CI passed. Full CI originally exposed a network-stalled/playback-status defect; the corrected regression and unchanged real-media browser trials passed. Original failures/traces are retained. | Qualify the eventual delivered candidate. Neither responsive viewports nor real browser media decoding prove physical iOS or VoiceOver. |
-| Native packages | Exact source `67c7ef08e515c84eb2b0736c474ec2c4b0c21682` built all four desktop targets in [run 42761983020](https://github.com/rupret007/webjam/actions/runs/42761983020). All four actual archives passed source/private-beta, paths/CRC, architecture, component, generated-notice and all 11 pinned license checks, including the corrected own-MIT copy. Both Mac bundles passed five strict signature checks; Windows Setup/ZIP checksums and hosted install/start/uninstall passed. [Current package receipt and screenshots](../pr-assets/private-readiness/20261110/README.md). | Desktop selections were last verified at source `533514d` and were not changed here. Only ARM `67c7ef0` idle Music/Art and normal Command-Q exit were observed locally; Intel/Windows/Linux `67c7ef0` were not locally executed. Native macOS menu Quit is still reported disabled and remains unqualified. Mac ad-hoc is not notarization; Windows is unsigned. No current physical Music or meeting proof. |
+| Native packages | Exact source `67c7ef08e515c84eb2b0736c474ec2c4b0c21682` built all four desktop targets in [run 42761983020](https://github.com/rupret007/webjam/actions/runs/42761983020). All four actual archives passed source/private-beta, paths/CRC, architecture, component, generated-notice and all 11 pinned license checks. Both Mac bundles passed five strict signature checks; Windows Setup/ZIP checksums and hosted install/start/uninstall passed. [Package receipt and screenshots](../pr-assets/private-readiness/20261110/README.md). | Fresh Mini Desktop selection points to an older `4c4` cache, not the separately qualified `67c7ef0`; it was preserved. MacBook selection is not freshly verified. Only ARM `67c7ef0` idle Music/Art and Command-Q exit were locally observed. Intel/Windows/Linux `67c7ef0` were not locally executed. Native menu Quit remains unqualified. Mac ad-hoc is not notarization; Windows is unsigned. No current physical Music or meeting proof. |
 | Native fixes and CI | WebJam PRs `#462–#465` are merged; exact `67c7ef0` source tree `1e0126b23cc309159ca2e4bb92c0d96ad7083f3a` matches merged native revision `7b6e6612a99518f28aff93d36b29698be86d57ea`. Current private build passed 12,976 unit tests, 60 existing skips and 566 modules, plus 11 RPC and 7 generated JACK boundary cases for each pinned Jamulus version (3.12.2 and 3.12.3), and all four package jobs. It includes meeting-audio guidance, restored lesson/Conversation context, dialog-owned Quit shortcut and own-license packaging. | Older `7153994` and `6b89ddd` packages remain distinct historical sources. Source tests and generated JACK cases do not prove physical Music/Shared Track/Webex. Current ARM idle screenshots do not resolve the native menu Quit limitation or VoiceOver. |
+| Selected audio connection | Upstream [WebJam PR466](https://github.com/rupret007/webjam/pull/466), reviewed head `098c57250b5ed2b97c233d7e843f5c5d1297a9e8`, merged as `01804299f3940f243b06f88749d488e03f08cf5c`. Delay and receiver adaptation now use the actual selected transport pair rather than a retired pair encountered last. Four regressions failed before the fix. Completed CI passed 44 Web Join unit cases, 69 browser cases, 87 Worker cases and 12,976 application tests with 60 existing skips across 566 modules. The website mirrors the reviewed audio bytes and provenance. | This browser JavaScript fix does not change the native host runtime or relabel existing native packages. Physical latency, acoustic listening, LAN routing and relay admission still need their own evidence. |
+| Current application provider-start CI | [Run 42780185842](https://github.com/rupret007/StalemateSite/actions/runs/42780185842), job 129708072371, completed the actual `--participation --provider-start` application/workerd mode. Its tested synthetic tree equals current website `11c9d1f8`. All 15 recorded mode/install/audit exits were zero; 49 tracked provider-start inputs and 50 workflow-declared inputs were checked separately. Owner/start ordering, duplicate start, Stop/revoke/close fencing and owned cleanup passed. | This is current application/workerd CI evidence, not native desktop/media, real guardian decisions, hosted capacity, provider activation or private delivery. The evidence explicitly leaves those outcomes unqualified. |
 | Issuer | Last verified `fd37578f-13cd-4fce-b557-35c0d962ef9d` at100%; completed405/204/403 negatives have receiptc209b961. | Reuse that completed result; do not rerun it or mint test credentials. The existing cap/hold and fresh account headroom still govern trials. |
 | Rollback | Retained site2c5c81e5 and issuer4db649fa; the completed c83 delivery needed no rollback. | A new delivery must preserve actual live configuration and stable IDs and verify its rollback path before any switch. |
 
@@ -57,19 +59,24 @@ permissions, caps and existing release/provider holds stay unchanged.
 
 Private delivery stopped before provider authentication/API/upload/switch because
 the recorded relay-cap hold marker is missing. A bounded search found no matching
-backup. Do not recreate/reset/waive it. Genuine continuity or an owner resolution
-is required. The Mini also fell below its15GiB free-disk floor, then later passed a fresh
-resource readback before local tests resumed. That positive change has no
-attributed cause and does not waive the missing hold. The application resource
-gate remains swap below90%, load below10 and disk at least15GiB;
-the stricter80% native-GUI gate is separate. Fresh checks are required before use.
+backup. The one-time owner continuity proposal remains unanswered; it would replace
+only the lost-file prerequisite with explicit owner continuity and fresh existing
+v4 checks. It has not been executed. Do not recreate the original marker, reset
+counters/caps, expand permissions or waive another hold. A provider quota refusal,
+configuration mismatch, resource failure or any other failed gate still stops work.
 
-Five verified archive files were offloaded to the existing external drive with
-hash-checked copies and original-path links. No current app or Desktop selection,
-credentials, holds or shared services changed. This did not establish adequate
-available disk headroom; the external drive also has little room remaining.
-Exact private operational paths and restore receipts stay outside this repository.
-Do not restart the completed offload, package inspectors or older observation jobs.
+The application resource gate remains swap below 90%, load below 10 and disk at
+least 15 GiB; the stricter 80% native-GUI gate is separate. Fresh checks are required.
+A readback below the disk floor stopped work before provider activity. Space later
+recovered before deletion for an unattributed reason. Three cold extracted Mini
+app caches were then removed only after full byte/CRC/path/symlink comparison with
+retained, restore-verified archives, no active process and no launcher reference.
+The observed free-space gain was about 1.29 GiB, reaching about 18.99 GiB at that moment;
+that is dated evidence, not a future resource admission. Current `67c7ef0` and the
+selected older `4c4` app, source, profiles, recordings, archives, Desktop links and
+shared services were preserved. Earlier verified external-drive offloads remain
+historical; do not restart completed offloads, inspectors or observation jobs.
+Exact operational paths and restore receipts remain private and untracked.
 
 Before a later switch, use the applicable approved v4ccbf21e9 procedure, never
 dd65999f. Snapshot actual live configuration and preserve every effective
@@ -77,10 +84,15 @@ variable, secret binding, namespace/stable ID, exact origin, admission control,
 cap and hold. Defaults and `--keep-vars` alone are insufficient. Require reviewed
 source/CI, current resource/headroom checks, ready rollback, exact served hashes,
 configuration comparison and a normally admitted private session afterward.
-The prepared 70-asset candidate was built at reviewed source `f098d4c`; every output
-byte matches the protected inputs in merged `1159c8e6`, and its Worker is unchanged.
-That is offline preparation, not admission or delivery. The older PR247-only
-two-asset delta is historical and must not be used as the combined candidate.
+The prepared 70-asset candidate contains 25,791,406 bytes and was built at reviewed
+source `d53ff7f87070dad7acf0183b0e1f63181b242c6c`. Every actual output byte matches
+merged `11c9d1f8`; its Worker remains equal to recorded serving c83. Two assets
+changed from the older f098 candidate, and seven differ from recorded c83. Preserve
+the immutable d53 build identity. This is offline preparation, not admission,
+upload or delivery. Earlier f098 and PR247-only packages remain historical.
+The current eight-file entry toolkit was also verified from the actual CI archive;
+its manifest is source evidence, not public integration or deployment proof. Its
+redistribution-license qualification remains explicitly unfinished.
 
 ## Remaining band journey
 
@@ -90,8 +102,9 @@ two-asset delta is historical and must not be used as the combined candidate.
    Command-Q exit were observed; the other local packages have static evidence
    only. The native menu Quit limitation remains explicit. Do not bypass macOS
    privacy/quarantine, stop an independently opened session, or count a cached
-   archive as a launch. Existing Desktop selection and older packages remain
-   unchanged; no current-build Music trial is inferred from these checks.
+   archive as a launch. The inspected Mini Desktop selection remains the older `4c4` app;
+   older cold extracted copies can be restored from verified retained archives.
+   No current-build Music trial is inferred from these checks.
 2. Use one Mac native Music host and one Windows Chrome guest for at most ten
    minutes, with participant consent, headphones and no recording. The host
    creates a fresh browser invitation and shares it in the private Jam room.
