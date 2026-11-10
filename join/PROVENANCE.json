@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/rupret007/webjam",
-  "commit": "84193760a0d10050a649d0872151c30637997c63",
-  "sourcePR": "https://github.com/rupret007/webjam/pull/453",
+  "commit": "098c57250b5ed2b97c233d7e843f5c5d1297a9e8",
+  "sourcePR": "https://github.com/rupret007/webjam/pull/466",
   "license": "MIT",
   "modifications": {},
   "files": {
@@ -12,8 +12,8 @@
     },
     "audio.js": {
       "source": "web/join/audio.js",
-      "upstreamSha256": "b08d16ad514606206754dd926a231ee35f7aca3e6450ad0f40ee516a9bf5d04b",
-      "shippedSha256": "b08d16ad514606206754dd926a231ee35f7aca3e6450ad0f40ee516a9bf5d04b"
+      "upstreamSha256": "7fbba2ffdbccbd1c9c0140031ac78b5b8aafe77b1ab51816f4682fccdc844245",
+      "shippedSha256": "7fbba2ffdbccbd1c9c0140031ac78b5b8aafe77b1ab51816f4682fccdc844245"
     },
     "config.js": {
       "source": "web/join/config.js",
