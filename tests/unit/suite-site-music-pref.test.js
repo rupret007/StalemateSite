@@ -78,6 +78,36 @@ function loadPlayPage(bodyHtml) {
 }
 
 describe('suite BGM follows site music preference', () => {
+    it.each([2, 4])('keeps confirmed playback through a network stall at readyState %i, but honours actual waiting', async (readyState) => {
+        let state;
+        const player = createSuiteMusic({
+            isSuiteMuted: () => false,
+            resolveSrc: (rel) => `https://stalemate.band/play/assets/${rel}`,
+            AudioCtor: MockSuiteAudio,
+            onStateChange: (next) => { state = next; }
+        });
+        player.armFromGesture();
+        await Promise.resolve(); await Promise.resolve();
+        const audio = player.audioElement;
+        audio.readyState = readyState;
+        audio.currentTime = 4;
+        audio._emit('timeupdate');
+        expect(state.status).toBe('playing');
+        audio._emit('stalled');
+        expect(state.status).toBe('playing');
+        expect(audio.paused).toBe(false);
+
+        audio._emit('waiting');
+        expect(state.status).toBe('loading');
+        audio._emit('stalled');
+        expect(state.status).toBe('loading');
+        audio._emit('seeked');
+        expect(state.status).toBe('loading');
+        audio.currentTime = 5;
+        audio._emit('timeupdate');
+        expect(state.status).toBe('playing');
+    });
+
     it('wires stalemate-music-change in turdsuite boot', () => {
         expect(turdsuiteSource).toContain('wireSiteMusicPref');
         expect(turdsuiteSource).toContain("addEventListener('stalemate-music-change'");
