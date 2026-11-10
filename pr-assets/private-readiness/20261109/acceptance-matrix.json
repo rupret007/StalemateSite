@@ -1,0 +1,687 @@
+{
+  "canonicalRequirementsSha256": "3d5db107977f652a1bd51286c02657aaff70c9c3590adb876e03f6d909679999",
+  "requirementCount": 62,
+  "rows": [
+    {
+      "id": "F1",
+      "requiredOutcome": "One community, with shared people, channels, rooms, identity and moderation; no brand silos",
+      "evidenceClasses": [
+        "L",
+        "S"
+      ],
+      "evidence": "Shared lobby, people, room discovery and text across the two entry contexts; one source moderation service.",
+      "remaining": "Current cross-entry human moderator review and broader platform journeys.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "F2",
+      "requiredOutcome": "Guests choose nicknames without needing a band account",
+      "evidenceClasses": [
+        "L"
+      ],
+      "evidence": "Two ordinary guests chose nicknames and joined without a band account.",
+      "remaining": "Retain this property through remaining platform/newcomer checks.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "F3",
+      "requiredOutcome": "Anyone may host permitted temporary rooms, not only band/staff",
+      "evidenceClasses": [
+        "L",
+        "S"
+      ],
+      "evidence": "Ordinary guests hosted temporary chat, Draw and Paint rooms; host and guest controls differed.",
+      "remaining": "Current Music host/guest, remaining room lifecycle and platform checks.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "F4",
+      "requiredOutcome": "IRC channels, commands, presence, room/host controls and welcoming quiet rooms",
+      "evidenceClasses": [
+        "L",
+        "C"
+      ],
+      "evidence": "Live topic/+m commands, presence, quiet-room copy and discovery; broader command tests.",
+      "remaining": "Remaining host handoff/kick/ban and current-platform newcomer journeys.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "F5",
+      "requiredOutcome": "Chat begins at join; connected-session scrollback only",
+      "evidenceClasses": [
+        "L",
+        "C"
+      ],
+      "evidence": "A fresh join excluded earlier authored text; the connected guest retained its own scrollback.",
+      "remaining": "Current logout/revocation and failure boundaries; narrow evidence exceptions remain separate.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "F6",
+      "requiredOutcome": "Research current primary sources, read product/evidence docs and revalidate repository/release state",
+      "evidenceClasses": [
+        "S"
+      ],
+      "evidence": "Current source/tree/CI review plus primary YouTube, Apple and WebKit research; dated receipts retained.",
+      "remaining": "Refresh relevant external state before release; outstanding legal/provider/device facts remain outstanding.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "F7",
+      "requiredOutcome": "Implement small, reviewable changes; finish usable core before expanding scope",
+      "evidenceClasses": [
+        "S",
+        "C"
+      ],
+      "evidence": "Small reviewed application PRs;247/248 merged,249 keyboard candidate separately qualified locally.",
+      "remaining": "Finish essential Music/SharedTrack/Webex and private delivery rather than add unrelated features.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "A1",
+      "requiredOutcome": "Both websites open one shared community address with return navigation",
+      "evidenceClasses": [
+        "L",
+        "S"
+      ],
+      "evidence": "Both private entry contexts reached one address with return context; concrete entry toolkit retained.",
+      "remaining": "Receiving website integration remains staged; public navigation deliberately unpublished.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "A2",
+      "requiredOutcome": "Small “via Stalemate”/“via Rad Dad” beside names/messages and in People",
+      "evidenceClasses": [
+        "L",
+        "C"
+      ],
+      "evidence": "Source badge shown on new messages and in People in actual cross-entry checks.",
+      "remaining": "Retest remaining platforms and preserve source semantics through delivery.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "A3",
+      "requiredOutcome": "Badge can be hidden; direct, unknown and repeated source values are neutral",
+      "evidenceClasses": [
+        "L",
+        "C"
+      ],
+      "evidence": "Actual hide/show; source tests cover neutral/invalid entrance values. Earlier message badges are not retroactively erased.",
+      "remaining": "Current third-site/direct-input and privacy-boundary journey beyond the observed Mac check.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "A4",
+      "requiredOutcome": "Entry badge never establishes verified identity, band membership, room powers or staff permission",
+      "evidenceClasses": [
+        "L",
+        "C",
+        "S"
+      ],
+      "evidence": "Actual guests remained guests; entry metadata is separate from host/staff authority.",
+      "remaining": "Current real role/revocation adversarial checks; do not infer staff access from a badge.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "A5",
+      "requiredOutcome": "Audit real login providers",
+      "evidenceClasses": [
+        "L",
+        "S"
+      ],
+      "evidence": "Configured Cloudflare email-code path previously worked; latest owner-panel visit now requests fresh sign-in.",
+      "remaining": "Current real owner/moderator sign-in and account-provider audit beyond guest entry.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "A6",
+      "requiredOutcome": "Secure first-party sessions; preserve ownership and verified account linking",
+      "evidenceClasses": [
+        "C",
+        "S"
+      ],
+      "evidence": "Session/ownership/linking implementation and regression evidence retained.",
+      "remaining": "Current live ownership/linking/logout/revocation across devices.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "A7",
+      "requiredOutcome": "No cross-domain cookies, wildcard origins or copied account credentials",
+      "evidenceClasses": [
+        "C",
+        "S"
+      ],
+      "evidence": "Canonical first-party service, exact origins and preserved configuration; no copied site accounts used.",
+      "remaining": "Repeat applicable configuration comparison before later delivery; broader integration audit.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "A8",
+      "requiredOutcome": "Preserve canonical service, namespace and IDs through migration/rollback",
+      "evidenceClasses": [
+        "S"
+      ],
+      "evidence": "Completed c83 delivery compared effective configuration and stable namespace IDs against its snapshot.",
+      "remaining": "New candidate requires a fresh snapshot/rollback comparison after hold/resource gates.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "E1",
+      "requiredOutcome": "Adding a basic Join link is simple and needs no site credential",
+      "evidenceClasses": [
+        "S",
+        "C"
+      ],
+      "evidence": "Concrete allowlisted entry toolkit and hash verification; a neutral Join link needs no site credential.",
+      "remaining": "Receiving-site review/install remains staged, without publishing navigation early.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "E2",
+      "requiredOutcome": "Optional versioned integration contract with verified domains, exact registered origins, scoped permissions and revocation",
+      "evidenceClasses": [
+        "S",
+        "C"
+      ],
+      "evidence": "Optional contract/policy and exact-origin/revocation source tests; distinct from basic Join links.",
+      "remaining": "Live registered integration qualification, ownership and revocation without expanding permissions.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "E3",
+      "requiredOutcome": "A third test site reaches the same community",
+      "evidenceClasses": [
+        "C"
+      ],
+      "evidence": "Third-site fixtures/source exist; no current real third-site journey claimed.",
+      "remaining": "Observed private third-site integration into the same community.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "E4",
+      "requiredOutcome": "Integration revocation is accurate and grants no staff powers",
+      "evidenceClasses": [
+        "C",
+        "S"
+      ],
+      "evidence": "Revocation/role isolation coverage exists in controlled adapters and tests.",
+      "remaining": "Current live third-site revocation and no-staff-power verification.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "E5",
+      "requiredOutcome": "Safe public package; no repository/private-file copy or output overwrite",
+      "evidenceClasses": [
+        "S",
+        "C"
+      ],
+      "evidence": "Reviewed package: exact8-file allowlist,7 payloads and matching source/payload hashes.",
+      "remaining": "Preserve safe-output/overwrite checks and settle redistribution/license scope before external reuse.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "E6",
+      "requiredOutcome": "Federation stays outside this requirement",
+      "evidenceClasses": [
+        "S"
+      ],
+      "evidence": "Federation remains outside this scope; entry context is not federation.",
+      "remaining": "Do not substitute federation work for unfinished private-use requirements.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "D1",
+      "requiredOutcome": "Accessible retro IRC design, refined typography/navigation/presence",
+      "evidenceClasses": [
+        "L",
+        "S"
+      ],
+      "evidence": "Actual three-pane retro IRC workspace and refined phone fixtures; native screenshot retained.",
+      "remaining": "Broader newcomer/usability review, platform and assistive-technology qualification.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "D2",
+      "requiredOutcome": "Clear connection, sign-in, loading and error/retry states",
+      "evidenceClasses": [
+        "L",
+        "C",
+        "S"
+      ],
+      "evidence": "Live truthful refusal/draft states; merged247 admission and248 video-reason recovery;249 keyboard candidate.",
+      "remaining": "Guarded delivery and current live recovery for those new candidates.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "D3",
+      "requiredOutcome": "Welcoming quiet rooms, room discovery and simple creation/join/switch/leave",
+      "evidenceClasses": [
+        "L",
+        "C"
+      ],
+      "evidence": "Quiet lobby, directory, guest creation/join and host closure observed.",
+      "remaining": "Remaining activity/room recovery/host-transfer paths and uncoached newcomer use.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "D4",
+      "requiredOutcome": "Keyboard navigation and focus",
+      "evidenceClasses": [
+        "L",
+        "C"
+      ],
+      "evidence": "Actual Safari Option-Tab/PM action;249 local60 cross-engine keyboard cases passed.",
+      "remaining": "Exact-head/combined CI and delivery; physical browser/platform keyboard coverage remains scoped.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "D5",
+      "requiredOutcome": "Screen-reader behavior",
+      "evidenceClasses": [
+        "L",
+        "C",
+        "S"
+      ],
+      "evidence": "ARIA/log semantics and announcement controls exist; native member-dialog AX omission recorded.",
+      "remaining": "Actual VoiceOver/NVDA behavior and the unresolved Safari AX observation; no speech pass claimed.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "D6",
+      "requiredOutcome": "Zoom/reflow and WCAG 2.2 AA",
+      "evidenceClasses": [
+        "C",
+        "S"
+      ],
+      "evidence": "249 responsive/zoom-equivalent cases include320x256 and strict composer bounds.",
+      "remaining": "Actual browser zoom, assistive technology and full WCAG2.2AA assessment, beyond viewport fixtures.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "D7",
+      "requiredOutcome": "Reduced-motion preference",
+      "evidenceClasses": [
+        "C",
+        "S"
+      ],
+      "evidence": "Reduced-motion CSS and enabled reduced-motion fixtures retained.",
+      "remaining": "Verify remaining actual browser/OS preference behavior; no broad accessibility certification.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "D8",
+      "requiredOutcome": "375/390px screenshots, no page overflow, input/Send visible, iOS inputs 16px",
+      "evidenceClasses": [
+        "C",
+        "L"
+      ],
+      "evidence": "375/390px prejoin deployed evidence plus joined249 fixtures; 16px fields, contained composer/Send.",
+      "remaining": "Deliver249 and qualify actual phone/keyboard behavior; responsive emulation is not physical iOS.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "D9",
+      "requiredOutcome": "Starter/action rows contain themselves and text wraps",
+      "evidenceClasses": [
+        "C",
+        "S"
+      ],
+      "evidence": "Current fixture geometry/screenshots cover wrapping text and self-contained starter/action rows.",
+      "remaining": "Current delivered/physical-device checks, including unusually long text and controls.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "D10",
+      "requiredOutcome": "Cameras/microphones remain opt-in",
+      "evidenceClasses": [
+        "L",
+        "C"
+      ],
+      "evidence": "No camera/microphone started in the live chat/creative/PM checks; media remains opt-in.",
+      "remaining": "Fresh consent, stop/revoke and device checks before remaining Music/Webex trials.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "D11",
+      "requiredOutcome": "Review reused components for license and security",
+      "evidenceClasses": [
+        "S"
+      ],
+      "evidence": "Existing notices retained; no Halloy code copied by these changes. Toolkit redistribution license remains unqualified.",
+      "remaining": "Complete relevant component/license/security review; do not assume all public source is reusable.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "S1",
+      "requiredOutcome": "Measure busy lobby, fan-out, presence and abuse-control bottlenecks",
+      "evidenceClasses": [
+        "G",
+        "C"
+      ],
+      "evidence": "Controlled admission/fan-out/presence regression evidence; limits and original failures retained.",
+      "remaining": "Measured realistic hosted staging bottlenecks, not inferred from unit counts.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "S2",
+      "requiredOutcome": "Separate many-room scaling, one hot room and media limits",
+      "evidenceClasses": [
+        "G",
+        "S"
+      ],
+      "evidence": "Scale documentation separates many rooms, hot-room fan-out and media.",
+      "remaining": "Current staging measurements for each distinct dimension.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "S3",
+      "requiredOutcome": "Bounded outbound delivery and inbound/pending work",
+      "evidenceClasses": [
+        "C",
+        "S"
+      ],
+      "evidence": "Bounded transport, read/write/admission guards and failure tests retained.",
+      "remaining": "Current slow-reader/overload measurements at the intended deployment boundary.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "S4",
+      "requiredOutcome": "Staging load tiers and realistic user/message/fan-out workload",
+      "evidenceClasses": [
+        "G",
+        "S"
+      ],
+      "evidence": "Documented controlled tiers and admission/room fixtures.",
+      "remaining": "Realistic staging socket/user/message/fan-out workload under existing cost/limit holds.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "S5",
+      "requiredOutcome": "Reliability/latency targets and cost ceilings",
+      "evidenceClasses": [
+        "S"
+      ],
+      "evidence": "Existing caps and cost constraints retained; no broad SLO claim.",
+      "remaining": "Measured reliability/latency targets and account headroom at the actual intended load.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "S6",
+      "requiredOutcome": "Many rooms under load",
+      "evidenceClasses": [
+        "G",
+        "C"
+      ],
+      "evidence": "Controlled many-room fixtures remain distinct from hosted capacity.",
+      "remaining": "Current observed many-room staging load.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "S7",
+      "requiredOutcome": "Reconnect storms",
+      "evidenceClasses": [
+        "G",
+        "C"
+      ],
+      "evidence": "Reconnect-storm and recovery regressions retained.",
+      "remaining": "Current realistic staged reconnect storm and authority/recovery checks.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "S8",
+      "requiredOutcome": "Slow clients and overload behavior",
+      "evidenceClasses": [
+        "G",
+        "C"
+      ],
+      "evidence": "Controlled outbound/slow-client/admission refusals remain bounded.",
+      "remaining": "Observed staging slow-reader and overload behavior, without increasing production limits.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "S9",
+      "requiredOutcome": "Restart, hibernation and backing-service failure recovery",
+      "evidenceClasses": [
+        "G",
+        "C"
+      ],
+      "evidence": "SQLite transaction/rollback and lifetime/restart/hibernation failure coverage retained.",
+      "remaining": "Current runtime/deployed restart and backing-service failure qualification at required boundaries.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "S10",
+      "requiredOutcome": "Honest capacity claims without changing production limits or spending",
+      "evidenceClasses": [
+        "S"
+      ],
+      "evidence": "Capacity docs explicitly limit generated evidence and keep production limits/spend unchanged.",
+      "remaining": "No universal hosted150/200-user or media capacity claim until appropriate measurements exist.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "P1",
+      "requiredOutcome": "All ages supported through appropriate features and required parental-consent paths",
+      "evidenceClasses": [
+        "U",
+        "S"
+      ],
+      "evidence": "Private13+ and camera18+ guards remain; all-ages scope is preserved as unfinished.",
+      "remaining": "Appropriate feature/data eligibility and required parental-consent paths; operator/legal qualification.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "P2",
+      "requiredOutcome": "Minimize personal data; no default ID/biometrics, private-message scanning or media recording",
+      "evidenceClasses": [
+        "L",
+        "C",
+        "S"
+      ],
+      "evidence": "No ID/biometrics, PM scanning or recording introduced; live tests used synthetic text and no capture.",
+      "remaining": "Complete current data-flow, device/capture and narrow-retention verification.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "P3",
+      "requiredOutcome": "Shared report/block/mute/ban controls, not one policy per entry site",
+      "evidenceClasses": [
+        "L",
+        "C"
+      ],
+      "evidence": "Actual identity-bound PM block; host moderation/refusal; shared report/moderator source path.",
+      "remaining": "Current real report/human-review/mute/ban across entries, after fresh owner sign-in.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "P4",
+      "requiredOutcome": "Human review, appeals and honest coverage",
+      "evidenceClasses": [
+        "S"
+      ],
+      "evidence": "Review/appeal contact and honest coverage documentation retained.",
+      "remaining": "Current human review/appeal journey and operator coverage; no24/7 promise.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "P5",
+      "requiredOutcome": "Limited evidence access and no nickname-based punishment",
+      "evidenceClasses": [
+        "L",
+        "C"
+      ],
+      "evidence": "Actual exact-message peer block; source identity/role/evidence access regressions.",
+      "remaining": "Current adversarial identity reuse, restricted evidence and staff-role checks.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "P6",
+      "requiredOutcome": "Ephemeral chat with narrow lawful-preservation exceptions",
+      "evidenceClasses": [
+        "L",
+        "C",
+        "S"
+      ],
+      "evidence": "Session-only user scrollback observed; narrow evidence/storage purposes documented.",
+      "remaining": "Current retention/purge and qualified lawful-preservation assessment; no blanket legal claim.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "P7",
+      "requiredOutcome": "COPPA/child-data, exploitation reporting, intimate-image takedowns, copyright and jurisdiction assessment",
+      "evidenceClasses": [
+        "U",
+        "S"
+      ],
+      "evidence": "Operator confirmed Jeff/bandmates personally inTexas; required legal topics remain explicit.",
+      "remaining": "Qualified jurisdiction/child-data/reporting/takedown/copyright assessment for the intended service.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "P8",
+      "requiredOutcome": "Resolve applicable launch duties through qualified legal review; no blanket compliance claim",
+      "evidenceClasses": [
+        "U"
+      ],
+      "evidence": "No qualified legal launch approval or compliance claim established.",
+      "remaining": "Resolve applicable duties through qualified review; private test success is insufficient.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "P9",
+      "requiredOutcome": "AI assists humans only on disclosed eligible public content after provider/child-data readiness",
+      "evidenceClasses": [
+        "C",
+        "S"
+      ],
+      "evidence": "AI is off; disclosed eligible-public-content/human-review policy and source boundaries retained.",
+      "remaining": "Provider/child-data/operator readiness before any separately approved AI activation.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "P10",
+      "requiredOutcome": "Different storage purposes/retention documented accurately",
+      "evidenceClasses": [
+        "S",
+        "C"
+      ],
+      "evidence": "Purposes/retention are documented separately from connected-session scrollback.",
+      "remaining": "Current storage/purge/exception behavior and operator/legal review.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "V1",
+      "requiredOutcome": "Both sites' visitors exchange messages and show/hide source badges",
+      "evidenceClasses": [
+        "L"
+      ],
+      "evidence": "Observed private Stalemate/RadDad text and badge show/hide on c83.",
+      "remaining": "Remaining supported platform/newcomer qualification; public entrances remain staged.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "V2",
+      "requiredOutcome": "Ordinary visitors create/join creative rooms and collaborate",
+      "evidenceClasses": [
+        "L"
+      ],
+      "evidence": "Actual ordinary guests hosted/joined Draw/Paint/chat and collaborated.",
+      "remaining": "Current native Music/SharedTrack/Webex and other original creative/platform outcomes.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "V3",
+      "requiredOutcome": "Reporting and moderator review work across entries",
+      "evidenceClasses": [
+        "C",
+        "S"
+      ],
+      "evidence": "Earlier report-review receipts retained at their own revisions; current owner login requires email sign-in.",
+      "remaining": "Current cross-entry report and human review; no new report created while reviewer unavailable.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "V4",
+      "requiredOutcome": "Fresh-join privacy, logout/revocation and role isolation",
+      "evidenceClasses": [
+        "L",
+        "C"
+      ],
+      "evidence": "Live fresh-join privacy, guest topic denial, PM consent/block and local closed draft.",
+      "remaining": "Current live logout/revocation, account ownership and full role isolation.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "V5",
+      "requiredOutcome": "Failures/recovery are clear and truthful",
+      "evidenceClasses": [
+        "L",
+        "C",
+        "S"
+      ],
+      "evidence": "Live refusal/draft recovery;247/248 fixes merged;249 short-viewport fix tested.",
+      "remaining": "Eventual delivered-candidate failure/recovery and remaining media handoff checks.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "V6",
+      "requiredOutcome": "Mac, Windows and Linux support qualified honestly",
+      "evidenceClasses": [
+        "C",
+        "S",
+        "L"
+      ],
+      "evidence": "Four6b packages built/static-checked; actual Mac browser chat; earlier Windows transport kept historical.",
+      "remaining": "Current Windows/Linux/browser/native media roles, trust and physical devices; no native hosting equivalence claim.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "V7",
+      "requiredOutcome": "Deliver source, tests, screenshots and small PRs",
+      "evidenceClasses": [
+        "S",
+        "C",
+        "L"
+      ],
+      "evidence": "Application PRs, source-bound fixture screenshots and sanitized actual live receipt delivered.",
+      "remaining": "Finish outstanding exact-head/combined CI, PR completion and media/evidence deliverables.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "V8",
+      "requiredOutcome": "Deliver integration instructions and a clean concrete package",
+      "evidenceClasses": [
+        "S",
+        "C"
+      ],
+      "evidence": "Concrete entry toolkit, setup/support and restore/rollback guidance retained.",
+      "remaining": "Receiving-site integration review, remaining package/license/platform qualification.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "V9",
+      "requiredOutcome": "Deliver a migration/rollback plan with remaining dependencies",
+      "evidenceClasses": [
+        "S"
+      ],
+      "evidence": "Existing migration/rollback identities, configuration requirements and exact dependency stops documented.",
+      "remaining": "Fresh gated rollback readiness and effective-config preservation for any later switch.",
+      "fullRequirementCompletionClaimed": false
+    },
+    {
+      "id": "V10",
+      "requiredOutcome": "Completion requires observed application journeys and concrete integration package, with unverified work explicit",
+      "evidenceClasses": [
+        "L",
+        "S",
+        "C",
+        "G",
+        "H",
+        "U"
+      ],
+      "evidence": "Observed browser journeys and concrete package now exist; evidence layers remain distinct.",
+      "remaining": "All original outcomes still need appropriate proof; uncoached essential private band journeys remain unfinished.",
+      "fullRequirementCompletionClaimed": false
+    }
+  ]
+}
