@@ -31,3 +31,16 @@ No public entrance, deployment, configuration, cap or hold changed.
 ![Current ARM idle Art screen](arm67-art-start.png)
 
 ![Current ARM idle Music screen](arm67-music-start.png)
+
+## Current source and prepared private package
+
+The [sanitized source qualification](current-source-qualification.json) records
+website PR253, upstream WebJam PR466, exact CI/tree identities and the prepared
+70-asset private package. It also records actual current-tree application/workerd
+provider-start CI and the verified eight-file integration toolkit. These browser
+source changes do not rebuild or relabel the native `67c7ef0` archives above.
+
+The prepared site is not uploaded or admitted. The owner continuity decision for
+the missing relay-hold record remains pending; other controls remain unchanged.
+Physical Music, WAV/MP3 Shared Track mixing and Webex video/audio handoff are still
+required. Neither source CI nor an idle screenshot establishes those journeys.
