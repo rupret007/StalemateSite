@@ -107,7 +107,7 @@
 
     <main class="irc" data-app hidden>
         <h1 class="sr-only">Community chat</h1>
-        <aside class="pane rooms" data-pane="rooms" aria-label="Rooms">
+        <aside class="pane rooms" id="rooms-pane" data-pane="rooms" aria-label="Rooms">
             <button class="channel-home" type="button" data-lobby-home><b>#stalemate</b><span data-lobby-count>The main conversation</span></button>
             <section class="presence" aria-label="Lobby presence">
                 <h2 data-presence-title>Getting connected</h2>
@@ -126,7 +126,7 @@
                     <span data-creation-detail></span>
                 </div>
             </section>
-            <h2>Room directory <span class="count" data-room-count>0</span></h2>
+            <h2 data-room-directory-title tabindex="-1">Room directory <span class="count" data-room-count>0</span></h2>
             <p class="small directory-hint">Find a conversation. Make something together.</p>
             <div class="directory-controls"><label class="small"><span class="sr-only">Show</span><select data-room-filter aria-label="Room directory"><option value="active">Active now</option><option value="registered">Registered rooms</option><option value="mine">My rooms</option></select></label>
             <label class="small"><span class="sr-only">Find a room</span><input data-room-search type="search" maxlength="40" aria-label="Find a room" placeholder="Find a room…"></label></div>
@@ -134,7 +134,7 @@
             <button class="btn btn--small btn--ghost" data-owner-signout hidden>Continue as guest</button>
             <ul class="roomlist" data-roomlist></ul>
             <p class="empty" data-rooms-empty>No rooms yet. Stay for a chat, or be the first to start one.</p>
-            <h2 class="start-heading">Make room for something</h2>
+            <h2 class="start-heading" tabindex="-1">Make room for something</h2>
             <p class="small creation-hint">Pick a starting point. You’re the host.</p>
             <div class="tiles" data-tiles>
                 <button class="tile tile-chat" type="button" data-start="chat"><b aria-hidden="true">#</b><strong>Start a chat channel</strong><span>Your name. Your corner of the internet.</span></button>
@@ -148,7 +148,7 @@
             <a class="private private-invite" data-private href="../">↗ Encrypted private room</a>
         </aside>
 
-        <section class="pane chat" data-pane="chat" aria-label="Chat">
+        <section class="pane chat" id="chat-pane" data-pane="chat" aria-label="Chat">
             <nav class="tabs" data-tabs role="tablist"></nav>
             <div class="topic" data-topic></div>
             <p class="network-note" data-network-note role="status" hidden></p>
@@ -314,7 +314,7 @@
             <button class="jump-new" data-new-messages type="button" hidden>New messages ↓</button>
             <div class="pmreq" data-pmreqs></div>
             <div class="quick" data-quick>
-                <button type="button" class="startroom" data-show="rooms">＋ Start a room</button>
+                <button type="button" class="startroom" data-show="rooms" aria-controls="rooms-pane">＋ Start a room</button>
                 <button type="button" data-quick-line="🤘 SHRED">🤘</button>
                 <button type="button" data-quick-line="happy little tree 🌲">🌲</button>
                 <button type="button" data-quick-me="moshes">/me mosh</button>
@@ -334,7 +334,7 @@
             <div class="chat-status"><span data-chat-context>#stalemate</span><span title="The last 300 lines received in this channel during this session. No earlier messages are replayed.">Session scrollback · /help</span></div>
         </section>
 
-        <aside class="pane people" data-pane="people" aria-label="People">
+        <aside class="pane people" id="people-pane" data-pane="people" aria-label="People">
             <p class="eyebrow people-eyebrow">IN THIS CHANNEL</p><h2 data-people-title>People</h2>
             <ul class="nicks" data-nicks></ul>
             <label class="pmtoggle"><input type="checkbox" data-pm-off> Turn off PM requests</label>
@@ -355,9 +355,9 @@
             <div class="toast" data-toast role="status" tabindex="0" hidden></div>
         </div>
         <nav class="phonetabs" aria-label="Sections">
-            <button type="button" data-show="rooms">🎨 Rooms</button>
-            <button type="button" data-show="chat" aria-current="true">💬 Chat</button>
-            <button type="button" data-show="people">🤘 People</button>
+            <button type="button" data-show="rooms" aria-controls="rooms-pane">🎨 Rooms</button>
+            <button type="button" data-show="chat" aria-controls="chat-pane" aria-current="true">💬 Chat</button>
+            <button type="button" data-show="people" aria-controls="people-pane">🤘 People</button>
         </nav>
     </main>
 

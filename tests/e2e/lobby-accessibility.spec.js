@@ -111,6 +111,32 @@ for (const width of [375, 1440]) test(`landmarks, visible nickname label and mes
     } finally { await context.close(); }
 });
 
+for (const width of [375, 390]) test(`mobile keyboard section shortcuts focus the opened pane at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+    const visitor = await guest(browser, baseURL, `SectionFocus${width}`, { width, height: 667 });
+    const { page } = visitor;
+    try {
+        const start = page.getByRole('button', { name: /Start a room/ });
+        await tabTo(page, start);
+        await page.keyboard.press('Enter');
+        const startHeading = page.getByRole('heading', { name: 'Make room for something' });
+        await expect(startHeading).toBeFocused();
+        await expect(startHeading).toBeInViewport();
+        await page.keyboard.press(tabKey(page));
+        await expect(page.getByRole('button', { name: /Start a chat channel/ })).toBeFocused();
+        await page.screenshot({ path: testInfo.outputPath(`mobile-section-focus-${width}.png`) });
+
+        await section(page, 'people');
+        await expect(page.locator('[data-people-title]')).toBeFocused();
+        await expect(page.locator('nav [data-show="people"]')).toHaveAttribute('aria-current', 'true');
+        await section(page, 'chat');
+        await expect(page.getByRole('tab', { name: '#stalemate' })).toBeFocused();
+        await section(page, 'rooms');
+        await expect(page.getByRole('heading', { name: /^Room directory/ })).toBeFocused();
+        await expect(page.locator('nav [data-show="rooms"]')).toHaveAttribute('aria-current', 'true');
+        expect(visitor.errors).toEqual([]);
+    } finally { await visitor.close(); }
+});
+
 test('keyboard guest can join, recover a named-room error, chat, navigate tabs and leave host dialogs', async ({ browser, baseURL }, testInfo) => {
     const visitor = await guest(browser, baseURL, 'KeyboardVisitor', { width: 1280, height: 900 });
     const { page } = visitor;

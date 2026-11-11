@@ -28,7 +28,8 @@ button, input, select { font: inherit; }
 button, summary { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .45; }
 button, input, select { border-radius: 4px; }
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, .toast:focus-visible, [data-people-title]:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, .toast:focus-visible,
+.rooms h2[tabindex="-1"]:focus-visible, [data-people-title]:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
 ::selection { background: var(--lime); color: var(--ink); }
 a { color: var(--blue); text-underline-offset: 3px; }
 h1, h2, h3, p { margin-top: 0; }
@@ -107,6 +108,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .presence h2 { margin: 0 0 5px; font-size: 12px; color: var(--cream); font-weight: 550; }
 .presence p { margin: 0; font-size: 11px; line-height: 1.65; color: var(--muted); }
 .rooms > h2 { display: flex; justify-content: space-between; align-items: center; margin: 0 0 8px; font: 600 10px var(--mono); text-transform: uppercase; letter-spacing: .09em; }
+.rooms h2[tabindex="-1"] { scroll-margin-block: 6px; }
 .count { display: inline-grid; place-items: center; min-width: 21px; min-height: 19px; padding: 1px 5px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); font: 10px var(--mono); }
 .directory-hint { margin: 0 0 12px; font-size: 11px; }
 .directory-controls { display: grid; grid-template-columns: 1fr; gap: 7px; }

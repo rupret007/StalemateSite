@@ -1353,10 +1353,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         app.pendingRoomJoin = '';
         cmd('join', [room]);
     }
-    function focusChannelTab(key) {
+    function focusChannelTab(key, { preventScroll = true } = {}) {
         const tab = $$('[data-tabs] [data-channel-key]').find(tab => tab.dataset.channelKey === key);
-        tab?.focus({ preventScroll: true });
-        if (document.activeElement !== tab) $('.phonetabs [aria-current="true"]')?.focus({ preventScroll: true });
+        tab?.focus({ preventScroll });
+        if (document.activeElement !== tab) $('.phonetabs [aria-current="true"]')?.focus({ preventScroll });
     }
     function readGameReturn() {
         let saved = gameReturn;
@@ -2387,11 +2387,21 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         } else clearJamInviteQr();
     });
 
+    const sectionButtons = $$('.phonetabs [data-show]');
     function show(pane) {
         document.body.dataset.show = pane;
-        $$('[data-show]').forEach((b) => (b.dataset.show === pane ? b.setAttribute('aria-current', 'true') : b.removeAttribute('aria-current')));
+        sectionButtons.forEach((b) => (b.dataset.show === pane ? b.setAttribute('aria-current', 'true') : b.removeAttribute('aria-current')));
     }
-    $$('[data-show]').forEach((b) => b.addEventListener('click', () => show(b.dataset.show)));
+    sectionButtons.forEach((button) => button.addEventListener('click', () => {
+        const pane = button.dataset.show;
+        show(pane);
+        if (pane === 'chat') focusChannelTab(app.active, { preventScroll: false });
+        else $(pane === 'rooms' ? '[data-room-directory-title]' : '[data-people-title]').focus();
+    }));
+    $('.startroom').addEventListener('click', () => {
+        show('rooms');
+        $('.start-heading').focus();
+    });
     show('chat');
 
     let toastTimer, toastDuration = 4000;
