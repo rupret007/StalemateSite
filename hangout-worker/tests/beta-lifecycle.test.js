@@ -99,6 +99,23 @@ beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-19T03:
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('beta session revocation across private rooms and lobby', () => {
+    it.each([false, true])('delivers a fresh device token and preserves its identity on reconnect (inline: %s)', async (inline) => {
+        const h = harness(), visitor = await guest(h);
+        const path = `/lobby?preview=${PREVIEW}${inline ? '&device-in-hello=1' : ''}`;
+        const connect = async (url) => {
+            const response = await betaFetch(request(url, { cookie: visitor.cookie, upgrade: true }), h.env);
+            expect(response.status).toBe(101);
+            return h.lobbyState.getWebSockets().at(-1);
+        };
+        const fresh = await connect(path);
+        expect(fresh.frames.map(({ t }) => t)).toEqual(inline ? ['hello'] : ['device', 'hello']);
+        const token = inline ? fresh.frames[0].deviceToken : fresh.frames[0].token;
+        expect(typeof token).toBe('string');
+        const remembered = await connect(`${path}&dev=${encodeURIComponent(token)}`);
+        expect(remembered.frames.map(({ t }) => t)).toEqual(['hello']);
+        expect(remembered.frames[0]).not.toHaveProperty('deviceToken');
+        expect(remembered.deserializeAttachment().dev).toBe(fresh.deserializeAttachment().dev);
+    });
     it('closes every registered room and lobby socket, preserves another visitor, and rejects copied cookies', async () => {
         const h = harness(), a = await guest(h), b = await guest(h);
         const lobby = await betaFetch(request(`/lobby?preview=${PREVIEW}`, { cookie: a.cookie, upgrade: true }), h.env);
