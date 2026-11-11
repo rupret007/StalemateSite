@@ -178,7 +178,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await player.locator('[data-send]').tap();
         await expect(host.getByRole('log', { name: 'Conversation' }).getByRole('listitem')
             .filter({ hasText: 'Meet me at the chess board' })).toBeVisible();
-        if (media && !relay) await verifyTransportRecovery(host, player, matches, calls);
+        if (media && !relay) {
+            await verifyTransportRecovery(host, player, matches, calls);
+            await player.goto(link.href);
+            await enterFromShell(player, 'LinkGuest', true);
+            await expectRefusal();
+            console.log('Passed Chromium kicked guest cannot reuse the old Game Night link.');
+        }
         console.log(`Passed ${engine} protected Game Night launch, invite-only room link, stale instance refusal, shared Chess move and chat.`);
     }
     async function verifyTransportRecovery(host, player, matches, calls) {
@@ -223,8 +229,24 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await waitForPackets(player, 'audio');
         assert.equal(calls.length, 2);
         assert.deepEqual(await player.evaluate(() => window.testLocalTracks.map(track => track.readyState)), ['ended']);
-        for (const page of [player, host]) await page.getByRole('button', { name: 'Leave call', exact: true }).click();
         console.log('Passed Chromium separate match and call connection failures, same Chess seat, continued chat and explicit receive-only call rejoin.');
+
+        await player.getByRole('button', { name: 'Unmute mic' }).click();
+        await expect(player.getByRole('button', { name: 'Mute mic' })).toBeVisible();
+        await host.getByRole('button', { name: 'Allow room cameras' }).click();
+        await player.getByLabel('I am 18 or older').check();
+        await player.getByRole('button', { name: 'Turn camera on' }).click();
+        await waitForPackets(host, 'video');
+        await host.getByRole('button', { name: 'Actions for LinkGuest' }).click();
+        await host.locator('[data-sheet]').getByRole('button', { name: 'Kick', exact: true }).click();
+        await expect(player.locator('[data-game-night]')).toBeHidden();
+        await expect(player.locator('[data-connection]')).toHaveText('Connected');
+        await expect.poll(() => player.evaluate(() => window.testLocalTracks.map(track => track.readyState)))
+            .toEqual(['ended', 'ended', 'ended']);
+        await expect(host.locator('[data-call-peers] li')).toHaveCount(0);
+        await expect(host.getByRole('button', { name: 'Open Chess match' })).toBeVisible();
+        await host.getByRole('button', { name: 'Leave call', exact: true }).click();
+        console.log('Passed Chromium host room revocation retires the Chess seat and stops guest microphone and camera capture.');
     }
     async function moveByKeyboard(page, from, arrow, count) {
         await page.locator(`[data-square="${from}"]`).focus();
