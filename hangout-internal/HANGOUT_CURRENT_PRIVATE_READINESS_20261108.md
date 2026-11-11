@@ -165,18 +165,48 @@ redistribution-license qualification remains explicitly unfinished.
    passed. The Mini still selects AE49. Qualify the Apple Silicon replacement
    after its archive, trust and resource checks. Keep the previous shortcuts
    and settings available for rollback.
-2. Use one Mac native Music host and one Windows Chrome guest for at most ten
-   minutes, with participant consent, headphones and no recording. The host
-   chooses **Music → Host**, then **Copy browser invite** in the browser guest
-   panel. In Hang Out, the host opens **Rooms → Jam (WebJam)**, invites the guest
-   into the room, pastes the browser link and clicks **Share**. The guest chooses
-   **Join in browser**, runs **Check microphone**, selects their interface if the
-   **Microphone** picker appears, confirms headphones, then selects **Join with
-   microphone**. If the link expires, the host shares a
-   fresh link. Verify speech and music both ways, leave/rejoin and cleanup.
-   Qualify Intel and Apple Silicon hosts separately. The Windows browser
-   participant uses Chrome and their interface.
-3. Through the desktop Shared Track sender, load **Original Test Chords.wav**,
+2. Before hosting or copying an invite, connect the dock Ethernet and SSL 2+.
+   Plug the guitar pedal into SSL input 1, the vocal mic into input 2 and wired
+   headphones into the SSL. With Music idle, open macOS **Audio MIDI Setup**.
+   In **Audio Devices**, select the **SSL 2+** and confirm **Format** is
+   **48,000 Hz** for input and output. The last idle MacBook check saw the SSL
+   at 44.1 kHz. If needed, change it to 48,000 Hz and recheck before hosting.
+   [Apple audio device setup](https://support.apple.com/guide/audio-midi-setup/ams59f301fda/mac)
+
+3. Use one Mac native Music host and one Windows Chrome guest for at most ten
+   minutes, with participant consent, headphones and no recording. First get
+   both people into the same Jam room in Hang Out. The host can create one
+   through **Rooms → Jam (WebJam)**. Use **Invite bandmate to room** when it
+   appears, or have Che choose the room from **Rooms**.
+   Have Che connect the Roland drums to his interface and check that Windows
+   sees the input.
+
+   On the Mac, choose **Music → Host**. Once Jamulus opens, choose
+   **Settings → Audio/Network Settings** in Jamulus. Select the SSL 2+ and
+   map the guitar and vocal to separate input slots. Start both hardware gains
+   low. **Mono-in / Stereo-out** combines both inputs into a centered mix.
+   **Stereo** can keep them left and right in one participant stream. Che hears
+   the session mix in Chrome and the host sets the guitar-to-vocal balance.
+   [Jamulus input controls](https://jamulus.app/wiki/Software-Manual#input-balance) · [Jamulus input mix](https://github.com/jamulussoftware/jamulus/blob/r3_12_2/src/client.cpp#L1342-L1390) · [Browser audio bridge](https://github.com/rupret007/webjam/blob/93497494dd0057a05282033b4208721b6061097c/docs/web-join-bridge.md#L17-L20)
+
+   In WebJam, choose **Copy browser invite**. Paste the fresh link into the Jam
+   room and click **Share**. On Windows, choose **Join in browser**, run
+   **Check microphone**, select the interface if the **Microphone** picker
+   appears, confirm headphones
+   and choose **Join with microphone**. Have Che listen to guitar alone, vocal
+   alone, then both together. Adjust the SSL gains or Jamulus **Input Balance**
+   if needed. Then confirm Jeff hears Che’s drums. Verify speech and music both
+   ways, leave/rejoin and cleanly end the session. If the link expires, the
+   host shares a fresh one.
+
+   Qualify Intel and Apple Silicon hosts separately. Note whether the browser
+   shows **Direct connection**, **Relayed connection**, or no route label.
+   Web Join prefers direct and can fall back to TURN. Repeat on a second
+   network and note Wi-Fi or Ethernet for each run. The browser’s delay
+   estimate covers the network and playback, with capture and the host
+   bridge outside the estimate.
+   [Browser connection setup](https://github.com/rupret007/webjam/blob/6e26c693c7d8b0160d8a9ea3434954df526e81bd/web/join/session.js#L55-L60)
+4. Through the desktop Shared Track sender, load **Original Test Chords.wav**,
    then **Original Test Chords.mp3**. Matching copies of both 40-second stereo
    48 kHz files are staged on both Macs. Keep the primary microphone and
    headphones on the physical route and verify the separate existing
@@ -186,7 +216,7 @@ redistribution-license qualification remains explicitly unfinished.
    The current sender backend is Mac-only; Windows/Linux cannot send Shared Track
    until their routing isolation is qualified. A Windows browser guest can be the
    listening/playing participant; that full Mac-host-to-Windows mix is still pending.
-4. The Mini has the Webex app and a saved Personal Room link that passes
+5. The Mini has the Webex app and a saved Personal Room link that passes
    validation. The Intel Mac has no saved link, and Webex was absent from its
    standard application folders. Use the normal setup or joining flow for the
    test. Verify real Webex join, video, leave and Music→conversation→Music.
@@ -196,23 +226,6 @@ redistribution-license qualification remains explicitly unfinished.
    to disconnect audio and verify the handoff with both participants.
    Disconnect meeting audio at both ends before Music. Leave/end Music before
    connecting meeting audio. Microphone or monitor mute alone is insufficient.
-5. On the Mac, open **More → Audio Settings in Jamulus**, select the SSL 2+
-   and check that the guitar and vocal mic are mapped to different inputs. Set
-   both input gains low to start. Have Che listen to guitar alone, vocal alone,
-   then both together. Set the relative levels on the SSL 2+ or use Jamulus
-   **Input Balance**. [Jamulus input controls](https://jamulus.app/wiki/Software-Manual#input-balance)
-
-   Jamulus owns the host's saved device and channel settings. In **Mono-in / Stereo-out**
-   it combines the two mapped inputs before sending them. In **Stereo** the
-   inputs can remain left and right within one participant. The browser receives
-   one stereo session mix without separate guitar and vocal faders. Confirm the
-   saved mode and actual sound at rehearsal. [Native profile](https://github.com/rupret007/webjam/blob/93497494dd0057a05282033b4208721b6061097c/core/jamulus_profile.py#L490-L498) · [Jamulus input mix](https://github.com/jamulussoftware/jamulus/blob/r3_12_2/src/client.cpp#L1342-L1390) · [Browser audio bridge](https://github.com/rupret007/webjam/blob/93497494dd0057a05282033b4208721b6061097c/docs/web-join-bridge.md#L17-L20)
-
-   Then have Jeff confirm Che's drum input. Record Wi-Fi, dock Ethernet and a
-   second-network test separately. Web Join prefers a direct connection and can
-   fall back to TURN. Record the selected route from the browser after joining
-   on each network. Browser delay omits parts of the capture and bridge path.
-   [Browser connection setup](https://github.com/rupret007/webjam/blob/6e26c693c7d8b0160d8a9ea3434954df526e81bd/web/join/session.js#L55-L60)
 
 For a newcomer, send the community invitation privately. The fresh Music link
 is a separate, short-lived invitation created by the host. Never put either code
