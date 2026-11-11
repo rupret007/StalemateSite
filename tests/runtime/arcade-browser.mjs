@@ -272,17 +272,23 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 bytesSent: pair?.bytesSent, bytesReceived: pair?.bytesReceived, rttMs: pair?.currentRoundTripTime * 1000 };
         });
     }
-    function packetCount(page, kind) {
+    function packetCounts(page, kind) {
         return page.evaluate(async expected => {
-            const pc = window.testPeers.findLast(peer => peer.connectionState !== 'closed');
-            if (!pc) return 0;
-            const stats = await pc.getStats();
-            return [...stats.values()].filter(stat => stat.type === 'inbound-rtp' && stat.kind === expected)
-                .reduce((total, stat) => total + stat.packetsReceived, 0);
+            const active = window.testPeers.filter(peer => peer.connectionState !== 'closed');
+            return Promise.all(active.map(async peer => {
+                const stats = await peer.getStats();
+                return [...stats.values()].filter(stat => stat.type === 'inbound-rtp' && stat.kind === expected)
+                    .reduce((total, stat) => total + stat.packetsReceived, 0);
+            }));
         }, kind);
     }
+    async function packetCount(page, kind) { return (await packetCounts(page, kind)).at(-1) ?? 0; }
     async function waitForPackets(page, kind, after = 5) {
         await expect.poll(() => packetCount(page, kind)).toBeGreaterThan(after);
+    }
+    async function expectOriginalPeer(page) {
+        assert.deepEqual(await page.evaluate(() => window.testPeers.flatMap((peer, index) =>
+            peer.connectionState === 'closed' ? [] : [index])), [0]);
     }
     async function submitCallReport(page, reason, capture = false) {
         const dialog = page.getByRole('dialog', { name: 'Report call participant' });
@@ -332,7 +338,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(b.locator('[data-eights-score="a"]')).toContainText(`${await aCards.count()} cards`);
         if (media) {
             await waitForPackets(b, 'audio', before);
-            assert.equal(await b.evaluate(() => window.testPeers.length), 1);
+            await expectOriginalPeer(b);
         } else {
             const hand = await bCards.evaluateAll(buttons => buttons.map(button => button.dataset.eightsCard));
             await b.reload();
@@ -399,7 +405,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(a.getByRole('button', { name: `Take ${discarded}`, exact: true })).toBeEnabled();
         if (media) {
             await waitForPackets(b, 'audio', before);
-            assert.equal(await b.evaluate(() => window.testPeers.length), 1);
+            await expectOriginalPeer(b);
         }
         await b.locator('[data-rummy-action="resign"]').click();
         await b.getByRole('dialog', { name: 'Resign this match?' }).getByRole('button', { name: 'Resign', exact: true }).click();
@@ -422,6 +428,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await inviteToGame(a, north, 'SpadesNorth');
         await inviteToGame(a, east, 'SpadesEast');
         const players = [a, b, north, east];
+        const groupCall = media && !relay;
         for (const page of players) {
             await expect(page.locator('[data-arcade-game] option[value="turdspades"]')).toBeEnabled();
             await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdspades');
@@ -447,6 +454,11 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             }
             throw error;
         }
+        let audioBeforeTrick;
+        if (groupCall) {
+            await joinSpadesCall(players);
+            audioBeforeTrick = await Promise.all(players.map(page => packetCounts(page, 'audio')));
+        }
         await b.getByLabel('Your bid').selectOption('0');
         for (const page of [b, north, east, a]) await page.getByRole('button', { name: 'Lock bid' }).click();
         await expect(a.locator('[data-spades-trick]')).toContainText('West · Nil');
@@ -467,9 +479,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         for (const page of [north, east, a]) await page.locator('[data-spades-card]:enabled').first().click();
         await expect(a.locator('[data-spades-status]')).toContainText('won the last trick');
-        if (media) {
+        if (media && !groupCall) {
             await waitForPackets(b, 'audio', before);
-            assert.equal(await b.evaluate(() => window.testPeers.length), 1);
+            await expectOriginalPeer(b);
         }
         await b.locator('[data-spades-action="resign"]').click();
         await b.getByRole('dialog', { name: 'Resign for your team?' }).getByRole('button', { name: 'Resign', exact: true }).click();
@@ -480,6 +492,22 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await east.getByRole('button', { name: 'Accept Spades rematch' }).click();
         await expect(b.locator('[data-spades-status]')).toContainText('Round 1 · Your bid');
         await expect(b.locator('[data-spades-card]')).toHaveCount(13);
+        if (groupCall) {
+            for (const [index, page] of players.entries()) {
+                await expect.poll(async () => (await packetCounts(page, 'audio'))
+                    .map((count, peer) => count > audioBeforeTrick[index][peer])).toEqual([true, true, true]);
+            }
+            for (const page of [east, north]) {
+                await page.locator('[data-call-toggle]').click();
+                await page.getByRole('button', { name: 'Leave call', exact: true }).click();
+                assert.ok(await page.evaluate(() => window.testLocalTracks.every(track => track.readyState === 'ended')));
+            }
+            for (const page of [a, b]) {
+                await expect(page.locator('[data-call-peers] li')).toHaveCount(1);
+                await expectOriginalPeer(page);
+            }
+            console.log('Passed Chromium four-player Spades trick and rematch during a shared call, all 12 audio paths, camera delivery to three peers and cleanup on leave.');
+        }
         if (evidence) {
             await mkdir(evidence, { recursive: true });
             await a.screenshot({ path: join(evidence, `spades-${engine}-desktop.png`) });
@@ -487,6 +515,28 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         console.log(`Passed ${engine} TurdSpades four independent guests, bidding, a complete trick, ${media ? 'same call during a game switch' : 'full reload mid-trick'}, and unanimous rematch.`);
         return north;
+    }
+    async function joinSpadesCall([host, west, north, east]) {
+        for (const page of [north, east]) {
+            await page.getByRole('button', { name: 'Call', exact: true }).click();
+            await page.getByRole('button', { name: 'Join call', exact: true }).click();
+            await expect(page.locator('[data-call-toggle]')).toHaveText('Call joined');
+            assert.deepEqual(await page.evaluate(() => window.testLocalTracks.map(track => track.kind)), []);
+            await page.getByRole('button', { name: 'Unmute mic' }).click();
+            await expect(page.getByRole('button', { name: 'Mute mic' })).toBeVisible();
+        }
+        for (const page of [host, west, north, east]) {
+            await expect(page.locator('[data-call-peers] li')).toHaveCount(3);
+            await expect.poll(async () => (await packetCounts(page, 'audio')).map(count => count > 5)).toEqual([true, true, true]);
+        }
+        await host.locator('[data-call-toggle]').click();
+        await host.getByRole('button', { name: 'Allow room cameras' }).click();
+        await east.getByLabel('I am 18 or older').check();
+        await east.getByRole('button', { name: 'Turn camera on' }).click();
+        for (const page of [host, west, north]) {
+            await expect.poll(async () => (await packetCounts(page, 'video')).filter(count => count > 5).length).toBe(1);
+        }
+        for (const page of [host, north, east]) await page.locator('[data-call-toggle]').click();
     }
     async function playJack(a, b, spectator) {
         const before = media ? await packetCount(b, 'audio') : 0;
@@ -548,7 +598,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(spectator.locator('[data-jack-players] li').nth(1)).toContainText(/20 chips · (Win|Loss|Blackjack|Push)/);
         if (media) {
             await waitForPackets(b, 'audio', before);
-            assert.equal(await b.evaluate(() => window.testPeers.length), 1);
+            await expectOriginalPeer(b);
         }
         await a.getByRole('button', { name: 'Next round' }).click();
         await expect(b.locator('[data-jack-status]')).toContainText('Round 2');
@@ -622,7 +672,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(score(b)).toContainText(/· [1-9]\d* pts/);
         if (media) {
             await waitForPackets(b, 'audio', before);
-            assert.equal(await b.evaluate(() => window.testPeers.length), 1);
+            await expectOriginalPeer(b);
         } else {
             const recorded = await score(b).textContent();
             await b.reload();
@@ -740,7 +790,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         if (media) {
             await waitForPackets(b, 'audio', before);
-            assert.equal(await b.evaluate(() => window.testPeers.length), 1);
+            await expectOriginalPeer(b);
         }
         await a.getByRole('button', { name: 'Request Turdomania rematch' }).click();
         await b.getByRole('button', { name: 'Accept Turdomania rematch' }).click();
@@ -845,7 +895,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         if (media) {
             await waitForPackets(b, 'audio', before);
-            assert.equal(await b.evaluate(() => window.testPeers.length), 1);
+            await expectOriginalPeer(b);
         }
         await a.getByRole('button', { name: 'Request Turd Rush rematch' }).click();
         await b.getByRole('button', { name: 'Accept Turd Rush rematch' }).click();
@@ -940,7 +990,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(match(b)).toHaveAttribute('data-sequence', '0');
         if (media) {
             await waitForPackets(b, 'audio', before);
-            assert.equal(await b.evaluate(() => window.testPeers.length), 1);
+            await expectOriginalPeer(b);
         }
         console.log(`Passed ${engine} Turdanoid same wall, keyboard launch, ${media ? 'native phone drag with 220 ms delay and active call' : 'native phone tap and full reload'}, visible paddle and Launch, both scores, spectator and rematch.`);
     }
@@ -984,7 +1034,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         if (media) {
             await expect(b.locator('[data-call-toggle]')).toHaveText('Call joined');
             await waitForPackets(b, 'audio', beforeSwitch);
-            assert.equal(await b.evaluate(() => window.testPeers.length), 1);
+            await expectOriginalPeer(b);
         }
         await b.locator('[data-text]').fill('Back at the same board');
         await b.locator('[data-send]').click();
