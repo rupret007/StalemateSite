@@ -9,7 +9,8 @@
         bobross: Object.freeze({ label: 'Bob Ross paint-along', description: 'Watch and paint on a shared canvas. Camera optional.' }),
         watch: Object.freeze({ label: 'Watch together', description: 'Share a YouTube video and chat. Camera optional.' }),
         art: Object.freeze({ label: 'Draw together', description: 'Make something on a shared canvas. Camera optional.' }),
-        jam: Object.freeze({ label: 'Jam together', description: 'Meet musicians and share a WebJam invite. Audio needs a host and a supported WebJam setup.' })
+        jam: Object.freeze({ label: 'Jam together', description: 'Meet musicians and share a WebJam invite. Audio needs a host and a supported WebJam setup.' }),
+        game: Object.freeze({ label: 'Game Night', description: 'An invite-only room to play games and hang out.' })
     });
     const ROOM_NAME = /^#[a-z0-9-]{2,30}$/i;
     const NICK = /^[A-Za-z][A-Za-z0-9_\-[\]{}^`|]{2,19}$/;

@@ -12,7 +12,7 @@ async function community(browser, baseURL) {
     const { createLobby } = await import('../../hangout-worker/src/lobby-core.mjs');
     const contexts = [], sockets = new Map(), identities = new Map(), inbound = [], held = new Map();
     let at = 1800000000000, serial = 0;
-    const engine = createLobby({ now: () => at, send: (id, frame) => {
+    const engine = createLobby({ gameNight: true, now: () => at, send: (id, frame) => {
         // Freeze the real engine's frame now, and delay the entire connection's
         // outbound stream in FIFO order. Never let later frames overtake it.
         const raw = JSON.stringify(frame), queue = held.get(id);
@@ -332,4 +332,60 @@ test('replacement, clear, room changes and disconnect suppress delayed clipboard
         await expect(guest.locator('[data-connection]')).toHaveText('Offline');
         await guest.evaluate(() => window.rejectClipboard()); await cleared(guest);
     } finally { await f.close(); }
+});
+
+test('Game Night invites players, publishes a Discord handoff and keeps chat usable on phones', async ({ browser, baseURL }, testInfo) => {
+    const fixture = await community(browser, baseURL);
+    const link = 'https://discord.gg/GameNightFixture';
+    try {
+        const host = await fixture.visitor('GameHost', { width: 1280, height: 850 });
+        const guest = await fixture.visitor('GameGuest', { width: 390, height: 844 });
+        const discordRequests = [];
+        await guest.context().route(link, route => {
+            discordRequests.push(route.request().headers().referer);
+            return route.fulfill({ body: 'Synthetic Discord destination' });
+        });
+        await host.getByRole('button', { name: /Game Night/ }).click();
+        await host.getByRole('region', { name: /Game Night/ }).getByRole('button', { name: 'Invite players' }).click();
+        await host.locator('[data-invite-options]').selectOption({ label: 'GameGuest' });
+        await host.locator('[data-invite-person-send]').click();
+        await guest.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
+        const panel = guest.getByRole('region', { name: /Game Night/ });
+        const open = panel.getByRole('link', { name: 'Open Discord call' });
+        await expect(panel).toBeVisible();
+        await expect(panel.getByRole('link', { name: 'Open Stalemate Arcade' })).toHaveAttribute('href', 'https://stalemate.band/play/');
+        await expect(open).toHaveCount(0);
+        await expect(panel.getByText('Manage Discord link')).toBeHidden();
+        await expect(guest.locator('[data-cam]')).toBeHidden();
+
+        await host.getByText('Manage Discord link').click();
+        const input = host.getByLabel('Discord invite or voice channel link');
+        await input.fill('https://discord.gg.invalid/example');
+        await host.getByRole('button', { name: 'Share link' }).click();
+        await expect(host.locator('[data-game-error]')).toContainText('Paste a Discord invite');
+        await input.fill(link);
+        await host.getByRole('button', { name: 'Share link' }).click();
+        await expect(open).toHaveAttribute('href', link);
+        await expect(open).toHaveAttribute('target', '_blank');
+        await expect(open).toHaveAttribute('referrerpolicy', 'no-referrer');
+        expect(discordRequests).toHaveLength(0);
+        const [popup] = await Promise.all([guest.waitForEvent('popup'), open.click()]);
+        await expect(popup.locator('body')).toHaveText('Synthetic Discord destination');
+        expect(discordRequests).toEqual([undefined]);
+        await popup.close();
+        for (const width of [390, 375]) {
+            await guest.setViewportSize({ width, height: 844 });
+            await expect(guest.locator('[data-send]')).toBeInViewport();
+            expect(await guest.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+            await guest.screenshot({ path: testInfo.outputPath(`game-night-${width}.png`), animations: 'disabled' });
+        }
+
+        await guest.locator('[data-text]').fill('Anyone up for a round?');
+        await guest.locator('[data-send]').click();
+        await expect(host.locator('[data-chat-lines]')).toContainText('Anyone up for a round?');
+        await host.getByRole('button', { name: 'Remove link' }).click();
+        await expect(guest.locator('[data-game-open]')).not.toHaveAttribute('href', /./);
+    } finally {
+        await fixture.close();
+    }
 });

@@ -4,6 +4,7 @@ import { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams
 import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
 import { createIdleHeartbeat } from './idle-heartbeat.mjs';
+import { discordCallLink, gameNightRoomName } from './game-night.mjs';
 (() => {
     'use strict';
     const $ = (s, el = document) => el.querySelector(s);
@@ -76,8 +77,8 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
     // GoatCounter: fixed, privacy-safe event names only (no nicks, no room names, no query string).
     const count = (event) => { try { if (window.goatcounter && window.goatcounter.count) window.goatcounter.count({ path: `hangout-${event}`, title: 'Hang Out', event: true, referrer: '' }); } catch (e) { /* analytics never breaks chat */ } };
     count('lobby-view');
-    const KIND_ICON = { lobby: '#', chat: '#', bobross: '🎨', watch: '📺', art: '🖌️', jam: '🎸' };
-    const KIND_NAME = { chat: 'Chat channel', bobross: 'Bob Ross paint-along', watch: 'Watch together', art: 'Draw together', jam: 'Jam' };
+    const KIND_ICON = { lobby: '#', chat: '#', bobross: '🎨', watch: '📺', art: '🖌️', jam: '🎸', game: '🎮' };
+    const KIND_NAME = { chat: 'Chat channel', bobross: 'Bob Ross paint-along', watch: 'Watch together', art: 'Draw together', jam: 'Jam', game: 'Game Night' };
     const WORDS = ['happy', 'little', 'gross', 'loud', 'feral', 'fuzzy', 'mighty', 'snotty', 'rad', 'grumpy', 'soggy', 'mosh'];
     const THINGS = ['tree', 'cloud', 'possum', 'riff', 'taco', 'goat', 'ghost', 'drip', 'squirrel', 'pickle', 'van', 'amp'];
     const pick = (a) => a[Math.floor(Math.random() * a.length)];
@@ -302,6 +303,7 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
     // onLeave invalidates capture/room generations as well as live tracks/PCs.
     function pauseLocalMedia() {
         app.localMediaPaused = true;
+        clearGameLinks();
         clearJamInvitations();
         if (roomApi) roomApi.onLeave();
         $('[data-activity]').hidden = true; $('[data-jam]').hidden = true; $('[data-cam]').hidden = true;
@@ -456,6 +458,7 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
     let jamContext = null;
     let pendingJamShare = null;
     let jamShareResultsSupported = false, jamShareTimer;
+    let gameNightSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
     function stopLocalCamera(channel) {
         const c = app.chans.get(channel);
         if (!c) return false;
@@ -559,7 +562,7 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
     let connectionAttempt = 0;
     function setConnection(state) {
         connectionState = state;
-        if (state !== 'connected') { clearJamInvitations(); if (pendingKeep) clearKeep(pendingKeep.stage === 'submitted' ? 'Keeping this room was not confirmed. Check Host tools after reconnecting.' : 'Your room return was interrupted. Nothing was kept.'); }
+        if (state !== 'connected') { clearGameLinks(); clearJamInvitations(); if (pendingKeep) clearKeep(pendingKeep.stage === 'submitted' ? 'Keeping this room was not confirmed. Check Host tools after reconnecting.' : 'Your room return was interrupted. Nothing was kept.'); }
         const label = { offline: 'Offline', connecting: 'Connecting…', reconnecting: 'Reconnecting…', connected: 'Connected', ended: 'Session ended' }[state];
         $('[data-connection]').textContent = label;
         $('[data-connection]').dataset.state = state;
@@ -874,6 +877,10 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
             endedPmLabel = null;
             messageResultsSupported = m.features?.messageResults === 1;
             jamShareResultsSupported = m.features?.jamShareResults === 1;
+            gameNightSupported = m.features?.gameNight === 1;
+            discordLinksSupported = m.features?.discordLinks === true;
+            shieldActive = m.shield === true;
+            $('[data-start="game"]').hidden = !gameNightSupported;
             entrySourcesSupported = m.features?.entrySources === 1;
             privateMessageContextSupported = m.features?.privateMessageContext === 1;
             privateMessagePeersSupported = m.features?.privateMessagePeers === 1;
@@ -1033,6 +1040,7 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
             app.kicked = m.ch === '#stalemate';
             toast(`${m.banned ? 'Banned' : 'Kicked'} from ${m.ch} by ${m.by}: ${m.reason}`);
             if (app.kicked) {
+                clearGameLinks();
                 clearJamInvitations();
                 $('[data-gate]').hidden = false; $('[data-app]').hidden = true; gateStatus(`You got the boot (${m.reason}). Take a breather.`);
             } else {
@@ -1052,7 +1060,10 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
             break;
         }
         case 'cam-gate': if (!app.localMediaPaused) $('[data-cam-gate]').showModal(); break;
-        case 'net': app.netLock = m.lock; drawCommunity(); if (m.shield) toast('🛡️ Shield’s up: slow mode, cameras off for a bit.'); break;
+        case 'net':
+            app.netLock = m.lock; shieldActive = m.shield === true;
+            if (shieldActive) clearGameLinks(); else drawGameNight();
+            drawCommunity(); if (m.shield) toast('🛡️ Shield’s up: slow mode, cameras off for a bit.'); break;
         case 'modlog': m.entries.forEach((e) => line(app.active, { notice: true, from: 'log', text: `${new Date(e.at).toLocaleTimeString()} ${e.by} ${e.action} ${e.target} ${e.reason}` })); break;
         default: break;
         }
@@ -1340,6 +1351,62 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
                 window.open(context.web, '_blank', 'noopener,noreferrer');
         };
     }
+    function currentGameNight() {
+        const c = app.chans.get(app.active);
+        return gameNightSupported && connectionState === 'connected' && !app.sharingStopped && !app.localMediaPaused
+            && c?.kind === 'game' && c.names?.some(member => member.id === app.selfId) ? c : null;
+    }
+    function clearGameLinks() {
+        for (const c of app.chans.values()) if (c.kind === 'game') c.gameCall = '';
+        drawGameNight();
+    }
+    function drawGameNight() {
+        const c = currentGameNight();
+        const canCall = discordLinksSupported && !shieldActive;
+        const canManage = c && canCall && amOp(c) && roomNonce(c.keepRef);
+        const editor = $('[data-game-editor]');
+        if (gameEditorRoom !== (canManage ? c : null)) {
+            gameEditorRoom = canManage ? c : null;
+            editor.open = false;
+            $('[data-game-form]').reset();
+            $('[data-game-error]').textContent = '';
+        }
+        const link = canCall ? discordCallLink(c?.gameCall) : '';
+        const input = $('[data-game-link]');
+        if (canManage && link && discordCallLink(input.value) === link) input.value = '';
+        const open = $('[data-game-open]');
+        if (link) open.href = link; else open.removeAttribute('href');
+        open.hidden = !link;
+        const status = $('[data-game-call-status]');
+        const guidance = !c ? '' : link ? 'Voice and video open in Discord. Hang Out chat stays here.'
+            : canCall ? 'Voice and video are optional. A host can share a Discord call link.' : 'Discord calls are unavailable in this session. You can still play and chat.';
+        if (status.textContent !== guidance) status.textContent = guidance;
+        editor.hidden = !canManage;
+        $('[data-game-clear]').hidden = !link;
+        $('[data-game-invite]').hidden = !c || !amOp(c);
+        $('[data-game-night]').hidden = !c;
+    }
+    function changeGameLink(value) {
+        const c = currentGameNight();
+        return !!(c && c === gameEditorRoom && amOp(c) && cmd('discord', [value], c.name, c.keepRef));
+    }
+    $('[data-game-invite]').addEventListener('click', () => openInviteDialog());
+    $('[data-game-form]').addEventListener('submit', event => {
+        event.preventDefault();
+        const input = $('[data-game-link]');
+        const link = discordCallLink(input.value);
+        const error = $('[data-game-error]');
+        if (!link) {
+            error.textContent = 'Paste a Discord invite or a server channel link.';
+            input.focus();
+        } else if (changeGameLink(link)) error.textContent = '';
+        else error.textContent = 'Reconnect and open Host tools before trying again.';
+    });
+    $('[data-game-clear]').addEventListener('click', () => {
+        $('[data-game-error]').textContent = changeGameLink('clear') ? '' : 'Reconnect before removing the link.';
+        $('[data-game-link]').focus();
+    });
+
     function drawChan() {
         drawKeepPrompt();
         refreshPaletteCohosts();
@@ -1354,6 +1421,7 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
         if (inviteContext && (inviteContext !== c || connectionState !== 'connected' || !amOp(c))) closeInviteDialog();
         $('[data-roombar]').hidden = app.sharingStopped || app.localMediaPaused || !room;
         drawJam();
+        drawGameNight();
         const showAct = !app.sharingStopped && !app.localMediaPaused && room && ['bobross', 'watch', 'art'].includes(c.kind);
         $('[data-activity]').hidden = !showAct;
         $('[data-activity-title]').textContent = showAct ? c.kind === 'art' ? 'A canvas for everyone' : c.kind === 'bobross' ? 'A little paint. A little Bob Ross.' : 'Watching together' : 'Shared activity';
@@ -1365,7 +1433,7 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
             $('[data-host-status]').textContent = (c.persistent ? `Registered · expires ${new Date(c.expiresAt).toLocaleDateString()} · ` : 'Temporary · ') + (amOp(c) ? 'You have @ host controls · /op nick adds a co-host' : hosts.length ? `Hosts: ${hosts.map((nick) => `@${nick}`).join(', ')}` : 'No room host online. An existing host can return, or a site moderator can help.');
             $('[data-modes]').textContent = `${KIND_NAME[c.kind]} · +t${m.m ? 'm' : ''}${m.i ? 'i' : ''}${m.k ? 'k' : ''}${m.C ? 'C' : ''}${m.Q ? 'Q' : ''}${m.S ? ` slow ${m.S}s` : ''}${m.locked ? ' 🔒' : ''} · ${c.count}/${m.l}`;
             const cam = $('[data-cam]');
-            cam.hidden = app.localMediaPaused || c.kind === 'chat';
+            cam.hidden = app.localMediaPaused || ['chat', 'game'].includes(c.kind);
             cam.setAttribute('aria-pressed', String(!!c.myCam));
             cam.textContent = c.myCam ? '📷 Camera on' : m.C ? '📷 Camera (18+)' : '📷 Cameras off here';
             cam.disabled = !m.C && !c.myCam;
@@ -1557,7 +1625,12 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
             $('[data-channel-name]').focus();
             return;
         }
-        count(`room-start-${b.dataset.start}`); cmd('join', [`#${b.dataset.start}-${slug()}`]);
+        const kind = b.dataset.start;
+        if (kind === 'game' && !gameNightSupported) return;
+        // Break up numeric runs so a random room code never looks like a phone number.
+        const code = kind === 'game' ? crypto.randomUUID().replaceAll('-', '') : '';
+        const suffix = code ? `${code.slice(0, 6)}x${code.slice(6, 12)}` : slug();
+        count(`room-start-${kind}`); cmd('join', [`#${kind}-${suffix}`]);
     }));
     $('[data-channel-cancel]').addEventListener('click', () => $('[data-channel-dialog]').close());
     $('[data-channel-dialog]').addEventListener('close', () => {
@@ -1578,7 +1651,7 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
             switchTo(name);
             return;
         }
-        if (/^#(?:art|watch|bobross|jam)(?:-|$)/.test(name) && !app.rooms.some((r) => r.name === name)) {
+        if ((/^#(?:art|watch|bobross|jam)(?:-|$)/.test(name) || gameNightSupported && gameNightRoomName(name)) && !app.rooms.some((r) => r.name === name)) {
             $('[data-channel-error]').textContent = 'That name starts an activity room. Choose another name for chat, or use the activity buttons.';
             $('[data-channel-name]').focus();
             return;
@@ -1807,7 +1880,8 @@ import { createIdleHeartbeat } from './idle-heartbeat.mjs';
             if (name === 'register' && current?.persistent) continue;
             if (['cohost', 'transfer', 'unregister'].includes(name) && !owner) continue;
             if (current?.persistent && ['op', 'deop', 'close'].includes(name) && !owner && !app.capabilities?.configure) continue;
-            if (store(app.active)?.kind === 'chat' && name === 'mode' && ['+C', '-C'].includes(fixed?.[0])) continue;
+            if (['chat', 'game'].includes(current?.kind) && name === 'mode' && ['+C', '-C'].includes(fixed?.[0])) continue;
+            if (current?.kind === 'game' && name === 'mode' && ['+i', '-i'].includes(fixed?.[0])) continue;
             const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--small'; b.textContent = label;
             b.addEventListener('click', () => {
                 $('[data-palette]').close();

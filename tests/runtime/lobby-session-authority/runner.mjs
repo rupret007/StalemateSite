@@ -64,7 +64,7 @@ const sources = () => Object.fromEntries([
     ['fixture/runner.mjs', FILE], ['fixture/worker.mjs', join(HERE, 'worker.mjs')], ['fixture/README.md', join(HERE, 'README.md')],
     ['fixture/control-credit-observation.mjs', join(HERE, 'control-credit-observation.mjs')],
     ...readdirSync(join(APP, 'hangout-worker/src')).filter(name => name.endsWith('.mjs')).sort().map(name => [`application/src/${name}`, join(APP, 'hangout-worker/src', name)]),
-    ...['r/45662413410ed051/sync-core.js', 'r/45662413410ed051/entry-sites.mjs', 'package.json', 'package-lock.json', '.github/workflows/durable-record-runtime.yml', 'hangout-worker/wrangler.beta.toml', 'node_modules/rolldown/package.json', 'node_modules/obscenity/package.json'].map(name => [`application/${name}`, join(APP, name)]),
+    ...['r/45662413410ed051/sync-core.js', 'r/45662413410ed051/entry-sites.mjs', 'r/45662413410ed051/lobby/game-night.mjs', 'package.json', 'package-lock.json', '.github/workflows/durable-record-runtime.yml', 'hangout-worker/wrangler.beta.toml', 'node_modules/rolldown/package.json', 'node_modules/obscenity/package.json'].map(name => [`application/${name}`, join(APP, name)]),
     ...['package.json', 'package-lock.json'].map(name => [`tools/${name}`, join(TOOLS, name)])
 ].map(([name, path]) => [name, hash(path)]));
 function bindingPackage() {
@@ -291,7 +291,10 @@ async function runtime(phase, state, nonce) {
         const visitor = new Visitor(response.webSocket, label, transport, acknowledge); visitors.push(visitor);
         const hello = await visitor.wait(f => f.t === 'hello', 'actual hello');
         if (FANOUT_50 && admissionProfile) admissionProfile.serverHello = performance.now();
-        assert.deepEqual(hello.features, { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, transportPing: 1 }); assert.equal(hello.role, 'fan');
+        assert.deepEqual(hello.features, { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1,
+            personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, gameNight: 1,
+            discordLinks: !PARTICIPATION, transportPing: 1 });
+        assert.equal(hello.role, 'fan');
         if (FANOUT_50 && admissionProfile) admissionProfile.clientHello = performance.now();
         visitor.send({ t: 'hello', nick: label, age13: true, entrySource: source, ...(transport ? { transport: 1 } : {}) });
         await visitor.wait(f => f.t === 'join' && f.ch.name === '#stalemate', 'lobby membership');
