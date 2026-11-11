@@ -23,10 +23,15 @@ The [afternoon delivery receipt](../pr-assets/private-readiness/20261110/private
 records 31 served files and the Chrome prejoin observations. The
 [evening release receipt](../pr-assets/private-readiness/20261110/readiness-release/qualification.json)
 records 33 served files, missing-invite recovery, the earlier Chrome entry zoom
-checks and the actual Linux archive. The current release adds browser invite-expiry recovery, 33 verified served
-files and current Mac shortcut and fixture checks. The responsive expiry
-screens were captured from an offline fixture running the staged website bytes.
-The deployed Chrome check observed the private admission prompt. [Current evidence](../pr-assets/private-readiness/20261111/web-join-expiry/qualification.json)
+checks and the Linux archive. The next rollout added invite-expiry recovery
+and verified 33 served files. The responsive expiry screens came from an offline
+fixture with the staged website bytes. The deployed Chrome check observed the
+private admission prompt. [Invite-expiry evidence](../pr-assets/private-readiness/20261111/web-join-expiry/qualification.json)
+
+The latest private rollout serves the Safari dialog fix. A normal guest session
+verified the live lobby markup and 33 other files. The extracted Linux package
+also passed hosted startup and dummy-audio checks.
+[Safari and Linux evidence](../pr-assets/private-readiness/20261111/safari-dialog/qualification.json)
 
 The original 62 ID and outcome cells below are copied verbatim.
 
@@ -56,8 +61,8 @@ The original 62 ID and outcome cells below are copied verbatim.
 | D1 | Accessible retro IRC design, refined typography/navigation/presence | **L,S** — Actual three-pane retro IRC workspace and refined phone fixtures; native screenshot retained. | Broader newcomer/usability review, platform and assistive-technology qualification. |
 | D2 | Clear connection, sign-in, loading and error/retry states | **L,C,S** — Browser expiry during audio setup now closes capture and shows fresh-link guidance. A local Chrome fixture confirmed focus moves to the message. The deployed Chrome entry still requires private admission. | Qualify recovery with a real private replacement invite, plus the remaining connected and sign-in flows. |
 | D3 | Welcoming quiet rooms, room discovery and simple creation/join/switch/leave | **L,C** — Quiet lobby, directory, guest creation/join and host closure observed. | Remaining activity/room recovery/host-transfer paths and uncoached newcomer use. |
-| D4 | Keyboard navigation and focus | **L,C** — Chrome Tab reached the name generator, agreement, privacy link and scrollback disclosure with visible focus. Earlier Safari PM keyboard and ARM idle native Quit evidence are retained. | Joined chat, VoiceOver/NVDA, Intel startup and workspace native Quit need their own checks. |
-| D5 | Screen-reader behavior | **L,C,S** — ARIA/log semantics and announcement controls exist; native member-dialog AX omission recorded. | Actual VoiceOver/NVDA behavior and the unresolved Safari AX observation; no speech pass claimed. |
+| D4 | Keyboard navigation and focus | **L,C** — Chrome reached the nickname and agreement controls with visible focus. Native Safari opened Commands with Space and restored focus on Escape in the candidate fixture. ARM idle native Quit evidence is retained. | Verify current joined chat, VoiceOver/NVDA, Intel startup and workspace native Quit. |
+| D5 | Screen-reader behavior | **L,C,S** — Native Safari exposed the candidate’s member, command and channel controls in the accessibility tree. The private release serves the reviewed markup. | Verify the joined dialog in live Safari and listen to VoiceOver and NVDA. |
 | D6 | Zoom/reflow and WCAG 2.2 AA | **L,C,S** — Actual Chrome 200% and 400% zoom produced 600 and 300 CSS pixel widths. Scroll width matched the viewport and the tested nickname controls retained visible focus. | Verify joined chat, physical mobile, assistive technology and the remaining WCAG 2.2 AA requirements. |
 | D7 | Reduced-motion preference | **C,S** — Reduced-motion CSS and enabled reduced-motion fixtures retained. | Verify remaining actual browser/OS preference behavior; no broad accessibility certification. |
 | D8 | 375/390px screenshots, no page overflow, input/Send visible, iOS inputs 16px | **C,L** — 375/390 CSS pixel local expiry screens fit without overflow. Earlier deployed prejoin checks and joined fixtures cover 16 px inputs and the contained composer and Send button. | Qualify current joined chat on a physical phone, including focus and keyboard reflow. |
@@ -89,10 +94,10 @@ The original 62 ID and outcome cells below are copied verbatim.
 | V3 | Reporting and moderator review work across entries | **C,S** — Earlier report-review receipts retained at their own revisions; current owner login requires email sign-in. | Current cross-entry report and human review; no new report created while reviewer unavailable. |
 | V4 | Fresh-join privacy, logout/revocation and role isolation | **L,C** — Live fresh-join privacy, guest topic denial and PM consent/block were previously observed. The current isolated guest logout returned 200 and the following state check returned 401. | Qualify live revocation, account ownership and full role isolation. |
 | V5 | Failures/recovery are clear and truthful | **L,C,S** — The private site serves the reviewed expiry fix. Local Chrome showed fresh-link recovery, moved focus and reopened audio setup when given a replacement fixture. | Observe recovery with a real replacement invite, plus connected recovery and media handoff. |
-| V6 | Mac, Windows and Linux support qualified honestly | **C,S,L** — AE49 archive checks cover all four targets. Both Mac Desktop shortcuts select their verified build. The Mini passed idle launch and Quit. | Qualify actual Intel startup, local Windows/Linux execution, physical media roles and publisher trust. |
-| V7 | Deliver source, tests, screenshots and small PRs | **S,C,L** — WebJam PR 470 and website PR 259 passed CI. The private delivery has 33 verified files and two local responsive recovery screenshots. Earlier Chrome zoom and four current desktop archives remain documented. | Finish joined chat, media and uncoached newcomer journeys. |
+| V6 | Mac, Windows and Linux support qualified honestly | **C,S,L** — Four AE49 archives passed inspection. Both Mac shortcuts select their verified builds. The Mini passed idle launch and Quit. The extracted Linux package passed hosted startup and dummy JACK initialization. | Qualify actual Intel startup, local Windows/Linux execution, physical media roles and publisher trust. |
+| V7 | Deliver source, tests, screenshots and small PRs | **S,C,L** — Website PR 261 passed both CI runs. Private guest readback verified 34 served files including the Safari lobby. The invite-expiry screenshots and four desktop archive receipts remain available. | Finish joined chat, media and uncoached newcomer journeys. |
 | V8 | Deliver integration instructions and a clean concrete package | **S,C** — Concrete entry toolkit, setup/support and restore/rollback guidance retained. | Receiving-site integration review, remaining package/license/platform qualification. |
-| V9 | Deliver a migration/rollback plan with remaining dependencies | **S** — The current rollout records the serving version, config comparison and immediate rollback `31f8271c`. Original Mac shortcuts are preserved. | Refresh gates for later switches and verify any restored serving state. |
+| V9 | Deliver a migration/rollback plan with remaining dependencies | **S** — The current rollout records serving version `87df0c36`, configuration comparison and immediate rollback `e12b3fa5`. Original Mac shortcuts are preserved. | Refresh gates for later switches and verify any restored serving state. |
 | V10 | Completion requires observed application journeys and concrete integration package, with unverified work explicit | **L,S,C,G,H,U** — Observed browser journeys and concrete package now exist; evidence layers remain distinct. | All original outcomes still need appropriate proof; uncoached essential private band journeys remain unfinished. |
 
 ## Required media evidence beyond these browser rows

@@ -1,0 +1,68 @@
+{
+  "observedThroughUtc": "2026-11-11T02:03:15.462399+00:00",
+  "privateWebsite": {
+    "websitePR": 261,
+    "sourceHead": "c2b085340d508d7589f2c873fdedf58c89feef8b",
+    "merge": "7920e1ab1ac0fe5620c6b3e0c9b45c89e4328400",
+    "tree": "bc2404928b7fb4d86e31133d3ee63b73c3391c03",
+    "passedCiRuns": [
+      42937002006,
+      42937011391
+    ],
+    "activePrivateVersion": "87df0c36-5689-4248-a6e9-b075d1baa361",
+    "deployment": "b4287529-c97b-419b-950f-eed0c83831d7",
+    "immediateRollback": "e12b3fa5-fdea-4a48-9de6-b6b8a44e2e39",
+    "originalRollback": "2c5c81e5-1aa4-4ea7-be69-cacda13c20e8",
+    "issuer": "fd37578f-13cd-4fce-b557-35c0d962ef9d",
+    "workerSha256": "9fefc1a13eaecb138be633e85d19039c15969f7066b7e71b6123636858493b78",
+    "bindingsPreserved": 28,
+    "approvedConfigPreserved": true,
+    "anonymousAccessBoundariesPassed": true,
+    "admittedGuestAndLogoutPassed": true,
+    "unchangedStaticFilesComparedExactly": 33,
+    "lobbyMarkupVerifiedAfterWorkerSubstitutions": true
+  },
+  "localSafari": {
+    "version": "27.2 (20625.2.8.18.4)",
+    "system": "macOS 15.8.2 (24H232)",
+    "scope": "Owned synthetic loopback fixture with the candidate HTML and unchanged application scripts. Entry button renamed to identify the fixture.",
+    "controlsVisibleToAX": {
+      "member": true,
+      "commands": true,
+      "channel": true
+    },
+    "initialFocusInsideModal": true,
+    "backgroundExcludedWhileModal": true,
+    "escapeRestoredWorkspace": true,
+    "keyboardCommands": {
+      "optionShiftTab": true,
+      "spaceOpened": true,
+      "escapeReturnedFocus": true
+    },
+    "voiceOverSpeechTested": false
+  },
+  "localAccessibilityCasesPassed": 60,
+  "hostedLinux": {
+    "source": "ae49c915070f2951db9ff441c23c7f0a9d90ce1b",
+    "run": 42888556613,
+    "attempt": 1,
+    "job": 130096378059,
+    "artifact": 13799986040,
+    "hostedExtractedLinuxArchive": {
+      "idleStartup": true,
+      "pocketStageRuntime": true,
+      "referenceStudioRuntime": true,
+      "joinOnlyAudioStartupWithDummyJACK": true,
+      "jamulusLocalRpcAuthenticationChecked": true,
+      "expectedExitAndAudioCleanupChecked": true
+    },
+    "hostedFrozenLessonRuntime": true,
+    "physicalLinuxAudioOrPrivateMusicQualified": false
+  },
+  "remainingAcceptance": [
+    "Joined Safari dialog and actual VoiceOver/NVDA behavior",
+    "Real replacement invite and Mac-host-to-Windows Music",
+    "Physical Shared Track and Webex audio handoff",
+    "Physical mobile, moderator review, hosted capacity and all-ages operator and legal work"
+  ]
+}

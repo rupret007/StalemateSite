@@ -6,11 +6,16 @@ band rehearsal is not yet qualified.** Music, actual Shared Track mixing and
 Webex video/audio handoff remain essential acceptance work, not optional extras.
 Both public websites and their navigation remain unchanged.
 
-The private site received the browser invite-expiry fix on November 11 at
-00:39 UTC. When a link expires during audio setup, the browser releases the
+The private site received the Safari dialog fix on November 11 at 01:58 UTC.
+Native Safari exposed the member, command and channel controls in the local
+candidate. Space opened Commands and Escape returned focus to its button.
+The admitted live readback verified the updated lobby markup.
+[Safari and Linux evidence](../pr-assets/private-readiness/20261111/safari-dialog/qualification.json)
+
+The 00:39 UTC private rollout added the browser invite-expiry fix. When a link expires during audio setup, the browser releases the
 microphone and asks the guest to open a fresh link. The staged client showed
 the recovery message and returned keyboard focus to it at both phone widths.
-The deployed client still requires private admission. [Current release evidence](../pr-assets/private-readiness/20261111/web-join-expiry/qualification.json)
+The deployed client still requires private admission. [Invite-expiry evidence](../pr-assets/private-readiness/20261111/web-join-expiry/qualification.json)
 · [375 px preview](../pr-assets/private-readiness/20261111/web-join-expiry/expired-invite-375.png)
 · [390 px preview](../pr-assets/private-readiness/20261111/web-join-expiry/expired-invite-390.png)
 
@@ -24,16 +29,16 @@ tracks all [62 original requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md).
 
 | Layer | Qualified evidence | Still required |
 | --- | --- | --- |
-| Last verified private website | Frontend merge `02891edb6875e5256620fd0638355f906d8f6f69` serves as version `e12b3fa5-fdea-4a48-9de6-b6b8a44e2e39` at 100%, deployment `119276a8-9735-448d-82ba-75f52d2430dc`. The `c83dfaff` Worker, all 28 bindings, namespace IDs and effective settings matched the prior private version. An admitted readback matched 33 files, including all four changed files. Logout returned 200 and the next session check returned 401. | The guest agreement and joined chat still need an attended check. A real replacement invite and media acceptance remain pending. |
-| Current application source | Both website CI runs passed 2,110 unit tests, 904 browser cases, and 34 root plus 34 project-path checks. The tested tree `13ed8d9e49103ab2ae05ed11ce7d164f165e381a` matches the merge. Upstream browser CI passed 79 cases. [Website PR 259](https://github.com/rupret007/StalemateSite/pull/259) · [WebJam PR 470](https://github.com/rupret007/webjam/pull/470). | Current physical input, meeting and connected recovery need attended checks. |
+| Last verified private website | Frontend merge `7920e1ab1ac0fe5620c6b3e0c9b45c89e4328400` serves as `87df0c36-5689-4248-a6e9-b075d1baa361` at 100%, deployment `b4287529-c97b-419b-950f-eed0c83831d7`. The `c83dfaff` Worker, all 28 bindings, namespace IDs and effective settings matched the prior private version. An admitted readback matched the lobby HTML after the Worker’s standard substitutions and 33 other files byte for byte. Logout returned 200 and the next session check returned 401. | Verify the member menu in joined Safari and with VoiceOver. A real replacement invite and media acceptance remain pending. |
+| Current application source | Both website CI runs passed on the reviewed Safari commit, including 904 browser cases and 34 checks at each served path. The merge tree `bc2404928b7fb4d86e31133d3ee63b73c3391c03` adds the separately reviewed readiness documentation to that commit. The 70 staged assets matched the merge. [Safari PR 261](https://github.com/rupret007/StalemateSite/pull/261) · [Invite-expiry PR 259](https://github.com/rupret007/StalemateSite/pull/259) · [WebJam PR 470](https://github.com/rupret007/webjam/pull/470). | Physical input, meeting and connected recovery need attended checks. |
 | Keyboard/playback correction | PR249 merged as `ce319fd73ad12cf43cd67cb96276302698d07d6c`. Its current-head and combined-private CI passed. Full CI originally exposed a network-stalled/playback-status defect; the corrected regression and unchanged real-media browser trials passed. Original failures/traces are retained. | Qualify current delivered keyboard/playback journeys. Neither responsive viewports nor real browser media decoding prove physical iOS or VoiceOver. |
-| Current native packages | Exact source `ae49c915070f2951db9ff441c23c7f0a9d90ce1b` completed four desktop jobs in [run 42888556613](https://github.com/rupret007/webjam/actions/runs/42888556613), final attempt 2. All four actual archives passed source, private target, paths/CRC, architecture, component, generated-notice and eleven-license checks. Both Macs passed five strict signature checks. Windows Setup/ZIP checksums and hosted install/start/uninstall passed. [ARM startup and earlier archive evidence](../pr-assets/private-readiness/20261110/native-ae49/README.md). | Both Mac Desktop shortcuts now select the verified AE49 packages. The Mini shortcut passed idle startup and Quit. Intel startup, local Windows and Linux execution, publisher trust and physical media remain open. |
+| Current native packages | Exact source `ae49c915070f2951db9ff441c23c7f0a9d90ce1b` completed four desktop jobs across the initial run and Intel retry. All four archives passed source, private target, paths/CRC, architecture, component, generated-notice and eleven-license checks. Both Macs passed five strict signature checks. Windows Setup/ZIP checksums and hosted install/start/uninstall passed. The extracted Linux package passed idle startup, Pocket Stage, Reference Studio and Jamulus startup against dummy JACK. The frozen lesson player also passed on the Linux runner. [ARM startup and archive evidence](../pr-assets/private-readiness/20261110/native-ae49/README.md) · [Linux build job](https://github.com/rupret007/webjam/actions/runs/42888556613/job/130096378059). | Both Mac Desktop shortcuts select the verified AE49 packages. The Mini shortcut passed idle startup and Quit. Intel startup, local Windows and Linux execution, publisher trust and physical media remain open. |
 | Prior native package baseline | Older `67c7ef08e515c84eb2b0736c474ec2c4b0c21682` and its all-four-archive checks remain in the [unchanged prior receipt](../pr-assets/private-readiness/20261110/README.md). | Its idle UI/Command-Q and disabled native-menu observation remain historical. Do not relabel it AE49 or replay completed checks. |
 | Native fixes and CI | [WebJam PR468](https://github.com/rupret007/webjam/pull/468) merged as `3eb71e9892e72062ea6991ccd76a8805f85497a1`; actual tree `50596d2a1e2e18b19832ee8da89faaee86fe8916` equals reviewed AE49 and tested synthetic merge. Startup workaround is Cocoa-only; macOS offscreen keeps modal completion. All nine focused startup cases pass; full source CI passed 12,985 tests, 60 existing skips and all 567 modules exactly once. Both unchanged Mac workspace gates passed 204 cases with 12 existing skips, plus 34 Reference Studio cases. | Intel attempt 1 failed at pinned Opus download with TLS EOF35 after passing the workspace gate; one failed-jobs-only retry succeeded without changing security checks or source. Source/generated tests do not prove physical media. Later misclassified hostname/observer-relaunch probes are explicitly unqualified in the current receipt. |
 | Selected audio connection | Upstream [WebJam PR466](https://github.com/rupret007/webjam/pull/466), reviewed head `098c57250b5ed2b97c233d7e843f5c5d1297a9e8`, merged as `01804299f3940f243b06f88749d488e03f08cf5c`. Delay and receiver adaptation now use the actual selected transport pair rather than a retired pair encountered last. Four regressions failed before the fix. Completed CI passed 44 Web Join unit cases, 69 browser cases, 87 Worker cases and 12,976 application tests with 60 existing skips across 566 modules. The website mirrors the reviewed audio bytes and provenance. | This browser JavaScript fix does not change the native host runtime or relabel existing native packages. Physical latency, acoustic listening, LAN routing and relay admission still need their own evidence. |
 | Earlier application provider-start CI | [Run 42780185842](https://github.com/rupret007/StalemateSite/actions/runs/42780185842), job 129708072371, completed the actual `--participation --provider-start` application/workerd mode against website revision `11c9d1f8`. All 15 recorded mode/install/audit exits were zero. Owner/start ordering, duplicate start, Stop/revoke/close fencing and owned cleanup passed. | Real guardian decisions, hosted capacity and media acceptance remain open. |
 | Issuer | Last verified `fd37578f-13cd-4fce-b557-35c0d962ef9d` at100%; completed405/204/403 negatives have receiptc209b961. | Reuse that completed result; do not rerun it or mint test credentials. The existing cap/hold and fresh account headroom still govern trials. |
-| Rollback | Use `31f8271c-27d9-4d52-ab33-23884c79bae9` for the immediate private-site rollback. Prior version `2b205a24`, original version `2c5c81e5` and issuer rollback `4db649fa` were available at the release check. | Recheck the guards and compare serving state and effective configuration after a rollback. |
+| Rollback | Use `e12b3fa5-fdea-4a48-9de6-b6b8a44e2e39` for the immediate private-site rollback. Prior versions `31f8271c` and `2b205a24`, original version `2c5c81e5` and issuer rollback `4db649fa` are retained in the release history. | Recheck the guards and compare serving state and effective configuration after a rollback. |
 
 The [sanitized live receipt and screenshots](../pr-assets/private-readiness/20261109/README.md)
 cover actual Mac Chrome/Safari observations on c83:
@@ -55,8 +60,8 @@ Both guests disconnected and owned test tabs closed. No microphone, camera,
 Music relay, AI or recording was started. An earlier tab-controlled Chrome video
 attempt timed out, while later normal-window Chrome host and guest playback
 worked. Its cause remains unproven; do not weaken CSP/referrer/browser protections.
-Safari’s native member-dialog AX output also remains unexplained. Option-Tab and
-normal visible actions worked; that is not a full screen-reader qualification.
+The c83 Safari run showed the original member-dialog omission. VoiceOver speech
+and NVDA remain separate device checks.
 
 ## Release and device gates
 
@@ -99,11 +104,10 @@ variable, secret binding, namespace/stable ID, exact origin, admission control,
 cap and hold. Defaults and `--keep-vars` alone are insufficient. Require reviewed
 source/CI, current resource/headroom checks, ready rollback, exact served hashes,
 configuration comparison and a normally admitted private session afterward.
-The 00:39 UTC rollout used 70 reviewed assets and the exact c83 Worker. It
-changed the Web Join HTML, two JavaScript files and the provenance record. The
-other 66 assets matched the previous package byte for byte. The inactive
-version passed configuration comparison before the traffic switch. An isolated
-ordinary guest session verified 33 served files and logged out.
+The 01:58 UTC rollout used 70 reviewed assets and the exact c83 Worker. Only
+`lobby/index.html` changed. The inactive version passed configuration comparison
+before traffic switched. An isolated guest verified the served lobby and 33
+other files, then logged out.
 The current eight-file entry toolkit was also verified from the actual CI archive;
 its manifest is source evidence, not public integration or deployment proof. Its
 redistribution-license qualification remains explicitly unfinished.
@@ -112,8 +116,9 @@ redistribution-license qualification remains explicitly unfinished.
 
 1. Use the current AE49 package identities above. All four hosted desktop builds
    passed. Actual archive inspection covers all four packages, and ARM idle
-   startup and native Quit have local evidence. Intel startup and local Windows
-   and Linux execution still need their own checks.
+   startup and native Quit have local evidence. The Linux archive ran on the
+   hosted Ubuntu runner with dummy audio. Intel startup and local Windows and
+   Linux device runs still need their own checks.
    Open **WebJam Private Band Demo** on the Mac Desktop after fresh trust,
    device, resource and release checks. Both shortcuts resolve to the verified
    AE49 build for their architecture. The original shortcut objects remain
