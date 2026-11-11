@@ -193,6 +193,7 @@
                 <div class="game-heading">
                     <h3 class="jam-title" id="game-night-title">Game Night</h3>
                     <p class="small game-note">Invite-only room</p>
+                    <p class="sr-only" role="status" data-four-availability></p>
                 </div>
                 <div class="jam-actions game-actions">
                     <button class="btn btn--small" type="button" data-game-invite hidden>Invite players</button>
@@ -211,13 +212,14 @@
                         </span>
                     </summary>
                     <div class="four-info">
-                        <p class="small game-note" data-four-status role="status"></p>
+                        <p class="small game-note" data-four-status role="status" tabindex="-1"></p>
                         <button class="btn btn--small" type="button" data-four-action hidden></button>
                     </div>
                     <div data-four-board hidden>
                         <div class="four-columns" role="group" aria-label="Drop a piece" data-four-columns></div>
                         <table class="four-board" aria-label="Four in a Row board" data-four-table></table>
                     </div>
+                    <button class="btn btn--small btn--ghost four-leave" type="button" data-four-leave hidden></button>
                 </details>
                 <div class="game-call">
                     <p class="small game-note" data-game-call-status role="status"></p>
@@ -343,7 +345,14 @@
             <p class="small" data-entry-unavailable hidden>Entry-site badges aren’t available on this server.</p>
         </aside>
 
-        <div class="toast" data-toast role="status" tabindex="0" hidden></div>
+        <div class="irc-notices">
+            <div class="game-offer" data-game-offer hidden>
+                <p data-game-offer-status role="status"></p>
+                <button class="btn btn--small" type="button" data-game-offer-join></button>
+                <button class="btn btn--small btn--ghost" type="button" data-game-offer-dismiss>Not now</button>
+            </div>
+            <div class="toast" data-toast role="status" tabindex="0" hidden></div>
+        </div>
         <nav class="phonetabs" aria-label="Sections">
             <button type="button" data-show="rooms">🎨 Rooms</button>
             <button type="button" data-show="chat" aria-current="true">💬 Chat</button>

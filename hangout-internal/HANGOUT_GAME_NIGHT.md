@@ -1,6 +1,8 @@
 # Game Night private beta
 
-Use **Rooms → Game Night → Invite players** while the other players are in Hang Out. To play in the room, open **Four in a Row** and choose **Open a match**. A second player chooses **Join match**. X moves first. Choose a numbered column on your turn to drop a piece. Other invited guests can watch and keep chatting. The host can open another match after a win or draw.
+Use **Rooms → Game Night → Invite players** while the other players are in Hang Out. Guests can choose **Join Game Night** or **Not now** in the invitation bar. To play in the room, open **Four in a Row** and choose **Open a match**. The guest sees **Join match** when a seat opens. X moves first. Choose a numbered column on your turn to drop a piece. Other invited guests can watch and keep chatting. The host can open another match after a win or draw.
+
+If you lose your connection or reload, reconnect to Hang Out and choose **Return to room** if offered. The original room and your permission to join are checked again. A match ends when a player disconnects, and the host can open another. If the room closed or access changed, ask the host for a fresh invitation.
 
 **Open Stalemate Arcade** opens the existing arcade in a separate tab. For an external multiplayer game, use that game's controls to join the same match.
 
