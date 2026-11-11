@@ -1,6 +1,6 @@
 /* #stalemate lobby client. Hidden preview. Everything is rendered with textContent;
  * the server enforces permissions, rate limits and public-content policies. */
-import { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff, readEntryHandoff, KEEP_ROOM_INTENT_KEY, KEEP_ROOM_INTENT_TTL, keepRoomIntent, consumeKeepRoomIntent } from '../entry-sites.mjs';
+import { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff, readEntryHandoff, KEEP_ROOM_INTENT_KEY, KEEP_ROOM_INTENT_TTL, keepRoomIntent, readKeepRoomIntent, consumeKeepRoomIntent } from '../entry-sites.mjs';
 import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
 import { createIdleHeartbeat } from './idle-heartbeat.mjs';
@@ -40,16 +40,31 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const betaBootstrap = betaShell && window.HangoutBootstrap;
 
     const entrySites = createEntrySiteRegistry(window.HangoutEntrySites);
+    const ARCADE_RESUME_KEY = 'hangout-arcade-resume';
+    const savedArcade = readTab(ARCADE_RESUME_KEY);
+    removeTab(ARCADE_RESUME_KEY);
+    let arcadeResume = null, resumeEntry = null;
+    if (betaShell && !params.has('via') && !location.hash && performance.getEntriesByType('navigation')[0]?.type === 'reload'
+        && typeof savedArcade === 'string' && savedArcade.length <= 512) {
+        try {
+            const saved = JSON.parse(savedArcade);
+            const intent = readKeepRoomIntent(saved?.intent);
+            if (intent && gameNightRoomName(intent.room)) {
+                arcadeResume = intent;
+                resumeEntry = readEntryHandoff(saved.entry, Date.now(), entrySites);
+            }
+        } catch { /* Tab state only restores navigation; the server authorizes entry. */ }
+    }
     let handoff = null;
     try {
         if (params.get('entry-return') === '1') handoff = readEntryHandoff(sessionStorage.getItem(ENTRY_HANDOFF_KEY), Date.now(), entrySites);
         sessionStorage.removeItem(ENTRY_HANDOFF_KEY);
     } catch { /* A blocked tab store must not prevent ordinary chat. */ }
-    const entrySource = params.has('via') ? entrySourceFromParams(params, entrySites) : handoff?.source || '';
+    const entrySource = params.has('via') ? entrySourceFromParams(params, entrySites) : handoff?.source || resumeEntry?.source || '';
     const gameArcadeBrand = entrySource === 'rad-dad' ? entrySites['rad-dad'] : entrySites.stalemate;
     $('[data-game-arcade]').href = new URL('play/', gameArcadeBrand.home).href;
     $('[data-game-arcade-label]').textContent = `Open ${gameArcadeBrand.label} Arcade`;
-    let shareEntry = handoff?.share !== false;
+    let shareEntry = (handoff || resumeEntry)?.share !== false;
     let entrySourcesSupported = null;
     let privateMessageContextSupported = false, privateMessagePeersSupported = false, personTargetsSupported = false;
     let paletteContext = null;
@@ -462,7 +477,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let pendingJamShare = null;
     let jamShareResultsSupported = false, jamShareTimer;
     let gameNightSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
-    let arcadeChessSupported = false, arcadeChess = null, arcadeChessLoading = false;
+    let arcadeChessSupported = false, arcadeChess = null, arcadeChessLoading = false, arcadeReturning = null;
     let fourInARowSupported = false, fourRoom = null, fourPlayed = false;
     const fourButtons = [], fourCells = [];
     function stopLocalCamera(channel) {
@@ -934,6 +949,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             app.kicked = false; retry = 0; setConnection('connected');
             entrySharing.joined();
             returnToKeepRoom();
+            if (arcadeResume) {
+                if (arcadeChessSupported && !app.sharingStopped && !pendingKeep &&
+                    cmd('join', [arcadeResume.room], '#stalemate', arcadeResume.ref)) arcadeReturning = arcadeResume;
+                arcadeResume = null;
+            }
             followPendingRoomJoin();
             if (app.restorePmOff) { cmd('pm', ['off']); app.restorePmOff = false; }
             $('[data-gate]').hidden = true; $('[data-app]').hidden = false;
@@ -1413,7 +1433,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function drawArcadeChess(c) {
         const scope = arcadeChessSupported && !shieldActive && c && roomNonce(c.keepRef)
             ? { actor: app.selfId, room: c.name, ref: c.keepRef } : null;
-        if (arcadeChess) return arcadeChess.setRoom(scope);
+        if (arcadeChess) {
+            arcadeChess.setRoom(scope);
+            if (scope && scope.room === arcadeReturning?.room && scope.ref === arcadeReturning.ref) {
+                arcadeReturning = null;
+                arcadeChess.open();
+            }
+            return;
+        }
         if (!scope || arcadeChessLoading) return;
         arcadeChessLoading = true;
         import('./arcade-chess.mjs').then(module => {
@@ -1422,6 +1449,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }).catch(() => toast('Chess could not load. Reopen Game Night to try again.'))
             .finally(() => { arcadeChessLoading = false; });
     }
+    window.addEventListener('pagehide', () => {
+        const current = currentGameNight();
+        if (!current || !arcadeChess?.isOpen()) return;
+        const intent = keepRoomIntent(current);
+        if (intent) writeTab(ARCADE_RESUME_KEY, JSON.stringify({ intent, entry: entryHandoff(entrySource, shareEntry, Date.now(), entrySites) }));
+    });
     function fourCommand(action, column) {
         const c = currentGameNight();
         if (!c || c !== fourRoom || shieldActive || !roomNonce(c.keepRef)) return;

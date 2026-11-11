@@ -118,6 +118,7 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                 return send(socket, { t: 'match-error', reason: 'unavailable' });
             }
             let changed = game?.expire(now()) || false;
+            const resume = frame.action === 'sync' && game?.seat(subject) && !scope.synced;
             let expiresAt = record?.expiresAt;
             let error = '';
             if (frame.action !== 'sync') {
@@ -142,11 +143,14 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                     if (!outcome.ok) error = outcome.reason;
                 }
             }
+            if (frame.action === 'sync' && !scope.synced) {
+                socket.serializeAttachment({ ...socket.deserializeAttachment(), synced: true });
+            }
             if (changed) {
                 if (game) await state.storage.put(key(scope), { room: scope.room, expiresAt, chess: game.checkpoint() });
                 else await state.storage.delete(key(scope));
                 publish(scope, game);
-            } else publish(scope, game, socket);
+            } else publish(scope, game, resume ? null : socket);
             if (error) send(socket, { t: 'match-error', reason: error });
         } catch {
             send(socket, { t: 'match-error', reason: 'storage-unavailable' });

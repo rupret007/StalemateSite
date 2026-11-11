@@ -26,8 +26,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await page.goto(entrance.url);
             const entry = page.getByRole('link', { name: 'Play online with friends' });
             await expect(entry).toHaveAttribute('href', destination);
-            await entry.click();
-            await expect(page).toHaveURL(destination);
+            await Promise.all([
+                page.waitForRequest(request => request.isNavigationRequest() && request.url() === destination),
+                entry.click()
+            ]);
         } else await page.goto(destination);
         await page.getByLabel('Invitation code').fill(invitation);
         await page.getByRole('button', { name: 'Enter the community' }).click();
@@ -94,13 +96,23 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.locator('[data-text]').fill('Good game from Rad Dad');
         await b.locator('[data-send]').click();
         await expect(a.locator('[data-buffer]')).toContainText('Good game from Rad Dad');
+        await b.reload();
+        await expect(b.getByLabel('Your nick')).toHaveValue('ChessGuest');
+        await b.locator('[data-enter]').click();
+        await expect(b.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
+        await expect(b.getByRole('button', { name: 'e5, Black pawn' })).toBeVisible();
+        await expect(a.getByRole('button', { name: 'e5, Black pawn' })).toBeVisible();
+        await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+        await expect(b.locator('[data-buffer]')).not.toContainText('Good game from Rad Dad');
         await b.getByText('Four in a Row', { exact: true }).click();
         await expect(b.locator('[data-four]')).toHaveAttribute('open', '');
         await expect(b.locator('.arcade-chess')).not.toHaveAttribute('open', '');
         await b.getByText('Royal Flush Chess', { exact: true }).click();
         await expect(b.getByRole('button', { name: 'e5, Black pawn' })).toBeVisible();
         await expect(b.locator('[data-four]')).not.toHaveAttribute('open', '');
-        await expect(b.locator('[data-buffer]')).toContainText('Good game from Rad Dad');
+        await b.locator('[data-text]').fill('Back at the same board');
+        await b.locator('[data-send]').click();
+        await expect(a.locator('[data-buffer]')).toContainText('Back at the same board');
         await a.getByRole('button', { name: 'Offer draw', exact: true }).click();
         await b.getByRole('button', { name: 'Accept draw', exact: true }).click();
         await expect(a.locator('[data-chess-status]')).toContainText('Draw by agreement');
@@ -118,6 +130,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         await b.setViewportSize({ width: 390, height: 844 });
         await fit(b, 'phone-tall');
+        await b.locator('[data-leave]').click();
+        await expect(b.locator('[data-game-night]')).toBeHidden();
+        await b.reload();
+        await b.locator('[data-enter]').click();
+        await expect(b.locator('[data-connection]')).toHaveText('Connected');
+        await expect(b.locator('[data-game-night]')).toBeHidden();
         assert.deepEqual(errors, []);
         console.log(`Passed ${engine} ${entrances ? 'both generated arcade entry links' : 'protected entry with both brand contexts'}, invitation, keyboard/touch Chess, room chat, draw and rematch.`);
     } finally { await browser.close(); }
