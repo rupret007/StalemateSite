@@ -535,6 +535,44 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         console.log(`Passed ${engine} TurdRummy private hands, discard pickup, touch selection, ${media ? 'same call during a game switch' : 'full reload mid-draw'}, and rematch.`);
     }
+    async function finishSpadesRound(players) {
+        const status = page => page.locator('[data-spades-status]');
+        const cards = page => page.locator('[data-spades-card]');
+        const scores = page => page.locator('[data-spades-score]');
+        const remaining = players.map(() => 12);
+        for (let play = 4; play < 52; play++) {
+            let turn;
+            await expect.poll(async () => {
+                const messages = await Promise.all(players.map(page => status(page).textContent()));
+                turn = messages.flatMap((message, index) => message.startsWith('Round 1 · Your play') ? [index] : []);
+                return turn.length;
+            }).toBe(1);
+            const index = turn[0], page = players[index];
+            await page.locator('[data-spades-card]:enabled').first().click();
+            await expect(cards(page)).toHaveCount(--remaining[index]);
+        }
+        assert.deepEqual(remaining, [0, 0, 0, 0]);
+        const host = players[0];
+        await expect(status(host)).toHaveText(/^South \+ North [+-]?\d+.* \/ West \+ East [+-]?\d+/);
+        const summary = await status(host).textContent();
+        const scored = await scores(host).allTextContents();
+        const deltas = summary.split(' / ').map(team => Number(team.match(/ ([+-]?\d+)(?: ·|$)/)[1]));
+        for (const [index, score] of scored.entries()) {
+            assert.equal(Number(score.match(/ · (-?\d+)\/250 · /)[1]), deltas[index]);
+        }
+        for (const page of players) {
+            await expect(page.locator('[data-spades-table]')).toHaveAttribute('data-phase', 'round-end');
+            await expect(status(page)).toHaveText(summary);
+            await expect(scores(page)).toHaveText(scored);
+        }
+        await host.getByRole('button', { name: 'Next round' }).click();
+        await expect(status(players[2])).toHaveText('Round 2 · Your bid');
+        for (const page of players) {
+            await expect(cards(page)).toHaveCount(13);
+            await expect(scores(page)).toHaveText(scored);
+        }
+        console.log(`Passed ${engine} TurdSpades 13 tricks, matching partnership scores and dealer rotation.`);
+    }
     async function playSpades(a, b) {
         const north = await guest('stalemate', 'SpadesNorth', { width: 1280, height: 900 });
         const east = await guest('rad-dad', 'SpadesEast', { width: 390, height: 844 }, true);
@@ -610,6 +648,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         for (const page of [north, east, a]) await page.locator('[data-spades-card]:enabled').first().click();
         await expect(a.locator('[data-spades-status]')).toContainText('won the last trick');
+        await finishSpadesRound(players);
         await b.locator('[data-spades-action="resign"]').click();
         await b.getByRole('dialog', { name: 'Resign for your team?' }).getByRole('button', { name: 'Resign', exact: true }).click();
         await expect(a.locator('[data-spades-status]')).toContainText('South + North win by resignation');
@@ -646,14 +685,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(page.locator('[data-call-peers] li')).toHaveCount(1);
                 await expectOriginalPeer(page);
             }
-            console.log('Passed Chromium four-player Spades trick and rematch during a shared call, all 12 audio paths, camera delivery to three peers and cleanup on leave.');
+            console.log('Passed Chromium four-player Spades round and rematch during a shared call, all 12 audio paths, camera delivery to three peers and cleanup on leave.');
         }
         if (evidence) {
             await mkdir(evidence, { recursive: true });
             await a.screenshot({ path: join(evidence, `spades-${engine}-desktop.png`) });
             await b.screenshot({ path: join(evidence, `spades-${engine}-phone.png`) });
         }
-        console.log(`Passed ${engine} TurdSpades four independent guests, bidding, a complete trick, ${media ? 'same call during a game switch' : 'full reload mid-trick'}, and unanimous rematch.`);
+        console.log(`Passed ${engine} TurdSpades four independent guests, bidding, a scored round, ${media ? 'same call during a game switch' : 'full reload mid-trick'}, and unanimous rematch.`);
         return north;
     }
     async function joinSpadesCall([host, west, north, east]) {
