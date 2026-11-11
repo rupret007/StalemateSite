@@ -120,6 +120,9 @@ test('Stalemate entry through jam room to connected browser Web Join with few ba
         const inviteBandmate = hostCtx.page.getByRole('button', { name: 'Invite bandmate to room', exact: true });
         const guestNickname = hostCtx.page.getByLabel('Guest nickname', { exact: true });
         await expect(inviteBandmate).toBeInViewport({ ratio: 1 });
+        await hostCtx.page.setViewportSize({ width: 375, height: 667 });
+        await expect(inviteBandmate).toBeInViewport({ ratio: 1 });
+        expect(await hostCtx.page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
         await inviteBandmate.press('Enter');
         await expect(guestNickname).toBeFocused();
         await hostCtx.page.keyboard.press('Escape');
