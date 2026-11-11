@@ -262,6 +262,9 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .four-board td span { display: grid; min-height: 22px; place-items: center; font: bold 14px var(--mono); }
 .four-board [data-mark="X"] { color: var(--lime); }
 .four-board [data-mark="O"] { color: var(--blue); }
+@media (max-width: 1099px) {
+  .game-night:has(.four-match[open]) .game-call { display: none; }
+}
 @media (min-width: 1100px) {
   .game-night:has(.four-match[open]) {
     display: grid;

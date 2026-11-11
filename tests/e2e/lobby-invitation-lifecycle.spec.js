@@ -383,6 +383,9 @@ test('Game Night invites players, publishes a Discord handoff and keeps chat usa
         await guest.locator('[data-text]').fill('Anyone up for a round?');
         await guest.locator('[data-send]').click();
         await expect(host.locator('[data-chat-lines]')).toContainText('Anyone up for a round?');
+        await guest.getByText('Four in a Row', { exact: true }).click();
+        await expect(guest.locator('[data-game-call-status]')).toBeHidden();
+        await expect(open).toBeVisible();
         await host.getByRole('button', { name: 'Remove link' }).click();
         await expect(guest.locator('[data-game-open]')).not.toHaveAttribute('href', /./);
     } finally {
