@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { chromium, webkit } from 'playwright';
 import { expect } from '@playwright/test';
 import { findDuelSolution } from '../../hangout-worker/arcade/games/turdomania-duel.js';
 import { unpackRushRacer } from '../../hangout-worker/arcade/games/turdrush-race.js';
+
+const runProcess = promisify(execFile);
 
 export async function runArcadeBrowser(engine, origin, invitation, evidence, entrances, media, relay = false, mixed = null) {
     const browser = await { chromium, webkit }[engine].launch({
@@ -267,7 +272,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(b.getByRole('button', { name: 'Mute mic' })).toBeVisible();
         for (const page of [a, b]) await waitForPackets(page, 'audio');
         if (relay) for (const page of [a, b]) {
-            const [selected] = await relayStats(page);
+            const [selected] = await selectedPairStats(page);
             assert.deepEqual(selected.candidates, ['relay', 'relay']);
         }
         if (relay) console.log('Verified both browsers selected TURN relay candidates and received audio over the relay.');
@@ -296,7 +301,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(a.locator('[data-call-peers] video')).toBeHidden();
         for (const page of [a, b]) await page.locator('[data-call-toggle]').click();
     }
-    function relayStats(page) {
+    function selectedPairStats(page) {
         return page.evaluate(async () => {
             const active = window.testPeers.filter(peer => peer.connectionState !== 'closed');
             return Promise.all(active.map(async peer => {
@@ -325,6 +330,30 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     async function expectOriginalPeer(page) {
         assert.deepEqual(await page.evaluate(() => window.testPeers.flatMap((peer, index) =>
             peer.connectionState === 'closed' ? [] : [index])), [0]);
+    }
+    async function compareHostsDuringCall(voicePeers, cameraPeers) {
+        const packetSamples = [...voicePeers.map(page => [page, 'audio']), ...cameraPeers.map(page => [page, 'video'])];
+        const before = await Promise.all(packetSamples.map(([page, kind]) => packetCounts(page, kind)));
+        const initialPairs = (await Promise.all(voicePeers.map(selectedPairStats))).flat();
+        const benchmark = fileURLToPath(new URL('./turdtris-host-compare.mjs', import.meta.url));
+        const start = performance.now();
+        const { stdout } = await runProcess(process.execPath, [benchmark], { timeout: 30000 });
+        const seconds = (performance.now() - start) / 1000;
+        const finalPairs = (await Promise.all(voicePeers.map(selectedPairStats))).flat();
+        const after = await Promise.all(packetSamples.map(([page, kind]) => packetCounts(page, kind)));
+        for (const [index, [, kind]] of packetSamples.entries()) {
+            assert.equal(after[index].length, 3);
+            const advanced = after[index].filter((count, peer) => count > before[index][peer]).length;
+            assert.equal(advanced, kind === 'audio' ? 3 : 1, `${kind} carried packets during the host comparison`);
+        }
+        assert.equal(initialPairs.length, 12);
+        assert.equal(finalPairs.length, initialPairs.length);
+        const bytesReceived = finalPairs.reduce((total, pair, index) => total + pair.bytesReceived - initialPairs[index].bytesReceived, 0);
+        assert.ok(bytesReceived > 0);
+        const result = JSON.parse(stdout);
+        console.log('Turdtris host comparison during a four-person loopback call:', JSON.stringify({
+            ...result, call: { relayed: relay, seconds: Number(seconds.toFixed(2)), browserPairBytesReceived: bytesReceived }
+        }));
     }
     async function submitCallReport(page, reason, capture = false) {
         const dialog = page.getByRole('dialog', { name: 'Report call participant' });
@@ -528,7 +557,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     .map((count, peer) => count > audioBeforeTrick[index][peer])).toEqual([true, true, true]);
             }
             if (relay) {
-                const stats = (await Promise.all(players.map(relayStats))).flat();
+                const stats = (await Promise.all(players.map(selectedPairStats))).flat();
                 assert.equal(stats.length, 12);
                 for (const sample of stats) {
                     assert.deepEqual(sample.candidates, ['relay', 'relay']);
@@ -575,6 +604,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         for (const page of [host, west, north]) {
             await expect.poll(async () => (await packetCounts(page, 'video')).filter(count => count > 5).length).toBe(1);
         }
+        if (process.env.ARCADE_COMPARE_HOSTS === '1') await compareHostsDuringCall([host, west, north, east], [host, west, north]);
         await expect(west.locator('[data-spades-hand]')).toBeInViewport({ ratio: 1 });
         await west.locator('[data-call-toggle]').tap();
         await expect(west.getByRole('button', { name: 'Mute mic' })).toBeVisible();
@@ -1131,7 +1161,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await playTurdRush(a, b, spectator);
         await playTurdanoid(a, b, spectator);
         if (relay) {
-            const stats = (await Promise.all([relayStats(a), relayStats(b)])).flat();
+            const stats = (await Promise.all([selectedPairStats(a), selectedPairStats(b)])).flat();
             assert.equal(stats.length, 2);
             for (const sample of stats) {
                 assert.deepEqual(sample.candidates, ['relay', 'relay']);
