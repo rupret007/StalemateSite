@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import worker from '../src/index.mjs';
 import { createLobby, BOT } from '../src/lobby-core.mjs';
 
@@ -85,7 +86,7 @@ describe('approved deployment decisions', () => {
     });
     it('vault dry-run works without a vault and emits item/binding names only', () => {
         const script = new URL('../../scripts/hangout-secrets-from-vault.sh', import.meta.url);
-        const output = execFileSync('bash', [script.pathname, '--dry-run'], { env: { PATH: process.env.PATH, HOME: '/nonexistent-vault' }, encoding: 'utf8' });
+        const output = execFileSync('bash', [fileURLToPath(script), '--dry-run'], { env: { PATH: process.env.PATH, HOME: '/nonexistent-vault' }, encoding: 'utf8' });
         expect(output.trim().split('\n')).toEqual([
             'Hangout HMAC Key -> HANGOUT_HMAC_KEY',
             'Hangout Turnstile Secret -> HANGOUT_TURNSTILE_SECRET',
