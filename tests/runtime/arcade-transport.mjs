@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,7 +16,11 @@ const room = '#game-2ca9e1x1be34a';
 const browserName = process.argv[2]?.replace(/^--browser=/, '') || '';
 assert.ok(['', 'chromium', 'webkit'].includes(browserName), 'choose --browser=chromium or --browser=webkit');
 const evidence = process.env.ARCADE_BROWSER_EVIDENCE ? resolve(process.env.ARCADE_BROWSER_EVIDENCE) : null;
+const app = fileURLToPath(new URL('../../', import.meta.url));
 const assets = fileURLToPath(new URL('../../.beta-assets/', import.meta.url));
+const sharedSource = process.env.ARCADE_TEST_SOURCE ? resolve(process.env.ARCADE_TEST_SOURCE) : null;
+const radDad = process.env.ARCADE_TEST_RAD_DAD ? resolve(process.env.ARCADE_TEST_RAD_DAD) : null;
+assert.equal(!!sharedSource, !!radDad, 'provide both arcade checkouts for the cross-site browser proof');
 const directory = await mkdtemp(join(tmpdir(), 'game-night-arcade-'));
 let mf, runtime;
 
@@ -78,6 +83,26 @@ async function serveAsset(request) {
     catch { return new Response('Not found', { status: 404 }); }
 }
 
+async function previewEntrances(betaOrigin) {
+    if (!sharedSource) return null;
+    const receipt = await readFile(join(app, 'hangout-worker/arcade/VENDORED.txt'), 'utf8');
+    const sha = /^Turdanoid@([a-f0-9]{40})\s*$/.exec(receipt)?.[1];
+    assert.ok(sha, 'shared arcade source pin');
+    const entries = {};
+    for (const [brand, repository, script, url] of [
+        ['stalemate', app, 'lib/sync-turdanoid.cjs', 'https://stalemate.band/play/'],
+        ['rad-dad', radDad, 'sync-arcade.cjs', 'https://raddadband.com/play/']
+    ]) {
+        const stage = join(directory, brand);
+        await mkdir(stage);
+        await cp(join(repository, 'scripts'), join(stage, 'scripts'), { recursive: true });
+        execFileSync(process.execPath, [join(stage, 'scripts', script), '--source', sharedSource, '--game-night', betaOrigin + '/beta/', sha],
+            { cwd: stage, stdio: 'pipe' });
+        entries[brand] = { url, html: await readFile(join(stage, 'play/index.html'), 'utf8') };
+    }
+    return entries;
+}
+
 try {
     runtime = await rolldown({ input: fileURLToPath(new URL('./lobby-session-authority/worker.mjs', import.meta.url)),
         platform: 'neutral', external: ['node:crypto'] });
@@ -85,7 +110,7 @@ try {
     mf = new Miniflare(convertV4MiniflareOptions({
         name: 'private-arcade-fixture', rootPath: directory, modulesRoot: directory,
         modules: [{ type: 'ESModule', path: join(directory, 'worker.mjs'), contents: bundled.output[0].code }],
-        compatibilityDate: '2026-10-01', host: '127.0.0.1', port: 0, telemetry: { enabled: false },
+        compatibilityDate: '2026-10-01', host: '127.0.0.1', port: 0, https: !!browserName, telemetry: { enabled: false },
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true } },
         bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1',
             ...(browserName ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
@@ -101,7 +126,8 @@ try {
     assert.equal(initialized.status, 200, await initialized.text());
     if (browserName) {
         const { runArcadeBrowser } = await import('./arcade-browser.mjs');
-        await runArcadeBrowser(browserName, (await mf.ready).origin, invite, evidence);
+        const browserOrigin = (await mf.ready).origin;
+        await runArcadeBrowser(browserName, browserOrigin, invite, evidence, await previewEntrances(browserOrigin));
     } else {
     const white = await guest('FixtureWhite', 'stalemate', '192.0.2.11');
     const black = await guest('FixtureBlack', 'rad-dad', '192.0.2.12');

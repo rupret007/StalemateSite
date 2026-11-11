@@ -26,7 +26,7 @@ const markup = `
         <div data-clock-side="w"><span>White</span><time data-clock="w">10:00</time></div>
         <div data-clock-side="b"><span>Black</span><time data-clock="b">10:00</time></div>
     </div>
-    <div id="board" class="arcade-chess-board" role="group" aria-label="Chessboard"></div>
+    <div id="board" class="arcade-chess-board" role="group" aria-label="Chessboard" aria-description="Use arrow keys to navigate squares and Enter to select or move."></div>
     <div class="arcade-chess-actions" aria-label="Match controls">
         <button type="button" class="btn btn--small btn--ghost" data-action="offer-draw">Offer draw</button>
         <button type="button" class="btn btn--small" data-action="accept-draw" hidden>Accept draw</button>
@@ -35,6 +35,7 @@ const markup = `
         <button type="button" class="btn btn--small btn--ghost" data-action="resign">Resign</button>
         <button type="button" class="btn btn--small btn--ghost" data-action="leave">Leave match</button>
     </div>
+    <a class="small" href="/play/assets/chess/chessground-10.5.0-source.tar.gz" download>Chess board source</a>
 </div>
 <dialog class="sheet" aria-labelledby="arcade-chess-choice-title" data-chess-choice>
     <h3 id="arcade-chess-choice-title"></h3>
@@ -172,6 +173,7 @@ export function mountArcadeChess(container) {
 
     function applyState(frame) {
         const prior = model?.match, next = frame.state?.match;
+        const enteringBoard = next && next.id !== prior?.id;
         if (model?.id !== frame.state?.id || prior?.revision !== next?.revision) {
             selected = null; closeChoice(); feedback.textContent = '';
         }
@@ -180,6 +182,9 @@ export function mountArcadeChess(container) {
         model = frame.state; canOpen = frame.canOpen === true;
         receivedAt = performance.now(); deadlineSynced = false;
         draw();
+        if (enteringBoard) requestAnimationFrame(() => {
+            if (panel.open && model?.id === next.id) container.scrollTop = 0;
+        });
     }
 
     const isTurn = () => ready && !pending && model?.seat === model?.match?.turn && !!chess && !model.match.result;

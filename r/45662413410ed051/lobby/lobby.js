@@ -46,6 +46,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         sessionStorage.removeItem(ENTRY_HANDOFF_KEY);
     } catch { /* A blocked tab store must not prevent ordinary chat. */ }
     const entrySource = params.has('via') ? entrySourceFromParams(params, entrySites) : handoff?.source || '';
+    const gameArcadeBrand = entrySource === 'rad-dad' ? entrySites['rad-dad'] : entrySites.stalemate;
+    $('[data-game-arcade]').href = new URL('play/', gameArcadeBrand.home).href;
+    $('[data-game-arcade-label]').textContent = `Open ${gameArcadeBrand.label} Arcade`;
     let shareEntry = handoff?.share !== false;
     let entrySourcesSupported = null;
     let privateMessageContextSupported = false, privateMessagePeersSupported = false, personTargetsSupported = false;

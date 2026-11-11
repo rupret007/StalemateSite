@@ -333,12 +333,12 @@ function ensureMountSlot(doc, target) {
   let slot = target.parent.querySelector(`:scope > #suite-arcade-a11y-mount, :scope > .${target.slotClass}`);
   if (!slot) {
     slot = doc.createElement('div');
-    slot.id = 'suite-arcade-a11y-mount';
     slot.className = target.slotClass;
     target.parent.insertBefore(slot, target.parent.firstChild);
-  } else if (!slot.id) {
-    slot.id = 'suite-arcade-a11y-mount';
   }
+  const previous = doc.getElementById('suite-arcade-a11y-mount');
+  if (previous && previous !== slot) { previous.removeAttribute('id'); }
+  slot.id = 'suite-arcade-a11y-mount';
   return slot;
 }
 
@@ -366,6 +366,20 @@ export function syncArcadeA11yMount(doc) {
   }
   if (!toggle) {
     return ensureArcadeA11yMount(doc);
+  }
+  const header = doc.querySelector('.suite-a11y-header-slot');
+  if (header) {
+    const previous = doc.getElementById('suite-arcade-a11y-mount');
+    if (previous && previous !== header) { previous.removeAttribute('id'); }
+    header.id = 'suite-arcade-a11y-mount';
+    if (toggle.parentElement !== header) {
+      header.appendChild(toggle);
+      toggle.className = 'suite-arcade-a11y-toggle suite-arcade-a11y-toggle--inline';
+    }
+    if (previous?.matches('.suite-a11y-pit-slot, .suite-a11y-body-slot') && !previous.childElementCount) {
+      previous.remove();
+    }
+    return header;
   }
   let bodySlot = doc.querySelector('body > .suite-a11y-body-slot');
   if (!bodySlot) {

@@ -67,6 +67,65 @@
 .arcade-chess-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
 .arcade-chess .btn { min-height: 44px; }
 .arcade-chess [data-chess-primary] { margin-bottom: .45rem; }
+.game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) { max-height: 68dvh; }
+@media (min-width: 901px) {
+    .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) {
+        display: grid;
+        grid-template: "chess heading" auto "chess actions" auto "chess other" auto "chess call" 1fr /
+            minmax(0, 30rem) minmax(0, 1fr);
+        gap: .6rem 1rem;
+        align-items: start;
+    }
+    .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .game-heading { grid-area: heading; }
+    .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .game-actions { grid-area: actions; }
+    .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .four-match { grid-area: other; }
+    .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .game-call { grid-area: call; }
+    .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .arcade-chess {
+        grid-area: chess;
+        margin-top: 0;
+    }
+    .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .buffer { min-height: 64px; }
+    .arcade-chess #board, .arcade-chess-clocks { width: min(100%, 25rem, max(15rem, calc(100dvh - 560px))); }
+}
+@media (max-width: 900px) {
+    body:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .titlebar {
+        min-height: 48px;
+        padding: 5px 10px;
+        gap: 8px;
+    }
+    body:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .brand-caption { display: none; }
+    body:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .brand { gap: 6px; }
+    body:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .brand b { white-space: nowrap; }
+    body:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .brand-mark { width: 29px; height: 29px; }
+    body:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .connection-tools { gap: 4px 6px; flex-wrap: nowrap; }
+    body:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .connection-tools button { min-height: 26px; padding-block: 3px; }
+    body:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) [data-fullscreen] { font-size: 0; }
+    body:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) [data-fullscreen]::before { content: "⛶"; font-size: 16px; }
+    .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .tabs { min-height: 40px; }
+    .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .tabs button { min-height: 35px; }
+    .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .roombar { padding: 4px 10px; }
+    .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .roombar .modes { flex-basis: auto; }
+    .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .buffer { min-height: 46px; padding-block: 4px; }
+    .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .quick { display: none; }
+    .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) {
+        display: flex;
+        flex-direction: column;
+        gap: .5rem;
+        padding: 6px 10px;
+    }
+    .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > * { flex-shrink: 0; }
+    .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .arcade-chess {
+        order: -1;
+        margin-top: 0;
+        padding: .3rem .5rem .5rem;
+    }
+    .arcade-chess-status { margin-block: 0 .3rem; }
+    .arcade-chess-playing { gap: .35rem; justify-items: center; }
+    .arcade-chess #board, .arcade-chess-clocks { width: min(100%, 25rem, max(13.25rem, calc(100dvh - 454px))); }
+}
+@media (max-width: 359px) {
+    body:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .connection { font-size: 0; gap: 0; }
+}
 @media (max-height: 530px) {
     .arcade-chess #board, .arcade-chess-clocks { width: min(100%, 15rem); }
 }
