@@ -123,6 +123,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(player.locator('[data-game-night]')).toBeVisible();
         await expect(player.getByRole('button', { name: 'Share room link' })).toBeHidden();
         await expect(player.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+        const matches = [], calls = [];
+        if (media && !relay) {
+            for (const [path, connections] of [[/\/beta\/arcade-match$/, matches], [/\/beta\/game-night-media$/, calls]]) {
+                await player.routeWebSocket(path, route => { connections.push([route, route.connectToServer()]); });
+            }
+        }
         await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
         await player.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
         await host.getByRole('button', { name: 'Open Chess match' }).click();
@@ -134,7 +140,53 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await player.locator('[data-send]').tap();
         await expect(host.getByRole('log', { name: 'Conversation' }).getByRole('listitem')
             .filter({ hasText: 'Meet me at the chess board' })).toBeVisible();
+        if (media && !relay) await verifyTransportRecovery(host, player, matches, calls);
         console.log(`Passed ${engine} protected Game Night launch, invite-only room link, stale instance refusal, shared Chess move and chat.`);
+    }
+    async function verifyTransportRecovery(host, player, matches, calls) {
+        const interrupt = connection => Promise.all(connection.map(route => route.close({ code: 1011, reason: 'fixture connection interrupted' })));
+        for (const page of [host, player]) {
+            await page.getByRole('button', { name: 'Call', exact: true }).click();
+            await page.getByRole('button', { name: 'Join call', exact: true }).click();
+            await expect(page.locator('[data-call-toggle]')).toHaveText('Call joined');
+            await page.getByRole('button', { name: 'Unmute mic' }).click();
+            await expect(page.getByRole('button', { name: 'Mute mic' })).toBeVisible();
+        }
+        await waitForPackets(host, 'audio');
+        await waitForPackets(player, 'audio');
+        const before = await packetCount(player, 'audio');
+        assert.equal(matches.length, 1);
+        assert.equal(calls.length, 1);
+        await interrupt(matches[0]);
+        await expect.poll(() => matches.length).toBe(2);
+        await expect(player.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+        await expect(player.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
+        await expect(player.locator('[data-connection]')).toHaveText('Connected');
+        await expect(player.locator('[data-call-toggle]')).toHaveText('Call joined');
+        await waitForPackets(player, 'audio', before);
+        assert.equal(calls.length, 1);
+        assert.equal(await player.evaluate(() => window.testPeers.length), 1);
+
+        await interrupt(calls[0]);
+        await expect(player.locator('[data-call-status]')).toHaveText('The call ended. Chat and games are still available.');
+        await expect.poll(() => player.evaluate(() => window.testLocalTracks.map(track => track.readyState))).toEqual(['ended']);
+        await expect(host.locator('[data-call-toggle]')).toHaveText('Call joined');
+        await tapSquare(player, 'd7');
+        await tapSquare(player, 'd5');
+        await expect(host.getByRole('button', { name: 'd5, Black pawn' })).toBeAttached();
+        assert.equal(matches.length, 2);
+        await player.locator('[data-text]').fill('The board and chat stayed connected');
+        await player.locator('[data-send]').tap();
+        await expect(host.getByRole('log', { name: 'Conversation' })).toContainText('The board and chat stayed connected');
+
+        await player.getByRole('button', { name: 'Join call', exact: true }).click();
+        await expect(player.locator('[data-call-toggle]')).toHaveText('Call joined');
+        await expect(player.getByRole('button', { name: 'Unmute mic' })).toBeVisible();
+        await waitForPackets(player, 'audio');
+        assert.equal(calls.length, 2);
+        assert.deepEqual(await player.evaluate(() => window.testLocalTracks.map(track => track.readyState)), ['ended']);
+        for (const page of [player, host]) await page.getByRole('button', { name: 'Leave call', exact: true }).click();
+        console.log('Passed Chromium separate match and call connection failures, same Chess seat, continued chat and explicit receive-only call rejoin.');
     }
     async function moveByKeyboard(page, from, arrow, count) {
         await page.locator(`[data-square="${from}"]`).focus();
@@ -222,8 +274,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     }
     function packetCount(page, kind) {
         return page.evaluate(async expected => {
-            const [pc] = window.testPeers;
-            if (!pc || pc.connectionState === 'closed') return 0;
+            const pc = window.testPeers.findLast(peer => peer.connectionState !== 'closed');
+            if (!pc) return 0;
             const stats = await pc.getStats();
             return [...stats.values()].filter(stat => stat.type === 'inbound-rtp' && stat.kind === expected)
                 .reduce((total, stat) => total + stat.packetsReceived, 0);
