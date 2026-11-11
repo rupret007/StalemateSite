@@ -153,14 +153,25 @@ test('three entrances share a guest-hosted creative room, real report review and
         for (const page of [author, witness, observer]) await expect(received(page, text)).toHaveCount(1);
         expect(await witness.evaluate(() => window.__lobby.capabilities.moderate)).toBe(false);
 
+        const normalViewport = witness.viewportSize();
+        await witness.setViewportSize({ width: 320, height: 188 });
         const flag = received(witness, text).locator('.flag');
         await flag.press('Enter');
         await expect(flag).toHaveText('✓');
         await expect(flag).toHaveAttribute('aria-disabled', 'true');
         await expect(flag).toHaveAttribute('tabindex', '-1');
         await expect(flag).toBeFocused();
+        await expect.poll(() => flag.evaluate(button => {
+            const flagBounds = button.getBoundingClientRect();
+            const chatBounds = button.closest('.chat').getBoundingClientRect();
+            const bufferBounds = button.closest('.buffer').getBoundingClientRect();
+            const composerBounds = document.querySelector('[data-say]').getBoundingClientRect();
+            return flagBounds.top >= Math.max(0, chatBounds.top, bufferBounds.top) &&
+                flagBounds.bottom <= Math.min(innerHeight, chatBounds.bottom, bufferBounds.bottom, composerBounds.top);
+        })).toBe(true);
         await witness.keyboard.press('Enter');
         await expect(flag).toBeFocused();
+        await witness.setViewportSize(normalViewport);
         await expect(reportRow(moderator, text)).toContainText('StaleAuthor');
         expect(await moderator.evaluate(id => window.__admin.state.reports.find(item => item.id === id).count, messageId)).toBe(1);
         await expect(moderator.locator('[data-panic]')).toBeHidden();
