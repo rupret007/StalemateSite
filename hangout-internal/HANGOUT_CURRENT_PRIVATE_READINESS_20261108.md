@@ -167,13 +167,17 @@ redistribution-license qualification remains explicitly unfinished.
    Disconnect meeting audio at both ends before Music. Leave/end Music before
    connecting meeting audio. Microphone or monitor mute alone is insufficient.
 5. Qualify the actual SSL2+ guitar/vocal inputs and Che’s Roland/interface route
-   when connected. Start quietly. Have Che confirm guitar alone, vocal alone,
-   then both together. Balance those inputs on the host before playing. The
-   browser receives one stereo mix with no separate guitar and vocal faders.
+   when connected. Start with low input gain on both SSL 2+ channels. Have Che
+   confirm guitar alone, vocal alone, then both together. Adjust their relative
+   levels on the SSL 2+ before playing. WebJam's default Jamulus route combines
+   both inputs before sending them. The browser receives one stereo session mix
+   with no separate guitar or vocal fader. [Jamulus input mix](https://github.com/jamulussoftware/jamulus/blob/r3_12_2/src/client.cpp#L1232-L1276) · [Browser audio bridge](https://github.com/rupret007/webjam/blob/6e26c693c7d8b0160d8a9ea3434954df526e81bd/docs/web-join-bridge.md#L17-L20)
+
    Then have Jeff confirm Che's drum input. Record Wi-Fi, dock Ethernet and a
-   second-network test separately. Record the browser's displayed direct or
-   relay route where available. Browser delay omits parts of the capture and
-   bridge path. [Browser audio bridge](https://github.com/rupret007/webjam/blob/6e26c693c7d8b0160d8a9ea3434954df526e81bd/docs/web-join-bridge.md#L17-L20)
+   second-network test separately. Web Join prefers a direct connection and can
+   fall back to TURN. Record the selected route from the browser after joining
+   on each network. Browser delay omits parts of the capture and bridge path.
+   [Browser connection setup](https://github.com/rupret007/webjam/blob/6e26c693c7d8b0160d8a9ea3434954df526e81bd/web/join/session.js#L55-L60)
 
 For a newcomer, send the community invitation privately. The fresh Music link
 is a separate, short-lived invitation created by the host. Never put either code
