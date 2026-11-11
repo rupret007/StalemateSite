@@ -18,17 +18,23 @@ WebJam source `b5483c5` also passed browser, desktop, and Jamulus integration CI
 [Website microphone checks](https://github.com/rupret007/StalemateSite/pull/283) ·
 [WebJam CI](https://github.com/rupret007/webjam/actions/runs/43079275947)
 
-The candidate changes six protected assets against the last verified serving
-source `3ad1cc19`. The other 65 protected assets, 56 Worker inputs and five
-build inputs match. Local workerd exercised 50 connected test guests, 12
+The later private-branch merge `60a24c0` keeps the Jam invite button's keyboard
+focus outline visible after closing the dialog at deep zoom. Both checks for
+that change passed. [Jam invite keyboard fix](https://github.com/rupret007/StalemateSite/pull/285)
+
+Through `60a24c0`, the branch changes the same six protected asset paths against
+the last verified serving source `3ad1cc19`. The keyboard fix revises the lobby
+stylesheet, already one of those six paths. The other 65 protected assets,
+56 Worker inputs and five build inputs match. Local workerd exercised the earlier
+`33d57f9` candidate with 50 connected test guests, 12
 messages and 600 deliveries, along with slow-client isolation, revocation and
 cold recovery. Hosted capacity and live media still need their own trials.
 [Local runtime CI](https://github.com/rupret007/StalemateSite/actions/runs/43081753166)
 
-The candidate awaits the Mini's deployment resource check and a fresh
-configuration, billing and rollback readback. The last verified serving
-version is `fca791b7`. Before switching to a candidate, verify `fca791b7` as
-the rollback target. After switching, use a normally admitted guest to check
+The next rollout awaits the Mini's deployment resource check and a fresh
+configuration, billing and rollback readback. Confirm the version serving
+immediately before the switch and keep it ready for rollback. The last verified
+serving version was `fca791b7`. After switching, use a normally admitted guest to check
 the served Jam and Web Join assets, then log out. The Windows NucBox was
 offline at the latest check. The live Mac-to-Windows rehearsal, Shared Track
 and Webex remain open.
@@ -119,7 +125,7 @@ tracks all [62 original requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md).
 | Selected audio connection | Upstream [WebJam PR466](https://github.com/rupret007/webjam/pull/466), reviewed head `098c57250b5ed2b97c233d7e843f5c5d1297a9e8`, merged as `01804299f3940f243b06f88749d488e03f08cf5c`. Delay and receiver adaptation now use the actual selected transport pair rather than a retired pair encountered last. Four regressions failed before the fix. Completed CI passed 44 Web Join unit cases, 69 browser cases, 87 Worker cases and 12,976 application tests with 60 existing skips across 566 modules. The website mirrors the reviewed audio bytes and provenance. | This browser JavaScript fix does not change the native host runtime or relabel existing native packages. Physical latency, acoustic listening, LAN routing and relay admission still need their own evidence. |
 | Earlier application provider-start CI | [Run 42780185842](https://github.com/rupret007/StalemateSite/actions/runs/42780185842), job 129708072371, completed the actual `--participation --provider-start` application/workerd mode against website revision `11c9d1f8`. All 15 recorded mode/install/audit exits were zero. Owner/start ordering, duplicate start, Stop/revoke/close fencing and owned cleanup passed. | Real guardian decisions, hosted capacity and media acceptance remain open. |
 | Issuer | Last verified `fd37578f-13cd-4fce-b557-35c0d962ef9d` at100%; completed405/204/403 negatives have receiptc209b961. | Reuse that completed result; do not rerun it or mint test credentials. The existing cap/hold and fresh account headroom still govern trials. |
-| Rollback | Use `43002fe9-4d04-456b-9fde-320dc151abc8` for the immediate private-site rollback. The earlier `f5319d4a`, `e1c40ea5`, `1b48de76` and issuer rollback `4db649fa` remain in the release history. | Recheck the guards and compare serving state and effective configuration after a rollback. |
+| Private site rollback | `fca791b7` was the last verified serving version. If it is still serving before the next rollout, keep it ready as that rollout's rollback target. `43002fe9-4d04-456b-9fde-320dc151abc8` was the previous version and remains the recorded fallback for the switch that deployed `fca791b7`. [Release evidence](../pr-assets/private-readiness/20261111/web-join-audio-check/qualification.json) | Verify the current serving version and rollback target before switching. Compare the serving state and effective configuration after any rollback. The issuer has its own recorded fallback, `4db649fa`. |
 
 The [sanitized live receipt and screenshots](../pr-assets/private-readiness/20261109/README.md)
 cover actual Mac Chrome/Safari observations on c83:
