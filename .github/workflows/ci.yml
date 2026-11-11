@@ -52,6 +52,16 @@ jobs:
       - name: Run automated tests
         run: npm test
 
+      - name: Exercise the protected Chess room in Chromium and WebKit
+        timeout-minutes: 5
+        env:
+          ARCADE_BROWSER_EVIDENCE: ${{ github.workspace }}/test-results/arcade-multiplayer
+        run: |
+          npm ci --prefix tests/runtime/durable-records
+          npm run package:beta
+          node tests/runtime/arcade-transport.mjs --browser=chromium
+          node tests/runtime/arcade-transport.mjs --browser=webkit
+
       - name: Build the shared-community entry toolkit
         shell: bash
         run: |
