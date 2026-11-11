@@ -5,7 +5,7 @@ import { ROOM_TTL, LOG_TTL, OWNER_TRANSFER_TTL, roomRecord, validRoom, createRat
 import { checkNick, checkText, defaultLists, normalize } from './filter.mjs';
 import { actSnapshot, applyClear, applyStroke, applyVideo, cleanRtc, parseActFrame, PAINT_KINDS, VIDEO_KINDS } from './lobby-act.mjs';
 import { messageReceipt, receiptDigest } from './message-receipts.mjs';
-import { discordCallLink, gameNightRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import { discordCallLink, dropFour, fourFinished, fourMark, gameNightRoomName, openFour } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import { personRoomProjection } from './lobby-effect-records.mjs';
 import { TRANSPORT_CONTROL_BLOCK } from './transport-budget.mjs';
 import { ENTRY_SITES, normalizeEntrySource } from '../../r/45662413410ed051/entry-sites.mjs';
@@ -123,7 +123,7 @@ const parseDuration = (s, fallback) => {
 export const COMMANDS = Object.freeze({
     register: 'any', cohost: 'any', transfer: 'any', acceptowner: 'any', unregister: 'any', join: 'any', part: 'any', quit: 'any', nick: 'any', me: 'any', msg: 'any', query: 'any', whois: 'any', away: 'any',
     ignore: 'any', unignore: 'any', list: 'any', names: 'any', topic: 'any', slap: 'any', help: 'any', report: 'any',
-    accept: 'any', decline: 'any', block: 'any', unblock: 'any', pm: 'any', cam: 'any',
+    accept: 'any', decline: 'any', block: 'any', unblock: 'any', pm: 'any', cam: 'any', four: 'any',
     kick: 'chanop', ban: 'chanop', unban: 'chanop', invite: 'chanop', op: 'chanop', deop: 'chanop', voice: 'chanop',
     devoice: 'chanop', jamlink: 'chanop', discord: 'chanop', mode: 'chanop', close: 'chanop', lock: 'chanop',
     mute: 'moderator', gban: 'moderator', purge: 'moderator', shield: 'band', shieldoff: 'band', lobby: 'band', filter: 'band',
@@ -549,7 +549,11 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         return { ok: true };
     }
     const chanView = (chan, viewer) => ({ name: chan.name, kind: roomKind(chan), title: chan.title, topic: chan.topic, modes: { ...chan.modes, k: chan.modes.k ? true : false }, count: chan.members.size, keepRef: chan.keepRef, persistent: !!chan.owner, expiresAt: chan.owner ? chan.renewed + ROOM_TTL : null, names: names(chan), mediaBlocked: mediaBlocked(chan, viewer), jam: chan.jam ? { desktop: chan.jam.desktop, invitation: chan.jam.invitation || chan.jam.desktop, web: chan.jam.web, webReady: !!chan.jam.web } : null,
-        ...(roomKind(chan) === 'game' ? { gameCall: chan.gameCall?.url || '' } : {}) });
+        ...(roomKind(chan) === 'game' ? { gameCall: chan.gameCall?.url || '', four: chan.four || null } : {}) });
+    const updateFour = (chan, game) => {
+        chan.four = game;
+        cast(chan, { t: 'four', ch: chan.name, roomInstance: chan.keepRef, game });
+    };
     const sendChan = (chan, { presence = false } = {}) => {
         if (chan.gameCall) {
             const host = conns.get(chan.gameCall.by);
@@ -858,7 +862,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             cams: new Set(), since: now(), lastNick: 0, tokens: L.burst, last: now(), frames: 0, lastSaid: {}, actTokens: L.actBurst, actLast: now() };
         conns.set(id, c);
         if (band) { net.lastBand = now(); if (net.shieldAuto || net.lockAuto) bot(c, 'A saved safety state needs review: fans can read but not talk while the lobby is read-only. Check the band panel; /lobby unlock and /shieldoff when you are ready.'); saveNet(); }
-        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, ...(gameNight ? { gameNight: 1, discordLinks: !participationConfigured } : {}) } });
+        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, ...(gameNight ? { gameNight: 1, fourInARow: 1, discordLinks: !participationConfigured } : {}) } });
         return { ok: true };
     }
 
@@ -885,6 +889,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (!chan || !chan.members.has(c.id)) return;
         chan.members.delete(c.id);
         c.channels.delete(chan.name);
+        if (chan.four && [chan.four.host, chan.four.guest].includes(c.id)) updateFour(chan, null);
         if (![...c.channels].some(name => !['lobby', 'chat', 'jam'].includes(ch(name)?.kind))) participationMedia.delete(c.id);
         c.cams.delete(lc(chan.name));
         event(chan, quitting ? `${nickOf(c)} has quit (${why || 'Quit'})` : `${nickOf(c)} has left ${chan.name}${why ? ` (${why})` : ''}`);
@@ -924,7 +929,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         event(chan, `${nickOf(c)} has joined ${chan.name}`);
         if (chan.kind === 'lobby') bot(c, `welcome to #stalemate, ${c.nick}. One rule: Don’t be a dick. Swear all you want; no hate, threats, creepy stuff or personal info. 🚩 anything gross. /help for commands.`);
         else if (chan.kind === 'jam') bot(c, `welcome to ${chan.name}. Music runs in the WebJam desktop app using Jamulus. Ethernet is recommended; actual delay and dropouts depend on the devices and network.`);
-        else if (roomKind(chan) === 'game') bot(c, `welcome to ${chan.name}. Invite your players and use chat to pick a game.`);
+        else if (roomKind(chan) === 'game') bot(c, 'Chat starts when you join. Use the flag beside a message to report it.');
         else if (chan.kind === 'chat') bot(c, `welcome to ${chan.name}. The room host runs this conversation; site moderators handle abuse. Chat starts when you join. Start an activity room to draw, watch or use optional cameras.`);
         else bot(c, `welcome to ${chan.name}. The room host runs this activity; site moderators handle abuse. Cameras stay off unless you turn yours on (18+).`);
         sendChan(chan, { presence: true });
@@ -1351,8 +1356,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             Object.assign(room, r, { ops: new Set(r.ops), opAccounts: new Map(r.opAccounts || []), voice: new Set(r.voice), invites: new Set(r.invites), cohosts: new Set(r.cohosts), emptySince: r.emptySince ?? now(),
                 transfer: r.transfer?.until > now() ? { ...r.transfer } : null });
             // Game Night persists as a chat room, which older Workers can also read.
-            // Call links are live-only, and Game Night always returns as invite-only.
+            // Calls and boards are live-only, and Game Night returns as invite-only.
             room.gameCall = null;
+            room.four = null;
             if (roomKind(room) === 'game') { room.modes.i = true; room.modes.C = false; }
             // Decode through the activity validators; malformed media state cannot become a frame.
             room.act = { strokes: [], video: null };
@@ -1609,7 +1615,16 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 }
             }
             if (!closing) { out(t, { t: 'pm-closed', with: c.nick }); out(c, { t: 'pm-closed', with: t.nick }); }
-            if (mediaChanged) refreshBlockedMedia(c, t.dev);
+            if (mediaChanged) {
+                refreshBlockedMedia(c, t.dev);
+                for (const name of c.channels) {
+                    const room = ch(name);
+                    if (!room?.four) continue;
+                    const { host, guest } = room.four;
+                    const opponent = host === c.id ? guest : guest === c.id ? host : '';
+                    if (conns.get(opponent)?.dev === t.dev) updateFour(room, null);
+                }
+            }
             bot(c, `Blocked ${t.nick || 'this visitor'}. They can't PM you and you won't see them.`);
             return personPreferences(c);
         },
@@ -1775,6 +1790,38 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (!url) return bot(c, 'Use a Discord server invite or a server channel link.', 'error');
             chan.gameCall = { url, by: c.id };
             return sendChan(chan);
+        },
+        four(c, chan, [action, gameId = '', revision, column], instance) {
+            if (roomKind(chan) !== 'game' || !chan.members.has(c.id) || instance !== chan.keepRef)
+                return bot(c, 'Open your current Game Night room to play.', 'error');
+            const game = chan.four;
+            const seat = game?.host === c.id ? 'X' : game?.guest === c.id ? 'O' : '';
+            if (gameId !== (game?.id || '')) return bot(c, 'The match changed. Use the current board.', 'error');
+            if (action === 'leave' && seat) return updateFour(chan, null);
+            if (net.shield || budgetLevel() !== 'ok' || net.lock === 'readonly' || chan.modes.Q
+                || Math.max(net.mutes[c.dev] || 0, net.mutes[c.account] || 0) > now()
+                || chan.modes.m && !hosts(c, chan) && !chan.voice.has(c.dev))
+                return bot(c, 'The board is read-only for you right now.', 'error');
+            if (action === 'open' && isOp(c, chan) && (!game || fourFinished(game))) {
+                requireParticipation(c, 'publicArtifact');
+                return updateFour(chan, openFour(crypto.randomUUID(), c.id));
+            }
+            if (action === 'join' && game && !seat && !game.guest) {
+                const host = conns.get(game.host);
+                if (!host || host.dev === c.dev || c.blocks.has(host.dev) || host.blocks.has(c.dev))
+                    return bot(c, 'That seat is unavailable to you.', 'error');
+                requireParticipation(c, 'publicArtifact');
+                return updateFour(chan, { ...game, guest: c.id });
+            }
+            if (action === 'drop' && game && seat === fourMark(game.moves) && revision === String(game.moves)
+                && /^[1-7]$/.test(column || '')) {
+                const next = dropFour(game, Number(column) - 1);
+                if (next) {
+                    requireParticipation(c, 'publicArtifact');
+                    return updateFour(chan, next);
+                }
+            }
+            return bot(c, 'That move is unavailable. Check the turn and column on the board.', 'error');
         },
         lock(c, chan, [v]) {
             if (chan.kind === 'lobby') return handlers.lobby(c, chan, [v === 'off' ? 'unlock' : 'readonly']);
@@ -2403,6 +2450,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         net.shieldAuto = false;
         if (on) for (const room of channels.values()) {
             room.gameCall = null;
+            room.four = null;
             if (room.kind !== 'lobby') { room.modes.C = false; camsOff(room, by); }
         }
         else for (const room of channels.values()) if (room.kind !== 'lobby' && room.kind !== 'chat') room.modes.C = true;

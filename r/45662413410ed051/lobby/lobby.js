@@ -4,7 +4,7 @@ import { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams
 import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
 import { createIdleHeartbeat } from './idle-heartbeat.mjs';
-import { discordCallLink, gameNightRoomName } from './game-night.mjs';
+import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourWinningCells, gameNightRoomName } from './game-night.mjs';
 (() => {
     'use strict';
     const $ = (s, el = document) => el.querySelector(s);
@@ -460,6 +460,8 @@ import { discordCallLink, gameNightRoomName } from './game-night.mjs';
     let jamShareResultsSupported = false, jamShareTimer;
     let gameNightSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
     let arcadeChessSupported = false, arcadeChess = null, arcadeChessLoading = false;
+    let fourInARowSupported = false, fourRoom = null, fourPlayed = false;
+    const fourButtons = [], fourCells = [];
     function stopLocalCamera(channel) {
         const c = app.chans.get(channel);
         if (!c) return false;
@@ -880,6 +882,7 @@ import { discordCallLink, gameNightRoomName } from './game-night.mjs';
             jamShareResultsSupported = m.features?.jamShareResults === 1;
             gameNightSupported = m.features?.gameNight === 1;
             arcadeChessSupported = m.features?.arcadeChess === 1;
+            fourInARowSupported = m.features?.fourInARow === 1;
             discordLinksSupported = m.features?.discordLinks === true;
             shieldActive = m.shield === true;
             $('[data-start="game"]').hidden = !gameNightSupported;
@@ -966,6 +969,13 @@ import { discordCallLink, gameNightRoomName } from './game-night.mjs';
             c.mediaBlocked = [...denied];
             const r = room();
             if (r) r.onChan(c);
+            break;
+        }
+        case 'four': {
+            const c = app.chans.get(m.ch);
+            if (!fourInARowSupported || c?.kind !== 'game' || c.keepRef !== m.roomInstance) break;
+            c.four = m.game;
+            if (app.active === c.name) drawGameNight();
             break;
         }
         case 'chan': {
@@ -1194,10 +1204,11 @@ import { discordCallLink, gameNightRoomName } from './game-night.mjs';
         const focusKey = nav.contains(document.activeElement) ? document.activeElement.dataset.channelKey : null;
         nav.replaceChildren();
         let totalUnread = 0;
-        const mk = (key, label, unread, mentions) => {
+        const mk = (key, label, unread, mentions, title) => {
             const b = document.createElement('button');
             b.type = 'button'; b.role = 'tab'; b.textContent = unread ? `${label} (${unread}${mentions ? ' · @you' : ''})` : label;
             b.dataset.channelKey = key;
+            if (title) b.title = title;
             b.setAttribute('aria-selected', String(app.active === key));
             b.tabIndex = app.active === key ? 0 : -1;
             b.classList.toggle('has-mention', !!mentions);
@@ -1205,7 +1216,13 @@ import { discordCallLink, gameNightRoomName } from './game-night.mjs';
             b.addEventListener('click', () => switchTo(key));
             nav.append(b);
         };
-        for (const c of app.chans.values()) mk(c.name, `${KIND_ICON[c.kind] === '#' ? '' : `${KIND_ICON[c.kind]} `}${c.name}`, c.unread, c.mentions);
+        const gameRooms = [...app.chans.values()].filter(c => c.kind === 'game');
+        for (const c of app.chans.values()) {
+            if (c.kind === 'game') {
+                const label = gameRooms.length === 1 ? 'Game Night' : `Game Night ${gameRooms.indexOf(c) + 1}`;
+                mk(c.name, label, c.unread, c.mentions, c.name);
+            } else mk(c.name, `${KIND_ICON[c.kind] === '#' ? '' : `${KIND_ICON[c.kind]} `}${c.name}`, c.unread, c.mentions);
+        }
         for (const [ref, p] of app.pms) mk(`pm:${ref}`, `✉ ${p.nick}${p.open ? '' : ' (closed)'}`, p.unread, p.mentions);
         if (focusKey) $$('[role="tab"]', nav).find((b) => b.dataset.channelKey === focusKey)?.focus({ preventScroll: true });
         document.title = `${totalUnread ? `(${totalUnread}) ` : ''}#stalemate · Hang Out`;
@@ -1359,7 +1376,7 @@ import { discordCallLink, gameNightRoomName } from './game-night.mjs';
             && c?.kind === 'game' && c.names?.some(member => member.id === app.selfId) ? c : null;
     }
     function clearGameLinks() {
-        for (const c of app.chans.values()) if (c.kind === 'game') c.gameCall = '';
+        for (const c of app.chans.values()) if (c.kind === 'game') { c.gameCall = ''; c.four = null; }
         drawGameNight();
     }
     function drawGameNight() {
@@ -1387,6 +1404,7 @@ import { discordCallLink, gameNightRoomName } from './game-night.mjs';
         $('[data-game-clear]').hidden = !link;
         $('[data-game-invite]').hidden = !c || !amOp(c);
         $('[data-game-night]').hidden = !c;
+        drawFour(c);
         drawArcadeChess(c);
     }
     function drawArcadeChess(c) {
@@ -1401,6 +1419,98 @@ import { discordCallLink, gameNightRoomName } from './game-night.mjs';
         }).catch(() => toast('Chess could not load. Reopen Game Night to try again.'))
             .finally(() => { arcadeChessLoading = false; });
     }
+    function fourCommand(action, column) {
+        const c = currentGameNight();
+        if (!c || c !== fourRoom || shieldActive || !roomNonce(c.keepRef)) return;
+        const game = c.four;
+        const args = [action, game?.id || ''];
+        if (action === 'drop') args.push(String(game.moves), String(column + 1));
+        if (!cmd('four', args, c.name, c.keepRef)) toast('Reconnect before playing.');
+    }
+    function buildFourBoard() {
+        for (let column = 0; column < FOUR_COLUMNS; column++) {
+            const b = document.createElement('button');
+            b.className = 'btn btn--small btn--ghost'; b.type = 'button';
+            b.textContent = column + 1;
+            b.setAttribute('aria-label', `Drop in column ${column + 1}`);
+            b.addEventListener('click', () => {
+                if (b.getAttribute('aria-disabled') === 'false') fourCommand('drop', column);
+            });
+            fourButtons.push(b);
+        }
+        $('[data-four-columns]').append(...fourButtons);
+        const body = $('[data-four-table]').createTBody();
+        for (let row = 0; row < FOUR_ROWS; row++) {
+            const line = body.insertRow();
+            for (let column = 0; column < FOUR_COLUMNS; column++) {
+                const cell = line.insertCell(), piece = document.createElement('span');
+                cell.append(piece);
+                fourCells.push(piece);
+            }
+        }
+    }
+    function drawFour(c) {
+        const detail = $('[data-four]'), status = $('[data-four-status]');
+        const action = $('[data-four-action]'), board = $('[data-four-board]');
+        const focused = detail.contains(document.activeElement) ? document.activeElement : null;
+        if (fourRoom !== c) {
+            fourRoom = c; detail.open = false; fourPlayed = false;
+        }
+        detail.hidden = !c || !fourInARowSupported || shieldActive;
+        if (detail.hidden) { status.textContent = ''; board.hidden = true; return; }
+        const game = c.four, seat = game?.host === app.selfId ? 'X' : game?.guest === app.selfId ? 'O' : '';
+        $('[data-four-seats]').hidden = !game;
+        if (game) {
+            const playerName = (id, mark) => id ? c.names.find(person => person.id === id)?.nick || `Player ${mark}` : 'Open seat';
+            $('[data-four-player="X"]').textContent = playerName(game.host, 'X');
+            $('[data-four-player="O"]').textContent = playerName(game.guest, 'O');
+        }
+        const playing = !!game?.guest && !fourFinished(game);
+        const yourTurn = playing && seat === fourMark(game.moves);
+        let message = fourPlayed ? 'Match ended. A host can open another.' : 'Two players. Connect four pieces in any direction.';
+        let button = amOp(c) ? ['open', game ? 'Play again' : 'Open a match'] : null;
+        if (game) {
+            fourPlayed = true;
+            if (!game.guest) {
+                message = seat ? 'Waiting for someone in the room to join.' : 'An open seat is available. X goes first.';
+                button = seat ? ['leave', 'Close match'] : ['join', 'Join match'];
+            } else {
+                const lastMove = game.moves ? `${fourMark(game.moves - 1)} played column ${game.lastColumn + 1}. ` : '';
+                const turn = yourTurn ? `Your turn (${seat}).` : `${fourMark(game.moves)} to play.`;
+                message = lastMove + (game.winner ? `${game.winner} wins.` : playing ? turn : 'Draw.');
+                if (playing) button = seat ? ['leave', 'Leave match'] : null;
+            }
+        }
+        if (status.textContent !== message) status.textContent = message;
+        action.hidden = !button;
+        if (button) {
+            action.dataset.fourAction = button[0]; action.textContent = button[1];
+            action.classList.toggle('btn--ghost', button[0] === 'leave');
+        }
+        board.hidden = !game?.guest;
+        if (!board.hidden) {
+            if (!fourButtons.length) buildFourBoard();
+            const last = game.board.findIndex((mark, index) => mark && index % FOUR_COLUMNS === game.lastColumn);
+            const winning = new Set(game.winner ? fourWinningCells(game.board, last) : []);
+            fourButtons.forEach((b, col) => {
+                const full = !!game.board[col], enabled = yourTurn && !full;
+                b.setAttribute('aria-label', `Drop in column ${col + 1}${full ? ' (full)' : ''}`);
+                b.setAttribute('aria-disabled', String(!enabled));
+                b.tabIndex = enabled ? 0 : -1;
+            });
+            fourCells.forEach((piece, index) => {
+                const mark = game.board[index], cell = piece.parentElement;
+                if (piece.textContent !== mark) piece.textContent = mark;
+                cell.dataset.mark = mark;
+                cell.toggleAttribute('data-last', index === last);
+                cell.toggleAttribute('data-winning', winning.has(index));
+                cell.setAttribute('aria-label', winning.has(index) ? `${mark}, winning piece` : mark || 'Empty');
+            });
+        }
+        if (focused && (focused === action && action.hidden || board.contains(focused) && board.hidden))
+            detail.querySelector('summary').focus({ preventScroll: true });
+    }
+    $('[data-four-action]').addEventListener('click', event => fourCommand(event.currentTarget.dataset.fourAction));
     function changeGameLink(value) {
         const c = currentGameNight();
         return !!(c && c === gameEditorRoom && amOp(c) && cmd('discord', [value], c.name, c.keepRef));

@@ -345,7 +345,14 @@ export function mountArcadeChess(container) {
         const rank = Math.max(1, Math.min(8, Number(focused[1]) + y * sign));
         squares.get(files[file] + rank)?.focus();
     });
-    panel.addEventListener('toggle', () => { if (panel.open && scope) void connect(); else stop(); });
+    const four = container.querySelector('[data-four]');
+    four?.addEventListener('toggle', () => { if (four.open) panel.open = false; });
+    panel.addEventListener('toggle', () => {
+        if (panel.open && scope) {
+            if (four) four.open = false;
+            void connect();
+        } else stop();
+    });
     return {
         setRoom(next) {
             if (scope?.room === next?.room && scope?.ref === next?.ref && scope?.actor === next?.actor) return;
