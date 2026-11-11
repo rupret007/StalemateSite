@@ -6,7 +6,20 @@ band rehearsal is not yet qualified.** Music, actual Shared Track mixing and
 Webex video/audio handoff remain essential acceptance work, not optional extras.
 Both public websites and their navigation remain unchanged.
 
-The private beta received the Web Join keyboard recovery fix at 12:33 UTC.
+At 14:02 UTC, the private beta received the Web Join microphone-check update.
+A hosted Chromium guest exercised a simulated missing microphone at 375 and
+390 CSS pixels. **Try again** received keyboard focus. **Skip check** focused
+headphone confirmation, and confirming it enabled **Join with microphone**.
+The page fit both widths and logout removed guest access. The exact staged
+client also kept keyboard controls visible at Chrome's 200% and 400% page zoom
+on the Intel Mac. Physical microphones, mobile devices and screen-reader speech
+remain separate checks.
+[Release evidence](../pr-assets/private-readiness/20261111/web-join-audio-check/qualification.json)
+· [375 px](../pr-assets/private-readiness/20261111/web-join-audio-check/mic-retry-375.png)
+· [390 px](../pr-assets/private-readiness/20261111/web-join-audio-check/mic-retry-390.png)
+· [400% zoom](../pr-assets/private-readiness/20261111/web-join-audio-check/zoom-400-ready.png)
+
+The private beta received the earlier Web Join expiry recovery fix at 12:33 UTC.
 An admitted Chromium guest opened the deployed page with an existing synthetic
 invite fixture. When the fixture expired, keyboard focus moved from Join to
 the recovery message at both 375 and 390 CSS pixels, with no horizontal
@@ -66,18 +79,18 @@ tracks all [62 original requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md).
 
 | Layer | Qualified evidence | Still required |
 | --- | --- | --- |
-| Last verified private website | Private merge `e1fafefc6c19a370edd33964b7776840016deb3e` serves as `43002fe9-4d04-456b-9fde-320dc151abc8` at 100%, deployment `9eb0e1c6-d427-4f2f-bc97-e9dd3fee7081`. The rollout preserved effective configuration, issuer and anonymous admission. An admitted guest verified six protected Web Join assets and logged out. [PR 275](https://github.com/rupret007/StalemateSite/pull/275) passed both exact CI runs with 916 browser checks and 34 checks per route style in each. | Verify joined native Safari, assistive technology and live Music. |
+| Last verified private website | Private merge `3ad1cc19b06ac2070480232676b3866279fd37c6` serves as `fca791b7-bcec-4597-a855-fb7d7eb152d5` at 100%, deployment `a73dcc6a-b9ca-43f6-a78e-8fb5629321e7`. The rollout preserved effective configuration, issuer and anonymous admission. An admitted guest verified six protected Web Join assets and logged out. [PR 277](https://github.com/rupret007/StalemateSite/pull/277) passed both exact CI runs with 916 browser checks and 34 checks per route style in each. | Verify joined native Safari, physical mobile, screen-reader speech and live Music. |
 | Current application source | [PR 270](https://github.com/rupret007/StalemateSite/pull/270) bounds stalled joins and preserves the nickname for retry. [PR 271](https://github.com/rupret007/StalemateSite/pull/271) uses one first-join frame for updated clients. Both exact PR 271 browser runs passed 912 browser cases, 34 checks on each route and 150 test SQLite admissions; both native workerd runs passed. | Continue native Safari, physical mobile and screen-reader checks. |
 | Keyboard/playback correction | PR249 merged as `ce319fd73ad12cf43cd67cb96276302698d07d6c`. Its current-head and combined-private CI passed. Full CI originally exposed a network-stalled/playback-status defect; the corrected regression and unchanged real-media browser trials passed. Original failures/traces are retained. | Qualify current delivered keyboard/playback journeys. Neither responsive viewports nor real browser media decoding prove physical iOS or VoiceOver. |
-| Current native packages | Exact source `ae49c915070f2951db9ff441c23c7f0a9d90ce1b` completed four desktop jobs across the initial run and Intel retry. All four archives passed source, private target, paths/CRC, architecture, component, generated-notice and eleven-license checks. Both Macs passed five strict signature checks. Windows Setup/ZIP checksums and hosted install/start/uninstall passed. The extracted Linux package passed idle startup, Pocket Stage, Reference Studio and Jamulus startup against dummy JACK. The frozen lesson player also passed on the Linux runner. [ARM startup and archive evidence](../pr-assets/private-readiness/20261110/native-ae49/README.md) · [Linux build job](https://github.com/rupret007/webjam/actions/runs/42888556613/job/130096378059). | Both Mac Desktop shortcuts select the verified AE49 packages. The Mini shortcut passed idle startup and Quit. Intel startup, local Windows and Linux execution, publisher trust and physical media remain open. |
-| Replacement rehearsal build | [Private run 42997398282](https://github.com/rupret007/webjam/actions/runs/42997398282) passed all four desktop targets at `23cfae6ac05c128e1caf8a6fd366751686304ba6`. Both Mac disk images passed the mounted-package checks, and Windows passed hosted install, launch and uninstall. Exact artifact IDs and SHA-256 digests are in the [package evidence](../pr-assets/private-readiness/20261111/band-rehearsal/qualification.json). | Verify the downloaded archive bytes and app trust before staging this build on each Mac. Verify local startup and physical media with the selected build. |
+| AE49 native packages | Exact source `ae49c915070f2951db9ff441c23c7f0a9d90ce1b` completed four desktop jobs across the initial run and Intel retry. All four archives passed source, private target, paths/CRC, architecture, component, generated-notice and eleven-license checks. Both Macs passed five strict signature checks. Windows Setup/ZIP checksums and hosted install/start/uninstall passed. The extracted Linux package passed idle startup, Pocket Stage, Reference Studio and Jamulus startup against dummy JACK. The frozen lesson player also passed on the Linux runner. [ARM startup and archive evidence](../pr-assets/private-readiness/20261110/native-ae49/README.md) · [Linux build job](https://github.com/rupret007/webjam/actions/runs/42888556613/job/130096378059). | The Mini still selects AE49 and passed idle startup and Quit. Intel now selects the newer rehearsal build below. Local Windows and Linux execution, publisher trust and physical media remain open. |
+| Replacement rehearsal build | [Private run 42997398282](https://github.com/rupret007/webjam/actions/runs/42997398282) passed all four desktop targets at `23cfae6ac05c128e1caf8a6fd366751686304ba6`. Both Mac disk images passed the mounted-package checks, and Windows passed hosted install, launch and uninstall. Exact artifact IDs and SHA-256 digests are in the [package evidence](../pr-assets/private-readiness/20261111/band-rehearsal/qualification.json). | The Intel Mac archive and signatures were checked locally. The build started under an isolated home and now has the Intel Desktop shortcut. Stage the ARM build when its guard opens. Actual rehearsal audio remains unverified. |
 | Prior native package baseline | Older `67c7ef08e515c84eb2b0736c474ec2c4b0c21682` and its all-four-archive checks remain in the [unchanged prior receipt](../pr-assets/private-readiness/20261110/README.md). | Its idle UI/Command-Q and disabled native-menu observation remain historical. Do not relabel it AE49 or replay completed checks. |
 | Native fixes and CI | [WebJam PR468](https://github.com/rupret007/webjam/pull/468) merged as `3eb71e9892e72062ea6991ccd76a8805f85497a1`; actual tree `50596d2a1e2e18b19832ee8da89faaee86fe8916` equals reviewed AE49 and tested synthetic merge. Startup workaround is Cocoa-only; macOS offscreen keeps modal completion. All nine focused startup cases pass; full source CI passed 12,985 tests, 60 existing skips and all 567 modules exactly once. Both unchanged Mac workspace gates passed 204 cases with 12 existing skips, plus 34 Reference Studio cases. | Intel attempt 1 failed at pinned Opus download with TLS EOF35 after passing the workspace gate; one failed-jobs-only retry succeeded without changing security checks or source. Source/generated tests do not prove physical media. Later misclassified hostname/observer-relaunch probes are explicitly unqualified in the current receipt. |
-| Webex audio handoff | [WebJam PR 471](https://github.com/rupret007/webjam/pull/471) merged as `ba4f4c2c9ec24ec99ca3f834095cd505fbd44b35`. The [private desktop packaging run](https://github.com/rupret007/webjam/actions/runs/42960638326) passed all four platforms on `6e26c693c7d8b0160d8a9ea3434954df526e81bd`. Both Mac archives passed full download digest and outer package name checks. The AE49 builds remain selected on the Mac Desktop shortcuts. | Complete package inspection and select the new build under the normal trust and resource checks. Verify a real Personal Room join and video, then switch between Music and meeting audio with both participants. |
+| Webex audio handoff | [WebJam PR 471](https://github.com/rupret007/webjam/pull/471) merged as `ba4f4c2c9ec24ec99ca3f834095cd505fbd44b35`. The [private desktop packaging run](https://github.com/rupret007/webjam/actions/runs/42960638326) passed all four platforms on `6e26c693c7d8b0160d8a9ea3434954df526e81bd`. Both Mac archives passed full download digest and outer package name checks. The current Intel rehearsal build includes the handoff guidance. | Verify a real Personal Room join and video, then switch between Music and meeting audio with both participants. |
 | Selected audio connection | Upstream [WebJam PR466](https://github.com/rupret007/webjam/pull/466), reviewed head `098c57250b5ed2b97c233d7e843f5c5d1297a9e8`, merged as `01804299f3940f243b06f88749d488e03f08cf5c`. Delay and receiver adaptation now use the actual selected transport pair rather than a retired pair encountered last. Four regressions failed before the fix. Completed CI passed 44 Web Join unit cases, 69 browser cases, 87 Worker cases and 12,976 application tests with 60 existing skips across 566 modules. The website mirrors the reviewed audio bytes and provenance. | This browser JavaScript fix does not change the native host runtime or relabel existing native packages. Physical latency, acoustic listening, LAN routing and relay admission still need their own evidence. |
 | Earlier application provider-start CI | [Run 42780185842](https://github.com/rupret007/StalemateSite/actions/runs/42780185842), job 129708072371, completed the actual `--participation --provider-start` application/workerd mode against website revision `11c9d1f8`. All 15 recorded mode/install/audit exits were zero. Owner/start ordering, duplicate start, Stop/revoke/close fencing and owned cleanup passed. | Real guardian decisions, hosted capacity and media acceptance remain open. |
 | Issuer | Last verified `fd37578f-13cd-4fce-b557-35c0d962ef9d` at100%; completed405/204/403 negatives have receiptc209b961. | Reuse that completed result; do not rerun it or mint test credentials. The existing cap/hold and fresh account headroom still govern trials. |
-| Rollback | Use `f5319d4a-6953-4162-8521-e7a5a15f86d0` for the immediate private-site rollback. The earlier `e1c40ea5`, `1b48de76` and issuer rollback `4db649fa` remain in the release history. | Recheck the guards and compare serving state and effective configuration after a rollback. |
+| Rollback | Use `43002fe9-4d04-456b-9fde-320dc151abc8` for the immediate private-site rollback. The earlier `f5319d4a`, `e1c40ea5`, `1b48de76` and issuer rollback `4db649fa` remain in the release history. | Recheck the guards and compare serving state and effective configuration after a rollback. |
 
 The [sanitized live receipt and screenshots](../pr-assets/private-readiness/20261109/README.md)
 cover actual Mac Chrome/Safari observations on c83:
@@ -126,16 +139,10 @@ other failed gate still stops work.
 
 The application resource gate remains swap below 90%, load below 10 and disk at
 least 15 GiB; the stricter 80% native-GUI gate is separate. Fresh checks are required.
-A readback below the disk floor stopped work before provider activity. Space later
-recovered before deletion for an unattributed reason. Three cold extracted Mini
-app caches were then removed only after full byte/CRC/path/symlink comparison with
-retained, restore-verified archives, no active process and no launcher reference.
-The observed free-space gain was about 1.29 GiB, reaching about 18.99 GiB at that moment;
-that is dated evidence, not a future resource admission. Current `67c7ef0` and the
-selected older `4c4` app, source, profiles, recordings, archives, Desktop links and
-shared services were preserved. Earlier verified external-drive offloads remain
-historical; do not restart completed offloads, inspectors or observation jobs.
-Exact operational paths and restore receipts remain private and untracked.
+For the 14:02 UTC rollout, a byte-verified duplicate Mac app and reproducible
+Pages output were cleared from idle historical worktrees. The verified archive,
+active app and tracked sources remain available. Exact operational paths and
+restore receipts remain private.
 
 Before a later switch, use the applicable approved v4ccbf21e9 procedure, never
 dd65999f. Snapshot actual live configuration and preserve every effective
@@ -153,12 +160,11 @@ redistribution-license qualification remains explicitly unfinished.
 
 ## Remaining band journey
 
-1. For the next rehearsal, use the replacement build listed above after its
-   archive, trust, resource and device checks. On each Mac, confirm the exact
-   build ID through the app before hosting. The existing **WebJam Private Band
-   Demo** shortcuts still select AE49. Keep the current shortcut and a private
-   settings preimage for rollback. Verify idle startup and Quit on both Mac
-   architectures before starting the media trial.
+1. On the Intel Mac, open **WebJam Private Band Demo** from the Desktop and
+   confirm build `23cfae6`. Its archive, signatures and isolated idle startup
+   passed. The Mini still selects AE49. Qualify the Apple Silicon replacement
+   after its archive, trust and resource checks. Keep the previous shortcuts
+   and settings available for rollback.
 2. Use one Mac native Music host and one Windows Chrome guest for at most ten
    minutes, with participant consent, headphones and no recording. The host
    chooses **Music → Host**, then **Copy browser invite** in the browser guest
