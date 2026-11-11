@@ -4,11 +4,30 @@ import { join } from 'node:path';
 import { chromium, webkit } from 'playwright';
 import { expect } from '@playwright/test';
 
-export async function runArcadeBrowser(engine, origin, invitation, evidence, entrances) {
-    const browser = await { chromium, webkit }[engine].launch({ headless: true });
+export async function runArcadeBrowser(engine, origin, invitation, evidence, entrances, media) {
+    const browser = await { chromium, webkit }[engine].launch({
+        headless: true, ...(media ? { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } : {})
+    });
     const errors = [];
     async function guest(source, name, viewport, hasTouch = false) {
         const context = await browser.newContext({ viewport, hasTouch, reducedMotion: 'reduce', serviceWorkers: 'block', ignoreHTTPSErrors: true });
+        if (media) await context.addInitScript(() => {
+            window.testPeers = [];
+            window.testLocalTracks = [];
+            window.RTCPeerConnection = class extends RTCPeerConnection {
+                constructor(...args) { super(...args); window.testPeers.push(this); }
+            };
+            const capture = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+            navigator.mediaDevices.getUserMedia = async (...args) => {
+                if (window.testDenyDevice) {
+                    window.testDenyDevice = false;
+                    throw new DOMException('Denied by the test', 'NotAllowedError');
+                }
+                const stream = await capture(...args);
+                window.testLocalTracks.push(...stream.getTracks());
+                return stream;
+            };
+        });
         const entrance = entrances?.[source];
         await context.route('**/*', route => {
             const url = route.request().url();
@@ -72,6 +91,57 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             throw error;
         }
     }
+    async function joinCalls(a, b) {
+        for (const page of [a, b]) {
+            await page.getByRole('button', { name: 'Call', exact: true }).click();
+            await page.getByRole('button', { name: 'Join call', exact: true }).click();
+            await expect(page.locator('[data-call-toggle]')).toHaveText('Call joined');
+            assert.deepEqual(await page.evaluate(() => window.testLocalTracks.map(track => track.kind)), []);
+        }
+        await expect(a.getByRole('button', { name: 'Actions for ChessGuest' })).toBeVisible();
+        await expect(b.getByRole('button', { name: 'Actions for ChessHost' })).toBeVisible();
+        await a.getByRole('button', { name: 'Unmute mic' }).click();
+        await expect(a.getByRole('button', { name: 'Mute mic' })).toBeVisible();
+        await b.getByRole('button', { name: 'Unmute mic' }).click();
+        await expect(b.getByRole('button', { name: 'Mute mic' })).toBeVisible();
+        for (const page of [a, b]) await waitForPackets(page, 'audio');
+        await b.getByRole('button', { name: 'Mute mic' }).click();
+        await expect(b.getByRole('button', { name: 'Unmute mic' })).toBeVisible();
+        assert.deepEqual(await b.evaluate(() => window.testLocalTracks.map(track => track.readyState)), ['ended']);
+        await expect(a.locator('[data-call-peers] audio')).toHaveJSProperty('muted', true);
+        await b.evaluate(() => { window.testDenyDevice = true; });
+        await b.getByRole('button', { name: 'Unmute mic' }).click();
+        await expect(b.locator('[data-call-status]')).toContainText('Check browser permissions');
+        await expect(b.locator('[data-call-toggle]')).toHaveText('Call joined');
+        assert.deepEqual(await b.evaluate(() => window.testLocalTracks.map(track => track.readyState)), ['ended']);
+        await b.getByRole('button', { name: 'Unmute mic' }).click();
+        await expect(b.getByRole('button', { name: 'Mute mic' })).toBeVisible();
+        await expect(a.locator('[data-call-peers] audio')).toHaveJSProperty('muted', false);
+        await a.getByRole('button', { name: 'Allow room cameras' }).click();
+        await expect(b.getByRole('button', { name: 'Turn camera on' })).toBeDisabled();
+        await b.getByLabel('I am 18 or older').check();
+        await b.getByRole('button', { name: 'Turn camera on' }).click();
+        await expect(b.getByRole('button', { name: 'Turn camera off' })).toBeVisible();
+        await waitForPackets(a, 'video');
+        await expect.poll(() => a.locator('[data-call-peers] video').evaluate(video => video.videoWidth)).toBeGreaterThan(0);
+        await a.getByRole('button', { name: 'Disable room cameras' }).click();
+        await expect(b.getByRole('button', { name: 'Turn camera off' })).toBeHidden();
+        assert.deepEqual(await b.evaluate(() => window.testLocalTracks.filter(track => track.kind === 'video').map(track => track.readyState)), ['ended']);
+        await expect(a.locator('[data-call-peers] video')).toBeHidden();
+        for (const page of [a, b]) await page.locator('[data-call-toggle]').click();
+    }
+    function packetCount(page, kind) {
+        return page.evaluate(async expected => {
+            const [pc] = window.testPeers;
+            if (!pc || pc.connectionState === 'closed') return 0;
+            const stats = await pc.getStats();
+            return [...stats.values()].filter(stat => stat.type === 'inbound-rtp' && stat.kind === expected)
+                .reduce((total, stat) => total + stat.packetsReceived, 0);
+        }, kind);
+    }
+    async function waitForPackets(page, kind, after = 5) {
+        await expect.poll(() => packetCount(page, kind)).toBeGreaterThan(after);
+    }
     try {
         const a = await guest('stalemate', 'ChessHost', { width: 1280, height: 900 });
         const b = await guest('rad-dad', 'ChessGuest', { width: 375, height: 667 }, true);
@@ -104,12 +174,20 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(a.getByRole('button', { name: 'e5, Black pawn' })).toBeVisible();
         await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
         await expect(b.locator('[data-buffer]')).not.toContainText('Good game from Rad Dad');
+        if (media) await joinCalls(a, b);
+        else await expect(b.locator('[data-call-toggle]')).toBeHidden();
+        const beforeSwitch = media ? await packetCount(b, 'audio') : 0;
         await b.getByText('Four in a Row', { exact: true }).click();
         await expect(b.locator('[data-four]')).toHaveAttribute('open', '');
         await expect(b.locator('.arcade-chess')).not.toHaveAttribute('open', '');
         await b.getByText('Royal Flush Chess', { exact: true }).click();
         await expect(b.getByRole('button', { name: 'e5, Black pawn' })).toBeVisible();
         await expect(b.locator('[data-four]')).not.toHaveAttribute('open', '');
+        if (media) {
+            await expect(b.locator('[data-call-toggle]')).toHaveText('Call joined');
+            await waitForPackets(b, 'audio', beforeSwitch);
+            assert.equal(await b.evaluate(() => window.testPeers.length), 1);
+        }
         await b.locator('[data-text]').fill('Back at the same board');
         await b.locator('[data-send]').click();
         await expect(a.locator('[data-buffer]')).toContainText('Back at the same board');
@@ -130,8 +208,24 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         await b.setViewportSize({ width: 390, height: 844 });
         await fit(b, 'phone-tall');
+        if (media) {
+            await a.locator('[data-call-toggle]').click();
+            await a.getByRole('button', { name: 'Actions for ChessGuest' }).click();
+            await a.locator('[data-sheet]').getByRole('button', { name: 'Block', exact: true }).click();
+            for (const page of [a, b]) {
+                await expect(page.locator('[data-call-peers] li')).toHaveCount(0);
+                assert.equal(await page.evaluate(() => window.testPeers[0].connectionState), 'closed');
+            }
+        }
         await b.locator('[data-leave]').click();
         await expect(b.locator('[data-game-night]')).toBeHidden();
+        if (media) {
+            await expect.poll(() => b.evaluate(() => window.testLocalTracks.every(track => track.readyState === 'ended'))).toBe(true);
+            await expect(a.locator('[data-call-peers] li')).toHaveCount(0);
+            await a.getByRole('button', { name: 'Leave call', exact: true }).click();
+            assert.equal(await a.evaluate(() => window.testLocalTracks.every(track => track.readyState === 'ended')), true);
+            console.log('Passed protected two-brand browser voice and video with Chromium synthetic devices, camera revocation, game switching and track cleanup.');
+        }
         await b.reload();
         await b.locator('[data-enter]').click();
         await expect(b.locator('[data-connection]')).toHaveText('Connected');

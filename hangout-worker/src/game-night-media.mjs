@@ -103,7 +103,10 @@ export function createGameNightMedia({ state, current, active, approve, charge, 
             publish(scope);
         } else if (frame.action === 'camera-policy') {
             if (!binding.canOpen || !binding.canPlay || typeof frame.on !== 'boolean') return error(socket, 'camera-policy-unavailable');
-            save(socket, { videoAllowed: frame.on });
+            for (const peer of peers) {
+                const videoAllowed = frame.on && peer.ws === socket;
+                if (peer.scope.videoAllowed !== videoAllowed) save(peer.ws, { videoAllowed });
+            }
             publish(scope);
         } else if (frame.action === 'tracks') {
             if (typeof frame.audio !== 'boolean' || typeof frame.video !== 'boolean' ||

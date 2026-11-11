@@ -478,6 +478,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let jamShareResultsSupported = false, jamShareTimer;
     let gameNightSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
     let arcadeChessSupported = false, arcadeChess = null, arcadeChessLoading = false, arcadeReturning = null;
+    let arcadeMediaSupported = false, arcadeMedia = null, arcadeMediaLoading = false;
     let fourInARowSupported = false, fourRoom = null, fourPlayed = false;
     const fourButtons = [], fourCells = [];
     function stopLocalCamera(channel) {
@@ -900,6 +901,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             jamShareResultsSupported = m.features?.jamShareResults === 1;
             gameNightSupported = m.features?.gameNight === 1;
             arcadeChessSupported = m.features?.arcadeChess === 1;
+            arcadeMediaSupported = m.features?.arcadeMedia === 1;
             fourInARowSupported = m.features?.fourInARow === 1;
             discordLinksSupported = m.features?.discordLinks === true;
             shieldActive = m.shield === true;
@@ -1429,6 +1431,27 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-game-night]').hidden = !c;
         drawFour(c);
         drawArcadeChess(c);
+        drawArcadeMedia(c);
+    }
+    function drawArcadeMedia(c) {
+        const scope = arcadeMediaSupported && !shieldActive && c && roomNonce(c.keepRef)
+            ? { actor: app.selfId, room: c.name, ref: c.keepRef } : null;
+        if (arcadeMedia) {
+            arcadeMedia.setRoom(scope);
+            return;
+        }
+        if (!scope || arcadeMediaLoading) return;
+        arcadeMediaLoading = true;
+        import('./game-night-call.mjs').then(module => {
+            arcadeMedia = module.mountGameNightCall($('#game-night-call'), $('[data-call-toggle]'), {
+                personActions(peer) {
+                    const room = currentGameNight(), target = room?.names?.find(person => person.id === peer);
+                    if (target) nickSheet(target.nick, personContext(peer, room.name, room.keepRef, target.nick));
+                }
+            });
+            drawArcadeMedia(currentGameNight());
+        }).catch(() => toast('Call controls could not load. Reopen Game Night to try again.'))
+            .finally(() => { arcadeMediaLoading = false; });
     }
     function drawArcadeChess(c) {
         const scope = arcadeChessSupported && !shieldActive && c && roomNonce(c.keepRef)

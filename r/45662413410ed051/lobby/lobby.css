@@ -272,8 +272,17 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .four-board td[data-mark="O"] { color: var(--blue); background: #17282b; }
 .four-board td[data-last] { border-color: #7d8877; }
 .four-board td[data-winning] { border-color: currentColor; }
+.game-night-call { margin-block: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
+.game-night-call h4, .game-night-call p { margin: 0 0 5px; }
+.game-night-call .jam-actions { margin-bottom: 4px; }
+.game-camera-age input { width: auto; vertical-align: middle; }
+.game-call-peers { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.game-call-peers li { display: grid; align-content: start; gap: 3px; min-width: 0; }
+.game-call-peers video { display: block; width: min(100%, 150px); aspect-ratio: 16 / 9; object-fit: cover; }
+.game-call-peers video[hidden] { display: none; }
 @media (max-width: 1099px) {
-  .game-night:has(.four-match[open]) .game-call { display: none; }
+  .game-night:has(.four-match[open]) .game-call > :not(.game-night-call) { display: none; }
+  .game-night:has(.four-match[open]) .game-call:not(:has(.game-night-call:not([hidden]))) { display: none; }
 }
 @media (min-width: 1100px) {
   .game-night:has(.four-match[open]) {

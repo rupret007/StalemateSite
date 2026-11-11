@@ -14,6 +14,8 @@ const preview = 'local-arcade-fixture-preview-key-2026';
 const nonce = randomBytes(16).toString('hex');
 const room = '#game-2ca9e1x1be34a';
 const browserName = process.argv[2]?.replace(/^--browser=/, '') || '';
+const browserMedia = process.argv.includes('--media');
+assert.ok(!browserMedia || browserName === 'chromium', 'the synthetic device media test uses Chromium');
 assert.ok(['', 'chromium', 'webkit'].includes(browserName), 'choose --browser=chromium or --browser=webkit');
 const evidence = process.env.ARCADE_BROWSER_EVIDENCE ? resolve(process.env.ARCADE_BROWSER_EVIDENCE) : null;
 const app = fileURLToPath(new URL('../../', import.meta.url));
@@ -173,7 +175,7 @@ try {
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true } },
         bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1',
             ...(browserName ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
-            ...(!browserName ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
+            ...(!browserName || browserMedia ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
             HANGOUT_HMAC_KEY: 'owned-arcade-fixture-hmac-not-for-deployment-2026', HANGOUT_BETA_INVITE_KEY: invite,
             HANGOUT_BETA_INVITE_VERSION: '1', HANGOUT_PREVIEW_KEY: preview, HANGOUT_OPEN: '1', HANGOUT_AI_ENABLED: '0', HANGOUT_TURN_ENABLED: '0' },
         ...(browserName ? { serviceBindings: { ASSETS: serveAsset } } : {}),
@@ -187,7 +189,7 @@ try {
     if (browserName) {
         const { runArcadeBrowser } = await import('./arcade-browser.mjs');
         const browserOrigin = (await mf.ready).origin;
-        await runArcadeBrowser(browserName, browserOrigin, invite, evidence, await previewEntrances(browserOrigin));
+        await runArcadeBrowser(browserName, browserOrigin, invite, evidence, await previewEntrances(browserOrigin), browserMedia);
     } else {
     const white = await guest('FixtureWhite', 'stalemate', '192.0.2.11');
     const black = await guest('FixtureBlack', 'rad-dad', '192.0.2.12');

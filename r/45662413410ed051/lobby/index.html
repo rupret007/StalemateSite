@@ -181,6 +181,7 @@
                 <span class="modes" data-modes></span>
                 <button class="btn btn--small btn--ghost" type="button" data-cam aria-pressed="false">📷 Camera (18+)</button>
                 <button class="btn btn--small btn--ghost op-only" type="button" data-roomtools>@ Host tools</button>
+                <button class="btn btn--small btn--ghost" type="button" data-call-toggle aria-expanded="false" aria-controls="game-night-call" hidden>Call</button>
                 <button class="btn btn--small btn--ghost" type="button" data-leave>Leave</button>
                 <span class="small host-status" data-host-status></span>
             </div>
@@ -220,6 +221,19 @@
                     </div>
                 </details>
                 <div class="game-call">
+                    <section id="game-night-call" class="game-night-call" aria-labelledby="game-night-call-title" hidden>
+                        <h4 id="game-night-call-title">Room call</h4>
+                        <p class="small game-note" data-call-status role="status"></p>
+                        <div class="jam-actions">
+                            <button class="btn btn--small" type="button" data-call-join>Join call</button>
+                            <button class="btn btn--small btn--ghost" type="button" data-call-mic aria-pressed="false" hidden>Unmute mic</button>
+                            <button class="btn btn--small btn--ghost" type="button" data-call-camera aria-pressed="false" hidden>Turn camera on</button>
+                            <button class="btn btn--small btn--ghost" type="button" data-call-leave hidden>Leave call</button>
+                            <button class="btn btn--small btn--ghost" type="button" data-call-policy hidden>Allow room cameras</button>
+                        </div>
+                        <label class="small game-camera-age" hidden><input type="checkbox" data-call-adult> I am 18 or older</label>
+                        <ul class="game-call-peers" aria-label="People in the call" data-call-peers></ul>
+                    </section>
                     <p class="small game-note" data-game-call-status role="status"></p>
                     <details data-game-editor hidden>
                         <summary>Manage Discord link</summary>
