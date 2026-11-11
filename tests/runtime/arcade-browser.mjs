@@ -18,6 +18,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             ...(media ? ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] : [])] } : {})
     });
     const errors = [];
+    const naturalBrickRace = process.env.ARCADE_BRICK_FULL_RACE === '1';
+    const longRoomTrace = [];
     async function enterFromShell(page, name, game = false) {
         await page.getByRole('link', { name: game ? /Enter Game Night/ : /Choose a nickname and join/ }).click();
         await page.getByLabel('Your nick').fill(name);
@@ -64,6 +66,18 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const page = await context.newPage();
         page.setDefaultTimeout(10000);
         page.on('pageerror', error => errors.push(`${name}: ${error.message}`));
+        if (naturalBrickRace && name === 'ChessGuest') page.on('websocket', socket => {
+            if (new URL(socket.url()).pathname !== '/lobby') return;
+            for (const direction of ['framesent', 'framereceived']) socket.on(direction, ({ payload }) => {
+                try {
+                    const { t, name, kind, text } = JSON.parse(payload.toString());
+                    if (!['part', 'closed', 'notice', 'rate-limit'].includes(t) && !(t === 'cmd' && name === 'part')) return;
+                    longRoomTrace.push({ direction, t, name, kind, text });
+                    if (longRoomTrace.length > 16) longRoomTrace.shift();
+                } catch { /* Preserve structured fixture diagnostics only. */ }
+            });
+            socket.on('close', () => longRoomTrace.push({ t: 'socket closed' }));
+        });
         const protectedBoard = await context.request.get(origin + '/play/games/chess-board.js');
         assert.ok((mixed?.previousWorker ? [401, 404] : [401]).includes(protectedBoard.status()), 'anonymous match asset stays protected');
         const destination = `${origin}/beta/?via=${source}`;
@@ -749,8 +763,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdspades');
         }
         await a.getByRole('button', { name: 'Open Spades table' }).click();
-        for (const [page, seat] of [[b, 'West'], [north, 'North'], [east, 'East']]) {
+        for (const [index, [page, seat]] of [[b, 'West'], [north, 'North'], [east, 'East']].entries()) {
             await page.getByRole('button', { name: 'Join ' + seat }).click();
+            if (index < 2) await expect(a.locator('[data-spades-status]')).toContainText(`${index + 2}/4 seated`);
         }
         const allHands = [];
         for (const page of players) {
@@ -1265,6 +1280,46 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(race(b)).toHaveAttribute('data-sequence', '0');
         console.log(`Passed ${engine} Turd Rush shared course and collision, keyboard, ${media ? 'native swipe with 220 ms delay and active call' : '44px phone touch and full reload'}, 2D fallback, spectator and rematch.`);
     }
+    async function verifyBrickRaceFinish(a, b, spectator) {
+        const pages = [a, b, spectator];
+        const status = page => page.locator('[data-brick-status]');
+        const match = page => page.locator('[data-brick-match]');
+        const scoreboard = page => page.locator('[data-brick-score]').evaluateAll(rows => rows.map(row => ({
+            seat: row.dataset.brickScore,
+            bricks: row.children[1].textContent,
+            score: row.children[2].textContent
+        })));
+        const audioBeforeWait = media ? await packetCount(b, 'audio') : 0;
+        await a.locator('[data-text]').fill('Playing this brick race to the buzzer');
+        await a.locator('[data-send]').click();
+        await expect(b.locator('[data-buffer]')).toContainText('Playing this brick race to the buzzer');
+        await expect(match(a)).toHaveAttribute('data-phase', 'finished', { timeout: 82000 });
+        for (const page of pages) {
+            await expect(match(page)).toHaveAttribute('data-phase', 'finished');
+            await expect(page.locator('[data-brick-clock]')).toHaveText('Final');
+        }
+        const scores = await scoreboard(spectator);
+        assert.deepEqual(scores.map(score => score.seat), ['a', 'b']);
+        const [first, second] = scores;
+        const lead = parseInt(first.bricks, 10) - parseInt(second.bricks, 10) || parseInt(first.score, 10) - parseInt(second.score, 10);
+        const publicResult = await status(spectator).textContent();
+        const [, reason] = publicResult.split(' · ');
+        assert.ok(['time limit', 'wall cleared', 'out of balls'].includes(reason), publicResult);
+        const labels = lead > 0 ? ['You win', 'Rival wins', 'Player 1 wins']
+            : lead < 0 ? ['Rival wins', 'You win', 'Player 2 wins'] : ['Draw', 'Draw', 'Draw'];
+        for (const [index, page] of pages.entries()) {
+            await expect(status(page)).toHaveText(`${labels[index]} · ${reason}`);
+            assert.deepEqual(await scoreboard(page), scores);
+        }
+        await expect(b.getByRole('button', { name: 'Request Turdanoid rematch' })).toBeInViewport({ ratio: 1 });
+        await expect(spectator.getByRole('button', { name: /Turdanoid rematch/ })).toBeHidden();
+        if (media) {
+            await waitForPackets(b, 'audio', audioBeforeWait);
+            await expectOriginalPeer(b);
+        }
+        if (evidence) await b.screenshot({ path: join(evidence, `brick-${engine}-natural-finish.png`) });
+        console.log(`Passed ${engine} natural Turdanoid finish and matching player/spectator scores (${publicResult}).`);
+    }
     async function playTurdanoid(a, b, spectator) {
         const before = media ? await packetCount(b, 'audio') : 0;
         const launchFrames = [];
@@ -1389,9 +1444,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(b.locator('[data-brick-score="b"]')).toContainText(/[1-9]\d* pts/);
             await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
         }
-        await b.getByRole('button', { name: 'Leave race' }).click();
-        await b.getByRole('dialog', { name: 'Leave this race?' }).getByRole('button', { name: 'Leave race' }).click();
-        await expect(a.locator('[data-brick-status]')).toHaveText('You win · forfeit');
+        if (naturalBrickRace) await verifyBrickRaceFinish(a, b, spectator);
+        else {
+            await b.getByRole('button', { name: 'Leave race' }).click();
+            await b.getByRole('dialog', { name: 'Leave this race?' }).getByRole('button', { name: 'Leave race' }).click();
+            await expect(a.locator('[data-brick-status]')).toHaveText('You win · forfeit');
+        }
         await a.getByRole('button', { name: 'Request Turdanoid rematch' }).click();
         await b.getByRole('button', { name: 'Accept Turdanoid rematch' }).click();
         await expect(match(b)).toHaveAttribute('data-phase', 'countdown');
@@ -1499,6 +1557,19 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await report.getByRole('button', { name: 'Cancel' }).tap();
             await expect(flag).toBeFocused();
             await flag.tap();
+            const preservedFocus = await report.getByRole('button', { name: 'Cancel' }).evaluate(cancel => new Promise(resolve => {
+                const dialog = cancel.closest('dialog');
+                const leave = document.querySelector('[data-leave]');
+                dialog.addEventListener('close', () => resolve(document.activeElement === leave), { once: true });
+                cancel.click();
+                leave.focus();
+            }));
+            assert.equal(preservedFocus, true, 'the queued dialog close event respects a later focus change');
+            await flag.tap();
+            await report.getByLabel('What happened?').press('Escape');
+            await expect(report).toBeHidden();
+            await expect(flag).toBeFocused();
+            await flag.tap();
             await submitCallReport(b, 'Synthetic phone report while both players are still in the call.', true);
             await waitForPackets(b, 'audio', beforeReport);
             await a.locator('[data-call-toggle]').click();
@@ -1516,7 +1587,17 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const leaveRoom = b.locator('[data-leave]');
         await leaveRoom.focus();
         await leaveRoom.press('Enter');
-        await expect(b.locator('[data-game-night]')).toBeHidden();
+        try {
+            await expect(b.locator('[data-game-night]')).toBeHidden();
+        } catch (error) {
+            if (naturalBrickRace) {
+                const state = await leaveRoom.evaluate(button => ({ disabled: button.disabled,
+                    focused: document.activeElement === button, connection: document.querySelector('[data-connection]').textContent }));
+                console.error('Leave after full brick race', JSON.stringify({ state, longRoomTrace }));
+                if (evidence) await b.screenshot({ path: join(evidence, `brick-${engine}-leave-failure.png`) });
+            }
+            throw error;
+        }
         await expect(b.getByRole('tab', { name: '#stalemate', exact: true })).toBeFocused();
         if (media) {
             await expect.poll(() => b.evaluate(() => window.testLocalTracks.every(track => track.readyState === 'ended'))).toBe(true);

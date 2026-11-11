@@ -110,7 +110,6 @@ export function mountGameNightCall(container, toggle, { personActions }) {
         const prior = socket;
         socket = null;
         const unconfirmedReport = !!reportDraft?.attempt;
-        if (report.open) report.close();
         if (prior && prior.readyState < WebSocket.CLOSING) prior.close(1000);
         for (const id of peers.keys()) closePeer(id);
         for (const kind of types) detachTrack(kind);
@@ -121,6 +120,7 @@ export function mountGameNightCall(container, toggle, { personActions }) {
         drawRecentReports([]);
         notice = unconfirmedReport && message ? message + ' Report delivery was unconfirmed.' : message;
         draw();
+        if (report.open) closeReport();
     }
 
     function drawReport(waiting) {
@@ -137,6 +137,18 @@ export function mountGameNightCall(container, toggle, { personActions }) {
         drawReport(false);
         report.showModal();
         reportReason.focus();
+    }
+
+    function closeReport() {
+        clearTimeout(reportTimer);
+        const opener = reportDraft?.opener;
+        reportDraft = null;
+        report.close();
+        reportForm.reset();
+        reportStatus.textContent = '';
+        if (!scope) return;
+        const target = opener?.isConnected && opener.getClientRects().length && !container.hidden && joined ? opener : toggle;
+        target.focus({ preventScroll: true });
     }
 
     function drawRecentReports(people) {
@@ -167,8 +179,7 @@ export function mountGameNightCall(container, toggle, { personActions }) {
         const attempt = reportDraft?.attempt;
         if (!report.open || !attempt || attempt.request !== frame.request || attempt.reason !== reportReason.value.trim()) return;
         if (frame.status === 'queued') {
-            reportDraft.attempt = null;
-            report.close();
+            closeReport();
             notice = 'Queued for review when a moderator is available.';
             draw();
             return;
@@ -206,17 +217,10 @@ export function mountGameNightCall(container, toggle, { personActions }) {
         reportTimer = setTimeout(() => finishReportWait('Report delivery is unconfirmed. Retry the same details to check.'), 12000);
     });
     reportConsent.addEventListener('change', () => drawReport(false));
-    reportClose.addEventListener('click', () => report.close());
-    report.addEventListener('cancel', event => { if (reportDraft?.waiting) event.preventDefault(); });
-    report.addEventListener('close', () => {
-        if (report.open) return;
-        clearTimeout(reportTimer);
-        const opener = reportDraft?.opener;
-        reportDraft = null;
-        reportForm.reset();
-        reportStatus.textContent = '';
-        if (!scope) return;
-        (opener?.isConnected && !container.hidden && joined ? opener : toggle).focus({ preventScroll: true });
+    reportClose.addEventListener('click', closeReport);
+    report.addEventListener('cancel', event => {
+        event.preventDefault();
+        if (!reportDraft?.waiting) closeReport();
     });
 
     function retryRelay(delay) {
