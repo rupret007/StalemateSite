@@ -257,6 +257,33 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             throw error;
         }
     }
+    async function playChessCheckmate(black, white) {
+        const before = media ? await packetCount(white, 'audio') : 0;
+        for (const [page, from, to] of [
+            [white, 'e2', 'e4'], [black, 'e7', 'e5'], [white, 'd1', 'h5'], [black, 'b8', 'c6'],
+            [white, 'f1', 'c4'], [black, 'g8', 'f6'], [white, 'h5', 'f7']
+        ]) {
+            await expect(page.locator('[data-chess-status]')).toContainText('Your turn');
+            if (page === white) {
+                await tapSquare(page, from);
+                await tapSquare(page, to);
+            } else {
+                for (const square of [from, to]) await page.locator(`[data-square="${square}"]`).press('Enter');
+            }
+        }
+        for (const page of [black, white]) {
+            await expect(page.locator('[data-chess-status]')).toHaveText('White wins · Checkmate');
+            await expect(page.getByRole('button', { name: 'f7, White queen' })).toBeAttached();
+        }
+        if (media) {
+            await waitForPackets(white, 'audio', before);
+            await expectOriginalPeer(white);
+        }
+        await black.getByRole('button', { name: 'Request rematch' }).click();
+        await white.getByRole('button', { name: 'Accept rematch' }).click();
+        await expect(black.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
+        console.log(`Passed ${engine} Royal Flush Chess from first move to checkmate, matching results and rematch${media ? ' during the same call' : ''}.`);
+    }
     async function joinCalls(a, b) {
         for (const page of [a, b]) {
             await page.getByRole('button', { name: 'Call', exact: true }).click();
@@ -1152,6 +1179,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.setViewportSize({ width: 390, height: 844 });
         await fit(b, 'phone-tall');
         await b.setViewportSize({ width: 375, height: 667 });
+        await playChessCheckmate(a, b);
         await playEights(a, b);
         await playRummy(a, b);
         const spectator = await playSpades(a, b);
