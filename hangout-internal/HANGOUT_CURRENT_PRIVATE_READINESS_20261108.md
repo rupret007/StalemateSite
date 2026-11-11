@@ -1,6 +1,6 @@
 # WebJam / Hang Out: current private readiness
 
-As of November 10, 2026 (Central time), shared browser chat, guest-hosted creative
+As of November 11, 2026 (Central time), shared browser chat, guest-hosted creative
 rooms and private messaging have demonstrated useful live journeys. **The full
 band rehearsal is not yet qualified.** Music, actual Shared Track mixing and
 Webex video/audio handoff remain essential acceptance work, not optional extras.
@@ -13,6 +13,12 @@ Arcade. The private rollout was verified through an admitted readback of five
 changed assets. Two-player room behavior and the optional external call link
 passed in Chromium and WebKit CI. A live two-person Game Night with voice and
 video still needs a trial. [Game Night evidence](../pr-assets/private-readiness/20261111/game-night/qualification.json)
+
+Four in a Row is integrated in the private branch. The follow-up improves
+keyboard invitations, returning to the same room after a disconnect, and
+playing while reading chat at short heights. Its current revision passed local
+Chromium and WebKit checks and Chromium's actual 200% page zoom. The
+follow-up is pending private delivery. [Game Night follow-up PR](https://github.com/rupret007/StalemateSite/pull/266)
 
 The private site received the Safari dialog fix on November 11 at 01:58 UTC.
 Native Safari exposed the member, command and channel controls in the local
@@ -38,12 +44,12 @@ tracks all [62 original requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md).
 | Layer | Qualified evidence | Still required |
 | --- | --- | --- |
 | Last verified private website | Game Night merge `a12ee75e6dc166dfdc54a4364b6270e1f4622f04` serves as `49f12e46-f3a1-4667-a86d-7eebee8ad7a9` at 100%, deployment `23385198-d918-4539-9be7-dee56d6404ad`. All 28 bindings and effective settings matched the prior version. An admitted readback matched the five changed protected assets. A fresh Chrome tab showed the invitation requirement, and an anonymous request to the Game Night module returned 401. | Verify a live joined Game Night, the member menu in joined Safari and VoiceOver. A real replacement Music invite and media acceptance remain pending. |
-| Current application source | [Game Night PR 263](https://github.com/rupret007/StalemateSite/pull/263) merged with tree `b12a389aea827a4cdcb74224ae215dcebe563f8d`, matching the reviewed and tested combined tree. Both hosted browser runs passed 906 browser cases and 34 route checks at each served path. Both Worker test runs passed. Earlier Safari and invite-expiry evidence is linked above. | Physical input, a real meeting and connected recovery need attended checks. |
+| Current application source | [Game Night PR 263](https://github.com/rupret007/StalemateSite/pull/263) is the deployed source. Both browser runs passed 906 cases and 34 route checks per served path. [PR 265](https://github.com/rupret007/StalemateSite/pull/265) integrated Four in a Row as `650cfb94`. [PR 266](https://github.com/rupret007/StalemateSite/pull/266) adds guest recovery and reflow. Its exact `43402a51` revision has focused Chromium and WebKit evidence and an offline verified private package. | Finish hosted CI, verify the deployed follow-up with two private participants, and check screen-reader use. |
 | Keyboard/playback correction | PR249 merged as `ce319fd73ad12cf43cd67cb96276302698d07d6c`. Its current-head and combined-private CI passed. Full CI originally exposed a network-stalled/playback-status defect; the corrected regression and unchanged real-media browser trials passed. Original failures/traces are retained. | Qualify current delivered keyboard/playback journeys. Neither responsive viewports nor real browser media decoding prove physical iOS or VoiceOver. |
 | Current native packages | Exact source `ae49c915070f2951db9ff441c23c7f0a9d90ce1b` completed four desktop jobs across the initial run and Intel retry. All four archives passed source, private target, paths/CRC, architecture, component, generated-notice and eleven-license checks. Both Macs passed five strict signature checks. Windows Setup/ZIP checksums and hosted install/start/uninstall passed. The extracted Linux package passed idle startup, Pocket Stage, Reference Studio and Jamulus startup against dummy JACK. The frozen lesson player also passed on the Linux runner. [ARM startup and archive evidence](../pr-assets/private-readiness/20261110/native-ae49/README.md) · [Linux build job](https://github.com/rupret007/webjam/actions/runs/42888556613/job/130096378059). | Both Mac Desktop shortcuts select the verified AE49 packages. The Mini shortcut passed idle startup and Quit. Intel startup, local Windows and Linux execution, publisher trust and physical media remain open. |
 | Prior native package baseline | Older `67c7ef08e515c84eb2b0736c474ec2c4b0c21682` and its all-four-archive checks remain in the [unchanged prior receipt](../pr-assets/private-readiness/20261110/README.md). | Its idle UI/Command-Q and disabled native-menu observation remain historical. Do not relabel it AE49 or replay completed checks. |
 | Native fixes and CI | [WebJam PR468](https://github.com/rupret007/webjam/pull/468) merged as `3eb71e9892e72062ea6991ccd76a8805f85497a1`; actual tree `50596d2a1e2e18b19832ee8da89faaee86fe8916` equals reviewed AE49 and tested synthetic merge. Startup workaround is Cocoa-only; macOS offscreen keeps modal completion. All nine focused startup cases pass; full source CI passed 12,985 tests, 60 existing skips and all 567 modules exactly once. Both unchanged Mac workspace gates passed 204 cases with 12 existing skips, plus 34 Reference Studio cases. | Intel attempt 1 failed at pinned Opus download with TLS EOF35 after passing the workspace gate; one failed-jobs-only retry succeeded without changing security checks or source. Source/generated tests do not prove physical media. Later misclassified hostname/observer-relaunch probes are explicitly unqualified in the current receipt. |
-| Webex audio handoff | [WebJam PR 471](https://github.com/rupret007/webjam/pull/471) merged as `ba4f4c2c9ec24ec99ca3f834095cd505fbd44b35`. Reviewed head `6e26c693c7d8b0160d8a9ea3434954df526e81bd` and the merged source have the same tree. Hosted main, Windows diagnostics, Web Join and both Jamulus integration jobs passed. A [private-target desktop packaging run](https://github.com/rupret007/webjam/actions/runs/42960638326) started for that head. The AE49 archives above remain the latest inspected packages. | Inspect the new artifacts as they finish. Verify a real Personal Room join and video, then switch between Music and meeting audio with both participants. |
+| Webex audio handoff | [WebJam PR 471](https://github.com/rupret007/webjam/pull/471) merged as `ba4f4c2c9ec24ec99ca3f834095cd505fbd44b35`. The [private desktop packaging run](https://github.com/rupret007/webjam/actions/runs/42960638326) passed all four platforms on `6e26c693c7d8b0160d8a9ea3434954df526e81bd`. Both Mac archives passed full download digest and outer package name checks. The AE49 builds remain selected on the Mac Desktop shortcuts. | Complete package inspection and select the new build under the normal trust and resource checks. Verify a real Personal Room join and video, then switch between Music and meeting audio with both participants. |
 | Selected audio connection | Upstream [WebJam PR466](https://github.com/rupret007/webjam/pull/466), reviewed head `098c57250b5ed2b97c233d7e843f5c5d1297a9e8`, merged as `01804299f3940f243b06f88749d488e03f08cf5c`. Delay and receiver adaptation now use the actual selected transport pair rather than a retired pair encountered last. Four regressions failed before the fix. Completed CI passed 44 Web Join unit cases, 69 browser cases, 87 Worker cases and 12,976 application tests with 60 existing skips across 566 modules. The website mirrors the reviewed audio bytes and provenance. | This browser JavaScript fix does not change the native host runtime or relabel existing native packages. Physical latency, acoustic listening, LAN routing and relay admission still need their own evidence. |
 | Earlier application provider-start CI | [Run 42780185842](https://github.com/rupret007/StalemateSite/actions/runs/42780185842), job 129708072371, completed the actual `--participation --provider-start` application/workerd mode against website revision `11c9d1f8`. All 15 recorded mode/install/audit exits were zero. Owner/start ordering, duplicate start, Stop/revoke/close fencing and owned cleanup passed. | Real guardian decisions, hosted capacity and media acceptance remain open. |
 | Issuer | Last verified `fd37578f-13cd-4fce-b557-35c0d962ef9d` at100%; completed405/204/403 negatives have receiptc209b961. | Reuse that completed result; do not rerun it or mint test credentials. The existing cap/hold and fresh account headroom still govern trials. |
@@ -161,16 +167,21 @@ redistribution-license qualification remains explicitly unfinished.
    Disconnect meeting audio at both ends before Music. Leave/end Music before
    connecting meeting audio. Microphone or monitor mute alone is insufficient.
 5. Qualify the actual SSL2+ guitar/vocal inputs and Che’s Roland/interface route
-   when connected; his exact interface/module model is still unknown. Keep
-   Wi-Fi, dock Ethernet and a second-network test as distinct results. Browser
-   delay estimates omit parts of the capture/bridge path and are not acoustic
-   latency or a guarantee of tight rehearsal.
+   when connected. Start quietly. Have Che confirm guitar alone, vocal alone,
+   then both together. Balance those inputs on the host before playing. The
+   browser receives one stereo mix with no separate guitar and vocal faders.
+   Then have Jeff confirm Che's drum input. Record Wi-Fi, dock Ethernet and a
+   second-network test separately. Record the browser's displayed direct or
+   relay route where available. Browser delay omits parts of the capture and
+   bridge path. [Browser audio bridge](https://github.com/rupret007/webjam/blob/6e26c693c7d8b0160d8a9ea3434954df526e81bd/docs/web-join-bridge.md#L17-L20)
 
 For a newcomer, send the community invitation privately. The fresh Music link
 is a separate, short-lived invitation created by the host. Never put either code
 or a private meeting link in a public document. A desktop install is needed for
 the current Mac Music host; Che’s planned PC route is the browser. Linux and
-Windows native Music hosting/trust remain explicit gaps, not renamed passes.
+Windows native Music hosting and trust still need qualification. The published
+v0.29.0 tag predates Web Join. Identify the private host build by its exact
+revision and archive receipt. [Published release](https://github.com/rupret007/webjam/releases/tag/v0.29.0)
 
 Fresh moderator email sign-in is also needed for current human report review and
 revocation checks. No new synthetic report was created while that sign-in was
