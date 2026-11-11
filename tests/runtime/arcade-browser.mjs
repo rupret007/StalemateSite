@@ -561,9 +561,28 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         if (!media) {
             const ids = page => page.locator('[data-spades-card]').evaluateAll(buttons => buttons.map(button => button.dataset.spadesCard));
             const hand = await ids(b);
-            await b.reload();
-            await b.locator('[data-enter]').click();
-            await expect(b.locator('[data-spades-card]')).toHaveCount(12);
+            const events = [];
+            function observeReload(socket) {
+                for (const type of ['framesent', 'framereceived']) socket.on(type, ({ payload }) => {
+                    if (events.length >= 80) return;
+                    try {
+                        const { t, name, action, reason, state } = JSON.parse(payload.toString());
+                        events.push({ type, t, name, action, reason, seat: state?.seat, cards: state?.match?.hand?.length });
+                    } catch { /* Record only structured lobby and match frames. */ }
+                });
+                socket.on('close', () => events.push({ type: 'close' }));
+            }
+            b.on('websocket', observeReload);
+            try {
+                await b.reload();
+                await b.locator('[data-enter]').click();
+                await expect(b.locator('[data-connection]')).toHaveText('Connected');
+                await expect(b.locator('[data-spades-card]')).toHaveCount(12);
+            } catch (error) {
+                if (evidence) await b.screenshot({ path: join(evidence, `spades-${engine}-reload-failure.png`) });
+                console.error('Spades reload events:', JSON.stringify(events));
+                throw error;
+            } finally { b.off('websocket', observeReload); }
             assert.deepEqual(await ids(b), hand);
             await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
         }
@@ -573,8 +592,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.getByRole('dialog', { name: 'Resign for your team?' }).getByRole('button', { name: 'Resign', exact: true }).click();
         await expect(a.locator('[data-spades-status]')).toContainText('South + North win by resignation');
         await a.getByRole('button', { name: 'Request Spades rematch' }).click();
-        for (const page of [b, north]) await page.getByRole('button', { name: 'Accept Spades rematch' }).click();
-        await expect(east.locator('[data-spades-status]')).toContainText('3/4 ready');
+        const votes = east.locator('[data-spades-status]');
+        await expect(votes).toContainText('1/4 ready');
+        await b.getByRole('button', { name: 'Accept Spades rematch' }).click();
+        await expect(votes).toContainText('2/4 ready');
+        await north.getByRole('button', { name: 'Accept Spades rematch' }).click();
+        await expect(votes).toContainText('3/4 ready');
         await east.getByRole('button', { name: 'Accept Spades rematch' }).click();
         await expect(b.locator('[data-spades-status]')).toContainText('Round 1 · Your bid');
         await expect(b.locator('[data-spades-card]')).toHaveCount(13);
