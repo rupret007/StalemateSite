@@ -568,6 +568,8 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 .sheet-buttons .btn { font-size: 12px; }
 [data-call-report-reason] { display: block; width: 100%; margin: 6px 0 12px; padding: 8px;
   resize: vertical; color: var(--cream); background: var(--ink); border: 1px solid var(--control-line); border-radius: 4px; font: inherit; }
+.call-report-consent { display: flex; align-items: flex-start; gap: 8px; min-height: 44px; font-size: 14px; line-height: 1.45; }
+.call-report-consent input { flex: 0 0 17px; width: 17px; height: 17px; min-height: 0; margin: 2px 0 0; accent-color: var(--lime); }
 .channel-label { display: block; margin: 16px 0 8px; font-size: 12px; }
 [data-channel-name], [data-invite-nick] { width: 100%; }
 .check { display: flex; align-items: center; gap: 10px; min-height: 44px; }

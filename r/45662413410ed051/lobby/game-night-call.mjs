@@ -7,12 +7,12 @@ const device = { audio: 'microphone', video: 'camera' };
 const reportMarkup = `
     <h3 id="call-report-title">Report call participant</h3>
     <p data-call-report-target></p>
-    <p>Community staff receive the participant name, room reference and the details you enter. Calls are unrecorded.</p>
+    <p>Community staff receive the participant’s name, the room reference and your description. Calls are unrecorded.</p>
     <form>
         <label>What happened?
             <textarea name="reason" rows="4" maxlength="380" required data-call-report-reason></textarea>
         </label>
-        <label class="game-camera-age"><input type="checkbox" required data-call-report-consent> Share these details with community staff</label>
+        <label class="call-report-consent"><input type="checkbox" required data-call-report-consent> Share these details with community staff</label>
         <p role="status" data-call-report-status></p>
         <div class="sheet-buttons">
             <button class="btn" type="submit" data-call-report-send>Send report</button>
