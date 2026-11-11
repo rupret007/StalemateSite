@@ -172,12 +172,17 @@ redistribution-license qualification remains explicitly unfinished.
    to disconnect audio and verify the handoff with both participants.
    Disconnect meeting audio at both ends before Music. Leave/end Music before
    connecting meeting audio. Microphone or monitor mute alone is insufficient.
-5. Qualify the actual SSL2+ guitar/vocal inputs and Che’s Roland/interface route
-   when connected. Start with low input gain on both SSL 2+ channels. Have Che
-   confirm guitar alone, vocal alone, then both together. Adjust their relative
-   levels on the SSL 2+ before playing. WebJam's default Jamulus route combines
-   both inputs before sending them. The browser receives one stereo session mix
-   with no separate guitar or vocal fader. [Jamulus input mix](https://github.com/jamulussoftware/jamulus/blob/r3_12_2/src/client.cpp#L1232-L1276) · [Browser audio bridge](https://github.com/rupret007/webjam/blob/6e26c693c7d8b0160d8a9ea3434954df526e81bd/docs/web-join-bridge.md#L17-L20)
+5. On the Mac, open **More → Audio Settings in Jamulus**, select the SSL 2+
+   and check that the guitar and vocal mic are mapped to different inputs. Set
+   both input gains low to start. Have Che listen to guitar alone, vocal alone,
+   then both together. Set the relative levels on the SSL 2+ or use Jamulus
+   **Input Balance**. [Jamulus input controls](https://jamulus.app/wiki/Software-Manual#input-balance)
+
+   Jamulus owns the host's saved device and channel settings. In **Mono-in / Stereo-out**
+   it combines the two mapped inputs before sending them. In **Stereo** the
+   inputs can remain left and right within one participant. The browser receives
+   one stereo session mix without separate guitar and vocal faders. Confirm the
+   saved mode and actual sound at rehearsal. [Native profile](https://github.com/rupret007/webjam/blob/93497494dd0057a05282033b4208721b6061097c/core/jamulus_profile.py#L490-L498) · [Jamulus input mix](https://github.com/jamulussoftware/jamulus/blob/r3_12_2/src/client.cpp#L1342-L1390) · [Browser audio bridge](https://github.com/rupret007/webjam/blob/93497494dd0057a05282033b4208721b6061097c/docs/web-join-bridge.md#L17-L20)
 
    Then have Jeff confirm Che's drum input. Record Wi-Fi, dock Ethernet and a
    second-network test separately. Web Join prefers a direct connection and can
