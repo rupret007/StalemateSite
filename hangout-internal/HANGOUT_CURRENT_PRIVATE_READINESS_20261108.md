@@ -211,8 +211,8 @@ redistribution-license qualification remains explicitly unfinished.
    [PR 289](https://github.com/rupret007/StalemateSite/pull/289) is rolled out,
    the invitation notice lasts about twelve seconds. Invite Che again if he
    misses it, refreshes or reconnects. After that rollout the invitation waits
-   above the chat box until he chooses **Join room**, and **Return to room**
-   appears after a refresh or dropped connection.
+   at the bottom of the window until he chooses **Join room**, and
+   **Return to room** appears there after a refresh or dropped connection.
    Have Che connect the Roland drums to his interface and check that Windows
    sees the input.
 
