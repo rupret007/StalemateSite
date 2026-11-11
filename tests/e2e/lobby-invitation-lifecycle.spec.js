@@ -444,6 +444,14 @@ test('Game Night plays one shared Four in a Row match with the chat composer sti
         expect((await guest.locator('[data-buffer]').boundingBox()).height).toBeGreaterThanOrEqual(64);
         await guest.locator('[data-text]').scrollIntoViewIfNeeded();
         await expect(guest.locator('[data-send]')).toBeInViewport();
+        await host.locator('[data-text]').fill('Can you read this while playing?');
+        await host.locator('[data-send]').click();
+        const reply = guest.locator('[data-chat-lines]').getByText('Can you read this while playing?');
+        await reply.scrollIntoViewIfNeeded();
+        expect(await reply.evaluate(line => {
+            const bounds = line.getBoundingClientRect();
+            return line.contains(document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2));
+        })).toBe(true);
         await guest.setViewportSize({ width: 375, height: 667 });
         const landingRow = guest.locator('[data-four-table] tbody tr').last();
         await landingRow.scrollIntoViewIfNeeded();
