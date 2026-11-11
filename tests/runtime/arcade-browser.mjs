@@ -653,6 +653,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
         assert.equal(await b.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
         await track(a).focus();
+        await expect(race(a)).toHaveAttribute('data-phase', 'play');
         await expect(race(b)).toHaveAttribute('data-phase', 'play');
         const control = b.getByRole('button', { name: 'Move ' + direction });
         const controlBox = await control.boundingBox();
@@ -714,6 +715,97 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(race(b)).toHaveAttribute('data-phase', 'countdown');
         await expect(race(b)).toHaveAttribute('data-sequence', '0');
         console.log(`Passed ${engine} Turd Rush shared course and collision, keyboard, ${media ? 'native swipe with 220 ms delay and active call' : '44px phone touch and full reload'}, 2D fallback, spectator and rematch.`);
+    }
+    async function playTurdanoid(a, b, spectator) {
+        const before = media ? await packetCount(b, 'audio') : 0;
+        if (media) {
+            await b.routeWebSocket(/\/beta\/arcade-turdanoid-match$/, route => {
+                const server = route.connectToServer();
+                route.onMessage(message => {
+                    if (typeof message === 'string' && JSON.parse(message).action === 'input') {
+                        setTimeout(() => server.send(message), 220);
+                    } else server.send(message);
+                });
+            });
+        }
+        for (const page of [a, b, spectator]) {
+            await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdanoid');
+        }
+        const match = page => page.locator('[data-brick-match]');
+        const board = page => page.getByRole('region', { name: 'Turdanoid playfield' });
+        const serve = page => page.getByRole('button', { name: 'Launch ball' });
+        await a.getByRole('button', { name: 'Open Turdanoid race' }).click();
+        await b.getByRole('button', { name: 'Join Turdanoid race' }).click();
+        await expect(match(b)).toHaveAttribute('data-phase', 'countdown');
+        await expect(board(spectator)).toBeVisible();
+        await expect(serve(spectator)).toBeHidden();
+        await expect(board(b)).toBeInViewport({ ratio: 1 });
+        await expect(serve(b)).toBeInViewport({ ratio: 1 });
+        await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
+        const field = await board(b).boundingBox(), launch = await serve(b).boundingBox();
+        assert.ok(field && launch);
+        assert.ok(launch.width >= 44 && launch.height >= 44, 'phone-sized Turdanoid Launch button');
+        assert.ok(launch.x >= field.x + field.width, 'Launch button does not cover the playfield or paddle');
+        assert.equal(await b.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+        await expect(serve(b)).toBeEnabled();
+        await expect(serve(a)).toBeEnabled();
+        const x = field.x + field.width * .5, y = field.y + field.height * .85;
+        const prediction = media ? b.evaluate(async () => {
+            const table = document.querySelector('[data-brick-match]');
+            const start = performance.now();
+            while (performance.now() - start < 400) {
+                await new Promise(requestAnimationFrame);
+                if (table.dataset.sequence !== '0') return false;
+                if (Number(table.dataset.paddle) > 250) return true;
+            }
+            return false;
+        }) : null;
+        if (engine === 'chromium') {
+            const connection = await b.context().newCDPSession(b);
+            try {
+                await connection.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+                await connection.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + field.width * .075, y }] });
+                await connection.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+            } finally { await connection.detach(); }
+        } else await b.touchscreen.tap(x + field.width * .075, y);
+        if (prediction) assert.equal(await prediction, true, 'phone drag moves paddle before delayed server confirmation');
+        await expect.poll(async () => Number(await match(b).getAttribute('data-paddle'))).toBeGreaterThan(260);
+        await expect(match(b)).toHaveAttribute('data-sequence', /^[1-9]\d*$/);
+        await board(a).focus();
+        await a.keyboard.down('ArrowRight');
+        await expect.poll(async () => Number(await match(a).getAttribute('data-paddle'))).toBeGreaterThan(248);
+        await a.keyboard.up('ArrowRight');
+        if (evidence) {
+            await a.screenshot({ path: join(evidence, `brick-${engine}-desktop.png`) });
+            await b.screenshot({ path: join(evidence, `brick-${engine}-phone.png`) });
+        }
+        await a.keyboard.press('Space');
+        await b.touchscreen.tap(launch.x + launch.width / 2, launch.y + launch.height / 2);
+        for (const page of [a, b, spectator]) {
+            for (const seat of ['a', 'b']) {
+                await expect(page.locator(`[data-brick-score="${seat}"]`)).toContainText(/[1-9]\d* pts/);
+            }
+        }
+        if (!media) {
+            const sequence = await match(b).getAttribute('data-sequence');
+            await b.reload();
+            await b.locator('[data-enter]').click();
+            await expect(match(b)).toHaveAttribute('data-sequence', sequence);
+            await expect(b.locator('[data-brick-score="b"]')).toContainText(/[1-9]\d* pts/);
+            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+        }
+        await b.getByRole('button', { name: 'Leave race' }).click();
+        await b.getByRole('dialog', { name: 'Leave this race?' }).getByRole('button', { name: 'Leave race' }).click();
+        await expect(a.locator('[data-brick-status]')).toHaveText('You win · forfeit');
+        await a.getByRole('button', { name: 'Request Turdanoid rematch' }).click();
+        await b.getByRole('button', { name: 'Accept Turdanoid rematch' }).click();
+        await expect(match(b)).toHaveAttribute('data-phase', 'countdown');
+        await expect(match(b)).toHaveAttribute('data-sequence', '0');
+        if (media) {
+            await waitForPackets(b, 'audio', before);
+            assert.equal(await b.evaluate(() => window.testPeers.length), 1);
+        }
+        console.log(`Passed ${engine} Turdanoid same wall, keyboard launch, ${media ? 'native phone drag with 220 ms delay and active call' : 'native phone tap and full reload'}, visible paddle and Launch, both scores, spectator and rematch.`);
     }
     try {
         const a = await guest('stalemate', 'ChessHost', { width: 1280, height: 900 });
@@ -785,6 +877,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await playTurdtris(a, b, spectator);
         await playTurdomania(a, b, spectator);
         await playTurdRush(a, b, spectator);
+        await playTurdanoid(a, b, spectator);
         if (media) {
             await a.locator('[data-call-toggle]').click();
             await a.getByRole('button', { name: 'Actions for ChessGuest' }).click();

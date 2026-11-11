@@ -408,6 +408,7 @@
 <script src="games/turdanoid-brick-core.js"></script>
 <script src="games/turdanoid-audio-core.js"></script>
 <script src="games/turdanoid-levels-core.js"></script>
+<script src="games/turdanoid-physics-core.js"></script>
 <script src="games/turdanoid-worlds-core.js"></script>
 <script src="games/turdanoid-sprites-core.js?v=291cbfad320c500d"></script>
 <script src="games/turdanoid-brick-sprite-core.js"></script>
@@ -710,6 +711,7 @@ const TBOSS = typeof TurdanoidBoss !== 'undefined' ? TurdanoidBoss : null;
 const TCOACH = typeof TurdanoidCoach !== 'undefined' ? TurdanoidCoach : null;
 const TAUDIO = typeof TurdanoidAudio !== 'undefined' ? TurdanoidAudio : null;
 const TLEVELS = typeof TurdanoidLevels !== 'undefined' ? TurdanoidLevels : null;
+const TPHYSICS = globalThis.TurdanoidPhysics;
 const TPERF = typeof TurdanoidPerf !== 'undefined' ? TurdanoidPerf : null;
 const TTALLY = typeof TurdanoidTally !== 'undefined' ? TurdanoidTally : null;
 let titleDemoBall = { x: 0, y: 0, vx: 2.2, vy: -1.8, r: 9 };
@@ -2500,10 +2502,8 @@ function step(dt){
     if(b.y < b.r){ b.y = b.r; b.vy = Math.abs(b.vy); b.squash = Math.min(1,(b.squash||0)+0.5); b.squashAng = Math.PI/2; clampMinBallSpeed(b); sfx.bounce(); spawnImpactRing(b.x,b.y,wallFx); spawnHitSpark(b.x,b.y,wallFx); }
 
     if(b.vy>0 && b.y+b.r >= paddle.y && b.y - b.r <= paddle.y + paddle.h && Math.abs(b.x - paddle.x) < paddle.w/2 + b.r){
-      const rel = (b.x - paddle.x)/(paddle.w/2);
-      const ang = -Math.PI/2 + Math.max(-1, Math.min(1, rel)) * FEEL_PADDLE_ENGLISH;
-      const sp = Math.hypot(b.vx,b.vy);
-      b.vx = Math.cos(ang)*sp; b.vy = Math.sin(ang)*sp;
+      const rebound = TPHYSICS.paddleVelocity(b, paddle, FEEL_PADDLE_ENGLISH);
+      b.vx = rebound.vx; b.vy = rebound.vy;
       clampMinBallSpeed(b);
       b.y = paddle.y - b.r - 1;
       b.squash = 1; b.squashAng = Math.PI/2;
@@ -2519,10 +2519,9 @@ function step(dt){
     if(b.ghost && b.ghost>0) b.ghost -= ts;
     for(let i=bricks.length-1;i>=0;i--){
       const br = bricks[i];
-      if(b.x + b.r > br.x && b.x - b.r < br.x + br.w && b.y + b.r > br.y && b.y - b.r < br.y + br.h){
-        const dx = b.x - (br.x + br.w/2), dy = b.y - (br.y + br.h/2);
-        const px = br.w/2 + b.r - Math.abs(dx);
-        const py = br.h/2 + b.r - Math.abs(dy);
+      const contact = TPHYSICS.brickContact(b, br);
+      if(contact){
+        const {dx,dy,px,py} = contact;
         let scoreEvent = true;
         if(steel(br)){
           if(b.ghost>0){

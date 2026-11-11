@@ -589,6 +589,66 @@ async function verifyTurdRush(white, black, spectator, ref) {
     return host;
 }
 
+async function verifyTurdanoid(white, black, spectator, ref) {
+    const endpoint = '/beta/arcade-turdanoid';
+    const connect = async player => {
+        const ticket = await grant(player, ref, endpoint + '-ticket');
+        const response = await upgrade(player.cookie, ticket, endpoint + '-match');
+        assert.equal(response.status, 101);
+        const link = observe(response.webSocket);
+        await link.wait(frame => frame.t === 'match-ready', 'Turdanoid connection');
+        return link;
+    };
+    const host = await connect(white), watch = await connect(spectator);
+    let guest = await connect(black);
+    host.send({ version: 1, action: 'open' });
+    const id = (await guest.wait(frame => frame.state?.waiting, 'Turdanoid open race')).state.id;
+    const send = (link, action, fields = {}) => link.send({ version: 1, id, action, ...fields });
+    send(guest, 'join');
+    const a = (await host.wait(frame => frame.state?.match, 'Turdanoid host countdown')).state.match;
+    const b = (await guest.wait(frame => frame.state?.match, 'Turdanoid guest countdown')).state.match;
+    assert.equal(a.startsAt, b.startsAt);
+    assert.equal(a.seed, b.seed);
+    assert.deepEqual(a.wall, b.wall);
+    assert.deepEqual(a.runner.run.hp, b.runner.run.hp);
+    const serve = { sequence: 1, inputs: [[1, 'serve']] };
+    send(host, 'input', serve);
+    await host.wait(frame => frame.reason === 'countdown', 'Turdanoid prestart input refusal');
+    await new Promise(resolve => setTimeout(resolve, Math.max(0, a.startsAt + 20 - Date.now())));
+    send(watch, 'input', serve);
+    send(host, 'input', serve);
+    send(guest, 'input', serve);
+    await watch.wait(frame => frame.reason === 'unavailable', 'Turdanoid spectator cannot launch');
+    for (const player of [host, guest]) {
+        await player.wait(frame => frame.state?.match?.runner.sequence === 1, 'Turdanoid launch accepted');
+    }
+    guest.socket.close(1000, 'Turdanoid reconnect fixture');
+    guest = await connect(black);
+    await new Promise(resolve => setTimeout(resolve, Math.max(0, a.startsAt + 1800 - Date.now())));
+    send(guest, 'sync');
+    const scored = frame => frame.state?.match?.players.a.score > 0 && frame.state.match.players.b.score > 0;
+    const recovered = (await guest.wait(scored, 'Turdanoid resumed scored board')).state.match;
+    assert.equal(recovered.runner.sequence, 1);
+    assert.equal(recovered.runner.run.serves, 1);
+    assert.equal(recovered.startsAt, a.startsAt);
+    assert.notDeepEqual(recovered.runner.run.hp, b.runner.run.hp);
+    assert.deepEqual(recovered.players.a, recovered.players.b);
+    assert.deepEqual((await watch.wait(scored, 'Turdanoid spectator scoreboard')).state.match.players, recovered.players);
+    send(guest, 'resign');
+    const result = (await host.wait(frame => frame.state?.match?.result, 'Turdanoid forfeit')).state.match.result;
+    assert.equal(result.winner, 'a');
+    assert.equal(result.reason, 'resign');
+    send(host, 'rematch');
+    await guest.wait(frame => frame.state?.rematch === 'a', 'Turdanoid rematch vote');
+    send(guest, 'rematch');
+    const fresh = (await guest.wait(frame => frame.state?.match?.id && frame.state.match.id !== id, 'Turdanoid rematch')).state;
+    assert.equal(fresh.seat, 'a');
+    assert.equal(fresh.match.runner.sequence, 0);
+    assert.equal(fresh.match.players.a.score + fresh.match.players.b.score, 0);
+    console.log(`Passed native Turdanoid same wall, verified brick hits on both seats, spectator refusal, reconnect, forfeit and rematch. Player snapshot ${Buffer.byteLength(JSON.stringify(recovered))} bytes.`);
+    return host;
+}
+
 async function verifyMedia(white, black, ref, matchA, matchB) {
     const endpoint = '/beta/game-night-media';
     const join = async player => {
@@ -657,7 +717,7 @@ try {
         modules: [{ type: 'ESModule', path: join(directory, 'worker.mjs'), contents: bundled.output[0].code }],
         compatibilityDate: '2026-10-01', host: '127.0.0.1', port: 0, https: !!browserName, telemetry: { enabled: false },
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true } },
-        bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1', HANGOUT_ARCADE_CRAPEIGHTS: '1', HANGOUT_ARCADE_TURDRUMMY: '1', HANGOUT_ARCADE_TURDSPADES: '1', HANGOUT_ARCADE_TURDJACK: '1', HANGOUT_ARCADE_TURDTRIS: '1', HANGOUT_ARCADE_TURDOMANIA: '1', HANGOUT_ARCADE_TURDRUSH: '1',
+        bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1', HANGOUT_ARCADE_CRAPEIGHTS: '1', HANGOUT_ARCADE_TURDRUMMY: '1', HANGOUT_ARCADE_TURDSPADES: '1', HANGOUT_ARCADE_TURDJACK: '1', HANGOUT_ARCADE_TURDTRIS: '1', HANGOUT_ARCADE_TURDOMANIA: '1', HANGOUT_ARCADE_TURDRUSH: '1', HANGOUT_ARCADE_TURDANOID: '1',
             ...(browserName ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
             ...(!browserName || browserMedia ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
             HANGOUT_HMAC_KEY: 'owned-arcade-fixture-hmac-not-for-deployment-2026', HANGOUT_BETA_INVITE_KEY: invite,
@@ -726,10 +786,12 @@ try {
     const tris = await verifyTurdtris(white, black, spectator, ch.keepRef);
     const mania = await verifyTurdomania(white, black, spectator, ch.keepRef);
     const rush = await verifyTurdRush(white, black, spectator, ch.keepRef);
+    const brick = await verifyTurdanoid(white, black, spectator, ch.keepRef);
     assert.ok([...a.frames, ...cards.frames].every(frame => frame.state?.game !== 'turdrummy'));
     white.lobby.send({ t: 'say', ch: room, text: 'Good luck at Chess' });
     await black.lobby.wait(frame => frame.t === 'line' && frame.text === 'Good luck at Chess', 'chat while match is open');
     const partAt = a.frames.length, cardsPartAt = cards.frames.length, rummyPartAt = rummy.frames.length, spadesPartAt = spades.frames.length, jackPartAt = jack.frames.length, trisPartAt = tris.frames.length, maniaPartAt = mania.frames.length, rushPartAt = rush.frames.length;
+    const brickPartAt = brick.frames.length;
     black.lobby.send({ t: 'cmd', name: 'part', args: [room], ch: room });
     await black.lobby.wait(frame => frame.t === 'part' && frame.ch === room, 'explicit room departure');
     await a.wait(frame => frame.t === 'match-state' && frame.state === null, 'seat retirement', partAt);
@@ -740,6 +802,7 @@ try {
     await tris.wait(frame => frame.t === 'match-state' && frame.state === null, 'Turdtris race retirement', trisPartAt);
     await mania.wait(frame => frame.t === 'match-state' && frame.state === null, 'Turdomania duel retirement', maniaPartAt);
     await rush.wait(frame => frame.t === 'match-state' && frame.state === null, 'Turd Rush race retirement', rushPartAt);
+    await brick.wait(frame => frame.t === 'match-state' && frame.state === null, 'Turdanoid race retirement', brickPartAt);
     console.log('Passed native Turdtris countdown, same seed, separate boards, spectator permissions, paired inputs, reconnect, forfeit, rematch and retirement.');
     console.log('Passed native four-player Crapjack dealer settlement, hidden hands, spectator permissions, reconnect, fresh session and seat retirement.');
     console.log('Passed native four-seat TurdSpades, spectator privacy, bidding, 13 tricks, rematch and seat retirement.');

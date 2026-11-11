@@ -1,15 +1,16 @@
 import { TUNING, act, advance, createRun, startRun, queueRushSwipe, rushSwipeAction } from './turdrush-core.js';
+import { ACTION_TICKS_PER_SECOND, ACTION_INPUT_BUFFER_MS, ACTION_BURST_CREDITS, ACTION_QUEUE_LIMIT, actionTick, acceptTimedInputs } from './arcade-action-clock.js';
 
 export const TURD_RUSH_RACE_VERSION = 1;
 export const RUSH_COURSE_METRES = 480;
 export const RUSH_COUNTDOWN_MS = 3000;
-export const RUSH_INPUT_BUFFER_MS = 320;
-export const RUSH_TICKS_PER_SECOND = 120;
+export const RUSH_INPUT_BUFFER_MS = ACTION_INPUT_BUFFER_MS;
+export const RUSH_TICKS_PER_SECOND = ACTION_TICKS_PER_SECOND;
 export const RUSH_LIMIT_TICKS = 45 * RUSH_TICKS_PER_SECOND;
 const actions = ['left', 'right', 'jump', 'slide', 'swipe-left', 'swipe-right', 'cancel-swipe'];
 const kinds = ['barrier', 'beam', 'crate', 'pick', 'shield', 'magnet'];
 const seats = ['a', 'b'];
-const inputCost = 10, burstCredits = 60, maxQueued = 24, maxBatch = 4, futureTicks = 12;
+const burstCredits = ACTION_BURST_CREDITS, maxQueued = ACTION_QUEUE_LIMIT;
 const checkpointInterval = RUSH_TICKS_PER_SECOND;
 const raceDurationMs = RUSH_LIMIT_TICKS / RUSH_TICKS_PER_SECOND * 1000 + RUSH_INPUT_BUFFER_MS;
 const mapSeats = fn => Object.fromEntries(seats.map(seat => [seat, fn(seat)]));
@@ -19,7 +20,7 @@ const bounded = (value, min, max) => Number.isFinite(value) && value >= min && v
 const validId = value => typeof value === 'string' && /^[a-zA-Z0-9-]{5,80}$/.test(value);
 
 export function rushRaceTick(startsAt, now) {
-  return Math.max(0, Math.min(RUSH_LIMIT_TICKS, Math.floor((now - startsAt) * RUSH_TICKS_PER_SECOND / 1000)));
+  return actionTick(startsAt, now, RUSH_LIMIT_TICKS);
 }
 
 function flushSwipe(racer) {
@@ -178,23 +179,8 @@ export class TurdRushRace {
     if (now < state.startsAt) { return { ok: false, reason: 'countdown' }; }
     const racer = state.racers[seat];
     if (racer.status !== 'running') { return { ok: false, reason: 'run-ended' }; }
-    if (frame.sequence !== racer.sequence + 1) { return { ok: false, reason: 'sequence' }; }
-    const { inputs } = frame;
-    if (!Array.isArray(inputs) || !inputs.length || inputs.length > maxBatch || !inputs.every(validInput)) {
-      return { ok: false, reason: 'invalid-input' };
-    }
-    if (inputs[0][0] <= state.tick) { return { ok: false, reason: 'late-input' }; }
-    const current = rushRaceTick(state.startsAt, now);
-    if (inputs[0][0] < racer.lastInputTick || inputs.some(([tick], index) =>
-      tick > current + futureTicks || (index && tick < inputs[index - 1][0]))) { return { ok: false, reason: 'invalid-tick' }; }
-    const credits = Math.min(burstCredits, racer.credits + Math.max(0, current - racer.chargedAt)) - inputCost * inputs.length;
-    if (credits < 0 || racer.queue.length + inputs.length > maxQueued) { return { ok: false, reason: 'input-paced' }; }
-    racer.sequence = frame.sequence;
-    racer.credits = credits;
-    racer.chargedAt = Math.max(racer.chargedAt, current);
-    racer.lastInputTick = inputs.at(-1)[0];
-    racer.queue.push(...inputs.map(input => [...input]));
-    return { ok: true };
+    const reason = acceptTimedInputs(racer, frame, state.tick, rushRaceTick(state.startsAt, now), validInput);
+    return reason ? { ok: false, reason } : { ok: true };
   }
 
   view(seat, now) {

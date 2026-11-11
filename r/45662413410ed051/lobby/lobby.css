@@ -306,7 +306,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 @media (min-width: 1100px) {
   .game-night:has(.arcade-card-table[open] [data-card-table]:not([hidden])) {
     display: grid;
-    grid-template: "cards heading" auto "cards actions" auto "cards four" auto "cards chess" auto "cards eights" auto "cards rummy" auto "cards spades" auto "cards jack" auto "cards tris" auto "cards mania" auto "cards rush" auto "cards call" 1fr /
+    grid-template: "cards heading" auto "cards actions" auto "cards four" auto "cards chess" auto "cards eights" auto "cards rummy" auto "cards spades" auto "cards jack" auto "cards tris" auto "cards mania" auto "cards rush" auto "cards brick" auto "cards call" 1fr /
       minmax(0, 27rem) minmax(0, 1fr);
     gap: 4px 16px;
     align-items: start;
@@ -321,6 +321,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .game-night:has(.arcade-card-table[open]) > .arcade-tris:not([open]) { grid-area: tris; }
   .game-night:has(.arcade-card-table[open]) > .arcade-mania:not([open]) { grid-area: mania; }
   .game-night:has(.arcade-card-table[open]) > .arcade-rush-race:not([open]) { grid-area: rush; }
+  .game-night:has(.arcade-card-table[open]) > .arcade-brick-race:not([open]) { grid-area: brick; }
 }
 @media (max-width: 900px) {
   .roombar:has([data-arcade-game]:not([hidden])) .modes { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -455,6 +456,32 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 .rush-race-controls small { font-size: .7rem; text-transform: capitalize; }
 @media (max-height: 750px) {
   .rush-race-status.rush-race-playing { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+}
+.arcade-brick-race { position: relative; }
+.arcade-brick-race summary, .arcade-brick-race [data-brick-leave] { min-height: 44px; }
+.arcade-brick-race [data-brick-leave] { position: absolute; inset: 1px 0 auto auto; }
+.brick-race-actions:has([data-brick-main][hidden]) { display: none; }
+.brick-race-actions:has([data-brick-main][hidden]):has([data-brick-leave]:not([hidden])) { display: contents; }
+.brick-race-layout { display: grid; grid-template-columns: minmax(0, 1fr) 4.75rem; gap: 6px; align-items: start; }
+.brick-race-board { position: relative; width: 100%; aspect-ratio: 6 / 5; overflow: hidden;
+  border: 1px solid #75a99d; border-radius: 8px; background: #10272d; touch-action: none; user-select: none; scroll-margin-top: 50px; }
+.brick-race-board canvas { display: block; width: 100%; height: 100%; pointer-events: none; }
+.brick-race-board b { position: absolute; inset: 0; display: grid; place-items: center;
+  background: #071d2480; color: #d1ffeb; pointer-events: none; font: bold clamp(1.1rem, 5vw, 2.2rem) var(--mono); }
+.brick-race-board b[hidden], .brick-race-rail [data-brick-serve][hidden], .brick-race-rail [data-brick-power]:empty { display: none; }
+.brick-race-rail { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.brick-race-rail > time, .brick-race-rail > div { display: grid; gap: 2px; padding: 4px; border: 1px solid var(--line);
+  border-radius: 5px; background: var(--surface); color: var(--cream); font: .68rem var(--mono); }
+.brick-race-rail > time { order: -2; text-align: center; font-size: .9rem; }
+.brick-race-rail > div b { color: var(--lime); }
+.brick-race-rail > div small { font-size: .64rem; }
+.brick-race-rail [data-brick-serve] { order: 3; min-height: 44px; min-width: 44px; padding-inline: 3px;
+  white-space: normal; touch-action: manipulation; line-height: 1.12; }
+.brick-race-rail [data-brick-power] { order: 4; }
+.brick-race-help { margin: 4px 0 0; }
+@media (max-height: 750px) {
+  .brick-race-board { max-width: min(100%, calc(clamp(150px, 100dvh - 435px, 285px) * 1.2)); justify-self: center; }
+  .brick-race-help { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
 .game-night-call { margin-block: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
 .game-night-call h4, .game-night-call p { margin: 0 0 5px; }

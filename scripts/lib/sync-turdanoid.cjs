@@ -8,7 +8,7 @@ const { versionArcadeAssets } = require('./arcade-asset-versions.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const UPSTREAM = 'https://github.com/rupret007/Turdanoid.git';
-const PIN = '5f07783de30da174d643e39c106b57b84c94baa4';
+const PIN = 'd80e169b57704d4d25d16e0cce4e51bdb206ad82';
 const FILES = [
     'index.html', 'TurdAnoid.html', 'turdtris.html', 'turdjack.html', 'crapeights.html',
     'turdrummy.html', 'turdspades.html', 'turdomania.html', 'chess.html', 'turdrush.html', 'neon-arkanoid.html',
@@ -24,7 +24,8 @@ const MATCH_WORKER_FILES = [
     'games/turdtris-match.js', 'games/turdtris-sprint.js', 'games/turdtris_logic.js',
     'games/turdtris-presentation.js', 'games/turdtris-modes.js',
     'games/turdomania-duel.js', 'games/turdomania-core.js',
-    'games/turdrush-race.js', 'games/turdrush-core.js'
+    'games/turdrush-race.js', 'games/turdrush-core.js', 'games/arcade-action-clock.js',
+    'games/turdanoid-race.js', 'games/turdanoid-physics-core.js', 'games/turdanoid-levels.js', 'games/turdanoid-levels-core.js'
 ];
 const SONGS = ['manic.m4a', 'andrea.m4a', 'only-been-18.m4a', 'wham-bam.m4a', 'planet-of-the-flakes.m4a'];
 const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'";

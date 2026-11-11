@@ -22,6 +22,8 @@ if (target === 'beta') {
             'games/turdtris-modes.js', 'games/turdtris-art.js',
             'games/turdomania-core.js', 'assets/turdomania-tiles.svg',
             'games/turdrush-race.js', 'games/turdrush-core.js', 'games/turdrush-renderer.js',
+            'games/arcade-action-clock.js', 'games/turdanoid-race.js', 'games/turdanoid-physics-core.js',
+            'games/turdanoid-levels.js', 'games/turdanoid-levels-core.js', 'games/turdanoid-sprites-core.js',
             'assets/vendor/three/three.module.js', 'assets/vendor/three/three.core.js', 'assets/vendor/three/LICENSE',
             'assets/chess/chessground.js', 'assets/chess/chessground.base.css', 'assets/chess/chess-board.css',
             'assets/chess/chessground-10.5.0-source.tar.gz',
