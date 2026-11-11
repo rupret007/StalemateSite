@@ -1,0 +1,84 @@
+{
+  "recordedAt": "2026-11-11T10:44:43.195726+00:00",
+  "privateLobby": {
+    "source": "3533420b6e5d44e95abd899c7d021a0f89f424be",
+    "servingVersion": "f5319d4a-6953-4162-8521-e7a5a15f86d0",
+    "deployment": "aa41b155-1777-4e26-bcda-dd2d37b27078",
+    "previousServingVersion": "e1c40ea5-653e-47ad-af1f-b80aaeede80e",
+    "issuerVersion": "fd37578f-13cd-4fce-b557-35c0d962ef9d",
+    "protectedGuestAssetsVerified": 5,
+    "logoutVerified": true,
+    "publicRelease": false,
+    "sitePr": 273,
+    "browserCasesPerExactRun": 916,
+    "localRouteCasesPerStyle": 34,
+    "releaseReceiptSha256": "8f70eef35573aaa5d4ca5bd16e941744bb3e3040a70f59b8a1c5639055cd6c71",
+    "workerAndConfigurationPreserved": true
+  },
+  "hostedCandidateKeyboardJourney": {
+    "lobbySource": "87282dd258375ca402ef142774c8d3d6914081b7",
+    "workerSource": "0b681670657127147a2bb686b792901ae857ffbd",
+    "receiptSha256": "de869081bdb4547d620af28594792020f5381ad6d48401b8e864ffcc11307042",
+    "focusRestoredForTwoGuests": true,
+    "candidateScriptSubstitutedInBrowser": true,
+    "fullPostDeployJourneyPending": true
+  },
+  "hostedMusicRoom": {
+    "source": "0b681670657127147a2bb686b792901ae857ffbd",
+    "receiptSha256": "55297474747b20b23209c53bf3bfca960fddcd471686dae668d298a587041d26",
+    "hostAndGuestJoined": true,
+    "rejectedPasteStayedEditable": true,
+    "guestJoinStayedDisabled": true,
+    "viewports": [
+      375,
+      390
+    ],
+    "verifiedGuestLogouts": 2,
+    "mediaRequests": 0,
+    "validMusicInviteUsed": false,
+    "priorFailureCauseConfirmed": false
+  },
+  "desktopCandidates": {
+    "source": "23cfae6ac05c128e1caf8a6fd366751686304ba6",
+    "run": 42997398282,
+    "target": "private-beta",
+    "githubHostedBuildsPassed": true,
+    "packages": {
+      "macos-arm64": {
+        "job": 130457956341,
+        "artifact": 13846183965,
+        "sha256": "c573056309e882674904357ffe5ea0235d2ee67425da84344ef1b1a67549d45a",
+        "sizeBytes": 459668297
+      },
+      "windows-x64": {
+        "job": 130457956308,
+        "artifact": 13847081842,
+        "sha256": "e065eea771947c010b0f0c5f4afa29cd88e9ed519d7f4310a95c6d68c0f9b403",
+        "sizeBytes": 613267494
+      },
+      "linux-x64": {
+        "job": 130457956317,
+        "artifact": 13846486848,
+        "sha256": "1c5f76fa8ec5d0cd95e528ae8360e1541cf55257b79cea8cec4d4392b0311a64",
+        "sizeBytes": 458992265
+      },
+      "macos-x64": {
+        "job": 130457956199,
+        "artifact": 13847713990,
+        "sha256": "1597e38d121b8e0972caa258f807b96845c26d3721e57533bf57ca1749a14cdc",
+        "sizeBytes": 474638278
+      }
+    },
+    "publicRelease": false,
+    "localArchiveChecksPending": true,
+    "newPackageInstalled": false,
+    "physicalMediaVerified": false
+  },
+  "remaining": [
+    "Verify newest archive bytes and trust on both Macs, then run local startup and Quit.",
+    "Rehearse Mac-to-Windows audio, leave/rejoin and second-network recovery.",
+    "Hear WAV and MP3 Shared Track alongside physical input.",
+    "Verify real Webex video and exclusive audio handoff.",
+    "Complete joined native Safari, physical mobile, assistive technology and remaining evidence-matrix checks."
+  ]
+}
