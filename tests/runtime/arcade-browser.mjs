@@ -1268,12 +1268,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     async function playTurdanoid(a, b, spectator) {
         const before = media ? await packetCount(b, 'audio') : 0;
         const launchFrames = [];
+        let sentServes = 0;
         function observeLaunch(socket) {
             if (!new URL(socket.url()).pathname.endsWith('/arcade-turdanoid-match')) return;
             for (const direction of ['framesent', 'framereceived']) socket.on(direction, ({ payload }) => {
                 const { action, inputs, sequence, reason, state } = JSON.parse(payload.toString());
                 const runner = state?.match?.runner;
                 if (action !== 'input' && !reason && !runner) return;
+                if (direction === 'framesent' && action === 'input') sentServes += inputs.filter(([, control]) => control === 'serve').length;
                 launchFrames.push({ direction, action, inputs, sequence, reason,
                     at: state?.match?.at, tick: runner?.tick, confirmed: runner?.sequence, serves: runner?.run?.serves });
                 if (launchFrames.length > 24) launchFrames.shift();
@@ -1345,18 +1347,24 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.bringToFront();
         const sequenceBeforeLaunch = Number(await match(b).getAttribute('data-sequence'));
         await expect(serve(b)).toBeInViewport({ ratio: 1 });
-        const launchEvents = await b.evaluateHandle(() => {
+        const launchEvents = await b.evaluateHandle(suppressClick => {
             const events = [], controller = new AbortController();
             for (const type of ['pointerdown', 'pointerup', 'pointercancel', 'click']) document.addEventListener(type, event => {
                 const button = event.target.closest?.('[data-brick-serve]');
                 events.push({ type, trusted: event.isTrusted, pointer: event.pointerType, onLaunch: !!button, disabled: button?.disabled });
+                // Match the hosted Chromium trace where only native touch pointer events reached Launch.
+                if (button && type === 'click' && suppressClick) event.stopImmediatePropagation();
             }, { capture: true, signal: controller.signal });
             return { events, controller };
-        });
+        }, engine === 'chromium');
         try {
             await serve(b).tap();
+            const events = await launchEvents.evaluate(trace => trace.events);
+            assert.ok(events.some(event => event.type === 'pointerup' && event.trusted && event.pointer === 'touch' && event.onLaunch));
             await expect(match(b)).toHaveAttribute('data-stuck', 'false');
             await expect.poll(async () => Number(await match(b).getAttribute('data-sequence'))).toBeGreaterThan(sequenceBeforeLaunch);
+            await expect.poll(() => launchFrames.some(frame => frame.serves === 1)).toBe(true);
+            assert.equal(sentServes, 1, 'one phone tap produces one serve command');
         } catch (error) {
             const events = await launchEvents.evaluate(trace => trace.events);
             const feedback = await b.locator('[data-brick-error]').textContent();

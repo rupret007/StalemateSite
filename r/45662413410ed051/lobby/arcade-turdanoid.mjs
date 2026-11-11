@@ -94,10 +94,18 @@ export function mountArcadeTurdanoid(container) {
     const paint = createPainter(board.querySelector('canvas'));
     let scope, model, canOpen, connection, visual, wall, receivedAt, raf = 0, pending, pointer,
         desiredAim = null, lastAim = -Infinity, lastSent = -Infinity, lastSync = -Infinity, retryAt = 0, redraw = true;
+    let launchPointer = null;
     let buffer = [], flights = [], keys = new Set();
     const serverNow = time => model.match.at + Math.max(0, time - receivedAt);
     function clearPending() { clearTimeout(pending); pending = null; }
-    function clearInputs() { buffer = []; flights = []; keys.clear(); pointer = null; desiredAim = null; }
+    function clearInputs() {
+        buffer = [];
+        flights = [];
+        keys.clear();
+        pointer = null;
+        launchPointer = null;
+        desiredAim = null;
+    }
     function rebuild() {
         visual = model?.match ? structuredClone(model.match.runner) : null;
         if (!visual) return;
@@ -164,6 +172,13 @@ export function mountArcadeTurdanoid(container) {
         visual.queue.push(input);
         put(error, '');
         return true;
+    }
+
+    function requestServe() {
+        const containsServe = inputs => inputs.some(([, control]) => control === 'serve');
+        if (!visual?.run.ball.stuck || containsServe(visual.queue) || containsServe(buffer) ||
+            flights.some(flight => containsServe(flight.inputs))) return;
+        queue('serve');
     }
 
     function drawFrame(time) {
@@ -243,7 +258,22 @@ export function mountArcadeTurdanoid(container) {
     }
 
     main.addEventListener('click', () => send(main.dataset.command));
-    launch.addEventListener('click', () => queue('serve'));
+    const hitsLaunch = event => launch.contains(document.elementFromPoint(event.clientX, event.clientY));
+    launch.addEventListener('pointerdown', event => {
+        if (event.pointerType === 'touch' && event.isPrimary && event.button === 0 && !launch.disabled) launchPointer = event.pointerId;
+    });
+    launch.addEventListener('pointerup', event => {
+        if (event.pointerId !== launchPointer) return;
+        launchPointer = null;
+        // Captured touch can end outside the button, and a touch release may have no click.
+        if (!launch.disabled && hitsLaunch(event)) requestServe();
+    });
+    for (const name of ['pointercancel', 'lostpointercapture']) launch.addEventListener(name, event => {
+        if (event.pointerId === launchPointer) launchPointer = null;
+    });
+    launch.addEventListener('click', event => {
+        if (event.detail === 0 || hitsLaunch(event)) requestServe();
+    });
     leave.addEventListener('click', () => {
         put($('[data-brick-confirm-text]'), model?.waiting ? 'The open seat will close.' : 'Leaving forfeits your race.');
         confirm.showModal();
@@ -255,7 +285,7 @@ export function mountArcadeTurdanoid(container) {
         if (event.ctrlKey || event.altKey || event.metaKey || !['ArrowLeft', 'ArrowRight', ' '].includes(event.key)) return;
         event.preventDefault();
         if (event.repeat) return;
-        if (event.key === ' ') { queue('serve'); return; }
+        if (event.key === ' ') { requestServe(); return; }
         desiredAim = null;
         keys.add(event.key);
         if (!queue('axis', axis())) keys.delete(event.key);
