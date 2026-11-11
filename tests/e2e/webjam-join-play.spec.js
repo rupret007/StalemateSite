@@ -144,17 +144,23 @@ for (const width of [375, 390]) {
     }
 }
 
-for (const width of [375, 390]) {
-    test(`the packaged website offers an alternate microphone after the default fails at ${width}px`, async ({ page, baseURL }) => {
+const alternateMicrophoneCases = [
+    { width: 375, errorName: 'NotReadableError' },
+    { width: 390, errorName: 'NotReadableError' },
+    { width: 375, errorName: 'NotFoundError' },
+    { width: 390, errorName: 'NotFoundError' },
+];
+for (const { width, errorName } of alternateMicrophoneCases) {
+    test(`the packaged website offers an alternate microphone after ${errorName} at ${width}px`, async ({ page, baseURL }) => {
         await page.setViewportSize({ width, height: 844 });
-        await page.addInitScript(() => {
+        await page.addInitScript((failure) => {
             window.captureInputs = [];
             const media = Object.getPrototypeOf(navigator.mediaDevices);
             media.enumerateDevices = async () => [{ kind: 'audioinput', deviceId: 'alternate', label: 'USB headset' }];
             media.getUserMedia = async ({ audio }) => {
                 const selection = audio.deviceId?.exact ?? '';
                 window.captureInputs.push(selection);
-                if (selection !== 'alternate') throw new DOMException('Fixture device is busy', 'NotReadableError');
+                if (selection !== 'alternate') throw new DOMException('Fixture default input failed', failure);
                 const audioContext = new AudioContext();
                 const output = audioContext.createMediaStreamDestination();
                 const tone = audioContext.createOscillator();
@@ -168,7 +174,7 @@ for (const width of [375, 390]) {
                 track.stop = () => { stop(); audioContext.close().catch(() => {}); };
                 return output.stream;
             };
-        });
+        }, errorName);
         const external = [];
         await page.route('**/*', route => {
             if (new URL(route.request().url()).origin === new URL(baseURL).origin) return route.continue();
@@ -181,7 +187,9 @@ for (const width of [375, 390]) {
         await expect(picker).toBeHidden();
         expect(await page.evaluate(() => window.captureInputs)).toEqual([]);
         await page.getByRole('button', { name: 'Check microphone', exact: true }).press('Enter');
-        await expect(page.locator('#mic-error')).toContainText("Couldn't open this microphone");
+        await expect(page.locator('#mic-error')).toContainText(
+            errorName === 'NotFoundError' ? 'Choose another input if available' : "Couldn't open this microphone",
+        );
         await expect(page.getByRole('button', { name: 'Try again' })).toBeFocused();
         await expect(picker).toBeVisible();
         expect(await page.evaluate(() => window.captureInputs)).toEqual(['']);
