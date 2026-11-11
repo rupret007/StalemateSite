@@ -306,7 +306,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 @media (min-width: 1100px) {
   .game-night:has(.arcade-card-table[open] [data-card-table]:not([hidden])) {
     display: grid;
-    grid-template: "cards heading" auto "cards actions" auto "cards four" auto "cards chess" auto "cards eights" auto "cards rummy" auto "cards spades" auto "cards jack" auto "cards tris" auto "cards mania" auto "cards call" 1fr /
+    grid-template: "cards heading" auto "cards actions" auto "cards four" auto "cards chess" auto "cards eights" auto "cards rummy" auto "cards spades" auto "cards jack" auto "cards tris" auto "cards mania" auto "cards rush" auto "cards call" 1fr /
       minmax(0, 27rem) minmax(0, 1fr);
     gap: 4px 16px;
     align-items: start;
@@ -320,6 +320,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .game-night:has(.arcade-card-table[open]) > .arcade-jack:not([open]) { grid-area: jack; }
   .game-night:has(.arcade-card-table[open]) > .arcade-tris:not([open]) { grid-area: tris; }
   .game-night:has(.arcade-card-table[open]) > .arcade-mania:not([open]) { grid-area: mania; }
+  .game-night:has(.arcade-card-table[open]) > .arcade-rush-race:not([open]) { grid-area: rush; }
 }
 @media (max-width: 900px) {
   .roombar:has([data-arcade-game]:not([hidden])) .modes { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -429,6 +430,32 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
   .mania-own { width: min(100%, 17rem); }
 }
 @media (prefers-reduced-motion: reduce) { .mania-tile { transition: none; } }
+.arcade-rush-race { position: relative; }
+.arcade-rush-race summary { min-height: 44px; }
+.arcade-rush-race [data-race-leave] { position: absolute; inset: 1px 0 auto auto; min-height: 44px; }
+.rush-race-actions:has([data-race-main][hidden]) { display: none; }
+.rush-race-actions:has([data-race-main][hidden]):has([data-race-leave]:not([hidden])) { display: contents; }
+.rush-race-hud { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-bottom: 6px; }
+.rush-race-hud > div { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 3px 5px;
+  min-width: 0; padding: 4px 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface);
+  color: var(--cream); font: .7rem var(--mono); }
+.rush-race-hud b { color: var(--lime); }
+.rush-race-hud progress { flex-basis: 100%; width: 100%; height: 5px; accent-color: #89edc8; }
+.rush-race-track { position: relative; overflow: hidden; isolation: isolate; width: 100%;
+  height: clamp(132px, calc(100dvh - 490px), 275px); border: 1px solid #75a99d; border-radius: 8px;
+  background: #104650; touch-action: none; user-select: none; scroll-margin-top: 50px; }
+.rush-race-track canvas { display: block; width: 100%; height: 100%; pointer-events: none; }
+.rush-race-track canvas[hidden] { display: none; }
+.rush-race-track b { position: absolute; inset: 0; display: grid; place-items: center; padding: 6px;
+  background: #071d2480; color: #d1ffeb; pointer-events: none; font: bold clamp(1.1rem, 5vw, 2.2rem) var(--mono); text-align: center; }
+.rush-race-track b[hidden] { display: none; }
+.rush-race-controls { display: grid; grid-template-columns: repeat(4, minmax(44px, 1fr)); gap: 4px; margin-top: 5px; }
+.rush-race-controls[hidden] { display: none; }
+.rush-race-controls .btn { min-height: 44px; padding: 3px; font: bold 1rem var(--mono); touch-action: manipulation; user-select: none; }
+.rush-race-controls small { font-size: .7rem; text-transform: capitalize; }
+@media (max-height: 750px) {
+  .rush-race-status.rush-race-playing { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+}
 .game-night-call { margin-block: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
 .game-night-call h4, .game-night-call p { margin: 0 0 5px; }
 .game-night-call .jam-actions { margin-bottom: 4px; }

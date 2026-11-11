@@ -1123,7 +1123,7 @@ export default { async fetch(request, env) {
         return denied();
     }
     if (!['/beta/unlock', '/beta/logout', '/beta/state', '/beta/participation', '/beta/participation/stop', '/lobby', '/room', '/turn',
-        '/beta/arcade-ticket', '/beta/arcade-match', '/beta/arcade-crapeights-ticket', '/beta/arcade-crapeights-match', '/beta/arcade-turdrummy-ticket', '/beta/arcade-turdrummy-match', '/beta/arcade-turdspades-ticket', '/beta/arcade-turdspades-match', '/beta/arcade-turdjack-ticket', '/beta/arcade-turdjack-match', '/beta/arcade-turdtris-ticket', '/beta/arcade-turdtris-match', '/beta/arcade-turdomania-ticket', '/beta/arcade-turdomania-match', '/beta/game-night-media-ticket', '/beta/game-night-media'].includes(url.pathname)) return denied();
+        '/beta/arcade-ticket', '/beta/arcade-match', '/beta/arcade-crapeights-ticket', '/beta/arcade-crapeights-match', '/beta/arcade-turdrummy-ticket', '/beta/arcade-turdrummy-match', '/beta/arcade-turdspades-ticket', '/beta/arcade-turdspades-match', '/beta/arcade-turdjack-ticket', '/beta/arcade-turdjack-match', '/beta/arcade-turdtris-ticket', '/beta/arcade-turdtris-match', '/beta/arcade-turdomania-ticket', '/beta/arcade-turdomania-match', '/beta/arcade-turdrush-ticket', '/beta/arcade-turdrush-match', '/beta/game-night-media-ticket', '/beta/game-night-media'].includes(url.pathname)) return denied();
     if (request.headers.get('Origin') !== ORIGIN) return denied();
     const appEnv = { ...env, ASSETS: { fetch: () => new Response('no fixture page requested', { status: 404 }) } };
     return betaFetch(request, appEnv);

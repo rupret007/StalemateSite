@@ -484,7 +484,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         ['turdspades', { label: 'TurdSpades', load: () => import('./arcade-turdspades.mjs').then(module => module.mountArcadeTurdSpades) }],
         ['turdjack', { label: 'Crapjack 21', load: () => import('./arcade-turdjack.mjs').then(module => module.mountArcadeTurdJack) }],
         ['turdtris', { label: 'Turdtris Sprint', load: () => import('./arcade-turdtris.mjs').then(module => module.mountArcadeTurdtris) }],
-        ['turdomania', { label: 'Turdomania Duel', load: () => import('./arcade-turdomania.mjs').then(module => module.mountArcadeTurdomania) }]
+        ['turdomania', { label: 'Turdomania Duel', load: () => import('./arcade-turdomania.mjs').then(module => module.mountArcadeTurdomania) }],
+        ['turdrush', { label: 'Turd Rush Race', load: () => import('./arcade-turdrush.mjs').then(module => module.mountArcadeTurdRush) }]
     ]);
     let arcadeReturning = null;
     let arcadeMediaSupported = false, arcadeMedia = null, arcadeMediaLoading = false;
@@ -925,6 +926,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             arcadeTables.get('turdjack').supported = m.features?.arcadeTurdJack === 1;
             arcadeTables.get('turdtris').supported = m.features?.arcadeTurdtris === 1;
             arcadeTables.get('turdomania').supported = m.features?.arcadeTurdomania === 1;
+            arcadeTables.get('turdrush').supported = m.features?.arcadeTurdRush === 1;
             arcadeMediaSupported = m.features?.arcadeMedia === 1;
             fourInARowSupported = m.features?.fourInARow === 1;
             discordLinksSupported = m.features?.discordLinks === true;

@@ -181,6 +181,28 @@ export function act(state, action) {
   return [];
 }
 
+export function classifyRushSwipe(x, y) {
+  if (Math.max(Math.abs(x), Math.abs(y)) < 18) {return null;}
+  if (Math.abs(x) > Math.abs(y) * 1.12) {return x > 0 ? 'right' : 'left';}
+  if (Math.abs(y) > Math.abs(x) * 1.12) {return y > 0 ? 'slide' : 'jump';}
+  return null;
+}
+
+// Keep a single bounded destination through the cooldown. Opposite flicks
+// correct that destination and outside lanes never accrue movement debt.
+export function queueRushSwipe(state, pending, action, owner = null) {
+  const live = pending && state.elapsed <= pending.until;
+  const from = live ? pending.lane : state.player.lane;
+  const lane = Math.max(0, Math.min(2, from + (action === 'left' ? -1 : 1)));
+  if (live && lane === from) {return pending;}
+  return lane === state.player.lane ? null : { lane, owner, until: state.elapsed + .25 };
+}
+
+export function rushSwipeAction(state, pending) {
+  if (!pending || state.phase !== 'running' || state.elapsed > pending.until || pending.lane === state.player.lane) {return null;}
+  return pending.lane < state.player.lane ? 'left' : 'right';
+}
+
 function countdown(value, seconds) {
   return value <= seconds + EPSILON ? 0 : value - seconds;
 }

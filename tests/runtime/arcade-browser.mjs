@@ -4,14 +4,23 @@ import { join } from 'node:path';
 import { chromium, webkit } from 'playwright';
 import { expect } from '@playwright/test';
 import { findDuelSolution } from '../../hangout-worker/arcade/games/turdomania-duel.js';
+import { unpackRushRacer } from '../../hangout-worker/arcade/games/turdrush-race.js';
 
 export async function runArcadeBrowser(engine, origin, invitation, evidence, entrances, media) {
     const browser = await { chromium, webkit }[engine].launch({
-        headless: true, ...(media ? { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } : {})
+        headless: true, ...(engine === 'chromium' ? { args: ['--enable-unsafe-swiftshader',
+            ...(media ? ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] : [])] } : {})
     });
     const errors = [];
     async function guest(source, name, viewport, hasTouch = false) {
         const context = await browser.newContext({ viewport, hasTouch, reducedMotion: 'reduce', serviceWorkers: 'block', ignoreHTTPSErrors: true });
+        if (hasTouch) await context.addInitScript(() => {
+            const native = HTMLCanvasElement.prototype.getContext;
+            HTMLCanvasElement.prototype.getContext = function (type, ...options) {
+                if (type === 'webgl2' && this.hasAttribute('data-race-3d')) return null;
+                return native.call(this, type, ...options);
+            };
+        });
         if (media) await context.addInitScript(() => {
             window.testPeers = [];
             window.testLocalTracks = [];
@@ -603,6 +612,109 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(board(b).getByRole('gridcell')).toHaveCount(36);
         console.log(`Passed ${engine} Turdomania two complete puzzles, keyboard and 44px phone touch input, ${media ? 'local prediction with 220 ms input delay and the same call' : 'full reload mid-duel'}, spectator and rematch.`);
     }
+    async function playTurdRush(a, b, spectator) {
+        const before = media ? await packetCount(b, 'audio') : 0;
+        if (media) {
+            await b.routeWebSocket(/\/beta\/arcade-turdrush-match$/, route => {
+                const server = route.connectToServer();
+                route.onMessage(message => {
+                    const action = typeof message === 'string' && JSON.parse(message).action === 'input';
+                    if (action) setTimeout(() => server.send(message), 220);
+                    else server.send(message);
+                });
+            });
+        }
+        let opening;
+        a.on('websocket', socket => {
+            if (!socket.url().endsWith('/beta/arcade-turdrush-match')) return;
+            socket.on('framereceived', ({ payload }) => {
+                if (typeof payload !== 'string') return;
+                const match = JSON.parse(payload).state?.match;
+                if (match && !opening) opening = match;
+            });
+        });
+        for (const page of [a, b, spectator]) {
+            await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdrush');
+        }
+        const race = page => page.locator('[data-race-match]');
+        const track = page => page.getByRole('region', { name: 'Turd Rush race track' });
+        await a.getByRole('button', { name: 'Open Turd Rush race' }).click();
+        await b.getByRole('button', { name: 'Join Turd Rush race' }).click();
+        await expect(race(b)).toHaveAttribute('data-phase', 'countdown');
+        await expect(race(b)).toHaveAttribute('data-renderer', '2d');
+        if (engine === 'chromium') await expect(race(a)).toHaveAttribute('data-renderer', '3d');
+        await expect(spectator.locator('[data-race-controls]')).toBeHidden();
+        await expect.poll(() => !!opening).toBe(true);
+        const danger = unpackRushRacer(opening.runner).run.entities
+            .find(entity => entity.at === 100 && entity.lane !== 1 && ['crate', 'beam', 'barrier'].includes(entity.kind)).lane;
+        const direction = danger === 0 ? 'left' : 'right';
+        await expect(track(b)).toBeInViewport({ ratio: 1 });
+        await expect(b.locator('[data-race-controls]')).toBeInViewport({ ratio: 1 });
+        await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
+        assert.equal(await b.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+        await track(a).focus();
+        await expect(race(b)).toHaveAttribute('data-phase', 'play');
+        const control = b.getByRole('button', { name: 'Move ' + direction });
+        const controlBox = await control.boundingBox();
+        assert.ok(controlBox?.width >= 44 && controlBox.height >= 44, 'phone-sized Turd Rush control');
+        const prediction = media ? b.evaluate(async expectedLane => {
+            const table = document.querySelector('[data-race-match]');
+            const start = performance.now();
+            while (performance.now() - start < 400) {
+                await new Promise(requestAnimationFrame);
+                if (table.dataset.sequence !== '0') return false;
+                if (table.dataset.lane === expectedLane) return true;
+            }
+            return false;
+        }, String(danger)) : null;
+        if (engine === 'chromium') {
+            const connection = await b.context().newCDPSession(b);
+            try {
+                const box = await track(b).boundingBox();
+                assert.ok(box);
+                const x = box.x + box.width / 2, y = box.y + box.height * .66;
+                await connection.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+                await connection.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + (danger === 0 ? -75 : 75), y }] });
+                await connection.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+            } finally { await connection.detach(); }
+        } else await b.touchscreen.tap(controlBox.x + controlBox.width / 2, controlBox.y + controlBox.height / 2);
+        await a.keyboard.press(danger === 0 ? 'ArrowLeft' : 'ArrowRight');
+        if (prediction) assert.equal(await prediction, true, 'native phone swipe moves locally before delayed confirmation');
+        for (const page of [a, b]) {
+            await expect(race(page)).toHaveAttribute('data-sequence', '1');
+            await expect(race(page)).toHaveAttribute('data-lane', String(danger));
+        }
+        await expect.poll(async () => {
+            const meters = await b.locator('[data-race-score] progress').evaluateAll(bars => bars.map(bar => bar.value));
+            return meters[0] > 0 && meters[0] === meters[1];
+        }).toBe(true);
+        if (!media) {
+            await b.reload();
+            await b.locator('[data-enter]').click();
+            await expect(race(b)).toHaveAttribute('data-sequence', '1');
+            await expect(race(b)).toHaveAttribute('data-lane', String(danger));
+            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+        }
+        if (evidence) {
+            await mkdir(evidence, { recursive: true });
+            await a.screenshot({ path: join(evidence, `rush-${engine}-desktop.png`) });
+            await b.screenshot({ path: join(evidence, `rush-${engine}-phone.png`) });
+        }
+        for (const page of [a, b, spectator]) {
+            await expect(race(page)).toHaveAttribute('data-phase', 'finished', { timeout: 14000 });
+            await expect(page.locator('[data-race-score="a"]')).toContainText(/99 m .*Out/);
+            await expect(page.locator('[data-race-score="b"]')).toContainText(/99 m .*Out/);
+        }
+        if (media) {
+            await waitForPackets(b, 'audio', before);
+            assert.equal(await b.evaluate(() => window.testPeers.length), 1);
+        }
+        await a.getByRole('button', { name: 'Request Turd Rush rematch' }).click();
+        await b.getByRole('button', { name: 'Accept Turd Rush rematch' }).click();
+        await expect(race(b)).toHaveAttribute('data-phase', 'countdown');
+        await expect(race(b)).toHaveAttribute('data-sequence', '0');
+        console.log(`Passed ${engine} Turd Rush shared course and collision, keyboard, ${media ? 'native swipe with 220 ms delay and active call' : '44px phone touch and full reload'}, 2D fallback, spectator and rematch.`);
+    }
     try {
         const a = await guest('stalemate', 'ChessHost', { width: 1280, height: 900 });
         const b = await guest('rad-dad', 'ChessGuest', { width: 375, height: 667 }, true);
@@ -672,6 +784,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await playJack(a, b, spectator);
         await playTurdtris(a, b, spectator);
         await playTurdomania(a, b, spectator);
+        await playTurdRush(a, b, spectator);
         if (media) {
             await a.locator('[data-call-toggle]').click();
             await a.getByRole('button', { name: 'Actions for ChessGuest' }).click();

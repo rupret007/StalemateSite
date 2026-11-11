@@ -71,7 +71,7 @@
 @media (min-width: 901px) {
     .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) {
         display: grid;
-        grid-template: "chess heading" auto "chess actions" auto "chess other" auto "chess eights" auto "chess rummy" auto "chess spades" auto "chess jack" auto "chess tris" auto "chess mania" auto "chess call" 1fr /
+        grid-template: "chess heading" auto "chess actions" auto "chess other" auto "chess eights" auto "chess rummy" auto "chess spades" auto "chess jack" auto "chess tris" auto "chess mania" auto "chess rush" auto "chess call" 1fr /
             minmax(0, 30rem) minmax(0, 1fr);
         gap: .6rem 1rem;
         align-items: start;
@@ -85,6 +85,7 @@
     .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .arcade-jack { grid-area: jack; }
     .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .arcade-tris { grid-area: tris; }
     .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .arcade-mania { grid-area: mania; }
+    .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .arcade-rush-race { grid-area: rush; }
     .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .game-call { grid-area: call; }
     .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .arcade-chess {
         grid-area: chess;
