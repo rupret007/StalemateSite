@@ -1358,6 +1358,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(match(b)).toHaveAttribute('data-phase', 'countdown');
         await expect(board(spectator)).toBeVisible();
         await expect(serve(spectator)).toBeHidden();
+        await b.setViewportSize({ width: 667, height: 375 });
+        await b.locator('.brick-race-layout').evaluate(element => element.scrollIntoView({ block: 'center' }));
+        await expect(board(b)).toBeInViewport({ ratio: 1 });
+        await expect(serve(b)).toBeInViewport({ ratio: 1 });
+        await b.setViewportSize({ width: 375, height: 667 });
+        await board(b).scrollIntoViewIfNeeded();
         await expect(board(b)).toBeInViewport({ ratio: 1 });
         await expect(serve(b)).toBeInViewport({ ratio: 1 });
         await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
