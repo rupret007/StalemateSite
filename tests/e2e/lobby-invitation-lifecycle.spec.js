@@ -454,9 +454,13 @@ test('Game Night plays one shared Four in a Row match with the chat composer sti
         })).toBe(true);
         await guest.setViewportSize({ width: 375, height: 667 });
         const landingRow = guest.locator('[data-four-table] tbody tr').last();
-        await landingRow.scrollIntoViewIfNeeded();
+        await landingRow.evaluate(row => row.scrollIntoView({ block: 'nearest' }));
         await expect(landingRow).toBeInViewport({ ratio: 1 });
-        await expect(guest.locator('[data-four-columns]')).toBeInViewport({ ratio: 1 });
+        const columns = guest.locator('[data-four-columns]');
+        await expect(columns).toBeInViewport({ ratio: 1 });
+        const rowBounds = await landingRow.boundingBox();
+        const columnBounds = await columns.boundingBox();
+        expect(rowBounds.y).toBeGreaterThanOrEqual(columnBounds.y + columnBounds.height);
         await guest.locator('[data-text]').fill('Good game');
         await guest.locator('[data-send]').click();
         await expect(host.locator('[data-chat-lines]')).toContainText('Good game');
