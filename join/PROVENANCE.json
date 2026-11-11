@@ -1,14 +1,14 @@
 {
   "repository": "https://github.com/rupret007/webjam",
-  "commit": "dc50e86abb00b1919e94da91abeda085d92daa6a",
-  "sourcePR": "https://github.com/rupret007/webjam/pull/476",
+  "commit": "aa58920fcc5709983925343b967ca3798f822a90",
+  "sourcePR": "https://github.com/rupret007/webjam/pull/477",
   "license": "MIT",
   "modifications": {},
   "files": {
     "app.js": {
       "source": "web/join/app.js",
-      "upstreamSha256": "c5baa7ff088580c9bea37b021188a5820495f13718986975c703b2de442d01c3",
-      "shippedSha256": "c5baa7ff088580c9bea37b021188a5820495f13718986975c703b2de442d01c3"
+      "upstreamSha256": "987b8d91f55a6bb3d34ba822b4b0de2631ea9fe48a847ab3b4f2e851bff4f8bf",
+      "shippedSha256": "987b8d91f55a6bb3d34ba822b4b0de2631ea9fe48a847ab3b4f2e851bff4f8bf"
     },
     "audio.js": {
       "source": "web/join/audio.js",
@@ -32,8 +32,8 @@
     },
     "index.html": {
       "source": "web/join/index.html",
-      "upstreamSha256": "427cfe1ac650444f408c6239cf60cdf924810952078b61b6d7e6af869fa49907",
-      "shippedSha256": "427cfe1ac650444f408c6239cf60cdf924810952078b61b6d7e6af869fa49907"
+      "upstreamSha256": "6b20e43bb8124a91eee43b573573826ef10c7d8e4a9adf8b14a6882b75bc6ef1",
+      "shippedSha256": "6b20e43bb8124a91eee43b573573826ef10c7d8e4a9adf8b14a6882b75bc6ef1"
     },
     "mailbox.js": {
       "source": "web/join/mailbox.js",
@@ -57,8 +57,8 @@
     },
     "style.css": {
       "source": "web/join/style.css",
-      "upstreamSha256": "51512c3d9478adc5440d99c0f3f7e78c5016859255c3ddd135853c2e565e779c",
-      "shippedSha256": "51512c3d9478adc5440d99c0f3f7e78c5016859255c3ddd135853c2e565e779c"
+      "upstreamSha256": "ade9a975218f6ef2f30f5726627c1be92a97fd0dc86a1afeeff28a965499dd77",
+      "shippedSha256": "ade9a975218f6ef2f30f5726627c1be92a97fd0dc86a1afeeff28a965499dd77"
     },
     "_headers": {
       "source": "web/join/_headers",
