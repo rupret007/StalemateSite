@@ -1,0 +1,43 @@
+{
+  "activationReceiptSha256": "5cd455f74cd61280f2e47a7518a572f01a6483268e54cf1c8bfa437e2678451c",
+  "admittedAssetsMatched": 6,
+  "anonymousAdmissionPreserved": true,
+  "browser": {
+    "engine": "Chromium",
+    "liveMusicOrProviderUse": false,
+    "physicalMobile": false,
+    "scope": "Hosted private page with an existing synthetic invite and simulated clock expiry",
+    "viewports": [
+      {
+        "captureCalls": 0,
+        "deployedAppSha256": "c5baa7ff088580c9bea37b021188a5820495f13718986975c703b2de442d01c3",
+        "height": 812,
+        "noHorizontalOverflow": true,
+        "screenshot": "expired-invite-375.png",
+        "screenshotSha256": "d385151e9fd485242b4f18c413f5a4ccc3e25e76c3679f06f1a6f8bf21e18fbb",
+        "terminalMessageFocused": true,
+        "width": 375
+      },
+      {
+        "captureCalls": 0,
+        "deployedAppSha256": "c5baa7ff088580c9bea37b021188a5820495f13718986975c703b2de442d01c3",
+        "height": 844,
+        "noHorizontalOverflow": true,
+        "screenshot": "expired-invite-390.png",
+        "screenshotSha256": "95223a0c60d38132489d1fb8da77b826a4410cf11458c272186022b17640fb2d",
+        "terminalMessageFocused": true,
+        "width": 390
+      }
+    ]
+  },
+  "deployment": "9eb0e1c6-d427-4f2f-bc97-e9dd3fee7081",
+  "effectiveConfigurationPreserved": true,
+  "guestLogoutAndRevocationVerified": true,
+  "hostedBrowserReceiptSha256": "e42788389bf3b7fb66cefe301198983a50c575119ffd210e75e3c850ca81c01e",
+  "issuerUnchanged": "fd37578f-13cd-4fce-b557-35c0d962ef9d",
+  "previousServingVersion": "f5319d4a-6953-4162-8521-e7a5a15f86d0",
+  "recordedAt": "2026-11-11T12:39:20.666899+00:00",
+  "servingVersion": "43002fe9-4d04-456b-9fde-320dc151abc8",
+  "source": "e1fafefc6c19a370edd33964b7776840016deb3e",
+  "websitePullRequest": 275
+}
