@@ -1118,7 +1118,8 @@ export default { async fetch(request, env) {
         }
         return denied();
     }
-    if (!['/beta/unlock', '/beta/logout', '/beta/state', '/beta/participation', '/beta/participation/stop', '/lobby', '/room', '/turn'].includes(url.pathname)) return denied();
+    if (!['/beta/unlock', '/beta/logout', '/beta/state', '/beta/participation', '/beta/participation/stop', '/lobby', '/room', '/turn',
+        '/beta/arcade-ticket', '/beta/arcade-match'].includes(url.pathname)) return denied();
     if (request.headers.get('Origin') !== ORIGIN) return denied();
     const appEnv = { ...env, ASSETS: { fetch: () => new Response('no fixture page requested', { status: 404 }) } };
     return betaFetch(request, appEnv);

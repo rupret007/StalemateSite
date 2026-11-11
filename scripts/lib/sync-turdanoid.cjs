@@ -14,24 +14,51 @@ const FILES = [
     'turdrummy.html', 'turdspades.html', 'turdomania.html', 'chess.html', 'turdrush.html', 'neon-arkanoid.html',
     'hub.html', 'game.js', 'favicon.svg', 'assets', 'games'
 ];
+const MATCH_WORKER_FILES = [
+    'games/chess-match.js', 'games/chess-core.js', 'assets/chess/chess.js', 'assets/chess/chess.js.map',
+    'assets/chess/chessjs-LICENSE.txt', 'assets/chess/GPL-3.0.txt'
+];
 const SONGS = ['manic.m4a', 'andrea.m4a', 'only-been-18.m4a', 'wham-bam.m4a', 'planet-of-the-flakes.m4a'];
 const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'";
 
 function options(args) {
     let source = UPSTREAM;
     let ref;
+    let matchWorker = false;
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--source') {
             if (!args[i + 1] || args[i + 1].startsWith('-')) throw new Error('--source requires a local repository path');
             source = fs.realpathSync(path.resolve(args[++i]));
             if (!fs.statSync(source).isDirectory()) throw new Error('--source must be a local repository directory');
+        } else if (args[i] === '--match-worker' && !matchWorker) {
+            matchWorker = true;
         } else if (args[i].startsWith('-') || ref) {
-            throw new Error('Usage: scripts/sync-turdanoid.sh [--source /path/to/Turdanoid] [branch|tag|SHA]');
+            throw new Error('Usage: scripts/sync-turdanoid.sh [--source /path/to/Turdanoid] [--match-worker] [branch|tag|SHA]');
         } else {
             ref = args[i];
         }
     }
-    return { source, ref: ref || PIN };
+    return { source, ref: ref || PIN, matchWorker };
+}
+
+function replaceStagedDirectories(pairs) {
+    const installed = [];
+    try {
+        for (const [staged, destination] of pairs) {
+            const backup = fs.existsSync(destination) ? `${staged}-previous` : null;
+            if (backup) fs.renameSync(destination, backup);
+            installed.push({ destination, backup, moved: false });
+            fs.renameSync(staged, destination);
+            installed.at(-1).moved = true;
+        }
+    } catch (error) {
+        for (const { destination, backup, moved } of installed.reverse()) {
+            if (moved) fs.rmSync(destination, { recursive: true });
+            if (backup) fs.renameSync(backup, destination);
+        }
+        throw error;
+    }
+    for (const { backup } of installed) if (backup) fs.rmSync(backup, { recursive: true });
 }
 
 function git(args, cwd) {
@@ -136,11 +163,10 @@ function transform(stage) {
 }
 
 function main() {
-    const { source, ref } = options(process.argv.slice(2));
+    const { source, ref, matchWorker } = options(process.argv.slice(2));
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stalemate-upstream-'));
     const stage = fs.mkdtempSync(path.join(ROOT, '.play-sync-'));
-    const dest = path.join(ROOT, 'play');
-    const backup = `${stage}-previous`;
+    const workerStage = matchWorker ? fs.mkdtempSync(path.join(ROOT, '.match-worker-sync-')) : null;
     try {
         git(['init', '--quiet', tmp], ROOT);
         git(['remote', 'add', 'origin', source], tmp);
@@ -149,23 +175,25 @@ function main() {
         const sha = git(['rev-parse', '--verify', 'FETCH_HEAD^{commit}'], tmp);
         git(['-c', 'advice.detachedHead=false', 'checkout', '--quiet', '--detach', sha], tmp);
         for (const name of FILES) fs.cpSync(path.join(tmp, name), path.join(stage, name), { recursive: true });
+        if (workerStage) {
+            for (const name of MATCH_WORKER_FILES) {
+                const output = path.join(workerStage, name);
+                fs.mkdirSync(path.dirname(output), { recursive: true });
+                fs.writeFileSync(output, execFileSync('git', ['cat-file', 'blob', `${sha}:${name}`], { cwd: tmp }));
+            }
+            fs.writeFileSync(path.join(workerStage, 'VENDORED.txt'), `Turdanoid@${sha}\n`);
+        }
         transform(stage);
         versionArcadeAssets(stage);
         fs.writeFileSync(path.join(stage, 'VENDORED.txt'), `Vendored from github.com/rupret007/Turdanoid@${sha}.\nOriginal arcade material: same owner as StalemateSite. New chess modules/page and Chessground 10.5.0: GPL-3.0-or-later. Spatial piece artwork by Maurizio Monge: MIT. chess.js 1.4.0: BSD-2-Clause. Stockfish.js 19.0.1: GPL-3.0. See assets/chess/credits.html, included licenses and corresponding-source archives.\nDo not edit by hand: run scripts/sync-turdanoid.sh ${sha}\n`);
-        // Both renames stay on the destination filesystem. A failed transform leaves play intact.
-        const hadDest = fs.existsSync(dest);
-        if (hadDest) fs.renameSync(dest, backup);
-        try {
-            fs.renameSync(stage, dest);
-        } catch (error) {
-            if (hadDest) fs.renameSync(backup, dest);
-            throw error;
-        }
-        fs.rmSync(backup, { recursive: true, force: true });
+        const outputs = [[stage, path.join(ROOT, 'play')]];
+        if (workerStage) outputs.push([workerStage, path.join(ROOT, 'hangout-worker/arcade')]);
+        replaceStagedDirectories(outputs);
         process.stdout.write(`Synced Turdanoid ${sha} into play/\n`);
     } finally {
         fs.rmSync(tmp, { recursive: true, force: true });
         fs.rmSync(stage, { recursive: true, force: true });
+        if (workerStage) fs.rmSync(workerStage, { recursive: true, force: true });
     }
 }
 

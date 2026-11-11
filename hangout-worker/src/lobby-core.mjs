@@ -292,7 +292,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         return [...conns.values()].map(connectionView);
     }
     function effectOperation(fn, args, connections) {
-        const kind = fn === connect ? 'connect' : fn === message ? 'message' : fn === reserveTransportControl ? 'control'
+        const kind = fn === connect ? 'connect' : fn === message || fn === approveArcade ? 'message' : fn === reserveTransportControl ? 'control'
             : fn === completePrivateReportAction ? 'private-report-complete' : fn === disconnect ? 'disconnect' : fn === tick ? 'tick'
                 : fn === restoreRooms ? 'restore-rooms' : fn === restoreModerationQueue ? 'restore-moderation' : fn === restoreAiReviews ? 'restore-ai'
                     : fn === applyAiReview ? 'apply-ai' : fn === refreshParticipationState ? 'refresh' : '';
@@ -526,6 +526,28 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     // Only current connection IDs are disclosed to the affected recipient.
     // Device block references remain private session preferences.
     const roomKind = (chan) => gameNight && chan.kind === 'chat' && gameNightRoomName(chan.name) ? 'game' : chan.kind;
+    function arcadeActor({ actor, room, ref }) {
+        const c = conns.get(actor), chan = ch(room);
+        if (!c?.nick || c.safetyOnly || !c.betaSid || !chan?.members.has(c.id) || chan.keepRef !== ref ||
+            roomKind(chan) !== 'game' || !chan.modes.i || net.shield || net.lock === 'closed' || roomsBroken) return null;
+        const peers = subject => membersOf(chan).filter(peer => peer.betaSid === subject);
+        const canSee = subject => {
+            if (subject === c.betaSid) return true;
+            const matches = peers(subject);
+            return matches.length > 0 && matches.every(peer => !c.blocks.has(peer.dev) && !peer.blocks.has(c.dev));
+        };
+        return { canOpen: isOp(c, chan), canSee,
+            canJoin: subject => subject !== c.betaSid && canSee(subject) && peers(subject).some(peer => peer.dev !== c.dev),
+            canPlay: budgetLevel() === 'ok' && net.lock !== 'readonly' && !chan.modes.Q
+                && Math.max(net.mutes[c.dev] || 0, net.mutes[c.account] || 0) <= now()
+                && (!chan.modes.m || hosts(c, chan) || chan.voice.has(c.dev)) };
+    }
+    function approveArcade(id) {
+        const c = conns.get(id);
+        if (!c || c.safetyOnly) return { ok: false };
+        requireParticipation(c, 'publicArtifact');
+        return { ok: true };
+    }
     const chanView = (chan, viewer) => ({ name: chan.name, kind: roomKind(chan), title: chan.title, topic: chan.topic, modes: { ...chan.modes, k: chan.modes.k ? true : false }, count: chan.members.size, keepRef: chan.keepRef, persistent: !!chan.owner, expiresAt: chan.owner ? chan.renewed + ROOM_TTL : null, names: names(chan), mediaBlocked: mediaBlocked(chan, viewer), jam: chan.jam ? { desktop: chan.jam.desktop, invitation: chan.jam.invitation || chan.jam.desktop, web: chan.jam.web, webReady: !!chan.jam.web } : null,
         ...(roomKind(chan) === 'game' ? { gameCall: chan.gameCall?.url || '' } : {}) });
     const sendChan = (chan, { presence = false } = {}) => {
@@ -2509,6 +2531,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return controlledRun(message, [...args, true], safetyMessage(args[1]));
         }, flushPresence,
         transportControlReady, reserveTransportControl: (...args) => execute(reserveTransportControl, args, true),
+        arcadeActor, arcadeRoomRef: name => {
+            const room = ch(name);
+            return room && roomKind(room) === 'game' ? room.keepRef : null;
+        }, approveArcade: id => execute(approveArcade, [id]),
         completePrivateReportAction: (...args) => execute(completePrivateReportAction, args, true), tick: (...args) => execute(tick, args, false),
         roomSnapshot, restoreRooms: (...args) => commitConfigured ? controlledRun(restoreRooms, args) : restoreRooms(...args),
         sessionSnapshot, restoreSessions, abuseSnapshot, restoreAbuse, snapshot, restore, restoreLog,

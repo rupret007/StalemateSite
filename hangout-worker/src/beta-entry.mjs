@@ -10,6 +10,7 @@ import { entrySitesFromConfig } from '../../r/45662413410ed051/entry-sites.mjs';
 import { lobbyParticipationMode, participationConfigurationValid } from './lobby-participation.mjs';
 import { incidentSourceConfigurationValid } from './lobby-incident-sources.mjs';
 import { publicBetaHelp } from './beta-public-help.mjs';
+import { arcadeEnabled, arcadePath, arcadeRoomRequest } from './arcade-transport.mjs';
 export { BetaSessions } from './beta-sessions.mjs';
 export { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget };
 
@@ -239,7 +240,7 @@ async function betaRequest(request, env, deps = {}) {
         const asset = await env.ASSETS.fetch(new Request(`${url.origin}${ROOT}entry-sites.mjs`));
         return reply(asset.body, asset.status, 'text/javascript');
     }
-    if (request.method === 'POST' && url.pathname.startsWith('/beta/')) {
+    if (request.method === 'POST' && url.pathname.startsWith('/beta/') && !arcadePath(url.pathname)) {
         if (!sameOrigin(request) || !/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type') || '')) return json({ error: 'Same-origin JSON request required.' }, 403);
         if (Number(request.headers.get('Content-Length') || 0) > 2048) return json({ error: 'Request too large.' }, 413);
         const body = await readBetaBody(request);
@@ -310,6 +311,23 @@ async function betaRequest(request, env, deps = {}) {
         const result = redirect(owner ? `${ROOT}lobby/?owner=1${url.searchParams.get('entry-return') === '1' ? '&entry-return=1' : ''}` : `${ROOT}admin/?signed-in=1`, { 'Set-Cookie': betaCookie(BETA_IDENTITY_COOKIE, token, identity.exp - Date.now()) });
         result.headers.append('Set-Cookie', next.cookie);
         return result;
+    }
+    if (arcadePath(url.pathname)) {
+        if (!arcadeEnabled(env)) return reply('Match service unavailable.', 404);
+        if (!sameOrigin(request) || url.search) return reply('Admission denied.', 403);
+        const issuing = url.pathname.endsWith('-ticket');
+        if (issuing ? request.method !== 'POST' || !/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type') || '')
+            : request.method !== 'GET' || request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') return reply('Invalid match request.', 400);
+        const scope = issuing ? arcadeRoomRequest(await readBetaBody(request)) : null;
+        if (issuing && !scope) return reply('Current room required.', 400);
+        const next = new Headers(request.headers);
+        next.delete('Cookie');
+        next.delete('Content-Length');
+        next.set('X-Hangout-Arcade', JSON.stringify({ scope, session: {
+            betaSid: session.access.sid, betaInviteVersion: session.access.version
+        } }));
+        const forward = new Request(url, { method: request.method, headers: next });
+        return env.LOBBY.get(env.LOBBY.idFromName('stalemate')).fetch(forward);
     }
     if (['/lobby', '/lobby-owner', '/lobby-admin'].includes(url.pathname)) {
         if (env.HANGOUT_OPEN === '0' && url.pathname !== '/lobby-admin') return reply('The community is temporarily paused. Please try again later.', 503);

@@ -1,4 +1,4 @@
-import { ChessMatch, CHESS_MATCH_VERSION } from '../../play/games/chess-match.js';
+import { ChessMatch, CHESS_MATCH_VERSION } from '../arcade/games/chess-match.js';
 
 // Room admission supplies server-owned subjects. This state never decides who
 // can enter a room or see its board. The lobby must authorize each operation,
@@ -35,6 +35,7 @@ export class GameNightChess {
     }
 
     get deadline() { return this.#match?.deadline ?? null; }
+    get subjects() { return this.#seats.b ? [this.#seats.w, this.#seats.b] : [this.#seats.w]; }
 
     seat(subject) {
         if (typeof subject !== 'string' || !subject) return null;
