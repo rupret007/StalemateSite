@@ -1163,6 +1163,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
 
     const hhmm = (ts) => { const d = ts ? new Date(ts) : new Date(); return `[${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}]`; };
     const colorOf = (nick) => { let h = 0; for (const ch of String(nick || "")) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return `hsl(${h % 360} 80% 70%)`; };
+    function revealFocusedReport(button) {
+        if (document.activeElement !== button) return;
+        requestAnimationFrame(() => {
+            if (document.activeElement === button && button.matches(':focus-visible')) {
+                button.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            }
+        });
+    }
     function finishReport(id, submitted) {
         const pending = pendingReports.get(id);
         if (pending) { clearTimeout(pending.timer); pendingReports.delete(id); }
@@ -1181,6 +1189,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             button.textContent = submitted ? '✓' : '🚩';
             button.title = submitted ? REPORT_QUEUED_LABEL : 'Report this message';
             if (submitted) button.setAttribute('aria-label', REPORT_QUEUED_LABEL);
+            revealFocusedReport(button);
         }
     }
     function resetPendingReports() { for (const id of [...pendingReports.keys()]) finishReport(id, false); }
@@ -1216,6 +1225,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 const r = document.createElement('button'); r.type = 'button'; r.className = 'flag'; r.textContent = '🚩'; r.setAttribute('aria-label', `Report this message from ${l.from}`);
                 if (l.reported) { r.setAttribute('aria-disabled', 'true'); r.tabIndex = -1; r.textContent = '✓'; r.title = REPORT_QUEUED_LABEL; r.setAttribute('aria-label', REPORT_QUEUED_LABEL); }
                 else if (pendingReports.has(l.id)) { r.setAttribute('aria-disabled', 'true'); r.textContent = '…'; pendingReports.get(l.id).button = r; }
+                r.addEventListener('focus', () => revealFocusedReport(r));
                 r.addEventListener('click', () => {
                     if (l.reported || pendingReports.has(l.id)) return;
                     if (!send({ t: 'report', id: l.id, text: l.text })) return toast('You are offline. Reconnect before reporting this message.');
