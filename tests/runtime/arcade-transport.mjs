@@ -63,13 +63,13 @@ async function guest(nick, entrySource, ip) {
     await lobby.wait(frame => frame.t === 'join' && frame.ch.name === '#stalemate', 'lobby admission');
     return { lobby, cookie, id };
 }
-async function grant(guest, ref) {
-    const ticket = await call('/beta/arcade-ticket', guest.cookie, { actor: guest.id, room, ref });
+async function grant(guest, ref, path = '/beta/arcade-ticket') {
+    const ticket = await call(path, guest.cookie, { actor: guest.id, room, ref });
     assert.equal(ticket.status, 200, await ticket.clone().text());
     return ticket.json();
 }
-function upgrade(cookie, { protocol, ticket }) {
-    return mf.dispatchFetch(origin + '/beta/arcade-match', { headers: { ...base(cookie), Upgrade: 'websocket',
+function upgrade(cookie, { protocol, ticket }, path = '/beta/arcade-match') {
+    return mf.dispatchFetch(origin + path, { headers: { ...base(cookie), Upgrade: 'websocket',
         'Sec-WebSocket-Protocol': `${protocol}, ${ticket}` } });
 }
 const pause = () => new Promise(resolve => setTimeout(resolve, 600));
@@ -103,6 +103,65 @@ async function previewEntrances(betaOrigin) {
     return entries;
 }
 
+async function verifyMedia(white, black, ref, matchA, matchB) {
+    const endpoint = '/beta/game-night-media';
+    const join = async player => {
+        const ticket = await grant(player, ref, endpoint + '-ticket');
+        const response = await upgrade(player.cookie, ticket, endpoint);
+        assert.equal(response.status, 101);
+        const media = observe(response.webSocket);
+        await media.wait(frame => frame.t === 'media-ready', 'media admission');
+        media.send({ version: 1, action: 'join' });
+        const initial = await media.wait(frame => frame.t === 'media-room', 'call with tracks off');
+        assert.deepEqual(initial.tracks, { audio: false, video: false });
+        return media;
+    };
+    const wrongChannel = await upgrade(white.cookie, await grant(white, ref), endpoint);
+    assert.equal(wrongChannel.status, 403);
+    await wrongChannel.body?.cancel();
+    const a = await join(white), b = await join(black);
+    await a.wait(frame => frame.peers?.some(peer => peer.id === black.id), 'other call participant');
+    const offer = { version: 1, action: 'signal', to: black.id,
+        sdp: { type: 'offer', sdp: 'v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\na=sendonly\r\n' } };
+    a.send(offer);
+    await a.wait(frame => frame.t === 'media-error' && frame.reason === 'tracks-unavailable', 'unapproved send track refused');
+    a.send({ version: 1, action: 'tracks', audio: true, video: false });
+    await b.wait(frame => frame.peers?.some(peer => peer.id === white.id && peer.audio), 'explicit microphone consent');
+    a.send(offer);
+    const relayed = await b.wait(frame => frame.t === 'media-signal' && frame.from === white.id, 'targeted call offer');
+    assert.deepEqual(relayed.sdp, offer.sdp);
+    const attempt = b.frames.length;
+    b.send({ version: 1, action: 'tracks', audio: false, video: true, adult18: true });
+    await b.wait(frame => frame.t === 'media-error' && frame.reason === 'tracks-unavailable', 'default camera gate', attempt);
+    a.send({ version: 1, action: 'camera-policy', on: true });
+    await b.wait(frame => frame.cameraAllowed, 'host enabled camera choice');
+    const ageCheck = b.frames.length;
+    b.send({ version: 1, action: 'tracks', audio: false, video: true, adult18: false });
+    await b.wait(frame => frame.t === 'media-error' && frame.reason === 'tracks-unavailable', 'adult eligibility required', ageCheck);
+    b.send({ version: 1, action: 'tracks', audio: false, video: true, adult18: true });
+    await a.wait(frame => frame.peers?.some(peer => peer.id === black.id && peer.video), 'opted-in adult camera');
+    const cameraOff = b.frames.length;
+    a.send({ version: 1, action: 'camera-policy', on: false });
+    await b.wait(frame => frame.t === 'media-room' && !frame.cameraAllowed && !frame.tracks.video, 'host revoked camera', cameraOff);
+    const blockAt = b.frames.length;
+    white.lobby.send({ t: 'cmd', name: 'block', args: ['FixtureBlack'], ch: room,
+        roomInstance: ref, personContext: 1, personPeer: black.id });
+    await b.wait(frame => frame.peers?.length === 0, 'blocked peers removed from call', blockAt);
+    const blocked = a.frames.length;
+    a.send(offer);
+    await a.wait(frame => frame.t === 'media-error' && frame.reason === 'peer-unavailable', 'blocked offer refused', blocked);
+    const unblockAt = b.frames.length;
+    white.lobby.send({ t: 'cmd', name: 'unblock', args: ['FixtureBlack'], ch: room,
+        roomInstance: ref, personContext: 1, personPeer: black.id });
+    await b.wait(frame => frame.peers?.some(peer => peer.id === white.id), 'unblocked peer restored to call', unblockAt);
+    const before = b.frames.length;
+    a.send({ version: 1, action: 'leave' });
+    await b.wait(frame => frame.peers?.length === 0, 'call leave published', before);
+    for (const other of [white.lobby, black.lobby, matchA, matchB]) assert.ok(other.frames.every(frame => frame.t !== 'media-signal'));
+    b.send({ version: 1, action: 'leave' });
+    console.log('Passed native separate call admission, receive-only default, microphone opt-in, adult camera controls and targeted signaling.');
+}
+
 try {
     runtime = await rolldown({ input: fileURLToPath(new URL('./lobby-session-authority/worker.mjs', import.meta.url)),
         platform: 'neutral', external: ['node:crypto'] });
@@ -114,6 +173,7 @@ try {
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true } },
         bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1',
             ...(browserName ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
+            ...(!browserName ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
             HANGOUT_HMAC_KEY: 'owned-arcade-fixture-hmac-not-for-deployment-2026', HANGOUT_BETA_INVITE_KEY: invite,
             HANGOUT_BETA_INVITE_VERSION: '1', HANGOUT_PREVIEW_KEY: preview, HANGOUT_OPEN: '1', HANGOUT_AI_ENABLED: '0', HANGOUT_TURN_ENABLED: '0' },
         ...(browserName ? { serviceBindings: { ASSETS: serveAsset } } : {}),
@@ -172,11 +232,13 @@ try {
     returning.send({ version: 1, action: 'sync' });
     const synced = await returning.wait(frame => frame.state?.match?.moves?.[0] === 'e2e4', 'restored board');
     assert.equal(synced.state.seat, 'b');
+    await verifyMedia(white, black, ch.keepRef, a, returning);
     white.lobby.send({ t: 'say', ch: room, text: 'Good luck at Chess' });
     await black.lobby.wait(frame => frame.t === 'line' && frame.text === 'Good luck at Chess', 'chat while match is open');
+    const partAt = a.frames.length;
     black.lobby.send({ t: 'cmd', name: 'part', args: [room], ch: room });
     await black.lobby.wait(frame => frame.t === 'part' && frame.ch === room, 'explicit room departure');
-    await a.wait(frame => frame.t === 'match-state' && frame.state === null, 'seat retirement');
+    await a.wait(frame => frame.t === 'match-state' && frame.state === null, 'seat retirement', partAt);
     console.log('Passed native private invitations, session-bound one-use grants, two-brand Chess move and chat, match reconnection, and explicit seat retirement.');
     }
 } finally {

@@ -11,6 +11,7 @@ import { lobbyParticipationMode, participationConfigurationValid } from './lobby
 import { incidentSourceConfigurationValid } from './lobby-incident-sources.mjs';
 import { publicBetaHelp } from './beta-public-help.mjs';
 import { arcadeEnabled, arcadePath, arcadeRoomRequest } from './arcade-transport.mjs';
+import { mediaEnabled, mediaPath } from './game-night-media.mjs';
 export { BetaSessions } from './beta-sessions.mjs';
 export { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget };
 
@@ -240,7 +241,7 @@ async function betaRequest(request, env, deps = {}) {
         const asset = await env.ASSETS.fetch(new Request(`${url.origin}${ROOT}entry-sites.mjs`));
         return reply(asset.body, asset.status, 'text/javascript');
     }
-    if (request.method === 'POST' && url.pathname.startsWith('/beta/') && !arcadePath(url.pathname)) {
+    if (request.method === 'POST' && url.pathname.startsWith('/beta/') && !arcadePath(url.pathname) && !mediaPath(url.pathname)) {
         if (!sameOrigin(request) || !/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type') || '')) return json({ error: 'Same-origin JSON request required.' }, 403);
         if (Number(request.headers.get('Content-Length') || 0) > 2048) return json({ error: 'Request too large.' }, 413);
         const body = await readBetaBody(request);
@@ -312,8 +313,8 @@ async function betaRequest(request, env, deps = {}) {
         result.headers.append('Set-Cookie', next.cookie);
         return result;
     }
-    if (arcadePath(url.pathname)) {
-        if (!arcadeEnabled(env)) return reply('Match service unavailable.', 404);
+    if (arcadePath(url.pathname) || mediaPath(url.pathname)) {
+        if (!(mediaPath(url.pathname) ? mediaEnabled(env) : arcadeEnabled(env))) return reply('Room service unavailable.', 404);
         if (!sameOrigin(request) || url.search) return reply('Admission denied.', 403);
         const issuing = url.pathname.endsWith('-ticket');
         if (issuing ? request.method !== 'POST' || !/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type') || '')

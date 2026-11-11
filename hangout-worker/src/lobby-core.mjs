@@ -292,7 +292,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         return [...conns.values()].map(connectionView);
     }
     function effectOperation(fn, args, connections) {
-        const kind = fn === connect ? 'connect' : fn === message || fn === approveArcade ? 'message' : fn === reserveTransportControl ? 'control'
+        const kind = fn === connect ? 'connect' : fn === message || fn === approveArcade || fn === approveGameMedia ? 'message' : fn === reserveTransportControl ? 'control'
             : fn === completePrivateReportAction ? 'private-report-complete' : fn === disconnect ? 'disconnect' : fn === tick ? 'tick'
                 : fn === restoreRooms ? 'restore-rooms' : fn === restoreModerationQueue ? 'restore-moderation' : fn === restoreAiReviews ? 'restore-ai'
                     : fn === applyAiReview ? 'apply-ai' : fn === refreshParticipationState ? 'refresh' : '';
@@ -536,7 +536,12 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             const matches = peers(subject);
             return matches.length > 0 && matches.every(peer => !c.blocks.has(peer.dev) && !peer.blocks.has(c.dev));
         };
-        return { canOpen: isOp(c, chan), canSee,
+        const canCall = id => {
+            const peer = conns.get(id);
+            return !!(peer?.nick && !peer.safetyOnly && peer.dev !== c.dev && chan.members.has(peer.id) &&
+                !c.blocks.has(peer.dev) && !peer.blocks.has(c.dev));
+        };
+        return { canOpen: isOp(c, chan), canSee, canCall, nick: c.nick,
             canJoin: subject => subject !== c.betaSid && canSee(subject) && peers(subject).some(peer => peer.dev !== c.dev),
             canPlay: budgetLevel() === 'ok' && net.lock !== 'readonly' && !chan.modes.Q
                 && Math.max(net.mutes[c.dev] || 0, net.mutes[c.account] || 0) <= now()
@@ -547,6 +552,17 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (!c || c.safetyOnly) return { ok: false };
         requireParticipation(c, 'publicArtifact');
         return { ok: true };
+    }
+    function approveGameMedia(id, scope, tracks, peer, peerTracks) {
+        const actor = arcadeActor(scope), c = conns.get(id);
+        const mayParticipate = (connection, member, requested) => !!(connection && member && requested &&
+            (!(requested.audio || requested.video) || member.canPlay) &&
+            (!requested.video || (connection.camReports || 0) < L.reportsCamOff) &&
+            participationAllows(connection, 'receiveMedia') &&
+            (!requested.audio || participationAllows(connection, 'sendAudio')) &&
+            (!requested.video || participationAllows(connection, 'sendCamera')));
+        return { ok: scope.actor === id && mayParticipate(c, actor, tracks) &&
+            (!peer || actor.canCall(peer.actor) && mayParticipate(conns.get(peer.actor), arcadeActor(peer), peerTracks)) };
     }
     const chanView = (chan, viewer) => ({ name: chan.name, kind: roomKind(chan), title: chan.title, topic: chan.topic, modes: { ...chan.modes, k: chan.modes.k ? true : false }, count: chan.members.size, keepRef: chan.keepRef, persistent: !!chan.owner, expiresAt: chan.owner ? chan.renewed + ROOM_TTL : null, names: names(chan), mediaBlocked: mediaBlocked(chan, viewer), jam: chan.jam ? { desktop: chan.jam.desktop, invitation: chan.jam.invitation || chan.jam.desktop, web: chan.jam.web, webReady: !!chan.jam.web } : null,
         ...(roomKind(chan) === 'game' ? { gameCall: chan.gameCall?.url || '', four: chan.four || null } : {}) });
@@ -2583,6 +2599,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             const room = ch(name);
             return room && roomKind(room) === 'game' ? room.keepRef : null;
         }, approveArcade: id => execute(approveArcade, [id]),
+        approveGameMedia: (scope, ...args) => execute(approveGameMedia, [scope.actor, scope, ...args]),
         completePrivateReportAction: (...args) => execute(completePrivateReportAction, args, true), tick: (...args) => execute(tick, args, false),
         roomSnapshot, restoreRooms: (...args) => commitConfigured ? controlledRun(restoreRooms, args) : restoreRooms(...args),
         sessionSnapshot, restoreSessions, abuseSnapshot, restoreAbuse, snapshot, restore, restoreLog,
