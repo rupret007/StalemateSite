@@ -7,9 +7,9 @@ Webex video/audio handoff remain essential acceptance work, not optional extras.
 Both public websites and their navigation remain unchanged.
 
 The private beta received the room-leave keyboard fix at 10:37 UTC. An admitted
-guest verified the served lobby script and four companion assets. Before the
-switch, two hosted WebKit guests used the exact candidate script to return
-keyboard focus to the lobby after Paint Along. Two other admitted guests
+guest verified the served lobby script and four companion assets. Two hosted
+WebKit guests used the deployed release to chat, share a Paint Along canvas
+and return keyboard focus to the lobby. Both logged out. Two other admitted guests
 created and joined a private Music room, recovered from a rejected invitation
 paste and logged out without activating media. [Release and test evidence](../pr-assets/private-readiness/20261111/band-rehearsal/qualification.json)
 
@@ -56,7 +56,7 @@ tracks all [62 original requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md).
 
 | Layer | Qualified evidence | Still required |
 | --- | --- | --- |
-| Last verified private website | Private merge `3533420b6e5d44e95abd899c7d021a0f89f424be` serves as `f5319d4a-6953-4162-8521-e7a5a15f86d0` at 100%, deployment `aa41b155-1777-4e26-bcda-dd2d37b27078`. The rollout preserved effective configuration, issuer and anonymous admission. An admitted guest verified five protected assets and logged out. [PR 273](https://github.com/rupret007/StalemateSite/pull/273) passed both exact CI runs with 916 browser checks and 34 checks per route style in each. | Repeat the keyboard leave journey on the deployed release. Verify joined native Safari, assistive technology and live Music. |
+| Last verified private website | Private merge `3533420b6e5d44e95abd899c7d021a0f89f424be` serves as `f5319d4a-6953-4162-8521-e7a5a15f86d0` at 100%, deployment `aa41b155-1777-4e26-bcda-dd2d37b27078`. The rollout preserved effective configuration, issuer and anonymous admission. An admitted guest verified five protected assets and logged out. [PR 273](https://github.com/rupret007/StalemateSite/pull/273) passed both exact CI runs with 916 browser checks and 34 checks per route style in each. | Verify joined native Safari, assistive technology and live Music. |
 | Current application source | [PR 270](https://github.com/rupret007/StalemateSite/pull/270) bounds stalled joins and preserves the nickname for retry. [PR 271](https://github.com/rupret007/StalemateSite/pull/271) uses one first-join frame for updated clients. Both exact PR 271 browser runs passed 912 browser cases, 34 checks on each route and 150 test SQLite admissions; both native workerd runs passed. | Continue native Safari, physical mobile and screen-reader checks. |
 | Keyboard/playback correction | PR249 merged as `ce319fd73ad12cf43cd67cb96276302698d07d6c`. Its current-head and combined-private CI passed. Full CI originally exposed a network-stalled/playback-status defect; the corrected regression and unchanged real-media browser trials passed. Original failures/traces are retained. | Qualify current delivered keyboard/playback journeys. Neither responsive viewports nor real browser media decoding prove physical iOS or VoiceOver. |
 | Current native packages | Exact source `ae49c915070f2951db9ff441c23c7f0a9d90ce1b` completed four desktop jobs across the initial run and Intel retry. All four archives passed source, private target, paths/CRC, architecture, component, generated-notice and eleven-license checks. Both Macs passed five strict signature checks. Windows Setup/ZIP checksums and hosted install/start/uninstall passed. The extracted Linux package passed idle startup, Pocket Stage, Reference Studio and Jamulus startup against dummy JACK. The frozen lesson player also passed on the Linux runner. [ARM startup and archive evidence](../pr-assets/private-readiness/20261110/native-ae49/README.md) · [Linux build job](https://github.com/rupret007/webjam/actions/runs/42888556613/job/130096378059). | Both Mac Desktop shortcuts select the verified AE49 packages. The Mini shortcut passed idle startup and Quit. Intel startup, local Windows and Linux execution, publisher trust and physical media remain open. |

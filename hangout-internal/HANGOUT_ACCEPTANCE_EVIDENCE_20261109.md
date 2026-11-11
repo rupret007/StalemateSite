@@ -44,10 +44,11 @@ physical iPhone and assistive-technology checks remain open.
 · [Earlier local browser evidence](../pr-assets/private-readiness/20261111/game-night-follow-up/qualification.json)
 · [Private rollout and rollback](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
 
-The private keyboard fix shipped after the earlier lobby release. Exact hosted
-candidate testing covered room exit focus, and the deployed readback verified
-five protected files and logout. The Music room and invite rejection worked
-against the prior live release without starting audio.
+The private keyboard fix shipped after the earlier lobby release. Two hosted
+WebKit guests used the deployed release to leave Paint Along by keyboard. Focus
+returned to the lobby tab for both guests, and logout removed protected access.
+The Music room and invite rejection worked against the prior live release
+without starting audio.
 [Keyboard release and Music room evidence](../pr-assets/private-readiness/20261111/band-rehearsal/qualification.json)
 
 The original 62 ID and outcome cells below are copied verbatim.
@@ -78,7 +79,7 @@ The original 62 ID and outcome cells below are copied verbatim.
 | D1 | Accessible retro IRC design, refined typography/navigation/presence | **L,S** — Actual three-pane retro IRC workspace and refined phone fixtures; native screenshot retained. | Broader newcomer/usability review, platform and assistive-technology qualification. |
 | D2 | Clear connection, sign-in, loading and error/retry states | **L,C,S** — Browser invitation expiry asks for a fresh link and releases capture. The lobby now offers retry after a stalled join and retains the nickname. Two fresh hosted WebKit guests joined on the first attempt. | Qualify a real replacement Music invitation and remaining owner/moderator sign-in flows. |
 | D3 | Welcoming quiet rooms, room discovery and simple creation/join/switch/leave | **L,C** — Quiet lobby, directory, guest creation/join and host closure observed. | Remaining activity/room recovery/host-transfer paths and uncoached newcomer use. |
-| D4 | Keyboard navigation and focus | **L,C** — Earlier Chrome and local native Safari focus evidence is retained. Hosted WebKit covered Game Night invitations and return. The Paint Along candidate restored focus to the lobby for both test guests, and the exact script passed deployed readback. | Repeat Paint Along keyboard leave on the deployed release. Verify joined native Safari, screen-reader speech and native startup/Quit. |
+| D4 | Keyboard navigation and focus | **L,C** — Earlier Chrome and local native Safari focus evidence is retained. Hosted WebKit covered Game Night invitations and return. Both Paint Along guests left by keyboard and returned focus to the lobby on the deployed release. | Verify joined native Safari, screen-reader speech and native startup/Quit. |
 | D5 | Screen-reader behavior | **L,C,S** — Native Safari exposed the candidate’s member, command and channel controls in the accessibility tree. The private release serves the reviewed markup. | Verify the joined dialog in live Safari and listen to VoiceOver and NVDA. |
 | D6 | Zoom/reflow and WCAG 2.2 AA | **L,C,S** — Actual Chrome 200% and 400% zoom produced 600 and 300 CSS pixel widths. Scroll width matched the viewport and the tested nickname controls retained visible focus. | Verify joined chat, physical mobile, assistive technology and the remaining WCAG 2.2 AA requirements. |
 | D7 | Reduced-motion preference | **C,S** — Reduced-motion CSS and enabled reduced-motion fixtures retained. | Verify remaining actual browser/OS preference behavior; no broad accessibility certification. |

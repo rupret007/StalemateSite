@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-11-11T10:44:43.195726+00:00",
+  "recordedAt": "2026-11-11T10:54:25.680768+00:00",
   "privateLobby": {
     "source": "3533420b6e5d44e95abd899c7d021a0f89f424be",
     "servingVersion": "f5319d4a-6953-4162-8521-e7a5a15f86d0",
@@ -20,8 +20,7 @@
     "workerSource": "0b681670657127147a2bb686b792901ae857ffbd",
     "receiptSha256": "de869081bdb4547d620af28594792020f5381ad6d48401b8e864ffcc11307042",
     "focusRestoredForTwoGuests": true,
-    "candidateScriptSubstitutedInBrowser": true,
-    "fullPostDeployJourneyPending": true
+    "candidateScriptSubstitutedInBrowser": true
   },
   "hostedMusicRoom": {
     "source": "0b681670657127147a2bb686b792901ae857ffbd",
@@ -80,5 +79,17 @@
     "Hear WAV and MP3 Shared Track alongside physical input.",
     "Verify real Webex video and exclusive audio handoff.",
     "Complete joined native Safari, physical mobile, assistive technology and remaining evidence-matrix checks."
-  ]
+  ],
+  "hostedDeployedKeyboardJourney": {
+    "source": "3533420b6e5d44e95abd899c7d021a0f89f424be",
+    "lobbyJsSha256": "102efe84fc66b2744ea9f5df605e49bf8194a9c852c47bd282fa32a84b6af88a",
+    "receiptSha256": "8622a3716c44051aa27bc2aaf6b5180b585cbf156b3ffe3c2e6e8a0eeaa47be1",
+    "browser": "Playwright WebKit",
+    "unmodifiedAssets": true,
+    "focusRestoredForTwoGuests": true,
+    "crossEntryChatAndPaintAlongPassed": true,
+    "protectedAssetRefusedAfterBothLogouts": true,
+    "youtubePlaybackTested": false,
+    "mediaStarted": false
+  }
 }
