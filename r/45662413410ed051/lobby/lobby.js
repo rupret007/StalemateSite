@@ -50,7 +50,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             const saved = JSON.parse(savedArcade);
             const intent = readKeepRoomIntent(saved?.intent);
             if (intent && gameNightRoomName(intent.room)) {
-                arcadeResume = intent;
+                arcadeResume = { ...intent, game: saved.game === 'crapeights' ? 'crapeights' : 'chess' };
                 resumeEntry = readEntryHandoff(saved.entry, Date.now(), entrySites);
             }
         } catch { /* Tab state only restores navigation; the server authorizes entry. */ }
@@ -477,7 +477,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let pendingJamShare = null;
     let jamShareResultsSupported = false, jamShareTimer;
     let gameNightSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
-    let arcadeChessSupported = false, arcadeChess = null, arcadeChessLoading = false, arcadeReturning = null;
+    const arcadeTables = new Map([
+        ['chess', { label: 'Chess', load: () => import('./arcade-chess.mjs').then(module => module.mountArcadeChess) }],
+        ['crapeights', { label: 'Crappy Eights', load: () => import('./arcade-crapeights.mjs').then(module => module.mountArcadeCrapeights) }]
+    ]);
+    let arcadeReturning = null;
     let arcadeMediaSupported = false, arcadeMedia = null, arcadeMediaLoading = false;
     let fourInARowSupported = false, fourRoom = null, fourPlayed = false;
     const fourButtons = [], fourCells = [];
@@ -900,7 +904,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             messageResultsSupported = m.features?.messageResults === 1;
             jamShareResultsSupported = m.features?.jamShareResults === 1;
             gameNightSupported = m.features?.gameNight === 1;
-            arcadeChessSupported = m.features?.arcadeChess === 1;
+            arcadeTables.get('chess').supported = m.features?.arcadeChess === 1;
+            arcadeTables.get('crapeights').supported = m.features?.arcadeCrapeights === 1;
             arcadeMediaSupported = m.features?.arcadeMedia === 1;
             fourInARowSupported = m.features?.fourInARow === 1;
             discordLinksSupported = m.features?.discordLinks === true;
@@ -952,7 +957,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             entrySharing.joined();
             returnToKeepRoom();
             if (arcadeResume) {
-                if (arcadeChessSupported && !app.sharingStopped && !pendingKeep &&
+                if (arcadeTables.get(arcadeResume.game)?.supported && !app.sharingStopped && !pendingKeep &&
                     cmd('join', [arcadeResume.room], '#stalemate', arcadeResume.ref)) arcadeReturning = arcadeResume;
                 arcadeResume = null;
             }
@@ -1429,8 +1434,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-game-clear]').hidden = !link;
         $('[data-game-invite]').hidden = !c || !amOp(c);
         $('[data-game-night]').hidden = !c;
+        $('[data-arcade-game]').hidden = !c || ![...arcadeTables.values()].some(table => table.supported);
         drawFour(c);
-        drawArcadeChess(c);
+        for (const [game, table] of arcadeTables) drawArcadeTable(c, game, table);
         drawArcadeMedia(c);
     }
     function drawArcadeMedia(c) {
@@ -1453,30 +1459,40 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }).catch(() => toast('Call controls could not load. Reopen Game Night to try again.'))
             .finally(() => { arcadeMediaLoading = false; });
     }
-    function drawArcadeChess(c) {
-        const scope = arcadeChessSupported && !shieldActive && c && roomNonce(c.keepRef)
+    function drawArcadeTable(c, game, table) {
+        const scope = table.supported && !shieldActive && c && roomNonce(c.keepRef)
             ? { actor: app.selfId, room: c.name, ref: c.keepRef } : null;
-        if (arcadeChess) {
-            arcadeChess.setRoom(scope);
-            if (scope && scope.room === arcadeReturning?.room && scope.ref === arcadeReturning.ref) {
+        const option = $(`[data-arcade-game] option[value="${game}"]`);
+        option.hidden = option.disabled = !scope || !table.controller;
+        if (table.controller) {
+            table.controller.setRoom(scope);
+            if (scope && game === arcadeReturning?.game && scope.room === arcadeReturning.room && scope.ref === arcadeReturning.ref) {
                 arcadeReturning = null;
-                arcadeChess.open();
+                table.controller.open();
             }
             return;
         }
-        if (!scope || arcadeChessLoading) return;
-        arcadeChessLoading = true;
-        import('./arcade-chess.mjs').then(module => {
-            arcadeChess = module.mountArcadeChess($('[data-game-night]'));
-            drawArcadeChess(currentGameNight());
-        }).catch(() => toast('Chess could not load. Reopen Game Night to try again.'))
-            .finally(() => { arcadeChessLoading = false; });
+        if (!scope || table.loading) return;
+        table.loading = true;
+        table.load().then(mount => {
+            table.controller = mount($('[data-game-night]'));
+            drawArcadeTable(currentGameNight(), game, table);
+        }).catch(() => toast(`${table.label} could not load. Reopen Game Night to try again.`))
+            .finally(() => { table.loading = false; });
     }
+    $('[data-arcade-game]').addEventListener('change', event => {
+        const game = event.target.value;
+        event.target.value = '';
+        if (!currentGameNight() || !game) return;
+        if (game === 'four' && !$('[data-four]').hidden) $('[data-four]').open = true;
+        else arcadeTables.get(game)?.controller?.open();
+    });
     window.addEventListener('pagehide', () => {
         const current = currentGameNight();
-        if (!current || !arcadeChess?.isOpen()) return;
+        const open = [...arcadeTables].find(([, table]) => table.controller?.isOpen());
+        if (!current || !open) return;
         const intent = keepRoomIntent(current);
-        if (intent) writeTab(ARCADE_RESUME_KEY, JSON.stringify({ intent, entry: entryHandoff(entrySource, shareEntry, Date.now(), entrySites) }));
+        if (intent) writeTab(ARCADE_RESUME_KEY, JSON.stringify({ intent, game: open[0], entry: entryHandoff(entrySource, shareEntry, Date.now(), entrySites) }));
     });
     function fourCommand(action, column) {
         const c = currentGameNight();

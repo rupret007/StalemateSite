@@ -11,7 +11,7 @@ const TARGETS = new Set([
     'games/turdtris-audio.js', 'games/turdjack-audio.js',
     'games/turdrummy-audio.js', 'games/turdrummy-audio-core.js',
     'games/turdspades-audio.js', 'games/turdspades-client.js',
-    'games/crapeights-presentation.js',
+    'games/crapeights-presentation.js', 'games/crapeights-rules.js',
     'games/suite-progress-core.js', 'games/table-continue-core.js',
     'games/chess-core.js', 'games/chess-engine.js', 'games/chess-ui.js',
     'games/chess-board.js', 'assets/chess/chess-board.css',

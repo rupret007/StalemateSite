@@ -142,6 +142,63 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     async function waitForPackets(page, kind, after = 5) {
         await expect.poll(() => packetCount(page, kind)).toBeGreaterThan(after);
     }
+    async function playEights(a, b) {
+        const before = media ? await packetCount(b, 'audio') : 0;
+        for (const page of [a, b]) await page.getByRole('combobox', { name: 'Switch game' }).selectOption('crapeights');
+        await a.getByRole('button', { name: 'Open Eights table' }).click();
+        await b.getByRole('button', { name: 'Join Eights table' }).click();
+        const aCards = a.locator('[data-eights-card]'), bCards = b.locator('[data-eights-card]');
+        await expect(aCards).toHaveCount(7);
+        await expect(bCards).toHaveCount(7);
+        try {
+            await expect(b.locator('[data-eights-hand]')).toBeInViewport({ ratio: 1 });
+            await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
+        } catch (error) {
+            if (evidence) {
+                await mkdir(evidence, { recursive: true });
+                await b.screenshot({ path: join(evidence, `eights-${engine}-fit-failure.png`) });
+            }
+            throw error;
+        }
+        const aHand = await aCards.evaluateAll(buttons => buttons.map(button => button.dataset.eightsCard));
+        const bHand = await bCards.evaluateAll(buttons => buttons.map(button => button.dataset.eightsCard));
+        assert.ok(aHand.every(id => !bHand.includes(id)));
+        const playable = a.locator('[data-eights-card]:enabled').first();
+        if (await playable.count()) {
+            const wild = (await playable.getAttribute('aria-label')).includes('Wild');
+            await playable.press('Enter');
+            if (wild) await a.locator('[data-eights-suits]').getByRole('button', { name: '♥ Hearts', exact: true }).click();
+            await expect(aCards).toHaveCount(6);
+        } else {
+            await a.getByRole('button', { name: /Draw ·/ }).click();
+            await expect(aCards).toHaveCount(8);
+        }
+        await expect(b.locator('[data-eights-score="a"]')).toContainText(`${await aCards.count()} cards`);
+        if (media) {
+            await waitForPackets(b, 'audio', before);
+            assert.equal(await b.evaluate(() => window.testPeers.length), 1);
+        } else {
+            const hand = await bCards.evaluateAll(buttons => buttons.map(button => button.dataset.eightsCard));
+            await b.reload();
+            await b.locator('[data-enter]').click();
+            await expect(b.locator('[data-eights-table]')).toBeVisible();
+            assert.deepEqual(await bCards.evaluateAll(buttons => buttons.map(button => button.dataset.eightsCard)), hand);
+            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+        }
+        await b.getByRole('button', { name: 'Resign', exact: true }).click();
+        await b.getByRole('dialog', { name: 'Resign this match?' }).getByRole('button', { name: 'Resign', exact: true }).click();
+        await expect(a.locator('[data-eights-status]')).toContainText('You won the match by resignation');
+        await a.getByRole('button', { name: 'Request Eights rematch' }).click();
+        await b.getByRole('button', { name: 'Accept Eights rematch' }).click();
+        await expect(b.locator('[data-eights-status]')).toContainText('Round 1 · Your turn');
+        await expect(bCards).toHaveCount(7);
+        if (evidence) {
+            await mkdir(evidence, { recursive: true });
+            await a.screenshot({ path: join(evidence, `eights-${engine}-desktop.png`) });
+            await b.screenshot({ path: join(evidence, `eights-${engine}-phone.png`) });
+        }
+        console.log(`Passed ${engine} Crappy Eights private hands, a played turn, ${media ? 'same call during a game switch' : 'full reload and seat recovery'}, and rematch.`);
+    }
     try {
         const a = await guest('stalemate', 'ChessHost', { width: 1280, height: 900 });
         const b = await guest('rad-dad', 'ChessGuest', { width: 375, height: 667 }, true);
@@ -152,7 +209,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await invite.getByRole('button', { name: 'Invite selected person' }).click();
         await b.getByRole('button', { name: 'Join', exact: true }).click();
         await expect(b.getByRole('link', { name: 'Open Rad Dad Arcade' })).toHaveAttribute('href', 'https://raddadband.com/play/');
-        for (const page of [a, b]) await page.getByText('Royal Flush Chess', { exact: true }).click();
+        for (const page of [a, b]) await page.locator('.arcade-chess summary').click();
         await a.getByRole('button', { name: 'Open Chess match' }).click();
         await b.getByRole('button', { name: 'Join as Black' }).click();
         await expect(a.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
@@ -177,10 +234,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         if (media) await joinCalls(a, b);
         else await expect(b.locator('[data-call-toggle]')).toBeHidden();
         const beforeSwitch = media ? await packetCount(b, 'audio') : 0;
-        await b.getByText('Four in a Row', { exact: true }).click();
+        await b.locator('[data-four] summary').click();
         await expect(b.locator('[data-four]')).toHaveAttribute('open', '');
         await expect(b.locator('.arcade-chess')).not.toHaveAttribute('open', '');
-        await b.getByText('Royal Flush Chess', { exact: true }).click();
+        await b.locator('.arcade-chess summary').click();
         await expect(b.getByRole('button', { name: 'e5, Black pawn' })).toBeVisible();
         await expect(b.locator('[data-four]')).not.toHaveAttribute('open', '');
         if (media) {
@@ -208,6 +265,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         await b.setViewportSize({ width: 390, height: 844 });
         await fit(b, 'phone-tall');
+        await b.setViewportSize({ width: 375, height: 667 });
+        await playEights(a, b);
         if (media) {
             await a.locator('[data-call-toggle]').click();
             await a.getByRole('button', { name: 'Actions for ChessGuest' }).click();

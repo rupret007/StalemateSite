@@ -17,7 +17,7 @@ import { lobbyAuthorityMode, createLobbySessionAuthority, createLobbyAuthoritySt
 import { createLobbyParticipation, lobbyParticipationMode, participationConfigurationValid } from './lobby-participation.mjs';
 import { PARTICIPATION_POLICY_KEY } from './participation-partitions.mjs';
 import { lobbyIncidentSourceMode, incidentSourceConfigurationValid } from './lobby-incident-sources.mjs';
-import { arcadeEnabled, arcadePath, arcadeRoomRequest, createArcadeTransport, isArcadeSocket } from './arcade-transport.mjs';
+import { arcadeEnabled, arcadeGame, arcadeGames, arcadePath, arcadeRoomRequest, arcadeSocketGame, createArcadeTransport, isArcadeSocket } from './arcade-transport.mjs';
 import { createGameNightMedia, isMediaSocket, mediaEnabled, mediaPath } from './game-night-media.mjs';
 
 const privateReportResponse = (value) => new Response(JSON.stringify(value), {
@@ -254,12 +254,12 @@ export class HangoutLobby {
         this.authorityMode = lobbyAuthorityMode(env);
         this.liveBindings = new Map();
         this.arcadeDepartures = [];
-        this.arcade = createArcadeTransport({
-            state, current: scope => this.arcadeBinding(scope), active: binding => this.sessionActive(binding),
+        this.arcade = new Map(arcadeGames.map(name => [name, createArcadeTransport({
+            name, state, current: scope => this.arcadeBinding(scope), active: binding => this.sessionActive(binding),
             charge: (socket, actor) => this.controlBudget.take(socket, actor),
             approve: async actor => (await this.engine.approveArcade(actor))?.ok === true,
-            allowed: () => arcadeEnabled(env) && !this.authorityUnavailable
-        });
+            allowed: () => arcadeEnabled(env, name) && !this.authorityUnavailable
+        })]));
         this.gameMedia = createGameNightMedia({
             state, current: scope => this.arcadeBinding(scope), active: binding => this.sessionActive(binding),
             charge: (socket, actor) => this.controlBudget.take(socket, actor),
@@ -439,7 +439,7 @@ export class HangoutLobby {
         else { const logs = await state.storage.list({ prefix: 'log:', reverse: true, limit: 2000 }); this.engine.restoreLog([...logs.values()].reverse()); }
         if (this.authorityMode) { await this.authority.schedule(); this.privateQueueActor = null; }
         else await this.scheduleLegacyAlarm();
-        this.arcade.reconcile();
+        for (const service of this.arcade.values()) service.reconcile();
         this.gameMedia.reconcile();
     }
 
@@ -479,9 +479,16 @@ export class HangoutLobby {
         if (mediaEnabled(this.env)) this.gameMedia.reconcile();
         if (!arcadeEnabled(this.env)) return;
         for (const departure of this.arcadeDepartures.splice(0)) {
-            if (!await this.arcade.revoke(departure.scope, departure.subject)) this.arcadeDepartures.push(departure);
+            let retired = true;
+            for (const service of this.arcade.values()) {
+                if (!await service.revoke(departure.scope, departure.subject)) retired = false;
+            }
+            if (!retired) this.arcadeDepartures.push(departure);
         }
-        this.arcade.reconcile();
+        for (const service of this.arcade.values()) service.reconcile();
+    }
+    async maintainArcade() {
+        for (const [name, service] of this.arcade) if (arcadeEnabled(this.env, name)) await service.maintain().catch(() => {});
     }
     async sessionActive(value) {
         if (!this.authorityMode) return activeBetaSession(this.env, value);
@@ -860,7 +867,7 @@ export class HangoutLobby {
                     const ticked = await this.engine.tick();
                     if (this.participationMode && ticked?.ok === false) throw Error('participation tick unavailable');
                     await this.pruneLogs();
-                    if (arcadeEnabled(this.env)) await this.arcade.maintain().catch(() => {});
+                    await this.maintainArcade();
                     if (mediaEnabled(this.env)) await this.gameMedia.maintain().catch(() => {});
                     this.privateQueueActor = { kind: 'maintenance' };
                     try { await this.refreshPrivateReports(); } finally { this.privateQueueActor = null; }
@@ -893,7 +900,7 @@ export class HangoutLobby {
                 if (this.closedSockets.has(ws) || ended) { const { entry } = closeTransport(this, ws, 4401, 'sign in again'); await retireClosed(this, entry, gate); }
             }
             await this.engine.tick(); await this.pruneLogs();
-            if (arcadeEnabled(this.env)) await this.arcade.maintain().catch(() => {});
+            await this.maintainArcade();
             if (mediaEnabled(this.env)) await this.gameMedia.maintain().catch(() => {});
             await this.refreshPrivateReports();
             await this.scheduleLegacyAlarm(undefined, true);
@@ -905,9 +912,9 @@ export class HangoutLobby {
         if (path.startsWith(LOBBY_AUTHORITY_PATH)) return this.authorityRequest(request, path.slice(LOBBY_AUTHORITY_PATH.length));
         if (this.authorityUnavailable) return new Response('community authority unavailable', { status: 503 });
         if (arcadePath(path) || mediaPath(path)) {
-            const media = mediaPath(path);
-            if (!(media ? mediaEnabled(this.env) : arcadeEnabled(this.env))) return new Response('not found', { status: 404 });
-            const service = media ? this.gameMedia : this.arcade;
+            const media = mediaPath(path), game = arcadeGame(path);
+            if (!(media ? mediaEnabled(this.env) : arcadeEnabled(this.env, game))) return new Response('not found', { status: 404 });
+            const service = media ? this.gameMedia : this.arcade.get(game);
             let trusted;
             try { trusted = JSON.parse(request.headers.get('X-Hangout-Arcade')); } catch { /* deny below */ }
             if (!trusted?.session?.betaSid) return new Response('session required', { status: 403 });
@@ -1006,7 +1013,8 @@ export class HangoutLobby {
         for (const frame of initialFrames) {
             if (frame.t === 'admin' && this.env.HANGOUT_BETA_MODE === 'protected') this.sendPrivateAdmin(pair[1], id, frame);
             else this.delivery.send(pair[1], frame.t === 'hello'
-                ? { ...frame, features: { ...frame.features, transportPing: 1, ...(arcadeEnabled(this.env) ? { arcadeChess: 1 } : {}),
+                ? { ...frame, features: { ...frame.features, transportPing: 1, ...(arcadeEnabled(this.env, 'chess') ? { arcadeChess: 1 } : {}),
+                    ...(arcadeEnabled(this.env, 'crapeights') ? { arcadeCrapeights: 1 } : {}),
                     ...(mediaEnabled(this.env) ? { arcadeMedia: 1 } : {}) } } : frame);
         }
         return new Response(null, { status: 101, webSocket: pair[0] });
@@ -1023,7 +1031,8 @@ export class HangoutLobby {
         if (this.closedSockets?.has(ws)) return;
         await this.ready;
         if (isMediaSocket(ws)) return retirementGate(this, () => this.gameMedia.receive(ws, raw));
-        if (isArcadeSocket(ws)) return retirementGate(this, () => this.arcade.receive(ws, raw));
+        const game = arcadeSocketGame(ws);
+        if (game) return retirementGate(this, () => this.arcade.get(game).receive(ws, raw));
         if (this.closedSockets?.has(ws)) return;
         if (this.authorityUnavailable) { ws.close(1011, 'community authority unavailable'); return; }
         return retirementGate(this, async gate => {

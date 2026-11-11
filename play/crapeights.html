@@ -785,6 +785,7 @@
     </div>
   </div>
 
+  <script src="games/crapeights-rules.js?v=a053e73c5338e669"></script>
   <script src="games/crapeights-ai.js"></script>
   <script src="games/crapeights-presentation.js?v=7243470350b7a5dc"></script>
   <script src="games/crapeights-table.js"></script>
@@ -806,11 +807,9 @@
       fanLayout: () => [], focusIndex: (index,key,count) => (index + 1) % count,
       turnHint: ({ human, name }) => ({ title: human ? 'Your move' : `${name} is thinking`, detail: 'Match suit or rank. Eights are wild.' })
     };
-    const MATCH_TARGET = 200;
-    const STARTING_HAND = 7;
+    const { suits: SUITS, ranks: RANKS, target: MATCH_TARGET, handSize: STARTING_HAND,
+      cardPoints, canPlay, cardEffect } = window.CrapeightsRules;
     const STORAGE = { stats: 'crapeightsStats', sound: 'crapeightsSoundOn_v1' };
-    const SUITS = ['S', 'H', 'D', 'C'];
-    const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
     const BOT_FIRST_NAMES = [
       'Alex', 'Casey', 'Jordan', 'Taylor', 'Riley', 'Parker', 'Logan', 'Morgan',
       'Avery', 'Quinn', 'Blake', 'Cameron', 'Drew', 'Hayden', 'Reese', 'Rowan',
@@ -999,7 +998,6 @@
     function suitGlyph(suit) { return suit === 'S' ? '\u2660' : suit === 'H' ? '\u2665' : suit === 'D' ? '\u2666' : '\u2663'; }
     function suitName(suit) { return suit === 'S' ? 'Spades' : suit === 'H' ? 'Hearts' : suit === 'D' ? 'Diamonds' : 'Clubs'; }
     function isRedSuit(suit) { return suit === 'H' || suit === 'D'; }
-    function cardPoints(card) { if (!card) return 0; if (card.rank === '8') return 50; if (card.rank === 'A') return 1; if (['10', 'J', 'Q', 'K'].includes(card.rank)) return 10; return parseInt(card.rank, 10); }
     function cardStyleMeta(card) {
       if (!card) return { face: '', badge: '' };
       if (card.rank === '8') return { face: 'wild', badge: 'Wild' };
@@ -1068,7 +1066,7 @@
     }
 
     function topCard() { return discard.length ? discard[discard.length - 1] : null; }
-    function isPlayable(card) { const top = topCard(); return !!(card && top && (card.rank === '8' || card.suit === activeSuit || card.rank === top.rank)); }
+    function isPlayable(card) { return canPlay(card, topCard(), activeSuit); }
     function getPlayableCards(hand) { return hand.filter((card) => isPlayable(card)); }
     function isHumanTurn() { return roundActive && players[currentPlayer] && players[currentPlayer].human; }
     function getNextPlayerIndex(fromIndex) { return (fromIndex + direction + players.length) % players.length; }
@@ -1762,9 +1760,10 @@
       if (card.rank === '8') { activeSuit = forcedSuit || chooseBestSuit(player.hand, card.id); playSfx('wild'); } else activeSuit = card.suit;
 
       let detail = `${player.name} played ${card.rank}${suitGlyph(card.suit)}.`;
-      if (card.rank === '2') { pendingDrawCards += 2; detail += ' Draw Two triggered.'; playSfx('penalty'); }
-      else if (card.rank === 'J') { pendingSkips += 1; detail += ' Skip triggered.'; playSfx('skip'); }
-      else if (card.rank === 'Q') { direction *= -1; detail += ' Reverse direction.'; playSfx('reverse'); }
+      const effect = cardEffect(card);
+      if (effect === 'draw-two') { pendingDrawCards += 2; detail += ' Draw Two triggered.'; playSfx('penalty'); }
+      else if (effect === 'skip') { pendingSkips += 1; detail += ' Skip triggered.'; playSfx('skip'); }
+      else if (effect === 'reverse') { direction *= -1; detail += ' Reverse direction.'; playSfx('reverse'); }
       else if (card.rank !== '8') playSfx('play');
       if (card.rank === '8') detail += ` Suit is now ${suitName(activeSuit)}.`;
       if (player.hand.length === 1) detail += ` ${player.name} has one card left.`;

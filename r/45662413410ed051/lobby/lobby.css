@@ -272,6 +272,56 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .four-board td[data-mark="O"] { color: var(--blue); background: #17282b; }
 .four-board td[data-last] { border-color: #7d8877; }
 .four-board td[data-winning] { border-color: currentColor; }
+.arcade-game-picker { max-width: 9.5rem; min-width: 0; }
+.game-night:has(.arcade-eights[open]) { max-height: 68dvh; overscroll-behavior: contain; overflow-anchor: none; }
+.arcade-eights { margin: 6px 0; border-block: 1px solid var(--line); padding: 4px 0 8px; }
+.arcade-eights summary { display: list-item; min-height: 34px; padding: 6px 2px; font-weight: 650; color: var(--cream); }
+.eights-status, .eights-error, .eights-hand-label { margin: 4px 0; }
+.eights-error:empty { display: none; }
+.eights-error { color: #ffc497; }
+.arcade-eights [data-eights-table] { max-width: 420px; }
+.eights-score, .eights-piles, .eights-actions { display: flex; gap: 5px 8px; flex-wrap: wrap; align-items: center; }
+.eights-score > span { background: var(--surface); border: 1px solid var(--line); padding: 4px 7px; border-radius: 5px; font-size: .78rem; }
+.eights-piles { margin-block: 6px; }
+.eights-discard { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 5px; color: #151c18; background: #f4ebcf; }
+.eights-discard b { font: bold 1.3rem var(--mono); }
+.eights-discard span { font-size: .76rem; }
+.eights-hand { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin-bottom: 6px; }
+.eights-hand button { display: grid; gap: 0; justify-items: start; min-height: 44px; padding: 2px 5px; text-align: left; background: #f4ebcf; border: 2px solid var(--lime); border-radius: 6px; color: #151c18; cursor: pointer; }
+.eights-hand button:disabled { border-color: #c5ba9b; cursor: default; opacity: .7; }
+.eights-hand b { font: bold 1.15rem var(--mono); }
+.eights-hand span { font-size: .7rem; }
+.eights-hand [data-red="true"] b, .eights-discard [data-red="true"] { color: #8e2538; }
+.arcade-eights fieldset { min-width: 0; border: 1px solid var(--line); padding: 5px; margin: 0 0 6px; }
+@media (max-width: 1099px) {
+  .game-night:has(.arcade-eights[open] [data-eights-table]:not([hidden])) { display: flex; flex-direction: column; gap: 4px; padding: 6px 10px; }
+  .game-night:has(.arcade-eights[open] [data-eights-table]:not([hidden])) > * { flex-shrink: 0; }
+  .game-night:has(.arcade-eights[open] [data-eights-table]:not([hidden])) > .arcade-eights { order: -1; margin: 0; }
+}
+@media (min-width: 1100px) {
+  .game-night:has(.arcade-eights[open] [data-eights-table]:not([hidden])) {
+    display: grid;
+    grid-template: "eights heading" auto "eights actions" auto "eights four" auto "eights chess" auto "eights call" 1fr /
+      minmax(0, 27rem) minmax(0, 1fr);
+    gap: 4px 16px;
+    align-items: start;
+  }
+  .game-night:has(.arcade-eights[open]) > .arcade-eights { grid-area: eights; margin: 0; }
+  .game-night:has(.arcade-eights[open]) > .four-match { grid-area: four; }
+  .game-night:has(.arcade-eights[open]) > .arcade-chess { grid-area: chess; }
+}
+@media (max-width: 900px) {
+  .roombar:has([data-arcade-game]:not([hidden])) .modes { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .roombar .arcade-game-picker { width: 5.1rem; padding-inline: 6px; font-size: 11px; }
+  .chat:has(.arcade-eights[open] [data-eights-table]:not([hidden])) .buffer { min-height: 46px; padding-block: 4px; }
+  .chat:has(.arcade-eights[open] [data-eights-table]:not([hidden])) .quick { display: none; }
+  .chat:has(.arcade-eights[open] [data-eights-table]:not([hidden])) .roombar { padding: 4px 10px; }
+  body:has(.arcade-eights[open] [data-eights-table]:not([hidden])) .titlebar { min-height: 48px; padding: 5px 10px; gap: 8px; }
+  body:has(.arcade-eights[open] [data-eights-table]:not([hidden])) .brand-caption { display: none; }
+  body:has(.arcade-eights[open] [data-eights-table]:not([hidden])) .brand b { white-space: nowrap; }
+  body:has(.arcade-eights[open] [data-eights-table]:not([hidden])) [data-fullscreen] { min-height: 26px; padding-block: 3px; font-size: 0; }
+  body:has(.arcade-eights[open] [data-eights-table]:not([hidden])) [data-fullscreen]::before { content: "⛶"; font-size: 16px; }
+}
 .game-night-call { margin-block: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
 .game-night-call h4, .game-night-call p { margin: 0 0 5px; }
 .game-night-call .jam-actions { margin-bottom: 4px; }

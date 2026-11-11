@@ -10,7 +10,7 @@ import { entrySitesFromConfig } from '../../r/45662413410ed051/entry-sites.mjs';
 import { lobbyParticipationMode, participationConfigurationValid } from './lobby-participation.mjs';
 import { incidentSourceConfigurationValid } from './lobby-incident-sources.mjs';
 import { publicBetaHelp } from './beta-public-help.mjs';
-import { arcadeEnabled, arcadePath, arcadeRoomRequest } from './arcade-transport.mjs';
+import { arcadeEnabled, arcadeGame, arcadePath, arcadeRoomRequest } from './arcade-transport.mjs';
 import { mediaEnabled, mediaPath } from './game-night-media.mjs';
 export { BetaSessions } from './beta-sessions.mjs';
 export { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget };
@@ -314,7 +314,7 @@ async function betaRequest(request, env, deps = {}) {
         return result;
     }
     if (arcadePath(url.pathname) || mediaPath(url.pathname)) {
-        if (!(mediaPath(url.pathname) ? mediaEnabled(env) : arcadeEnabled(env))) return reply('Room service unavailable.', 404);
+        if (!(mediaPath(url.pathname) ? mediaEnabled(env) : arcadeEnabled(env, arcadeGame(url.pathname)))) return reply('Room service unavailable.', 404);
         if (!sameOrigin(request) || url.search) return reply('Admission denied.', 403);
         const issuing = url.pathname.endsWith('-ticket');
         if (issuing ? request.method !== 'POST' || !/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type') || '')

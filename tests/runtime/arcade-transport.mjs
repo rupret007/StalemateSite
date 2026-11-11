@@ -105,6 +105,65 @@ async function previewEntrances(betaOrigin) {
     return entries;
 }
 
+async function verifyEights(white, black, ref, chess) {
+    const ticketPath = '/beta/arcade-crapeights-ticket', matchPath = '/beta/arcade-crapeights-match';
+    const guestTicket = await grant(white, ref, ticketPath);
+    const wrongGame = await upgrade(white.cookie, guestTicket);
+    assert.equal(wrongGame.status, 403, 'an Eights grant cannot upgrade a Chess socket');
+    await wrongGame.body?.cancel();
+    async function connect(player, ticket) {
+        const response = await upgrade(player.cookie, ticket || await grant(player, ref, ticketPath), matchPath);
+        assert.equal(response.status, 101);
+        const link = observe(response.webSocket);
+        await link.wait(frame => frame.t === 'match-ready', 'Eights ready');
+        return link;
+    }
+    const a = await connect(white, guestTicket), b = await connect(black);
+    const spectator = await guest('FixtureWatcher', 'rad-dad', '192.0.2.13');
+    await pause();
+    white.lobby.send({ t: 'cmd', name: 'invite', args: ['FixtureWatcher', room], ch: room,
+        roomInstance: ref, personContext: 1, personPeer: spectator.id });
+    await spectator.lobby.wait(frame => frame.t === 'invite' && frame.ch === room, 'watcher invitation');
+    spectator.lobby.send({ t: 'cmd', name: 'join', args: [room], ch: '#stalemate' });
+    await spectator.lobby.wait(frame => frame.t === 'join' && frame.ch.name === room, 'watcher admission');
+    const watch = await connect(spectator);
+    a.send({ version: 1, action: 'open' });
+    const open = await b.wait(frame => frame.state?.waiting, 'Eights open');
+    const id = open.state.id;
+    b.send({ version: 1, action: 'join', id });
+    const dealt = [a, b, watch].map(link => link.wait(frame => frame.state?.match?.revision === 0, 'Eights deal'));
+    const [av, bv, wv] = (await Promise.all(dealt)).map(frame => frame.state.match);
+    assert.equal(av.hand.length, 7);
+    assert.equal(bv.hand.length, 7);
+    assert.deepEqual(wv.hand, []);
+    assert.deepEqual(wv.counts, { a: 7, b: 7 });
+    assert.equal(av.hand.some(card => bv.hand.some(other => card.id === other.id)), false);
+    for (const projection of [av, bv, wv]) assert.ok(!('deck' in projection) && !('hands' in projection));
+    watch.send({ version: 1, action: 'draw', id, revision: 0 });
+    await watch.wait(frame => frame.t === 'match-error' && frame.reason === 'unavailable', 'spectator cannot draw');
+    const playable = av.hand.find(card => card.playable);
+    a.send({ version: 1, action: playable ? 'play' : 'draw', id, revision: 0,
+        ...(playable ? { card: playable.id, suit: 'D' } : {}) });
+    await watch.wait(frame => frame.state?.match?.revision === 1, 'spectator sees public move');
+    const after = await b.wait(frame => frame.state?.match?.revision === 1, 'opponent sees public move');
+    b.socket.close(1000, 'Eights fixture reconnect');
+    const returning = await connect(black);
+    returning.send({ version: 1, action: 'sync' });
+    const restored = await returning.wait(frame => frame.state?.match?.revision === 1, 'restored private hand');
+    assert.deepEqual(restored.state.match.hand, after.state.match.hand);
+    returning.send({ version: 1, action: 'resign', id, revision: 1 });
+    await a.wait(frame => frame.state?.match?.result?.winner === 'a', 'Eights resignation');
+    a.send({ version: 1, action: 'rematch', id });
+    await returning.wait(frame => frame.state?.rematch === 'a', 'Eights rematch invitation');
+    returning.send({ version: 1, action: 'rematch', id });
+    const rematch = await a.wait(frame => frame.state?.id && frame.state.id !== id, 'fresh Eights rematch');
+    assert.equal(rematch.state.seat, 'b');
+    assert.equal(rematch.state.match.hand.length, 7);
+    assert.ok(chess.frames.every(frame => frame.state?.game !== 'crapeights'));
+    assert.ok(watch.frames.every(frame => !frame.state?.match?.hand?.length));
+    return a;
+}
+
 async function verifyMedia(white, black, ref, matchA, matchB) {
     const endpoint = '/beta/game-night-media';
     const join = async player => {
@@ -173,7 +232,7 @@ try {
         modules: [{ type: 'ESModule', path: join(directory, 'worker.mjs'), contents: bundled.output[0].code }],
         compatibilityDate: '2026-10-01', host: '127.0.0.1', port: 0, https: !!browserName, telemetry: { enabled: false },
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true } },
-        bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1',
+        bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1', HANGOUT_ARCADE_CRAPEIGHTS: '1',
             ...(browserName ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
             ...(!browserName || browserMedia ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
             HANGOUT_HMAC_KEY: 'owned-arcade-fixture-hmac-not-for-deployment-2026', HANGOUT_BETA_INVITE_KEY: invite,
@@ -235,12 +294,15 @@ try {
     const synced = await returning.wait(frame => frame.state?.match?.moves?.[0] === 'e2e4', 'restored board');
     assert.equal(synced.state.seat, 'b');
     await verifyMedia(white, black, ch.keepRef, a, returning);
+    const cards = await verifyEights(white, black, ch.keepRef, a);
     white.lobby.send({ t: 'say', ch: room, text: 'Good luck at Chess' });
     await black.lobby.wait(frame => frame.t === 'line' && frame.text === 'Good luck at Chess', 'chat while match is open');
-    const partAt = a.frames.length;
+    const partAt = a.frames.length, cardsPartAt = cards.frames.length;
     black.lobby.send({ t: 'cmd', name: 'part', args: [room], ch: room });
     await black.lobby.wait(frame => frame.t === 'part' && frame.ch === room, 'explicit room departure');
     await a.wait(frame => frame.t === 'match-state' && frame.state === null, 'seat retirement', partAt);
+    await cards.wait(frame => frame.t === 'match-state' && frame.state === null, 'Eights seat retirement', cardsPartAt);
+    console.log('Passed native Crappy Eights private hands, spectator projection, wrong-game grant rejection, rejoin, and rematch.');
     console.log('Passed native private invitations, session-bound one-use grants, two-brand Chess move and chat, match reconnection, and explicit seat retirement.');
     }
 } finally {

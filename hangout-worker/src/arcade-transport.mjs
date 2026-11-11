@@ -1,33 +1,49 @@
 import { GameNightChess } from './game-night-chess.mjs';
+import { GameNightCrapeights } from './game-night-crapeights.mjs';
 import { createGameNightSockets } from './game-night-sockets.mjs';
 export { arcadeRoomRequest } from './game-night-sockets.mjs';
 
 export const ARCADE_TAG = 'game-night-match';
 export const ARCADE_PROTOCOL = 'game-night.v1';
-const TICKET_PATH = '/beta/arcade-ticket';
-const MATCH_PATH = '/beta/arcade-match';
 const MATCH_TTL = 40 * 60000;
 const MATCH_CAP = 60;
-const PREFIX = 'game-night-match:';
+const adapters = new Map([
+    ['chess', { flag: 'HANGOUT_ARCADE_CHESS', Table: GameNightChess }],
+    ['crapeights', { flag: 'HANGOUT_ARCADE_CRAPEIGHTS', Table: GameNightCrapeights, renewOnAction: true }]
+]);
 
-export const arcadePath = path => path === TICKET_PATH || path === MATCH_PATH;
-export const arcadeEnabled = (env = {}) => env.HANGOUT_BETA_MODE === 'protected' && env.HANGOUT_ARCADE_CHESS === '1' && env.HANGOUT_OPEN !== '0';
-export const isArcadeSocket = socket => socket.deserializeAttachment?.()?.kind === ARCADE_TAG;
+export const arcadeGames = Object.freeze([...adapters.keys()]);
+const tagFor = game => game === 'chess' ? ARCADE_TAG : ARCADE_TAG + ':' + game;
+const gamesByTag = new Map(arcadeGames.map(game => [tagFor(game), game]));
+export const arcadeSocketGame = socket => gamesByTag.get(socket.deserializeAttachment?.()?.kind);
+export const isArcadeSocket = socket => !!arcadeSocketGame(socket);
+const gamesByPath = new Map(arcadeGames.flatMap(game => {
+    const prefix = game === 'chess' ? '/beta/arcade' : '/beta/arcade-' + game;
+    return [[prefix + '-ticket', game], [prefix + '-match', game]];
+}));
+export const arcadeGame = path => gamesByPath.get(path);
+export const arcadePath = path => gamesByPath.has(path);
+export function arcadeEnabled(env = {}, game) {
+    if (env.HANGOUT_BETA_MODE !== 'protected' || env.HANGOUT_OPEN === '0') return false;
+    return game ? env[adapters.get(game)?.flag] === '1' : arcadeGames.some(name => arcadeEnabled(env, name));
+}
 
 // Call from the same Durable Object's serialized lobby event path. The
 // callbacks resolve membership and participation against the committed lobby.
-export function createArcadeTransport({ state, current, active, approve, charge, allowed, now = () => Date.now(), uuid = () => crypto.randomUUID() }) {
+export function createArcadeTransport({ state, current, active, approve, charge, allowed, name = 'chess', now = () => Date.now(), uuid = () => crypto.randomUUID() }) {
+    const { Table, renewOnAction } = adapters.get(name);
+    const tag = tagFor(name), prefix = name === 'chess' ? ARCADE_TAG + ':' : 'game-night-' + name + ':';
     const pendingRevocations = new Map();
     const { issue, upgrade, member, sockets, send, close } = createGameNightSockets({
-        state, current, active, charge, now, uuid, tag: ARCADE_TAG, protocol: ARCADE_PROTOCOL,
+        state, current, active, charge, now, uuid, tag, protocol: ARCADE_PROTOCOL,
         readyType: 'match-ready', allowed: scope => !pendingRevocations.has(scope?.ref) && allowed()
     });
-    const key = scope => PREFIX + scope.ref;
+    const key = scope => prefix + scope.ref;
     async function load(scope) {
         const record = await state.storage.get(key(scope));
         if (!record) return null;
         if (record.expiresAt <= now()) { await state.storage.delete(key(scope)); return null; }
-        return { expiresAt: record.expiresAt, game: GameNightChess.restore(record.chess) };
+        return { expiresAt: record.expiresAt, game: Table.restore(record[name]) };
     }
     function publish(scope, game, requester = null) {
         for (const socket of requester ? [requester] : sockets()) {
@@ -68,8 +84,8 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                 if (!binding.canPlay || !await approve(scope.actor)) error = 'unavailable';
                 else if (frame.action === 'open') {
                     if (!binding.canOpen || game) error = 'unavailable';
-                    else if ((await state.storage.list({ prefix: PREFIX, limit: MATCH_CAP })).size >= MATCH_CAP) error = 'unavailable';
-                    else { game = new GameNightChess(uuid(), subject); changed = true; expiresAt = now() + MATCH_TTL; }
+                    else if ((await state.storage.list({ prefix, limit: MATCH_CAP })).size >= MATCH_CAP) error = 'unavailable';
+                    else { game = new Table(uuid(), subject); changed = true; expiresAt = now() + MATCH_TTL; }
                 } else if (!game) error = 'match-changed';
                 else if (frame.action === 'join') {
                     if (!binding.canJoin(game.subjects[0]) || !game.join(subject, frame.id, now())) error = 'seat-unavailable';
@@ -84,13 +100,14 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                     const outcome = game.command(subject, frame, now());
                     changed ||= outcome.ok || outcome.changed === true;
                     if (!outcome.ok) error = outcome.reason;
+                    else if (renewOnAction) expiresAt = now() + MATCH_TTL;
                 }
             }
             if (frame.action === 'sync' && !scope.synced) {
                 socket.serializeAttachment({ ...socket.deserializeAttachment(), synced: true });
             }
             if (changed) {
-                if (game) await state.storage.put(key(scope), { room: scope.room, expiresAt, chess: game.checkpoint() });
+                if (game) await state.storage.put(key(scope), { room: scope.room, expiresAt, [name]: game.checkpoint() });
                 else await state.storage.delete(key(scope));
                 publish(scope, game);
             } else publish(scope, game, resume ? null : socket);
@@ -130,16 +147,16 @@ export function createArcadeTransport({ state, current, active, approve, charge,
     }
     async function maintain() {
         reconcile();
-        const records = await state.storage.list({ prefix: PREFIX, limit: MATCH_CAP });
-        for (const [name, record] of records) {
-            const scope = { room: record.room, ref: name.slice(PREFIX.length) };
+        const records = await state.storage.list({ prefix, limit: MATCH_CAP });
+        for (const [storageKey, record] of records) {
+            const scope = { room: record.room, ref: storageKey.slice(prefix.length) };
             if (record.expiresAt <= now()) {
-                await state.storage.delete(name);
+                await state.storage.delete(storageKey);
                 publish(scope, null);
             } else {
-                const game = GameNightChess.restore(record.chess);
+                const game = Table.restore(record[name]);
                 if (!game.expire(now())) continue;
-                await state.storage.put(name, { ...record, chess: game.checkpoint() });
+                await state.storage.put(storageKey, { ...record, [name]: game.checkpoint() });
                 publish(scope, game);
             }
         }
