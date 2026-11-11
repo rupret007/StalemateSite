@@ -544,10 +544,13 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .activity { min-height: 28px; }
   .activity-heading { padding-block: 8px; }
   .buffer { min-height: 0; padding-block: 1px; }
+  .buffer:has(:focus-visible),
   .chat:has(.four-match[open]) .buffer { min-height: 64px; flex-shrink: 0; }
   .game-night:has(.four-match[open]) { min-height: 108px; }
   .buffer li { padding-block: 0; }
+  .buffer .flag { scroll-margin-block: 4px; }
   .say { position: sticky; bottom: 0; z-index: 1; margin-block: 4px; }
+  .chat:has(.buffer :focus-visible) .say,
   .chat:has(.four-match[open]:not([hidden])) .say { position: static; }
   .say input { min-height: 36px; padding-block: 8px; scroll-margin-bottom: 8px; }
   /* Send is shorter than its input. Leave room for the entire composer when
