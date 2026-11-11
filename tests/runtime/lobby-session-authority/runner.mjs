@@ -1028,6 +1028,10 @@ async function runtime(phase, state, nonce) {
                 assert.ok(a.frames.every(f => f.t !== 'four' && !(f.t === 'join' && f.ch.name === gameRoom)));
                 await four(b, c, ['leave', id], game => game === null, 'native board end');
                 await c.command('close', [], gameRoom, f => f.t === 'closed' && f.ch === gameRoom, 'close test Game Night room');
+                // The host spent five additional command tokens. Let the
+                // production one-token-per-second bucket replenish before
+                // the existing camera, block and crash-recovery sequence.
+                await delay(5000);
             }
             if (TRAFFIC_ACKS) {
                 const peers = [a, b, c], warmupUntil = performance.now() + 3300;
