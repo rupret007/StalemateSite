@@ -234,7 +234,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(b.getByRole('button', { name: 'Mute mic' })).toBeVisible();
         for (const page of [a, b]) await waitForPackets(page, 'audio');
         if (relay) for (const page of [a, b]) {
-            const selected = await relayStats(page);
+            const [selected] = await relayStats(page);
             assert.deepEqual(selected.candidates, ['relay', 'relay']);
         }
         if (relay) console.log('Verified both browsers selected TURN relay candidates and received audio over the relay.');
@@ -265,11 +265,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     }
     function relayStats(page) {
         return page.evaluate(async () => {
-            const stats = await window.testPeers[0].getStats();
-            const transport = [...stats.values()].find(row => row.type === 'transport' && row.selectedCandidatePairId);
-            const pair = stats.get(transport?.selectedCandidatePairId);
-            return { candidates: [pair?.localCandidateId, pair?.remoteCandidateId].map(id => stats.get(id)?.candidateType),
-                bytesSent: pair?.bytesSent, bytesReceived: pair?.bytesReceived, rttMs: pair?.currentRoundTripTime * 1000 };
+            const active = window.testPeers.filter(peer => peer.connectionState !== 'closed');
+            return Promise.all(active.map(async peer => {
+                const stats = await peer.getStats();
+                const transport = [...stats.values()].find(row => row.type === 'transport' && row.selectedCandidatePairId);
+                const pair = stats.get(transport?.selectedCandidatePairId);
+                return { candidates: [pair?.localCandidateId, pair?.remoteCandidateId].map(id => stats.get(id)?.candidateType),
+                    bytesSent: pair?.bytesSent, bytesReceived: pair?.bytesReceived, rttMs: pair?.currentRoundTripTime * 1000 };
+            }));
         });
     }
     function packetCounts(page, kind) {
@@ -422,13 +425,11 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         console.log(`Passed ${engine} TurdRummy private hands, discard pickup, touch selection, ${media ? 'same call during a game switch' : 'full reload mid-draw'}, and rematch.`);
     }
     async function playSpades(a, b) {
-        const before = media ? await packetCount(b, 'audio') : 0;
         const north = await guest('stalemate', 'SpadesNorth', { width: 1280, height: 900 });
         const east = await guest('rad-dad', 'SpadesEast', { width: 390, height: 844 }, true);
         await inviteToGame(a, north, 'SpadesNorth');
         await inviteToGame(a, east, 'SpadesEast');
         const players = [a, b, north, east];
-        const groupCall = media && !relay;
         for (const page of players) {
             await expect(page.locator('[data-arcade-game] option[value="turdspades"]')).toBeEnabled();
             await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdspades');
@@ -455,7 +456,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             throw error;
         }
         let audioBeforeTrick;
-        if (groupCall) {
+        if (media) {
             await joinSpadesCall(players);
             audioBeforeTrick = await Promise.all(players.map(page => packetCounts(page, 'audio')));
         }
@@ -479,10 +480,6 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         for (const page of [north, east, a]) await page.locator('[data-spades-card]:enabled').first().click();
         await expect(a.locator('[data-spades-status]')).toContainText('won the last trick');
-        if (media && !groupCall) {
-            await waitForPackets(b, 'audio', before);
-            await expectOriginalPeer(b);
-        }
         await b.locator('[data-spades-action="resign"]').click();
         await b.getByRole('dialog', { name: 'Resign for your team?' }).getByRole('button', { name: 'Resign', exact: true }).click();
         await expect(a.locator('[data-spades-status]')).toContainText('South + North win by resignation');
@@ -492,10 +489,19 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await east.getByRole('button', { name: 'Accept Spades rematch' }).click();
         await expect(b.locator('[data-spades-status]')).toContainText('Round 1 · Your bid');
         await expect(b.locator('[data-spades-card]')).toHaveCount(13);
-        if (groupCall) {
+        if (media) {
             for (const [index, page] of players.entries()) {
                 await expect.poll(async () => (await packetCounts(page, 'audio'))
                     .map((count, peer) => count > audioBeforeTrick[index][peer])).toEqual([true, true, true]);
+            }
+            if (relay) {
+                const stats = (await Promise.all(players.map(relayStats))).flat();
+                assert.equal(stats.length, 12);
+                for (const sample of stats) {
+                    assert.deepEqual(sample.candidates, ['relay', 'relay']);
+                    assert.ok(sample.bytesSent > 0 && sample.bytesReceived > 0);
+                }
+                console.log('Selected loopback TURN pairs during four-player Spades:', JSON.stringify(stats));
             }
             for (const page of [east, north]) {
                 await page.locator('[data-call-toggle]').click();
@@ -1066,7 +1072,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await playTurdRush(a, b, spectator);
         await playTurdanoid(a, b, spectator);
         if (relay) {
-            const stats = await Promise.all([relayStats(a), relayStats(b)]);
+            const stats = (await Promise.all([relayStats(a), relayStats(b)])).flat();
+            assert.equal(stats.length, 2);
             for (const sample of stats) {
                 assert.deepEqual(sample.candidates, ['relay', 'relay']);
                 assert.ok(sample.bytesReceived > 0 && sample.bytesSent > 0);
