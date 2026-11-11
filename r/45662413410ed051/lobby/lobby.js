@@ -941,9 +941,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             followPendingRoomJoin();
             if (app.restorePmOff) { cmd('pm', ['off']); app.restorePmOff = false; }
             $('[data-gate]').hidden = true; $('[data-app]').hidden = false;
-            if (!wasIn || app.resetSession) {
+            if (gameNightSupported && (!wasIn || app.resetSession)) {
                 gameReturn = readGameReturn();
-                gameReturnOffered = gameNightSupported && !!gameReturn;
+                gameReturnOffered = !!gameReturn;
                 drawGameOffer();
             }
             if (wasIn && app.resetSession) {
@@ -1341,7 +1341,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (!saved) {
             try { saved = JSON.parse(readTab(gameReturnKey)); } catch { /* Ignore stale tab data. */ }
         }
-        if (gameNightRoomName(saved?.room) && roomNonce(saved.ref) && saved.until > Date.now()) return saved;
+        if (saved?.room && gameNightRoomName(saved.room) && roomNonce(saved.ref) && saved.until > Date.now()) return saved;
         removeTab(gameReturnKey);
         return null;
     }
