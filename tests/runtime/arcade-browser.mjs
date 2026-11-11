@@ -128,13 +128,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(b.getByRole('button', { name: 'Mute mic' })).toBeVisible();
         for (const page of [a, b]) await waitForPackets(page, 'audio');
         if (relay) for (const page of [a, b]) {
-            const selected = await page.evaluate(async () => {
-                const stats = await window.testPeers[0].getStats();
-                const transport = [...stats.values()].find(row => row.type === 'transport' && row.selectedCandidatePairId);
-                const pair = stats.get(transport?.selectedCandidatePairId);
-                return [pair?.localCandidateId, pair?.remoteCandidateId].map(id => stats.get(id)?.candidateType);
-            });
-            assert.deepEqual(selected, ['relay', 'relay']);
+            const selected = await relayStats(page);
+            assert.deepEqual(selected.candidates, ['relay', 'relay']);
         }
         if (relay) console.log('Verified both browsers selected TURN relay candidates and received audio over the relay.');
         await b.getByRole('button', { name: 'Mute mic' }).click();
@@ -161,6 +156,15 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         assert.deepEqual(await b.evaluate(() => window.testLocalTracks.filter(track => track.kind === 'video').map(track => track.readyState)), ['ended']);
         await expect(a.locator('[data-call-peers] video')).toBeHidden();
         for (const page of [a, b]) await page.locator('[data-call-toggle]').click();
+    }
+    function relayStats(page) {
+        return page.evaluate(async () => {
+            const stats = await window.testPeers[0].getStats();
+            const transport = [...stats.values()].find(row => row.type === 'transport' && row.selectedCandidatePairId);
+            const pair = stats.get(transport?.selectedCandidatePairId);
+            return { candidates: [pair?.localCandidateId, pair?.remoteCandidateId].map(id => stats.get(id)?.candidateType),
+                bytesSent: pair?.bytesSent, bytesReceived: pair?.bytesReceived, rttMs: pair?.currentRoundTripTime * 1000 };
+        });
     }
     function packetCount(page, kind) {
         return page.evaluate(async expected => {
@@ -891,6 +895,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await playTurdomania(a, b, spectator);
         await playTurdRush(a, b, spectator);
         await playTurdanoid(a, b, spectator);
+        if (relay) {
+            const stats = await Promise.all([relayStats(a), relayStats(b)]);
+            for (const sample of stats) {
+                assert.deepEqual(sample.candidates, ['relay', 'relay']);
+                assert.ok(sample.bytesReceived > 0 && sample.bytesSent > 0);
+            }
+            console.log('Selected loopback relay pair after all nine arcade journeys:', JSON.stringify(stats));
+        }
         if (media) {
             await a.locator('[data-call-toggle]').click();
             await a.getByRole('button', { name: 'Actions for ChessGuest' }).click();
