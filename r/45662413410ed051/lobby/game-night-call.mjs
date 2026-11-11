@@ -14,6 +14,7 @@ export function mountGameNightCall(container, toggle, { personActions }) {
     const buttons = { audio: $('[data-call-mic]'), video: $('[data-call-camera]') };
     const peers = new Map(), tracks = new Map();
     let scope = null, socket = null, request = null, timer, joined = false;
+    let relayAvailable = false, relayTimer = null, iceServers = [];
     let allowed = off(), canUseCamera = false, canManageCamera = false, pending = null;
     const supported = !!(navigator.mediaDevices?.getUserMedia && window.RTCPeerConnection);
     let notice = '';
@@ -62,6 +63,10 @@ export function mountGameNightCall(container, toggle, { personActions }) {
 
     function stop(message = '') {
         clearTimeout(timer);
+        clearTimeout(relayTimer);
+        relayTimer = null;
+        relayAvailable = false;
+        iceServers = [];
         clearTimeout(pending?.timer);
         pending = null;
         request?.abort(); request = null;
@@ -75,6 +80,18 @@ export function mountGameNightCall(container, toggle, { personActions }) {
         canUseCamera = canManageCamera = joined = false;
         notice = message;
         draw();
+    }
+
+    function retryRelay(delay) {
+        clearTimeout(relayTimer);
+        relayTimer = setTimeout(() => {
+            relayTimer = null;
+            requestRelay();
+        }, delay);
+    }
+
+    function requestRelay() {
+        if (relayAvailable && peers.size && !relayTimer && send('relay')) retryRelay(60_000);
     }
 
     function changeTracks(kind, on) {
@@ -175,6 +192,7 @@ export function mountGameNightCall(container, toggle, { personActions }) {
         try {
             peer.link = openGameNightPeer({
                 initiates: scope.actor < id,
+                iceServers,
                 send: frame => send('signal', { to: id, ...frame }),
                 remoteTrack(track) {
                     const media = peer[track.kind];
@@ -211,6 +229,7 @@ export function mountGameNightCall(container, toggle, { personActions }) {
 
     function roster(frame) {
         if (!joined) { clearTimeout(timer); joined = true; notice = ''; }
+        relayAvailable = frame.relay === true;
         const prior = allowed;
         allowed = { audio: frame.tracks?.audio === true, video: frame.tracks?.video === true };
         canUseCamera = frame.cameraAllowed === true;
@@ -239,6 +258,7 @@ export function mountGameNightCall(container, toggle, { personActions }) {
             if (needsAudio) playRemoteAudio(peer);
         }
         if (pending && !pending.started && allowed[pending.kind]) void capture(pending);
+        requestRelay();
         draw();
     }
 
@@ -285,6 +305,12 @@ export function mountGameNightCall(container, toggle, { personActions }) {
                 if (frame.t === 'media-ready') send('join');
                 else if (frame.t === 'media-room' && Array.isArray(frame.peers)) roster(frame);
                 else if (frame.t === 'media-signal') peers.get(frame.from)?.link.receive(frame);
+                else if (frame.t === 'media-relay' && relayAvailable && Array.isArray(frame.iceServers) &&
+                    Number.isSafeInteger(frame.refreshInMs) && frame.refreshInMs > 0) {
+                    iceServers = frame.iceServers;
+                    for (const peer of peers.values()) peer.link.setIceServers(iceServers);
+                    retryRelay(frame.refreshInMs);
+                }
             });
         } catch {
             if (request === attempt) stop('Couldn’t join the call. Try again.');

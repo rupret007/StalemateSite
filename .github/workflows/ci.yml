@@ -59,7 +59,7 @@ jobs:
         run: |
           npm ci --prefix tests/runtime/durable-records
           npm run package:beta
-          node tests/runtime/arcade-transport.mjs
+          node tests/runtime/arcade-transport.mjs --relay
           node tests/runtime/arcade-transport.mjs --browser=chromium --media
           node tests/runtime/arcade-transport.mjs --browser=webkit
 

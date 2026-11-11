@@ -1,7 +1,7 @@
 // The initial offerer establishes one transceiver per kind. Both peers can
 // renegotiate after that, for example when both turn on their mics at once.
-export function openGameNightPeer({ initiates, send, remoteTrack, connectionChanged, failed }) {
-    const pc = new RTCPeerConnection();
+export function openGameNightPeer({ initiates, iceServers, send, remoteTrack, connectionChanged, failed }) {
+    const pc = new RTCPeerConnection({ iceServers });
     const kinds = ['audio', 'video'];
     const tracks = new Map();
     const pendingIce = [];
@@ -35,6 +35,20 @@ export function openGameNightPeer({ initiates, send, remoteTrack, connectionChan
         setTrack(kind, track) {
             tracks.set(kind, track);
             enqueue(applyTracks);
+        },
+        setIceServers(servers) {
+            enqueue(async () => {
+                pc.setConfiguration({ ...pc.getConfiguration(), iceServers: servers });
+                if (!pc.getTransceivers().length) return;
+                if (pc.connectionState === 'connected') {
+                    const stats = await pc.getStats();
+                    const transport = [...stats.values()].find(row => row.type === 'transport' && row.selectedCandidatePairId);
+                    const pair = stats.get(transport?.selectedCandidatePairId);
+                    const selected = stats.get(pair?.localCandidateId);
+                    if (selected && selected.candidateType !== 'relay') return;
+                }
+                if (!closed) pc.restartIce();
+            });
         },
         receive({ sdp, ice }) {
             enqueue(async () => {

@@ -6,7 +6,7 @@ import { expect } from '@playwright/test';
 import { findDuelSolution } from '../../hangout-worker/arcade/games/turdomania-duel.js';
 import { unpackRushRacer } from '../../hangout-worker/arcade/games/turdrush-race.js';
 
-export async function runArcadeBrowser(engine, origin, invitation, evidence, entrances, media) {
+export async function runArcadeBrowser(engine, origin, invitation, evidence, entrances, media, relay = false) {
     const browser = await { chromium, webkit }[engine].launch({
         headless: true, ...(engine === 'chromium' ? { args: ['--enable-unsafe-swiftshader',
             ...(media ? ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] : [])] } : {})
@@ -21,11 +21,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 return native.call(this, type, ...options);
             };
         });
-        if (media) await context.addInitScript(() => {
+        if (media) await context.addInitScript(forceRelay => {
             window.testPeers = [];
             window.testLocalTracks = [];
             window.RTCPeerConnection = class extends RTCPeerConnection {
-                constructor(...args) { super(...args); window.testPeers.push(this); }
+                constructor(config) {
+                    super(forceRelay ? { ...config, iceTransportPolicy: 'relay' } : config);
+                    window.testPeers.push(this);
+                }
             };
             const capture = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
             navigator.mediaDevices.getUserMedia = async (...args) => {
@@ -37,7 +40,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 window.testLocalTracks.push(...stream.getTracks());
                 return stream;
             };
-        });
+        }, relay);
         const entrance = entrances?.[source];
         await context.route('**/*', route => {
             const url = route.request().url();
@@ -124,6 +127,16 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.getByRole('button', { name: 'Unmute mic' }).click();
         await expect(b.getByRole('button', { name: 'Mute mic' })).toBeVisible();
         for (const page of [a, b]) await waitForPackets(page, 'audio');
+        if (relay) for (const page of [a, b]) {
+            const selected = await page.evaluate(async () => {
+                const stats = await window.testPeers[0].getStats();
+                const transport = [...stats.values()].find(row => row.type === 'transport' && row.selectedCandidatePairId);
+                const pair = stats.get(transport?.selectedCandidatePairId);
+                return [pair?.localCandidateId, pair?.remoteCandidateId].map(id => stats.get(id)?.candidateType);
+            });
+            assert.deepEqual(selected, ['relay', 'relay']);
+        }
+        if (relay) console.log('Verified both browsers selected TURN relay candidates and received audio over the relay.');
         await b.getByRole('button', { name: 'Mute mic' }).click();
         await expect(b.getByRole('button', { name: 'Unmute mic' })).toBeVisible();
         assert.deepEqual(await b.evaluate(() => window.testLocalTracks.map(track => track.readyState)), ['ended']);

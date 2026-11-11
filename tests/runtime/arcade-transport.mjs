@@ -15,10 +15,14 @@ const invite = 'local-arcade-fixture-invitation-2026';
 const preview = 'local-arcade-fixture-preview-key-2026';
 const nonce = randomBytes(16).toString('hex');
 const room = '#game-2ca9e1x1be34a';
-const browserName = process.argv[2]?.replace(/^--browser=/, '') || '';
+const browserName = process.argv.find(arg => arg.startsWith('--browser='))?.slice(10) || '';
 const browserMedia = process.argv.includes('--media');
+const relay = process.argv.includes('--relay');
+const fixtureIce = { urls: [process.env.ARCADE_TEST_TURN_URL || 'turn:fixture.invalid:3478'],
+    username: 'arcade-fixture', credential: 'arcade-local-turn-only' };
 assert.ok(!browserMedia || browserName === 'chromium', 'the synthetic device media test uses Chromium');
 assert.ok(['', 'chromium', 'webkit'].includes(browserName), 'choose --browser=chromium or --browser=webkit');
+assert.ok(!relay || !browserName || browserMedia && process.env.ARCADE_TEST_TURN_URL, 'browser relay test needs --media and a local TURN URL');
 const evidence = process.env.ARCADE_BROWSER_EVIDENCE ? resolve(process.env.ARCADE_BROWSER_EVIDENCE) : null;
 const app = fileURLToPath(new URL('../../', import.meta.url));
 const assets = fileURLToPath(new URL('../../.beta-assets/', import.meta.url));
@@ -27,6 +31,7 @@ const radDad = process.env.ARCADE_TEST_RAD_DAD ? resolve(process.env.ARCADE_TEST
 assert.equal(!!sharedSource, !!radDad, 'provide both arcade checkouts for the cross-site browser proof');
 const directory = await mkdtemp(join(tmpdir(), 'game-night-arcade-'));
 let mf, runtime;
+let heldMint;
 
 function observe(socket) {
     const frames = [];
@@ -667,6 +672,15 @@ async function verifyMedia(white, black, ref, matchA, matchB) {
     await wrongChannel.body?.cancel();
     const a = await join(white), b = await join(black);
     await a.wait(frame => frame.peers?.some(peer => peer.id === black.id), 'other call participant');
+    a.send({ version: 1, action: 'relay' });
+    if (relay) {
+        const allocation = await a.wait(frame => frame.t === 'media-relay', 'admitted relay credentials');
+        assert.deepEqual(allocation.iceServers, [fixtureIce]);
+        assert.ok(allocation.refreshInMs <= 540_000 && allocation.refreshInMs > 530_000);
+        a.send({ version: 1, action: 'relay' });
+        await a.wait(frame => frame.reason === 'relay-unavailable', 'early credential renewal refused');
+        assert.ok(b.frames.every(frame => frame.t !== 'media-relay'));
+    } else await a.wait(frame => frame.reason === 'relay-unavailable', 'relay switch off');
     const offer = { version: 1, action: 'signal', to: black.id,
         sdp: { type: 'offer', sdp: 'v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\na=sendonly\r\n' } };
     a.send(offer);
@@ -700,10 +714,40 @@ async function verifyMedia(white, black, ref, matchA, matchB) {
     white.lobby.send({ t: 'cmd', name: 'unblock', args: ['FixtureBlack'], ch: room,
         roomInstance: ref, personContext: 1, personPeer: black.id });
     await b.wait(frame => frame.peers?.some(peer => peer.id === white.id), 'unblocked peer restored to call', unblockAt);
+    if (relay) {
+        let arrived, release;
+        const pending = new Promise(resolve => { arrived = resolve; });
+        const resume = new Promise(resolve => { release = resolve; });
+        heldMint = async () => { arrived(); await resume; };
+        b.send({ version: 1, action: 'relay' });
+        let timeout;
+        try {
+            await Promise.race([pending, new Promise((_, reject) => {
+                timeout = setTimeout(() => reject(Error('Relay fixture did not reach the provider')), 5000);
+            })]);
+            white.lobby.send({ t: 'say', ch: room, text: 'Chat works during a slow relay request' });
+            await black.lobby.wait(frame => frame.t === 'line' && frame.text === 'Chat works during a slow relay request', 'chat during pending TURN request');
+            const departing = b.frames.length;
+            a.send({ version: 1, action: 'leave' });
+            await b.wait(frame => frame.peers?.length === 0, 'call leave while relay issuance is pending', departing);
+        } finally {
+            clearTimeout(timeout);
+            heldMint = null;
+            release();
+        }
+        // A fresh command still gets a reply after the stale provider response.
+        const afterLeave = b.frames.length;
+        b.send({ version: 1, action: 'signal', to: white.id });
+        await b.wait(frame => frame.reason === 'peer-unavailable', 'call still responds after peer departure', afterLeave);
+        assert.ok(b.frames.every(frame => frame.t !== 'media-relay'));
+        console.log('Passed native Game Night TURN budget admission, credential isolation and chat/leave during a pending provider request.');
+    }
     const before = b.frames.length;
-    a.send({ version: 1, action: 'leave' });
-    await b.wait(frame => frame.peers?.length === 0, 'call leave published', before);
-    for (const other of [white.lobby, black.lobby, matchA, matchB]) assert.ok(other.frames.every(frame => frame.t !== 'media-signal'));
+    if (!relay) {
+        a.send({ version: 1, action: 'leave' });
+        await b.wait(frame => frame.peers?.length === 0, 'call leave published', before);
+    }
+    for (const other of [white.lobby, black.lobby, matchA, matchB]) assert.ok(other.frames.every(frame => !['media-signal', 'media-relay'].includes(frame.t)));
     b.send({ version: 1, action: 'leave' });
     console.log('Passed native separate call admission, receive-only default, microphone opt-in, adult camera controls and targeted signaling.');
 }
@@ -716,14 +760,27 @@ try {
         name: 'private-arcade-fixture', rootPath: directory, modulesRoot: directory,
         modules: [{ type: 'ESModule', path: join(directory, 'worker.mjs'), contents: bundled.output[0].code }],
         compatibilityDate: '2026-10-01', host: '127.0.0.1', port: 0, https: !!browserName, telemetry: { enabled: false },
-        durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true } },
+        durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true },
+            ...(relay ? { TURN_BUDGET: { className: 'HangoutTurnBudget', useSQLite: true } } : {}) },
         bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1', HANGOUT_ARCADE_CRAPEIGHTS: '1', HANGOUT_ARCADE_TURDRUMMY: '1', HANGOUT_ARCADE_TURDSPADES: '1', HANGOUT_ARCADE_TURDJACK: '1', HANGOUT_ARCADE_TURDTRIS: '1', HANGOUT_ARCADE_TURDOMANIA: '1', HANGOUT_ARCADE_TURDRUSH: '1', HANGOUT_ARCADE_TURDANOID: '1',
             ...(browserName ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
             ...(!browserName || browserMedia ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
+            ...(relay ? { HANGOUT_ARCADE_TURN: '1', HANGOUT_CF_ACCOUNT_ID: 'f'.repeat(32), HANGOUT_TURN_MONTHLY_GB: '1',
+                HANGOUT_TURN_KEY_ID: 'arcade-fixture-key', HANGOUT_TURN_API_TOKEN: 'fixture', HANGOUT_TURN_ANALYTICS_TOKEN: 'fixture' } : {}),
             HANGOUT_HMAC_KEY: 'owned-arcade-fixture-hmac-not-for-deployment-2026', HANGOUT_BETA_INVITE_KEY: invite,
             HANGOUT_BETA_INVITE_VERSION: '1', HANGOUT_PREVIEW_KEY: preview, HANGOUT_OPEN: '1', HANGOUT_AI_ENABLED: '0', HANGOUT_TURN_ENABLED: '0' },
         ...(browserName ? { serviceBindings: { ASSETS: serveAsset } } : {}),
-        outboundService: () => new Response('fixture egress denied', { status: 503 })
+        outboundService: async request => {
+            if (relay && request.url === 'https://api.cloudflare.com/client/v4/graphql') {
+                return Response.json({ data: { viewer: { accounts: [{ callsTurnUsageAdaptiveGroups: [] }] } } });
+            }
+            if (relay && request.url === 'https://rtc.live.cloudflare.com/v1/turn/keys/arcade-fixture-key/credentials/generate-ice-servers') {
+                assert.deepEqual(await request.json(), { ttl: 600 });
+                await heldMint?.();
+                return Response.json({ iceServers: [fixtureIce] });
+            }
+            return new Response('fixture egress denied', { status: 503 });
+        }
     }));
     await mf.ready;
     const initialized = await mf.dispatchFetch(origin + '/_fixture/initialize', {
@@ -733,7 +790,7 @@ try {
     if (browserName) {
         const { runArcadeBrowser } = await import('./arcade-browser.mjs');
         const browserOrigin = (await mf.ready).origin;
-        await runArcadeBrowser(browserName, browserOrigin, invite, evidence, await previewEntrances(browserOrigin), browserMedia);
+        await runArcadeBrowser(browserName, browserOrigin, invite, evidence, await previewEntrances(browserOrigin), browserMedia, relay);
     } else {
     const white = await guest('FixtureWhite', 'stalemate', '192.0.2.11');
     const black = await guest('FixtureBlack', 'rad-dad', '192.0.2.12');

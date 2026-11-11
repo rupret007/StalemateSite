@@ -19,6 +19,7 @@ import { PARTICIPATION_POLICY_KEY } from './participation-partitions.mjs';
 import { lobbyIncidentSourceMode, incidentSourceConfigurationValid } from './lobby-incident-sources.mjs';
 import { arcadeEnabled, arcadeGame, arcadeGames, arcadePath, arcadeRoomRequest, arcadeSocketGame, createArcadeTransport, isArcadeSocket } from './arcade-transport.mjs';
 import { createGameNightMedia, isMediaSocket, mediaEnabled, mediaPath } from './game-night-media.mjs';
+import { issueGameNightTurn } from './turn.mjs';
 
 const privateReportResponse = (value) => new Response(JSON.stringify(value), {
     status: value.ok ? 200 : Number.isInteger(value.status) ? value.status : 503,
@@ -264,7 +265,9 @@ export class HangoutLobby {
             state, current: scope => this.arcadeBinding(scope), active: binding => this.sessionActive(binding),
             charge: (socket, actor) => this.controlBudget.take(socket, actor),
             approve: async (...args) => (await this.engine.approveGameMedia(...args))?.ok === true,
-            allowed: () => mediaEnabled(env) && !this.authorityUnavailable
+            allowed: () => mediaEnabled(env) && !this.authorityUnavailable,
+            mintRelay: env.HANGOUT_ARCADE_TURN === '1' ? (ref, dev) => issueGameNightTurn(env, ref, dev) : null,
+            serialize: operation => retirementGate(this, operation)
         });
         this.ready = state.blockConcurrencyWhile(async () => {
             try { await this.start(); }
@@ -1037,7 +1040,11 @@ export class HangoutLobby {
     async webSocketMessage(ws, raw) {
         if (this.closedSockets?.has(ws)) return;
         await this.ready;
-        if (isMediaSocket(ws)) return retirementGate(this, () => this.gameMedia.receive(ws, raw));
+        if (isMediaSocket(ws)) {
+            const relay = await retirementGate(this, () => this.gameMedia.receive(ws, raw));
+            if (relay) await relay();
+            return;
+        }
         const game = arcadeSocketGame(ws);
         if (game) return retirementGate(this, () => this.arcade.get(game).receive(ws, raw));
         if (this.closedSockets?.has(ws)) return;
