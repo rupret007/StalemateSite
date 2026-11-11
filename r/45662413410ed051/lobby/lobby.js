@@ -1393,6 +1393,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-jam-invite-qr-toggle]').textContent = 'Show QR code';
         $('[data-jam-link]').value = ''; $('[data-jam-form]').hidden = true;
         $('[data-jam-host-steps]').hidden = true;
+        $('[data-jam-invite-room]').hidden = true;
         $('[data-jam-wait]').hidden = false;
         const web = $('[data-jam-web]'); web.disabled = true; web.onclick = null; web.textContent = 'Browser join unavailable';
     }
@@ -1540,6 +1541,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
         if (!next) return;
         $('[data-jam]').hidden = false; $('[data-jam-form]').hidden = !next.host;
+        $('[data-jam-invite-room]').hidden = !next.host;
         const desktop = $('[data-jam-desktop]');
         desktop.hidden = !next.desktop;
         if (/^webjam:\/\//.test(next.desktop)) desktop.setAttribute('href', next.desktop);
@@ -2327,15 +2329,16 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     $('[data-palette-close]').addEventListener('click', () => $('[data-palette]').close());
     $('[data-palette]').addEventListener('close', () => { if (!$('[data-palette]').open) paletteContext = null; });
 
-    let inviteInstance = '', invitePeople = new Map();
+    let inviteInstance = '', invitePeople = new Map(), jamInviteOpener = null;
     function closeInviteDialog() {
         inviteInstance = ''; invitePeople.clear();
         inviteContext = null; $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
         if ($('[data-invite-dialog]').open) $('[data-invite-dialog]').close();
     }
-    function openInviteDialog() {
+    function openInviteDialog(opener = null) {
         const current = store(app.active);
         if (connectionState !== 'connected' || !current || current.kind === 'lobby' || !amOp(current)) return;
+        jamInviteOpener = opener ? { button: opener, room: current } : null;
         inviteContext = current; inviteInstance = current.keepRef; invitePeople.clear(); $('[data-invite-room]').textContent = current.name; $('[data-invite-error]').textContent = '';
         $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
         const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose a current person'; $('[data-invite-options]').append(placeholder);
@@ -2348,11 +2351,19 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-invite-person-send]').disabled = !personTargetsSupported || !roomNonce(inviteInstance);
         $('[data-invite-dialog]').showModal(); $('[data-invite-nick]').focus();
     }
+    $('[data-jam-invite-room]').addEventListener('click', event => openInviteDialog(event.currentTarget));
     $('[data-invite-cancel]').addEventListener('click', closeInviteDialog);
     $('[data-invite-dialog]').addEventListener('close', () => {
         if ($('[data-invite-dialog]').open) return;
+        const opener = jamInviteOpener;
+        jamInviteOpener = null;
         closeInviteDialog();
-        if (connectionState === 'connected') $(amOp(store(app.active)) ? '[data-roomtools]' : '[data-text]').focus({ preventScroll: true });
+        if (connectionState !== 'connected') return;
+        const current = store(app.active);
+        const host = amOp(current);
+        const target = host && opener && opener.room === current && !opener.button.hidden
+            ? opener.button : $(host ? '[data-roomtools]' : '[data-text]');
+        target.focus({ preventScroll: true });
     });
     $('[data-invite-person-send]').addEventListener('click', () => {
         const current = store(app.active), context = invitePeople.get($('[data-invite-options]').value);

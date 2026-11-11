@@ -231,6 +231,8 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .jam { flex: 0 1 auto; min-height: 0; overflow: auto; max-height: 35dvh; padding: 16px 20px; background: #171e15; border-bottom: 1px solid #43543a; font-size: 12px; }
 .jam-title { margin: 0 0 4px; font-size: 14px; }
 .jam-note { margin: 0 0 6px; }
+.jam-room-invite { margin-bottom: 8px; }
+.jam-room-invite:focus-visible { outline-offset: -5px; }
 .jam-host-steps { margin: 0 0 8px; padding-left: 20px; overflow-wrap: anywhere; }
 .jam-host-steps strong { color: var(--cream); }
 .jam-platform { margin: 10px 0 0; }
