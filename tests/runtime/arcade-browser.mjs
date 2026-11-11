@@ -1023,7 +1023,11 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await b.screenshot({ path: join(evidence, `brick-${engine}-phone.png`) });
         }
         await a.keyboard.press('Space');
-        await b.touchscreen.tap(launch.x + launch.width / 2, launch.y + launch.height / 2);
+        const sequenceBeforeLaunch = Number(await match(b).getAttribute('data-sequence'));
+        await expect(serve(b)).toBeInViewport({ ratio: 1 });
+        await serve(b).tap();
+        await expect(match(b)).toHaveAttribute('data-stuck', 'false');
+        await expect.poll(async () => Number(await match(b).getAttribute('data-sequence'))).toBeGreaterThan(sequenceBeforeLaunch);
         for (const page of [a, b, spectator]) {
             for (const seat of ['a', 'b']) {
                 await expect(page.locator(`[data-brick-score="${seat}"]`)).toContainText(/[1-9]\d* pts/);
@@ -1160,8 +1164,11 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await submitCallReport(b, 'Synthetic report after a peer was blocked.');
             console.log('Passed Chromium phone report consent, accessible cancel and focus, durable acknowledgement, continued audio and reporting a recently blocked peer.');
         }
-        await b.locator('[data-leave]').click();
+        const leaveRoom = b.locator('[data-leave]');
+        await leaveRoom.focus();
+        await leaveRoom.press('Enter');
         await expect(b.locator('[data-game-night]')).toBeHidden();
+        await expect(b.getByRole('tab', { name: '#stalemate', exact: true })).toBeFocused();
         if (media) {
             await expect.poll(() => b.evaluate(() => window.testLocalTracks.every(track => track.readyState === 'ended'))).toBe(true);
             await expect(a.locator('[data-call-peers] li')).toHaveCount(0);
