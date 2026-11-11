@@ -117,12 +117,19 @@ test('Stalemate entry through jam room to connected browser Web Join with few ba
         const roomName = await hostCtx.page.locator('[data-chat-context]').textContent();
         await expect(roomName).toMatch(/^#jam-/);
 
-        await hostCtx.page.click('[data-roomtools]');
-        await hostCtx.page.getByRole('button', { name: 'Invite guest', exact: true }).click();
-        await hostCtx.page.getByLabel('Guest nickname', { exact: true }).fill('DemoMate');
+        const inviteBandmate = hostCtx.page.getByRole('button', { name: 'Invite bandmate to room', exact: true });
+        const guestNickname = hostCtx.page.getByLabel('Guest nickname', { exact: true });
+        await expect(inviteBandmate).toBeInViewport({ ratio: 1 });
+        await inviteBandmate.press('Enter');
+        await expect(guestNickname).toBeFocused();
+        await hostCtx.page.keyboard.press('Escape');
+        await expect(inviteBandmate).toBeFocused();
+        await inviteBandmate.press('Enter');
+        await guestNickname.fill('DemoMate');
         await hostCtx.page.getByRole('button', { name: 'Send invitation', exact: true }).click();
         await mateCtx.page.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
         await expect(mateCtx.page.locator('[data-chat-context]')).toHaveText(roomName);
+        await expect(mateCtx.page.locator('[data-jam-invite-room]')).toBeHidden();
         await expect.poll(mateCtx.clicks).toBeGreaterThanOrEqual(3);
         expect(mateCtx.clicks()).toBeLessThanOrEqual(4);
         await testInfo.attach('bandmate-click-count', {
