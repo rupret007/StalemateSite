@@ -1,0 +1,26 @@
+{
+  "source": "43402a51139c2bf696218688688056d89d23098e",
+  "privateMerge": "03231d50d0c4be5fa5a10491e2cb88c9f7811b74",
+  "workerBundleSha256": "4d0b00509f2704eb937896e7a58969dbe0aa8fbbeddffc72770f082530f5fdf1",
+  "scope": "Exact deployed bundle and built assets, real local Chromium and workerd HTTPS/WSS/SQLite, synthetic private guest contexts only",
+  "checks": [
+    "ordinary invitation page, secure cookies, nickname entry and two actual workerd WebSockets",
+    "hosted temporary room, roster-targeted invitation, keyboard acceptance and focus",
+    "two turns and in-room chat synchronized; board and composer visible at 375 and 390 px",
+    "reload ended the match, rejoined the same room with fresh scrollback, and explicit leave restored lobby focus",
+    "both browser guests logged out through the UI and lost protected asset access"
+  ],
+  "screenshots": [
+    {
+      "file": "game-night-375.png",
+      "sha256": "5b00b009089775da3d82972e20e7ff9bcf33d9320e242a0b050438fa9e7980df"
+    },
+    {
+      "file": "game-night-390.png",
+      "sha256": "df7b50526a2fd8cb777a4838739e554e14ed1646b870d1fbf645dfbf9504e6dc"
+    }
+  ],
+  "hostedTwoPersonTrial": "pending",
+  "localWebKit": "Two guests entered the room once. The match was not verified.",
+  "physicalMedia": "not tested"
+}
