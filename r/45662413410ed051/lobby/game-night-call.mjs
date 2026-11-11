@@ -24,6 +24,7 @@ export function mountGameNightCall(container, toggle, { personActions }) {
     const document = container.ownerDocument;
     const $ = selector => container.querySelector(selector);
     const join = $('[data-call-join]'), leave = $('[data-call-leave]');
+    const hide = $('[data-call-hide]'), stage = container.closest('[data-game-night]');
     const status = $('[data-call-status]'), peersHost = $('[data-call-peers]');
     const adult = $('[data-call-adult]'), cameraPolicy = $('[data-call-policy]');
     const buttons = { audio: $('[data-call-mic]'), video: $('[data-call-camera]') };
@@ -52,6 +53,7 @@ export function mountGameNightCall(container, toggle, { personActions }) {
     let allowed = off(), canUseCamera = false, canManageCamera = false, pending = null;
     const supported = !!(navigator.mediaDevices?.getUserMedia && window.RTCPeerConnection);
     let notice = '';
+    let previousView = null;
 
     function draw() {
         toggle.hidden = !scope;
@@ -466,13 +468,30 @@ export function mountGameNightCall(container, toggle, { personActions }) {
         }
     }
 
-    toggle.addEventListener('click', () => {
-        container.hidden = !container.hidden;
+    const activeGame = () => stage?.querySelector(':scope > details[open]');
+    function hideControls() {
+        container.hidden = true;
         draw();
+        if (stage && previousView && previousView.game === activeGame()) stage.scrollTop = previousView.scrollTop;
+        previousView = null;
+        toggle.focus({ preventScroll: true });
+    }
+    toggle.addEventListener('click', () => {
         if (!container.hidden) {
-            container.scrollIntoView({ block: 'nearest' });
-            (joined ? leave : join).focus({ preventScroll: true });
+            hideControls();
+            return;
         }
+        if (stage) previousView = { game: activeGame(), scrollTop: stage.scrollTop };
+        container.hidden = false;
+        draw();
+        container.scrollIntoView({ block: 'nearest' });
+        (joined ? hide || toggle : join).focus({ preventScroll: true });
+    });
+    hide?.addEventListener('click', hideControls);
+    container.addEventListener('keydown', event => {
+        if (event.key !== 'Escape' || event.defaultPrevented) return;
+        event.preventDefault();
+        hideControls();
     });
     join.addEventListener('click', connect);
     leave.addEventListener('click', () => {
@@ -488,6 +507,7 @@ export function mountGameNightCall(container, toggle, { personActions }) {
         setRoom(next) {
             if (scope?.room === next?.room && scope?.ref === next?.ref && scope?.actor === next?.actor) return;
             scope = next;
+            previousView = null;
             container.hidden = true;
             stop(next && !supported ? 'This browser doesn’t support calls here.' : '');
         }

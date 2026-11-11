@@ -575,6 +575,23 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         for (const page of [host, west, north]) {
             await expect.poll(async () => (await packetCounts(page, 'video')).filter(count => count > 5).length).toBe(1);
         }
+        await expect(west.locator('[data-spades-hand]')).toBeInViewport({ ratio: 1 });
+        await west.locator('[data-call-toggle]').tap();
+        await expect(west.getByRole('button', { name: 'Mute mic' })).toBeVisible();
+        const hide = west.getByRole('button', { name: 'Hide call controls' });
+        await expect(hide).toBeInViewport({ ratio: 1 });
+        assert.ok((await hide.boundingBox()).height >= 44);
+        if (evidence) await west.screenshot({ path: join(evidence, 'spades-phone-call-controls-fixed.png') });
+        await hide.tap();
+        await expect(west.locator('[data-spades-hand]')).toBeInViewport({ ratio: 1 });
+        await expect(west.locator('[data-call-toggle]')).toHaveText('Call joined');
+        await expect(west.locator('[data-call-toggle]')).toBeFocused();
+        await west.locator('[data-call-toggle]').press('Enter');
+        await expect(hide).toBeFocused();
+        await hide.press('Escape');
+        await expect(west.locator('[data-spades-hand]')).toBeInViewport({ ratio: 1 });
+        await expect(west.locator('[data-send]')).toBeInViewport();
+        if (evidence) await west.screenshot({ path: join(evidence, 'spades-phone-call-dismissed.png') });
         for (const page of [host, north, east]) await page.locator('[data-call-toggle]').click();
     }
     async function playJack(a, b, spectator) {

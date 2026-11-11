@@ -485,6 +485,9 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 }
 .game-night-call { margin-block: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
 .game-night-call h4, .game-night-call p { margin: 0 0 5px; }
+.game-call-heading { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #171e15; }
+.game-call-heading h4 { margin: 0; }
+.game-call-heading .btn { min-height: 44px; }
 .game-night-call .jam-actions { margin-bottom: 4px; }
 .game-camera-age input { width: auto; vertical-align: middle; }
 .game-call-peers { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
