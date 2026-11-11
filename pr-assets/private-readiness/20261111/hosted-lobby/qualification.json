@@ -1,0 +1,39 @@
+{
+  "recordedAt": "2026-11-11T09:33:48.172503+00:00",
+  "source": "0b681670657127147a2bb686b792901ae857ffbd",
+  "privateVersion": "e1c40ea5-653e-47ad-af1f-b80aaeede80e",
+  "deployment": "e6b105d0-9e2d-4fae-a1cd-ad9ad668c452",
+  "immediateRollback": "1b48de76-0f05-4668-a0e2-1d745cee9691",
+  "issuerVersion": "fd37578f-13cd-4fce-b557-35c0d962ef9d",
+  "deployedLobbyJsSha256": "2ba2e6714c9831aa0aa8bbe5691ff8a09f82629610d8f10e6e5af1ec7b192453",
+  "effectiveConfigurationPreserved": true,
+  "anonymousAdmissionPreserved": true,
+  "protectedAssetsVerified": 5,
+  "browser": "Playwright WebKit against the hosted private beta over TLS and WebSockets",
+  "guestSessions": 2,
+  "freshConnectionsUsingInlineHello": 2,
+  "rememberedDeviceReconnects": 1,
+  "journeys": [
+    "two fresh hosted WebKit guests received the inline hello and joined on the first attempt",
+    "temporary room, roster-targeted invitation and keyboard focus",
+    "two turns and in-room chat synchronized, mobile board and composer visible",
+    "reload ended the match, returned to the room with fresh scrollback, and left with keyboard focus"
+  ],
+  "viewports": [
+    375,
+    390
+  ],
+  "inputFontPx": 16,
+  "captureDigests": {
+    "375": "df44d09c55c8ccbbb4a03007ccd50b8255482a4b43ad6cbe9a4cffa23e801831",
+    "390": "40d9bdf553ef149f097aeb1950500d78ff4df2fddd0be555855909845125254f"
+  },
+  "testGuestLogoutsVerified": 2,
+  "mediaStarted": false,
+  "publicDeployment": false,
+  "pending": [
+    "Native Safari and physical iPhone",
+    "VoiceOver and NVDA",
+    "Real Music, Shared Track and Webex handoff"
+  ]
+}
