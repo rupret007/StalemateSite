@@ -6,6 +6,16 @@ band rehearsal is not yet qualified.** Music, actual Shared Track mixing and
 Webex video/audio handoff remain essential acceptance work, not optional extras.
 Both public websites and their navigation remain unchanged.
 
+The private beta received the Web Join keyboard recovery fix at 12:33 UTC.
+An admitted Chromium guest opened the deployed page with an existing synthetic
+invite fixture. When the fixture expired, keyboard focus moved from Join to
+the recovery message at both 375 and 390 CSS pixels, with no horizontal
+overflow. The guest logged out and lost access. The check used no microphone
+and did not connect to a music host.
+[Evidence](../pr-assets/private-readiness/20261111/web-join-keyboard/qualification.json)
+· [375 px](../pr-assets/private-readiness/20261111/web-join-keyboard/expired-invite-375.png)
+· [390 px](../pr-assets/private-readiness/20261111/web-join-keyboard/expired-invite-390.png)
+
 The private beta received the room-leave keyboard fix at 10:37 UTC. An admitted
 guest verified the served lobby script and four companion assets. Two hosted
 WebKit guests used the deployed release to chat, share a Paint Along canvas
@@ -56,7 +66,7 @@ tracks all [62 original requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md).
 
 | Layer | Qualified evidence | Still required |
 | --- | --- | --- |
-| Last verified private website | Private merge `3533420b6e5d44e95abd899c7d021a0f89f424be` serves as `f5319d4a-6953-4162-8521-e7a5a15f86d0` at 100%, deployment `aa41b155-1777-4e26-bcda-dd2d37b27078`. The rollout preserved effective configuration, issuer and anonymous admission. An admitted guest verified five protected assets and logged out. [PR 273](https://github.com/rupret007/StalemateSite/pull/273) passed both exact CI runs with 916 browser checks and 34 checks per route style in each. | Verify joined native Safari, assistive technology and live Music. |
+| Last verified private website | Private merge `e1fafefc6c19a370edd33964b7776840016deb3e` serves as `43002fe9-4d04-456b-9fde-320dc151abc8` at 100%, deployment `9eb0e1c6-d427-4f2f-bc97-e9dd3fee7081`. The rollout preserved effective configuration, issuer and anonymous admission. An admitted guest verified six protected Web Join assets and logged out. [PR 275](https://github.com/rupret007/StalemateSite/pull/275) passed both exact CI runs with 916 browser checks and 34 checks per route style in each. | Verify joined native Safari, assistive technology and live Music. |
 | Current application source | [PR 270](https://github.com/rupret007/StalemateSite/pull/270) bounds stalled joins and preserves the nickname for retry. [PR 271](https://github.com/rupret007/StalemateSite/pull/271) uses one first-join frame for updated clients. Both exact PR 271 browser runs passed 912 browser cases, 34 checks on each route and 150 test SQLite admissions; both native workerd runs passed. | Continue native Safari, physical mobile and screen-reader checks. |
 | Keyboard/playback correction | PR249 merged as `ce319fd73ad12cf43cd67cb96276302698d07d6c`. Its current-head and combined-private CI passed. Full CI originally exposed a network-stalled/playback-status defect; the corrected regression and unchanged real-media browser trials passed. Original failures/traces are retained. | Qualify current delivered keyboard/playback journeys. Neither responsive viewports nor real browser media decoding prove physical iOS or VoiceOver. |
 | Current native packages | Exact source `ae49c915070f2951db9ff441c23c7f0a9d90ce1b` completed four desktop jobs across the initial run and Intel retry. All four archives passed source, private target, paths/CRC, architecture, component, generated-notice and eleven-license checks. Both Macs passed five strict signature checks. Windows Setup/ZIP checksums and hosted install/start/uninstall passed. The extracted Linux package passed idle startup, Pocket Stage, Reference Studio and Jamulus startup against dummy JACK. The frozen lesson player also passed on the Linux runner. [ARM startup and archive evidence](../pr-assets/private-readiness/20261110/native-ae49/README.md) · [Linux build job](https://github.com/rupret007/webjam/actions/runs/42888556613/job/130096378059). | Both Mac Desktop shortcuts select the verified AE49 packages. The Mini shortcut passed idle startup and Quit. Intel startup, local Windows and Linux execution, publisher trust and physical media remain open. |
@@ -67,7 +77,7 @@ tracks all [62 original requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md).
 | Selected audio connection | Upstream [WebJam PR466](https://github.com/rupret007/webjam/pull/466), reviewed head `098c57250b5ed2b97c233d7e843f5c5d1297a9e8`, merged as `01804299f3940f243b06f88749d488e03f08cf5c`. Delay and receiver adaptation now use the actual selected transport pair rather than a retired pair encountered last. Four regressions failed before the fix. Completed CI passed 44 Web Join unit cases, 69 browser cases, 87 Worker cases and 12,976 application tests with 60 existing skips across 566 modules. The website mirrors the reviewed audio bytes and provenance. | This browser JavaScript fix does not change the native host runtime or relabel existing native packages. Physical latency, acoustic listening, LAN routing and relay admission still need their own evidence. |
 | Earlier application provider-start CI | [Run 42780185842](https://github.com/rupret007/StalemateSite/actions/runs/42780185842), job 129708072371, completed the actual `--participation --provider-start` application/workerd mode against website revision `11c9d1f8`. All 15 recorded mode/install/audit exits were zero. Owner/start ordering, duplicate start, Stop/revoke/close fencing and owned cleanup passed. | Real guardian decisions, hosted capacity and media acceptance remain open. |
 | Issuer | Last verified `fd37578f-13cd-4fce-b557-35c0d962ef9d` at100%; completed405/204/403 negatives have receiptc209b961. | Reuse that completed result; do not rerun it or mint test credentials. The existing cap/hold and fresh account headroom still govern trials. |
-| Rollback | Use `e1c40ea5-653e-47ad-af1f-b80aaeede80e` for the immediate private-site rollback. The earlier `1b48de76` and issuer rollback `4db649fa` remain in the release history. | Recheck the guards and compare serving state and effective configuration after a rollback. |
+| Rollback | Use `f5319d4a-6953-4162-8521-e7a5a15f86d0` for the immediate private-site rollback. The earlier `e1c40ea5`, `1b48de76` and issuer rollback `4db649fa` remain in the release history. | Recheck the guards and compare serving state and effective configuration after a rollback. |
 
 The [sanitized live receipt and screenshots](../pr-assets/private-readiness/20261109/README.md)
 cover actual Mac Chrome/Safari observations on c83:
