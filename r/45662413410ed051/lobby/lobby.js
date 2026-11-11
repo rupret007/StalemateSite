@@ -1417,7 +1417,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             return;
         }
         const message = joiningGameRoom === offer.room ? 'Joining Game Night…'
-            : gameReturnOffered ? 'Game Night disconnected. Any match you were playing ended.'
+            : gameReturnOffered ? 'Game Night disconnected. Return to the room to check your match.'
             : `${offer.by} invited you to Game Night.`;
         if (status.textContent !== message) status.textContent = message;
         button.textContent = gameReturnOffered ? 'Return to room' : 'Join Game Night';

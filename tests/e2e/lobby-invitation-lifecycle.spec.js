@@ -385,7 +385,7 @@ test('Game Night invites players, publishes a Discord handoff and keeps chat usa
         await guest.locator('[data-text]').fill('Anyone up for a round?');
         await guest.locator('[data-send]').click();
         await expect(host.locator('[data-chat-lines]')).toContainText('Anyone up for a round?');
-        await guest.getByText('Four in a Row', { exact: true }).click();
+        await guest.locator('[data-four] summary').click();
         await expect(guest.locator('[data-game-call-status]')).toBeHidden();
         await expect(open).toBeVisible();
         await host.getByRole('button', { name: 'Remove link' }).click();
@@ -406,8 +406,8 @@ test('Game Night plays one shared Four in a Row match with the chat composer sti
         await host.locator('[data-invite-person-send]').click();
         await guest.getByRole('button', { name: 'Join Game Night' }).click();
         await expect(guest.getByRole('tab', { name: 'Game Night' })).toHaveAttribute('aria-selected', 'true');
-        await host.getByText('Four in a Row', { exact: true }).click();
-        await guest.getByText('Four in a Row', { exact: true }).click();
+        await host.locator('[data-four] summary').click();
+        await guest.locator('[data-four] summary').click();
         await host.getByRole('button', { name: 'Open a match' }).click();
         await expect(host.locator('[data-four-status]')).toContainText('Waiting');
         await expect(host.locator('[data-four-player="O"]')).toHaveText('Open seat');
@@ -504,7 +504,7 @@ test('Game Night keeps invitations actionable and offers a safe return after a d
         await expect(offer).toBeHidden();
         await expect(guest.locator('[data-four]')).not.toHaveAttribute('open', '');
 
-        await host.getByText('Four in a Row', { exact: true }).click();
+        await host.locator('[data-four] summary').click();
         await host.getByRole('button', { name: 'Open a match' }).dblclick();
         await expect(host.getByRole('button', { name: 'Close match' })).toBeVisible();
         await expect(guest.locator('[data-four-availability]')).toContainText('has an open seat');
@@ -518,7 +518,7 @@ test('Game Night keeps invitations actionable and offers a safe return after a d
 
         fixture.disconnect('ReturnGuest', 1012);
         await expect(host.locator('[data-four-status]')).toContainText('Match ended');
-        await expect(offer).toContainText('Any match you were playing ended.');
+        await expect(offer).toContainText('Game Night disconnected. Return to the room to check your match.');
         await offer.getByRole('button', { name: 'Return to room' }).click();
         await expect(roomTab).toBeFocused();
         await expect(guest.locator('[data-four-table]')).toBeHidden();

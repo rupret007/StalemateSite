@@ -66,7 +66,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const dialog = host.locator('[data-invite-dialog]');
         await dialog.getByLabel('Choose a current person').selectOption({ label: nick });
         await dialog.getByRole('button', { name: 'Invite selected person' }).click();
-        await guest.getByRole('button', { name: 'Join', exact: true }).click();
+        const offer = guest.locator('[data-game-offer]');
+        await offer.getByRole('button', { name: 'Join Game Night', exact: true }).click();
+        await expect(offer).toBeHidden();
     }
     async function moveByKeyboard(page, from, arrow, count) {
         await page.locator(`[data-square="${from}"]`).focus();
