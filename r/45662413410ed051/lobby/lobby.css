@@ -245,6 +245,9 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .game-night summary { cursor: pointer; width: fit-content; }
 .game-night input { flex: 1 1 220px; min-width: 0; max-width: 100%; font: inherit; font-size: 16px; }
 .game-night [data-game-error]:empty { display: none; }
+.game-offer { display: flex; flex: none; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 6px 12px; border-block-end: 1px solid var(--line); background: var(--raised); }
+.game-offer p { flex: 1 1 180px; margin: 0; overflow-wrap: anywhere; color: var(--cream); font-size: 13px; }
+.game-offer .btn { flex: none; }
 .game-night:has(.four-match[open]) { max-height: 52dvh; }
 .game-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 12px; margin-bottom: 8px; }
 .game-heading .jam-title, .game-heading .game-note { margin: 0; }
@@ -261,7 +264,8 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .four-info { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin-bottom: 8px; }
 .four-info p { flex: 1; min-width: 150px; margin: 0; }
 .four-columns, .four-board { max-width: 336px; width: 100%; }
-.four-columns { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.four-columns { position: sticky; top: 0; z-index: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; padding-block: 3px; background: #171e15; }
+.four-leave { margin-block: 4px; }
 .four-columns .btn { min-width: 0; min-height: 36px; padding-inline: 0; }
 .four-columns .btn[aria-disabled="true"] { color: var(--muted); cursor: default; }
 .four-columns .btn[aria-disabled="false"] { border-color: #637943; color: var(--lime); }
@@ -348,7 +352,9 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .check input { min-height: 0; accent-color: var(--lime); }
 /* Status owns a bounded grid row, never an overlay over the composer. It is
    keyboard-focusable so a long notice and its actions can scroll in place. */
-.toast { grid-column: 1 / -1; grid-row: 2; min-width: 0; max-width: 100%; max-height: min(20dvh, 120px); overflow: auto; overflow-wrap: anywhere; padding: 8px 16px; border-top: 1px solid var(--lime); color: var(--cream); background: var(--surface); font-size: 13px; }
+.irc-notices { grid-column: 1 / -1; grid-row: 2; min-width: 0; }
+.irc-notices:not(:has(> :not([hidden]))) { display: none; }
+.toast { min-width: 0; max-width: 100%; max-height: min(20dvh, 120px); overflow: auto; overflow-wrap: anywhere; padding: 8px 16px; border-top: 1px solid var(--lime); color: var(--cream); background: var(--surface); font-size: 13px; }
 .toast .btn { margin: 4px; }
 .guest-check { position: fixed; z-index: 20; right: 16px; bottom: 80px; width: min(340px, calc(100vw - 32px)); padding: 16px; background: var(--surface); border: 1px solid var(--amber); border-radius: 4px; }
 .guest-check p { margin: 0 0 10px; font-size: 12px; }
@@ -535,6 +541,8 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .activity { min-height: 28px; }
   .activity-heading { padding-block: 8px; }
   .buffer { min-height: 0; padding-block: 1px; }
+  .chat:has(.four-match[open]) .buffer { min-height: 64px; flex-shrink: 0; }
+  .game-night:has(.four-match[open]) { flex-shrink: 0; }
   .buffer li { padding-block: 0; }
   .say { position: sticky; bottom: 0; z-index: 1; margin-block: 4px; }
   .say input { min-height: 36px; padding-block: 8px; scroll-margin-bottom: 8px; }

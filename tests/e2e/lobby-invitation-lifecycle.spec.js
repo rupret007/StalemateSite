@@ -74,7 +74,7 @@ async function community(browser, baseURL) {
                 for (const raw of frames) sockets.get(id)?.send(raw);
             } };
         },
-        disconnect: nick => { const identity = identities.get(nick); engine.disconnect(identity.id); sockets.get(identity.id).close({ code: 1000, reason: 'Synthetic normal disconnect' }); },
+        disconnect: (nick, code = 1000) => { const identity = identities.get(nick); engine.disconnect(identity.id); sockets.get(identity.id).close({ code, reason: 'Synthetic disconnect' }); },
         close: () => Promise.all(contexts.map(context => context.close())) };
 }
 const command = (page, name, args = [], channel) => page.evaluate(({ name, args, channel }) => __lobby.cmd(name, args, channel), { name, args, channel });
@@ -349,7 +349,7 @@ test('Game Night invites players, publishes a Discord handoff and keeps chat usa
         await host.getByRole('region', { name: /Game Night/ }).getByRole('button', { name: 'Invite players' }).click();
         await host.locator('[data-invite-options]').selectOption({ label: 'GameGuest' });
         await host.locator('[data-invite-person-send]').click();
-        await guest.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
+        await guest.getByRole('button', { name: 'Join Game Night' }).click();
         const panel = guest.getByRole('region', { name: /Game Night/ });
         const open = panel.getByRole('link', { name: 'Open Discord call' });
         await expect(panel).toBeVisible();
@@ -404,7 +404,7 @@ test('Game Night plays one shared Four in a Row match with the chat composer sti
         await host.getByRole('button', { name: 'Invite players' }).click();
         await host.locator('[data-invite-options]').selectOption({ label: 'FourGuest' });
         await host.locator('[data-invite-person-send]').click();
-        await guest.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
+        await guest.getByRole('button', { name: 'Join Game Night' }).click();
         await expect(guest.getByRole('tab', { name: 'Game Night' })).toHaveAttribute('aria-selected', 'true');
         await host.getByText('Four in a Row', { exact: true }).click();
         await guest.getByText('Four in a Row', { exact: true }).click();
@@ -439,6 +439,16 @@ test('Game Night plays one shared Four in a Row match with the chat composer sti
             expect(await guest.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
             await guest.screenshot({ path: testInfo.outputPath(`four-in-a-row-${width}.png`), animations: 'disabled' });
         }
+        await guest.setViewportSize({ width: 640, height: 356 });
+        await expect(guest.locator('[data-buffer]')).toHaveCSS('min-height', '64px');
+        expect((await guest.locator('[data-buffer]').boundingBox()).height).toBeGreaterThanOrEqual(64);
+        await guest.locator('[data-text]').scrollIntoViewIfNeeded();
+        await expect(guest.locator('[data-send]')).toBeInViewport();
+        await guest.setViewportSize({ width: 375, height: 667 });
+        const landingRow = guest.locator('[data-four-table] tbody tr').last();
+        await landingRow.scrollIntoViewIfNeeded();
+        await expect(landingRow).toBeInViewport({ ratio: 1 });
+        await expect(guest.locator('[data-four-columns]')).toBeInViewport({ ratio: 1 });
         await guest.locator('[data-text]').fill('Good game');
         await guest.locator('[data-send]').click();
         await expect(host.locator('[data-chat-lines]')).toContainText('Good game');
@@ -447,6 +457,69 @@ test('Game Night plays one shared Four in a Row match with the chat composer sti
         await guest.getByRole('button', { name: 'Leave match' }).click();
         await expect(host.locator('[data-four-status]')).toHaveText('Match ended. A host can open another.');
         await expect(host.getByRole('button', { name: 'Open a match' })).toBeVisible();
+    } finally {
+        await fixture.close();
+    }
+});
+
+test('Game Night keeps invitations actionable and offers a safe return after a disconnect or refresh', async ({ browser, baseURL }) => {
+    const fixture = await community(browser, baseURL);
+    try {
+        const host = await fixture.visitor('ReturnHost', { width: 1280, height: 850 });
+        const guest = await fixture.visitor('ReturnGuest', { width: 375, height: 667 });
+        await host.getByRole('button', { name: /Game Night/ }).click();
+        const roomTab = guest.getByRole('tab', { name: 'Game Night' });
+        const offer = guest.locator('[data-game-offer]');
+        const roomSection = guest.getByRole('navigation', { name: 'Sections' }).locator('[data-show="rooms"]');
+        await roomSection.click();
+        await guest.clock.install();
+        const invitePlayer = async () => {
+            await host.getByRole('button', { name: 'Invite players' }).click();
+            await host.locator('[data-invite-options]').selectOption({ label: 'ReturnGuest' });
+            await host.locator('[data-invite-person-send]').click();
+            await expect(offer).toContainText('ReturnHost invited you to Game Night.');
+        };
+        await invitePlayer();
+        await guest.getByRole('button', { name: 'Not now', exact: true }).press('Enter');
+        await expect(offer).toBeHidden();
+        await expect(roomSection).toBeFocused();
+        await invitePlayer();
+        await guest.clock.runFor(13_000);
+        const join = offer.getByRole('button', { name: 'Join Game Night' });
+        await expect(join).toBeVisible();
+        await join.press('Enter');
+        await expect(roomTab).toBeFocused();
+        await expect(offer).toBeHidden();
+        await expect(guest.locator('[data-four]')).not.toHaveAttribute('open', '');
+
+        await host.getByText('Four in a Row', { exact: true }).click();
+        await host.getByRole('button', { name: 'Open a match' }).dblclick();
+        await expect(host.getByRole('button', { name: 'Close match' })).toBeVisible();
+        await expect(guest.locator('[data-four-availability]')).toContainText('has an open seat');
+        await guest.getByRole('button', { name: 'Join match' }).press('Enter');
+        await expect(guest.locator('[data-four-status]')).toBeFocused();
+        await guest.keyboard.press('Enter');
+        await expect(host.locator('[data-four-status]')).toHaveText('Your turn (X).');
+        await expect(guest.getByRole('button', { name: 'Leave match' })).toBeVisible();
+        await host.getByRole('button', { name: 'Drop in column 1' }).press('Enter');
+        await expect(guest.locator('[data-four-status]')).toContainText('X played column 1');
+
+        fixture.disconnect('ReturnGuest', 1012);
+        await expect(host.locator('[data-four-status]')).toContainText('Match ended');
+        await expect(offer).toContainText('Any match you were playing ended.');
+        await offer.getByRole('button', { name: 'Return to room' }).click();
+        await expect(roomTab).toBeFocused();
+        await expect(guest.locator('[data-four-table]')).toBeHidden();
+
+        await guest.reload();
+        await guest.locator('[data-nick]').fill('ReturnGuest');
+        await guest.locator('[data-enter]').click();
+        await offer.getByRole('button', { name: 'Return to room' }).press('Enter');
+        await expect(roomTab).toBeFocused();
+        await guest.locator('[data-leave]').press('Enter');
+        await expect(guest.getByRole('tab', { name: '#stalemate', exact: true })).toBeFocused();
+        await expect(offer).toBeHidden();
+        expect(await guest.evaluate(() => sessionStorage.getItem('hangout-game-return'))).toBeNull();
     } finally {
         await fixture.close();
     }

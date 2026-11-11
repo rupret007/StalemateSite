@@ -460,7 +460,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let jamShareResultsSupported = false, jamShareTimer;
     let gameNightSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
     let fourInARowSupported = false, fourRoom = null, fourPlayed = false;
+    let fourGameId = '', fourActionPending = false;
     const fourButtons = [], fourCells = [];
+    const gameReturnKey = 'hangout-game-return';
+    const gameInvites = new Map();
+    let gameReturn = null, gameReturnOffered = false, joiningGameRoom = '';
     function stopLocalCamera(channel) {
         const c = app.chans.get(channel);
         if (!c) return false;
@@ -564,7 +568,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let connectionAttempt = 0;
     function setConnection(state) {
         connectionState = state;
-        if (state !== 'connected') { clearGameLinks(); clearJamInvitations(); if (pendingKeep) clearKeep(pendingKeep.stage === 'submitted' ? 'Keeping this room was not confirmed. Check Host tools after reconnecting.' : 'Your room return was interrupted. Nothing was kept.'); }
+        if (state !== 'connected') {
+            gameInvites.clear(); gameReturnOffered = false; joiningGameRoom = ''; drawGameOffer();
+            clearGameLinks(); clearJamInvitations();
+            if (pendingKeep) clearKeep(pendingKeep.stage === 'submitted' ? 'Keeping this room was not confirmed. Check Host tools after reconnecting.' : 'Your room return was interrupted. Nothing was kept.');
+        }
         const label = { offline: 'Offline', connecting: 'Connecting…', reconnecting: 'Reconnecting…', connected: 'Connected', ended: 'Session ended' }[state];
         $('[data-connection]').textContent = label;
         $('[data-connection]').dataset.state = state;
@@ -720,6 +728,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         // Keep the unsent text under its original channel/PM key. Never move a
         // private draft into #stalemate or persist it during re-authentication.
         drafts.set(app.active, $('[data-text]').value);
+        clearGameReturn();
         app.chans.clear(); app.pms.clear(); app.rooms = []; app.pendingChannel = '';
         app.band = false; app.verified = false; app.role = 'fan'; app.capabilities = {};
         ownerSession = false; removeTab('hangout-owner');
@@ -932,7 +941,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             followPendingRoomJoin();
             if (app.restorePmOff) { cmd('pm', ['off']); app.restorePmOff = false; }
             $('[data-gate]').hidden = true; $('[data-app]').hidden = false;
-            if (wasIn && app.resetSession) toast('Connected. Room ownership and settings are kept; chat starts fresh. Choose a room to rejoin. Cameras stay off.');
+            if (!wasIn || app.resetSession) {
+                gameReturn = readGameReturn();
+                gameReturnOffered = gameNightSupported && !!gameReturn;
+                drawGameOffer();
+            }
+            if (wasIn && app.resetSession) {
+                if (!gameReturnOffered) toast('Connected. Room ownership and settings are kept; chat starts fresh. Choose a room to rejoin. Cameras stay off.');
+            }
             else if (wasIn) line(app.active, { event: true, text: `* You are now ${m.nick}` });
             app.resetSession = false;
             document.body.classList.toggle('is-band', !!m.band);
@@ -940,6 +956,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
         case 'join': {
             const c = { ...m.ch, lines: [] };
+            const gameOfferAccepted = joiningGameRoom === c.name;
+            const returningToGame = gameReturnOffered && gameReturn?.room === c.name;
+            if (gameOfferAccepted) joiningGameRoom = '';
+            if (returningToGame) gameReturnOffered = false;
+            if (gameInvites.delete(c.name) || gameOfferAccepted || returningToGame) drawGameOffer();
             if (app.pendingChannel === m.ch.name) {
                 app.pendingChannel = '';
                 $('[data-channel-dialog]').close();
@@ -952,6 +973,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             // Classic IRC: joining begins a fresh buffer; never render pre-join backlog.
             if (activityRoom(c)) c.actSnap = activitySnapshot(m.act);
             switchTo(m.ch.name, { freshJoin: true });
+            if (gameOfferAccepted) focusChannelTab(c.name);
             followPendingRoomJoin();
             break;
         }
@@ -973,6 +995,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             const c = app.chans.get(m.ch);
             if (!fourInARowSupported || c?.kind !== 'game' || c.keepRef !== m.roomInstance) break;
             c.four = m.game;
+            if (fourRoom === c) fourActionPending = false;
             if (app.active === c.name) drawGameNight();
             break;
         }
@@ -1003,10 +1026,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             break;
         }
         case 'part': case 'closed': {
+            const leavingGame = app.chans.get(m.ch)?.kind === 'game';
+            forgetGameRoom(m.ch);
             app.chans.delete(m.ch);
             if (m.t === 'closed') toast(`${m.ch} was ${m.reason}.`);
             if (app.active === m.ch) switchTo('#stalemate');
             drawTabs();
+            if (leavingGame && app.active === '#stalemate') focusChannelTab('#stalemate');
             break;
         }
         case 'line': pushLine(m.ch, m); break;
@@ -1014,16 +1040,24 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         case 'notice':
             line(app.active, { notice: true, from: m.from, text: m.text, kind: m.kind });
             if (m.kind === 'error') {
+                const failedGameJoin = !!joiningGameRoom;
+                if (joiningGameRoom) {
+                    const failedRoom = joiningGameRoom;
+                    joiningGameRoom = '';
+                    forgetGameRoom(failedRoom);
+                    toast('Couldn’t join Game Night. Ask the host for a fresh invitation.');
+                }
+                if (fourActionPending) { fourActionPending = false; drawGameNight(); }
                 if (personPreferencePending) { personPreferencePending = null; personSheetStatus('That preference was not confirmed. Check the current person and try again.'); }
                 if (pendingKeep) clearKeep();
                 resetPendingReports();
                 if (app.pendingChannel && $('[data-channel-dialog]').open) {
                     $('[data-channel-error]').textContent = m.text;
                     app.pendingChannel = '';
-                } else toast(m.text);
+                } else if (!failedGameJoin) toast(m.text);
             }
             break;
-        case 'denied': if (personPreferencePending) { personPreferencePending = null; personSheetStatus('That preference was not confirmed. Check the current person and try again.'); } if (pendingKeep) clearKeep(); line(app.active, { notice: true, from: 'StaleBot', text: m.text, kind: 'error' }); break;
+        case 'denied': if (personPreferencePending) { personPreferencePending = null; personSheetStatus('That preference was not confirmed. Check the current person and try again.'); } if (pendingKeep) clearKeep(); if (fourActionPending) { fourActionPending = false; drawGameNight(); } line(app.active, { notice: true, from: 'StaleBot', text: m.text, kind: 'error' }); break;
         case 'list': app.rooms = m.rooms; drawRooms(); if (m.show) show('rooms'); break;
         case 'delete': for (const c of [...app.chans.values(), ...app.pms.values()]) c.lines = c.lines.filter((l) => !m.ids.includes(l.id)); $$('[data-id]').forEach((li) => { if (m.ids.includes(li.dataset.id)) li.remove(); }); break;
         case 'pm-request': pmRequest(m); break;
@@ -1045,8 +1079,19 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (view) pushLine(`pm:${view.ref}`, { ...m, ch: `pm:${view.ref}` }); break;
         }
         case 'pm-setting': $('[data-pm-off]').checked = m.off; toast(m.text); break;
-        case 'invite': toast(`${m.by} invited you to ${m.ch}`, [['Join', () => cmd('join', [m.ch])]]); break;
+        case 'invite':
+            if (gameNightSupported && gameNightRoomName(m.ch) && roomNonce(m.roomInstance)) {
+                if (!app.chans.has(m.ch)) {
+                    if (!gameInvites.has(m.ch) && gameInvites.size === 5 && !joiningGameRoom)
+                        gameInvites.delete(gameInvites.keys().next().value);
+                    if (gameInvites.has(m.ch) || gameInvites.size < 5)
+                        gameInvites.set(m.ch, { room: m.ch, ref: m.roomInstance, by: m.by });
+                    drawGameOffer();
+                }
+            } else toast(`${m.by} invited you to ${m.ch}`, [['Join', () => cmd('join', [m.ch])]]);
+            break;
         case 'kicked': {
+            forgetGameRoom(m.ch);
             app.kicked = m.ch === '#stalemate';
             toast(`${m.banned ? 'Banned' : 'Kicked'} from ${m.ch} by ${m.by}: ${m.reason}`);
             if (app.kicked) {
@@ -1179,6 +1224,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (prev !== key) { drafts.set(prev, $('[data-text]').value); $('[data-text]').value = drafts.get(key) || ''; }
         app.active = key;
         const c = store(key);
+        if (c?.kind === 'game') rememberGameReturn(c);
         if (c) { c.unread = 0; c.mentions = 0; }
         belowFold = 0; drawNewMessages(); replaying = true;
         announcements.replace(() => {
@@ -1285,6 +1331,72 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         app.pendingRoomJoin = '';
         cmd('join', [room]);
     }
+    function focusChannelTab(key) {
+        const tab = $$('[data-tabs] [data-channel-key]').find(tab => tab.dataset.channelKey === key);
+        tab?.focus({ preventScroll: true });
+        if (document.activeElement !== tab) $('.phonetabs [aria-current="true"]')?.focus({ preventScroll: true });
+    }
+    function readGameReturn() {
+        let saved = gameReturn;
+        if (!saved) {
+            try { saved = JSON.parse(readTab(gameReturnKey)); } catch { /* Ignore stale tab data. */ }
+        }
+        if (gameNightRoomName(saved?.room) && roomNonce(saved.ref) && saved.until > Date.now()) return saved;
+        removeTab(gameReturnKey);
+        return null;
+    }
+    function rememberGameReturn(room) {
+        if (!gameNightRoomName(room.name) || !roomNonce(room.keepRef)) return;
+        // Tab-local room reference only. Admission, nicknames and match state stay elsewhere.
+        gameReturn = { room: room.name, ref: room.keepRef, until: Date.now() + 30 * 60 * 1000 };
+        writeTab(gameReturnKey, JSON.stringify(gameReturn));
+    }
+    function clearGameReturn() {
+        gameReturn = null; gameReturnOffered = false;
+        removeTab(gameReturnKey);
+    }
+    function forgetGameRoom(name) {
+        const removed = gameInvites.delete(name);
+        if (gameReturn?.room === name) { clearGameReturn(); drawGameOffer(); }
+        else if (removed) drawGameOffer();
+    }
+    function currentGameOffer() {
+        return gameReturnOffered ? gameReturn : gameInvites.values().next().value;
+    }
+    function drawGameOffer() {
+        const offer = currentGameOffer();
+        const panel = $('[data-game-offer]'), status = $('[data-game-offer-status]');
+        const button = $('[data-game-offer-join]');
+        const hadFocus = panel.contains(document.activeElement);
+        panel.hidden = !offer;
+        if (!offer) {
+            status.textContent = '';
+            if (hadFocus) focusChannelTab(app.active);
+            return;
+        }
+        const message = joiningGameRoom === offer.room ? 'Joining Game Night…'
+            : gameReturnOffered ? 'Game Night disconnected. Any match you were playing ended.'
+            : `${offer.by} invited you to Game Night.`;
+        if (status.textContent !== message) status.textContent = message;
+        button.textContent = gameReturnOffered ? 'Return to room' : 'Join Game Night';
+        button.setAttribute('aria-disabled', String(!!joiningGameRoom));
+        $('[data-game-offer-dismiss]').disabled = !!joiningGameRoom;
+    }
+    $('[data-game-offer-join]').addEventListener('click', () => {
+        const offer = currentGameOffer();
+        if (!offer || joiningGameRoom || connectionState !== 'connected' || sessionEnded || app.sharingStopped) return;
+        if (!cmd('join', [offer.room], app.active, offer.ref)) return toast('Reconnect before joining Game Night.');
+        joiningGameRoom = offer.room;
+        drawGameOffer();
+    });
+    $('[data-game-offer-dismiss]').addEventListener('click', () => {
+        const offer = currentGameOffer();
+        if (offer && !joiningGameRoom) forgetGameRoom(offer.room);
+    });
+    window.addEventListener('pagehide', () => {
+        const c = app.chans.get(gameReturn?.room);
+        if (connectionState === 'connected' && c?.kind === 'game') rememberGameReturn(c);
+    });
     function clearJamInviteQr() {
         const canvas = $('[data-jam-invite-qr]');
         canvas.width = canvas.width; // Reset the backing bitmap and drawing state.
@@ -1407,10 +1519,16 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function fourCommand(action, column) {
         const c = currentGameNight();
         if (!c || c !== fourRoom || shieldActive || !roomNonce(c.keepRef)) return;
+        const primary = action === 'open' || action === 'join';
+        if (primary && fourActionPending) return;
         const game = c.four;
         const args = [action, game?.id || ''];
         if (action === 'drop') args.push(String(game.moves), String(column + 1));
         if (!cmd('four', args, c.name, c.keepRef)) toast('Reconnect before playing.');
+        else if (primary) {
+            fourActionPending = true;
+            $('[data-four-action]').setAttribute('aria-disabled', 'true');
+        }
     }
     function buildFourBoard() {
         for (let column = 0; column < FOUR_COLUMNS; column++) {
@@ -1436,14 +1554,21 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     }
     function drawFour(c) {
         const detail = $('[data-four]'), status = $('[data-four-status]');
-        const action = $('[data-four-action]'), board = $('[data-four-board]');
+        const action = $('[data-four-action]'), board = $('[data-four-board]'), leave = $('[data-four-leave]');
+        const availability = $('[data-four-availability]');
         const focused = detail.contains(document.activeElement) ? document.activeElement : null;
         if (fourRoom !== c) {
             fourRoom = c; detail.open = false; fourPlayed = false;
+            fourGameId = ''; fourActionPending = false;
         }
         detail.hidden = !c || !fourInARowSupported || shieldActive;
-        if (detail.hidden) { status.textContent = ''; board.hidden = true; return; }
+        if (detail.hidden) { status.textContent = ''; availability.textContent = ''; board.hidden = true; return; }
         const game = c.four, seat = game?.host === app.selfId ? 'X' : game?.guest === app.selfId ? 'O' : '';
+        const openSeat = !!game && !game.guest && !seat;
+        if (openSeat && fourGameId !== game.id) detail.open = true;
+        fourGameId = game?.id || '';
+        const availabilityText = openSeat ? 'Four in a Row has an open seat. Choose Join match to play.' : '';
+        if (availability.textContent !== availabilityText) availability.textContent = availabilityText;
         $('[data-four-seats]').hidden = !game;
         if (game) {
             const playerName = (id, mark) => id ? c.names.find(person => person.id === id)?.nick || `Player ${mark}` : 'Open seat';
@@ -1454,24 +1579,31 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const yourTurn = playing && seat === fourMark(game.moves);
         let message = fourPlayed ? 'Match ended. A host can open another.' : 'Two players. Connect four pieces in any direction.';
         let button = amOp(c) ? ['open', game ? 'Play again' : 'Open a match'] : null;
+        let leaveLabel = '';
         if (game) {
             fourPlayed = true;
             if (!game.guest) {
                 message = seat ? 'Waiting for someone in the room to join.' : 'An open seat is available. X goes first.';
-                button = seat ? ['leave', 'Close match'] : ['join', 'Join match'];
+                button = seat ? null : ['join', 'Join match'];
+                if (seat) leaveLabel = 'Close match';
             } else {
                 const lastMove = game.moves ? `${fourMark(game.moves - 1)} played column ${game.lastColumn + 1}. ` : '';
                 const turn = yourTurn ? `Your turn (${seat}).` : `${fourMark(game.moves)} to play.`;
                 message = lastMove + (game.winner ? `${game.winner} wins.` : playing ? turn : 'Draw.');
-                if (playing) button = seat ? ['leave', 'Leave match'] : null;
+                if (playing) {
+                    button = null;
+                    if (seat) leaveLabel = 'Leave match';
+                }
             }
         }
         if (status.textContent !== message) status.textContent = message;
         action.hidden = !button;
+        action.setAttribute('aria-disabled', String(fourActionPending));
         if (button) {
             action.dataset.fourAction = button[0]; action.textContent = button[1];
-            action.classList.toggle('btn--ghost', button[0] === 'leave');
         }
+        leave.hidden = !leaveLabel;
+        leave.textContent = leaveLabel;
         board.hidden = !game?.guest;
         if (!board.hidden) {
             if (!fourButtons.length) buildFourBoard();
@@ -1492,10 +1624,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 cell.setAttribute('aria-label', winning.has(index) ? `${mark}, winning piece` : mark || 'Empty');
             });
         }
-        if (focused && (focused === action && action.hidden || board.contains(focused) && board.hidden))
+        if (focused === action && action.hidden) status.focus({ preventScroll: true });
+        else if (focused && (focused === leave && leave.hidden || board.contains(focused) && board.hidden))
             detail.querySelector('summary').focus({ preventScroll: true });
     }
     $('[data-four-action]').addEventListener('click', event => fourCommand(event.currentTarget.dataset.fourAction));
+    $('[data-four-leave]').addEventListener('click', () => fourCommand('leave'));
     function changeGameLink(value) {
         const c = currentGameNight();
         return !!(c && c === gameEditorRoom && amOp(c) && cmd('discord', [value], c.name, c.keepRef));
