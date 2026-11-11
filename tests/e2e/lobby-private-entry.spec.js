@@ -56,9 +56,13 @@ test('an open connection without a welcome times out and the guest can retry', a
     const { createLobby } = await import('../../hangout-worker/src/lobby-core.mjs');
     await page.route('**/*', route => new URL(route.request().url()).origin === baseURL ? route.continue() : route.abort());
     let attempts = 0, staleClosed = false, active;
-    const engine = createLobby({ send: (_id, frame) => active.send(JSON.stringify(frame)) });
+    const offers = [];
+    const engine = createLobby({ send: (_id, frame) => active.send(JSON.stringify(frame.t === 'hello'
+        ? { ...frame, deviceToken: 'inline-synthetic-device' } : frame)) });
     await page.routeWebSocket(url => url.pathname.endsWith('/lobby'), socket => {
         attempts++;
+        const params = new URL(socket.url()).searchParams;
+        offers.push([params.get('device-in-hello'), params.get('dev')]);
         if (attempts === 1) {
             socket.onClose(() => { staleClosed = true; });
             socket.send(JSON.stringify({ t: 'device', token: 'synthetic-device' }));
@@ -88,6 +92,8 @@ test('an open connection without a welcome times out and the guest can retry', a
 
     await page.locator('[data-enter]').press('Enter');
     await expect(page.locator('[data-connection]')).toHaveText('Connected');
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('hangout-dev'))).toBe('inline-synthetic-device');
+    expect(offers).toEqual([['1', null], ['1', 'synthetic-device']]);
     await page.clock.runFor(20_001);
     await expect(page.locator('[data-connection]')).toHaveText('Connected');
     expect(attempts).toBe(2);

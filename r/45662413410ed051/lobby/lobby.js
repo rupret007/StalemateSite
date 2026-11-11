@@ -663,7 +663,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const tsToken = ownerSession ? '' : await loadTurnstile();
         if (attempt !== connectionAttempt) return;
         if (!ownerSession && siteKey && !tsToken) { setConnection('offline'); return gateStatus('The guest check couldn’t finish. Please try again.'); }
-        const q = new URLSearchParams({ preview: previewKey });
+        const q = new URLSearchParams({ preview: previewKey, 'device-in-hello': '1' });
         const dev = readRemembered('hangout-dev');
         if (dev) q.set('dev', dev);
         if (tsToken) q.set('ts', tsToken);
@@ -935,6 +935,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             break;
         case 'device': writeRemembered('hangout-dev', m.token); break;
         case 'hello':
+            if (typeof m.deviceToken === 'string' && m.deviceToken) writeRemembered('hangout-dev', m.deviceToken);
             endedPmLabel = null;
             messageResultsSupported = m.features?.messageResults === 1;
             jamShareResultsSupported = m.features?.jamShareResults === 1;

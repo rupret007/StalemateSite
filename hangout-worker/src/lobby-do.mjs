@@ -933,7 +933,7 @@ export class HangoutLobby {
     }
     async fetch(request) {
         await this.ready;
-        const path = new URL(request.url).pathname;
+        const { pathname: path, searchParams } = new URL(request.url);
         if (path.startsWith(LOBBY_AUTHORITY_PATH)) return this.authorityRequest(request, path.slice(LOBBY_AUTHORITY_PATH.length));
         if (this.authorityUnavailable) return new Response('community authority unavailable', { status: 503 });
         if (arcadePath(path) || mediaPath(path)) {
@@ -1034,7 +1034,10 @@ export class HangoutLobby {
             betaInviteVersion: this.env.HANGOUT_BETA_MODE === 'protected' ? identity.betaInviteVersion : undefined,
             ...(this.authorityMode ? { authorityRef: id, authorityRevision: 1 } : {}),
             dev: identity.dev, iph: identity.iph, role: identity.role, email: identity.email, account: identity.account, expiresAt: identity.expiresAt, admin: identity.admin });
-        if (identity.devToken) this.delivery.send(pair[1], { t: 'device', token: identity.devToken });
+        // Fresh browsers can read the device token from the hello. Some
+        // WebKit clients miss the second frame sent during a local upgrade.
+        const deviceInHello = searchParams.get('device-in-hello') === '1';
+        if (identity.devToken && !deviceInHello) this.delivery.send(pair[1], { t: 'device', token: identity.devToken });
         for (const frame of initialFrames) {
             if (frame.t === 'admin' && this.env.HANGOUT_BETA_MODE === 'protected') this.sendPrivateAdmin(pair[1], id, frame);
             else this.delivery.send(pair[1], frame.t === 'hello'
@@ -1047,7 +1050,8 @@ export class HangoutLobby {
                     ...(arcadeEnabled(this.env, 'turdomania') ? { arcadeTurdomania: 1 } : {}),
                     ...(arcadeEnabled(this.env, 'turdrush') ? { arcadeTurdRush: 1 } : {}),
                     ...(arcadeEnabled(this.env, 'turdanoid') ? { arcadeTurdanoid: 1 } : {}),
-                    ...(mediaEnabled(this.env) ? { arcadeMedia: 1 } : {}) } } : frame);
+                    ...(mediaEnabled(this.env) ? { arcadeMedia: 1 } : {}) },
+                    ...(deviceInHello && identity.devToken ? { deviceToken: identity.devToken } : {}) } : frame);
         }
         return new Response(null, { status: 101, webSocket: pair[0] });
         } catch {
