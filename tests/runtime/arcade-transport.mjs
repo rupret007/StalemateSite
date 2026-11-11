@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { cp, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,11 +18,15 @@ const room = '#game-2ca9e1x1be34a';
 const browserName = process.argv.find(arg => arg.startsWith('--browser='))?.slice(10) || '';
 const browserMedia = process.argv.includes('--media');
 const relay = process.argv.includes('--relay');
+const rollback = process.argv.includes('--rollback');
+const rollbackRef = process.argv.find(arg => arg.startsWith('--rollback-ref='))?.slice(15);
 const fixtureIce = { urls: [process.env.ARCADE_TEST_TURN_URL || 'turn:fixture.invalid:3478'],
     username: 'arcade-fixture', credential: 'arcade-local-turn-only' };
 assert.ok(!browserMedia || browserName === 'chromium', 'the synthetic device media test uses Chromium');
 assert.ok(['', 'chromium', 'webkit'].includes(browserName), 'choose --browser=chromium or --browser=webkit');
 assert.ok(!relay || !browserName || browserMedia && process.env.ARCADE_TEST_TURN_URL, 'browser relay test needs --media and a local TURN URL');
+assert.ok(!rollback || !browserName, 'the rollback rehearsal uses native workerd');
+assert.ok(!rollbackRef || rollback && /^[a-f0-9]{40}$/.test(rollbackRef), 'use --rollback with an exact optional source revision');
 const evidence = process.env.ARCADE_BROWSER_EVIDENCE ? resolve(process.env.ARCADE_BROWSER_EVIDENCE) : null;
 const app = fileURLToPath(new URL('../../', import.meta.url));
 const assets = fileURLToPath(new URL('../../.beta-assets/', import.meta.url));
@@ -30,6 +34,13 @@ const sharedSource = process.env.ARCADE_TEST_SOURCE ? resolve(process.env.ARCADE
 const radDad = process.env.ARCADE_TEST_RAD_DAD ? resolve(process.env.ARCADE_TEST_RAD_DAD) : null;
 assert.equal(!!sharedSource, !!radDad, 'provide both arcade checkouts for the cross-site browser proof');
 const directory = await mkdtemp(join(tmpdir(), 'game-night-arcade-'));
+const arcadeCapabilities = {
+    chess: 'arcadeChess', crapeights: 'arcadeCrapeights', turdrummy: 'arcadeTurdRummy', turdspades: 'arcadeTurdSpades',
+    turdjack: 'arcadeTurdJack', turdtris: 'arcadeTurdtris', turdomania: 'arcadeTurdomania', turdrush: 'arcadeTurdRush',
+    turdanoid: 'arcadeTurdanoid'
+};
+const arcadeFlags = Object.fromEntries(Object.keys(arcadeCapabilities).map(game => ['HANGOUT_ARCADE_' + game.toUpperCase(), '1']));
+const arcadePrefix = game => game === 'chess' ? '/beta/arcade' : '/beta/arcade-' + game;
 let mf, runtime;
 let heldMint;
 
@@ -66,14 +77,21 @@ async function guest(nick, entrySource, ip) {
     assert.equal(unlocked.status, 200, await unlocked.clone().text());
     const cookie = unlocked.headers.get('Set-Cookie').split(';')[0];
     await unlocked.body?.cancel();
-    const connected = await mf.dispatchFetch(origin + '/lobby?preview=' + preview, { headers: { ...base(cookie, ip), Upgrade: 'websocket' } });
+    return connectGuest(nick, entrySource, ip, cookie);
+}
+async function connectGuest(nick, entrySource, ip, cookie, dev) {
+    const url = new URL(origin + '/lobby');
+    url.searchParams.set('preview', preview);
+    url.searchParams.set('device-in-hello', '1');
+    if (dev) url.searchParams.set('dev', dev);
+    const connected = await mf.dispatchFetch(url, { headers: { ...base(cookie, ip), Upgrade: 'websocket' } });
     assert.equal(connected.status, 101);
     const lobby = observe(connected.webSocket);
-    await lobby.wait(frame => frame.t === 'hello', 'lobby hello');
+    const hello = await lobby.wait(frame => frame.t === 'hello', 'lobby hello');
     lobby.send({ t: 'hello', nick, age13: true, entrySource });
     const { id } = await lobby.wait(frame => frame.t === 'welcome', 'lobby identity');
     await lobby.wait(frame => frame.t === 'join' && frame.ch.name === '#stalemate', 'lobby admission');
-    return { lobby, cookie, id };
+    return { lobby, cookie, id, dev: hello.deviceToken || dev, features: hello.features };
 }
 async function grant(guest, ref, path = '/beta/arcade-ticket') {
     const ticket = await call(path, guest.cookie, { actor: guest.id, room, ref });
@@ -799,17 +817,178 @@ async function verifyMedia(white, black, ref, matchA, matchB) {
     console.log('Passed native separate call admission, receive-only default, microphone opt-in, adult camera controls and targeted signaling.');
 }
 
+async function verifyRollback(reloadWorker) {
+    let white = await guest('FixtureWhite', 'stalemate', '192.0.2.11');
+    let black = await guest('FixtureBlack', 'rad-dad', '192.0.2.12');
+    assert.ok(white.dev && black.dev);
+    assert.ok(Object.values(arcadeCapabilities).every(feature => white.features[feature] === 1));
+    assert.equal(white.features.arcadeMedia, 1);
+    white.lobby.send({ t: 'cmd', name: 'join', args: [room], ch: '#stalemate' });
+    const { ch } = await white.lobby.wait(frame => frame.t === 'join' && frame.ch.name === room, 'rollback Game Night room');
+    await pause();
+    white.lobby.send({ t: 'cmd', name: 'invite', args: ['FixtureBlack', room], ch: room,
+        roomInstance: ch.keepRef, personContext: 1, personPeer: black.id });
+    await black.lobby.wait(frame => frame.t === 'invite' && frame.ch === room, 'rollback guest invited');
+    black.lobby.send({ t: 'cmd', name: 'join', args: [room], ch: '#stalemate', roomInstance: ch.keepRef });
+    await black.lobby.wait(frame => frame.t === 'join' && frame.ch.name === room, 'rollback guest admitted');
+
+    const chess = observe((await upgrade(white.cookie, await grant(white, ch.keepRef))).webSocket);
+    const chessGuest = observe((await upgrade(black.cookie, await grant(black, ch.keepRef))).webSocket);
+    await chess.wait(frame => frame.t === 'match-ready', 'rollback Chess socket');
+    chess.send({ version: 1, action: 'open' });
+    const opened = await chessGuest.wait(frame => frame.state?.waiting, 'stored Chess table');
+    chessGuest.send({ version: 1, action: 'join', id: opened.state.id });
+    await chess.wait(frame => frame.state?.match, 'two seated players before rollback');
+    chess.send({ version: 1, action: 'move', id: opened.state.id, revision: 0, move: 'e2e4' });
+    await chessGuest.wait(frame => frame.state?.match?.moves?.[0] === 'e2e4', 'committed Chess move before rollback');
+    const tris = observe((await upgrade(white.cookie, await grant(white, ch.keepRef, '/beta/arcade-turdtris-ticket'), '/beta/arcade-turdtris-match')).webSocket);
+    await tris.wait(frame => frame.t === 'match-ready', 'rollback Turdtris socket');
+    tris.send({ version: 1, action: 'open' });
+    const originalTris = (await tris.wait(frame => frame.state?.waiting, 'stored Turdtris table')).state.id;
+    await verifyMedia(white, black, ch.keepRef, chess, tris);
+    const mediaPath = '/beta/game-night-media';
+    const listening = observe((await upgrade(white.cookie, await grant(white, ch.keepRef, mediaPath + '-ticket'), mediaPath)).webSocket);
+    await listening.wait(frame => frame.t === 'media-ready', 'media socket before rollback');
+    listening.send({ version: 1, action: 'join' });
+    await listening.wait(frame => frame.t === 'media-room', 'active receive-only call before rollback');
+    const pending = await grant(white, ch.keepRef);
+    const reportState = async () => {
+        const response = await reportQueueControl({});
+        assert.equal(response.status, 200);
+        const { receipts, reports } = await response.json();
+        return { receipts, reports };
+    };
+    const saved = await reportState();
+    assert.equal(saved.receipts, 2);
+    assert.equal(saved.reports.length, 2);
+    async function rejoinRoom(player) {
+        player.lobby.send({ t: 'cmd', name: 'join', args: [room], ch: '#stalemate', roomInstance: ch.keepRef });
+        const restored = (await player.lobby.wait(frame => frame.t === 'join' && frame.ch.name === room, 'restored private room')).ch;
+        assert.equal(restored.keepRef, ch.keepRef);
+        assert.equal(restored.modes.i, true);
+    }
+
+    async function reopen(label, mediaEnabled = false) {
+        white = await connectGuest('FixtureWhite', 'stalemate', '192.0.2.11', white.cookie, white.dev);
+        black = await connectGuest('FixtureBlack', 'rad-dad', '192.0.2.12', black.cookie, black.dev);
+        assert.equal(white.features.gameNight, 1, 'Game Night stays available for ordinary chat and Four in a Row');
+        assert.equal(white.features.arcadeMedia, mediaEnabled ? 1 : undefined);
+        white.lobby.send({ t: 'say', ch: '#stalemate', text: label });
+        await black.lobby.wait(frame => frame.t === 'line' && frame.text === label, 'chat after Worker restart');
+        assert.deepEqual(await reportState(), saved);
+    }
+    const assertDisabled = async (prefix, socketPath = prefix + '-match') => {
+        const scope = { actor: white.id, room, ref: ch.keepRef };
+        const ticket = await call(prefix + '-ticket', white.cookie, scope);
+        assert.equal(ticket.status, 404, prefix + ' ticket after disable');
+        await ticket.body?.cancel();
+        const old = await upgrade(white.cookie, pending, socketPath);
+        assert.equal(old.status, 404, prefix + ' upgrade after disable');
+        await old.body?.cancel();
+    };
+    await reloadWorker({ HANGOUT_ARCADE_CHESS: '0' });
+    await reopen('Chat after disabling Chess', true);
+    assert.equal(white.features.arcadeChess, undefined);
+    for (const [game, feature] of Object.entries(arcadeCapabilities)) if (game !== 'chess') assert.equal(white.features[feature], 1);
+    await assertDisabled(arcadePrefix('chess'));
+    await rejoinRoom(white);
+    const stillAvailable = await upgrade(white.cookie, await grant(white, ch.keepRef, mediaPath + '-ticket'), mediaPath);
+    assert.equal(stillAvailable.status, 101, 'media remains independently available');
+    const stillCall = observe(stillAvailable.webSocket);
+    await stillCall.wait(frame => frame.t === 'media-ready', 'media after disabling Chess');
+    stillCall.send({ version: 1, action: 'join' });
+    await stillCall.wait(frame => frame.t === 'media-room', 'joined media after disabling Chess');
+    const game = await upgrade(white.cookie, await grant(white, ch.keepRef, '/beta/arcade-turdtris-ticket'), '/beta/arcade-turdtris-match');
+    assert.equal(game.status, 101);
+    const active = observe(game.webSocket);
+    await active.wait(frame => frame.t === 'match-ready', 'enabled Turdtris after partial rollback');
+    active.send({ version: 1, action: 'sync' });
+    await active.wait(frame => frame.state?.waiting && frame.state.id === originalTris, 'independent game checkpoint is preserved');
+    await reloadWorker({ HANGOUT_ARCADE_MEDIA: '0' });
+    await reopen('Chat after disabling calls');
+    assert.equal(white.features.arcadeTurdtris, 1);
+    await assertDisabled(mediaPath, mediaPath);
+    await reloadWorker(Object.fromEntries(Object.keys(arcadeFlags).map(key => [key, '0'])));
+    await reopen('Chat after disabling all arcade games');
+    for (const [game, feature] of Object.entries(arcadeCapabilities)) {
+        assert.equal(white.features[feature], undefined);
+        await assertDisabled(arcadePrefix(game));
+    }
+    await assertDisabled(mediaPath, mediaPath);
+    console.log('Passed same-storage Worker restarts with per-game and media kill switches, stale grants, existing sessions, chat and private report retention.');
+    // Restarts preserve the guest device's lobby command rate window.
+    const allowNextCommand = () => new Promise(resolve => setTimeout(resolve, 1100));
+    if (rollbackRef) {
+        await reloadWorker({}, rollbackRef);
+        await reopen('Chat after restoring the previous Worker source');
+        for (const [game, feature] of Object.entries(arcadeCapabilities)) {
+            assert.equal(white.features[feature], undefined);
+            await assertDisabled(arcadePrefix(game));
+        }
+        await assertDisabled(mediaPath, mediaPath);
+        await allowNextCommand();
+        await rejoinRoom(white);
+        await rejoinRoom(black);
+        await allowNextCommand();
+        white.lobby.send({ t: 'cmd', name: 'four', args: ['open', ''], ch: room, roomInstance: ch.keepRef });
+        const four = await black.lobby.wait(frame => frame.t === 'four' && frame.game?.host === white.id, 'previous Worker Four in a Row');
+        assert.equal(four.game.moves, 0);
+        console.log(`Passed rollback to source ${rollbackRef} with the same protected storage, sessions, private room, Four in a Row and reports.`);
+    }
+    await allowNextCommand();
+    await reloadWorker({ ...arcadeFlags, HANGOUT_ARCADE_MEDIA: '1' });
+    white = await connectGuest('FixtureWhite', 'stalemate', '192.0.2.11', white.cookie, white.dev);
+    assert.equal(white.features.arcadeChess, 1);
+    assert.equal(white.features.arcadeMedia, 1);
+    const stale = await upgrade(white.cookie, pending);
+    assert.equal(stale.status, 403, 'an unused pre-rollback grant stays invalid after restoring the candidate');
+    await stale.body?.cancel();
+    assert.deepEqual(await reportState(), saved);
+    await rejoinRoom(white);
+    for (const name of ['chess', 'turdtris']) {
+        const prefix = arcadePrefix(name);
+        const response = await upgrade(white.cookie, await grant(white, ch.keepRef, prefix + '-ticket'), prefix + '-match');
+        assert.equal(response.status, 101);
+        const match = observe(response.webSocket);
+        await match.wait(frame => frame.t === 'match-ready', name + ' restored transport');
+        match.send({ version: 1, action: 'sync' });
+        await match.wait(frame => frame.t === 'match-state' && frame.state === null && frame.canOpen, name + ' disabled checkpoint retired');
+    }
+    console.log('Passed forward restore with the prior private report queue intact and pre-rollback grants and match checkpoints retired.');
+}
+
+const fixtureWorker = fileURLToPath(new URL('./lobby-session-authority/worker.mjs', import.meta.url));
+
+async function bundleRollbackSource(revision) {
+    const previous = join(directory, 'previous-source');
+    await mkdir(previous);
+    const archive = execFileSync('git', ['archive', revision, 'hangout-worker/src', 'r/45662413410ed051', 'package-lock.json'],
+        { cwd: app, maxBuffer: 32 * 1024 * 1024 });
+    execFileSync('tar', ['-x', '-C', previous], { input: archive });
+    assert.deepEqual(await readFile(join(previous, 'package-lock.json')), await readFile(join(app, 'package-lock.json')),
+        'previous Worker and current fixture use the same installed dependency lock');
+    await symlink(join(app, 'node_modules'), join(previous, 'node_modules'), 'dir');
+    const prefix = '../../../hangout-worker/';
+    const old = await rolldown({ input: fixtureWorker, platform: 'neutral', external: ['node:crypto'],
+        plugins: [{ name: 'rollback-source', resolveId(id, importer) {
+            if (importer === fixtureWorker && id.startsWith(prefix)) return join(previous, 'hangout-worker', id.slice(prefix.length));
+        } }]
+    });
+    try { return (await old.generate({ format: 'esm', codeSplitting: false })).output[0].code; }
+    finally { await old.close(); }
+}
+
 try {
-    runtime = await rolldown({ input: fileURLToPath(new URL('./lobby-session-authority/worker.mjs', import.meta.url)),
+    runtime = await rolldown({ input: fixtureWorker,
         platform: 'neutral', external: ['node:crypto'] });
     const bundled = await runtime.generate({ format: 'esm', codeSplitting: false });
-    mf = new Miniflare(convertV4MiniflareOptions({
+    const options = {
         name: 'private-arcade-fixture', rootPath: directory, modulesRoot: directory,
         modules: [{ type: 'ESModule', path: join(directory, 'worker.mjs'), contents: bundled.output[0].code }],
         compatibilityDate: '2026-10-01', host: '127.0.0.1', port: 0, https: !!browserName, telemetry: { enabled: false },
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true },
             ...(relay ? { TURN_BUDGET: { className: 'HangoutTurnBudget', useSQLite: true } } : {}) },
-        bindings: { FIXTURE_NONCE: nonce, FIXTURE_ARCADE_REPORTS: '1', HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1', HANGOUT_ARCADE_CRAPEIGHTS: '1', HANGOUT_ARCADE_TURDRUMMY: '1', HANGOUT_ARCADE_TURDSPADES: '1', HANGOUT_ARCADE_TURDJACK: '1', HANGOUT_ARCADE_TURDTRIS: '1', HANGOUT_ARCADE_TURDOMANIA: '1', HANGOUT_ARCADE_TURDRUSH: '1', HANGOUT_ARCADE_TURDANOID: '1',
+        bindings: { FIXTURE_NONCE: nonce, FIXTURE_ARCADE_REPORTS: '1', HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', ...arcadeFlags,
             ...(browserName ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
             ...(!browserName || browserMedia ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
             ...(relay ? { HANGOUT_ARCADE_TURN: '1', HANGOUT_CF_ACCOUNT_ID: 'f'.repeat(32), HANGOUT_TURN_MONTHLY_GB: '1',
@@ -817,6 +996,7 @@ try {
             HANGOUT_HMAC_KEY: 'owned-arcade-fixture-hmac-not-for-deployment-2026', HANGOUT_BETA_INVITE_KEY: invite,
             HANGOUT_BETA_INVITE_VERSION: '1', HANGOUT_PREVIEW_KEY: preview, HANGOUT_OPEN: '1', HANGOUT_AI_ENABLED: '0', HANGOUT_TURN_ENABLED: '0' },
         ...(browserName ? { serviceBindings: { ASSETS: serveAsset } } : {}),
+        ...(rollback ? { durableObjectsPersist: join(directory, 'state') } : {}),
         outboundService: async request => {
             if (relay && request.url === 'https://api.cloudflare.com/client/v4/graphql') {
                 return Response.json({ data: { viewer: { accounts: [{ callsTurnUsageAdaptiveGroups: [] }] } } });
@@ -828,7 +1008,8 @@ try {
             }
             return new Response('fixture egress denied', { status: 503 });
         }
-    }));
+    };
+    mf = new Miniflare(convertV4MiniflareOptions(options));
     await mf.ready;
     const initialized = await mf.dispatchFetch(origin + '/_fixture/initialize', {
         method: 'POST', headers: { 'X-Fixture-Nonce': nonce, 'Content-Type': 'application/json' }, body: '{}'
@@ -838,6 +1019,13 @@ try {
         const { runArcadeBrowser } = await import('./arcade-browser.mjs');
         const browserOrigin = (await mf.ready).origin;
         await runArcadeBrowser(browserName, browserOrigin, invite, evidence, await previewEntrances(browserOrigin), browserMedia, relay);
+    } else if (rollback) {
+        await verifyRollback(async (bindings, revision) => {
+            Object.assign(options.bindings, bindings);
+            options.modules[0].contents = revision ? await bundleRollbackSource(revision) : bundled.output[0].code;
+            await mf.setOptions(convertV4MiniflareOptions(options));
+            await mf.ready;
+        });
     } else {
     const white = await guest('FixtureWhite', 'stalemate', '192.0.2.11');
     const black = await guest('FixtureBlack', 'rad-dad', '192.0.2.12');

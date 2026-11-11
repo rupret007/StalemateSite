@@ -186,5 +186,9 @@ export function createArcadeTransport({ state, current, active, approve, charge,
             }
         }
     }
-    return { issue, upgrade, receive, reconcile, revoke, maintain };
+    async function retireDisabled() {
+        const records = await state.storage.list({ prefix, limit: MATCH_CAP });
+        if (records.size) await state.storage.delete([...records.keys()]);
+    }
+    return { issue, upgrade, receive, reconcile, revoke, maintain, retireDisabled };
 }

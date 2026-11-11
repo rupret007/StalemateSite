@@ -255,11 +255,12 @@ export class HangoutLobby {
         this.authorityMode = lobbyAuthorityMode(env);
         this.liveBindings = new Map();
         this.arcadeDepartures = [];
+        this.arcadeConfigurationReady = false;
         this.arcade = new Map(arcadeGames.map(name => [name, createArcadeTransport({
             name, state, current: scope => this.arcadeBinding(scope), active: binding => this.sessionActive(binding),
             charge: (socket, actor) => this.controlBudget.take(socket, actor),
             approve: async actor => (await this.engine.approveArcade(actor))?.ok === true,
-            allowed: () => arcadeEnabled(env, name) && !this.authorityUnavailable
+            allowed: () => this.arcadeAvailable(name) && !this.authorityUnavailable
         })]));
         this.gameMedia = createGameNightMedia({
             state, current: scope => this.arcadeBinding(scope), active: binding => this.sessionActive(binding),
@@ -443,6 +444,7 @@ export class HangoutLobby {
         else { const logs = await state.storage.list({ prefix: 'log:', reverse: true, limit: 2000 }); this.engine.restoreLog([...logs.values()].reverse()); }
         if (this.authorityMode) { await this.authority.schedule(); this.privateQueueActor = null; }
         else await this.scheduleLegacyAlarm();
+        if (env.HANGOUT_BETA_MODE === 'protected') await this.restoreArcadeConfiguration().catch(() => {});
         for (const service of this.arcade.values()) service.reconcile();
         this.gameMedia.reconcile();
     }
@@ -479,6 +481,25 @@ export class HangoutLobby {
         const member = this.engine.arcadeActor(scope);
         return member ? { ...a, ...member, socket } : null;
     }
+    arcadeAvailable(name) {
+        return this.arcadeConfigurationReady && arcadeEnabled(this.env, name);
+    }
+    async restoreArcadeConfiguration() {
+        const key = 'game-night-enabled:v1', storage = this.state.storage;
+        const enabled = arcadeGames.filter(name => arcadeEnabled(this.env, name));
+        const saved = await storage.get(key);
+        const previous = saved === undefined ? [] : Array.isArray(saved) && saved.length <= arcadeGames.length
+            && saved.every(name => this.arcade.has(name)) ? saved : arcadeGames;
+        for (const name of arcadeGames) {
+            if (previous.includes(name) && !enabled.includes(name)) await this.arcade.get(name).retireDisabled();
+        }
+        if (JSON.stringify(previous) !== JSON.stringify(enabled)) {
+            if (enabled.length) await storage.put(key, enabled);
+            else await storage.delete(key);
+        }
+        // Failed cleanup fences arcade admission until maintenance can retry.
+        this.arcadeConfigurationReady = true;
+    }
     async reconcileArcade() {
         if (mediaEnabled(this.env)) this.gameMedia.reconcile();
         if (!arcadeEnabled(this.env)) return;
@@ -492,7 +513,10 @@ export class HangoutLobby {
         for (const service of this.arcade.values()) service.reconcile();
     }
     async maintainArcade() {
-        for (const [name, service] of this.arcade) if (arcadeEnabled(this.env, name)) await service.maintain().catch(() => {});
+        if (this.env.HANGOUT_BETA_MODE === 'protected' && !this.arcadeConfigurationReady) {
+            await this.restoreArcadeConfiguration().catch(() => {});
+        }
+        for (const [name, service] of this.arcade) if (this.arcadeAvailable(name)) await service.maintain().catch(() => {});
     }
     async sessionActive(value) {
         if (!this.authorityMode) return activeBetaSession(this.env, value);
@@ -938,7 +962,7 @@ export class HangoutLobby {
         if (this.authorityUnavailable) return new Response('community authority unavailable', { status: 503 });
         if (arcadePath(path) || mediaPath(path)) {
             const media = mediaPath(path), game = arcadeGame(path);
-            if (!(media ? mediaEnabled(this.env) : arcadeEnabled(this.env, game))) return new Response('not found', { status: 404 });
+            if (!(media ? mediaEnabled(this.env) : this.arcadeAvailable(game))) return new Response('not found', { status: 404 });
             const service = media ? this.gameMedia : this.arcade.get(game);
             let trusted;
             try { trusted = JSON.parse(request.headers.get('X-Hangout-Arcade')); } catch { /* deny below */ }
@@ -1041,15 +1065,15 @@ export class HangoutLobby {
         for (const frame of initialFrames) {
             if (frame.t === 'admin' && this.env.HANGOUT_BETA_MODE === 'protected') this.sendPrivateAdmin(pair[1], id, frame);
             else this.delivery.send(pair[1], frame.t === 'hello'
-                ? { ...frame, features: { ...frame.features, transportPing: 1, ...(arcadeEnabled(this.env, 'chess') ? { arcadeChess: 1 } : {}),
-                    ...(arcadeEnabled(this.env, 'crapeights') ? { arcadeCrapeights: 1 } : {}),
-                    ...(arcadeEnabled(this.env, 'turdrummy') ? { arcadeTurdRummy: 1 } : {}),
-                    ...(arcadeEnabled(this.env, 'turdspades') ? { arcadeTurdSpades: 1 } : {}),
-                    ...(arcadeEnabled(this.env, 'turdjack') ? { arcadeTurdJack: 1 } : {}),
-                    ...(arcadeEnabled(this.env, 'turdtris') ? { arcadeTurdtris: 1 } : {}),
-                    ...(arcadeEnabled(this.env, 'turdomania') ? { arcadeTurdomania: 1 } : {}),
-                    ...(arcadeEnabled(this.env, 'turdrush') ? { arcadeTurdRush: 1 } : {}),
-                    ...(arcadeEnabled(this.env, 'turdanoid') ? { arcadeTurdanoid: 1 } : {}),
+                ? { ...frame, features: { ...frame.features, transportPing: 1, ...(this.arcadeAvailable('chess') ? { arcadeChess: 1 } : {}),
+                    ...(this.arcadeAvailable('crapeights') ? { arcadeCrapeights: 1 } : {}),
+                    ...(this.arcadeAvailable('turdrummy') ? { arcadeTurdRummy: 1 } : {}),
+                    ...(this.arcadeAvailable('turdspades') ? { arcadeTurdSpades: 1 } : {}),
+                    ...(this.arcadeAvailable('turdjack') ? { arcadeTurdJack: 1 } : {}),
+                    ...(this.arcadeAvailable('turdtris') ? { arcadeTurdtris: 1 } : {}),
+                    ...(this.arcadeAvailable('turdomania') ? { arcadeTurdomania: 1 } : {}),
+                    ...(this.arcadeAvailable('turdrush') ? { arcadeTurdRush: 1 } : {}),
+                    ...(this.arcadeAvailable('turdanoid') ? { arcadeTurdanoid: 1 } : {}),
                     ...(mediaEnabled(this.env) ? { arcadeMedia: 1 } : {}) },
                     ...(deviceInHello && identity.devToken ? { deviceToken: identity.devToken } : {}) } : frame);
         }
