@@ -22,7 +22,7 @@ const markup = `
 <summary>TurdRummy</summary>
 <p class="small arcade-card-status" data-rummy-status role="status"></p>
 <p class="small arcade-card-error" data-rummy-error role="status"></p>
-<button class="btn btn--small" type="button" data-rummy-main hidden></button>
+<button class="btn" type="button" data-rummy-main hidden></button>
 <div data-card-table data-rummy-table hidden>
     <div class="arcade-card-score" aria-label="Match scores">
         <span data-rummy-score="a"></span><span data-rummy-score="b"></span>
@@ -37,7 +37,6 @@ const markup = `
         <button class="btn btn--small" type="button" data-rummy-action="discard">Discard</button>
         <button class="btn btn--small btn--ghost" type="button" data-rummy-action="knock">Knock</button>
         <button class="btn btn--small btn--ghost" type="button" data-rummy-action="gin">Gin</button>
-        <button class="btn btn--small" type="button" data-rummy-action="next-round" hidden>Next round</button>
     </div>
     <div class="arcade-card-actions">
         <button class="btn btn--small btn--ghost" type="button" data-rummy-action="resign">Resign</button>
@@ -85,8 +84,12 @@ export function mountArcadeTurdRummy(container) {
         },
         onState({ state, canOpen: host }) {
             if (state && (state.game !== 'turdrummy' || state.version !== 1)) return;
-            const revealing = state?.match && (!model?.match || model.id !== state.id);
-            if (model?.id !== state?.id || model?.match?.revision !== state?.match?.revision) {
+            const match = state?.match, previous = model?.match;
+            const revealing = match && (!previous || model.id !== state.id);
+            const showingOutcome = panel.open && ((match?.result && !previous?.result) || (match?.roundResult && !previous?.roundResult));
+            const focused = document.activeElement;
+            const focusInTable = showingOutcome && panel.contains(focused);
+            if (model?.id !== state?.id || previous?.revision !== match?.revision) {
                 clearChoice();
                 error.textContent = '';
             }
@@ -95,7 +98,9 @@ export function mountArcadeTurdRummy(container) {
             connection = 'ready';
             clearPending();
             draw();
-            if (revealing) container.scrollTop = 0;
+            if (revealing || showingOutcome && (focusInTable || focused === document.body)) container.scrollTop = 0;
+            if (focusInTable && !main.hidden && !main.disabled &&
+                (document.activeElement !== focused || focused.matches(':disabled') || focused.closest('[hidden]'))) main.focus({ preventScroll: true });
         },
         onError(reason) {
             clearPending();
@@ -174,6 +179,7 @@ export function mountArcadeTurdRummy(container) {
             const titles = { gin: 'Gin', knock: 'Knock', undercut: 'Undercut' };
             message = `${titles[result.kind]} · ${name(result.winner)} +${result.points} · Deadwood ${result.knockerDeadwood}–${result.defenderDeadwood}`;
             if (result.laidOff) message += ` · ${result.laidOff} laid off`;
+            if (seat) { command = 'next-round'; label = 'Next round'; }
         } else if (match) {
             const turn = match.turn === seat ? (match.phase === 'draw' ? 'Draw a card' : 'Choose your discard') : name(match.turn) + ' to play';
             message = `Round ${match.round} · ${turn}`;
@@ -198,13 +204,12 @@ export function mountArcadeTurdRummy(container) {
         const legal = {
             'draw-stock': match.canDrawStock, 'draw-discard': match.canTakeDiscard,
             discard: deadwood !== null, knock: deadwood !== null && deadwood <= match.knockLimit, gin: deadwood === 0,
-            'next-round': !!match.roundResult, resign: !match.result, leave: true
+            resign: !match.result, leave: true
         };
         for (const button of actions) {
             const action = button.dataset.rummyAction;
             const pile = action === 'draw-stock' || action === 'draw-discard';
-            button.hidden = !pile && (!seat || (action === 'next-round' ? !match.roundResult || !!match.result
-                : action === 'resign' ? !active : action !== 'leave' && !canSelect));
+            button.hidden = !pile && (!seat || (action === 'resign' ? !active : action !== 'leave' && !canSelect));
             button.disabled = pending || !legal[action];
             if (action === 'draw-stock') button.textContent = `${match.canDrawStock ? 'Draw stock' : 'Stock'} · ${match.stockCount}`;
             if (action === 'draw-discard') {

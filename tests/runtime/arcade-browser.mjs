@@ -8,6 +8,7 @@ import { chromium, webkit } from 'playwright';
 import { expect } from '@playwright/test';
 import { findDuelSolution } from '../../hangout-worker/arcade/games/turdomania-duel.js';
 import { unpackRushRacer } from '../../hangout-worker/arcade/games/turdrush-race.js';
+import '../../hangout-worker/arcade/games/turdrummy-rules.js';
 
 const runProcess = promisify(execFile);
 
@@ -418,10 +419,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(dialog).toBeHidden();
         await expect(page.locator('[data-call-status]')).toHaveText('Queued for review when a moderator is available.');
     }
-    function watchEights(page) {
+    function watchCardMatch(page, game) {
         let current;
         page.on('websocket', socket => {
-            if (!new URL(socket.url()).pathname.endsWith('/arcade-crapeights-match')) return;
+            if (!new URL(socket.url()).pathname.endsWith(`/arcade-${game}-match`)) return;
             socket.on('framereceived', ({ payload }) => {
                 const frame = JSON.parse(payload.toString());
                 if (frame.t === 'match-state') current = frame.state;
@@ -503,7 +504,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     }
     async function playEights(a, b) {
         const before = media ? await packetCount(b, 'audio') : 0;
-        const views = process.env.ARCADE_EIGHTS_FULL_MATCH === '1' ? [a, b].map(watchEights) : null;
+        const views = process.env.ARCADE_EIGHTS_FULL_MATCH === '1' ? [a, b].map(page => watchCardMatch(page, 'crapeights')) : null;
         for (const page of [a, b]) await page.getByRole('combobox', { name: 'Switch game' }).selectOption('crapeights');
         await a.getByRole('button', { name: 'Open Eights table' }).click();
         await b.getByRole('button', { name: 'Join Eights table' }).click();
@@ -560,8 +561,86 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         console.log(`Passed ${engine} Crappy Eights private hands, a played turn, ${media ? 'same call during a game switch' : 'full reload and seat recovery'}, and rematch.`);
     }
+    async function playRummyToTarget(players, views) {
+        const { analyzeHand, cardDeadwoodValue } = globalThis.TurdRummyRules;
+        const fastPoll = { intervals: [10, 25, 50, 100] };
+        const startingAudio = media ? await packetCount(players[1], 'audio') : 0;
+        await expect.poll(() => views.map(read => read()?.match?.revision), fastPoll).toEqual([0, 0]);
+        let match = views[0]().match, commands = 0;
+        const id = match.id, totals = { a: 0, b: 0 };
+        assert.equal(views[1]().match.id, id);
+        function bestDiscard(hand, blocked) {
+            return hand.filter(card => card.id !== blocked).map(card => ({ card,
+                deadwood: analyzeHand(hand.filter(other => other.id !== card.id)).deadwoodScore }))
+                .sort((a, b) => a.deadwood - b.deadwood || cardDeadwoodValue(b.card) - cardDeadwoodValue(a.card))[0];
+        }
+        async function expectOutcome(action) {
+            for (const [index, page] of players.entries()) {
+                try {
+                    const button = page.getByRole('button', { name: action });
+                    await expect(page.locator('[data-rummy-status]')).toBeInViewport({ ratio: 1 });
+                    await expect(button).toBeInViewport({ ratio: 1 });
+                    assert.ok((await button.boundingBox())?.height >= 44, 'phone-sized Rummy outcome action');
+                } catch (error) {
+                    if (evidence) await page.screenshot({ path: join(evidence, `rummy-${engine}-${index}-outcome-failure.png`) });
+                    throw error;
+                }
+            }
+        }
+        while (!match.result && commands < 1500) {
+            const index = views.findIndex(read => read().seat === match.turn);
+            assert.ok(index >= 0, 'the active Rummy seat has a connected client');
+            const page = players[index], own = views[index]().match;
+            if (own.roundResult) {
+                await expectOutcome('Next round');
+                await page.getByRole('button', { name: 'Next round' }).click();
+            } else if (own.phase === 'draw') {
+                const deadwood = analyzeHand(own.hand).deadwoodScore;
+                const takeDiscard = own.canTakeDiscard && (!own.canDrawStock ||
+                    bestDiscard([...own.hand, { ...own.top, id: -1 }], -1).deadwood < deadwood);
+                await page.locator(`[data-rummy-action="${takeDiscard ? 'draw-discard' : 'draw-stock'}"]`).click();
+            } else {
+                const { card, deadwood } = bestDiscard(own.hand, own.blocked);
+                const action = deadwood === 0 ? 'gin' : deadwood <= own.knockLimit ? 'knock' : 'discard';
+                if (action !== 'discard') await players[1 - index].locator('[data-rummy-table]').evaluate(table => {
+                    const surface = table.closest('.game-night');
+                    surface.scrollTop = surface.scrollHeight;
+                });
+                await page.locator(`[data-rummy-card="${card.id}"]`).click();
+                await page.locator(`[data-rummy-action="${action}"]`).click();
+            }
+            const revision = match.revision + 1;
+            await expect.poll(() => views.map(read => read()?.match?.revision), fastPoll).toEqual([revision, revision]);
+            match = views[0]().match;
+            if (match.roundResult) totals[match.roundResult.winner] += match.roundResult.points;
+            for (const read of views) assert.deepEqual(read().match.score, totals);
+            commands++;
+        }
+        assert.equal(match.result?.reason, 'score', 'complete a Rummy match by earning points');
+        assert.equal(match.target, 100);
+        assert.ok(totals[match.result.winner] >= match.target);
+        assert.deepEqual(views[1]().match.result, match.result);
+        const winner = views.findIndex(read => read().seat === match.result.winner);
+        await expect(players[winner].locator('[data-rummy-status]')).toHaveText('You won the match.');
+        await expect(players[1 - winner].locator('[data-rummy-status]')).toHaveText(/^Seat [12] won the match\.$/);
+        await expectOutcome('Request Rummy rematch');
+        if (evidence) await players[1].screenshot({ path: join(evidence, `rummy-${engine}-score-finish.png`) });
+        await players[winner].getByRole('button', { name: 'Request Rummy rematch' }).click();
+        await players[1 - winner].getByRole('button', { name: 'Accept Rummy rematch' }).click();
+        for (const page of players) {
+            await expect(page.locator('[data-rummy-card]')).toHaveCount(10);
+            for (const seat of ['a', 'b']) await expect(page.locator(`[data-rummy-score="${seat}"]`)).toContainText('· 0/100 pts ·');
+        }
+        assert.notEqual(views[0]().match.id, id);
+        if (media) {
+            await waitForPackets(players[1], 'audio', startingAudio);
+            await expectOriginalPeer(players[1]);
+        }
+        console.log(`Passed ${engine} TurdRummy scored match and fresh rematch after ${match.round} rounds and ${commands} commands, final score ${totals.a}–${totals.b}.`);
+    }
     async function playRummy(a, b) {
         const before = media ? await packetCount(b, 'audio') : 0;
+        const views = process.env.ARCADE_RUMMY_FULL_MATCH === '1' ? [a, b].map(page => watchCardMatch(page, 'turdrummy')) : null;
         for (const page of [a, b]) {
             await expect(page.locator('[data-arcade-game] option[value="turdrummy"]')).toBeEnabled();
             await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdrummy');
@@ -613,6 +692,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.getByRole('button', { name: 'Accept Rummy rematch' }).click();
         await expect(a.locator('[data-rummy-status]')).toContainText('Round 1 · Draw a card');
         await expect(bCards).toHaveCount(10);
+        if (views) await playRummyToTarget([a, b], views);
         if (evidence) {
             await mkdir(evidence, { recursive: true });
             await a.screenshot({ path: join(evidence, `rummy-${engine}-desktop.png`) });
