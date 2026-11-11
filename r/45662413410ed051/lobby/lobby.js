@@ -44,8 +44,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const savedArcade = readTab(ARCADE_RESUME_KEY);
     removeTab(ARCADE_RESUME_KEY);
     let arcadeResume = null, resumeEntry = null;
-    if (betaShell && !params.has('via') && !location.hash && performance.getEntriesByType('navigation')[0]?.type === 'reload'
-        && typeof savedArcade === 'string' && savedArcade.length <= 512) {
+    if (betaShell && typeof savedArcade === 'string' && savedArcade.length <= 512
+        && !params.has('via') && !location.hash && performance.getEntriesByType?.('navigation')[0]?.type === 'reload') {
         try {
             const saved = JSON.parse(savedArcade);
             const intent = readKeepRoomIntent(saved?.intent);

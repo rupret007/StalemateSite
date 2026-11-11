@@ -144,6 +144,15 @@ function transform(stage, gameNight) {
                 .replace(/\n[ \t]*\.changelog \{[^}]*\}/gi, '');
             if (/changelog/i.test(html)) throw new Error('Hub changelog strip failed');
             if (gameNight) html = insert(html, '<section class="games"', `<p class="arcade-mode-shortcut"><a href="${gameNight.href}">Play online with friends →</a></p>`, filename);
+            const footerNote = /<p class="footer-note">[^\n]*<\/p>/;
+            if (!footerNote.test(html)) throw Error('Arcade footer note missing');
+            html = html.replace(footerNote, note => note + `
+    <footer class="site-footer site-footer--play">
+      <nav aria-label="Footer navigation">
+        <a href="../">Band homepage</a>
+        <a href="../#contact">Contact</a>
+      </nav>
+    </footer>`);
             html = insert(html, '</head>', '<link rel="stylesheet" href="stalemate-strip.css">', filename);
             html = html.replace(/<body\b[^>]*>/i, '$&\n<nav class="stalemate-strip" aria-label="Stalemate"><a href="../" class="sm-home"><img src="../assets/mark.svg" alt="" width="22" height="22">Stalemate Arcade</a><a href="../#contact" class="sm-contact">Contact</a><button type="button" class="stalemate-music-toggle" data-music-toggle aria-label="Site music on or off">Music on</button><button type="button" class="sm-listen" data-site-play="manic" data-site-play-label="Listen to Manic" aria-label="Play Manic here">Listen to Manic</button></nav>');
         }
@@ -182,6 +191,9 @@ function main() {
         git(['fetch', '--quiet', '--depth=1', 'origin', ref], tmp);
         const sha = git(['rev-parse', '--verify', 'FETCH_HEAD^{commit}'], tmp);
         git(['-c', 'advice.detachedHead=false', 'checkout', '--quiet', '--detach', sha], tmp);
+        // The disposable checkout is the patch root. A source change that
+        // needs the site music overlay refreshed fails before publishing play.
+        git(['apply', path.join(ROOT, 'scripts/stalemate-arcade-music.patch')], tmp);
         for (const name of FILES) fs.cpSync(path.join(tmp, name), path.join(stage, name), { recursive: true });
         if (workerStage) {
             for (const name of MATCH_WORKER_FILES) {
