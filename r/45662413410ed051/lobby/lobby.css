@@ -249,7 +249,15 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .game-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 12px; margin-bottom: 8px; }
 .game-heading .jam-title, .game-heading .game-note { margin: 0; }
 .four-match { margin: 8px 0; border-block: 1px solid var(--line); }
-.four-match summary { min-height: 34px; padding: 8px 2px; color: var(--cream); }
+.game-night .four-match summary { width: 100%; min-height: 34px; padding: 8px 2px; color: var(--cream); }
+.four-summary { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; width: calc(100% - 16px); vertical-align: middle; }
+.four-summary > :first-child { flex: none; font-weight: 650; }
+.four-seats { display: inline-flex; min-width: 0; gap: 6px; }
+.four-seat { display: inline-flex; align-items: center; gap: 4px; min-width: 0; color: var(--muted); font: 10px var(--mono); }
+.four-seat b { font-size: 12px; }
+.four-seat span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.four-seat[data-seat="X"] b { color: var(--lime); }
+.four-seat[data-seat="O"] b { color: var(--blue); }
 .four-info { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin-bottom: 8px; }
 .four-info p { flex: 1; min-width: 150px; margin: 0; }
 .four-columns, .four-board { max-width: 336px; width: 100%; }
@@ -260,8 +268,10 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .four-board { table-layout: fixed; border-spacing: 4px; padding-bottom: 6px; text-align: center; }
 .four-board td { padding: 0; border: 1px solid #394739; border-radius: 3px; background: var(--surface); }
 .four-board td span { display: grid; min-height: 22px; place-items: center; font: bold 14px var(--mono); }
-.four-board [data-mark="X"] { color: var(--lime); }
-.four-board [data-mark="O"] { color: var(--blue); }
+.four-board td[data-mark="X"] { color: var(--lime); background: #222b19; }
+.four-board td[data-mark="O"] { color: var(--blue); background: #17282b; }
+.four-board td[data-last] { border-color: #7d8877; }
+.four-board td[data-winning] { border-color: currentColor; }
 @media (max-width: 1099px) {
   .game-night:has(.four-match[open]) .game-call { display: none; }
 }

@@ -22,6 +22,26 @@ export function openFour(id, host) {
         moves: 0, winner: '', lastColumn: null };
 }
 
+export function fourWinningCells(board, placed) {
+    const mark = board[placed];
+    if (!mark) return [];
+    const row = Math.floor(placed / FOUR_COLUMNS), column = placed % FOUR_COLUMNS;
+    const winning = new Set();
+    for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
+        const line = [placed];
+        for (const direction of [-1, 1]) {
+            const dy = dr * direction, dx = dc * direction;
+            for (let r = row + dy, c = column + dx; r >= 0 && r < FOUR_ROWS && c >= 0 && c < FOUR_COLUMNS; r += dy, c += dx) {
+                const index = r * FOUR_COLUMNS + c;
+                if (board[index] !== mark) break;
+                line.push(index);
+            }
+        }
+        if (line.length >= 4) for (const index of line) winning.add(index);
+    }
+    return [...winning];
+}
+
 export function dropFour(game, column) {
     if (!game.guest || fourFinished(game) || !Number.isInteger(column) || column < 0 || column >= FOUR_COLUMNS) return null;
     const index = (row, col) => row * FOUR_COLUMNS + col;
@@ -30,13 +50,8 @@ export function dropFour(game, column) {
     if (row < 0) return null;
     const mark = fourMark(game.moves);
     const board = game.board.slice();
-    board[index(row, column)] = mark;
-    const count = (dr, dc) => {
-        let length = 0;
-        for (let r = row + dr, c = column + dc; r >= 0 && r < FOUR_ROWS && c >= 0 && c < FOUR_COLUMNS
-            && board[index(r, c)] === mark; r += dr, c += dc) length++;
-        return length;
-    };
-    const won = [[0, 1], [1, 0], [1, 1], [1, -1]].some(([dr, dc]) => 1 + count(dr, dc) + count(-dr, -dc) >= 4);
+    const placed = index(row, column);
+    board[placed] = mark;
+    const won = fourWinningCells(board, placed).length > 0;
     return { ...game, board, moves: game.moves + 1, winner: won ? mark : '', lastColumn: column };
 }

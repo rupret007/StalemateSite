@@ -4,7 +4,7 @@ import { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams
 import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
 import { createIdleHeartbeat } from './idle-heartbeat.mjs';
-import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, gameNightRoomName } from './game-night.mjs';
+import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourWinningCells, gameNightRoomName } from './game-night.mjs';
 (() => {
     'use strict';
     const $ = (s, el = document) => el.querySelector(s);
@@ -1444,6 +1444,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, gameN
         detail.hidden = !c || !fourInARowSupported || shieldActive;
         if (detail.hidden) { status.textContent = ''; board.hidden = true; return; }
         const game = c.four, seat = game?.host === app.selfId ? 'X' : game?.guest === app.selfId ? 'O' : '';
+        $('[data-four-seats]').hidden = !game;
+        if (game) {
+            const playerName = (id, mark) => id ? c.names.find(person => person.id === id)?.nick || `Player ${mark}` : 'Open seat';
+            $('[data-four-player="X"]').textContent = playerName(game.host, 'X');
+            $('[data-four-player="O"]').textContent = playerName(game.guest, 'O');
+        }
         const playing = !!game?.guest && !fourFinished(game);
         const yourTurn = playing && seat === fourMark(game.moves);
         let message = fourPlayed ? 'Match ended. A host can open another.' : 'Two players. Connect four pieces in any direction.';
@@ -1469,6 +1475,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, gameN
         board.hidden = !game?.guest;
         if (!board.hidden) {
             if (!fourButtons.length) buildFourBoard();
+            const last = game.board.findIndex((mark, index) => mark && index % FOUR_COLUMNS === game.lastColumn);
+            const winning = new Set(game.winner ? fourWinningCells(game.board, last) : []);
             fourButtons.forEach((b, col) => {
                 const full = !!game.board[col], enabled = yourTurn && !full;
                 b.setAttribute('aria-label', `Drop in column ${col + 1}${full ? ' (full)' : ''}`);
@@ -1476,10 +1484,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, gameN
                 b.tabIndex = enabled ? 0 : -1;
             });
             fourCells.forEach((piece, index) => {
-                const mark = game.board[index];
-                piece.textContent = mark;
-                piece.dataset.mark = mark;
-                piece.parentElement.setAttribute('aria-label', mark || 'Empty');
+                const mark = game.board[index], cell = piece.parentElement;
+                if (piece.textContent !== mark) piece.textContent = mark;
+                cell.dataset.mark = mark;
+                cell.toggleAttribute('data-last', index === last);
+                cell.toggleAttribute('data-winning', winning.has(index));
+                cell.setAttribute('aria-label', winning.has(index) ? `${mark}, winning piece` : mark || 'Empty');
             });
         }
         if (focused && (focused === action && action.hidden || board.contains(focused) && board.hidden))

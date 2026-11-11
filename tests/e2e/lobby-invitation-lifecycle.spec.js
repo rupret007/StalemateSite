@@ -353,7 +353,9 @@ test('Game Night invites players, publishes a Discord handoff and keeps chat usa
         const panel = guest.getByRole('region', { name: /Game Night/ });
         const open = panel.getByRole('link', { name: 'Open Discord call' });
         await expect(panel).toBeVisible();
-        await expect(panel.getByRole('link', { name: 'Open Stalemate Arcade' })).toHaveAttribute('href', 'https://stalemate.band/play/');
+        const arcade = panel.getByRole('link', { name: 'Open Stalemate Arcade' });
+        await expect(arcade).toHaveAttribute('href', 'https://stalemate.band/play/');
+        await expect(arcade).toHaveAccessibleDescription('Opens in a new tab');
         await expect(open).toHaveCount(0);
         await expect(panel.getByText('Manage Discord link')).toBeHidden();
         await expect(guest.locator('[data-cam]')).toBeHidden();
@@ -408,12 +410,16 @@ test('Game Night plays one shared Four in a Row match with the chat composer sti
         await guest.getByText('Four in a Row', { exact: true }).click();
         await host.getByRole('button', { name: 'Open a match' }).click();
         await expect(host.locator('[data-four-status]')).toContainText('Waiting');
+        await expect(host.locator('[data-four-player="O"]')).toHaveText('Open seat');
         await guest.getByRole('button', { name: 'Join match' }).click();
+        await expect(guest.locator('[data-four-player="X"]')).toHaveText('FourHost');
+        await expect(guest.locator('[data-four-player="O"]')).toHaveText('FourGuest');
         await expect(host.locator('[data-four-status]')).toHaveText('Your turn (X).');
         await expect(guest.getByRole('button', { name: 'Drop in column 1' })).toHaveAttribute('aria-disabled', 'true');
         const drop = (page, column) => page.getByRole('button', { name: `Drop in column ${column}` });
         await drop(host, 1).press('Enter');
         await expect(guest.locator('[data-four-status]')).toHaveText('X played column 1. Your turn (O).');
+        await expect(guest.locator('[data-four-table] [data-last]')).toHaveText('X');
         await guest.setViewportSize({ width: 375, height: 844 });
         await expect(guest.getByRole('table', { name: 'Four in a Row board' }).locator('tr').last()).toBeInViewport({ ratio: 1 });
         await expect(guest.locator('[data-send]')).toBeInViewport();
@@ -424,7 +430,7 @@ test('Game Night plays one shared Four in a Row match with the chat composer sti
         }
         await drop(host, 4).click();
         await expect(guest.locator('[data-four-status]')).toHaveText('X played column 4. X wins.');
-        await expect(guest.getByRole('table', { name: 'Four in a Row board' }).locator('tbody tr').last().locator('[data-mark="X"]')).toHaveCount(4);
+        await expect(guest.getByRole('table', { name: 'Four in a Row board' }).locator('tbody tr').last().locator('[data-mark="X"][data-winning]')).toHaveCount(4);
         await host.screenshot({ path: testInfo.outputPath('four-in-a-row-desktop.png'), animations: 'disabled' });
         for (const width of [390, 375]) {
             await guest.setViewportSize({ width, height: 844 });

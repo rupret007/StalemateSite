@@ -196,11 +196,20 @@
                 </div>
                 <div class="jam-actions game-actions">
                     <button class="btn btn--small" type="button" data-game-invite hidden>Invite players</button>
-                    <a class="btn btn--small btn--ghost" href="https://stalemate.band/play/" target="_blank" rel="noopener noreferrer">Open Stalemate Arcade</a>
+                    <a class="btn btn--small btn--ghost" href="https://stalemate.band/play/" target="_blank" rel="noopener noreferrer" aria-describedby="game-arcade-tab-note">Open Stalemate Arcade <span aria-hidden="true">↗</span></a>
+                    <span class="sr-only" id="game-arcade-tab-note">Opens in a new tab</span>
                     <a class="btn btn--small btn--ghost" data-game-open target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden>Open Discord call</a>
                 </div>
                 <details class="four-match" data-four hidden>
-                    <summary>Four in a Row</summary>
+                    <summary>
+                        <span class="four-summary">
+                            <span>Four in a Row</span>
+                            <span class="four-seats" data-four-seats hidden>
+                                <span class="four-seat" data-seat="X"><b>X</b><span data-four-player="X"></span></span>
+                                <span class="four-seat" data-seat="O"><b>O</b><span data-four-player="O"></span></span>
+                            </span>
+                        </span>
+                    </summary>
                     <div class="four-info">
                         <p class="small game-note" data-four-status role="status"></p>
                         <button class="btn btn--small" type="button" data-four-action hidden></button>
