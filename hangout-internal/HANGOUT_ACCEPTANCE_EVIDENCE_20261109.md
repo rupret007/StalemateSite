@@ -38,8 +38,12 @@ The rollout preserved the access rules, Worker bindings, stable namespaces and
 issuer. An admitted guest verified five protected assets and logged out. A
 local test of the same bundled Worker and assets used two Chromium guest
 contexts, real workerd WebSockets and SQLite. It verified joining a private
-room by invitation, game moves, chat, reload recovery and logout. The hosted
-two-person game and assistive-technology checks remain open.
+room by invitation, game moves, chat, reload recovery and logout. A local
+WebKit attempt verified joining the room. The match did not complete. The
+hosted two-person game and assistive-technology checks remain open.
+[Local browser evidence](../pr-assets/private-readiness/20261111/game-night-follow-up/qualification.json)
+· [375 px](../pr-assets/private-readiness/20261111/game-night-follow-up/game-night-375.png)
+· [390 px](../pr-assets/private-readiness/20261111/game-night-follow-up/game-night-390.png)
 [Private rollout and rollback](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
 · [Game Night source](https://github.com/rupret007/StalemateSite/pull/266)
 
