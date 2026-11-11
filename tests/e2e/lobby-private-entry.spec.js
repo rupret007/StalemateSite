@@ -52,3 +52,43 @@ for (const { width, status } of [{ width: 375, status: 401 }, { width: 390, stat
     });
 }
 
+test('an open connection without a welcome times out and the guest can retry', async ({ page, baseURL }) => {
+    const { createLobby } = await import('../../hangout-worker/src/lobby-core.mjs');
+    await page.route('**/*', route => new URL(route.request().url()).origin === baseURL ? route.continue() : route.abort());
+    let attempts = 0, staleClosed = false, active;
+    const engine = createLobby({ send: (_id, frame) => active.send(JSON.stringify(frame)) });
+    await page.routeWebSocket(url => url.pathname.endsWith('/lobby'), socket => {
+        attempts++;
+        if (attempts === 1) {
+            socket.onClose(() => { staleClosed = true; });
+            socket.send(JSON.stringify({ t: 'device', token: 'synthetic-device' }));
+            return;
+        }
+        active = socket;
+        socket.onMessage(raw => void engine.message('timeout-retry', String(raw)));
+        socket.onClose(() => void engine.disconnect('timeout-retry'));
+        engine.connect({ id: 'timeout-retry', dev: 'device-retry', iph: 'ip-retry', role: 'fan', account: '', admin: false });
+    });
+    await page.clock.install();
+    const relay = hangoutRelayWsBase(baseURL, 'join-timeout');
+    await page.goto(`${ROOT}?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+    await page.fill('[data-nick]', 'RetryGuest');
+    await page.click('[data-enter]');
+    await expect.poll(() => attempts).toBe(1);
+    await expect(page.locator('[data-connection]')).toHaveText('Connecting…');
+    await expect(page.locator('[data-enter]')).toBeDisabled();
+    await page.clock.runFor(20_001);
+
+    await expect(page.locator('[data-connection]')).toHaveText('Offline');
+    await expect(page.locator('[data-gate-status]')).toHaveText('Hang Out took too long to respond. Try again.');
+    await expect(page.locator('[data-nick]')).toHaveValue('RetryGuest');
+    await expect(page.locator('[data-enter]')).toBeEnabled();
+    await expect.poll(() => staleClosed).toBe(true);
+    expect(attempts).toBe(1);
+
+    await page.locator('[data-enter]').press('Enter');
+    await expect(page.locator('[data-connection]')).toHaveText('Connected');
+    await page.clock.runFor(20_001);
+    await expect(page.locator('[data-connection]')).toHaveText('Connected');
+    expect(attempts).toBe(2);
+});

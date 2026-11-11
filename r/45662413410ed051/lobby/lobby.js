@@ -586,6 +586,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
         drawCommunity(); drawRooms(); drawMessageRecovery(); refreshPaletteCohosts();
     }
+    const JOIN_TIMEOUT_MS = 20_000;
     let cancelTransportAck = () => {};
     let cancelEntryCheck = () => {}, pageLeaving = false;
     window.addEventListener('pagehide', () => { pageLeaving = true; cancelEntryCheck(); });
@@ -641,8 +642,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const heartbeat = createIdleHeartbeat(ws, () => attempt === connectionAttempt && app.ws === ws);
         let opened = false;
         let sessionNick = nick;
-        let ackTimer, ackSeq = 0, ackFrames = 0, ackSentAt = -Infinity;
-        cancelTransportAck = () => { clearTimeout(ackTimer); ackTimer = null; ackFrames = 0; heartbeat.stop(); };
+        let joinTimer, ackTimer, ackSeq = 0, ackFrames = 0, ackSentAt = -Infinity;
+        cancelTransportAck = () => {
+            clearTimeout(joinTimer);
+            clearTimeout(ackTimer); ackTimer = null; ackFrames = 0; heartbeat.stop();
+        };
         const flushAck = () => {
             clearTimeout(ackTimer); ackTimer = null;
             if (attempt === connectionAttempt && ws.readyState === 1 && ackFrames) {
@@ -662,6 +666,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (!m || typeof m !== 'object') return;
             heartbeat.received();
             if (m.t === 'hello') heartbeat.negotiate(m.features?.transportPing);
+            if (m.t === 'welcome' || m.t === 'nick-error') clearTimeout(joinTimer);
             if (m.t === 'welcome') sessionNick = m.nick;
             if (m.t !== 'transport-pong') handle(m, sessionNick);
             if (Number.isSafeInteger(m.transportSeq) && m.transportSeq > 0) {
@@ -670,7 +675,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 else if (!ackTimer) ackTimer = setTimeout(flushAck, 50);
             }
         };
-        ws.onclose = async (e) => {
+        const onClose = async (e, timedOut = false) => {
             if (attempt !== connectionAttempt) return;
             cancelTransportAck();
             entrySharing.disconnect();
@@ -680,6 +685,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             uncertainMessages();
             setConnection('offline');
             if (roomApi) roomApi.onLeave();
+            if (timedOut) {
+                const message = 'Hang Out took too long to respond. Try again.';
+                gateStatus(message);
+                if (app.me) line(app.active, { event: true, text: `* ${message}` });
+                return;
+            }
             if (e.code === 4401) return endSession();
             if (!opened && betaShell && !pageLeaving) {
                 const missing = await privateAccessMissing();
@@ -715,6 +726,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             setConnection('reconnecting');
             retryTimer = setTimeout(() => connect(app.me || nick), Math.min(10000, 1000 * (2 ** Math.min(retry++, 4))) * (0.75 + Math.random() * 0.25));
         };
+        ws.onclose = onClose;
+        joinTimer = setTimeout(() => {
+            if (attempt !== connectionAttempt || app.ws !== ws) return;
+            // An open socket alone does not confirm that the visitor joined.
+            ws.onopen = ws.onmessage = ws.onclose = null;
+            ws.close(1000);
+            void onClose({ code: 1000 }, true);
+        }, JOIN_TIMEOUT_MS);
     }
     function endSession(reason = 'expired') {
         const wasVerified = ownerSession || app.verified;
