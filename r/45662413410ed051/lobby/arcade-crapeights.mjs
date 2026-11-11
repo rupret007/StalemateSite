@@ -15,25 +15,25 @@ const errors = {
 };
 const markup = `
 <summary>Crappy Eights</summary>
-<p class="small eights-status" data-eights-status role="status"></p>
-<p class="small eights-error" data-eights-error role="status"></p>
+<p class="small arcade-card-status" data-eights-status role="status"></p>
+<p class="small arcade-card-error" data-eights-error role="status"></p>
 <button class="btn btn--small" type="button" data-eights-main hidden></button>
-<div data-eights-table hidden>
-    <div class="eights-score" aria-label="Match scores">
+<div data-eights-table data-card-table hidden>
+    <div class="arcade-card-score" aria-label="Match scores">
         <span data-eights-score="a"></span>
         <span data-eights-score="b"></span>
     </div>
-    <div class="eights-piles">
-        <div class="eights-discard" aria-label="Discard"><b data-eights-top></b><span data-eights-suit></span></div>
+    <div class="arcade-card-piles">
+        <div class="arcade-card-discard" aria-label="Discard"><b data-eights-top></b><span data-eights-suit></span></div>
         <div><button class="btn btn--small" type="button" data-eights-action="draw">Draw</button><button class="btn btn--small btn--ghost" type="button" data-eights-action="pass" hidden>Pass</button></div>
     </div>
-    <p class="small eights-hand-label" data-eights-hand-label></p>
-    <div class="eights-hand" aria-label="Your hand" role="group" data-eights-hand></div>
+    <p class="small arcade-card-hand-label" data-eights-hand-label></p>
+    <div class="arcade-card-hand" aria-label="Your hand" role="group" data-eights-hand></div>
     <fieldset data-eights-choose hidden>
         <legend>Choose the suit for your eight</legend>
-        <div class="eights-actions" data-eights-suits></div>
+        <div class="arcade-card-actions" data-eights-suits></div>
     </fieldset>
-    <div class="eights-actions">
+    <div class="arcade-card-actions">
         <button class="btn btn--small" type="button" data-eights-action="next-round" hidden>Next round</button>
         <button class="btn btn--small btn--ghost" type="button" data-eights-action="resign" hidden>Resign</button>
         <button class="btn btn--small btn--ghost" type="button" data-eights-action="leave" hidden>Leave table</button>
@@ -42,7 +42,7 @@ const markup = `
 <dialog class="sheet" aria-labelledby="eights-confirm-title" data-eights-confirm>
     <h3 id="eights-confirm-title"></h3>
     <p class="small" data-eights-confirm-text></p>
-    <div class="eights-actions">
+    <div class="arcade-card-actions">
         <button class="btn btn--small" type="button" data-eights-confirm-yes>Confirm</button>
         <button class="btn btn--small btn--ghost" type="button" data-eights-confirm-no>Cancel</button>
     </div>
@@ -51,7 +51,7 @@ const markup = `
 export function mountArcadeCrapeights(container) {
     const document = container.ownerDocument;
     const panel = document.createElement('details');
-    panel.className = 'arcade-eights';
+    panel.className = 'arcade-card-table arcade-eights';
     panel.hidden = true;
     panel.innerHTML = markup;
     container.append(panel);
@@ -269,7 +269,7 @@ export function mountArcadeCrapeights(container) {
 
     container.addEventListener('toggle', event => {
         if (event.target !== panel && event.target.open &&
-            event.target.matches('.arcade-chess, [data-four]')) panel.open = false;
+            event.target.matches('.arcade-chess, .arcade-card-table, [data-four]')) panel.open = false;
     }, true);
     panel.addEventListener('toggle', () => {
         if (!panel.open || !scope) { reset(); return; }

@@ -1,5 +1,6 @@
 import { GameNightChess } from './game-night-chess.mjs';
 import { GameNightCrapeights } from './game-night-crapeights.mjs';
+import { GameNightTurdRummy } from './game-night-turdrummy.mjs';
 import { createGameNightSockets } from './game-night-sockets.mjs';
 export { arcadeRoomRequest } from './game-night-sockets.mjs';
 
@@ -9,7 +10,8 @@ const MATCH_TTL = 40 * 60000;
 const MATCH_CAP = 60;
 const adapters = new Map([
     ['chess', { flag: 'HANGOUT_ARCADE_CHESS', Table: GameNightChess }],
-    ['crapeights', { flag: 'HANGOUT_ARCADE_CRAPEIGHTS', Table: GameNightCrapeights, renewOnAction: true }]
+    ['crapeights', { flag: 'HANGOUT_ARCADE_CRAPEIGHTS', Table: GameNightCrapeights, renewOnAction: true }],
+    ['turdrummy', { flag: 'HANGOUT_ARCADE_TURDRUMMY', Table: GameNightTurdRummy, renewOnAction: true }]
 ]);
 
 export const arcadeGames = Object.freeze([...adapters.keys()]);

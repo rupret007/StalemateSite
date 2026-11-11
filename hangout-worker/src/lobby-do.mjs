@@ -1015,6 +1015,7 @@ export class HangoutLobby {
             else this.delivery.send(pair[1], frame.t === 'hello'
                 ? { ...frame, features: { ...frame.features, transportPing: 1, ...(arcadeEnabled(this.env, 'chess') ? { arcadeChess: 1 } : {}),
                     ...(arcadeEnabled(this.env, 'crapeights') ? { arcadeCrapeights: 1 } : {}),
+                    ...(arcadeEnabled(this.env, 'turdrummy') ? { arcadeTurdRummy: 1 } : {}),
                     ...(mediaEnabled(this.env) ? { arcadeMedia: 1 } : {}) } } : frame);
         }
         return new Response(null, { status: 101, webSocket: pair[0] });

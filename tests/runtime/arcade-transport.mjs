@@ -161,6 +161,63 @@ async function verifyEights(white, black, ref, chess) {
     assert.equal(rematch.state.match.hand.length, 7);
     assert.ok(chess.frames.every(frame => frame.state?.game !== 'crapeights'));
     assert.ok(watch.frames.every(frame => !frame.state?.match?.hand?.length));
+    return { a, spectator };
+}
+
+async function verifyRummy(white, black, spectator, ref) {
+    const ticketPath = '/beta/arcade-turdrummy-ticket', matchPath = '/beta/arcade-turdrummy-match';
+    async function connect(guest) {
+        const response = await upgrade(guest.cookie, await grant(guest, ref, ticketPath), matchPath);
+        assert.equal(response.status, 101);
+        const link = observe(response.webSocket);
+        await link.wait(frame => frame.t === 'match-ready', 'Rummy ready');
+        return link;
+    }
+    const a = await connect(white), b = await connect(black), watch = await connect(spectator);
+    const revision = (link, value) => link.wait(frame => frame.state?.match?.revision === value, 'Rummy revision ' + value);
+    a.send({ version: 1, action: 'open' });
+    const id = (await b.wait(frame => frame.state?.waiting, 'Rummy open')).state.id;
+    const send = (link, action, value, fields = {}) => link.send({ version: 1, action, id, revision: value, ...fields });
+    send(b, 'join');
+    const [host, player, spectatorView] = (await Promise.all([a, b, watch].map(link => revision(link, 0)))).map(frame => frame.state.match);
+    assert.equal(host.hand.length, 10);
+    assert.equal(player.hand.length, 10);
+    assert.equal(host.hand.some(card => player.hand.some(other => card.id === other.id)), false);
+    assert.deepEqual(spectatorView.hand, []);
+    assert.deepEqual(spectatorView.top, player.top);
+    send(watch, 'draw-stock', 0);
+    await watch.wait(frame => frame.t === 'match-error' && frame.reason === 'unavailable', 'spectator cannot draw Rummy');
+    send(b, 'draw-stock', 0);
+    const [publicStockDraw, privateStockDraw, spectatorStockDraw] = (await Promise.all([a, b, watch].map(link => revision(link, 1)))).map(frame => frame.state.match);
+    assert.equal(privateStockDraw.hand.length, 11);
+    assert.equal(typeof privateStockDraw.drawn, 'number');
+    for (const view of [publicStockDraw, spectatorStockDraw]) {
+        assert.equal(view.drawn, null);
+        assert.equal(view.stockCount, 30);
+        assert.ok(!('stock' in view) && !('hands' in view));
+    }
+    b.socket.close(1000, 'Rummy fixture reconnect');
+    const back = await connect(black);
+    back.send({ version: 1, action: 'sync' });
+    assert.deepEqual((await revision(back, 1)).state.match, privateStockDraw);
+    send(back, 'discard', 1, { card: privateStockDraw.drawn });
+    await revision(a, 2);
+    send(a, 'draw-discard', 2);
+    const picked = (await revision(a, 3)).state.match;
+    assert.equal(picked.blocked, privateStockDraw.drawn);
+    send(a, 'discard', 3, { card: picked.blocked });
+    await a.wait(frame => frame.t === 'match-error' && frame.reason === 'return-discard', 'Rummy discard restriction');
+    send(a, 'discard', 3, { card: picked.hand.find(card => card.id !== picked.blocked).id });
+    await revision(back, 4);
+    send(back, 'resign', 4);
+    await a.wait(frame => frame.state?.match?.result?.winner === 'a', 'Rummy resignation');
+    send(a, 'rematch');
+    await back.wait(frame => frame.state?.rematch === 'a', 'Rummy rematch offer');
+    send(back, 'rematch');
+    const rematch = await a.wait(frame => frame.state?.id && frame.state.id !== id, 'fresh Rummy rematch');
+    assert.equal(rematch.state.seat, 'b');
+    assert.equal(rematch.state.match.hand.length, 10);
+    assert.ok(watch.frames.every(frame => !frame.state?.match?.hand?.length));
     return a;
 }
 
@@ -232,7 +289,7 @@ try {
         modules: [{ type: 'ESModule', path: join(directory, 'worker.mjs'), contents: bundled.output[0].code }],
         compatibilityDate: '2026-10-01', host: '127.0.0.1', port: 0, https: !!browserName, telemetry: { enabled: false },
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true } },
-        bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1', HANGOUT_ARCADE_CRAPEIGHTS: '1',
+        bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1', HANGOUT_ARCADE_CRAPEIGHTS: '1', HANGOUT_ARCADE_TURDRUMMY: '1',
             ...(browserName ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
             ...(!browserName || browserMedia ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
             HANGOUT_HMAC_KEY: 'owned-arcade-fixture-hmac-not-for-deployment-2026', HANGOUT_BETA_INVITE_KEY: invite,
@@ -294,14 +351,18 @@ try {
     const synced = await returning.wait(frame => frame.state?.match?.moves?.[0] === 'e2e4', 'restored board');
     assert.equal(synced.state.seat, 'b');
     await verifyMedia(white, black, ch.keepRef, a, returning);
-    const cards = await verifyEights(white, black, ch.keepRef, a);
+    const { a: cards, spectator } = await verifyEights(white, black, ch.keepRef, a);
+    const rummy = await verifyRummy(white, black, spectator, ch.keepRef);
+    assert.ok([...a.frames, ...cards.frames].every(frame => frame.state?.game !== 'turdrummy'));
     white.lobby.send({ t: 'say', ch: room, text: 'Good luck at Chess' });
     await black.lobby.wait(frame => frame.t === 'line' && frame.text === 'Good luck at Chess', 'chat while match is open');
-    const partAt = a.frames.length, cardsPartAt = cards.frames.length;
+    const partAt = a.frames.length, cardsPartAt = cards.frames.length, rummyPartAt = rummy.frames.length;
     black.lobby.send({ t: 'cmd', name: 'part', args: [room], ch: room });
     await black.lobby.wait(frame => frame.t === 'part' && frame.ch === room, 'explicit room departure');
     await a.wait(frame => frame.t === 'match-state' && frame.state === null, 'seat retirement', partAt);
     await cards.wait(frame => frame.t === 'match-state' && frame.state === null, 'Eights seat retirement', cardsPartAt);
+    await rummy.wait(frame => frame.t === 'match-state' && frame.state === null, 'Rummy seat retirement', rummyPartAt);
+    console.log('Passed native TurdRummy private stock draws, spectator projection, mid-turn reconnect, restricted discard, rematch, and retirement.');
     console.log('Passed native Crappy Eights private hands, spectator projection, wrong-game grant rejection, rejoin, and rematch.');
     console.log('Passed native private invitations, session-bound one-use grants, two-brand Chess move and chat, match reconnection, and explicit seat retirement.');
     }

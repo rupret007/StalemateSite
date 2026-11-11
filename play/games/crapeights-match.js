@@ -1,4 +1,5 @@
 import './crapeights-rules.js?v=a053e73c5338e669';
+import { shuffleDeck } from './arcade-deck.js?v=feb24df2eef77b9b';
 
 const { suits, ranks, handSize, target, canPlay, cardPoints, cardEffect } = globalThis.CrapeightsRules;
 export const CRAPEIGHTS_MATCH_VERSION = 1;
@@ -11,23 +12,8 @@ const matchId = id => typeof id === 'string' && /^[a-zA-Z0-9-]{5,80}$/.test(id);
 const count = value => Number.isSafeInteger(value) && value >= 0;
 const publicCard = id => ({ ...cards[id] });
 
-function randomInt(max) {
-  const values = new Uint32Array(1);
-  const limit = Math.floor(0x100000000 / max) * max;
-  do { crypto.getRandomValues(values); } while (values[0] >= limit);
-  return values[0] % max;
-}
-
-function shuffle(deck) {
-  for (let i = deck.length - 1; i > 0; i--) {
-    const j = randomInt(i + 1);
-    [deck[i], deck[j]] = [deck[j], deck[i]];
-  }
-  return deck;
-}
-
 function newRound(round) {
-  const deck = shuffle(cards.map((_, index) => index));
+  const deck = shuffleDeck(cards.map((_, index) => index));
   const hands = { a: [], b: [] };
   for (let i = 0; i < handSize; i++) {
     hands.a.push(deck.pop());
@@ -97,7 +83,7 @@ export class CrapeightsMatch {
   #draw(seat) {
     const state = this.#state;
     if (!state.deck.length && state.discard.length > 1) {
-      state.deck = shuffle(state.discard.splice(0, state.discard.length - 1));
+      state.deck = shuffleDeck(state.discard.splice(0, state.discard.length - 1));
     }
     if (!state.deck.length) { return null; }
     const id = state.deck.pop();

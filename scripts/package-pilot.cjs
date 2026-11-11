@@ -17,6 +17,7 @@ if (target === 'beta') {
             throw Error('The protected match and arcade imports must use the same revision.');
         const files = [
             'games/chess-core.js', 'games/chess-board.js', 'assets/chess/chess.js',
+            'games/turdrummy-rules.js',
             'assets/chess/chessground.js', 'assets/chess/chessground.base.css', 'assets/chess/chess-board.css',
             'assets/chess/chessground-10.5.0-source.tar.gz',
             'assets/chess/Chessground-LICENSE.txt', 'assets/chess/chessjs-LICENSE.txt',

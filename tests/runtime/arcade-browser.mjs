@@ -199,6 +199,66 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         console.log(`Passed ${engine} Crappy Eights private hands, a played turn, ${media ? 'same call during a game switch' : 'full reload and seat recovery'}, and rematch.`);
     }
+    async function playRummy(a, b) {
+        const before = media ? await packetCount(b, 'audio') : 0;
+        for (const page of [a, b]) {
+            await expect(page.locator('[data-arcade-game] option[value="turdrummy"]')).toBeEnabled();
+            await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdrummy');
+        }
+        await a.getByRole('button', { name: 'Open Rummy table' }).click();
+        await b.getByRole('button', { name: 'Join Rummy table' }).click();
+        const aCards = a.locator('[data-rummy-card]'), bCards = b.locator('[data-rummy-card]');
+        const ids = cards => cards.evaluateAll(buttons => buttons.map(button => button.dataset.rummyCard));
+        await expect(aCards).toHaveCount(10);
+        await expect(bCards).toHaveCount(10);
+        const aHand = await ids(aCards), bHand = await ids(bCards);
+        assert.ok(aHand.every(id => !bHand.includes(id)));
+        await expect(b.locator('[data-rummy-status]')).toContainText('Draw a card');
+        await expect(b.locator('[data-rummy-hand]')).toBeInViewport({ ratio: 1 });
+        await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
+        await b.locator('[data-rummy-action="draw-discard"]').click();
+        await expect(bCards).toHaveCount(11);
+        const drawn = b.locator('[data-rummy-card][data-drawn="true"]');
+        await expect(drawn).toBeDisabled();
+        await expect(drawn).toHaveAttribute('aria-label', /taken from discard/);
+        if (!media) {
+            const hand = await ids(bCards);
+            await b.reload();
+            await b.locator('[data-enter]').click();
+            await expect(b.locator('[data-rummy-table]')).toBeVisible();
+            assert.deepEqual(await ids(bCards), hand);
+            await expect(drawn).toBeDisabled();
+            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+        }
+        const card = b.locator('[data-rummy-card]:enabled').first();
+        const discarded = await card.getAttribute('aria-label');
+        await card.scrollIntoViewIfNeeded();
+        const box = await card.boundingBox();
+        assert.ok(box?.width >= 44 && box?.height >= 44, 'phone-sized card button');
+        await b.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+        await expect(card).toHaveAttribute('aria-pressed', 'true');
+        await expect(b.locator('[data-rummy-hand-label]')).toContainText('deadwood after discard');
+        await b.getByRole('button', { name: 'Discard', exact: true }).click();
+        await expect(bCards).toHaveCount(10);
+        await expect(a.getByRole('button', { name: `Take ${discarded}`, exact: true })).toBeEnabled();
+        if (media) {
+            await waitForPackets(b, 'audio', before);
+            assert.equal(await b.evaluate(() => window.testPeers.length), 1);
+        }
+        await b.locator('[data-rummy-action="resign"]').click();
+        await b.getByRole('dialog', { name: 'Resign this match?' }).getByRole('button', { name: 'Resign', exact: true }).click();
+        await expect(a.locator('[data-rummy-status]')).toContainText('You won the match by resignation');
+        await a.getByRole('button', { name: 'Request Rummy rematch' }).click();
+        await b.getByRole('button', { name: 'Accept Rummy rematch' }).click();
+        await expect(a.locator('[data-rummy-status]')).toContainText('Round 1 · Draw a card');
+        await expect(bCards).toHaveCount(10);
+        if (evidence) {
+            await mkdir(evidence, { recursive: true });
+            await a.screenshot({ path: join(evidence, `rummy-${engine}-desktop.png`) });
+            await b.screenshot({ path: join(evidence, `rummy-${engine}-phone.png`) });
+        }
+        console.log(`Passed ${engine} TurdRummy private hands, discard pickup, touch selection, ${media ? 'same call during a game switch' : 'full reload mid-draw'}, and rematch.`);
+    }
     try {
         const a = await guest('stalemate', 'ChessHost', { width: 1280, height: 900 });
         const b = await guest('rad-dad', 'ChessGuest', { width: 375, height: 667 }, true);
@@ -267,6 +327,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await fit(b, 'phone-tall');
         await b.setViewportSize({ width: 375, height: 667 });
         await playEights(a, b);
+        await playRummy(a, b);
         if (media) {
             await a.locator('[data-call-toggle]').click();
             await a.getByRole('button', { name: 'Actions for ChessGuest' }).click();

@@ -50,7 +50,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             const saved = JSON.parse(savedArcade);
             const intent = readKeepRoomIntent(saved?.intent);
             if (intent && gameNightRoomName(intent.room)) {
-                arcadeResume = { ...intent, game: saved.game === 'crapeights' ? 'crapeights' : 'chess' };
+                arcadeResume = { ...intent, game: typeof saved.game === 'string' ? saved.game : 'chess' };
                 resumeEntry = readEntryHandoff(saved.entry, Date.now(), entrySites);
             }
         } catch { /* Tab state only restores navigation; the server authorizes entry. */ }
@@ -479,7 +479,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let gameNightSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
     const arcadeTables = new Map([
         ['chess', { label: 'Chess', load: () => import('./arcade-chess.mjs').then(module => module.mountArcadeChess) }],
-        ['crapeights', { label: 'Crappy Eights', load: () => import('./arcade-crapeights.mjs').then(module => module.mountArcadeCrapeights) }]
+        ['crapeights', { label: 'Crappy Eights', load: () => import('./arcade-crapeights.mjs').then(module => module.mountArcadeCrapeights) }],
+        ['turdrummy', { label: 'TurdRummy', load: () => import('./arcade-turdrummy.mjs').then(module => module.mountArcadeTurdRummy) }]
     ]);
     let arcadeReturning = null;
     let arcadeMediaSupported = false, arcadeMedia = null, arcadeMediaLoading = false;
@@ -906,6 +907,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             gameNightSupported = m.features?.gameNight === 1;
             arcadeTables.get('chess').supported = m.features?.arcadeChess === 1;
             arcadeTables.get('crapeights').supported = m.features?.arcadeCrapeights === 1;
+            arcadeTables.get('turdrummy').supported = m.features?.arcadeTurdRummy === 1;
             arcadeMediaSupported = m.features?.arcadeMedia === 1;
             fourInARowSupported = m.features?.fourInARow === 1;
             discordLinksSupported = m.features?.discordLinks === true;
