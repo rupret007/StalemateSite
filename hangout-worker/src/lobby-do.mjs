@@ -313,6 +313,7 @@ export class HangoutLobby {
         } : null;
         this.engine = createLobby({
             incidentSources: !!this.incidentSourceMode,
+            gameNight: env.HANGOUT_BETA_MODE === 'protected',
             ...(this.authorityMode ? { effectCommit: this.authority.effectCommit } : {}),
             ...(this.participationMode ? { participation: createLobbyParticipation({ env, authority: this.authority,
                 dispatchStart: request => this.dispatchParticipationStart(request, participationStartOwner) }) } : {}),

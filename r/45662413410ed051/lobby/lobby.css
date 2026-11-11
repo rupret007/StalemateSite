@@ -241,6 +241,10 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .jam-invite-qr { flex-basis: 100%; display: grid; justify-items: start; gap: 6px; margin-top: 4px; }
 .jam-invite-qr canvas { display: block; width: min(200px, 100%); height: auto; background: #f4f0e6; border: 1px solid var(--line); border-radius: 4px; }
 .jam-paste { margin-top: 10px; }
+.game-note { margin: 4px 0 8px; }
+.game-night summary { cursor: pointer; width: fit-content; }
+.game-night input { flex: 1 1 220px; min-width: 0; max-width: 100%; font: inherit; font-size: 16px; }
+.game-night [data-game-error]:empty { display: none; }
 .jam-paste .small { flex-basis: 100%; margin: 0; }
 [data-jam-share-status]:empty { display: none; }
 .jam-paste textarea, .act-load input { flex: 1; min-width: 0; }

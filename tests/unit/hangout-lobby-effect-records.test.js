@@ -28,6 +28,26 @@ async function fixture({ logs = [], initialize = true } = {}) {
 }
 const log = (n, at = NOW) => ({ at, by: 'TestOwner', action: 'room-register', target: `#test-${n}`, reason: '', ch: '#stalemate' });
 describe('known lobby effects in one physical-record transaction', () => {
+    it('persists Game Night as an ordinary invite-only chat record without the call URL', async () => {
+        const f = await fixture(), frames = [];
+        const app = createLobby({ gameNight: true, now: () => NOW, send: (_, frame) => frames.push(frame) });
+        const room = '#game-123456x789012';
+        app.connect({ id: 'host', dev: 'test-host-device', iph: 'test-host-ip', role: 'fan' });
+        app.message('host', JSON.stringify({ t: 'hello', nick: 'GameHost', age13: true }));
+        app.message('host', JSON.stringify({ t: 'cmd', ch: '#stalemate', name: 'join', args: [room] }));
+        const view = frames.findLast(m => m.t === 'join').ch;
+        expect(view).toMatchObject({ name: room, kind: 'game' });
+        app.message('host', JSON.stringify({ t: 'cmd', ch: room, roomInstance: view.keepRef, name: 'discord',
+            args: ['https://discord.gg/GameNightFixture'] }));
+        expect(frames.findLast(m => m.t === 'chan').ch.gameCall).toBe('https://discord.gg/GameNightFixture');
+
+        await f.write([['rooms', app.roomSnapshot()]]);
+        const { rooms } = await f.read();
+        expect(rooms.rooms).toHaveLength(1);
+        expect(rooms.rooms[0]).toMatchObject({ name: room, kind: 'chat', modes: { i: true, C: false } });
+        expect(JSON.stringify(rooms)).not.toContain('GameNightFixture');
+    });
+
     it('requires explicit known-new initialization and refuses missing or overwritten initialized state', async () => {
         const f = await fixture({ initialize: false });
         await expect(f.read()).rejects.toThrow('lobby-effects-unavailable');

@@ -2,17 +2,18 @@
 // Hang Out lobby engine: IRC commands, server-side permissions, filters, PMs, moderation, budget, stats.
 import { describe, expect, it, beforeEach } from 'vitest';
 import { createLobby, COMMANDS, LOBBY, validWebjamInvite, validWebJoin } from '../../hangout-worker/src/lobby-core.mjs';
+import { discordCallLink } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import { checkText, checkNick, normalize } from '../../hangout-worker/src/filter.mjs';
 
 let clock;
 let L;
 let inbox;
 let closed;
-function boot(limits = {}) {
+function boot(limits = {}, gameNight = false) {
     clock = 1_800_000_000_000;
     inbox = new Map();
     closed = [];
-    L = createLobby({ now: () => clock, limits, send: (id, m) => { if (!inbox.has(id)) inbox.set(id, []); inbox.get(id).push(m); }, close: (id, code) => closed.push([id, code]) });
+    L = createLobby({ gameNight, now: () => clock, limits, send: (id, m) => { if (!inbox.has(id)) inbox.set(id, []); inbox.get(id).push(m); }, close: (id, code) => closed.push([id, code]) });
 }
 let n = 0;
 function join(nick, { role = 'fan', iph = 'ip1', dev, admin } = {}) {
@@ -891,5 +892,93 @@ describe('open-room paint + synced video (act frames)', () => {
         expect(got(host).some((m) => m.t === 'act' && m.kind === 'video')).toBe(false);
         act(host, '#watch-sync', { kind: 'video', source: { kind: 'yt', id: 'oh5p5f5_-7A' }, playing: true, pos: 3 });
         expect(got(guest).some((m) => m.t === 'act' && m.kind === 'video')).toBe(true);
+    });
+});
+
+describe('Game Night', () => {
+    it('only accepts HTTPS Discord invites and server channel links', () => {
+        for (const url of ['https://discord.gg/GameNight_01', 'https://discord.com/invite/ABC-xyz',
+            'https://discord.com/channels/123456789012345678/234567890123456789']) {
+            expect(discordCallLink(` ${url} `)).toBe(url);
+        }
+        for (const url of ['http://discord.gg/abc', 'https://discord.gg.evil.test/abc', 'https://discord.gg@evil.test/abc',
+            'https://example.com/discord.gg/abc', 'https://discord.gg:443/abc', 'https://discord.gg/%61bc',
+            'https://discord.gg/abc?redirect=evil', 'https://discord.gg/abc#frag', 'https://discord.com/channels/@me/234567890123456789']) {
+            expect(discordCallLink(url), url).toBe('');
+        }
+    });
+
+    it('shares a live link only with invited players and retires it with the sharing host', () => {
+        boot({}, true);
+        const host = join('GameHost');
+        const guest = join('GameGuest');
+        const stranger = join('UninvitedFan');
+        const room = '#game-9cde12x9df823';
+        const first = 'https://discord.gg/GameNight_01';
+        const second = 'https://discord.com/invite/GameNight_02';
+        const latestRoom = (person) => got(person).findLast(m => ['join', 'chan'].includes(m.t) && m.ch.name === room)?.ch;
+        cmd(host, 'join', [room]);
+        expect(latestRoom(host)).toMatchObject({ kind: 'game', modes: { i: true, C: false }, gameCall: '' });
+        const nonce = latestRoom(host).keepRef;
+        const share = (person, value, roomInstance = nonce) =>
+            L.message(person.id, JSON.stringify({ t: 'cmd', name: 'discord', args: [value], ch: room, roomInstance }));
+        cmd(host, 'mode', ['-i'], room);
+        expect(notices(host)).toContain('Game Night stays invite-only');
+        cmd(stranger, 'join', [room]);
+        expect(latestRoom(stranger)).toBeUndefined();
+        namedCmd(host, 'invite', [guest.nick], room);
+        cmd(guest, 'join', [room]);
+        share(host, first, '0'.repeat(32));
+        share(host, 'https://example.com/fake');
+        share(guest, first);
+        expect(latestRoom(guest).gameCall).toBe('');
+        share(host, first);
+        expect(latestRoom(guest).gameCall).toBe(first);
+        expect(JSON.stringify(got(stranger))).not.toContain(first);
+        expect(JSON.stringify(got(guest).filter(m => !['join', 'chan'].includes(m.t)))).not.toContain(first);
+        expect(JSON.stringify(L.roomSnapshot())).not.toContain(first);
+        expect(L.roomSnapshot().rooms[0]).toMatchObject({ kind: 'chat', modes: { i: true, C: false } });
+        share(host, 'clear');
+        expect(latestRoom(guest).gameCall).toBe('');
+        namedCmd(host, 'op', [guest.nick], room);
+        share(guest, second);
+        expect(latestRoom(host).gameCall).toBe(second);
+        namedCmd(host, 'deop', [guest.nick], room);
+        expect(latestRoom(host).gameCall).toBe('');
+        share(host, first);
+        L.disconnect(host.id);
+        expect(latestRoom(guest).gameCall).toBe('');
+    });
+
+    it('keeps the public engine on ordinary chat and leaves Discord sharing unavailable', () => {
+        const host = join('GameHost');
+        const room = '#game-3adfc4xc61437';
+        cmd(host, 'join', [room]);
+        expect(got(host).find(m => m.t === 'hello').features).not.toHaveProperty('gameNight');
+        const view = got(host).findLast(m => m.t === 'join').ch;
+        expect(view).toMatchObject({ kind: 'chat', modes: { i: false } });
+        cmd(host, 'discord', ['https://discord.gg/GameNight_01'], room);
+        expect(JSON.stringify(got(host))).not.toContain('https://discord.gg/');
+    });
+
+    it('restores a private room and drops its call link across engine restart', async () => {
+        boot({}, true);
+        const host = join('GameHost');
+        const room = '#game-f4e0bfx372e4d';
+        cmd(host, 'join', [room]);
+        const old = L.roomSnapshot();
+        // A rollback Worker knows this as a chat room and can open +i.
+        // The new Worker restores Game Night as invite-only.
+        old.rooms[0].modes.i = false;
+        old.rooms[0].gameCall = { by: host.id, url: 'https://discord.gg/OldCall' };
+        boot({}, true);
+        await L.restoreRooms(old);
+        const returning = join('GameHost');
+        const uninvited = join('OtherFan');
+        cmd(uninvited, 'join', [room]);
+        expect(notices(uninvited)).toContain('invite-only');
+        cmd(returning, 'join', [room]);
+        expect(got(returning).findLast(m => m.t === 'join').ch)
+            .toMatchObject({ kind: 'game', modes: { i: true, C: false }, gameCall: '' });
     });
 });
