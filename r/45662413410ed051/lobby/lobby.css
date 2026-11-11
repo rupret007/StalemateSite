@@ -301,7 +301,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 @media (min-width: 1100px) {
   .game-night:has(.arcade-card-table[open] [data-card-table]:not([hidden])) {
     display: grid;
-    grid-template: "cards heading" auto "cards actions" auto "cards four" auto "cards chess" auto "cards eights" auto "cards rummy" auto "cards spades" auto "cards jack" auto "cards tris" auto "cards call" 1fr /
+    grid-template: "cards heading" auto "cards actions" auto "cards four" auto "cards chess" auto "cards eights" auto "cards rummy" auto "cards spades" auto "cards jack" auto "cards tris" auto "cards mania" auto "cards call" 1fr /
       minmax(0, 27rem) minmax(0, 1fr);
     gap: 4px 16px;
     align-items: start;
@@ -314,6 +314,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .game-night:has(.arcade-card-table[open]) > .arcade-spades:not([open]) { grid-area: spades; }
   .game-night:has(.arcade-card-table[open]) > .arcade-jack:not([open]) { grid-area: jack; }
   .game-night:has(.arcade-card-table[open]) > .arcade-tris:not([open]) { grid-area: tris; }
+  .game-night:has(.arcade-card-table[open]) > .arcade-mania:not([open]) { grid-area: mania; }
 }
 @media (max-width: 900px) {
   .roombar:has([data-arcade-game]:not([hidden])) .modes { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -388,6 +389,41 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .tris-primary { width: min(11rem, max(6.25rem, calc((100dvh - 540px) / 2))); }
   .tris-controls { grid-column: auto; grid-template-columns: repeat(2, minmax(44px, 1fr)); }
 }
+.arcade-mania { position: relative; }
+.arcade-mania summary { min-height: 44px; }
+.arcade-mania [data-mania-leave] { position: absolute; inset: 1px 0 auto auto; min-height: 44px; }
+.mania-actions:has([data-mania-main][hidden]) { display: none; }
+.mania-actions:has([data-mania-main][hidden]):has([data-mania-leave]:not([hidden])) { display: contents; }
+.mania-playfield { display: grid; grid-template-columns: minmax(0, 1fr) 4.25rem; gap: 8px; }
+.mania-own { position: relative; width: min(100%, 19rem); }
+.mania-board { position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: 9px; border: 1px solid #607a55;
+  background-color: #171e19; background-image: linear-gradient(to right, #607a5536 1px, transparent 1px), linear-gradient(to bottom, #607a5536 1px, transparent 1px);
+  background-size: calc(100% / 6) calc(100% / 6); }
+.mania-board [role="row"] { display: contents; }
+.mania-tile { position: absolute; inset: calc(var(--row) * 100% / 6) auto auto calc(var(--col) * 100% / 6);
+  display: grid; place-items: center; width: calc(100% / 6); height: calc(100% / 6); margin: 0; padding: 0;
+  border: 2px solid #1b251e; border-radius: 7px; background: #4a3326; touch-action: manipulation; }
+button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms ease-out; }
+.mania-tile[data-kind="1"] { background: #524720; }
+.mania-tile[data-kind="2"] { background: #294a2c; }
+.mania-tile svg { display: block; width: 92%; height: 92%; pointer-events: none; }
+.mania-tile.mania-group { border-color: #9cbe59; }
+.mania-tile:focus-visible { z-index: 2; outline: 2px solid var(--lime); outline-offset: -2px; }
+.mania-countdown { position: absolute; inset: 0; display: grid; place-items: center; z-index: 2; border-radius: 8px;
+  background: #121c16bb; color: var(--lime); pointer-events: none; font: bold 3rem var(--mono); }
+.mania-countdown[hidden], .mania-watching[hidden] { display: none; }
+.mania-hud { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.mania-hud > * { display: grid; gap: 2px; background: var(--surface); border: 1px solid var(--line); border-radius: 5px;
+  padding: 5px 4px; color: var(--muted); font: .67rem var(--mono); text-align: center; overflow-wrap: anywhere; }
+.mania-hud time { order: -2; color: var(--lime); font-variant-numeric: tabular-nums; font-weight: bold; }
+.mania-hud b { color: var(--cream); font-size: .9rem; }
+.mania-hud small { font-size: inherit; }
+.mania-watching { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 6px; }
+@media (max-height: 750px) {
+  .mania-status.mania-playing { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .mania-own { width: min(100%, 17rem); }
+}
+@media (prefers-reduced-motion: reduce) { .mania-tile { transition: none; } }
 .game-night-call { margin-block: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
 .game-night-call h4, .game-night-call p { margin: 0 0 5px; }
 .game-night-call .jam-actions { margin-bottom: 4px; }

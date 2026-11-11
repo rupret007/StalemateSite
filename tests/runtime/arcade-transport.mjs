@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rolldown } from 'rolldown';
+import { findDuelSolution } from '../../hangout-worker/arcade/games/turdomania-duel.js';
 import { Miniflare, convertV4MiniflareOptions } from './durable-records/node_modules/miniflare/dist/src/index.js';
 
 const origin = 'https://local-fixture.invalid';
@@ -461,6 +462,72 @@ async function verifyTurdtris(white, black, spectator, ref) {
     return host;
 }
 
+async function verifyTurdomania(white, black, spectator, ref) {
+    const endpoint = '/beta/arcade-turdomania';
+    const connect = async player => {
+        const ticket = await grant(player, ref, endpoint + '-ticket');
+        const response = await upgrade(player.cookie, ticket, endpoint + '-match');
+        assert.equal(response.status, 101);
+        const link = observe(response.webSocket);
+        await link.wait(frame => frame.t === 'match-ready', 'Turdomania connection');
+        return link;
+    };
+    const host = await connect(white), watch = await connect(spectator);
+    let guest = await connect(black);
+    host.send({ version: 1, action: 'open' });
+    const id = (await guest.wait(frame => frame.state?.waiting, 'Turdomania open duel')).state.id;
+    const send = (link, action, fields = {}) => link.send({ version: 1, id, action, ...fields });
+    send(guest, 'join');
+    const a = (await host.wait(frame => frame.state?.match, 'Turdomania host countdown')).state.match;
+    const b = (await guest.wait(frame => frame.state?.match, 'Turdomania guest countdown')).state.match;
+    const path = findDuelSolution(a.self.board);
+    assert.ok(path.length >= 5);
+    assert.equal(a.startsAt, b.startsAt);
+    assert.deepEqual(a.self.board, b.self.board);
+    assert.equal(a.boards, null);
+    assert.equal(b.boards, null);
+    send(host, 'pop', { move: 0, tile: path[0] });
+    await host.wait(frame => frame.reason === 'countdown', 'Turdomania rejects prestart pop');
+    await new Promise(resolve => setTimeout(resolve, Math.max(0, a.startsAt - Date.now()) + 25));
+    send(watch, 'pop', { move: 0, tile: path[0] });
+    await watch.wait(frame => frame.reason === 'unavailable', 'Turdomania spectator cannot pop');
+    const view = (link, seat, moves) => link.wait(frame => frame.state?.match?.players[seat].moves === moves, 'confirmed puzzle move ' + seat + moves);
+    send(host, 'pop', { move: 0, tile: path[0] });
+    const first = (await view(host, 'a', 1)).state.match;
+    const watcher = (await view(watch, 'a', 1)).state.match;
+    assert.equal(watcher.self, null);
+    assert.deepEqual(watcher.boards.a, first.self.board);
+    assert.deepEqual(watcher.boards.b, b.self.board);
+    assert.deepEqual((await view(guest, 'a', 1)).state.match.self.board, b.self.board);
+    send(guest, 'pop', { move: 0, tile: path[0] });
+    const prior = (await view(guest, 'b', 1)).state.match;
+    guest.socket.close(1000, 'Turdomania reconnect fixture');
+    guest = await connect(black);
+    send(guest, 'sync');
+    const recovered = (await view(guest, 'b', 1)).state.match;
+    assert.equal(recovered.startsAt, a.startsAt);
+    assert.deepEqual(recovered.self, prior.self);
+    for (const [move, tile] of path.entries()) {
+        if (!move) continue;
+        send(host, 'pop', { move, tile });
+        send(guest, 'pop', { move, tile });
+        await Promise.all([view(host, 'a', move + 1), view(guest, 'b', move + 1)]);
+    }
+    const result = (await watch.wait(frame => frame.state?.match?.phase === 'finished', 'Turdomania completed duel')).state.match;
+    assert.deepEqual(result.boards, { a: [], b: [] });
+    assert.equal(result.players.a.score, result.players.b.score);
+    assert.equal(result.result.winner, null);
+    assert.equal(result.result.reason, 'boards');
+    send(host, 'rematch');
+    await guest.wait(frame => frame.state?.rematch === 'a', 'Turdomania rematch vote');
+    send(guest, 'rematch');
+    const fresh = await guest.wait(frame => frame.state?.match?.id && frame.state.match.id !== id, 'Turdomania rematch');
+    assert.equal(fresh.state.seat, 'a');
+    assert.equal(fresh.state.match.players.a.left, 36);
+    console.log(`Passed native Turdomania complete shared puzzle (${path.length} legal moves per player), independent boards, spectator permissions, reconnect, draw and rematch.`);
+    return host;
+}
+
 async function verifyMedia(white, black, ref, matchA, matchB) {
     const endpoint = '/beta/game-night-media';
     const join = async player => {
@@ -529,7 +596,7 @@ try {
         modules: [{ type: 'ESModule', path: join(directory, 'worker.mjs'), contents: bundled.output[0].code }],
         compatibilityDate: '2026-10-01', host: '127.0.0.1', port: 0, https: !!browserName, telemetry: { enabled: false },
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true } },
-        bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1', HANGOUT_ARCADE_CRAPEIGHTS: '1', HANGOUT_ARCADE_TURDRUMMY: '1', HANGOUT_ARCADE_TURDSPADES: '1', HANGOUT_ARCADE_TURDJACK: '1', HANGOUT_ARCADE_TURDTRIS: '1',
+        bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1', HANGOUT_ARCADE_CRAPEIGHTS: '1', HANGOUT_ARCADE_TURDRUMMY: '1', HANGOUT_ARCADE_TURDSPADES: '1', HANGOUT_ARCADE_TURDJACK: '1', HANGOUT_ARCADE_TURDTRIS: '1', HANGOUT_ARCADE_TURDOMANIA: '1',
             ...(browserName ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
             ...(!browserName || browserMedia ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
             HANGOUT_HMAC_KEY: 'owned-arcade-fixture-hmac-not-for-deployment-2026', HANGOUT_BETA_INVITE_KEY: invite,
@@ -596,10 +663,11 @@ try {
     const { host: spades, north, east } = await verifySpades(white, black, spectator, ch.keepRef);
     const jack = await verifyJack(white, black, north, east, spectator, ch.keepRef);
     const tris = await verifyTurdtris(white, black, spectator, ch.keepRef);
+    const mania = await verifyTurdomania(white, black, spectator, ch.keepRef);
     assert.ok([...a.frames, ...cards.frames].every(frame => frame.state?.game !== 'turdrummy'));
     white.lobby.send({ t: 'say', ch: room, text: 'Good luck at Chess' });
     await black.lobby.wait(frame => frame.t === 'line' && frame.text === 'Good luck at Chess', 'chat while match is open');
-    const partAt = a.frames.length, cardsPartAt = cards.frames.length, rummyPartAt = rummy.frames.length, spadesPartAt = spades.frames.length, jackPartAt = jack.frames.length, trisPartAt = tris.frames.length;
+    const partAt = a.frames.length, cardsPartAt = cards.frames.length, rummyPartAt = rummy.frames.length, spadesPartAt = spades.frames.length, jackPartAt = jack.frames.length, trisPartAt = tris.frames.length, maniaPartAt = mania.frames.length;
     black.lobby.send({ t: 'cmd', name: 'part', args: [room], ch: room });
     await black.lobby.wait(frame => frame.t === 'part' && frame.ch === room, 'explicit room departure');
     await a.wait(frame => frame.t === 'match-state' && frame.state === null, 'seat retirement', partAt);
@@ -608,6 +676,7 @@ try {
     await spades.wait(frame => frame.t === 'match-state' && frame.state === null, 'Spades seat retirement', spadesPartAt);
     await jack.wait(frame => frame.t === 'match-state' && frame.state === null, 'Crapjack seat retirement', jackPartAt);
     await tris.wait(frame => frame.t === 'match-state' && frame.state === null, 'Turdtris race retirement', trisPartAt);
+    await mania.wait(frame => frame.t === 'match-state' && frame.state === null, 'Turdomania duel retirement', maniaPartAt);
     console.log('Passed native Turdtris countdown, same seed, separate boards, spectator permissions, paired inputs, reconnect, forfeit, rematch and retirement.');
     console.log('Passed native four-player Crapjack dealer settlement, hidden hands, spectator permissions, reconnect, fresh session and seat retirement.');
     console.log('Passed native four-seat TurdSpades, spectator privacy, bidding, 13 tricks, rematch and seat retirement.');

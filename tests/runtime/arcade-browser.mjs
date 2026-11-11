@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium, webkit } from 'playwright';
 import { expect } from '@playwright/test';
+import { findDuelSolution } from '../../hangout-worker/arcade/games/turdomania-duel.js';
 
 export async function runArcadeBrowser(engine, origin, invitation, evidence, entrances, media) {
     const browser = await { chromium, webkit }[engine].launch({
@@ -495,6 +496,111 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(table(b)).toHaveAttribute('data-sequence', '0');
         console.log(`Passed ${engine} Turdtris same countdown and bag, keyboard and 44px phone touch input, ${media ? 'local prediction with 220 ms input delay and the same call' : 'full reload mid-race'}, spectator and rematch.`);
     }
+    async function playTurdomania(a, b, spectator) {
+        const before = media ? await packetCount(b, 'audio') : 0;
+        if (media) {
+            await b.routeWebSocket(/\/beta\/arcade-turdomania-match$/, route => {
+                const server = route.connectToServer();
+                route.onMessage(message => {
+                    const pop = typeof message === 'string' && JSON.parse(message).action === 'pop';
+                    if (pop) setTimeout(() => server.send(message), 220);
+                    else server.send(message);
+                });
+            });
+        }
+        for (const page of [a, b, spectator]) {
+            await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdomania');
+        }
+        const table = page => page.locator('[data-mania-match]');
+        const board = page => page.getByRole('grid', { name: 'Your puzzle' });
+        const tile = (page, id) => board(page).locator(`[data-mania-tile="${id}"]`);
+        const current = page => board(page).getByRole('gridcell').evaluateAll(nodes => {
+            const stacks = Array.from({ length: 6 }, () => []);
+            for (const { dataset } of nodes) {
+                stacks[Number(dataset.col)][Number(dataset.row)] = { id: Number(dataset.maniaTile), kind: Number(dataset.kind) };
+            }
+            return stacks.filter(stack => stack.length);
+        });
+        await a.getByRole('button', { name: 'Open Turdomania duel' }).click();
+        await b.getByRole('button', { name: 'Join Turdomania duel' }).click();
+        await expect(table(a)).toHaveAttribute('data-phase', 'countdown');
+        await expect(table(b)).toHaveAttribute('data-phase', 'countdown');
+        const opening = await current(a);
+        assert.deepEqual(await current(b), opening);
+        const path = findDuelSolution(opening);
+        assert.ok(path.length >= 5);
+        await expect(spectator.getByRole('img', { name: 'Player 1 puzzle' }).locator('[data-mania-tile]')).toHaveCount(36);
+        await expect(spectator.getByRole('img', { name: 'Player 2 puzzle' }).locator('[data-mania-tile]')).toHaveCount(36);
+        await expect(spectator.getByRole('grid')).toHaveCount(0);
+        await expect(table(b)).toHaveAttribute('data-phase', 'play');
+        if (evidence) {
+            await mkdir(evidence, { recursive: true });
+            await b.screenshot({ path: join(evidence, `mania-${engine}-phone.png`) });
+            await a.screenshot({ path: join(evidence, `mania-${engine}-desktop.png`) });
+        }
+        await expect(board(b)).toBeInViewport({ ratio: 1 });
+        await expect(b.locator('[data-mania-clock]')).toBeInViewport({ ratio: 1 });
+        await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
+        assert.equal(await b.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+        const first = tile(a, path[0]);
+        await first.focus();
+        const row = Number(await first.getAttribute('data-row'));
+        await a.keyboard.press(row === 5 ? 'ArrowDown' : 'ArrowUp');
+        await expect(first).not.toBeFocused();
+        await a.keyboard.press(row === 5 ? 'ArrowUp' : 'ArrowDown');
+        await expect(first).toBeFocused();
+        await a.keyboard.press('Enter');
+        await expect(table(a)).toHaveAttribute('data-move', '1');
+        assert.deepEqual(await current(b), opening);
+        const touch = tile(b, path[0]);
+        const box = await touch.boundingBox();
+        assert.ok(box?.width >= 44 && box?.height >= 44, 'phone-sized Turdomania tile');
+        const prediction = media ? b.evaluate(async id => {
+            const table = document.querySelector('[data-mania-match]');
+            const target = document.querySelector('[data-mania-board="self"] [data-mania-tile="' + id + '"]');
+            const start = performance.now();
+            while (performance.now() - start < 350) {
+                await new Promise(requestAnimationFrame);
+                if (table.dataset.move !== '0') return false;
+                if (!target.isConnected) return true;
+            }
+            return false;
+        }, path[0]) : null;
+        await b.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+        if (prediction) assert.equal(await prediction, true, 'the local tile disappears before the delayed server confirmation');
+        await expect(table(b)).toHaveAttribute('data-move', '1');
+        assert.deepEqual(await current(b), await current(a));
+        if (!media) {
+            const prior = await current(b);
+            await b.reload();
+            await b.locator('[data-enter]').click();
+            await expect(table(b)).toHaveAttribute('data-move', '1');
+            assert.deepEqual(await current(b), prior);
+            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+        }
+        for (const [move, id] of path.entries()) {
+            if (!move) continue;
+            await tile(a, id).click();
+            await tile(b, id).click();
+            await expect(table(a)).toHaveAttribute('data-move', String(move + 1));
+            await expect(table(b)).toHaveAttribute('data-move', String(move + 1));
+        }
+        for (const page of [a, b, spectator]) {
+            await expect(table(page)).toHaveAttribute('data-phase', 'finished');
+            await expect(page.locator('[data-mania-status]')).toHaveText('Draw');
+            await expect(page.getByText('Cleared', { exact: true })).toHaveCount(2);
+        }
+        if (media) {
+            await waitForPackets(b, 'audio', before);
+            assert.equal(await b.evaluate(() => window.testPeers.length), 1);
+        }
+        await a.getByRole('button', { name: 'Request Turdomania rematch' }).click();
+        await b.getByRole('button', { name: 'Accept Turdomania rematch' }).click();
+        await expect(table(b)).toHaveAttribute('data-phase', 'countdown');
+        await expect(table(b)).toHaveAttribute('data-move', '0');
+        await expect(board(b).getByRole('gridcell')).toHaveCount(36);
+        console.log(`Passed ${engine} Turdomania two complete puzzles, keyboard and 44px phone touch input, ${media ? 'local prediction with 220 ms input delay and the same call' : 'full reload mid-duel'}, spectator and rematch.`);
+    }
     try {
         const a = await guest('stalemate', 'ChessHost', { width: 1280, height: 900 });
         const b = await guest('rad-dad', 'ChessGuest', { width: 375, height: 667 }, true);
@@ -563,6 +669,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const spectator = await playSpades(a, b);
         await playJack(a, b, spectator);
         await playTurdtris(a, b, spectator);
+        await playTurdomania(a, b, spectator);
         if (media) {
             await a.locator('[data-call-toggle]').click();
             await a.getByRole('button', { name: 'Actions for ChessGuest' }).click();

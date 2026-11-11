@@ -20,6 +20,7 @@ if (target === 'beta') {
             'games/turdrummy-rules.js',
             'games/turdtris-sprint.js', 'games/turdtris_logic.js', 'games/turdtris-presentation.js',
             'games/turdtris-modes.js', 'games/turdtris-art.js',
+            'games/turdomania-core.js', 'assets/turdomania-tiles.svg',
             'assets/chess/chessground.js', 'assets/chess/chessground.base.css', 'assets/chess/chess-board.css',
             'assets/chess/chessground-10.5.0-source.tar.gz',
             'assets/chess/Chessground-LICENSE.txt', 'assets/chess/chessjs-LICENSE.txt',

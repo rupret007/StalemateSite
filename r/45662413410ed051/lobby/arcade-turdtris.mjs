@@ -227,7 +227,7 @@ export function mountArcadeTurdtris(container) {
                 : (result.winner === 'a' ? 'Player 1 wins' : 'Player 2 wins');
             message += ' · ' + { finish: '40 lines', time: 'time limit', resign: 'forfeit', 'top-out': 'both boards out' }[result.reason];
             if (seat && seat !== model.rematch) { action = 'rematch'; label = model.rematch ? 'Accept Turdtris rematch' : 'Request Turdtris rematch'; }
-            if (model.rematch === seat) message += ' · Rematch requested';
+            if (seat && model.rematch === seat) message += ' · Rematch requested';
         } else if (match) {
             message = !seat ? 'Watching the race' : match.self.board.status === 'top-out' ? 'Your board topped out. Opponent still playing.'
                 : match.self.board.status === 'cleared' ? '40 lines cleared. Confirming the finish…' : 'Race to 40';

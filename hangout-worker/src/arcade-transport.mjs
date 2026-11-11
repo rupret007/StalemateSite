@@ -4,6 +4,7 @@ import { GameNightTurdRummy } from './game-night-turdrummy.mjs';
 import { GameNightTurdSpades } from './game-night-turdspades.mjs';
 import { GameNightTurdJack } from './game-night-turdjack.mjs';
 import { GameNightTurdtris } from './game-night-turdtris.mjs';
+import { GameNightTurdomania } from './game-night-turdomania.mjs';
 import { createGameNightSockets } from './game-night-sockets.mjs';
 export { arcadeRoomRequest } from './game-night-sockets.mjs';
 
@@ -17,7 +18,8 @@ const adapters = new Map([
     ['turdrummy', { flag: 'HANGOUT_ARCADE_TURDRUMMY', Table: GameNightTurdRummy, renewOnAction: true }],
     ['turdspades', { flag: 'HANGOUT_ARCADE_TURDSPADES', Table: GameNightTurdSpades, renewOnAction: true }],
     ['turdjack', { flag: 'HANGOUT_ARCADE_TURDJACK', Table: GameNightTurdJack, renewOnAction: true }],
-    ['turdtris', { flag: 'HANGOUT_ARCADE_TURDTRIS', Table: GameNightTurdtris, tableCap: 4 }]
+    ['turdtris', { flag: 'HANGOUT_ARCADE_TURDTRIS', Table: GameNightTurdtris, tableCap: 4 }],
+    ['turdomania', { flag: 'HANGOUT_ARCADE_TURDOMANIA', Table: GameNightTurdomania, tableCap: 8 }]
 ]);
 
 export const arcadeGames = Object.freeze([...adapters.keys()]);
