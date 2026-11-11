@@ -58,6 +58,18 @@ out. The exact staged page also passed actual Chrome 200% and 400% Page zoom on
 Intel. Physical media and screen-reader speech remain open.
 [Release and browser evidence](../pr-assets/private-readiness/20261111/web-join-audio-check/qualification.json)
 
+The next private candidate, `33d57f9`, includes the direct Jam room invitation
+and improved browser microphone recovery. Both exact PR runs passed 952
+browser cases. These included choosing another input after a missing or busy
+default and completing the check when the browser could not list devices.
+The local workerd artifact matched 50 source inputs against the private merge
+and passed all 15 recorded steps. It covered 50 native guest sockets, 600
+deliveries, revocation, slow-client isolation and cold recovery. The
+[current readiness guide](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md#candidate-awaiting-private-rollout)
+records the deployment and physical checks still needed.
+[Browser CI](https://github.com/rupret007/StalemateSite/actions/runs/43076121054) ·
+[Local runtime CI](https://github.com/rupret007/StalemateSite/actions/runs/43081753166)
+
 The original 62 ID and outcome cells below are copied verbatim.
 
 | ID | Original required outcome | Evidence and scope | Still required / limit |
