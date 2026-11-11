@@ -536,3 +536,94 @@ test('Game Night keeps invitations actionable and offers a safe return after a d
         await fixture.close();
     }
 });
+
+for (const width of [375, 390, 1280]) test(`a Jam room invitation stays actionable and a dropped or refreshed bandmate can return at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+    const fixture = await community(browser, baseURL);
+    try {
+        const host = await fixture.visitor('JamHost', { width: 1280, height: 850 });
+        const guest = await fixture.visitor('JamGuest', { width, height: width > 500 ? 850 : 667 });
+        await host.locator('[data-start="jam"]').click();
+        await expect(host.locator('[data-jam]')).toBeVisible();
+        const room = await host.locator('[data-chat-context]').textContent();
+        const offer = guest.locator('[data-game-offer]'), roomTab = guest.getByRole('tab', { name: room });
+        const context = guest.locator('[data-chat-context]');
+        // The offer waits for an answer, so it must not cover the composer or
+        // widen the page while it is showing.
+        const composerClear = () => guest.evaluate(() => {
+            const say = document.querySelector('[data-say]').getBoundingClientRect();
+            const notices = document.querySelector('.irc-notices').getBoundingClientRect();
+            return notices.height > 0 && say.height > 0 && say.bottom <= notices.top && document.documentElement.scrollWidth <= innerWidth;
+        });
+        const enter = async page => {
+            await page.locator('[data-nick]').fill(page === host ? 'JamHost' : 'JamGuest');
+            await page.locator('[data-enter]').click();
+            await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        };
+        const inviteGuest = async () => {
+            await host.locator('[data-jam-invite-room]').click();
+            await host.locator('[data-invite-options]').selectOption({ label: 'JamGuest' });
+            await host.locator('[data-invite-person-send]').click();
+            await expect(offer).toContainText(`JamHost invited you to ${room}.`);
+        };
+        await guest.clock.install();
+        await inviteGuest();
+        // The earlier invitation was a notice that disappeared after twelve
+        // seconds, leaving no way into an invite-only room.
+        await guest.clock.runFor(13_000);
+        const join = offer.getByRole('button', { name: 'Join room', exact: true });
+        await expect(join).toBeVisible();
+        await expect(guest.locator('[data-toast]')).toBeHidden();
+        expect(await composerClear()).toBe(true);
+        await guest.screenshot({ path: testInfo.outputPath(`jam-room-invitation-${width}.png`) });
+        await join.press('Enter');
+        await expect(context).toHaveText(room);
+        await expect(roomTab).toBeFocused();
+        await expect(offer).toBeHidden();
+        await expect(guest.locator('[data-jam]')).toBeVisible();
+
+        // A rehearsal lasts longer than the return window measured from the
+        // last tab switch. A late connection drop still offers the room.
+        await guest.clock.fastForward(45 * 60 * 1000);
+        fixture.disconnect('JamGuest', 1012);
+        await expect(offer).toContainText(`You were disconnected from ${room}.`);
+        await expect(context).toHaveText('#stalemate');
+        expect(await composerClear()).toBe(true);
+        await guest.screenshot({ path: testInfo.outputPath(`jam-room-return-${width}.png`) });
+        await offer.getByRole('button', { name: 'Return to room', exact: true }).press('Enter');
+        await expect(context).toHaveText(room);
+        await expect(roomTab).toBeFocused();
+        await expect(offer).toBeHidden();
+
+        // Leaving on purpose is not a disconnect. A fresh invitation is needed.
+        await guest.locator('[data-leave]').press('Enter');
+        await expect(context).toHaveText('#stalemate');
+        await expect(offer).toBeHidden();
+        expect(await guest.evaluate(() => sessionStorage.getItem('hangout-game-return'))).toBeNull();
+        await inviteGuest();
+        await offer.getByRole('button', { name: 'Join room', exact: true }).click();
+        await expect(context).toHaveText(room);
+
+        // The host can refresh without losing the room or their bandmate.
+        await host.reload();
+        await enter(host);
+        await host.locator('[data-game-offer]').getByRole('button', { name: 'Return to room', exact: true }).click();
+        await expect(host.locator('[data-chat-context]')).toHaveText(room);
+        await expect(host.locator('[data-jam-invite-room]')).toBeVisible();
+
+        // A refreshed bandmate is offered the same room. If the host closed it
+        // meanwhile, the stale offer says so and goes away.
+        await guest.reload();
+        await enter(guest);
+        const comeBack = offer.getByRole('button', { name: 'Return to room', exact: true });
+        await expect(comeBack).toBeVisible();
+        await command(host, 'close', [], room);
+        await expect(host.locator('[data-chat-context]')).toHaveText('#stalemate');
+        await comeBack.click();
+        await expect(guest.locator('[data-toast]')).toContainText(`Couldn’t join ${room}. It may have closed.`);
+        await expect(offer).toBeHidden();
+        await expect(context).toHaveText('#stalemate');
+        expect(await guest.evaluate(() => sessionStorage.getItem('hangout-game-return'))).toBeNull();
+    } finally {
+        await fixture.close();
+    }
+});

@@ -66,6 +66,7 @@ for (const width of [375, 390]) {
             await say(outsider, '/invite JourneyGuest ' + roomName);
             await expect(outsider.locator('[data-buffer]')).toContainText('/invite: permission denied');
             await expect(guest.locator('[data-toast] button')).toHaveCount(0);
+            await expect(guest.locator('[data-game-offer]')).toBeHidden();
             await host.click('[data-roomtools]');
             await expect(host.getByRole('button', { name: 'Invite guest', exact: true })).toBeVisible();
             await host.getByRole('button', { name: 'Invite guest', exact: true }).click();
@@ -78,8 +79,8 @@ for (const width of [375, 390]) {
             await host.screenshot({ path: testInfo.outputPath(`invite-guest-${width}.png`) });
             await dialog.getByRole('button', { name: 'Send invitation', exact: true }).click();
             await expect(dialog).toBeHidden();
-            await expect(guest.locator('[data-toast]')).toContainText('JourneyHost invited you to ' + roomName);
-            await guest.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
+            await expect(guest.locator('[data-game-offer]')).toContainText('JourneyHost invited you to ' + roomName);
+            await guest.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).click();
             await expect(guest.locator('[data-chat-context]')).toHaveText(roomName);
             await expect(guest.locator('[data-roomtools]')).toBeHidden();
             await host.fill('[data-jam-link]', INVITE); await host.locator('[data-jam-form] button[type=submit]').click();
@@ -261,7 +262,7 @@ test('a host losing room controls cannot submit an invitation from an already op
         await host.click('[data-roomtools]'); await host.getByRole('button', { name: 'Invite guest', exact: true }).click();
         await host.getByLabel('Guest nickname', { exact: true }).fill('CurrentHost');
         await host.getByRole('button', { name: 'Send invitation', exact: true }).click();
-        await cohost.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
+        await cohost.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).click();
         await expect(cohost.locator('[data-jam]')).toBeVisible();
         await say(host, '/op CurrentHost'); await expect(cohost.locator('[data-roomtools]')).toBeVisible();
         await host.click('[data-roomtools]'); await host.getByRole('button', { name: 'Invite guest', exact: true }).click();
@@ -277,6 +278,7 @@ test('a host losing room controls cannot submit an invitation from an already op
         await host.locator('[data-invite-form]').evaluate(form => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
         expect(fixture.inbound.filter(frame => frame.nick === 'FormerHost' && frame.name === 'invite')).toHaveLength(before);
         await expect(target.locator('[data-toast] button')).toHaveCount(0);
+        await expect(target.locator('[data-game-offer]')).toBeHidden();
     } finally { await Promise.all(pages.map(page => page.context().close())); }
 });
 
