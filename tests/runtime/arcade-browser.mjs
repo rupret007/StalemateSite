@@ -1102,6 +1102,19 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     }
     async function playTurdanoid(a, b, spectator) {
         const before = media ? await packetCount(b, 'audio') : 0;
+        const launchFrames = [];
+        function observeLaunch(socket) {
+            if (!new URL(socket.url()).pathname.endsWith('/arcade-turdanoid-match')) return;
+            for (const direction of ['framesent', 'framereceived']) socket.on(direction, ({ payload }) => {
+                const { action, inputs, sequence, reason, state } = JSON.parse(payload.toString());
+                const runner = state?.match?.runner;
+                if (action !== 'input' && !reason && !runner) return;
+                launchFrames.push({ direction, action, inputs, sequence, reason,
+                    at: state?.match?.at, tick: runner?.tick, confirmed: runner?.sequence, serves: runner?.run?.serves });
+                if (launchFrames.length > 24) launchFrames.shift();
+            });
+        }
+        b.on('websocket', observeLaunch);
         if (media) {
             await b.routeWebSocket(/\/beta\/arcade-turdanoid-match$/, route => {
                 const server = route.connectToServer();
@@ -1164,11 +1177,32 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await b.screenshot({ path: join(evidence, `brick-${engine}-phone.png`) });
         }
         await a.keyboard.press('Space');
+        await b.bringToFront();
         const sequenceBeforeLaunch = Number(await match(b).getAttribute('data-sequence'));
         await expect(serve(b)).toBeInViewport({ ratio: 1 });
-        await serve(b).tap();
-        await expect(match(b)).toHaveAttribute('data-stuck', 'false');
-        await expect.poll(async () => Number(await match(b).getAttribute('data-sequence'))).toBeGreaterThan(sequenceBeforeLaunch);
+        const launchEvents = await b.evaluateHandle(() => {
+            const events = [], controller = new AbortController();
+            for (const type of ['pointerdown', 'pointerup', 'pointercancel', 'click']) document.addEventListener(type, event => {
+                const button = event.target.closest?.('[data-brick-serve]');
+                events.push({ type, trusted: event.isTrusted, pointer: event.pointerType, onLaunch: !!button, disabled: button?.disabled });
+            }, { capture: true, signal: controller.signal });
+            return { events, controller };
+        });
+        try {
+            await serve(b).tap();
+            await expect(match(b)).toHaveAttribute('data-stuck', 'false');
+            await expect.poll(async () => Number(await match(b).getAttribute('data-sequence'))).toBeGreaterThan(sequenceBeforeLaunch);
+        } catch (error) {
+            const events = await launchEvents.evaluate(trace => trace.events);
+            const feedback = await b.locator('[data-brick-error]').textContent();
+            console.error('Turdanoid phone launch', JSON.stringify({ sequenceBeforeLaunch, events, feedback, launchFrames }));
+            if (evidence) await b.screenshot({ path: join(evidence, `brick-${engine}-launch-failure.png`) });
+            throw error;
+        } finally {
+            b.off('websocket', observeLaunch);
+            await launchEvents.evaluate(trace => trace.controller.abort());
+            await launchEvents.dispose();
+        }
         for (const page of [a, b, spectator]) {
             for (const seat of ['a', 'b']) {
                 await expect(page.locator(`[data-brick-score="${seat}"]`)).toContainText(/[1-9]\d* pts/);

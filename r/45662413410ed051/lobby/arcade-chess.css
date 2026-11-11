@@ -93,7 +93,7 @@
         margin-top: 0;
     }
     .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .buffer { min-height: 64px; }
-    .arcade-chess #board, .arcade-chess-clocks { width: min(100%, 25rem, max(15rem, calc(100dvh - 560px))); }
+    .arcade-chess #board, .arcade-chess-clocks { width: min(100%, 25rem, max(15rem, calc(100dvh - 568px))); }
 }
 @media (max-width: 900px) {
     body:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .titlebar {
