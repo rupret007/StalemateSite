@@ -411,6 +411,90 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(b.locator('[data-jack-bank]')).toHaveText('1000 play chips');
         console.log(`Passed ${engine} Crapjack two independent players, touch wager, spectator privacy, settlement, ${media ? 'same call during a game switch' : 'full reload after the deal'}, and fresh session.`);
     }
+    async function playTurdtris(a, b, spectator) {
+        const before = media ? await packetCount(b, 'audio') : 0;
+        if (media) {
+            await b.routeWebSocket(/\/beta\/arcade-turdtris-match$/, route => {
+                const server = route.connectToServer();
+                route.onMessage(message => {
+                    const isInput = typeof message === 'string' && JSON.parse(message).action === 'input';
+                    if (isInput) setTimeout(() => server.send(message), 220);
+                    else server.send(message);
+                });
+            });
+        }
+        for (const page of [a, b, spectator]) {
+            await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdtris');
+        }
+        const table = page => page.locator('[data-tris-match]');
+        const score = page => page.locator('[data-tris-score]');
+        const board = page => page.locator('[data-tris-playfield] canvas');
+        await a.getByRole('button', { name: 'Open Turdtris race' }).click();
+        await b.getByRole('button', { name: 'Join Turdtris race' }).click();
+        await expect(table(a)).toHaveAttribute('data-phase', 'countdown');
+        await expect(table(b)).toHaveAttribute('data-phase', 'countdown');
+        assert.equal(await a.locator('[data-tris-preview]').textContent(), await b.locator('[data-tris-preview]').textContent());
+        await expect(spectator.locator('[data-tris-controls]')).toBeHidden();
+        await expect(table(b)).toHaveAttribute('data-phase', 'play');
+        if (evidence) {
+            await mkdir(evidence, { recursive: true });
+            await b.screenshot({ path: join(evidence, `tris-${engine}-before-input.png`) });
+        }
+        await expect(board(b)).toBeInViewport({ ratio: 1 });
+        await expect(b.locator('[data-tris-controls]')).toBeInViewport({ ratio: 1 });
+        await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
+        assert.equal(await b.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+        await board(a).focus();
+        await a.keyboard.press('ArrowLeft');
+        await a.keyboard.press('Space');
+        await expect(score(a)).toContainText(/· [1-9]\d* pts/);
+        await expect(a.locator('[data-tris-clock]')).toBeInViewport({ ratio: 1 });
+        await expect(a.locator('[data-tris-controls]')).toBeInViewport({ ratio: 1 });
+        const drop = b.getByRole('button', { name: 'Hard drop' });
+        const box = await drop.boundingBox();
+        assert.ok(box?.width >= 44 && box?.height >= 44, 'phone-sized Turdtris drop button');
+        const accepted = media ? b.evaluate(async () => {
+            // Record a paint before server acknowledgement while its frame is delayed.
+            const canvas = document.querySelector('[data-tris-playfield] canvas');
+            const before = canvas.toDataURL();
+            const table = document.querySelector('[data-tris-match]');
+            const sequence = table.dataset.sequence;
+            const start = performance.now();
+            while (performance.now() - start < 300) {
+                await new Promise(requestAnimationFrame);
+                if (table.dataset.sequence !== sequence) return false;
+                if (canvas.toDataURL() !== before) return true;
+            }
+            return false;
+        }) : null;
+        await b.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+        if (accepted) assert.equal(await accepted, true, 'Turdtris paints locally before the delayed server acknowledgement');
+        await expect(table(b)).toHaveAttribute('data-sequence', '1');
+        await expect(score(b)).toContainText(/· [1-9]\d* pts/);
+        if (media) {
+            await waitForPackets(b, 'audio', before);
+            assert.equal(await b.evaluate(() => window.testPeers.length), 1);
+        } else {
+            const recorded = await score(b).textContent();
+            await b.reload();
+            await b.locator('[data-enter]').click();
+            await expect(table(b)).toHaveAttribute('data-sequence', '1');
+            await expect(score(b)).toHaveText(recorded);
+            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+        }
+        if (evidence) {
+            await a.screenshot({ path: join(evidence, `tris-${engine}-desktop.png`) });
+            await b.screenshot({ path: join(evidence, `tris-${engine}-phone.png`) });
+        }
+        await b.getByRole('button', { name: 'Leave race' }).click();
+        await b.getByRole('dialog', { name: 'Leave this race?' }).getByRole('button', { name: 'Leave race' }).click();
+        await expect(a.locator('[data-tris-status]')).toHaveText('You win · forfeit');
+        await a.getByRole('button', { name: 'Request Turdtris rematch' }).click();
+        await b.getByRole('button', { name: 'Accept Turdtris rematch' }).click();
+        await expect(table(b)).toHaveAttribute('data-phase', 'countdown');
+        await expect(table(b)).toHaveAttribute('data-sequence', '0');
+        console.log(`Passed ${engine} Turdtris same countdown and bag, keyboard and 44px phone touch input, ${media ? 'local prediction with 220 ms input delay and the same call' : 'full reload mid-race'}, spectator and rematch.`);
+    }
     try {
         const a = await guest('stalemate', 'ChessHost', { width: 1280, height: 900 });
         const b = await guest('rad-dad', 'ChessGuest', { width: 375, height: 667 }, true);
@@ -478,6 +562,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await playRummy(a, b);
         const spectator = await playSpades(a, b);
         await playJack(a, b, spectator);
+        await playTurdtris(a, b, spectator);
         if (media) {
             await a.locator('[data-call-toggle]').click();
             await a.getByRole('button', { name: 'Actions for ChessGuest' }).click();

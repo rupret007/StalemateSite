@@ -3,6 +3,7 @@ import { GameNightCrapeights } from './game-night-crapeights.mjs';
 import { GameNightTurdRummy } from './game-night-turdrummy.mjs';
 import { GameNightTurdSpades } from './game-night-turdspades.mjs';
 import { GameNightTurdJack } from './game-night-turdjack.mjs';
+import { GameNightTurdtris } from './game-night-turdtris.mjs';
 import { createGameNightSockets } from './game-night-sockets.mjs';
 export { arcadeRoomRequest } from './game-night-sockets.mjs';
 
@@ -15,7 +16,8 @@ const adapters = new Map([
     ['crapeights', { flag: 'HANGOUT_ARCADE_CRAPEIGHTS', Table: GameNightCrapeights, renewOnAction: true }],
     ['turdrummy', { flag: 'HANGOUT_ARCADE_TURDRUMMY', Table: GameNightTurdRummy, renewOnAction: true }],
     ['turdspades', { flag: 'HANGOUT_ARCADE_TURDSPADES', Table: GameNightTurdSpades, renewOnAction: true }],
-    ['turdjack', { flag: 'HANGOUT_ARCADE_TURDJACK', Table: GameNightTurdJack, renewOnAction: true }]
+    ['turdjack', { flag: 'HANGOUT_ARCADE_TURDJACK', Table: GameNightTurdJack, renewOnAction: true }],
+    ['turdtris', { flag: 'HANGOUT_ARCADE_TURDTRIS', Table: GameNightTurdtris, tableCap: 4 }]
 ]);
 
 export const arcadeGames = Object.freeze([...adapters.keys()]);
@@ -37,7 +39,7 @@ export function arcadeEnabled(env = {}, game) {
 // Call from the same Durable Object's serialized lobby event path. The
 // callbacks resolve membership and participation against the committed lobby.
 export function createArcadeTransport({ state, current, active, approve, charge, allowed, name = 'chess', now = () => Date.now(), uuid = () => crypto.randomUUID() }) {
-    const { Table, renewOnAction } = adapters.get(name);
+    const { Table, renewOnAction, tableCap = MATCH_CAP } = adapters.get(name);
     const tag = tagFor(name), prefix = name === 'chess' ? ARCADE_TAG + ':' : 'game-night-' + name + ':';
     const pendingRevocations = new Map();
     const { issue, upgrade, member, sockets, send, close } = createGameNightSockets({
@@ -90,7 +92,7 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                 if (!binding.canPlay || !await approve(scope.actor)) error = 'unavailable';
                 else if (frame.action === 'open') {
                     if (!binding.canOpen || game) error = 'unavailable';
-                    else if ((await state.storage.list({ prefix, limit: MATCH_CAP })).size >= MATCH_CAP) error = 'unavailable';
+                    else if ((await state.storage.list({ prefix, limit: tableCap })).size >= tableCap) error = 'unavailable';
                     else { game = new Table(uuid(), subject); changed = true; expiresAt = now() + MATCH_TTL; }
                 } else if (!game) error = 'match-changed';
                 else if (frame.action === 'join') {

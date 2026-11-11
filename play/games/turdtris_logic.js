@@ -45,7 +45,7 @@ export function isValidMove(matrix, cellRow, cellCol, playfield) {
         cellCol + col < 0 ||
           cellCol + col >= playfield[0].length ||
           cellRow + row >= playfield.length ||
-          playfield[cellRow + row][cellCol + col])
+          playfield[cellRow + row]?.[cellCol + col])
       ) {
         return false;
       }

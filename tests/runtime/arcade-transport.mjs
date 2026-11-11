@@ -399,6 +399,68 @@ async function verifyJack(white, black, north, east, spectator, ref) {
     return host;
 }
 
+async function verifyTurdtris(white, black, spectator, ref) {
+    const endpoint = '/beta/arcade-turdtris';
+    const connect = async player => {
+        const ticket = await grant(player, ref, endpoint + '-ticket');
+        const response = await upgrade(player.cookie, ticket, endpoint + '-match');
+        assert.equal(response.status, 101);
+        const link = observe(response.webSocket);
+        await link.wait(frame => frame.t === 'match-ready', 'Turdtris connection');
+        return link;
+    };
+    const host = await connect(white), watch = await connect(spectator);
+    let guest = await connect(black);
+    host.send({ version: 1, action: 'open' });
+    const id = (await guest.wait(frame => frame.state?.waiting, 'Turdtris open race')).state.id;
+    const send = (link, action, fields = {}) => link.send({ version: 1, id, action, ...fields });
+    send(guest, 'join');
+    const a = (await host.wait(frame => frame.state?.match, 'Turdtris host countdown')).state.match;
+    const b = (await guest.wait(frame => frame.state?.match, 'Turdtris guest countdown')).state.match;
+    assert.equal(a.seed, b.seed);
+    assert.equal(a.startsAt, b.startsAt);
+    assert.deepEqual(a.self.board, b.self.board);
+    assert.deepEqual(a.self.next, b.self.next);
+    send(host, 'input', { sequence: 1, inputs: ['drop'] });
+    await host.wait(frame => frame.reason === 'countdown', 'prestart drop refused');
+    await new Promise(resolve => setTimeout(resolve, Math.max(0, a.startsAt - Date.now()) + 25));
+    send(watch, 'input', { sequence: 1, inputs: ['drop'] });
+    await watch.wait(frame => frame.reason === 'unavailable', 'Turdtris spectator cannot control a board');
+    const confirmed = (link, sequence) => link.wait(frame => frame.state?.match?.self?.sequence === sequence, 'confirmed sprint input ' + sequence);
+    const timings = [];
+    for (let sequence = 1; sequence <= 13; sequence++) {
+        const started = performance.now();
+        send(host, 'input', { sequence, inputs: sequence === 1 ? ['left', 'drop'] : [sequence % 2 ? 'left' : 'right'] });
+        send(guest, 'input', { sequence, inputs: sequence === 1 ? ['right', 'drop'] : [sequence % 2 ? 'right' : 'left'] });
+        const frames = await Promise.all([confirmed(host, sequence), confirmed(guest, sequence)]);
+        timings.push(performance.now() - started);
+        assert.ok(frames.every(frame => frame.state.match.id === id));
+        await new Promise(resolve => setTimeout(resolve, 90));
+    }
+    const publicView = (await watch.wait(frame => frame.state?.match?.revision === 26, 'Turdtris spectator sees both boards')).state.match;
+    assert.equal(publicView.self, null);
+    assert.notDeepEqual(publicView.boards.a.grid, publicView.boards.b.grid);
+    assert.ok(publicView.boards.a.score > 0 && publicView.boards.b.score > 0);
+    guest.socket.close(1000, 'Turdtris reconnect fixture');
+    guest = await connect(black);
+    send(guest, 'sync');
+    const recovered = (await confirmed(guest, 13)).state.match;
+    assert.deepEqual(recovered.boards.b.grid, publicView.boards.b.grid);
+    assert.equal(recovered.startsAt, a.startsAt);
+    send(guest, 'resign');
+    const result = await host.wait(frame => frame.state?.match?.result?.winner === 'a', 'Turdtris forfeit');
+    assert.equal(result.state.match.result.reason, 'resign');
+    send(host, 'rematch');
+    await guest.wait(frame => frame.state?.rematch === 'a', 'Turdtris rematch vote');
+    send(guest, 'rematch');
+    const fresh = await guest.wait(frame => frame.state?.match?.id && frame.state.match.id !== id, 'Turdtris rematch');
+    assert.equal(fresh.state.seat, 'a');
+    assert.equal(fresh.state.match.self.sequence, 0);
+    timings.sort((a, b) => a - b);
+    console.log(`Turdtris local workerd paired input confirmation, ${timings.length} samples: median ${timings[6].toFixed(1)} ms, max ${timings.at(-1).toFixed(1)} ms.`);
+    return host;
+}
+
 async function verifyMedia(white, black, ref, matchA, matchB) {
     const endpoint = '/beta/game-night-media';
     const join = async player => {
@@ -467,7 +529,7 @@ try {
         modules: [{ type: 'ESModule', path: join(directory, 'worker.mjs'), contents: bundled.output[0].code }],
         compatibilityDate: '2026-10-01', host: '127.0.0.1', port: 0, https: !!browserName, telemetry: { enabled: false },
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true } },
-        bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1', HANGOUT_ARCADE_CRAPEIGHTS: '1', HANGOUT_ARCADE_TURDRUMMY: '1', HANGOUT_ARCADE_TURDSPADES: '1', HANGOUT_ARCADE_TURDJACK: '1',
+        bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1', HANGOUT_ARCADE_CRAPEIGHTS: '1', HANGOUT_ARCADE_TURDRUMMY: '1', HANGOUT_ARCADE_TURDSPADES: '1', HANGOUT_ARCADE_TURDJACK: '1', HANGOUT_ARCADE_TURDTRIS: '1',
             ...(browserName ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
             ...(!browserName || browserMedia ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
             HANGOUT_HMAC_KEY: 'owned-arcade-fixture-hmac-not-for-deployment-2026', HANGOUT_BETA_INVITE_KEY: invite,
@@ -533,10 +595,11 @@ try {
     const rummy = await verifyRummy(white, black, spectator, ch.keepRef);
     const { host: spades, north, east } = await verifySpades(white, black, spectator, ch.keepRef);
     const jack = await verifyJack(white, black, north, east, spectator, ch.keepRef);
+    const tris = await verifyTurdtris(white, black, spectator, ch.keepRef);
     assert.ok([...a.frames, ...cards.frames].every(frame => frame.state?.game !== 'turdrummy'));
     white.lobby.send({ t: 'say', ch: room, text: 'Good luck at Chess' });
     await black.lobby.wait(frame => frame.t === 'line' && frame.text === 'Good luck at Chess', 'chat while match is open');
-    const partAt = a.frames.length, cardsPartAt = cards.frames.length, rummyPartAt = rummy.frames.length, spadesPartAt = spades.frames.length, jackPartAt = jack.frames.length;
+    const partAt = a.frames.length, cardsPartAt = cards.frames.length, rummyPartAt = rummy.frames.length, spadesPartAt = spades.frames.length, jackPartAt = jack.frames.length, trisPartAt = tris.frames.length;
     black.lobby.send({ t: 'cmd', name: 'part', args: [room], ch: room });
     await black.lobby.wait(frame => frame.t === 'part' && frame.ch === room, 'explicit room departure');
     await a.wait(frame => frame.t === 'match-state' && frame.state === null, 'seat retirement', partAt);
@@ -544,6 +607,8 @@ try {
     await rummy.wait(frame => frame.t === 'match-state' && frame.state === null, 'Rummy seat retirement', rummyPartAt);
     await spades.wait(frame => frame.t === 'match-state' && frame.state === null, 'Spades seat retirement', spadesPartAt);
     await jack.wait(frame => frame.t === 'match-state' && frame.state === null, 'Crapjack seat retirement', jackPartAt);
+    await tris.wait(frame => frame.t === 'match-state' && frame.state === null, 'Turdtris race retirement', trisPartAt);
+    console.log('Passed native Turdtris countdown, same seed, separate boards, spectator permissions, paired inputs, reconnect, forfeit, rematch and retirement.');
     console.log('Passed native four-player Crapjack dealer settlement, hidden hands, spectator permissions, reconnect, fresh session and seat retirement.');
     console.log('Passed native four-seat TurdSpades, spectator privacy, bidding, 13 tricks, rematch and seat retirement.');
     console.log('Passed native TurdRummy private stock draws, spectator projection, mid-turn reconnect, restricted discard, rematch, and retirement.');

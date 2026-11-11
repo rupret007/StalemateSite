@@ -1018,6 +1018,7 @@ export class HangoutLobby {
                     ...(arcadeEnabled(this.env, 'turdrummy') ? { arcadeTurdRummy: 1 } : {}),
                     ...(arcadeEnabled(this.env, 'turdspades') ? { arcadeTurdSpades: 1 } : {}),
                     ...(arcadeEnabled(this.env, 'turdjack') ? { arcadeTurdJack: 1 } : {}),
+                    ...(arcadeEnabled(this.env, 'turdtris') ? { arcadeTurdtris: 1 } : {}),
                     ...(mediaEnabled(this.env) ? { arcadeMedia: 1 } : {}) } } : frame);
         }
         return new Response(null, { status: 101, webSocket: pair[0] });
