@@ -17,7 +17,7 @@ const markup = `
 <summary>Crappy Eights</summary>
 <p class="small arcade-card-status" data-eights-status role="status"></p>
 <p class="small arcade-card-error" data-eights-error role="status"></p>
-<button class="btn btn--small" type="button" data-eights-main hidden></button>
+<button class="btn" type="button" data-eights-main hidden></button>
 <div data-eights-table data-card-table hidden>
     <div class="arcade-card-score" aria-label="Match scores">
         <span data-eights-score="a"></span>
@@ -34,7 +34,6 @@ const markup = `
         <div class="arcade-card-actions" data-eights-suits></div>
     </fieldset>
     <div class="arcade-card-actions">
-        <button class="btn btn--small" type="button" data-eights-action="next-round" hidden>Next round</button>
         <button class="btn btn--small btn--ghost" type="button" data-eights-action="resign" hidden>Resign</button>
         <button class="btn btn--small btn--ghost" type="button" data-eights-action="leave" hidden>Leave table</button>
     </div>
@@ -91,14 +90,20 @@ export function mountArcadeCrapeights(container) {
         },
         onState({ state, canOpen: host }) {
             if (state && (state.game !== 'crapeights' || state.version !== 1)) return;
-            const showingTable = state?.match && (!model?.match || model.id !== state.id);
-            if (model?.id !== state?.id || model?.match?.revision !== state?.match?.revision) closeChoices();
+            const match = state?.match, previous = model?.match;
+            const showingTable = match && (!previous || model.id !== state.id);
+            const showingOutcome = panel.open && ((match?.result && !previous?.result) || (match?.roundResult && !previous?.roundResult));
+            const focused = document.activeElement;
+            const focusInTable = showingOutcome && panel.contains(focused);
+            if (model?.id !== state?.id || previous?.revision !== match?.revision) closeChoices();
             phase = 'ready';
             model = state;
             canOpen = host;
             clearPending();
             draw();
-            if (showingTable) container.scrollTop = 0;
+            if (showingTable || showingOutcome && (focusInTable || focused === document.body)) container.scrollTop = 0;
+            if (focusInTable && !main.hidden && !main.disabled &&
+                (document.activeElement !== focused || focused.matches(':disabled') || focused.closest('[hidden]'))) main.focus({ preventScroll: true });
         },
         onError(reason) {
             clearPending();
@@ -179,7 +184,7 @@ export function mountArcadeCrapeights(container) {
                 command = model.rematch === model.seat ? '' : 'rematch';
                 label = model.rematch ? 'Accept Eights rematch' : 'Request Eights rematch';
                 if (!command) status.textContent += ' Waiting for rematch acceptance.';
-            }
+            } else if (match.roundResult && seated) { command = 'next-round'; label = 'Next round'; }
         }
         main.hidden = !command;
         main.textContent = label;
@@ -201,8 +206,7 @@ export function mountArcadeCrapeights(container) {
             const action = button.dataset.eightsAction;
             button.hidden = action === 'draw' ? !seated || !!match.roundResult || !!match.result
                 : action === 'pass' ? !match.canPass
-                    : action === 'next-round' ? !seated || !match.roundResult || !!match.result
-                        : !seated || action === 'resign' && !!match.result;
+                    : !seated || action === 'resign' && !!match.result;
             button.disabled = pending || (action === 'draw' && !match.canDraw);
             if (action === 'draw') button.textContent = `Draw · ${match.deckCount}`;
         }

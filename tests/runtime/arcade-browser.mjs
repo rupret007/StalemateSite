@@ -418,8 +418,92 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(dialog).toBeHidden();
         await expect(page.locator('[data-call-status]')).toHaveText('Queued for review when a moderator is available.');
     }
+    function watchEights(page) {
+        let current;
+        page.on('websocket', socket => {
+            if (!new URL(socket.url()).pathname.endsWith('/arcade-crapeights-match')) return;
+            socket.on('framereceived', ({ payload }) => {
+                const frame = JSON.parse(payload.toString());
+                if (frame.t === 'match-state') current = frame.state;
+            });
+        });
+        return () => current;
+    }
+    async function playEightsToTarget(players, views) {
+        const suitLabels = { S: '♠ Spades', H: '♥ Hearts', D: '♦ Diamonds', C: '♣ Clubs' };
+        const fastPoll = { intervals: [10, 25, 50, 100] };
+        await expect.poll(() => views.map(read => read()?.match?.revision), fastPoll).toEqual([0, 0]);
+        const first = views[0]();
+        assert.equal(views[1]().match.id, first.match.id);
+        const startingAudio = media ? await packetCount(players[1], 'audio') : 0;
+        async function expectOutcomeAction(name) {
+            for (const page of players) {
+                const action = page.getByRole('button', { name });
+                await expect(page.locator('[data-eights-status]')).toBeInViewport({ ratio: 1 });
+                await expect(action).toBeInViewport({ ratio: 1 });
+                assert.ok((await action.boundingBox())?.height >= 44, 'phone-sized Eights outcome action');
+            }
+        }
+        let commands = 0, table = first.match;
+        while (!table.result && commands < 1500) {
+            const index = views.findIndex(read => read().seat === table.turn);
+            assert.ok(index >= 0, 'the active seat has a connected client');
+            const page = players[index], match = views[index]().match;
+            if (match.roundResult) {
+                await expectOutcomeAction('Next round');
+                await page.getByRole('button', { name: 'Next round' }).click();
+            } else {
+                const card = match.hand.find(card => card.playable && card.rank !== '8') || match.hand.find(card => card.playable);
+                if (!card) {
+                    await page.locator(`[data-eights-action="${match.canPass ? 'pass' : 'draw'}"]`).click();
+                } else {
+                    if (match.hand.length === 1) await players[1 - index].locator('[data-eights-table]').evaluate(table => {
+                        const surface = table.closest('.game-night');
+                        surface.scrollTop = surface.scrollHeight;
+                    });
+                    await page.locator(`[data-eights-card="${card.id}"]`).click();
+                    if (card.rank === '8') {
+                        const remaining = match.hand.filter(card => card.rank !== '8');
+                        const count = suit => remaining.filter(card => card.suit === suit).length;
+                        const suit = Object.keys(suitLabels).sort((a, b) => count(b) - count(a))[0];
+                        await page.locator('[data-eights-suits]').getByRole('button', { name: suitLabels[suit], exact: true }).click();
+                    }
+                }
+            }
+            const nextRevision = table.revision + 1;
+            await expect.poll(() => views.map(read => read()?.match?.revision), fastPoll).toEqual([nextRevision, nextRevision]);
+            table = views[0]().match;
+            commands++;
+        }
+        assert.equal(table.result?.reason, 'score', 'complete a match by earning points');
+        assert.equal(table.target, 200);
+        assert.ok(table.score[table.result.winner] >= table.target);
+        assert.deepEqual(views[1]().match.score, table.score);
+        assert.deepEqual(views[1]().match.result, table.result);
+        const winner = views.findIndex(read => read().seat === table.result.winner);
+        await expect(players[winner].locator('[data-eights-status]')).toHaveText('You won the match.');
+        await expect(players[1 - winner].locator('[data-eights-status]')).toHaveText(/^Seat [12] won the match\.$/);
+        for (const page of players) for (const seat of ['a', 'b']) {
+            await expect(page.locator(`[data-eights-score="${seat}"]`)).toContainText(`· ${table.score[seat]}/200 pts ·`);
+        }
+        if (evidence) await players[1].screenshot({ path: join(evidence, `eights-${engine}-score-finish.png`) });
+        await expectOutcomeAction('Request Eights rematch');
+        await players[winner].getByRole('button', { name: 'Request Eights rematch' }).click();
+        await players[1 - winner].getByRole('button', { name: 'Accept Eights rematch' }).click();
+        for (const page of players) {
+            await expect(page.locator('[data-eights-card]')).toHaveCount(7);
+            for (const seat of ['a', 'b']) await expect(page.locator(`[data-eights-score="${seat}"]`)).toContainText('· 0/200 pts ·');
+        }
+        assert.notEqual(views[0]().match.id, table.id);
+        if (media) {
+            await waitForPackets(players[1], 'audio', startingAudio);
+            await expectOriginalPeer(players[1]);
+        }
+        console.log(`Passed ${engine} Crappy Eights scored match and fresh rematch after ${table.round} rounds and ${commands} commands, final score ${table.score.a}–${table.score.b}.`);
+    }
     async function playEights(a, b) {
         const before = media ? await packetCount(b, 'audio') : 0;
+        const views = process.env.ARCADE_EIGHTS_FULL_MATCH === '1' ? [a, b].map(watchEights) : null;
         for (const page of [a, b]) await page.getByRole('combobox', { name: 'Switch game' }).selectOption('crapeights');
         await a.getByRole('button', { name: 'Open Eights table' }).click();
         await b.getByRole('button', { name: 'Join Eights table' }).click();
@@ -468,6 +552,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.getByRole('button', { name: 'Accept Eights rematch' }).click();
         await expect(b.locator('[data-eights-status]')).toContainText('Round 1 · Your turn');
         await expect(bCards).toHaveCount(7);
+        if (views) await playEightsToTarget([a, b], views);
         if (evidence) {
             await mkdir(evidence, { recursive: true });
             await a.screenshot({ path: join(evidence, `eights-${engine}-desktop.png`) });
