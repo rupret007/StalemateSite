@@ -6,6 +6,35 @@ band rehearsal is not yet qualified.** Music, actual Shared Track mixing and
 Webex video/audio handoff remain essential acceptance work, not optional extras.
 Both public websites and their navigation remain unchanged.
 
+## Candidate awaiting private rollout
+
+Private source `33d57f9be9d7e156db1b2dfc88537a322f3dd197` adds **Invite bandmate
+to room** in the Jam panel. Web Join can offer a working input when the selected
+microphone is missing or busy. It can also test the default microphone when the
+browser cannot list devices. Both exact PR runs passed 952 browser cases,
+including keyboard setup and recovery at 375 and 390 CSS pixels. The latest
+WebJam source `b5483c5` also passed browser, desktop, and Jamulus integration CI.
+[Jam invite](https://github.com/rupret007/StalemateSite/pull/280) ·
+[Website microphone checks](https://github.com/rupret007/StalemateSite/pull/283) ·
+[WebJam CI](https://github.com/rupret007/webjam/actions/runs/43079275947)
+
+The candidate changes six protected assets against the last verified serving
+source `3ad1cc19`. The other 65 protected assets, 56 Worker inputs and five
+build inputs match. Local workerd exercised 50 connected test guests, 12
+messages and 600 deliveries, along with slow-client isolation, revocation and
+cold recovery. Hosted capacity and live media still need their own trials.
+[Local runtime CI](https://github.com/rupret007/StalemateSite/actions/runs/43081753166)
+
+The candidate awaits the Mini's deployment resource check and a fresh
+configuration, billing and rollback readback. The last verified serving
+version is `fca791b7`. Before switching to a candidate, verify `fca791b7` as
+the rollback target. After switching, use a normally admitted guest to check
+the served Jam and Web Join assets, then log out. The Windows NucBox was
+offline at the latest check. The live Mac-to-Windows rehearsal, Shared Track
+and Webex remain open.
+
+## Last verified private beta
+
 At 14:02 UTC, the private beta received the Web Join microphone-check update.
 A hosted Chromium guest exercised a simulated missing microphone at 375 and
 390 CSS pixels. **Try again** received keyboard focus. **Skip check** focused
