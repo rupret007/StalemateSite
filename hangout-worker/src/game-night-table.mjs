@@ -1,58 +1,79 @@
-// Room admission supplies server-owned subjects. This state never decides who
-// can enter a room or see its board. The lobby must authorize each operation,
-// including a read, and serialize membership changes with match changes.
-export function createGameNightTable({ name, version, Match, sides: [first, second], finished, project, create = (id, now) => new Match(id, now) }) {
+// The lobby supplies admitted subjects and authorizes every read and command.
+// This table assigns seats and preserves a distinct view for each viewer.
+export function createGameNightTable({ name, version, Match, sides, finished, project, create = (id, now) => new Match(id, now) }) {
+    const first = sides[0], twoSeats = sides.length === 2;
+    const subjectValid = value => typeof value === 'string' && !!value;
     return class GameNightTable {
         #seats;
         #match = null;
-        #rematch = null;
+        #votes = [];
         #id;
 
         constructor(id, host) {
-            if (typeof id !== 'string' || !/^[a-zA-Z0-9-]{5,80}$/.test(id) ||
-                typeof host !== 'string' || !host) throw new TypeError('Invalid match or seat identity');
+            if (typeof id !== 'string' || !/^[a-zA-Z0-9-]{5,80}$/.test(id) || !subjectValid(host)) {
+                throw new TypeError('Invalid match or seat identity');
+            }
             this.#id = id;
-            this.#seats = { [first]: host, [second]: null };
+            this.#seats = Object.fromEntries(sides.map(seat => [seat, seat === first ? host : null]));
         }
 
         static restore(record) {
             if (record?.version !== version || !record.seats) throw new TypeError('Invalid room match checkpoint');
             const game = new GameNightTable(record.id, record.seats[first]);
-            if (record.match) {
-                if (record.match.id !== record.id || typeof record.seats[second] !== 'string' ||
-                    !record.seats[second] || record.seats[second] === record.seats[first]) throw new TypeError('Invalid match seats');
+            for (const seat of sides.slice(1)) {
+                const subject = record.seats[seat];
+                if (subject === null) continue;
+                if (!subjectValid(subject) || game.seat(subject)) throw new TypeError('Invalid match seats');
+                game.#seats[seat] = subject;
+            }
+            const filled = game.subjects.length === sides.length;
+            if (filled !== !!record.match || (record.match && record.match.id !== record.id)) throw new TypeError('Invalid match seats');
+            if (filled) {
                 game.#match = Match.restore(record.match);
-                game.#seats[second] = record.seats[second];
-                if (finished(game.#match) && [first, second].includes(record.rematch)) game.#rematch = record.rematch;
+                const votes = twoSeats ? (record.rematch ? [record.rematch] : []) : record.rematchVotes;
+                if (finished(game.#match) && Array.isArray(votes) && votes.length < sides.length &&
+                    new Set(votes).size === votes.length && votes.every(seat => sides.includes(seat))) game.#votes = [...votes];
             }
             return game;
         }
 
+        #rematchView() {
+            return twoSeats ? { rematch: this.#votes[0] ?? null } : { rematchVotes: [...this.#votes] };
+        }
+
         checkpoint() {
-            return { version, id: this.#id, seats: { ...this.#seats },
-                match: this.#match?.checkpoint() ?? null, rematch: this.#rematch };
+            return { version, id: this.#id, seats: { ...this.#seats }, match: this.#match?.checkpoint() ?? null, ...this.#rematchView() };
         }
 
         get deadline() { return this.#match?.deadline ?? null; }
-        get subjects() { return this.#seats[second] ? [this.#seats[first], this.#seats[second]] : [this.#seats[first]]; }
+        get subjects() { return sides.map(seat => this.#seats[seat]).filter(Boolean); }
 
         seat(subject) {
-            if (typeof subject !== 'string' || !subject) return null;
-            if (this.#seats[first] === subject) return first;
-            if (this.#seats[second] === subject) return second;
-            return null;
+            return subjectValid(subject) ? sides.find(seat => this.#seats[seat] === subject) ?? null : null;
         }
 
         view(subject, now) {
-            return { version, game: name, id: this.#id,
-                seat: this.seat(subject), waiting: !this.#match, match: this.#match ? project(this.#match, this.seat(subject), now) : null,
-                rematch: this.#rematch };
+            const seat = this.seat(subject);
+            return {
+                version, game: name, id: this.#id, seat, waiting: !this.#match,
+                match: this.#match ? project(this.#match, seat, now) : null, ...this.#rematchView(),
+                ...(!twoSeats ? { occupied: sides.filter(position => this.#seats[position]) } : {})
+            };
         }
 
-        join(subject, id, now) {
-            if (id !== this.#id || this.#match || typeof subject !== 'string' || !subject || this.seat(subject)) return false;
-            this.#match = create(id, now);
-            this.#seats[second] = subject;
+        join(subject, id, now, requested) {
+            if (id !== this.#id || this.#match || !subjectValid(subject) || this.seat(subject)) return false;
+            const seat = twoSeats ? sides[1] : requested;
+            if (!sides.includes(seat) || this.#seats[seat]) return false;
+            if (this.subjects.length === sides.length - 1) this.#match = create(id, now);
+            this.#seats[seat] = subject;
+            return true;
+        }
+
+        releaseSeat(subject) {
+            const seat = this.seat(subject);
+            if (twoSeats || this.#match || !seat || seat === first) return false;
+            this.#seats[seat] = null;
             return true;
         }
 
@@ -64,17 +85,17 @@ export function createGameNightTable({ name, version, Match, sides: [first, seco
 
         requestRematch(subject, id, nextId, now) {
             const seat = this.seat(subject);
-            if (id !== this.#id || !seat || !this.#match || !finished(this.#match) || seat === this.#rematch) return false;
-            if (!this.#rematch) {
-                this.#rematch = seat;
+            if (id !== this.#id || !seat || !this.#match || !finished(this.#match) || this.#votes.includes(seat)) return false;
+            if (this.#votes.length < sides.length - 1) {
+                this.#votes.push(seat);
                 return true;
             }
             if (nextId === id) return false;
             const match = create(nextId, now);
-            this.#seats = { [first]: this.#seats[second], [second]: this.#seats[first] };
+            if (twoSeats) [this.#seats[first], this.#seats[sides[1]]] = [this.#seats[sides[1]], this.#seats[first]];
             this.#id = nextId;
             this.#match = match;
-            this.#rematch = null;
+            this.#votes = [];
             return true;
         }
     };

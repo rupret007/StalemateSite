@@ -221,6 +221,95 @@ async function verifyRummy(white, black, spectator, ref) {
     return a;
 }
 
+async function verifySpades(white, black, spectator, ref) {
+    const north = await guest('FixtureNorth', 'stalemate', '192.0.2.14');
+    const east = await guest('FixtureEast', 'rad-dad', '192.0.2.15');
+    for (const [player, nick] of [[north, 'FixtureNorth'], [east, 'FixtureEast']]) {
+        await pause();
+        white.lobby.send({ t: 'cmd', name: 'invite', args: [nick, room], ch: room,
+            roomInstance: ref, personContext: 1, personPeer: player.id });
+        await player.lobby.wait(frame => frame.t === 'invite' && frame.ch === room, 'Spades room invitation');
+        player.lobby.send({ t: 'cmd', name: 'join', args: [room], ch: '#stalemate' });
+        await player.lobby.wait(frame => frame.t === 'join' && frame.ch.name === room, 'Spades room admission');
+    }
+    const players = { south: white, west: black, north, east };
+    async function connect(player) {
+        const response = await upgrade(player.cookie, await grant(player, ref, '/beta/arcade-turdspades-ticket'), '/beta/arcade-turdspades-match');
+        assert.equal(response.status, 101);
+        const link = observe(response.webSocket);
+        await link.wait(frame => frame.t === 'match-ready', 'Spades ready');
+        return link;
+    }
+    const links = {};
+    for (const [seat, player] of Object.entries(players)) links[seat] = await connect(player);
+    const watch = await connect(spectator), host = links.south;
+    host.send({ version: 1, action: 'open' });
+    const id = (await watch.wait(frame => frame.state?.waiting, 'Spades table open')).state.id;
+    const send = (link, action, fields = {}) => link.send({ version: 1, id, action, ...fields });
+    const seatsAt = (count, start = 0) => watch.wait(frame => frame.state?.occupied?.length === count, 'Spades seated ' + count, start);
+    send(links.west, 'join', { seat: 'west' });
+    await seatsAt(2);
+    send(links.north, 'join', { seat: 'west' });
+    await links.north.wait(frame => frame.t === 'match-error' && frame.reason === 'seat-unavailable', 'occupied seat refused');
+    send(links.north, 'join', { seat: 'north' });
+    await seatsAt(3);
+    const releasedAt = watch.frames.length;
+    send(links.north, 'leave');
+    await seatsAt(2, releasedAt);
+    send(links.north, 'join', { seat: 'north' });
+    send(links.east, 'join', { seat: 'east' });
+    const revision = (link, value) => link.wait(frame => frame.state?.match?.revision === value, 'Spades revision ' + value);
+    let publicView = (await revision(watch, 0)).state.match;
+    const initial = await Promise.all(Object.entries(links).map(async ([seat, link]) => {
+        const view = (await revision(link, 0)).state;
+        assert.equal(view.seat, seat);
+        assert.equal(view.match.hand.length, 13);
+        return view.match.hand;
+    }));
+    assert.equal(new Set(initial.flat().map(card => card.id)).size, 52);
+    assert.deepEqual(publicView.hand, []);
+    send(watch, 'bid', { revision: 0, bid: 1 });
+    await watch.wait(frame => frame.t === 'match-error' && frame.reason === 'unavailable', 'Spades spectator cannot bid');
+    for (const bid of [0, 3, 2, 4]) {
+        send(links[publicView.turn], 'bid', { revision: publicView.revision, bid });
+        publicView = (await revision(watch, publicView.revision + 1)).state.match;
+    }
+    const westBefore = (await revision(links.west, 4)).state.match;
+    links.west.socket.close(1000, 'Spades fixture reconnect');
+    links.west = await connect(black);
+    send(links.west, 'sync');
+    assert.deepEqual((await revision(links.west, 4)).state.match, westBefore);
+    while (publicView.phase === 'play') {
+        const actor = links[publicView.turn];
+        const visible = (await revision(actor, publicView.revision)).state.match;
+        const card = visible.hand.find(value => value.playable);
+        assert.ok(card, 'legal card available');
+        send(actor, 'play', { revision: publicView.revision, card: card.id });
+        publicView = (await revision(watch, publicView.revision + 1)).state.match;
+    }
+    assert.equal(publicView.phase, 'round-end');
+    assert.equal(Object.values(publicView.tricks).reduce((sum, value) => sum + value, 0), 13);
+    assert.equal(publicView.lastTrick.length, 4);
+    assert.equal(publicView.roundResult.length, 2);
+    assert.ok(watch.frames.every(frame => !frame.state?.match?.hand?.length));
+    if (!publicView.result) {
+        send(host, 'next-round', { revision: publicView.revision });
+        publicView = (await revision(watch, publicView.revision + 1)).state.match;
+        assert.equal(publicView.round, 2);
+        send(host, 'resign', { revision: publicView.revision });
+        await revision(watch, publicView.revision + 1);
+    }
+    const watchAt = watch.frames.length;
+    for (const link of Object.values(links)) send(link, 'rematch');
+    const fresh = await watch.wait(frame => frame.state?.id && frame.state.id !== id, 'four-seat rematch', watchAt);
+    assert.equal(fresh.state.match.round, 1);
+    for (const [seat, link] of Object.entries(links)) {
+        const view = await link.wait(frame => frame.state?.id === fresh.state.id, 'same Spades partnership');
+        assert.equal(view.state.seat, seat);
+    }
+    return host;
+}
+
 async function verifyMedia(white, black, ref, matchA, matchB) {
     const endpoint = '/beta/game-night-media';
     const join = async player => {
@@ -289,7 +378,7 @@ try {
         modules: [{ type: 'ESModule', path: join(directory, 'worker.mjs'), contents: bundled.output[0].code }],
         compatibilityDate: '2026-10-01', host: '127.0.0.1', port: 0, https: !!browserName, telemetry: { enabled: false },
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true } },
-        bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1', HANGOUT_ARCADE_CRAPEIGHTS: '1', HANGOUT_ARCADE_TURDRUMMY: '1',
+        bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1', HANGOUT_ARCADE_CRAPEIGHTS: '1', HANGOUT_ARCADE_TURDRUMMY: '1', HANGOUT_ARCADE_TURDSPADES: '1',
             ...(browserName ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
             ...(!browserName || browserMedia ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
             HANGOUT_HMAC_KEY: 'owned-arcade-fixture-hmac-not-for-deployment-2026', HANGOUT_BETA_INVITE_KEY: invite,
@@ -353,15 +442,18 @@ try {
     await verifyMedia(white, black, ch.keepRef, a, returning);
     const { a: cards, spectator } = await verifyEights(white, black, ch.keepRef, a);
     const rummy = await verifyRummy(white, black, spectator, ch.keepRef);
+    const spades = await verifySpades(white, black, spectator, ch.keepRef);
     assert.ok([...a.frames, ...cards.frames].every(frame => frame.state?.game !== 'turdrummy'));
     white.lobby.send({ t: 'say', ch: room, text: 'Good luck at Chess' });
     await black.lobby.wait(frame => frame.t === 'line' && frame.text === 'Good luck at Chess', 'chat while match is open');
-    const partAt = a.frames.length, cardsPartAt = cards.frames.length, rummyPartAt = rummy.frames.length;
+    const partAt = a.frames.length, cardsPartAt = cards.frames.length, rummyPartAt = rummy.frames.length, spadesPartAt = spades.frames.length;
     black.lobby.send({ t: 'cmd', name: 'part', args: [room], ch: room });
     await black.lobby.wait(frame => frame.t === 'part' && frame.ch === room, 'explicit room departure');
     await a.wait(frame => frame.t === 'match-state' && frame.state === null, 'seat retirement', partAt);
     await cards.wait(frame => frame.t === 'match-state' && frame.state === null, 'Eights seat retirement', cardsPartAt);
     await rummy.wait(frame => frame.t === 'match-state' && frame.state === null, 'Rummy seat retirement', rummyPartAt);
+    await spades.wait(frame => frame.t === 'match-state' && frame.state === null, 'Spades seat retirement', spadesPartAt);
+    console.log('Passed native four-seat TurdSpades, spectator privacy, bidding, 13 tricks, rematch and seat retirement.');
     console.log('Passed native TurdRummy private stock draws, spectator projection, mid-turn reconnect, restricted discard, rematch, and retirement.');
     console.log('Passed native Crappy Eights private hands, spectator projection, wrong-game grant rejection, rejoin, and rematch.');
     console.log('Passed native private invitations, session-bound one-use grants, two-brand Chess move and chat, match reconnection, and explicit seat retirement.');

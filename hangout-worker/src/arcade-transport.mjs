@@ -1,6 +1,7 @@
 import { GameNightChess } from './game-night-chess.mjs';
 import { GameNightCrapeights } from './game-night-crapeights.mjs';
 import { GameNightTurdRummy } from './game-night-turdrummy.mjs';
+import { GameNightTurdSpades } from './game-night-turdspades.mjs';
 import { createGameNightSockets } from './game-night-sockets.mjs';
 export { arcadeRoomRequest } from './game-night-sockets.mjs';
 
@@ -11,7 +12,8 @@ const MATCH_CAP = 60;
 const adapters = new Map([
     ['chess', { flag: 'HANGOUT_ARCADE_CHESS', Table: GameNightChess }],
     ['crapeights', { flag: 'HANGOUT_ARCADE_CRAPEIGHTS', Table: GameNightCrapeights, renewOnAction: true }],
-    ['turdrummy', { flag: 'HANGOUT_ARCADE_TURDRUMMY', Table: GameNightTurdRummy, renewOnAction: true }]
+    ['turdrummy', { flag: 'HANGOUT_ARCADE_TURDRUMMY', Table: GameNightTurdRummy, renewOnAction: true }],
+    ['turdspades', { flag: 'HANGOUT_ARCADE_TURDSPADES', Table: GameNightTurdSpades, renewOnAction: true }]
 ]);
 
 export const arcadeGames = Object.freeze([...adapters.keys()]);
@@ -90,11 +92,14 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                     else { game = new Table(uuid(), subject); changed = true; expiresAt = now() + MATCH_TTL; }
                 } else if (!game) error = 'match-changed';
                 else if (frame.action === 'join') {
-                    if (!binding.canJoin(game.subjects[0]) || !game.join(subject, frame.id, now())) error = 'seat-unavailable';
+                    if (!game.subjects.every(peer => binding.canJoin(peer)) || !game.join(subject, frame.id, now(), frame.seat)) error = 'seat-unavailable';
                     else { changed = true; expiresAt = now() + MATCH_TTL; }
                 } else if (frame.action === 'leave') {
                     if (!game.seat(subject) || game.view(subject, now()).id !== frame.id) error = 'match-changed';
-                    else { game = null; changed = true; }
+                    else {
+                        if (!game.releaseSeat(subject)) game = null;
+                        changed = true;
+                    }
                 } else if (frame.action === 'rematch') {
                     if (!game.requestRematch(subject, frame.id, uuid(), now())) error = 'rematch-unavailable';
                     else { changed = true; expiresAt = now() + MATCH_TTL; }
@@ -134,13 +139,18 @@ export function createArcadeTransport({ state, current, active, approve, charge,
         pending.add(subject);
         pendingRevocations.set(scope.ref, pending);
         try {
-            const game = (await load(scope))?.game;
-            if (game?.seat(subject)) {
-                await state.storage.delete(key(scope));
+            const record = await load(scope);
+            const game = record?.game, occupied = !!game?.seat(subject);
+            let remaining = null;
+            if (occupied) {
+                if (game.releaseSeat(subject)) {
+                    remaining = game;
+                    await state.storage.put(key(scope), { room: scope.room, expiresAt: record.expiresAt, [name]: game.checkpoint() });
+                } else await state.storage.delete(key(scope));
             }
             pending.delete(subject);
             if (!pending.size) pendingRevocations.delete(scope.ref);
-            if (game?.seat(subject)) publish(scope, null);
+            if (occupied) publish(scope, remaining);
             return true;
         } catch {
             for (const ws of sockets()) if (ws.deserializeAttachment()?.ref === scope.ref) close(ws, 1011, 'match storage unavailable');

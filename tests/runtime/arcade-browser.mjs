@@ -60,6 +60,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(page.locator('[data-entry-label]').first()).toHaveText(label);
         return page;
     }
+    async function inviteToGame(host, guest, nick) {
+        await host.getByRole('button', { name: 'Invite players' }).click();
+        const dialog = host.locator('[data-invite-dialog]');
+        await dialog.getByLabel('Choose a current person').selectOption({ label: nick });
+        await dialog.getByRole('button', { name: 'Invite selected person' }).click();
+        await guest.getByRole('button', { name: 'Join', exact: true }).click();
+    }
     async function moveByKeyboard(page, from, arrow, count) {
         await page.locator(`[data-square="${from}"]`).focus();
         await page.keyboard.press('Enter');
@@ -259,15 +266,83 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         console.log(`Passed ${engine} TurdRummy private hands, discard pickup, touch selection, ${media ? 'same call during a game switch' : 'full reload mid-draw'}, and rematch.`);
     }
+    async function playSpades(a, b) {
+        const before = media ? await packetCount(b, 'audio') : 0;
+        const north = await guest('stalemate', 'SpadesNorth', { width: 1280, height: 900 });
+        const east = await guest('rad-dad', 'SpadesEast', { width: 390, height: 844 }, true);
+        await inviteToGame(a, north, 'SpadesNorth');
+        await inviteToGame(a, east, 'SpadesEast');
+        const players = [a, b, north, east];
+        for (const page of players) {
+            await expect(page.locator('[data-arcade-game] option[value="turdspades"]')).toBeEnabled();
+            await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdspades');
+        }
+        await a.getByRole('button', { name: 'Open Spades table' }).click();
+        for (const [page, seat] of [[b, 'West'], [north, 'North'], [east, 'East']]) {
+            await page.getByRole('button', { name: 'Join ' + seat }).click();
+        }
+        const allHands = [];
+        for (const page of players) {
+            const hand = page.locator('[data-spades-card]');
+            await expect(hand).toHaveCount(13);
+            allHands.push(...await hand.evaluateAll(buttons => buttons.map(button => button.dataset.spadesCard)));
+        }
+        assert.equal(new Set(allHands).size, 52);
+        try {
+            await expect(b.locator('[data-spades-hand]')).toBeInViewport({ ratio: 1 });
+            await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
+        } catch (error) {
+            if (evidence) {
+                await mkdir(evidence, { recursive: true });
+                await b.screenshot({ path: join(evidence, `spades-${engine}-fit-failure.png`) });
+            }
+            throw error;
+        }
+        await b.getByLabel('Your bid').selectOption('0');
+        for (const page of [b, north, east, a]) await page.getByRole('button', { name: 'Lock bid' }).click();
+        await expect(a.locator('[data-spades-trick]')).toContainText('West · Nil');
+        const lead = b.locator('[data-spades-card]:enabled').first();
+        await lead.scrollIntoViewIfNeeded();
+        const box = await lead.boundingBox();
+        assert.ok(box?.width >= 44 && box?.height >= 44, 'phone-sized Spades card button');
+        await b.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+        await expect(b.locator('[data-spades-card]')).toHaveCount(12);
+        if (!media) {
+            const ids = page => page.locator('[data-spades-card]').evaluateAll(buttons => buttons.map(button => button.dataset.spadesCard));
+            const hand = await ids(b);
+            await b.reload();
+            await b.locator('[data-enter]').click();
+            await expect(b.locator('[data-spades-card]')).toHaveCount(12);
+            assert.deepEqual(await ids(b), hand);
+            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+        }
+        for (const page of [north, east, a]) await page.locator('[data-spades-card]:enabled').first().click();
+        await expect(a.locator('[data-spades-status]')).toContainText('won the last trick');
+        if (media) {
+            await waitForPackets(b, 'audio', before);
+            assert.equal(await b.evaluate(() => window.testPeers.length), 1);
+        }
+        await b.locator('[data-spades-action="resign"]').click();
+        await b.getByRole('dialog', { name: 'Resign for your team?' }).getByRole('button', { name: 'Resign', exact: true }).click();
+        await expect(a.locator('[data-spades-status]')).toContainText('South + North win by resignation');
+        await a.getByRole('button', { name: 'Request Spades rematch' }).click();
+        for (const page of [b, north]) await page.getByRole('button', { name: 'Accept Spades rematch' }).click();
+        await expect(east.locator('[data-spades-status]')).toContainText('3/4 ready');
+        await east.getByRole('button', { name: 'Accept Spades rematch' }).click();
+        await expect(b.locator('[data-spades-status]')).toContainText('Round 1 · Your bid');
+        await expect(b.locator('[data-spades-card]')).toHaveCount(13);
+        if (evidence) {
+            await mkdir(evidence, { recursive: true });
+            await a.screenshot({ path: join(evidence, `spades-${engine}-desktop.png`) });
+            await b.screenshot({ path: join(evidence, `spades-${engine}-phone.png`) });
+        }
+        console.log(`Passed ${engine} TurdSpades four independent guests, bidding, a complete trick, ${media ? 'same call during a game switch' : 'full reload mid-trick'}, and unanimous rematch.`);
+    }
     try {
         const a = await guest('stalemate', 'ChessHost', { width: 1280, height: 900 });
         const b = await guest('rad-dad', 'ChessGuest', { width: 375, height: 667 }, true);
         await a.getByRole('button', { name: /Game Night/ }).click();
-        await a.getByRole('button', { name: 'Invite players' }).click();
-        const invite = a.locator('[data-invite-dialog]');
-        await invite.getByLabel('Choose a current person').selectOption({ label: 'ChessGuest' });
-        await invite.getByRole('button', { name: 'Invite selected person' }).click();
-        await b.getByRole('button', { name: 'Join', exact: true }).click();
+        await inviteToGame(a, b, 'ChessGuest');
         await expect(b.getByRole('link', { name: 'Open Rad Dad Arcade' })).toHaveAttribute('href', 'https://raddadband.com/play/');
         for (const page of [a, b]) await page.locator('.arcade-chess summary').click();
         await a.getByRole('button', { name: 'Open Chess match' }).click();
@@ -328,6 +403,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.setViewportSize({ width: 375, height: 667 });
         await playEights(a, b);
         await playRummy(a, b);
+        await playSpades(a, b);
         if (media) {
             await a.locator('[data-call-toggle]').click();
             await a.getByRole('button', { name: 'Actions for ChessGuest' }).click();

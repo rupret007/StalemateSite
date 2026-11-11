@@ -301,7 +301,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 @media (min-width: 1100px) {
   .game-night:has(.arcade-card-table[open] [data-card-table]:not([hidden])) {
     display: grid;
-    grid-template: "cards heading" auto "cards actions" auto "cards four" auto "cards chess" auto "cards eights" auto "cards rummy" auto "cards call" 1fr /
+    grid-template: "cards heading" auto "cards actions" auto "cards four" auto "cards chess" auto "cards eights" auto "cards rummy" auto "cards spades" auto "cards call" 1fr /
       minmax(0, 27rem) minmax(0, 1fr);
     gap: 4px 16px;
     align-items: start;
@@ -311,6 +311,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .game-night:has(.arcade-card-table[open]) > .arcade-chess { grid-area: chess; }
   .game-night:has(.arcade-card-table[open]) > .arcade-eights:not([open]) { grid-area: eights; }
   .game-night:has(.arcade-card-table[open]) > .arcade-rummy:not([open]) { grid-area: rummy; }
+  .game-night:has(.arcade-card-table[open]) > .arcade-spades:not([open]) { grid-area: spades; }
 }
 @media (max-width: 900px) {
   .roombar:has([data-arcade-game]:not([hidden])) .modes { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -328,6 +329,19 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .arcade-rummy .arcade-card-hand button { justify-items: center; align-content: center; }
 .arcade-rummy .arcade-card-hand [aria-pressed="true"] { background: var(--lime); box-shadow: inset 0 0 0 2px #354624; }
 .arcade-rummy .arcade-card-hand [data-drawn="true"]:not([aria-pressed="true"]) { box-shadow: inset 0 0 0 2px #a07c32; }
+.arcade-spades .arcade-card-hand { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.arcade-spades .arcade-card-hand button { justify-items: center; align-content: center; padding-inline: 1px; }
+.spades-trick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; list-style: none; margin: 4px 0; padding: 0; }
+.spades-trick li { min-width: 0; display: grid; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); padding: 2px 4px; }
+.spades-trick span { font-size: .66rem; overflow-wrap: anywhere; }
+.spades-trick b { font: bold 1rem var(--mono); }
+[data-spades-table][data-phase="bid"] .spades-trick b { display: none; }
+.spades-trick [data-active="true"] { border-color: var(--lime); }
+.spades-trick [data-red="true"] b { color: #ffa6aa; }
+.arcade-spades [data-spades-bid] select { padding: 4px; min-height: 38px; }
+@media (max-width: 355px) {
+  .arcade-spades .arcade-card-hand { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
 .game-night-call { margin-block: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
 .game-night-call h4, .game-night-call p { margin: 0 0 5px; }
 .game-night-call .jam-actions { margin-bottom: 4px; }
