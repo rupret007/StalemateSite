@@ -459,6 +459,7 @@ import { discordCallLink, gameNightRoomName } from './game-night.mjs';
     let pendingJamShare = null;
     let jamShareResultsSupported = false, jamShareTimer;
     let gameNightSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
+    let arcadeChessSupported = false, arcadeChess = null, arcadeChessLoading = false;
     function stopLocalCamera(channel) {
         const c = app.chans.get(channel);
         if (!c) return false;
@@ -878,6 +879,7 @@ import { discordCallLink, gameNightRoomName } from './game-night.mjs';
             messageResultsSupported = m.features?.messageResults === 1;
             jamShareResultsSupported = m.features?.jamShareResults === 1;
             gameNightSupported = m.features?.gameNight === 1;
+            arcadeChessSupported = m.features?.arcadeChess === 1;
             discordLinksSupported = m.features?.discordLinks === true;
             shieldActive = m.shield === true;
             $('[data-start="game"]').hidden = !gameNightSupported;
@@ -1385,6 +1387,19 @@ import { discordCallLink, gameNightRoomName } from './game-night.mjs';
         $('[data-game-clear]').hidden = !link;
         $('[data-game-invite]').hidden = !c || !amOp(c);
         $('[data-game-night]').hidden = !c;
+        drawArcadeChess(c);
+    }
+    function drawArcadeChess(c) {
+        const scope = arcadeChessSupported && !shieldActive && c && roomNonce(c.keepRef)
+            ? { actor: app.selfId, room: c.name, ref: c.keepRef } : null;
+        if (arcadeChess) return arcadeChess.setRoom(scope);
+        if (!scope || arcadeChessLoading) return;
+        arcadeChessLoading = true;
+        import('./arcade-chess.mjs').then(module => {
+            arcadeChess = module.mountArcadeChess($('[data-game-night]'));
+            drawArcadeChess(currentGameNight());
+        }).catch(() => toast('Chess could not load. Reopen Game Night to try again.'))
+            .finally(() => { arcadeChessLoading = false; });
     }
     function changeGameLink(value) {
         const c = currentGameNight();

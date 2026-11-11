@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rolldown } from 'rolldown';
 import { Miniflare, convertV4MiniflareOptions } from './durable-records/node_modules/miniflare/dist/src/index.js';
@@ -12,6 +12,10 @@ const invite = 'local-arcade-fixture-invitation-2026';
 const preview = 'local-arcade-fixture-preview-key-2026';
 const nonce = randomBytes(16).toString('hex');
 const room = '#game-2ca9e1x1be34a';
+const browserName = process.argv[2]?.replace(/^--browser=/, '') || '';
+assert.ok(['', 'chromium', 'webkit'].includes(browserName), 'choose --browser=chromium or --browser=webkit');
+const evidence = process.env.ARCADE_BROWSER_EVIDENCE ? resolve(process.env.ARCADE_BROWSER_EVIDENCE) : null;
+const assets = fileURLToPath(new URL('../../.beta-assets/', import.meta.url));
 const directory = await mkdtemp(join(tmpdir(), 'game-night-arcade-'));
 let mf, runtime;
 
@@ -65,6 +69,15 @@ function upgrade(cookie, { protocol, ticket }) {
 }
 const pause = () => new Promise(resolve => setTimeout(resolve, 600));
 
+async function serveAsset(request) {
+    const name = decodeURIComponent(new URL(request.url).pathname);
+    const file = resolve(assets, '.' + name + (name.endsWith('/') ? 'index.html' : ''));
+    if (!file.startsWith(assets.endsWith(sep) ? assets : assets + sep)) return new Response('Not found', { status: 404 });
+    const mime = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.txt': 'text/plain' };
+    try { return new Response(await readFile(file), { headers: { 'Content-Type': mime[extname(file)] || 'application/octet-stream' } }); }
+    catch { return new Response('Not found', { status: 404 }); }
+}
+
 try {
     runtime = await rolldown({ input: fileURLToPath(new URL('./lobby-session-authority/worker.mjs', import.meta.url)),
         platform: 'neutral', external: ['node:crypto'] });
@@ -75,8 +88,10 @@ try {
         compatibilityDate: '2026-10-01', host: '127.0.0.1', port: 0, telemetry: { enabled: false },
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true } },
         bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1',
+            ...(browserName ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
             HANGOUT_HMAC_KEY: 'owned-arcade-fixture-hmac-not-for-deployment-2026', HANGOUT_BETA_INVITE_KEY: invite,
             HANGOUT_BETA_INVITE_VERSION: '1', HANGOUT_PREVIEW_KEY: preview, HANGOUT_OPEN: '1', HANGOUT_AI_ENABLED: '0', HANGOUT_TURN_ENABLED: '0' },
+        ...(browserName ? { serviceBindings: { ASSETS: serveAsset } } : {}),
         outboundService: () => new Response('fixture egress denied', { status: 503 })
     }));
     await mf.ready;
@@ -84,6 +99,10 @@ try {
         method: 'POST', headers: { 'X-Fixture-Nonce': nonce, 'Content-Type': 'application/json' }, body: '{}'
     });
     assert.equal(initialized.status, 200, await initialized.text());
+    if (browserName) {
+        const { runArcadeBrowser } = await import('./arcade-browser.mjs');
+        await runArcadeBrowser(browserName, (await mf.ready).origin, invite, evidence);
+    } else {
     const white = await guest('FixtureWhite', 'stalemate', '192.0.2.11');
     const black = await guest('FixtureBlack', 'rad-dad', '192.0.2.12');
     white.lobby.send({ t: 'cmd', name: 'join', args: [room], ch: '#stalemate' });
@@ -133,6 +152,7 @@ try {
     await black.lobby.wait(frame => frame.t === 'part' && frame.ch === room, 'explicit room departure');
     await a.wait(frame => frame.t === 'match-state' && frame.state === null, 'seat retirement');
     console.log('Passed native private invitations, session-bound one-use grants, two-brand Chess move and chat, match reconnection, and explicit seat retirement.');
+    }
 } finally {
     await mf?.dispose();
     await runtime?.close();

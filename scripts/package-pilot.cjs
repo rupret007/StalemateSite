@@ -8,4 +8,25 @@ if (!['pilot', 'beta'].includes(target)) throw new Error('Choose pilot or beta a
 const out = path.join(root, `.${target}-assets`);
 fs.rmSync(out, { recursive: true, force: true }); fs.mkdirSync(out, { recursive: true });
 for (const dir of ['r', 'assets', ...(target === 'beta' ? ['join'] : [])]) fs.cpSync(path.join(root, dir), path.join(out, dir), { recursive: true });
+if (target === 'beta') {
+    const play = path.join(root, 'play');
+    const matchReceipt = path.join(root, 'hangout-worker/arcade/VENDORED.txt');
+    if (fs.existsSync(matchReceipt)) {
+        const source = fs.readFileSync(matchReceipt, 'utf8').trim();
+        if (!/^Turdanoid@[a-f0-9]{40}$/.test(source) || !fs.readFileSync(path.join(play, 'VENDORED.txt'), 'utf8').split('\n')[0].includes(source))
+            throw Error('The protected match and arcade imports must use the same revision.');
+        const files = [
+            'games/chess-core.js', 'games/chess-board.js', 'assets/chess/chess.js',
+            'assets/chess/chessground.js', 'assets/chess/chessground.base.css', 'assets/chess/chess-board.css',
+            'assets/chess/Chessground-LICENSE.txt', 'assets/chess/chessjs-LICENSE.txt',
+            'assets/chess/Spatial-LICENSE.txt', 'assets/chess/GPL-3.0.txt'
+        ];
+        for (const color of ['w', 'b']) for (const piece of 'prnbqk') files.push(`assets/chess/pieces/spatial-${color}${piece}.svg`);
+        for (const file of files) {
+            const output = path.join(out, 'play', file);
+            fs.mkdirSync(path.dirname(output), { recursive: true });
+            fs.copyFileSync(path.join(play, file), output);
+        }
+    }
+}
 console.log(`Built private ${target} assets. Deploy with wrangler.${target}.toml only.`);
