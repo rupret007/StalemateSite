@@ -39,7 +39,7 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, { shar
     // Execute the actual browser client, replacing only module loading, which
     // jsdom cannot perform. Real Chromium journeys cover native ESM loading.
     const imports = [...client.matchAll(/^import \{([^}]+)\} from '[^']+';/gm)].map((match) => match[1]).join(',');
-    window.eval(`const {${imports}} = window.HangoutClientTestModules;\n${client.replace(/^import .*$/gm, '')}`);
+    window.eval(`const entrance = window.HangoutClientTestModules; const {${imports}} = entrance;\n${client.replace(/^import .*$/gm, '')}`);
     window.document.querySelector('[data-nick]').value = 'Viewer';
     window.document.querySelector('[data-enter]').click();
     await vi.waitFor(() => expect(sockets.length).toBe(1));

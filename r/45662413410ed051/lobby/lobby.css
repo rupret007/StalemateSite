@@ -571,7 +571,7 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 .call-report-consent { display: flex; align-items: flex-start; gap: 8px; min-height: 44px; font-size: 14px; line-height: 1.45; }
 .call-report-consent input { flex: 0 0 17px; width: 17px; height: 17px; min-height: 0; margin: 2px 0 0; accent-color: var(--lime); }
 .channel-label { display: block; margin: 16px 0 8px; font-size: 12px; }
-[data-channel-name], [data-invite-nick] { width: 100%; }
+[data-channel-name], [data-invite-nick], [data-game-share-value] { width: 100%; }
 .check { display: flex; align-items: center; gap: 10px; min-height: 44px; }
 .check input { min-height: 0; accent-color: var(--lime); }
 /* Status owns a bounded grid row, never an overlay over the composer. It is

@@ -12,7 +12,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             ...(media ? ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] : [])] } : {})
     });
     const errors = [];
-    async function guest(source, name, viewport, hasTouch = false) {
+    async function enterFromShell(page, name, game = false) {
+        await page.getByRole('link', { name: game ? /Enter Game Night/ : /Choose a nickname and join/ }).click();
+        await page.getByLabel('Your nick').fill(name);
+        await page.locator('[data-enter]').click();
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+    }
+    async function guest(source, name, viewport, hasTouch = false, gameUrl = null) {
         const context = await browser.newContext({ viewport, hasTouch, reducedMotion: 'reduce', serviceWorkers: 'block', ignoreHTTPSErrors: true });
         if (hasTouch) await context.addInitScript(() => {
             const native = HTMLCanvasElement.prototype.getContext;
@@ -54,7 +60,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const protectedBoard = await context.request.get(origin + '/play/games/chess-board.js');
         assert.equal(protectedBoard.status(), 401, 'anonymous match asset stays protected');
         const destination = `${origin}/beta/?via=${source}`;
-        if (entrance) {
+        if (gameUrl) await page.goto(gameUrl);
+        else if (entrance) {
             await page.goto(entrance.url);
             const entry = page.getByRole('link', { name: 'Play online with friends' });
             await expect(entry).toHaveAttribute('href', destination);
@@ -65,22 +72,69 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         } else await page.goto(destination);
         await page.getByLabel('Invitation code').fill(invitation);
         await page.getByRole('button', { name: 'Enter the community' }).click();
-        await page.getByRole('link', { name: /Choose a nickname and join/ }).click();
-        await page.getByLabel('Your nick').fill(name);
-        await page.locator('[data-enter]').click();
-        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        await enterFromShell(page, name, !!gameUrl);
         const label = source === 'rad-dad' ? 'via Rad Dad' : 'via Stalemate';
         await expect(page.locator('[data-entry-label]').first()).toHaveText(label);
         return page;
     }
-    async function inviteToGame(host, guest, nick) {
+    async function sendGameInvite(host, nick) {
         await host.getByRole('button', { name: 'Invite players' }).click();
         const dialog = host.locator('[data-invite-dialog]');
         await dialog.getByLabel('Choose a current person').selectOption({ label: nick });
         await dialog.getByRole('button', { name: 'Invite selected person' }).click();
+    }
+    async function inviteToGame(host, guest, nick) {
+        await sendGameInvite(host, nick);
         const offer = guest.locator('[data-game-offer]');
         await offer.getByRole('button', { name: 'Join Game Night', exact: true }).click();
         await expect(offer).toBeHidden();
+    }
+    async function verifyGameNightEntry() {
+        const host = await guest('rad-dad', 'LinkHost', { width: 1280, height: 900 }, false, origin + '/beta/?game-night=1&via=rad-dad');
+        await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
+        await host.getByRole('button', { name: 'Share room link' }).click();
+        const share = host.getByRole('dialog', { name: 'Share Game Night' });
+        const link = new URL(await share.getByLabel('Game Night room link').inputValue());
+        assert.equal(link.origin, origin);
+        assert.equal(link.pathname, '/beta/');
+        assert.equal(link.search, '?game-night=1&via=rad-dad');
+        assert.match(link.hash, /^#game=game-[a-f0-9]{6}x[a-f0-9]{6}&instance=[a-f0-9]{32}$/);
+        if (evidence) await host.screenshot({ path: join(evidence, `webjam-room-link-${engine}.png`) });
+        await share.getByRole('button', { name: 'Done' }).click();
+        const player = await guest('rad-dad', 'LinkGuest', { width: 375, height: 667 }, true, link.href);
+        const joinOffer = player.locator('[data-game-offer]').getByRole('button', { name: 'Join Game Night', exact: true });
+        async function expectRefusal() {
+            await joinOffer.click();
+            await expect(player.getByText('Couldn’t join Game Night. Ask the host for a fresh invitation.', { exact: true })).toBeVisible();
+            await expect(player.locator('[data-game-night]')).toBeHidden();
+        }
+        assert.equal(new URL(player.url()).hash, '');
+        await expectRefusal();
+        await sendGameInvite(host, 'LinkGuest');
+        await expect(player.locator('[data-game-offer-status]')).toHaveText('LinkHost invited you to Game Night.');
+        const stale = new URL(link);
+        stale.hash = stale.hash.slice(0, -1) + (stale.hash.endsWith('0') ? '1' : '0');
+        await player.goto(stale.href);
+        await enterFromShell(player, 'LinkGuest', true);
+        await expectRefusal();
+        await player.goto(link.href);
+        await enterFromShell(player, 'LinkGuest', true);
+        await joinOffer.click();
+        await expect(player.locator('[data-game-night]')).toBeVisible();
+        await expect(player.getByRole('button', { name: 'Share room link' })).toBeHidden();
+        await expect(player.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+        await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
+        await player.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
+        await host.getByRole('button', { name: 'Open Chess match' }).click();
+        await player.getByRole('button', { name: 'Join as Black' }).click();
+        await expect(host.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
+        await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
+        await expect(player.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
+        await player.locator('[data-text]').fill('Meet me at the chess board');
+        await player.locator('[data-send]').tap();
+        await expect(host.getByRole('log', { name: 'Conversation' }).getByRole('listitem')
+            .filter({ hasText: 'Meet me at the chess board' })).toBeVisible();
+        console.log(`Passed ${engine} protected Game Night launch, invite-only room link, stale instance refusal, shared Chess move and chat.`);
     }
     async function moveByKeyboard(page, from, arrow, count) {
         await page.locator(`[data-square="${from}"]`).focus();
@@ -955,6 +1009,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.locator('[data-enter]').click();
         await expect(b.locator('[data-connection]')).toHaveText('Connected');
         await expect(b.locator('[data-game-night]')).toBeHidden();
+        await verifyGameNightEntry();
         assert.deepEqual(errors, []);
         console.log(`Passed ${engine} ${entrances ? 'both generated arcade entry links' : 'protected entry with both brand contexts'}, invitation, keyboard/touch Chess, room chat, draw and rematch.`);
     } finally { await browser.close(); }

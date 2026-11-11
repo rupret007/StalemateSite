@@ -35,7 +35,7 @@ async function visitor(features = { messageResults: 1, privateMessageContext: 1,
         createChatAnnouncements: log => createChatAnnouncements(log, { frame: fn => window.setTimeout(fn, 16), cancel: id => window.clearTimeout(id) }) };
     window.eval(discovery);
     const imports = [...client.matchAll(/^import \{([^}]+)\} from '[^']+';/gm)].map(match => match[1]).join(',');
-    window.eval(`const {${imports}} = window.HangoutClientTestModules;\n${client.replace(/^import .*$/gm, '')}`);
+    window.eval(`const entrance = window.HangoutClientTestModules; const {${imports}} = entrance;\n${client.replace(/^import .*$/gm, '')}`);
     const $ = selector => window.document.querySelector(selector);
     $('[data-nick]').value = 'Viewer'; $('[data-enter]').click();
     await vi.waitFor(() => expect(sockets.length).toBe(1));

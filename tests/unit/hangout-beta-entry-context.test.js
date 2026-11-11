@@ -25,7 +25,7 @@ async function shell(address, config = env(), prepare) {
     if (prepare) prepare(dom.window);
     // jsdom does not execute ES modules. Supply the actual shared module exports
     // while executing the served shell client unchanged below its import line.
-    dom.window.eval(client.replace(/^import \{([^}]+)\} from '[^']+';/, 'const {$1} = entryFunctions;'));
+    dom.window.eval(client.replace(/^import \* as (\w+) from '[^']+';/, 'const $1 = entryFunctions;'));
     await vi.waitFor(() => expect(dom.window.document.querySelector('#inside').hidden).toBe(false));
     return dom;
 }
@@ -46,6 +46,26 @@ describe('entry context through the private beta shell', () => {
             const handoff = entryFunctions.readEntryHandoff(dom.window.sessionStorage.getItem(entryFunctions.ENTRY_HANDOFF_KEY));
             expect(handoff).toEqual({ source: 'rad-dad', share: true });
         } finally { dom.window.close(); }
+    });
+    it('carries the Game Night locator to the lobby and accepts an older entrance module', async () => {
+        const hash = '#game=game-abc123x456def&instance=' + 'a'.repeat(32);
+        const address = 'https://beta.example/beta/?game-night=1&via=rad-dad' + hash;
+        const current = await shell(address);
+        try {
+            const link = click(current, '#inside .button');
+            expect(link.textContent).toContain('Enter Game Night');
+            expect(link.href).toBe(`https://beta.example${root}lobby/?entry-return=1&game-night=1${hash}`);
+            expect(current.window.location.href).toBe('https://beta.example/beta/');
+        } finally { current.window.close(); }
+        const older = await shell(address, env(), window => {
+            const { GAME_NIGHT_QUERY, gameNightEntry, gameNightFragment, ...priorExports } = entryFunctions;
+            window.entryFunctions = priorExports;
+        });
+        try {
+            const link = click(older, '#inside .button');
+            expect(link.textContent).toContain('Choose a nickname and join');
+            expect(link.href).toBe(`https://beta.example${root}lobby/?entry-return=1`);
+        } finally { older.window.close(); }
     });
     it('uses the same bounded handoff for owner sign-in while a direct visit erases stale attribution', async () => {
         const dom = await shell('https://beta.example/?via=stalemate');
@@ -166,7 +186,7 @@ describe('optional storage in the actual private beta client', () => {
                 window.HangoutClientTestModules = { ...entryFunctions, createEntrySharing, createIdleHeartbeat, createChatAnnouncements };
                 window.eval(discovery);
                 const imports = [...client.matchAll(/^import \{([^}]+)\} from '[^']+';/gm)].map(match => match[1]).join(',');
-                window.eval(`const {${imports}} = window.HangoutClientTestModules;\n${client.replace(/^import .*$/gm, '')}`);
+                window.eval(`const entrance = window.HangoutClientTestModules; const {${imports}} = entrance;\n${client.replace(/^import .*$/gm, '')}`);
                 const $ = selector => window.document.querySelector(selector);
                 expect($('[data-enter]').hidden).toBe(false);
                 $('[data-nick]').value = 'BootstrapGuest'; $('[data-enter]').click();
@@ -228,7 +248,7 @@ describe('truthful invitation and service state in the actual private beta shell
                 calls.push({ path, method, status: response.status, setsCookie: response.headers.has('Set-Cookie') });
                 return response;
             });
-            dom.window.eval(client.replace(/^import \{([^}]+)\} from '[^']+';/, 'const {$1} = entryFunctions;'));
+            dom.window.eval(client.replace(/^import \* as (\w+) from '[^']+';/, 'const $1 = entryFunctions;'));
             await vi.waitFor(() => expect(dom.window.document.querySelector('#code').disabled).toBe(false));
             return { dom, calls };
         };
@@ -287,7 +307,7 @@ describe('explicit recovery and lifecycle fencing in the served invitation porta
             return responder(path, options, calls.length);
         });
         if (prepare) prepare(dom.window);
-        dom.window.eval(client.replace(/^import \{([^}]+)\} from '[^']+';/, 'const {$1} = entryFunctions;'));
+        dom.window.eval(client.replace(/^import \* as (\w+) from '[^']+';/, 'const $1 = entryFunctions;'));
         return { dom, calls };
     }
     const state = () => Response.json({ kind: 'guest', role: 'fan', emailConfigured: true, staffConfigured: true });
