@@ -238,11 +238,10 @@ export function createSuiteMusic(opts) {
     observedTime = Number(audio.currentTime);
     phase = 'playing'; publishState();
   });
-  // `stalled` describes the network fetch, not playback stopping. WebKit can
-  // report it at HAVE_CURRENT_DATA while buffered audio keeps advancing. A
-  // real playback gap emits `waiting`; a new play request already says Loading.
-  audio.addEventListener('waiting', () => {
+  for (const event of ['waiting', 'stalled']) audio.addEventListener(event, () => {
     if (failure || blocked() || !armed) return;
+    // A stalled network fetch does not stop playback of already buffered data.
+    if (event === 'stalled' && Number(audio.readyState) >= 3 && !audio.paused) return;
     observedTime = Number(audio.currentTime);
     phase = 'loading'; publishState();
   });

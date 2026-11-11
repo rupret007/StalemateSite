@@ -56,8 +56,8 @@
   #stage.layout-wide #powers .chip{font-size:10px;min-width:0;width:100%}
 
   /* HUD — glass chips so the numbers read over any wall */
-  .hud{position:absolute;left:10px;right:10px;top:max(10px,calc(var(--safe-top) + 6px));display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;font-weight:700;letter-spacing:.02em;text-transform:uppercase;font-size:clamp(11px,2.6vw,14px);text-shadow:0 2px 8px rgba(0,0,0,.75);gap:8px}
-  .hud .col{display:flex;flex-direction:column;gap:1px;padding:7px 12px 8px;border-radius:14px;background:linear-gradient(180deg,rgba(255,248,220,.12),rgba(255,255,255,.02)),var(--panel);border:1px solid var(--panel-border);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 0 0 1px rgba(232,197,106,.16),0 10px 24px rgba(0,0,0,.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);min-width:74px}
+  .hud{position:absolute;left:10px;right:10px;top:max(10px,calc(var(--safe-top) + 6px));z-index:4;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;font-weight:700;letter-spacing:.02em;text-transform:uppercase;font-size:clamp(11px,2.6vw,14px);text-shadow:0 2px 8px rgba(0,0,0,.75);gap:8px}
+  .hud .col{display:flex;flex-direction:column;gap:1px;padding:7px 12px 8px;border-radius:14px;background:linear-gradient(180deg,rgba(255,248,220,.12),rgba(255,255,255,.02)),var(--panel);border:1px solid var(--panel-border);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 0 0 1px rgba(232,197,106,.16),0 10px 24px rgba(0,0,0,.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);min-width:74px;pointer-events:auto}
   .hud .lbl{font-size:.72em;color:var(--ta-muted,#9ab4aa);opacity:1;letter-spacing:.08em}
   .hud .val{font-size:1.45em;color:var(--accent);text-shadow:0 0 16px rgba(62,207,154,.4),0 2px 6px rgba(0,0,0,.75);font-variant-numeric:tabular-nums}
   .hud .right{text-align:right;margin-right:0}
@@ -213,7 +213,7 @@
     .hud .col{padding:4px 9px 5px;min-width:0}
   }
   @media (max-width:520px){
-    .hud{left:max(10px, calc(env(safe-area-inset-left, 0px) + 68px));right:max(10px,calc(env(safe-area-inset-right, 0px) + 4px));padding:4px 2px 5px;border-radius:16px;background:linear-gradient(180deg,rgba(255,248,220,.12),rgba(255,255,255,.02)),var(--panel);border:1px solid var(--panel-border);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 0 0 1px rgba(232,197,106,.26),0 10px 22px rgba(0,0,0,.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);gap:0;align-items:stretch}
+    .hud{left:max(10px, calc(env(safe-area-inset-left, 0px) + 68px));right:max(10px,calc(env(safe-area-inset-right, 0px) + 98px));padding:4px 2px 5px;border-radius:16px;background:linear-gradient(180deg,rgba(255,248,220,.12),rgba(255,255,255,.02)),var(--panel);border:1px solid var(--panel-border);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 0 0 1px rgba(232,197,106,.26),0 10px 22px rgba(0,0,0,.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);gap:0;align-items:stretch}
     .hud .right{margin-right:0px;text-align:center}
     .hud .center{margin-right:0px;text-align:center}
     .hud .col{padding:3px 7px 4px;min-width:0;flex:1 1 0;align-items:center;background:transparent;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;border-radius:0}
@@ -257,6 +257,8 @@
 </style>
 <link rel="stylesheet" href="assets/mobile-fit.css">
 <script src="assets/mobile-fit.js" defer></script>
+<link rel="stylesheet" href="stalemate/play-music-pref.css">
+<script src="../js/music-preference.js"></script>
 <link rel="stylesheet" href="stalemate/stalemate-overlay.css">
 <meta property="og:title" content="Stalemate Arcade">
 <meta property="og:description" content="Nine free browser games, including chess. Music by Stalemate.">
@@ -264,8 +266,6 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="stylesheet" href="stalemate/play-music-pref.css">
-<script src="../js/music-preference.js"></script>
 </head>
 <body class="arcade" data-arcade-game="turdanoid" data-suite-no-bg="1">
 <div id="app" role="main">
