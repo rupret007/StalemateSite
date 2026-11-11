@@ -465,6 +465,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const gameReturnKey = 'hangout-game-return';
     const gameInvites = new Map();
     let gameReturn = null, gameReturnOffered = false, joiningGameRoom = '';
+    // Jam rooms are invite-only like Game Night, so the directory cannot lead
+    // an invited guest back. They share the same offer and return controls.
+    const jamRoomName = name => typeof name === 'string' && /^#jam(?:-[a-z0-9-]{1,26})?$/.test(name);
+    const offerRoomName = name => jamRoomName(name) || gameNightSupported && gameNightRoomName(name);
     function stopLocalCamera(channel) {
         const c = app.chans.get(channel);
         if (!c) return false;
@@ -925,6 +929,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 app.resetSession = true; setConnection('reconnecting');
                 drafts.set(app.active, $('[data-text]').value);
                 if (roomApi) roomApi.onLeave();
+                // A rehearsal outlasts the return window. Restart it at the
+                // reconnect, not at the last time the room tab was opened.
+                const returning = app.chans.get(gameReturn?.room);
+                if (returning) rememberGameReturn(returning);
                 app.chans.clear();
                 for (const [ref, view] of app.pms) {
                     // A new socket starts a fresh received transcript. Only
@@ -961,7 +969,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             followPendingRoomJoin();
             if (app.restorePmOff) { cmd('pm', ['off']); app.restorePmOff = false; }
             $('[data-gate]').hidden = true; $('[data-app]').hidden = false;
-            if (gameNightSupported && (!wasIn || app.resetSession)) {
+            if (!wasIn || app.resetSession) {
                 gameReturn = readGameReturn();
                 gameReturnOffered = !!gameReturn;
                 drawGameOffer();
@@ -1066,7 +1074,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                     const failedRoom = joiningGameRoom;
                     joiningGameRoom = '';
                     forgetGameRoom(failedRoom);
-                    toast('Couldn’t join Game Night. Ask the host for a fresh invitation.');
+                    toast(jamRoomName(failedRoom) ? `Couldn’t join ${failedRoom}. It may have closed. Ask the host to invite you again.`
+                        : 'Couldn’t join Game Night. Ask the host for a fresh invitation.');
                 }
                 if (fourActionPending) { fourActionPending = false; drawGameNight(); }
                 if (personPreferencePending) { personPreferencePending = null; personSheetStatus('That preference was not confirmed. Check the current person and try again.'); }
@@ -1101,12 +1110,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
         case 'pm-setting': $('[data-pm-off]').checked = m.off; toast(m.text); break;
         case 'invite':
-            if (gameNightSupported && gameNightRoomName(m.ch) && roomNonce(m.roomInstance)) {
+            if (jamRoomName(m.ch) || gameNightSupported && gameNightRoomName(m.ch) && roomNonce(m.roomInstance)) {
                 if (!app.chans.has(m.ch)) {
                     if (!gameInvites.has(m.ch) && gameInvites.size === 5 && !joiningGameRoom)
                         gameInvites.delete(gameInvites.keys().next().value);
                     if (gameInvites.has(m.ch) || gameInvites.size < 5)
-                        gameInvites.set(m.ch, { room: m.ch, ref: m.roomInstance, by: m.by });
+                        gameInvites.set(m.ch, { room: m.ch, ref: roomNonce(m.roomInstance) ? m.roomInstance : undefined, by: m.by });
                     drawGameOffer();
                 }
             } else toast(`${m.by} invited you to ${m.ch}`, [['Join', () => cmd('join', [m.ch])]]);
@@ -1262,7 +1271,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (prev !== key) { drafts.set(prev, $('[data-text]').value); $('[data-text]').value = drafts.get(key) || ''; }
         app.active = key;
         const c = store(key);
-        if (c?.kind === 'game') rememberGameReturn(c);
+        if (c?.kind === 'game' || c?.kind === 'jam') rememberGameReturn(c);
         if (c) { c.unread = 0; c.mentions = 0; }
         belowFold = 0; drawNewMessages(); replaying = true;
         announcements.replace(() => {
@@ -1380,12 +1389,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (!saved) {
             try { saved = JSON.parse(readTab(gameReturnKey)); } catch { /* Ignore stale tab data. */ }
         }
-        if (saved?.room && gameNightRoomName(saved.room) && roomNonce(saved.ref) && saved.until > Date.now()) return saved;
+        if (saved?.room && offerRoomName(saved.room) && roomNonce(saved.ref) && saved.until > Date.now()) return saved;
         removeTab(gameReturnKey);
         return null;
     }
     function rememberGameReturn(room) {
-        if (!gameNightRoomName(room.name) || !roomNonce(room.keepRef)) return;
+        if (!offerRoomName(room.name) || !roomNonce(room.keepRef)) return;
         // Tab-local room reference only. Admission, nicknames and match state stay elsewhere.
         gameReturn = { room: room.name, ref: room.keepRef, until: Date.now() + 30 * 60 * 1000 };
         writeTab(gameReturnKey, JSON.stringify(gameReturn));
@@ -1413,18 +1422,20 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (hadFocus) focusChannelTab(app.active);
             return;
         }
-        const message = joiningGameRoom === offer.room ? 'Joining Game Night…'
-            : gameReturnOffered ? 'Game Night disconnected. Any match you were playing ended.'
-            : `${offer.by} invited you to Game Night.`;
+        const jam = jamRoomName(offer.room);
+        const message = joiningGameRoom === offer.room ? jam ? `Joining ${offer.room}…` : 'Joining Game Night…'
+            : gameReturnOffered ? jam ? `You were disconnected from ${offer.room}. Chat starts fresh.`
+                : 'Game Night disconnected. Any match you were playing ended.'
+            : jam ? `${offer.by} invited you to ${offer.room}.` : `${offer.by} invited you to Game Night.`;
         if (status.textContent !== message) status.textContent = message;
-        button.textContent = gameReturnOffered ? 'Return to room' : 'Join Game Night';
+        button.textContent = gameReturnOffered ? 'Return to room' : jam ? 'Join room' : 'Join Game Night';
         button.setAttribute('aria-disabled', String(!!joiningGameRoom));
         $('[data-game-offer-dismiss]').disabled = !!joiningGameRoom;
     }
     $('[data-game-offer-join]').addEventListener('click', () => {
         const offer = currentGameOffer();
         if (!offer || joiningGameRoom || connectionState !== 'connected' || sessionEnded || app.sharingStopped) return;
-        if (!cmd('join', [offer.room], app.active, offer.ref)) return toast('Reconnect before joining Game Night.');
+        if (!cmd('join', [offer.room], app.active, offer.ref)) return toast(jamRoomName(offer.room) ? 'Reconnect before joining the room.' : 'Reconnect before joining Game Night.');
         joiningGameRoom = offer.room;
         drawGameOffer();
     });
@@ -1434,7 +1445,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     });
     window.addEventListener('pagehide', () => {
         const c = app.chans.get(gameReturn?.room);
-        if (connectionState === 'connected' && c?.kind === 'game') rememberGameReturn(c);
+        if (connectionState === 'connected' && (c?.kind === 'game' || c?.kind === 'jam')) rememberGameReturn(c);
     });
     function clearJamInviteQr() {
         const canvas = $('[data-jam-invite-qr]');

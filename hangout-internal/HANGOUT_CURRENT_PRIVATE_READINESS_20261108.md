@@ -212,7 +212,13 @@ redistribution-license qualification remains explicitly unfinished.
    minutes, with participant consent, headphones and no recording. First get
    both people into the same Jam room in Hang Out. The host can create one
    through **Rooms → Jam (WebJam)**. Use **Invite bandmate to room** when it
-   appears, or have Che choose the room from **Rooms**.
+   appears, or type `/invite` and Che's nickname in the room. A Jam room is
+   invite-only, so a guest does not see it under **Rooms**. Until
+   [PR 289](https://github.com/rupret007/StalemateSite/pull/289) is rolled out,
+   the invitation notice lasts about twelve seconds. Invite Che again if he
+   misses it, refreshes or reconnects. After that rollout the invitation waits
+   at the bottom of the window until he chooses **Join room**, and
+   **Return to room** appears there after a refresh or dropped connection.
    Have Che connect the Roland drums to his interface and check that Windows
    sees the input.
 
