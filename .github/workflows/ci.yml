@@ -52,7 +52,7 @@ jobs:
       - name: Run automated tests
         run: npm test
 
-      - name: Exercise the protected Chess room in Chromium and WebKit
+      - name: Exercise protected Game Night in workerd, Chromium and WebKit
         timeout-minutes: 5
         env:
           ARCADE_BROWSER_EVIDENCE: ${{ github.workspace }}/test-results/arcade-multiplayer

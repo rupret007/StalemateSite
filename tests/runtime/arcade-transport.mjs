@@ -307,6 +307,95 @@ async function verifySpades(white, black, spectator, ref) {
         const view = await link.wait(frame => frame.state?.id === fresh.state.id, 'same Spades partnership');
         assert.equal(view.state.seat, seat);
     }
+    return { host, north, east };
+}
+
+async function verifyJack(white, black, north, east, spectator, ref) {
+    async function connect(player) {
+        const endpoint = '/beta/arcade-turdjack';
+        const ticket = await grant(player, ref, endpoint + '-ticket');
+        const response = await upgrade(player.cookie, ticket, endpoint + '-match');
+        assert.equal(response.status, 101);
+        const link = observe(response.webSocket);
+        await link.wait(frame => frame.t === 'match-ready', 'Crapjack ready');
+        return link;
+    }
+    const players = { one: white, two: black, three: north, four: east };
+    const links = {};
+    for (const [seat, player] of Object.entries(players)) links[seat] = await connect(player);
+    const watch = await connect(spectator), host = links.one;
+    host.send({ version: 1, action: 'open' });
+    const id = (await watch.wait(frame => frame.state?.waiting, 'Crapjack table open')).state.id;
+    const send = (link, action, fields = {}) => link.send({ version: 1, id, action, ...fields });
+    send(host, 'start');
+    await host.wait(frame => frame.reason === 'start-unavailable', 'Crapjack minimum seats enforced');
+    for (const [index, seat] of ['two', 'three', 'four'].entries()) {
+        send(links[seat], 'join', { seat });
+        await watch.wait(frame => frame.state?.occupied.length === index + 2, 'Crapjack seats');
+    }
+    send(links.two, 'start');
+    await links.two.wait(frame => frame.reason === 'start-unavailable', 'only the host can start');
+    send(host, 'start');
+    const revision = (link, value) => link.wait(frame => frame.state?.match?.revision === value, 'Crapjack revision ' + value);
+    let publicView = (await revision(watch, 0)).state.match;
+    assert.deepEqual(publicView.players, Object.keys(players));
+    send(watch, 'wager', { revision: 0, chips: 10 });
+    await watch.wait(frame => frame.reason === 'unavailable', 'Crapjack spectator cannot wager');
+    const stakes = [10, 20, 50, 100];
+    for (const [index, link] of Object.values(links).entries()) {
+        send(link, 'wager', { revision: index, chips: stakes[index] });
+        publicView = (await revision(watch, index + 1)).state.match;
+    }
+    for (const [seat, link] of Object.entries(links)) {
+        const { state } = await revision(link, 4);
+        assert.equal(state.seat, seat);
+        assert.equal(state.match.self.hands[0].cards.length, 2);
+        assert.equal(state.match.self.wager, stakes[Object.keys(links).indexOf(seat)]);
+        assert.deepEqual(state.match.table, publicView.table);
+        assert.ok(Object.values(state.match.table).every(player => Object.keys(player).sort().join() === 'hands,ready,wager'));
+    }
+    assert.equal(publicView.dealerHidden, publicView.phase !== 'settled');
+    assert.ok(publicView.dealerHidden ? publicView.dealer.length === 1 : publicView.dealer.length >= 2);
+    const original = (await revision(links.two, 4)).state.match;
+    links.two.socket.close(1000, 'Crapjack fixture reconnect');
+    links.two = await connect(black);
+    send(links.two, 'sync');
+    assert.deepEqual((await revision(links.two, 4)).state.match, original);
+    if (publicView.phase === 'insurance') {
+        for (const link of Object.values(links)) {
+            send(link, 'skip-cover', { revision: publicView.revision });
+            publicView = (await revision(watch, publicView.revision + 1)).state.match;
+        }
+    }
+    while (publicView.phase === 'play') {
+        send(links[publicView.active], 'stand', { revision: publicView.revision });
+        publicView = (await revision(watch, publicView.revision + 1)).state.match;
+    }
+    assert.equal(publicView.phase, 'settled');
+    assert.equal(publicView.dealerHidden, false);
+    assert.ok(publicView.dealer.length >= 2);
+    assert.ok(Object.values(publicView.table).every(player => player.hands[0].outcome));
+    assert.ok(watch.frames.filter(frame => frame.state?.match).every(({ state: { match } }) =>
+        match.self === null && match.actions.length === 0 && !('shoe' in match)));
+    send(host, 'next-round', { revision: publicView.revision });
+    publicView = (await revision(watch, publicView.revision + 1)).state.match;
+    assert.equal(publicView.round, 2);
+    assert.equal(publicView.phase, 'wager');
+    send(host, 'finish', { revision: publicView.revision });
+    await revision(watch, publicView.revision + 1);
+    for (const [index, link] of Object.values(links).entries()) {
+        const offset = watch.frames.length;
+        send(link, 'rematch');
+        if (index < 3) {
+            await watch.wait(frame => frame.state?.rematchVotes.length === index + 1, 'Crapjack fresh session vote', offset);
+        } else {
+            const fresh = await watch.wait(frame => frame.state?.id && frame.state.id !== id, 'Crapjack fresh session', offset);
+            assert.equal(fresh.state.match.round, 1);
+            assert.deepEqual(fresh.state.occupied, Object.keys(players));
+            const own = await links.two.wait(frame => frame.state?.id === fresh.state.id, 'Crapjack new private bankroll');
+            assert.equal(own.state.match.self.chips, 1000);
+        }
+    }
     return host;
 }
 
@@ -378,7 +467,7 @@ try {
         modules: [{ type: 'ESModule', path: join(directory, 'worker.mjs'), contents: bundled.output[0].code }],
         compatibilityDate: '2026-10-01', host: '127.0.0.1', port: 0, https: !!browserName, telemetry: { enabled: false },
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true } },
-        bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1', HANGOUT_ARCADE_CRAPEIGHTS: '1', HANGOUT_ARCADE_TURDRUMMY: '1', HANGOUT_ARCADE_TURDSPADES: '1',
+        bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1', HANGOUT_ARCADE_CRAPEIGHTS: '1', HANGOUT_ARCADE_TURDRUMMY: '1', HANGOUT_ARCADE_TURDSPADES: '1', HANGOUT_ARCADE_TURDJACK: '1',
             ...(browserName ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
             ...(!browserName || browserMedia ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
             HANGOUT_HMAC_KEY: 'owned-arcade-fixture-hmac-not-for-deployment-2026', HANGOUT_BETA_INVITE_KEY: invite,
@@ -442,17 +531,20 @@ try {
     await verifyMedia(white, black, ch.keepRef, a, returning);
     const { a: cards, spectator } = await verifyEights(white, black, ch.keepRef, a);
     const rummy = await verifyRummy(white, black, spectator, ch.keepRef);
-    const spades = await verifySpades(white, black, spectator, ch.keepRef);
+    const { host: spades, north, east } = await verifySpades(white, black, spectator, ch.keepRef);
+    const jack = await verifyJack(white, black, north, east, spectator, ch.keepRef);
     assert.ok([...a.frames, ...cards.frames].every(frame => frame.state?.game !== 'turdrummy'));
     white.lobby.send({ t: 'say', ch: room, text: 'Good luck at Chess' });
     await black.lobby.wait(frame => frame.t === 'line' && frame.text === 'Good luck at Chess', 'chat while match is open');
-    const partAt = a.frames.length, cardsPartAt = cards.frames.length, rummyPartAt = rummy.frames.length, spadesPartAt = spades.frames.length;
+    const partAt = a.frames.length, cardsPartAt = cards.frames.length, rummyPartAt = rummy.frames.length, spadesPartAt = spades.frames.length, jackPartAt = jack.frames.length;
     black.lobby.send({ t: 'cmd', name: 'part', args: [room], ch: room });
     await black.lobby.wait(frame => frame.t === 'part' && frame.ch === room, 'explicit room departure');
     await a.wait(frame => frame.t === 'match-state' && frame.state === null, 'seat retirement', partAt);
     await cards.wait(frame => frame.t === 'match-state' && frame.state === null, 'Eights seat retirement', cardsPartAt);
     await rummy.wait(frame => frame.t === 'match-state' && frame.state === null, 'Rummy seat retirement', rummyPartAt);
     await spades.wait(frame => frame.t === 'match-state' && frame.state === null, 'Spades seat retirement', spadesPartAt);
+    await jack.wait(frame => frame.t === 'match-state' && frame.state === null, 'Crapjack seat retirement', jackPartAt);
+    console.log('Passed native four-player Crapjack dealer settlement, hidden hands, spectator permissions, reconnect, fresh session and seat retirement.');
     console.log('Passed native four-seat TurdSpades, spectator privacy, bidding, 13 tricks, rematch and seat retirement.');
     console.log('Passed native TurdRummy private stock draws, spectator projection, mid-turn reconnect, restricted discard, rematch, and retirement.');
     console.log('Passed native Crappy Eights private hands, spectator projection, wrong-game grant rejection, rejoin, and rematch.');

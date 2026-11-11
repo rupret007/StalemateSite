@@ -337,6 +337,79 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await b.screenshot({ path: join(evidence, `spades-${engine}-phone.png`) });
         }
         console.log(`Passed ${engine} TurdSpades four independent guests, bidding, a complete trick, ${media ? 'same call during a game switch' : 'full reload mid-trick'}, and unanimous rematch.`);
+        return north;
+    }
+    async function playJack(a, b, spectator) {
+        const before = media ? await packetCount(b, 'audio') : 0;
+        for (const page of [a, b, spectator]) {
+            await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdjack');
+        }
+        const table = a.locator('[data-jack-table]');
+        const privateCards = page => page.locator('[data-jack-hands] .jack-face');
+        await a.getByRole('button', { name: 'Open Crapjack table' }).click();
+        await b.getByRole('button', { name: 'Join Seat 2' }).click();
+        await a.getByRole('button', { name: 'Start table' }).click();
+        await expect(b.locator('[data-jack-bank]')).toHaveText('1000 play chips');
+        await b.getByLabel('Play chips').selectOption('20');
+        await a.getByRole('button', { name: 'Ready', exact: true }).click();
+        await expect(b.locator('[data-jack-status]')).toContainText('1/2 ready');
+        await expect(b.getByLabel('Play chips')).toHaveValue('20');
+        const ready = b.getByRole('button', { name: 'Ready', exact: true });
+        await ready.scrollIntoViewIfNeeded();
+        const box = await ready.boundingBox();
+        assert.ok(box?.width >= 44 && box?.height >= 44, 'phone-sized Crapjack Ready button');
+        await b.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+        await expect(table).toHaveAttribute('data-phase', /^(play|insurance|settled)$/);
+        for (const page of [a, b]) await expect(privateCards(page)).toHaveCount(2);
+        await expect(spectator.locator('[data-jack-bank]')).toHaveText('Watching · hands are private');
+        await expect(privateCards(spectator)).toHaveCount(0);
+        if (await table.getAttribute('data-phase') !== 'settled') {
+            await expect(spectator.locator('[data-jack-dealer] [aria-label="Hidden dealer card"]')).toBeVisible();
+        }
+        if (!media) {
+            const hand = await privateCards(b).allTextContents();
+            await b.reload();
+            await b.locator('[data-enter]').click();
+            await expect(privateCards(b)).toHaveCount(2);
+            assert.deepEqual(await privateCards(b).allTextContents(), hand);
+            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+        }
+        if (evidence) {
+            await mkdir(evidence, { recursive: true });
+            await a.screenshot({ path: join(evidence, `jack-${engine}-desktop.png`) });
+            await b.screenshot({ path: join(evidence, `jack-${engine}-phone.png`) });
+        }
+        await expect(b.locator('[data-jack-hands]')).toBeInViewport({ ratio: 1 });
+        await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
+        if (await table.getAttribute('data-phase') === 'insurance') {
+            await a.getByRole('button', { name: 'Decline insurance' }).click();
+            await expect(b.locator('[data-jack-players] li').first()).toContainText('Ready');
+            await b.getByRole('button', { name: 'Decline insurance' }).click();
+            await expect(table).toHaveAttribute('data-phase', /^(play|settled)$/);
+        }
+        const active = a.locator('[data-jack-players] [data-active="true"]');
+        for (let index = 0; index < 2 && await table.getAttribute('data-phase') === 'play'; index++) {
+            const label = await active.textContent();
+            const page = label.startsWith('You') ? a : b;
+            await page.getByRole('button', { name: 'Stand', exact: true }).click();
+            await expect.poll(async () => (await active.allTextContents())[0]).not.toBe(label);
+        }
+        await expect(table).toHaveAttribute('data-phase', 'settled');
+        await expect(spectator.locator('[data-jack-dealer] .jack-face').nth(1)).toBeVisible();
+        await expect(spectator.locator('[data-jack-players] li').nth(1)).toContainText(/20 chips · (Win|Loss|Blackjack|Push)/);
+        if (media) {
+            await waitForPackets(b, 'audio', before);
+            assert.equal(await b.evaluate(() => window.testPeers.length), 1);
+        }
+        await a.getByRole('button', { name: 'Next round' }).click();
+        await expect(b.locator('[data-jack-status]')).toContainText('Round 2');
+        await a.getByRole('button', { name: 'End session' }).click();
+        await a.getByRole('dialog', { name: 'End this session?' }).getByRole('button', { name: 'End session' }).click();
+        await a.getByRole('button', { name: 'Request fresh session' }).click();
+        await b.getByRole('button', { name: 'Accept fresh session' }).click();
+        await expect(b.locator('[data-jack-status]')).toContainText('Round 1');
+        await expect(b.locator('[data-jack-bank]')).toHaveText('1000 play chips');
+        console.log(`Passed ${engine} Crapjack two independent players, touch wager, spectator privacy, settlement, ${media ? 'same call during a game switch' : 'full reload after the deal'}, and fresh session.`);
     }
     try {
         const a = await guest('stalemate', 'ChessHost', { width: 1280, height: 900 });
@@ -403,7 +476,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.setViewportSize({ width: 375, height: 667 });
         await playEights(a, b);
         await playRummy(a, b);
-        await playSpades(a, b);
+        const spectator = await playSpades(a, b);
+        await playJack(a, b, spectator);
         if (media) {
             await a.locator('[data-call-toggle]').click();
             await a.getByRole('button', { name: 'Actions for ChessGuest' }).click();

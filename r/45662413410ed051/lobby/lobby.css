@@ -301,7 +301,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 @media (min-width: 1100px) {
   .game-night:has(.arcade-card-table[open] [data-card-table]:not([hidden])) {
     display: grid;
-    grid-template: "cards heading" auto "cards actions" auto "cards four" auto "cards chess" auto "cards eights" auto "cards rummy" auto "cards spades" auto "cards call" 1fr /
+    grid-template: "cards heading" auto "cards actions" auto "cards four" auto "cards chess" auto "cards eights" auto "cards rummy" auto "cards spades" auto "cards jack" auto "cards call" 1fr /
       minmax(0, 27rem) minmax(0, 1fr);
     gap: 4px 16px;
     align-items: start;
@@ -312,6 +312,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .game-night:has(.arcade-card-table[open]) > .arcade-eights:not([open]) { grid-area: eights; }
   .game-night:has(.arcade-card-table[open]) > .arcade-rummy:not([open]) { grid-area: rummy; }
   .game-night:has(.arcade-card-table[open]) > .arcade-spades:not([open]) { grid-area: spades; }
+  .game-night:has(.arcade-card-table[open]) > .arcade-jack:not([open]) { grid-area: jack; }
 }
 @media (max-width: 900px) {
   .roombar:has([data-arcade-game]:not([hidden])) .modes { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -342,6 +343,17 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 @media (max-width: 355px) {
   .arcade-spades .arcade-card-hand { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
+.jack-dealer, .jack-hand { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 5px 0; }
+.jack-dealer > b, .jack-hand > b { min-width: 75px; }
+.jack-hand[data-active="true"] > b { color: var(--lime); }
+.jack-face { display: grid; place-items: center; min-width: 35px; min-height: 39px; padding: 1px 4px; border-radius: 5px; color: #151c18; background: #f4ebcf; font: bold .95rem var(--mono); }
+.jack-face[data-red="true"] { color: #8e2538; }
+.jack-seats { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; padding: 0; list-style: none; }
+.jack-seats li { padding: 3px 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
+.jack-seats [data-active="true"] { border-color: var(--lime); }
+.arcade-jack select { padding: 4px; }
+.arcade-jack select, .arcade-jack .btn { min-height: 44px; }
+.jack-controls { margin-top: 6px; }
 .game-night-call { margin-block: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
 .game-night-call h4, .game-night-call p { margin: 0 0 5px; }
 .game-night-call .jam-actions { margin-bottom: 4px; }
