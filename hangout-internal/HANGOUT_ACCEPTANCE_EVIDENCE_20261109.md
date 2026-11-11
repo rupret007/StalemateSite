@@ -33,19 +33,16 @@ verified the live lobby markup and 33 other files. The extracted Linux package
 also passed hosted startup and dummy-audio checks.
 [Safari and Linux evidence](../pr-assets/private-readiness/20261111/safari-dialog/qualification.json)
 
-The current private site serves the Four in a Row recovery and reflow update.
-The rollout preserved the access rules, Worker bindings, stable namespaces and
-issuer. An admitted guest verified five protected assets and logged out. A
-local test of the same bundled Worker and assets used two Chromium guest
-contexts, real workerd WebSockets and SQLite. It verified joining a private
-room by invitation, game moves, chat, reload recovery and logout. A local
-WebKit attempt verified joining the room. The match did not complete. The
-hosted two-person game and assistive-technology checks remain open.
-[Local browser evidence](../pr-assets/private-readiness/20261111/game-night-follow-up/qualification.json)
-· [375 px](../pr-assets/private-readiness/20261111/game-night-follow-up/game-night-375.png)
-· [390 px](../pr-assets/private-readiness/20261111/game-night-follow-up/game-night-390.png)
-[Private rollout and rollback](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
-· [Game Night source](https://github.com/rupret007/StalemateSite/pull/266)
+The private beta serves the lobby timeout and single-frame first-join fixes from
+PRs 270 and 271. The rollout preserved access, configuration, stable namespaces
+and the issuer. An admitted guest verified five protected assets and logged out.
+Two hosted WebKit guests then joined on the first attempt, exchanged a Game
+Night invitation, played, chatted, rejoined with fresh scrollback and logged out.
+The board and Send button stayed visible at 375 and 390 CSS pixels. Native Safari,
+physical iPhone and assistive-technology checks remain open.
+[Hosted lobby evidence](../pr-assets/private-readiness/20261111/hosted-lobby/qualification.json)
+· [Earlier local browser evidence](../pr-assets/private-readiness/20261111/game-night-follow-up/qualification.json)
+· [Private rollout and rollback](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
 
 The original 62 ID and outcome cells below are copied verbatim.
 
@@ -65,7 +62,7 @@ The original 62 ID and outcome cells below are copied verbatim.
 | A5 | Audit real login providers | **L,S** — Configured Cloudflare email-code path previously worked; latest owner-panel visit now requests fresh sign-in. | Current real owner/moderator sign-in and account-provider audit beyond guest entry. |
 | A6 | Secure first-party sessions; preserve ownership and verified account linking | **C,S** — Session/ownership/linking implementation and regression evidence retained. | Current live ownership/linking/logout/revocation across devices. |
 | A7 | No cross-domain cookies, wildcard origins or copied account credentials | **C,S** — Canonical first-party service, exact origins and preserved configuration; no copied site accounts used. | Repeat applicable configuration comparison before later delivery; broader integration audit. |
-| A8 | Preserve canonical service, namespace and IDs through migration/rollback | **S,L** — The current private rollout matched the live Worker, effective bindings and settings, stable IDs and issuer. Immediate rollback is `49f12e46`. | Verify serving state and configuration whenever rollback is exercised. |
+| A8 | Preserve canonical service, namespace and IDs through migration/rollback | **S,L** — The latest private rollout matched the live Worker, effective bindings and settings, stable IDs and issuer. Immediate rollback is `1b48de76`. | Verify serving state and configuration whenever rollback is exercised. |
 | E1 | Adding a basic Join link is simple and needs no site credential | **S,C** — Concrete allowlisted entry toolkit and hash verification; a neutral Join link needs no site credential. | Receiving-site review/install remains staged, without publishing navigation early. |
 | E2 | Optional versioned integration contract with verified domains, exact registered origins, scoped permissions and revocation | **S,C** — Optional contract/policy and exact-origin/revocation source tests; distinct from basic Join links. | Live registered integration qualification, ownership and revocation without expanding permissions. |
 | E3 | A third test site reaches the same community | **C** — Third-site fixtures/source exist; no current real third-site journey claimed. | Observed private third-site integration into the same community. |
@@ -73,13 +70,13 @@ The original 62 ID and outcome cells below are copied verbatim.
 | E5 | Safe public package; no repository/private-file copy or output overwrite | **S,C** — Reviewed package: exact8-file allowlist,7 payloads and matching source/payload hashes. | Preserve safe-output/overwrite checks and settle redistribution/license scope before external reuse. |
 | E6 | Federation stays outside this requirement | **S** — Federation remains outside this scope; entry context is not federation. | Do not substitute federation work for unfinished private-use requirements. |
 | D1 | Accessible retro IRC design, refined typography/navigation/presence | **L,S** — Actual three-pane retro IRC workspace and refined phone fixtures; native screenshot retained. | Broader newcomer/usability review, platform and assistive-technology qualification. |
-| D2 | Clear connection, sign-in, loading and error/retry states | **L,C,S** — Browser expiry during audio setup now closes capture and shows fresh-link guidance. A local Chrome fixture confirmed focus moves to the message. The deployed Chrome entry still requires private admission. | Qualify recovery with a real private replacement invite, plus the remaining connected and sign-in flows. |
+| D2 | Clear connection, sign-in, loading and error/retry states | **L,C,S** — Browser invitation expiry asks for a fresh link and releases capture. The lobby now offers retry after a stalled join and retains the nickname. Two fresh hosted WebKit guests joined on the first attempt. | Qualify a real replacement Music invitation and remaining owner/moderator sign-in flows. |
 | D3 | Welcoming quiet rooms, room discovery and simple creation/join/switch/leave | **L,C** — Quiet lobby, directory, guest creation/join and host closure observed. | Remaining activity/room recovery/host-transfer paths and uncoached newcomer use. |
-| D4 | Keyboard navigation and focus | **L,C** — Chrome reached the nickname and agreement controls with visible focus. Native Safari opened Commands with Space and restored focus on Escape in a local fixture. Two Chromium guests using the exact current bundle confirmed keyboard Game Night invitations, match focus, room recovery and return to the lobby tab. | Verify joined Safari, actual screen-reader use, Intel startup and workspace native Quit. |
+| D4 | Keyboard navigation and focus | **L,C** — Earlier Chrome and local native Safari focus evidence is retained. Two hosted WebKit guests used the keyboard for Game Night invitation, match focus, room return and focus restoration to the lobby tab. | Verify joined native Safari, screen-reader speech, Intel startup and native Quit. |
 | D5 | Screen-reader behavior | **L,C,S** — Native Safari exposed the candidate’s member, command and channel controls in the accessibility tree. The private release serves the reviewed markup. | Verify the joined dialog in live Safari and listen to VoiceOver and NVDA. |
 | D6 | Zoom/reflow and WCAG 2.2 AA | **L,C,S** — Actual Chrome 200% and 400% zoom produced 600 and 300 CSS pixel widths. Scroll width matched the viewport and the tested nickname controls retained visible focus. | Verify joined chat, physical mobile, assistive technology and the remaining WCAG 2.2 AA requirements. |
 | D7 | Reduced-motion preference | **C,S** — Reduced-motion CSS and enabled reduced-motion fixtures retained. | Verify remaining actual browser/OS preference behavior; no broad accessibility certification. |
-| D8 | 375/390px screenshots, no page overflow, input/Send visible, iOS inputs 16px | **C,L** — Local Chromium on the exact deployed bundle kept the board and Send button visible at 375 and 390 CSS pixels, with no page overflow and a 16 px input. Earlier deployed prejoin and local expiry checks are retained. | Qualify joined chat on a physical iPhone, including focus and keyboard reflow. |
+| D8 | 375/390px screenshots, no page overflow, input/Send visible, iOS inputs 16px | **C,L** — Hosted WebKit kept the board and Send button visible at 375 and 390 CSS pixels, with no page overflow and a 16 px input. Captures are retained. | Qualify joined chat on a physical iPhone, including focus and keyboard reflow. |
 | D9 | Starter/action rows contain themselves and text wraps | **C,S** — Current fixture geometry/screenshots cover wrapping text and self-contained starter/action rows. | Current delivered/physical-device checks, including unusually long text and controls. |
 | D10 | Cameras/microphones remain opt-in | **L,C** — No camera/microphone started in the live chat/creative/PM checks; media remains opt-in. | Fresh consent, stop/revoke and device checks before remaining Music/Webex trials. |
 | D11 | Review reused components for license and security | **S,C** — All four actual AE49 archives match generated notices and eleven pinned licenses. Prior 67 archive evidence remains dated. | Complete the remaining license/security review and resolve redistribution of the website toolkit. |
@@ -106,12 +103,12 @@ The original 62 ID and outcome cells below are copied verbatim.
 | V1 | Both sites' visitors exchange messages and show/hide source badges | **L** — Observed private Stalemate/RadDad text and badge show/hide on c83. | Remaining supported platform/newcomer qualification; public entrances remain staged. |
 | V2 | Ordinary visitors create/join creative rooms and collaborate | **L** — Actual ordinary guests hosted/joined Draw/Paint/chat and collaborated. | Current native Music/SharedTrack/Webex and other original creative/platform outcomes. |
 | V3 | Reporting and moderator review work across entries | **C,S** — Earlier report-review receipts retained at their own revisions; current owner login requires email sign-in. | Current cross-entry report and human review; no new report created while reviewer unavailable. |
-| V4 | Fresh-join privacy, logout/revocation and role isolation | **L,C** — Earlier live fresh-join privacy, guest topic denial and PM consent/block are retained. Current rollout guest logout completed. In the exact-bundle local test, rejoining returned no prior chat or board, and logout removed protected asset access. | Qualify live revocation, account ownership and full role isolation. |
-| V5 | Failures/recovery are clear and truthful | **L,C,S** — The private site serves browser invitation-expiry recovery and Game Night return. The exact-bundle local browser test ended the board on reload, offered a room return and kept old chat out of the new session. | Observe recovery with a real replacement Music invitation and verify hosted game recovery and media handoff. |
+| V4 | Fresh-join privacy, logout/revocation and role isolation | **L,C** — The hosted WebKit guest returned with fresh scrollback and an ended board. Both ordinary test guests logged out and lost protected asset access. Earlier topic denial and PM consent/block are retained. | Qualify current moderator revocation, account ownership and broader role isolation. |
+| V5 | Failures/recovery are clear and truthful | **L,C,S** — The private site serves browser invite expiry, stalled-join retry and Game Night return. Hosted WebKit ended the board on reload, returned to the same room and kept prior chat out of the new scrollback. | Observe recovery with a real replacement Music invitation and media handoff. |
 | V6 | Mac, Windows and Linux support qualified honestly | **C,S,L** — Four AE49 archives passed inspection. Both Mac shortcuts select verified AE49 builds and the Mini passed idle launch and Quit. A newer four-platform run includes the Webex fix. Its Windows installer passed hosted install, launch and uninstall; its Mac archive wrappers were verified. | Qualify actual Intel startup, the newer selected desktop packages, local Windows/Linux execution, physical media roles and publisher trust. |
-| V7 | Deliver source, tests, screenshots and small PRs | **S,C,L** — PR266 merged after exact native and browser checks. The private rollout verified five protected assets. Current local browser screenshots show the game and chat composer at 375 and 390 px. Prior invite-expiry screenshots and desktop receipts remain available. | Finish joined hosted game, media and uncoached newcomer journeys. |
+| V7 | Deliver source, tests, screenshots and small PRs | **S,C,L** — PRs 270 and 271 merged after exact browser and native checks. Five protected assets and a hosted two-guest Game Night journey were verified. The hosted 375/390 px captures and prior screenshots are retained. | Finish media and uncoached newcomer journeys. |
 | V8 | Deliver integration instructions and a clean concrete package | **S,C** — Concrete entry toolkit, setup/support and restore/rollback guidance retained. | Receiving-site integration review, remaining package/license/platform qualification. |
-| V9 | Deliver a migration/rollback plan with remaining dependencies | **S,L** — The current rollout records serving version `1b48de76`, verified configuration preservation and immediate rollback `49f12e46`. Original Mac shortcuts are preserved. | Refresh resource and trust checks for later switches and verify any restored serving state. |
+| V9 | Deliver a migration/rollback plan with remaining dependencies | **S,L** — The current private rollout records serving version `e1c40ea5`, verified configuration preservation and immediate rollback `1b48de76`. Original Mac shortcuts are preserved. | Refresh resource and trust checks for later switches and verify any restored serving state. |
 | V10 | Completion requires observed application journeys and concrete integration package, with unverified work explicit | **L,S,C,G,H,U** — Observed browser journeys and concrete package now exist; evidence layers remain distinct. | All original outcomes still need appropriate proof; uncoached essential private band journeys remain unfinished. |
 
 ## Required media evidence beyond these browser rows
