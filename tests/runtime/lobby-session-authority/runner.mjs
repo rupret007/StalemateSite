@@ -1004,9 +1004,15 @@ async function runtime(phase, state, nonce) {
                 const joined = await joinRoom(c, gameRoom);
                 assert.equal(joined.ch.kind, 'game'); assert.equal(joined.ch.modes.i, true);
                 assert.equal(joined.ch.four, null);
-                const inviteAt = b.frames.length;
-                await c.command('invite', [b.label], gameRoom);
-                await b.wait(f => f.t === 'invite' && f.ch === gameRoom, 'Game Night invitation', inviteAt);
+                const inviteAt = b.frames.length, hostInviteAt = c.frames.length;
+                const guestId = canvasC.ch.names.find(person => person.nick === b.label)?.id;
+                assert.match(guestId, /^c[a-f0-9]{32}$/);
+                c.send({ t: 'cmd', name: 'invite', args: [b.label, gameRoom], ch: gameRoom,
+                    roomInstance: joined.ch.keepRef, personContext: 1, personPeer: guestId });
+                await Promise.all([
+                    b.wait(f => f.t === 'invite' && f.ch === gameRoom, 'Game Night invitation', inviteAt),
+                    c.wait(f => f.t === 'notice' && f.text === `Invited ${b.label} to ${gameRoom}.`, 'Game Night invite confirmation', hostInviteAt),
+                ]);
                 await joinRoom(b, gameRoom);
                 const four = (from, to, args, accepts, label) => {
                     const since = to.frames.length;
