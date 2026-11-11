@@ -1171,7 +1171,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
         const button = pending?.button || $$('[data-id]').find((line) => line.dataset.id === id)?.querySelector('.flag');
         if (button) {
-            button.disabled = submitted;
+            if (submitted) {
+                button.setAttribute('aria-disabled', 'true');
+                button.tabIndex = -1;
+            } else {
+                button.removeAttribute('aria-disabled');
+                button.tabIndex = 0;
+            }
             button.textContent = submitted ? '✓' : '🚩';
             button.title = submitted ? REPORT_QUEUED_LABEL : 'Report this message';
             if (submitted) button.setAttribute('aria-label', REPORT_QUEUED_LABEL);
@@ -1208,11 +1214,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             li.append(' ', l.text);
             if (l.id && (l.t === 'pm' ? l.self !== true : l.personSelf !== true)) {
                 const r = document.createElement('button'); r.type = 'button'; r.className = 'flag'; r.textContent = '🚩'; r.setAttribute('aria-label', `Report this message from ${l.from}`);
-                if (l.reported) { r.disabled = true; r.textContent = '✓'; r.title = REPORT_QUEUED_LABEL; r.setAttribute('aria-label', REPORT_QUEUED_LABEL); }
-                else if (pendingReports.has(l.id)) { r.disabled = true; r.textContent = '…'; pendingReports.get(l.id).button = r; }
+                if (l.reported) { r.setAttribute('aria-disabled', 'true'); r.tabIndex = -1; r.textContent = '✓'; r.title = REPORT_QUEUED_LABEL; r.setAttribute('aria-label', REPORT_QUEUED_LABEL); }
+                else if (pendingReports.has(l.id)) { r.setAttribute('aria-disabled', 'true'); r.textContent = '…'; pendingReports.get(l.id).button = r; }
                 r.addEventListener('click', () => {
+                    if (l.reported || pendingReports.has(l.id)) return;
                     if (!send({ t: 'report', id: l.id, text: l.text })) return toast('You are offline. Reconnect before reporting this message.');
-                    r.disabled = true; r.textContent = '…';
+                    r.setAttribute('aria-disabled', 'true'); r.textContent = '…';
                     const timer = setTimeout(() => { finishReport(l.id, false); toast('Report confirmation did not arrive. Try again or use the moderation contact.'); }, 10000);
                     pendingReports.set(l.id, { button: r, timer });
                 });

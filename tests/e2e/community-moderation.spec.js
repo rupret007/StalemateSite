@@ -153,8 +153,14 @@ test('three entrances share a guest-hosted creative room, real report review and
         for (const page of [author, witness, observer]) await expect(received(page, text)).toHaveCount(1);
         expect(await witness.evaluate(() => window.__lobby.capabilities.moderate)).toBe(false);
 
-        await received(witness, text).locator('.flag').click();
-        await expect(received(witness, text).locator('.flag')).toHaveText('✓');
+        const flag = received(witness, text).locator('.flag');
+        await flag.press('Enter');
+        await expect(flag).toHaveText('✓');
+        await expect(flag).toHaveAttribute('aria-disabled', 'true');
+        await expect(flag).toHaveAttribute('tabindex', '-1');
+        await expect(flag).toBeFocused();
+        await witness.keyboard.press('Enter');
+        await expect(flag).toBeFocused();
         await expect(reportRow(moderator, text)).toContainText('StaleAuthor');
         expect(await moderator.evaluate(id => window.__admin.state.reports.find(item => item.id === id).count, messageId)).toBe(1);
         await expect(moderator.locator('[data-panic]')).toBeHidden();
