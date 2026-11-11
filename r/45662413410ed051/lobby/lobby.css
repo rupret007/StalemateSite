@@ -245,6 +245,35 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .game-night summary { cursor: pointer; width: fit-content; }
 .game-night input { flex: 1 1 220px; min-width: 0; max-width: 100%; font: inherit; font-size: 16px; }
 .game-night [data-game-error]:empty { display: none; }
+.game-night:has(.four-match[open]) { max-height: 52dvh; }
+.game-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 12px; margin-bottom: 8px; }
+.game-heading .jam-title, .game-heading .game-note { margin: 0; }
+.four-match { margin: 8px 0; border-block: 1px solid var(--line); }
+.four-match summary { min-height: 34px; padding: 8px 2px; color: var(--cream); }
+.four-info { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin-bottom: 8px; }
+.four-info p { flex: 1; min-width: 150px; margin: 0; }
+.four-columns, .four-board { max-width: 336px; width: 100%; }
+.four-columns { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.four-columns .btn { min-width: 0; min-height: 36px; padding-inline: 0; }
+.four-columns .btn[aria-disabled="true"] { color: var(--muted); cursor: default; }
+.four-columns .btn[aria-disabled="false"] { border-color: #637943; color: var(--lime); }
+.four-board { table-layout: fixed; border-spacing: 4px; padding-bottom: 6px; text-align: center; }
+.four-board td { padding: 0; border: 1px solid #394739; border-radius: 3px; background: var(--surface); }
+.four-board td span { display: grid; min-height: 22px; place-items: center; font: bold 14px var(--mono); }
+.four-board [data-mark="X"] { color: var(--lime); }
+.four-board [data-mark="O"] { color: var(--blue); }
+@media (min-width: 1100px) {
+  .game-night:has(.four-match[open]) {
+    display: grid;
+    grid-template: "heading match" auto "actions match" auto "call match" 1fr / minmax(0, 1fr) minmax(0, 336px);
+    gap: 0 18px;
+    align-items: start;
+  }
+  .game-heading { grid-area: heading; }
+  .game-actions { grid-area: actions; }
+  .game-call { grid-area: call; }
+  .game-night .four-match[open] { grid-area: match; margin: 0; border-block: 0; }
+}
 .jam-paste .small { flex-basis: 100%; margin: 0; }
 [data-jam-share-status]:empty { display: none; }
 .jam-paste textarea, .act-load input { flex: 1; min-width: 0; }

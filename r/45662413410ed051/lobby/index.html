@@ -142,7 +142,7 @@
                 <button class="tile" type="button" data-start="watch"><b aria-hidden="true">▷</b><strong>Watch together</strong><span>Same video. Same moment.</span></button>
                 <button class="tile" type="button" data-start="bobross"><b aria-hidden="true"><img class="paint-together-mark" src="../paint-together-afro.webp" width="28" height="28" alt="" loading="lazy"></b><strong>Paint along</strong><span>Pick Bob Ross or bring a YouTube lesson. Paint together.</span></button>
                 <button class="tile" type="button" data-start="jam"><b aria-hidden="true">≋</b><strong>Jam (WebJam)</strong><span>Bring a riff. Find your band.</span></button>
-                <button class="tile" type="button" data-start="game" hidden><b aria-hidden="true">🎮</b><strong>Game Night</strong><span>Invite friends, pick a game and start a group call.</span></button>
+                <button class="tile" type="button" data-start="game" hidden><b aria-hidden="true">🎮</b><strong>Game Night</strong><span>Invite friends to play and chat.</span></button>
             </div>
             <details class="room-details"><summary>About hosting &amp; keeping a room</summary><p class="small">Anyone can host a temporary room. Sign in with email to keep its name across visits. Registered rooms expire after 90 days without an owner or verified co-host visit. You can stay in #stalemate while a room is open. Cameras are always optional.</p></details>
             <a class="private private-invite" data-private href="../">↗ Encrypted private room</a>
@@ -190,24 +190,39 @@
                 <button class="btn btn--small btn--ghost" type="button" data-keep-cancel>Not now</button>
             </section>
             <section class="jam game-night" data-game-night hidden aria-labelledby="game-night-title">
-                <h3 class="jam-title" id="game-night-title">🎮 Game Night</h3>
-                <p class="small game-note">Invite-only. Pick a game in chat, then play in your own tab or app.</p>
-                <div class="jam-actions">
+                <div class="game-heading">
+                    <h3 class="jam-title" id="game-night-title">Game Night</h3>
+                    <p class="small game-note">Invite-only room</p>
+                </div>
+                <div class="jam-actions game-actions">
                     <button class="btn btn--small" type="button" data-game-invite hidden>Invite players</button>
                     <a class="btn btn--small btn--ghost" href="https://stalemate.band/play/" target="_blank" rel="noopener noreferrer">Open Stalemate Arcade</a>
-                    <a class="btn btn--small" data-game-open target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden>Open Discord call</a>
+                    <a class="btn btn--small btn--ghost" data-game-open target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden>Open Discord call</a>
                 </div>
-                <p class="small game-note" data-game-call-status role="status"></p>
-                <details data-game-editor hidden>
-                    <summary>Manage Discord link</summary>
-                    <form class="jam-paste" data-game-form>
-                        <label class="small" for="game-call-link">Discord invite or voice channel link</label>
-                        <input id="game-call-link" data-game-link placeholder="https://discord.gg/…" inputmode="url" maxlength="96" autocomplete="off" spellcheck="false" required>
-                        <button class="btn btn--small" type="submit">Share link</button>
-                        <button class="btn btn--small btn--ghost" type="button" data-game-clear hidden>Remove link</button>
-                        <p class="small" data-game-error role="status"></p>
-                    </form>
+                <details class="four-match" data-four hidden>
+                    <summary>Four in a Row</summary>
+                    <div class="four-info">
+                        <p class="small game-note" data-four-status role="status"></p>
+                        <button class="btn btn--small" type="button" data-four-action hidden></button>
+                    </div>
+                    <div data-four-board hidden>
+                        <div class="four-columns" role="group" aria-label="Drop a piece" data-four-columns></div>
+                        <table class="four-board" aria-label="Four in a Row board" data-four-table></table>
+                    </div>
                 </details>
+                <div class="game-call">
+                    <p class="small game-note" data-game-call-status role="status"></p>
+                    <details data-game-editor hidden>
+                        <summary>Manage Discord link</summary>
+                        <form class="jam-paste" data-game-form>
+                            <label class="small" for="game-call-link">Discord invite or voice channel link</label>
+                            <input id="game-call-link" data-game-link placeholder="https://discord.gg/…" inputmode="url" maxlength="96" autocomplete="off" spellcheck="false" required>
+                            <button class="btn btn--small" type="submit">Share link</button>
+                            <button class="btn btn--small btn--ghost" type="button" data-game-clear hidden>Remove link</button>
+                            <p class="small" data-game-error role="status"></p>
+                        </form>
+                    </details>
+                </div>
             </section>
             <div class="jam" data-jam hidden role="region" aria-labelledby="jam-title">
                 <h3 class="jam-title" id="jam-title">Live music with WebJam</h3>
