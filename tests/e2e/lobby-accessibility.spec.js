@@ -145,6 +145,23 @@ test('keyboard guest can join, recover a named-room error, chat, navigate tabs a
     } finally { await visitor.close(); }
 });
 
+for (const width of [390, 1280]) test(`leaving Paint along with the keyboard returns focus to the lobby at ${width}px`, async ({ browser, baseURL }) => {
+    const visitor = await guest(browser, baseURL, `PaintFocus${width}`, { width, height: 844 });
+    const { page } = visitor;
+    try {
+        await section(page, 'rooms');
+        await tabTo(page, page.locator('[data-start="bobross"]'));
+        await page.keyboard.press('Enter');
+        await expect(page.locator('[data-act-canvas]')).toBeVisible();
+        const leave = page.getByRole('button', { name: 'Leave', exact: true });
+        await tabTo(page, leave);
+        await page.keyboard.press('Enter');
+        await expect(page.locator('[data-chat-context]')).toHaveText('#stalemate');
+        await expect(page.getByRole('tab', { name: '#stalemate', exact: true })).toBeFocused();
+        expect(visitor.errors).toEqual([]);
+    } finally { await visitor.close(); }
+});
+
 test('a delayed native close event cannot erase a reopened channel request and trap focus', async ({ browser, baseURL }) => {
     let holdNextReply = false, held = false, forwarding = Promise.resolve();
     const transportErrors = [];
