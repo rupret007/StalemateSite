@@ -1749,7 +1749,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (chan.kind === 'lobby') return bot(c, '/invite nick #room', 'error');
             if (chan.invites.size >= 150 && !chan.invites.has(t.dev)) return bot(c, 'Room invitation list is full.', 'error');
             chan.invites.add(t.dev);
-            out(t, { t: 'invite', ch: chan.name, by: c.nick });
+            out(t, { t: 'invite', ch: chan.name, by: c.nick, ...(roomKind(chan) === 'game' ? { roomInstance: chan.keepRef } : {}) });
             return bot(c, `Invited ${t.nick} to ${chan.name}.`);
         },
         op(c, chan, [n], _r, _m, peer) { return setRank(c, chan, n, 'ops', true, '+o', peer); },
