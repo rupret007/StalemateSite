@@ -276,6 +276,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         assert.ok(box?.width > 22 && box?.height > 22);
         await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
     }
+    async function fitLandscape(page, scrollTarget, ...controls) {
+        const portrait = page.viewportSize();
+        await page.setViewportSize({ width: 667, height: 375 });
+        await scrollTarget.evaluate(element => element.scrollIntoView({ block: 'center' }));
+        for (const control of controls) await expect(control).toBeInViewport({ ratio: 1 });
+        await page.setViewportSize(portrait);
+        await controls[0].scrollIntoViewIfNeeded();
+    }
     async function fit(page, label) {
         try {
             await expect(page.locator('.arcade-chess-board')).toBeInViewport({ ratio: 1 });
@@ -1016,6 +1024,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await mkdir(evidence, { recursive: true });
             await b.screenshot({ path: join(evidence, `tris-${engine}-before-input.png`) });
         }
+        await fitLandscape(b, b.locator('.tris-arena'), board(b), b.locator('[data-tris-controls]'));
         await expect(board(b)).toBeInViewport({ ratio: 1 });
         await expect(b.locator('[data-tris-controls]')).toBeInViewport({ ratio: 1 });
         await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
@@ -1113,6 +1122,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await b.screenshot({ path: join(evidence, `mania-${engine}-phone.png`) });
             await a.screenshot({ path: join(evidence, `mania-${engine}-desktop.png`) });
         }
+        await fitLandscape(b, b.locator('.mania-playfield'), board(b), b.locator('[data-mania-clock]'));
         await expect(board(b)).toBeInViewport({ ratio: 1 });
         await expect(b.locator('[data-mania-clock]')).toBeInViewport({ ratio: 1 });
         await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
@@ -1212,6 +1222,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const danger = unpackRushRacer(opening.runner).run.entities
             .find(entity => entity.at === 100 && entity.lane !== 1 && ['crate', 'beam', 'barrier'].includes(entity.kind)).lane;
         const direction = danger === 0 ? 'left' : 'right';
+        await fitLandscape(b, track(b), track(b), b.locator('[data-race-controls]'));
         await expect(track(b)).toBeInViewport({ ratio: 1 });
         await expect(b.locator('[data-race-controls]')).toBeInViewport({ ratio: 1 });
         await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
@@ -1358,12 +1369,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(match(b)).toHaveAttribute('data-phase', 'countdown');
         await expect(board(spectator)).toBeVisible();
         await expect(serve(spectator)).toBeHidden();
-        await b.setViewportSize({ width: 667, height: 375 });
-        await b.locator('.brick-race-layout').evaluate(element => element.scrollIntoView({ block: 'center' }));
-        await expect(board(b)).toBeInViewport({ ratio: 1 });
-        await expect(serve(b)).toBeInViewport({ ratio: 1 });
-        await b.setViewportSize({ width: 375, height: 667 });
-        await board(b).scrollIntoViewIfNeeded();
+        await fitLandscape(b, b.locator('.brick-race-layout'), board(b), serve(b));
         await expect(board(b)).toBeInViewport({ ratio: 1 });
         await expect(serve(b)).toBeInViewport({ ratio: 1 });
         await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
@@ -1482,6 +1488,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.getByRole('button', { name: 'Join as Black' }).click();
         await expect(a.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
         await fit(a, 'desktop');
+        const phoneChessboard = b.locator('.arcade-chess-board');
+        await fitLandscape(b, phoneChessboard, phoneChessboard);
         await fit(b, 'phone');
         await moveByKeyboard(a, 'e2', 'ArrowUp', 2);
         await expect(b.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();

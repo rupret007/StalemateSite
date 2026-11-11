@@ -782,14 +782,17 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
   .phonetabs button { min-height: 44px; }
 }
 @media (max-height: 450px) and (max-width: 900px) and (orientation: landscape) {
-  /* Let the chat pane scroll past an active brick race instead of clipping
-     the playfield inside a second, shorter scroll area. */
-  .chat:has(.arcade-brick-race[open] [data-brick-match]:not([hidden])) .game-night {
+  /* Keep each board within one scroll pane so the composer cannot cover it. */
+  .chat:has(> .game-night:not([hidden]) :is(.arcade-chess, .arcade-tris, .arcade-mania, .arcade-rush-race, .arcade-brick-race)[open]
+    :is([data-chess-playing], [data-card-table]):not([hidden])) .game-night {
     flex-shrink: 0;
     max-height: none;
     overflow: visible;
   }
-  .chat:has(.arcade-brick-race[open] [data-brick-match]:not([hidden])) .say { position: static; }
+  .chat:has(> .game-night:not([hidden]) :is(.arcade-chess, .arcade-tris, .arcade-mania, .arcade-rush-race, .arcade-brick-race)[open]
+    :is([data-chess-playing], [data-card-table]):not([hidden])) .say { position: static; }
+  .tris-arena:has(.tris-controls:not([hidden])) { grid-template-columns: auto minmax(0, 1fr) minmax(92px, 8rem); }
+  .tris-controls { grid-column: auto; grid-template-columns: repeat(2, minmax(44px, 1fr)); }
   .brick-race-layout, .brick-race-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .brick-race-rail { display: grid; }
   .brick-race-rail > :is(time, button, [data-brick-power]) { grid-column: 1 / -1; }
