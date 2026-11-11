@@ -127,6 +127,12 @@ test('Stalemate entry through jam room to connected browser Web Join with few ba
         await expect(guestNickname).toBeFocused();
         await hostCtx.page.keyboard.press('Escape');
         await expect(inviteBandmate).toBeFocused();
+        const outlineOverhang = await inviteBandmate.evaluate(button => {
+            const { outlineOffset, outlineStyle, outlineWidth } = getComputedStyle(button);
+            if (outlineStyle === 'none' || parseFloat(outlineWidth) <= 0) return Infinity;
+            return parseFloat(outlineOffset) + parseFloat(outlineWidth);
+        });
+        expect(outlineOverhang).toBeLessThanOrEqual(0);
         await inviteBandmate.press('Enter');
         await guestNickname.fill('DemoMate');
         await hostCtx.page.getByRole('button', { name: 'Send invitation', exact: true }).click();
