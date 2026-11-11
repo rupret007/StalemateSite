@@ -188,6 +188,15 @@ test('host command, camera and person dialogs expose visible headings as accessi
     const visitor = await guest(browser, baseURL, 'NamedDialogGuest', { width: 1280, height: 900 }, relay);
     let peer;
     try {
+        // Native Safari can omit the modal's accessibility children when the
+        // dialog follows the live workspace, even when role and name checks pass.
+        const misplaced = await visitor.page.locator('dialog').evaluateAll(dialogs => {
+            const workspace = document.querySelector('[data-app]');
+            return dialogs.filter(dialog => dialog.parentElement !== document.body
+                || !(dialog.compareDocumentPosition(workspace) & Node.DOCUMENT_POSITION_FOLLOWING))
+                .map(dialog => dialog.getAttribute('aria-labelledby'));
+        });
+        expect(misplaced).toEqual([]);
         await send(visitor.page, '/join #art-dialog-studio');
         await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#art-dialog-studio');
         await tabTo(visitor.page, visitor.page.locator('[data-roomtools]')); await visitor.page.keyboard.press('Enter');
