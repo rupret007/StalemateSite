@@ -20,6 +20,7 @@ const browserMedia = process.argv.includes('--media');
 const relay = process.argv.includes('--relay');
 const rollback = process.argv.includes('--rollback');
 const rollbackRef = process.argv.find(arg => arg.startsWith('--rollback-ref='))?.slice(15);
+const mixedRef = process.argv.find(arg => arg.startsWith('--mixed-ref='))?.slice('--mixed-ref='.length);
 const fixtureIce = { urls: [process.env.ARCADE_TEST_TURN_URL || 'turn:fixture.invalid:3478'],
     username: 'arcade-fixture', credential: 'arcade-local-turn-only' };
 assert.ok(!browserMedia || browserName === 'chromium', 'the synthetic device media test uses Chromium');
@@ -27,12 +28,20 @@ assert.ok(['', 'chromium', 'webkit'].includes(browserName), 'choose --browser=ch
 assert.ok(!relay || !browserName || browserMedia && process.env.ARCADE_TEST_TURN_URL, 'browser relay test needs --media and a local TURN URL');
 assert.ok(!rollback || !browserName, 'the rollback rehearsal uses native workerd');
 assert.ok(!rollbackRef || rollback && /^[a-f0-9]{40}$/.test(rollbackRef), 'use --rollback with an exact optional source revision');
+assert.ok(mixedRef === undefined || browserName && !relay && /^[a-f0-9]{40}$/.test(mixedRef), 'use --mixed-ref with a browser and exact source revision');
 const evidence = process.env.ARCADE_BROWSER_EVIDENCE ? resolve(process.env.ARCADE_BROWSER_EVIDENCE) : null;
 const app = fileURLToPath(new URL('../../', import.meta.url));
 const assets = fileURLToPath(new URL('../../.beta-assets/', import.meta.url));
 const sharedSource = process.env.ARCADE_TEST_SOURCE ? resolve(process.env.ARCADE_TEST_SOURCE) : null;
 const radDad = process.env.ARCADE_TEST_RAD_DAD ? resolve(process.env.ARCADE_TEST_RAD_DAD) : null;
 assert.equal(!!sharedSource, !!radDad, 'provide both arcade checkouts for the cross-site browser proof');
+const previousAssets = new Map();
+if (mixedRef) {
+    for (const file of ['entry-sites.mjs', 'lobby/index.html', 'lobby/lobby.js', 'lobby/lobby.css']) {
+        const path = 'r/45662413410ed051/' + file;
+        previousAssets.set('/' + path, execFileSync('git', ['show', `${mixedRef}:${path}`], { cwd: app }));
+    }
+}
 const directory = await mkdtemp(join(tmpdir(), 'game-night-arcade-'));
 const arcadeCapabilities = {
     chess: 'arcadeChess', crapeights: 'arcadeCrapeights', turdrummy: 'arcadeTurdRummy', turdspades: 'arcadeTurdSpades',
@@ -105,11 +114,13 @@ function upgrade(cookie, { protocol, ticket }, path = '/beta/arcade-match') {
 const pause = () => new Promise(resolve => setTimeout(resolve, 600));
 
 async function serveAsset(request) {
-    const name = decodeURIComponent(new URL(request.url).pathname);
-    const file = resolve(assets, '.' + name + (name.endsWith('/') ? 'index.html' : ''));
+    const pathname = decodeURIComponent(new URL(request.url).pathname);
+    const name = pathname.endsWith('/') ? pathname + 'index.html' : pathname;
+    const file = resolve(assets, '.' + name);
     if (!file.startsWith(assets.endsWith(sep) ? assets : assets + sep)) return new Response('Not found', { status: 404 });
     const mime = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.txt': 'text/plain' };
-    try { return new Response(await readFile(file), { headers: { 'Content-Type': mime[extname(file)] || 'application/octet-stream' } }); }
+    const previous = request.headers.get('X-Fixture-Previous-Lobby') === '1' && previousAssets.get(name);
+    try { return new Response(previous || await readFile(file), { headers: { 'Content-Type': mime[extname(file)] || 'application/octet-stream' } }); }
     catch { return new Response('Not found', { status: 404 }); }
 }
 
@@ -1018,7 +1029,15 @@ try {
     if (browserName) {
         const { runArcadeBrowser } = await import('./arcade-browser.mjs');
         const browserOrigin = (await mf.ready).origin;
-        await runArcadeBrowser(browserName, browserOrigin, invite, evidence, await previewEntrances(browserOrigin), browserMedia, relay);
+        if (mixedRef) {
+            await runArcadeBrowser(browserName, browserOrigin, invite, evidence, null, browserMedia, false, { previousClient: true });
+            options.modules[0].contents = await bundleRollbackSource(mixedRef);
+            await mf.setOptions(convertV4MiniflareOptions(options));
+            await runArcadeBrowser(browserName, (await mf.ready).origin, invite, evidence, null, browserMedia, false, { previousWorker: true });
+            console.log(`Passed ${browserName} mixed lobby versions using source ${mixedRef}.`);
+        } else {
+            await runArcadeBrowser(browserName, browserOrigin, invite, evidence, await previewEntrances(browserOrigin), browserMedia, relay);
+        }
     } else if (rollback) {
         await verifyRollback(async (bindings, revision) => {
             Object.assign(options.bindings, bindings);

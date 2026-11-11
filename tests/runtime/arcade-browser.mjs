@@ -6,7 +6,7 @@ import { expect } from '@playwright/test';
 import { findDuelSolution } from '../../hangout-worker/arcade/games/turdomania-duel.js';
 import { unpackRushRacer } from '../../hangout-worker/arcade/games/turdrush-race.js';
 
-export async function runArcadeBrowser(engine, origin, invitation, evidence, entrances, media, relay = false) {
+export async function runArcadeBrowser(engine, origin, invitation, evidence, entrances, media, relay = false, mixed = null) {
     const browser = await { chromium, webkit }[engine].launch({
         headless: true, ...(engine === 'chromium' ? { args: ['--enable-unsafe-swiftshader',
             ...(media ? ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] : [])] } : {})
@@ -18,8 +18,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await page.locator('[data-enter]').click();
         await expect(page.locator('[data-connection]')).toHaveText('Connected');
     }
-    async function guest(source, name, viewport, hasTouch = false, gameUrl = null) {
-        const context = await browser.newContext({ viewport, hasTouch, reducedMotion: 'reduce', serviceWorkers: 'block', ignoreHTTPSErrors: true });
+    async function guest(source, name, viewport, hasTouch = false, gameUrl = null, previousClient = false) {
+        const context = await browser.newContext({ viewport, hasTouch, reducedMotion: 'reduce', serviceWorkers: 'block', ignoreHTTPSErrors: true,
+            ...(previousClient ? { extraHTTPHeaders: { 'X-Fixture-Previous-Lobby': '1' } } : {}) });
         if (hasTouch) await context.addInitScript(() => {
             const native = HTMLCanvasElement.prototype.getContext;
             HTMLCanvasElement.prototype.getContext = function (type, ...options) {
@@ -58,7 +59,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         page.setDefaultTimeout(10000);
         page.on('pageerror', error => errors.push(`${name}: ${error.message}`));
         const protectedBoard = await context.request.get(origin + '/play/games/chess-board.js');
-        assert.equal(protectedBoard.status(), 401, 'anonymous match asset stays protected');
+        assert.ok((mixed?.previousWorker ? [401, 404] : [401]).includes(protectedBoard.status()), 'anonymous match asset stays protected');
         const destination = `${origin}/beta/?via=${source}`;
         if (gameUrl) await page.goto(gameUrl);
         else if (entrance) {
@@ -88,6 +89,38 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const offer = guest.locator('[data-game-offer]');
         await offer.getByRole('button', { name: 'Join Game Night', exact: true }).click();
         await expect(offer).toBeHidden();
+    }
+    async function verifyMixedVersions({ previousClient, previousWorker }) {
+        const host = await guest('stalemate', previousWorker ? 'OldWorkerHost' : 'CurrentHost', { width: 1280, height: 900 });
+        const nick = previousWorker ? 'OldWorkerGuest' : 'PreviousClient';
+        const player = await guest('rad-dad', nick, { width: 375, height: 667 }, true, null, previousClient);
+        await host.getByRole('button', { name: /Game Night/ }).click();
+        await inviteToGame(host, player, nick);
+        await expect(player.locator('[data-arcade-game]')).toHaveCount(previousClient ? 0 : 1);
+        await expect(player.getByRole('combobox', { name: 'Switch game' })).toBeHidden();
+        await expect(player.locator('[data-call-toggle]')).toBeHidden();
+        for (const page of [host, player]) await page.locator('[data-four] summary').click();
+        await host.getByRole('button', { name: 'Open a match' }).click();
+        await player.getByRole('button', { name: 'Join match' }).click();
+        await host.getByRole('button', { name: 'Drop in column 1' }).click();
+        await player.getByRole('button', { name: 'Drop in column 2' }).tap();
+        await expect(host.locator('[data-four-status]')).toContainText('Your turn');
+        if (previousWorker) {
+            await expect(host.getByRole('combobox', { name: 'Switch game' })).toBeHidden();
+            await expect(host.locator('[data-call-toggle]')).toBeHidden();
+        } else {
+            if (media) await expect(host.locator('[data-call-toggle]')).toBeVisible();
+            await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
+            await host.getByRole('button', { name: 'Open Chess match' }).click();
+            await expect(host.locator('[data-chess-status]')).toContainText('Waiting');
+            await expect(player.locator('[data-four-board]')).toBeVisible();
+        }
+        for (const [sender, recipient, message] of [[player, host, 'Hello from Rad Dad'], [host, player, 'Hello from Stalemate']]) {
+            await sender.locator('[data-text]').fill(message);
+            await sender.locator('[data-send]').click();
+            await expect(recipient.getByRole('log', { name: 'Conversation' })).toContainText(message);
+        }
+        console.log(`Passed ${engine} ${previousWorker ? 'current client with previous Worker' : 'previous and current clients together'}, invitation, Four in a Row and two-way room chat.`);
     }
     async function verifyGameNightEntry() {
         const host = await guest('rad-dad', 'LinkHost', { width: 1280, height: 900 }, false, origin + '/beta/?game-night=1&via=rad-dad');
@@ -1001,6 +1034,11 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         console.log(`Passed ${engine} Turdanoid same wall, keyboard launch, ${media ? 'native phone drag with 220 ms delay and active call' : 'native phone tap and full reload'}, visible paddle and Launch, both scores, spectator and rematch.`);
     }
     try {
+        if (mixed) {
+            await verifyMixedVersions(mixed);
+            assert.deepEqual(errors, []);
+            return;
+        }
         const a = await guest('stalemate', 'ChessHost', { width: 1280, height: 900 });
         const b = await guest('rad-dad', 'ChessGuest', { width: 375, height: 667 }, true);
         await a.getByRole('button', { name: /Game Night/ }).click();
