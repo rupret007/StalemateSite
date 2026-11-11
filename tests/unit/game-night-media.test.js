@@ -27,7 +27,7 @@ describe('Game Night media descriptions', () => {
     });
 });
 
-function relayFixture() {
+function relayFixture(submitReport) {
     const ref = '7'.repeat(32), room = '#game-relay', dev = 'A'.repeat(22);
     let clock = 10_000, permits = true, blocked = false, active = true;
     const socket = (actor, joined) => ({
@@ -42,13 +42,13 @@ function relayFixture() {
     const iceServers = [{ urls: ['turn:fixture.invalid'], username: 'fixture', credential: 'fixture-only' }];
     const mintRelay = vi.fn(() => Promise.resolve({ iceServers, expiresAt: clock + 600_000 }));
     const service = createGameNightMedia({
-        state: { getWebSockets }, current: scope => ({ betaSid: scope.actor, betaInviteVersion: 1, dev,
+        state: { getWebSockets }, current: scope => ({ betaSid: scope.actor, betaInviteVersion: 1, dev, nick: scope.actor,
             canPlay: true, canCall: peer => !blocked && peer !== scope.actor }),
         active: () => active, approve: () => permits, charge: () => true, allowed: () => true,
-        mintRelay, serialize: operation => operation(), now: () => clock
+        mintRelay, serialize: operation => operation(), now: () => clock, submitReport
     });
-    const receive = (socket, action) => service.receive(socket, JSON.stringify({ version: 1, action }));
-    return { ref, dev, first, second, waiting, iceServers, mintRelay, receive, advance: ms => { clock += ms; },
+    const receive = (socket, action, fields) => service.receive(socket, JSON.stringify({ version: 1, action, ...fields }));
+    return { ref, dev, first, second, waiting, iceServers, mintRelay, receive, reconcile: service.reconcile, advance: ms => { clock += ms; },
         revoke: () => { permits = false; }, block: () => { blocked = true; }, expire: () => { active = false; } };
 }
 
@@ -100,5 +100,38 @@ describe('Game Night relay admission', () => {
         expect(f.first.frames).toContainEqual({ t: 'media-error', reason: 'relay-unavailable' });
         expect(f.first.attachment.joined).toBe(true);
         expect(f.first.readyState).toBe(1);
+    });
+});
+
+describe('Game Night call report witness', () => {
+    const input = { request: 'a'.repeat(24), target: 'second', reason: 'Test concern', consent: true };
+
+    it('refuses a guessed target when the reporter has never shared a visible call with them', async () => {
+        const submit = vi.fn();
+        const f = relayFixture(submit);
+        f.block();
+        f.reconcile();
+        await f.receive(f.first, 'report', input);
+        expect(f.first.frames.at(-1)).toMatchObject({ t: 'media-report', status: 'peer-unavailable' });
+        expect(submit).not.toHaveBeenCalled();
+    });
+
+    it('keeps a bounded report witness after the target leaves and expires it', async () => {
+        const submit = vi.fn(() => ({ ok: true }));
+        const f = relayFixture(submit);
+        f.reconcile();
+        await f.receive(f.second, 'leave');
+        expect(f.first.frames.at(-1)).toMatchObject({ peers: [], recentReportPeers: [{ id: 'second', nick: 'second' }] });
+        f.advance(299_999);
+        await f.receive(f.first, 'report', input);
+        expect(f.first.frames.at(-1)).toMatchObject({ t: 'media-report', status: 'queued' });
+        expect(submit).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ target: null, reason: input.reason }));
+        f.advance(1);
+        await f.receive(f.first, 'report', input);
+        expect(f.first.frames.at(-1)).toMatchObject({ t: 'media-report', status: 'peer-unavailable' });
+        f.reconcile();
+        expect(f.first.frames.at(-1)).toMatchObject({ recentReportPeers: [] });
+        expect(f.first.attachment.reportPeers).toEqual([]);
+        expect(submit).toHaveBeenCalledTimes(1);
     });
 });

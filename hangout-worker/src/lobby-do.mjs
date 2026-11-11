@@ -267,7 +267,8 @@ export class HangoutLobby {
             approve: async (...args) => (await this.engine.approveGameMedia(...args))?.ok === true,
             allowed: () => mediaEnabled(env) && !this.authorityUnavailable,
             mintRelay: env.HANGOUT_ARCADE_TURN === '1' ? (ref, dev) => issueGameNightTurn(env, ref, dev) : null,
-            serialize: operation => retirementGate(this, operation)
+            serialize: operation => retirementGate(this, operation),
+            submitReport: report => this.submitGameNightReport(report)
         });
         this.ready = state.blockConcurrencyWhile(async () => {
             try { await this.start(); }
@@ -758,6 +759,27 @@ export class HangoutLobby {
         this.privateQueueActor = { binding: a };
         try { const result = await this.privateReportQueue.resolve(id, action); await this.refreshPrivateReports(); return result; }
         finally { this.privateQueueActor = null; }
+    }
+    async submitGameNightReport({ binding, scope, witness, target, request, reason }) {
+        if (!this.privateReportQueue) return { ok: false, status: 503 };
+        const key = this.env.HANGOUT_HMAC_KEY;
+        const report = { type: 'private-report', v: 1, request, kind: 'member',
+            target: 'p' + witness.id, claimedName: witness.nick, excerpt: '', reason: 'Game Night call · ' + reason, consent: true };
+        const checked = validatePrivateReportControl(report);
+        if (!checked.ok) return checked;
+        const [reporterRef, roomRef, targetSessionRef] = await Promise.all([
+            privateReportRef('reporter', binding.betaSid, key),
+            privateReportRef('room', 'game-night-' + scope.ref, key),
+            target ? privateReportRef('target', target.betaSid, key) : null
+        ]);
+        this.privateQueueActor = { binding };
+        try {
+            const result = await this.privateReportQueue.submit(checked.report, { reporterRef, roomRef,
+                reporterConnection: 'p' + scope.actor, targetConnection: report.target, targetSessionRef,
+                targetMembership: target ? 'live' : 'unverified' });
+            await this.refreshPrivateReports();
+            return result;
+        } finally { this.privateQueueActor = null; }
     }
     async receivePrivateReport(request) {
         if (this.env.HANGOUT_BETA_MODE !== 'protected' || request.method !== 'POST' || !this.privateReportQueue) {

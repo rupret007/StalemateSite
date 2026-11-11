@@ -4,6 +4,21 @@ const protocol = 'game-night-media.v1';
 const off = () => ({ audio: false, video: false });
 const types = ['audio', 'video'];
 const device = { audio: 'microphone', video: 'camera' };
+const reportMarkup = `
+    <h3 id="call-report-title">Report call participant</h3>
+    <p data-call-report-target></p>
+    <p>Community staff receive the participant name, room reference and the details you enter. Calls are unrecorded.</p>
+    <form>
+        <label>What happened?
+            <textarea name="reason" rows="4" maxlength="380" required data-call-report-reason></textarea>
+        </label>
+        <label class="game-camera-age"><input type="checkbox" required data-call-report-consent> Share these details with community staff</label>
+        <p role="status" data-call-report-status></p>
+        <div class="sheet-buttons">
+            <button class="btn" type="submit" data-call-report-send>Send report</button>
+            <button class="btn btn--ghost" type="button" data-call-report-close>Cancel</button>
+        </div>
+    </form>`;
 
 export function mountGameNightCall(container, toggle, { personActions }) {
     const document = container.ownerDocument;
@@ -12,9 +27,28 @@ export function mountGameNightCall(container, toggle, { personActions }) {
     const status = $('[data-call-status]'), peersHost = $('[data-call-peers]');
     const adult = $('[data-call-adult]'), cameraPolicy = $('[data-call-policy]');
     const buttons = { audio: $('[data-call-mic]'), video: $('[data-call-camera]') };
+    const report = document.createElement('dialog');
+    report.className = 'sheet';
+    report.setAttribute('aria-labelledby', 'call-report-title');
+    report.innerHTML = reportMarkup;
+    document.body.append(report);
+    const reportForm = report.querySelector('form');
+    const reportReason = report.querySelector('[data-call-report-reason]'), reportConsent = report.querySelector('[data-call-report-consent]');
+    const reportStatus = report.querySelector('[data-call-report-status]'), reportSend = report.querySelector('[data-call-report-send]');
+    const reportClose = report.querySelector('[data-call-report-close]');
+    const recent = document.createElement('details'), recentTitle = document.createElement('summary');
+    const recentList = document.createElement('ul');
+    recent.className = 'game-call-recent';
+    recentList.className = 'game-call-peers';
+    recentTitle.textContent = 'Report a recent call participant';
+    recent.hidden = true;
+    recent.append(recentTitle, recentList);
+    peersHost.after(recent);
     const peers = new Map(), tracks = new Map();
     let scope = null, socket = null, request = null, timer, joined = false;
     let relayAvailable = false, relayTimer = null, iceServers = [];
+    let reportsAvailable = false, reportDraft = null, reportTimer = null;
+    let recentSignature = '';
     let allowed = off(), canUseCamera = false, canManageCamera = false, pending = null;
     const supported = !!(navigator.mediaDevices?.getUserMedia && window.RTCPeerConnection);
     let notice = '';
@@ -64,6 +98,7 @@ export function mountGameNightCall(container, toggle, { personActions }) {
     function stop(message = '') {
         clearTimeout(timer);
         clearTimeout(relayTimer);
+        clearTimeout(reportTimer);
         relayTimer = null;
         relayAvailable = false;
         iceServers = [];
@@ -72,15 +107,115 @@ export function mountGameNightCall(container, toggle, { personActions }) {
         request?.abort(); request = null;
         const prior = socket;
         socket = null;
+        const unconfirmedReport = !!reportDraft?.attempt;
+        if (report.open) report.close();
         if (prior && prior.readyState < WebSocket.CLOSING) prior.close(1000);
         for (const id of peers.keys()) closePeer(id);
         for (const kind of types) detachTrack(kind);
         allowed = off();
         adult.checked = false;
         canUseCamera = canManageCamera = joined = false;
-        notice = message;
+        reportsAvailable = false;
+        drawRecentReports([]);
+        notice = unconfirmedReport && message ? message + ' Report delivery was unconfirmed.' : message;
         draw();
     }
+
+    function drawReport(waiting) {
+        reportReason.disabled = reportConsent.disabled = reportClose.disabled = waiting;
+        reportSend.disabled = waiting || !reportConsent.checked;
+    }
+
+    function openReport(id, nick, opener) {
+        if (!joined || !reportsAvailable || report.open) return;
+        reportDraft = { id, opener, attempt: null, waiting: false };
+        reportForm.reset();
+        report.querySelector('[data-call-report-target]').textContent = nick;
+        reportStatus.textContent = '';
+        drawReport(false);
+        report.showModal();
+        reportReason.focus();
+    }
+
+    function drawRecentReports(people) {
+        const signature = JSON.stringify(people);
+        if (signature === recentSignature) return;
+        recentSignature = signature;
+        recent.hidden = people.length === 0;
+        if (recent.hidden) recent.open = false;
+        recentList.replaceChildren(...people.map(({ id, nick }) => {
+            const row = document.createElement('li'), flag = document.createElement('button');
+            flag.type = 'button';
+            flag.className = 'btn btn--small btn--ghost';
+            flag.textContent = 'Report ' + nick;
+            flag.addEventListener('click', () => openReport(id, nick, flag));
+            row.append(flag);
+            return row;
+        }));
+    }
+
+    function finishReportWait(message) {
+        clearTimeout(reportTimer);
+        reportDraft.waiting = false;
+        reportStatus.textContent = message;
+        drawReport(false);
+    }
+
+    function receiveReport(frame) {
+        const attempt = reportDraft?.attempt;
+        if (!report.open || !attempt || attempt.request !== frame.request || attempt.reason !== reportReason.value.trim()) return;
+        if (frame.status === 'queued') {
+            reportDraft.attempt = null;
+            report.close();
+            notice = 'Queued for review when a moderator is available.';
+            draw();
+            return;
+        }
+        const messages = {
+            invalid: 'Check the description and remove any invitation links or access codes.',
+            limited: 'The report allowance is full. Wait before trying again.',
+            conflict: 'This report conflicts with an earlier submission. Close this form and try again.',
+            'peer-unavailable': 'This call participant is no longer available to report.'
+        };
+        finishReportWait(messages[frame.status] || 'Report delivery is unconfirmed. Retry the same details to check.');
+    }
+
+    reportForm.addEventListener('submit', event => {
+        event.preventDefault();
+        if (!reportDraft || reportDraft.waiting || !joined || !reportsAvailable || !reportConsent.checked) return;
+        const reason = reportReason.value.trim();
+        if (!reason) {
+            reportStatus.textContent = 'Describe what happened.';
+            reportReason.focus();
+            return;
+        }
+        if (reportDraft.attempt?.reason !== reason) {
+            const bytes = crypto.getRandomValues(new Uint8Array(18));
+            const request = btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_');
+            reportDraft.attempt = { request, reason };
+        }
+        if (!send('report', { target: reportDraft.id, ...reportDraft.attempt, consent: true })) {
+            finishReportWait('Call disconnected. Report delivery is unconfirmed.');
+            return;
+        }
+        reportDraft.waiting = true;
+        drawReport(true);
+        reportStatus.textContent = 'Waiting for confirmation…';
+        reportTimer = setTimeout(() => finishReportWait('Report delivery is unconfirmed. Retry the same details to check.'), 12000);
+    });
+    reportConsent.addEventListener('change', () => drawReport(false));
+    reportClose.addEventListener('click', () => report.close());
+    report.addEventListener('cancel', event => { if (reportDraft?.waiting) event.preventDefault(); });
+    report.addEventListener('close', () => {
+        if (report.open) return;
+        clearTimeout(reportTimer);
+        const opener = reportDraft?.opener;
+        reportDraft = null;
+        reportForm.reset();
+        reportStatus.textContent = '';
+        if (!scope) return;
+        (opener?.isConnected && !container.hidden && joined ? opener : toggle).focus({ preventScroll: true });
+    });
 
     function retryRelay(delay) {
         clearTimeout(relayTimer);
@@ -168,6 +303,7 @@ export function mountGameNightCall(container, toggle, { personActions }) {
 
     function addPeer({ id, nick }) {
         const row = document.createElement('li'), name = document.createElement('button');
+        const actions = document.createElement('div'), flag = document.createElement('button');
         const video = document.createElement('video'), audio = document.createElement('audio');
         const play = document.createElement('button'), devices = document.createElement('span');
         name.type = play.type = 'button';
@@ -175,6 +311,12 @@ export function mountGameNightCall(container, toggle, { personActions }) {
         name.textContent = nick;
         name.setAttribute('aria-label', `Actions for ${nick}`);
         name.addEventListener('click', () => personActions(id));
+        actions.className = 'game-call-peer-actions';
+        flag.type = 'button';
+        flag.className = name.className;
+        flag.textContent = 'Report';
+        flag.addEventListener('click', () => openReport(id, name.textContent, flag));
+        actions.append(name, flag);
         play.textContent = 'Play call audio';
         play.hidden = true;
         play.addEventListener('click', () => audio.play().then(() => {
@@ -186,9 +328,9 @@ export function mountGameNightCall(container, toggle, { personActions }) {
         devices.className = 'small game-note';
         video.hidden = true;
         video.setAttribute('aria-label', `Camera from ${nick}`);
-        row.append(name, devices, play, video, audio);
+        row.append(actions, devices, play, video, audio);
         peersHost.append(row);
-        const peer = { row, audio, video, name, devices, play, needsPlayback: false, link: null };
+        const peer = { row, audio, video, name, flag, devices, play, needsPlayback: false, link: null };
         try {
             peer.link = openGameNightPeer({
                 initiates: scope.actor < id,
@@ -230,6 +372,8 @@ export function mountGameNightCall(container, toggle, { personActions }) {
     function roster(frame) {
         if (!joined) { clearTimeout(timer); joined = true; notice = ''; }
         relayAvailable = frame.relay === true;
+        reportsAvailable = frame.reports === true;
+        drawRecentReports(reportsAvailable && Array.isArray(frame.recentReportPeers) ? frame.recentReportPeers : []);
         const prior = allowed;
         allowed = { audio: frame.tracks?.audio === true, video: frame.tracks?.video === true };
         canUseCamera = frame.cameraAllowed === true;
@@ -250,6 +394,8 @@ export function mountGameNightCall(container, toggle, { personActions }) {
             if (!peer) continue;
             peer.name.textContent = state.nick;
             peer.name.setAttribute('aria-label', `Actions for ${state.nick}`);
+            peer.flag.hidden = !reportsAvailable;
+            peer.flag.setAttribute('aria-label', `Report ${state.nick} from this call`);
             peer.devices.textContent = `Mic ${state.audio ? 'on' : 'off'} · Camera ${state.video ? 'on' : 'off'}`;
             const needsAudio = state.audio && peer.audio.muted;
             peer.audio.muted = !state.audio;
@@ -305,6 +451,7 @@ export function mountGameNightCall(container, toggle, { personActions }) {
                 if (frame.t === 'media-ready') send('join');
                 else if (frame.t === 'media-room' && Array.isArray(frame.peers)) roster(frame);
                 else if (frame.t === 'media-signal') peers.get(frame.from)?.link.receive(frame);
+                else if (frame.t === 'media-report') receiveReport(frame);
                 else if (frame.t === 'media-relay' && relayAvailable && Array.isArray(frame.iceServers) &&
                     Number.isSafeInteger(frame.refreshInMs) && frame.refreshInMs > 0) {
                     iceServers = frame.iceServers;

@@ -178,6 +178,20 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     async function waitForPackets(page, kind, after = 5) {
         await expect.poll(() => packetCount(page, kind)).toBeGreaterThan(after);
     }
+    async function submitCallReport(page, reason, capture = false) {
+        const dialog = page.getByRole('dialog', { name: 'Report call participant' });
+        const description = dialog.getByLabel('What happened?'), send = dialog.getByRole('button', { name: 'Send report' });
+        await expect(dialog).toBeInViewport({ ratio: 1 });
+        await expect(description).toBeFocused();
+        await description.fill(reason);
+        await expect(send).toBeDisabled();
+        await dialog.getByLabel('Share these details with community staff').check();
+        await expect(send).toBeEnabled();
+        if (capture && evidence) await page.screenshot({ path: join(evidence, 'call-report-chromium-phone.png') });
+        await send.tap();
+        await expect(dialog).toBeHidden();
+        await expect(page.locator('[data-call-status]')).toHaveText('Queued for review when a moderator is available.');
+    }
     async function playEights(a, b) {
         const before = media ? await packetCount(b, 'audio') : 0;
         for (const page of [a, b]) await page.getByRole('combobox', { name: 'Switch game' }).selectOption('crapeights');
@@ -904,6 +918,18 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             console.log('Selected loopback relay pair after all nine arcade journeys:', JSON.stringify(stats));
         }
         if (media) {
+            const beforeReport = await packetCount(b, 'audio');
+            await b.locator('[data-call-toggle]').tap();
+            const flag = b.getByRole('button', { name: 'Report ChessHost from this call' });
+            const hitArea = await flag.boundingBox();
+            assert.ok(hitArea?.height >= 44);
+            await flag.tap();
+            const report = b.getByRole('dialog', { name: 'Report call participant' });
+            await report.getByRole('button', { name: 'Cancel' }).tap();
+            await expect(flag).toBeFocused();
+            await flag.tap();
+            await submitCallReport(b, 'Synthetic phone report while both players are still in the call.', true);
+            await waitForPackets(b, 'audio', beforeReport);
             await a.locator('[data-call-toggle]').click();
             await a.getByRole('button', { name: 'Actions for ChessGuest' }).click();
             await a.locator('[data-sheet]').getByRole('button', { name: 'Block', exact: true }).click();
@@ -911,6 +937,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(page.locator('[data-call-peers] li')).toHaveCount(0);
                 assert.equal(await page.evaluate(() => window.testPeers[0].connectionState), 'closed');
             }
+            await b.getByText('Report a recent call participant', { exact: true }).tap();
+            await b.getByRole('button', { name: 'Report ChessHost', exact: true }).tap();
+            await submitCallReport(b, 'Synthetic report after a peer was blocked.');
+            console.log('Passed Chromium phone report consent, accessible cancel and focus, durable acknowledgement, continued audio and reporting a recently blocked peer.');
         }
         await b.locator('[data-leave]').click();
         await expect(b.locator('[data-game-night]')).toBeHidden();

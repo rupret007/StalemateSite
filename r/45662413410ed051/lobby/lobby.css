@@ -489,6 +489,10 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 .game-camera-age input { width: auto; vertical-align: middle; }
 .game-call-peers { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .game-call-peers li { display: grid; align-content: start; gap: 3px; min-width: 0; }
+.game-call-peer-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.game-call-peer-actions .btn { min-height: 44px; }
+.game-call-recent summary { min-height: 44px; padding: 10px 4px; cursor: pointer; }
+.game-call-recent .btn { min-height: 44px; }
 .game-call-peers video { display: block; width: min(100%, 150px); aspect-ratio: 16 / 9; object-fit: cover; }
 .game-call-peers video[hidden] { display: none; }
 @media (max-width: 1099px) {
@@ -562,6 +566,8 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 .sheet p { color: var(--muted); font-size: 13px; }
 .sheet-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 16px 0; }
 .sheet-buttons .btn { font-size: 12px; }
+[data-call-report-reason] { display: block; width: 100%; margin: 6px 0 12px; padding: 8px;
+  resize: vertical; color: var(--cream); background: var(--ink); border: 1px solid var(--control-line); border-radius: 4px; font: inherit; }
 .channel-label { display: block; margin: 16px 0 8px; font-size: 12px; }
 [data-channel-name], [data-invite-nick] { width: 100%; }
 .check { display: flex; align-items: center; gap: 10px; min-height: 44px; }

@@ -191,7 +191,8 @@ export class FixtureLobby extends HangoutLobby {
                 let originalSha256;
                 if (armed) {
                     ensure(transactionWitness && !transactionWitness.fault, 'fixture-fault-needs-owned-native-transaction');
-                    ensure(['sessions', 'community-room:#art-native-canvas'].includes(control.faultKey), 'fixture-fault-record-not-allowed');
+                    ensure(['sessions', 'community-room:#art-native-canvas'].includes(control.faultKey) ||
+                        control.faultKey === 'private-reports-v1' && env.FIXTURE_ARCADE_REPORTS === '1', 'fixture-fault-record-not-allowed');
                     originalSha256 = await manifestDigest(raw, args[0]);
                 }
                 control.nativeCalls++;
@@ -1077,6 +1078,19 @@ export class FixtureLobby extends HangoutLobby {
                 if (path === PREFIX + 'fanout-summary' && Object.keys(body).length === 0) return Response.json(await this.fixtureFanoutSummary());
                 if (path === PREFIX + 'fanout-scan') return Response.json(await this.fixtureFanoutScan(body));
                 if (path === PREFIX + 'inspect' && Object.keys(body).length === 0) return Response.json(await this.fixtureInspect());
+                if (path === PREFIX + 'game-night-reports' && this.env.FIXTURE_ARCADE_REPORTS === '1') {
+                    if (Object.keys(body).join(',') === 'fail' && body.fail === true) {
+                        ensure(!this.fixtureControl.faultKey && !this.fixtureControl.history.includes('private-reports-v1'), 'fixture-fault-already-used');
+                        this.fixtureControl.faultKey = 'private-reports-v1';
+                        return Response.json({ armed: true });
+                    }
+                    if (Object.keys(body).length !== 0) return denied();
+                    const queue = await this.authority.records.transaction(tx => tx.get('private-reports-v1'));
+                    return Response.json({ rollback: this.fixtureControl.rollbackWitnesses.some(item =>
+                        item.record === 'private-reports-v1' && item.stagedChanged && item.restoredBeforeEngineRecovery),
+                    receipts: queue.receipts.length, reports: queue.reports.map(({ id, kind, claimedName, excerpt, reason, targetMembership }) =>
+                        ({ id, kind, claimedName, excerpt, reason, targetMembership })) });
+                }
                 if (path === PREFIX + 'pressure-register' && Object.keys(body).join(',') === 'cookie') return Response.json(await this.fixturePressureRegister(body.cookie));
                 if (path === PREFIX + 'pressure-metrics' && Object.keys(body).length === 0) return Response.json(this.fixturePressureMetrics());
                 if (path === PREFIX + 'traffic-metrics' && Object.keys(body).length === 0) return Response.json(this.fixtureTrafficMetrics());
@@ -1113,7 +1127,8 @@ export default { async fetch(request, env) {
             // Explicit fixture lifecycle action; betaFetch never forwards it.
             return stub.fetch(new Request(ORIGIN + LOBBY_AUTHORITY_PATH + 'initialize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }));
         }
-        if (['fanout-metrics', 'fanout-summary', 'fanout-scan', 'pressure-register', 'pressure-metrics', 'traffic-metrics', 'inspect', 'fault', 'participation-policy', 'participation-grant', 'participation-reduce', 'participation-alarm', 'retention-seed', 'retention-read', 'provider-start-proof', 'provider-start-state', 'provider-start-release', 'incident-initialize', 'incident-preserve', 'incident-read'].includes(url.pathname.slice(PREFIX.length))) return stub.fetch(new Request(request.url, {
+        if (url.pathname === PREFIX + 'game-night-reports' && env.FIXTURE_ARCADE_REPORTS !== '1') return denied();
+        if (['fanout-metrics', 'fanout-summary', 'fanout-scan', 'pressure-register', 'pressure-metrics', 'traffic-metrics', 'inspect', 'fault', 'participation-policy', 'participation-grant', 'participation-reduce', 'participation-alarm', 'retention-seed', 'retention-read', 'provider-start-proof', 'provider-start-state', 'provider-start-release', 'incident-initialize', 'incident-preserve', 'incident-read', 'game-night-reports'].includes(url.pathname.slice(PREFIX.length))) return stub.fetch(new Request(request.url, {
             method: 'POST', headers: request.headers, body: JSON.stringify(body)
         }));
         if (url.pathname === PREFIX + 'egress-probe' && Object.keys(body).length === 0) {

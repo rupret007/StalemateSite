@@ -58,6 +58,9 @@ const base = (cookie = '', ip = '192.0.2.11') => ({ Origin: origin, 'X-Fixture-N
 const call = (path, cookie, payload, ip) => mf.dispatchFetch(origin + path, {
     headers: { ...base(cookie, ip), 'Content-Type': 'application/json' }, method: 'POST', body: JSON.stringify(payload)
 });
+const reportQueueControl = payload => mf.dispatchFetch(origin + '/_fixture/game-night-reports', {
+    headers: { 'X-Fixture-Nonce': nonce, 'Content-Type': 'application/json' }, method: 'POST', body: JSON.stringify(payload)
+});
 async function guest(nick, entrySource, ip) {
     const unlocked = await call('/beta/unlock', '', { key: invite }, ip);
     assert.equal(unlocked.status, 200, await unlocked.clone().text());
@@ -665,6 +668,7 @@ async function verifyMedia(white, black, ref, matchA, matchB) {
         media.send({ version: 1, action: 'join' });
         const initial = await media.wait(frame => frame.t === 'media-room', 'call with tracks off');
         assert.deepEqual(initial.tracks, { audio: false, video: false });
+        assert.equal(initial.reports, true);
         return media;
     };
     const wrongChannel = await upgrade(white.cookie, await grant(white, ref), endpoint);
@@ -672,6 +676,26 @@ async function verifyMedia(white, black, ref, matchA, matchB) {
     await wrongChannel.body?.cancel();
     const a = await join(white), b = await join(black);
     await a.wait(frame => frame.peers?.some(peer => peer.id === black.id), 'other call participant');
+    async function report(link, { request, target, reason, consent = true }) {
+        const start = link.frames.length;
+        link.send({ version: 1, action: 'report', request, target, reason, consent });
+        return (await link.wait(frame => frame.t === 'media-report' && frame.request === request, 'call report response', start)).status;
+    }
+    const first = { request: 'a'.repeat(24), target: black.id, reason: 'Fixture live call concern' };
+    assert.equal(await report(a, { ...first, consent: false }), 'invalid');
+    assert.equal(await report(a, { ...first, target: white.id }), 'peer-unavailable');
+    assert.equal(await report(a, { ...first, target: 'c' + '0'.repeat(32) }), 'peer-unavailable');
+    assert.equal(await report(a, { ...first, reason: 'webjam://fixture-do-not-share' }), 'invalid');
+    const armed = await reportQueueControl({ fail: true });
+    assert.equal(armed.status, 200);
+    assert.deepEqual(await armed.json(), { armed: true });
+    assert.equal(await report(a, first), 'unavailable');
+    const failed = await reportQueueControl({});
+    assert.equal(failed.status, 200);
+    assert.deepEqual(await failed.json(), { rollback: true, receipts: 0, reports: [] });
+    assert.equal(await report(a, first), 'queued');
+    assert.equal(await report(a, first), 'queued');
+    assert.ok(b.frames.every(frame => frame.t !== 'media-report'));
     a.send({ version: 1, action: 'relay' });
     if (relay) {
         const allocation = await a.wait(frame => frame.t === 'media-relay', 'admitted relay credentials');
@@ -747,8 +771,31 @@ async function verifyMedia(white, black, ref, matchA, matchB) {
         a.send({ version: 1, action: 'leave' });
         await b.wait(frame => frame.peers?.length === 0, 'call leave published', before);
     }
-    for (const other of [white.lobby, black.lobby, matchA, matchB]) assert.ok(other.frames.every(frame => !['media-signal', 'media-relay'].includes(frame.t)));
+    const second = { request: 'b'.repeat(24), target: white.id, reason: 'Fixture report after the peer left' };
+    assert.equal(await report(b, second), 'queued');
+    const readback = await reportQueueControl({});
+    assert.equal(readback.status, 200);
+    const queue = await readback.json();
+    assert.equal(queue.receipts, 2);
+    assert.equal(queue.reports.length, 2);
+    for (const [item, nick, input, membership] of [
+        [queue.reports[0], 'FixtureBlack', first, 'live'],
+        [queue.reports[1], 'FixtureWhite', second, 'unverified']
+    ]) {
+        assert.match(item.id, /^pr[A-Za-z0-9_-]{43}$/);
+        assert.equal(item.kind, 'member');
+        assert.equal(item.claimedName, nick);
+        assert.equal(item.excerpt, '');
+        assert.equal(item.reason, 'Game Night call · ' + input.reason);
+        assert.equal(item.targetMembership, membership);
+    }
+    for (const other of [white.lobby, black.lobby, matchA, matchB]) {
+        assert.ok(other.frames.every(frame => !['media-signal', 'media-relay', 'media-report'].includes(frame.t)));
+        assert.ok(!JSON.stringify(other.frames).includes(first.reason));
+        assert.ok(!JSON.stringify(other.frames).includes(second.reason));
+    }
     b.send({ version: 1, action: 'leave' });
+    console.log('Passed native call reports with consent, same-call witness, queue commit, deduplication, and late-peer privacy.');
     console.log('Passed native separate call admission, receive-only default, microphone opt-in, adult camera controls and targeted signaling.');
 }
 
@@ -762,7 +809,7 @@ try {
         compatibilityDate: '2026-10-01', host: '127.0.0.1', port: 0, https: !!browserName, telemetry: { enabled: false },
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true },
             ...(relay ? { TURN_BUDGET: { className: 'HangoutTurnBudget', useSQLite: true } } : {}) },
-        bindings: { FIXTURE_NONCE: nonce, HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1', HANGOUT_ARCADE_CRAPEIGHTS: '1', HANGOUT_ARCADE_TURDRUMMY: '1', HANGOUT_ARCADE_TURDSPADES: '1', HANGOUT_ARCADE_TURDJACK: '1', HANGOUT_ARCADE_TURDTRIS: '1', HANGOUT_ARCADE_TURDOMANIA: '1', HANGOUT_ARCADE_TURDRUSH: '1', HANGOUT_ARCADE_TURDANOID: '1',
+        bindings: { FIXTURE_NONCE: nonce, FIXTURE_ARCADE_REPORTS: '1', HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', HANGOUT_ARCADE_CHESS: '1', HANGOUT_ARCADE_CRAPEIGHTS: '1', HANGOUT_ARCADE_TURDRUMMY: '1', HANGOUT_ARCADE_TURDSPADES: '1', HANGOUT_ARCADE_TURDJACK: '1', HANGOUT_ARCADE_TURDTRIS: '1', HANGOUT_ARCADE_TURDOMANIA: '1', HANGOUT_ARCADE_TURDRUSH: '1', HANGOUT_ARCADE_TURDANOID: '1',
             ...(browserName ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
             ...(!browserName || browserMedia ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
             ...(relay ? { HANGOUT_ARCADE_TURN: '1', HANGOUT_CF_ACCOUNT_ID: 'f'.repeat(32), HANGOUT_TURN_MONTHLY_GB: '1',
