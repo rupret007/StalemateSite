@@ -1850,7 +1850,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const c = currentGameNight();
         return !!(c && c === gameEditorRoom && amOp(c) && cmd('discord', [value], c.name, c.keepRef));
     }
-    $('[data-game-invite]').addEventListener('click', () => openInviteDialog());
+    $('[data-game-invite]').addEventListener('click', event => openInviteDialog(event.currentTarget));
     gameShareButton?.addEventListener('click', () => {
         const c = currentGameNight();
         if (!betaShell || !gameShareDialog || !c || !amOp(c)) return;
@@ -2400,6 +2400,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function closeInviteDialog() {
         inviteInstance = ''; invitePeople.clear();
         inviteContext = null; $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
+        $('[data-game-invite-people]').replaceChildren();
         if ($('[data-invite-dialog]').open) $('[data-invite-dialog]').close();
     }
     function openInviteDialog(opener = null) {
@@ -2408,15 +2409,34 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         jamInviteOpener = opener ? { button: opener, room: current } : null;
         inviteContext = current; inviteInstance = current.keepRef; invitePeople.clear(); $('[data-invite-room]').textContent = current.name; $('[data-invite-error]').textContent = '';
         $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
+        const isGame = current.kind === 'game';
+        const roster = $('[data-game-invite-people]');
+        roster.replaceChildren();
+        $('[data-invite-explainer]').hidden = isGame;
+        $('[data-invite-form]').hidden = isGame;
+        $('[data-game-invite-picker]').hidden = !isGame;
         const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose a current person'; $('[data-invite-options]').append(placeholder);
         for (const person of app.chans.get('#stalemate')?.names || []) {
             if (!personId(person.id) || person.id === app.selfId || current.names.some(member => member.id === person.id)) continue;
             const context = personContext(person.id, current.name, inviteInstance, person.nick);
             invitePeople.set(person.id, context);
-            const option = document.createElement('option'); option.value = person.id; option.textContent = person.nick; $('[data-invite-options]').append(option);
+            if (isGame) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'btn btn--ghost';
+                button.textContent = `Invite ${person.nick}`;
+                button.disabled = !personTargetsSupported || !roomNonce(inviteInstance);
+                button.addEventListener('click', () => inviteCurrentPerson(context));
+                roster.append(button);
+            } else {
+                const option = document.createElement('option'); option.value = person.id; option.textContent = person.nick; $('[data-invite-options]').append(option);
+            }
         }
+        $('[data-game-invite-empty]').hidden = !!roster.childElementCount;
         $('[data-invite-person-send]').disabled = !personTargetsSupported || !roomNonce(inviteInstance);
-        $('[data-invite-dialog]').showModal(); $('[data-invite-nick]').focus();
+        $('[data-invite-dialog]').showModal();
+        if (isGame) (roster.querySelector('button:enabled') || $('[data-game-invite-cancel]')).focus();
+        else $('[data-invite-nick]').focus();
     }
     function roomInviteArgs(nick, room) {
         const target = room.kind === 'game' && [...arcadeTables.values()].find(table => table.invite && table.controller?.isOpen())?.invite;
@@ -2424,6 +2444,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     }
     $('[data-jam-invite-room]').addEventListener('click', event => openInviteDialog(event.currentTarget));
     $('[data-invite-cancel]').addEventListener('click', closeInviteDialog);
+    $('[data-game-invite-cancel]').addEventListener('click', closeInviteDialog);
     $('[data-invite-dialog]').addEventListener('close', () => {
         if ($('[data-invite-dialog]').open) return;
         const opener = jamInviteOpener;
@@ -2436,18 +2457,21 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             ? opener.button : $(host ? '[data-roomtools]' : '[data-text]');
         target.focus({ preventScroll: true });
     });
-    $('[data-invite-person-send]').addEventListener('click', () => {
-        const current = store(app.active), context = invitePeople.get($('[data-invite-options]').value);
+    function inviteCurrentPerson(context) {
+        const current = store(app.active);
         if (!inviteContext || inviteContext !== current || current.keepRef !== inviteInstance || !amOp(current) || !context) {
             $('[data-invite-error]').textContent = 'Choose a current person in the original room.'; return;
         }
         // Invitation target may be outside this room, but must remain the
         // original live connection in the shared lobby's current roster.
         const person = findPerson(context.peer);
-        if (!person || !personContextValid(context)) { $('[data-invite-error]').textContent = 'That person is no longer confirmed.'; return; }
+        if (!person || !personContextValid(context) || current.names.some(member => member.id === context.peer)) {
+            $('[data-invite-error]').textContent = 'That person is no longer available to invite.'; return;
+        }
         if (send({ t: 'cmd', name: 'invite', args: roomInviteArgs(person.nick, current), ch: context.channel, roomInstance: context.instance, personContext: 1, personPeer: context.peer })) closeInviteDialog();
         else $('[data-invite-error]').textContent = 'The invitation was not sent. Reconnect before trying again.';
-    });
+    }
+    $('[data-invite-person-send]').addEventListener('click', () => inviteCurrentPerson(invitePeople.get($('[data-invite-options]').value)));
     $('[data-invite-form]').addEventListener('submit', event => {
         event.preventDefault();
         const current = store(app.active), nick = $('[data-invite-nick]').value.trim();

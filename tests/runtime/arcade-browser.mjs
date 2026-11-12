@@ -98,11 +98,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(page.locator('[data-entry-label]').first()).toHaveText(label);
         return page;
     }
-    async function sendGameInvite(host, nick) {
+    async function sendGameInvite(host, nick, capture) {
         await host.getByRole('button', { name: 'Invite players' }).click();
         const dialog = host.locator('[data-invite-dialog]');
-        await dialog.getByLabel('Choose a current person').selectOption({ label: nick });
-        await dialog.getByRole('button', { name: 'Invite selected person' }).click();
+        await expect(dialog.locator('form')).toBeHidden();
+        if (capture) await capture();
+        await dialog.getByRole('button', { name: `Invite ${nick}`, exact: true }).click();
     }
     async function inviteToGame(host, guest, nick) {
         await sendGameInvite(host, nick);
@@ -176,7 +177,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await host.getByRole('combobox', { name: 'Switch game' }).selectOption(game);
                 await host.getByRole('button', { name: phone ? 'Open Chess match' : 'Open Spades table' }).click();
                 await expect(host.locator(phone ? '[data-chess-status]' : '[data-spades-status]')).toContainText(phone ? 'Waiting for an opponent' : '1/4 seated');
-                await sendGameInvite(host, nick);
+                const hostViewport = host.viewportSize();
+                await host.setViewportSize(viewport);
+                try { await sendGameInvite(host, nick, () => captureArcadeInvite(host, viewport, '00-host-invite')); }
+                finally { await host.setViewportSize(hostViewport); }
                 const offer = friend.locator('[data-game-offer]');
                 await expect(offer).toContainText(`LinkHost invited you to play ${label}.`);
                 await expect(friend.locator('[data-game-night]')).toBeHidden();
