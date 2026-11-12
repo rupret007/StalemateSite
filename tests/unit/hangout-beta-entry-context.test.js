@@ -36,6 +36,40 @@ function click(dom, selector) {
 }
 
 describe('entry context through the private beta shell', () => {
+    it('offers same-tab WebJam admission without reading or sending the music invitation', async () => {
+        const config = env();
+        const address = 'https://beta.example/join/#k=local-fixture-capability&s=local-fixture-session&g=1&e=1800000000';
+        const response = await betaFetch(new Request('https://beta.example/join/'), config);
+        expect(response.status).toBe(401);
+        expect(response.headers.get('Content-Security-Policy')).toContain("script-src 'self'; connect-src 'self'");
+        expect(response.headers.get('Permissions-Policy')).toBe('camera=(), geolocation=(), microphone=()');
+        expect(response.headers.get('Referrer-Policy')).toBe('no-referrer');
+        expect(config.ASSETS.fetch).not.toHaveBeenCalled();
+        const dom = new JSDOM(await response.text(), { url: address, runScripts: 'outside-only' });
+        try {
+            const { window } = dom;
+            expect(window.document.querySelector('script[type="module"]')?.getAttribute('src')).toBe('/beta/client.js');
+            expect(window.document.querySelector('[target="_blank"]')).toBeNull();
+            window.entryFunctions = entryFunctions;
+            window.fetch = vi.fn(async () => new Response(null, { status: 401 }));
+            const client = await (await betaFetch(new Request('https://beta.example/beta/client.js'), config)).text();
+            window.eval(client.replace(/^import \{([^}]+)\} from '[^']+';/, 'const {$1} = entryFunctions;'));
+            const form = window.document.querySelector('#unlock');
+            const code = window.document.querySelector('#code');
+            await vi.waitFor(() => expect(form.closest('section').hidden).toBe(false));
+            expect(window.location.href).toBe(address);
+            code.value = 'incorrect local invitation';
+            form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+            await vi.waitFor(() => expect(window.document.querySelector('#status').textContent).toContain('not accepted'));
+            expect(window.document.activeElement).toBe(code);
+            expect(window.location.href).toBe(address);
+            const calls = window.fetch.mock.calls;
+            expect(calls.map(([path]) => path)).toEqual(['/beta/state', '/beta/unlock']);
+            expect(JSON.parse(calls[1][1].body)).toEqual({ key: code.value });
+            expect(window.sessionStorage.length).toBe(0);
+        } finally { dom.window.close(); }
+    });
+
     it('carries the selected entrance through invitation unlock and a deliberate join without keeping it in the address', async () => {
         const dom = await shell('https://beta.example/?via=rad-dad#invite=private-fixture');
         try {
