@@ -1588,6 +1588,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const roomLabel = jam ? offer.room : 'Game Night';
         const gameLabel = arcadeTables.get(offer?.arcade?.game)?.label;
         const selectedGame = arcadeTables.get(gameEntry?.table)?.label;
+        panel.toggleAttribute('data-arcade-offer', !!gameLabel);
         let message;
         if (start) message = gameOpenPending ? 'Opening Game Night…' : gameOpenError || (selectedGame
             ? `Start a private Game Night for ${selectedGame}.` : 'Start a private Game Night or wait for your host’s invitation.');

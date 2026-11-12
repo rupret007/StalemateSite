@@ -685,6 +685,15 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .pane { display: none; grid-column: 1; grid-row: 1; }
   body[data-show=chat] .chat { display: flex; }
   body[data-show=rooms] .rooms, body[data-show=people] .people { display: block; }
+  .game-offer[data-arcade-offer]:not([hidden]) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 10px 12px;
+    border-block-start: 1px solid #46513e;
+  }
+  .game-offer[data-arcade-offer] p { grid-column: 1 / -1; }
+  .game-offer[data-arcade-offer] .btn { min-height: 44px; }
   .phonetabs { display: grid; grid-column: 1; grid-row: 3; grid-template-columns: repeat(3, 1fr); min-height: 60px; padding-bottom: env(safe-area-inset-bottom, 0px); border-top: 1px solid var(--line); background: var(--surface); }
   .phonetabs button { min-height: 56px; border: 0; border-top: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 550; }
   .phonetabs button[aria-current=true] { border-top-color: var(--lime); color: var(--lime); background: #20271d; }
