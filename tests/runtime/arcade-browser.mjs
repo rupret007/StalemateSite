@@ -370,6 +370,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 }
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
                 await expect(guest.locator('[data-game-guest-connecting]')).toBeHidden();
+                await expect(guest.locator('details.arcade-chess > summary')).toBeFocused();
                 const pieces = guest.locator('.arcade-chess cg-board piece');
                 await expect(pieces).toHaveCount(32);
                 await expect(pieces.first()).toBeVisible();

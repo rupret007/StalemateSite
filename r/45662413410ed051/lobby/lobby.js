@@ -1836,6 +1836,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 gameGuestSeated = true;
                 $('[data-app]').hidden = false;
                 $('[data-game-guest-connecting]').hidden = true;
+                table.controller.panel.querySelector('summary').focus({ preventScroll: true });
             }
             return finishArcadeInvitation();
         }
