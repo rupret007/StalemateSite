@@ -428,13 +428,25 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             try {
                 const friend = await context.newPage();
                 await openGameNightLink(friend, link);
-                await friend.route('**/beta/game-night/invitation/accept', route => route.fulfill({
-                    status: 503, json: { error: message }
-                }), { times: 1 });
+                let releaseAccept;
+                const holdAccept = new Promise(resolve => { releaseAccept = resolve; });
+                await friend.route('**/beta/game-night/invitation/accept', async route => {
+                    await holdAccept;
+                    await route.fulfill({ status: 503, json: { error: message } });
+                }, { times: 1 });
                 const join = friend.getByRole('button', { name: 'Join game', exact: true });
                 const activate = () => phone ? join.tap() : friend.keyboard.press('Enter');
-                if (!phone) await expect(join).toBeFocused();
-                await activate();
+                try {
+                    await expect(join).toBeVisible();
+                    if (!phone) await expect(join).toBeFocused();
+                    const before = await join.boundingBox();
+                    await activate();
+                    const joining = friend.getByRole('button', { name: 'Joining…', exact: true });
+                    await expect(joining).toBeDisabled();
+                    await expect(friend.locator('[data-guest-status]')).toHaveText('Joining the game…');
+                    assert.equal((await joining.boundingBox()).y, before.y, 'Join stays in place while accepting');
+                    await captureArcadeInvite(friend, viewport, 'guest-retry-01-joining');
+                } finally { releaseAccept(); }
                 await expect(friend.locator('[data-guest-status]')).toHaveText(message);
                 await expect(join).toBeEnabled();
                 await captureArcadeInvite(friend, viewport, 'guest-retry-01-error');
