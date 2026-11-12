@@ -13,6 +13,7 @@ const sidPattern = /^[a-z0-9-]{16,64}$/;
 const randomCode = () => crypto.randomUUID().replaceAll('-', '');
 const digest = async value => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))),
     byte => byte.toString(16).padStart(2, '0')).join('');
+export const gameGuestSessionRef = sid => digest('game-guest-session:' + sid);
 const reply = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 const unavailable = () => reply({ error: 'This invitation has expired, was used, or the game is no longer waiting for a guest. Ask your host for a new invite.' }, 410);
 
