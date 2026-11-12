@@ -1126,8 +1126,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         case 'music-invite-ended':
             receiveMusicInvite(m);
             break;
-        case 'music-invite-sent':
-            if (currentJam()?.keepRef === m.roomInstance) toast('Music invitation sent.');
+        case 'music-invite-result':
+            if (pendingMusicHandoff?.submitted && pendingMusicHandoff.request === m.request
+                && ['sent', 'unavailable'].includes(m.status)) finishMusicHandoff(m.status === 'sent');
             break;
         case 'room-invite-result': {
             const sent = [...sentRoomInvites.values()].find(invite => invite.request === m.request);
@@ -2491,27 +2492,31 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         pendingMusicHandoff.channel.close();
         pendingMusicHandoff = null;
     }
+    function finishMusicHandoff(sent) {
+        pendingMusicHandoff.channel.postMessage({ returned: sent });
+        closeMusicHandoff();
+        toast(sent ? 'Music invitation sent.' : 'Music invitation couldn’t be sent. Try again from your Jam room.');
+    }
     function startMusicHandoff(room, context) {
         closeMusicHandoff();
         const request = crypto.randomUUID().replaceAll('-', '');
         const channel = new BroadcastChannel(`webjam-music-${request}`);
         const handoff = {
-            room, channel, timer: setTimeout(() => {
+            room, channel, request, submitted: false, timer: setTimeout(() => {
                 closeMusicHandoff();
                 toast('Music invitation timed out. Open the private WebJam app and try again.');
             }, 90000)
         };
         pendingMusicHandoff = handoff;
         channel.onmessage = ({ data }) => {
-            if (pendingMusicHandoff !== handoff || typeof data?.href !== 'string') return;
+            if (pendingMusicHandoff !== handoff || handoff.submitted || typeof data?.href !== 'string') return;
             const current = currentJam();
             const sent = current === room && current.keepRef === context.instance && amOp(current)
                 && findPerson(context.peer) && send({
-                    t: 'music-invite-offer', ch: context.channel, roomInstance: context.instance, peer: context.peer, href: data.href
+                    t: 'music-invite-offer', request, ch: context.channel, roomInstance: context.instance, peer: context.peer, href: data.href
                 });
-            channel.postMessage({ returned: !!sent });
-            closeMusicHandoff();
-            if (!sent) toast('That room or bandmate changed. Choose a new Music invitation.');
+            if (!sent) return finishMusicHandoff(false);
+            handoff.submitted = true;
         };
         const launch = document.createElement('a');
         launch.href = `webjam-beta://hangout-music/${request}`;

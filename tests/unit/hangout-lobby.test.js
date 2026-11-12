@@ -81,7 +81,7 @@ describe('direct Jam music invitations', () => {
         invite = `${origin}/join/#k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=${clock / 1000 + 60}`;
     });
     function offer(sender = host, overrides = {}) {
-        send(sender, { t: 'music-invite-offer', ch: room, roomInstance, peer: guest.id, href: invite, ...overrides });
+        send(sender, { t: 'music-invite-offer', request: 'd'.repeat(32), ch: room, roomInstance, peer: guest.id, href: invite, ...overrides });
         return got(guest).filter(m => m.t === 'music-invite').at(-1);
     }
     function accept(user, received, overrides = {}) {
@@ -91,6 +91,7 @@ describe('direct Jam music invitations', () => {
     it('sends only an offer to the chosen connection and delivers audio only once after room admission', () => {
         const pending = offer();
         expect(pending).toMatchObject({ ch: room, roomInstance, by: host.nick });
+        expect(got(host).at(-1)).toEqual({ t: 'music-invite-result', request: 'd'.repeat(32), status: 'sent' });
         expect(got(peer).some(m => m.t === 'music-invite')).toBe(false);
         expect(JSON.stringify([...inbox.values()])).not.toContain(invite);
         expect(JSON.stringify(L.roomSnapshot())).not.toContain(invite);
@@ -105,12 +106,16 @@ describe('direct Jam music invitations', () => {
         expect(delivered(guest)).toHaveLength(1);
         expect(JSON.stringify(got(host))).not.toContain(invite);
         expect(JSON.stringify(got(peer))).not.toContain(invite);
+        cmd(guest, 'part', [], room);
+        cmd(guest, 'join', [room]);
+        expect(got(guest).filter(m => m.t === 'join' && m.ch.name === room)).toHaveLength(1);
     });
     it('refuses a nonhost, a different room instance, and an invalid browser destination', () => {
         expect(offer(peer)).toBeUndefined();
         expect(offer(host, { roomInstance: '0'.repeat(32) })).toBeUndefined();
         expect(offer(host, { href: invite.replace('/join/', '/other/') })).toBeUndefined();
         expect(offer(host, { href: invite.replace(origin, 'https://another.example.test') })).toBeUndefined();
+        expect(got(host).at(-1)).toEqual({ t: 'music-invite-result', request: 'd'.repeat(32), status: 'unavailable' });
     });
     it('refuses expired offers and offers whose host has left', () => {
         const expired = offer();

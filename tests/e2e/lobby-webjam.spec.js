@@ -158,6 +158,7 @@ test('only the selected guest can accept a music invitation and open the audio c
         await host.click('[data-show="rooms"]');
         await host.click('[data-start="jam"]');
         await expect(host.locator('[data-jam]')).toBeVisible();
+        await expect(host.locator('[data-chat-context]')).toHaveText(/^#jam-/);
         const room = await host.locator('[data-chat-context]').textContent();
         const invite = `https://webjam.example/join/#k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=${Math.floor(Date.now() / 1000) + 120}`;
         // Intercept the system app launch. The real lobby still binds the
@@ -170,19 +171,26 @@ test('only the selected guest can accept a music invitation and open the audio c
                 window.musicRequest = new URL(link.href).pathname.slice(1);
             }, true);
         });
-        await host.getByRole('button', { name: 'Invite bandmate to Music' }).click();
-        await host.getByRole('button', { name: 'Invite ChosenGuest', exact: true }).click();
-        const request = await host.evaluate(() => window.musicRequest);
-        expect(request).toMatch(/^[a-f0-9]{32}$/);
         const callback = await host.context().newPage();
         await callback.goto('/join/handoff.html');
-        const returned = await callback.evaluate(({ request, href }) => new Promise(resolve => {
-            const channel = new BroadcastChannel(`webjam-music-${request}`);
-            channel.onmessage = ({ data }) => { channel.close(); resolve(data.returned); };
-            channel.postMessage({ href });
-        }), { request, href: invite });
-        expect(returned).toBe(true);
+        async function returnInvite(href) {
+            await host.getByRole('button', { name: 'Invite bandmate to Music' }).click();
+            await host.getByRole('button', { name: 'Invite ChosenGuest', exact: true }).click();
+            const request = await host.evaluate(() => window.musicRequest);
+            expect(request).toMatch(/^[a-f0-9]{32}$/);
+            return callback.evaluate(({ request, href }) => new Promise(resolve => {
+                const channel = new BroadcastChannel(`webjam-music-${request}`);
+                const timer = setTimeout(() => { channel.close(); resolve('timed out'); }, 4000);
+                channel.onmessage = ({ data }) => { clearTimeout(timer); channel.close(); resolve(data.returned); };
+                channel.postMessage({ href });
+            }), { request, href });
+        }
         const panel = guest.locator('[data-music-invite]');
+        expect(await returnInvite(invite.replace(/&e=\d+$/, '&e=1'))).toBe(false);
+        await expect(panel).toBeHidden();
+        await expect(host.locator('[data-toast]')).toContainText('Music invitation couldn’t be sent.');
+        expect(await returnInvite(invite)).toBe(true);
+        await expect(host.locator('[data-toast]')).toContainText('Music invitation sent.');
         await expect(panel).toContainText('MusicHost invited you to play');
         await expect(other.locator('[data-music-invite]')).toBeHidden();
         await expect(guest.locator('[data-chat-context]')).toHaveText('#stalemate');

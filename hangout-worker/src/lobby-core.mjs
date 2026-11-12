@@ -345,7 +345,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const oldReceiptBytes = receiptBytes;
         const oldLastStatSave = lastStatSave;
         try {
-            checkpoint = createParticipationCheckpoint({ conns, channels, pm, roomInvites, devStats, ipRooms, net, reports, held, lines, lineMeta,
+            checkpoint = createParticipationCheckpoint({ conns, channels, pm, roomInvites, musicInvites, devStats, ipRooms, net, reports, held, lines, lineMeta,
                 receipts, receiptSizes, heldChannels, aiPending, aiReviews, participationMedia }, safe ? { opaque: [...channels.values()].map(room => room.act) } : {});
             if (effectCommitConfigured && !effectCommitReady) throw Error('Effect commit fence unavailable');
             const connections = participationConnections(fn, args);
@@ -950,25 +950,28 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
 
     function offerMusicInvite(host, frame) {
+        if (!validPmRef(frame.request)) return;
+        const result = status => out(host, { t: 'music-invite-result', request: frame.request, status });
         const room = musicInviteRoom(frame);
         const guest = typeof frame.peer === 'string' && conns.get(frame.peer);
-        if (!room || !canInviteMusic(host, guest, room)) return bot(host, 'This bandmate or Jam room is no longer available.', 'error');
+        if (!room || !canInviteMusic(host, guest, room)) return result('unavailable');
         const href = typeof frame.href === 'string' && validWebJoin(frame.href, L.webJoinOrigins || []);
-        if (!href) return bot(host, 'WebJam did not provide a music invitation.', 'error');
+        if (!href) return result('unavailable');
         const url = new URL(href);
         const fragment = /^#k=[A-Za-z0-9_-]{43}&s=[a-f0-9]{64}&g=([1-9]\d{0,9})&e=([1-9]\d{0,12})$/.exec(url.hash);
         const expires = fragment ? Number(fragment[2]) * 1000 : 0;
         const time = now();
         if (url.pathname !== '/join/' || url.username || url.password || !fragment || Number(fragment[1]) > 0xffffffff
             || !Number.isSafeInteger(expires) || expires <= time || expires > time + 10 * MIN)
-            return bot(host, 'WebJam did not provide a current music invitation.', 'error');
+            return result('unavailable');
+        personDependency(guest, room);
         const id = crypto.randomUUID().replace(/-/g, '');
         const previous = musicInvites.get(room.name);
         const previousGuest = previous && conns.get(previous.guest);
         if (previousGuest) out(previousGuest, { t: 'music-invite-ended', id: previous.id });
         musicInvites.set(room.name, { id, host: host.id, guest: guest.id, instance: room.keepRef, href, expires });
         out(guest, { t: 'music-invite', id, ch: room.name, roomInstance: room.keepRef, by: host.nick, expires });
-        out(host, { t: 'music-invite-sent', ch: room.name, roomInstance: room.keepRef, peer: guest.id });
+        result('sent');
     }
 
     function acceptMusicInvite(guest, frame) {
@@ -978,22 +981,14 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (validPmRef(frame.id)) out(guest, { t: 'music-invite-ended', id: frame.id });
             return;
         }
-        if (offer.expires <= now() || !canInviteMusic(conns.get(offer.host), guest, room)) {
+        const host = conns.get(offer.host);
+        if (offer.expires <= now() || !canInviteMusic(host, guest, room)) {
             musicInvites.delete(room.name);
             return out(guest, { t: 'music-invite-ended', id: offer.id });
         }
-        const wasMember = room.members.has(guest.id);
-        const invited = room.invites.has(guest.dev);
-        if (!wasMember && !invited) {
-            if (room.invites.size >= 150 || !roomCapacity()) return out(guest, { t: 'music-invite-ended', id: offer.id });
-            room.invites.add(guest.dev);
-        }
-        if (!enter(guest, room)) {
-            if (!invited && !wasMember) room.invites.delete(guest.dev);
-            out(guest, { t: 'music-invite-ended', id: offer.id });
-            return;
-        }
+        personDependency(host, room);
         musicInvites.delete(room.name);
+        if (!enter(guest, room, { invited: true })) return out(guest, { t: 'music-invite-ended', id: offer.id });
         out(guest, { t: 'music-invite-accepted', id: offer.id, ch: room.name, roomInstance: room.keepRef, href: offer.href, expires: offer.expires });
     }
 
