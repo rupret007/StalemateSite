@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { runInNewContext } from 'node:vm';
 import { betaFetch, betaAccessConfigured } from '../src/beta-entry.mjs';
 import { BETA_COOKIE, BETA_IDENTITY_COOKIE, BETA_TTL, betaSession, readBeta, signBeta } from '../src/beta-auth.mjs';
@@ -133,7 +134,13 @@ describe('real invitation-only beta boundary', () => {
         const entrance = await betaFetch(request('/join/'), config, deps);
         expect(entrance.headers.get('Content-Type')).toContain('text/html');
         expect(entrance.headers.get('Permissions-Policy')).toContain('microphone=()');
-        expect(await entrance.text()).toContain('href="/beta/" target="_blank" rel="noopener noreferrer"');
+        const gate = await entrance.text();
+        expect(gate).toContain('href="/beta/" target="_blank" rel="noopener noreferrer"');
+        const scripts = [...gate.matchAll(/<script>([^<]+)<\/script>/g)];
+        expect(scripts).toHaveLength(1);
+        const digest = createHash('sha256').update(scripts[0][1]).digest('base64');
+        expect(entrance.headers.get('Content-Security-Policy')).toMatch(`script-src 'sha256-${digest}';`);
+        expect(entrance.headers.get('Content-Security-Policy')).not.toContain('unsafe-inline');
         expect(await (await betaFetch(request('/join/', { method: 'HEAD' }), config, deps)).text()).toBe('');
         expect((await betaFetch(request('/join/app.js'), config, deps)).headers.get('Content-Type')).toContain('text/plain');
         expect(config.ASSETS.fetch).not.toHaveBeenCalled();
