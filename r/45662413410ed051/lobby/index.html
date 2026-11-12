@@ -246,10 +246,7 @@
                 <p class="small jam-note">Browser audio: headphones required; higher delay.</p>
                 <button class="btn btn--ghost jam-room-invite" type="button" data-jam-invite-room aria-haspopup="dialog" hidden>Invite bandmate to room</button>
                 <p class="small room-invite-status" data-room-invite-status role="status"></p>
-                <ol class="small jam-host-steps" id="jam-host-steps" data-jam-host-steps hidden>
-                    <li>In the WebJam beta app on your Mac, choose <strong>Music → Host</strong>.</li>
-                    <li>Once your bandmate is in this room, click <strong>Copy browser invite</strong> in WebJam.</li>
-                </ol>
+                <button class="btn btn--ghost jam-room-invite" type="button" data-jam-invite-music aria-haspopup="dialog" hidden>Invite bandmate to Music</button>
                 <div class="jam-actions" data-jam-actions>
                     <a class="btn" data-jam-desktop href="#" hidden>Open in WebJam 🎸</a>
                     <button class="btn" type="button" data-jam-copy hidden>Copy desktop invite</button>
@@ -268,12 +265,19 @@
                 <label class="small" data-jam-invite-copy-fallback hidden>Select this invite link, then copy it.
                     <textarea data-jam-invite-copy-value readonly aria-label="Browser invite link to copy" autocomplete="off" spellcheck="false" rows="2"></textarea>
                 </label>
-                <form class="jam-paste op-only" data-jam-form>
+                <details class="jam-setup" data-jam-manual hidden>
+                  <summary data-jam-manual-label>Share a link manually</summary>
+                  <ol class="small jam-host-steps" id="jam-host-steps" data-jam-host-steps hidden>
+                    <li>In the WebJam beta app on your Mac, choose <strong>Music → Host</strong>.</li>
+                    <li>Once your bandmate is in this room, click <strong>Copy browser invite</strong> in WebJam.</li>
+                  </ol>
+                  <form class="jam-paste op-only" data-jam-form>
                     <textarea data-jam-link placeholder="Paste an invite link or the whole message" aria-label="WebJam invitation" aria-describedby="jam-host-steps jam-share-help" autocomplete="off" spellcheck="false" maxlength="8192" rows="2"></textarea>
                     <button class="btn btn--small" type="submit">Share with room</button>
                     <p class="small" id="jam-share-help">Paste the link and choose <strong>Share with room</strong>. Your bandmate can then choose <strong>Join in browser</strong>. For desktop guests, paste the full desktop invite.</p>
                     <p class="small" data-jam-share-status role="status"></p>
-                </form>
+                  </form>
+                </details>
                 <p class="small jam-platform" data-jam-platform>A Mac hosts music in WebJam. Mac and Windows guests can join in a browser. Windows native music needs a signed build; this unsigned beta cannot join natively.</p>
                 <details class="jam-setup" data-jam-help>
                     <summary>Setup &amp; invitation help</summary>
@@ -354,6 +358,11 @@
         </aside>
 
         <div class="irc-notices">
+            <div class="game-offer" data-music-invite hidden>
+                <p data-music-invite-status role="status"></p>
+                <button class="btn btn--small" type="button" data-music-invite-action></button>
+                <button class="btn btn--small btn--ghost" type="button" data-music-invite-dismiss>Not now</button>
+            </div>
             <div class="game-offer" data-game-offer hidden>
                 <p data-game-offer-status role="status"></p>
                 <button class="btn btn--small" type="button" data-game-offer-join></button>

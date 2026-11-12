@@ -1,6 +1,7 @@
 // The site relays the app's invitation unchanged. WebJam owns parsing and admission.
 const { test, expect } = require('@playwright/test');
 const { randomUUID } = require('node:crypto');
+const path = require('node:path');
 const jsQR = require('jsqr');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 // Full clipboard format from WebJam build_invite_message and direct_stun_invite.
@@ -62,9 +63,9 @@ test('two visitors can copy an unchanged app invite, with a fallback when clipbo
 // Reserved test origin only; opening the destination is intercepted, so this
 // proves room handoff and permissions, not Web Join enrollment or music audio.
 const WEB_INVITE = 'https://webjam.example/join/#k=synthetic_browser_capability&s=fixture&g=1&e=1800000000';
-async function browserRoom(browser, baseURL, configured, viewport) {
+async function browserRoom(browser, baseURL, configured, viewport, directMusic = false) {
     const contexts = [], external = [];
-    const relay = hangoutRelayWsBase(baseURL, `${configured ? 'webjam-browser-' : 'webjam-off-'}${randomUUID()}`);
+    const relay = hangoutRelayWsBase(baseURL, `${configured ? 'webjam-browser-' : 'webjam-off-'}${directMusic ? 'music-' : ''}${randomUUID()}`);
     const join = async (nick, controls = false, via = '', beforeConnect) => {
         const context = await browser.newContext({ viewport,
             ...(controls && browser.browserType().name() === 'chromium' ? { permissions: ['local-network-access'] } : {}) }); contexts.push(context);
@@ -116,6 +117,107 @@ const paste = async (page, value) => {
     await page.fill('[data-jam-link]', value);
     await page.locator('[data-jam-form] button[type="submit"]').click();
 };
+
+test('the native return page clears the invitation fragment and returns it to its original tab', async ({ browser }) => {
+    const context = await browser.newContext();
+    const origin = 'https://webjam.example';
+    const request = 'b'.repeat(32);
+    const fragment = `k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=1800000000`;
+    try {
+        await context.route(`${origin}/**`, route => {
+            const file = new URL(route.request().url()).pathname;
+            if (file === '/') return route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Jam tab fixture</title>' });
+            if (['/join/handoff.html', '/join/handoff.js', '/join/style.css'].includes(file)) {
+                return route.fulfill({ path: path.resolve(__dirname, '../..', file.slice(1)) });
+            }
+            return route.abort();
+        });
+        const host = await context.newPage();
+        await host.goto(origin);
+        await host.evaluate(request => {
+            const channel = new BroadcastChannel(`webjam-music-${request}`);
+            channel.onmessage = ({ data }) => {
+                window.returnedInvite = data.href;
+                channel.postMessage({ returned: true });
+                channel.close();
+            };
+        }, request);
+        const callback = await context.newPage();
+        await callback.goto(`${origin}/join/handoff.html#${request}&${fragment}`);
+        await expect(callback.getByRole('status')).toHaveText('Return to your Jam room. You can close this tab.');
+        await expect(callback).toHaveURL(`${origin}/join/handoff.html`);
+        expect(await host.evaluate(() => window.returnedInvite)).toBe(`${origin}/join/#${fragment}`);
+    } finally { await context.close(); }
+});
+
+test('only the selected guest can accept a music invitation and open the audio check', async ({ browser, baseURL }) => {
+    const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 }, true);
+    try {
+        const host = await f.join('MusicHost');
+        const guest = await f.join('ChosenGuest');
+        const other = await f.join('OtherGuest');
+        await host.click('[data-show="rooms"]');
+        await host.click('[data-start="jam"]');
+        await expect(host.locator('[data-jam]')).toBeVisible();
+        await expect(host.locator('[data-chat-context]')).toHaveText(/^#jam-/);
+        const room = await host.locator('[data-chat-context]').textContent();
+        const invite = `https://webjam.example/join/#k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=${Math.floor(Date.now() / 1000) + 120}`;
+        // Intercept the system app launch. The real lobby still binds the
+        // browser callback to the selected live guest and publishes it.
+        await host.evaluate(() => {
+            document.addEventListener('click', event => {
+                const link = event.target.closest('a[href^="webjam-beta://hangout-music/"]');
+                if (!link) return;
+                event.preventDefault();
+                window.musicRequest = new URL(link.href).pathname.slice(1);
+            }, true);
+        });
+        const callback = await host.context().newPage();
+        await callback.goto('/join/handoff.html');
+        async function returnInvite(href) {
+            await host.getByRole('button', { name: 'Invite bandmate to Music' }).click();
+            await host.getByRole('button', { name: 'Invite ChosenGuest', exact: true }).click();
+            const request = await host.evaluate(() => window.musicRequest);
+            expect(request).toMatch(/^[a-f0-9]{32}$/);
+            return callback.evaluate(({ request, href }) => new Promise(resolve => {
+                const channel = new BroadcastChannel(`webjam-music-${request}`);
+                const timer = setTimeout(() => { channel.close(); resolve('timed out'); }, 4000);
+                channel.onmessage = ({ data }) => { clearTimeout(timer); channel.close(); resolve(data.returned); };
+                channel.postMessage({ href });
+            }), { request, href });
+        }
+        const panel = guest.locator('[data-music-invite]');
+        expect(await returnInvite(invite.replace(/&e=\d+$/, '&e=1'))).toBe(false);
+        await expect(panel).toBeHidden();
+        await expect(host.locator('[data-toast]')).toContainText('Music invitation couldn’t be sent.');
+        expect(await returnInvite(invite)).toBe(true);
+        await expect(host.locator('[data-toast]')).toContainText('Music invitation sent.');
+        await expect(panel).toContainText('MusicHost invited you to play');
+        await expect(other.locator('[data-music-invite]')).toBeHidden();
+        await expect(guest.locator('[data-chat-context]')).toHaveText('#stalemate');
+        await panel.getByRole('button', { name: 'Accept and join' }).press('Enter');
+        await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
+        const audio = panel.getByRole('button', { name: 'Open audio check' });
+        await expect(audio).toBeFocused();
+        await expect(guest.locator('[data-jam-actions]')).toBeHidden();
+        await audio.press('Enter');
+        expect(await guest.evaluate(() => window.browserOpens)).toEqual([[invite, '_blank', 'noopener,noreferrer']]);
+        expect(await guest.evaluate(() => window.audioRequests)).toBe(0);
+        expect(await guest.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain(invite);
+        // A guest already in this Jam room can still receive a Music invitation.
+        await host.getByRole('button', { name: 'Invite bandmate to room' }).click();
+        await expect(host.getByRole('button', { name: /Invite ChosenGuest/ })).toHaveCount(0);
+        await host.getByRole('button', { name: 'Cancel', exact: true }).click();
+        expect(await returnInvite(invite)).toBe(true);
+        const accept = panel.getByRole('button', { name: 'Accept and join' });
+        await expect(accept).toBeVisible();
+        await accept.click();
+        await expect(audio).toBeVisible();
+        await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        expect(f.external).toEqual([]);
+    } finally { await f.close(); }
+});
 
 for (const [hostSite, guestSite] of [['rad-dad', 'stalemate'], ['stalemate', 'rad-dad']]) {
     test(`${hostSite} can invite someone from ${guestSite} with a single join action`, async ({ browser, baseURL }) => {

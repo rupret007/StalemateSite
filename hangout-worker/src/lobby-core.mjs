@@ -146,13 +146,16 @@ const PERSON_COMMANDS = new Set(['msg', 'query', 'whois', 'ignore', 'unignore', 
 const NAMED_PERSON_COMMANDS = new Set([...PERSON_COMMANDS, 'accept', 'decline', 'report', 'mode']);
 const PERSON_ROOM_COMMANDS = new Set(['slap', 'kick', 'ban', 'invite', 'op', 'deop', 'voice', 'devoice', 'cohost', 'transfer']);
 
-export function createLobby({ now = () => Date.now(), send: sendImpl = () => {}, close: closeImpl = () => {}, persist: persistImpl = () => {}, deferPresence: deferPresenceImpl = null, participation = null, effectCommit = null, incidentSources = false, gameNight = false, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
+export function createLobby({ now = () => Date.now(), send: sendImpl = () => {}, close: closeImpl = () => {}, persist: persistImpl = () => {}, deferPresence: deferPresenceImpl = null, participation = null, effectCommit = null, incidentSources = false, gameNight = false, directMusicInvites = false, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
     if (typeof incidentSources !== 'boolean') throw Error('incident-source-configuration');
     const L = { ...LOBBY_LIMITS, ...limits };
     const entrySites = L.entrySites || ENTRY_SITES;
     const roomStateLimit = Math.max(32768, Math.min(ROOM_STATE_MAX_BYTES, Number(L.roomStateBytes) || ROOM_STATE_MAX_BYTES));
     const conns = new Map();          // connId -> conn
     const channels = new Map();       // lc(name) -> channel
+    // One volatile music offer per Jam room. This is neither room metadata
+    // nor a device grant until the intended live connection accepts it.
+    const musicInvites = new Map();
     const pm = new Map();             // exact connection pair -> consent; device IDs are rate limits, never consent grants
     const roomInvites = new Map();    // short-lived offers between current connections
     const devStats = new Map();       // dev -> {day, msgs, lastRoom}
@@ -343,7 +346,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const oldReceiptBytes = receiptBytes;
         const oldLastStatSave = lastStatSave;
         try {
-            checkpoint = createParticipationCheckpoint({ conns, channels, pm, roomInvites, devStats, ipRooms, net, reports, held, lines, lineMeta,
+            checkpoint = createParticipationCheckpoint({ conns, channels, pm, roomInvites, musicInvites, devStats, ipRooms, net, reports, held, lines, lineMeta,
                 receipts, receiptSizes, heldChannels, aiPending, aiReviews, participationMedia }, safe ? { opaque: [...channels.values()].map(room => room.act) } : {});
             if (effectCommitConfigured && !effectCommitReady) throw Error('Effect commit fence unavailable');
             const connections = participationConnections(fn, args);
@@ -845,13 +848,16 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             cams: new Set(), since: now(), lastNick: 0, tokens: L.burst, last: now(), frames: 0, lastSaid: {}, actTokens: L.actBurst, actLast: now() };
         conns.set(id, c);
         if (band) { net.lastBand = now(); if (net.shieldAuto || net.lockAuto) bot(c, 'A saved safety state needs review: fans can read but not talk while the lobby is read-only. Check the band panel; /lobby unlock and /shieldoff when you are ready.'); saveNet(); }
-        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, roomInvites: 1, ...(gameNight ? { gameNight: 1, fourInARow: 1, discordLinks: !participationConfigured } : {}) } });
+        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, roomInvites: 1, ...(directMusicInvites && !participationConfigured && L.webJoinOrigins?.length ? { directMusicInvites: 1 } : {}), ...(gameNight ? { gameNight: 1, fourInARow: 1, discordLinks: !participationConfigured } : {}) } });
         return { ok: true };
     }
 
     function disconnect(id, why = 'Quit') {
         const c = conns.get(id);
         if (!c) return;
+        for (const [room, offer] of musicInvites) {
+            if (offer.host === id || offer.guest === id) musicInvites.delete(room);
+        }
         for (const [request, offer] of roomInvites) if (offer.host === id || offer.guest === id)
             finishRoomInvite(request, offer, 'expired', id);
         for (const name of [...c.channels]) leave(c, ch(name), why, true);
@@ -872,6 +878,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
 
     function leave(c, chan, why = '', quitting = false) {
         if (!chan || !chan.members.has(c.id)) return;
+        const musicInvite = musicInvites.get(chan.name);
+        if (musicInvite && (musicInvite.host === c.id || musicInvite.guest === c.id)) musicInvites.delete(chan.name);
         chan.members.delete(c.id);
         c.channels.delete(chan.name);
         for (const [request, offer] of roomInvites) {
@@ -927,6 +935,62 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (becameBusy) sendChan(ch(LOBBY), { presence: true });
         pushList({ presence: true });
         return true;
+    }
+
+    function musicInviteRoom(frame) {
+        const room = typeof frame.ch === 'string' && ch(frame.ch);
+        return directMusicInvites && !participationConfigured && !roomsBroken
+            && room?.kind === 'jam' && room.keepRef === frame.roomInstance ? room : null;
+    }
+
+    function canInviteMusic(host, guest, room) {
+        return !!host?.nick && !host.safetyOnly && !!guest?.nick && !guest.safetyOnly
+            && host.id !== guest.id && host.dev !== guest.dev && room.members.has(host.id)
+            && isOp(host, room) && !host.blocks.has(guest.dev) && !guest.blocks.has(host.dev)
+            && !guest.ignoredPeerIds.has(host.id) && !guest.ignores.has(lc(host.nick));
+    }
+
+    function offerMusicInvite(host, frame) {
+        if (!validPmRef(frame.request)) return;
+        const result = status => out(host, { t: 'music-invite-result', request: frame.request, status });
+        const room = musicInviteRoom(frame);
+        const guest = typeof frame.peer === 'string' && conns.get(frame.peer);
+        if (!room || !canInviteMusic(host, guest, room)) return result('unavailable');
+        const href = typeof frame.href === 'string' && validWebJoin(frame.href, L.webJoinOrigins || []);
+        if (!href) return result('unavailable');
+        const url = new URL(href);
+        const fragment = /^#k=[A-Za-z0-9_-]{43}&s=[a-f0-9]{64}&g=([1-9]\d{0,9})&e=([1-9]\d{0,12})$/.exec(url.hash);
+        const expires = fragment ? Number(fragment[2]) * 1000 : 0;
+        const time = now();
+        if (url.pathname !== '/join/' || url.username || url.password || !fragment || Number(fragment[1]) > 0xffffffff
+            || !Number.isSafeInteger(expires) || expires <= time || expires > time + 10 * MIN)
+            return result('unavailable');
+        personDependency(guest, room);
+        const id = crypto.randomUUID().replace(/-/g, '');
+        const previous = musicInvites.get(room.name);
+        const previousGuest = previous && conns.get(previous.guest);
+        if (previousGuest) out(previousGuest, { t: 'music-invite-ended', id: previous.id });
+        musicInvites.set(room.name, { id, host: host.id, guest: guest.id, instance: room.keepRef, href, expires });
+        out(guest, { t: 'music-invite', id, ch: room.name, roomInstance: room.keepRef, by: host.nick, expires });
+        result('sent');
+    }
+
+    function acceptMusicInvite(guest, frame) {
+        const room = musicInviteRoom(frame);
+        const offer = room && musicInvites.get(room.name);
+        if (!offer || offer.id !== frame.id || offer.guest !== guest.id || offer.instance !== room.keepRef) {
+            if (validPmRef(frame.id)) out(guest, { t: 'music-invite-ended', id: frame.id });
+            return;
+        }
+        const host = conns.get(offer.host);
+        if (offer.expires <= now() || !canInviteMusic(host, guest, room)) {
+            musicInvites.delete(room.name);
+            return out(guest, { t: 'music-invite-ended', id: offer.id });
+        }
+        personDependency(host, room);
+        musicInvites.delete(room.name);
+        if (!acceptJamInvitation(guest, room)) return out(guest, { t: 'music-invite-ended', id: offer.id });
+        out(guest, { t: 'music-invite-accepted', id: offer.id, ch: room.name, roomInstance: room.keepRef, href: offer.href, expires: offer.expires });
     }
 
     function finishRoomInvite(request, offer, status, disconnected = '') {
@@ -1067,6 +1131,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (f.t !== 'act' && f.t !== 'say' && f.t !== 'cmd' && !limited(c, 'command', 10, 1, true)) return;
         switch (f.t) {
         case 'hello': return hello(c, f);
+        case 'music-invite-offer': return offerMusicInvite(c, f);
+        case 'music-invite-accept': return acceptMusicInvite(c, f);
         case 'say': {
             const text = typeof f.text === 'string' ? f.text : '';
             if (text.startsWith('/') && !text.startsWith('//')) return runLine(c, f.ch, text, f);
@@ -2113,6 +2179,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
 
     function closeRoom(chan, by, why) {
+        musicInvites.delete(chan.name);
         const members = membersOf(chan);
         for (const m of members) { out(m, { t: 'closed', ch: chan.name, by, reason: why }); m.channels.delete(chan.name); m.cams.delete(lc(chan.name)); }
         for (const [request, offer] of roomInvites) if (offer.room === chan) finishRoomInvite(request, offer, 'expired');
@@ -2553,6 +2620,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     let lastStatSave = '';
     function tick() {
         const t = now();
+        for (const [room, offer] of musicInvites) if (offer.expires <= t) musicInvites.delete(room);
         expireRoomInvites(t);
         rates.prune();
         if (hourKey() !== lastStatSave) { lastStatSave = hourKey(); saveNet(); } // stats: ~24 row writes/day
