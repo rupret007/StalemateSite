@@ -1,42 +1,69 @@
-# Band demo journey map (Stalemate → Hang Out → Web Join)
+# Private band rehearsal in Hang Out and WebJam
 
-End-to-end path for a first-time bandmate and a host, using local preview / `serve:test` fixtures. This is a working map for QA and Playwright; it is not a claim about production hosting.
+Use the [current private readiness guide](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
+to match the served website and the Mac's Desktop shortcut before inviting anyone.
+Keep the rehearsal private and use the build-specific invitation steps below.
 
-## Steps
+## What to send the guest
 
-| Step | Visitor action | Page / code | Notes |
-| --- | --- | --- | --- |
-| 1 | Open reviewed **Stalemate** entry link (“Hang Out”) | Band site fixture or packaged `stalemate.html` via `communityJoinLink()` → `r/<hidden-slug>/lobby/?via=stalemate…` | `tests/e2e/community-entry.spec.js` pattern; `via` badge is optional to show/hide. |
-| 2 | Pick nickname, agree, enter lobby | Gate: `r/<hidden-slug>/lobby/index.html` (`data-nick`, `data-enter`); connect in `lobby.js` | **Friction:** long gate button copy (“I’m 13+…”) reads like legal fine print before the obvious action. **Friction:** must wait for relay/preview params or enter stays disabled with no plain “missing link” copy on some builds. |
-| 3 | Say hello in `#stalemate` | Chat pane `data-text` / `data-send`; scrollback `data-buffer` | Slow mode (3s) between lines from same author in shared tests. Conversation starters help; optional. |
-| 4 | Host opens **Rooms** → **Jam (WebJam)** | `data-show="rooms"`, `data-start="jam"`; channel `#jam-…` | **Friction:** two navigation hops before hosting; no single “Start a jam” on chat home. Jam rooms are **invite-only** (`+i`); directory shows them but join without invite fails (`invite-only` toast). |
-| 5 | Bandmate **sees** the jam room in directory | Rooms pane `data-roomlist`, labels from `discovery-core.js` | **Friction (partially addressed):** old copy said “Try joining” on invite-only rows, implying a self-serve join. |
-| 6 | Host invites bandmate by nickname | Host tools `data-roomtools` → “Invite guest” dialog (`data-invite-dialog`); server `invite` in `lobby-core.mjs` | **Friction:** host must know exact nickname; dialog is behind Host tools, not surfaced on jam start. |
-| 7 | Bandmate accepts **Join** on invitation toast | `data-toast` button; lands in jam room (`data-chat-context`, `data-jam`) | Lowest-click path for invite-only jam (toast vs directory). |
-| 8 | Host pastes **browser Web Join** link | Host-only `data-jam-form` / `data-jam-link`; validation in worker + `webJoinOrigins` on test relay (`webjam-browser-*` namespaces) | **Friction (partially addressed):** guests saw “Waiting for the host to paste their WebJam invite” even when only a browser link is needed. Rejected paste needs reread of toast (`Browser joining is not configured`). |
-| 9 | Bandmate **Join in browser** | `data-jam-web` opens approved `https://…/join/#…` | **Friction:** disabled state title was generic; button label “Browser join unavailable” sounds broken rather than “waiting on host”. |
-| 10 | Web Join: headphones, mic check, connect | `/join/` (`join/app.js`, `join/session.js`); fake media in e2e | **Friction:** without host-side mailbox/relay, real join fails at credentials (`Web Join is unavailable` in `webjam-join-play.spec.js`); demo/tests must mock transport. CSP limits connect-src to turn worker origin. |
-| 11 | Connected audio ready | `#status` “Connected — Web Join…”; `join/session.js` `onStatus` | Not the same as native WebJam/TURN qualification across houses. |
+> Hey Che’, open the private Hang Out invite I send you in Chrome on your PC.
+> Pick a nickname and enter the lobby. Keep wired headphones handy. I’ll send
+> you the Music invite from inside Hang Out. Once you reach the audio check,
+> pick your drum interface as the microphone, click **Check microphone** and
+> play a few hits. When the meter responds, check the headphones box and click
+> **Join with microphone**. You can do this in Chrome without installing WebJam.
 
-## Admin / alternate entry (out of band demo spec)
+Send the private Hang Out invitation separately through the usual private
+channel. A guest opens it and reads the guest agreement before entering. A
+name badge can show Stalemate or Rad Dad. Guests from either entry meet in
+the same lobby and can see each other in **People**.
 
-- **Guest nickname only** — same gate as step 2.
-- **Admin / room owner email code** — `data-owner-signin`, preview launcher “Room owner A/B”, `/lobby-owner/login` on preview server (`HANGOUT_LOCAL_TESTING.md`). Not required for the two-guest band demo.
+## Host setup
 
-## Friction summary (open vs addressed in this branch)
+1. Open the verified WebJam rehearsal shortcut on the Mac. Choose **Music**
+   and **Host**, then **Start Session** if shown. Check the physical input,
+   wired headphones and intended network first. For the band's rehearsal,
+   verify the SSL 2+ guitar and vocal inputs and Che’s drum interface.
+2. In Hang Out, open **Rooms** and choose **Jam (WebJam)**. Keep the lobby
+   and native Music session open. An online guest can wait in the lobby
+   while the host prepares the invitation.
+3. Use the invitation path that matches the private build.
 
-| Issue | Severity | Status |
+| Build | Host | Guest |
 | --- | --- | --- |
-| Invite-only jam directory implies self-serve join | High | **Addressed:** clearer directory action label |
-| Jam guest wait copy mentions desktop paste only | Medium | **Addressed:** wait line mentions browser or desktop invite |
-| Disabled browser join button sounds like a product bug | Medium | **Addressed:** clearer disabled title |
-| Two taps to reach room tiles from chat | Medium | Open (by design: IRC layout) |
-| Host must find “Invite guest” under Host tools | Medium | Open |
-| Web Join real relay not available in local static server | High | Mock in e2e; document in step 10 |
-| Gate legal button text before “in” | Low | Open |
-| `/join` failure copy good; success path needs host mailbox in live env | Medium | Open for production qualification |
+| Current delivered rehearsal flow | Choose **Invite bandmate to room** if shown. If the room shows **Invite guest** under host controls, select the guest there. Once both guests are in the Jam room, choose **Invite a browser guest → Copy browser invite** in WebJam. Paste it in the Jam room and click **Share**. | Accept **Join room**, then choose **Join in browser** once the host has shared the Music invite. |
+| One-tap Music candidate, private fixture | Choose **Invite bandmate to Music**, select the guest's name, and confirm the invitation in WebJam. Wait for Hang Out to show that it was sent. | Choose **Accept and join**. If the audio check remains available in the room, choose **Open audio check**. The browser joins the Jam room and opens the audio check without exchanging a link. |
 
-## Automated coverage
+The verified one-tap candidate used private website tree `5553434` and
+browser source `90331ff`. The isolated tests exercised native confirmation,
+Windows Chrome, fresh invites and mixer-loss recovery with generated audio.
+Use the one-tap instructions for an attended rehearsal once the corresponding
+site and native handoff are delivered and confirmed on the actual devices.
 
-- Full two-context path: `tests/e2e/band-demo-journey.spec.js`
-- Related: `community-entry.spec.js`, `lobby-guest-journeys.spec.js`, `lobby-webjam.spec.js`, `webjam-join-play.spec.js`
+## Audio check, recovery and ending the session
+
+- On Windows, choose the intended microphone if Chrome lists more than one.
+  Allow capture when prompted. Confirm that **Check microphone** responds to
+  that input and that headphones are connected before joining.
+- If the chosen input stays silent, check the interface in Windows Sound,
+  choose it in Chrome and retry the mic check. If the Music invitation expires
+  or the host ends the session, return to Hang Out and ask for a fresh invite.
+- After joining, each person should say a few words and confirm hearing the
+  other. Play a short passage and check guitar, vocal and drum levels by
+  listening together. Finish with **Leave session** in Chrome and **End Session**
+  in WebJam. Start a fresh invite for a rejoin.
+- If using Webex video, join it without audio while playing. For conversation,
+  end Music before connecting Webex audio. Before restarting Music, everyone
+  disconnects Webex audio or leaves the meeting.
+
+The [attended music worksheet](HANGOUT_MUSIC_DEMO_ACCEPTANCE.md) covers both
+Macs, a second network, and the WAV and MP3 Shared Track checks. The
+[Webex handoff guide](HANGOUT_WEBEX_AUDIO_HANDOFF.md) covers video and the
+manual audio switch. These physical checks remain open. Use the approved
+short private trials, consent before capture, and no recording.
+
+## Repeatable QA
+
+- [Lobby to Music journey](../tests/e2e/band-demo-journey.spec.js)
+- [WebJam invitation and recovery tests](../tests/e2e/lobby-webjam.spec.js)
+- [All 62 community acceptance requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md)
