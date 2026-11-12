@@ -93,7 +93,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             ]);
         } else await page.goto(destination);
         await page.getByLabel('Invitation code').fill(invitation);
-        await page.getByRole('button', { name: 'Enter the community' }).click();
+        await page.getByRole('button', { name: /Enter the community|Continue to Game Night/ }).click();
         await enterFromShell(page, name, !!gameUrl);
         const label = source === 'rad-dad' ? 'via Rad Dad' : 'via Stalemate';
         await expect(page.locator('[data-entry-label]').first()).toHaveText(label);
@@ -632,7 +632,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(page.getByLabel('Invitation code')).toBeVisible();
                 if (!phone) {
                     await page.getByLabel('Invitation code').fill(invitation);
-                    await page.getByRole('button', { name: 'Enter the community' }).click();
+                    await page.getByRole('button', { name: 'Continue to Game Night' }).click();
                     await enterFromShell(page, 'PreviewHost', true);
                     await expect(page.locator('[data-game-offer-status]')).toContainText('Royal Flush Chess');
                     await page.getByRole('button', { name: 'Start Game Night', exact: true }).click();
@@ -673,8 +673,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await online.click();
                 assert.equal(new URL(host.url()).pathname, '/beta/');
                 await expect(host.getByLabel('Invitation code')).toBeVisible();
+                await expect(host.getByRole('heading', { name: 'Game Night', level: 1 })).toBeVisible();
+                await expect(host.getByText('If a friend invited you to play', { exact: false })).toBeVisible();
+                await expect(host.getByRole('heading', { name: 'A little field guide' })).toBeHidden();
+                const continueToGameNight = host.getByRole('button', { name: 'Continue to Game Night' });
+                await expectUncoveredControl(continueToGameNight);
                 await host.getByLabel('Invitation code').fill(invitation);
-                await host.getByRole('button', { name: 'Enter the community' }).click();
+                await continueToGameNight.click();
                 await expect(host.getByRole('link', { name: /Enter Game Night/ })).toHaveCount(1);
                 await captureArcadeInvite(host, viewport, step('01-game-night-entry'));
                 await enterFromShell(host, radDad ? 'RadDadHost' : 'PreviewHost', true);

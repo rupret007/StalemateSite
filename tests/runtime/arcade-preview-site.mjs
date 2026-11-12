@@ -25,9 +25,8 @@ function insertBefore(html, marker, content) {
 function previewHtml(name, html, radDad) {
     html = html.replace(/<script\b[^>]*data-goatcounter[^>]*>[\s\S]*?<\/script>/gi, '');
     if (radDad) {
-        // This is the link produced by Rad Dad's optional private arcade build.
         if (name === 'play/index.html') return insertBefore(insertBefore(html, '</head>', onlineAction), '<div class="arcade-grid-heading">',
-            '<p class="arcade-mode-shortcut"><a class="private-online" href="/beta/?via=rad-dad">Play online with friends →</a></p>');
+            '<p class="arcade-mode-shortcut"><a class="private-online" href="/beta/?game-night=1&amp;via=rad-dad">Play online with friends →</a></p>');
         return html;
     }
     if (name === 'index.html') {
