@@ -261,6 +261,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     }
     async function shareGameNightLink(host, viewport, step, capturePicker) {
         const original = host.viewportSize();
+        await host.bringToFront();
         await host.evaluate(() => {
             window.testGameInvitation = '';
             Object.defineProperty(navigator, 'share', { configurable: true, value: async ({ url }) => { window.testGameInvitation = url; } });
