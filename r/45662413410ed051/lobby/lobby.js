@@ -187,7 +187,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             button('Restore draft', 'restore', () => {
                 if (!canRestoreMessage(record)) return;
                 if (record.status !== 'rejected' && !confirm('This message may still arrive or be published. Restoring can create a duplicate if you send it again, and does not cancel the original. Restore the draft?')) return;
-                $('[data-text]').value = record.text; drafts.set(record.key, record.text);
+                $('[data-text]').value = record.text; saveDraft(record.key, record.text);
                 recoveryDraftChanged(); forgetSavedMessage(record); $('[data-text]').focus({ preventScroll: true });
             }).disabled = !canRestoreMessage(record);
             button('Copy', 'copy', () => copySavedMessage(record)).setAttribute('aria-label', 'Copy saved text');
@@ -446,6 +446,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     drawEntryChoice();
     // Drafts are tab-local only. Chat, PMs and invitation links are never copied into browser storage.
     const drafts = new Map();
+    function saveDraft(key, text) {
+        const channel = app.chans.get(key);
+        // A room-removal handler saves the draft before deleting the channel.
+        // The subsequent switch must not overwrite it without the room identity.
+        if (!channel && key !== '#stalemate' && !key.startsWith('pm:')) return;
+        if (text) drafts.set(key, { text, roomInstance: channel?.keepRef });
+        else drafts.delete(key);
+    }
     const pendingReports = new Map();
     const pmReportDialog = $('[data-pm-report-dialog]');
     let pmReportIntent = null;
@@ -770,7 +778,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         clearTimeout(retryTimer); cancelTransportAck();
         // Keep the unsent text under its original channel/PM key. Never move a
         // private draft into #stalemate or persist it during re-authentication.
-        drafts.set(app.active, $('[data-text]').value);
+        saveDraft(app.active, $('[data-text]').value);
         clearGameReturn();
         app.chans.clear(); app.pms.clear(); app.rooms = []; app.pendingChannel = '';
         app.band = false; app.verified = false; app.role = 'fan'; app.capabilities = {};
@@ -950,7 +958,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             app.role = m.role; app.verified = m.verified === true; app.capabilities = m.capabilities || {}; $('[data-owner-signout]').hidden = !ownerSession; app.netLock = m.lock; app.budget = m.budget;
             if (app.me) {
                 app.resetSession = true; setConnection('reconnecting');
-                drafts.set(app.active, $('[data-text]').value);
+                saveDraft(app.active, $('[data-text]').value);
                 if (roomApi) roomApi.onLeave();
                 // A rehearsal outlasts the return window. Restart it at the
                 // reconnect, not at the last time the room tab was opened.
@@ -960,7 +968,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 for (const [ref, view] of app.pms) {
                     // A new socket starts a fresh received transcript. Only
                     // an unsent draft keeps a closed, non-rebindable old tab.
-                    if (!drafts.get(`pm:${ref}`)) { app.pms.delete(ref); continue; }
+                    if (!drafts.has(`pm:${ref}`)) { app.pms.delete(ref); continue; }
                     view.open = false; view.lines = []; view.unread = 0; view.mentions = 0;
                     recoveryContexts.delete(view);
                 }
@@ -968,7 +976,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 app.away = false; app.ignores.clear(); app.peerIgnores.clear();
                 app.restorePmOff = $('[data-pm-off]').checked;
                 $('[data-pmreqs]').replaceChildren();
-                $('[data-text]').value = drafts.get('#stalemate') || '';
+                $('[data-text]').value = drafts.get('#stalemate')?.text || '';
             }
             send({ t: 'hello', nick, age13: true, entrySource: entrySharing.helloSource(), transport: 1,
                 ...(m.features?.compactLobbyRoster === 1 ? { compactLobbyRoster: 1 } : {}) }); break;
@@ -1008,6 +1016,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
         case 'join': {
             const c = { ...m.ch, lines: [] };
+            const draft = drafts.get(c.name);
+            if (c.name !== '#stalemate' && draft && (!roomNonce(c.keepRef) || draft.roomInstance !== c.keepRef)) {
+                drafts.delete(c.name);
+            }
             const gameOfferAccepted = joiningGameRoom === c.name;
             const returningToGame = gameReturnOffered && gameReturn?.room === c.name;
             if (gameOfferAccepted) joiningGameRoom = '';
@@ -1086,16 +1098,17 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             break;
         }
         case 'part': case 'closed': {
-            const leavingGame = app.chans.get(m.ch)?.kind === 'game';
+            const leavingActiveGame = app.active === m.ch && app.chans.get(m.ch)?.kind === 'game';
             const leavingFromButton = app.active === m.ch && document.activeElement === $('[data-leave]');
             forgetGameRoom(m.ch);
             const sent = sentRoomInvites.get(m.ch);
             if (sent) { clearTimeout(sent.timer); sentRoomInvites.delete(m.ch); }
+            if (app.active === m.ch) saveDraft(m.ch, $('[data-text]').value);
             app.chans.delete(m.ch);
             if (m.t === 'closed') toast(`${m.ch} was ${m.reason}.`);
             if (app.active === m.ch) switchTo('#stalemate');
             drawTabs();
-            if ((leavingGame || leavingFromButton) && app.active === '#stalemate') focusChannelTab('#stalemate');
+            if ((leavingActiveGame || leavingFromButton) && app.active === '#stalemate') focusChannelTab('#stalemate');
             break;
         }
         case 'line': pushLine(m.ch, m); break;
@@ -1204,6 +1217,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 clearJamInvitations();
                 $('[data-gate]').hidden = false; $('[data-app]').hidden = true; gateStatus(`You got the boot (${m.reason}). Take a breather.`);
             } else {
+                if (app.active === m.ch) saveDraft(m.ch, $('[data-text]').value);
                 app.chans.delete(m.ch);
                 if (app.active === m.ch) switchTo('#stalemate');
                 drawTabs();
@@ -1375,7 +1389,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function switchTo(key, { freshJoin = false } = {}) {
         const directoryRoom = document.activeElement?.closest('[data-roomlist] button[data-room]');
         const prev = app.active;
-        if (prev !== key) { drafts.set(prev, $('[data-text]').value); $('[data-text]').value = drafts.get(key) || ''; }
+        if (prev !== key) {
+            saveDraft(prev, $('[data-text]').value);
+            $('[data-text]').value = drafts.get(key)?.text || '';
+        }
         app.active = key;
         const c = store(key);
         if (c?.kind === 'game' || c?.kind === 'jam') rememberGameReturn(c);
