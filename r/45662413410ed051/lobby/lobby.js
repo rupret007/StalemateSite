@@ -447,6 +447,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     // Drafts are tab-local only. Chat, PMs and invitation links are never copied into browser storage.
     const drafts = new Map();
     const pendingReports = new Map();
+    const pmReportDialog = $('[data-pm-report-dialog]');
+    let pmReportIntent = null;
+    pmReportDialog?.querySelector('[data-pm-report-cancel]').addEventListener('click', () => closePmReport(false));
+    pmReportDialog?.querySelector('[data-pm-report-send]').addEventListener('click', () => closePmReport(true));
+    pmReportDialog?.addEventListener('cancel', (event) => {
+        event.preventDefault();
+        closePmReport(false);
+    });
     let connectionState = 'offline';
     let sessionEnded = false;
     let endedPmLabel = null; // Display only; never a view, endpoint or send context.
@@ -1268,7 +1276,29 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             revealFocusedReport(button);
         }
     }
-    function resetPendingReports() { for (const id of [...pendingReports.keys()]) finishReport(id, false); }
+    function submitReport(line, button) {
+        if (!button.isConnected || line.reported || pendingReports.has(line.id)) return;
+        if (!send({ t: 'report', id: line.id, text: line.text })) return toast('You are offline. Reconnect before reporting this message.');
+        button.setAttribute('aria-disabled', 'true');
+        button.textContent = '…';
+        const timer = setTimeout(() => {
+            finishReport(line.id, false);
+            toast('Report confirmation did not arrive. Try again or use the moderation contact.');
+        }, 10000);
+        pendingReports.set(line.id, { button, timer });
+    }
+    function closePmReport(share) {
+        const intent = pmReportIntent;
+        pmReportIntent = null;
+        if (pmReportDialog?.open) pmReportDialog.close();
+        if (!intent?.button.isConnected) return;
+        intent.button.focus({ preventScroll: true });
+        if (share) submitReport(intent.line, intent.button);
+    }
+    function resetPendingReports() {
+        closePmReport(false);
+        for (const id of [...pendingReports.keys()]) finishReport(id, false);
+    }
     function appendLine(l) {
         const buf = $('[data-buffer]');
         const lines = $('[data-chat-lines]');
@@ -1298,16 +1328,18 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (l.band) { const s = document.createElement('span'); s.className = 'badge'; s.textContent = '⭐ BAND'; li.append(' ', s); }
             li.append(' ', l.text);
             if (l.id && (l.t === 'pm' ? l.self !== true : l.personSelf !== true)) {
-                const r = document.createElement('button'); r.type = 'button'; r.className = 'flag'; r.textContent = '🚩'; r.setAttribute('aria-label', `Report this message from ${l.from}`);
+                const r = document.createElement('button'); r.type = 'button'; r.className = 'flag'; r.textContent = '🚩';
+                r.setAttribute('aria-label', `Report this ${l.t === 'pm' ? 'private ' : ''}message from ${l.from}`);
                 if (l.reported) { r.setAttribute('aria-disabled', 'true'); r.tabIndex = -1; r.textContent = '✓'; r.title = REPORT_QUEUED_LABEL; r.setAttribute('aria-label', REPORT_QUEUED_LABEL); }
                 else if (pendingReports.has(l.id)) { r.setAttribute('aria-disabled', 'true'); r.textContent = '…'; pendingReports.get(l.id).button = r; }
                 r.addEventListener('focus', () => revealFocusedReport(r));
                 r.addEventListener('click', () => {
                     if (l.reported || pendingReports.has(l.id)) return;
-                    if (!send({ t: 'report', id: l.id, text: l.text })) return toast('You are offline. Reconnect before reporting this message.');
-                    r.setAttribute('aria-disabled', 'true'); r.textContent = '…';
-                    const timer = setTimeout(() => { finishReport(l.id, false); toast('Report confirmation did not arrive. Try again or use the moderation contact.'); }, 10000);
-                    pendingReports.set(l.id, { button: r, timer });
+                    if (l.t !== 'pm') return submitReport(l, r);
+                    if (!pmReportDialog) return toast('Reload Hang Out before reporting a private message.');
+                    if (pmReportDialog.open) return;
+                    pmReportIntent = { line: l, button: r };
+                    pmReportDialog.showModal();
                 });
                 li.append(r);
             }

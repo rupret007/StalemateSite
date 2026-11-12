@@ -922,8 +922,29 @@ test('older PM peer binding cannot silently use nickname-collateral Block while 
         await sheet.getByRole('button', { name: 'Who?', exact: true }).click();
         await expect(sheet).toBeHidden();
         await expect(sender.locator('[data-buffer]')).toContainText('Recipient · on');
-        await received(sender, history).locator('.flag').click();
-        await expect(received(sender, history).locator('.flag')).toHaveText('✓');
+        await sender.setViewportSize({ width: 375, height: 844 });
+        const message = received(sender, history);
+        const flag = message.locator('.flag');
+        const beforeReport = fixture.inbound.length;
+        const confirmation = sender.getByRole('dialog', { name: 'Report a private message?' });
+        const reportFrames = () => fixture.inbound.slice(beforeReport).filter(frame => frame.t === 'report');
+        await flag.press('Enter');
+        await expect(confirmation).toBeVisible();
+        await expect(confirmation).toHaveAccessibleDescription('Send only this message to moderators for review.');
+        await expect(confirmation.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
+        expect(reportFrames()).toEqual([]);
+        await sender.screenshot({ path: test.info().outputPath('private-message-report-375.png') });
+        await sender.keyboard.press('Escape');
+        await expect(confirmation).toBeHidden();
+        await expect(flag).toBeFocused();
+        expect(reportFrames()).toEqual([]);
+        await flag.press('Enter');
+        await confirmation.getByRole('button', { name: 'Send report', exact: true }).press('Enter');
+        await expect(confirmation).toBeHidden();
+        await expect(flag).toHaveText('✓');
+        await expect.poll(() => reportFrames().map(({ id, text }) => ({ id, text }))).toEqual([
+            { id: await message.getAttribute('data-id'), text: history }
+        ]);
         fixture.advance(4000); const beforeNamed = fixture.inbound.length;
         await send(sender, '/block Recipient');
         await expect(sender.locator('[data-buffer]')).toContainText('Blocked Recipient');
