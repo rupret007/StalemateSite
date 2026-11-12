@@ -32,15 +32,15 @@ to a bounded test.
 Only Jeff disposes moderation reports. Actual headphone and microphone use on
 Windows still needs the participant's confirmation.
 
-## Current listening sequence — November 10
+## Current listening sequence
 
 Use the [current private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
-for the source and delivered version. Native packages are source `67c7ef0`;
-reviewed frontend `d53ff7f` / merged `11c9d1f8` now serves privately as version
-`2b205a24`, with the existing c83 backend and issuer `fd37578f` unchanged. The
-[delivery receipt](../pr-assets/private-readiness/20261110/private-delivery/README.md)
-qualifies 31 served static files and Chrome invitation/prejoin observations;
-it does not qualify physical listening on this runtime.
+for current delivery and device checks. The private site is serving the Arcade
+trial, which includes the current Jam invitation and Web Join changes. The
+Intel MacBook selects the verified native build `23cfae6`. The same Apple
+Silicon build is staged on the Mini and still needs its first idle launch.
+Both hosts still need an attended listening test with the current Windows
+browser guest.
 
 The earlier generated Mac-to-Windows trial passed transport both ways,
 40-second synthetic WAV chord detection, a fresh invitation and shutdown at its
@@ -59,12 +59,14 @@ application delivery gate.
    intended headset/interface and mic permission. Obtain fresh resource and
    account headroom checks before starting a bounded trial.
 2. The **host** uses native WebJam: Music → Host → Start Session if shown.
-   Use the visible **Copy browser invite** control, wait for **Link copied**,
-   then paste the fresh browser invitation into
-   the private Jam room's invitation field, then Share. The **Windows guest**
-   uses Chrome, checks the selected microphone and headphones, then chooses
-   **Join with microphone**. The guest needs no native WebJam or BlackHole
-   installation. Keep private links out of logs, documents and public channels.
+   Invite the Windows guest to the same private Jam room in Hang Out. The
+   guest selects **Join room** at the bottom of the lobby. Then use **Copy
+   browser invite** in WebJam, wait for **Link copied**, paste the fresh
+   link into the Jam room's invitation field and click **Share**. The guest
+   opens **Join in browser** in Chrome, checks the selected microphone and
+   headphones, then chooses **Join with microphone**. The guest needs no
+   native WebJam or BlackHole installation. Keep private links out of logs,
+   documents and public channels.
 3. Confirm speech in both directions, then a short musical passage. For the
    actual band setup, confirm the SSL 2+ guitar/vocal inputs and Che's actual
    Roland/interface route before testing them. Record setup time, audible
@@ -90,9 +92,8 @@ application delivery gate.
    bounded music trial from a second network when available. Keep these outcomes separate from same-household
    transport. Existing caps and all release/trust holds remain in force.
 
-The [overnight evidence note](HANGOUT_OVERNIGHT_CHECKS_20261107.md) separates new
-hosted chat/layout tests from these remaining attended music gates. No new
-question or physical capture is needed while Jeff is sleeping.
+The [overnight evidence note](HANGOUT_OVERNIGHT_CHECKS_20261107.md) records
+earlier hosted chat and layout tests separately from the attended music checks.
 
 ## Historical November 6 listening sequence
 
