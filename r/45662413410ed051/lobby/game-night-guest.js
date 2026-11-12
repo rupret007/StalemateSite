@@ -48,7 +48,10 @@ join.addEventListener('click', async () => {
     } catch (error) {
         status.textContent = [410, 429, 503].includes(error.status) ? error.message : 'Couldn’t join just now. Try again.';
         if (error.status === 410) invite.hidden = true;
-        else join.disabled = false;
+        else {
+            join.disabled = false;
+            if (document.activeElement === document.body) join.focus({ preventScroll: true });
+        }
     }
 });
 
