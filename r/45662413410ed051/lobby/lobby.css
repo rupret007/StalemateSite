@@ -594,8 +594,8 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 .sheet-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 16px 0; }
 [data-game-invite-link] { margin-block: 12px 16px; }
 [data-game-invite-link-status]:empty { display: none; }
-.game-guest [data-pane=rooms], .game-guest [data-show=rooms], .game-guest .startroom,
-.game-guest .pmtoggle, .game-guest [data-four], .game-guest [data-game-arcade] { display: none !important; }
+.game-guest [data-pane=rooms], .game-guest [data-show=rooms], .game-guest .chat .startroom,
+.game-guest .pmtoggle:has([data-pm-off]), .game-guest [data-four], .game-guest [data-game-arcade] { display: none !important; }
 .sheet-buttons .btn { font-size: 12px; }
 [data-call-report-reason] { display: block; width: 100%; margin: 6px 0 12px; padding: 8px;
   resize: vertical; color: var(--cream); background: var(--ink); border: 1px solid var(--control-line); border-radius: 4px; font: inherit; }
@@ -674,6 +674,11 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
   .phonetabs button { min-height: 56px; border: 0; border-top: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 550; }
   .phonetabs button[aria-current=true] { border-top-color: var(--lime); color: var(--lime); background: #20271d; }
   .game-guest .phonetabs { grid-template-columns: repeat(2, 1fr); }
+  .irc:has(.game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess, .four-match)[open]) :is(.phonetabs, .phonetabs button) {
+    min-height: 44px;
+  }
+  .chat:has(> .game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess, .four-match)[open]) .quick { display: none; }
+  .game-night { scroll-padding-block: 8px; }
   .tabs { min-height: 47px; padding: 4px 10px 0; }
   .tabs button { min-height: 42px; padding: 8px 12px; font-size: 11px; }
   .topic { min-height: 35px; padding: 8px 14px; font-size: 10px; }
@@ -805,7 +810,7 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
   .buffer .flag { scroll-margin-block: 4px; }
   .say { position: sticky; bottom: 0; z-index: 1; margin-block: 4px; }
   .chat:has(.buffer :focus-visible) .say,
-  .chat:has(.four-match[open]:not([hidden])) .say { position: static; }
+  .chat:has(> .game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess, .four-match)[open]) .say { position: static; }
   .say input { min-height: 36px; padding-block: 8px; scroll-margin-bottom: 8px; }
   /* Send is shorter than its input. Leave room for the entire composer when
      native focus scrolling brings the button into a deeply zoomed viewport. */
