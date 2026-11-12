@@ -185,6 +185,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .notice.error { color: var(--pink); }
 .act { color: #c6a5db; }
 .who { padding: 0; border: 0; background: transparent; font: 600 12px var(--mono); }
+.buffer .who:disabled { opacity: 1; cursor: inherit; }
 .badge { padding: 1px 4px; border: 1px solid #806b3c; border-radius: 2px; color: var(--amber); font: 9px var(--mono); }
 .entry-badge { color: var(--muted); font: 10px/1.5 var(--mono); overflow-wrap: anywhere; }
 .nicks .entry-badge { display: block; padding: 0 6px 5px 20px; }
