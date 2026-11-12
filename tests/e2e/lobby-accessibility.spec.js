@@ -628,6 +628,13 @@ for (const width of [375, 390]) {
             expect(await button.evaluate((element, before) => element === before, original)).toBe(true);
             await visitor.page.keyboard.press('Enter');
             await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#directory-room');
+            const activeTab = visitor.page.getByRole('tab', { name: '#directory-room', exact: true });
+            await expect(activeTab).toBeFocused();
+            await expect(activeTab).toBeInViewport({ ratio: 1 });
+            await section(visitor.page, 'rooms');
+            await tabTo(visitor.page, button);
+            await visitor.page.keyboard.press('Enter');
+            await expect(activeTab).toBeFocused();
             const composer = visitor.page.getByRole('textbox', { name: 'Message', exact: true });
             await tabTo(visitor.page, composer); await visitor.page.keyboard.type('A draft while room metadata changes');
             await send(host.page, '/mode +l 5');
@@ -637,6 +644,38 @@ for (const width of [375, 390]) {
             contained(await composerGeometry(visitor.page));
             expect(visitor.errors).toEqual([]); expect(host.errors).toEqual([]); expect(arrival.errors).toEqual([]);
         } finally { await arrival?.close(); await visitor.close(); await host.close(); }
+    });
+
+    test(`room directory explains why there are no results at ${width}px`, async ({ browser, baseURL }) => {
+        const relay = hangoutRelayWsBase(baseURL, `directory-results-${randomUUID()}`), viewport = { width, height: 667 };
+        const host = await guest(browser, baseURL, 'SearchHost', viewport, relay);
+        const visitor = await guest(browser, baseURL, 'SearchGuest', viewport, relay);
+        try {
+            const empty = visitor.page.locator('[data-rooms-empty]');
+            await section(visitor.page, 'rooms');
+            await expect(empty).toBeVisible();
+            await expect(empty).toContainText('No rooms yet');
+            await send(host.page, '/join #open-practice');
+            const card = visitor.page.locator('[data-roomlist] button[data-room="#open-practice"]');
+            await expect(card).toBeVisible();
+            await expect(empty).toBeHidden();
+            const search = visitor.page.getByRole('searchbox', { name: 'Find a room', exact: true });
+            await search.fill('missing-room');
+            await expect(empty).toBeVisible();
+            await expect(empty).toHaveText('No rooms match your search. Try another name or clear the search.');
+            await search.fill('');
+            const filter = visitor.page.getByRole('combobox', { name: 'Room directory', exact: true });
+            await filter.selectOption('registered');
+            await expect(empty).toBeVisible();
+            await expect(empty).toHaveText('No registered rooms to show.');
+            await filter.selectOption('active');
+            await expect(card).toBeVisible();
+            await expect(empty).toBeHidden();
+            await filter.selectOption('registered');
+            await visitor.page.evaluate(() => window.__lobby.ws.close(1000));
+            await expect(visitor.page.locator('[data-connection]')).toHaveText('Offline');
+            await expect(empty).toHaveText('Connect to see current rooms.');
+        } finally { await visitor.close(); await host.close(); }
     });
 
     test(`a removed focused room returns to the visible directory filter at ${width}px`, async ({ browser, baseURL }) => {

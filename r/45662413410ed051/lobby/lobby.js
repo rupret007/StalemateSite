@@ -1269,6 +1269,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     });
 
     function switchTo(key, { freshJoin = false } = {}) {
+        const directoryRoom = document.activeElement?.closest('[data-roomlist] button[data-room]');
         const prev = app.active;
         if (prev !== key) { drafts.set(prev, $('[data-text]').value); $('[data-text]').value = drafts.get(key) || ''; }
         app.active = key;
@@ -1284,6 +1285,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         drawTabs(); drawChan(); drawMessageRecovery();
         drawCommunity(); drawRooms();
         show('chat');
+        if (directoryRoom?.dataset.room === key) focusChannelTab(key, { preventScroll: false });
         const buf = $('[data-buffer]'); buf.scrollTop = buf.scrollHeight;
         const r = room();
         if (r) {
@@ -1856,7 +1858,16 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             (filter === 'mine' ? r.mine : filter === 'registered' ? r.persistent : r.count > 0 || !r.persistent)
             && (!query || `${r.name} ${r.title}`.toLowerCase().includes(query))), [...app.chans.keys()]);
         $('[data-room-count]').textContent = String(rooms.length);
-        $('[data-rooms-empty]').hidden = rooms.length > 0;
+        const empty = $('[data-rooms-empty]');
+        empty.hidden = rooms.length > 0;
+        if (!empty.hidden) {
+            const message = connectionState !== 'connected' ? 'Connect to see current rooms.'
+                : query ? 'No rooms match your search. Try another name or clear the search.'
+                : filter === 'registered' ? 'No registered rooms to show.'
+                : filter === 'mine' ? 'You don’t have any registered rooms.'
+                : 'No rooms yet. Stay for a chat, or be the first to start one.';
+            if (empty.textContent !== message) empty.textContent = message;
+        }
         const rows = rooms.map(r => {
             const li = previous.get(r.name) || document.createElement('li');
             li.dataset.roomKey = r.name;
