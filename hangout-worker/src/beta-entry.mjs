@@ -58,10 +58,21 @@ const WEB_JOIN_ENTRANCE = `<!doctype html>
 const GAME_GUEST_ENTRANCE = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Game Night invitation</title><link rel="stylesheet" href="/beta/style.css"><script type="module" src="${GAME_GUEST_PATH}.js"></script></head>
-<body><main><p class="eyebrow">PRIVATE ARCADE / GAME NIGHT</p><h1>Game Night<span aria-hidden="true">_</span></h1>
+<body><main class="game-invitation"><p class="eyebrow">PRIVATE GAME NIGHT</p><h1 data-guest-game>Game Night</h1>
 <p class="lede" data-guest-inviter hidden></p><p data-guest-status role="status">Checking your invitation…</p>
-<section data-guest-invite hidden><h2 data-guest-game></h2><p>By joining, you confirm you’re 13+ and agree to the <a href="/beta/privacy" target="_blank" rel="noopener">house rules</a>. Chat starts when you enter. Camera and microphone stay off.</p>
-<button type="button" data-guest-join>Join game</button></section></main></body></html>`;
+<section data-guest-invite aria-label="Accept the invitation" hidden>
+<p id="guest-agreement">By joining, you confirm you’re 13+ and agree to the house rules.</p>
+<button type="button" aria-describedby="guest-agreement" data-guest-join>Join game</button>
+<p class="muted">Camera and microphone stay off. <a href="/beta/privacy" target="_blank" rel="noopener">Read the house rules</a></p>
+</section><button type="button" data-guest-retry hidden>Try again</button></main></body></html>`;
+const GAME_GUEST_STYLE = `
+.game-invitation h1 { font-size: clamp(2.6rem, 9vw, 4.5rem); }
+.game-invitation section { max-width: 32rem; }
+.game-invitation section p:first-child { margin-top: 0; }
+.game-invitation section p:last-child { margin-bottom: 0; }
+.game-invitation [data-guest-join] { width: 100%; min-height: 48px; }
+.game-invitation [data-guest-status]:empty { display: none; }
+`;
 const headers = { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow, noarchive, nosnippet', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': CSP };
 const reply = (body, status = 200, type = 'text/plain; charset=utf-8', extra = {}) => new Response(body, { status, headers: { ...headers, 'Content-Type': type, ...extra } });
 const json = (body, status = 200, extra = {}) => reply(JSON.stringify(body), status, 'application/json; charset=utf-8', extra);
@@ -279,7 +290,7 @@ async function betaRequest(request, env, deps = {}) {
         .replace('Stalemate · Private community beta', 'Hang Out · Private community beta')
         .replace('STALEMATE / INVITATION ONLY', 'HANG OUT / INVITATION ONLY')
         .replace('<script defer src="/beta/client.js">', '<script type="module" src="/beta/client.js">'), 200, 'text/html; charset=utf-8');
-    if (url.pathname === '/beta/style.css') return reply(STYLE, 200, 'text/css');
+    if (url.pathname === '/beta/style.css') return reply(STYLE + GAME_GUEST_STYLE, 200, 'text/css');
     if (url.pathname === GAME_GUEST_PATH || url.pathname === GAME_GUEST_PATH + '.js') {
         if (!gameGuestEnabled(env) || !['GET', 'HEAD'].includes(request.method)) return reply('Game invitations are unavailable.', 404);
         if (url.pathname === GAME_GUEST_PATH) return reply(request.method === 'HEAD' ? null : GAME_GUEST_ENTRANCE, 200, 'text/html; charset=utf-8');
