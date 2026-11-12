@@ -123,7 +123,7 @@ const parseDuration = (s, fallback) => {
 export const COMMANDS = Object.freeze({
     register: 'any', cohost: 'any', transfer: 'any', acceptowner: 'any', unregister: 'any', join: 'any', part: 'any', quit: 'any', nick: 'any', me: 'any', msg: 'any', query: 'any', whois: 'any', away: 'any',
     ignore: 'any', unignore: 'any', list: 'any', names: 'any', topic: 'any', slap: 'any', help: 'any', report: 'any',
-    accept: 'any', decline: 'any', block: 'any', unblock: 'any', pm: 'any', cam: 'any', four: 'any',
+    accept: 'any', decline: 'any', block: 'any', unblock: 'any', pm: 'any', cam: 'any', four: 'any', gameopen: 'any',
     kick: 'chanop', ban: 'chanop', unban: 'chanop', invite: 'chanop', op: 'chanop', deop: 'chanop', voice: 'chanop',
     devoice: 'chanop', jamlink: 'chanop', discord: 'chanop', mode: 'chanop', close: 'chanop', lock: 'chanop',
     mute: 'moderator', gban: 'moderator', purge: 'moderator', shield: 'band', shieldoff: 'band', lobby: 'band', filter: 'band',
@@ -133,7 +133,7 @@ export const COMMANDS = Object.freeze({
 // effect. Every other command needs a real channel, never an implicit fallback
 // from a private conversation or a channel that has disappeared.
 const CONTEXT_INDEPENDENT_COMMANDS = new Set([
-    'join', 'quit', 'nick', 'msg', 'query', 'whois', 'away', 'ignore', 'unignore', 'list', 'help',
+    'join', 'gameopen', 'quit', 'nick', 'msg', 'query', 'whois', 'away', 'ignore', 'unignore', 'list', 'help',
     'accept', 'decline', 'block', 'unblock', 'pm', 'mute', 'gban', 'purge', 'shield', 'shieldoff',
     'lobby', 'filter', 'slow', 'approve', 'dismiss', 'aidismiss', 'privatereport', 'log', 'delete'
 ]);
@@ -886,7 +886,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (c.gameGuest) c.pmOff = true;
         conns.set(id, c);
         if (band) { net.lastBand = now(); if (net.shieldAuto || net.lockAuto) bot(c, 'A saved safety state needs review: fans can read but not talk while the lobby is read-only. Check the band panel; /lobby unlock and /shieldoff when you are ready.'); saveNet(); }
-        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, ...(gameNight ? { gameNight: 1, fourInARow: 1, discordLinks: !participationConfigured } : {}) } });
+        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, ...(gameNight ? { gameNight: 1, gameOpen: 1, fourInARow: 1, discordLinks: !participationConfigured } : {}) } });
         return { ok: true };
     }
 
@@ -1572,6 +1572,18 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 return bot(c, 'That room changed or closed while you signed in. Choose a room to continue.', 'error');
             if (existing) return enter(c, existing, { key });
             return create(c, name, key, titleWords.join(' '));
+        },
+        gameopen(c, _chan, [request]) {
+            if (!gameNight || !gameNightRoomName(request)) return bot(c, 'Open Game Night from the room picker.', 'error');
+            let room = [...channels.values()].find(candidate => roomKind(candidate) === 'game'
+                && candidate.modes.i && candidate.founder === c.dev && hosts(c, candidate));
+            if (room) enter(c, room);
+            else if (!ch(request)) {
+                create(c, request, '', '');
+                room = ch(request);
+            }
+            const opened = room?.members.has(c.id);
+            return out(c, { t: 'game-room-open', request, ok: !!opened, ...(opened ? { room: room.name, ref: room.keepRef } : {}) });
         },
         part(c, chan, [maybe]) {
             const target_ = maybe && ch(maybe) ? ch(maybe) : chan;
