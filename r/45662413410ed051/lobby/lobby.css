@@ -348,6 +348,8 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .op-only { display: none; }
 .am-op .op-only { display: inline-flex; }
 .am-op form.op-only { display: flex; }
+.am-op .act-load-status { display: block; margin: 0; }
+.act-load-status:not(:empty) { padding-top: 6px; }
 .phonetabs { display: none; }
 .sheet { width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); padding: 24px; border: 1px solid #63734f; border-radius: 6px; background: var(--surface); color: var(--cream); box-shadow: 8px 8px 0 #212a1b; }
 .sheet::backdrop { background: #000a; backdrop-filter: blur(3px); }
