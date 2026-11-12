@@ -1,7 +1,7 @@
 import { GameNightChess } from './game-night-chess.mjs';
 import { GameNightCrapeights } from './game-night-crapeights.mjs';
 import { GameNightTurdRummy } from './game-night-turdrummy.mjs';
-import { GameNightTurdSpades } from './game-night-turdspades.mjs';
+import { GameNightTurdSpades, GameNightSpadesPartners } from './game-night-turdspades.mjs';
 import { GameNightTurdJack } from './game-night-turdjack.mjs';
 import { GameNightTurdtris } from './game-night-turdtris.mjs';
 import { GameNightTurdomania } from './game-night-turdomania.mjs';
@@ -18,7 +18,7 @@ const adapters = new Map([
     ['chess', { flag: 'HANGOUT_ARCADE_CHESS', Table: GameNightChess }],
     ['crapeights', { flag: 'HANGOUT_ARCADE_CRAPEIGHTS', Table: GameNightCrapeights, renewOnAction: true }],
     ['turdrummy', { flag: 'HANGOUT_ARCADE_TURDRUMMY', Table: GameNightTurdRummy, renewOnAction: true }],
-    ['turdspades', { flag: 'HANGOUT_ARCADE_TURDSPADES', Table: GameNightTurdSpades, renewOnAction: true }],
+    ['turdspades', { flag: 'HANGOUT_ARCADE_TURDSPADES', Table: GameNightTurdSpades, PartnerTable: GameNightSpadesPartners, renewOnAction: true }],
     ['turdjack', { flag: 'HANGOUT_ARCADE_TURDJACK', Table: GameNightTurdJack, renewOnAction: true }],
     ['turdtris', { flag: 'HANGOUT_ARCADE_TURDTRIS', Table: GameNightTurdtris, tableCap: 4 }],
     ['turdomania', { flag: 'HANGOUT_ARCADE_TURDOMANIA', Table: GameNightTurdomania, tableCap: 8 }],
@@ -45,7 +45,7 @@ export function arcadeEnabled(env = {}, game) {
 // Call from the same Durable Object's serialized lobby event path. The
 // callbacks resolve membership and participation against the committed lobby.
 export function createArcadeTransport({ state, current, active, approve, charge, allowed, name = 'chess', now = () => Date.now(), uuid = () => crypto.randomUUID() }) {
-    const { Table, renewOnAction, tableCap = MATCH_CAP } = adapters.get(name);
+    const { Table, PartnerTable, renewOnAction, tableCap = MATCH_CAP } = adapters.get(name);
     const tag = tagFor(name), prefix = name === 'chess' ? ARCADE_TAG + ':' : 'game-night-' + name + ':';
     const pendingRevocations = new Map();
     const { issue, upgrade, member, sockets, send, close } = createGameNightSockets({
@@ -53,11 +53,12 @@ export function createArcadeTransport({ state, current, active, approve, charge,
         readyType: 'match-ready', allowed: scope => !pendingRevocations.has(scope?.ref) && allowed()
     });
     const key = scope => prefix + scope.ref;
+    const restore = record => (record.mode === 'partners' && PartnerTable ? PartnerTable : Table).restore(record);
     async function load(scope) {
         const record = await state.storage.get(key(scope));
         if (!record) return null;
         if (record.expiresAt <= now()) { await state.storage.delete(key(scope)); return null; }
-        return { expiresAt: record.expiresAt, game: Table.restore(record[name]) };
+        return { expiresAt: record.expiresAt, game: restore(record[name]) };
     }
     async function hasGuestSeat(scope, match, host) {
         const record = await load(scope);
@@ -74,7 +75,8 @@ export function createArcadeTransport({ state, current, active, approve, charge,
             try { socket.serializeAttachment({ ...recipient, subjects: permitted ? subjects : [] }); }
             catch { close(socket, 1011, 'match connection unavailable'); continue; }
             send(socket, { t: 'match-state', version: 1, room: recipient.room,
-                state: permitted && game ? game.view(binding.betaSid, now()) : null, canOpen: binding.canOpen });
+                state: permitted && game ? game.view(binding.betaSid, now()) : null, canOpen: binding.canOpen,
+                ...(PartnerTable ? { partners: true } : {}) });
         }
     }
     async function receive(socket, raw) {
@@ -101,9 +103,10 @@ export function createArcadeTransport({ state, current, active, approve, charge,
             if (frame.action !== 'sync') {
                 if (!binding.canPlay || !await approve(scope.actor)) error = 'unavailable';
                 else if (frame.action === 'open') {
-                    if (!binding.canOpen || game) error = 'unavailable';
+                    const SelectedTable = frame.mode === undefined ? Table : frame.mode === 'partners' ? PartnerTable : null;
+                    if (!binding.canOpen || game || !SelectedTable) error = 'unavailable';
                     else if ((await state.storage.list({ prefix, limit: tableCap })).size >= tableCap) error = 'unavailable';
-                    else { game = new Table(uuid(), subject); changed = true; expiresAt = now() + MATCH_TTL; }
+                    else { game = new SelectedTable(uuid(), subject); changed = true; expiresAt = now() + MATCH_TTL; }
                 } else if (!game) error = 'match-changed';
                 else if (frame.action === 'join') {
                     if (!game.subjects.every(peer => binding.canJoin(peer)) || !game.join(subject, frame.id, now(), frame.seat)) error = 'seat-unavailable';
@@ -183,7 +186,7 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                 await state.storage.delete(storageKey);
                 publish(scope, null);
             } else {
-                const game = Table.restore(record[name]);
+                const game = restore(record[name]);
                 if (!game.expire(now())) continue;
                 await state.storage.put(storageKey, { ...record, [name]: game.checkpoint() });
                 publish(scope, game);

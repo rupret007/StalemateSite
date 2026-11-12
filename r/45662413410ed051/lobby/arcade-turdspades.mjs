@@ -17,7 +17,10 @@ const markup = `
 <summary>TurdSpades</summary>
 <p class="small arcade-card-status" data-spades-status role="status"></p>
 <p class="small arcade-card-error" data-spades-error role="status"></p>
-<button class="btn btn--small" type="button" data-spades-main hidden></button>
+<div class="arcade-card-actions">
+    <button class="btn btn--small" type="button" data-spades-partners hidden>Open 2-player Spades</button>
+    <button class="btn btn--small" type="button" data-spades-main hidden></button>
+</div>
 <div class="arcade-card-actions" data-spades-seats hidden></div>
 <div data-card-table data-spades-table hidden>
     <div class="arcade-card-score" aria-label="Partnership scores"><span data-spades-score="0"></span><span data-spades-score="1"></span></div>
@@ -50,10 +53,11 @@ export function mountArcadeTurdSpades(container, onMatch) {
     container.append(panel);
     const $ = selector => panel.querySelector(selector);
     const status = $('[data-spades-status]'), feedback = $('[data-spades-error]'), main = $('[data-spades-main]');
+    const partnerButton = $('[data-spades-partners]');
     const table = $('[data-spades-table]'), seatsHost = $('[data-spades-seats]'), hand = $('[data-spades-hand]');
     const bid = $('#spades-bid'), confirm = $('[data-spades-confirm]');
     const actions = [...panel.querySelectorAll('[data-spades-action]')];
-    let scope = null, model = null, canOpen = false, connection = 'connecting', connectionError;
+    let scope = null, model = null, canOpen = false, partnersSupported = false, connection = 'connecting', connectionError;
     let pending = false, timer, confirmation = '';
 
     function clearPending() { clearTimeout(timer); pending = false; }
@@ -69,7 +73,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
             closeConfirmation();
             draw();
         },
-        onState({ state, canOpen: host }) {
+        onState({ state, canOpen: host, partners }) {
             if (state && (state.game !== 'turdspades' || state.version !== 1)) return;
             const revealing = state?.match && (!model?.match || model.id !== state.id);
             if (state?.id !== model?.id || state?.match?.revision !== model?.match?.revision) {
@@ -78,6 +82,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
             }
             model = state;
             canOpen = host;
+            partnersSupported = partners === true;
             connection = 'ready';
             connectionError = undefined;
             clearPending();
@@ -106,6 +111,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         client.stop();
         model = null;
         canOpen = false;
+        partnersSupported = false;
         connection = 'connecting';
         connectionError = undefined;
         feedback.textContent = '';
@@ -160,6 +166,10 @@ export function mountArcadeTurdSpades(container, onMatch) {
 
     function draw() {
         const match = model?.match, seat = model?.seat, occupied = model?.occupied || [];
+        const paired = model?.mode === 'partners', people = paired ? 2 : 4;
+        const computer = position => paired && ['north', 'east'].includes(position);
+        const nameFor = position => names[position] + (computer(position) ? ' (CPU)' : '');
+        const teams = paired ? ['South + North CPU', 'West + East CPU'] : partnerships;
         let command = '', label = '', message = 'Connecting to the table…';
         if (connection === 'unavailable') {
             message = matchConnectionErrors[connectionError] || 'The table couldn’t reconnect. Try again from this room.';
@@ -167,49 +177,53 @@ export function mountArcadeTurdSpades(container, onMatch) {
         } else if (connection !== 'ready') {
             if (match) message = seat ? 'Reconnecting to the table… Your hand is paused.' : 'Reconnecting to the table…';
         } else if (!model) {
-            message = canOpen ? 'Open a partnership table for four players.' : 'Waiting for the host to open a table.';
-            if (canOpen) { command = 'open'; label = 'Open Spades table'; }
+            message = canOpen ? (partnersSupported ? 'Play with one friend and a CPU partner on each team, or fill all four seats with friends.'
+                : 'Open a partnership table for four players.') : 'Waiting for the host to open a table.';
+            if (canOpen) { command = 'open'; label = partnersSupported ? 'Open 4-player Spades' : 'Open Spades table'; }
         } else if (model?.waiting) {
-            message = `${occupied.length}/4 seated${seat ? ` · You’re ${names[seat]}` : ''} · ${partnerships.join(' vs ')}`;
+            message = `${occupied.length}/${people} seated${seat ? ` · You’re ${nameFor(seat)}` : ''} · ${teams.join(' vs ')}`;
             if (seat) { command = 'leave'; label = seat === 'south' ? 'Close table' : 'Release seat'; }
         } else if (match?.result) {
-            message = `${partnerships[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}.`;
+            message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}.`;
             if (seat) {
-                const votes = model.rematchVotes;
-                message += ` ${votes.length}/4 ready for a rematch.`;
+                const votes = model.rematchVotes ?? (model.rematch ? [model.rematch] : []);
+                message += ` ${votes.length}/${people} ready for a rematch.`;
                 if (!votes.includes(seat)) { command = 'rematch'; label = votes.length ? 'Accept Spades rematch' : 'Request Spades rematch'; }
             }
         } else if (match?.roundResult) {
             message = match.roundResult.map((result, team) => {
                 const signed = result.delta > 0 ? '+' + result.delta : result.delta;
-                const nil = result.nil.map(entry => `${names[entry.seat]} ${entry.succeeded ? 'made' : 'missed'} Nil`);
+                const nil = result.nil.map(entry => `${nameFor(entry.seat)} ${entry.succeeded ? 'made' : 'missed'} Nil`);
                 if (result.bagPenalties) nil.push('bag penalty');
-                return `${partnerships[team]} ${signed}${nil.length ? ' · ' + nil.join(', ') : ''}`;
+                return `${teams[team]} ${signed}${nil.length ? ' · ' + nil.join(', ') : ''}`;
             }).join(' / ');
         } else if (match) {
-            const turn = seat === match.turn ? (match.phase === 'bid' ? 'Your bid' : 'Your play') : `${names[match.turn]} to ${match.phase === 'bid' ? 'bid' : 'play'}`;
+            const turn = seat === match.turn ? (match.phase === 'bid' ? 'Your bid' : 'Your play') : `${nameFor(match.turn)} to ${match.phase === 'bid' ? 'bid' : 'play'}`;
             message = `Round ${match.round} · ${turn}`;
-            if (match.lastWinner && !match.trick.length) message += ` · ${names[match.lastWinner]} won the last trick`;
+            if (match.lastWinner && (paired || !match.trick.length)) message += ` · ${nameFor(match.lastWinner)} won the last trick`;
         }
         if (status.textContent !== message) status.textContent = message;
         main.hidden = !command;
         main.textContent = label;
         main.dataset.command = command;
         main.disabled = pending;
+        partnerButton.hidden = command !== 'open' || !partnersSupported;
+        partnerButton.disabled = pending;
         seatsHost.hidden = connection !== 'ready' || !model?.waiting || !!seat;
-        seatButtons.forEach((button, index) => { button.hidden = occupied.includes(seats[index]); button.disabled = pending; });
+        seatButtons.forEach((button, index) => { button.hidden = computer(seats[index]) || occupied.includes(seats[index]); button.disabled = pending; });
         table.hidden = !match;
         if (!match) { showHand([]); return; }
         table.dataset.phase = match.phase;
+        table.dataset.mode = paired ? 'partners' : 'four';
 
         for (let team = 0; team < 2; team++) {
-            $(`[data-spades-score="${team}"]`).textContent = `${partnerships[team]} · ${match.scores[team]}/${match.target} · ${match.bags[team]} bags`;
+            $(`[data-spades-score="${team}"]`).textContent = `${teams[team]} · ${match.scores[team]}/${match.target} · ${match.bags[team]} bags`;
         }
         const shown = match.trick.length ? match.trick : match.lastTrick;
         trickSlots.forEach(({ row, label, card }, index) => {
             const position = seats[index], entry = shown.find(value => value.seat === position);
             const called = match.bids[position];
-            label.textContent = `${names[position]}${seat === position ? ' (you)' : ''} · ${called === null ? '—' : called || 'Nil'}`;
+            label.textContent = `${nameFor(position)}${seat === position ? ' (you)' : ''} · ${called === null ? '—' : called || 'Nil'}`;
             card.textContent = entry ? face(entry) : '—';
             card.setAttribute('aria-label', entry ? cardLabel(entry) : 'No card played');
             row.dataset.active = String(!match.result && match.phase !== 'round-end' && match.turn === position);
@@ -239,6 +253,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         if (action === 'retry') client.start(scope);
         else if (action) send(action);
     });
+    partnerButton.addEventListener('click', () => send('open', { mode: 'partners' }));
     for (const control of actions) control.addEventListener('click', () => {
         const action = control.dataset.spadesAction;
         if (action === 'bid') send(action, { bid: Number(bid.value) });
@@ -248,7 +263,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
             $('[data-spades-confirm-yes]').textContent = control.textContent;
             $('#spades-confirm-title').textContent = action === 'resign' ? 'Resign for your team?' : 'Leave this table?';
             $('[data-spades-confirm-text]').textContent = action === 'resign'
-                ? 'The other partnership wins if you resign.' : 'Leaving closes the table for all four players.';
+                ? 'The other partnership wins if you resign.' : model?.mode === 'partners'
+                    ? 'Leaving ends this match for both players.' : 'Leaving closes the table for all four players.';
             confirm.showModal();
         }
     });
