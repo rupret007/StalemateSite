@@ -1685,17 +1685,20 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (next.host && (!direct || roomChanged)) manual.open = !direct;
         drawSentRoomInvite(c);
         const desktop = $('[data-jam-desktop]');
+        const desktopCopy = $('[data-jam-copy]');
         desktop.hidden = !next.desktop;
         if (/^webjam:\/\//.test(next.desktop)) desktop.setAttribute('href', next.desktop);
         else desktop.removeAttribute('href');
         const now = Date.now();
         const browserLink = browserInviteLink(next, now);
+        desktop.classList.toggle('btn--ghost', !!browserLink);
+        desktopCopy.classList.toggle('btn--ghost', !!browserLink);
         const deadline = next.webReady ? browserInviteDeadline(next.web) : 0;
         const expired = deadline > 0 && deadline <= now;
         const shared = !!(next.invitation || browserLink);
         $('[data-jam-host-steps]').hidden = !next.host || shared || expired;
         $('[data-jam-actions]').hidden = next.host && !shared && !expired;
-        $('[data-jam-copy]').hidden = !next.invitation;
+        desktopCopy.hidden = !next.invitation;
         const wait = $('[data-jam-wait]'), web = $('[data-jam-web]');
         const copy = $('[data-jam-invite-copy]'), qr = $('[data-jam-invite-qr-toggle]');
         const manualCopy = $('[data-jam-invite-copy-value]');
@@ -1714,6 +1717,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             qr.textContent = 'Show QR code';
         } else if (!$('[data-jam-invite-qr-panel]').hidden) drawJamInviteQr(browserLink);
         web.disabled = !browserLink;
+        web.classList.toggle('btn--ghost', web.disabled);
         web.hidden = expired;
         web.textContent = web.disabled ? 'Browser join unavailable' : 'Join in browser';
         web.title = web.disabled ? 'Your host has not shared an approved browser invite yet'

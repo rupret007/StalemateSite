@@ -339,6 +339,43 @@ test('a host can share a browser invite pasted with its surrounding message', as
     } finally { await f.close(); }
 });
 
+for (const width of [375, 390, 1440]) test(`the shared Music invite leads with Join in browser at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+    const f = await browserRoom(browser, baseURL, true, { width, height: width === 1440 ? 900 : 844 });
+    try {
+        const host = await f.join('MusicHost', false, 'rad-dad');
+        const guest = await f.join('Bandmate', false, 'stalemate');
+        if (width < 800) await host.click('[data-show="rooms"]');
+        await host.click('[data-start="jam"]');
+        await host.getByRole('button', { name: 'Invite bandmate to room' }).click();
+        await host.getByRole('button', { name: 'Invite Bandmate', exact: true }).click();
+        await guest.locator('[data-game-offer]').getByRole('button', { name: 'Join room' }).click();
+        const waiting = guest.locator('[data-jam-wait]');
+        await expect(waiting).toBeVisible();
+        await waiting.focus();
+        await paste(host, WEB_INVITE);
+
+        const actions = guest.locator('[data-jam-actions]');
+        const join = actions.getByRole('button', { name: 'Join in browser', exact: true });
+        const copy = actions.getByRole('button', { name: 'Copy browser invite', exact: true });
+        const qr = actions.getByRole('button', { name: 'Show QR code', exact: true });
+        await expect(join).toBeFocused();
+        await expect(actions.getByRole('button').first()).toHaveText('Join in browser');
+        await expect(join).toBeInViewport({ ratio: 1 });
+        await expect(copy).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await expect(join).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await guest.screenshot({ path: testInfo.outputPath(`browser-join-primary-${width}.png`) });
+        // WebKit's macOS test defaults need Option+Tab to include buttons.
+        const nextControl = process.platform === 'darwin' && browser.browserType().name() === 'webkit' ? 'Alt+Tab' : 'Tab';
+        await guest.keyboard.press(nextControl);
+        await expect(copy).toBeFocused();
+        await guest.keyboard.press(nextControl);
+        await expect(qr).toBeFocused();
+        await join.press('Enter');
+        expect(await guest.evaluate(() => window.browserOpens)).toEqual([[WEB_INVITE, '_blank', 'noopener,noreferrer']]);
+        expect(await guest.evaluate(() => window.copiedInvite)).toBe('');
+    } finally { await f.close(); }
+});
+
 test('an expired browser invite is retired in place and a fresh invite restores Join', async ({ browser, baseURL }, testInfo) => {
     const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });
     try {
