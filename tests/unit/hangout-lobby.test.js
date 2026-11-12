@@ -896,6 +896,25 @@ describe('open-room paint + synced video (act frames)', () => {
 });
 
 describe('Game Night', () => {
+    it('reopens the founder’s existing private room while keeping the creation allowance', () => {
+        boot({ roomsPerIpHour: 1 }, true);
+        const host = join('GameHost');
+        const first = '#game-1acbefx23acbe', next = '#game-9cde12x9df823';
+        cmd(host, 'gameopen', [first]);
+        const ref = got(host).findLast(frame => frame.t === 'join').ch.keepRef;
+        cmd(host, 'part', [first], first);
+        cmd(host, 'join', [next]);
+        expect(notices(host)).toContain('One new room per 10 minutes');
+        cmd(host, 'gameopen', [next]);
+        expect(got(host).findLast(frame => frame.t === 'game-room-open')).toEqual({
+            t: 'game-room-open', request: next, ok: true, room: first, ref
+        });
+        const anotherHost = join('OtherHost');
+        cmd(anotherHost, 'gameopen', [next]);
+        expect(got(anotherHost).findLast(frame => frame.t === 'game-room-open')).toEqual({ t: 'game-room-open', request: next, ok: false });
+        expect(notices(anotherHost)).toContain('Too many new rooms');
+    });
+
     it('gives an invited guest a moderated alias when the first alias is already taken', () => {
         boot({}, true);
         const host = join('GameHost');

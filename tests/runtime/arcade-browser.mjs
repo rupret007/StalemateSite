@@ -175,6 +175,28 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             return button.contains(hit) && (!navigation.height || rect.bottom <= navigation.top);
         }), 'the full control stays above the mobile sections and receives the pointer');
     }
+    async function reopenGameNight(host, viewport, phone) {
+        const original = host.viewportSize();
+        const before = await host.evaluate(() => window.__lobby.chans.get(window.__lobby.active)?.keepRef);
+        assert.ok(/^[a-f0-9]{32}$/.test(before || ''), 'the host has a live room');
+        try {
+            await host.setViewportSize(viewport);
+            // A lost connection preserves the table. An explicit Leave intentionally retires its seat.
+            await host.goto(origin + '/r/45662413410ed051/lobby/?via=rad-dad');
+            await host.getByLabel('Your nick').fill('LinkHost');
+            await host.locator('[data-enter]').click();
+            await expect(host.locator('[data-connection]')).toHaveText('Connected');
+            await expect(host.locator('[data-game-night]')).toBeHidden();
+            if (phone) await host.locator('.phonetabs [data-show="rooms"]').click();
+            await host.locator('[data-start="game"]').click();
+            await expect(host.locator('[data-game-night]')).toBeVisible();
+            assert.ok(await host.evaluate(ref => window.__lobby.chans.get(window.__lobby.active)?.keepRef === ref, before),
+                'opening Game Night returns the host to the same room instance');
+            await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
+            await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
+            await captureArcadeInvite(host, viewport, 'reopened-00-host-waiting');
+        } finally { await host.setViewportSize(original); }
+    }
     async function verifyArcadeInvites(host) {
         for (const phone of [true, false]) {
             const viewport = phone ? { width: 390, height: 844 } : { width: 1440, height: 900 };
@@ -281,6 +303,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(guest.getByRole('button')).toHaveCount(1);
                 assert.equal(new URL(guest.url()).hash, '');
                 await captureArcadeInvite(guest, viewport, 'first-visit-01-guest-accept');
+                await reopenGameNight(host, viewport, phone);
                 const join = guest.getByRole('button', { name: 'Join game', exact: true });
                 await expect(join).toBeInViewport({ ratio: 1 });
                 await expect(join).toHaveAccessibleDescription(/13\+ and agree to the house rules/);
@@ -329,7 +352,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await reused.close();
                 await guest.locator('[data-leave]').click();
                 await expect(guest.locator('[data-game-night]')).toBeHidden();
-                console.log(`Passed ${engine} ${viewport.width}x${viewport.height} first-visit Chess, one tap from invitation to the same game, move, reload, room chat and replay refusal.`);
+                console.log(`Passed ${engine} ${viewport.width}x${viewport.height} first-visit Chess, host room reopened, one tap to the same game, move, reload, room chat and replay refusal.`);
             } finally { await context.close(); }
         }
     }

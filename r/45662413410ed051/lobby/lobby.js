@@ -484,7 +484,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let jamContext = null;
     let pendingJamShare = null;
     let jamShareResultsSupported = false, jamShareTimer;
-    let gameNightSupported = false, gameGuestInvitesSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
+    let gameNightSupported = false, gameOpenSupported = false, gameGuestInvitesSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
     const gameShareButton = $('[data-game-share]'), gameShareDialog = $('[data-game-share-dialog]'), gameShareValue = $('[data-game-share-value]');
     const arcadeTables = new Map([
         ['chess', { label: 'Royal Flush Chess', load: () => import('./arcade-chess.mjs').then(module => module.mountArcadeChess) }],
@@ -505,6 +505,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const gameReturnKey = 'hangout-game-return';
     const gameInvites = new Map();
     let gameReturn = null, gameReturnOffered = false, joiningGameRoom = '', joiningArcadeOffer = null;
+    let gameOpenPending = null, gameOpenError = '';
     // Jam rooms are invite-only like Game Night, so the directory cannot lead
     // an invited guest back. They share the same offer and return controls.
     const jamRoomName = name => typeof name === 'string' && /^#jam(?:-[a-z0-9-]{1,26})?$/.test(name);
@@ -613,6 +614,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function setConnection(state) {
         connectionState = state;
         if (state !== 'connected') {
+            if (gameOpenPending) {
+                clearTimeout(gameOpenPending.timer); gameOpenPending = null;
+                gameOpenError = 'Connection interrupted. Reconnect and try opening Game Night again.';
+            }
             gameInvites.clear(); gameReturnOffered = false; joiningGameRoom = ''; drawGameOffer();
             joiningArcadeOffer = null;
             finishArcadeInvitation();
@@ -961,6 +966,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             messageResultsSupported = m.features?.messageResults === 1;
             jamShareResultsSupported = m.features?.jamShareResults === 1;
             gameNightSupported = m.features?.gameNight === 1;
+            gameOpenSupported = m.features?.gameOpen === 1;
             gameGuestInvitesSupported = m.features?.gameGuestInvites === 1;
             arcadeTables.get('chess').supported = m.features?.arcadeChess === 1;
             arcadeTables.get('crapeights').supported = m.features?.arcadeCrapeights === 1;
@@ -1008,6 +1014,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             }
             send({ t: 'hello', nick, age13: true, entrySource: entrySharing.helloSource(), transport: 1 }); break;
         case 'person-preferences': acknowledgePersonPreferences(m); break;
+        case 'game-room-open':
+            if (gameOpenPending?.request === m.request) finishGameOpen(m);
+            break;
         case 'entry-source': entrySharing.acknowledge(m); break;
         case 'nick-error':
             setConnection('offline'); gateStatus(m.text);
@@ -1491,6 +1500,37 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function currentGameOffer() {
         return gameReturnOffered ? gameReturn : gameInvites.values().next().value || (gameNightSupported ? gameEntry?.target : null);
     }
+    function finishGameOpen(result) {
+        const pending = gameOpenPending;
+        if (!pending) return;
+        clearTimeout(pending.timer);
+        gameOpenPending = null;
+        const room = result?.ok && store(result.room);
+        if (room?.kind === 'game' && room.keepRef === result.ref) {
+            if (pending.fromEntry) gameEntry = null;
+            if (app.active !== room.name) switchTo(room.name);
+        } else {
+            gameOpenError = 'Couldn’t open Game Night. Try again or return to your room from the room list.';
+            if (!pending.fromEntry) toast(gameOpenError);
+        }
+        drawGameOffer();
+    }
+    function openGameRoom(fromEntry = false) {
+        if (gameOpenPending) return;
+        // Split the random name so it cannot resemble a phone number.
+        const code = crypto.randomUUID().replaceAll('-', '');
+        const request = `#game-${code.slice(0, 6)}x${code.slice(6, 12)}`;
+        count('room-start-game');
+        if (!gameOpenSupported) {
+            if (fromEntry) { gameEntry = null; drawGameOffer(); }
+            cmd('join', [request]);
+            return;
+        }
+        gameOpenError = '';
+        if (!cmd('gameopen', [request])) { toast('Reconnect before opening Game Night.'); return; }
+        gameOpenPending = { request, fromEntry, timer: setTimeout(() => finishGameOpen(null), 8000) };
+        drawGameOffer();
+    }
     function drawGameOffer() {
         const offer = currentGameOffer();
         const start = !offer && gameNightSupported && gameEntry && !gameEntry.target && connectionState === 'connected' && !app.sharingStopped;
@@ -1507,7 +1547,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const roomLabel = jam ? offer.room : 'Game Night';
         const gameLabel = arcadeTables.get(offer?.arcade?.game)?.label;
         let message;
-        if (start) message = 'Start a private Game Night or wait for your host’s invitation.';
+        if (start) message = gameOpenPending ? 'Opening Game Night…' : gameOpenError || 'Start a private Game Night or wait for your host’s invitation.';
         else if (joiningGameRoom === offer.room) message = `Joining ${roomLabel}…`;
         else if (gameReturnOffered) {
             message = jam ? `You were disconnected from ${offer.room}. Chat starts fresh.`
@@ -1517,18 +1557,16 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (status.textContent !== message) status.textContent = message;
         button.textContent = start ? 'Start Game Night' : gameReturnOffered ? 'Return to room'
             : gameLabel ? `Play ${gameLabel}` : jam ? 'Join room' : 'Join Game Night';
-        button.setAttribute('aria-disabled', String(!!joiningGameRoom));
-        $('[data-game-offer-dismiss]').disabled = !!joiningGameRoom;
+        const busy = !!joiningGameRoom || start && !!gameOpenPending;
+        button.setAttribute('aria-disabled', String(busy));
+        $('[data-game-offer-dismiss]').disabled = busy;
     }
     $('[data-game-offer-join]').addEventListener('click', () => {
         const offer = currentGameOffer();
         if (joiningGameRoom || connectionState !== 'connected' || sessionEnded || app.sharingStopped) return;
         if (!offer) {
             if (!gameNightSupported || !gameEntry || gameEntry.target) return;
-            gameEntry = null;
-            drawGameOffer();
-            $('[data-start="game"]').click();
-            return;
+            return openGameRoom(true);
         }
         if (!cmd('join', [offer.room], app.active, offer.ref)) {
             return toast(jamRoomName(offer.room) ? 'Reconnect before joining the room.' : 'Reconnect before joining Game Night.');
@@ -2133,11 +2171,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             return;
         }
         const kind = b.dataset.start;
-        if (kind === 'game' && !gameNightSupported) return;
-        // Break up numeric runs so a random room code never looks like a phone number.
-        const code = kind === 'game' ? crypto.randomUUID().replaceAll('-', '') : '';
-        const suffix = code ? `${code.slice(0, 6)}x${code.slice(6, 12)}` : slug();
-        count(`room-start-${kind}`); cmd('join', [`#${kind}-${suffix}`]);
+        if (kind === 'game') {
+            if (gameNightSupported) openGameRoom();
+            return;
+        }
+        count(`room-start-${kind}`); cmd('join', [`#${kind}-${slug()}`]);
     }));
     $('[data-channel-cancel]').addEventListener('click', () => $('[data-channel-dialog]').close());
     $('[data-channel-dialog]').addEventListener('close', () => {
