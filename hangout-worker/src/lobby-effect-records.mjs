@@ -131,7 +131,7 @@ function validSessions(value, now) {
         && [row.since, row.lastNick, row.last, row.actLast].every(at => time(at, now)) && number(row.tokens) && row.tokens <= 5
         && number(row.actTokens) && row.actTokens <= 24 && integer(row.frames) && row.frames <= 4000 && integer(row.camReports) && row.camReports <= 150
         && object(row.lastSaid) && Object.keys(row.lastSaid).length <= 31 && Object.entries(row.lastSaid).every(([name, at]) => row.channels.includes(name) && time(at, now));
-    if (!shape(value, ['version', 'connections', 'pm', 'pendingPm', 'receipts'], ['lobbyInstance']) || value.version !== 1
+    if (!shape(value, ['version', 'connections', 'pm', 'pendingPm', 'receipts'], ['lobbyInstance', 'roomInvites']) || value.version !== 1
         || Object.hasOwn(value, 'lobbyInstance') && (typeof value.lobbyInstance !== 'string' || !/^[a-f0-9]{32}$/.test(value.lobbyInstance))
         || !list(value.connections, 200, connection)
         || new Set(value.connections.map(row => row.id)).size !== value.connections.length
@@ -140,7 +140,13 @@ function validSessions(value, now) {
     const endpoints = row => id(row.from) && id(row.fromId) && id(row.toId) && row.fromId !== row.toId
         && row.key === [row.fromId, row.toId].sort().join('|') && connections.get(row.fromId)?.dev === row.from && connections.has(row.toId)
         && !connections.get(row.fromId).safetyOnly && !connections.get(row.toId).safetyOnly;
-    const reference = row => !Object.hasOwn(row, 'ref') || typeof row.ref === 'string' && /^[a-f0-9]{32}$/.test(row.ref);
+    const nonce = value => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);
+    const reference = row => !Object.hasOwn(row, 'ref') || nonce(row.ref);
+    const roomInvite = row => shape(row, ['request', 'host', 'guest', 'room', 'roomInstance', 'until'])
+        && nonce(row.request) && nonce(row.roomInstance) && id(row.host) && id(row.guest)
+        && channel(row.room) && row.host !== row.guest && integer(row.until) && row.until <= now + 120_000
+        && connections.get(row.host)?.channels.includes(row.room) && !connections.get(row.host).safetyOnly
+        && connections.get(row.guest)?.channels.includes('#stalemate') && !connections.get(row.guest).safetyOnly;
     const receipt = row => shape(row, ['t', 'id', 'ch', 'from', 'to', 'prefix', 'band', 'moderator', 'me', 'ts', 'authorDev', 'digest', 'recipients'], ['publicOrigin'])
         && nick(row.from) && id(row.authorDev) && /^[a-f0-9]{64}$/.test(row.digest) && time(row.ts, now) && ['', '@', '+'].includes(row.prefix)
         && ['band', 'moderator', 'me'].every(key => typeof row[key] === 'boolean')
@@ -153,6 +159,8 @@ function validSessions(value, now) {
         && list(value.pendingPm, 1000, row => shape(row, ['key', 'from', 'fromId', 'toId', 'at', 'hadFirst'], ['ref']) && reference(row) && endpoints(row) && time(row.at, now) && typeof row.hadFirst === 'boolean')
         && new Set([...value.pm, ...value.pendingPm].map(row => row.key)).size === value.pm.length + value.pendingPm.length
         && new Set([...value.pm, ...value.pendingPm].filter(row => Object.hasOwn(row, 'ref')).map(row => row.ref)).size === [...value.pm, ...value.pendingPm].filter(row => Object.hasOwn(row, 'ref')).length
+        && (!Object.hasOwn(value, 'roomInvites') || list(value.roomInvites, 200, roomInvite)
+            && new Set(value.roomInvites.map(row => row.request)).size === value.roomInvites.length)
         && list(value.receipts, 1000, receipt) && bytes(value.receipts) <= MIB && new Set(value.receipts.map(row => row.id)).size === value.receipts.length;
 }
 function validNet(value, now) {

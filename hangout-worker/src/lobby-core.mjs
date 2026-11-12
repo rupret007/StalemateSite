@@ -39,6 +39,8 @@ const SESSION_CONNECTIONS = 200;
 const SESSION_PREFERENCES = 50;
 const SESSION_PM_PAIRS = 2000;
 const SESSION_PM_PENDING = 1000;
+const ROOM_INVITE_LIMIT = 200;
+const ROOM_INVITE_TTL = 120_000;
 const PM_PENDING_TTL = 10 * MIN;
 const RECEIPT_MAX = 1000;
 const RECEIPT_STATE_BYTES = 1024 * 1024;
@@ -153,7 +155,6 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     const channels = new Map();       // lc(name) -> channel
     const pm = new Map();             // exact connection pair -> consent; device IDs are rate limits, never consent grants
     const roomInvites = new Map();    // short-lived offers between current connections
-    const ROOM_INVITE_TTL = 120_000;
     const devStats = new Map();       // dev -> {day, msgs, lastRoom}
     const ipRooms = new Map();        // iph -> [timestamps]
     let seq = 0;
@@ -873,11 +874,11 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (!chan || !chan.members.has(c.id)) return;
         chan.members.delete(c.id);
         c.channels.delete(chan.name);
-        if (chan.kind !== 'lobby') {
-            for (const [request, offer] of roomInvites) if (offer.room === chan && offer.host === c.id)
+        for (const [request, offer] of roomInvites) {
+            if (offer.room === chan && offer.host === c.id || chan.kind === 'lobby' && offer.guest === c.id)
                 finishRoomInvite(request, offer, 'expired');
-            if (!quitting && !inAnotherRoom(c)) sendChan(ch(LOBBY), { presence: true });
         }
+        if (chan.kind !== 'lobby' && !quitting && !inAnotherRoom(c)) sendChan(ch(LOBBY), { presence: true });
         if (chan.four && [chan.four.host, chan.four.guest].includes(c.id)) updateFour(chan, null);
         if (![...c.channels].some(name => !['lobby', 'chat', 'jam'].includes(ch(name)?.kind))) participationMedia.delete(c.id);
         c.cams.delete(lc(chan.name));
@@ -935,20 +936,28 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (guest && guest.id !== disconnected) out(guest, { t: 'room-invite-ended', request, status });
     }
 
+    function roomInviteAllowed(host, guest, room) {
+        return !roomsBroken && room?.kind === 'jam' && !!host?.nick && !!guest?.nick
+            && host !== guest && !host.safetyOnly && !guest.safetyOnly && room.members.has(host.id)
+            && isOp(host, room) && ch(LOBBY).members.has(guest.id) && !guest.blocks.has(host.dev)
+            && !host.blocks.has(guest.dev) && !ignoredBy(guest, host);
+    }
+
+    function roomInviteCapacity(request, host, guest, room) {
+        if (roomInvites.has(request) || roomInvites.size >= ROOM_INVITE_LIMIT) return false;
+        const pending = [...roomInvites.values()];
+        return !pending.some(offer => offer.room === room && (offer.host === host || offer.guest === guest))
+            && pending.filter(offer => offer.guest === guest).length < 5;
+    }
+
     function requestRoomInvite(host, frame) {
         const { request, roomInstance, peer } = frame;
         if (!validPmRef(request)) return;
         const reject = () => out(host, { t: 'room-invite-result', request, status: 'unavailable' });
         const room = typeof frame.ch === 'string' ? ch(frame.ch) : null;
         const guest = typeof peer === 'string' ? conns.get(peer) : null;
-        if (roomsBroken || room?.kind !== 'jam' || room.keepRef !== roomInstance
-            || !room.members.has(host.id) || !isOp(host, room) || !guest?.nick || guest.safetyOnly
-            || !ch(LOBBY).members.has(guest.id) || room.members.has(guest.id) || guest === host
-            || guest.blocks.has(host.dev) || host.blocks.has(guest.dev) || ignoredBy(guest, host)
-            || roomInvites.has(request) || roomInvites.size >= 200) return reject();
-        const pending = [...roomInvites.values()];
-        if (pending.some(offer => offer.room === room && (offer.host === host.id || offer.guest === guest.id))
-            || pending.filter(offer => offer.guest === guest.id).length >= 5) return reject();
+        if (!roomInviteAllowed(host, guest, room) || room.keepRef !== roomInstance || room.members.has(guest.id)
+            || !roomInviteCapacity(request, host.id, guest.id, room)) return reject();
         requireParticipation(host, 'requestDirectContact', guest);
         personDependency(guest, room);
         const until = now() + ROOM_INVITE_TTL;
@@ -963,13 +972,29 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (offer?.guest !== guest.id) return out(guest, { t: 'room-invite-ended', request, status: 'expired' });
         const { room, host: hostId, until } = offer;
         const host = conns.get(hostId);
-        if (roomsBroken || now() >= until || ch(room.name) !== room || !host
-            || !room.members.has(host.id) || !isOp(host, room) || guest.blocks.has(host.dev)
-            || host.blocks.has(guest.dev) || ignoredBy(guest, host))
+        if (now() >= until || ch(room.name) !== room || !roomInviteAllowed(host, guest, room))
             return finishRoomInvite(request, offer, 'expired');
         if (!accept) return finishRoomInvite(request, offer, 'declined');
         personDependency(host, room);
         return finishRoomInvite(request, offer, enter(guest, room, { invited: true }) ? 'accepted' : 'unavailable');
+    }
+
+    function restoreRoomInvites(stored, records) {
+        if (!Array.isArray(stored) || stored.length > ROOM_INVITE_LIMIT) return;
+        for (const offer of stored) {
+            if (!offer || !validPmRef(offer.request) || !validPmRef(offer.roomInstance) || typeof offer.room !== 'string'
+                || !records.has(offer.host) || !records.has(offer.guest) || offer.host === offer.guest
+                || !Number.isSafeInteger(offer.until) || offer.until < 0 || offer.until > now() + ROOM_INVITE_TTL
+                || roomInvites.has(offer.request)) continue;
+            const room = ch(offer.room);
+            if (offer.until <= now() || room?.keepRef !== offer.roomInstance
+                || !roomInviteAllowed(conns.get(offer.host), conns.get(offer.guest), room)
+                || !roomInviteCapacity(offer.request, offer.host, offer.guest, room)) {
+                finishRoomInvite(offer.request, offer, 'expired');
+                continue;
+            }
+            roomInvites.set(offer.request, { host: offer.host, guest: offer.guest, room, until: offer.until });
+        }
     }
 
     // ---------- inbound ----------
@@ -1279,7 +1304,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         })), pm: [...pm].filter(([, p]) => p.state === 'open' && conns.has(p.fromId) && conns.has(p.toId))
             .map(([key, p]) => ({ key, from: p.from, fromId: p.fromId, toId: p.toId, state: 'open', ...(p.ref ? { ref: p.ref } : {}) })),
         pendingPm: [...pm].filter(([, p]) => p.state === 'pending' && conns.has(p.fromId) && conns.has(p.toId))
-            .map(([key, p]) => ({ key, from: p.from, fromId: p.fromId, toId: p.toId, at: p.at, hadFirst: !!p.first || !!p.lostFirst, ...(p.ref ? { ref: p.ref } : {}) })) };
+            .map(([key, p]) => ({ key, from: p.from, fromId: p.fromId, toId: p.toId, at: p.at, hadFirst: !!p.first || !!p.lostFirst, ...(p.ref ? { ref: p.ref } : {}) })),
+        // Only same-socket room admission metadata survives a Worker restart.
+        ...(roomInvites.size ? { roomInvites: [...roomInvites].map(([request, { host, guest, room, until }]) =>
+            ({ request, host, guest, room: room.name, roomInstance: room.keepRef, until })) } : {}) };
     }
     function sessionSnapshot() {
         return { ...sessionMetadata(), receipts: [...receipts.values()].map((r) => ({ ...r, recipients: [...r.recipients] })) };
@@ -1358,6 +1386,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             }
         }
         restorePendingPm(saved.pendingPm, records);
+        restoreRoomInvites(saved.roomInvites, records);
         restoreReceipts(saved.receipts);
         for (const c of conns.values()) {
             const hadPeers = c.ignoredPeerIds.size > 0;
