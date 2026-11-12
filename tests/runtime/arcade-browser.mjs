@@ -259,13 +259,21 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             }
         }
     }
-    async function shareGameNightLink(host, viewport, step, capturePicker) {
+    async function shareGameNightLink(host, viewport, step, capturePicker, useClipboard = false) {
         const original = host.viewportSize();
         await host.bringToFront();
-        await host.evaluate(() => {
+        await host.evaluate(copy => {
             window.testGameInvitation = '';
+            if (copy) {
+                Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+                Object.defineProperty(navigator.clipboard, 'writeText', { configurable: true, value: async url => {
+                    if (!window.allowTestGameInvitationCopy) throw new DOMException('Clipboard unavailable', 'NotAllowedError');
+                    window.testGameInvitation = url;
+                } });
+                return;
+            }
             Object.defineProperty(navigator, 'share', { configurable: true, value: async ({ url }) => { window.testGameInvitation = url; } });
-        });
+        }, useClipboard);
         try {
             await host.setViewportSize(viewport);
             await host.getByRole('button', { name: 'Invite players' }).click();
@@ -273,14 +281,31 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(newGuest).toBeFocused();
             if (capturePicker) await capturePicker(newGuest);
             await newGuest.click();
-            await expect(host.getByRole('button', { name: 'Share invite' })).toBeVisible();
+            const deliver = host.getByRole('button', { name: useClipboard ? 'Copy invite' : 'Share invite' });
+            await expect(deliver).toBeFocused();
             await captureArcadeInvite(host, viewport, step);
-            await host.getByRole('button', { name: 'Share invite' }).click();
+            await deliver.click();
+            if (useClipboard) {
+                const status = host.locator('[data-game-invite-link-status]');
+                await expect(status).toHaveText('Couldn’t copy the invitation. You can still use Email invite.');
+                await expect(host.getByRole('button', { name: 'Email invite' })).toBeVisible();
+                await host.evaluate(() => { window.allowTestGameInvitationCopy = true; });
+                await deliver.click();
+                await expect(status).toContainText('Invitation copied.');
+                await host.getByRole('button', { name: 'Cancel' }).click();
+            }
             const link = new URL(await host.evaluate(() => window.testGameInvitation));
-            assert.ok(link.origin === origin && link.pathname === '/beta/game-night/guest' && /^#invite=[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/.test(link.hash), 'the share sheet receives one private game invitation');
+            assert.ok(link.origin === origin && link.pathname === '/beta/game-night/guest' && /^#invite=[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/.test(link.hash), 'the delivery action receives one private game invitation');
             return link;
         } finally {
-            await host.evaluate(() => { delete window.testGameInvitation; delete navigator.share; });
+            await host.evaluate(copy => {
+                delete window.testGameInvitation;
+                delete navigator.share;
+                if (copy) {
+                    delete navigator.clipboard.writeText;
+                    delete window.allowTestGameInvitationCopy;
+                }
+            }, useClipboard);
             await host.setViewportSize(original);
         }
     }
@@ -423,7 +448,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
             await host.getByRole('button', { name: 'Open Chess match' }).click();
             await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
-            const link = await shareGameNightLink(host, viewport, 'guest-retry-00-share');
+            const link = await shareGameNightLink(host, viewport, 'guest-retry-00-share', undefined, !phone);
             const context = await browser.newContext({ viewport, hasTouch: phone, reducedMotion: 'reduce', ignoreHTTPSErrors: true });
             try {
                 const friend = await context.newPage();
