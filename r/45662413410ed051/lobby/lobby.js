@@ -3,6 +3,7 @@
 import { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff, readEntryHandoff, KEEP_ROOM_INTENT_KEY, KEEP_ROOM_INTENT_TTL, keepRoomIntent, consumeKeepRoomIntent } from '../entry-sites.mjs';
 import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
+import { unpackLobbyRoster } from './lobby-roster.mjs';
 import { createIdleHeartbeat } from './idle-heartbeat.mjs';
 import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourWinningCells, gameNightRoomName } from './game-night.mjs';
 (() => {
@@ -954,7 +955,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 $('[data-pmreqs]').replaceChildren();
                 $('[data-text]').value = drafts.get('#stalemate') || '';
             }
-            send({ t: 'hello', nick, age13: true, entrySource: entrySharing.helloSource(), transport: 1 }); break;
+            send({ t: 'hello', nick, age13: true, entrySource: entrySharing.helloSource(), transport: 1,
+                ...(m.features?.compactLobbyRoster === 1 ? { compactLobbyRoster: 1 } : {}) }); break;
         case 'person-preferences': acknowledgePersonPreferences(m); break;
         case 'entry-source': entrySharing.acknowledge(m); break;
         case 'nick-error': setConnection('offline'); gateStatus(m.text); $('[data-gate]').hidden = false; $('[data-app]').hidden = true; break;
@@ -1037,7 +1039,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         case 'chan': {
             const c = app.chans.get(m.ch.name);
             if (c) {
-                Object.assign(c, m.ch);
+                const { rosterFormat, ...view } = m.ch;
+                if (rosterFormat !== undefined) {
+                    if (rosterFormat !== 1 || c.kind !== 'lobby') break;
+                    const names = unpackLobbyRoster(view.names);
+                    if (!names) break;
+                    view.names = names;
+                }
+                Object.assign(c, view);
                 const jamDraft = confirmJamShare(c, m.ch.jam);
                 if (app.active === c.name) drawChan();
                 // An own-share confirmation changes the room's invitation

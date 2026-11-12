@@ -195,8 +195,19 @@ test('an invite shows when the server has not replied and when a sent offer expi
 
 test('an open invite picker updates availability without moving keyboard focus', async ({ browser, baseURL }) => {
     const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });
+    let compactBusySeen = false;
     try {
-        const host = await f.join('RoomHost', false, 'rad-dad');
+        const host = await f.join('RoomHost', false, 'rad-dad', async (page, relay) => {
+            await page.routeWebSocket(url => url.href.startsWith(relay), socket => {
+                const server = socket.connectToServer();
+                server.onMessage(raw => {
+                    const frame = JSON.parse(raw);
+                    if (frame.t === 'chan' && frame.ch.rosterFormat === 1
+                        && frame.ch.names.some(row => row[1] === 'Bandmate' && (row[4] & 64))) compactBusySeen = true;
+                    socket.send(raw);
+                });
+            });
+        });
         const guest = await f.join('Bandmate', false, 'stalemate');
         await host.click('[data-show="rooms"]');
         await host.click('[data-start="jam"]');
@@ -208,6 +219,7 @@ test('an open invite picker updates availability without moving keyboard focus',
         await guest.click('[data-show="rooms"]');
         await guest.click('[data-start="jam"]');
         await expect(busy).toBeFocused();
+        expect(compactBusySeen).toBe(true);
         await guest.locator('[data-leave]').click();
         await expect(available).toBeFocused();
         const newcomer = await f.join('NewBandmate', false, 'rad-dad');
