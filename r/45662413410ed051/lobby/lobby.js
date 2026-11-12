@@ -2498,13 +2498,28 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             ? opener.button : $(host ? '[data-roomtools]' : '[data-text]');
         target.focus({ preventScroll: true });
     });
+    function showMusicHandoffStatus(message, canCancel = false) {
+        const cancel = $('[data-music-handoff-cancel]');
+        if (!canCancel && document.activeElement === cancel
+            && currentJam() === pendingMusicHandoff?.room && amOp(pendingMusicHandoff.room)) {
+            $('[data-jam-invite-music]').focus({ preventScroll: true });
+        }
+        cancel.hidden = !canCancel;
+        $('[data-music-handoff-status]').textContent = message;
+    }
     function closeMusicHandoff() {
         if (!pendingMusicHandoff) return;
         clearTimeout(pendingMusicHandoff.timer);
         pendingMusicHandoff.channel.close();
+        showMusicHandoffStatus('');
         pendingMusicHandoff = null;
         $('[data-jam-invite-music]').removeAttribute('aria-disabled');
     }
+    $('[data-music-handoff-cancel]').addEventListener('click', () => {
+        if (!pendingMusicHandoff || pendingMusicHandoff.submitted) return;
+        closeMusicHandoff();
+        toast('Music invite canceled in Hang Out. If WebJam still shows a confirmation, choose No.');
+    });
     function finishMusicHandoff(sent) {
         pendingMusicHandoff.channel.postMessage({ returned: sent });
         closeMusicHandoff();
@@ -2516,7 +2531,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const handoff = {
             room, channel, request, submitted: false, timer: setTimeout(() => {
                 closeMusicHandoff();
-                toast('Music invitation timed out. Open the private WebJam app and try again.');
+                toast(handoff.submitted
+                    ? 'Hang Out did not confirm delivery. Check with your bandmate before sending another invitation.'
+                    : 'WebJam did not return an invitation. Start a hosted Music session in the private app and try again.');
             }, 90000)
         };
         pendingMusicHandoff = handoff;
@@ -2530,13 +2547,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 });
             if (!sent) return finishMusicHandoff(false);
             handoff.submitted = true;
+            showMusicHandoffStatus('Waiting for Hang Out to confirm delivery…');
         };
         const launch = document.createElement('a');
         launch.href = `webjam-beta://hangout-music/${request}`;
         document.body.append(launch);
         launch.click();
         launch.remove();
-        toast('Confirm the invitation in WebJam.');
+        showMusicHandoffStatus('Confirm in WebJam. If no prompt appears, cancel here, start a hosted Music session in WebJam, then try again.', true);
     }
     function sendInviteToPerson(context, error, music = false) {
         const current = store(app.active);
