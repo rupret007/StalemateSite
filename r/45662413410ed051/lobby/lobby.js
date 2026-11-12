@@ -1989,9 +1989,16 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
         const kind = b.dataset.start;
         if (kind === 'game' && !gameNightSupported) return;
-        // Break up numeric runs so a random room code never looks like a phone number.
-        const code = kind === 'game' ? crypto.randomUUID().replaceAll('-', '') : '';
-        const suffix = code ? `${code.slice(0, 6)}x${code.slice(6, 12)}` : slug();
+        // Private activity names need a unique part even when their readable
+        // words match. Break up digits so the code won't look like a phone number.
+        const code = kind === 'game' || kind === 'jam' ? crypto.randomUUID().replaceAll('-', '') : '';
+        let suffix;
+        if (kind === 'game') {
+            suffix = `${code.slice(0, 6)}x${code.slice(6, 12)}`;
+        } else {
+            suffix = slug();
+            if (kind === 'jam') suffix += `-${code.slice(0, 4)}x${code.slice(4, 8)}`;
+        }
         count(`room-start-${kind}`); cmd('join', [`#${kind}-${suffix}`]);
     }));
     $('[data-channel-cancel]').addEventListener('click', () => $('[data-channel-dialog]').close());

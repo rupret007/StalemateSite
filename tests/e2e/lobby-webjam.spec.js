@@ -111,6 +111,26 @@ async function browserRoom(browser, baseURL, configured, viewport) {
     };
     return { join, external, close: () => Promise.all(contexts.map(context => context.close())) };
 }
+
+test('two hosts given the same Jam label start separate rooms', async ({ browser, baseURL }) => {
+    const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });
+    try {
+        const first = await f.join('FirstHost', false, 'stalemate');
+        const second = await f.join('SecondHost', false, 'rad-dad');
+        const names = [];
+        for (const host of [first, second]) {
+            // Force the same readable words while leaving the browser's UUIDs intact.
+            await host.evaluate(() => { Math.random = () => 0; });
+            await host.locator('.phonetabs [data-show="rooms"]').click();
+            await host.locator('[data-start="jam"]').click();
+            const context = host.locator('[data-chat-context]');
+            await expect(context).toHaveText(/^#jam-happy-tree(?:-|$)/);
+            names.push(await context.textContent());
+        }
+        expect(names[0]).not.toBe(names[1]);
+    } finally { await f.close(); }
+});
+
 const paste = async (page, value) => {
     await page.fill('[data-jam-link]', value);
     await page.locator('[data-jam-form] button[type="submit"]').click();
