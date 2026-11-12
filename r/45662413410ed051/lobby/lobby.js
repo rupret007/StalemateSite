@@ -1493,14 +1493,19 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function currentGameOffer() {
         return gameReturnOffered ? gameReturn : gameInvites.values().next().value;
     }
+    function updateOfferStatus(announcement, visible, message) {
+        if (announcement.textContent !== message) announcement.textContent = message;
+        if (visible.textContent !== message) visible.textContent = message;
+    }
     function drawGameOffer() {
         const offer = currentGameOffer();
         const panel = $('[data-game-offer]'), status = $('[data-game-offer-status]');
+        const visible = $('[data-game-offer-message]');
         const button = $('[data-game-offer-join]');
         const hadFocus = panel.contains(document.activeElement);
         panel.hidden = !offer;
         if (!offer) {
-            status.textContent = '';
+            updateOfferStatus(status, visible, '');
             if (hadFocus) focusChannelTab(app.active);
             return;
         }
@@ -1509,7 +1514,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             : gameReturnOffered ? jam ? `You were disconnected from ${offer.room}. Chat starts fresh.`
                 : 'Game Night disconnected. Any match you were playing ended.'
             : jam ? `${offer.by} invited you to ${offer.room}.` : `${offer.by} invited you to Game Night.`;
-        if (status.textContent !== message) status.textContent = message;
+        updateOfferStatus(status, visible, message);
         button.textContent = gameReturnOffered ? 'Return to room' : jam ? 'Join room' : 'Join Game Night';
         button.setAttribute('aria-disabled', String(!!joiningGameRoom));
         $('[data-game-offer-dismiss]').disabled = !!joiningGameRoom;
@@ -1584,10 +1589,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         panel.hidden = !musicInvite || (accepted && (current?.name !== musicInvite.room || current.keepRef !== musicInvite.instance));
         if (current && !amOp(current) && !current.jam?.web && !current.jam?.desktop && !current.jam?.invitation)
             $('[data-jam-actions]').hidden = accepted && !panel.hidden;
-        if (panel.hidden) return;
-        $('[data-music-invite-status]').textContent = ended ? 'This music invitation ended. Ask the host for a fresh one.'
+        const message = panel.hidden ? '' : ended ? 'This music invitation ended. Ask the host for a fresh one.'
             : accepted ? 'You’re in the Jam room. Open the audio check when you’re ready.'
             : `${musicInvite.from} invited you to play in ${musicInvite.room}.`;
+        updateOfferStatus($('[data-music-invite-status]'), $('[data-music-invite-message]'), message);
+        if (panel.hidden) return;
         if (ended && document.activeElement === action) dismiss.focus();
         action.hidden = ended;
         action.setAttribute('aria-disabled', String(musicInvite.state === 'joining'));

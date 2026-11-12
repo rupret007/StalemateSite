@@ -37,7 +37,7 @@ h1, h2, h3, p { margin-top: 0; }
 h2, h3 { font-weight: 650; }
 .small { color: var(--muted); font-size: 12px; line-height: 1.6; }
 .eyebrow { margin: 0; color: var(--muted); font: 600 10px/1.5 var(--mono); letter-spacing: .1em; }
-.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.sr-only, .room-invite-status:empty { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .status { color: var(--amber); font-size: 13px; margin: 0; }
 .status:empty { display: none; }
 .btn { display: inline-flex; justify-content: center; align-items: center; gap: 6px; min-height: 44px; padding: 10px 16px; border: 1px solid var(--lime); background: var(--lime); color: var(--ink); text-decoration: none; font-size: 13px; font-weight: 700; }
@@ -357,7 +357,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .sheet-buttons .btn { font-size: 12px; }
 .invite-people { max-height: min(240px, 36dvh); overflow-y: auto; overscroll-behavior: contain; padding: 3px; }
 .invite-people .btn { min-width: 0; text-align: left; overflow-wrap: anywhere; white-space: normal; }
-.invite-people:empty, [data-invite-quick-error]:empty, .room-invite-status:empty { display: none; }
+.invite-people:empty, [data-invite-quick-error]:empty { display: none; }
 .channel-label { display: block; margin: 16px 0 8px; font-size: 12px; }
 [data-channel-name], [data-invite-nick] { width: 100%; }
 .check { display: flex; align-items: center; gap: 10px; min-height: 44px; }
