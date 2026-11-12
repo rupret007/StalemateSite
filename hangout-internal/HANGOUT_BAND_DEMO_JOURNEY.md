@@ -8,10 +8,12 @@ Keep the rehearsal private and use the build-specific invitation steps below.
 
 > Hey Che’, open the private Hang Out invite I send you in Chrome on your PC.
 > Pick a nickname and enter the lobby. Keep wired headphones handy. I’ll send
-> you the Music invite from inside Hang Out. Once you reach the audio check,
-> pick your drum interface as the microphone, click **Check microphone** and
-> play a few hits. When the meter responds, check the headphones box and click
-> **Join with microphone**. You can do this in Chrome without installing WebJam.
+> you the Music invite from inside Hang Out. On the audio screen, click
+> **Check microphone**, allow Chrome to use it, and play a few drum hits.
+> If **Using** names the wrong input, select your drum interface under
+> **Microphone** when the picker appears, then play again. When you see
+> **Microphone detected.**, check the headphones box and click
+> **Join with microphone**. Chrome is all you need on the PC.
 
 Send the private Hang Out invitation separately through the usual private
 channel. A guest opens it and reads the guest agreement before entering. A
@@ -42,12 +44,13 @@ site and native handoff are delivered and confirmed on the actual devices.
 
 ## Audio check, recovery and ending the session
 
-- On Windows, choose the intended microphone if Chrome lists more than one.
-  Allow capture when prompted. Confirm that **Check microphone** responds to
-  that input and that headphones are connected before joining.
-- If the chosen input stays silent, check the interface in Windows Sound,
-  choose it in Chrome and retry the mic check. If the Music invitation expires
-  or the host ends the session, return to Hang Out and ask for a fresh invite.
+- Start with **Check microphone**. If **Microphone** appears, selecting an
+  interface starts another check. Read **Using** and play a few hits to verify
+  the input before checking the headphones box.
+- If the interface is missing or silent, check that Windows Sound sees it and
+  Chrome has microphone permission. Retry the check and wait for
+  **Microphone detected.** before joining. If the invite expires or the host
+  ends the session, return to Hang Out and ask for a fresh invite.
 - After joining, each person should say a few words and confirm hearing the
   other. Play a short passage and check guitar, vocal and drum levels by
   listening together. Finish with **Leave session** in Chrome and **End Session**
