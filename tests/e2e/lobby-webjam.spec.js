@@ -215,6 +215,12 @@ test('only the selected guest can accept a music invitation and open the audio c
         await accept.click();
         await expect(audio).toBeVisible();
         await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        expect(await returnInvite(invite)).toBe(true);
+        await expect(accept).toBeVisible();
+        await host.locator('[data-leave]').click();
+        await expect(panel).toContainText('This music invitation ended. Ask the host for a fresh one.');
+        await expect(accept).toBeHidden();
+        await expect(guest.locator('[data-chat-context]')).toHaveText(room);
         expect(f.external).toEqual([]);
     } finally { await f.close(); }
 });

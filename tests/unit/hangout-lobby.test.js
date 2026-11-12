@@ -186,7 +186,22 @@ describe('direct Jam music invitations', () => {
         cmd(host, 'part', [], room);
         accept(guest, pending);
         expect(delivered(guest)).toHaveLength(0);
-        expect(got(guest).filter(m => m.t === 'music-invite-ended').map(m => m.id)).toEqual([expired.id, pending.id]);
+        expect(got(guest).filter(m => m.t === 'music-invite-ended').map(m => m.id)).toContain(expired.id);
+    });
+    it.each([
+        ['the host leaves the room', () => cmd(host, 'part', [], room)],
+        ['the host disconnects', () => L.disconnect(host.id)],
+        ['the room closes', () => cmd(host, 'close', [], room)],
+        ['the relay expires the offer', () => { later(61_000); L.tick(); }],
+    ])('ends the offer immediately for the selected guest when %s', (_reason, end) => {
+        const pending = offer();
+        end();
+        const ended = { t: 'music-invite-ended', id: pending.id };
+        expect(got(guest).filter(m => m.t === ended.t)).toEqual([ended]);
+        expect(got(peer)).not.toContainEqual(ended);
+        expect(JSON.stringify(got(guest))).not.toContain(invite);
+        accept(guest, pending);
+        expect(delivered(guest)).toHaveLength(0);
     });
     it('does not transfer an unaccepted invitation to a new connection for the same bandmate', () => {
         const pending = offer();

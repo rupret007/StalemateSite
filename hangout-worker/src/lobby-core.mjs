@@ -856,7 +856,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const c = conns.get(id);
         if (!c) return;
         for (const [room, offer] of musicInvites) {
-            if (offer.host === id || offer.guest === id) musicInvites.delete(room);
+            if (offer.host === id || offer.guest === id) endMusicInvite(room, id);
         }
         for (const [request, offer] of roomInvites) if (offer.host === id || offer.guest === id)
             finishRoomInvite(request, offer, 'expired', id);
@@ -879,7 +879,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     function leave(c, chan, why = '', quitting = false) {
         if (!chan || !chan.members.has(c.id)) return;
         const musicInvite = musicInvites.get(chan.name);
-        if (musicInvite && (musicInvite.host === c.id || musicInvite.guest === c.id)) musicInvites.delete(chan.name);
+        if (musicInvite && (musicInvite.host === c.id || musicInvite.guest === c.id)) endMusicInvite(chan.name);
         chan.members.delete(c.id);
         c.channels.delete(chan.name);
         for (const [request, offer] of roomInvites) {
@@ -950,6 +950,14 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             && !guest.ignoredPeerIds.has(host.id) && !guest.ignores.has(lc(host.nick));
     }
 
+    function endMusicInvite(roomName, disconnected = '') {
+        const offer = musicInvites.get(roomName);
+        if (!offer) return;
+        musicInvites.delete(roomName);
+        const guest = conns.get(offer.guest);
+        if (guest && guest.id !== disconnected) out(guest, { t: 'music-invite-ended', id: offer.id });
+    }
+
     function offerMusicInvite(host, frame) {
         if (!validPmRef(frame.request)) return;
         const result = status => out(host, { t: 'music-invite-result', request: frame.request, status });
@@ -967,9 +975,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return result('unavailable');
         personDependency(guest, room);
         const id = crypto.randomUUID().replace(/-/g, '');
-        const previous = musicInvites.get(room.name);
-        const previousGuest = previous && conns.get(previous.guest);
-        if (previousGuest) out(previousGuest, { t: 'music-invite-ended', id: previous.id });
+        endMusicInvite(room.name);
         musicInvites.set(room.name, { id, host: host.id, guest: guest.id, instance: room.keepRef, href, expires });
         out(guest, { t: 'music-invite', id, ch: room.name, roomInstance: room.keepRef, by: host.nick, expires });
         result('sent');
@@ -983,10 +989,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return;
         }
         const host = conns.get(offer.host);
-        if (offer.expires <= now() || !canInviteMusic(host, guest, room)) {
-            musicInvites.delete(room.name);
-            return out(guest, { t: 'music-invite-ended', id: offer.id });
-        }
+        if (offer.expires <= now() || !canInviteMusic(host, guest, room)) return endMusicInvite(room.name);
         personDependency(host, room);
         musicInvites.delete(room.name);
         if (!acceptJamInvitation(guest, room)) return out(guest, { t: 'music-invite-ended', id: offer.id });
@@ -2179,7 +2182,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
 
     function closeRoom(chan, by, why) {
-        musicInvites.delete(chan.name);
+        endMusicInvite(chan.name);
         const members = membersOf(chan);
         for (const m of members) { out(m, { t: 'closed', ch: chan.name, by, reason: why }); m.channels.delete(chan.name); m.cams.delete(lc(chan.name)); }
         for (const [request, offer] of roomInvites) if (offer.room === chan) finishRoomInvite(request, offer, 'expired');
@@ -2620,7 +2623,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     let lastStatSave = '';
     function tick() {
         const t = now();
-        for (const [room, offer] of musicInvites) if (offer.expires <= t) musicInvites.delete(room);
+        for (const [room, offer] of musicInvites) if (offer.expires <= t) endMusicInvite(room);
         expireRoomInvites(t);
         rates.prune();
         if (hourKey() !== lastStatSave) { lastStatSave = hourKey(); saveNet(); } // stats: ~24 row writes/day
