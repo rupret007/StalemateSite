@@ -166,6 +166,15 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await textNodes.dispose();
         }
     }
+    async function expectUncoveredControl(control) {
+        await expect(control).toBeInViewport({ ratio: 1 });
+        assert.ok(await control.evaluate(button => {
+            const rect = button.getBoundingClientRect();
+            const navigation = document.querySelector('.phonetabs').getBoundingClientRect();
+            const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+            return button.contains(hit) && (!navigation.height || rect.bottom <= navigation.top);
+        }), 'the full control stays above the mobile sections and receives the pointer');
+    }
     async function verifyArcadeInvites(host) {
         for (const phone of [true, false]) {
             const viewport = phone ? { width: 390, height: 844 } : { width: 1440, height: 900 };
@@ -293,6 +302,18 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
                 await captureArcadeInvite(guest, viewport, 'first-visit-02-seated');
+                const leaveMatch = guest.getByRole('button', { name: 'Leave match', exact: true });
+                await expectUncoveredControl(leaveMatch);
+                await expectUncoveredControl(guest.locator('[data-send]'));
+                if (phone) {
+                    await guest.setViewportSize({ width: 390, height: 664 });
+                    try {
+                        await leaveMatch.scrollIntoViewIfNeeded();
+                        await expectUncoveredControl(leaveMatch);
+                        await expectUncoveredControl(guest.locator('[data-send]'));
+                        await captureArcadeInvite(guest, guest.viewportSize(), 'phone-short-03-controls');
+                    } finally { await guest.setViewportSize(viewport); }
+                } else await expect(guest.getByLabel('Announce new chat messages')).toBeVisible();
                 await guest.reload();
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
                 await guest.locator('[data-text]').fill('First visit from the game invite');
@@ -1744,6 +1765,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await fitLandscape(b, b.locator('.brick-race-layout'), board(b), serve(b));
         await expect(board(b)).toBeInViewport({ ratio: 1 });
         await expect(serve(b)).toBeInViewport({ ratio: 1 });
+        await expectUncoveredControl(serve(b));
         await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
         const field = await board(b).boundingBox(), launch = await serve(b).boundingBox();
         assert.ok(field && launch);
