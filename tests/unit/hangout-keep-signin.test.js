@@ -44,7 +44,7 @@ async function visitor({ via = 'rad-dad', verified = false, stored = {}, returni
     window.HangoutClientTestModules = { ...entryFunctions, createEntrySharing, createIdleHeartbeat, createChatAnnouncements };
     window.eval(discovery);
     const imports = [...client.matchAll(/^import \{([^}]+)\} from '[^']+';/gm)].map(match => match[1]).join(',');
-    window.eval(`const {${imports}} = window.HangoutClientTestModules;\n${client.replace(/^import .*$/gm, '')}`);
+    window.eval(`const entrance = window.HangoutClientTestModules; const {${imports}} = entrance;\n${client.replace(/^import .*$/gm, '')}`);
     window.document.querySelector('[data-nick]').value = 'Viewer';
     window.document.querySelector('[data-enter]').click();
     await vi.waitFor(() => expect(sockets).toHaveLength(1));

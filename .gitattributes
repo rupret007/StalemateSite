@@ -11,6 +11,11 @@ play/assets/fonts/*.txt -text
 
 # Keep the pinned chess vendor/artwork/license hashes identical after checkout.
 play/assets/chess/** -text
+hangout-worker/arcade/** -text
+hangout-worker/arcade/assets/chess/chess.js whitespace=-space-before-tab
+hangout-worker/arcade/assets/chess/GPL-3.0.txt whitespace=cr-at-eol
+# A unified diff represents blank context lines with a single space.
+scripts/stalemate-arcade-music.patch whitespace=-blank-at-eol
 
 # iCalendar content lines require literal CRLF bytes on every host.
 events/*.ics -text

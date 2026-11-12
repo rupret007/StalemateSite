@@ -50,6 +50,26 @@ export function entrySourceFromParams(params, registry = ENTRY_SITES) {
     return values.length === 1 ? normalizeEntrySource(values[0], registry) : '';
 }
 
+// A room link carries navigation only. The lobby checks the invitation and
+// exact room instance independently when the visitor chooses to join.
+const gameNightRoomName = name => typeof name === 'string' && /^#game-[a-f0-9]{6}x[a-f0-9]{6}$/.test(name);
+export const GAME_NIGHT_QUERY = 'game-night=1';
+
+export function gameNightEntry(params, hash = '') {
+    const selected = params.getAll('game-night');
+    if (selected.length !== 1 || selected[0] !== '1') return null;
+    const fragment = new URLSearchParams(hash.replace(/^#/, ''));
+    const room = '#' + fragment.get('game'), ref = fragment.get('instance');
+    const target = [...fragment.keys()].sort().join(',') === 'game,instance'
+        && gameNightRoomName(room) && /^[a-f0-9]{32}$/.test(ref || '') ? { room, ref } : null;
+    return { target };
+}
+
+export function gameNightFragment(target) {
+    return gameNightRoomName(target?.room) && typeof target.ref === 'string' && /^[a-f0-9]{32}$/.test(target.ref)
+        ? '#game=' + target.room.slice(1) + '&instance=' + target.ref : '';
+}
+
 // A short-lived, one-use tab handoff carries a choice through a real sign-in
 // navigation. It does not mark future direct visits or cross-tab browsing.
 export const ENTRY_HANDOFF_KEY = 'hangout-entry-handoff';

@@ -2,7 +2,21 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 import { ENTRY_SITES, createEntrySiteRegistry, entrySitesFromConfig, normalizeEntrySource, entrySourceFromParams,
-    entryBadge, entryReturn, entryHandoff, readEntryHandoff } from '../../r/45662413410ed051/entry-sites.mjs';
+    entryBadge, entryReturn, entryHandoff, readEntryHandoff, gameNightEntry, gameNightFragment } from '../../r/45662413410ed051/entry-sites.mjs';
+
+it('carries an exact Game Night room locator only from the explicit entrance', () => {
+    const params = new URLSearchParams('game-night=1&via=rad-dad');
+    const target = { room: '#game-abc123x456def', ref: 'a'.repeat(32) };
+    const hash = gameNightFragment(target);
+    expect(hash).toBe('#game=game-abc123x456def&instance=' + target.ref);
+    expect(gameNightEntry(params, hash)).toEqual({ target });
+    expect(gameNightEntry(new URLSearchParams('via=rad-dad'), hash)).toBeNull();
+    expect(gameNightEntry(new URLSearchParams('game-night=1&game-night=1'), hash)).toBeNull();
+    for (const malformed of ['', hash + '&game=game-abc123x456def', hash + '&invite=private', hash.slice(0, -1), hash.replace('game-abc', 'art-abc')]) {
+        expect(gameNightEntry(params, malformed)).toEqual({ target: null });
+    }
+    expect(gameNightFragment({ ...target, ref: 'unsafe&stuff' })).toBe('');
+});
 
 describe('reviewed entry-site display configuration', () => {
     it('uses allowlisted names and fixed return links; unknown and duplicate sources stay neutral', () => {

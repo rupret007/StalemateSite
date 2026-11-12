@@ -17,6 +17,9 @@ import { lobbyAuthorityMode, createLobbySessionAuthority, createLobbyAuthoritySt
 import { createLobbyParticipation, lobbyParticipationMode, participationConfigurationValid } from './lobby-participation.mjs';
 import { PARTICIPATION_POLICY_KEY } from './participation-partitions.mjs';
 import { lobbyIncidentSourceMode, incidentSourceConfigurationValid } from './lobby-incident-sources.mjs';
+import { arcadeEnabled, arcadeGame, arcadeGames, arcadePath, arcadeRoomRequest, arcadeSocketGame, createArcadeTransport, isArcadeSocket } from './arcade-transport.mjs';
+import { createGameNightMedia, isMediaSocket, mediaEnabled, mediaPath } from './game-night-media.mjs';
+import { issueGameNightTurn } from './turn.mjs';
 
 const privateReportResponse = (value) => new Response(JSON.stringify(value), {
     status: value.ok ? 200 : Number.isInteger(value.status) ? value.status : 503,
@@ -251,6 +254,23 @@ export class HangoutLobby {
         this.participationStartOwner = null;
         this.authorityMode = lobbyAuthorityMode(env);
         this.liveBindings = new Map();
+        this.arcadeDepartures = [];
+        this.arcadeConfigurationReady = false;
+        this.arcade = new Map(arcadeGames.map(name => [name, createArcadeTransport({
+            name, state, current: scope => this.arcadeBinding(scope), active: binding => this.sessionActive(binding),
+            charge: (socket, actor) => this.controlBudget.take(socket, actor),
+            approve: async actor => (await this.engine.approveArcade(actor))?.ok === true,
+            allowed: () => this.arcadeAvailable(name) && !this.authorityUnavailable
+        })]));
+        this.gameMedia = createGameNightMedia({
+            state, current: scope => this.arcadeBinding(scope), active: binding => this.sessionActive(binding),
+            charge: (socket, actor) => this.controlBudget.take(socket, actor),
+            approve: async (...args) => (await this.engine.approveGameMedia(...args))?.ok === true,
+            allowed: () => mediaEnabled(env) && !this.authorityUnavailable,
+            mintRelay: env.HANGOUT_ARCADE_TURN === '1' ? (ref, dev) => issueGameNightTurn(env, ref, dev) : null,
+            serialize: operation => retirementGate(this, operation),
+            submitReport: report => this.submitGameNightReport(report)
+        });
         this.ready = state.blockConcurrencyWhile(async () => {
             try { await this.start(); }
             catch (error) { if (!this.authorityMode) throw error; this.storageFailureToken = {}; this.authorityUnavailable = true; this.evidenceStorage = 'degraded'; }
@@ -331,6 +351,10 @@ export class HangoutLobby {
                 if (ws) {
                     if (this.closedSockets.has(ws)) return;
                     const a = ws.deserializeAttachment() || {};
+                    if (arcadeEnabled(env) && msg.t === 'part' && a.betaSid) {
+                        const ref = this.engine.arcadeRoomRef(msg.ch);
+                        if (ref) this.arcadeDepartures.push({ scope: { room: msg.ch, ref }, subject: a.betaSid });
+                    }
                     if (socketIdentityInvalid(a, env) || this.authorityMode && !this.bindingLive(a)) {
                         if (!a.sessionEnded) {
                             closeTransport(this, ws, 4401, 'sign in again');
@@ -383,7 +407,7 @@ export class HangoutLobby {
         // Hibernation preserves the browser's actual connection. Restore metadata only:
         // never send hello/join or erase its connected-session scrollback on an idle wake.
         const live = [], sockets = new Map(), betaChecks = new Map();
-        for (const ws of state.getWebSockets()) {
+        for (const ws of this.lobbySockets()) {
             const a = ws.deserializeAttachment() || {};
             if (!a.id) { ws.close(4401, 'session unavailable'); continue; }
             if (this.closedSockets.has(ws) || socketIdentityInvalid(a, env) || this.authorityMode && !this.bindingLive(a)) { ws.close(4401, 'sign in again'); continue; }
@@ -420,6 +444,9 @@ export class HangoutLobby {
         else { const logs = await state.storage.list({ prefix: 'log:', reverse: true, limit: 2000 }); this.engine.restoreLog([...logs.values()].reverse()); }
         if (this.authorityMode) { await this.authority.schedule(); this.privateQueueActor = null; }
         else await this.scheduleLegacyAlarm();
+        if (env.HANGOUT_BETA_MODE === 'protected') await this.restoreArcadeConfiguration().catch(() => {});
+        for (const service of this.arcade.values()) service.reconcile();
+        this.gameMedia.reconcile();
     }
 
     async scheduleLegacyAlarm(expiresAt, afterAlarm = false) {
@@ -427,7 +454,7 @@ export class HangoutLobby {
         let next = now + 60000;
         const include = value => { if (Number.isFinite(value)) next = Math.min(next, Math.max(now, value)); };
         if (expiresAt === undefined) {
-            for (const ws of this.state.getWebSockets()) {
+            for (const ws of this.lobbySockets()) {
                 if (ws.readyState === 3 || this.closedSockets?.has(ws)) continue;
                 const attachment = ws.deserializeAttachment() || {};
                 if (!attachment.sessionEnded && !attachment.betaEnded) include(attachment.expiresAt);
@@ -445,6 +472,51 @@ export class HangoutLobby {
         const saved = this.liveBindings.get(value.id);
         return !!saved && saved.expiresAt > Date.now() && ['id', 'betaSid', 'betaInviteVersion', 'dev', 'iph', 'account', 'role', 'admin', 'expiresAt', 'authorityRef', 'authorityRevision']
             .every(key => saved[key] === value[key]);
+    }
+    lobbySockets() { return this.state.getWebSockets().filter(socket => !isArcadeSocket(socket) && !isMediaSocket(socket)); }
+    arcadeBinding(scope) {
+        const socket = this.byId(scope.actor), a = socket?.deserializeAttachment();
+        if (!a || socket.readyState !== 1 || this.closedSockets.has(socket) ||
+            socketIdentityInvalid(a, this.env) || this.authorityMode && !this.bindingLive(a)) return null;
+        const member = this.engine.arcadeActor(scope);
+        return member ? { ...a, ...member, socket } : null;
+    }
+    arcadeAvailable(name) {
+        return this.arcadeConfigurationReady && arcadeEnabled(this.env, name);
+    }
+    async restoreArcadeConfiguration() {
+        const key = 'game-night-enabled:v1', storage = this.state.storage;
+        const enabled = arcadeGames.filter(name => arcadeEnabled(this.env, name));
+        const saved = await storage.get(key);
+        const previous = saved === undefined ? [] : Array.isArray(saved) && saved.length <= arcadeGames.length
+            && saved.every(name => this.arcade.has(name)) ? saved : arcadeGames;
+        for (const name of arcadeGames) {
+            if (previous.includes(name) && !enabled.includes(name)) await this.arcade.get(name).retireDisabled();
+        }
+        if (JSON.stringify(previous) !== JSON.stringify(enabled)) {
+            if (enabled.length) await storage.put(key, enabled);
+            else await storage.delete(key);
+        }
+        // Failed cleanup fences arcade admission until maintenance can retry.
+        this.arcadeConfigurationReady = true;
+    }
+    async reconcileArcade() {
+        if (mediaEnabled(this.env)) this.gameMedia.reconcile();
+        if (!arcadeEnabled(this.env)) return;
+        for (const departure of this.arcadeDepartures.splice(0)) {
+            let retired = true;
+            for (const service of this.arcade.values()) {
+                if (!await service.revoke(departure.scope, departure.subject)) retired = false;
+            }
+            if (!retired) this.arcadeDepartures.push(departure);
+        }
+        for (const service of this.arcade.values()) service.reconcile();
+    }
+    async maintainArcade() {
+        if (this.env.HANGOUT_BETA_MODE === 'protected' && !this.arcadeConfigurationReady) {
+            await this.restoreArcadeConfiguration().catch(() => {});
+        }
+        for (const [name, service] of this.arcade) if (this.arcadeAvailable(name)) await service.maintain().catch(() => {});
     }
     async sessionActive(value) {
         if (!this.authorityMode) return activeBetaSession(this.env, value);
@@ -513,7 +585,7 @@ export class HangoutLobby {
             rememberRetirement(this, id, sid); this.liveBindings.delete(id);
         }
         let closed = true;
-        for (const ws of this.state.getWebSockets()) {
+        for (const ws of this.lobbySockets()) {
             const attachment = ws.deserializeAttachment() || {};
             if (attachment.betaSid !== sid) continue;
             if (!closeTransport(this, ws, 4401, 'beta session ended', { betaEnded: true }).acknowledged) closed = false;
@@ -521,6 +593,7 @@ export class HangoutLobby {
         const selected = [...(this.pendingClosed?.values() || [])].filter(entry => entry.sid === sid && !attempted?.has(entry.id))
             .slice(0, Math.max(0, CLOSED_RETIREMENT_BATCH - (attempted?.size || 0)));
         for (const entry of selected) { attempted?.add(entry.id); if (!await retireClosed(this, entry, gate, !!attempted)) closed = false; }
+        if (arcadeEnabled(this.env) || mediaEnabled(this.env)) await this.reconcileArcade();
         return closed && !pendingSid(this, sid);
     }
     async closeAuthoritySession(record, localClosed) {
@@ -627,6 +700,7 @@ export class HangoutLobby {
                         let cleanup = 'confirmed';
                         try { const refreshed = await this.engine.refreshParticipation(); if (refreshed?.ok === false) cleanup = 'unconfirmed'; }
                         catch { cleanup = 'unconfirmed'; }
+                        if (mediaEnabled(this.env)) this.gameMedia.reconcile();
                         return reply(200, 'sharing withdrawn', { ...result, cleanup });
                     }
                     return reply(200, 'own sharing', result);
@@ -709,6 +783,27 @@ export class HangoutLobby {
         this.privateQueueActor = { binding: a };
         try { const result = await this.privateReportQueue.resolve(id, action); await this.refreshPrivateReports(); return result; }
         finally { this.privateQueueActor = null; }
+    }
+    async submitGameNightReport({ binding, scope, witness, target, request, reason }) {
+        if (!this.privateReportQueue) return { ok: false, status: 503 };
+        const key = this.env.HANGOUT_HMAC_KEY;
+        const report = { type: 'private-report', v: 1, request, kind: 'member',
+            target: 'p' + witness.id, claimedName: witness.nick, excerpt: '', reason: 'Game Night call · ' + reason, consent: true };
+        const checked = validatePrivateReportControl(report);
+        if (!checked.ok) return checked;
+        const [reporterRef, roomRef, targetSessionRef] = await Promise.all([
+            privateReportRef('reporter', binding.betaSid, key),
+            privateReportRef('room', 'game-night-' + scope.ref, key),
+            target ? privateReportRef('target', target.betaSid, key) : null
+        ]);
+        this.privateQueueActor = { binding };
+        try {
+            const result = await this.privateReportQueue.submit(checked.report, { reporterRef, roomRef,
+                reporterConnection: 'p' + scope.actor, targetConnection: report.target, targetSessionRef,
+                targetMembership: target ? 'live' : 'unverified' });
+            await this.refreshPrivateReports();
+            return result;
+        } finally { this.privateQueueActor = null; }
     }
     async receivePrivateReport(request) {
         if (this.env.HANGOUT_BETA_MODE !== 'protected' || request.method !== 'POST' || !this.privateReportQueue) {
@@ -805,7 +900,7 @@ export class HangoutLobby {
                     for (const entry of [...this.pendingClosed.values()].slice(0, CLOSED_RETIREMENT_BATCH)) {
                         entry.retryUsed = true; attempted.add(entry.id); await retireClosed(this, entry, gate, true);
                     }
-                    for (const ws of this.state.getWebSockets()) {
+                    for (const ws of this.lobbySockets()) {
                         const a = ws.deserializeAttachment() || {};
                         if (this.closedSockets.has(ws) || socketIdentityInvalid(a, this.env) || !await this.sessionActive(a)) {
                             const { entry } = closeTransport(this, ws, 4401, 'sign in again', { betaEnded: true });
@@ -821,6 +916,8 @@ export class HangoutLobby {
                     const ticked = await this.engine.tick();
                     if (this.participationMode && ticked?.ok === false) throw Error('participation tick unavailable');
                     await this.pruneLogs();
+                    await this.maintainArcade();
+                    if (mediaEnabled(this.env)) await this.gameMedia.maintain().catch(() => {});
                     this.privateQueueActor = { kind: 'maintenance' };
                     try { await this.refreshPrivateReports(); } finally { this.privateQueueActor = null; }
                     due = await this.authority.due(); await schedule();
@@ -842,7 +939,7 @@ export class HangoutLobby {
         }
         return retirementGate(this, async gate => {
             const betaChecks = new Map();
-            for (const ws of this.state.getWebSockets()) {
+            for (const ws of this.lobbySockets()) {
                 const a = ws.deserializeAttachment() || {};
                 let ended = socketIdentityInvalid(a, this.env);
                 if (!ended && this.env.HANGOUT_BETA_MODE === 'protected') {
@@ -852,6 +949,8 @@ export class HangoutLobby {
                 if (this.closedSockets.has(ws) || ended) { const { entry } = closeTransport(this, ws, 4401, 'sign in again'); await retireClosed(this, entry, gate); }
             }
             await this.engine.tick(); await this.pruneLogs();
+            await this.maintainArcade();
+            if (mediaEnabled(this.env)) await this.gameMedia.maintain().catch(() => {});
             await this.refreshPrivateReports();
             await this.scheduleLegacyAlarm(undefined, true);
         });
@@ -861,6 +960,24 @@ export class HangoutLobby {
         const { pathname: path, searchParams } = new URL(request.url);
         if (path.startsWith(LOBBY_AUTHORITY_PATH)) return this.authorityRequest(request, path.slice(LOBBY_AUTHORITY_PATH.length));
         if (this.authorityUnavailable) return new Response('community authority unavailable', { status: 503 });
+        if (arcadePath(path) || mediaPath(path)) {
+            const media = mediaPath(path), game = arcadeGame(path);
+            if (!(media ? mediaEnabled(this.env) : this.arcadeAvailable(game))) return new Response('not found', { status: 404 });
+            const service = media ? this.gameMedia : this.arcade.get(game);
+            let trusted;
+            try { trusted = JSON.parse(request.headers.get('X-Hangout-Arcade')); } catch { /* deny below */ }
+            if (!trusted?.session?.betaSid) return new Response('session required', { status: 403 });
+            return retirementGate(this, () => {
+                if (path.endsWith('-ticket') && request.method === 'POST') {
+                    const scope = arcadeRoomRequest(trusted.scope);
+                    return scope ? service.issue(scope, trusted.session) : new Response('room required', { status: 403 });
+                }
+                if (!path.endsWith('-ticket') && request.method === 'GET' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
+                    return service.upgrade(request.headers.get('Sec-WebSocket-Protocol'), trusted.session);
+                }
+                return new Response('invalid request', { status: 400 });
+            });
+        }
         if (new URL(request.url).pathname === '/__beta/private-report') {
             return this.state.blockConcurrencyWhile(() => this.receivePrivateReport(request));
         }
@@ -884,7 +1001,7 @@ export class HangoutLobby {
         try { identity = JSON.parse(request.headers.get('X-Hangout-Identity')); } catch (e) { return new Response('no', { status: 400 }); }
         if (this.env.PILOT_MODE === 'protected' && new URL(request.url).pathname === '/__pilot/disconnect' && request.method === 'POST' && /^[a-z0-9-]{16,64}$/.test(identity?.pilotSid || '')) {
             return this.state.blockConcurrencyWhile(async () => {
-                for (const ws of this.state.getWebSockets()) {
+                for (const ws of this.lobbySockets()) {
                     const a = ws.deserializeAttachment() || {};
                     if (a.pilotSid === identity.pilotSid) { this.delivery.forget(ws); ws.close(4401, 'pilot identity changed'); await this.engine.disconnect(a.id); }
                 }
@@ -893,10 +1010,11 @@ export class HangoutLobby {
         }
         if (this.env.HANGOUT_BETA_MODE === 'protected' && new URL(request.url).pathname === '/__beta/disconnect' && request.method === 'POST' && /^[a-z0-9-]{16,64}$/.test(identity?.betaSid || '')) {
             return this.state.blockConcurrencyWhile(async () => {
-                for (const ws of this.state.getWebSockets()) {
+                for (const ws of this.lobbySockets()) {
                     const a = ws.deserializeAttachment() || {};
                     if (a.betaSid === identity.betaSid) { this.delivery.forget(ws); ws.serializeAttachment({ ...a, betaEnded: true }); ws.close(4401, 'beta session ended'); await this.engine.disconnect(a.id); }
                 }
+                await this.reconcileArcade();
                 return new Response('ok');
             });
         }
@@ -947,7 +1065,16 @@ export class HangoutLobby {
         for (const frame of initialFrames) {
             if (frame.t === 'admin' && this.env.HANGOUT_BETA_MODE === 'protected') this.sendPrivateAdmin(pair[1], id, frame);
             else this.delivery.send(pair[1], frame.t === 'hello'
-                ? { ...frame, features: { ...frame.features, transportPing: 1 },
+                ? { ...frame, features: { ...frame.features, transportPing: 1, ...(this.arcadeAvailable('chess') ? { arcadeChess: 1 } : {}),
+                    ...(this.arcadeAvailable('crapeights') ? { arcadeCrapeights: 1 } : {}),
+                    ...(this.arcadeAvailable('turdrummy') ? { arcadeTurdRummy: 1 } : {}),
+                    ...(this.arcadeAvailable('turdspades') ? { arcadeTurdSpades: 1 } : {}),
+                    ...(this.arcadeAvailable('turdjack') ? { arcadeTurdJack: 1 } : {}),
+                    ...(this.arcadeAvailable('turdtris') ? { arcadeTurdtris: 1 } : {}),
+                    ...(this.arcadeAvailable('turdomania') ? { arcadeTurdomania: 1 } : {}),
+                    ...(this.arcadeAvailable('turdrush') ? { arcadeTurdRush: 1 } : {}),
+                    ...(this.arcadeAvailable('turdanoid') ? { arcadeTurdanoid: 1 } : {}),
+                    ...(mediaEnabled(this.env) ? { arcadeMedia: 1 } : {}) },
                     ...(deviceInHello && identity.devToken ? { deviceToken: identity.devToken } : {}) } : frame);
         }
         return new Response(null, { status: 101, webSocket: pair[0] });
@@ -963,6 +1090,13 @@ export class HangoutLobby {
     async webSocketMessage(ws, raw) {
         if (this.closedSockets?.has(ws)) return;
         await this.ready;
+        if (isMediaSocket(ws)) {
+            const relay = await retirementGate(this, () => this.gameMedia.receive(ws, raw));
+            if (relay) await relay();
+            return;
+        }
+        const game = arcadeSocketGame(ws);
+        if (game) return retirementGate(this, () => this.arcade.get(game).receive(ws, raw));
         if (this.closedSockets?.has(ws)) return;
         if (this.authorityUnavailable) { ws.close(1011, 'community authority unavailable'); return; }
         return retirementGate(this, async gate => {
@@ -985,6 +1119,7 @@ export class HangoutLobby {
                 if (control?.t === 'hello' && !this.delivery.negotiate(ws, control.transport)) return;
             }
             const result = await this.engine.message(this.state.getTags(ws)[0], typeof raw === 'string' ? raw : '');
+            await this.reconcileArcade();
             if (result?.privateReportAction) {
                 let resolved;
                 try { resolved = await this.resolvePrivateReport(result.privateReportAction); }
@@ -1002,12 +1137,23 @@ export class HangoutLobby {
     async webSocketClose(ws, code) {
         const replyCode = Number.isInteger(code) && (code >= 1000 && code <= 1014 && ![1004, 1005, 1006].includes(code)
             || code >= 3000 && code <= 4999) ? code : 1000;
+        if (isArcadeSocket(ws) || isMediaSocket(ws)) {
+            try { ws.close(replyCode); } catch { /* already closed */ }
+            if (isMediaSocket(ws)) {
+                await this.ready;
+                return retirementGate(this, () => this.gameMedia.reconcile());
+            }
+            return;
+        }
         // The attachment and WeakSet fence queued frames before any await;
         // acknowledgement/credit release do not claim semantic retirement.
         const { entry } = closeTransport(this, ws, replyCode);
         await this.ready;
         if (this.authorityUnavailable) return;
-        return retirementGate(this, gate => retireClosed(this, entry, gate));
+        return retirementGate(this, async gate => {
+            await retireClosed(this, entry, gate);
+            if (arcadeEnabled(this.env) || mediaEnabled(this.env)) await this.reconcileArcade();
+        });
     }
     async webSocketError(ws) { return this.webSocketClose(ws); }
 }

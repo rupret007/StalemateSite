@@ -41,6 +41,17 @@
         <div class="sheet-buttons" data-sheet-buttons></div>
         <button class="btn btn--ghost" type="button" data-sheet-close>Close</button>
     </dialog>
+    <dialog class="sheet" data-game-share-dialog aria-labelledby="game-share-title">
+        <h3 id="game-share-title">Share Game Night</h3>
+        <p>Share this link to point friends to your room. Invite them from Hang Out to grant access.</p>
+        <label class="channel-label" for="game-share-value">Game Night room link</label>
+        <input id="game-share-value" data-game-share-value readonly>
+        <p role="status" data-game-share-status></p>
+        <div class="sheet-buttons">
+            <button class="btn" type="button" data-game-share-copy>Copy link</button>
+            <button class="btn btn--ghost" type="button" data-game-share-close>Done</button>
+        </div>
+    </dialog>
     <dialog class="sheet" data-invite-dialog aria-labelledby="invite-dialog-title">
         <h3 id="invite-dialog-title">Invite a guest</h3>
         <p>Invite someone to <b data-invite-room></b>. They choose whether to join.</p>
@@ -181,6 +192,20 @@
                 <span class="modes" data-modes></span>
                 <button class="btn btn--small btn--ghost" type="button" data-cam aria-pressed="false">📷 Camera (18+)</button>
                 <button class="btn btn--small btn--ghost op-only" type="button" data-roomtools>@ Host tools</button>
+                <select class="btn btn--small btn--ghost arcade-game-picker" data-arcade-game aria-label="Switch game" hidden>
+                    <option value="">Games</option>
+                    <option value="four">Four in a Row</option>
+                    <option value="chess" hidden disabled>Royal Flush Chess</option>
+                    <option value="crapeights" hidden disabled>Crappy Eights</option>
+                    <option value="turdrummy" hidden disabled>TurdRummy</option>
+                    <option value="turdspades" hidden disabled>TurdSpades</option>
+                    <option value="turdjack" hidden disabled>Crapjack 21</option>
+                    <option value="turdtris" hidden disabled>Turdtris Sprint</option>
+                    <option value="turdomania" hidden disabled>Turdomania Duel</option>
+                    <option value="turdrush" hidden disabled>Turd Rush Race</option>
+                    <option value="turdanoid" hidden disabled>Turdanoid Brick Race</option>
+                </select>
+                <button class="btn btn--small btn--ghost" type="button" data-call-toggle aria-expanded="false" aria-controls="game-night-call" hidden>Call</button>
                 <button class="btn btn--small btn--ghost" type="button" data-leave>Leave</button>
                 <span class="small host-status" data-host-status></span>
             </div>
@@ -197,7 +222,8 @@
                 </div>
                 <div class="jam-actions game-actions">
                     <button class="btn btn--small" type="button" data-game-invite hidden>Invite players</button>
-                    <a class="btn btn--small btn--ghost" href="https://stalemate.band/play/" target="_blank" rel="noopener noreferrer" aria-describedby="game-arcade-tab-note">Open Stalemate Arcade <span aria-hidden="true">↗</span></a>
+                    <button class="btn btn--small btn--ghost" type="button" data-game-share hidden>Share room link</button>
+                    <a class="btn btn--small btn--ghost" data-game-arcade href="https://stalemate.band/play/" target="_blank" rel="noopener noreferrer" aria-describedby="game-arcade-tab-note"><span data-game-arcade-label>Open Stalemate Arcade</span> <span aria-hidden="true">↗</span></a>
                     <span class="sr-only" id="game-arcade-tab-note">Opens in a new tab</span>
                     <a class="btn btn--small btn--ghost" data-game-open target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden>Open Discord call</a>
                 </div>
@@ -222,6 +248,22 @@
                     <button class="btn btn--small btn--ghost four-leave" type="button" data-four-leave hidden></button>
                 </details>
                 <div class="game-call">
+                    <section id="game-night-call" class="game-night-call" aria-labelledby="game-night-call-title" hidden>
+                        <div class="game-call-heading">
+                            <h4 id="game-night-call-title">Room call</h4>
+                            <button class="btn btn--small btn--ghost" type="button" data-call-hide>Hide call controls</button>
+                        </div>
+                        <p class="small game-note" data-call-status role="status"></p>
+                        <div class="jam-actions">
+                            <button class="btn btn--small" type="button" data-call-join>Join call</button>
+                            <button class="btn btn--small btn--ghost" type="button" data-call-mic aria-pressed="false" hidden>Unmute mic</button>
+                            <button class="btn btn--small btn--ghost" type="button" data-call-camera aria-pressed="false" hidden>Turn camera on</button>
+                            <button class="btn btn--small btn--ghost" type="button" data-call-leave hidden>Leave call</button>
+                            <button class="btn btn--small btn--ghost" type="button" data-call-policy hidden>Allow room cameras</button>
+                        </div>
+                        <label class="small game-camera-age" hidden><input type="checkbox" data-call-adult> I am 18 or older</label>
+                        <ul class="game-call-peers" aria-label="People in the call" data-call-peers></ul>
+                    </section>
                     <p class="small game-note" data-game-call-status role="status"></p>
                     <details data-game-editor hidden>
                         <summary>Manage Discord link</summary>

@@ -10,6 +10,8 @@ import { entrySitesFromConfig } from '../../r/45662413410ed051/entry-sites.mjs';
 import { lobbyParticipationMode, participationConfigurationValid } from './lobby-participation.mjs';
 import { incidentSourceConfigurationValid } from './lobby-incident-sources.mjs';
 import { publicBetaHelp } from './beta-public-help.mjs';
+import { arcadeEnabled, arcadeGame, arcadePath, arcadeRoomRequest } from './arcade-transport.mjs';
+import { mediaEnabled, mediaPath } from './game-night-media.mjs';
 export { BetaSessions } from './beta-sessions.mjs';
 export { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget };
 
@@ -66,14 +68,22 @@ export function betaAccessConfigured(env) {
 
 const SHELL = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Stalemate · Private community beta</title><link rel="stylesheet" href="/beta/style.css"><script defer src="/beta/client.js"></script></head><body><main><p class="eyebrow">STALEMATE / INVITATION ONLY</p><h1>Hang Out<span aria-hidden="true">_</span></h1><p class="lede">Pick a nick. Find your people.<br>Make something together.</p><p id="status" role="status">Checking your invitation…</p><div class="recovery-actions"><button id="retry" type="button" hidden>Try again</button><button id="retry-leave" type="button" hidden>Retry leaving</button></div><section id="login" hidden><h2>Your private invitation</h2><p>Open the invitation you received, or enter its code here.</p><form id="unlock"><label>Invitation code<input id="code" type="password" autocomplete="off" required></label><button>Enter the community ↗</button></form></section><section id="inside" hidden><h2>You’re on the guest list.</h2><p id="identity"></p><a class="button" href="${ROOT}lobby/">Choose a nickname and join ↗</a><div class="options"><a id="owner" href="/lobby-owner/login">Verify your email to keep a room</a><a id="staff" href="/lobby-admin/login">Moderator sign-in</a><a id="moderation" href="${ROOT}admin/" hidden>Open moderation panel</a></div><p class="muted">Guest chat needs no account. Email verification is optional and lets you recover your registered rooms on another device. Staff permissions are granted separately.</p><form id="logout"><button class="secondary">Leave this beta</button></form></section><aside><h2>A little field guide</h2><ol><li>Say hello in #stalemate. Chat starts when you join; there’s no earlier backlog.</li><li>Start your own channel, shared canvas, watch room, or WebJam room.</li><li>Use Host tools → Keep this room after verifying your email to reserve its name.</li><li>Report abusive messages from their message menu. Hosts manage their rooms; community moderators review reports.</li></ol><a href="/beta/privacy">House rules, data handling &amp; contact</a></aside><p class="muted">Private beta. Cameras stay off until you choose them. Email sign-in uses Cloudflare Access.</p></main></body></html>`;
 const STYLE = `:root{color-scheme:dark;font:16px/1.6 system-ui,sans-serif;background:#101414;color:#eeeeda}*{box-sizing:border-box}body{margin:0;padding:32px 20px}main{max-width:680px;margin:auto}h1{font-size:clamp(3rem,12vw,5rem);line-height:1;letter-spacing:-.06em;margin:24px 0}h1 span,a,.eyebrow{color:#d1fa78}h2{font-size:1.35rem;line-height:1.3}p,li{overflow-wrap:anywhere}.eyebrow{font:11px/1.5 ui-monospace,monospace;letter-spacing:.08em}.lede{font-size:1.3rem}section,aside{padding:24px;border:1px solid #343d36;margin:24px 0;background:#171d1a}[hidden]{display:none!important}label{display:block;font-size:14px}input{display:block;width:100%;min-width:0;font:16px/1.5 ui-monospace,monospace;padding:12px;margin:8px 0 16px;background:#101414;color:inherit;border:1px solid #65725d}.button,button{display:inline-flex;justify-content:center;align-items:center;min-height:46px;max-width:100%;padding:12px 18px;font:600 16px/1.4 ui-monospace,monospace;border:1px solid #d1fa78;background:#d1fa78;color:#142014;text-decoration:none;cursor:pointer}.recovery-actions{display:flex;flex-wrap:wrap;gap:12px}button:disabled{opacity:.65;cursor:wait}.secondary{background:none;border-color:#65725d;color:inherit;font-size:16px}.options{display:flex;flex-wrap:wrap;gap:12px 20px;margin:24px 0;font-size:14px}.muted{font-size:13px;color:#a1aaa2}ol{padding-left:20px}li{padding-bottom:10px}a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #d1fa78;outline-offset:4px}#status{color:#e5c181;font:12px/1.6 ui-monospace,monospace}@media(max-width:480px){body{padding:24px 16px}section,aside{padding:20px}.options{flex-direction:column}.button{width:100%}}`;
-const CLIENT = `import { createEntrySiteRegistry, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff } from '/beta/entry-sites.mjs';
+const CLIENT = `import * as entrance from '/beta/entry-sites.mjs';
+const { createEntrySiteRegistry, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff, GAME_NIGHT_QUERY, gameNightEntry, gameNightFragment } = entrance;
 const entrySites = createEntrySiteRegistry(__ENTRY_SITES__);
-const source = entrySourceFromParams(new URLSearchParams(location.search), entrySites);
+const params = new URLSearchParams(location.search);
+const source = entrySourceFromParams(params, entrySites);
+const game = gameNightEntry?.(params, location.hash);
 const $ = s => document.querySelector(s);
 const rememberEntry = () => { try { sessionStorage.setItem(ENTRY_HANDOFF_KEY, entryHandoff(source, true, Date.now(), entrySites)); } catch { /* Entrance memory is optional. */ } };
-$('#inside .button').href = '${ROOT}lobby/?entry-return=1';
+const lobby = $('#inside .button');
+lobby.href = '${ROOT}lobby/?entry-return=1' + (game ? '&' + GAME_NIGHT_QUERY + gameNightFragment(game.target) : '');
+if (game) {
+    lobby.textContent = 'Enter Game Night ↗';
+    $('.lede').textContent = 'Play and chat with friends in a private Game Night room.';
+}
 $('#owner').href = '/lobby-owner/login?entry-return=1';
-$('#inside .button').addEventListener('click', rememberEntry);
+lobby.addEventListener('click', rememberEntry);
 $('#owner').addEventListener('click', rememberEntry);
 let currentAttempt = null, operation = '', leavingUnconfirmed = false;
 const unavailable = 'Community access is temporarily unavailable. Try again when you are ready.';
@@ -239,7 +249,7 @@ async function betaRequest(request, env, deps = {}) {
         const asset = await env.ASSETS.fetch(new Request(`${url.origin}${ROOT}entry-sites.mjs`));
         return reply(asset.body, asset.status, 'text/javascript');
     }
-    if (request.method === 'POST' && url.pathname.startsWith('/beta/')) {
+    if (request.method === 'POST' && url.pathname.startsWith('/beta/') && !arcadePath(url.pathname) && !mediaPath(url.pathname)) {
         if (!sameOrigin(request) || !/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type') || '')) return json({ error: 'Same-origin JSON request required.' }, 403);
         if (Number(request.headers.get('Content-Length') || 0) > 2048) return json({ error: 'Request too large.' }, 413);
         const body = await readBetaBody(request);
@@ -310,6 +320,23 @@ async function betaRequest(request, env, deps = {}) {
         const result = redirect(owner ? `${ROOT}lobby/?owner=1${url.searchParams.get('entry-return') === '1' ? '&entry-return=1' : ''}` : `${ROOT}admin/?signed-in=1`, { 'Set-Cookie': betaCookie(BETA_IDENTITY_COOKIE, token, identity.exp - Date.now()) });
         result.headers.append('Set-Cookie', next.cookie);
         return result;
+    }
+    if (arcadePath(url.pathname) || mediaPath(url.pathname)) {
+        if (!(mediaPath(url.pathname) ? mediaEnabled(env) : arcadeEnabled(env, arcadeGame(url.pathname)))) return reply('Room service unavailable.', 404);
+        if (!sameOrigin(request) || url.search) return reply('Admission denied.', 403);
+        const issuing = url.pathname.endsWith('-ticket');
+        if (issuing ? request.method !== 'POST' || !/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type') || '')
+            : request.method !== 'GET' || request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') return reply('Invalid match request.', 400);
+        const scope = issuing ? arcadeRoomRequest(await readBetaBody(request)) : null;
+        if (issuing && !scope) return reply('Current room required.', 400);
+        const next = new Headers(request.headers);
+        next.delete('Cookie');
+        next.delete('Content-Length');
+        next.set('X-Hangout-Arcade', JSON.stringify({ scope, session: {
+            betaSid: session.access.sid, betaInviteVersion: session.access.version
+        } }));
+        const forward = new Request(url, { method: request.method, headers: next });
+        return env.LOBBY.get(env.LOBBY.idFromName('stalemate')).fetch(forward);
     }
     if (['/lobby', '/lobby-owner', '/lobby-admin'].includes(url.pathname)) {
         if (env.HANGOUT_OPEN === '0' && url.pathname !== '/lobby-admin') return reply('The community is temporarily paused. Please try again later.', 503);

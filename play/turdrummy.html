@@ -17,8 +17,9 @@
   <script src="assets/suite-progress.js?v=cf46f758fae8dff1"></script>
   <script src="assets/suite-share.js?v=ad4aecc45730b022"></script>
   <script src="games/suite-dialog-focus.js"></script>
-  <script src="assets/turdsuite.js?v=3a5cafdb70bf7654"></script>
+  <script src="assets/turdsuite.js?v=3f5836f4ca55e4c2"></script>
   <!-- Bot strength follows turdsuite_difficulty_v1 / Suite.difficulty (turdrummy-ai-core.js). -->
+  <script src="games/turdrummy-rules.js?v=7fc23a6923ddd65e"></script>
   <script src="games/turdrummy-ai-core.js"></script>
   <script src="games/turdrummy-audio-core.js?v=bfc951560116f766"></script>
   <script src="games/turdrummy-fx-core.js"></script>
@@ -2358,11 +2359,11 @@
       html[data-mobile-game="turdrummy"] #coachCard .coach-actions { flex-wrap: nowrap; }
     }
   </style>
-<link rel="stylesheet" href="stalemate/play-music-pref.css">
-<script src="../js/music-preference.js"></script>
 <link rel="stylesheet" href="assets/mobile-fit.css">
 <script src="assets/mobile-fit.js" defer></script>
 <link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
+<link rel="stylesheet" href="stalemate/play-music-pref.css">
+<script src="../js/music-preference.js"></script>
 </head>
 <body class="suite-ambient suite-no-zoom arcade" data-arcade-game="turdrummy">
   <div class="app">
@@ -2515,10 +2516,7 @@
     };
 
     const TURDRUMMY_BALANCE = {
-      knockLimit: 10,
-      ginBonus: 25,
-      undercutBonus: 25,
-      matchTarget: 100,
+      ...window.TurdRummyRules.balance,
       ai: {
         takeDiscardGain: 2,
         takeDiscardLateRound: 8,
@@ -3379,21 +3377,12 @@
       return { tone: "neutral", ribbon: "" };
     }
 
-    function cardDeadwoodValue(card) {
-      if (card.rank === 1) return 1;
-      if (card.rank >= 10) return 10;
-      return card.rank;
-    }
+    const { cardDeadwoodValue, sortByRankThenSuit } = window.TurdRummyRules;
 
     function sortBySuitThenRank(a, b) {
       const suitDiff = SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit];
       if (suitDiff !== 0) return suitDiff;
       return a.rank - b.rank;
-    }
-
-    function sortByRankThenSuit(a, b) {
-      if (a.rank !== b.rank) return a.rank - b.rank;
-      return SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit];
     }
 
     function createDeck() {
@@ -3437,139 +3426,7 @@
       return state.playerHand.find((card) => card.id === state.selectedCardId) || null;
     }
 
-    function getCombinations(cards, k) {
-      const out = [];
-      function helper(start, choose, acc) {
-        if (choose === 0) {
-          out.push(acc.slice());
-          return;
-        }
-        for (let i = start; i <= cards.length - choose; i += 1) {
-          acc.push(cards[i]);
-          helper(i + 1, choose - 1, acc);
-          acc.pop();
-        }
-      }
-      helper(0, k, []);
-      return out;
-    }
-
-    function createMeld(type, cards, indexById) {
-      let mask = 0;
-      for (const card of cards) {
-        const idx = indexById.get(card.id);
-        mask |= (1 << idx);
-      }
-      return {
-        type,
-        cards: cards.slice().sort(sortByRankThenSuit),
-        mask
-      };
-    }
-
-    function isBetterAnalysis(a, b) {
-      if (!b) return true;
-      if (a.deadwoodScore !== b.deadwoodScore) return a.deadwoodScore < b.deadwoodScore;
-      if (a.meldCardCount !== b.meldCardCount) return a.meldCardCount > b.meldCardCount;
-      return a.deadwoodCards.length < b.deadwoodCards.length;
-    }
-
-    function collectCandidateMelds(cards) {
-      const indexById = new Map(cards.map((card, idx) => [card.id, idx]));
-      const melds = [];
-
-      const byRank = new Map();
-      for (const card of cards) {
-        if (!byRank.has(card.rank)) byRank.set(card.rank, []);
-        byRank.get(card.rank).push(card);
-      }
-      byRank.forEach((group) => {
-        if (group.length >= 3) {
-          const triples = getCombinations(group, 3);
-          for (const combo of triples) {
-            melds.push(createMeld("set", combo, indexById));
-          }
-          if (group.length === 4) {
-            melds.push(createMeld("set", group, indexById));
-          }
-        }
-      });
-
-      const bySuit = new Map();
-      for (const card of cards) {
-        if (!bySuit.has(card.suit)) bySuit.set(card.suit, []);
-        bySuit.get(card.suit).push(card);
-      }
-      bySuit.forEach((group) => {
-        group.sort((a, b) => a.rank - b.rank);
-        for (let start = 0; start < group.length; start += 1) {
-          const run = [group[start]];
-          for (let end = start + 1; end < group.length; end += 1) {
-            if (group[end].rank === group[end - 1].rank + 1) {
-              run.push(group[end]);
-              if (run.length >= 3) {
-                melds.push(createMeld("run", run, indexById));
-              }
-            } else {
-              break;
-            }
-          }
-        }
-      });
-
-      return melds;
-    }
-
-    function analyzeHand(hand) {
-      const cards = hand.slice().sort(sortByRankThenSuit);
-      const melds = collectCandidateMelds(cards);
-
-      const memo = new Map();
-      function solve(meldIdx, usedMask) {
-        const key = String(meldIdx) + "|" + String(usedMask);
-        if (memo.has(key)) return memo.get(key);
-
-        let result;
-        if (meldIdx >= melds.length) {
-          const deadwoodCards = [];
-          let deadwoodScore = 0;
-          for (let i = 0; i < cards.length; i += 1) {
-            if ((usedMask & (1 << i)) === 0) {
-              deadwoodCards.push(cards[i]);
-              deadwoodScore += cardDeadwoodValue(cards[i]);
-            }
-          }
-          result = {
-            deadwoodScore,
-            deadwoodCards,
-            melds: [],
-            meldCardCount: cards.length - deadwoodCards.length
-          };
-        } else {
-          const skip = solve(meldIdx + 1, usedMask);
-          let best = skip;
-          const meld = melds[meldIdx];
-          if ((usedMask & meld.mask) === 0) {
-            const withMeld = solve(meldIdx + 1, usedMask | meld.mask);
-            const candidate = {
-              deadwoodScore: withMeld.deadwoodScore,
-              deadwoodCards: withMeld.deadwoodCards,
-              melds: [{ type: meld.type, cards: meld.cards.slice() }].concat(withMeld.melds),
-              meldCardCount: withMeld.meldCardCount
-            };
-            if (isBetterAnalysis(candidate, best)) {
-              best = candidate;
-            }
-          }
-          result = best;
-        }
-
-        memo.set(key, result);
-        return result;
-      }
-
-      return solve(0, 0);
-    }
+    function analyzeHand(hand) { return window.TurdRummyRules.analyzeHand(hand); }
 
     // extraAttrs is trusted markup built by the page (data-hand-id, inline fan vars), never user text.
     function createCardHtml(card, interactive, selected, extraAttrs) {
@@ -4227,138 +4084,7 @@
         cardLikelyUsefulForMeld(state.aiHand, topCard);
     }
 
-    function cloneMelds(melds) {
-      return melds.map((meld) => ({
-        type: meld.type,
-        cards: meld.cards.map((card) => ({ suit: card.suit, rank: card.rank, id: card.id }))
-      }));
-    }
-
-    function canCardAttachToMeld(card, meld) {
-      if (meld.type === "set") {
-        if (card.rank !== meld.cards[0].rank) return false;
-        if (meld.cards.length >= 4) return false;
-        return !meld.cards.some((m) => m.suit === card.suit);
-      }
-      if (meld.type === "run") {
-        if (card.suit !== meld.cards[0].suit) return false;
-        const ranks = meld.cards.map((m) => m.rank).sort((a, b) => a - b);
-        const min = ranks[0];
-        const max = ranks[ranks.length - 1];
-        return card.rank === min - 1 || card.rank === max + 1;
-      }
-      return false;
-    }
-
-    function attachCardToMeld(card, meld) {
-      meld.cards.push({ suit: card.suit, rank: card.rank, id: card.id });
-      if (meld.type === "run") meld.cards.sort((a, b) => a.rank - b.rank);
-    }
-
-    function isBetterLayoff(a, b) {
-      if (!b) return true;
-      if (a.deadwoodScore !== b.deadwoodScore) return a.deadwoodScore < b.deadwoodScore;
-      if (a.laidOffCards.length !== b.laidOffCards.length) return a.laidOffCards.length > b.laidOffCards.length;
-      return a.deadwoodCards.length < b.deadwoodCards.length;
-    }
-
-    function applyLayoff(defenderHand, knockerMelds) {
-      const base = analyzeHand(defenderHand);
-      if (!knockerMelds || knockerMelds.length === 0 || base.deadwoodCards.length === 0) {
-        return { deadwoodScore: base.deadwoodScore, deadwoodCards: base.deadwoodCards.slice(), laidOffCards: [] };
-      }
-      const cards = defenderHand.slice().sort(sortByRankThenSuit);
-      const candidateMelds = collectCandidateMelds(cards);
-      const tableMelds = cloneMelds(knockerMelds);
-      const partitionMemo = new Map();
-      const unusedMaskMemo = new Map();
-
-      function searchDeadwood(deadwoodCards) {
-        const layoffMemo = new Map();
-
-        function search(remaining, melds) {
-          // Equivalent attachment orders reach the same remaining cards and
-          // table. Cache those states rather than exploring every permutation.
-          const key = JSON.stringify([remaining, melds.map((meld) => [
-            meld.type,
-            meld.cards.slice().sort(sortByRankThenSuit).map((card) => [card.suit, card.rank])
-          ])]);
-          if (layoffMemo.has(key)) return layoffMemo.get(key);
-
-          const keptCards = remaining.map((index) => deadwoodCards[index]);
-          let best = {
-            deadwoodScore: keptCards.reduce((total, card) => total + cardDeadwoodValue(card), 0),
-            deadwoodCards: keptCards,
-            laidOffCards: []
-          };
-
-          // A card that cannot attach yet stays available. For example, a 7 can
-          // join 3-4-5 only after the 6 extends it. Explore each destination too:
-          // placing that 6 on a rank set instead could strand the 7.
-          for (let position = 0; position < remaining.length; position += 1) {
-            const card = deadwoodCards[remaining[position]];
-            for (let i = 0; i < melds.length; i += 1) {
-              if (!canCardAttachToMeld(card, melds[i])) continue;
-              const nextMelds = cloneMelds(melds);
-              attachCardToMeld(card, nextMelds[i]);
-              const nextRemaining = remaining.filter((_index, at) => at !== position);
-              const continuation = search(nextRemaining, nextMelds);
-              if (continuation.deadwoodScore < best.deadwoodScore) {
-                best = {
-                  deadwoodScore: continuation.deadwoodScore,
-                  deadwoodCards: continuation.deadwoodCards,
-                  laidOffCards: [card].concat(continuation.laidOffCards)
-                };
-                // Scores cannot be negative. The receipt retains the legal
-                // attachment order that actually reached this best outcome.
-                if (best.deadwoodScore === 0) {
-                  layoffMemo.set(key, best);
-                  return best;
-                }
-              }
-            }
-          }
-          layoffMemo.set(key, best);
-          return best;
-        }
-
-        return search(deadwoodCards.map((_card, index) => index), tableMelds);
-      }
-
-      function layoffUnused(usedMask) {
-        if (unusedMaskMemo.has(usedMask)) return unusedMaskMemo.get(usedMask);
-        const unusedCards = [];
-        for (let i = 0; i < cards.length; i += 1) {
-          if ((usedMask & (1 << i)) === 0) unusedCards.push(cards[i]);
-        }
-        unusedCards.sort((a, b) => cardDeadwoodValue(b) - cardDeadwoodValue(a));
-        const result = searchDeadwood(unusedCards);
-        unusedMaskMemo.set(usedMask, result);
-        return result;
-      }
-
-      function solve(meldIdx, usedMask) {
-        const key = String(meldIdx) + "|" + String(usedMask);
-        if (partitionMemo.has(key)) return partitionMemo.get(key);
-
-        let best;
-        if (meldIdx >= candidateMelds.length) {
-          best = layoffUnused(usedMask);
-        } else {
-          best = solve(meldIdx + 1, usedMask);
-          const meld = candidateMelds[meldIdx];
-          if ((usedMask & meld.mask) === 0) {
-            const withMeld = solve(meldIdx + 1, usedMask | meld.mask);
-            if (isBetterLayoff(withMeld, best)) best = withMeld;
-          }
-        }
-
-        partitionMemo.set(key, best);
-        return best;
-      }
-
-      return solve(0, 0);
-    }
+    function applyLayoff(hand, melds) { return window.TurdRummyRules.applyLayoff(hand, melds); }
 
     function finishRound(knocker, isGin, knockerDeadwood, knockerMelds) {
       trackCardProgressDifficulty();
@@ -4368,35 +4094,18 @@
       state.stats.roundsPlayed += 1;
       const defender = knocker === "player" ? "ai" : "player";
       const defenderHand = defender === "player" ? state.playerHand : state.aiHand;
-      const defenderBase = analyzeHand(defenderHand);
-      let defenderDeadwood = defenderBase.deadwoodScore;
-      let layoffText = "";
-      let layoffCards = [];
-
-      if (!isGin) {
-        const layoff = applyLayoff(defenderHand, knockerMelds);
-        defenderDeadwood = layoff.deadwoodScore;
-        layoffCards = layoff.laidOffCards.slice();
-        if (layoff.laidOffCards.length > 0) {
-          layoffText = " Layoff: " + layoff.laidOffCards.map(cardText).join(", ") + ".";
-        }
-      }
-
-      let points = 0;
-      let awardedTo = "";
+      const settled = window.TurdRummyRules.scoreRound({ deadwoodScore: knockerDeadwood, melds: knockerMelds }, defenderHand, isGin);
+      const { points, defenderDeadwood, laidOffCards: layoffCards } = settled;
+      const layoffText = layoffCards.length ? " Layoff: " + layoffCards.map(cardText).join(", ") + "." : "";
+      let awardedTo = knocker;
       let summary = "";
       if (isGin) {
-        points = TURDRUMMY_BALANCE.ginBonus + defenderDeadwood;
-        awardedTo = knocker;
         summary = (knocker === "player" ? "You called GIN!" : "AI called GIN!") + " +" + points + ".";
         if (knocker === "player") state.stats.playerGins += 1;
         else state.stats.aiGins += 1;
-      } else if (knockerDeadwood < defenderDeadwood) {
-        points = defenderDeadwood - knockerDeadwood;
-        awardedTo = knocker;
+      } else if (settled.kind === "knock") {
         summary = (knocker === "player" ? "You knocked." : "AI knocked.") + " +" + points + "." + layoffText;
       } else {
-        points = TURDRUMMY_BALANCE.undercutBonus + (knockerDeadwood - defenderDeadwood);
         awardedTo = defender;
         summary = "Undercut! " + (defender === "player" ? "You" : "AI") + " gain +" + points + "." + layoffText;
         state.stats.undercuts += 1;
