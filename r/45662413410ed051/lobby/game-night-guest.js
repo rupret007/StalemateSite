@@ -1,6 +1,7 @@
 const status = document.querySelector('[data-guest-status]');
 const invite = document.querySelector('[data-guest-invite]');
 const join = document.querySelector('[data-guest-join]');
+const retry = document.querySelector('[data-guest-retry]');
 const code = new URLSearchParams(location.hash.slice(1)).get('invite');
 const attempt = crypto.randomUUID().replaceAll('-', '');
 if (location.hash || location.search) history.replaceState(null, '', location.pathname);
@@ -16,10 +17,12 @@ async function request(action, data) {
 }
 
 async function describe() {
+    retry.hidden = true;
     if (!code || code.length > 250) {
         status.textContent = 'Open the Game Night invitation your host sent you.';
         return;
     }
+    status.textContent = 'Checking your invitation…';
     try {
         const { game, host } = await request('details');
         const inviter = document.querySelector('[data-guest-inviter]');
@@ -28,8 +31,10 @@ async function describe() {
         document.querySelector('[data-guest-game]').textContent = game;
         status.textContent = '';
         invite.hidden = false;
+        if (document.activeElement === document.body) join.focus({ preventScroll: true });
     } catch (error) {
-        status.textContent = error.status === 410 ? error.message : 'Couldn’t check the invitation. Open the original link again in a moment.';
+        status.textContent = error.status === 410 ? error.message : 'Couldn’t check the invitation. Try again.';
+        retry.hidden = error.status === 410;
     }
 }
 
@@ -47,4 +52,5 @@ join.addEventListener('click', async () => {
     }
 });
 
+retry.addEventListener('click', () => void describe());
 void describe();

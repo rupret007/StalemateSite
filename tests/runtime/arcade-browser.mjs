@@ -273,7 +273,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 assert.equal(new URL(guest.url()).hash, '');
                 await captureArcadeInvite(guest, viewport, 'first-visit-01-guest-accept');
                 const join = guest.getByRole('button', { name: 'Join game', exact: true });
-                if (phone) await join.tap(); else await join.click();
+                await expect(join).toBeInViewport({ ratio: 1 });
+                await expect(join).toHaveAccessibleDescription(/13\+ and agree to the house rules/);
+                assert.ok((await join.boundingBox()).height >= 44, 'the first action is a full touch target');
+                if (phone) await join.tap();
+                else {
+                    await expect(join).toBeFocused();
+                    await guest.keyboard.press('Enter');
+                }
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
                 await expect(guest.getByLabel('Your nick')).toBeHidden();
                 await expect(guest.getByRole('combobox', { name: 'Switch game' })).toBeHidden();
