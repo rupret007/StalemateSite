@@ -286,6 +286,11 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .four-board td[data-last] { border-color: #7d8877; }
 .four-board td[data-winning] { border-color: currentColor; }
 .game-actions .arcade-game-picker { min-height: 44px; padding-inline-end: 24px; font: inherit; font-weight: 700; }
+.game-actions:has(.arcade-game-picker:not([hidden])) [data-game-invite] {
+    color: var(--lime);
+    background: transparent;
+}
+.game-actions:has(.arcade-game-picker:not([hidden])) [data-game-invite]:hover { background: #242f1c; }
 .game-night:has(.arcade-card-table[open]) { max-height: 68dvh; overscroll-behavior: contain; overflow-anchor: none; }
 .arcade-card-table { margin: 6px 0; border-block: 1px solid var(--line); padding: 4px 0 8px; }
 .arcade-card-table summary { display: list-item; min-height: 34px; padding: 6px 2px; font-weight: 650; color: var(--cream); }
