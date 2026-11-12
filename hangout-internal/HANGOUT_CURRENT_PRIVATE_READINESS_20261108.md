@@ -6,38 +6,28 @@ band rehearsal is not yet qualified.** Music, actual Shared Track mixing and
 Webex video/audio handoff remain essential acceptance work, not optional extras.
 Both public websites and their navigation remain unchanged.
 
-## Candidate awaiting private rollout
+## Current private site
 
-Private source `33d57f9be9d7e156db1b2dfc88537a322f3dd197` adds **Invite bandmate
-to room** in the Jam panel. Web Join can offer a working input when the selected
-microphone is missing or busy. It can also test the default microphone when the
-browser cannot list devices. Both exact PR runs passed 952 browser cases,
-including keyboard setup and recovery at 375 and 390 CSS pixels. The latest
-WebJam source `b5483c5` also passed browser, desktop, and Jamulus integration CI.
-[Jam invite](https://github.com/rupret007/StalemateSite/pull/280) ·
-[Website microphone checks](https://github.com/rupret007/StalemateSite/pull/283) ·
-[WebJam CI](https://github.com/rupret007/webjam/actions/runs/43079275947)
+The invite-only site serves the Arcade trial at `dc77aef929700a6668945344f210cf6a81d50813`
+as version `8d76db40`. That source includes the rehearsal merge `3d741f5`, the
+persistent Jam invitation and **Return to room** after reconnecting. The live
+rollout checked 28 protected assets, including all three updated Web Join
+files. A follow-up readback confirmed the Worker bytes, private admission,
+effective configuration with the Arcade flags, unchanged issuer and
+rollback version `fca791b7`. The earlier four-guest Arcade table trial passed
+and all guests logged out. The separate live reconnect/rematch trial is still
+open. [Arcade trial source](https://github.com/rupret007/StalemateSite/pull/267) ·
+[Jam invitation and return](https://github.com/rupret007/StalemateSite/pull/289)
 
-The later private-branch merge `60a24c0` keeps the Jam invite button's keyboard
-focus outline visible after closing the dialog at deep zoom. Both checks for
-that change passed. [Jam invite keyboard fix](https://github.com/rupret007/StalemateSite/pull/285)
+The merged rehearsal branch passed all 962 browser cases and both 34-case
+deployment checks on the second attempt at the same commit. The first run's
+Chromium Rummy timeout remains unexplained. The Arcade trial has its own
+source and checks. [Exact rehearsal CI](https://github.com/rupret007/StalemateSite/actions/runs/43115175160)
 
-Through `60a24c0`, the branch changes the same six protected asset paths against
-the last verified serving source `3ad1cc19`. The keyboard fix revises the lobby
-stylesheet, already one of those six paths. The other 65 protected assets,
-56 Worker inputs and five build inputs match. Local workerd exercised the earlier
-`33d57f9` candidate with 50 connected test guests, 12
-messages and 600 deliveries, along with slow-client isolation, revocation and
-cold recovery. Hosted capacity and live media still need their own trials.
-[Local runtime CI](https://github.com/rupret007/StalemateSite/actions/runs/43081753166)
-
-The next rollout awaits the Mini's deployment resource check and a fresh
-configuration, billing and rollback readback. Confirm the version serving
-immediately before the switch and keep it ready for rollback. The last verified
-serving version was `fca791b7`. After switching, use a normally admitted guest to check
-the served Jam and Web Join assets, then log out. The Windows NucBox was
-offline at the latest check. The live Mac-to-Windows rehearsal, Shared Track
-and Webex remain open.
+Local workerd exercised the earlier `33d57f9` candidate with 50 connected
+test guests, 12 messages and 600 deliveries, along with slow-client isolation,
+revocation and cold recovery. Hosted capacity and live media still need
+their own trials. [Local runtime CI](https://github.com/rupret007/StalemateSite/actions/runs/43081753166)
 
 ## Last verified private beta
 
@@ -114,18 +104,18 @@ tracks all [62 original requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md).
 
 | Layer | Qualified evidence | Still required |
 | --- | --- | --- |
-| Last verified private website | Private merge `3ad1cc19b06ac2070480232676b3866279fd37c6` serves as `fca791b7-bcec-4597-a855-fb7d7eb152d5` at 100%, deployment `a73dcc6a-b9ca-43f6-a78e-8fb5629321e7`. The rollout preserved effective configuration, issuer and anonymous admission. An admitted guest verified six protected Web Join assets and logged out. [PR 277](https://github.com/rupret007/StalemateSite/pull/277) passed both exact CI runs with 916 browser checks and 34 checks per route style in each. | Verify joined native Safari, physical mobile, screen-reader speech and live Music. |
+| Last verified private website | Arcade trial source `dc77aef` serves as `8d76db40-4eda-4e9c-9dee-f724ea9622ef` at 100%. The rollout verified the protected assets and anonymous admission. A later provider readback matched the serving Worker, configuration and issuer. | Verify joined native Safari, physical mobile, screen-reader speech and live Music. |
 | Current application source | [PR 270](https://github.com/rupret007/StalemateSite/pull/270) bounds stalled joins and preserves the nickname for retry. [PR 271](https://github.com/rupret007/StalemateSite/pull/271) uses one first-join frame for updated clients. Both exact PR 271 browser runs passed 912 browser cases, 34 checks on each route and 150 test SQLite admissions; both native workerd runs passed. | Continue native Safari, physical mobile and screen-reader checks. |
 | Keyboard/playback correction | PR249 merged as `ce319fd73ad12cf43cd67cb96276302698d07d6c`. Its current-head and combined-private CI passed. Full CI originally exposed a network-stalled/playback-status defect; the corrected regression and unchanged real-media browser trials passed. Original failures/traces are retained. | Qualify current delivered keyboard/playback journeys. Neither responsive viewports nor real browser media decoding prove physical iOS or VoiceOver. |
-| AE49 native packages | Exact source `ae49c915070f2951db9ff441c23c7f0a9d90ce1b` completed four desktop jobs across the initial run and Intel retry. All four archives passed source, private target, paths/CRC, architecture, component, generated-notice and eleven-license checks. Both Macs passed five strict signature checks. Windows Setup/ZIP checksums and hosted install/start/uninstall passed. The extracted Linux package passed idle startup, Pocket Stage, Reference Studio and Jamulus startup against dummy JACK. The frozen lesson player also passed on the Linux runner. [ARM startup and archive evidence](../pr-assets/private-readiness/20261110/native-ae49/README.md) · [Linux build job](https://github.com/rupret007/webjam/actions/runs/42888556613/job/130096378059). | The Mini still selects AE49 and passed idle startup and Quit. Intel now selects the newer rehearsal build below. Local Windows and Linux execution, publisher trust and physical media remain open. |
-| Replacement rehearsal build | [Private run 42997398282](https://github.com/rupret007/webjam/actions/runs/42997398282) passed all four desktop targets at `23cfae6ac05c128e1caf8a6fd366751686304ba6`. Both Mac disk images passed the mounted-package checks, and Windows passed hosted install, launch and uninstall. Exact artifact IDs and SHA-256 digests are in the [package evidence](../pr-assets/private-readiness/20261111/band-rehearsal/qualification.json). | The Intel Mac archive and signatures were checked locally. The build started under an isolated home and now has the Intel Desktop shortcut. Stage the ARM build when its guard opens. Actual rehearsal audio remains unverified. |
+| AE49 native packages | Exact source `ae49c915070f2951db9ff441c23c7f0a9d90ce1b` completed four desktop jobs across the initial run and Intel retry. All four archives passed source, private target, paths/CRC, architecture, component, generated-notice and eleven-license checks. Both Macs passed five strict signature checks. Windows Setup/ZIP checksums and hosted install/start/uninstall passed. The extracted Linux package passed idle startup, Pocket Stage, Reference Studio and Jamulus startup against dummy JACK. The frozen lesson player also passed on the Linux runner. [ARM startup and archive evidence](../pr-assets/private-readiness/20261110/native-ae49/README.md) · [Linux build job](https://github.com/rupret007/webjam/actions/runs/42888556613/job/130096378059). | The earlier Mini startup passed. Its old Desktop link target is now missing. Local Windows and Linux native execution, publisher trust and physical media remain open. |
+| Replacement rehearsal build | [Private run 42997398282](https://github.com/rupret007/webjam/actions/runs/42997398282) passed all four desktop targets at `23cfae6ac05c128e1caf8a6fd366751686304ba6`. Both Mac disk images passed the mounted-package checks, and Windows passed hosted install, launch and uninstall. Exact artifact IDs and SHA-256 digests are in the [package evidence](../pr-assets/private-readiness/20261111/band-rehearsal/qualification.json). Both Mac builds passed isolated idle startup and their Desktop shortcuts select the verified build. On the Mini, Join opened the secure invite field, Back returned to idle and Command-Q closed the app. | Actual rehearsal audio remains unverified on both hosts. |
 | Prior native package baseline | Older `67c7ef08e515c84eb2b0736c474ec2c4b0c21682` and its all-four-archive checks remain in the [unchanged prior receipt](../pr-assets/private-readiness/20261110/README.md). | Its idle UI/Command-Q and disabled native-menu observation remain historical. Do not relabel it AE49 or replay completed checks. |
 | Native fixes and CI | [WebJam PR468](https://github.com/rupret007/webjam/pull/468) merged as `3eb71e9892e72062ea6991ccd76a8805f85497a1`; actual tree `50596d2a1e2e18b19832ee8da89faaee86fe8916` equals reviewed AE49 and tested synthetic merge. Startup workaround is Cocoa-only; macOS offscreen keeps modal completion. All nine focused startup cases pass; full source CI passed 12,985 tests, 60 existing skips and all 567 modules exactly once. Both unchanged Mac workspace gates passed 204 cases with 12 existing skips, plus 34 Reference Studio cases. | Intel attempt 1 failed at pinned Opus download with TLS EOF35 after passing the workspace gate; one failed-jobs-only retry succeeded without changing security checks or source. Source/generated tests do not prove physical media. Later misclassified hostname/observer-relaunch probes are explicitly unqualified in the current receipt. |
 | Webex audio handoff | [WebJam PR 471](https://github.com/rupret007/webjam/pull/471) merged as `ba4f4c2c9ec24ec99ca3f834095cd505fbd44b35`. The [private desktop packaging run](https://github.com/rupret007/webjam/actions/runs/42960638326) passed all four platforms on `6e26c693c7d8b0160d8a9ea3434954df526e81bd`. Both Mac archives passed full download digest and outer package name checks. The current Intel rehearsal build includes the handoff guidance. | Verify a real Personal Room join and video, then switch between Music and meeting audio with both participants. |
 | Selected audio connection | Upstream [WebJam PR466](https://github.com/rupret007/webjam/pull/466), reviewed head `098c57250b5ed2b97c233d7e843f5c5d1297a9e8`, merged as `01804299f3940f243b06f88749d488e03f08cf5c`. Delay and receiver adaptation now use the actual selected transport pair rather than a retired pair encountered last. Four regressions failed before the fix. Completed CI passed 44 Web Join unit cases, 69 browser cases, 87 Worker cases and 12,976 application tests with 60 existing skips across 566 modules. The website mirrors the reviewed audio bytes and provenance. | This browser JavaScript fix does not change the native host runtime or relabel existing native packages. Physical latency, acoustic listening, LAN routing and relay admission still need their own evidence. |
 | Earlier application provider-start CI | [Run 42780185842](https://github.com/rupret007/StalemateSite/actions/runs/42780185842), job 129708072371, completed the actual `--participation --provider-start` application/workerd mode against website revision `11c9d1f8`. All 15 recorded mode/install/audit exits were zero. Owner/start ordering, duplicate start, Stop/revoke/close fencing and owned cleanup passed. | Real guardian decisions, hosted capacity and media acceptance remain open. |
 | Issuer | Last verified `fd37578f-13cd-4fce-b557-35c0d962ef9d` at100%; completed405/204/403 negatives have receiptc209b961. | Reuse that completed result; do not rerun it or mint test credentials. The existing cap/hold and fresh account headroom still govern trials. |
-| Private site rollback | `fca791b7` was the last verified serving version. If it is still serving before the next rollout, keep it ready as that rollout's rollback target. `43002fe9-4d04-456b-9fde-320dc151abc8` was the previous version and remains the recorded fallback for the switch that deployed `fca791b7`. [Release evidence](../pr-assets/private-readiness/20261111/web-join-audio-check/qualification.json) | Verify the current serving version and rollback target before switching. Compare the serving state and effective configuration after any rollback. The issuer has its own recorded fallback, `4db649fa`. |
+| Private site rollback | `fca791b7-bcec-4597-a855-fb7d7eb152d5` is the recorded and readable rollback for the active Arcade trial. Its own earlier fallback was `43002fe9-4d04-456b-9fde-320dc151abc8`. [Earlier release evidence](../pr-assets/private-readiness/20261111/web-join-audio-check/qualification.json) | Verify the current serving version and rollback target before switching. Compare the serving state and effective configuration after any rollback. The issuer has its own recorded fallback, `4db649fa`. |
 
 The [sanitized live receipt and screenshots](../pr-assets/private-readiness/20261109/README.md)
 cover actual Mac Chrome/Safari observations on c83:
@@ -195,11 +185,10 @@ redistribution-license qualification remains explicitly unfinished.
 
 ## Remaining band journey
 
-1. On the Intel Mac, open **WebJam Private Band Demo** from the Desktop and
-   confirm build `23cfae6`. Its archive, signatures and isolated idle startup
-   passed. The Mini still selects AE49. Qualify the Apple Silicon replacement
-   after its archive, trust and resource checks. Keep the previous shortcuts
-   and settings available for rollback.
+1. On either Mac, open **WebJam Private Band Demo** from the Desktop and
+   confirm build `23cfae6`. Both archives, signatures and isolated idle
+   startup checks passed. The Mini's previous link was preserved. Its target
+   is missing, so restoring AE49 would also require a verified earlier copy.
 2. Before hosting or copying an invite, connect the dock Ethernet and SSL 2+.
    Plug the guitar pedal into SSL input 1, the vocal mic into input 2 and wired
    headphones into the SSL. With Music idle, open macOS **Audio MIDI Setup**.
@@ -213,12 +202,10 @@ redistribution-license qualification remains explicitly unfinished.
    both people into the same Jam room in Hang Out. The host can create one
    through **Rooms → Jam (WebJam)**. Use **Invite bandmate to room** when it
    appears, or type `/invite` and Che's nickname in the room. A Jam room is
-   invite-only, so a guest does not see it under **Rooms**. Until
-   [PR 289](https://github.com/rupret007/StalemateSite/pull/289) is rolled out,
-   the invitation notice lasts about twelve seconds. Invite Che again if he
-   misses it, refreshes or reconnects. After that rollout the invitation waits
-   at the bottom of the window until he chooses **Join room**, and
-   **Return to room** appears there after a refresh or dropped connection.
+   invite-only, so a guest does not see it under **Rooms**. The invitation
+   waits at the bottom of the window for **Join room**. After joining, use
+   **Return to room** there after a refresh or dropped connection. If the room
+   has ended or the invitation is unavailable, ask the host for a fresh invite.
    Have Che connect the Roland drums to his interface and check that Windows
    sees the input.
 
@@ -249,8 +236,9 @@ redistribution-license qualification remains explicitly unfinished.
    [Browser connection setup](https://github.com/rupret007/webjam/blob/6e26c693c7d8b0160d8a9ea3434954df526e81bd/web/join/session.js#L55-L60)
 4. Through the desktop Shared Track sender, load **Original Test Chords.wav**,
    then **Original Test Chords.mp3**. Matching copies of both 40-second stereo
-   48 kHz files are staged on both Macs. Keep the primary microphone and
-   headphones on the physical route and verify the separate existing
+   48 kHz files are staged on both Macs. The Mini's bundled decoder passed
+   five seeks per file plus pause, restart and trim in memory. Keep the primary
+   microphone and headphones on the physical route and verify the separate existing
    BlackHole 16-channel 48 kHz backing route. Hear backing plus live
    input together; check levels/mute, pause/restart/seek and stopping. Earlier
    file decoding, locked controls and generated tones do not establish this mix.
