@@ -310,6 +310,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await host.getByRole('button', { name: 'Open Chess match' }).click();
             await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
             const link = await shareGameNightLink(host, viewport, 'first-visit-00-host-share');
+            const inviteFromTable = host.locator('.arcade-chess').getByRole('button', { name: 'Invite a friend', exact: true });
+            await inviteFromTable.click();
+            const picker = host.getByRole('dialog', { name: 'Invite a guest' });
+            await expect(picker.getByRole('button', { name: 'Invite a friend to Royal Flush Chess' })).toBeFocused();
+            await picker.press('Escape');
+            await expect(inviteFromTable).toBeFocused();
             const context = await browser.newContext({ viewport, hasTouch: phone, reducedMotion: 'reduce', ignoreHTTPSErrors: true });
             try {
                 const guest = await context.newPage();
@@ -364,6 +370,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 }
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
                 await expect(guest.locator('[data-game-guest-connecting]')).toBeHidden();
+                await expect(guest.locator('details.arcade-chess > summary')).toBeFocused();
                 const pieces = guest.locator('.arcade-chess cg-board piece');
                 await expect(pieces).toHaveCount(32);
                 await expect(pieces.first()).toBeVisible();
