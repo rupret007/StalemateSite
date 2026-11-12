@@ -64,7 +64,7 @@ const sources = () => Object.fromEntries([
     ['fixture/runner.mjs', FILE], ['fixture/worker.mjs', join(HERE, 'worker.mjs')], ['fixture/README.md', join(HERE, 'README.md')],
     ['fixture/control-credit-observation.mjs', join(HERE, 'control-credit-observation.mjs')],
     ...readdirSync(join(APP, 'hangout-worker/src')).filter(name => name.endsWith('.mjs')).sort().map(name => [`application/src/${name}`, join(APP, 'hangout-worker/src', name)]),
-    ...['r/45662413410ed051/sync-core.js', 'r/45662413410ed051/entry-sites.mjs', 'package.json', 'package-lock.json', '.github/workflows/durable-record-runtime.yml', 'hangout-worker/wrangler.beta.toml', 'node_modules/rolldown/package.json', 'node_modules/obscenity/package.json'].map(name => [`application/${name}`, join(APP, name)]),
+    ...['r/45662413410ed051/sync-core.js', 'r/45662413410ed051/entry-sites.mjs', 'r/45662413410ed051/lobby/game-night.mjs', 'package.json', 'package-lock.json', '.github/workflows/durable-record-runtime.yml', 'hangout-worker/wrangler.beta.toml', 'node_modules/rolldown/package.json', 'node_modules/obscenity/package.json'].map(name => [`application/${name}`, join(APP, name)]),
     ...['package.json', 'package-lock.json'].map(name => [`tools/${name}`, join(TOOLS, name)])
 ].map(([name, path]) => [name, hash(path)]));
 function bindingPackage() {
@@ -291,7 +291,10 @@ async function runtime(phase, state, nonce) {
         const visitor = new Visitor(response.webSocket, label, transport, acknowledge); visitors.push(visitor);
         const hello = await visitor.wait(f => f.t === 'hello', 'actual hello');
         if (FANOUT_50 && admissionProfile) admissionProfile.serverHello = performance.now();
-        assert.deepEqual(hello.features, { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1 }); assert.equal(hello.role, 'fan');
+        assert.deepEqual(hello.features, { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1,
+            personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, gameNight: 1,
+            fourInARow: 1, discordLinks: !PARTICIPATION, transportPing: 1 });
+        assert.equal(hello.role, 'fan');
         if (FANOUT_50 && admissionProfile) admissionProfile.clientHello = performance.now();
         visitor.send({ t: 'hello', nick: label, age13: true, entrySource: source, ...(transport ? { transport: 1 } : {}) });
         await visitor.wait(f => f.t === 'join' && f.ch.name === '#stalemate', 'lobby membership');
@@ -996,6 +999,40 @@ async function runtime(phase, state, nonce) {
             assert.equal(newcomer.ch.names.find(person => person.nick === 'NativeCharlie').entrySource, '');
             const canvasC = await joinRoom(c, '#art-native-canvas'); assert.deepEqual(canvasC.act.strokes, [stroke]);
             await c.barrier(); assert.ok(c.frames.every(frame => frame.t !== 'line' || !['Native selected report greeting', 'Native Rad Dad ephemeral greeting', 'Native Stalemate ephemeral greeting'].includes(frame.text)), 'new visitor received pre-join chat');
+            if (!PARTICIPATION) {
+                const gameRoom = '#game-2ca9e1x1be34a';
+                const joined = await joinRoom(c, gameRoom);
+                assert.equal(joined.ch.kind, 'game'); assert.equal(joined.ch.modes.i, true);
+                assert.equal(joined.ch.four, null);
+                const inviteAt = b.frames.length, hostInviteAt = c.frames.length;
+                const guestId = canvasC.ch.names.find(person => person.nick === b.label)?.id;
+                assert.match(guestId, /^c[a-f0-9]{32}$/);
+                c.send({ t: 'cmd', name: 'invite', args: [b.label, gameRoom], ch: gameRoom,
+                    roomInstance: joined.ch.keepRef, personContext: 1, personPeer: guestId });
+                await Promise.all([
+                    b.wait(f => f.t === 'invite' && f.ch === gameRoom, 'Game Night invitation', inviteAt),
+                    c.wait(f => f.t === 'notice' && f.text === `Invited ${b.label} to ${gameRoom}.`, 'Game Night invite confirmation', hostInviteAt),
+                ]);
+                await joinRoom(b, gameRoom);
+                const four = (from, to, args, accepts, label) => {
+                    const since = to.frames.length;
+                    from.send({ t: 'cmd', name: 'four', args, ch: gameRoom, roomInstance: joined.ch.keepRef });
+                    return to.wait(f => f.t === 'four' && f.ch === gameRoom && accepts(f.game), label, since);
+                };
+                const opened = await four(c, b, ['open'], game => !!game && !game.guest, 'native board open');
+                const id = opened.game.id;
+                await four(b, c, ['join', id], game => !!game?.guest, 'native board seat');
+                const moved = await four(c, b, ['drop', id, '0', '4'], game => game?.moves === 1, 'native board move');
+                assert.deepEqual(moved.game.board.slice(-7), ['', '', '', 'X', '', '', '']);
+                await a.command('join', [gameRoom], '#stalemate', f => f.t === 'notice' && /invite-only/.test(f.text), 'nonmember game refusal');
+                assert.ok(a.frames.every(f => f.t !== 'four' && !(f.t === 'join' && f.ch.name === gameRoom)));
+                await four(b, c, ['leave', id], game => game === null, 'native board end');
+                await c.command('close', [], gameRoom, f => f.t === 'closed' && f.ch === gameRoom, 'close test Game Night room');
+                // The host spent five additional command tokens. Let the
+                // production one-token-per-second bucket replenish before
+                // the existing camera, block and crash-recovery sequence.
+                await delay(5000);
+            }
             if (TRAFFIC_ACKS) {
                 const peers = [a, b, c], warmupUntil = performance.now() + 3300;
                 while (performance.now() < warmupUntil) await delay(warmupUntil - performance.now());
@@ -1277,6 +1314,7 @@ async function runtime(phase, state, nonce) {
             secrets = { revokedCookie: cookieA, liveCookie: cookieB, ...(PARTICIPATION ? { safetyCookie } : {}) };
             proof = { admissionDenials, missingMarkerRefused: true, cookiePolicyVerified: true, actualGatewayVisitors: 3, originalGatewayVisitors: 3, totalRealAdmittedVisitors: PARTICIPATION ? 5 : 3,
                 checks: ['actual-beta-unlock-and-WebSocket-admission', 'stalemate-rad-dad-shared-chat-and-canvas', 'direct-newcomer-neutral-without-prejoin-chat', 'actual-report-persisted', 'connected-logout-and-cookie-replay-denied', 'ordinary-chat-excluded-from-durable-records', 'actual-device-block-policy-and-RTC-denial-persisted', 'actual-post-native-session-write-rollback-before-block-success', 'actual-post-native-write-rollback-before-success'],
+                ...(!PARTICIPATION ? { gameNightChecks: ['actual-private-room-invitation', 'board-open-join-move-and-end', 'nonmember-denied-without-board-frames'] } : {}),
                 ...(PARTICIPATION ? { participationChecks: ['actual-DO-missing-policy-denies-without-provisioning', 'real-signed-SID-principal-with-explicit-synthetic-C2-grants', 'unfenced-private-room-and-TURN-denied', 'committed-media-reduction-production-alarm-closes-only-affected-visitor'] } : {}),
                 ...(PARTICIPATION ? { sharingChecks: ['actual-caller-only-GET-and-native-self-withdrawal', 'same-WebSocket-old-delivered-report-ACK-with-new-publishing-denied', 'closed-safety-socket-retires-before-original-two-live-bindings-checkpoint'], sharing } : {}),
                 ...(INCIDENT ? { incidentSourceChecks: ['actual-public-report-index-and-I1-copy-share-native-transaction-domain', 'selected-only-encrypted-case-and-metadata-only-index'], incidentSource } : {}),

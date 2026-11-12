@@ -33,7 +33,7 @@ test('two visitors can copy an unchanged app invite, with a fallback when clipbo
         await guest.evaluate((channel) => __lobby.cmd('join', [channel]), channel);
         await expect(guest.locator('[data-toast]')).toContainText('invite-only');
         await host.evaluate(() => __lobby.cmd('invite', ['InviteGuest']));
-        await guest.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
+        await guest.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).click();
         await expect(guest.locator('[data-jam]')).toBeVisible();
         await expect(guest.locator('[data-jam-copy]')).toBeHidden();
         await host.fill('[data-jam-link]', INVITE); await host.locator('[data-jam-form] button[type="submit"]').click();
@@ -116,6 +116,118 @@ const paste = async (page, value) => {
     await page.locator('[data-jam-form] button[type="submit"]').click();
 };
 
+test('a host can share a browser invite pasted with its surrounding message', async ({ browser, baseURL }) => {
+    const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });
+    try {
+        const host = await f.join('PasteHost');
+        const guest = await f.join('PasteGuest');
+        await host.click('[data-show="rooms"]');
+        await host.click('[data-start="jam"]');
+        await host.getByRole('button', { name: 'Invite bandmate to room' }).click();
+        await host.locator('[data-invite-options]').selectOption({ label: 'PasteGuest' });
+        await host.locator('[data-invite-person-send]').click();
+        await guest.locator('[data-game-offer]').getByRole('button', { name: 'Join room' }).click();
+        await expect(guest.locator('[data-jam-web]')).toBeDisabled();
+
+        const forwarded = `Join me for Music:\n<${WEB_INVITE}>\nSee you there.`;
+        await paste(host, forwarded);
+        await expect(guest.getByRole('button', { name: 'Join in browser' })).toBeEnabled();
+        await expect(host.locator('[data-jam-link]')).toHaveValue('');
+        await guest.getByRole('button', { name: 'Join in browser' }).click();
+        expect(await guest.evaluate(() => window.browserOpens)).toEqual([[WEB_INVITE, '_blank', 'noopener,noreferrer']]);
+        expect(await guest.evaluate(() => window.audioRequests)).toBe(0);
+
+        const other = WEB_INVITE.replace('synthetic_browser_capability', 'other_fixture');
+        const ambiguous = `Two invites:\n${WEB_INVITE}\n${other}`;
+        await paste(host, ambiguous);
+        await expect(host.locator('[data-jam-share-status]')).toHaveText('Paste just one browser invite link.');
+        await expect(host.locator('[data-jam-link]')).toHaveValue(ambiguous);
+        await expect(host.locator('[data-jam-link]')).toBeFocused();
+        await guest.getByRole('button', { name: 'Join in browser' }).click();
+        expect(await guest.evaluate(() => window.browserOpens)).toEqual([
+            [WEB_INVITE, '_blank', 'noopener,noreferrer'], [WEB_INVITE, '_blank', 'noopener,noreferrer']
+        ]);
+        expect(f.external).toEqual([]);
+    } finally { await f.close(); }
+});
+
+test('an expired browser invite is retired in place and a fresh invite restores Join', async ({ browser, baseURL }, testInfo) => {
+    const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });
+    try {
+        const host = await f.join('ExpiryHost'), guest = await f.join('ExpiryGuest');
+        await host.click('[data-show="rooms"]');
+        await host.click('[data-start="jam"]');
+        await expect(host.locator('[data-jam]')).toBeVisible();
+        await host.evaluate(() => __lobby.cmd('invite', ['ExpiryGuest']));
+        await guest.locator('[data-game-offer]').getByRole('button', { name: 'Join room' }).click();
+        await expect(guest.locator('[data-jam]')).toBeVisible();
+        const room = await guest.locator('[data-chat-context]').textContent();
+        const now = Date.now();
+        await host.clock.install({ time: now });
+        await guest.clock.install({ time: now });
+        const expiry = Math.floor(now / 1000) + 60;
+        const oldLink = WEB_INVITE.replace(/e=\d+$/, `e=${expiry}`);
+        await paste(host, oldLink);
+        await expect(guest.locator('[data-jam-web]')).toBeEnabled();
+        await guest.getByRole('button', { name: 'Show QR code' }).click();
+        await expect(guest.locator('[data-jam-invite-qr-panel]')).toBeVisible();
+        await guest.evaluate(() => { navigator.clipboard.writeText = async () => { throw Error('Clipboard blocked'); }; });
+        await guest.getByRole('button', { name: 'Copy browser invite' }).click();
+        await expect(guest.locator('[data-jam-invite-copy-value]')).toBeFocused();
+        await guest.clock.fastForward(61_000);
+        await host.clock.fastForward(61_000);
+        await expect(guest.locator('[data-jam-web]')).toBeDisabled();
+        await expect(guest.locator('[data-jam-web]')).toBeHidden();
+        await expect(guest.locator('[data-jam-wait]')).toHaveText('Browser invite expired. Ask your host for a fresh invite here.');
+        await expect(guest.locator('[data-jam-wait]')).toBeFocused();
+        await expect(guest.locator('[data-jam-invite-qr-panel]')).toBeHidden();
+        await expect(guest.locator('[data-jam-invite-copy-value]')).toHaveValue('');
+        await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        await expect(guest.locator('[data-connection]')).toHaveText('Connected');
+        expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
+        await expect(host.locator('[data-jam-wait]')).toContainText('Copy a fresh browser invite');
+        await expect(host.locator('[data-jam-host-steps]')).toBeHidden();
+        await expect(host.locator('[data-jam-form] button[type="submit"]')).toBeEnabled();
+        await guest.screenshot({ path: testInfo.outputPath('expired-browser-invite-390.png') });
+
+        const freshLink = oldLink.replace('synthetic_browser_capability', 'replacement_fixture')
+            .replace(/e=\d+$/, `e=${expiry + 120}`);
+        await paste(host, freshLink);
+        await expect(guest.getByRole('button', { name: 'Join in browser' })).toBeFocused();
+        await guest.screenshot({ path: testInfo.outputPath('fresh-browser-invite-390.png') });
+        await guest.getByRole('button', { name: 'Join in browser' }).click();
+        expect(await guest.evaluate(() => window.browserOpens)).toEqual([[freshLink, '_blank', 'noopener,noreferrer']]);
+        expect(await guest.evaluate(() => window.audioRequests)).toBe(0);
+        expect(f.external).toEqual([]);
+    } finally { await f.close(); }
+});
+
+test('first-invite guidance follows current host power without opening setup help', async ({ browser, baseURL }) => {
+    const f = await browserRoom(browser, baseURL, true, { width: 1440, height: 900 });
+    try {
+        const host = await f.join('SetupHost'), peer = await f.join('SetupPeer');
+        await host.click('[data-start="jam"]');
+        // Commands target the admitted active channel, not a pending room join.
+        await expect(host.locator('[data-jam-host-steps]')).toBeVisible();
+        await host.evaluate(() => __lobby.cmd('invite', ['SetupPeer']));
+        await peer.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).click();
+        await expect(host.locator('[data-jam-host-steps]')).toBeInViewport();
+        await expect(peer.locator('[data-jam-host-steps]')).toBeHidden();
+        await host.evaluate(() => __lobby.cmd('op', ['SetupPeer']));
+        await expect(peer.locator('[data-jam-host-steps]')).toBeVisible();
+        await peer.evaluate(() => __lobby.cmd('deop', ['SetupHost']));
+        await expect(host.locator('[data-jam-host-steps]')).toBeHidden();
+        await expect(host.locator('[data-jam-wait]')).toBeVisible();
+        await expect(host.locator('[data-jam-form]')).toBeHidden();
+        for (const page of [host, peer]) {
+            await expect(page.locator('[data-jam-help]')).not.toHaveAttribute('open');
+            expect(await page.evaluate(() => window.audioRequests)).toBe(0);
+            expect(await page.evaluate(() => window.browserOpens)).toEqual([]);
+        }
+        expect(f.external).toEqual([]);
+    } finally { await f.close(); }
+});
+
 for (const width of [375, 390]) test(`host can share desktop and browser invitations through the visible form at ${width}px`, async ({ browser, baseURL }, testInfo) => {
     const f = await browserRoom(browser, baseURL, true, { width, height: 844 });
     try {
@@ -123,21 +235,34 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         await host.click('[data-show="rooms"]');
         await host.click('[data-start="jam"]');
         await expect(host.locator('[data-jam]')).toBeVisible();
+        // First-time hosts get their next steps without opening a help panel.
+        await expect(host.locator('[data-jam-help]')).not.toHaveAttribute('open');
+        await expect(host.locator('[data-jam-host-steps]')).toBeVisible();
+        await expect(host.locator('[data-jam-host-steps]')).toContainText('Music → Host');
+        await expect(host.locator('[data-jam-host-steps]')).toContainText('Once your bandmate is in this room, click Copy browser invite in WebJam.');
+        await expect(host.getByRole('textbox', { name: 'WebJam invitation' })).toHaveAccessibleDescription(/Copy browser invite[\s\S]*Share with room[\s\S]*Join in browser/);
+        await expect(host.getByRole('button', { name: 'Share with room', exact: true })).toBeInViewport();
+        await host.screenshot({ path: testInfo.outputPath(`jam-host-before-sharing-${width}.png`), fullPage: true });
         const channel = await host.evaluate(() => __lobby.active);
         await host.evaluate(() => __lobby.cmd('invite', ['BrowserGuest']));
-        await guest.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
+        await guest.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).click();
         await expect(guest.locator('[data-jam]')).toBeVisible();
         await expect(guest.locator('[data-jam-web]')).toBeDisabled();
         await expect(guest.locator('[data-jam-form]')).toBeHidden();
+        await expect(guest.locator('[data-jam-host-steps]')).toBeHidden();
+        await expect(guest.locator('[data-jam-wait]')).toContainText('no app needed');
         await paste(host, INVITE);
         // Each socket confirms independently. A replacement announcement
         // clears an old editor; wait for the host's own confirmation before
         // typing the next invitation, even if the guest received it first.
         await expect(host.locator('[data-jam-copy]')).toBeVisible();
+        await expect(host.locator('[data-jam-host-steps]')).toBeHidden();
         await expect(guest.locator('[data-jam-copy]')).toBeVisible();
         await paste(host, ` \n${WEB_INVITE}\n `);
         await expect(host.locator('[data-jam-web]')).toBeEnabled();
         await expect(guest.locator('[data-jam-web]')).toBeEnabled();
+        await expect(host.getByRole('button', { name: 'Copy desktop invite', exact: true })).toBeVisible();
+        await expect(host.getByRole('button', { name: 'Copy browser invite', exact: true })).toBeVisible();
         await expect(guest.locator('[data-jam-web]')).toHaveAttribute('title', /headphones and audio consent/);
         await expect(guest.locator('[data-jam-wait]')).toBeHidden();
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
@@ -156,6 +281,7 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
             // Platform limits must remain visible without expanding setup help.
             await expect(page.locator('[data-jam-platform]')).toBeVisible();
             await expect(page.locator('[data-jam-platform]')).toContainText('A Mac hosts music');
+            await expect(page.locator('[data-jam-platform]')).toContainText('Mac and Windows guests can join in a browser');
             await expect(page.locator('[data-jam-platform]')).toContainText('this unsigned beta cannot join natively');
             expect(await page.locator('#jam-title').evaluate(title => {
                 const panel = title.closest('[data-jam]').getBoundingClientRect(), rect = title.getBoundingClientRect();
@@ -172,6 +298,7 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         const help = guest.locator('[data-jam-help]'), summary = help.locator('summary');
         await summary.focus(); await summary.press('Enter');
         await expect(help).toHaveAttribute('open'); await expect(summary).toBeFocused();
+        await expect(help).toContainText('click Copy browser invite. Wait for Link copied, then paste the link above and choose Share with room.');
         await expect(help).toContainText('Sharing an invite does not turn on your microphone');
         await expect(help.locator('p').first()).toBeInViewport({ ratio: 0.5, timeout: 1000 });
         expect(await summary.evaluate(element => {
@@ -196,6 +323,8 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         await expect(guest.locator('[data-jam-web]')).toBeDisabled();
         await expect(guest.locator('[data-jam-copy]')).toBeHidden();
         await expect(guest.locator('[data-jam-wait]')).toBeVisible();
+        await expect(host.locator('[data-jam-host-steps]')).toBeVisible();
+        await expect(guest.locator('[data-jam-host-steps]')).toBeHidden();
         expect(f.external).toEqual([]);
     } finally { await f.close(); }
 });
@@ -366,13 +495,15 @@ test('a bandmate reaches the jam room within three clicks of opening the copied 
             await bandmate.click('[data-enter]');
         }
         await expect(bandmate.locator('[data-connection]')).toHaveText('Connected');
-        await host.fill('[data-text]', '/invite LinkBandmate');
-        await host.press('[data-text]', 'Enter');
-        const joinToast = bandmate.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true });
-        await expect(joinToast).toBeVisible();
-        await joinToast.click();
+        // The room link and the earlier invitation already admit the bandmate.
+        // A repeated invitation must not ask someone in the room to join it.
         await expect(bandmate.locator('[data-jam]')).toBeVisible();
         await expect(bandmate.locator('[data-chat-context]')).toHaveText(channel);
+        await host.fill('[data-text]', '/invite LinkBandmate');
+        await host.press('[data-text]', 'Enter');
+        await expect(host.locator('[data-buffer]')).toContainText(`Invited LinkBandmate to ${channel}.`);
+        await expect(bandmate.locator('[data-game-offer]')).toBeHidden();
+        await expect(bandmate.locator('[data-toast] button')).toHaveCount(0);
         expect(await bandmate.evaluate(() => window.__bandmateClicks ?? 0)).toBeLessThanOrEqual(3);
         await bandmateContext.close();
     } finally { await f.close(); }

@@ -1,0 +1,314 @@
+{
+  "observedAtUTC": "2026-11-10T14:56:25.840978+00:00",
+  "scope": "Private frontend delivery; full 62-outcome and physical band acceptance unfinished",
+  "frontendSource": "d53ff7f87070dad7acf0183b0e1f63181b242c6c",
+  "frontendMergedRevision": "11c9d1f8e73233eeaf601a1fef304b57568ae639",
+  "backendSourceUnchanged": "c83dfaff1fe924ea0a70cfc902731234113f0c09",
+  "siteVersion": "2b205a24-392c-4cdb-9d0b-daaf8c065d0b",
+  "deployment": "580bce86-7e17-4511-a866-7f2073ba69eb",
+  "backendModuleSha256": "9fefc1a13eaecb138be633e85d19039c15969f7066b7e71b6123636858493b78",
+  "assetPackage": {
+    "count": 70,
+    "bytes": 25791406,
+    "manifestSha256": "040f19e1079f1a0a7aa55bfb42645ab1d3f36cd41301a9c4653e864ce8112c3f"
+  },
+  "preservation": {
+    "allBindingsExact": true,
+    "allNamespaceIdsExact": true,
+    "allPlainVariablesExact": true,
+    "allSecretNamesExact": true,
+    "assetBindingAndRuntimeExact": true,
+    "migrationAndExportsExact": true,
+    "secretValuesReadOrWritten": false
+  },
+  "serviceSettingsPreserved": true,
+  "issuerVersionUnchanged": "fd37578f-13cd-4fce-b557-35c0d962ef9d",
+  "immediateSiteRollbackRetained": "49f19821-e3cf-4699-8698-3dd3f446ca3b",
+  "originalSiteRollbackRetained": "2c5c81e5-1aa4-4ea7-be69-cacda13c20e8",
+  "issuerRollbackRetained": "4db649fa-a465-44b4-8487-414987b3a660",
+  "rollbackPerformed": false,
+  "anonymousAccessBoundariesUnchanged": true,
+  "ownerContinuityApproved": {
+    "scope": "Only the missing local relay-record presence/hash prerequisite; fresh existing v4 checks remained required",
+    "originalMarkerRecreated": false,
+    "counterCapPermissionOrOtherHoldReset": false,
+    "cryptographicSignatureClaimed": false
+  },
+  "headroom": {
+    "observedDateUTC": "2026-11-10",
+    "billingPeriod": [
+      "2026-10-15",
+      "2026-11-14"
+    ],
+    "includedGBDisplayed": 1000,
+    "usedGBDisplayed": "0.01",
+    "costUSDDisplayed": "0.00",
+    "derivedUnusedGBAtDisplayPrecision": "999.99",
+    "exactRealTimeBalanceOrFutureCostGuarantee": false,
+    "utcMonthAccountTurnIngressBytes": 14848164,
+    "utcMonthAccountTurnEgressBytes": 10241040,
+    "utcMonthAccountTurnCombinedBytes": 25089204,
+    "aggregateScope": "Entire account UTC month; conservative upper bound, not individually queried secret keys",
+    "combinedCapGBUnchanged": 800,
+    "webCapGBUnchanged": 200,
+    "initialReadBudgetRefusal": "Preserved; normal five-minute cooldown elapsed before one reduced successful read; no reset"
+  },
+  "servedStaticReadback": {
+    "source": "d53ff7f87070dad7acf0183b0e1f63181b242c6c",
+    "files": [
+      {
+        "path": "assets/favicon.svg",
+        "status": 200,
+        "bytes": 350,
+        "sha256": "85b285ae9db139aef374675a98fe789996eab223564bb0f6c393d8325e9f5923",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "join/app.js",
+        "status": 200,
+        "bytes": 13358,
+        "sha256": "d01cf80bf2fca096b39e08ff5623e08d8261d231e3c8e69dbc3cce6c55da714f",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "join/audio.js",
+        "status": 200,
+        "bytes": 8122,
+        "sha256": "7fbba2ffdbccbd1c9c0140031ac78b5b8aafe77b1ab51816f4682fccdc844245",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "join/config.js",
+        "status": 200,
+        "bytes": 170,
+        "sha256": "f0e6dabeff031994670126b6c2008d645aeda58cd3a1fb87513a2f0418b0ccfd",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "join/crypto.js",
+        "status": 200,
+        "bytes": 6057,
+        "sha256": "9f4cdfb4a34606df5cf7181523a16d8317071c5c1d283d20b2fdf95c432c4fc8",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "join/errors.js",
+        "status": 200,
+        "bytes": 7786,
+        "sha256": "e20c4eb68da2f22991cc25ed3d8fb94756a71aaf9222e9a6834916e362a8f3f6",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "join/mailbox.js",
+        "status": 200,
+        "bytes": 6892,
+        "sha256": "b419f8d69c2f57a6668a9c05b638780a0d3c4e68fff03f3fbc3f48709c387cb2",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "join/policy.js",
+        "status": 200,
+        "bytes": 4879,
+        "sha256": "3e89bf3cee36d7dccf5c8bb4716093661a3f35f8ddace58dbcef14a12c196658",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "join/prejoin.js",
+        "status": 200,
+        "bytes": 2422,
+        "sha256": "9852946eeb450f76a0679da214b4e6b73d193055bc79a5b74b7a97b09198212d",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "join/session.js",
+        "status": 200,
+        "bytes": 10143,
+        "sha256": "1855ed9acb576cad13230f1a422578c848af35173887a9c797209689d2d3d044",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "join/style.css",
+        "status": 200,
+        "bytes": 3316,
+        "sha256": "af2689b995cefcc4cb67377d5dbddcd7824aff764c1fd32e4117dc6ae4217369",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/bob-ross.js",
+        "status": 200,
+        "bytes": 4430,
+        "sha256": "46f4877ad91f33d636b1100c1734f0a2e1d7fd60cf43eeb79957452ff8df5b64",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/entry-sites.mjs",
+        "status": 200,
+        "bytes": 5124,
+        "sha256": "af76f0cccec4e7bdffdb8f01574d71bf5d7a5a6dee738bfc5fd4169942e157fb",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/lobby/chat-announcements.mjs",
+        "status": 200,
+        "bytes": 1443,
+        "sha256": "58bf8f124dcfa8e4a413f8cd03af1eb5965289cbb0c649f826b5e83b09541873",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/lobby/discovery-core.js",
+        "status": 200,
+        "bytes": 21418,
+        "sha256": "48d1e60ad80d555942005c184e21e05efef554e934c72f818a9716a19e3a09fa",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/lobby/entry-sharing.mjs",
+        "status": 200,
+        "bytes": 2762,
+        "sha256": "07ce2ca5ad8dbc15a21df722842e9e2b8ac2dd14b27a78cd3506244fb48ab97a",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/lobby/idle-heartbeat.mjs",
+        "status": 200,
+        "bytes": 1436,
+        "sha256": "aef5c3174176c88d992890016d0b94f632071b44c140d82218908da7286ce220",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/lobby/lobby-room.js",
+        "status": 200,
+        "bytes": 53950,
+        "sha256": "60868b0fd898e9da94c38873420344feefbbad700b4d540bba0e7ccd290a2861",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/lobby/lobby.css",
+        "status": 200,
+        "bytes": 39029,
+        "sha256": "e473caf86b50dc653641c0b388956005b8461c27ae98b5d055200c7792df1e7c",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/lobby/lobby.js",
+        "status": 200,
+        "bytes": 139301,
+        "sha256": "2a45f8e714d825baec2ae74bb9f139bdff0aefb0f81d51339183a9e51dd96742",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/lobby/qr-lite.js",
+        "status": 200,
+        "bytes": 58736,
+        "sha256": "ab9e2f8092c32a5a3887444915ec019291e4d1713783a551e134ee062e2d29d0",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/names.js",
+        "status": 200,
+        "bytes": 4124,
+        "sha256": "9fa7a05707ba8d72397154ac4744d13463e1f7126a38dbbfaca6ba5c41abbf6d",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/private-recovery.js",
+        "status": 200,
+        "bytes": 16300,
+        "sha256": "fed51acaf3aa89270053d138657417a6d80b7bf7774cf109db65c6a93ae3c196",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/private-snapshot.js",
+        "status": 200,
+        "bytes": 14502,
+        "sha256": "1ff25018d9c29b99b26a5b3b884807594e4be20e345e59eeb5a964eaa7aeebb5",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/room.css",
+        "status": 200,
+        "bytes": 13655,
+        "sha256": "3df2398495bad84643a3680ae10adee330826212ff64086b6fe298bd55d9bd6a",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/room.js",
+        "status": 200,
+        "bytes": 145222,
+        "sha256": "7f5ca940aef22a93fac45b4e51cd7d9a894e59de7c442144712b1441e9312e43",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/sync-core.js",
+        "status": 200,
+        "bytes": 15329,
+        "sha256": "d9a12c344826a585a0702677bbbb9ac3985a77f44c83f9ffcdd39eb99a939f34",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/terms/terms.css",
+        "status": 200,
+        "bytes": 653,
+        "sha256": "7b37085e379b33e06cc100efed97f311ca55c9cf3ae1b06ea8611576c82bef67",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/turn-client.js",
+        "status": 200,
+        "bytes": 5048,
+        "sha256": "592d3e66f39de77487dc78b5ba27036795ec029119e504ef30e83c2513ce7e57",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/video-core.js",
+        "status": 200,
+        "bytes": 12603,
+        "sha256": "b95f5d29d9565b014078065487a9fff8165835a81538887ca251d7b4cefdd1ed",
+        "matchesReviewedBytes": true
+      },
+      {
+        "path": "r/45662413410ed051/youtube-player.js",
+        "status": 200,
+        "bytes": 8412,
+        "sha256": "75e5b64006ade22a57e0be40392670e4a7326217cc84d940c9ebc3fd041d30eb",
+        "matchesReviewedBytes": true
+      }
+    ],
+    "passed": true,
+    "isolatedSessionClosed": true,
+    "all70FilesClaimedReadBack": false,
+    "failedDefaultHttpObserverRetained": true,
+    "correction": "A descriptive WebJam request identity succeeded; no security settings changed"
+  },
+  "browserObservations": {
+    "existingInvitationAccepted": true,
+    "nicknamePrejoinObserved": true,
+    "guestAgreementClicked": false,
+    "joinedChat": false,
+    "missingMusicInvite": "Clear fresh-link instruction; prejoin hidden and Join/mic controls disabled",
+    "microphoneCheckClicked": false,
+    "currentValidMusicInviteOrMediaQualified": false
+  },
+  "unchangedLimits": {
+    "publicEntrancesUnpublished": true,
+    "recordingOff": true,
+    "aiOff": true,
+    "noNewProviderCredentials": true,
+    "noPermissionExpansion": true,
+    "noPurchase": true,
+    "noStoryPoolOperations": true
+  },
+  "screenshots": [
+    {
+      "path": "prejoin.jpg",
+      "sha256": "2250aec5220cc8f6b589f3f1e95e901b4fb28238a81a8af88939afa54e6588d7",
+      "scope": "Admitted nickname prejoin only; guest agreement not clicked"
+    },
+    {
+      "path": "missing-invite.jpg",
+      "sha256": "a7f771e9228d953490ca787f2065238362cf33e9407cbab7707b921f6ddf1f7f",
+      "scope": "Missing music invitation recovery UI only; no mic or Join clicked"
+    }
+  ],
+  "fullAcceptanceComplete": false
+}

@@ -67,6 +67,57 @@ describe('real invitation-only beta boundary', () => {
         expect((await betaFetch(request('/assets/favicon.svg', { method: 'HEAD' }), config, deps)).status).toBe(401);
         expect(config.ASSETS.fetch).not.toHaveBeenCalled();
     });
+    it.each(['/r/45662413410ed051/lobby', '/r/45662413410ed051/lobby/', '/r/45662413410ed051/lobby/index.html', '/r/45662413410ed051/%6cobby/%69ndex.html'])(
+        'offers a same-origin invitation path for a logged-out lobby bookmark: %s', async (path) => {
+            const config = env();
+            const response = await betaFetch(request(path + '?next=https://attacker.example/&via=untrusted'), config, deps);
+            expect(response.status).toBe(401);
+            expect(response.headers.get('Content-Type')).toContain('text/html');
+            expect(response.headers.get('Cache-Control')).toBe('no-store');
+            expect(response.headers.get('X-Robots-Tag')).toContain('noindex');
+            expect(response.headers.get('Referrer-Policy')).toBe('no-referrer');
+            expect(response.headers.get('Content-Security-Policy')).toBe("default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
+            expect(response.headers.get('Permissions-Policy')).toBe('camera=(), geolocation=(), microphone=()');
+            expect(response.headers.has('Set-Cookie')).toBe(false);
+            expect(response.headers.has('Location')).toBe(false);
+            const body = await response.text();
+            expect(body).toContain('<h1>Enter Hang Out</h1>');
+            expect(body).toContain('<a class="button" href="/beta/">Enter invitation</a>');
+            expect(body).not.toMatch(/<script|attacker\.example|via=untrusted/);
+            for (const value of [invite, secret, preview]) expect(body).not.toContain(value);
+            expect(config.ASSETS.fetch).not.toHaveBeenCalled();
+            const head = await betaFetch(request(path, { method: 'HEAD' }), config, deps);
+            expect(head.status).toBe(401);
+            expect(head.headers.get('Content-Type')).toContain('text/html');
+            expect(await head.text()).toBe('');
+        });
+    it('does not replace protected code, API, websocket or write denials with a lobby page', async () => {
+        const config = env();
+        for (const path of ['/r/45662413410ed051/lobby/lobby.js', '/r/45662413410ed051/lobby/lobby.css', '/beta/state', '/beta/bootstrap.js', '/lobby', '/room', '/turn', '/join/app.js']) {
+            const response = await betaFetch(request(path), config, deps);
+            expect(response.status).toBe(401);
+            expect(response.headers.get('Content-Type')).toContain('text/plain');
+            expect(await response.text()).not.toContain('Enter invitation');
+        }
+        for (const options of [{ upgrade: 'websocket' }, { method: 'POST' }]) {
+            const response = await betaFetch(request('/r/45662413410ed051/lobby/', options), config, deps);
+            expect(response.status).toBe(401);
+            expect(response.headers.get('Content-Type')).toContain('text/plain');
+        }
+        expect(config.ASSETS.fetch).not.toHaveBeenCalled();
+    });
+    it('serves the actual lobby after invitation admission and keeps registry outages as failures', async () => {
+        const config = env(), cookie = await unlock(config);
+        const response = await betaFetch(request('/r/45662413410ed051/lobby/', { cookie }), config, deps);
+        expect(response.status).toBe(200);
+        expect(await response.text()).toContain('Product');
+        expect(config.ASSETS.fetch).toHaveBeenCalledTimes(1);
+        config.BETA_SESSIONS.get = () => ({ fetch: async () => new Response('unavailable', { status: 503 }) });
+        const outage = await betaFetch(request('/r/45662413410ed051/lobby/', { cookie }), config, deps);
+        expect(outage.status).toBe(503);
+        expect(await outage.text()).not.toContain('Enter invitation');
+        expect(config.ASSETS.fetch).toHaveBeenCalledTimes(1);
+    });
     it('fails closed for missing mode, secrets and bindings', async () => {
         for (const name of ['HANGOUT_BETA_MODE', 'HANGOUT_BETA_INVITE_KEY', 'HANGOUT_HMAC_KEY', 'HANGOUT_PREVIEW_KEY', 'ASSETS', 'LOBBY', 'QUOTA', 'ROOMS', 'BETA_SESSIONS']) {
             const config = env(); delete config[name];
@@ -78,6 +129,13 @@ describe('real invitation-only beta boundary', () => {
         for (const path of ['/join/', '/join/app.js', '/%6aoin/index.html']) {
             for (const method of ['GET', 'HEAD']) expect((await betaFetch(request(path, { method }), config, deps)).status).toBe(401);
         }
+        expect(config.ASSETS.fetch).not.toHaveBeenCalled();
+        const entrance = await betaFetch(request('/join/'), config, deps);
+        expect(entrance.headers.get('Content-Type')).toContain('text/html');
+        expect(entrance.headers.get('Permissions-Policy')).toContain('microphone=()');
+        expect(await entrance.text()).toContain('href="/beta/" target="_blank" rel="noopener noreferrer"');
+        expect(await (await betaFetch(request('/join/', { method: 'HEAD' }), config, deps)).text()).toBe('');
+        expect((await betaFetch(request('/join/app.js'), config, deps)).headers.get('Content-Type')).toContain('text/plain');
         expect(config.ASSETS.fetch).not.toHaveBeenCalled();
         const cookie = await unlock(config);
         for (const path of ['/join/', '/join/app.js', '/%6aoin/index.html']) {

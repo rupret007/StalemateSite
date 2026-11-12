@@ -1,0 +1,131 @@
+{
+  "at": "2026-11-07T07:23:44.573Z",
+  "bridgeSource": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "macFabric": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "host": "Intel MacBook",
+  "guest": "Windows NucBox Chrome",
+  "exactPackageComponents": [
+    "Intel fabric",
+    "Jamulus server",
+    "Opus codec"
+  ],
+  "pythonHostService": "exact tracked bridge source and verified package components",
+  "generatedAudioOnly": true,
+  "trials": [
+    {
+      "seconds": 40,
+      "browser": {
+        "elapsedMs": 40419,
+        "toneWindows": 160,
+        "disconnectedWindows": 0,
+        "musicalWindows": {
+          "E": 53,
+          "G": 53,
+          "A": 53
+        },
+        "seconds": 40,
+        "state": "connected",
+        "delayMs": 46,
+        "packetsSent": 2070,
+        "packetsReceived": 2021,
+        "lost": 0,
+        "path": [
+          "relay",
+          "srflx"
+        ]
+      },
+      "host": {
+        "nativeProductionPreparationPassed": true,
+        "proof": {
+          "wavFramesSent": 1941120,
+          "secondMixerParticipantReady": true,
+          "guestToneAtNativeParticipant": true,
+          "guestToneWindows": 403,
+          "hostBeforeStop": "connected",
+          "fabricStopped": true,
+          "fixtureClosed": true,
+          "mixerStopped": true,
+          "secondMixerBridgeStopped": true,
+          "toneThreadStopped": true,
+          "bridgeLogCodes": [
+            "transport_stop",
+            "transport_stop"
+          ],
+          "bridgeReason": "endpoint closed"
+        },
+        "exit": 0
+      },
+      "hostEndVisible": true,
+      "windowsClosed": true
+    },
+    {
+      "seconds": 8,
+      "browser": {
+        "elapsedMs": 8141,
+        "toneWindows": 32,
+        "disconnectedWindows": 0,
+        "musicalWindows": {
+          "E": 31,
+          "G": 0,
+          "A": 0
+        },
+        "seconds": 8,
+        "state": "connected",
+        "delayMs": 44,
+        "packetsSent": 435,
+        "packetsReceived": 407,
+        "lost": 0,
+        "path": [
+          "relay",
+          "srflx"
+        ]
+      },
+      "browserLeft": true,
+      "host": {
+        "nativeProductionPreparationPassed": true,
+        "proof": {
+          "wavFramesSent": 399360,
+          "secondMixerParticipantReady": true,
+          "guestToneAtNativeParticipant": true,
+          "guestToneWindows": 83,
+          "hostBeforeStop": "closed",
+          "fabricStopped": true,
+          "fixtureClosed": true,
+          "mixerStopped": true,
+          "secondMixerBridgeStopped": true,
+          "toneThreadStopped": true,
+          "bridgeLogCodes": [
+            "transport_stop",
+            "transport_stop"
+          ],
+          "bridgeReason": "endpoint closed"
+        },
+        "exit": 0
+      },
+      "windowsClosed": true
+    }
+  ],
+  "round": 1,
+  "websiteSource": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "issuerVersion": "4db649fa-a465-44b4-8487-414987b3a660",
+  "sourceFixture": "Original generated WAV mixed into a synthetic Jamulus peer; no physical capture and no Shared Track sender backend",
+  "browserOutputMuted": true,
+  "fullHumanMusicAcceptance": false,
+  "providerObservationAt": "2026-11-07T07:19:12.446422+00:00",
+  "existingCapMarkerConsulted": true,
+  "nativeProductionCredentialPreflightMustSucceedBeforeBrowserJoin": true,
+  "entryRoute": "ordinary private invitation form",
+  "guestLoggedOut": true,
+  "capMarkerUnchanged": true,
+  "passed": true,
+  "completedAt": "2026-11-07T07:25:24.186Z",
+  "postRunNativeAudioOrAppProcessCount": 0,
+  "postRunFixtureControllerCount": 0,
+  "measurementDefinitions": {
+    "delayMs": "Single UI listening-delay estimate; network and playback estimate excluding capture and host bridge, not measured instrument-to-ear latency",
+    "lost": "Browser inbound-rtp reported packetsLost at the end of each short trial",
+    "toneWindows": "Quarter-second Windows FFT observations",
+    "guestToneWindows": "Native decoded-audio detector observations, not human hearing",
+    "path": "Selected Windows local candidate type followed by remote candidate type"
+  }
+}

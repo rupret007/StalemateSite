@@ -1,0 +1,29 @@
+{
+  "state": "READ_ONLY_PRIVATE_MEDIA_PREFLIGHT_PASSED_NORMAL_NATIVE_AND_BROWSER_ISSUANCE_STILL_REQUIRED",
+  "startedAt": "2026-11-07T17:30:02.855859+00:00",
+  "readOnly": true,
+  "versions": {
+    "stalemate-hangout-beta": "c2271048-aaa3-4649-8e9e-48dd46212da5",
+    "webjam-turn-credentials": "4db649fa-a465-44b4-8487-414987b3a660"
+  },
+  "allLiveSettingsMatchExistingBaselines": true,
+  "capMarkerSha256": "455ed66975e47e2838d47c2026ebd57e287721d9ad7f09922c72c64b50e35150",
+  "physicalCapture": false,
+  "providerCredentialsMinted": false,
+  "storyPoolChanged": false,
+  "previousStoppedPreflightPreserved": true,
+  "originalPreflightFailureCause": "Original AssertionError did not retain failing provider response; later independent normal TURN and SFU queries succeeded. No exact transient cause established.",
+  "usageInputsAreSeparatelyTimestampedReadbacks": true,
+  "emptySfuRowsNotAssumedZeroUsageOrHeadroom": true,
+  "nativeReadOnlyReadiness": {
+    "existingBootstrapIdleResourceAndImportCheckExitCode": 0,
+    "all32SourceFilesMatch": true,
+    "wavSha256": "f5298cbb71fea2a9d394de3c517bea795de97bc445b7020f50f00c8b40e7db45",
+    "physicalCapture": false,
+    "sessionStarted": false
+  },
+  "allLiveSettingsAndVersionsUnchanged": true,
+  "capMarkerUnchanged": true,
+  "approvedNextTrial": "One native generated Intel host and one sandboxed headless Linux browser guest;40seconds of generated media; no physical capture or recording; original155second host deadline unchanged",
+  "completedAt": "2026-11-07T17:30:07.549498+00:00"
+}

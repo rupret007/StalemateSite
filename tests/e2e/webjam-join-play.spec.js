@@ -1,74 +1,115 @@
 const { test, expect } = require('@playwright/test');
 
-test('the website serves Web Join with its complete module graph and no capture without consent', async ({ page, baseURL }) => {
-    const external = [];
-    await page.route('**/*', route => {
-        if (new URL(route.request().url()).origin === baseURL) return route.continue();
-        external.push(route.request().url()); return route.abort();
-    });
-    await page.goto('/join/');
-    await expect(page.locator('#status')).toContainText('Invalid Web Join invite');
-    await expect(page.getByRole('button', { name: 'Join with microphone', exact: true })).toBeDisabled();
-    await expect(page.locator('#prejoin')).toBeHidden();
-    await expect(page.locator('#retry')).toBeHidden();
-    expect(external).toEqual([]);
-});
-
 for (const width of [375, 390]) {
-    test(`the website preserves fragment privacy and recovers provider failure at ${width}px`, async ({ page, baseURL }, testInfo) => {
-        const external = [], requests = [];
-        await page.setViewportSize({ width, height: 844 });
-        await page.addInitScript(() => {
-            window.captureTracks = []; window.captureCount = 0;
-            Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), 'getUserMedia', {
-                configurable: true, value: async () => {
-                    window.captureCount++;
-                    const context = new AudioContext();
-                    const stream = context.createMediaStreamDestination().stream;
-                    for (const track of stream.getTracks()) {
-                        const stop = track.stop.bind(track);
-                        track.stop = () => { stop(); context.close().catch(() => {}); };
-                        window.captureTracks.push(track);
-                    }
-                    return stream;
+    for (const kind of ['missing', 'malformed', 'expired']) {
+        test(`the packaged website gives ${kind} invites a usable fresh-link recovery at ${width}px without capture`, async ({ page, baseURL }) => {
+            await page.setViewportSize({ width, height: 844 });
+            await page.addInitScript(() => {
+                window.captureCalls = 0;
+                for (const name of ['getUserMedia', 'getDisplayMedia']) {
+                    Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), name, {
+                        configurable: true, value: async () => { window.captureCalls++; throw new Error('No capture for an unusable invite'); }
+                    });
                 }
             });
+            const external = [];
+            await page.route('**/*', route => {
+                if (new URL(route.request().url()).origin === baseURL) return route.continue();
+                external.push(route.request().url()); return route.abort();
+            });
+            const expires = Math.floor(Date.now() / 1000) - 1;
+            const value = kind === 'missing' ? '' : kind === 'malformed' ? '#k=truncated' :
+                `#k=${Buffer.alloc(32, 17).toString('base64url')}&s=${'22'.repeat(32)}&g=1&e=${expires}`;
+            await page.goto(`/join/${value}`);
+            await expect(page.locator('#status')).toHaveAttribute('data-failure', 'true');
+            await expect(page.locator('#error-hint')).toHaveText('Ask your host for a new browser invite and open the full link.');
+            await expect(page.locator('#error-hint')).not.toContainText(/retry/i);
+            for (const id of ['prejoin', 'join', 'retry', 'leave']) await expect(page.locator(`#${id}`)).toBeHidden();
+            expect(await page.evaluate(() => window.captureCalls)).toBe(0);
+            expect(external).toEqual([]);
+            expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
         });
-        page.on('request', request => requests.push(request.url()));
-        await page.route('**/*', route => {
-            const address = new URL(route.request().url());
-            if (address.origin === baseURL) return route.continue();
-            external.push(address.href);
-            if (address.origin === 'https://webjam-turn-credentials.jeffstory007.workers.dev') return route.fulfill({ status: 503, body: 'unavailable' });
-            return route.abort();
+    }
+}
+
+for (const width of [375, 390]) {
+    for (const dailyHint of [false, true]) {
+        test(`the website preserves fragment privacy and recovers provider failure at ${width}px (daily reset hint: ${dailyHint})`, async ({ page, baseURL }, testInfo) => {
+            const external = [], requests = [];
+            await page.setViewportSize({ width, height: width === 375 ? 667 : 844 });
+            await page.addInitScript(() => {
+                window.captureTracks = []; window.captureCount = 0;
+                Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), 'getUserMedia', {
+                    configurable: true, value: async () => {
+                        window.captureCount++;
+                        const context = new AudioContext();
+                        const stream = context.createMediaStreamDestination().stream;
+                        for (const track of stream.getTracks()) {
+                            const stop = track.stop.bind(track);
+                            track.stop = () => { stop(); context.close().catch(() => {}); };
+                            track.getSettings = () => ({ channelCount: 1, sampleRate: 16000 });
+                            window.captureTracks.push(track);
+                        }
+                        return stream;
+                    }
+                });
+            });
+            page.on('request', request => requests.push(request.url()));
+            await page.route('**/*', route => {
+                const address = new URL(route.request().url());
+                if (address.origin === baseURL) return route.continue();
+                external.push(address.href);
+                if (address.origin === 'https://webjam-turn-credentials.jeffstory007.workers.dev') {
+                    if (external.length === 1) return route.fulfill({ status: 503, body: 'unavailable' });
+                    return route.fulfill({ status: 429, json: { error: 'cap' }, ...(dailyHint ? {
+                        headers: { 'Retry-After': '60', 'Access-Control-Expose-Headers': 'Retry-After' }
+                    } : {}) });
+                }
+                return route.abort();
+            });
+            const capability = Buffer.alloc(32, 17).toString('base64url'), session = '22'.repeat(32);
+            await page.goto(`/join/#k=${capability}&s=${session}&g=1&e=${Math.floor(Date.now() / 1000) + 300}`);
+            await expect(page.locator('#status')).toContainText('Your host invited you');
+            expect(await page.evaluate(() => window.captureCount)).toBe(0);
+            expect(external).toEqual([]);
+            const join = page.getByRole('button', { name: 'Join with microphone', exact: true });
+            const retry = page.getByRole('button', { name: 'Retry', exact: true });
+            await expect(join).toBeInViewport({ ratio: 1 });
+            await page.getByRole('button', { name: 'Skip check', exact: true }).press('Enter');
+            await expect(page.getByRole('checkbox')).toBeFocused();
+            await page.keyboard.press('Space');
+            await expect(join).toBeEnabled();
+            await expect(join).toBeInViewport({ ratio: 1 });
+            expect(await page.evaluate(() => window.captureCount)).toBe(0);
+            await join.press('Enter');
+            await expect(page.locator('#status')).toContainText('Web Join is unavailable');
+            await expect(retry).toBeFocused();
+            await expect(page.getByText('Your mic is using voice-quality audio.')).toBeVisible();
+            await expect(page.locator('#warnings')).toBeHidden();
+            await page.getByText('Audio details', { exact: true }).click();
+            await expect(page.locator('#warnings')).toContainText('sampleRate: requested 48000, actual 16000');
+            await expect(page.locator('#warnings')).toBeVisible();
+            await page.getByText('Audio details', { exact: true }).click();
+            await expect(join).toBeHidden();
+            await expect(retry).toBeVisible();
+            await expect(page.getByRole('button', { name: 'Leave session', exact: true })).toBeHidden();
+            expect(await page.evaluate(() => captureTracks.length > 0 && captureTracks.every(track => track.readyState === 'ended'))).toBe(true);
+            expect(external).toHaveLength(1);
+            await retry.press('Enter');
+            await expect(page.locator('#status')).toHaveText('Web Join reached a usage limit.');
+            await expect(page.locator('#status')).toBeFocused();
+            await expect(page.locator('#error-hint')).toContainText(dailyHint
+                ? 'daily request allowance resets around' : 'Ask for a new browser invite');
+            await expect(retry).toBeHidden();
+            await expect.poll(() => page.evaluate(() => window.captureCount)).toBe(2);
+            expect(await page.evaluate(() => captureTracks.every(track => track.readyState === 'ended'))).toBe(true);
+            expect(external).toHaveLength(2);
+            for (const address of requests) { expect(address).not.toContain(capability); expect(address).not.toContain(session); }
+            expect(await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }))).not.toContain(capability);
+            expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+            await page.screenshot({ path: testInfo.outputPath(`webjam-join-${width}.png`) });
         });
-        const capability = Buffer.alloc(32, 17).toString('base64url'), session = '22'.repeat(32);
-        await page.goto(`/join/#k=${capability}&s=${session}&g=1&e=${Math.floor(Date.now() / 1000) + 300}`);
-        await expect(page.locator('#status')).toContainText('Your host invited you');
-        expect(await page.evaluate(() => window.captureCount)).toBe(0);
-        expect(external).toEqual([]);
-        await page.getByRole('button', { name: 'Skip check', exact: true }).click();
-        await page.getByRole('checkbox').check();
-        const join = page.getByRole('button', { name: 'Join with microphone', exact: true });
-        await expect(join).toBeEnabled();
-        expect(await page.evaluate(() => window.captureCount)).toBe(0);
-        await join.click();
-        await expect(page.locator('#status')).toContainText('Web Join is unavailable');
-        await expect(join).toBeHidden();
-        await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Leave session', exact: true })).toBeHidden();
-        expect(await page.evaluate(() => captureTracks.length > 0 && captureTracks.every(track => track.readyState === 'ended'))).toBe(true);
-        expect(external).toHaveLength(1);
-        await page.getByRole('button', { name: 'Retry', exact: true }).click();
-        await expect(page.locator('#status')).toContainText('Web Join is unavailable');
-        await expect.poll(() => page.evaluate(() => window.captureCount)).toBe(2);
-        expect(await page.evaluate(() => captureTracks.every(track => track.readyState === 'ended'))).toBe(true);
-        expect(external).toHaveLength(2);
-        for (const address of requests) { expect(address).not.toContain(capability); expect(address).not.toContain(session); }
-        expect(await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }))).not.toContain(capability);
-        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-        await page.screenshot({ path: testInfo.outputPath(`webjam-join-${width}.png`) });
-    });
+    }
 }
 
 for (const width of [375, 390]) {
@@ -89,24 +130,133 @@ for (const width of [375, 390]) {
             const capability = Buffer.alloc(32, 17).toString('base64url');
             await page.goto(`/join/#k=${capability}&s=${'22'.repeat(32)}&g=1&e=${Math.floor(Date.now() / 1000) + 300}`);
             expect(await page.evaluate(() => window.captureCount)).toBe(0);
-            await page.getByRole('button', { name: 'Check microphone', exact: true }).click();
+            await page.getByRole('button', { name: 'Check microphone', exact: true }).press('Enter');
             await expect(page.locator('#mic-error')).toContainText(name === 'NotAllowedError' ? 'Microphone access was blocked' : 'No microphone found');
             await expect(page.locator('#join')).toBeDisabled();
-            await page.getByRole('button', { name: 'Try again', exact: true }).click();
+            const retry = page.getByRole('button', { name: 'Try again', exact: true });
+            await expect(retry).toBeFocused();
+            await page.keyboard.press('Enter');
             await expect.poll(() => page.evaluate(() => window.captureCount)).toBe(2);
-            await expect(page.locator('#mic-retry')).toBeVisible();
+            await expect(retry).toBeFocused();
             expect(external).toEqual([]);
             expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
         });
     }
 }
 
+const alternateMicrophoneCases = [
+    { width: 375, errorName: 'NotReadableError' },
+    { width: 390, errorName: 'NotReadableError' },
+    { width: 375, errorName: 'NotFoundError' },
+    { width: 390, errorName: 'NotFoundError' },
+];
+for (const { width, errorName } of alternateMicrophoneCases) {
+    test(`the packaged website offers an alternate microphone after ${errorName} at ${width}px`, async ({ page, baseURL }) => {
+        await page.setViewportSize({ width, height: 844 });
+        await page.addInitScript((failure) => {
+            window.captureInputs = [];
+            const media = Object.getPrototypeOf(navigator.mediaDevices);
+            media.enumerateDevices = async () => [{ kind: 'audioinput', deviceId: 'alternate', label: 'USB headset' }];
+            media.getUserMedia = async ({ audio }) => {
+                const selection = audio.deviceId?.exact ?? '';
+                window.captureInputs.push(selection);
+                if (selection !== 'alternate') throw new DOMException('Fixture default input failed', failure);
+                const audioContext = new AudioContext();
+                const output = audioContext.createMediaStreamDestination();
+                const tone = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                gain.gain.value = 0.08;
+                tone.connect(gain).connect(output);
+                tone.start();
+                await audioContext.resume();
+                const track = output.stream.getAudioTracks()[0];
+                const stop = track.stop.bind(track);
+                track.stop = () => { stop(); audioContext.close().catch(() => {}); };
+                return output.stream;
+            };
+        }, errorName);
+        const external = [];
+        await page.route('**/*', route => {
+            if (new URL(route.request().url()).origin === new URL(baseURL).origin) return route.continue();
+            external.push(route.request().url());
+            return route.abort();
+        });
+        const capability = Buffer.alloc(32, 17).toString('base64url');
+        await page.goto(`/join/#k=${capability}&s=${'22'.repeat(32)}&g=1&e=${Math.floor(Date.now() / 1000) + 300}`);
+        const picker = page.getByLabel('Microphone', { exact: true });
+        await expect(picker).toBeHidden();
+        expect(await page.evaluate(() => window.captureInputs)).toEqual([]);
+        await page.getByRole('button', { name: 'Check microphone', exact: true }).press('Enter');
+        await expect(page.locator('#mic-error')).toContainText(
+            errorName === 'NotFoundError' ? 'Choose another input if available' : "Couldn't open this microphone",
+        );
+        await expect(page.getByRole('button', { name: 'Try again' })).toBeFocused();
+        await expect(picker).toBeVisible();
+        expect(await page.evaluate(() => window.captureInputs)).toEqual(['']);
+        await page.keyboard.press('Tab');
+        await expect(picker).toBeFocused();
+        await picker.selectOption({ label: 'USB headset' });
+        await expect(page.getByText('Microphone detected.', { exact: true })).toBeVisible();
+        await page.getByRole('checkbox').check();
+        await expect(page.locator('#join')).toBeEnabled();
+        expect(await page.evaluate(() => window.captureInputs)).toEqual(['', 'alternate']);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        expect(external).toEqual([]);
+    });
+}
+
+for (const width of [375, 390]) {
+    test(`the packaged website can check the default microphone without a device list at ${width}px`, async ({ page, baseURL }) => {
+        await page.setViewportSize({ width, height: 844 });
+        await page.addInitScript(() => {
+            window.captureCount = 0;
+            const media = Object.getPrototypeOf(navigator.mediaDevices);
+            media.enumerateDevices = async () => { throw new DOMException('Fixture device list unavailable', 'NotAllowedError'); };
+            media.getUserMedia = async () => {
+                window.captureCount++;
+                const audioContext = new AudioContext();
+                const output = audioContext.createMediaStreamDestination();
+                const tone = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                gain.gain.value = 0.08;
+                tone.connect(gain).connect(output);
+                tone.start();
+                await audioContext.resume();
+                const track = output.stream.getAudioTracks()[0];
+                const stop = track.stop.bind(track);
+                track.stop = () => { stop(); audioContext.close().catch(() => {}); };
+                return output.stream;
+            };
+        });
+        const external = [];
+        const origin = new URL(baseURL).origin;
+        await page.route('**/*', route => {
+            if (new URL(route.request().url()).origin === origin) return route.continue();
+            external.push(route.request().url());
+            return route.abort();
+        });
+        const capability = Buffer.alloc(32, 17).toString('base64url');
+        await page.goto(`/join/#k=${capability}&s=${'22'.repeat(32)}&g=1&e=${Math.floor(Date.now() / 1000) + 300}`);
+        expect(await page.evaluate(() => window.captureCount)).toBe(0);
+        await page.getByRole('button', { name: 'Check microphone', exact: true }).press('Enter');
+        await expect(page.getByText('Microphone detected.', { exact: true })).toBeVisible();
+        await expect(page.locator('#mic-error')).toBeEmpty();
+        await expect(page.getByLabel('Microphone', { exact: true })).toBeHidden();
+        await expect(page.getByRole('checkbox')).toBeFocused();
+        await page.keyboard.press('Space');
+        await expect(page.locator('#join')).toBeEnabled();
+        expect(await page.evaluate(() => window.captureCount)).toBe(1);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        expect(external).toEqual([]);
+    });
+}
+
 // Ownership regressions exercise the shipped module through the website URL.
 // Adapted from WebJam failure-recovery.spec.js at01ffdc8 (MIT; see join/LICENSE).
-async function openOwnedInvitation(page, width = 390) {
+async function openOwnedInvitation(page, width = 390, skipCheck = true) {
   await page.setViewportSize({ width, height: 844 });
   await page.clock.install();
-  await page.addInitScript(() => {
+  await page.addInitScript(({ skipCheck }) => {
     window.captureTracks = [];
     const nativeContext = window.AudioContext;
     window.audioContexts = [];
@@ -116,9 +266,18 @@ async function openOwnedInvitation(page, width = 390) {
     Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), 'getUserMedia', {
       configurable: true,
       value: async () => {
-        // Synthetic silent audio only; never request the tester's microphone.
+        // Synthetic audio only; never request the tester's microphone.
         const context = new AudioContext();
-        const stream = context.createMediaStreamDestination().stream;
+        const output = context.createMediaStreamDestination();
+        const { stream } = output;
+        if (!skipCheck) {
+          const oscillator = context.createOscillator();
+          const gain = context.createGain();
+          gain.gain.value = 0.08;
+          oscillator.connect(gain).connect(output);
+          oscillator.start();
+          await context.resume();
+        }
         for (const track of stream.getTracks()) {
           const stop = track.stop.bind(track);
           track.stop = () => { stop(); context.close().catch(() => {}); };
@@ -127,12 +286,61 @@ async function openOwnedInvitation(page, width = 390) {
         return stream;
       }
     });
-  });
+  }, { skipCheck });
   const expires = Math.floor(Date.now() / 1000) + 300;
   // Local test-only capability, with no corresponding host or mailbox.
   await page.goto(`/join/#k=${Buffer.alloc(32, 17).toString('base64url')}&s=${'22'.repeat(32)}&g=1&e=${expires}`);
   await page.getByRole('checkbox').check();
-  await page.getByRole('button', { name: 'Skip check' }).click();
+  if (skipCheck) await page.getByRole('button', { name: 'Skip check' }).click();
+}
+
+test('losing the checked microphone clears Join readiness until a deliberate recheck', async ({ page }) => {
+  await openOwnedInvitation(page, 390, false);
+  await page.getByRole('button', { name: 'Check microphone', exact: true }).click();
+  await expect(page.locator('#join')).toBeEnabled();
+  await page.evaluate(() => {
+    captureTracks[0].stop();
+    captureTracks[0].dispatchEvent(new Event('ended'));
+  });
+  await expect(page.locator('#mic-error')).toContainText('Microphone disconnected');
+  await expect(page.locator('#mic-heard')).toBeHidden();
+  await expect(page.locator('#join')).toBeDisabled();
+  expect(await page.evaluate(() => captureTracks.length)).toBe(1);
+  await page.getByRole('button', { name: 'Try again', exact: true }).click();
+  await expect(page.locator('#join')).toBeEnabled();
+  expect(await page.evaluate(() => captureTracks.length)).toBe(2);
+  await page.evaluate(() => captureTracks[0].dispatchEvent(new Event('ended')));
+  await expect(page.locator('#join')).toBeEnabled();
+});
+
+for (const skipCheck of [false, true]) {
+  test(`losing an enrolled microphone closes the audio session after ${skipCheck ? 'skipping' : 'passing'} the mic check`, async ({ page }) => {
+    await page.route('**/join/session.js', route => route.fulfill({ contentType: 'text/javascript', body: `
+      export class WebJoinSession {
+        constructor(options) { this.options = options; }
+        async join() { this.options.onStatus('Synthetic session connected.'); }
+        close() {
+          window.micLossSessionClosed = true;
+          this.options.stream.getTracks().forEach(track => track.stop());
+        }
+      }` }));
+    await openOwnedInvitation(page, 390, skipCheck);
+    if (!skipCheck) {
+      await page.getByRole('button', { name: 'Check microphone', exact: true }).click();
+      await expect(page.locator('#join')).toBeEnabled();
+    }
+    await page.locator('#join').click();
+    await expect(page.locator('#status')).toHaveText('Synthetic session connected.');
+    await page.evaluate(() => {
+      captureTracks[0].stop();
+      captureTracks[0].dispatchEvent(new Event('ended'));
+    });
+    await expect(page.locator('#status')).toHaveText('Microphone disconnected.');
+    await expect(page.locator('#error-hint')).toContainText('new browser invite');
+    for (const id of ['join', 'retry', 'leave', 'prejoin']) await expect(page.locator('#' + id)).toBeHidden();
+    await expect.poll(() => page.evaluate(() => window.micLossSessionClosed && audioContexts.every(context => context.state === 'closed'))).toBe(true);
+    expect(await page.evaluate(() => captureTracks.length)).toBe(1);
+  });
 }
 
 for (const outcome of ['rejoining', 'failed']) {
@@ -152,8 +360,12 @@ for (const outcome of ['rejoining', 'failed']) {
     await openOwnedInvitation(page);
     const join = page.getByRole('button', { name: 'Join with microphone', exact: true });
     const leave = page.getByRole('button', { name: 'Leave session', exact: true });
-    await join.click(); await expect(page.locator('#status')).toHaveText('Attempt 1 pending.');
-    await leave.click(); await join.click();
+    await join.press('Enter');
+    await expect(page.locator('#status')).toHaveText('Attempt 1 pending.');
+    await expect(leave).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(join).toBeFocused();
+    await page.keyboard.press('Enter');
     await expect(page.locator('#status')).toHaveText('Attempt 2 pending.');
     if (outcome === 'failed') await page.evaluate(() => pendingSessions[1].options.onError(new Error('Current enrollment failed.')));
     await page.evaluate(() => pendingSessions[0].finish());

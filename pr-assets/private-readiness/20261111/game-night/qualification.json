@@ -1,0 +1,35 @@
+{
+  "privateWebsite": {
+    "releasedUtc": "2026-11-11T04:34:31Z",
+    "pullRequest": 263,
+    "reviewedHead": "a6b7467331656a0a6714da42ae8d1d6ffec34336",
+    "merge": "a12ee75e6dc166dfdc54a4364b6270e1f4622f04",
+    "tree": "b12a389aea827a4cdcb74224ae215dcebe563f8d",
+    "bundleSha256": "a8792b190959177cc6731dd00ebc9db5031f464d58d17e0beed37dd819ea9bb7",
+    "servingVersion": "49f12e46-f3a1-4667-a86d-7eebee8ad7a9",
+    "deployment": "23385198-d918-4539-9be7-dee56d6404ad",
+    "trafficPercent": 100,
+    "rollbackVersion": "87df0c36-5689-4248-a6e9-b075d1baa361",
+    "preservedBindingCount": 28,
+    "admittedChangedAssetsMatched": 5,
+    "admittedLogoutVerified": true,
+    "anonymousGameNightModuleStatus": 401
+  },
+  "hostedTests": {
+    "browserRuns": [42953489625, 42953495756],
+    "browserCasesPassedPerRun": 906,
+    "routeChecksPassedPerServedPath": 34,
+    "workerRuns": [42953489645, 42953495750],
+    "gameNightBrowsers": ["Chromium", "WebKit"],
+    "gameNightMobileWidthsPx": [375, 390],
+    "externalCallNavigation": "Synthetic link and navigation check"
+  },
+  "desktopChromeSmoke": {
+    "privateLobby": "Fresh tab showed the private invitation requirement",
+    "publicArcade": "Opened Turdtris and verified Play and Pause"
+  },
+  "remainingAcceptance": [
+    "Two people complete a live private Game Night together",
+    "Two people join the same external voice and video call from Game Night"
+  ]
+}

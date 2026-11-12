@@ -1,0 +1,123 @@
+{
+  "scope": "Approved private music activation, API/configuration evidence only; no actual media",
+  "websiteSource": "de2b01725925d2f78ee21af33f68f3eb4eb95407",
+  "issuer": {
+    "at": "2026-11-04T18:06:16.863953+00:00",
+    "issuerVersion": "60e3f182-2d11-4740-b89a-74377778766d",
+    "rollbackVersion": "0293048a-6440-4e31-ad41-85b3d8f4074b",
+    "existingBindingsSecretNamesAndNamespaceIDsPreserved": true,
+    "runtimeSettingsPreserved": true,
+    "onlyAddedFourReviewedPlainVars": true,
+    "actualProtectedJoinBrowserCorsAndInvalidInvite": "PASS: issuer-browser-preflight-result-nov04.json",
+    "pythonProbe": "FAILED with Cloudflare1010 before application; retained private-issuer-python-preflight-failure-nov04.json; not negative CORS proof",
+    "liveDisallowedOriginProbe": "not yet qualified; source/config exact-origin gates retain their CI scope",
+    "credentialsMintedByProbes": false,
+    "actualAudio": false,
+    "publicNavigationChanged": false,
+    "scope": "18:06 configuration/browser observation; later18:33 API result separately supersedes its not-yet-qualified CORS status"
+  },
+  "beta": {
+    "at": "2026-11-04T18:09:50.838770+00:00",
+    "source": "de2b01725925d2f78ee21af33f68f3eb4eb95407",
+    "newVersion": "c0586c29-3d43-4ffa-96e4-646b9e7dde06",
+    "rollbackVersion": "dbcaddf5-dd3f-48e3-9826-0d7998ffdbc0",
+    "onlyChangedBinding": "WEBJAM_WEB_ORIGINS",
+    "allOtherBindingsIncludingNamespacesAndSecretsIdentical": true,
+    "runtimeSettingsIdentical": true,
+    "packagedSourceAssetsUnchanged": 68,
+    "aiAndSeparateHangoutMediaTurnRemainOff": true,
+    "musicNotYetQualified": true,
+    "publicNavigationChanged": false
+  },
+  "laterIssuerApi": {
+    "at": "2026-11-04T18:33:20.614522+00:00",
+    "issuerVersion": "60e3f182-2d11-4740-b89a-74377778766d",
+    "scope": "Live CORS and credential API preflight with one random syntactically valid test session, not a native invitation or music journey",
+    "honestClientIdentity": "WebJam",
+    "capture": false,
+    "turnAllocationsCreated": false,
+    "credentialValuesRecorded": false,
+    "cors": [
+      {
+        "origin": "https://stalemate-hangout-beta.jeffstory007.workers.dev",
+        "status": 204,
+        "bodyBytes": 0,
+        "exactAllowedOrigin": true,
+        "allowHeaderAbsent": false
+      },
+      {
+        "origin": "https://stalemate.band",
+        "status": 204,
+        "bodyBytes": 0,
+        "exactAllowedOrigin": true,
+        "allowHeaderAbsent": false
+      },
+      {
+        "origin": "https://unregistered.invalid",
+        "status": 403,
+        "bodyBytes": 0,
+        "exactAllowedOrigin": false,
+        "allowHeaderAbsent": true
+      }
+    ],
+    "credentialHttpStatus": 200,
+    "credentialShape": {
+      "client": "web",
+      "ttl": 600,
+      "quotaBytes": 268435456,
+      "iceServerCount": 2,
+      "turnCredentialPresent": true,
+      "relayIpCount": 2,
+      "noStore": true
+    },
+    "status": "passed"
+  },
+  "headroom": {
+    "at": "2026-11-04T18:00:33.151968+00:00",
+    "accountScope": "Same authenticated account as the existing issuer; no app/key filter",
+    "turn": {
+      "httpStatus": 200,
+      "operation": "CallsTurnBandwidthUsage",
+      "dataset": "callsTurnUsageAdaptiveGroups",
+      "filters": {
+        "AND": [
+          {
+            "datetimeMinute_geq": "2026-10-05T17:56:15Z",
+            "datetimeMinute_leq": "2026-11-04T17:56:15Z"
+          }
+        ]
+      },
+      "accounts": 1,
+      "usageGroups": 0,
+      "errors": null
+    },
+    "sfu": {
+      "httpStatus": 200,
+      "operation": "CallsSfuBandwidthUsage",
+      "dataset": "callsUsageAdaptiveGroups",
+      "filters": {
+        "AND": [
+          {
+            "datetimeMinute_geq": "2026-10-05T17:58:55Z",
+            "datetimeMinute_leq": "2026-11-04T17:58:55Z"
+          }
+        ]
+      },
+      "accounts": 1,
+      "usageGroups": 0,
+      "errors": null
+    },
+    "billingScope": "These windows cover the observed October15-November14 subscription period to date and calendar November to date; earlier same-day plan/cycle assessment retained separately",
+    "headroomInference": "Sufficient observed shared allowance for the approved one-host/one-guest bounded private trials; analytics lag/concurrent users/issued credentials prevent an account spending guarantee",
+    "providerEntitlementEvidence": "Earlier same-day account-wide-music-headroom-nov04.json plus current successful account-wide query responses; Cloudflare shared1000GB SFU/TURN documentation",
+    "credentialValuesRecorded": false,
+    "paidPlanOrPurchaseChanged": false
+  },
+  "separateApplication": "webjam-private-web",
+  "newEncryptedBindingNames": [
+    "WEB_TURN_KEY_ID",
+    "WEB_TURN_KEY_API_TOKEN"
+  ],
+  "credentialValuesIncluded": false,
+  "publicNavigationChanged": false
+}

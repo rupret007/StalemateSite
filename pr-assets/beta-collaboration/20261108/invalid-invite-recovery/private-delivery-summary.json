@@ -1,0 +1,62 @@
+{
+  "state": "ALL66_SOURCE_CONTENTS_AND_SETTINGS_VERIFIED_HOSTED_JOURNEYS_PENDING",
+  "source": "71bff2cd6a5e352492eb7aaa304385182b378652",
+  "merge": "76ccf7b14c5a13943e1750a56fac3d79611eb387",
+  "tree": "3236c54ac2c0418e3d0469b717a38dadfbaf952c",
+  "version": "2c5c81e5-1aa4-4ea7-be69-cacda13c20e8",
+  "deployment": "e75182dd-8ac7-484a-809b-a80f6a8ac52e",
+  "previousVersion": "449fe7d2-0ac3-41b8-b622-fda2453b38db",
+  "previousDeployment": "9c793eb0-60a9-4c45-91b1-76cf3918ed61",
+  "issuerVersion": "4db649fa-a465-44b4-8487-414987b3a660",
+  "executionEndpoint": "Windows NucBox owned application cache",
+  "allEffectiveSettingsAndNamespacesPreserved": true,
+  "issuerUnchanged": true,
+  "all66DeployedSourceContentsVerified": true,
+  "originalRelayCapMarkerUnchanged": true,
+  "physicalCapture": false,
+  "providerMediaTrial": false,
+  "storyPoolUsed": false,
+  "publicSitesChanged": false,
+  "releaseCandidateReady": false,
+  "completedAt": "2026-11-08T08:45:28.759416+00:00",
+  "upstreamSource": "84193760a0d10050a649d0872151c30637997c63",
+  "upstreamPr": 453,
+  "applicationPr": 239,
+  "runtimeDelta": [
+    "join/app.js: two initial-invalid-invite recovery lines",
+    "join/PROVENANCE.json: exact13file upstream841 provenance"
+  ],
+  "sourceCi": {
+    "site": {
+      "runs": [
+        42460162446,
+        42460189565
+      ],
+      "mainCountsEach": {
+        "units": 2091,
+        "unitFiles": 138,
+        "browserCases": 851,
+        "smokes": [
+          34,
+          34
+        ]
+      },
+      "fullRawLogsReviewed": true
+    },
+    "webjam": {
+      "runs": [
+        42459981068,
+        42459981069,
+        42459981070
+      ],
+      "browserCases": 69,
+      "fullRawLogsReviewed": true
+    }
+  },
+  "limits": [
+    "No physical music/hearing or actual Shared Track playback in this check",
+    "No real Webex meeting/video/exclusive-audio acceptance",
+    "Viewport-emulated Windows Chrome; not physical iOS",
+    "Earlier449 audio, full lobby and heartbeat evidence retains its original version scope"
+  ]
+}

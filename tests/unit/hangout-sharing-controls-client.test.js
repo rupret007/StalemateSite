@@ -4,6 +4,7 @@ import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import * as entryFunctions from '../../r/45662413410ed051/entry-sites.mjs';
 import { createEntrySharing } from '../../r/45662413410ed051/lobby/entry-sharing.mjs';
+import { createIdleHeartbeat } from '../../r/45662413410ed051/lobby/idle-heartbeat.mjs';
 import { createChatAnnouncements } from '../../r/45662413410ed051/lobby/chat-announcements.mjs';
 
 const html = readFileSync(new URL('../../r/45662413410ed051/lobby/index.html', import.meta.url), 'utf8');
@@ -31,7 +32,7 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, { shar
         receive(frame) { this.onmessage?.({ data: JSON.stringify(frame) }); }
         close(code = 1000) { this.readyState = 3; this.onclose?.({ code }); }
     };
-    window.HangoutClientTestModules = { ...entryFunctions, createEntrySharing,
+    window.HangoutClientTestModules = { ...entryFunctions, createEntrySharing, createIdleHeartbeat,
         createChatAnnouncements: (log) => createChatAnnouncements(log, { frame: (fn) => window.setTimeout(fn, 16), cancel: (id) => window.clearTimeout(id) }) };
     window.eval(discovery);
     window.eval(activity);
@@ -210,7 +211,7 @@ describe('private caller sharing controls in the actual browser client', () => {
         expect(ws.sent.filter(frame => frame.t === 'cmd' && frame.name === 'block')).toEqual([{ t: 'cmd', name: 'block', args: ['Friend'], ch: '#stalemate', roomInstance: 'a'.repeat(32), personContext: 1, personPeer: 'friend-socket' }]);
         get('[data-sharing-leave]').click(); get('[data-sharing-leave]').click();
         expect(closes).toEqual([[1000, 'Left chat']]); expect(ws.onclose).toBeNull(); expect(ws.onmessage).toBeNull();
-        expect(window.__lobby.chans.size).toBe(0); expect(window.__lobby.pms.size).toBe(0); expect(get('[data-buffer]').children).toHaveLength(0);
+        expect(window.__lobby.chans.size).toBe(0); expect(window.__lobby.pms.size).toBe(0); expect(get('[data-chat-lines]').children).toHaveLength(0);
         expect(get('[data-session-reason]').textContent).toContain('You left this chat'); expect(get('[data-session-reason]').textContent).not.toContain('expired');
         release(Response.json({ error: 'Synthetic pending request ended' }, { status: 503 }));
         await vi.waitFor(() => expect(get('[data-sharing-check]').disabled).toBe(false)); flush(1000);

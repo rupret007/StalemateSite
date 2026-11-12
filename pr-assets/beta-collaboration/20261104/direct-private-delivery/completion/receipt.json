@@ -1,0 +1,44 @@
+{
+  "at": "2026-11-04T10:05:34.400767+00:00",
+  "scope": "Additional qualified observations; earlier dated receipts/failures retained",
+  "requirementsFileSha256": "3d5db107977f652a1bd51286c02657aaff70c9c3590adb876e03f6d909679999",
+  "physicalMusicQualified": false,
+  "publicLaunch": false,
+  "files": [
+    {
+      "path": "arm-startup.json",
+      "bytes": 1030,
+      "sha256": "fe389d776703022cbf9e400ea17d3f281f8c5d22d47d03686491d4ba2bcf3afe"
+    },
+    {
+      "path": "configuration-dry-runs.json",
+      "bytes": 650,
+      "sha256": "0c9ac9db80eafa266c47f5283ae86e0ac52c8bc61a8eb4a7b7b6e133dc636e5e"
+    },
+    {
+      "path": "native-packages.json",
+      "bytes": 7659,
+      "sha256": "299d30bf7b56b0909e83882d6bf0d0cd96e6a0d7ff195e6313f01f38d06da6cb"
+    },
+    {
+      "path": "reconnect-first-attempt.json",
+      "bytes": 849,
+      "sha256": "db9c8c00124a1744123ca15b4cdf17394afe2782d423334aaca8dc2e0d7925e8"
+    },
+    {
+      "path": "reconnect.json",
+      "bytes": 1144,
+      "sha256": "a5071abb6159df054bb4c1d50146b77adae8d71002615088a292e6af1daccdc6"
+    },
+    {
+      "path": "report.json",
+      "bytes": 1095,
+      "sha256": "4a38628ec01a9b6a15dfc3347c736b07542d53af0fd55193fbbef6357320c9b9"
+    },
+    {
+      "path": "website202-ci.json",
+      "bytes": 1618,
+      "sha256": "a1f013bd597eb3a16991c09b7f03cf28984520f51b233eec4d18a9fb4f83e816"
+    }
+  ]
+}

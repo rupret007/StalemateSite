@@ -1,0 +1,50 @@
+{
+  "state": "READ_ONLY_PRIVATE_MEDIA_POSTCHECK_PASSED_NO_ADDITIONAL_MEDIA_STARTED",
+  "startedAt": "2026-11-07T11:51:07.891865+00:00",
+  "readOnly": true,
+  "billingObservation": {
+    "recordedAt": "2026-11-07T11:36:08.833457+00:00",
+    "readOnlyBillingHeadroomGuardPassed": true,
+    "subscriptionOrLimitChanged": false,
+    "physicalCaptureAllowedByThisReceipt": false,
+    "privateBillingDetailsOmittedFromPublicExcerpt": true
+  },
+  "versions": {
+    "stalemate-hangout-beta": "33862058-10a5-4a6f-9659-38841d70292f",
+    "webjam-turn-credentials": "4db649fa-a465-44b4-8487-414987b3a660"
+  },
+  "allLiveSettingsMatchExistingBaselines": true,
+  "capMarkerSha256": "455ed66975e47e2838d47c2026ebd57e287721d9ad7f09922c72c64b50e35150",
+  "physicalCapture": false,
+  "providerCredentialsMintedByPostcheck": false,
+  "successfulTrialReceipt": "current-generated-linux-media-full-wav.json",
+  "storyPoolChanged": false,
+  "usage": {
+    "callsTurnUsageAdaptiveGroups": {
+      "rows": [
+        {
+          "sum": {
+            "egressBytes": 7117904,
+            "ingressBytes": 10159676
+          }
+        }
+      ],
+      "emptyIsNotZeroUsageOrHeadroom": true
+    },
+    "callsUsageAdaptiveGroups": {
+      "rows": [],
+      "emptyIsNotZeroUsageOrHeadroom": true
+    }
+  },
+  "nativeReadOnlyReadiness": {
+    "existingBootstrapIdleResourceAndImportCheckExitCode": 0,
+    "all32SourceFilesMatch": true,
+    "wavSha256": "f5298cbb71fea2a9d394de3c517bea795de97bc445b7020f50f00c8b40e7db45",
+    "physicalCapture": false,
+    "sessionStarted": false
+  },
+  "allLiveSettingsAndVersionsUnchanged": true,
+  "capMarkerUnchanged": true,
+  "verificationScope": "Final read-only versions/settings/source/idle/cap-marker check after the completed40-second trial; no further media started",
+  "completedAt": "2026-11-07T11:51:09.962957+00:00"
+}

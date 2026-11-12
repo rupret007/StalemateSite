@@ -1,0 +1,53 @@
+{
+  "at": "2026-11-04T18:43:52.790Z",
+  "role": "ARM Mini room creator",
+  "source": "de2b01725925d2f78ee21af33f68f3eb4eb95407",
+  "expectedRuntime": "c0586c29-3d43-4ffa-96e4-646b9e7dde06",
+  "scope": "Actual two physical Macs and private service; MacBook on Wi-Fi; browser chat only, not physical music or public band navigation",
+  "mediaRequested": false,
+  "browser": "156.0.8078.80",
+  "nodeArchitecture": "arm64",
+  "guestRoomJoined": true,
+  "remote": {
+    "at": "2026-11-04T18:43:59.798Z",
+    "role": "Intel MacBook guest",
+    "source": "de2b01725925d2f78ee21af33f68f3eb4eb95407",
+    "expectedRuntime": "c0586c29-3d43-4ffa-96e4-646b9e7dde06",
+    "scope": "Actual two physical Macs and private service; MacBook on Wi-Fi; browser chat only, not physical music or public band navigation",
+    "mediaRequested": false,
+    "browser": "157.0.8103.38",
+    "nodeArchitecture": "x64",
+    "guestRoomJoined": true,
+    "noEarlierChannelBacklog": true,
+    "twoWayExchange": true,
+    "layouts": [
+      {
+        "width": 375,
+        "html": 375,
+        "body": 375,
+        "inputFont": 16,
+        "composerContained": true,
+        "screenshot": "intel-wireless-375.png"
+      },
+      {
+        "width": 390,
+        "html": 390,
+        "body": 390,
+        "inputFont": 16,
+        "composerContained": true,
+        "screenshot": "intel-wireless-390.png"
+      }
+    ],
+    "status": "passed",
+    "logoutStatus": 200,
+    "stateAfterLogout": 401,
+    "captureRequests": 0,
+    "completedAt": "2026-11-04T18:44:17.471Z"
+  },
+  "twoWayCrossEntryMessages": true,
+  "status": "passed",
+  "logoutStatus": 200,
+  "stateAfterLogout": 401,
+  "captureRequests": 0,
+  "completedAt": "2026-11-04T18:44:18.063Z"
+}

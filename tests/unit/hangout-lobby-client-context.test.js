@@ -4,6 +4,7 @@ import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import * as entryFunctions from '../../r/45662413410ed051/entry-sites.mjs';
 import { createEntrySharing } from '../../r/45662413410ed051/lobby/entry-sharing.mjs';
+import { createIdleHeartbeat } from '../../r/45662413410ed051/lobby/idle-heartbeat.mjs';
 import { createChatAnnouncements } from '../../r/45662413410ed051/lobby/chat-announcements.mjs';
 
 const html = readFileSync(new URL('../../r/45662413410ed051/lobby/index.html', import.meta.url), 'utf8');
@@ -12,13 +13,19 @@ const discovery = readFileSync(new URL('../../r/45662413410ed051/lobby/discovery
 const windows = [];
 afterEach(() => { for (const dom of windows.splice(0)) dom.window.close(); });
 
-async function visitor(via = 'stalemate', features = { entrySources: 1 }) {
+async function visitor(via = 'stalemate', features = { entrySources: 1 }, options = {}) {
     const dom = new JSDOM(html, { url: `http://127.0.0.1:4320/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=ws%3A%2F%2F127.0.0.1%3A4320%2Frelay&via=${encodeURIComponent(via)}`, runScripts: 'outside-only' });
     windows.push(dom);
     const { window } = dom, timers = new Map(), sockets = []; let timerId = 0, elapsed = 0;
     Object.defineProperty(window.performance, 'now', { value: () => elapsed });
     window.setTimeout = (fn, delay) => { timers.set(++timerId, { fn, delay }); return timerId; };
     window.clearTimeout = (id) => timers.delete(id);
+    if (options.beta) {
+        const bootstrap = window.document.createElement('script');
+        bootstrap.src = '/beta/bootstrap.js'; window.document.head.append(bootstrap);
+        window.HangoutBootstrap = { preview: 'local-preview-key-0001', owner: options.owner === true };
+    }
+    window.fetch = options.fetch || vi.fn();
     const paint = () => { for (const [id, task] of [...timers]) if (task.delay === 16) { timers.delete(id); task.fn(); } };
     const flush = (delay) => { for (const [id, task] of [...timers]) if (task.delay === delay) { timers.delete(id); task.fn(); } };
     window.WebSocket = class {
@@ -27,9 +34,9 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }) {
         send(text) { this.sent.push(JSON.parse(text)); }
         open() { this.readyState = 1; this.onopen?.(); }
         receive(frame) { this.onmessage?.({ data: JSON.stringify(frame) }); }
-        close(code = 1000) { this.readyState = 3; this.onclose?.({ code }); }
+        close(code = 1000) { this.readyState = 3; return this.onclose?.({ code }); }
     };
-    window.HangoutClientTestModules = { ...entryFunctions, createEntrySharing,
+    window.HangoutClientTestModules = { ...entryFunctions, createEntrySharing, createIdleHeartbeat,
         createChatAnnouncements: (log) => createChatAnnouncements(log, { frame: (fn) => window.setTimeout(fn, 16), cancel: (id) => window.clearTimeout(id) }) };
     window.eval(discovery);
     // Execute the actual browser client, replacing only module loading, which
@@ -39,14 +46,158 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }) {
     window.document.querySelector('[data-nick]').value = 'Viewer';
     window.document.querySelector('[data-enter]').click();
     await vi.waitFor(() => expect(sockets.length).toBe(1));
-    const ws = sockets[0]; ws.open();
-    ws.receive({ t: 'hello', role: 'fan', lock: 'off', budget: 'ok', features });
+    const ws = sockets[0];
+    if (options.open !== false) {
+        ws.open();
+        ws.receive({ t: 'hello', role: 'fan', lock: 'off', budget: 'ok', features });
+    }
     const welcome = (socket = ws, seq = 1) => socket.receive({ t: 'welcome', nick: 'Viewer', role: 'fan', band: false, verified: false, capabilities: {}, transportSeq: seq });
     const join = (name = '#stalemate') => ws.receive({ t: 'join', ch: { name, kind: name === '#stalemate' ? 'lobby' : 'chat', title: 'Shared chat', topic: '', count: 1, modes: {}, names: [{ nick: 'Viewer', prefix: '', entrySource: via }] } });
     return { dom, window, ws, sockets, welcome, join, timers, paint, flush, advance: (ms) => { elapsed += ms; } };
 }
 
+describe('private entry recovery after a rejected socket admission', () => {
+    it('offers normal private entry only after the same-origin access check returns 401', async () => {
+        const fetch = vi.fn(async () => ({ status: 401 }));
+        const { window, ws, sockets } = await visitor('rad-dad', undefined, { beta: true, open: false, fetch });
+        await ws.close(1006);
+        const link = window.document.querySelector('[data-gate-private-entry]');
+        expect(link?.hidden).toBe(false);
+        expect(link.getAttribute('href')).toBe('/beta/');
+        expect(window.document.querySelector('[data-gate-status]').textContent).toContain('private access');
+        expect(window.document.querySelector('[data-nick]').value).toBe('Viewer');
+        expect(window.document.querySelector('[data-gate]').hidden).toBe(false);
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(fetch.mock.calls[0][0]).toBe('/beta/state');
+        expect(fetch.mock.calls[0][1]).toMatchObject({ credentials: 'same-origin', cache: 'no-store' });
+        expect(sockets).toHaveLength(1);
+    });
+    it.each([200, 403, 429, 503])('does not diagnose missing access from status %s', async status => {
+        const { window, ws } = await visitor('', undefined, { beta: true, open: false, fetch: vi.fn(async () => ({ status })) });
+        await ws.close(1006);
+        expect(window.document.querySelector('[data-gate-private-entry]')?.hidden).toBe(true);
+        const message = window.document.querySelector('[data-gate-status]').textContent;
+        expect(message).toContain('Couldn’t connect');
+        expect(message).not.toMatch(/private access|got the boot|locked|full/i);
+    });
+    it('keeps public admission failures independent of the private access service', async () => {
+        const fetch = vi.fn();
+        const { window, ws } = await visitor('', undefined, { open: false, fetch });
+        await ws.close(1006);
+        expect(fetch).not.toHaveBeenCalled();
+        expect(window.document.querySelector('[data-gate-private-entry]')?.hidden).toBe(true);
+    });
+    it('keeps network errors truthful and bounds an unresponsive check', async () => {
+        const failed = await visitor('', undefined, { beta: true, open: false, fetch: vi.fn(async () => { throw Error('synthetic network failure'); }) });
+        await failed.ws.close(1006);
+        expect(failed.window.document.querySelector('[data-gate-private-entry]')?.hidden).toBe(true);
+        const fetch = vi.fn(() => new Promise(() => {}));
+        const stalled = await visitor('', undefined, { beta: true, open: false, fetch });
+        const closing = stalled.ws.close(1006);
+        expect(fetch).toHaveBeenCalledTimes(1);
+        stalled.flush(3000); await closing;
+        expect(fetch.mock.calls[0][1].signal.aborted).toBe(true);
+        expect(stalled.window.document.querySelector('[data-gate-private-entry]')?.hidden).toBe(true);
+        expect(stalled.sockets).toHaveLength(1);
+    });
+    it('cancels the old check and ignores its late denial after a newer successful join', async () => {
+        let complete;
+        const fetch = vi.fn(() => new Promise(resolve => { complete = resolve; }));
+        const { window, ws, sockets, welcome } = await visitor('', undefined, { beta: true, open: false, fetch });
+        const closing = ws.close(1006);
+        window.document.querySelector('[data-enter]').click();
+        await vi.waitFor(() => expect(sockets).toHaveLength(2));
+        const current = sockets[1]; current.open(); welcome(current);
+        complete({ status: 401 }); await closing;
+        expect(fetch.mock.calls[0][1].signal.aborted).toBe(true);
+        expect(window.document.querySelector('[data-connection]').textContent).toBe('Connected');
+        expect(window.document.querySelector('[data-gate-private-entry]')?.hidden).toBe(true);
+    });
+    it('cancels on page departure and never probes an ordinary successful connection', async () => {
+        const fetch = vi.fn(() => new Promise(() => {}));
+        const { window, ws } = await visitor('', undefined, { beta: true, open: false, fetch });
+        const closing = ws.close(1006);
+        window.dispatchEvent(new window.Event('pagehide')); await closing;
+        expect(fetch.mock.calls[0][1].signal.aborted).toBe(true);
+        expect(window.document.querySelector('[data-gate-private-entry]')?.hidden).toBe(true);
+        const healthyFetch = vi.fn();
+        const healthy = await visitor('', undefined, { beta: true, fetch: healthyFetch });
+        healthy.welcome(); healthy.join(); await healthy.ws.close(4401);
+        expect(healthyFetch).not.toHaveBeenCalled();
+    });
+    it('distinguishes private access renewal from verified-email recovery', async () => {
+        const missing = await visitor('', undefined, { beta: true, owner: true, open: false, fetch: vi.fn(async () => ({ status: 401 })) });
+        await missing.ws.close(1006);
+        expect(missing.window.document.querySelector('[data-gate-status]').textContent).toContain('private access');
+        const email = await visitor('', undefined, { beta: true, owner: true, open: false, fetch: vi.fn(async () => ({ status: 200 })) });
+        await email.ws.close(1006);
+        expect(email.window.document.querySelector('[data-gate-status]').textContent).toContain('Email sign-in');
+        expect(email.window.document.querySelector('[data-gate-guest]').hidden).toBe(false);
+    });
+    it('ends an expired private reconnect without losing its unsent draft', async () => {
+        const fetch = vi.fn(async () => ({ status: 401 }));
+        const { window, ws, sockets, welcome, join } = await visitor('', undefined, { beta: true, fetch });
+        welcome(); join();
+        window.document.querySelector('[data-text]').value = 'Keep this unsent rehearsal note';
+        await ws.close(4429);
+        window.document.querySelector('[data-reconnect]').click();
+        await vi.waitFor(() => expect(sockets).toHaveLength(2));
+        await sockets[1].close(1006);
+        expect(window.document.querySelector('[data-session-ended]').hidden).toBe(false);
+        expect(window.document.querySelector('[data-session-reason]').textContent).toContain('private community access needs renewal');
+        expect(window.document.querySelector('[data-session-reentry]').hidden).toBe(false);
+        expect(window.document.querySelector('[data-text]').value).toBe('Keep this unsent rehearsal note');
+        expect(window.document.querySelector('[data-text]').readOnly).toBe(true);
+        expect(fetch).toHaveBeenCalledTimes(1);
+    });
+});
+
 describe('browser client privacy and bounded delivery wiring', () => {
+    async function ownerPalette(cohosts = []) {
+        const view = await visitor('stalemate', { entrySources: 1, personTargets: 1 });
+        const { window, ws, welcome } = view;
+        // Only the dialog surface is substituted; the real client receives
+        // ordered socket frames and builds/sends its own Host tools commands.
+        window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+        window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event('close')); };
+        window.confirm = vi.fn(() => true);
+        welcome();
+        const channel = { name: '#owned', kind: 'chat', persistent: true, keepRef: 'a'.repeat(32), modes: {}, count: 1, cohosts,
+            names: [{ nick: 'Viewer', prefix: '@', owner: true }] };
+        ws.receive({ t: 'join', ch: channel });
+        window.document.querySelector('[data-roomtools]').click();
+        const palette = window.document.querySelector('[data-palette]');
+        return { ...view, channel, palette, buttons: () => [...palette.querySelectorAll('button')],
+            ownership: cohosts => ws.receive({ t: 'ownership', ch: channel.name, cohosts }) };
+    }
+    it('reconciles named co-host actions without replacing focused controls or leaking them into slash commands', async () => {
+        const { window, ws, palette, buttons, ownership } = await ownerPalette();
+        const invite = buttons().find(button => button.textContent === 'Invite guest'); invite.focus();
+        ownership([{ id: 'account-one', label: 'FirstCoHost' }]);
+        const remove = buttons().find(button => button.textContent === 'Remove verified co-host: FirstCoHost');
+        expect(remove).toBeDefined(); expect(window.document.activeElement).toBe(invite);
+        remove.focus();
+        ownership([{ id: 'account-one', label: 'RenamedCoHost' }]);
+        expect(buttons().find(button => button.textContent === 'Remove verified co-host: RenamedCoHost')).toBe(remove);
+        expect(window.document.activeElement).toBe(remove);
+        ownership([]);
+        expect(remove.isConnected).toBe(false); expect(window.document.activeElement).toBe(invite);
+        const sent = ws.sent.length; remove.click(); expect(ws.sent).toHaveLength(sent);
+        palette.close();
+        window.document.querySelector('[data-palette-open]').click();
+        ownership([{ id: 'account-two', label: 'OtherCoHost' }]);
+        expect(buttons().some(button => button.textContent.startsWith('Remove verified co-host'))).toBe(false);
+    });
+    it.each(['owner revoked', 'room replaced', 'disconnected'])('retires open named co-host controls when %s', async reason => {
+        const { ws, channel, buttons } = await ownerPalette([{ id: 'account-one', label: 'FirstCoHost' }]);
+        const remove = buttons().find(button => button.textContent === 'Remove verified co-host: FirstCoHost');
+        expect(remove).toBeDefined();
+        if (reason === 'disconnected') ws.close(1000);
+        else ws.receive({ t: 'chan', ch: { ...channel, ...(reason === 'room replaced' ? { keepRef: 'b'.repeat(32) }
+            : { names: [{ nick: 'Viewer', prefix: '', owner: false }] }) } });
+        expect(remove.isConnected).toBe(false);
+        const sent = ws.sent.length; remove.click(); expect(ws.sent).toHaveLength(sent);
+    });
     it('waits for confirmation of the latest privacy choice before any post-welcome user message', async () => {
         const { window, ws, welcome, join } = await visitor('rad-dad');
         expect(ws.sent[0]).toMatchObject({ t: 'hello', entrySource: 'rad-dad', transport: 1 });
@@ -199,5 +350,26 @@ describe('browser client privacy and bounded delivery wiring', () => {
         expect(choice.checked).toBe(true); expect(choice.closest('label').textContent).toContain('Announce new chat messages');
         choice.click(); join('#our-room'); paint(); paint(); expect(log.getAttribute('aria-live')).toBe('off');
         expect(log.getAttribute('role')).toBe('log'); expect(log.getAttribute('aria-label')).toBe('Conversation');
+    });
+    it('bounds and clears messages without removing their list or the live-region preference', async () => {
+        const { window, ws, welcome, join, paint } = await visitor(); welcome(); join(); paint(); paint();
+        const log = window.document.querySelector('[data-buffer]');
+        const messages = log.querySelector('[role="list"][aria-label="Messages"]');
+        expect(messages).not.toBeNull();
+        for (let index = 0; index < 305; index++)
+            ws.receive({ t: 'line', id: `bounded-${index}`, ch: '#stalemate', from: 'Friend', text: `Bounded line ${index}` });
+        expect(messages.children).toHaveLength(300);
+        expect(messages.firstElementChild.textContent).toContain('Bounded line 5');
+        expect(messages.lastElementChild.textContent).toContain('Bounded line 304');
+        expect([...messages.children].every(item => item.tagName === 'LI')).toBe(true);
+        window.document.querySelector('[data-chat-announcements]').click();
+        join('#another-room'); paint(); paint();
+        expect(log.querySelector('[role="list"]')).toBe(messages);
+        expect(messages.children).toHaveLength(0);
+        expect(log.getAttribute('aria-live')).toBe('off');
+        ws.close(4401);
+        expect(log.querySelector('[role="list"]')).toBe(messages);
+        expect(messages.children).toHaveLength(0);
+        expect(log.getAttribute('aria-live')).toBe('off');
     });
 });

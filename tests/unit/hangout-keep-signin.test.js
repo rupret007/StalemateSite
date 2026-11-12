@@ -4,6 +4,7 @@ import { JSDOM, VirtualConsole } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import * as entryFunctions from '../../r/45662413410ed051/entry-sites.mjs';
 import { createEntrySharing } from '../../r/45662413410ed051/lobby/entry-sharing.mjs';
+import { createIdleHeartbeat } from '../../r/45662413410ed051/lobby/idle-heartbeat.mjs';
 import { createChatAnnouncements } from '../../r/45662413410ed051/lobby/chat-announcements.mjs';
 import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 
@@ -40,7 +41,7 @@ async function visitor({ via = 'rad-dad', verified = false, stored = {}, returni
         receive(frame) { this.onmessage?.({ data: JSON.stringify(frame) }); }
         close(code = 1000) { this.readyState = 3; this.onclose?.({ code }); }
     };
-    window.HangoutClientTestModules = { ...entryFunctions, createEntrySharing, createChatAnnouncements };
+    window.HangoutClientTestModules = { ...entryFunctions, createEntrySharing, createIdleHeartbeat, createChatAnnouncements };
     window.eval(discovery);
     const imports = [...client.matchAll(/^import \{([^}]+)\} from '[^']+';/gm)].map(match => match[1]).join(',');
     window.eval(`const {${imports}} = window.HangoutClientTestModules;\n${client.replace(/^import .*$/gm, '')}`);

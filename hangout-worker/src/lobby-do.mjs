@@ -313,6 +313,7 @@ export class HangoutLobby {
         } : null;
         this.engine = createLobby({
             incidentSources: !!this.incidentSourceMode,
+            gameNight: env.HANGOUT_BETA_MODE === 'protected',
             ...(this.authorityMode ? { effectCommit: this.authority.effectCommit } : {}),
             ...(this.participationMode ? { participation: createLobbyParticipation({ env, authority: this.authority,
                 dispatchStart: request => this.dispatchParticipationStart(request, participationStartOwner) }) } : {}),
@@ -418,7 +419,25 @@ export class HangoutLobby {
         if (recovered) this.engine.restoreLog(recovered.state.modlog);
         else { const logs = await state.storage.list({ prefix: 'log:', reverse: true, limit: 2000 }); this.engine.restoreLog([...logs.values()].reverse()); }
         if (this.authorityMode) { await this.authority.schedule(); this.privateQueueActor = null; }
-        else if (!(await state.storage.getAlarm())) await state.storage.setAlarm(Date.now() + 60 * 1000);
+        else await this.scheduleLegacyAlarm();
+    }
+
+    async scheduleLegacyAlarm(expiresAt, afterAlarm = false) {
+        const now = Date.now();
+        let next = now + 60000;
+        const include = value => { if (Number.isFinite(value)) next = Math.min(next, Math.max(now, value)); };
+        if (expiresAt === undefined) {
+            for (const ws of this.state.getWebSockets()) {
+                if (ws.readyState === 3 || this.closedSockets?.has(ws)) continue;
+                const attachment = ws.deserializeAttachment() || {};
+                if (!attachment.sessionEnded && !attachment.betaEnded) include(attachment.expiresAt);
+            }
+        } else include(expiresAt);
+        const current = await this.state.storage.getAlarm();
+        // Admission must not postpone an existing due alarm. After an alarm
+        // fires, its old deadline is consumed; retain only a future earlier one.
+        if (Number.isFinite(current) && (!afterAlarm || current > now)) next = Math.min(next, current);
+        if (afterAlarm || current !== next) await this.state.storage.setAlarm(next);
     }
 
     bindingLive(value) {
@@ -834,12 +853,12 @@ export class HangoutLobby {
             }
             await this.engine.tick(); await this.pruneLogs();
             await this.refreshPrivateReports();
-            await this.state.storage.setAlarm(Date.now() + 60000);
+            await this.scheduleLegacyAlarm(undefined, true);
         });
     }
     async fetch(request) {
         await this.ready;
-        const path = new URL(request.url).pathname;
+        const { pathname: path, searchParams } = new URL(request.url);
         if (path.startsWith(LOBBY_AUTHORITY_PATH)) return this.authorityRequest(request, path.slice(LOBBY_AUTHORITY_PATH.length));
         if (this.authorityUnavailable) return new Response('community authority unavailable', { status: 503 });
         if (new URL(request.url).pathname === '/__beta/private-report') {
@@ -885,6 +904,10 @@ export class HangoutLobby {
         if (!identity || !identity.dev) return new Response('no', { status: 400 });
         if (socketIdentityInvalid(identity, this.env)) return new Response('session required', { status: 403 });
         if (this.env.HANGOUT_BETA_MODE === 'protected' && !await this.sessionActive(identity)) return new Response('beta session required', { status: 403 });
+        if (!this.authorityMode) {
+            try { await this.scheduleLegacyAlarm(identity.expiresAt ?? null); }
+            catch { return new Response('community admission unavailable', { status: 503 }); }
+        }
         if (socketIdentityInvalid(identity, this.env)) return new Response('session required', { status: 403 });
         const id = `c${crypto.randomUUID().replaceAll('-', '')}`;
         let trusted = { ...identity, id };
@@ -917,10 +940,15 @@ export class HangoutLobby {
             betaInviteVersion: this.env.HANGOUT_BETA_MODE === 'protected' ? identity.betaInviteVersion : undefined,
             ...(this.authorityMode ? { authorityRef: id, authorityRevision: 1 } : {}),
             dev: identity.dev, iph: identity.iph, role: identity.role, email: identity.email, account: identity.account, expiresAt: identity.expiresAt, admin: identity.admin });
-        if (identity.devToken) this.delivery.send(pair[1], { t: 'device', token: identity.devToken });
+        // Fresh browsers can read the device token from the hello. Some
+        // WebKit clients miss the second frame sent during a local upgrade.
+        const deviceInHello = searchParams.get('device-in-hello') === '1';
+        if (identity.devToken && !deviceInHello) this.delivery.send(pair[1], { t: 'device', token: identity.devToken });
         for (const frame of initialFrames) {
             if (frame.t === 'admin' && this.env.HANGOUT_BETA_MODE === 'protected') this.sendPrivateAdmin(pair[1], id, frame);
-            else this.delivery.send(pair[1], frame);
+            else this.delivery.send(pair[1], frame.t === 'hello'
+                ? { ...frame, features: { ...frame.features, transportPing: 1 },
+                    ...(deviceInHello && identity.devToken ? { deviceToken: identity.devToken } : {}) } : frame);
         }
         return new Response(null, { status: 101, webSocket: pair[0] });
         } catch {
@@ -947,12 +975,12 @@ export class HangoutLobby {
             if (typeof raw === 'string' && raw.length <= LOBBY_LIMITS.actFrameBytes) {
                 let control;
                 try { control = JSON.parse(raw); } catch { /* The engine refuses malformed application frames. */ }
-                if (control?.t === 'transport-ack') {
+                if (control?.t === 'transport-ack' || control?.t === 'transport-ping' && Object.keys(control).length === 1) {
                     if (!await this.controlBudget.take(ws, a.id)) {
                         const { entry } = closeTransport(this, ws, 4413, 'community control allowance unavailable');
                         return await retireClosed(this, entry, gate);
                     }
-                    return this.delivery.acknowledge(ws, control.seq);
+                    return control.t === 'transport-ping' ? this.delivery.heartbeat(ws) : this.delivery.acknowledge(ws, control.seq);
                 }
                 if (control?.t === 'hello' && !this.delivery.negotiate(ws, control.transport)) return;
             }

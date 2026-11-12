@@ -9,7 +9,8 @@
         bobross: Object.freeze({ label: 'Bob Ross paint-along', description: 'Watch and paint on a shared canvas. Camera optional.' }),
         watch: Object.freeze({ label: 'Watch together', description: 'Share a YouTube video and chat. Camera optional.' }),
         art: Object.freeze({ label: 'Draw together', description: 'Make something on a shared canvas. Camera optional.' }),
-        jam: Object.freeze({ label: 'Jam together', description: 'Meet musicians and share a WebJam invite. Audio needs a host and a supported WebJam setup.' })
+        jam: Object.freeze({ label: 'Jam together', description: 'Meet musicians and share a WebJam invite. Audio needs a host and a supported WebJam setup.' }),
+        game: Object.freeze({ label: 'Game Night', description: 'An invite-only room to play games and hang out.' })
     });
     const ROOM_NAME = /^#[a-z0-9-]{2,30}$/i;
     const NICK = /^[A-Za-z][A-Za-z0-9_\-[\]{}^`|]{2,19}$/;
@@ -232,9 +233,7 @@
         const quiet = known && summary.others === 0;
         const detail = shown
             ? `${summary.detail} Next confirmed gathering: ${shown.host}, ${shown.timing.toLowerCase()}, ${shown.localStart} to ${shown.localEnd}. ${shown.activityLabel}`
-            : quiet
-                ? `${summary.detail} No confirmed gathering was supplied. Anyone visiting can host one.`
-                : summary.detail;
+            : summary.detail;
         return Object.freeze({
             connection: 'connected',
             quiet,
@@ -275,14 +274,14 @@
             gatheringWhen: confirmed ? `${visit.gathering.timing}: ${visit.gathering.localStart} to ${visit.gathering.localEnd}${visit.gathering.timeZoneAssumed ? ' (shown in UTC)' : ''}` : '',
             gatheringActivity: confirmed
                 ? visit.gathering.activityLabel
-                : none ? 'No confirmed gathering was supplied. Anyone visiting can host one. This screen does not invent a time or a weekly cadence, and it does not require a band member to be present.' : '',
+                : none ? 'Nothing scheduled yet. Anyone can host; no band member needs to be here.' : '',
             gatheringNote: confirmed ? visit.gathering.note : '',
             showSave: confirmed,
             showCreation: quiet,
             creationHeading: past ? 'Approved past creation' : 'Past creation',
             creationTitle: past ? past.title : '',
             creationDetail: past ? (past.room ? `${past.detail} It was made in ${past.room}.` : past.detail) : '',
-            creationMissing: quiet && !past ? 'No approved past creation was supplied for this quiet visit.' : '',
+            creationMissing: quiet && !past ? 'No past creations shared yet.' : '',
             showQuietPrompt: !!(visit && visit.quietPrompt),
             quietPromptLabel: visit && visit.quietPrompt ? visit.quietPrompt.label : '',
             quietPromptDraft: visit && visit.quietPrompt ? visit.quietPrompt.draft : ''

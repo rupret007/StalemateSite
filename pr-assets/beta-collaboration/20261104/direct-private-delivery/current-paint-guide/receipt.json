@@ -1,0 +1,159 @@
+{
+  "source": "a04db4b8ebaeb654b945128230a176229a47cc98",
+  "runtime": "9a558aff-138e-44d3-8a25-5233002ef8f7",
+  "completedAt": "2026-11-05T00:47:53.589Z",
+  "status": "passed",
+  "scope": "Actual private deployment with two independent ordinary visitors per browser engine; same machine, not physical music or real band-homepage navigation",
+  "screenshots": [
+    {
+      "image": "chromium-paint-materials-375.png",
+      "sha256": "18e590f6d8ce672fe5dc4b61c24de5569d268a55f285b122dc96cc8854eaffb3",
+      "engine": "chromium",
+      "engineVersion": "156.0.8078.4",
+      "geometry": {
+        "width": 375,
+        "height": 844,
+        "htmlWidth": 375,
+        "bodyWidth": 375,
+        "font": 16
+      },
+      "visuallyInspected": true
+    },
+    {
+      "image": "chromium-paint-390.png",
+      "sha256": "560702523075ee73596cf17322fe756eef85563b7fd2945eb0d0ba35b920c1d3",
+      "engine": "chromium",
+      "engineVersion": "156.0.8078.4",
+      "geometry": {
+        "width": 390,
+        "height": 844,
+        "htmlWidth": 390,
+        "bodyWidth": 390,
+        "font": 16
+      },
+      "visuallyInspected": true
+    },
+    {
+      "image": "webkit-paint-materials-375.png",
+      "sha256": "4ec5709f9782a2d925fe6dfddcacf1e0d40e693b12335b42d00e3696234362a7",
+      "engine": "webkit",
+      "engineVersion": "27.2",
+      "geometry": {
+        "width": 375,
+        "height": 844,
+        "htmlWidth": 375,
+        "bodyWidth": 375,
+        "font": 16
+      },
+      "visuallyInspected": true
+    },
+    {
+      "image": "webkit-paint-390.png",
+      "sha256": "5bb40114db5bca265e951d2d22edb4e3179801d0569dec1263d440ad492a2ad6",
+      "engine": "webkit",
+      "engineVersion": "27.2",
+      "geometry": {
+        "width": 390,
+        "height": 844,
+        "htmlWidth": 390,
+        "bodyWidth": 390,
+        "font": 16
+      },
+      "visuallyInspected": true
+    },
+    {
+      "image": "chromium-desktop-1440.png",
+      "sha256": "e60184dfcab614638f5b25a235650f7c5eab8486399b10fb6e2f7b04d72fffc8",
+      "engine": "chromium",
+      "engineVersion": "156.0.8078.4",
+      "geometry": {
+        "width": 1440,
+        "height": 900,
+        "htmlWidth": 1440,
+        "bodyWidth": 1440,
+        "font": 13
+      },
+      "visuallyInspected": true
+    }
+  ],
+  "captureRequests": 0,
+  "reportsCreated": 0,
+  "pageErrors": [
+    0,
+    0
+  ],
+  "cleanup": [
+    {
+      "engine": "chromium",
+      "visitors": [
+        {
+          "logout": 200,
+          "copiedCookieAsset": 401,
+          "copiedCookieState": 401,
+          "copiedCookieSocket": 401
+        },
+        {
+          "logout": 200,
+          "copiedCookieAsset": 401,
+          "copiedCookieState": 401,
+          "copiedCookieSocket": 401
+        }
+      ]
+    },
+    {
+      "engine": "webkit",
+      "visitors": [
+        {
+          "logout": 200,
+          "copiedCookieAsset": 401,
+          "copiedCookieState": 401,
+          "copiedCookieSocket": 401
+        },
+        {
+          "logout": 200,
+          "copiedCookieAsset": 401,
+          "copiedCookieState": 401,
+          "copiedCookieSocket": 401
+        }
+      ]
+    }
+  ],
+  "provider": {
+    "chromium": {
+      "attempted": true,
+      "physicalHearingQualified": false,
+      "recording": false,
+      "host": {
+        "initial": {
+          "id": "mT0RNrTDHkI",
+          "position": 0.42600010871887206,
+          "muted": false,
+          "state": 1
+        },
+        "final": {
+          "position": 2.8545959313354494,
+          "state": 1
+        }
+      },
+      "guest": {
+        "initial": {
+          "id": "mT0RNrTDHkI",
+          "position": 0.4929998188018799,
+          "muted": false,
+          "state": 1
+        },
+        "final": {
+          "position": 2.920630005722046,
+          "state": 1
+        }
+      },
+      "status": "advancing-unmuted-provider-timelines"
+    },
+    "webkit": {
+      "attempted": false,
+      "reason": "External providers blocked for scoped WebKit layout/chat/drawing checks"
+    }
+  },
+  "physicalMusicQualified": false,
+  "originalHarnessFailuresPreservedLocally": true
+}

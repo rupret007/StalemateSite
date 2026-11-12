@@ -1,0 +1,14 @@
+{
+  "at": "2026-11-07T07:34:58.348027+00:00",
+  "source": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "scannerSha256": "9164b71e74da1e75e63293aded599585588509a9b42977eddbe20d91e0fdb50b",
+  "readOnly": true,
+  "deviceScanSucceeded": true,
+  "officialRouteCandidates": [],
+  "hasNecessaryOfficialRouteAt48kHz": false,
+  "nativeAudioOrAppProcessCount": 0,
+  "physicalCapture": false,
+  "streamsOpened": 0,
+  "routeOrDeviceSettingsChanged": false,
+  "fullSharedTrackBackendQualified": false
+}

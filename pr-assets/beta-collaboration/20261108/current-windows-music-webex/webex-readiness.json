@@ -1,0 +1,70 @@
+{
+  "state": "WEBEX_CLIENT_AND_SAVED_LINK_METADATA_READ_BACK_REAL_MEETING_PENDING",
+  "startedAt": "2026-11-08T06:59:41.978721+00:00",
+  "source": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "moduleHashes": {
+    "webex_app": "b873e69558fb347fed515a1561267b6ab52f7c29febf1fbaedf56b2a482b0978",
+    "webex_url": "e9ce6be5f3ec19fe4661961e745498c48b7179a8ae08a04cc197c84965e12b13"
+  },
+  "readOnly": true,
+  "realVideoOrAudioSwitchQualified": false,
+  "macbook": {
+    "observedAt": "2026-11-08T06:59:42.271958+00:00",
+    "nativeSource": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+    "productionDetector": {
+      "state": "not-installed",
+      "version": "",
+      "publisher_verified": false,
+      "reason_code": ""
+    },
+    "configurationReadable": true,
+    "savedWebexLinkPresent": false,
+    "savedWebexLinkValid": false,
+    "meetingLinkPrintedOrPersisted": false,
+    "appStarted": false,
+    "meetingJoined": false,
+    "cameraActivated": false,
+    "microphoneActivated": false,
+    "deviceSettingsChanged": false,
+    "recording": false,
+    "existingAudioAppProcesses": []
+  },
+  "mini": {
+    "observedAt": "2026-11-08T06:59:49.638643+00:00",
+    "nativeSource": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+    "productionDetector": {
+      "state": "installed",
+      "version": "46.7.0.35472",
+      "publisher_verified": true,
+      "reason_code": ""
+    },
+    "configurationReadable": true,
+    "savedWebexLinkPresent": false,
+    "savedWebexLinkValid": false,
+    "meetingLinkPrintedOrPersisted": false,
+    "appStarted": false,
+    "meetingJoined": false,
+    "cameraActivated": false,
+    "microphoneActivated": false,
+    "deviceSettingsChanged": false,
+    "recording": false,
+    "existingAudioAppProcesses": []
+  },
+  "windows": {
+    "installedCandidates": [
+      {
+        "name": "CiscoCollabHost.exe",
+        "version": "45.6.1.32593",
+        "signatureStatus": "Valid",
+        "ciscoPublisher": true
+      }
+    ],
+    "readOnly": true,
+    "appStarted": false,
+    "meetingJoined": false,
+    "cameraActivated": false,
+    "microphoneActivated": false,
+    "policy": "Restricted"
+  },
+  "completedAt": "2026-11-08T06:59:50.042113+00:00"
+}

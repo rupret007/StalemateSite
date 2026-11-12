@@ -1,0 +1,28 @@
+{
+  "at": "2026-11-07T13:32:25.483519+00:00",
+  "state": "OFFICIAL_PINNED_AXE_QA_CACHE_READY_NO_INSTALL_SCRIPTS",
+  "version": "4.14.0",
+  "license": "MPL-2.0",
+  "guardBefore": {
+    "load1": 0.1064453125,
+    "memoryAvailableGiB": 14.518722534179688,
+    "swapPercent": 13.006973266601562,
+    "freeGiB": 722.9152908325195
+  },
+  "tarballSha256": "2277b0a3ef47af9b52497faa3e71598e86e0a0e5e6eb295207a5657ede4709af",
+  "sha512IntegrityAndLegacyShasumVerified": true,
+  "onlySelectedRegularFilesExtracted": true,
+  "fileSha256": {
+    "axe.min.js": "20c09fe157a8a34a30e241aaa1fcdade657734f08ab379ecfbeb7d45cc46e878",
+    "LICENSE": "af175b9d96ee93c21a036152e1b905b0b95304d4ae8c2c921c7609100ba8df7e",
+    "LICENSE-3RD-PARTY.txt": "4f8563870d0fca38bbc3e00b6f670cb7fa9f380ba9f26a7f7d1184a6b18b1653",
+    "package.json": "486715407f3c8c7d1de882bacc2622acb0adf1ec0f21807fc1251aed64bf9001",
+    "README.md": "b994303ff0df0a44d9bd2fb0faf2ff49670844379f3796047f48e8cb8b9edfaf"
+  },
+  "thirdPartyLicenseLines": 66,
+  "applicationDependencyChanged": false,
+  "globalConfigOrPackageInstalled": false,
+  "installScriptsExecuted": false,
+  "browserStarted": false,
+  "source": "https://github.com/dequelabs/axe-core"
+}

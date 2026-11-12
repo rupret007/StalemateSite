@@ -2,8 +2,9 @@
 
 This is the visitor-facing contract for roadmap item 5 in
 [Hang Out product direction](HANGOUT_PRODUCT_DIRECTION.md) and requirement P4.
-It does not appoint a reviewer, publish a contact address, change queue limits,
-or promise that a person is available.
+The acknowledgement does not appoint a reviewer, change queue limits, or promise
+that a person is available. The protected beta's configured contact and sole
+initial reviewer are recorded in the [current acceptance checkpoint](HANGOUT_ACCEPTANCE_CHECKPOINT_20261107.md#one-real-report-submission-human-review-remains-pending).
 
 ## What a saved report says
 
@@ -15,9 +16,11 @@ StaleBot notice:
 
 That notice describes stored evidence waiting for a person. It does not say a
 moderator received the report, is present, or will reply now. Appeals stay in
-House rules. The contact shown there remains the configured placeholder until
-a monitored address is published. This slice does not treat that placeholder
-as a working inbox.
+House rules. The contact comes from the operator's live configuration. The
+initial component used a placeholder, which was not a working inbox. The
+current protected beta uses Jeff's confirmed contact, `jeffstory007@gmail.com`;
+this does not demonstrate that the inbox is being watched now or promise a
+response deadline.
 
 The flag's tooltip and accessible name become:
 
@@ -38,5 +41,7 @@ the evidence again and does not add another vote. Its notice is:
 - Queue capacity, the 24-hour evidence lifetime, and report authorization are
   unchanged.
 - No new durable field is stored. AI review stays off.
-- Who receives reports, and when a human is actually available, is still
-  undefined. This acknowledgement does not close P4.
+- Jeff is the sole initial owner/reviewer. Band membership, a website entrance
+  badge and room-host powers do not appoint another reviewer. Actual review
+  coverage, backup arrangements and human disposition of the latest synthetic
+  report remain separate acceptance work. This acknowledgement does not close P4.

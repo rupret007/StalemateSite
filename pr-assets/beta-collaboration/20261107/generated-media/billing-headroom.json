@@ -1,0 +1,17 @@
+{
+  "recordedAt": "2026-11-07T07:07:19.539813+00:00",
+  "observationMethod": "Existing signed-in Cloudflare billable-usage tab explicitly reloaded through CUA in this turn",
+  "product": "Realtime bandwidth",
+  "includedGB": 1000,
+  "displayedUsageGB": 0.01,
+  "displayedBillableGB": 0,
+  "displayedCurrentCostUSD": 0,
+  "displayedProjectedCostUSD": 0,
+  "cycle": "2026-10-15 through 2026-11-14",
+  "observedThrough": "2026-11-07",
+  "providerSaysWithinIncludedTier": true,
+  "roundedDisplayIsNotExactTrafficOrSpendingGuarantee": true,
+  "subscriptionOrLimitChanged": false,
+  "qualifiedForExistingOneHostOneGuestBoundedPrivateTrial": true,
+  "physicalCaptureAllowedByThisReceipt": false
+}

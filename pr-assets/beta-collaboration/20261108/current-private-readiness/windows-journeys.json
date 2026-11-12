@@ -1,0 +1,117 @@
+{
+  "state": "HOSTED_JOURNEYS_WITH_INDEPENDENT_CLEANUP_AND_VISUAL_REVIEW_VERIFIED",
+  "source": "ac9b82f42c8d6952193f5cbefbf11fc04816821d",
+  "version": "449fe7d2-0ac3-41b8-b622-fda2453b38db",
+  "physicalCapture": false,
+  "providerMediaTrial": false,
+  "originalStructuredProofSha256": "a9816326958cedaf4fdd13f31f43298649b0eaadb594beee5b32dbe5797cdb5f",
+  "independentReadbackSha256": "ef3f8ba1f471d09ec20e5c2c7dd40d81c63661a22d88458fa98605efb40738ea",
+  "visualReviewSha256": "da9b411a9cdf7056e504ce6afbd3b8cdee4ddfd8d946f5bca2004a84d4da56c3",
+  "proof": {
+    "state": "PASSED_ACTUAL_WINDOWS_CHROME_JOURNEYS_PROCESS_READBACK_PENDING",
+    "startedAt": "2026-11-08T01:50:11.620Z",
+    "completedAt": "2026-11-08T01:50:24.568Z",
+    "browserVersion": "156.0.8078.80",
+    "checks": [
+      "Anonymous state and protected code stay denied",
+      "Both branded entrances admit ordinary guests; later join starts fresh",
+      "Reciprocal chat displays source badges without granting roles",
+      "Fourteen actual Windows browser runtime hashes match the private candidate",
+      "375px and390px contain chat, input and Send with16px input",
+      "Windows reconnect preserves a private draft and resets scrollback",
+      "Simulated mic denial gives Try again without physical capture or provider issuance"
+    ],
+    "logout": [
+      {
+        "logout": 200,
+        "copiedCookie": 401,
+        "protectedCode": 401
+      },
+      {
+        "logout": 200,
+        "copiedCookie": 401,
+        "protectedCode": 401
+      }
+    ],
+    "roles": [
+      {
+        "site": "stalemate",
+        "kind": "guest",
+        "role": "fan"
+      },
+      {
+        "site": "rad-dad",
+        "kind": "guest",
+        "role": "fan"
+      }
+    ],
+    "mobile": [
+      {
+        "width": 375,
+        "pageWidth": 375,
+        "inputLeft": 46,
+        "inputRight": 294,
+        "sendLeft": 299,
+        "sendRight": 357,
+        "fontSize": "16px",
+        "screenshot": "windows-heartbeat-ac9-375.png",
+        "sha256": "40a21e035f643cc9aba33ea72059092f6d6c1f4f60ddfa1ac41917f277323c9f"
+      },
+      {
+        "width": 390,
+        "pageWidth": 390,
+        "inputLeft": 46,
+        "inputRight": 309,
+        "sendLeft": 314,
+        "sendRight": 372,
+        "fontSize": "16px",
+        "screenshot": "windows-heartbeat-ac9-390.png",
+        "sha256": "954308717106a4d6deabf2831bb5a2865ad727f03f19daa82203c5d5318c93ca"
+      }
+    ],
+    "assets": [
+      "join/app.js",
+      "join/audio.js",
+      "join/config.js",
+      "join/crypto.js",
+      "join/errors.js",
+      "join/index.html",
+      "join/mailbox.js",
+      "join/policy.js",
+      "join/prejoin.js",
+      "join/session.js",
+      "join/style.css",
+      "r/45662413410ed051/lobby/idle-heartbeat.mjs",
+      "r/45662413410ed051/lobby/lobby.css",
+      "r/45662413410ed051/lobby/lobby.js"
+    ],
+    "setupMs": [
+      {
+        "site": "stalemate",
+        "ms": 3223
+      },
+      {
+        "site": "rad-dad",
+        "ms": 1080
+      }
+    ],
+    "reconnectMs": 283,
+    "simulatedMicDenials": 1,
+    "allOwnedBrowserContextsClosed": true,
+    "ownedBrowserCloseRequested": true
+  },
+  "readback": {
+    "state": "SAME_PROOF_HARNESS_AND_OWNED_PROCESS_CLEANUP_INDEPENDENTLY_VERIFIED",
+    "ownedProcessesGone": true,
+    "listenerFree": true,
+    "temporaryTaskAbsent": true,
+    "executionPolicyUnchanged": "Restricted",
+    "remoteProofSha256": "a9816326958cedaf4fdd13f31f43298649b0eaadb594beee5b32dbe5797cdb5f",
+    "harnessSha256": "9e9ca1a2b22e1b22bd09c137188b843a4361ad845680e211531c6fb17a43cfa6",
+    "sameStructuredProof": true,
+    "completedAt": "2026-11-08T01:52:22.844728+00:00"
+  },
+  "limits": "No physical capture or listening; SDK/viewport checks are not physical Safari/iPhone or full assistive-technology qualification.",
+  "setupTimingBoundary": "From initial entry navigation through invitation and nickname fill to connected",
+  "crossPlatformSpeedComparisonQualified": false
+}

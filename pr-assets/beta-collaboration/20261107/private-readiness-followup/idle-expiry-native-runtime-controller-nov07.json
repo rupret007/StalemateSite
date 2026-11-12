@@ -1,0 +1,48 @@
+{
+  "state": "NATIVE_FIXTURE_STOPPED_INSPECT_ORIGINAL_FILES_NO_RETRY",
+  "startedAt": "2026-11-07T16:51:53.233454+00:00",
+  "physicalCapture": false,
+  "hostedEightHourQualification": false,
+  "result": {
+    "state": "NATIVE_FIXTURE_STOPPED_INSPECT_ORIGINAL_FILES_NO_RETRY",
+    "startedAt": "2026-11-07T16:51:58.323368+00:00",
+    "guardBefore": {
+      "load1": 0.6259765625,
+      "memoryAvailableGiB": 14.316093444824219,
+      "swapPercent": 14.774036407470703,
+      "freeGiB": 721.8947868347168
+    },
+    "physicalCapture": false,
+    "providerCredentials": false,
+    "hostedEightHourQualification": false,
+    "guardBeforeRuntime": {
+      "load1": 0.6259765625,
+      "memoryAvailableGiB": 14.313777923583984,
+      "swapPercent": 14.774036407470703,
+      "freeGiB": 721.8947639465332
+    },
+    "ownedPid": 945471,
+    "exitCode": 1,
+    "result": {
+      "state": "NATIVE_FIXTURE_STOPPED_INSPECT_ORIGINAL_NO_RETRY",
+      "productionTtlMs": 28800000,
+      "syntheticAccessMs": 10000,
+      "shortenedProductionTtl": false,
+      "manualAlarmCalls": 0,
+      "clockAdvances": 0,
+      "providerCredentials": false,
+      "physicalCapture": false,
+      "hostedEightHourQualification": false,
+      "cases": [],
+      "failure": {
+        "name": "AssertionError",
+        "message": "Expected values to be strictly deep-equal:\n+ actual - expected\n\n+ [\n+   'node:crypto'\n+ ]\n- []\n"
+      },
+      "completedAt": "2026-11-07T16:51:59.024Z"
+    },
+    "failureType": "AssertionError",
+    "ownedProcessesRemaining": [],
+    "completedAt": "2026-11-07T16:51:59.073746+00:00"
+  },
+  "completedAt": "2026-11-07T16:51:54.717279+00:00"
+}

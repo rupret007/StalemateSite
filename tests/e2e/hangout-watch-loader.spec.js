@@ -123,6 +123,7 @@ for (const surface of ['private', 'channel']) {
         await expect.poll(room.host.attempts).toBe(1);
         await expect(room.host.page.locator(room.status)).toBeVisible();
         await expect(room.host.page.locator(room.status)).toContainText('YouTube couldn’t load');
+        await expect(room.host.page.locator(room.status)).toContainText('Couldn’t reach YouTube');
         await expect(room.host.page.locator(room.tap)).toBeVisible();
         await expect(room.host.page.locator(room.tap)).toHaveText('Retry video');
         await room.host.page.click(room.tap);
@@ -304,6 +305,8 @@ for (const [surface, mode] of [['private', 'never-ready'], ['channel', 'provider
         await expect.poll(() => room.host.page.evaluate(() => window.__ytLoaderFixture?.constructed || 0)).toBe(1);
         // Real default readiness deadline, no application test hook or fake clock.
         await expect(room.host.page.locator(room.status)).toContainText('YouTube couldn’t load', { timeout: 18000 });
+        await expect(room.host.page.locator(room.status)).toContainText(mode === 'never-ready'
+            ? 'didn’t finish connecting' : 'This video is unavailable');
         await expect(room.host.page.locator(room.tap)).toHaveText('Retry video');
         await room.host.page.click(room.tap);
         await expectPlaying(room, VIDEO);
@@ -352,6 +355,71 @@ test('private Bob controls use current shared intent while the replacement playe
     expect(room.host.errors).toEqual([]);
     expect(room.guest.errors).toEqual([]);
 });
+
+for (const surface of ['private', 'channel']) {
+    for (const [code, hint] of [[100, 'This video is unavailable'], [101, 'doesn’t allow playback inside a room'],
+        [150, 'doesn’t allow playback inside a room'], [153, 'couldn’t verify this video player'],
+        ['private-invitation-canary', 'Retry video when you’re ready']]) {
+        test(`${surface} provider code ${typeof code === 'number' ? code : 'unknown'} gives safe, actionable local feedback`, async ({ browser, baseURL }, testInfo) => {
+            const room = await pair(browser, baseURL, surface,
+                route => route.fulfill({ body: FAKE_SOURCE + '\n' + LOADER_FAULT_SOURCE, contentType: 'text/javascript' }), 'provider-error');
+            await room.host.page.evaluate(value => { window.__ytLoaderErrorCode = value; }, code);
+            await room.load(VIDEO);
+            await expect(room.host.page.locator(room.status)).toContainText(hint);
+            await expect(room.host.page.locator(room.status)).not.toContainText('private-invitation-canary');
+            await expect(room.host.page.locator(room.tap)).toHaveText('Retry video');
+            if ([100, 101, 150].includes(code)) {
+                await expect(room.host.page.locator(room.status)).toContainText('Choose another video');
+                await expect(room.host.page.locator(room.status)).not.toContainText('Ask the host');
+            }
+            if (surface === 'channel' && code === 101) {
+                for (const width of [375, 390]) {
+                    await room.host.page.setViewportSize({ width, height: 844 });
+                    expect(await room.host.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+                    await expect(room.host.page.locator(room.status)).toBeVisible();
+                    await expect(room.host.page.locator(room.tap)).toBeInViewport();
+                    await room.host.page.screenshot({ path: testInfo.outputPath(`video-failure-${width}.png`) });
+                    // The host's chooser follows Retry in keyboard order and
+                    // scrolls inside the bounded activity panel on phones.
+                    await room.host.page.locator(room.tap).press('Tab');
+                    const input = room.host.page.getByRole('textbox', { name: 'YouTube URL', exact: true });
+                    await expect(input).toBeFocused(); await expect(input).toBeInViewport();
+                    expect(await input.evaluate(node => getComputedStyle(node).fontSize)).toBe('16px');
+                }
+                await room.load(OTHER);
+                await expectPlaying(room, OTHER);
+            } else {
+                await room.host.page.click(room.tap);
+                await expectPlaying(room, VIDEO);
+            }
+            expect(room.host.errors).toEqual([]); expect(room.guest.errors).toEqual([]);
+        });
+    }
+
+    test(`${surface} a guest's embed restriction does not pause the host and points to the host's controls`, async ({ browser, baseURL }) => {
+        const room = await pair(browser, baseURL, surface, undefined, undefined,
+            route => route.fulfill({ body: FAKE_SOURCE + '\n' + LOADER_FAULT_SOURCE, contentType: 'text/javascript' }));
+        await room.guest.page.evaluate(() => { window.__ytLoaderFailure = 'provider-error'; window.__ytLoaderErrorCode = 101; });
+        await room.load(VIDEO);
+        await expect(room.guest.page.locator(room.status)).toContainText('Ask the host to choose another video');
+        expect((await room.shared(room.host.page)).playing).toBe(true);
+        expect((await room.shared(room.guest.page)).playing).toBe(true);
+        await expect(room.host.page.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+        expect(room.host.errors).toEqual([]); expect(room.guest.errors).toEqual([]);
+    });
+
+    test(`${surface} an error after readiness keeps its reason and leaves shared playback intent unchanged`, async ({ browser, baseURL }) => {
+        const room = await pair(browser, baseURL, surface,
+            route => route.fulfill({ body: FAKE_SOURCE + '\n' + LOADER_FAULT_SOURCE, contentType: 'text/javascript' }), 'manual-error');
+        await room.load(VIDEO); await expectPlaying(room, VIDEO);
+        await room.host.page.evaluate(() => window.__ytLoaderFixture.failCurrent(150));
+        await expect(room.host.page.locator(room.status)).toContainText('doesn’t allow playback inside a room');
+        await expect(room.host.page.locator(room.status)).toContainText('Choose another video');
+        expect((await room.shared(room.guest.page)).playing).toBe(true);
+        await expect(room.host.page.locator(room.tap)).toHaveText('Retry video');
+        expect(room.host.errors).toEqual([]); expect(room.guest.errors).toEqual([]);
+    });
+}
 
 test('private guest Bob Catchup keeps failed retry visible and Retry stays local to that guest', async ({ browser, baseURL }) => {
     const room = await pair(browser, baseURL, 'private', undefined, undefined,

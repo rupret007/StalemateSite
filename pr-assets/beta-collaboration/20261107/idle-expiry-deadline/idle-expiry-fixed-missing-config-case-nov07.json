@@ -1,0 +1,29 @@
+{
+  "state": "MISSING_STATIC_CONFIG_CASE_PASSED_WITH_UNCHANGED_TEST_ASSERTIONS",
+  "unitExitCode": 0,
+  "summary": [
+    " Test Files  1 passed (1)",
+    "      Tests  1 passed | 29 skipped (30)"
+  ],
+  "configSha256": "57ab0eae3f1a24422e9e6c7ebdd9e4ffa320c97b80eb2ccd9235a6e71e82b2fc",
+  "unchangedProductionAndTestFileHashes": {
+    "hangout-worker/src/lobby-do.mjs": "7eddf4c4b2ce4166fbe45eeb1d9c98dc731ef6bf7b5cc82ebbcc29fdb76d0732",
+    "hangout-worker/tests/beta-lifecycle.test.js": "fb7b4df51ac4d04f7de1d3fae8a4a6b0fedced86efa44b0e330b6435537c1b7a",
+    "hangout-worker/tests/beta.test.js": "1efacaa79a8f94b54d3852353fa1d002948a307303c915cba7bf5f5e1f7a8f24",
+    "hangout-worker/tests/lobby-session-integration.test.js": "34d87ca454cc0ddbbf623443efcdb34f5a44e691b4f92e08a0538920ccac045c",
+    "tests/support/durable-record-sqlite.mjs": "56951f7384e4a492be7320c5b90b0b9b6d6661bde923b907589bf0474d28118b"
+  },
+  "original97PassingCasesRetained": true,
+  "originalMissingFileFailureRetained": true,
+  "productOrAssertionsChangedForRetest": false,
+  "all5NewLifecycleCasesPassedInOriginalRun": true,
+  "guardBefore": {
+    "load1": 0.05615234375,
+    "memoryAvailableGiB": 14.472160339355469,
+    "swapPercent": 14.823246002197266,
+    "freeGiB": 722.4023208618164
+  },
+  "at": "2026-11-07T16:25:53.504941+00:00",
+  "logSha256": "5c4fb1e255ccc7a2054923a55c32b98c8fa587a05cc23851f1b647e3b46a63ce",
+  "real8HourExpiryQualified": false
+}

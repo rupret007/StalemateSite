@@ -1,15 +1,20 @@
 # Sharing a WebJam browser invitation in a Jam room
 
 The room host can use the visible invitation box for either the complete
-desktop **Copy Invite** message or the single HTTPS URL from **Web Join →
-Copy web invite**. Desktop messages retain their full original text, including
-sealed replies. Only an explicitly pasted HTTPS URL uses the existing `web`
-command. The server still requires current host authority and an exact allowed
-Web Join origin; production's empty allowlist keeps browser joining off.
+desktop **Copy Invite** message or the HTTPS URL from the Music room's
+**Copy browser invite** control. A forwarded message can contain that one
+browser link. Desktop messages retain their full original text, including
+sealed replies. The browser URL uses the existing `web` command. The server
+still requires current host authority and an exact allowed
+Web Join origin. The tracked default allowlist is empty; the approved private
+runtime has its exact browser origin configured. Neither a source change nor
+a plain entrance link enables another deployment automatically.
 
-In the desktop host, start the supported music session, select **Web Join →
-Allow a web guest**, then **Copy web invite**. Paste that link into the room's
-invitation box and click **Share**. It can coexist with a desktop invitation.
+Have your bandmate enter Hang Out and use **Invite bandmate to room** to
+bring them into the Jam room. In the staged desktop host, start Music and use
+the visible **Copy browser invite** control. Wait for **Link copied**.
+Paste the link into the room's invitation box and choose **Share with room**.
+The browser link can coexist with a desktop invitation.
 Members must click **Join in browser** themselves; sharing never opens a page
 or requests media. The destination owns headphones/audio consent, enrollment
 and audio. Browser joining has higher delay and the host's guest limit still

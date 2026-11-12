@@ -1,0 +1,139 @@
+{
+  "startedAt": "2026-11-07T09:08:32.881Z",
+  "source": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "version": "33862058-10a5-4a6f-9659-38841d70292f",
+  "scope": "Actual protected Worker keyboard entry, dialog recovery and responsive reflow; not native browser zoom, screen-reader speech or complete WCAG qualification",
+  "engine": "WebKit",
+  "endpoint": "Intel MacBook",
+  "ordinaryGuests": 1,
+  "physicalCapture": false,
+  "providerCredentials": false,
+  "roomCreations": 0,
+  "messagesToOtherPeople": 0,
+  "checks": [],
+  "geometries": [],
+  "resourceChecks": [
+    {
+      "at": "2026-11-07T09:08:32.885Z",
+      "load": 1.83740234375,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.92
+    }
+  ],
+  "logout": [
+    401
+  ],
+  "browserVersion": "27.2",
+  "keyboardTargets": [
+    {
+      "target": "getByLabel('Invitation code')",
+      "visited": [
+        {
+          "tag": "BODY",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        }
+      ],
+      "tabs": 1
+    },
+    {
+      "target": "getByRole('button', { name: /Enter the community/ })",
+      "visited": [
+        {
+          "tag": "INPUT",
+          "id": "code",
+          "role": null,
+          "label": null,
+          "type": "password"
+        },
+        {
+          "tag": "BODY",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        },
+        {
+          "tag": "INPUT",
+          "id": "code",
+          "role": null,
+          "label": null,
+          "type": "password"
+        },
+        {
+          "tag": "BODY",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        },
+        {
+          "tag": "INPUT",
+          "id": "code",
+          "role": null,
+          "label": null,
+          "type": "password"
+        },
+        {
+          "tag": "BODY",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        },
+        {
+          "tag": "INPUT",
+          "id": "code",
+          "role": null,
+          "label": null,
+          "type": "password"
+        },
+        {
+          "tag": "BODY",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        },
+        {
+          "tag": "INPUT",
+          "id": "code",
+          "role": null,
+          "label": null,
+          "type": "password"
+        },
+        {
+          "tag": "BODY",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        },
+        {
+          "tag": "INPUT",
+          "id": "code",
+          "role": null,
+          "label": null,
+          "type": "password"
+        },
+        {
+          "tag": "BODY",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        }
+      ]
+    }
+  ],
+  "status": "failed",
+  "failureStage": "Invitation, nickname and entry use actual keyboard events",
+  "failureType": "Error",
+  "captureRequests": 0,
+  "originalCookieStateAfterLogout": 401,
+  "contextsClosed": true,
+  "pageErrorTypes": [],
+  "completedAt": "2026-11-07T09:08:34.351Z"
+}

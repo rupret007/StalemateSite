@@ -143,6 +143,38 @@ describe('HangoutLobby AI review integration', () => {
 
 afterEach(() => vi.unstubAllGlobals());
 
+describe('metered lobby heartbeat controls', () => {
+    it('advertises support, prepays the normal budget and does not run a chat/room action', async () => {
+        const pairs = installUpgradeRuntime(), state = stateWith(), lobby = new HangoutLobby(state, {});
+        await lobby.fetch(request()); const ws = pairs[0][1];
+        expect(ws.frames.find(f => f.t === 'hello').features.transportPing).toBe(1);
+        await lobby.webSocketMessage(ws, JSON.stringify({ t: 'hello', nick: 'QuietGuest', age13: true, transport: 1 }));
+        const before = structuredClone(lobby.engine.snapshot()), message = vi.spyOn(lobby.engine, 'message');
+        await lobby.webSocketMessage(ws, '{"t":"transport-ping"}');
+        expect(ws.frames.at(-1)).toMatchObject({ t: 'transport-pong', transportSeq: expect.any(Number) });
+        expect(lobby.controlBudget.snapshot().consumedControls).toBe(1); expect(message).not.toHaveBeenCalled();
+        const after = lobby.engine.snapshot(); expect({ ...after, budget: before.budget }).toEqual(before);
+    });
+    it('cannot bypass the existing shared control budget', async () => {
+        const pairs = installUpgradeRuntime(), state = stateWith(), lobby = new HangoutLobby(state, {});
+        await lobby.fetch(request()); const ws = pairs[0][1];
+        await lobby.webSocketMessage(ws, JSON.stringify({ t: 'hello', nick: 'CappedGuest', age13: true, transport: 1 }));
+        vi.spyOn(lobby.controlBudget, 'take').mockResolvedValue(false);
+        await lobby.webSocketMessage(ws, '{"t":"transport-ping"}');
+        expect(ws.closed.code).toBe(4413); expect(ws.frames.some(f => f.t === 'transport-pong')).toBe(false);
+    });
+    it('does not keep an expired identity alive or spend credit after expiry', async () => {
+        const pairs = installUpgradeRuntime(), state = stateWith(), lobby = new HangoutLobby(state, {});
+        await lobby.fetch(request({ ...identity, expiresAt: Date.now() + 60000 })); const ws = pairs[0][1];
+        await lobby.webSocketMessage(ws, JSON.stringify({ t: 'hello', nick: 'ExpiringGuest', age13: true, transport: 1 }));
+        ws.serializeAttachment({ ...ws.deserializeAttachment(), expiresAt: Date.now() - 1 });
+        const take = vi.spyOn(lobby.controlBudget, 'take');
+        await lobby.webSocketMessage(ws, '{"t":"transport-ping"}');
+        expect(ws.closed.code).toBe(4401); expect(take).not.toHaveBeenCalled();
+        expect(ws.frames.some(f => f.t === 'transport-pong')).toBe(false);
+    });
+});
+
 describe('HangoutLobby peer close acknowledgement', () => {
     it('acknowledges a half-closed socket before readiness and retires only its admitted member', async () => {
         const pairs = installUpgradeRuntime(), state = stateWith(), lobby = new HangoutLobby(state, {});
@@ -212,7 +244,7 @@ describe('HangoutLobby WebSocket admission', () => {
         const server = pairs[0][1];
         expect(state.getWebSockets()).toEqual([server]);
         expect(server.frames.filter((frame) => frame.t === 'hello')).toEqual([
-            { t: 'hello', role: 'fan', lock: 'off', shield: false, budget: 'ok', needNick: true, verified: false, capabilities: { moderate: false, configure: false, register: false }, features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1 } }
+            { t: 'hello', role: 'fan', lock: 'off', shield: false, budget: 'ok', needNick: true, verified: false, capabilities: { moderate: false, configure: false, register: false }, features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, transportPing: 1 } }
         ]);
         expect(server.frames.map((frame) => frame.t)).toEqual(devToken ? ['device', 'hello'] : ['hello']);
         expect(lobby.pendingAdmission.size).toBe(0);

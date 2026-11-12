@@ -117,12 +117,28 @@ test('Stalemate entry through jam room to connected browser Web Join with few ba
         const roomName = await hostCtx.page.locator('[data-chat-context]').textContent();
         await expect(roomName).toMatch(/^#jam-/);
 
-        await hostCtx.page.click('[data-roomtools]');
-        await hostCtx.page.getByRole('button', { name: 'Invite guest', exact: true }).click();
-        await hostCtx.page.getByLabel('Guest nickname', { exact: true }).fill('DemoMate');
+        const inviteBandmate = hostCtx.page.getByRole('button', { name: 'Invite bandmate to room', exact: true });
+        const guestNickname = hostCtx.page.getByLabel('Guest nickname', { exact: true });
+        await expect(inviteBandmate).toBeInViewport({ ratio: 1 });
+        await hostCtx.page.setViewportSize({ width: 375, height: 667 });
+        await expect(inviteBandmate).toBeInViewport({ ratio: 1 });
+        expect(await hostCtx.page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+        await inviteBandmate.press('Enter');
+        await expect(guestNickname).toBeFocused();
+        await hostCtx.page.keyboard.press('Escape');
+        await expect(inviteBandmate).toBeFocused();
+        const outlineOverhang = await inviteBandmate.evaluate(button => {
+            const { outlineOffset, outlineStyle, outlineWidth } = getComputedStyle(button);
+            if (outlineStyle === 'none' || parseFloat(outlineWidth) <= 0) return Infinity;
+            return parseFloat(outlineOffset) + parseFloat(outlineWidth);
+        });
+        expect(outlineOverhang).toBeLessThanOrEqual(0);
+        await inviteBandmate.press('Enter');
+        await guestNickname.fill('DemoMate');
         await hostCtx.page.getByRole('button', { name: 'Send invitation', exact: true }).click();
-        await mateCtx.page.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
+        await mateCtx.page.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).click();
         await expect(mateCtx.page.locator('[data-chat-context]')).toHaveText(roomName);
+        await expect(mateCtx.page.locator('[data-jam-invite-room]')).toBeHidden();
         await expect.poll(mateCtx.clicks).toBeGreaterThanOrEqual(3);
         expect(mateCtx.clicks()).toBeLessThanOrEqual(4);
         await testInfo.attach('bandmate-click-count', {
@@ -139,7 +155,7 @@ test('Stalemate entry through jam room to connected browser Web Join with few ba
         await mateCtx.page.click('[data-jam-web]');
         const joinPage = await joinPopup;
         await expect(joinPage).toHaveURL(/webjam\.example\/join\/#/);
-        await expect(joinPage.locator('h1')).toContainText('Join your band');
+        await expect(joinPage.getByRole('heading', { name: 'Check your audio', exact: true })).toBeVisible();
         await joinPage.getByRole('button', { name: 'Skip check', exact: true }).click();
         await joinPage.getByRole('checkbox').check();
         await joinPage.getByRole('button', { name: 'Join with microphone', exact: true }).click();

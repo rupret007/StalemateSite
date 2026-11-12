@@ -1,5 +1,16 @@
 # Website integration: one shared Hang Out
 
+**Latest checkpoint, November 10:** reviewed frontend `d53ff7f` (merged runtime
+`11c9d1f8`) is privately delivered as version
+`2b205a24-392c-4cdb-9d0b-daaf8c065d0b`; backend source remains `c83dfaff` and the
+issuer remains `fd37578f`. All 28 bindings and effective settings were preserved;
+31 checked served files match reviewed bytes. Existing invitation/prejoin and
+missing-Music-invite guidance work; current joined chat and Music/Shared Track/
+Webex acceptance remain pending. Use the [current readiness handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
+and [sanitized delivery receipt](../pr-assets/private-readiness/20261110/private-delivery/README.md).
+This session owns private application delivery independently of StoryPool.
+Public links remain unpublished.
+
 Use this short guide to prepare the receiving owner's release. This application
 session supplies source, tests and integration assets. Following Jeff's October30
 clarification, application code, project CI and application PRs proceed here
@@ -8,26 +19,196 @@ operational files remain outside this task. Existing GitHub protections and
 security/provider/release holds still apply. This document is not release
 approval or evidence that a live website contains the candidate.
 
-## Select one tested candidate
+## Historical November 8 candidate and runtime
 
-The current protected private website uses application source
-`4ed1525c84f48173077f506261cb5acd19e3c1dc`, tree
-`2144677d638fee4b078a18e75892db9d75c6acdc`, matched to Worker version
-`a9724702-3ce5-418a-bbd4-950f2e169c9e`. Its current site CI, hosted mobile/short
-layout, logout and read-only health evidence are in the
-[dated application receipt](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md).
-Only chat CSS changed since the preceding source96/runtime629. That older
-source retains the broader hosted chat/drawing proof and original failed
-eight-hour observer, with its separate predicate diagnosis and ending identity.
-The explicit eighth provider-start CI mode used inert callbacks; it does not
-prove music or activate providers. Keep settings, keys, namespaces and release
-holds intact. Documentation/toolkit-only merges do not change the live app.
+The source, package, issuer and pending-delivery statements in this section are
+dated November 8 history. They do not supersede the current checkpoint above or
+instruct a rollback, reinstall, delivery retry or new provider activation.
 
-Current native source is `bf24e7d4769aa8ef8ce1300ccacc7d1fe9b2fc35`. All four
-matching private builds succeeded; actual ARM package identity, normal GUI and
-idle transport checks are in the dated receipt above. Actual browser invitation,
-installation and reciprocal ARM/Intel/Windows music remain required. Keep those
-proof scopes distinct and use these identities before historical branches below.
+The application branch now includes the merged UI work from #241/#242 at
+`844a32850d5a68c741b393e25b6ad11ba9b64890`, tree
+`992a18759df2055d7b29fc5496fc2cda30305ce0`. Its current-head source CI passed
+cleanly and actual Chrome previews verified host setup guidance and deep-zoom
+composer focus. It is **not deployed**: the 19:48 UTC readback still found the
+private runtime below. Use the
+[latest candidate matrix](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md#source-serving-state-and-evidence)
+to distinguish source, packaging, delivered assets and physical acceptance.
+The receiving owner must re-read actual effective configuration and preserve
+all existing bindings, namespace IDs, secrets, origins, caps and holds before
+delivery. Public links remain unpublished while the release candidate is pending.
+
+**Current protected runtime, verified November 8 at 08:45 UTC; release candidate
+still pending:** website source `71bff2cd6a5e352492eb7aaa304385182b378652` /
+[PR 239](https://github.com/rupret007/StalemateSite/pull/239), merge
+`76ccf7b14c5a13943e1750a56fac3d79611eb387`, reviewed/merged tree
+`3236c54ac2c0418e3d0469b717a38dadfbaf952c`. Private Worker version
+`2c5c81e5-1aa4-4ea7-be69-cacda13c20e8`, deployment
+`e75182dd-8ac7-484a-809b-a80f6a8ac52e`, was independently read back at 100%.
+The update only changes Web Join's initial invalid-link recovery and provenance.
+All backend source contents and actual Worker JavaScript bytes are unchanged
+from version 449; effective settings, namespaces, issuer and caps were preserved.
+Eight deployed Windows Chrome recovery/prejoin cases and screenshots at
+375/390px passed without capture or provider media. The broader lobby/music
+observations below retain their actual version 449 or earlier scopes.
+
+The preceding C227 runtime has a completed real expiry baseline but lacks the
+new heartbeat and browser audio cleanup. The older `33862058` runtime has the
+known idle-expiry defect. Neither is a blind rollback recommendation; retain
+current source, keys, namespaces and effective controls.
+
+Start with the [current readiness handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
+and its sanitized evidence packet. Earlier version 449 Intel SDK WebKit and actual Windows
+Chrome checks passed branded chat, 375/390px containment, draft-preserving
+reconnect and logout revocation; owned cleanup was independently verified.
+The version 449 110-minute heartbeat observation passed with ten ping/pong pairs
+and no socket closures. Independent cleanup and a separate metadata readback
+are verified; the original postcheck failures remain in the evidence.
+The earlier [generated-media trial](HANGOUT_HOSTED_COUNTDOWN_PROOF_20261107.md)
+retains its C227/Intel-components-to-Linux scope. These results do not prove
+physical Windows music, desktop Shared Track, Webex video/manual handoff, full
+accessibility or public readiness. All
+[62 requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md) remain in force.
+The original explicit eighth workerd provider-start CI command has already run;
+its 51 source entries and 68 bundle inputs match the current application inputs.
+See [the qualified receipt and limits](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md#source-serving-state-and-evidence).
+It remains separate from frozen desktop audio and real provider/media use.
+
+The browser-access clock and subsequent real WebKit audio-context teardown
+corrections remain included in current WebJam source
+`84193760a0d10050a649d0872151c30637997c63`, with the thirteen provenance
+records and MIT notice retained. The earlier generated trial demonstrated the
+connected countdown on its own recorded source. The original repaired C227
+eight-hour observation is now terminal with expired-cookie denial and cleanup
+verified; five recovered interruptions prevent an uninterrupted-uptime claim.
+The preceding failed full-duration observation remains failed. Current-version
+heartbeat behavior has its own separate real-time observation.
+
+Native packages remain source `76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c`.
+The separate issuer remains source `e735a048de82e26c424e31964a30f1dfbd548df9`,
+version `4db649fa-a465-44b4-8487-414987b3a660`. Generated package-component
+trials are not desktop UI, physical listening or Shared Track proof. The
+[next Shared Track check](HANGOUT_SHARED_TRACK_NEXT_CHECK_20261107.md) records
+the verified installed BlackHole 16ch/48 kHz device on the MacBook. Do not
+reinstall it. Active desktop routing and audible GUI Shared Track playback still
+need verification. Refresh normal
+provider headroom before any new bounded media trial and retain existing quotas,
+trust, capture and resource guards.
+
+**Entry-link integration does not deploy the community.** The receiving website
+session can prepare two navigation links to the existing shared address without
+copying this backend, changing namespaces or running Wrangler. Keep the public
+links unpublished until release readiness is demonstrated. Before any later
+backend update/rollback, re-read live configuration and explicitly carry every
+active plain setting, with secret bindings and namespace IDs preserved. The
+recorded seventeen plain values include the approved WebJam origin; tracked
+defaults and `--keep-vars` alone are not a substitute for that reconciliation.
+See [private delivery safeguards](HANGOUT_BETA_HANDOFF.md#build-and-deploy-privately).
+No public website/navigation or shared infrastructure changed here.
+
+### Prepare the two band links
+
+For the existing protected private address, the website session can prepare
+these ordinary links in its own staging pages. They use the already built-in
+band entries and need no new registration or backend configuration.
+
+Stalemate:
+
+```html
+<a href="https://stalemate-hangout-beta.jeffstory007.workers.dev/beta/?via=stalemate" referrerpolicy="no-referrer">Hang Out</a>
+```
+
+Rad Dad:
+
+```html
+<a href="https://stalemate-hangout-beta.jeffstory007.workers.dev/beta/?via=rad-dad" referrerpolicy="no-referrer">Hang Out</a>
+```
+
+Both enter the same lobby and room directory. Normal private invitation rules
+still apply; neither link contains or grants an invitation or a staff role.
+The visitor can hide the arrival badge. Preserve each site's existing pages and
+navigation, keep these public links unpublished while the release is pending,
+and qualify actual site navigation separately before launch. Current ordinary
+guest checks exercised both destination routes; they did not publish either
+band's navigation or supply cross-site account SSO. A future shared public
+address must be qualified and substituted consistently rather than launching
+separate community backends.
+
+The existing [eight-file entry toolkit ZIP](../pr-assets/beta-collaboration/20261107/composed-private-rc/community-entry-toolkit-b35e5fc.zip)
+is reusable: [current input readback](../pr-assets/beta-collaboration/20261108/current-private-readiness/entry-toolkit-reuse.json)
+verified all seven manifested payloads, the eight-member archive and all five
+exporter/source inputs against source `ac9b82f` and the recorded documentation
+checkpoint. A [current-source readback](../pr-assets/beta-collaboration/20261108/invalid-invite-recovery/entry-toolkit-current-inputs.json)
+confirms those same five inputs and the existing archive remain byte-identical
+on deployed source `71bff2c`. Its own manifest remains correctly
+pinned to `b35e5fc`; it was not rewritten or relabeled. The toolkit contains
+finite link tooling, not the complete application, native builds or a private
+invitation. Optional registrations still start disabled and unverified.
+
+**Earlier November 6 observations:** the following revisions and table retain
+their original scope. Use the current receipt above for new delivery work.
+
+On November 6, the protected private website served Worker version
+`50c62fa6-676c-4c1a-888f-ae4ceb74a3be` at 100% of deployment
+`3186f5ce-3da2-4459-8413-f78ddb16de76`. Application source
+`7c6a77cddcb882b9368b3bb2dff4405298135979` and the merge of
+[site PR #210](https://github.com/rupret007/StalemateSite/pull/210) have the
+same tree, `588509579d6a95d089a3207eea4a2f4d9ab70a12`.
+
+The tested application candidate advanced to `54cf2799c34ffcc344d9fedd72b05e047897d6ef`
+on the private beta branch. [Site PR #216](https://github.com/rupret007/StalemateSite/pull/216)
+added the browser's Direct connection or Relayed connection indicator, following
+[WebJam PR #446](https://github.com/rupret007/webjam/pull/446). The candidate passed
+both website CI jobs and all 69 packaged files matched the merged source.
+The served deployment identity above remains the last hosted verification.
+
+The guest recovery update from [WebJam PR #447](https://github.com/rupret007/webjam/pull/447)
+distinguishes a confirmed usage cap from a temporary outage. A local relay Worker
+fixture used one shared daily request across the mailbox and credential routes.
+It denied issuance before UTC midnight, resumed it after midnight, and denied
+the next request at the new day's cap. The fixture used mocked provider calls.
+Live relay recovery still requires a separate private trial.
+
+The private native packages come from
+`76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c`. All four targets passed the
+[private package run](https://github.com/rupret007/webjam/actions/runs/42169901070).
+The staged Intel MacBook and Apple Silicon packages both passed signature,
+build identity and local audio-file checks. The
+[installer guide](HANGOUT_WEBJAM_INSTALLERS.md) binds all four downloads to
+the exact source, artifact IDs and checksums. The relay-limit explanation in
+[WebJam PR #444](https://github.com/rupret007/webjam/pull/444) merged later as
+`7ab74ddfc8b0fcc26731ea477395c85972fc0651`. The staged packages still use the
+source above. The merged change explains the refusal without raising quotas.
+
+| Evidence | November 6 result |
+| --- | --- |
+| Hosted private branded entrances | Generated Stalemate and Rad Dad links on two local test pages reached the same hosted beta. Fresh Chromium contexts at 1280px and 390px reached the lobby in 2.0s and 1.5s in one run, including automated invitation entry. A later guest saw no earlier chat. The shared chat showed the Rad Dad badge. Both guests joined the same temporary Art room through the visible controls, a canvas stroke propagated, and both beta logouts succeeded. |
+| Hosted neutral partner entrance | A plain link on a third loopback test site reached the same private lobby as the Rad Dad link. Ordinary guests exchanged chat. Hiding the Rad Dad badge removed it from People and new messages, preserved the prior message and the approved return link, and left both roles unchanged. Both logged out. Optional third-site branding still requires operator review. |
+| Local browser checks on the matching site tree | 42 Chromium and WebKit cases passed. They cover mobile layout, shared entry, badge withdrawal, room creation, report review, Ignore/Block, fixture-verified ownership, reconnect and expired-session recovery. |
+| Local room and lobby capacity | The 50- and 150-client synthetic workloads passed, along with three nine-browser trials against the eight-person Art-room limit. See [load and recovery qualification](HANGOUT_SCALE_QUALIFICATION.md) for timings and the remaining hosted tests. |
+| Paint Along and Webex | Two private hosted Chromium visitors shared the canvas and played the featured YouTube lesson. The host clicked the embedded player to pause, and the guest followed pause and resume. Both played a different lesson loaded through the custom URL form. Both logged out. The served room/player scripts matched the pinned site source above. Native Webex control tests cover the external-link handoff and verified Mac app focus. There is no embedded browser meeting or automatic cross-app audio switch. An actual meeting and the [manual audio handoff](HANGOUT_WEBEX_AUDIO_HANDOFF.md) still need verification. |
+| Windows Word and browser entry | The exact handout opened in Word. Its link and manual code admitted guests in separate Windows Chrome profiles. Hosted checks also covered mic denial, early entry and expired-link recovery. |
+| Music release gate | Earlier live runs exchanged generated audio. Human speech and a short musical passage on the staged build, live shared WAV playback, and a second-network check remain pending. The private relay returned a quota-cap response. |
+
+The [October 31 application receipt](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md)
+and November 6 identities above preserve historical deployment/native evidence.
+Use the current protected-runtime identities at the top for the receiving
+website session, and verify live state again before delivery work.
+
+| Platform | Verified for this candidate | Remaining music evidence |
+| --- | --- | --- |
+| Intel Mac | Packaged build and local WAV/MP3 playback on the MacBook | Live host with Windows Chrome on the staged build, including speech and a musical passage |
+| Apple Silicon Mac | Packaged build and local WAV/MP3 playback on the Mini. Candidate source passed both read-only Shared Track checks with the actual 48 kHz BlackHole 16ch device. | Attended native Music host with the selected physical audio route and audible Shared Track at a second device |
+| Windows x64 | Verified downloadable package, native CI Setup install/launch/uninstall, browser entry and mic-permission recovery on Windows Chrome | Physical browser listening with the current host; native remote Join requires a trusted signed build |
+| Linux x64 | Verified downloadable package and native CI packaged client/Reference Studio smoke | Attended installation, native remote Join and audio |
+
+Use the [November 6 listening sequence](HANGOUT_MUSIC_DEMO_ACCEPTANCE.md#november-6-listening-sequence)
+for device setup, measurement and release evidence. The Intel MacBook handles
+the first live trial. The Apple Silicon Mini has the Shared Track virtual route.
+
+Use the [moderator guide](HANGOUT_MODERATOR_GUIDE.md) for queue coverage and
+recovery. The [privacy and incident handoff](HANGOUT_PRIVACY_AND_INCIDENTS.md)
+records the Texas operators' unresolved public-launch decisions, including
+all-ages participation, selected-evidence retention and incident coverage.
 
 The preceding `codex/webjam-native-ci-20261030`, based on PR169 head
 `43457849374bfa00e68fcf3f224954e3f3832026`, added the separate eighth provider-start

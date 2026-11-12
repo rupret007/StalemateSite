@@ -1,0 +1,28 @@
+{
+  "files": [
+    {
+      "relativePath": "Contents/Resources/webjam-web-join-target.json",
+      "symlink": false,
+      "resolvedRelativePath": "Contents/Resources/webjam-web-join-target.json",
+      "sha256": "5c607c0dd640370f79a25c834500a557ec24c975140504fbee00b9dd779c484b",
+      "target": {
+        "build": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+        "target": "private-beta",
+        "version": 1
+      }
+    },
+    {
+      "relativePath": "Contents/Frameworks/webjam-web-join-target.json",
+      "symlink": true,
+      "resolvedRelativePath": "Contents/Resources/webjam-web-join-target.json",
+      "sha256": "5c607c0dd640370f79a25c834500a557ec24c975140504fbee00b9dd779c484b",
+      "target": {
+        "build": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+        "target": "private-beta",
+        "version": 1
+      }
+    }
+  ],
+  "shortcutChanged": false,
+  "physicalCapture": false
+}

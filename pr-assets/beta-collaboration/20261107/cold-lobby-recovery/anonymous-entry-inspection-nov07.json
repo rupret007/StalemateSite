@@ -1,0 +1,40 @@
+{
+  "state": "COMPLETED_NORMAL_BROWSER_ANONYMOUS_ENTRY_INSPECTION",
+  "rows": [
+    {
+      "path": "/",
+      "status": 200,
+      "title": "Hang Out \u00b7 Private community beta",
+      "hasInvitationForm": true,
+      "invitationLinkCount": 1,
+      "plainPrivateInvitationNotice": false,
+      "edgeChallenge": false
+    },
+    {
+      "path": "/r/45662413410ed051/lobby/",
+      "status": 401,
+      "title": "",
+      "hasInvitationForm": false,
+      "invitationLinkCount": 0,
+      "plainPrivateInvitationNotice": true,
+      "edgeChallenge": false
+    },
+    {
+      "path": "/join/",
+      "status": 401,
+      "title": "Enter Hang Out to join WebJam",
+      "hasInvitationForm": false,
+      "invitationLinkCount": 1,
+      "plainPrivateInvitationNotice": false,
+      "edgeChallenge": false
+    }
+  ],
+  "ordinaryGuestsMinted": 0,
+  "invitationOrProviderCredentialSupplied": false,
+  "physicalCapture": false,
+  "securityOrUserAgentOverrides": false,
+  "allOwnedBrowserResourcesClosed": true,
+  "fullBodyOrIpPersisted": false,
+  "at": "2026-11-07T14:25:07.291197+00:00",
+  "harnessSha256": "bb3d486782811e4e1252644651e562996b6f0d83220326cabc239c384864bf92"
+}

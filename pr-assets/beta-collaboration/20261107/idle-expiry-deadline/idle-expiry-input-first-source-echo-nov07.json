@@ -1,0 +1,10 @@
+{
+  "state": "INPUT_FIRST_TRANSPORT_PROBE_STOPPED_NO_PRODUCT_TESTS",
+  "startedAt": "2026-11-07T16:09:59.178081+00:00",
+  "sourcePayloadBytes": 832110,
+  "newTestsStarted": false,
+  "applicationOrServiceChanged": false,
+  "originalTimeoutPreserved": true,
+  "failureType": "TimeoutExpired",
+  "completedAt": "2026-11-07T16:10:44.200713+00:00"
+}

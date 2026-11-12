@@ -7,11 +7,18 @@ const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 const ROOT = '/r/45662413410ed051/lobby/';
 
+// Safari's default keyboard navigation skips buttons with plain Tab. Exercise
+// its documented Option-Tab path on macOS, without changing user preferences.
+// Linux/Windows and Chromium retain their ordinary Tab sequence.
+function tabKey(page, reverse = false) {
+    const option = process.platform === 'darwin' && page.context().browser()?.browserType().name() === 'webkit';
+    return `${option ? 'Alt+' : ''}${reverse ? 'Shift+' : ''}Tab`;
+}
 async function tabTo(page, target) {
     await expect(target).toBeVisible();
     for (let i = 0; i < 90; i += 1) {
         if (await target.evaluate(element => element === document.activeElement)) return;
-        await page.keyboard.press('Tab');
+        await page.keyboard.press(tabKey(page));
     }
     throw new Error('Visible control was not reachable through the actual Tab sequence');
 }
@@ -80,6 +87,56 @@ function contained(geometry) {
     expect(log.height).toBeGreaterThanOrEqual(log.lineHeight + log.verticalPadding);
 }
 
+for (const width of [375, 1440]) test(`landmarks, visible nickname label and message-list semantics at ${width}px`, async ({ browser, baseURL }) => {
+    const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: 'reduce' });
+    try {
+        const page = await context.newPage();
+        await page.route(/youtube\.com|ytimg|googlevideo|goatcounter/, route => route.abort());
+        const relay = hangoutRelayWsBase(baseURL, `semantics-${randomUUID()}`);
+        await page.goto(`${ROOT}?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+        await expect(page.getByRole('main')).toHaveCount(1);
+        await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toHaveText('#stalemate');
+        await expect(page.getByRole('group', { name: 'Ways to hang out' })).toContainText('Anyone can host');
+        const randomName = page.getByRole('button', { name: /^Make me a name/ });
+        await expect(randomName).toBeVisible();
+        await randomName.click(); await expect(page.locator('[data-nick]')).not.toHaveValue('');
+        await page.locator('[data-nick]').fill(`SemanticGuest${width}`); await page.locator('[data-enter]').click();
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        await expect(page.getByRole('main')).toHaveCount(1);
+        await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toHaveText('Community chat');
+        await send(page, 'A message in the accessible conversation');
+        const conversation = page.getByRole('log', { name: 'Conversation' });
+        await expect(conversation.getByRole('list', { name: 'Messages' })).toContainText('A message in the accessible conversation');
+        await expect(conversation.getByRole('listitem').filter({ hasText: 'A message in the accessible conversation' })).toHaveCount(1);
+    } finally { await context.close(); }
+});
+
+for (const width of [375, 390]) test(`mobile keyboard section shortcuts focus the opened pane at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+    const visitor = await guest(browser, baseURL, `SectionFocus${width}`, { width, height: 667 });
+    const { page } = visitor;
+    try {
+        const start = page.getByRole('button', { name: /Start a room/ });
+        await tabTo(page, start);
+        await page.keyboard.press('Enter');
+        const startHeading = page.getByRole('heading', { name: 'Make room for something' });
+        await expect(startHeading).toBeFocused();
+        await expect(startHeading).toBeInViewport();
+        await page.keyboard.press(tabKey(page));
+        await expect(page.getByRole('button', { name: /Start a chat channel/ })).toBeFocused();
+        await page.screenshot({ path: testInfo.outputPath(`mobile-section-focus-${width}.png`) });
+
+        await section(page, 'people');
+        await expect(page.locator('[data-people-title]')).toBeFocused();
+        await expect(page.locator('nav [data-show="people"]')).toHaveAttribute('aria-current', 'true');
+        await section(page, 'chat');
+        await expect(page.getByRole('tab', { name: '#stalemate' })).toBeFocused();
+        await section(page, 'rooms');
+        await expect(page.getByRole('heading', { name: /^Room directory/ })).toBeFocused();
+        await expect(page.locator('nav [data-show="rooms"]')).toHaveAttribute('aria-current', 'true');
+        expect(visitor.errors).toEqual([]);
+    } finally { await visitor.close(); }
+});
+
 test('keyboard guest can join, recover a named-room error, chat, navigate tabs and leave host dialogs', async ({ browser, baseURL }, testInfo) => {
     const visitor = await guest(browser, baseURL, 'KeyboardVisitor', { width: 1280, height: 900 });
     const { page } = visitor;
@@ -110,6 +167,23 @@ test('keyboard guest can join, recover a named-room error, chat, navigate tabs a
         const outline = await page.locator('[data-roomtools]').evaluate(element => ({ width: getComputedStyle(element).outlineWidth, style: getComputedStyle(element).outlineStyle }));
         expect(parseFloat(outline.width)).toBeGreaterThanOrEqual(2); expect(outline.style).not.toBe('none');
         await page.screenshot({ path: testInfo.outputPath('keyboard-room-focus.png'), fullPage: true });
+        expect(visitor.errors).toEqual([]);
+    } finally { await visitor.close(); }
+});
+
+for (const width of [390, 1280]) test(`leaving Paint along with the keyboard returns focus to the lobby at ${width}px`, async ({ browser, baseURL }) => {
+    const visitor = await guest(browser, baseURL, `PaintFocus${width}`, { width, height: 844 });
+    const { page } = visitor;
+    try {
+        await section(page, 'rooms');
+        await tabTo(page, page.locator('[data-start="bobross"]'));
+        await page.keyboard.press('Enter');
+        await expect(page.locator('[data-act-canvas]')).toBeVisible();
+        const leave = page.getByRole('button', { name: 'Leave', exact: true });
+        await tabTo(page, leave);
+        await page.keyboard.press('Enter');
+        await expect(page.locator('[data-chat-context]')).toHaveText('#stalemate');
+        await expect(page.getByRole('tab', { name: '#stalemate', exact: true })).toBeFocused();
         expect(visitor.errors).toEqual([]);
     } finally { await visitor.close(); }
 });
@@ -157,6 +231,15 @@ test('host command, camera and person dialogs expose visible headings as accessi
     const visitor = await guest(browser, baseURL, 'NamedDialogGuest', { width: 1280, height: 900 }, relay);
     let peer;
     try {
+        // Native Safari can omit the modal's accessibility children when the
+        // dialog follows the live workspace, even when role and name checks pass.
+        const misplaced = await visitor.page.locator('dialog').evaluateAll(dialogs => {
+            const workspace = document.querySelector('[data-app]');
+            return dialogs.filter(dialog => dialog.parentElement !== document.body
+                || !(dialog.compareDocumentPosition(workspace) & Node.DOCUMENT_POSITION_FOLLOWING))
+                .map(dialog => dialog.getAttribute('aria-labelledby'));
+        });
+        expect(misplaced).toEqual([]);
         await send(visitor.page, '/join #art-dialog-studio');
         await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#art-dialog-studio');
         await tabTo(visitor.page, visitor.page.locator('[data-roomtools]')); await visitor.page.keyboard.press('Enter');
@@ -210,6 +293,26 @@ for (const viewport of viewports) test(`${viewport.label}: long chat, error and 
     } finally { await visitor.close(); }
 });
 
+test('short deep-zoom equivalent: Tab to Send keeps the whole composer visible before and after sending', async ({ browser, baseURL }, testInfo) => {
+    // A real 1280px-wide Chrome window at 400% zoom leaves 320x232 CSS pixels
+    // below browser chrome. This is its layout regression, not a zoom claim.
+    const visitor = await guest(browser, baseURL, 'ShortZoomGuest', { width: 320, height: 232 }), { page } = visitor;
+    try {
+        await tabTo(page, page.getByRole('textbox', { name: 'Message', exact: true }));
+        const text = 'Keyboard composer stays visible at deep zoom.';
+        await page.keyboard.type(text); await page.keyboard.press(tabKey(page));
+        await expect(page.locator('[data-send]')).toBeFocused();
+        const before = await composerGeometry(page);
+        await attachGeometry(testInfo, 'short-zoom-before-send', before);
+        await page.screenshot({ path: testInfo.outputPath('short-zoom-before-send.png') });
+        contained(before);
+        await page.keyboard.press('Space');
+        await expect(page.locator('[data-buffer]')).toContainText(text);
+        contained(await composerGeometry(page));
+        expect(visitor.errors).toEqual([]);
+    } finally { await visitor.close(); }
+});
+
 // A retained rejected message adds a separate scrollable recovery row. Deep
 // native Chrome zoom exposed clipping that the empty-recovery viewport probes
 // did not cover. These dimensions are local reflow regressions; native zoom
@@ -225,7 +328,7 @@ for (const viewport of [{ width: 300, height: 299 }, { width: 320, height: 256 }
         await delay(3100);
         await tabTo(page, page.getByRole('textbox', { name: 'Message', exact: true }));
         const text = 'The composer and Send remain usable with a saved message copy.';
-        await page.keyboard.type(text); await page.keyboard.press('Tab');
+        await page.keyboard.type(text); await page.keyboard.press(tabKey(page));
         await expect(page.locator('[data-send]')).toBeFocused();
         await page.keyboard.press('Space');
         await expect(page.locator('[data-buffer]')).toContainText(text);
@@ -282,7 +385,7 @@ test('a focused status survives its dismiss timer and dismisses after keyboard f
         // decouple WebSocket/ACK timers from the real local relay's clock.
         await visitor.page.waitForTimeout(4200);
         await expect(status).toBeVisible(); await expect(status).toBeFocused();
-        await visitor.page.keyboard.press('Tab');
+        await visitor.page.keyboard.press(tabKey(visitor.page));
         await expect(status).not.toBeFocused(); await expect(status).toBeHidden({ timeout: 5000 });
     } finally { await visitor.close(); }
 });
@@ -628,8 +731,15 @@ for (const width of [375, 390]) test(`short Jam instructions and manual invite c
         expect(await fallback.evaluate(input => input.selectionEnd - input.selectionStart)).toBe(invitation.length);
         expect(await page.evaluate(() => window.__shortJamClipboardRefusals)).toBe(1);
         const manualCopy = await composerGeometry(page);
-        const beforeNativeTab = await page.locator('[data-jam]').evaluate(panel => ({ scrollTop: panel.scrollTop, scrollHeight: panel.scrollHeight, clientHeight: panel.clientHeight }));
-        await attachGeometry(testInfo, `short-jam-manual-copy-${width}`, { ...manualCopy, jam: beforeNativeTab });
+        // First retain the natural fallback layout. Then scroll the panel past
+        // Copy invite without changing focus, so Shift-Tab must actually reveal
+        // it in either engine (WebKit may leave it visible in its initial view).
+        const naturalCopyScroll = await page.locator('[data-jam]').evaluate(panel => ({ scrollTop: panel.scrollTop, scrollHeight: panel.scrollHeight, clientHeight: panel.clientHeight }));
+        const beforeNativeTab = await page.locator('[data-jam]').evaluate(panel => {
+            panel.scrollTop = panel.scrollHeight;
+            return { scrollTop: panel.scrollTop, scrollHeight: panel.scrollHeight, clientHeight: panel.clientHeight };
+        });
+        await attachGeometry(testInfo, `short-jam-manual-copy-${width}`, { ...manualCopy, jam: naturalCopyScroll, keyboardScrollStart: beforeNativeTab });
         await page.screenshot({ path: testInfo.outputPath(`short-jam-manual-copy-${width}.png`), fullPage: true });
 
         // These first containment checks use the snapshots taken without a
@@ -637,7 +747,7 @@ for (const width of [375, 390]) test(`short Jam instructions and manual invite c
         contained(standard); contained(manualCopy);
         expect(standard.fontSize).toBe('16px'); expect(manualCopy.fontSize).toBe('16px');
         expect(beforeNativeTab.scrollHeight).toBeGreaterThan(beforeNativeTab.clientHeight);
-        await page.keyboard.press('Shift+Tab'); await expect(copy).toBeFocused();
+        await page.keyboard.press(tabKey(page, true)); await expect(copy).toBeFocused();
         const afterNativeTab = await copy.evaluate(button => {
             const panel = button.closest('[data-jam]'), r = button.getBoundingClientRect(), p = panel.getBoundingClientRect();
             const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);

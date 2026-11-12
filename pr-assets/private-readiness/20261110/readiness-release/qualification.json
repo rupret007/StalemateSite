@@ -1,0 +1,121 @@
+{
+  "observedThroughUtc": "2026-11-10T22:38:53.546464+00:00",
+  "privateWebsite": {
+    "siteVersion": "31f8271c-27d9-4d52-ab33-23884c79bae9",
+    "deployment": "270923f6-49ab-4f09-babc-f8101334df25",
+    "rollback": "2b205a24-392c-4cdb-9d0b-daaf8c065d0b",
+    "issuerVersion": "fd37578f-13cd-4fce-b557-35c0d962ef9d",
+    "frontendMerge": "7a5486a90c4a64e9b0431959e1e2ffd05b0bf55f",
+    "testedTree": "939ba09e7d2eeb2fad54e6c7aab325739969a7b5",
+    "backendSource": "c83dfaff1fe924ea0a70cfc902731234113f0c09",
+    "workerSha256": "9fefc1a13eaecb138be633e85d19039c15969f7066b7e71b6123636858493b78",
+    "verifiedServedFiles": 33,
+    "allChangedFilesVerified": true,
+    "changedFiles": [
+      "join/PROVENANCE.json",
+      "join/app.js",
+      "join/index.html",
+      "join/style.css"
+    ],
+    "observedInviteRecovery": true,
+    "isolatedGuestSessionClosed": true,
+    "all28BindingsAndEffectiveSettingsVerified": true
+  },
+  "websiteCi": {
+    "pr": 257,
+    "upstreamWebJamPr": 469,
+    "testedAndMergedTree": "939ba09e7d2eeb2fad54e6c7aab325739969a7b5",
+    "filesMatchedUpstream": 13,
+    "completedRuns": [
+      {
+        "run": 42908150218,
+        "job": 130151460264,
+        "checkout": "cb2a198189c2593b4c455a112019c7b3bee12ac6",
+        "sha256": "44ca62daea124c35244accf1ca9d6dc3f7efdf68d9a114b67eeafd1bc48015cd",
+        "unitPassed": 2110,
+        "browserPassed": 904,
+        "rootPathPassed": 34,
+        "projectPathPassed": 34
+      },
+      {
+        "run": 42908228994,
+        "job": 130151727891,
+        "checkout": "ab23d2e6e1225de349203ece1029c95e46436270",
+        "sha256": "eb8a4f7463a7428964faf5e4fa36b0b504b82268115c79e69ce211de3862f223",
+        "unitPassed": 2110,
+        "browserPassed": 904,
+        "rootPathPassed": 34,
+        "projectPathPassed": 34
+      }
+    ]
+  },
+  "browser": {
+    "currentRelease": "Missing-invite recovery observed in Chrome. The full-link guidance was visible and Join and Check microphone were disabled.",
+    "earlierZoomObservation": {
+      "at": "2026-11-10T22:13:45.839654+00:00",
+      "lastQualifiedServingVersion": "2b205a24-392c-4cdb-9d0b-daaf8c065d0b",
+      "scope": "Disconnected nickname screen in Chrome",
+      "keyboardOrder": [
+        "Name generator",
+        "Guest agreement",
+        "House rules & privacy",
+        "Session scrollback disclosure"
+      ],
+      "eachFocusVisible": true,
+      "checks": [
+        {
+          "zoomPercent": 200,
+          "clientWidth": 600,
+          "scrollWidth": 600,
+          "nameGeneratorHorizontalBounds": [
+            510,
+            556
+          ],
+          "agreementHorizontalBounds": [
+            37,
+            556
+          ],
+          "focusVisible": true
+        },
+        {
+          "zoomPercent": 400,
+          "clientWidth": 300,
+          "scrollWidth": 300,
+          "nameGeneratorHorizontalBounds": [
+            213,
+            259
+          ],
+          "agreementHorizontalBounds": [
+            37,
+            259
+          ],
+          "focusVisible": true
+        }
+      ],
+      "originalZoomRestored": true
+    }
+  },
+  "linuxArchive": {
+    "source": "ae49c915070f2951db9ff441c23c7f0a9d90ce1b",
+    "run": 42888556613,
+    "artifact": 13799986040,
+    "outerBytes": 458991518,
+    "outerSha256": "ed15cc7dfc922856a1facae8b2ef190d646359a28724f8e7304a29b80c2175a7",
+    "innerBytes": 463246607,
+    "innerSha256": "b0301a920fc4f065196d330e586fed748d677a7bae60d72f655bbf57f19d7f7b",
+    "mainArchitecture": "ELF64-x86_64",
+    "entries": 3623,
+    "allMembersCrcValid": true,
+    "pathAndSymlinkChecksPassed": true,
+    "fabricSha256": "421b4a6c34f77bbad3e7ba0b33902c443cee0a3a9d896c29c4a5162553d14e16",
+    "systemOpusSha256": "f63e3597e52b57f8957bafb309e9f4d91108a3987136ace5f386f269a0947e55"
+  },
+  "linuxPinnedLicensesChecked": 11,
+  "linuxGeneratedNoticesChecked": 2,
+  "remainingAcceptance": [
+    "Live joined chat and moderator journeys on the delivered release",
+    "Physical Music, WAV/MP3 Shared Track and Webex audio handoff",
+    "Local Linux execution and physical Linux media",
+    "Full assistive technology, physical mobile, capacity, operator and legal requirements"
+  ]
+}

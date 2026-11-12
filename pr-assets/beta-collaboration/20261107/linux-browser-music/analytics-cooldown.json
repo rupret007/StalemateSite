@@ -1,0 +1,11 @@
+{
+  "observedAt": "2026-11-07T12:20:59.264622+00:00",
+  "earliestNextAnalyticsReadAt": "2026-11-07T12:25:59.264622+00:00",
+  "dataset": "callsUsageAdaptiveGroups",
+  "kind": "analytics read rate budget, not a relay allocation or bandwidth cap",
+  "providerCode": "budget",
+  "providerRequestedCooldownSeconds": 300,
+  "normalReadGuardRemainsRequired": true,
+  "noMediaStarted": true,
+  "noQuotaCredentialClockOrHoldChanges": true
+}

@@ -1,0 +1,46 @@
+{
+  "state": "METADATA_CONTROLS_MATCHED_ANALYTICS_SEPARATELY_READ_BACK_ORIGINAL_PARTIAL_STOP_RETAINED",
+  "originalPostcheckState": "POST_TRIAL_READBACK_STOP_INSPECT_NO_NEW_MEDIA",
+  "originalFailureType": "AssertionError",
+  "originalReceiptSha256": "f21ac80a07fe91295b679e23f816772590975dba4606e632a4b8a72605a605ed",
+  "originalDiagnostic": "First four metadata calls returned 200 and matched both versions/settings. The subsequent TURN GraphQL HTTP 200 failed an assertion; original body was not retained, so cause is unassigned. No media retry.",
+  "metadata": {
+    "stalemate-hangout-beta": {
+      "version": "449fe7d2-0ac3-41b8-b622-fda2453b38db",
+      "deployment": "9c793eb0-60a9-4c45-91b1-76cf3918ed61",
+      "settingsUnchanged": true
+    },
+    "webjam-turn-credentials": {
+      "version": "4db649fa-a465-44b4-8487-414987b3a660",
+      "deployment": "618e7517-42e1-422a-8449-5d04a2ecada0",
+      "settingsUnchanged": true
+    }
+  },
+  "separateAnalyticsReceiptSha256": "7f6ce75f044de2158bef560b263d596ac489f83148550421ff99fc1ae6006dce",
+  "separateAnalyticsAt": "2026-11-08T07:00:49.230185+00:00",
+  "analytics": {
+    "callsTurnUsageAdaptiveGroups": {
+      "rows": [
+        {
+          "sum": {
+            "egressBytes": 9661248,
+            "ingressBytes": 13992416
+          }
+        }
+      ],
+      "from": "2026-10-15",
+      "through": "2026-11-08",
+      "emptyRowsAreNotZeroUsageOrEntitlement": true
+    },
+    "callsUsageAdaptiveGroups": {
+      "rows": [],
+      "from": "2026-10-15",
+      "through": "2026-11-08",
+      "emptyRowsAreNotZeroUsageOrEntitlement": true
+    }
+  },
+  "capMarkerSha256": "455ed66975e47e2838d47c2026ebd57e287721d9ad7f09922c72c64b50e35150",
+  "capMarkerUnchanged": true,
+  "settingsOrRuntimeChanged": false,
+  "newMediaTrial": false
+}

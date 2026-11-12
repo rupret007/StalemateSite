@@ -43,7 +43,7 @@ module.exports = defineConfig({
             name: 'webkit-community',
             // Phone projects select a different file set. Exercise the shared
             // entrance and invitation/Stop journeys in WebKit explicitly.
-            testMatch: /(?:community-entry|lobby-webjam|lobby-invitation-lifecycle|webjam-join-play|band-demo-journey)\.spec\.js$/,
+            testMatch: /(?:community-entry|community-moderation|lobby-webjam|lobby-invitation-lifecycle|webjam-join-play|band-demo-journey|lobby-workspace|lobby-idle-heartbeat|lobby-private-entry|lobby-accessibility)\.spec\.js$/,
             use: { browserName: 'webkit' }
         },
         phoneProject('webkit-iphone-se', {

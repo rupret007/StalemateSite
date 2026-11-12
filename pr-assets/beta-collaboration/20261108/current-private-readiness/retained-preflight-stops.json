@@ -1,0 +1,13 @@
+{
+  "windowsInitialControllerSha256": "ee328ab0bf094ffa0bfe8905a704b8e9ce437bf7aab243cc35f65a2131291b39",
+  "initialFailureCauseEstablished": false,
+  "beforeBrowserOrStaging": true,
+  "originalFailurePreserved": true,
+  "continuation": "One guarded continuation of the same pre-browser attempt after free memory recovered; not a repeated browser test.",
+  "policyUnchanged": "Restricted",
+  "minimumFreeMemoryGiB": 2,
+  "minimumDiskGiB": 15,
+  "localEncodedCommandLimit": 6500,
+  "localCommandSizeStop": "Duplicate readiness assertion made the encoded command exceed6500 before remote execution. Removed only the duplicated long-block assertion; the existing short staging command still refuses an existing source file.",
+  "resourceThresholdOrSecurityPolicyWeakened": false
+}

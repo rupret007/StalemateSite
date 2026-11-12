@@ -1,24 +1,46 @@
 import { open, seal, validateOffer, sdpFingerprint, enrollmentProof } from "./crypto.js";
 import { Mailbox, BUSY_MESSAGE } from "./mailbox.js";
-import { policySdp, SESSION_BYTES } from "./policy.js";
-import { musicSdp, tuneReceiver, latencyMs, adaptJitterBufferTarget, applyAdaptiveReceiverTarget } from "./audio.js";
+import { candidateAllowed, offerHasReviewedAllocation, policySdp, SESSION_BYTES } from "./policy.js";
+import { musicSdp, tuneReceiver, latencyMs, adaptJitterBufferTarget, applyAdaptiveReceiverTarget, connectionRoute } from "./audio.js";
+import { JOIN_SIGNAL } from "./errors.js";
 
-export function waitFor(target, event, check, signal, timeout, message) {
-  return new Promise((resolve, reject) => {
-    const cleanup = () => { clearTimeout(timer); target.removeEventListener(event, changed); signal.removeEventListener("abort", abort); };
-    const changed = () => { if (check()) { cleanup(); resolve(); } };
+export async function gatherAnswerSDP(pc, signal, { timeout = 15000, allowReviewedAllocations = false } = {}) {
+  await new Promise((resolve, reject) => {
+    let graceElapsed = false;
+    const cleanup = () => {
+      clearTimeout(timer);
+      clearTimeout(grace);
+      pc.removeEventListener("icegatheringstatechange", changed);
+      pc.removeEventListener("icecandidate", changed);
+      signal.removeEventListener("abort", abort);
+    };
+    const finish = () => { cleanup(); resolve(); };
+    const changed = () => {
+      if (pc.iceGatheringState === "complete" || (graceElapsed &&
+          pc.localDescription?.sdp.split(/\r?\n/).some(line => line.startsWith("a=candidate:") &&
+            candidateAllowed(line, undefined, allowReviewedAllocations)))) finish();
+    };
     const abort = () => { cleanup(); reject(new DOMException("Stopped", "AbortError")); };
-    const timer = setTimeout(() => { cleanup(); reject(new Error(message)); }, timeout);
-    target.addEventListener(event, changed); signal.addEventListener("abort", abort, { once: true });
+    // Give alternate services time to gather, then signal vetted candidates
+    // while ICE can still use them. Keep waiting if we have no usable path.
+    const grace = setTimeout(() => { graceElapsed = true; changed(); }, Math.min(3500, timeout));
+    const timer = setTimeout(finish, timeout);
+    pc.addEventListener("icegatheringstatechange", changed);
+    pc.addEventListener("icecandidate", changed);
+    signal.addEventListener("abort", abort, { once: true });
     if (signal.aborted) abort(); else changed();
   });
+  if (signal.aborted) throw new DOMException("Stopped", "AbortError");
+  return policySdp(pc.localDescription?.sdp ?? "", { allowReviewedAllocations });
 }
 export class WebJoinSession {
-  constructor({ origin, invite, stream, audioContext, onStatus = () => {}, onTrack = () => {}, onLatency = () => {}, onError = () => {} }) {
-    Object.assign(this, { invite, stream, audioContext, onStatus, onTrack, onLatency, onError });
+  constructor({ origin, invite, stream, audioContext, onStatus = () => {}, onTrack = () => {}, onLatency = () => {}, onRoute = () => {}, onError = () => {} }) {
+    Object.assign(this, { invite, stream, audioContext, onStatus, onTrack, onLatency, onRoute, onError });
     this.controller = new AbortController();
     this.mailbox = new Mailbox(origin, invite, { signal: this.controller.signal });
     this.authorized = false; this.quotaBytes = SESSION_BYTES; this.previousBytes = 0;
+    this.accessExpiresAt = null;
+    this.route = null;
     this._jitterAdaptation = { targetMs: 20, lastChangeAt: 0 };
     this.stream.getAudioTracks().forEach((track) => { track.enabled = false; });
   }
@@ -28,6 +50,7 @@ export class WebJoinSession {
     const offer = validateOffer(this.invite, await open(this.invite, await this.mailbox.receive("offer")));
     const remoteSDP = policySdp(offer.sdp, { remote: true });
     const credentials = await this.mailbox.credentials();
+    this.accessExpiresAt = credentials.expiresAt;
     this.quotaBytes = Math.min(this.quotaBytes, credentials.quotaBytes);
     const certificate = await RTCPeerConnection.generateCertificate({ name: "ECDSA", namedCurve: "P-256" });
     if (signal.aborted) throw new DOMException("Stopped", "AbortError");
@@ -42,7 +65,9 @@ export class WebJoinSession {
       if (this.authorized) this.onTrack(stream); else this.pendingStream = stream;
     });
     pc.addEventListener("connectionstatechange", () => {
-      if (["failed", "closed"].includes(pc.connectionState) && !signal.aborted) this.fail(new Error("Connection ended. Ask the host for a new invite."));
+      if (["failed", "closed"].includes(pc.connectionState) && !signal.aborted) {
+        this.fail(new Error(this.authorized ? JOIN_SIGNAL.SESSION_ENDED : JOIN_SIGNAL.ICE_CONNECTION_FAILED));
+      }
       if (pc.connectionState === "disconnected") this.disconnectTimer ??= setTimeout(() => this.fail(new Error("The network connection timed out.")), 10000);
       if (pc.connectionState === "connected") { clearTimeout(this.disconnectTimer); this.disconnectTimer = null; }
     });
@@ -65,7 +90,9 @@ export class WebJoinSession {
           if (!sent || message.data !== "authorized" || this.authorized) { reject(new Error("Invalid enrollment response")); this.fail(new Error("Invalid enrollment response")); return; }
           this.authorized = true; resolve();
         });
-        channel.addEventListener("close", () => { if (!signal.aborted) this.fail(new Error("The host ended this web session.")); });
+        channel.addEventListener("close", () => {
+          if (!signal.aborted) this.fail(new Error(this.authorized ? JOIN_SIGNAL.SESSION_ENDED : JOIN_SIGNAL.ICE_CONNECTION_FAILED));
+        });
         prove();
       });
     });
@@ -75,8 +102,9 @@ export class WebJoinSession {
     pc.addTrack(this.stream.getAudioTracks()[0], this.stream);
     const description = await pc.createAnswer();
     await pc.setLocalDescription({ type: "answer", sdp: musicSdp(description.sdp) });
-    await waitFor(pc, "icegatheringstatechange", () => pc.iceGatheringState === "complete", signal, 15000, "Network discovery timed out. Try another network or the app.");
-    const sdp = policySdp(pc.localDescription.sdp);
+    // An older host rejects these addresses in an answer. Its authenticated
+    // offer advertises only the legacy candidates, so keep that answer policy.
+    const sdp = await gatherAnswerSDP(pc, signal, { allowReviewedAllocations: offerHasReviewedAllocation(remoteSDP) });
     answer = { ...offer, kind: "answer", guest_pin: sdpFingerprint(sdp), sdp };
     await this.mailbox.send("answer", await seal(this.invite, answer));
     let timer;
@@ -100,10 +128,11 @@ export class WebJoinSession {
     try {
       const stats = await Promise.race([this.pc.getStats(), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(BUSY_MESSAGE)), 3000); })]);
       if (this.controller.signal.aborted || !this.authorized) return;
-      let bytes = 0, transports = 0;
+      let bytes = 0, transports = 0, selectedPairId;
       for (const report of stats.values()) if (report.type === "transport") {
         if (!Number.isSafeInteger(report.bytesSent) || report.bytesSent < 0 || !Number.isSafeInteger(report.bytesReceived) || report.bytesReceived < 0) throw new Error(BUSY_MESSAGE);
         bytes += report.bytesSent + report.bytesReceived; transports++;
+        selectedPairId = report.selectedCandidatePairId;
       }
       if (!transports || bytes < this.previousBytes || bytes >= this.quotaBytes * 0.9) throw new Error(BUSY_MESSAGE);
       this.previousBytes = bytes;
@@ -112,12 +141,21 @@ export class WebJoinSession {
         applyAdaptiveReceiverTarget(this._inboundReceiver, this._jitterAdaptation);
       }
       this.onLatency(latencyMs(stats, this.audioContext.baseLatency));
+      // Web Join bundles audio and enrollment on one transport. With missing
+      // or ambiguous stats, leave the route unknown.
+      const route = transports === 1 && this.pc.connectionState === "connected"
+        ? connectionRoute(stats, selectedPairId) : null;
+      if (route !== this.route) {
+        this.route = route;
+        this.onRoute(route);
+      }
     } catch (error) { this.fail(error); }
     finally { clearTimeout(timer); this.statsPending = false; }
   }
   fail(error) { if (this.controller.signal.aborted) return; this.close(); this.onError(error); }
   close() {
     if (this.controller.signal.aborted) return;
+    this.accessExpiresAt = null;
     this.controller.abort();
     clearInterval(this.statsTimer); clearTimeout(this.expiryTimer); clearTimeout(this.disconnectTimer);
     this.channel?.close(); this.pc?.close();

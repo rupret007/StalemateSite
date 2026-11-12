@@ -1,19 +1,26 @@
-import { acquireMusicStream } from "./audio.js";
-
 /** RMS above this counts as audible input for the pre-join check. */
 export const MIC_HEARD_THRESHOLD = 0.012;
 
 export function micCheckFailure(error) {
+  if (error?.name === "OverconstrainedError" && error.constraint === "deviceId") {
+    return { message: "This microphone is unavailable. Choose another input or reconnect it, then try again.", showRetry: true };
+  }
   if (error?.name === "NotFoundError") {
     return {
-      message: "No microphone found - plug one in and press Try again.",
+      message: "No microphone found for the current selection. Choose another input if available, or connect one and press Try again.",
       showRetry: true,
     };
   }
   if (error?.name === "NotAllowedError") {
     return {
       message:
-        "Microphone access is blocked. Click the lock or site icon in your browser’s address bar, allow the microphone, then press Try again.",
+        "Microphone access was blocked. Use the site controls beside the address bar to allow your mic, then click Try again.",
+      showRetry: true,
+    };
+  }
+  if (error?.name === "NotReadableError") {
+    return {
+      message: "Couldn't open this microphone. Choose another input if available, or check your system sound settings and try again.",
       showRetry: true,
     };
   }
@@ -21,10 +28,6 @@ export function micCheckFailure(error) {
     message: error?.message || "Could not use your microphone. Press Try again.",
     showRetry: true,
   };
-}
-
-export function hasAudioInputDevice(devices) {
-  return devices.some((device) => device.kind === "audioinput");
 }
 
 export function micLevelRms(analyser) {
@@ -65,17 +68,4 @@ export function startMicLevelMonitor({
     source.disconnect();
     analyser.disconnect();
   };
-}
-
-export async function beginMicCheck(mediaDevices) {
-  const devices = await mediaDevices.enumerateDevices();
-  if (hasAudioInputDevice(devices)) {
-    return acquireMusicStream(mediaDevices);
-  }
-  try {
-    return await acquireMusicStream(mediaDevices);
-  } catch (error) {
-    if (error.name === "NotFoundError") throw error;
-    throw error;
-  }
 }

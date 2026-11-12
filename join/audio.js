@@ -6,6 +6,26 @@ export const MUSIC_CONSTRAINTS = Object.freeze({
   sampleRate: 48000,
 });
 
+export async function closeAudioContext(context) {
+  if (!context || context.state === "closed") return;
+  let deadline;
+  try {
+    // macOS WebKit can finish a pending rendering startup after close() has
+    // resolved. Await suspension acknowledgement before closing our context.
+    // A backgrounded or broken suspend must not hold teardown indefinitely.
+    if (typeof context.suspend === "function") {
+      await Promise.race([
+        Promise.resolve(context.suspend()).catch(() => {}),
+        new Promise((resolve) => { deadline = setTimeout(resolve, 250); }),
+      ]);
+    }
+  } catch { /* Closing remains mandatory if suspension throws. */ }
+  finally {
+    clearTimeout(deadline);
+    try { await context.close(); } catch { /* Preserve best-effort teardown. */ }
+  }
+}
+
 export function constraintWarnings(settings) {
   return Object.entries(MUSIC_CONSTRAINTS).filter(([key, expected]) => settings[key] !== expected).map(([key, expected]) => {
     const actual = settings[key] === undefined ? "not reported" : String(settings[key]);
@@ -13,18 +33,20 @@ export function constraintWarnings(settings) {
   });
 }
 
-export async function acquireMusicStream(mediaDevices) {
+export async function acquireMusicStream(mediaDevices, deviceId = "") {
   let stream;
   let fallback = false;
+  const device = deviceId ? { deviceId: { exact: deviceId } } : {};
   try {
-    stream = await mediaDevices.getUserMedia({ video: false, audio: { ...MUSIC_CONSTRAINTS } });
+    stream = await mediaDevices.getUserMedia({ video: false, audio: { ...MUSIC_CONSTRAINTS, ...device } });
   } catch (error) {
     if (error.name === "NotAllowedError") {
-      throw new Error("Microphone access was blocked. Allow the mic in your browser settings, then tap Join again.");
+      throw new Error("Microphone access was blocked. Allow the mic in your browser settings, then tap Join again.", { cause: error });
     }
     if (!["OverconstrainedError", "NotSupportedError"].includes(error.name)) throw error;
+    if (error.constraint === "deviceId") throw error;
     fallback = true;
-    stream = await mediaDevices.getUserMedia({ video: false, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    stream = await mediaDevices.getUserMedia({ video: false, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, ...device } });
   }
   const tracks = stream.getAudioTracks();
   if (tracks.length !== 1) {
@@ -32,7 +54,6 @@ export async function acquireMusicStream(mediaDevices) {
     throw new Error("A single audio input is required");
   }
   const settings = tracks[0].getSettings();
-  console.info("Web Join audio settings", settings);
   return { stream, warnings: [...(fallback ? ["Your browser needed simpler microphone constraints."] : []), ...constraintWarnings(settings)] };
 }
 
@@ -84,15 +105,28 @@ const JITTER_TARGET_MIN_MS = 20;
 const JITTER_TARGET_MAX_MS = 120;
 const JITTER_TARGET_DEFAULT_MS = 20;
 
+function selectedRoundTripTime(stats) {
+  let transports = 0, selectedPairId;
+  for (const report of stats.values()) if (report.type === "transport") {
+    transports++;
+    selectedPairId = report.selectedCandidatePairId;
+  }
+  // Web Join bundles audio and enrollment on one transport. A nominated or
+  // previously successful pair is not proof that it still carries the audio.
+  if (transports !== 1 || typeof selectedPairId !== "string" || !selectedPairId) return undefined;
+  const pair = stats.get(selectedPairId);
+  if (pair?.type !== "candidate-pair" || pair.state !== "succeeded" ||
+      !Number.isFinite(pair.currentRoundTripTime) || pair.currentRoundTripTime < 0) return undefined;
+  return pair.currentRoundTripTime;
+}
+
 export function adaptJitterBufferTarget(stats, state = {}) {
-  let rttMs;
+  const rtt = selectedRoundTripTime(stats);
+  const rttMs = rtt === undefined ? undefined : rtt * 1000;
   let jitterMs = 0;
   let lossRate = 0;
   let bufferMs = JITTER_TARGET_DEFAULT_MS;
   for (const report of stats.values()) {
-    if (report.type === "candidate-pair" && (report.nominated || report.selected) && report.state === "succeeded" && Number.isFinite(report.currentRoundTripTime)) {
-      rttMs = report.currentRoundTripTime * 1000;
-    }
     if (report.type === "inbound-rtp" && (report.kind === "audio" || report.mediaType === "audio")) {
       if (report.packetsReceived > 0 && Number.isFinite(report.packetsLost)) {
         lossRate = report.packetsLost / (report.packetsReceived + report.packetsLost);
@@ -127,11 +161,21 @@ export function applyAdaptiveReceiverTarget(receiver, adaptation) {
   return adaptation;
 }
 
+export function connectionRoute(stats, selectedPairId) {
+  const pair = stats.get(selectedPairId);
+  if (pair?.type !== "candidate-pair" || pair.state !== "succeeded") return null;
+  const local = stats.get(pair.localCandidateId);
+  const remote = stats.get(pair.remoteCandidateId);
+  const types = [local?.candidateType, remote?.candidateType];
+  if (types.includes("relay")) return "relayed";
+  // A peer-reflexive address learned during checks has no advertised origin.
+  return types.every(type => type === "host" || type === "srflx") ? "direct" : null;
+}
+
 export function latencyMs(stats, baseLatency = 0) {
-  let rtt;
+  const rtt = selectedRoundTripTime(stats);
   let buffer;
   for (const report of stats.values()) {
-    if (report.type === "candidate-pair" && (report.nominated || report.selected) && report.state === "succeeded" && Number.isFinite(report.currentRoundTripTime)) rtt = report.currentRoundTripTime;
     if (report.type === "inbound-rtp" && (report.kind === "audio" || report.mediaType === "audio") && report.jitterBufferEmittedCount > 0 && Number.isFinite(report.jitterBufferDelay)) buffer = report.jitterBufferDelay / report.jitterBufferEmittedCount;
   }
   if (rtt === undefined || buffer === undefined) return null;

@@ -1,0 +1,35 @@
+{
+  "recordedAt": "2026-11-07T07:35:54.810931+00:00",
+  "websiteSource": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "websiteVersion": "33862058-10a5-4a6f-9659-38841d70292f",
+  "nativeSource": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "issuerSource": "e735a048de82e26c424e31964a30f1dfbd548df9",
+  "issuerVersion": "4db649fa-a465-44b4-8487-414987b3a660",
+  "generatedInput": {
+    "original": true,
+    "sampleRate": 48000,
+    "channels": 2,
+    "sampleFrames": 1920000,
+    "sha256": "f5298cbb71fea2a9d394de3c517bea795de97bc445b7020f50f00c8b40e7db45"
+  },
+  "harness": {
+    "nativeMixerFixtureSha256": "d879bc8aa864776bbe5edb9fb58d6a87686e5de2cba84a3dadb8d4be0f458050",
+    "controllerSha256": "045f18fe54f17a1238a14800f2d9a334043eca08763c10682e6e62c67e52dfb1",
+    "trackedImportModuleHashesVerified": true,
+    "usesTestCredentialEndpointOverride": false,
+    "usesLabCandidatePolicy": false,
+    "physicalCapture": false,
+    "recording": false,
+    "isolatedJamulusIni": true,
+    "jamulusNoRecordFlag": true,
+    "desktopUiExercised": false,
+    "sharedTrackSenderBackendExercised": false
+  },
+  "files": {
+    "billing-headroom.json": "e98af8d5c50a1f593f6102e5a03698fdd4336166310b8e6d13edc0c159bfb22d",
+    "mac-windows-generated-media.json": "77e857fe927c70510a237d9aed3283b2c378050a61759d1fec6cfe5b9917addb",
+    "provider-preflight.json": "3d2d1379b0abb99ef6eb8a02e87bb7ffdc126e348b878fd97617d92a9708d7f4",
+    "shared-track-route-preflight.json": "31263fe6003af7b4ad88c3fb3f3517e9d0fce20463e794436c6c3c18318c7415"
+  },
+  "fullMusicAcceptance": false
+}

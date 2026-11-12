@@ -1,0 +1,42 @@
+[
+  {
+    "retainedLocalReceipt": "direct-hosted-candidate-chromium-nov06.json",
+    "status": "failed",
+    "failureStage": "Private runtime JavaScript and styles match the candidate exactly",
+    "reason": "The first harness expected 16 runtime files; the exact selected inventory contains 14.",
+    "logout": [
+      200,
+      200
+    ]
+  },
+  {
+    "retainedLocalReceipt": "direct-hosted-candidate-chromium-v2-nov06.json",
+    "status": "failed",
+    "failureStage": "Private runtime JavaScript and styles match the candidate exactly",
+    "reason": "The authenticated HTML shell is deliberately rewritten by beta-entry. Its raw asset hash cannot be compared with served HTML. The follow-up checks the 13 unchanged served runtime assets and tests HTML through the UI.",
+    "logout": [
+      200,
+      200
+    ]
+  },
+  {
+    "retainedLocalReceipt": "direct-hosted-candidate-chromium-v3-nov06.json",
+    "status": "failed",
+    "failureStage": "Manual reconnect retains an unsent draft and starts fresh scrollback",
+    "reason": "The follow-up message arrived inside the existing three-second slow mode. Reconnect completed, but this test sent the next line too soon.",
+    "logout": [
+      200,
+      200
+    ]
+  },
+  {
+    "retainedLocalReceipt": "direct-hosted-candidate-chromium-v4-nov06.json",
+    "status": "failed",
+    "failureStage": "Manual reconnect retains an unsent draft and starts fresh scrollback",
+    "reason": "Diagnostic rerun confirmed the post-reconnect message assertion failed. The next run waits 3.2 seconds without changing the server guard.",
+    "logout": [
+      200,
+      200
+    ]
+  }
+]

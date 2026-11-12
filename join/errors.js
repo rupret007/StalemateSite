@@ -2,6 +2,8 @@
 
 export const JOIN_SIGNAL = Object.freeze({
   ROOM_FULL: "This invitation was already used or expired. Ask the host for a new link.",
+  SESSION_ENDED: "The Web Join connection ended.",
+  MICROPHONE_ENDED: "Microphone disconnected.",
   HOST_NO_ANSWER: "The host did not answer in time. Ask for a new invite.",
   HOST_AUTH_TIMEOUT: "Host authentication timed out. Ask for a new invite.",
   INVITE_EXPIRED: "The invite expired. Ask the host for a new link.",
@@ -9,6 +11,7 @@ export const JOIN_SIGNAL = Object.freeze({
   INVITE_INVALID: "This Web Join invite is invalid or expired. Ask the host for a new link.",
   HOST_BINDING: "Host identity or invite binding did not match",
   RELAY_SESSION_EXPIRED: "The free relay session expired. Ask the host for a new invite.",
+  RELAY_CAP_REACHED: "Web Join reached a usage limit.",
   RELAY_UNAVAILABLE: "Web Join is unavailable. Try again later or ask your host for help.",
   ICE_GATHER_TIMEOUT: "Network discovery timed out. Try another network or the app.",
   ICE_CONNECTION_FAILED: "Connection ended. Ask the host for a new invite.",
@@ -41,12 +44,30 @@ const HOST_OFFLINE_SIGNALS = new Set([
 /** @param {unknown} error @returns {JoinFailureView} */
 export function mapJoinError(error) {
   const message = error instanceof Error ? error.message : String(error ?? "");
+  if (message === JOIN_SIGNAL.MICROPHONE_ENDED) {
+    return {
+      kind: "microphone_ended",
+      headline: message,
+      hint: "Reconnect your microphone or choose another input. Ask your host for a new browser invite.",
+      showRetry: false,
+      needsFreshInvite: true,
+    };
+  }
+  if (message === JOIN_SIGNAL.SESSION_ENDED) {
+    return {
+      kind: "session_ended",
+      headline: message,
+      hint: "Ask your host to create a new browser invite and open that link.",
+      showRetry: false,
+      needsFreshInvite: true,
+    };
+  }
   if (message === JOIN_SIGNAL.ROOM_FULL) {
     return {
       kind: "room_full",
-      headline: "This session already has a web guest.",
-      hint: "Only one browser guest can join at a time. Ask your host to kick the other guest or send a new invite after they reset Web Join.",
-      showRetry: true,
+      headline: "This browser invite could not be used.",
+      hint: "Ask your host for a fresh Web Join link. If another browser guest is connected, they’ll need to leave first.",
+      showRetry: false,
       needsFreshInvite: true,
     };
   }
@@ -85,6 +106,21 @@ export function mapJoinError(error) {
   if (EXPIRED_SIGNALS.has(message)) {
     return mapExpired(message);
   }
+  if (message === JOIN_SIGNAL.RELAY_CAP_REACHED) {
+    const seconds = error instanceof Error ? error.retryAfterSeconds : null;
+    const dailyReset = Number.isInteger(seconds) && seconds >= 1 && seconds <= 86400
+      ? new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(Date.now() + seconds * 1000)
+      : null;
+    return {
+      kind: "relay_cap",
+      headline: message,
+      hint: dailyReset
+        ? `This daily request allowance resets around ${dailyReset}. Your host can keep the Music room open and share a fresh browser invite afterward.`
+        : "Your host can keep the Music room open. Ask for a new browser invite when Web Join is available again.",
+      showRetry: false,
+      needsFreshInvite: true,
+    };
+  }
   if (message === JOIN_SIGNAL.RELAY_UNAVAILABLE) {
     return {
       kind: "relay_unavailable",
@@ -115,13 +151,16 @@ export function mapJoinError(error) {
 /** @param {string} message @returns {JoinFailureView} */
 function mapExpired(message) {
   const turnOnly = message === JOIN_SIGNAL.RELAY_SESSION_EXPIRED;
+  const inviteHeadline = message === JOIN_SIGNAL.INVITE_EXPIRED
+    ? "This browser invite has expired."
+    : "This invite link is no longer valid.";
   return {
     kind: turnOnly ? "turn_expired" : "invite_expired",
-    headline: turnOnly ? "The free relay session timed out." : "This invite link is no longer valid.",
+    headline: turnOnly ? "The free relay session timed out." : inviteHeadline,
     hint: turnOnly
       ? "Ask your host for a new invite if Retry does not connect. Retry fetches fresh relay credentials when the link is still good."
-      : "Ask your host to copy a new Web Join link from the desktop app, then open it and tap Retry.",
-    showRetry: true,
+      : "Ask your host for a new Web Join link and open it to join.",
+    showRetry: turnOnly,
     needsFreshInvite: !turnOnly,
   };
 }
@@ -132,7 +171,7 @@ export function applyJoinFailure(view, elements) {
   elements.hint.textContent = view.hint;
   elements.hint.hidden = !view.hint;
   elements.retry.hidden = !view.showRetry;
-  elements.join.hidden = view.showRetry;
+  elements.join.hidden = view.showRetry || view.needsFreshInvite;
   elements.leave.hidden = true;
   elements.retry.disabled = !view.showRetry;
   if (view.showRetry) elements.join.disabled = false;

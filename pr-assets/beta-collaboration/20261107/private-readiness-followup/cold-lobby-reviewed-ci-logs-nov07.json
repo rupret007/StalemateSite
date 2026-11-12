@@ -1,0 +1,89 @@
+{
+  "at": "2026-11-07T15:35:28.520Z",
+  "head": "dbbfdb4490d7c493094e9fdf8a32c63e9715c027",
+  "base": "96b6f72342b34f10231a53c623e2a865501987f8",
+  "jobs": [
+    {
+      "id": 128435738905,
+      "characters": 325369,
+      "summary": [
+        "2026-11-07T14:52:47.9758728Z  Test Files  137 passed (137)",
+        "2026-11-07T14:52:47.9765855Z       Tests  2069 passed (2069)",
+        "2026-11-07T15:19:17.7076541Z   813 passed (26.5m)",
+        "2026-11-07T15:20:24.6000139Z   34 passed (1.1m)",
+        "2026-11-07T15:21:27.5929416Z   34 passed (1.0m)"
+      ],
+      "reportedRetryLines": [],
+      "firstFailureExcerpt": [],
+      "rawFirstFailureLog": null
+    },
+    {
+      "id": 128435651782,
+      "characters": 339177,
+      "summary": [
+        "2026-11-07T14:54:03.2482680Z  Test Files  137 passed (137)",
+        "2026-11-07T14:54:03.2498255Z       Tests  2069 passed (2069)",
+        "2026-11-07T15:28:56.2726809Z   1 flaky",
+        "2026-11-07T15:28:56.2728626Z   812 passed (34.9m)",
+        "2026-11-07T15:30:32.4702769Z   34 passed (1.5m)",
+        "2026-11-07T15:32:04.4787204Z   34 passed (1.5m)"
+      ],
+      "reportedRetryLines": [
+        "2026-11-07T15:18:08.8385644Z   \u2718  652 [webkit-iphone-15] \u203a tests/e2e/play.spec.js:57:1 \u203a shared music advances once per track, persists preferences, and pauses in hidden tabs (20.5s)",
+        "2026-11-07T15:18:17.6638159Z   \u2713  653 [webkit-iphone-15] \u203a tests/e2e/play.spec.js:57:1 \u203a shared music advances once per track, persists preferences, and pauses in hidden tabs (retry #1) (8.2s)"
+      ],
+      "firstFailureExcerpt": [
+        "2026-11-07T15:28:56.2703779Z   1) [webkit-iphone-15] \u203a tests/e2e/play.spec.js:57:1 \u203a shared music advances once per track, persists preferences, and pauses in hidden tabs ",
+        "2026-11-07T15:28:56.2704890Z ",
+        "2026-11-07T15:28:56.2706879Z     Error: expect(locator).toHaveAttribute(expected) failed",
+        "2026-11-07T15:28:56.2707554Z ",
+        "2026-11-07T15:28:56.2708133Z     Locator:  locator('html')",
+        "2026-11-07T15:28:56.2708640Z     Expected: \"playing\"",
+        "2026-11-07T15:28:56.2709217Z     Received: \"paused\"",
+        "2026-11-07T15:28:56.2709601Z     Timeout:  5000ms",
+        "2026-11-07T15:28:56.2709835Z ",
+        "2026-11-07T15:28:56.2709982Z     Call log:",
+        "2026-11-07T15:28:56.2710564Z       - Expect \"toHaveAttribute\" locator('html') with timeout 5000ms",
+        "2026-11-07T15:28:56.2711255Z       - waiting for locator('html')",
+        "2026-11-07T15:28:56.2713001Z         5 \u00d7 locator resolved to <html lang=\"en\" data-stalemate-track=\"Manic\" data-mobile-game=\"turdomania\" data-stalemate-music=\"paused\" data-stalemate-music-pref=\"on\" class=\"suite-touch-manipulation\">\u2026</html>",
+        "2026-11-07T15:28:56.2713932Z           - unexpected value \"paused\"",
+        "2026-11-07T15:28:56.2714131Z ",
+        "2026-11-07T15:28:56.2714137Z ",
+        "2026-11-07T15:28:56.2714227Z       89 |     });",
+        "2026-11-07T15:28:56.2714911Z       90 |     await page.locator('#suite-music-toggle').click();",
+        "2026-11-07T15:28:56.2715428Z     > 91 |     await expect(html).toHaveAttribute('data-stalemate-music', 'playing');",
+        "2026-11-07T15:28:56.2715851Z          |                        ^",
+        "2026-11-07T15:28:56.2716259Z       92 |     expect(await page.evaluate(() => window.__unmutePlayCalls)).toBe(1);",
+        "2026-11-07T15:28:56.2716919Z       93 |     const resumedAt = await page.evaluate(async () => (await Suite.music()).audioElement.currentTime);",
+        "2026-11-07T15:28:56.2718479Z       94 |     await expect.poll(() => page.evaluate(async () => (await Suite.music()).audioElement.currentTime)).toBeGreaterThan(resumedAt + 0.25);",
+        "2026-11-07T15:28:56.2719214Z         at /__w/StalemateSite/StalemateSite/tests/e2e/play.spec.js:91:24",
+        "2026-11-07T15:28:56.2719500Z ",
+        "2026-11-07T15:28:56.2719943Z     attachment #2: video (video/webm) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+        "2026-11-07T15:28:56.2720730Z     test-results/play-shared-music-advances-1baf7-s-and-pauses-in-hidden-tabs-webkit-iphone-15/video.webm",
+        "2026-11-07T15:28:56.2721560Z     \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+        "2026-11-07T15:28:56.2721845Z ",
+        "2026-11-07T15:28:56.2722374Z     Error Context: test-results/play-shared-music-advances-1baf7-s-and-pauses-in-hidden-tabs-webkit-iphone-15/error-context.md",
+        "2026-11-07T15:28:56.2722928Z ",
+        "2026-11-07T15:28:56.2723323Z     attachment #4: trace (application/zip) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+        "2026-11-07T15:28:56.2724079Z     test-results/play-shared-music-advances-1baf7-s-and-pauses-in-hidden-tabs-webkit-iphone-15/trace.zip",
+        "2026-11-07T15:28:56.2724621Z     Usage:",
+        "2026-11-07T15:28:56.2724735Z ",
+        "2026-11-07T15:28:56.2725263Z         npx playwright show-trace test-results/play-shared-music-advances-1baf7-s-and-pauses-in-hidden-tabs-webkit-iphone-15/trace.zip",
+        "2026-11-07T15:28:56.2725831Z ",
+        "2026-11-07T15:28:56.2726171Z     \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+        "2026-11-07T15:28:56.2726697Z ",
+        "2026-11-07T15:28:56.2726809Z   1 flaky",
+        "2026-11-07T15:28:56.2727985Z     [webkit-iphone-15] \u203a tests/e2e/play.spec.js:57:1 \u203a shared music advances once per track, persists preferences, and pauses in hidden tabs ",
+        "2026-11-07T15:28:56.2728626Z   812 passed (34.9m)"
+      ],
+      "rawFirstFailureLog": "cold-lobby-ci-logs/push-test-128435651782.log",
+      "rawFirstFailureLogSha256": "7b0249e822f3ec46e381fd1aa53ed3881ad351a965f6887b86b2290807948314"
+    }
+  ],
+  "nativeProviderStartModeQualified": false,
+  "providerStartCheckScope": "Existing local workerd HTTP-fixture mode, not frozen native/live-provider hardware CI",
+  "rerunRequested": false,
+  "flakyGameMusicTestAndRuntimePathsUnchangedFromHostedB35": true,
+  "flakyRootCauseEstablished": false,
+  "firstFailurePreservedNotCalledCleanPass": true
+}

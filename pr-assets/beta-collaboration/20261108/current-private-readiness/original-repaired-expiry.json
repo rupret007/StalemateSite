@@ -1,0 +1,88 @@
+{
+  "state": "REPAIRED_BASELINE_EXPIRY_AND_OWNED_CLEANUP_VERIFIED_NOT_CURRENT449_EIGHT_HOUR_PROOF",
+  "proof": {
+    "state": "PASSED_REAL_NATURAL_EXPIRY",
+    "source": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+    "version": "c2271048-aaa3-4649-8e9e-48dd46212da5",
+    "startedAt": "2026-11-07T17:16:35.731Z",
+    "expiresAt": "2026-11-08T01:16:36.764Z",
+    "completedAt": "2026-11-08T01:16:39.482Z",
+    "closes": [
+      {
+        "at": 1794078658418,
+        "generation": 1,
+        "code": 1006
+      },
+      {
+        "at": 1794084669724,
+        "generation": 2,
+        "code": 1006
+      },
+      {
+        "at": 1794090637689,
+        "generation": 3,
+        "code": 1006
+      },
+      {
+        "at": 1794094384860,
+        "generation": 4,
+        "code": 1006
+      },
+      {
+        "at": 1794100396175,
+        "generation": 5,
+        "code": 1006
+      },
+      {
+        "at": 1794100596683,
+        "generation": 6,
+        "code": 4401
+      }
+    ],
+    "opens": [
+      {
+        "at": 1794071797460,
+        "generation": 1
+      },
+      {
+        "at": 1794078659615,
+        "generation": 2
+      },
+      {
+        "at": 1794084670983,
+        "generation": 3
+      },
+      {
+        "at": 1794090638900,
+        "generation": 4
+      },
+      {
+        "at": 1794094386114,
+        "generation": 5
+      },
+      {
+        "at": 1794100397333,
+        "generation": 6
+      }
+    ],
+    "unknownCloseCodes": 0,
+    "originalContextStatus": 401,
+    "expiredSignedTokenStatus": 401,
+    "expiredTokenProtectedCodeStatus": 401,
+    "observedDurationMs": 28803721,
+    "allOwnedBrowserResourcesClosed": true,
+    "physicalCapture": false,
+    "providerCredentials": false,
+    "recording": false,
+    "ttlOrClockChanged": false
+  },
+  "originalReceiptSha256": "97ff967ae97be8abfd9e357fb62c764330fac574abe405eb2f2dbf63bdd0e67b",
+  "priorFailedReceiptSha256": "29969789cc4ea0099fd8c02cbeaafc3aec28130a3c1b2cc5ba6c39f73b25f010",
+  "sameRemoteOriginalReceiptAndHarnessVerified": true,
+  "ownedObserverAndAssertionGone": true,
+  "abnormalCloseCount": 5,
+  "uninterruptedUptimeProved": false,
+  "disconnectCauseEstablished": false,
+  "expiryClockToleranceMs": 1500,
+  "serverTimingNotPreciselyEstablished": true
+}

@@ -1,0 +1,53 @@
+{
+  "verifiedAt": "2026-11-07 13:26:11 UTC",
+  "source": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "run": 42169901070,
+  "attempt": 1,
+  "runStatus": "completed",
+  "runConclusion": "success",
+  "scope": "Existing packaged Reference Studio MP3 decoding/streaming CI, re-read without starting a new run. Not a live shared mix, physical device/listening, installed-desktop, release-signing or provider-start mode qualification.",
+  "jobs": [
+    {
+      "target": "macos-x64",
+      "jobId": 127741545914,
+      "url": "https://github.com/rupret007/webjam/actions/runs/42169901070/job/127741545914",
+      "decodedAnsiStrippedLogCharacters": 2107757,
+      "exactPassLine": "2026-11-06T06:30:51.6086140Z WebJam Reference Studio frozen-runtime smoke passed",
+      "completedPackagedSmoke": true
+    },
+    {
+      "target": "macos-arm64",
+      "jobId": 127741545783,
+      "url": "https://github.com/rupret007/webjam/actions/runs/42169901070/job/127741545783",
+      "decodedAnsiStrippedLogCharacters": 516847,
+      "exactPassLine": "2026-11-06T06:11:45.0772760Z WebJam Reference Studio frozen-runtime smoke passed",
+      "completedPackagedSmoke": true
+    },
+    {
+      "target": "linux-x64",
+      "jobId": 127741545871,
+      "url": "https://github.com/rupret007/webjam/actions/runs/42169901070/job/127741545871",
+      "decodedAnsiStrippedLogCharacters": 188127,
+      "exactPassLine": "2026-11-06T06:05:59.1141224Z WebJam Reference Studio frozen-runtime smoke passed",
+      "completedPackagedSmoke": true
+    },
+    {
+      "target": "windows-x64",
+      "jobId": 127741545757,
+      "url": "https://github.com/rupret007/webjam/actions/runs/42169901070/job/127741545757",
+      "decodedAnsiStrippedLogCharacters": 732707,
+      "exactPassLine": "2026-11-06T06:10:49.8243389Z WebJam Reference Studio frozen-runtime smoke passed",
+      "completedPackagedSmoke": true
+    }
+  ],
+  "sourceReview": "packaged-mp3-source-review-nov07.json",
+  "allFourPackagedTargetsPassed": true,
+  "missingDecoderCapabilityIsAnErrorNotSkip": true,
+  "sourceArchiveAndStagedPackageProvenanceSeparatelyRetained": true,
+  "newCiRequested": false,
+  "newNativeImportOrMedia": false,
+  "actualSharedTrackSenderQualified": false,
+  "physicalAudioQualified": false,
+  "windowsNativeTrustQualified": false,
+  "eighthProviderStartModeQualifiedByThis": false
+}

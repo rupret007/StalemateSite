@@ -1,0 +1,33 @@
+{
+  "run": "5ca199",
+  "sourceCommit": "de2b01725925d2f78ee21af33f68f3eb4eb95407",
+  "runtimeVersion": "dbcaddf5-dd3f-48e3-9826-0d7998ffdbc0",
+  "startedAt": "2026-11-04T09:15:05.535Z",
+  "caption": "Private demo acceptance report test only November four 5ca199",
+  "actualMusic": false,
+  "externalProvidersBlocked": true,
+  "sameMachine": true,
+  "checks": [
+    "Actual protected source bytes/cache controls and current-runtime read-only health match; AI/TURN off",
+    "One benign received message flagged; exact server acknowledgement and truthful queued UI confirmed"
+  ],
+  "pageErrors": 0,
+  "engine": "156.0.8078.4",
+  "messageId": "mmw1wi7st1",
+  "reportAttemptedAt": "2026-11-04T09:15:08.696Z",
+  "reportAcknowledgement": {
+    "id": "mmw1wi7st1",
+    "submitted": true
+  },
+  "queuedAt": "2026-11-04T09:15:08.840Z",
+  "humanDisposition": "pending Jeff; only this synthetic report may be dismissed",
+  "screenshot": "site201-report-5ca199.png",
+  "status": "passed",
+  "cleanup": {
+    "logoutStatuses": [
+      200,
+      200
+    ]
+  },
+  "completedAt": "2026-11-04T09:15:09.247Z"
+}

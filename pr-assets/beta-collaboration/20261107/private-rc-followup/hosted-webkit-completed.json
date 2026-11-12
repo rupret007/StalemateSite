@@ -1,0 +1,90 @@
+{
+  "source": "b61bb416d7af39d2fe3a41529ddd65520e5305ca",
+  "activeVersion": "75655a50-9e13-4966-bb68-22b45a230c1d",
+  "engine": "webkit",
+  "scope": "Actual invitation-protected Cloudflare service; isolated synthetic guests, no live media, provider credentials, signed identity fixtures, or human moderation.",
+  "startedAt": "2026-11-07T04:12:02.316Z",
+  "checks": [
+    "Uninvited guests cannot read private state or Web Join JavaScript",
+    "Stalemate invitation, nickname and connected chat",
+    "Rad Dad invitation, nickname and connected chat",
+    "Both entrances share one lobby and display the arrival-site badge",
+    "Private runtime JavaScript and styles match the candidate exactly",
+    "Mobile chat contains page width and keeps input and Send visible at 375 and 390px",
+    "Manual reconnect retains an unsent draft and starts fresh scrollback",
+    "Two guests create and join an Art room with a received canvas stroke",
+    "The server allows the room host and refuses an ordinary guest topic change",
+    "A Jam host can invite a guest and share a browser destination on the preserved origin",
+    "Logout revokes copied cookies and protected code and closes the active page"
+  ],
+  "captureRequests": 0,
+  "assets": [
+    "join/app.js",
+    "join/audio.js",
+    "join/config.js",
+    "join/crypto.js",
+    "join/errors.js",
+    "join/index.html",
+    "join/mailbox.js",
+    "join/policy.js",
+    "join/prejoin.js",
+    "join/session.js",
+    "join/style.css",
+    "r/45662413410ed051/lobby/lobby.css",
+    "r/45662413410ed051/lobby/lobby.js"
+  ],
+  "logout": [
+    200,
+    200
+  ],
+  "mobile": [
+    {
+      "viewport": 375,
+      "pageWidth": 375,
+      "inputLeft": 46,
+      "inputRight": 294,
+      "sendRight": 357,
+      "sendLeft": 299,
+      "fontSize": "16px"
+    },
+    {
+      "viewport": 390,
+      "pageWidth": 390,
+      "inputLeft": 46,
+      "inputRight": 309,
+      "sendRight": 372,
+      "sendLeft": 314,
+      "fontSize": "16px"
+    }
+  ],
+  "reconnectMs": 306,
+  "reconnectSenderState": {
+    "modes": {
+      "m": false,
+      "i": false,
+      "k": false,
+      "l": 150,
+      "t": true,
+      "S": 3,
+      "C": false,
+      "Q": false,
+      "locked": false
+    },
+    "connection": "connected",
+    "budget": "ok",
+    "lock": "off"
+  },
+  "browserInvitationShared": true,
+  "setupMs": [
+    {
+      "source": "stalemate",
+      "ms": 2777
+    },
+    {
+      "source": "rad-dad",
+      "ms": 886
+    }
+  ],
+  "status": "passed",
+  "completedAt": "2026-11-07T04:12:15.184Z"
+}

@@ -1,0 +1,31 @@
+{
+  "state": "DESKTOP_SHORTCUT_POINTS_TO_VERIFIED_CURRENT_PRIVATE_BUILD_NO_APP_LAUNCHED",
+  "source": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "at": "2026-11-07T15:39:48.987456+00:00",
+  "oldTarget": "~/Library/Caches/WebJam/private-demo-87bc74f-20261105/intel/WebJam.app",
+  "newTarget": "~/Library/Caches/WebJam/private-demo-76b1fd7-20261105/intel/WebJam.app",
+  "launchedApp": false,
+  "physicalCapture": false,
+  "privacyPermissionChanged": false,
+  "signatureOrTrustBypass": false,
+  "originalExpiryObserverChanged": false,
+  "shortcutChanged": true,
+  "firstLayoutAssumptionFailurePreserved": true,
+  "layoutCorrection": "Use canonical regular Contents/Resources manifest selected by production core/web_join_target.py; codec basename from production loader.",
+  "guardBefore": {
+    "load": 2.177734375,
+    "swapPercent": 5.322265625,
+    "freeGiB": 21.47757339477539
+  },
+  "nativeWebJamAppPidsBefore": [],
+  "target": {
+    "build": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+    "target": "private-beta",
+    "version": 1
+  },
+  "codecSha256": "1aa66cac089001ada2ca843d63a15b2f5cf602e390e5b7252046568e3c789d6f",
+  "signatureExitCode": 0,
+  "gatekeeperOrNotarizationAcceptanceQualified": false,
+  "resolvedMarkerRechecked": true,
+  "nativeWebJamAppPidsAfter": []
+}

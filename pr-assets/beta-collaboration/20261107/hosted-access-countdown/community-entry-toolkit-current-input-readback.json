@@ -1,0 +1,52 @@
+{
+  "state": "EXISTING_ENTRY_TOOLKIT_ALL_PAYLOADS_AND_CURRENT_REPAIR_INPUTS_VERIFIED",
+  "at": "2026-11-07T18:50:36.134335+00:00",
+  "applicationSource": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+  "applicationVersion": "c2271048-aaa3-4649-8e9e-48dd46212da5",
+  "archivePath": "pr-assets/beta-collaboration/20261107/composed-private-rc/community-entry-toolkit-b35e5fc.zip",
+  "archiveSha256": "07bdb02a673b36dbcfcf061e57645b5e2d7159484e31d27a4cb4084616c732b1",
+  "archiveSourceCommitUnchanged": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "archiveMemberCount": 8,
+  "everyManifestPayloadVerified": true,
+  "currentSourceInputs": [
+    {
+      "path": "hangout-internal/community-integration.example.json",
+      "sha256": "0170b5a23d6faaf661d99c990f9888c199633d8af3f785ffdea4a219e71a5d9b",
+      "currentSourceMatchesArchivedInput": true
+    },
+    {
+      "path": "hangout-worker/src/community-integration.mjs",
+      "sha256": "5ea48d0d88c3b1e766d72e9e32e9573b3c23b529643a74b3091ffaf1308d3221",
+      "currentSourceMatchesArchivedInput": true
+    },
+    {
+      "path": "r/45662413410ed051/entry-sites.mjs",
+      "sha256": "af76f0cccec4e7bdffdb8f01574d71bf5d7a5a6dee738bfc5fd4169942e157fb",
+      "currentSourceMatchesArchivedInput": true
+    },
+    {
+      "path": "scripts/package-community-entry.mjs",
+      "sha256": "12cb470deb3f7509fcde4c6a459698d6a27ee5f2482c183be55a7e23fe3ed2eb",
+      "currentSourceMatchesArchivedInput": true
+    },
+    {
+      "path": "hangout-worker/tools/package-community-toolkit.mjs",
+      "sha256": "2bd4bb305578cc8a97d5023c810e675e9d995d491084685bfd755db5ccb3ffa5",
+      "currentSourceMatchesArchivedInput": true
+    }
+  ],
+  "registrationStartsDisabledUnverified": true,
+  "neutralLinkHasNoInvitation": true,
+  "knownPrivateValueScanPassed": true,
+  "archiveRewritten": false,
+  "filesExtracted": false,
+  "serverOrSiteChanged": false,
+  "publicReleaseAdmitted": false,
+  "initialReadOnlyInspectionStop": "Initial lookup assumed SOURCE-MANIFEST.json at ZIP root and raised KeyError; archive uses community-entry-toolkit/ prefix. No extraction or runtime operation occurred. Readback above used and validated actual member names.",
+  "limits": [
+    "Finite entry toolkit, not a complete application or native distribution",
+    "Manifest remains honestly pinned to b35e5fc; identical current source inputs do not relabel it as a new export",
+    "Local public-input/hash readback; actual current branded destinations separately verified by Mac/Windows browser checks",
+    "No proof of current public-band navigation, cross-site SSO or public-launch readiness"
+  ]
+}

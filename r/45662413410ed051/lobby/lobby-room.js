@@ -22,6 +22,7 @@
             load: $('[data-act-load]'),
             url: $('[data-act-url]'),
             bobPicks: $('[data-bob-picks]'),
+            paintStart: $('[data-paint-start]'),
             tiles: $('[data-act-tiles]'), relayStatus: $('[data-act-relay-status]')
         };
         const state = {
@@ -33,7 +34,7 @@
         const youtube = window.HangoutYouTube.create({
             getElement: () => ui.yt, setElement: (element) => { ui.yt = element; },
             onStateChange: onYtState, onAutoplayBlocked: onYtAutoplayBlocked,
-            onError: () => videoFailure(player.key)
+            onError: (error) => videoFailure(player.key, error)
         });
         let videoPublishTimer;
         let live = null;
@@ -220,14 +221,15 @@
             const video = chan.kind === 'bobross' || chan.kind === 'watch';
             ui.paint.hidden = !paint;
             ui.video.hidden = !video;
-            ui.load.hidden = chan.kind !== 'watch';
+            ui.load.hidden = !video;
             ui.bobPicks.hidden = chan.kind !== 'bobross';
+            ui.paintStart.hidden = chan.kind !== 'bobross';
             if (paint) setupCanvas();
             if (video) setupVideoUi();
             if (act) ingestSnap(act);
             syncNames(chan);
             if (video && chan.kind === 'bobross' && isOp() && !state.room.video) {
-                const ep = BOB.EPISODES[2];
+                const ep = BOB.DEFAULT_LESSON;
                 hostVideo({ kind: 'yt', id: ep.id }, true, 0);
             }
         }
@@ -398,7 +400,7 @@
         function setupVideoUi() {
             if (ui.bobPicks.dataset.ready) return;
             ui.bobPicks.dataset.ready = '1';
-            BOB.EPISODES.slice(0, 6).forEach((ep) => {
+            BOB.STARTER_EPISODES.forEach((ep) => {
                 const b = document.createElement('button');
                 b.type = 'button';
                 b.className = 'btn btn--small';
@@ -409,18 +411,23 @@
             ui.load.addEventListener('submit', (e) => {
                 e.preventDefault();
                 const id = H.parseYouTubeId(ui.url.value);
-                if (!id) return;
+                if (!id) {
+                    ui.url.setCustomValidity('Enter a YouTube video link or video ID.');
+                    ui.url.reportValidity();
+                    return;
+                }
                 ui.url.value = '';
                 hostVideo({ kind: 'yt', id }, true, 0);
             });
+            ui.url.addEventListener('input', () => ui.url.setCustomValidity(''));
             ui.tap.addEventListener('click', () => syncToState(true, true));
         }
 
-        function videoFailure(key) {
+        function videoFailure(key, error) {
             if (!state.ch || player.key !== key) return;
             player.yt = null; player.readyKey = ''; player.failedKey = key; player.autoplayBlocked = false;
             player.seenPlaying = false; player.playPending = false;
-            ui.videoStatus.textContent = 'YouTube couldn’t load. Retry video when you’re ready.';
+            ui.videoStatus.textContent = window.HangoutYouTube.failureMessage(error, { canChooseVideo: Boolean(isOp()) });
             ui.videoStatus.hidden = false;
             ui.tap.textContent = 'Retry video'; ui.tap.hidden = false;
         }
@@ -450,8 +457,8 @@
                     player.yt = instance; player.readyKey = key;
                     ui.videoStatus.hidden = true; ui.videoStatus.textContent = '';
                     return true;
-                } catch (_) {
-                    if (generation === roomGeneration) videoFailure(key);
+                } catch (error) {
+                    if (generation === roomGeneration) videoFailure(key, error);
                     return false;
                 }
             })();

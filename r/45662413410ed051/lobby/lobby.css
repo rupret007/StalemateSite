@@ -28,7 +28,9 @@ button, input, select { font: inherit; }
 button, summary { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .45; }
 button, input, select { border-radius: 4px; }
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, .toast:focus-visible, [data-people-title]:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, .toast:focus-visible,
+.rooms h2[tabindex="-1"]:focus-visible, [data-people-title]:focus-visible,
+[data-jam-wait]:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
 ::selection { background: var(--lime); color: var(--ink); }
 a { color: var(--blue); text-underline-offset: 3px; }
 h1, h2, h3, p { margin-top: 0; }
@@ -107,6 +109,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .presence h2 { margin: 0 0 5px; font-size: 12px; color: var(--cream); font-weight: 550; }
 .presence p { margin: 0; font-size: 11px; line-height: 1.65; color: var(--muted); }
 .rooms > h2 { display: flex; justify-content: space-between; align-items: center; margin: 0 0 8px; font: 600 10px var(--mono); text-transform: uppercase; letter-spacing: .09em; }
+.rooms h2[tabindex="-1"] { scroll-margin-block: 6px; }
 .count { display: inline-grid; place-items: center; min-width: 21px; min-height: 19px; padding: 1px 5px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); font: 10px var(--mono); }
 .directory-hint { margin: 0 0 12px; font-size: 11px; }
 .directory-controls { display: grid; grid-template-columns: 1fr; gap: 7px; }
@@ -171,6 +174,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .message-recovery .saved-message-text { white-space: pre-wrap; color: var(--cream); }
 [data-message-copy-text] { width: 100%; min-width: 0; max-width: 100%; font: 16px/1.5 var(--mono); }
 .buffer { flex: 1; min-height: 100px; margin: 0; padding: 14px 24px; list-style: none; overflow-y: auto; color: #e1e4d9; font: 12px/1.85 var(--mono); overflow-wrap: anywhere; scrollbar-width: thin; scrollbar-color: #465144 transparent; }
+.buffer-lines { margin: 0; padding: 0; list-style: none; }
 .buffer li { padding: 2px 5px; border-left: 2px solid transparent; }
 .buffer li:hover { background: #ffffff03; }
 .buffer .mention { background: #2b2719; border-left-color: var(--amber); }
@@ -230,7 +234,11 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .jam { flex: 0 1 auto; min-height: 0; overflow: auto; max-height: 35dvh; padding: 16px 20px; background: #171e15; border-bottom: 1px solid #43543a; font-size: 12px; }
 .jam-title { margin: 0 0 4px; font-size: 14px; }
 .jam-note { margin: 0 0 6px; }
-.jam-platform { margin: 0 0 10px; }
+.jam-room-invite { margin-bottom: 8px; }
+.jam-room-invite:focus-visible { outline-offset: -5px; }
+.jam-host-steps { margin: 0 0 8px; padding-left: 20px; overflow-wrap: anywhere; }
+.jam-host-steps strong { color: var(--cream); }
+.jam-platform { margin: 10px 0 0; }
 .jam-actions, .jam-paste { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .jam-actions .btn { flex: 1 1 145px; min-width: 0; max-width: 260px; padding-inline: 10px; overflow-wrap: anywhere; }
 .jam-actions [data-jam-wait] { flex-basis: 100%; }
@@ -238,6 +246,60 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .jam-invite-qr { flex-basis: 100%; display: grid; justify-items: start; gap: 6px; margin-top: 4px; }
 .jam-invite-qr canvas { display: block; width: min(200px, 100%); height: auto; background: #f4f0e6; border: 1px solid var(--line); border-radius: 4px; }
 .jam-paste { margin-top: 10px; }
+.game-note { margin: 4px 0 8px; }
+.game-night summary { cursor: pointer; width: fit-content; }
+.game-night input { flex: 1 1 220px; min-width: 0; max-width: 100%; font: inherit; font-size: 16px; }
+.game-night [data-game-error]:empty { display: none; }
+.game-offer { display: flex; flex: none; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 6px 12px; border-block-end: 1px solid var(--line); background: var(--raised); }
+.game-offer p { flex: 1 1 180px; margin: 0; overflow-wrap: anywhere; color: var(--cream); font-size: 13px; }
+.game-offer .btn { flex: none; }
+/* A pending offer stays until answered. Let the transcript give up height so
+   the composer and Send remain visible above it on a phone. */
+@media (min-height: 451px) { .irc:has(.game-offer:not([hidden])) .buffer { min-height: 48px; } }
+.game-night:has(.four-match[open]) { max-height: 52dvh; }
+.game-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 12px; margin-bottom: 8px; }
+.game-heading .jam-title, .game-heading .game-note { margin: 0; }
+.four-match { margin: 8px 0; border-block: 1px solid var(--line); }
+.game-night .four-match summary { width: 100%; min-height: 34px; padding: 8px 2px; color: var(--cream); }
+.four-summary { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; width: calc(100% - 16px); vertical-align: middle; }
+.four-summary > :first-child { flex: none; font-weight: 650; }
+.four-seats { display: inline-flex; min-width: 0; gap: 6px; }
+.four-seat { display: inline-flex; align-items: center; gap: 4px; min-width: 0; color: var(--muted); font: 10px var(--mono); }
+.four-seat b { font-size: 12px; }
+.four-seat span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.four-seat[data-seat="X"] b { color: var(--lime); }
+.four-seat[data-seat="O"] b { color: var(--blue); }
+.four-info { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin-bottom: 8px; }
+.four-info p { flex: 1; min-width: 150px; margin: 0; }
+.four-columns, .four-board { max-width: 336px; width: 100%; }
+.four-columns { position: sticky; top: 0; z-index: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; padding-block: 3px; background: #171e15; }
+.four-leave { margin-block: 4px; }
+.four-columns .btn { min-width: 0; min-height: 36px; padding-inline: 0; }
+.four-columns .btn[aria-disabled="true"] { color: var(--muted); cursor: default; }
+.four-columns .btn[aria-disabled="false"] { border-color: #637943; color: var(--lime); }
+.four-board { table-layout: fixed; border-spacing: 4px; padding-bottom: 6px; text-align: center; }
+.four-board tr { scroll-margin-block-start: 44px; }
+.four-board td { padding: 0; border: 1px solid #394739; border-radius: 3px; background: var(--surface); }
+.four-board td span { display: grid; min-height: 22px; place-items: center; font: bold 14px var(--mono); }
+.four-board td[data-mark="X"] { color: var(--lime); background: #222b19; }
+.four-board td[data-mark="O"] { color: var(--blue); background: #17282b; }
+.four-board td[data-last] { border-color: #7d8877; }
+.four-board td[data-winning] { border-color: currentColor; }
+@media (max-width: 1099px) {
+  .game-night:has(.four-match[open]) .game-call { display: none; }
+}
+@media (min-width: 1100px) {
+  .game-night:has(.four-match[open]) {
+    display: grid;
+    grid-template: "heading match" auto "actions match" auto "call match" 1fr / minmax(0, 1fr) minmax(0, 336px);
+    gap: 0 18px;
+    align-items: start;
+  }
+  .game-heading { grid-area: heading; }
+  .game-actions { grid-area: actions; }
+  .game-call { grid-area: call; }
+  .game-night .four-match[open] { grid-area: match; margin: 0; border-block: 0; }
+}
 .jam-paste .small { flex-basis: 100%; margin: 0; }
 [data-jam-share-status]:empty { display: none; }
 .jam-paste textarea, .act-load input { flex: 1; min-width: 0; }
@@ -265,6 +327,10 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .act-load { display: flex; gap: 6px; margin-top: 9px; }
 .act-load input { min-height: 36px; font-size: 12px; }
 .bob-picks { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.paint-together-mark { display: block; max-width: 100%; object-fit: contain; }
+.paint-start { margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 4px; font-size: 13px; overflow-wrap: anywhere; }
+.paint-start summary { cursor: pointer; }
+.paint-start p { margin: 8px 0 0; line-height: 1.5; }
 .activity-label { display: flex; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
 .activity-camera-count { color: var(--muted); }
 .act-camera-strip { --camera-tile-width: 128px; grid-column: 1 / -1; min-width: 0; max-width: 100%; }
@@ -295,7 +361,9 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .check input { min-height: 0; accent-color: var(--lime); }
 /* Status owns a bounded grid row, never an overlay over the composer. It is
    keyboard-focusable so a long notice and its actions can scroll in place. */
-.toast { grid-column: 1 / -1; grid-row: 2; min-width: 0; max-width: 100%; max-height: min(20dvh, 120px); overflow: auto; overflow-wrap: anywhere; padding: 8px 16px; border-top: 1px solid var(--lime); color: var(--cream); background: var(--surface); font-size: 13px; }
+.irc-notices { grid-column: 1 / -1; grid-row: 2; min-width: 0; }
+.irc-notices:not(:has(> :not([hidden]))) { display: none; }
+.toast { min-width: 0; max-width: 100%; max-height: min(20dvh, 120px); overflow: auto; overflow-wrap: anywhere; padding: 8px 16px; border-top: 1px solid var(--lime); color: var(--cream); background: var(--surface); font-size: 13px; }
 .toast .btn { margin: 4px; }
 .guest-check { position: fixed; z-index: 20; right: 16px; bottom: 80px; width: min(340px, calc(100vw - 32px)); padding: 16px; background: var(--surface); border: 1px solid var(--amber); border-radius: 4px; }
 .guest-check p { margin: 0 0 10px; font-size: 12px; }
@@ -310,6 +378,33 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .lobby-welcome { margin: 16px; padding: 14px; gap: 10px; }
   .welcome-symbol { display: none; }
   .buffer { padding-inline: 16px; }
+}
+/* Desktop workspace: compact channel navigation and chrome reserve the window
+   for the transcript. Inspired by mIRC and Halloy's single-pane workflow;
+   the existing channel controls, focus model and received-session buffer stay. */
+@media (min-width: 901px) {
+  .irc { width: 100%; grid-template-columns: 220px minmax(0, 1fr) 180px; }
+  .titlebar { min-height: 48px; padding: 7px 14px; gap: 12px; }
+  .title-extra { font-size: 11px; padding-left: 12px; margin-left: 4px; }
+  .rooms, .people { padding: 12px 10px; }
+  .channel-home { padding: 8px 10px; }
+  .presence { padding: 10px 0; margin-bottom: 10px; }
+  .tiles { grid-template-columns: 1fr; gap: 4px; }
+  .tile, .tile-chat { grid-column: auto; grid-template-columns: 22px minmax(0, 1fr); gap: 2px 8px; min-height: 48px; padding: 7px 8px; }
+  .tile > b { grid-row: 1 / span 2; align-self: center; }
+  .tile strong { font-size: 12px; }
+  .tile span { grid-column: 2; line-height: 1.35; }
+  .tabs { min-height: 36px; padding: 4px 8px 0; gap: 2px; }
+  .tabs button { min-height: 32px; padding: 6px 10px; }
+  .topic { min-height: 30px; padding: 7px 14px; }
+  .lobby-welcome { margin: 12px 14px 4px; padding: 12px; gap: 10px; }
+  .welcome-symbol { display: none; }
+  .lobby-welcome p { margin-bottom: 8px; }
+  .buffer { padding: 12px 16px; font-size: 14px; line-height: 1.55; }
+  .quick { padding: 6px 14px 0; }
+  .say { margin: 8px 14px 0; }
+  .chat-status { padding: 6px 16px 8px; }
+  .people h2 { margin-bottom: 10px; }
 }
 @media (max-width: 900px) {
   .titlebar { min-height: 60px; padding: 10px 16px; }
@@ -442,6 +537,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .brand { flex: none; gap: 8px; }
   .brand b { font-size: 10px; white-space: nowrap; }
   .connection-tools { gap: 6px; }
+  .connection-tools button { min-height: 26px; padding: 3px 6px; font-size: 10px; }
   .entry-return { min-height: 26px; }
   .brand-mark { width: 26px; height: 26px; font-size: 23px; }
   .brand-caption, .lobby-welcome, .quick, .chat-status { display: none; }
@@ -454,10 +550,18 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .activity { min-height: 28px; }
   .activity-heading { padding-block: 8px; }
   .buffer { min-height: 0; padding-block: 1px; }
+  .buffer:has(:focus-visible),
+  .chat:has(.four-match[open]) .buffer { min-height: 64px; flex-shrink: 0; }
+  .game-night:has(.four-match[open]) { min-height: 108px; }
   .buffer li { padding-block: 0; }
+  .buffer .flag { scroll-margin-block: 4px; }
   .say { position: sticky; bottom: 0; z-index: 1; margin-block: 4px; }
-  .say input { min-height: 36px; padding-block: 8px; }
-  .say .btn { min-height: 32px; padding: 6px 8px; margin: 3px; }
+  .chat:has(.buffer :focus-visible) .say,
+  .chat:has(.four-match[open]:not([hidden])) .say { position: static; }
+  .say input { min-height: 36px; padding-block: 8px; scroll-margin-bottom: 8px; }
+  /* Send is shorter than its input. Leave room for the entire composer when
+     native focus scrolling brings the button into a deeply zoomed viewport. */
+  .say .btn { min-height: 32px; padding: 6px 8px; margin: 3px; scroll-margin-block: 10px; }
   .toast { padding: 4px 12px; }
   .phonetabs { min-height: 44px; }
   .phonetabs button { min-height: 44px; }
