@@ -1000,6 +1000,12 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (guest && guest.id !== disconnected) out(guest, { t: 'room-invite-ended', request, status });
     }
 
+    function expireRoomInvites(at) {
+        for (const [request, offer] of roomInvites) {
+            if (at >= offer.until) finishRoomInvite(request, offer, 'expired');
+        }
+    }
+
     function roomInviteAllowed(host, guest, room) {
         return !roomsBroken && room?.kind === 'jam' && !!host?.nick && !!guest?.nick
             && host !== guest && !host.safetyOnly && !guest.safetyOnly && room.members.has(host.id)
@@ -1020,11 +1026,13 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const reject = () => out(host, { t: 'room-invite-result', request, status: 'unavailable' });
         const room = typeof frame.ch === 'string' ? ch(frame.ch) : null;
         const guest = typeof peer === 'string' ? conns.get(peer) : null;
-        if (!roomInviteAllowed(host, guest, room) || room.keepRef !== roomInstance || room.members.has(guest.id)
-            || !roomInviteCapacity(request, host.id, guest.id, room)) return reject();
+        if (!roomInviteAllowed(host, guest, room) || room.keepRef !== roomInstance || room.members.has(guest.id)) return reject();
+        const at = now();
+        expireRoomInvites(at);
+        if (!roomInviteCapacity(request, host.id, guest.id, room)) return reject();
         requireParticipation(host, 'requestDirectContact', guest);
         personDependency(guest, room);
-        const until = now() + ROOM_INVITE_TTL;
+        const until = at + ROOM_INVITE_TTL;
         roomInvites.set(request, { host: host.id, guest: guest.id, room, until });
         out(guest, { t: 'invite', request, ch: room.name, by: host.nick, roomInstance, until });
         out(host, { t: 'room-invite-result', request, status: 'sent', until });
@@ -2613,7 +2621,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     function tick() {
         const t = now();
         for (const [room, offer] of musicInvites) if (offer.expires <= t) musicInvites.delete(room);
-        for (const [request, offer] of roomInvites) if (t >= offer.until) finishRoomInvite(request, offer, 'expired');
+        expireRoomInvites(t);
         rates.prune();
         if (hourKey() !== lastStatSave) { lastStatSave = hourKey(); saveNet(); } // stats: ~24 row writes/day
         for (const [key, v] of devStats) if ((!v.lastRoom || now() - v.lastRoom > HOUR) && v.day !== new Date(now()).toISOString().slice(0, 10)) devStats.delete(key);

@@ -70,6 +70,30 @@ it('tracks a room invitation only between the original host and guest, and expir
     expect(got(returning).filter(m => m.t === 'join' && m.ch.name === ch)).toHaveLength(1);
 });
 
+it('lets a host send a fresh room invitation at the deadline without waiting for maintenance', () => {
+    boot();
+    const host = join('InviteHost'), guest = join('InviteGuest');
+    const room = '#jam-garage';
+    cmd(host, 'join', [room]);
+    const roomInstance = got(host).find(m => m.t === 'join' && m.ch.name === room).ch.keepRef;
+    const first = 'a'.repeat(32), fresh = 'b'.repeat(32);
+    const invite = request => L.message(host.id, JSON.stringify({
+        t: 'room-invite-request', request, ch: room, roomInstance, peer: guest.id,
+    }));
+    invite(first);
+    expect(got(host).at(-1)).toMatchObject({ request: first, status: 'sent' });
+    clock = got(host).at(-1).until - 1;
+    invite(fresh);
+    expect(got(host).at(-1)).toMatchObject({ request: fresh, status: 'unavailable' });
+    clock += 1;
+    invite(fresh);
+    expect(got(host).slice(-2)).toEqual([
+        { t: 'room-invite-result', request: first, status: 'expired' },
+        expect.objectContaining({ request: fresh, status: 'sent' }),
+    ]);
+    expect(got(guest).at(-1)).toMatchObject({ t: 'invite', request: fresh });
+});
+
 it('lets the same live guest accept a pending room invitation after engine recovery', () => {
     boot();
     const host = join('InviteHost'), guest = join('InviteGuest');
