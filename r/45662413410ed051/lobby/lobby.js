@@ -2435,7 +2435,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (!sent) toast('That room or bandmate changed. Choose a new Music invitation.');
         };
         const launch = document.createElement('a');
-        launch.href = `webjam://hangout-music/${request}`;
+        launch.href = `webjam-beta://hangout-music/${request}`;
         document.body.append(launch);
         launch.click();
         launch.remove();

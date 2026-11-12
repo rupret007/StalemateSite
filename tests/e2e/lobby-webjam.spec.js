@@ -164,7 +164,7 @@ test('only the selected guest can accept a music invitation and open the audio c
         // browser callback to the selected live guest and publishes it.
         await host.evaluate(() => {
             document.addEventListener('click', event => {
-                const link = event.target.closest('a[href^="webjam://hangout-music/"]');
+                const link = event.target.closest('a[href^="webjam-beta://hangout-music/"]');
                 if (!link) return;
                 event.preventDefault();
                 window.musicRequest = new URL(link.href).pathname.slice(1);
