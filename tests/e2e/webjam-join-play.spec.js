@@ -276,11 +276,19 @@ async function openOwnedInvitation(page, width = 390, skipCheck = true) {
           gain.gain.value = 0.08;
           oscillator.connect(gain).connect(output);
           oscillator.start();
-          await context.resume();
         }
+        // WebKit can finish the fixture's rendering startup after close
+        // returns. Settle it before handing the synthetic track to WebJam.
+        await context.resume();
+        let closing = false;
         for (const track of stream.getTracks()) {
           const stop = track.stop.bind(track);
-          track.stop = () => { stop(); context.close().catch(() => {}); };
+          track.stop = () => {
+            stop();
+            if (closing) return;
+            closing = true;
+            void context.close().catch(() => {});
+          };
           window.captureTracks.push(track);
         }
         return stream;
@@ -338,8 +346,11 @@ for (const skipCheck of [false, true]) {
     await expect(page.locator('#status')).toHaveText('Microphone disconnected.');
     await expect(page.locator('#error-hint')).toContainText('new browser invite');
     for (const id of ['join', 'retry', 'leave', 'prejoin']) await expect(page.locator('#' + id)).toBeHidden();
-    await expect.poll(() => page.evaluate(() => window.micLossSessionClosed && audioContexts.every(context => context.state === 'closed'))).toBe(true);
-    expect(await page.evaluate(() => captureTracks.length)).toBe(1);
+    await expect.poll(() => page.evaluate(() => ({
+      sessionClosed: window.micLossSessionClosed,
+      contexts: audioContexts.map(context => context.state),
+      tracks: captureTracks.map(track => track.readyState)
+    }))).toEqual({ sessionClosed: true, contexts: ['closed', 'closed'], tracks: ['ended'] });
   });
 }
 
