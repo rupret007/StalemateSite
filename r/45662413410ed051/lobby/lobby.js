@@ -45,7 +45,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const gameGuestQuery = gameGuest ? '?game-guest=1' : '';
     const guestInvitationChanged = gameGuest && history.state?.gameSessionRef && history.state.gameSessionRef !== gameGuest.sessionRef;
     let gameGuestExit = gameGuest && ['left', 'closed', 'removed'].includes(history.state?.gameExit) ? history.state.gameExit : '';
-    let gameGuestSeated = false;
+    let gameGuestSeated = false, gameGuestLoadFailed = false;
     if (gameGuest) document.body.classList.add('game-guest');
     let gameEntry = betaShell ? gameNightEntry?.(params, location.hash) : null;
 
@@ -631,7 +631,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-connection]').dataset.state = state;
         $('[data-send]').disabled = state !== 'connected';
         $('[data-enter]').disabled = state === 'connecting' || state === 'reconnecting' || state === 'ended' && betaShell;
-        if (gameGuest) $('[data-game-guest-retry]').hidden = state !== 'offline';
+        if (gameGuest) $('[data-game-guest-retry]').hidden = state !== 'offline' && !gameGuestLoadFailed;
         $('[data-reconnect]').hidden = !(state === 'offline' || state === 'ended' && !betaShell) || !app.me;
         $$('[data-start]').forEach((b) => { b.disabled = state !== 'connected'; });
         if (state === 'offline' && app.pendingChannel) {
@@ -1792,8 +1792,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             table.controller = mount($('[data-game-night]'), (room, state, sendMatch) => arcadeMatchState(game, table, room, state, sendMatch));
             drawArcadeTable(currentGameNight(), game, table);
         }).catch(() => {
-            if (gameGuest && !gameGuestSeated) finishArcadeInvitation(`${table.label} could not load. Refresh to try again.`);
-            else toast(`${table.label} could not load. Reopen Game Night to try again.`);
+            if (gameGuest && !gameGuestSeated) {
+                finishArcadeInvitation(`${table.label} could not load. Try again.`);
+                const retryGame = $('[data-game-guest-retry]');
+                retryGame.hidden = false;
+                if (!gameGuestLoadFailed) retryGame.focus({ preventScroll: true });
+                gameGuestLoadFailed = true;
+            } else toast(`${table.label} could not load. Reopen Game Night to try again.`);
         })
             .finally(() => { table.loading = false; });
     }
@@ -2844,7 +2849,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         } else if (gameGuestExit) leaveGameGuest(gameGuestExit);
         else {
             $('[data-game-guest-connecting]').hidden = false;
-            $('[data-game-guest-retry]').addEventListener('click', () => connect(''));
+            $('[data-game-guest-retry]').addEventListener('click', () => {
+                if (gameGuestLoadFailed) {
+                    $('[data-game-guest-retry]').disabled = true;
+                    gateStatus('Reloading the game…');
+                    location.reload();
+                } else void connect('');
+            });
             void connect('');
         }
     }
