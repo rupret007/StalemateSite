@@ -153,6 +153,40 @@ describe('real invitation-only beta boundary', () => {
         expect(lobby.headers.get('Content-Security-Policy')).not.toContain('webjam-turn-credentials');
         expect(await lobby.text()).toContain('/beta/bootstrap.js');
     });
+    it('shows Music return recovery in a signed-out browser without loading protected assets', async () => {
+        const config = env();
+        const path = '/join/handoff.html';
+        const response = await betaFetch(request(path + '?next=https://untrusted.example/'), config, deps);
+        expect(response.status).toBe(401);
+        expect(response.headers.get('Content-Type')).toContain('text/html');
+        expect(response.headers.get('Cache-Control')).toBe('no-store');
+        expect(response.headers.get('Referrer-Policy')).toBe('no-referrer');
+        expect(response.headers.get('Content-Security-Policy')).toBe("default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
+        expect(response.headers.get('Permissions-Policy')).toBe('camera=(), geolocation=(), microphone=()');
+        expect(response.headers.has('Location')).toBe(false);
+        expect(response.headers.has('Set-Cookie')).toBe(false);
+        const body = await response.text();
+        expect(body).toContain('End browser invite');
+        expect(body).toContain('href="/beta/"');
+        expect(body).not.toMatch(/<script|untrusted\.example/);
+        const head = await betaFetch(request(path, { method: 'HEAD' }), config, deps);
+        expect(head.status).toBe(401);
+        expect(await head.text()).toBe('');
+        for (const options of [{ method: 'POST' }, { upgrade: 'websocket' }]) {
+            const denied = await betaFetch(request(path, options), config, deps);
+            expect(denied.status).toBe(401);
+            expect(denied.headers.get('Content-Type')).toContain('text/plain');
+        }
+        const script = await betaFetch(request('/join/handoff.js'), config, deps);
+        expect(script.status).toBe(401);
+        expect(script.headers.get('Content-Type')).toContain('text/plain');
+        expect(config.ASSETS.fetch).not.toHaveBeenCalled();
+        const cookie = await unlock(config);
+        const admitted = await betaFetch(request(path, { cookie }), config, deps);
+        expect(admitted.status).toBe(200);
+        expect(await admitted.text()).toContain('Product');
+        expect(config.ASSETS.fetch).toHaveBeenCalledTimes(1);
+    });
     it('does not accept an operator code, role selection, forged identity or a pilot cookie', async () => {
         const config = env();
         expect((await betaFetch(request('/beta/unlock', { method: 'POST', body: { key: 'wrong', role: 'owner' } }), config, deps)).status).toBe(403);

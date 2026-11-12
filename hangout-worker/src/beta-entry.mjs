@@ -50,6 +50,23 @@ const WEB_JOIN_ENTRANCE = `<!doctype html>
 </main>
 </body>
 </html>`;
+const MUSIC_RETURN_ENTRANCE = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Return to Hang Out · WebJam</title>
+<link rel="stylesheet" href="/beta/style.css">
+</head>
+<body>
+<main>
+<h1>Open Hang Out first</h1>
+<p>This browser profile isn’t signed in to the private beta.</p>
+<p>Choose <strong>End browser invite</strong> in WebJam. Open Hang Out in this browser profile, enter your private invitation, then send a fresh Music invite from your Jam room.</p>
+<p><a class="button" href="/beta/">Open Hang Out</a></p>
+</main>
+</body>
+</html>`;
 const headers = { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow, noarchive, nosnippet', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': CSP };
 const reply = (body, status = 200, type = 'text/plain; charset=utf-8', extra = {}) => new Response(body, { status, headers: { ...headers, 'Content-Type': type, ...extra } });
 const json = (body, status = 200, extra = {}) => reply(JSON.stringify(body), status, 'application/json; charset=utf-8', extra);
@@ -269,9 +286,11 @@ async function betaRequest(request, env, deps = {}) {
     }
     const session = await betaSession(request, env);
     if (!session) {
-        if (['GET', 'HEAD'].includes(request.method) && !request.headers.get('Upgrade')
-            && [`${ROOT}lobby`, `${ROOT}lobby/`, `${ROOT}lobby/index.html`].includes(assetPath)) {
-            return reply(request.method === 'HEAD' ? null : LOBBY_ENTRANCE, 401, 'text/html; charset=utf-8', {
+        const returnPage = assetPath === '/join/handoff.html';
+        const lobbyPage = [`${ROOT}lobby`, `${ROOT}lobby/`, `${ROOT}lobby/index.html`].includes(assetPath);
+        if (['GET', 'HEAD'].includes(request.method) && !request.headers.get('Upgrade') && (lobbyPage || returnPage)) {
+            const entrance = returnPage ? MUSIC_RETURN_ENTRANCE : LOBBY_ENTRANCE;
+            return reply(request.method === 'HEAD' ? null : entrance, 401, 'text/html; charset=utf-8', {
                 'Content-Security-Policy': "default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
                 'Permissions-Policy': 'camera=(), geolocation=(), microphone=()',
             });
