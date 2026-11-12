@@ -367,6 +367,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 const pieces = guest.locator('.arcade-chess cg-board piece');
                 await expect(pieces).toHaveCount(32);
                 await expect(pieces.first()).toBeVisible();
+                await expect.poll(() => pieces.evaluateAll(nodes => nodes.length === 32 && nodes.every(piece =>
+                    getComputedStyle(piece).backgroundImage.startsWith('url("data:image/svg+xml;base64,'))), {
+                    message: 'The first guest board uses artwork delivered with its stylesheet.'
+                }).toBe(true);
                 await expect(guest.getByLabel('Your nick')).toBeHidden();
                 await expect(guest.getByRole('combobox', { name: 'Switch game' })).toBeHidden();
                 await expect(guest.locator('[data-call-toggle]')).toBeHidden();
