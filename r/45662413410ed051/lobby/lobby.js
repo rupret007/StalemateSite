@@ -1147,6 +1147,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             const c = app.chans.get(m.ch.name);
             if (c) {
                 Object.assign(c, m.ch);
+                if (inviteContext?.kind === 'game' && (c.name === '#stalemate' || c === inviteContext))
+                    refreshGameInvitePeople();
                 const jamDraft = confirmJamShare(c);
                 if (app.active === c.name) drawChan();
                 // An own-share confirmation changes the room's invitation
@@ -1586,6 +1588,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const roomLabel = jam ? offer.room : 'Game Night';
         const gameLabel = arcadeTables.get(offer?.arcade?.game)?.label;
         const selectedGame = arcadeTables.get(gameEntry?.table)?.label;
+        panel.toggleAttribute('data-arcade-offer', !!gameLabel);
         let message;
         if (start) message = gameOpenPending ? 'Opening Game Night…' : gameOpenError || (selectedGame
             ? `Start a private Game Night for ${selectedGame}.` : 'Start a private Game Night or wait for your host’s invitation.');
@@ -2505,13 +2508,53 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     $('[data-palette-close]').addEventListener('click', () => $('[data-palette]').close());
     $('[data-palette]').addEventListener('close', () => { if (!$('[data-palette]').open) paletteContext = null; });
 
-    let inviteInstance = '', invitePeople = new Map(), jamInviteOpener = null;
+    let inviteInstance = '', invitePeople = new Map(), gameInviteButtons = new Map(), jamInviteOpener = null;
     function closeInviteDialog() {
-        inviteInstance = ''; invitePeople.clear();
+        inviteInstance = ''; invitePeople.clear(); gameInviteButtons.clear();
         inviteContext = null; $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
         $('[data-game-invite-people]').replaceChildren();
         resetGuestLink();
         if ($('[data-invite-dialog]').open) $('[data-invite-dialog]').close();
+    }
+    function availableInvitePeople(room) {
+        const members = new Set(room.names.map(person => person.id));
+        return (app.chans.get('#stalemate')?.names || []).filter(person =>
+            personId(person.id) && person.id !== app.selfId && !members.has(person.id));
+    }
+    function refreshGameInvitePeople() {
+        const room = inviteContext;
+        if (!room || room.kind !== 'game' || room.keepRef !== inviteInstance || !amOp(room)) return;
+        const roster = $('[data-game-invite-people]');
+        const focused = document.activeElement;
+        const available = new Set();
+        for (const person of availableInvitePeople(room)) {
+            available.add(person.id);
+            let button = gameInviteButtons.get(person.id);
+            if (!button) {
+                const context = personContext(person.id, room.name, inviteInstance, person.nick);
+                button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'btn btn--ghost';
+                button.addEventListener('click', () => inviteCurrentPerson(context));
+                gameInviteButtons.set(person.id, button);
+                roster.append(button);
+            }
+            const label = `Invite ${person.nick}`;
+            if (button.textContent !== label) button.textContent = label;
+            button.disabled = !personTargetsSupported || !roomNonce(inviteInstance);
+        }
+        let lostFocus = false;
+        for (const [id, button] of gameInviteButtons) {
+            if (available.has(id)) continue;
+            lostFocus ||= button === focused;
+            button.remove();
+            gameInviteButtons.delete(id);
+        }
+        if (!gameGuestInvitesSupported) $('[data-game-invite-empty]').hidden = !!available.size;
+        if (lostFocus && $('[data-invite-dialog]').open) {
+            const next = roster.querySelector('button:enabled') || $('[data-game-invite-cancel]');
+            next.focus();
+        }
     }
     function openInviteDialog(opener = null) {
         const current = store(app.active);
@@ -2522,25 +2565,16 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const isGame = current.kind === 'game';
         const roster = $('[data-game-invite-people]');
         roster.replaceChildren();
+        gameInviteButtons.clear();
         $('[data-invite-explainer]').hidden = isGame;
         $('[data-invite-form]').hidden = isGame;
         $('[data-game-invite-picker]').hidden = !isGame;
         const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose a current person'; $('[data-invite-options]').append(placeholder);
-        for (const person of app.chans.get('#stalemate')?.names || []) {
-            if (!personId(person.id) || person.id === app.selfId || current.names.some(member => member.id === person.id)) continue;
+        if (isGame) refreshGameInvitePeople();
+        else for (const person of availableInvitePeople(current)) {
             const context = personContext(person.id, current.name, inviteInstance, person.nick);
             invitePeople.set(person.id, context);
-            if (isGame) {
-                const button = document.createElement('button');
-                button.type = 'button';
-                button.className = 'btn btn--ghost';
-                button.textContent = `Invite ${person.nick}`;
-                button.disabled = !personTargetsSupported || !roomNonce(inviteInstance);
-                button.addEventListener('click', () => inviteCurrentPerson(context));
-                roster.append(button);
-            } else {
-                const option = document.createElement('option'); option.value = person.id; option.textContent = person.nick; $('[data-invite-options]').append(option);
-            }
+            const option = document.createElement('option'); option.value = person.id; option.textContent = person.nick; $('[data-invite-options]').append(option);
         }
         const canInviteNew = isGame && gameGuestInvitesSupported;
         const target = canInviteNew && arcadeInviteTarget();
