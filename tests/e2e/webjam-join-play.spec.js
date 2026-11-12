@@ -314,6 +314,7 @@ for (const width of [375, 390]) {
     await openOwnedInvitation(page, width);
     await page.getByRole('button', { name: 'Join with microphone' }).press('Enter');
     const leave = page.getByRole('button', { name: 'Leave session' });
+    await expect(page.locator('#status')).toHaveText('Synthetic session connected.');
     await expect(leave).toBeFocused();
     await page.evaluate(() => window.endJoinedSession());
     await expect(page.locator('#status')).toHaveText('The Web Join connection ended.');
