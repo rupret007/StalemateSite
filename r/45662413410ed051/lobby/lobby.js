@@ -1129,7 +1129,11 @@ import { createEntrySharing } from './entry-sharing.mjs';
         };
         for (const c of app.chans.values()) mk(c.name, `${KIND_ICON[c.kind] === '#' ? '' : `${KIND_ICON[c.kind]} `}${c.name}`, c.unread, c.mentions);
         for (const [ref, p] of app.pms) mk(`pm:${ref}`, `✉ ${p.nick}${p.open ? '' : ' (closed)'}`, p.unread, p.mentions);
-        if (focusKey) $$('[role="tab"]', nav).find((b) => b.dataset.channelKey === focusKey)?.focus({ preventScroll: true });
+        if (focusKey) {
+            const sameTab = $$('[role="tab"]', nav).find((tab) => tab.dataset.channelKey === focusKey);
+            const nextTab = sameTab || $('[role="tab"][aria-selected="true"]', nav);
+            nextTab?.focus({ preventScroll: Boolean(sameTab) });
+        }
         document.title = `${totalUnread ? `(${totalUnread}) ` : ''}#stalemate · Hang Out`;
     }
     $('[data-tabs]').addEventListener('keydown', (e) => {

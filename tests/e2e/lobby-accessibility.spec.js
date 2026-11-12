@@ -536,6 +536,29 @@ for (const width of [375, 390]) {
         } finally { await arrival?.close(); await visitor.close(); await host.close(); }
     });
 
+    test(`keyboard focus returns to the lobby when a selected room closes at ${width}px`, async ({ browser, baseURL }) => {
+        const relay = hangoutRelayWsBase(baseURL, `closed-tab-${randomUUID()}`);
+        const viewport = { width, height: 667 };
+        const host = await guest(browser, baseURL, 'ClosingHost', viewport, relay);
+        const visitor = await guest(browser, baseURL, 'RoomGuest', viewport, relay);
+        try {
+            await send(host.page, '/join #vanishing-room');
+            await expect(host.page.locator('[data-chat-context]')).toHaveText('#vanishing-room');
+            await send(visitor.page, '/join #vanishing-room');
+            const tab = visitor.page.getByRole('tab', { name: '#vanishing-room', exact: true });
+            await expect(tab).toHaveAttribute('aria-selected', 'true');
+            await tabTo(visitor.page, tab);
+
+            await send(host.page, '/close');
+            await expect(tab).toHaveCount(0);
+            await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#stalemate');
+            const lobby = visitor.page.getByRole('tab', { name: '#stalemate', exact: true });
+            await expect(lobby).toHaveAttribute('aria-selected', 'true');
+            await expect(lobby).toBeFocused();
+            await expect(lobby).toBeInViewport();
+        } finally { await visitor.close(); await host.close(); }
+    });
+
     test(`a removed focused room returns to the visible directory filter at ${width}px`, async ({ browser, baseURL }) => {
         const relay = hangoutRelayWsBase(baseURL, `directory-removal-${randomUUID()}`), viewport = { width, height: 667 };
         const host = await guest(browser, baseURL, 'ClosingHost', viewport, relay);
