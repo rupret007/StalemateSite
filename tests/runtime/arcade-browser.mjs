@@ -693,7 +693,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await captureArcadeInvite(host, viewport, step('02b-room-address'), [address.getByLabel('Room address')]);
                 await address.getByRole('button', { name: 'Done' }).click();
                 await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
-                await host.getByRole('button', { name: 'Open Chess match' }).click();
+                await expect(host.locator('details.arcade-chess > summary')).toBeFocused();
+                const openChess = host.getByRole('button', { name: 'Open Chess match' });
+                await expectUncoveredControl(openChess);
+                await openChess.click();
                 await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
                 const link = await shareGameNightLink(host, viewport, step('02-share'), async newGuest => {
                     await expect(newGuest).toHaveAccessibleName('Invite a friend to Royal Flush Chess');
