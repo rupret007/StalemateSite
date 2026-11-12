@@ -98,7 +98,7 @@ const game = gameNightEntry?.(params, location.hash);
 const $ = s => document.querySelector(s);
 const rememberEntry = () => { try { sessionStorage.setItem(ENTRY_HANDOFF_KEY, entryHandoff(source, true, Date.now(), entrySites)); } catch { /* Entrance memory is optional. */ } };
 const lobby = $('#inside .button');
-lobby.href = '${ROOT}lobby/?entry-return=1' + (game ? '&' + GAME_NIGHT_QUERY + gameNightFragment(game.target) : '');
+lobby.href = '${ROOT}lobby/?entry-return=1' + (game ? '&' + GAME_NIGHT_QUERY + (game.table ? '&table=' + encodeURIComponent(game.table) : '') + gameNightFragment(game.target) : '');
 if (game) {
     lobby.textContent = 'Enter Game Night ↗';
     $('.lede').textContent = 'Play and chat with friends in a private Game Night room.';

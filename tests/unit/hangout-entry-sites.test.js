@@ -16,6 +16,11 @@ it('carries an exact Game Night room locator only from the explicit entrance', (
         expect(gameNightEntry(params, malformed)).toEqual({ target: null });
     }
     expect(gameNightFragment({ ...target, ref: 'unsafe&stuff' })).toBe('');
+    const chess = new URLSearchParams('game-night=1&via=stalemate&table=chess');
+    expect(gameNightEntry(chess)).toEqual({ target: null, table: 'chess' });
+    expect(gameNightEntry(chess, hash)).toEqual({ target });
+    chess.append('table', 'turdanoid');
+    expect(gameNightEntry(chess)).toEqual({ target: null });
 });
 
 describe('reviewed entry-site display configuration', () => {

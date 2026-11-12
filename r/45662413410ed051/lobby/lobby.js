@@ -1507,8 +1507,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         gameOpenPending = null;
         const room = result?.ok && store(result.room);
         if (room?.kind === 'game' && room.keepRef === result.ref) {
+            const requestedGame = pending.fromEntry && gameEntry?.table;
+            if (arcadeTables.get(requestedGame)?.supported) arcadeReturning = { room: room.name, ref: room.keepRef, game: requestedGame };
             if (pending.fromEntry) gameEntry = null;
             if (app.active !== room.name) switchTo(room.name);
+            else if (arcadeReturning) drawGameNight();
         } else {
             gameOpenError = 'Couldn’t open Game Night. Try again or return to your room from the room list.';
             if (!pending.fromEntry) toast(gameOpenError);
@@ -1546,8 +1549,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const jam = jamRoomName(offer?.room);
         const roomLabel = jam ? offer.room : 'Game Night';
         const gameLabel = arcadeTables.get(offer?.arcade?.game)?.label;
+        const selectedGame = arcadeTables.get(gameEntry?.table)?.label;
         let message;
-        if (start) message = gameOpenPending ? 'Opening Game Night…' : gameOpenError || 'Start a private Game Night or wait for your host’s invitation.';
+        if (start) message = gameOpenPending ? 'Opening Game Night…' : gameOpenError || (selectedGame
+            ? `Start a private Game Night for ${selectedGame}.` : 'Start a private Game Night or wait for your host’s invitation.');
         else if (joiningGameRoom === offer.room) message = `Joining ${roomLabel}…`;
         else if (gameReturnOffered) {
             message = jam ? `You were disconnected from ${offer.room}. Chat starts fresh.`

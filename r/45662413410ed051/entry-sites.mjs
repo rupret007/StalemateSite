@@ -62,7 +62,9 @@ export function gameNightEntry(params, hash = '') {
     const room = '#' + fragment.get('game'), ref = fragment.get('instance');
     const target = [...fragment.keys()].sort().join(',') === 'game,instance'
         && gameNightRoomName(room) && /^[a-f0-9]{32}$/.test(ref || '') ? { room, ref } : null;
-    return { target };
+    const tables = params.getAll('table');
+    const table = !target && tables.length === 1 && /^[a-z][a-z0-9]{2,15}$/.test(tables[0]) ? tables[0] : '';
+    return { target, ...(table ? { table } : {}) };
 }
 
 export function gameNightFragment(target) {

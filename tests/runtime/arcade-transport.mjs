@@ -9,6 +9,7 @@ import { rolldown } from 'rolldown';
 import { findDuelSolution } from '../../hangout-worker/arcade/games/turdomania-duel.js';
 import { unpackRushRacer } from '../../hangout-worker/arcade/games/turdrush-race.js';
 import { Miniflare, convertV4MiniflareOptions } from './durable-records/node_modules/miniflare/dist/src/index.js';
+import { createArcadePreviewSite } from './arcade-preview-site.mjs';
 
 const origin = 'https://local-fixture.invalid';
 const serve = process.argv.includes('--serve');
@@ -36,6 +37,7 @@ assert.ok(!rollbackRef || rollback && /^[a-f0-9]{40}$/.test(rollbackRef), 'use -
 assert.ok(mixedRef === undefined || browserName && !relay && /^[a-f0-9]{40}$/.test(mixedRef), 'use --mixed-ref with a browser and exact source revision');
 const evidence = process.env.ARCADE_BROWSER_EVIDENCE ? resolve(process.env.ARCADE_BROWSER_EVIDENCE) : null;
 const app = fileURLToPath(new URL('../../', import.meta.url));
+const previewSite = (browserName || serve) ? createArcadePreviewSite(app) : null;
 const assets = fileURLToPath(new URL('../../.beta-assets/', import.meta.url));
 const sharedSource = process.env.ARCADE_TEST_SOURCE ? resolve(process.env.ARCADE_TEST_SOURCE) : null;
 const radDad = process.env.ARCADE_TEST_RAD_DAD ? resolve(process.env.ARCADE_TEST_RAD_DAD) : null;
@@ -126,6 +128,7 @@ const pause = () => new Promise(resolve => setTimeout(resolve, 600));
 
 async function serveAsset(request) {
     const pathname = decodeURIComponent(new URL(request.url).pathname);
+    if (previewSite && pathname.startsWith('/site/')) return previewSite(request);
     const name = pathname.endsWith('/') ? pathname + 'index.html' : pathname;
     const file = resolve(assets, '.' + name);
     if (!file.startsWith(assets.endsWith(sep) ? assets : assets + sep)) return new Response('Not found', { status: 404 });
@@ -1040,7 +1043,7 @@ try {
     assert.equal(initialized.status, 200, await initialized.text());
     if (serve) {
         const { origin: localOrigin } = await mf.ready;
-        console.log(`Protected local Game Night with all nine games: ${localOrigin}/beta/?game-night=1&via=stalemate`);
+        console.log(`Stalemate private Game Night preview with all nine games: ${localOrigin}/site/`);
         await new Promise(resolve => {
             process.once('SIGINT', resolve);
             process.once('SIGTERM', resolve);
