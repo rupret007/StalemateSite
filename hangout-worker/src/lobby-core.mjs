@@ -848,7 +848,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             cams: new Set(), since: now(), lastNick: 0, tokens: L.burst, last: now(), frames: 0, lastSaid: {}, actTokens: L.actBurst, actLast: now() };
         conns.set(id, c);
         if (band) { net.lastBand = now(); if (net.shieldAuto || net.lockAuto) bot(c, 'A saved safety state needs review: fans can read but not talk while the lobby is read-only. Check the band panel; /lobby unlock and /shieldoff when you are ready.'); saveNet(); }
-        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, roomInvites: 1, ...(directMusicInvites && !participationConfigured && L.webJoinOrigins?.length ? { directMusicInvites: 1 } : {}), ...(gameNight ? { gameNight: 1, fourInARow: 1, discordLinks: !participationConfigured } : {}) } });
+        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, roomInvites: 1, ...(directMusicInvites && !participationConfigured && L.webJoinOrigins?.length ? { directMusicInvites: 1, musicInviteOutcomes: 1 } : {}), ...(gameNight ? { gameNight: 1, fourInARow: 1, discordLinks: !participationConfigured } : {}) } });
         return { ok: true };
     }
 
@@ -856,7 +856,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const c = conns.get(id);
         if (!c) return;
         for (const [room, offer] of musicInvites) {
-            if (offer.host === id || offer.guest === id) endMusicInvite(room, id);
+            if (offer.host === id || offer.guest === id) finishMusicInvite(room, 'unavailable', id);
         }
         for (const [request, offer] of roomInvites) if (offer.host === id || offer.guest === id)
             finishRoomInvite(request, offer, 'expired', id);
@@ -879,7 +879,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     function leave(c, chan, why = '', quitting = false) {
         if (!chan || !chan.members.has(c.id)) return;
         const musicInvite = musicInvites.get(chan.name);
-        if (musicInvite && (musicInvite.host === c.id || musicInvite.guest === c.id)) endMusicInvite(chan.name);
+        if (musicInvite && (musicInvite.host === c.id || musicInvite.guest === c.id)) finishMusicInvite(chan.name, 'unavailable');
         chan.members.delete(c.id);
         c.channels.delete(chan.name);
         for (const [request, offer] of roomInvites) {
@@ -950,12 +950,13 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             && !guest.ignoredPeerIds.has(host.id) && !guest.ignores.has(lc(host.nick));
     }
 
-    function endMusicInvite(roomName, disconnected = '') {
+    function finishMusicInvite(roomName, status, disconnected = '') {
         const offer = musicInvites.get(roomName);
         if (!offer) return;
         musicInvites.delete(roomName);
-        const guest = conns.get(offer.guest);
-        if (guest && guest.id !== disconnected) out(guest, { t: 'music-invite-ended', id: offer.id });
+        const host = conns.get(offer.host), guest = conns.get(offer.guest);
+        if (host && host.id !== disconnected) out(host, { t: 'music-invite-outcome', request: offer.request, status });
+        if (guest && guest.id !== disconnected && status !== 'accepted') out(guest, { t: 'music-invite-ended', id: offer.id });
     }
 
     function offerMusicInvite(host, frame) {
@@ -975,13 +976,13 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return result('unavailable');
         personDependency(guest, room);
         const id = crypto.randomUUID().replace(/-/g, '');
-        endMusicInvite(room.name);
-        musicInvites.set(room.name, { id, host: host.id, guest: guest.id, instance: room.keepRef, href, expires });
+        finishMusicInvite(room.name, 'unavailable');
+        musicInvites.set(room.name, { id, request: frame.request, host: host.id, guest: guest.id, instance: room.keepRef, href, expires });
         out(guest, { t: 'music-invite', id, ch: room.name, roomInstance: room.keepRef, by: host.nick, expires });
         result('sent');
     }
 
-    function acceptMusicInvite(guest, frame) {
+    function answerMusicInvite(guest, frame) {
         const room = musicInviteRoom(frame);
         const offer = room && musicInvites.get(room.name);
         if (!offer || offer.id !== frame.id || offer.guest !== guest.id || offer.instance !== room.keepRef) {
@@ -989,10 +990,12 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return;
         }
         const host = conns.get(offer.host);
-        if (offer.expires <= now() || !canInviteMusic(host, guest, room)) return endMusicInvite(room.name);
+        if (offer.expires <= now()) return finishMusicInvite(room.name, 'expired');
+        if (!canInviteMusic(host, guest, room)) return finishMusicInvite(room.name, 'unavailable');
+        if (frame.t === 'music-invite-decline') return finishMusicInvite(room.name, 'declined');
         personDependency(host, room);
-        musicInvites.delete(room.name);
-        if (!acceptJamInvitation(guest, room)) return out(guest, { t: 'music-invite-ended', id: offer.id });
+        if (!acceptJamInvitation(guest, room)) return finishMusicInvite(room.name, 'unavailable');
+        finishMusicInvite(room.name, 'accepted');
         out(guest, { t: 'music-invite-accepted', id: offer.id, ch: room.name, roomInstance: room.keepRef, href: offer.href, expires: offer.expires });
     }
 
@@ -1135,7 +1138,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         switch (f.t) {
         case 'hello': return hello(c, f);
         case 'music-invite-offer': return offerMusicInvite(c, f);
-        case 'music-invite-accept': return acceptMusicInvite(c, f);
+        case 'music-invite-accept':
+        case 'music-invite-decline': return answerMusicInvite(c, f);
         case 'say': {
             const text = typeof f.text === 'string' ? f.text : '';
             if (text.startsWith('/') && !text.startsWith('//')) return runLine(c, f.ch, text, f);
@@ -2182,7 +2186,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
 
     function closeRoom(chan, by, why) {
-        endMusicInvite(chan.name);
+        finishMusicInvite(chan.name, 'unavailable');
         const members = membersOf(chan);
         for (const m of members) { out(m, { t: 'closed', ch: chan.name, by, reason: why }); m.channels.delete(chan.name); m.cams.delete(lc(chan.name)); }
         for (const [request, offer] of roomInvites) if (offer.room === chan) finishRoomInvite(request, offer, 'expired');
@@ -2623,7 +2627,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     let lastStatSave = '';
     function tick() {
         const t = now();
-        for (const [room, offer] of musicInvites) if (offer.expires <= t) endMusicInvite(room);
+        for (const [room, offer] of musicInvites) if (offer.expires <= t) finishMusicInvite(room, 'expired');
         expireRoomInvites(t);
         rates.prune();
         if (hourKey() !== lastStatSave) { lastStatSave = hourKey(); saveNet(); } // stats: ~24 row writes/day

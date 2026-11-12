@@ -142,6 +142,7 @@ describe('direct Jam music invitations', () => {
         send(user, { t: 'music-invite-accept', id: received.id, ch: room, roomInstance, ...overrides });
     }
     const delivered = user => got(user).filter(m => m.t === 'music-invite-accepted');
+    const outcomes = () => got(host).filter(m => m.t === 'music-invite-outcome');
     it('sends only an offer to the chosen connection and delivers audio only once after room admission', () => {
         const pending = offer();
         expect(pending).toMatchObject({ ch: room, roomInstance, by: host.nick });
@@ -155,9 +156,11 @@ describe('direct Jam music invitations', () => {
         accept(guest, pending);
         const guestFrames = got(guest);
         expect(delivered(guest)).toEqual([expect.objectContaining({ id: pending.id, href: invite })]);
+        expect(outcomes()).toEqual([{ t: 'music-invite-outcome', request: 'd'.repeat(32), status: 'accepted' }]);
         expect(guestFrames.findIndex(m => m.t === 'join' && m.ch.name === room)).toBeLessThan(guestFrames.indexOf(delivered(guest)[0]));
         accept(guest, pending);
         expect(delivered(guest)).toHaveLength(1);
+        expect(outcomes()).toHaveLength(1);
         expect(JSON.stringify(got(host))).not.toContain(invite);
         expect(JSON.stringify(got(peer))).not.toContain(invite);
         L.disconnect(guest.id);
@@ -169,6 +172,26 @@ describe('direct Jam music invitations', () => {
         cmd(returning, 'part', [], room);
         cmd(returning, 'join', [room]);
         expect(got(returning).filter(m => m.t === 'join' && m.ch.name === room)).toHaveLength(1);
+    });
+    it('reports a decline only from the selected guest and expires a replacement separately', () => {
+        const pending = offer();
+        const decline = (user, id) => send(user, { t: 'music-invite-decline', id, ch: room, roomInstance });
+        decline(peer, pending.id);
+        expect(outcomes()).toEqual([]);
+        decline(guest, pending.id);
+        expect(outcomes()).toEqual([{ t: 'music-invite-outcome', request: 'd'.repeat(32), status: 'declined' }]);
+        expect(got(guest).some(m => m.t === 'join' && m.ch.name === room)).toBe(false);
+        expect(JSON.stringify(got(guest))).not.toContain(invite);
+        const replacement = offer(host, { request: 'e'.repeat(32) });
+        expect(replacement.id).not.toBe(pending.id);
+        decline(guest, pending.id);
+        later(61_000);
+        L.tick();
+        expect(outcomes()).toEqual([
+            { t: 'music-invite-outcome', request: 'd'.repeat(32), status: 'declined' },
+            { t: 'music-invite-outcome', request: 'e'.repeat(32), status: 'expired' }
+        ]);
+        expect(got(peer).some(m => m.t === 'music-invite-outcome')).toBe(false);
     });
     it('refuses a nonhost, a different room instance, and an invalid browser destination', () => {
         expect(offer(peer)).toBeUndefined();

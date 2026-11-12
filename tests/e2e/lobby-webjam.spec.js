@@ -187,16 +187,23 @@ test('only the selected guest can accept a music invitation and open the audio c
             }), { request, href });
         }
         const panel = guest.locator('[data-music-invite]');
+        const outcome = host.locator('[data-music-invite-outcome]');
         expect(await returnInvite(invite.replace(/&e=\d+$/, '&e=1'))).toBe(false);
         await expect(panel).toBeHidden();
         await expect(host.locator('[data-toast]')).toContainText('Music invitation couldn’t be sent.');
         expect(await returnInvite(invite)).toBe(true);
-        await expect(host.locator('[data-toast]')).toContainText('Music invitation sent.');
+        await expect(outcome).toHaveText('Music invitation sent to ChosenGuest. Waiting for a reply.');
         await expect(panel).toContainText('MusicHost invited you to play');
         await expect(other.locator('[data-music-invite]')).toBeHidden();
         await expect(guest.locator('[data-chat-context]')).toHaveText('#stalemate');
+        await panel.getByRole('button', { name: 'Not now' }).click();
+        await expect(panel).toBeHidden();
+        await expect(outcome).toHaveText('ChosenGuest declined the Music invitation.');
+        expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
+        expect(await returnInvite(invite)).toBe(true);
         await panel.getByRole('button', { name: 'Accept and join' }).press('Enter');
         await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        await expect(outcome).toHaveText('ChosenGuest accepted and joined the Jam room.');
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
         const audio = panel.getByRole('button', { name: 'Open audio check' });
         await expect(audio).toBeFocused();
