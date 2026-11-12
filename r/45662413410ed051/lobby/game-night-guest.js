@@ -2,9 +2,24 @@ const status = document.querySelector('[data-guest-status]');
 const invite = document.querySelector('[data-guest-invite]');
 const join = document.querySelector('[data-guest-join]');
 const retry = document.querySelector('[data-guest-retry]');
-const code = new URLSearchParams(location.hash.slice(1)).get('invite');
-const attempt = crypto.randomUUID().replaceAll('-', '');
-if (location.hash || location.search) history.replaceState(null, '', location.pathname);
+const gameTitle = document.querySelector('[data-guest-game]');
+const restored = !location.hash && !location.search ? history.state?.gameNightInvite : null;
+const code = restored?.code ?? new URLSearchParams(location.hash.slice(1)).get('invite');
+const attempt = restored?.attempt ?? crypto.randomUUID().replaceAll('-', '');
+const confirmedGame = typeof restored?.confirmedGame === 'string' ? restored.confirmedGame : '';
+const hasInvitation = typeof code === 'string' && code.length > 0 && code.length <= 250;
+
+function retainInvitation(confirmedGame) {
+    // A refresh can use this history entry, without putting the link back in the address.
+    history.replaceState({ gameNightInvite: { code, attempt, confirmedGame } }, '', location.pathname);
+}
+
+function clearInvitation() {
+    history.replaceState(null, '', location.pathname);
+}
+
+if (hasInvitation) retainInvitation(confirmedGame);
+else if (location.hash || location.search || restored) clearInvitation();
 
 async function request(action, data) {
     const response = await fetch('/beta/game-night/invitation/' + action, {
@@ -18,7 +33,7 @@ async function request(action, data) {
 
 async function describe() {
     retry.hidden = true;
-    if (!code || code.length > 250) {
+    if (!hasInvitation) {
         status.textContent = 'Open the Game Night invitation your host sent you.';
         return;
     }
@@ -28,17 +43,19 @@ async function describe() {
         const inviter = document.querySelector('[data-guest-inviter]');
         inviter.textContent = `${host} invited you to play.`;
         inviter.hidden = false;
-        document.querySelector('[data-guest-game]').textContent = game;
+        gameTitle.textContent = game;
         status.textContent = '';
         invite.hidden = false;
         if (document.activeElement === document.body) join.focus({ preventScroll: true });
     } catch (error) {
         status.textContent = error.status === 410 ? error.message : 'Couldn’t check the invitation. Try again.';
         retry.hidden = error.status === 410;
+        if (error.status === 410) clearInvitation();
     }
 }
 
-join.addEventListener('click', async () => {
+async function accept() {
+    retry.hidden = true;
     join.disabled = true;
     status.textContent = 'Joining the game…';
     try {
@@ -47,13 +64,29 @@ join.addEventListener('click', async () => {
         location.replace(next);
     } catch (error) {
         status.textContent = [410, 429, 503].includes(error.status) ? error.message : 'Couldn’t join just now. Try again.';
-        if (error.status === 410) invite.hidden = true;
-        else {
+        if (error.status === 410) {
+            clearInvitation();
+            invite.hidden = true;
+        } else if (invite.hidden) {
+            retry.hidden = false;
+            if (document.activeElement === document.body) retry.focus({ preventScroll: true });
+        } else {
             join.disabled = false;
             if (document.activeElement === document.body) join.focus({ preventScroll: true });
         }
     }
+}
+
+join.addEventListener('click', () => {
+    retainInvitation(gameTitle.textContent);
+    void accept();
 });
 
-retry.addEventListener('click', () => void describe());
-void describe();
+retry.addEventListener('click', () => void (confirmedGame ? accept() : describe()));
+if (hasInvitation && confirmedGame) {
+    // Resume only an accept attempt already confirmed by this guest.
+    gameTitle.textContent = confirmedGame;
+    void accept();
+} else {
+    void describe();
+}

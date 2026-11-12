@@ -286,6 +286,18 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }, { path: link.pathname, hash: link.hash });
         await page.goto(origin + link.pathname);
     }
+    async function tapGameNightLink(page, link, phone) {
+        const entry = origin + '/_fixture/invite-tap';
+        await page.route(entry, route => route.fulfill({ contentType: 'text/html',
+            body: '<meta name="viewport" content="width=device-width"><a href="#">Open invitation</a>' }));
+        await page.goto(entry);
+        await page.evaluate(url => { document.querySelector('a').href = url; }, link.href);
+        const area = await page.getByRole('link', { name: 'Open invitation' }).boundingBox();
+        assert.ok(area);
+        const x = area.x + area.width / 2, y = area.y + area.height / 2;
+        if (phone) await page.touchscreen.tap(x, y);
+        else await page.mouse.click(x, y);
+    }
     async function verifyFirstVisit(host) {
         for (const phone of [true, false]) {
             const viewport = phone ? { width: 390, height: 844 } : { width: 1440, height: 900 };
@@ -668,15 +680,41 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
                 const link = await shareGameNightLink(host, viewport, step('02-share'));
                 assert.equal((await friend.context().cookies()).length, 0, 'the invited profile is completely new');
-                await openGameNightLink(friend, link);
-                await expect(friend.getByRole('heading', { name: 'Royal Flush Chess' })).toBeVisible();
+                const attempts = [];
+                const acceptPath = '/beta/game-night/invitation/accept';
+                friend.on('request', request => {
+                    if (new URL(request.url()).pathname === acceptPath && request.method() === 'POST')
+                        attempts.push(request.postDataJSON().attempt);
+                });
+                const gameTitle = friend.getByRole('heading', { name: 'Royal Flush Chess' });
+                await tapGameNightLink(friend, link, phone);
+                await expect(gameTitle).toBeVisible();
+                assert.equal(new URL(friend.url()).hash, '', 'the invitation stays out of the address');
+                await friend.reload();
+                await expect(gameTitle).toBeVisible();
+                assert.equal(attempts.length, 0, 'refresh before confirmation must not attempt to join');
+                assert.equal((await friend.context().cookies()).length, 0, 'refresh before confirmation grants no access');
                 await expect(friend.getByRole('textbox')).toHaveCount(0);
                 await expect(friend.getByRole('button')).toHaveCount(1);
                 const joinGame = friend.getByRole('button', { name: 'Join game', exact: true });
                 await expectUncoveredControl(joinGame);
-                await captureArcadeInvite(friend, viewport, step('03-accept'));
+                await captureArcadeInvite(friend, viewport, step('03-accept-after-refresh'));
+                let firstStatus;
+                await friend.route(url => url.pathname === acceptPath, async route => {
+                    const response = await route.fetch();
+                    firstStatus = response.status();
+                    await response.dispose();
+                    await route.abort();
+                }, { times: 1 });
                 await (phone ? joinGame.tap() : joinGame.click());
+                await expect(friend.locator('[data-guest-status]')).toHaveText('Couldn’t join just now. Try again.');
+                assert.equal(firstStatus, 200, 'the server accepted the invitation before its response was dropped');
+                await captureArcadeInvite(friend, viewport, step('03b-join-response-interrupted'));
+                await friend.context().clearCookies();
+                await friend.reload({ waitUntil: 'commit' });
                 await expect(friend.locator('[data-chess-status]')).toContainText('You’re Black');
+                assert.ok(attempts.length === 2 && attempts[0] === attempts[1], 'reload recovers the same accepted attempt');
+                assert.ok(await friend.evaluate(() => !history.state?.gameNightInvite), 'the seated page retains no invitation state');
                 await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
                 await expect(friend.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
                 await tapSquare(friend, 'd7', phone);
@@ -684,7 +722,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(host.getByRole('button', { name: 'd5, Black pawn' })).toBeAttached();
                 await captureArcadeInvite(friend, viewport, step('04-playing'));
                 assert.equal((await friend.context().request.get(origin + '/beta/state')).status(), 401, 'the guest has only game access');
-                console.log(`Passed ${engine} ${viewport.width}x${viewport.height} ${brand} protected arcade, fresh guest seated and played.`);
+                console.log(`Passed ${engine} ${viewport.width}x${viewport.height} ${brand} invitation refresh, interrupted acceptance, and first move.`);
             } finally {
                 await friend.context().close();
                 await host.context().close();
