@@ -1978,11 +1978,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (!gameShareDialog.open || !link) return;
         try {
             await navigator.clipboard.writeText(link);
-            if (gameShareDialog.open && gameShareValue.value === link) $('[data-game-share-status]').textContent = 'Room link copied.';
+            if (gameShareDialog.open && gameShareValue.value === link) $('[data-game-share-status]').textContent = 'Room address copied.';
         } catch {
             if (gameShareDialog.open && gameShareValue.value === link) {
                 gameShareValue.select();
-                $('[data-game-share-status]').textContent = 'Select and copy the room link.';
+                $('[data-game-share-status]').textContent = 'Select and copy the room address.';
             }
         }
     });
@@ -2542,11 +2542,16 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 const option = document.createElement('option'); option.value = person.id; option.textContent = person.nick; $('[data-invite-options]').append(option);
             }
         }
-        $('[data-game-invite-empty]').hidden = !!roster.childElementCount;
-        $('[data-game-invite-link]').hidden = !isGame || !gameGuestInvitesSupported || !arcadeInviteTarget();
+        const canInviteNew = isGame && gameGuestInvitesSupported;
+        const target = canInviteNew && arcadeInviteTarget();
+        const inviteHint = $('[data-game-invite-empty]');
+        inviteHint.hidden = !!target || (!canInviteNew && !!roster.childElementCount);
+        inviteHint.textContent = canInviteNew ? 'Open a game with a free seat to invite a friend.' : 'Nobody else is in Hang Out yet.';
+        $('[data-game-invite-link]').hidden = !target;
+        if (target) createGuestLink.textContent = `Invite a friend to ${arcadeTables.get(target.game).label}`;
         $('[data-invite-person-send]').disabled = !personTargetsSupported || !roomNonce(inviteInstance);
         $('[data-invite-dialog]').showModal();
-        if (isGame) (roster.querySelector('button:enabled') || $('[data-game-invite-link]:not([hidden]) button') || $('[data-game-invite-cancel]')).focus();
+        if (isGame) (target ? createGuestLink : roster.querySelector('button:enabled') || $('[data-game-invite-cancel]')).focus();
         else $('[data-invite-nick]').focus();
     }
     function roomInviteArgs(nick, room) {
