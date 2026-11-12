@@ -461,6 +461,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let jamInviteExpiryTimer;
     let musicInvite = null, musicInviteTimer;
     let pendingMusicHandoff = null, directMusicInvitesSupported = false;
+    let sentMusicInvite = null, musicInviteOutcomesSupported = false;
+    const musicInviteFailed = 'Music invitation couldn’t be sent. Try again from your Jam room.';
+    const musicInviteConfirm = 'Confirm the invitation in WebJam.';
     const jamWaitingCopy = $('[data-jam-wait]').textContent;
     let gameNightSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
     let fourInARowSupported = false, fourRoom = null, fourPlayed = false;
@@ -922,6 +925,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             jamShareResultsSupported = m.features?.jamShareResults === 1;
             gameNightSupported = m.features?.gameNight === 1;
             directMusicInvitesSupported = m.features?.directMusicInvites === 1;
+            musicInviteOutcomesSupported = m.features?.musicInviteOutcomes === 1;
             fourInARowSupported = m.features?.fourInARow === 1;
             discordLinksSupported = m.features?.discordLinks === true;
             shieldActive = m.shield === true;
@@ -1130,6 +1134,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         case 'music-invite-result':
             if (pendingMusicHandoff?.submitted && pendingMusicHandoff.request === m.request
                 && ['sent', 'unavailable'].includes(m.status)) finishMusicHandoff(m.status === 'sent');
+            break;
+        case 'music-invite-outcome':
+            if (sentMusicInvite?.request === m.request && sentMusicInvite.status === 'sent'
+                && ['accepted', 'declined', 'expired', 'unavailable'].includes(m.status)) {
+                sentMusicInvite.status = m.status;
+                drawMusicInviteOutcome();
+            }
             break;
         case 'room-invite-result': {
             const sent = [...sentRoomInvites.values()].find(invite => invite.request === m.request);
@@ -1606,6 +1617,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
     });
     $('[data-music-invite-dismiss]').addEventListener('click', () => {
+        const offer = musicInvite;
+        if (musicInviteOutcomesSupported && offer?.state === 'offer' && offer.expires > Date.now()
+            && !send({ t: 'music-invite-decline', ch: offer.room, roomInstance: offer.instance, id: offer.id })) {
+            toast('Couldn’t send your reply. Check your connection and try again.');
+            return;
+        }
         clearTimeout(musicInviteTimer);
         musicInvite = null;
         drawMusicInvite();
@@ -1617,6 +1634,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         for (const c of app.chans.values()) if (c.kind === 'jam') c.jam = null;
         jamContext = null;
         closeMusicHandoff();
+        sentMusicInvite = null;
+        drawMusicInviteOutcome();
         clearTimeout(musicInviteTimer);
         musicInvite = null;
         drawMusicInvite();
@@ -1647,6 +1666,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     }
     function drawJam() {
         clearTimeout(jamInviteExpiryTimer);
+        drawMusicInviteOutcome();
         const focused = document.activeElement;
         if (app.sharingStopped || app.localMediaPaused) { resetJamControls(); $('[data-jam]').hidden = true; return; }
         const c = currentJam();
@@ -2527,17 +2547,41 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         pendingMusicHandoff.channel.close();
         pendingMusicHandoff = null;
     }
+    function drawMusicInviteOutcome() {
+        const output = $('[data-music-invite-outcome]');
+        const room = currentJam();
+        const invite = room && sentMusicInvite?.room === room && amOp(room) ? sentMusicInvite : null;
+        const message = invite ? {
+            sent: `Music invitation sent to ${invite.nick}. Waiting for a reply.`,
+            accepted: `${invite.nick} accepted and joined the Jam room.`,
+            declined: `${invite.nick} declined the Music invitation.`,
+            expired: `The Music invitation to ${invite.nick} expired.`,
+            unavailable: `The Music invitation to ${invite.nick} ended. You can send a new one.`
+        }[invite.status] : '';
+        if (output.textContent !== message) output.textContent = message;
+    }
     function finishMusicHandoff(sent) {
+        const { room, request, nick } = pendingMusicHandoff;
         pendingMusicHandoff.channel.postMessage({ returned: sent });
         closeMusicHandoff();
-        toast(sent ? 'Music invitation sent.' : 'Music invitation couldn’t be sent. Try again from your Jam room.');
+        if (sent && musicInviteOutcomesSupported) {
+            if ([musicInviteFailed, musicInviteConfirm].includes(toastRegion.textContent)) {
+                clearTimeout(toastTimer);
+                toastRegion.replaceChildren();
+                toastRegion.hidden = true;
+            }
+            sentMusicInvite = { room, request, nick, status: 'sent' };
+            drawMusicInviteOutcome();
+            return;
+        }
+        toast(sent ? 'Music invitation sent.' : musicInviteFailed);
     }
     function startMusicHandoff(room, context) {
         closeMusicHandoff();
         const request = crypto.randomUUID().replaceAll('-', '');
         const channel = new BroadcastChannel(`webjam-music-${request}`);
         const handoff = {
-            room, channel, request, submitted: false, timer: setTimeout(() => {
+            room, channel, request, nick: context.label, submitted: false, timer: setTimeout(() => {
                 closeMusicHandoff();
                 toast('Music invitation timed out. Open the private WebJam app and try again.');
             }, 90000)
@@ -2558,7 +2602,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         document.body.append(launch);
         launch.click();
         launch.remove();
-        toast('Confirm the invitation in WebJam.');
+        toast(musicInviteConfirm);
     }
     function sendInviteToPerson(context, error, music = false) {
         const current = store(app.active);
