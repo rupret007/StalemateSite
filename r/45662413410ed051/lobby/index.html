@@ -42,13 +42,13 @@
         <button class="btn btn--ghost" type="button" data-sheet-close>Close</button>
     </dialog>
     <dialog class="sheet" data-game-share-dialog aria-labelledby="game-share-title">
-        <h3 id="game-share-title">Share Game Night</h3>
-        <p>Share this link to point friends to your room. Invite them from Hang Out to grant access.</p>
-        <label class="channel-label" for="game-share-value">Game Night room link</label>
+        <h3 id="game-share-title">Game Night room address</h3>
+        <p>Players with a room invitation can use this address. Use Invite players to send a friend a game invitation.</p>
+        <label class="channel-label" for="game-share-value">Room address</label>
         <input id="game-share-value" data-game-share-value readonly>
         <p role="status" data-game-share-status></p>
         <div class="sheet-buttons">
-            <button class="btn" type="button" data-game-share-copy>Copy link</button>
+            <button class="btn" type="button" data-game-share-copy>Copy address</button>
             <button class="btn btn--ghost" type="button" data-game-share-close>Done</button>
         </div>
     </dialog>
@@ -57,12 +57,12 @@
         <p data-invite-explainer>Invite someone to <b data-invite-room></b>. They choose whether to join.</p>
         <div data-game-invite-picker hidden>
             <div data-game-invite-link hidden>
-                <button class="btn" type="button" data-game-invite-new>Invite someone new</button>
+                <button class="btn" type="button" data-game-invite-new autofocus>Invite a friend</button>
                 <button class="btn" type="button" data-game-invite-share hidden>Share invite</button>
                 <p class="small" data-game-invite-link-status role="status"></p>
             </div>
             <div class="sheet-buttons" data-game-invite-people></div>
-            <p class="small" data-game-invite-empty hidden>Nobody else is in the lobby yet.</p>
+            <p class="small" data-game-invite-empty hidden></p>
             <button class="btn btn--ghost" type="button" data-game-invite-cancel>Cancel</button>
         </div>
         <form data-invite-form>
@@ -242,7 +242,7 @@
                 </div>
                 <div class="jam-actions game-actions">
                     <button class="btn btn--small" type="button" data-game-invite hidden>Invite players</button>
-                    <button class="btn btn--small btn--ghost" type="button" data-game-share hidden>Share room link</button>
+                    <button class="btn btn--small btn--ghost" type="button" data-game-share hidden>Room address</button>
                     <a class="btn btn--small btn--ghost" data-game-arcade href="https://stalemate.band/play/" target="_blank" rel="noopener noreferrer" aria-describedby="game-arcade-tab-note"><span data-game-arcade-label>Open Stalemate Arcade</span> <span aria-hidden="true">↗</span></a>
                     <span class="sr-only" id="game-arcade-tab-note">Opens in a new tab</span>
                     <a class="btn btn--small btn--ghost" data-game-open target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden>Open Discord call</a>

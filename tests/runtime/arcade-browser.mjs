@@ -144,7 +144,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         console.log(`Passed ${engine} ${previousWorker ? 'current client with previous Worker' : 'previous and current clients together'}, invitation, Four in a Row and two-way room chat.`);
     }
-    async function captureArcadeInvite(page, viewport, step) {
+    async function captureArcadeInvite(page, viewport, step, mask = []) {
         const output = process.env.ARCADE_INVITE_EVIDENCE || evidence;
         if (!output) return;
         await mkdir(output, { recursive: true });
@@ -161,7 +161,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             return changes;
         });
         try {
-            await page.screenshot({ path: join(output, `${engine}-${viewport.width}x${viewport.height}-${step}.png`), animations: 'disabled' });
+            await page.screenshot({ path: join(output, `${engine}-${viewport.width}x${viewport.height}-${step}.png`),
+                animations: 'disabled', mask });
         } finally {
             await textNodes.evaluate(changes => { for (const [node, original] of changes) node.textContent = original; });
             await textNodes.dispose();
@@ -258,8 +259,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             }
         }
     }
-    async function shareGameNightLink(host, viewport, step) {
+    async function shareGameNightLink(host, viewport, step, capturePicker) {
         const original = host.viewportSize();
+        await host.bringToFront();
         await host.evaluate(() => {
             window.testGameInvitation = '';
             Object.defineProperty(navigator, 'share', { configurable: true, value: async ({ url }) => { window.testGameInvitation = url; } });
@@ -267,7 +269,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         try {
             await host.setViewportSize(viewport);
             await host.getByRole('button', { name: 'Invite players' }).click();
-            await host.getByRole('button', { name: 'Invite someone new' }).click();
+            const newGuest = host.getByRole('button', { name: /^Invite a friend to / });
+            await expect(newGuest).toBeFocused();
+            if (capturePicker) await capturePicker(newGuest);
+            await newGuest.click();
             await expect(host.getByRole('button', { name: 'Share invite' })).toBeVisible();
             await captureArcadeInvite(host, viewport, step);
             await host.getByRole('button', { name: 'Share invite' }).click();
@@ -502,15 +507,15 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await verifyGuestJoinRetry(host);
             await verifySpadesPartners(host);
         }
-        await host.getByRole('button', { name: 'Share room link' }).click();
-        const share = host.getByRole('dialog', { name: 'Share Game Night' });
-        const link = new URL(await share.getByLabel('Game Night room link').inputValue());
+        await host.getByRole('button', { name: 'Room address' }).click();
+        const share = host.getByRole('dialog', { name: 'Game Night room address' });
+        const link = new URL(await share.getByLabel('Room address').inputValue());
         assert.equal(link.origin, origin);
         assert.equal(link.pathname, '/beta/');
         assert.equal(link.search, '?game-night=1&via=rad-dad');
         assert.match(link.hash, /^#game=game-[a-f0-9]{6}x[a-f0-9]{6}&instance=[a-f0-9]{32}$/);
         if (evidence) await host.screenshot({ path: join(evidence, `webjam-room-link-${engine}.png`),
-            mask: [share.getByLabel('Game Night room link')] });
+            mask: [share.getByLabel('Room address')] });
         await share.getByRole('button', { name: 'Done' }).click();
         const player = await guest('rad-dad', 'LinkGuest', { width: 390, height: 844 }, true, link.href);
         const joinOffer = player.locator('[data-game-offer]').getByRole('button', { name: 'Join Game Night', exact: true });
@@ -532,7 +537,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await enterFromShell(player, 'LinkGuest', true);
         await joinOffer.click();
         await expect(player.locator('[data-game-night]')).toBeVisible();
-        await expect(player.getByRole('button', { name: 'Share room link' })).toBeHidden();
+        await expect(player.getByRole('button', { name: 'Room address' })).toBeHidden();
         await expect(player.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
         const matches = [], calls = [];
         if (media && !relay) {
@@ -663,10 +668,26 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await enterFromShell(host, radDad ? 'RadDadHost' : 'PreviewHost', true);
                 await expect(host.locator('[data-entry-label]').first()).toHaveText(`via ${brand}`);
                 await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
+                const invitePlayers = host.getByRole('button', { name: 'Invite players', exact: true });
+                await invitePlayers.click();
+                const invitePicker = host.locator('[data-invite-dialog]');
+                await expect(invitePicker.getByText('Open a game with a free seat to invite a friend.')).toBeVisible();
+                await expect(invitePicker.getByRole('button', { name: /^Invite a friend/ })).toHaveCount(0);
+                await captureArcadeInvite(host, viewport, step('02a-open-a-table'));
+                await invitePicker.getByRole('button', { name: 'Cancel' }).click();
+                await host.getByRole('button', { name: 'Room address', exact: true }).click();
+                const address = host.getByRole('dialog', { name: 'Game Night room address' });
+                await expect(address.getByText('Players with a room invitation can use this address.', { exact: false })).toBeVisible();
+                await captureArcadeInvite(host, viewport, step('02b-room-address'), [address.getByLabel('Room address')]);
+                await address.getByRole('button', { name: 'Done' }).click();
                 await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
                 await host.getByRole('button', { name: 'Open Chess match' }).click();
                 await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
-                const link = await shareGameNightLink(host, viewport, step('02-share'));
+                const link = await shareGameNightLink(host, viewport, step('02-share'), async newGuest => {
+                    await expect(newGuest).toHaveAccessibleName('Invite a friend to Royal Flush Chess');
+                    await expect(invitePicker.getByText('Nobody else is in Hang Out yet.')).toHaveCount(0);
+                    await captureArcadeInvite(host, viewport, step('02c-invite-picker'));
+                });
                 assert.equal((await friend.context().cookies()).length, 0, 'the invited profile is completely new');
                 await openGameNightLink(friend, link);
                 await expect(friend.getByRole('heading', { name: 'Royal Flush Chess' })).toBeVisible();
