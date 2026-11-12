@@ -17,11 +17,9 @@ entitlement, usage/headroom and resource checks remain necessary before media.
 This permission does not enable AI, Hang Out's separate chat/media TURN, public
 navigation, purchases, signing enrollment or any trust/age/consent bypass.
 
-Use the [current website and package identities](HANGOUT_WEBSITE_INTEGRATION.md)
-for the current trial. The four verified archives come from source
-`67c7ef08e515c84eb2b0736c474ec2c4b0c21682`; only the ARM idle UI has current local
-execution evidence. Build labels alone are insufficient.
-Older package and deployment receipts below describe their own candidates.
+Use the [current private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
+to confirm the website and native revisions before a trial. The older
+package and deployment receipts below describe their own candidates.
 
 Each physical trial remains one native host and one browser guest for at most
 ten minutes, with capture consent, headphones and no recording. Retain the
@@ -36,11 +34,11 @@ Windows still needs the participant's confirmation.
 
 Use the [current private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
 for current delivery and device checks. The private site is serving the Arcade
-trial, which includes the current Jam invitation and Web Join changes. The
-Intel MacBook selects the verified native build `23cfae6`. The same Apple
-Silicon build is staged on the Mini and still needs its first idle launch.
-Both hosts still need an attended listening test with the current Windows
-browser guest.
+trial, which includes the current Jam invitation and Web Join changes. Both
+Mac Desktop shortcuts select verified `23cfae6` builds that passed idle
+startup. Installed Windows Chrome passed simulated microphone recovery,
+expired-invite and Retry checks. Both hosts still need an attended listening
+test with the current Windows browser guest.
 
 The earlier generated Mac-to-Windows trial passed transport both ways,
 40-second synthetic WAV chord detection, a fresh invitation and shutdown at its
