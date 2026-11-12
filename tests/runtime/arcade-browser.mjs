@@ -899,15 +899,21 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             allHands.push(...await hand.evaluateAll(buttons => buttons.map(button => button.dataset.spadesCard)));
         }
         assert.equal(new Set(allHands).size, 52);
+        const portrait = b.viewportSize();
         try {
-            await expect(b.locator('[data-spades-hand]')).toBeInViewport({ ratio: 1 });
-            await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
+            for (const height of [portrait.height, 661]) {
+                await b.setViewportSize({ ...portrait, height });
+                await expect(b.locator('[data-spades-hand]')).toBeInViewport({ ratio: 1 });
+                await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
+            }
         } catch (error) {
             if (evidence) {
                 await mkdir(evidence, { recursive: true });
                 await b.screenshot({ path: join(evidence, `spades-${engine}-fit-failure.png`) });
             }
             throw error;
+        } finally {
+            await b.setViewportSize(portrait);
         }
         let audioBeforeTrick;
         if (media) {
