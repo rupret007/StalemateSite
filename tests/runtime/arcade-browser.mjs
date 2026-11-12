@@ -340,12 +340,20 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await holdTicket;
                     await route.continue();
                 }, { times: 1 });
+                await guest.route(url => url.pathname.endsWith('/lobby/arcade-chess.mjs'), route => route.abort(), { times: 1 });
                 try {
                     if (phone) await join.tap();
                     else {
                         await expect(join).toBeFocused();
                         await guest.keyboard.press('Enter');
                     }
+                    const retryGame = guest.getByRole('button', { name: 'Try again', exact: true });
+                    await expect(guest.locator('[data-game-guest-status]')).toHaveText('Royal Flush Chess could not load. Try again.');
+                    await expect(retryGame).toBeFocused();
+                    await expectUncoveredControl(retryGame);
+                    await captureArcadeInvite(guest, viewport, 'first-visit-01-game-load-retry');
+                    if (phone) await retryGame.tap();
+                    else await guest.keyboard.press('Enter');
                     await expect.poll(() => ticketRequested).toBe(true);
                     const joining = guest.locator('[data-game-guest-connecting]');
                     await expect(joining.getByRole('heading', { name: 'Royal Flush Chess', exact: true })).toBeVisible();
