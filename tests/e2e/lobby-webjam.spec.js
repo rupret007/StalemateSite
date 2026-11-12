@@ -65,7 +65,7 @@ const WEB_INVITE = 'https://webjam.example/join/#k=synthetic_browser_capability&
 async function browserRoom(browser, baseURL, configured, viewport) {
     const contexts = [], external = [];
     const relay = hangoutRelayWsBase(baseURL, `${configured ? 'webjam-browser-' : 'webjam-off-'}${randomUUID()}`);
-    const join = async (nick, controls = false) => {
+    const join = async (nick, controls = false, via = '') => {
         const context = await browser.newContext({ viewport,
             ...(controls && browser.browserType().name() === 'chromium' ? { permissions: ['local-network-access'] } : {}) }); contexts.push(context);
         await context.route('**/*', route => {
@@ -96,7 +96,7 @@ async function browserRoom(browser, baseURL, configured, viewport) {
             };
         });
         const page = await context.newPage();
-        await page.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+        await page.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}${via ? `&via=${via}` : ''}`);
         await page.fill('[data-nick]', nick); await page.click('[data-enter]');
         try { await expect(page.locator('[data-connection]')).toHaveText('Connected'); }
         catch (error) {
@@ -115,6 +115,69 @@ const paste = async (page, value) => {
     await page.fill('[data-jam-link]', value);
     await page.locator('[data-jam-form] button[type="submit"]').click();
 };
+
+for (const [hostSite, guestSite] of [['rad-dad', 'stalemate'], ['stalemate', 'rad-dad']]) {
+    test(`${hostSite} can invite someone from ${guestSite} with a single join action`, async ({ browser, baseURL }) => {
+        const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });
+        try {
+            const host = await f.join('RoomHost', false, hostSite);
+            const guest = await f.join('Bandmate', false, guestSite);
+            await host.click('[data-show="rooms"]');
+            await host.click('[data-start="jam"]');
+            await expect(host.locator('[data-chat-context]')).toHaveText(/^#jam-/);
+            const room = await host.locator('[data-chat-context]').textContent();
+            const invite = host.getByRole('button', { name: 'Invite bandmate to room' });
+            const status = host.locator('[data-room-invite-status]');
+            const offer = guest.locator('[data-game-offer]');
+            async function send() {
+                await invite.click();
+                const list = host.getByRole('group', { name: 'Online guests' });
+                await list.getByRole('button', { name: 'Invite Bandmate' }).click();
+                await expect(status).toHaveText('Invitation sent to Bandmate. Waiting for a reply.');
+                await expect(offer).toContainText(`RoomHost invited you to ${room}.`);
+            }
+            await send();
+            await offer.getByRole('button', { name: 'Not now' }).click();
+            await expect(status).toHaveText('Bandmate declined the invitation.');
+            await send();
+            await offer.getByRole('button', { name: 'Join room' }).click();
+            await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+            await expect(status).toHaveText('Bandmate accepted and joined.');
+            await expect(offer).toBeHidden();
+            expect(await guest.evaluate(() => [window.copiedInvite, window.browserOpens, window.audioRequests]))
+                .toEqual(['', [], 0]);
+        } finally { await f.close(); }
+    });
+}
+
+test('the crowded invite list scrolls on a 375px phone while Cancel stays visible', async ({ browser, baseURL }, testInfo) => {
+    const f = await browserRoom(browser, baseURL, true, { width: 375, height: 667 });
+    try {
+        const host = await f.join('RoomHost', false, 'rad-dad');
+        const busy = await f.join('BusyBandmate', false, 'stalemate');
+        await busy.click('[data-show="rooms"]');
+        await busy.click('[data-start="jam"]');
+        await expect(busy.locator('[data-jam]')).toBeVisible();
+        for (let i = 1; i <= 11; i++) await f.join(`Bandmate${i}`, false, i % 2 ? 'stalemate' : 'rad-dad');
+        await host.click('[data-show="rooms"]');
+        await host.click('[data-start="jam"]');
+        await host.getByRole('button', { name: 'Invite bandmate to room' }).click();
+        const list = host.getByRole('group', { name: 'Online guests' });
+        const cancel = host.getByRole('button', { name: 'Cancel', exact: true });
+        await expect(list.getByRole('button')).toHaveCount(12);
+        await expect(list.getByRole('button', { name: 'Invite BusyBandmate (busy)' })).toHaveText('BusyBandmate · Busy');
+        expect(await list.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
+        await expect(cancel).toBeInViewport({ ratio: 1 });
+        const file = testInfo.outputPath('invite-roster-375.png');
+        await host.screenshot({ path: file, animations: 'disabled' });
+        await testInfo.attach('crowded invite roster', { path: file, contentType: 'image/png' });
+        await list.evaluate(el => { el.scrollTop = el.scrollHeight; });
+        await expect(list.getByRole('button', { name: 'Invite BusyBandmate (busy)' })).toBeInViewport({ ratio: 1 });
+        await expect(cancel).toBeInViewport({ ratio: 1 });
+        await cancel.click();
+        await expect(host.getByRole('dialog', { name: 'Invite a guest' })).toBeHidden();
+    } finally { await f.close(); }
+});
 
 test('a host can share a browser invite pasted with its surrounding message', async ({ browser, baseURL }) => {
     const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });

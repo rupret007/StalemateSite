@@ -28,6 +28,40 @@ const cmd = (u, name, args = [], ch = LOBBY) => L.message(u.id, JSON.stringify({
 // Explicit nickname-intent fixtures only; generic/selected/malformed commands stay separate.
 const namedCmd = (u, name, args = [], ch = LOBBY) => L.message(u.id, JSON.stringify({ t: 'cmd', name, args, ch, personNamed: true }));
 const got = (u) => inbox.get(u.id) || [];
+
+it('tracks a room invitation only between the original host and guest, and expires it without granting access', () => {
+    boot();
+    const host = join('InviteHost'), guest = join('InviteGuest'), other = join('OtherGuest');
+    const ch = '#jam-garage';
+    const send = (user, frame) => L.message(user.id, JSON.stringify(frame));
+    cmd(host, 'join', [ch]);
+    const roomInstance = got(host).find(m => m.t === 'join' && m.ch.name === ch).ch.keepRef;
+    function offer(request) {
+        send(host, { t: 'room-invite-request', request, ch, roomInstance, peer: guest.id });
+        expect(got(host).at(-1)).toMatchObject({ t: 'room-invite-result', request, status: 'sent' });
+        expect(got(guest).at(-1)).toMatchObject({ t: 'invite', request, ch, roomInstance });
+        expect(got(other).some(m => m.request === request)).toBe(false);
+    }
+    const expired = 'a'.repeat(32);
+    offer(expired);
+    send(other, { t: 'room-invite-answer', request: expired, accept: true });
+    expect(got(host).at(-1)).toMatchObject({ status: 'sent' });
+    clock += 120_000;
+    L.tick();
+    expect(got(host)).toContainEqual({ t: 'room-invite-result', request: expired, status: 'expired' });
+    expect(got(guest)).toContainEqual({ t: 'room-invite-ended', request: expired, status: 'expired' });
+    cmd(guest, 'join', [ch]);
+    expect(got(guest).some(m => m.t === 'join' && m.ch.name === ch)).toBe(false);
+    const accepted = 'b'.repeat(32);
+    offer(accepted);
+    send(guest, { t: 'room-invite-answer', request: accepted, accept: true });
+    expect(got(guest).some(m => m.t === 'join' && m.ch.name === ch)).toBe(true);
+    expect(got(host)).toContainEqual({ t: 'room-invite-result', request: accepted, status: 'accepted' });
+    cmd(guest, 'part', [], ch);
+    cmd(guest, 'join', [ch]);
+    expect(got(guest).filter(m => m.t === 'join' && m.ch.name === ch)).toHaveLength(1);
+});
+
 const lines = (u) => got(u).filter((m) => m.t === 'line').map((m) => m.text);
 const notices = (u) => got(u).filter((m) => m.t === 'notice' || m.t === 'denied').map((m) => m.text).join('\n');
 const later = (ms) => { clock += ms; };

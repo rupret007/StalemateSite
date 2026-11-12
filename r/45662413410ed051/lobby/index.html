@@ -51,7 +51,7 @@
             <button class="btn btn--ghost" type="button" data-invite-quick-cancel>Cancel</button>
         </div>
         <form data-invite-form>
-            <label class="channel-label" for="invite-person">Choose a current person</label>
+            <label class="channel-label" for="invite-person">Choose someone online</label>
             <select id="invite-person" data-invite-options aria-describedby="invite-person-hint"></select>
             <p class="small" id="invite-person-hint">This choice stays with that connection if their nickname changes.</p>
             <button class="btn" type="button" data-invite-person-send>Invite selected person</button>
@@ -245,6 +245,7 @@
                 <h3 class="jam-title" id="jam-title">Live music with WebJam</h3>
                 <p class="small jam-note">Browser audio: headphones required; higher delay.</p>
                 <button class="btn btn--ghost jam-room-invite" type="button" data-jam-invite-room aria-haspopup="dialog" hidden>Invite bandmate to room</button>
+                <p class="small room-invite-status" data-room-invite-status role="status"></p>
                 <ol class="small jam-host-steps" id="jam-host-steps" data-jam-host-steps hidden>
                     <li>In the WebJam beta app on your Mac, choose <strong>Music → Host</strong>.</li>
                     <li>Once your bandmate is in this room, click <strong>Copy browser invite</strong> in WebJam.</li>

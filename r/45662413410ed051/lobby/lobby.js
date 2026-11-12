@@ -466,6 +466,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const fourButtons = [], fourCells = [];
     const gameReturnKey = 'hangout-game-return';
     const gameInvites = new Map();
+    const sentRoomInvites = new Map();
+    let roomInvitesSupported = false;
     let gameReturn = null, gameReturnOffered = false, joiningGameRoom = '';
     // Jam rooms are invite-only like Game Night, so the directory cannot lead
     // an invited guest back. They share the same offer and return controls.
@@ -576,6 +578,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         connectionState = state;
         if (state !== 'connected') {
             gameInvites.clear(); gameReturnOffered = false; joiningGameRoom = ''; drawGameOffer();
+            for (const invite of sentRoomInvites.values()) clearTimeout(invite.timer);
+            sentRoomInvites.clear();
             clearGameLinks(); clearJamInvitations();
             if (pendingKeep) clearKeep(pendingKeep.stage === 'submitted' ? 'Keeping this room was not confirmed. Check Host tools after reconnecting.' : 'Your room return was interrupted. Nothing was kept.');
         }
@@ -923,6 +927,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             privateMessageContextSupported = m.features?.privateMessageContext === 1;
             privateMessagePeersSupported = m.features?.privateMessagePeers === 1;
             personTargetsSupported = m.features?.personTargets === 1; app.selfId = ''; personPreferencePending = null;
+            roomInvitesSupported = m.features?.roomInvites === 1;
             app.ignores.clear(); app.peerIgnores.clear();
             entrySharing.setSupported(entrySourcesSupported); drawEntryChoice();
             keepSupported = m.features?.roomKeep === 1;
@@ -1059,6 +1064,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             const leavingGame = app.chans.get(m.ch)?.kind === 'game';
             const leavingFromButton = app.active === m.ch && document.activeElement === $('[data-leave]');
             forgetGameRoom(m.ch);
+            const sent = sentRoomInvites.get(m.ch);
+            if (sent) { clearTimeout(sent.timer); sentRoomInvites.delete(m.ch); }
             app.chans.delete(m.ch);
             if (m.t === 'closed') toast(`${m.ch} was ${m.reason}.`);
             if (app.active === m.ch) switchTo('#stalemate');
@@ -1111,13 +1118,38 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (view) pushLine(`pm:${view.ref}`, { ...m, ch: `pm:${view.ref}` }); break;
         }
         case 'pm-setting': $('[data-pm-off]').checked = m.off; toast(m.text); break;
+        case 'room-invite-result': {
+            const sent = [...sentRoomInvites.values()].find(invite => invite.request === m.request);
+            if (!sent || !['sent', 'accepted', 'declined', 'expired', 'unavailable'].includes(m.status)) break;
+            if (m.status !== 'sent' || Number.isFinite(m.until)) updateSentRoomInvite(sent, m.status, m.until);
+            break;
+        }
+        case 'room-invite-ended': {
+            const offer = [...gameInvites.values()].find(invite => invite.request === m.request);
+            if (!offer) break;
+            if (joiningGameRoom === offer.room) {
+                joiningGameRoom = '';
+                if (m.status === 'expired') toast('That invitation expired. Ask your host to send another.');
+                if (m.status === 'unavailable') toast('The room is unavailable. Ask your host to try again.');
+            }
+            forgetGameRoom(offer.room);
+            break;
+        }
         case 'invite':
             if (jamRoomName(m.ch) || gameNightSupported && gameNightRoomName(m.ch) && roomNonce(m.roomInstance)) {
                 if (!app.chans.has(m.ch)) {
                     if (!gameInvites.has(m.ch) && gameInvites.size === 5 && !joiningGameRoom)
                         gameInvites.delete(gameInvites.keys().next().value);
-                    if (gameInvites.has(m.ch) || gameInvites.size < 5)
-                        gameInvites.set(m.ch, { room: m.ch, ref: roomNonce(m.roomInstance) ? m.roomInstance : undefined, by: m.by });
+                    if (gameInvites.has(m.ch) || gameInvites.size < 5) {
+                        const request = roomNonce(m.request) && Number.isFinite(m.until) ? m.request : '';
+                        const offer = { room: m.ch, ref: roomNonce(m.roomInstance) ? m.roomInstance : undefined, by: m.by, request };
+                        if (request) setTimeout(() => {
+                            if (gameInvites.get(m.ch) !== offer) return;
+                            if (joiningGameRoom === m.ch) joiningGameRoom = '';
+                            forgetGameRoom(m.ch);
+                        }, Math.max(0, Math.min(120000, m.until - Date.now())));
+                        if (request || !gameInvites.get(m.ch)?.request) gameInvites.set(m.ch, offer);
+                    }
                     drawGameOffer();
                 }
             } else toast(`${m.by} invited you to ${m.ch}`, [['Join', () => cmd('join', [m.ch])]]);
@@ -1471,13 +1503,19 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     $('[data-game-offer-join]').addEventListener('click', () => {
         const offer = currentGameOffer();
         if (!offer || joiningGameRoom || connectionState !== 'connected' || sessionEnded || app.sharingStopped) return;
-        if (!cmd('join', [offer.room], app.active, offer.ref)) return toast(jamRoomName(offer.room) ? 'Reconnect before joining the room.' : 'Reconnect before joining Game Night.');
+        const sent = offer.request
+            ? send({ t: 'room-invite-answer', request: offer.request, accept: true })
+            : cmd('join', [offer.room], app.active, offer.ref);
+        if (!sent) return toast(jamRoomName(offer.room) ? 'Reconnect before joining the room.' : 'Reconnect before joining Game Night.');
         joiningGameRoom = offer.room;
         drawGameOffer();
     });
     $('[data-game-offer-dismiss]').addEventListener('click', () => {
         const offer = currentGameOffer();
-        if (offer && !joiningGameRoom) forgetGameRoom(offer.room);
+        if (!offer || joiningGameRoom) return;
+        if (offer.request && !send({ t: 'room-invite-answer', request: offer.request, accept: false }))
+            return toast('Reconnect before declining the invitation.');
+        forgetGameRoom(offer.room);
     });
     window.addEventListener('pagehide', () => {
         const c = app.chans.get(gameReturn?.room);
@@ -1549,6 +1587,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (!next) return;
         $('[data-jam]').hidden = false; $('[data-jam-form]').hidden = !next.host;
         $('[data-jam-invite-room]').hidden = !next.host;
+        drawSentRoomInvite(c);
         const desktop = $('[data-jam-desktop]');
         desktop.hidden = !next.desktop;
         if (/^webjam:\/\//.test(next.desktop)) desktop.setAttribute('href', next.desktop);
@@ -2269,6 +2308,30 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     $('[data-palette]').addEventListener('close', () => { if (!$('[data-palette]').open) paletteContext = null; });
 
     let inviteInstance = '', invitePeople = new Map(), jamInviteOpener = null;
+    function drawSentRoomInvite(room) {
+        const invite = sentRoomInvites.get(room.name);
+        const status = $('[data-room-invite-status]');
+        const messages = invite && {
+            sending: `Sending invitation to ${invite.nick}…`,
+            sent: `Invitation sent to ${invite.nick}. Waiting for a reply.`,
+            accepted: `${invite.nick} accepted and joined.`,
+            declined: `${invite.nick} declined the invitation.`,
+            expired: `The invitation to ${invite.nick} expired.`,
+            unavailable: `The invitation to ${invite.nick} couldn’t be completed. Try again when they’re online.`,
+        };
+        const text = amOp(room) && messages ? messages[invite.status] : '';
+        if (status.textContent !== text) status.textContent = text;
+        $('[data-jam-invite-room]').setAttribute('aria-disabled', String(
+            !!invite && ['sending', 'sent'].includes(invite.status)));
+    }
+    function updateSentRoomInvite(invite, status, until) {
+        clearTimeout(invite.timer);
+        invite.status = status;
+        if (status === 'sending' || status === 'sent') invite.timer = setTimeout(() => {
+            if (sentRoomInvites.get(invite.room.name) === invite) updateSentRoomInvite(invite, 'expired');
+        }, status === 'sending' ? 10000 : Math.max(0, Math.min(120000, until - Date.now())));
+        if (store(app.active) === invite.room) drawSentRoomInvite(invite.room);
+    }
     function closeInviteDialog() {
         inviteInstance = ''; invitePeople.clear();
         inviteContext = null; $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
@@ -2285,8 +2348,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-invite-quick]').hidden = !quick; $('[data-invite-form]').hidden = quick;
         list.replaceChildren(); options.replaceChildren(); error.textContent = '';
         $('[data-invite-nick]').value = '';
-        const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose a current person'; options.append(placeholder);
-        for (const person of app.chans.get('#stalemate')?.names || []) {
+        const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose someone online'; options.append(placeholder);
+        const online = new Map();
+        for (const room of app.chans.values()) if (room.kind === 'lobby') {
+            for (const person of room.names || []) online.set(person.id, person);
+        }
+        for (const person of online.values()) {
             if (!personId(person.id) || person.id === app.selfId || current.names.some(member => member.id === person.id)) continue;
             const context = personContext(person.id, current.name, inviteInstance, person.nick);
             invitePeople.set(person.id, context);
@@ -2294,12 +2361,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 const button = document.createElement('button');
                 button.type = 'button';
                 button.className = 'btn btn--ghost';
-                button.textContent = person.nick;
-                button.setAttribute('aria-label', `Invite ${person.nick}`);
+                button.textContent = person.busy ? `${person.nick} · Busy` : person.nick;
+                button.setAttribute('aria-label', `Invite ${person.nick}${person.busy ? ' (busy)' : ''}`);
                 button.addEventListener('click', () => sendInviteToPerson(context, error));
                 list.append(button);
             } else {
-                const option = document.createElement('option'); option.value = person.id; option.textContent = person.nick; options.append(option);
+                const option = document.createElement('option'); option.value = person.id;
+                option.textContent = person.busy ? `${person.nick} · Busy` : person.nick; options.append(option);
             }
         }
         $('[data-invite-empty]').hidden = invitePeople.size > 0;
@@ -2308,7 +2376,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const first = quick ? list.querySelector('button') || $('[data-invite-quick-cancel]') : $('[data-invite-nick]');
         first.focus();
     }
-    $('[data-jam-invite-room]').addEventListener('click', event => openInviteDialog(event.currentTarget));
+    $('[data-jam-invite-room]').addEventListener('click', event => {
+        if (event.currentTarget.getAttribute('aria-disabled') !== 'true') openInviteDialog(event.currentTarget);
+    });
     $('[data-invite-cancel]').addEventListener('click', closeInviteDialog);
     $('[data-invite-quick-cancel]').addEventListener('click', closeInviteDialog);
     $('[data-invite-dialog]').addEventListener('close', () => {
@@ -2327,12 +2397,22 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const current = store(app.active);
         if (!inviteContext || inviteContext !== current || current.keepRef !== inviteInstance || !amOp(current)
             || !context || invitePeople.get(context.peer) !== context) {
-            error.textContent = 'Choose a current person in the original room.'; return;
+            error.textContent = 'Open the invite list from your room and choose someone online.'; return;
         }
         // Invitation target may be outside this room, but must remain the
         // original live connection in the shared lobby's current roster.
         const person = findPerson(context.peer);
-        if (!person || !personContextValid(context)) { error.textContent = 'That person is no longer confirmed.'; return; }
+        if (!person || !personContextValid(context)) { error.textContent = 'That guest went offline. Choose someone else or try again when they’re back.'; return; }
+        if (jamInviteOpener && roomInvitesSupported) {
+            const request = crypto.randomUUID().replaceAll('-', '');
+            if (send({ t: 'room-invite-request', request, ch: current.name, roomInstance: context.instance, peer: context.peer })) {
+                const invite = { request, room: current, nick: person.nick };
+                sentRoomInvites.set(current.name, invite);
+                updateSentRoomInvite(invite, 'sending');
+                closeInviteDialog();
+            } else error.textContent = 'The invitation was not sent. Reconnect and try again.';
+            return;
+        }
         if (send({ t: 'cmd', name: 'invite', args: [person.nick, current.name], ch: context.channel, roomInstance: context.instance, personContext: 1, personPeer: context.peer })) closeInviteDialog();
         else error.textContent = 'The invitation was not sent. Reconnect before trying again.';
     }
