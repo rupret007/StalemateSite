@@ -976,7 +976,16 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return finishRoomInvite(request, offer, 'expired');
         if (!accept) return finishRoomInvite(request, offer, 'declined');
         personDependency(host, room);
-        return finishRoomInvite(request, offer, enter(guest, room, { invited: true }) ? 'accepted' : 'unavailable');
+        return finishRoomInvite(request, offer, acceptJamInvitation(guest, room) ? 'accepted' : 'unavailable');
+    }
+
+    function acceptJamInvitation(guest, room) {
+        if (!room.invites.has(guest.dev) && (room.invites.size >= 150 || !roomCapacity())) return false;
+        if (!enter(guest, room, { invited: true })) return false;
+        // An accepted invitation keeps the ordinary device-bound return path.
+        // The pending offer itself stays bound to the selected connection.
+        room.invites.add(guest.dev);
+        return true;
     }
 
     function restoreRoomInvites(stored, records) {
@@ -1587,6 +1596,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         part(c, chan, [maybe]) {
             const target_ = maybe && ch(maybe) ? ch(maybe) : chan;
             if (target_.kind === 'lobby' && !isBand(c)) return bot(c, 'You can’t part #stalemate, but you can /quit.', 'error');
+            if (target_.kind === 'jam' && target_.members.has(c.id)) target_.invites.delete(c.dev);
             return leave(c, target_);
         },
         quit(c, _chan, args) { kill(c, 1000, commitConfigured ? 'Quit' : normalize(args.join(' '), 80) || 'Quit'); },
