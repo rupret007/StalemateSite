@@ -116,6 +116,41 @@ const paste = async (page, value) => {
     await page.locator('[data-jam-form] button[type="submit"]').click();
 };
 
+test('only the selected guest can accept a music invitation and open the audio check', async ({ browser, baseURL }) => {
+    const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });
+    try {
+        const host = await f.join('MusicHost');
+        const guest = await f.join('ChosenGuest');
+        const other = await f.join('OtherGuest');
+        await host.click('[data-show="rooms"]');
+        await host.click('[data-start="jam"]');
+        await expect(host.locator('[data-jam]')).toBeVisible();
+        const room = await host.locator('[data-chat-context]').textContent();
+        const invite = `https://webjam.example/join/#k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=${Math.floor(Date.now() / 1000) + 120}`;
+        // This supplies the app-issued test link at the host transport
+        // boundary. Native desktop pairing is covered separately.
+        await host.evaluate(({ room, href }) => {
+            const instance = __lobby.chans.get(room).keepRef;
+            const peer = __lobby.chans.get('#stalemate').names.find(person => person.nick === 'ChosenGuest').id;
+            __lobby.ws.send(JSON.stringify({ t: 'music-invite-offer', ch: room, roomInstance: instance, peer, href }));
+        }, { room, href: invite });
+        const panel = guest.locator('[data-music-invite]');
+        await expect(panel).toContainText('MusicHost invited you to play');
+        await expect(other.locator('[data-music-invite]')).toBeHidden();
+        await expect(guest.locator('[data-chat-context]')).toHaveText('#stalemate');
+        await panel.getByRole('button', { name: 'Accept and join' }).press('Enter');
+        await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
+        const audio = panel.getByRole('button', { name: 'Open audio check' });
+        await expect(audio).toBeFocused();
+        await audio.press('Enter');
+        expect(await guest.evaluate(() => window.browserOpens)).toEqual([[invite, '_blank', 'noopener,noreferrer']]);
+        expect(await guest.evaluate(() => window.audioRequests)).toBe(0);
+        expect(await guest.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain(invite);
+        expect(f.external).toEqual([]);
+    } finally { await f.close(); }
+});
+
 test('a host can share a browser invite pasted with its surrounding message', async ({ browser, baseURL }) => {
     const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });
     try {

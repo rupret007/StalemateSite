@@ -47,6 +47,7 @@ export function createHangoutRelay({ previewKey = 'local-preview-key-0001', orig
     });
     const lobby = createLobby({
         gameNight: true,
+        directMusicInvites: true,
         now,
         limits: lobbyLimits,
         persist,

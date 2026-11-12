@@ -459,6 +459,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let pendingJamShare = null;
     let jamShareResultsSupported = false, jamShareTimer;
     let jamInviteExpiryTimer;
+    let musicInvite = null, musicInviteTimer;
     const jamWaitingCopy = $('[data-jam-wait]').textContent;
     let gameNightSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
     let fourInARowSupported = false, fourRoom = null, fourPlayed = false;
@@ -1111,6 +1112,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (view) pushLine(`pm:${view.ref}`, { ...m, ch: `pm:${view.ref}` }); break;
         }
         case 'pm-setting': $('[data-pm-off]').checked = m.off; toast(m.text); break;
+        case 'music-invite':
+        case 'music-invite-accepted':
+        case 'music-invite-ended':
+            receiveMusicInvite(m);
+            break;
+        case 'music-invite-sent':
+            if (currentJam()?.keepRef === m.roomInstance) toast('Music invitation sent.');
+            break;
         case 'invite':
             if (jamRoomName(m.ch) || gameNightSupported && gameNightRoomName(m.ch) && roomNonce(m.roomInstance)) {
                 if (!app.chans.has(m.ch)) {
@@ -1494,11 +1503,76 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (!link || !window.HangoutQrLite?.draw) { canvas.removeAttribute('data-invite-url'); return; }
         window.HangoutQrLite.draw(canvas, link);
     }
+    function receiveMusicInvite(frame) {
+        if (!roomNonce(frame.id) || connectionState !== 'connected' || app.sharingStopped || app.localMediaPaused) return;
+        if (frame.t === 'music-invite') {
+            if (!jamRoomName(frame.ch) || !roomNonce(frame.roomInstance) || typeof frame.by !== 'string'
+                || !Number.isSafeInteger(frame.expires) || frame.expires <= Date.now()) return;
+            musicInvite = { id: frame.id, room: frame.ch, instance: frame.roomInstance, from: frame.by, expires: frame.expires, state: 'offer' };
+            clearTimeout(musicInviteTimer);
+            musicInviteTimer = setTimeout(endMusicInvite, Math.min(frame.expires - Date.now(), 600000));
+        } else if (musicInvite?.id !== frame.id) return;
+        else if (frame.t === 'music-invite-ended') return endMusicInvite();
+        else if (musicInvite.state !== 'joining') return;
+        else {
+            const current = currentJam();
+            const link = typeof frame.href === 'string' && browserInviteLink({ webReady: true, web: frame.href });
+            if (!link || current?.name !== musicInvite.room || current.keepRef !== musicInvite.instance
+                || frame.ch !== musicInvite.room || frame.roomInstance !== musicInvite.instance
+                || browserInviteDeadline(link) !== musicInvite.expires) return endMusicInvite();
+            musicInvite.href = link;
+            musicInvite.state = 'accepted';
+        }
+        drawMusicInvite();
+    }
+    function endMusicInvite() {
+        if (!musicInvite) return;
+        musicInvite.state = 'ended';
+        delete musicInvite.href;
+        drawMusicInvite();
+    }
+    function drawMusicInvite() {
+        const panel = $('[data-music-invite]');
+        const action = $('[data-music-invite-action]');
+        const dismiss = $('[data-music-invite-dismiss]');
+        const accepted = musicInvite?.state === 'accepted';
+        const ended = musicInvite?.state === 'ended';
+        const current = currentJam();
+        panel.hidden = !musicInvite || (accepted && (current?.name !== musicInvite.room || current.keepRef !== musicInvite.instance));
+        if (panel.hidden) return;
+        $('[data-music-invite-status]').textContent = ended ? 'This music invitation ended. Ask the host for a fresh one.'
+            : accepted ? 'You’re in the Jam room. Open the audio check when you’re ready.'
+            : `${musicInvite.from} invited you to play in ${musicInvite.room}.`;
+        if (ended && document.activeElement === action) dismiss.focus();
+        action.hidden = ended;
+        action.setAttribute('aria-disabled', String(musicInvite.state === 'joining'));
+        action.textContent = accepted ? 'Open audio check' : musicInvite.state === 'joining' ? 'Joining…' : 'Accept and join';
+        dismiss.textContent = ended ? 'Dismiss' : 'Not now';
+    }
+    $('[data-music-invite-action]').addEventListener('click', () => {
+        const offer = musicInvite;
+        if (!offer || offer.expires <= Date.now()) return endMusicInvite();
+        if (offer.state === 'accepted' && !$('[data-music-invite]').hidden) {
+            window.open(offer.href, '_blank', 'noopener,noreferrer');
+        } else if (offer.state === 'offer' && send({ t: 'music-invite-accept', ch: offer.room, roomInstance: offer.instance, id: offer.id })) {
+            offer.state = 'joining';
+            drawMusicInvite();
+        }
+    });
+    $('[data-music-invite-dismiss]').addEventListener('click', () => {
+        clearTimeout(musicInviteTimer);
+        musicInvite = null;
+        drawMusicInvite();
+        focusChannelTab(app.active);
+    });
     function clearJamInvitations() {
         // A disconnected tab has no current room admission. Purge cached
         // capabilities too, so selecting an old tab cannot reveal them again.
         for (const c of app.chans.values()) if (c.kind === 'jam') c.jam = null;
         jamContext = null;
+        clearTimeout(musicInviteTimer);
+        musicInvite = null;
+        drawMusicInvite();
         resetJamControls();
     }
     function currentJam() {
@@ -1783,6 +1857,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (inviteContext && (inviteContext !== c || connectionState !== 'connected' || !amOp(c))) closeInviteDialog();
         $('[data-roombar]').hidden = app.sharingStopped || app.localMediaPaused || !room;
         drawJam();
+        drawMusicInvite();
         drawGameNight();
         const showAct = !app.sharingStopped && !app.localMediaPaused && room && ['bobross', 'watch', 'art'].includes(c.kind);
         $('[data-activity]').hidden = !showAct;
