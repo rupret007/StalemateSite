@@ -297,20 +297,26 @@ async function openOwnedInvitation(page, width = 390, skipCheck = true) {
 test('losing the checked microphone clears Join readiness until a deliberate recheck', async ({ page }) => {
   await openOwnedInvitation(page, 390, false);
   await page.getByRole('button', { name: 'Check microphone', exact: true }).click();
-  await expect(page.locator('#join')).toBeEnabled();
+  const join = page.getByRole('button', { name: 'Join with microphone', exact: true });
+  const retry = page.getByRole('button', { name: 'Try again', exact: true });
+  await expect(join).toBeEnabled();
+  await join.focus();
+  await expect(join).toBeFocused();
   await page.evaluate(() => {
     captureTracks[0].stop();
     captureTracks[0].dispatchEvent(new Event('ended'));
   });
   await expect(page.locator('#mic-error')).toContainText('Microphone disconnected');
   await expect(page.locator('#mic-heard')).toBeHidden();
-  await expect(page.locator('#join')).toBeDisabled();
+  await expect(join).toBeDisabled();
+  await expect(retry).toBeFocused();
   expect(await page.evaluate(() => captureTracks.length)).toBe(1);
-  await page.getByRole('button', { name: 'Try again', exact: true }).click();
-  await expect(page.locator('#join')).toBeEnabled();
+  await retry.press('Enter');
+  await expect(join).toBeEnabled();
+  await expect(join).toBeFocused();
   expect(await page.evaluate(() => captureTracks.length)).toBe(2);
   await page.evaluate(() => captureTracks[0].dispatchEvent(new Event('ended')));
-  await expect(page.locator('#join')).toBeEnabled();
+  await expect(join).toBeEnabled();
 });
 
 for (const skipCheck of [false, true]) {
