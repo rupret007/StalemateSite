@@ -1839,12 +1839,21 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (four) four.open = true;
         const heading = panel.querySelector('summary');
         heading.focus({ preventScroll: true });
-        const reveal = () => heading.scrollIntoView({ block: 'start', behavior: 'instant' });
+        const reveal = () => {
+            const target = panel.offsetHeight < panel.parentElement.clientHeight ? panel : heading;
+            target.scrollIntoView({ block: 'center', behavior: 'instant' });
+        };
         reveal();
         // Some games reset the scroll position as their panel opens.
         if (!wasOpen) panel.addEventListener('toggle', () => {
             if (panel.open && document.activeElement === heading) reveal();
         }, { once: true });
+        // The start controls can appear after the match service responds.
+        const resize = new ResizeObserver(() => {
+            if (panel.open && document.activeElement === heading) reveal();
+        });
+        resize.observe(panel);
+        heading.addEventListener('blur', () => resize.disconnect(), { once: true });
     });
     window.addEventListener('pagehide', () => {
         const current = currentGameNight();
