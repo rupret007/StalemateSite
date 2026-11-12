@@ -292,7 +292,7 @@ async function runtime(phase, state, nonce) {
         const hello = await visitor.wait(f => f.t === 'hello', 'actual hello');
         if (FANOUT_50 && admissionProfile) admissionProfile.serverHello = performance.now();
         assert.deepEqual(hello.features, { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1,
-            personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, gameNight: 1,
+            personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, roomInvites: 1, gameNight: 1,
             fourInARow: 1, discordLinks: !PARTICIPATION, transportPing: 1 });
         assert.equal(hello.role, 'fan');
         if (FANOUT_50 && admissionProfile) admissionProfile.clientHello = performance.now();
