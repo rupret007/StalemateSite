@@ -16,6 +16,10 @@ export { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget };
 const ROOT = '/r/45662413410ed051/';
 const CSP = "default-src 'self'; script-src 'self' https://challenges.cloudflare.com https://www.youtube.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' wss: https://challenges.cloudflare.com https://www.youtube.com https://*.googlevideo.com; img-src 'self' data: blob: https://i.ytimg.com; media-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 const WEB_JOIN_CSP = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' https://webjam-turn-credentials.jeffstory007.workers.dev; media-src 'self' blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+const READ_ONLY_PAGE = {
+    'Content-Security-Policy': "default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    'Permissions-Policy': 'camera=(), geolocation=(), microphone=()',
+};
 const LOBBY_ENTRANCE = `<!doctype html>
 <html lang="en">
 <head>
@@ -52,6 +56,22 @@ const WEB_JOIN_ENTRANCE = `<!doctype html>
 <section id="login" aria-label="Private invitation" hidden>
 ${invitationForm('Continue to audio check')}
 </section>
+</main>
+</body>
+</html>`;
+const WEB_JOIN_UNAVAILABLE = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Browser audio is unavailable · WebJam</title>
+<link rel="stylesheet" href="/beta/style.css">
+</head>
+<body>
+<main>
+<h1>Browser audio is unavailable</h1>
+<p>Browser audio is turned off for this private beta. You can still use Hang Out.</p>
+<p><a class="button" href="${ROOT}lobby/">Return to Hang Out</a></p>
 </main>
 </body>
 </html>`;
@@ -286,15 +306,13 @@ async function betaRequest(request, env, deps = {}) {
         return json({ error: 'Unknown request.' }, 404);
     }
     const session = await betaSession(request, env);
+    const webJoinPage = ['/join', '/join/', '/join/index.html'].includes(assetPath);
     if (!session) {
         if (['GET', 'HEAD'].includes(request.method) && !request.headers.get('Upgrade')
             && [`${ROOT}lobby`, `${ROOT}lobby/`, `${ROOT}lobby/index.html`].includes(assetPath)) {
-            return reply(request.method === 'HEAD' ? null : LOBBY_ENTRANCE, 401, 'text/html; charset=utf-8', {
-                'Content-Security-Policy': "default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
-                'Permissions-Policy': 'camera=(), geolocation=(), microphone=()',
-            });
+            return reply(request.method === 'HEAD' ? null : LOBBY_ENTRANCE, 401, 'text/html; charset=utf-8', READ_ONLY_PAGE);
         }
-        if (['GET', 'HEAD'].includes(request.method) && ['/join', '/join/', '/join/index.html'].includes(assetPath)) {
+        if (['GET', 'HEAD'].includes(request.method) && webJoinPage) {
             return reply(request.method === 'HEAD' ? null : WEB_JOIN_ENTRANCE, 401, 'text/html; charset=utf-8', {
                 'Content-Security-Policy': "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
                 'Permissions-Policy': 'camera=(), geolocation=(), microphone=()',
@@ -367,7 +385,12 @@ async function betaRequest(request, env, deps = {}) {
         return worker.fetch(next, { ...env, HANGOUT_EXTRA_ORIGINS: url.origin });
     }
     if ((assetPath === `${ROOT}admin` || assetPath.startsWith(`${ROOT}admin/`)) && session.identity?.kind !== 'staff') return reply('Restricted moderator sign-in required.', 403);
-    if (lobbyParticipationMode(env) && (assetPath === '/join' || assetPath.startsWith('/join/'))) return reply('This audio path is unavailable under the current participation permissions.', 503);
+    if (lobbyParticipationMode(env) && (assetPath === '/join' || assetPath.startsWith('/join/'))) {
+        if (webJoinPage && ['GET', 'HEAD'].includes(request.method) && !request.headers.get('Upgrade')) {
+            return reply(request.method === 'HEAD' ? null : WEB_JOIN_UNAVAILABLE, 503, 'text/html; charset=utf-8', READ_ONLY_PAGE);
+        }
+        return reply('This audio path is unavailable under the current participation permissions.', 503);
+    }
     if (!['GET', 'HEAD'].includes(request.method)) return reply('Method not allowed.', 405);
     const asset = await env.ASSETS.fetch(request);
     if (assetPath === '/join' || assetPath.startsWith('/join/')) {
