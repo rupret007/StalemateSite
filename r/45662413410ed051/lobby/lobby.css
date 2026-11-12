@@ -291,6 +291,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .arcade-card-status, .arcade-card-error, .arcade-card-hand-label { margin: 4px 0; }
 .arcade-card-error:empty { display: none; }
 .arcade-card-error { color: #ffc497; }
+.arcade-invite-friend { min-height: 44px; margin: 0 8px 8px 0; }
 .arcade-card-table [data-card-table] { max-width: 420px; }
 .arcade-card-score, .arcade-card-piles, .arcade-card-actions { display: flex; gap: 5px 8px; flex-wrap: wrap; align-items: center; }
 .arcade-card-score > span { background: var(--surface); border: 1px solid var(--line); padding: 4px 7px; border-radius: 5px; font-size: .78rem; }
