@@ -12,6 +12,12 @@ export function discordCallLink(value) {
 // readable by the previous Worker without a storage migration.
 export const gameNightRoomName = name => typeof name === 'string' && /^#game-[a-f0-9]{6}x[a-f0-9]{6}$/.test(name);
 
+export function newGameNightRoomName() {
+    // Split the random name to avoid phone-number matches.
+    const code = crypto.randomUUID().replaceAll('-', '');
+    return `#game-${code.slice(0, 6)}x${code.slice(6, 12)}`;
+}
+
 export const gameNightLabels = Object.freeze({
     chess: 'Royal Flush Chess', crapeights: 'Crappy Eights', turdrummy: 'TurdRummy', turdspades: 'TurdSpades',
     turdjack: 'Crapjack 21', turdtris: 'Turdtris Sprint', turdomania: 'Turdomania Duel',

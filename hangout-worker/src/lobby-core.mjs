@@ -5,7 +5,7 @@ import { ROOM_TTL, LOG_TTL, OWNER_TRANSFER_TTL, roomRecord, validRoom, createRat
 import { checkNick, checkText, defaultLists, normalize } from './filter.mjs';
 import { actSnapshot, applyClear, applyStroke, applyVideo, cleanRtc, parseActFrame, PAINT_KINDS, VIDEO_KINDS } from './lobby-act.mjs';
 import { messageReceipt, receiptDigest } from './message-receipts.mjs';
-import { discordCallLink, dropFour, fourFinished, fourMark, gameNightInvite, gameNightRoomName, openFour } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import { discordCallLink, dropFour, fourFinished, fourMark, gameNightInvite, gameNightRoomName, newGameNightRoomName, openFour } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import { personRoomProjection } from './lobby-effect-records.mjs';
 import { TRANSPORT_CONTROL_BLOCK } from './transport-budget.mjs';
 import { ENTRY_SITES, normalizeEntrySource } from '../../r/45662413410ed051/entry-sites.mjs';
@@ -1579,8 +1579,14 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 && candidate.modes.i && candidate.founder === c.dev && hosts(c, candidate));
             if (room) enter(c, room);
             else if (!ch(request)) {
-                create(c, request, '', '');
-                room = ch(request);
+                // Moderation can reject a generated name. Pick an approved candidate before creating the room once.
+                for (let attempt = 0; attempt < 4; attempt++) {
+                    const name = attempt === 0 ? request : newGameNightRoomName();
+                    if (ch(name) || !roomNameAllowed(name)) continue;
+                    create(c, name, '', '');
+                    room = ch(name);
+                    break;
+                }
             }
             const opened = room?.members.has(c.id);
             return out(c, { t: 'game-room-open', request, ok: !!opened, ...(opened ? { room: room.name, ref: room.keepRef } : {}) });
@@ -2059,6 +2065,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         return `+t${m.m ? 'm' : ''}${m.i ? 'i' : ''}${m.k ? 'k' : ''}${m.C ? 'C' : ''}${m.Q ? 'Q' : ''} l=${m.l}${m.S ? ` S=${m.S}s` : ''}${m.locked ? ' (locked)' : ''}`;
     }
 
+    function roomNameAllowed(name) {
+        return checkText(name.slice(1).replace(/-/g, ' '), net.lists, { handles: false }).verdict === 'ok';
+    }
+
     function create(c, name, key, titleText) {
         const kind = gameNight && gameNightRoomName(name) ? 'game'
             : Object.keys(KINDS).find((k) => k !== 'game' && (name === `#${k}` || name.startsWith(`#${k}-`))) || 'chat';
@@ -2077,8 +2087,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
         const title = titleText ? checkText(titleText, net.lists) : { verdict: 'ok', text: KINDS[kind].replace(/^\S+\s/, '') };
         if (title.verdict !== 'ok') return bot(c, 'Not cool here. Pick another title.', 'error');
-        const nameCheck = checkText(name.slice(1).replace(/-/g, ' '), net.lists, { handles: false });
-        if (nameCheck.verdict !== 'ok') return bot(c, 'Not cool here. Pick another room name.', 'error');
+        if (!roomNameAllowed(name)) return bot(c, 'Not cool here. Pick another room name.', 'error');
         requireParticipation(c, 'createRoom');
         const room = mkChannel(name, kind === 'game' ? 'chat' : kind, title.text.slice(0, 40), c.dev);
         if (c.account) room.opAccounts.set(c.dev, c.account);

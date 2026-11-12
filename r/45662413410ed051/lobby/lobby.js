@@ -4,7 +4,7 @@ import * as entrance from '../entry-sites.mjs';
 import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
 import { createIdleHeartbeat } from './idle-heartbeat.mjs';
-import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourWinningCells, gameInviteCode, gameNightInvite, gameNightRoomName } from './game-night.mjs';
+import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourWinningCells, gameInviteCode, gameNightInvite, gameNightRoomName, newGameNightRoomName } from './game-night.mjs';
 (() => {
     'use strict';
     const { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff,
@@ -1552,9 +1552,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     }
     function openGameRoom(fromEntry = false) {
         if (gameOpenPending) return;
-        // Split the random name so it cannot resemble a phone number.
-        const code = crypto.randomUUID().replaceAll('-', '');
-        const request = `#game-${code.slice(0, 6)}x${code.slice(6, 12)}`;
+        const request = newGameNightRoomName();
         count('room-start-game');
         if (!gameOpenSupported) {
             if (fromEntry) { gameEntry = null; drawGameOffer(); }
