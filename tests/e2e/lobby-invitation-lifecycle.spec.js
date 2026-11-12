@@ -197,6 +197,55 @@ test('an unconfirmed share keeps one request and an editable paste without autom
     } finally { await f.close(); }
 });
 
+for (const late of [false, true]) test(`a published invitation unlocks Share if its separate result is lost (${late ? 'late room state' : 'early room state'})`, async ({ browser, baseURL }) => {
+    const f = await community(browser, baseURL);
+    try {
+        const host = await f.visitor('LostResultHost'), guest = await f.visitor('LostResultGuest');
+        await create(host, '#jam-lostresult');
+        await invite(host, guest, '#jam-lostresult', 'LostResultGuest');
+        await host.clock.install();
+        const held = f.holdServerFrames('LostResultHost');
+        const submit = host.locator('[data-jam-form] button[type="submit"]');
+        await host.fill('[data-jam-link]', FIRST);
+        await submit.click();
+        await expect(guest.locator('[data-jam-copy]')).toBeVisible();
+        const request = f.inbound.find(frame => frame.name === 'jamlink');
+        await expect.poll(() => held.frames.some(raw => {
+            const frame = JSON.parse(raw);
+            return frame.t === 'jam-share-result' && frame.id === request.jamRequestId;
+        })).toBe(true);
+        if (late) {
+            await host.clock.runFor(8_500);
+            await expect(host.locator('[data-jam-share-status]')).toContainText('Still waiting');
+            await expect(submit).toBeDisabled();
+        }
+        held.releaseThrough(frame => frame.t === 'chan' && frame.ch.jam?.invitation === FIRST);
+        const resultIndex = held.frames.findIndex(raw => {
+            const frame = JSON.parse(raw);
+            return frame.t === 'jam-share-result' && frame.id === request.jamRequestId;
+        });
+        expect(resultIndex).toBeGreaterThanOrEqual(0);
+        held.frames.splice(resultIndex, 1);
+        held.release();
+        await expect(host.locator('[data-jam-copy]')).toBeVisible();
+        await host.fill('[data-jam-link]', DRAFT);
+        await expect(submit).toBeDisabled();
+        await host.clock.runFor(late ? 500 : 8_500);
+        await expect(submit).toBeEnabled();
+        await expect(host.locator('[data-jam-share-status]')).toHaveText('Invitation is available in the room. Your paste is kept.');
+        await expect(host.locator('[data-jam-link]')).toHaveValue(DRAFT);
+        expect(f.inbound.filter(frame => frame.name === 'jamlink')).toHaveLength(1);
+
+        await submit.click();
+        await expect(host.locator('[data-jam-share-status]')).toHaveText('Invitation shared.');
+        await expect(host.locator('[data-jam-link]')).toHaveValue('');
+        await expect.poll(() => guest.evaluate(expected => __lobby.chans.get(__lobby.active).jam.invitation === expected, DRAFT)).toBe(true);
+        expect(f.inbound.filter(frame => frame.name === 'jamlink').map(frame => frame.args)).toEqual([
+            ['invitation', FIRST], ['invitation', DRAFT]
+        ]);
+    } finally { await f.close(); }
+});
+
 test('a delayed confirmation from another room cannot clear or share the current room draft', async ({ browser, baseURL }) => {
     const f = await community(browser, baseURL);
     try {

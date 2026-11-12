@@ -240,14 +240,14 @@
                 <p class="small jam-note">Browser audio: headphones required; higher delay.</p>
                 <button class="btn btn--ghost jam-room-invite" type="button" data-jam-invite-room aria-haspopup="dialog" hidden>Invite bandmate to room</button>
                 <ol class="small jam-host-steps" id="jam-host-steps" data-jam-host-steps hidden>
-                    <li>On your Mac, open the supplied WebJam beta app and choose <strong>Music → Host</strong>.</li>
-                    <li>Click <strong>Invite a browser guest → Copy browser invite</strong>.</li>
+                    <li>In the WebJam beta app on your Mac, choose <strong>Music → Host</strong>.</li>
+                    <li>Once your bandmate is in this room, click <strong>Copy browser invite</strong> in WebJam.</li>
                 </ol>
                 <div class="jam-actions" data-jam-actions>
                     <a class="btn" data-jam-desktop href="#" hidden>Open in WebJam 🎸</a>
-                    <button class="btn" type="button" data-jam-copy hidden>Copy full invitation</button>
-                    <button class="btn" type="button" data-jam-invite-copy hidden>Copy invite link</button>
-                    <span class="small" data-jam-wait>Waiting for the host’s invite. When it’s ready, choose Join in browser—no app needed.</span>
+                    <button class="btn" type="button" data-jam-copy hidden>Copy desktop invite</button>
+                    <button class="btn" type="button" data-jam-invite-copy hidden>Copy browser invite</button>
+                    <span class="small" data-jam-wait role="status" tabindex="-1">Waiting for the host’s invite. When it’s ready, choose Join in browser—no app needed.</span>
                     <button class="btn btn--ghost" type="button" data-jam-web disabled title="Your host has not shared an approved browser invite yet">Browser join unavailable</button>
                     <button class="btn btn--ghost" type="button" data-jam-invite-qr-toggle hidden aria-expanded="false">Show QR code</button>
                 </div>
@@ -262,9 +262,9 @@
                     <textarea data-jam-invite-copy-value readonly aria-label="Browser invite link to copy" autocomplete="off" spellcheck="false" rows="2"></textarea>
                 </label>
                 <form class="jam-paste op-only" data-jam-form>
-                    <textarea data-jam-link placeholder="Paste a full desktop invite or browser link" aria-label="WebJam invitation" aria-describedby="jam-host-steps jam-share-help" autocomplete="off" spellcheck="false" maxlength="8192" rows="2"></textarea>
-                    <button class="btn btn--small" type="submit">Share</button>
-                    <p class="small" id="jam-share-help">Paste that link here and click <strong>Share</strong>. Keep the Music session running. For a desktop guest, paste the full desktop invite instead.</p>
+                    <textarea data-jam-link placeholder="Paste an invite link or the whole message" aria-label="WebJam invitation" aria-describedby="jam-host-steps jam-share-help" autocomplete="off" spellcheck="false" maxlength="8192" rows="2"></textarea>
+                    <button class="btn btn--small" type="submit">Share with room</button>
+                    <p class="small" id="jam-share-help">Paste the link and choose <strong>Share with room</strong>. Your bandmate can then choose <strong>Join in browser</strong>. For desktop guests, paste the full desktop invite.</p>
                     <p class="small" data-jam-share-status role="status"></p>
                 </form>
                 <p class="small jam-platform" data-jam-platform>A Mac hosts music in WebJam. Mac and Windows guests can join in a browser. Windows native music needs a signed build; this unsigned beta cannot join natively.</p>
@@ -272,7 +272,7 @@
                     <summary>Setup &amp; invitation help</summary>
                     <p>Use the beta app supplied by your host; the public download may reject this invitation. WebJam connects through a desktop host using Jamulus. Ethernet is recommended; actual delay and dropouts depend on the devices and network.</p>
                     <p>On a computer, copy the invite, open WebJam, choose Join, and paste it there. Opening the app directly is supported on Mac; Windows and Linux require pasting private invites. Phones can use this room’s chat while music runs on a computer.</p>
-                    <p>Hosting a browser guest: in WebJam’s Music room, click <strong>Copy browser invite</strong>. Wait for <strong>Link copied</strong>, then paste the link above and click <strong>Share</strong>. Keep the Music session open. For desktop guests, paste the entire Copy Invite message instead. Sharing an invite does not turn on your microphone.</p>
+                    <p>Hosting a browser guest: in WebJam’s Music room, click <strong>Copy browser invite</strong>. Wait for <strong>Link copied</strong>, then paste the link above and choose <strong>Share with room</strong>. Keep the Music session open. For desktop guests, paste the entire Copy Invite message instead. Sharing an invite does not turn on your microphone.</p>
                     <p>Invites may expire or admit one guest; ask the host for a fresh one if needed. A rejected paste stays editable while you remain this room’s connected host. Leaving the room or stopping locally clears its controls; it does not revoke an invitation already copied. End the music session or remove the guest in the host app when needed.</p>
                 </details>
             </div>
