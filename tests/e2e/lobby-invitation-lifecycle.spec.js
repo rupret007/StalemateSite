@@ -610,8 +610,7 @@ for (const width of [375, 390, 1280]) test(`a Jam room invitation stays actionab
         };
         const inviteGuest = async () => {
             await host.locator('[data-jam-invite-room]').click();
-            await host.locator('[data-invite-options]').selectOption({ label: 'JamGuest' });
-            await host.locator('[data-invite-person-send]').click();
+            await host.getByRole('button', { name: 'Invite JamGuest', exact: true }).click();
             await expect(offer).toContainText(`JamHost invited you to ${room}.`);
         };
         await guest.clock.install();
