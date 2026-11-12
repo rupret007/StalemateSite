@@ -167,7 +167,9 @@ async function expectExposedInviteStatus(page, selector) {
     return status;
 }
 
-test('only the selected guest can accept a music invitation and open the audio check', async ({ browser, baseURL }) => {
+for (const delayed of [false, true]) test(delayed
+    ? 'a guest can recover a failed Music reply and a slow join confirmation'
+    : 'only the selected guest can accept a music invitation and open the audio check', async ({ browser, baseURL }) => {
     const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 }, true);
     try {
         const host = await f.join('MusicHost');
@@ -223,12 +225,51 @@ test('only the selected guest can accept a music invitation and open the audio c
         await expect(guest.locator('[data-text]')).toBeFocused();
         await expect(other.locator('[data-music-invite]')).toBeHidden();
         await expect(guest.locator('[data-chat-context]')).toHaveText('#stalemate');
-        await panel.getByRole('button', { name: 'Accept and join' }).press('Enter');
+        const acceptReply = panel.getByRole('button', { name: 'Accept and join' });
+        if (delayed) {
+            await guest.clock.install();
+            await guest.evaluate(() => {
+                const socket = window.__lobby.ws;
+                const send = socket.send;
+                const onMessage = socket.onmessage;
+                let fail = true;
+                window.musicReplies = 0;
+                socket.send = function (data) {
+                    if (JSON.parse(data).t === 'music-invite-accept') {
+                        if (fail) { fail = false; throw new Error('Synthetic send failure'); }
+                        window.musicReplies++;
+                    }
+                    return send.call(this, data);
+                };
+                socket.onmessage = event => {
+                    if (JSON.parse(event.data).t !== 'music-invite-accepted') return onMessage.call(socket, event);
+                    window.releaseMusicAcceptance = () => {
+                        socket.onmessage = onMessage;
+                        onMessage.call(socket, event);
+                    };
+                };
+            });
+            await acceptReply.press('Enter');
+            await expect(guestStatus).toContainText('Couldn’t send your reply');
+            await expect(acceptReply).toBeFocused();
+        }
+        await acceptReply.press('Enter');
         await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        if (delayed) {
+            await expect(guestStatus).toContainText('Waiting for Hang Out to confirm');
+            await panel.getByRole('button', { name: 'Joining…' }).press('Enter');
+            await guest.waitForFunction(() => typeof window.releaseMusicAcceptance === 'function');
+            await guest.clock.fastForward(10_000);
+            await expect(guestStatus).toContainText('Hang Out hasn’t confirmed your Music invitation');
+            await expect(panel.getByRole('button', { name: 'Dismiss', exact: true })).toBeFocused();
+            await expect(panel.getByRole('button', { name: 'Open audio check' })).toBeHidden();
+            expect(await guest.evaluate(() => window.musicReplies)).toBe(1);
+            await guest.evaluate(() => window.releaseMusicAcceptance());
+        }
         await expect(guestStatus).toHaveText('You’re in the Jam room. Open the audio check when you’re ready.');
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
         const audio = panel.getByRole('button', { name: 'Open audio check' });
-        await expect(audio).toBeFocused();
+        await expect(delayed ? panel.getByRole('button', { name: 'Not now', exact: true }) : audio).toBeFocused();
         await expect(guest.locator('[data-jam-actions]')).toBeHidden();
         await audio.press('Enter');
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([[invite, '_blank', 'noopener,noreferrer']]);
