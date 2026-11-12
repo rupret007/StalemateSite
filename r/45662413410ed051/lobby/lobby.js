@@ -487,6 +487,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let pendingJamShare = null;
     let jamShareResultsSupported = false, jamShareTimer;
     let gameNightSupported = false, gameOpenSupported = false, gameGuestInvitesSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
+    const gameHostLink = $('[data-game-host-link]');
     const gameShareButton = $('[data-game-share]'), gameShareDialog = $('[data-game-share-dialog]'), gameShareValue = $('[data-game-share-value]');
     const arcadeTables = new Map([
         ['chess', { label: 'Royal Flush Chess', load: () => import('./arcade-chess.mjs').then(module => module.mountArcadeChess) }],
@@ -1744,7 +1745,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-game-clear]').hidden = !link;
         $('[data-game-invite]').hidden = !c || !amOp(c);
         const canShare = betaShell && gameNightFragment && c && amOp(c) && roomNonce(c.keepRef);
-        if (gameShareButton) gameShareButton.hidden = !canShare;
+        if (gameHostLink) {
+            gameHostLink.hidden = !canShare;
+            if (!canShare || gameHostLink.dataset.room !== c.keepRef) {
+                gameHostLink.open = false;
+                gameHostLink.dataset.room = canShare ? c.keepRef : '';
+            }
+        } else if (gameShareButton) gameShareButton.hidden = !canShare;
         if (gameShareDialog?.open && (!canShare || gameShareDialog.dataset.room !== c.keepRef)) gameShareDialog.close();
         $('[data-game-night]').hidden = !c;
         $('[data-arcade-game]').hidden = !!gameGuest || !c || ![...arcadeTables.values()].some(table => table.supported);

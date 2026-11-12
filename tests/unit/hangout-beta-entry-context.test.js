@@ -54,6 +54,11 @@ describe('entry context through the private beta shell', () => {
         try {
             const link = click(current, '#inside .button');
             expect(link.textContent).toContain('Enter Game Night');
+            expect(current.window.document.title).toBe('Game Night · Private beta');
+            expect(current.window.document.querySelector('h1').textContent).toBe('Game Night');
+            expect(current.window.document.querySelector('#unlock button').textContent).toContain('Continue to Game Night');
+            expect(current.window.document.querySelector('#community-guide').hidden).toBe(true);
+            expect(current.window.document.querySelector('#access-hint').textContent).toContain('open the game invite they sent you');
             expect(link.href).toBe(`https://beta.example${root}lobby/?entry-return=1&game-night=1${hash}`);
             expect(current.window.location.href).toBe('https://beta.example/beta/');
         } finally { current.window.close(); }
@@ -64,6 +69,7 @@ describe('entry context through the private beta shell', () => {
         try {
             const link = click(older, '#inside .button');
             expect(link.textContent).toContain('Choose a nickname and join');
+            expect(older.window.document.querySelector('#community-guide').hidden).toBe(false);
             expect(link.href).toBe(`https://beta.example${root}lobby/?entry-return=1`);
         } finally { older.window.close(); }
     });
@@ -75,6 +81,7 @@ describe('entry context through the private beta shell', () => {
         const explicit = await shell(address + '&game-night=1', config);
         try {
             expect(enabled.window.document.querySelector('#band-games').hidden).toBe(false);
+            expect(enabled.window.document.querySelector('#community-guide').hidden).toBe(false);
             expect(click(enabled, '#band-game-night').href).toBe(`https://beta.example${root}lobby/?entry-return=1&game-night=1`);
             expect(entryFunctions.readEntryHandoff(enabled.window.sessionStorage.getItem(entryFunctions.ENTRY_HANDOFF_KEY)))
                 .toEqual({ source, share: true });

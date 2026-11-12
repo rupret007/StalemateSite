@@ -93,7 +93,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             ]);
         } else await page.goto(destination);
         await page.getByLabel('Invitation code').fill(invitation);
-        await page.getByRole('button', { name: 'Enter the community' }).click();
+        await page.getByRole('button', { name: /Enter the community|Continue to Game Night/ }).click();
         await enterFromShell(page, name, !!gameUrl);
         const label = source === 'rad-dad' ? 'via Rad Dad' : 'via Stalemate';
         await expect(page.locator('[data-entry-label]').first()).toHaveText(label);
@@ -519,6 +519,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await verifyGuestJoinRetry(host);
             await verifySpadesPartners(host);
         }
+        const hostLink = host.locator('[data-game-host-link]');
+        await expect(hostLink.getByRole('button', { name: 'Room address' })).toBeHidden();
+        await hostLink.getByText('Host link', { exact: true }).click();
         await host.getByRole('button', { name: 'Room address' }).click();
         const share = host.getByRole('dialog', { name: 'Game Night room address' });
         const link = new URL(await share.getByLabel('Room address').inputValue());
@@ -529,6 +532,17 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         if (evidence) await host.screenshot({ path: join(evidence, `webjam-room-link-${engine}.png`),
             mask: [share.getByLabel('Room address')] });
         await share.getByRole('button', { name: 'Done' }).click();
+        const unopened = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, ignoreHTTPSErrors: true });
+        try {
+            const fresh = await unopened.newPage();
+            await fresh.addInitScript(({ search, hash }) => {
+                if (location.pathname === '/beta/') history.replaceState(null, '', '/beta/' + search + hash);
+            }, { search: link.search, hash: link.hash });
+            await fresh.goto(origin + '/beta/');
+            await expect(fresh.getByText('To join a match, ask your host for the game invite.', { exact: false })).toBeVisible();
+            await expect(fresh.getByLabel('Invitation code')).toBeVisible();
+            await expect(fresh.getByRole('button', { name: 'Join game', exact: true })).toHaveCount(0);
+        } finally { await unopened.close(); }
         const player = await guest('rad-dad', 'LinkGuest', { width: 390, height: 844 }, true, link.href);
         const joinOffer = player.locator('[data-game-offer]').getByRole('button', { name: 'Join Game Night', exact: true });
         async function expectRefusal() {
@@ -632,7 +646,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(page.getByLabel('Invitation code')).toBeVisible();
                 if (!phone) {
                     await page.getByLabel('Invitation code').fill(invitation);
-                    await page.getByRole('button', { name: 'Enter the community' }).click();
+                    await page.getByRole('button', { name: 'Continue to Game Night' }).click();
                     await enterFromShell(page, 'PreviewHost', true);
                     await expect(page.locator('[data-game-offer-status]')).toContainText('Royal Flush Chess');
                     await page.getByRole('button', { name: 'Start Game Night', exact: true }).click();
@@ -673,8 +687,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await online.click();
                 assert.equal(new URL(host.url()).pathname, '/beta/');
                 await expect(host.getByLabel('Invitation code')).toBeVisible();
+                await expect(host.getByRole('heading', { name: 'Game Night', level: 1 })).toBeVisible();
+                await expect(host.getByText('If a friend invited you to play', { exact: false })).toBeVisible();
+                await expect(host.getByRole('heading', { name: 'A little field guide' })).toBeHidden();
+                const continueToGameNight = host.getByRole('button', { name: 'Continue to Game Night' });
+                await expectUncoveredControl(continueToGameNight);
                 await host.getByLabel('Invitation code').fill(invitation);
-                await host.getByRole('button', { name: 'Enter the community' }).click();
+                await continueToGameNight.click();
                 await expect(host.getByRole('link', { name: /Enter Game Night/ })).toHaveCount(1);
                 await captureArcadeInvite(host, viewport, step('01-game-night-entry'));
                 await enterFromShell(host, radDad ? 'RadDadHost' : 'PreviewHost', true);
@@ -687,9 +706,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(invitePicker.getByRole('button', { name: /^Invite a friend/ })).toHaveCount(0);
                 await captureArcadeInvite(host, viewport, step('02a-open-a-table'));
                 await invitePicker.getByRole('button', { name: 'Cancel' }).click();
+                const hostLink = host.locator('[data-game-host-link]');
+                await expect(hostLink.getByRole('button', { name: 'Room address' })).toBeHidden();
+                await hostLink.getByText('Host link', { exact: true }).click();
                 await host.getByRole('button', { name: 'Room address', exact: true }).click();
                 const address = host.getByRole('dialog', { name: 'Game Night room address' });
-                await expect(address.getByText('Players with a room invitation can use this address.', { exact: false })).toBeVisible();
+                await expect(address.getByText('Use this address to return to the room.', { exact: false })).toBeVisible();
                 await captureArcadeInvite(host, viewport, step('02b-room-address'), [address.getByLabel('Room address')]);
                 await address.getByRole('button', { name: 'Done' }).click();
                 await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');

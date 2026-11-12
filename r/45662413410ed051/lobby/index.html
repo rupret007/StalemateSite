@@ -43,7 +43,7 @@
     </dialog>
     <dialog class="sheet" data-game-share-dialog aria-labelledby="game-share-title">
         <h3 id="game-share-title">Game Night room address</h3>
-        <p>Players with a room invitation can use this address. Use Invite players to send a friend a game invitation.</p>
+        <p>Use this address to return to the room. To bring a friend into a match, send a game invite from Invite players.</p>
         <label class="channel-label" for="game-share-value">Room address</label>
         <input id="game-share-value" data-game-share-value readonly>
         <p role="status" data-game-share-status></p>
@@ -239,10 +239,13 @@
                     <h3 class="jam-title" id="game-night-title">Game Night</h3>
                     <p class="small game-note">Invite-only room</p>
                     <p class="sr-only" role="status" data-four-availability></p>
+                    <details class="game-host-link" data-game-host-link hidden>
+                        <summary>Host link</summary>
+                        <button class="btn btn--small btn--ghost" type="button" data-game-share>Room address</button>
+                    </details>
                 </div>
                 <div class="jam-actions game-actions">
                     <button class="btn btn--small" type="button" data-game-invite hidden>Invite players</button>
-                    <button class="btn btn--small btn--ghost" type="button" data-game-share hidden>Room address</button>
                     <a class="btn btn--small btn--ghost" data-game-arcade href="https://stalemate.band/play/" target="_blank" rel="noopener noreferrer" aria-describedby="game-arcade-tab-note"><span data-game-arcade-label>Open Stalemate Arcade</span> <span aria-hidden="true">↗</span></a>
                     <span class="sr-only" id="game-arcade-tab-note">Opens in a new tab</span>
                     <a class="btn btn--small btn--ghost" data-game-open target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden>Open Discord call</a>

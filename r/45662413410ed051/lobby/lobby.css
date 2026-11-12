@@ -258,6 +258,9 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .game-night:has(.four-match[open]) { max-height: 52dvh; }
 .game-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 12px; margin-bottom: 8px; }
 .game-heading .jam-title, .game-heading .game-note { margin: 0; }
+.game-host-link { margin-inline-start: auto; color: var(--muted); font-size: 13px; }
+.game-host-link summary { min-height: 44px; align-content: center; padding-inline: 8px; cursor: pointer; }
+.game-host-link .btn { min-height: 44px; }
 .four-match { margin: 8px 0; border-block: 1px solid var(--line); }
 .game-night .four-match summary { width: 100%; min-height: 34px; padding: 8px 2px; color: var(--cream); }
 .four-summary { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; width: calc(100% - 16px); vertical-align: middle; }
