@@ -149,12 +149,32 @@ test('the native return page clears the invitation fragment and returns it to it
     } finally { await context.close(); }
 });
 
+async function expectExposedInviteStatus(page, selector) {
+    const status = page.locator(selector).and(page.getByRole('status'));
+    await expect(status).toHaveCount(1);
+    if (page.context().browser().browserType().name() === 'chromium') {
+        const cdp = await page.context().newCDPSession(page);
+        try {
+            const { root } = await cdp.send('DOM.getDocument');
+            const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector });
+            const { nodes: [node] } = await cdp.send('Accessibility.getPartialAXTree', { nodeId, fetchRelatives: false });
+            expect(node.ignored).toBe(false);
+            expect(node.properties).toEqual(expect.arrayContaining([
+                expect.objectContaining({ name: 'live', value: expect.objectContaining({ value: 'polite' }) }),
+            ]));
+        } finally { await cdp.detach(); }
+    }
+    return status;
+}
+
 test('only the selected guest can accept a music invitation and open the audio check', async ({ browser, baseURL }) => {
     const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 }, true);
     try {
         const host = await f.join('MusicHost');
         const guest = await f.join('ChosenGuest');
         const other = await f.join('OtherGuest');
+        const guestStatus = await expectExposedInviteStatus(guest, '[data-music-invite-status]');
+        await guest.locator('[data-text]').focus();
         await host.click('[data-show="rooms"]');
         await host.click('[data-start="jam"]');
         await expect(host.locator('[data-jam]')).toBeVisible();
@@ -192,10 +212,13 @@ test('only the selected guest can accept a music invitation and open the audio c
         expect(await returnInvite(invite)).toBe(true);
         await expect(host.locator('[data-toast]')).toContainText('Music invitation sent.');
         await expect(panel).toContainText('MusicHost invited you to play');
+        await expect(guestStatus).toHaveText(`MusicHost invited you to play in ${room}.`);
+        await expect(guest.locator('[data-text]')).toBeFocused();
         await expect(other.locator('[data-music-invite]')).toBeHidden();
         await expect(guest.locator('[data-chat-context]')).toHaveText('#stalemate');
         await panel.getByRole('button', { name: 'Accept and join' }).press('Enter');
         await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        await expect(guestStatus).toHaveText('You’re in the Jam room. Open the audio check when you’re ready.');
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
         const audio = panel.getByRole('button', { name: 'Open audio check' });
         await expect(audio).toBeFocused();
@@ -219,7 +242,9 @@ for (const [hostSite, guestSite] of [['rad-dad', 'stalemate'], ['stalemate', 'ra
             await expect(host.locator('[data-chat-context]')).toHaveText(/^#jam-/);
             const room = await host.locator('[data-chat-context]').textContent();
             const invite = host.getByRole('button', { name: 'Invite bandmate to room' });
-            const status = host.locator('[data-room-invite-status]');
+            const status = await expectExposedInviteStatus(host, '[data-room-invite-status]');
+            const guestStatus = await expectExposedInviteStatus(guest, '[data-game-offer-status]');
+            await guest.locator('[data-text]').focus();
             const offer = guest.locator('[data-game-offer]');
             async function send() {
                 await invite.click();
@@ -227,8 +252,10 @@ for (const [hostSite, guestSite] of [['rad-dad', 'stalemate'], ['stalemate', 'ra
                 await list.getByRole('button', { name: 'Invite Bandmate' }).click();
                 await expect(status).toHaveText('Invitation sent to Bandmate. Waiting for a reply.');
                 await expect(offer).toContainText(`RoomHost invited you to ${room}.`);
+                await expect(guestStatus).toHaveText(`RoomHost invited you to ${room}.`);
             }
             await send();
+            await expect(guest.locator('[data-text]')).toBeFocused();
             await offer.getByRole('button', { name: 'Not now' }).click();
             await expect(status).toHaveText('Bandmate declined the invitation.');
             await send();
