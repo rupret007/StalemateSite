@@ -356,6 +356,20 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .spades-trick [data-active="true"] { border-color: var(--lime); }
 .spades-trick [data-red="true"] b { color: #ffa6aa; }
 .arcade-spades [data-spades-bid] select { padding: 4px; min-height: 38px; }
+@media (max-width: 900px) {
+  .game-night :is(.arcade-eights, .arcade-rummy, .arcade-spades, .arcade-jack) :is(.btn, select) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .game-night :is(.arcade-spades, .arcade-jack) select {
+    appearance: none;
+    padding-inline-end: 24px;
+    background:
+      linear-gradient(45deg, transparent 50%, currentColor 50%) right 13px center / 5px 5px no-repeat,
+      linear-gradient(135deg, currentColor 50%, transparent 50%) right 8px center / 5px 5px no-repeat,
+      var(--ink);
+  }
+}
 @media (max-width: 355px) {
   .arcade-spades .arcade-card-hand { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }

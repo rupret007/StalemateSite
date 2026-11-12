@@ -337,6 +337,26 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             throw error;
         }
     }
+    async function verifyCardLandscape(page, game, ...controls) {
+        const original = page.viewportSize(), surface = page.locator('[data-game-night]');
+        const scroll = await surface.evaluate(node => node.scrollTop);
+        try {
+            await page.setViewportSize({ width: 667, height: 375 });
+            for (const control of controls) {
+                await control.evaluate(node => node.scrollIntoView({ block: 'center' }));
+                await expect(control).toBeInViewport({ ratio: 1 });
+                const box = await control.boundingBox();
+                assert.ok(box?.width >= 44 && box?.height >= 44, `${game} landscape control measures ${box?.width}×${box?.height}`);
+            }
+            await expect(page.locator('[data-send]')).toBeInViewport({ ratio: 1 });
+            assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), game + ' landscape fits horizontally');
+            if (evidence) await page.screenshot({ path: join(evidence, game + '-' + engine + '-landscape.png') });
+            console.log('Passed ' + engine + ' ' + game + ' landscape touch targets and chat composer.');
+        } finally {
+            await page.setViewportSize(original);
+            await surface.evaluate((node, offset) => { node.scrollTop = offset; }, scroll);
+        }
+    }
     async function playChessCheckmate(black, white) {
         const before = media ? await packetCount(white, 'audio') : 0;
         for (const [page, from, to] of [
@@ -608,6 +628,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(b.locator('[data-eights-status]')).not.toContainText('Reconnecting');
             assert.deepEqual(await bCards.evaluateAll(buttons => buttons.map(button => button.dataset.eightsCard)), bHand);
         }
+        await verifyCardLandscape(b, 'Crappy Eights', bCards.first(), b.locator('[data-eights-action="draw"]'));
         const playable = a.locator('[data-eights-card]:enabled').first();
         if (await playable.count()) {
             const wild = (await playable.getAttribute('aria-label')).includes('Wild');
@@ -774,6 +795,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(card).toHaveAttribute('aria-pressed', 'true');
             await expect(drawn).toBeDisabled();
         }
+        await verifyCardLandscape(b, 'TurdRummy', card, b.getByRole('button', { name: 'Discard', exact: true }));
         await b.getByRole('button', { name: 'Discard', exact: true }).click();
         await expect(bCards).toHaveCount(10);
         await expect(a.getByRole('button', { name: `Take ${discarded}`, exact: true })).toBeEnabled();
@@ -893,6 +915,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             audioBeforeTrick = await Promise.all(players.map(page => packetCounts(page, 'audio')));
         }
         await b.getByLabel('Your bid').selectOption('0');
+        await verifyCardLandscape(b, 'TurdSpades bid', b.getByLabel('Your bid'), b.getByRole('button', { name: 'Lock bid' }));
         if (pauseReconnect) {
             const cards = b.locator('[data-spades-card]');
             const hand = await cards.evaluateAll(buttons => buttons.map(button => button.dataset.spadesCard));
@@ -908,6 +931,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         for (const page of [b, north, east, a]) await page.getByRole('button', { name: 'Lock bid' }).click();
         await expect(a.locator('[data-spades-trick]')).toContainText('West · Nil');
         const lead = b.locator('[data-spades-card]:enabled').first();
+        await verifyCardLandscape(b, 'TurdSpades', lead, b.locator('[data-spades-action="resign"]'));
         await lead.scrollIntoViewIfNeeded();
         const box = await lead.boundingBox();
         assert.ok(box?.width >= 44 && box?.height >= 44, 'phone-sized Spades card button');
@@ -1047,6 +1071,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(b.locator('[data-jack-status]')).toContainText('1/2 ready');
         await expect(b.getByLabel('Play chips')).toHaveValue('20');
         const ready = b.getByRole('button', { name: 'Ready', exact: true });
+        await verifyCardLandscape(b, 'Crapjack 21', b.getByLabel('Play chips'), ready);
         await ready.scrollIntoViewIfNeeded();
         const box = await ready.boundingBox();
         assert.ok(box?.width >= 44 && box?.height >= 44, 'phone-sized Crapjack Ready button');
