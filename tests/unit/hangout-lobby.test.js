@@ -136,9 +136,15 @@ describe('direct Jam music invitations', () => {
         expect(delivered(guest)).toHaveLength(1);
         expect(JSON.stringify(got(host))).not.toContain(invite);
         expect(JSON.stringify(got(peer))).not.toContain(invite);
-        cmd(guest, 'part', [], room);
-        cmd(guest, 'join', [room]);
-        expect(got(guest).filter(m => m.t === 'join' && m.ch.name === room)).toHaveLength(1);
+        L.disconnect(guest.id);
+        const returning = join(guest.nick);
+        cmd(returning, 'join', [room]);
+        expect(got(returning).filter(m => m.t === 'join' && m.ch.name === room)).toHaveLength(1);
+        accept(returning, pending);
+        expect(delivered(returning)).toHaveLength(0);
+        cmd(returning, 'part', [], room);
+        cmd(returning, 'join', [room]);
+        expect(got(returning).filter(m => m.t === 'join' && m.ch.name === room)).toHaveLength(1);
     });
     it('refuses a nonhost, a different room instance, and an invalid browser destination', () => {
         expect(offer(peer)).toBeUndefined();

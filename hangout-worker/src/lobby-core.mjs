@@ -989,7 +989,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
         personDependency(host, room);
         musicInvites.delete(room.name);
-        if (!enter(guest, room, { invited: true })) return out(guest, { t: 'music-invite-ended', id: offer.id });
+        if (!acceptJamInvitation(guest, room)) return out(guest, { t: 'music-invite-ended', id: offer.id });
         out(guest, { t: 'music-invite-accepted', id: offer.id, ch: room.name, roomInstance: room.keepRef, href: offer.href, expires: offer.expires });
     }
 
