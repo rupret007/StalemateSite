@@ -193,6 +193,7 @@ test('only the selected guest can accept a music invitation and open the audio c
         await expect(host.locator('[data-toast]')).toContainText('Music invitation couldn’t be sent.');
         expect(await returnInvite(invite)).toBe(true);
         await expect(outcome).toHaveText('Music invitation sent to ChosenGuest. Waiting for a reply.');
+        await expect(host.locator('[data-toast]')).toBeHidden();
         await expect(panel).toContainText('MusicHost invited you to play');
         await expect(other.locator('[data-music-invite]')).toBeHidden();
         await expect(guest.locator('[data-chat-context]')).toHaveText('#stalemate');

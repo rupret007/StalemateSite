@@ -462,6 +462,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let musicInvite = null, musicInviteTimer;
     let pendingMusicHandoff = null, directMusicInvitesSupported = false;
     let sentMusicInvite = null, musicInviteOutcomesSupported = false;
+    const musicInviteFailed = 'Music invitation couldn’t be sent. Try again from your Jam room.';
+    const musicInviteConfirm = 'Confirm the invitation in WebJam.';
     const jamWaitingCopy = $('[data-jam-wait]').textContent;
     let gameNightSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
     let fourInARowSupported = false, fourRoom = null, fourPlayed = false;
@@ -2563,11 +2565,16 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         pendingMusicHandoff.channel.postMessage({ returned: sent });
         closeMusicHandoff();
         if (sent && musicInviteOutcomesSupported) {
+            if ([musicInviteFailed, musicInviteConfirm].includes(toastRegion.textContent)) {
+                clearTimeout(toastTimer);
+                toastRegion.replaceChildren();
+                toastRegion.hidden = true;
+            }
             sentMusicInvite = { room, request, nick, status: 'sent' };
             drawMusicInviteOutcome();
             return;
         }
-        toast(sent ? 'Music invitation sent.' : 'Music invitation couldn’t be sent. Try again from your Jam room.');
+        toast(sent ? 'Music invitation sent.' : musicInviteFailed);
     }
     function startMusicHandoff(room, context) {
         closeMusicHandoff();
@@ -2595,7 +2602,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         document.body.append(launch);
         launch.click();
         launch.remove();
-        toast('Confirm the invitation in WebJam.');
+        toast(musicInviteConfirm);
     }
     function sendInviteToPerson(context, error, music = false) {
         const current = store(app.active);
