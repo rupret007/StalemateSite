@@ -23,7 +23,7 @@ The preview uses a development fixture internally, never a production credential
 2. In a second browser, start Draw together. The first visitor can join it from the room directory, without creating another room.
 3. Leave an unsent draft, switch channels, and return. Mention a visitor by nickname from another channel; the tab shows the unread message and `@you`.
 4. Use the keyboard to move between channel tabs. While reading older chat, incoming messages leave your position alone and offer a jump control.
-5. Disconnect/reconnect during a local test. Offline submission preserves the draft. Reconnection returns to the lobby, removes stale room memberships and keeps room drafts available when rejoining. Cameras stay off and PM-off preference is reapplied.
+5. Disconnect/reconnect during a local test. Offline submission preserves the draft. Reconnection returns to the lobby and removes stale room memberships. Rejoin the original room to recover its draft. A new room with the same name opens with an empty composer. Cameras stay off and PM-off preference is reapplied.
 6. Try the phone layout: Chat, Rooms and People remain separate views, with the composer visible at a 375 × 667 viewport.
 7. Choose Start a chat channel and name it `#night-owls`, or type `/join #night-owls`. A guest who creates it gets `@` controls. Use `/topic` and `/op nick` to share hosting. No canvas, player or camera is opened for ordinary chat channels.
 8. Send a message, then join from another browser. The newcomer sees the topic and people, but no earlier chat. Messages received while joined remain in that tab (up to 300 lines per channel). Leaving/rejoining, reconnecting or refreshing begins fresh. Shared drawing/video state is separate and still synchronizes on entry.

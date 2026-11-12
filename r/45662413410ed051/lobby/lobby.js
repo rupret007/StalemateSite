@@ -165,7 +165,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             button('Restore draft', 'restore', () => {
                 if (!canRestoreMessage(record)) return;
                 if (record.status !== 'rejected' && !confirm('This message may still arrive or be published. Restoring can create a duplicate if you send it again, and does not cancel the original. Restore the draft?')) return;
-                $('[data-text]').value = record.text; drafts.set(record.key, record.text);
+                $('[data-text]').value = record.text; saveDraft(record.key, record.text);
                 recoveryDraftChanged(); forgetSavedMessage(record); $('[data-text]').focus({ preventScroll: true });
             }).disabled = !canRestoreMessage(record);
             button('Copy', 'copy', () => copySavedMessage(record)).setAttribute('aria-label', 'Copy saved text');
@@ -423,6 +423,14 @@ import { createEntrySharing } from './entry-sharing.mjs';
     drawEntryChoice();
     // Drafts are tab-local only. Chat, PMs and invitation links are never copied into browser storage.
     const drafts = new Map();
+    function saveDraft(key, text) {
+        const channel = app.chans.get(key);
+        // A room-removal handler saves the draft before deleting the channel.
+        // The subsequent switch must not overwrite it without the room identity.
+        if (!channel && key !== '#stalemate' && !key.startsWith('pm:')) return;
+        if (text) drafts.set(key, { text, roomInstance: channel?.keepRef });
+        else drafts.delete(key);
+    }
     const pendingReports = new Map();
     let connectionState = 'offline';
     let sessionEnded = false;
@@ -651,7 +659,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
         clearTimeout(retryTimer); cancelTransportAck();
         // Keep the unsent text under its original channel/PM key. Never move a
         // private draft into #stalemate or persist it during re-authentication.
-        drafts.set(app.active, $('[data-text]').value);
+        saveDraft(app.active, $('[data-text]').value);
         app.chans.clear(); app.pms.clear(); app.rooms = []; app.pendingChannel = '';
         app.band = false; app.verified = false; app.role = 'fan'; app.capabilities = {};
         ownerSession = false; removeTab('hangout-owner');
@@ -820,13 +828,13 @@ import { createEntrySharing } from './entry-sharing.mjs';
             app.role = m.role; app.verified = m.verified === true; app.capabilities = m.capabilities || {}; $('[data-owner-signout]').hidden = !ownerSession; app.netLock = m.lock; app.budget = m.budget;
             if (app.me) {
                 app.resetSession = true; setConnection('reconnecting');
-                drafts.set(app.active, $('[data-text]').value);
+                saveDraft(app.active, $('[data-text]').value);
                 if (roomApi) roomApi.onLeave();
                 app.chans.clear();
                 for (const [ref, view] of app.pms) {
                     // A new socket starts a fresh received transcript. Only
                     // an unsent draft keeps a closed, non-rebindable old tab.
-                    if (!drafts.get(`pm:${ref}`)) { app.pms.delete(ref); continue; }
+                    if (!drafts.has(`pm:${ref}`)) { app.pms.delete(ref); continue; }
                     view.open = false; view.lines = []; view.unread = 0; view.mentions = 0;
                     recoveryContexts.delete(view);
                 }
@@ -834,7 +842,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
                 app.away = false; app.ignores.clear(); app.peerIgnores.clear();
                 app.restorePmOff = $('[data-pm-off]').checked;
                 $('[data-pmreqs]').replaceChildren();
-                $('[data-text]').value = drafts.get('#stalemate') || '';
+                $('[data-text]').value = drafts.get('#stalemate')?.text || '';
             }
             send({ t: 'hello', nick, age13: true, entrySource: entrySharing.helloSource(), transport: 1 }); break;
         case 'person-preferences': acknowledgePersonPreferences(m); break;
@@ -866,6 +874,10 @@ import { createEntrySharing } from './entry-sharing.mjs';
         }
         case 'join': {
             const c = { ...m.ch, lines: [] };
+            const draft = drafts.get(c.name);
+            if (c.name !== '#stalemate' && draft && (!roomNonce(c.keepRef) || draft.roomInstance !== c.keepRef)) {
+                drafts.delete(c.name);
+            }
             if (app.pendingChannel === m.ch.name) {
                 app.pendingChannel = '';
                 $('[data-channel-dialog]').close();
@@ -922,6 +934,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
             break;
         }
         case 'part': case 'closed': {
+            if (app.active === m.ch) saveDraft(m.ch, $('[data-text]').value);
             app.chans.delete(m.ch);
             if (m.t === 'closed') toast(`${m.ch} was ${m.reason}.`);
             if (app.active === m.ch) switchTo('#stalemate');
@@ -972,6 +985,7 @@ import { createEntrySharing } from './entry-sharing.mjs';
                 clearJamInvitations();
                 $('[data-gate]').hidden = false; $('[data-app]').hidden = true; gateStatus(`You got the boot (${m.reason}). Take a breather.`);
             } else {
+                if (app.active === m.ch) saveDraft(m.ch, $('[data-text]').value);
                 app.chans.delete(m.ch);
                 if (app.active === m.ch) switchTo('#stalemate');
                 drawTabs();
@@ -1090,7 +1104,10 @@ import { createEntrySharing } from './entry-sharing.mjs';
 
     function switchTo(key, { freshJoin = false } = {}) {
         const prev = app.active;
-        if (prev !== key) { drafts.set(prev, $('[data-text]').value); $('[data-text]').value = drafts.get(key) || ''; }
+        if (prev !== key) {
+            saveDraft(prev, $('[data-text]').value);
+            $('[data-text]').value = drafts.get(key)?.text || '';
+        }
         app.active = key;
         const c = store(key);
         if (c) { c.unread = 0; c.mentions = 0; }
