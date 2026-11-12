@@ -796,7 +796,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         console.log(`Passed ${engine} TurdRummy private hands, discard pickup, touch selection, ${media ? 'same call during a game switch' : 'full reload mid-draw'}, and rematch.`);
     }
-    async function finishSpadesRound(players) {
+    async function finishSpadesRound(players, commands) {
         const status = page => page.locator('[data-spades-status]');
         const cards = page => page.locator('[data-spades-card]');
         const scores = page => page.locator('[data-spades-score]');
@@ -814,7 +814,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(cards(page)).toHaveCount(--remaining[index]);
             } catch (error) {
                 console.error('Spades play was not confirmed:', { play, index,
-                    status: await status(page).textContent(), error: await page.locator('[data-spades-error]').textContent() });
+                    status: await status(page).textContent(), error: await page.locator('[data-spades-error]').textContent(),
+                    command: commands[index] });
                 throw error;
             }
         }
@@ -847,6 +848,19 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await inviteToGame(a, north, 'SpadesNorth');
         await inviteToGame(a, east, 'SpadesEast');
         const players = [a, b, north, east];
+        const commands = players.map(page => {
+            const last = {};
+            page.on('websocket', socket => {
+                if (!new URL(socket.url()).pathname.endsWith('/arcade-turdspades-match')) return;
+                socket.on('framesent', ({ payload }) => { last.sent = JSON.parse(payload.toString()); });
+                socket.on('framereceived', ({ payload }) => {
+                    const frame = JSON.parse(payload.toString());
+                    if (frame.t === 'match-error') last.reason = frame.reason;
+                    if (frame.t === 'match-state') last.revision = frame.state?.match?.revision;
+                });
+            });
+            return last;
+        });
         for (const page of players) {
             await expect(page.locator('[data-arcade-game] option[value="turdspades"]')).toBeEnabled();
             await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdspades');
@@ -929,7 +943,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         for (const page of [north, east, a]) await page.locator('[data-spades-card]:enabled').first().click();
         await expect(a.locator('[data-spades-status]')).toContainText('won the last trick');
-        await finishSpadesRound(players);
+        await finishSpadesRound(players, commands);
         await b.locator('[data-spades-action="resign"]').click();
         await b.getByRole('dialog', { name: 'Resign for your team?' }).getByRole('button', { name: 'Resign', exact: true }).click();
         await expect(a.locator('[data-spades-status]')).toContainText('South + North win by resignation');
