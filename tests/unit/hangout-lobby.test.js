@@ -896,6 +896,23 @@ describe('open-room paint + synced video (act frames)', () => {
 });
 
 describe('Game Night', () => {
+    it('gives an invited guest a moderated alias when the first alias is already taken', () => {
+        boot({}, true);
+        const host = join('GameHost');
+        L._debug.conns.get(host.id).betaSid = 'room-host-session';
+        const taken = join('Guest-999999');
+        expect(got(taken).some(frame => frame.t === 'welcome')).toBe(true);
+        const room = '#game-1acbefx23acbe';
+        cmd(host, 'join', [room]);
+        const ref = got(host).findLast(frame => frame.t === 'join').ch.keepRef;
+        const visitor = { id: 'game-visitor' };
+        expect(L.connect({ ...visitor, dev: 'game-guest-device', iph: 'ip2', betaSid: 'room-guest-session',
+            gameGuest: { room, ref, host: 'room-host-session', nameSeed: 99_999_999 } }).ok).toBe(true);
+        L.message(visitor.id, JSON.stringify({ t: 'hello', nick: 'Ignored', age13: true }));
+        expect(got(visitor).find(frame => frame.t === 'welcome')).toMatchObject({ nick: 'Guest-000000' });
+        expect(got(visitor).filter(frame => frame.t === 'join').map(frame => frame.ch.name)).toEqual([room]);
+    });
+
     it('detects four in every direction, full columns and a draw without changing earlier positions', () => {
         const start = { ...openFour('fixture', 'host'), guest: 'guest' };
         const diagonal = [0, 1, 1, 2, 4, 2, 2, 3, 4, 3, 4, 3, 3];

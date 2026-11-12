@@ -1094,12 +1094,23 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
 
     function kill(c, code, reason) { if (closeBatch) closeBatch.push([c.id, code, reason]); else close(c.id, code, reason); disconnect(c.id, reason); }
 
+    function gameGuestNick(seed) {
+        for (const prefix of ['Guest', 'Player', 'Arcade']) {
+            for (let offset = 0; offset < 8; offset++) {
+                const suffix = String((seed + offset) % 1_000_000).padStart(6, '0');
+                const candidate = checkNick(`${prefix}-${suffix}`, net.lists);
+                if (candidate.ok && !byNick(candidate.nick)) return candidate;
+            }
+        }
+        return { ok: false, reason: 'Couldn’t assign a guest name. Ask your host for a fresh invitation.' };
+    }
+
     function hello(c, f) {
         if (c.nick) return bot(c, 'Already here. Use /nick to change.', 'error');
         if (!isStaff(c) && f.age13 !== true) return bot(c, 'Tick "I\'m 13+ and will be cool" to chat.', 'error');
         const game = c.gameGuest && invitedGameRoom(c.gameGuest);
         if (c.gameGuest && (!game || game.host.blocks.has(c.dev))) return out(c, { t: 'nick-error', text: 'Your host’s room is unavailable. Ask them to send a fresh invitation.' });
-        const v = checkNick(c.gameGuest?.nick || f.nick, net.lists, { band: isBand(c) });
+        const v = c.gameGuest ? gameGuestNick(c.gameGuest.nameSeed) : checkNick(f.nick, net.lists, { band: isBand(c) });
         if (!v.ok) return out(c, { t: 'nick-error', text: v.reason });
         if (byNick(v.nick)) return out(c, { t: 'nick-error', text: 'That nick is taken right now.' });
         if (!isBand(c) && banned(net.bans, { ...c, nick: v.nick })) { kill(c, 4403, 'banned'); return undefined; }

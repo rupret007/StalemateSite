@@ -23,8 +23,8 @@ export function gameGuestEnabled(env) {
 export function gameGuestScope(value) {
     const game = gameNightInvite(value?.game, value?.match);
     if (!game || !gameNightRoomName(value.room) || !codePattern.test(value.ref || '') || !sidPattern.test(value.host || '')
-        || !/^Guest-[a-f0-9]{8}$/.test(value.nick || '')) return null;
-    return { ...game, room: value.room, ref: value.ref, host: value.host, nick: value.nick };
+        || !Number.isInteger(value.nameSeed) || value.nameSeed < 0 || value.nameSeed > 0xffffffff) return null;
+    return { ...game, room: value.room, ref: value.ref, host: value.host, nameSeed: value.nameSeed };
 }
 
 // Called within the lobby's serialized event path. Only the Worker sends a trusted session for issuance.
@@ -36,7 +36,8 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
         const { actor, room, ref, game, match } = body;
         const scope = arcadeRoomRequest({ actor, room, ref });
         const host = scope && lobby.arcadeBinding(scope);
-        const guest = gameGuestScope({ room, ref, game, match, host: host?.betaSid, nick: 'Guest-' + randomCode().slice(0, 8) });
+        const [nameSeed] = crypto.getRandomValues(new Uint32Array(1));
+        const guest = gameGuestScope({ room, ref, game, match, host: host?.betaSid, nameSeed });
         if (!guest || !host.canOpen || !host.canPlay || host.gameGuest || session?.betaSid !== host.betaSid
             || !await lobby.sessionActive(host) || !lobby.arcadeAvailable(game)
             || !await lobby.arcade.get(game).hasGuestSeat(scope, match, host.betaSid)) {
