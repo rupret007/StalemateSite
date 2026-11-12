@@ -104,7 +104,9 @@ if (game) {
     document.title = 'Game Night · Private beta';
     $('h1').textContent = 'Game Night';
     $('.eyebrow').textContent = 'PRIVATE ARCADE';
-    $('.lede').textContent = game.target ? 'Return to your private Game Night room.' : 'Pick a game and invite a friend to play.';
+    $('.lede').textContent = game.target
+        ? 'Room address for returning players. To join a match, ask your host for the game invite.'
+        : 'Pick a game and invite a friend to play.';
     $('#access-title').textContent = 'Your private beta invitation';
     $('#access-hint').textContent = 'Open your beta invitation or enter its code here. If a friend invited you to play, open the game invite they sent you.';
     $('#unlock button').textContent = 'Continue to Game Night ↗';
