@@ -207,7 +207,6 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             const label = phone ? 'Royal Flush Chess' : 'TurdSpades';
             let friend;
             try {
-                if (phone) await friend.locator('.phonetabs [data-show="people"]').tap();
                 await host.getByRole('combobox', { name: 'Switch game' }).selectOption(game);
                 await host.getByRole('button', { name: phone ? 'Open Chess match' : 'Open 4-player Spades' }).click();
                 await expect(host.locator(phone ? '[data-chess-status]' : '[data-spades-status]')).toContainText(phone ? 'Waiting for an opponent' : '1/4 seated');
@@ -218,6 +217,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     const invite = host.locator('[data-invite-dialog]').getByRole('button', { name: `Invite ${nick}`, exact: true });
                     await expect(invite).toHaveCount(0);
                     friend = await guest(phone ? 'stalemate' : 'rad-dad', nick, viewport, phone);
+                    if (phone) await friend.locator('.phonetabs [data-show="people"]').tap();
                     await expect(invite).toBeVisible();
                     await captureArcadeInvite(host, viewport, '00-host-invite');
                     await invite.click();
