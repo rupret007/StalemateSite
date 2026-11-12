@@ -225,7 +225,7 @@ for (const delayed of [false, true]) test(delayed
         await expect(guest.locator('[data-text]')).toBeFocused();
         await expect(other.locator('[data-music-invite]')).toBeHidden();
         await expect(guest.locator('[data-chat-context]')).toHaveText('#stalemate');
-        const accept = panel.getByRole('button', { name: 'Accept and join' });
+        const acceptReply = panel.getByRole('button', { name: 'Accept and join' });
         if (delayed) {
             await guest.clock.install();
             await guest.evaluate(() => {
@@ -249,11 +249,11 @@ for (const delayed of [false, true]) test(delayed
                     };
                 };
             });
-            await accept.press('Enter');
+            await acceptReply.press('Enter');
             await expect(guestStatus).toContainText('Couldn’t send your reply');
-            await expect(accept).toBeFocused();
+            await expect(acceptReply).toBeFocused();
         }
-        await accept.press('Enter');
+        await acceptReply.press('Enter');
         await expect(guest.locator('[data-chat-context]')).toHaveText(room);
         if (delayed) {
             await expect(guestStatus).toContainText('Waiting for Hang Out to confirm');
