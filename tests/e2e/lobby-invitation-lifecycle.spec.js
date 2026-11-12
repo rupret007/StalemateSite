@@ -394,6 +394,36 @@ test('Game Night invites players, publishes a Discord handoff and keeps chat usa
     }
 });
 
+test('closing a background Game Night room leaves the lobby draft and composer focused', async ({ browser, baseURL }) => {
+    const fixture = await community(browser, baseURL);
+    try {
+        const host = await fixture.visitor('GameHost', { width: 1280, height: 850 });
+        const guest = await fixture.visitor('GameGuest', { width: 390, height: 844 });
+        await host.getByRole('button', { name: /Game Night/ }).click();
+        await host.getByRole('region', { name: /Game Night/ }).getByRole('button', { name: 'Invite players' }).click();
+        await host.getByRole('button', { name: 'Invite GameGuest', exact: true }).click();
+        await guest.getByRole('button', { name: 'Join Game Night' }).click();
+        const gameTab = guest.getByRole('tab', { name: 'Game Night', exact: true });
+        await expect(gameTab).toHaveAttribute('aria-selected', 'true');
+        await guest.locator('[data-channel-key="#stalemate"]').click();
+        await expect(gameTab).toHaveAttribute('aria-selected', 'false');
+        const composer = guest.locator('[data-text]');
+        await composer.fill('Typing in the lobby');
+        await expect(composer).toBeFocused();
+
+        await host.locator('[data-text]').fill('/close');
+        await host.locator('[data-text]').press('Enter');
+        await expect(gameTab).toHaveCount(0);
+        await expect(guest.locator('[data-chat-context]')).toHaveText('#stalemate');
+        await expect(composer).toBeFocused();
+        await expect(composer).toHaveValue('Typing in the lobby');
+        await guest.keyboard.type(' after the room closed');
+        await expect(composer).toHaveValue('Typing in the lobby after the room closed');
+    } finally {
+        await fixture.close();
+    }
+});
+
 test('Game Night plays one shared Four in a Row match with the chat composer still visible', async ({ browser, baseURL }, testInfo) => {
     const fixture = await community(browser, baseURL);
     try {

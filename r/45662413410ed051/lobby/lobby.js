@@ -1174,14 +1174,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 leaveGameGuest(m.t === 'closed' ? 'closed' : gameGuestExit === 'removed' ? 'removed' : 'left');
                 break;
             }
-            const leavingGame = app.chans.get(m.ch)?.kind === 'game';
+            const leavingActiveGame = app.active === m.ch && app.chans.get(m.ch)?.kind === 'game';
             const leavingFromButton = app.active === m.ch && document.activeElement === $('[data-leave]');
             forgetGameRoom(m.ch);
             app.chans.delete(m.ch);
             if (m.t === 'closed') toast(`${m.ch} was ${m.reason}.`);
             if (app.active === m.ch) switchTo('#stalemate');
             drawTabs();
-            if ((leavingGame || leavingFromButton) && app.active === '#stalemate') focusChannelTab('#stalemate');
+            if ((leavingActiveGame || leavingFromButton) && app.active === '#stalemate') focusChannelTab('#stalemate');
             break;
         }
         case 'line': pushLine(m.ch, m); break;
