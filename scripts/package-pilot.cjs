@@ -33,8 +33,20 @@ if (target === 'beta') {
         for (const color of ['w', 'b']) for (const piece of 'prnbqk') files.push(`assets/chess/pieces/spatial-${color}${piece}.svg`);
         for (const file of files) {
             const output = path.join(out, 'play', file);
+            const input = path.join(play, file);
             fs.mkdirSync(path.dirname(output), { recursive: true });
-            fs.copyFileSync(path.join(play, file), output);
+            if (file === 'assets/chess/chess-board.css') {
+                // The protected board opens on seat confirmation. Ship its art
+                // with the stylesheet so that the first board has pieces.
+                const css = fs.readFileSync(input, 'utf8').replace(
+                    /url\((['"]?)(pieces\/spatial-[wb][prnbqk]\.svg)\1\)/g,
+                    (_url, _quote, piece) => {
+                        const svg = fs.readFileSync(path.join(path.dirname(input), piece), 'base64');
+                        return `url("data:image/svg+xml;base64,${svg}")`;
+                    }
+                );
+                fs.writeFileSync(output, css);
+            } else fs.copyFileSync(input, output);
         }
     }
 }
