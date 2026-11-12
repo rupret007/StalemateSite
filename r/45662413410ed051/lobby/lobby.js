@@ -1831,12 +1831,20 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const game = event.target.value;
         event.target.value = '';
         if (!currentGameNight() || !game) return;
-        const panel = game === 'four' ? $('[data-four]:not([hidden])') : arcadeTables.get(game)?.controller?.open();
+        const four = game === 'four' ? $('[data-four]:not([hidden])') : null;
+        const controller = arcadeTables.get(game)?.controller;
+        const wasOpen = four?.open || controller?.isOpen();
+        const panel = four || controller?.open();
         if (!panel) return;
-        if (game === 'four') panel.open = true;
+        if (four) four.open = true;
         const heading = panel.querySelector('summary');
         heading.focus({ preventScroll: true });
-        heading.scrollIntoView({ block: 'start', behavior: 'instant' });
+        const reveal = () => heading.scrollIntoView({ block: 'start', behavior: 'instant' });
+        reveal();
+        // Some games reset the scroll position as their panel opens.
+        if (!wasOpen) panel.addEventListener('toggle', () => {
+            if (panel.open && document.activeElement === heading) reveal();
+        }, { once: true });
     });
     window.addEventListener('pagehide', () => {
         const current = currentGameNight();
