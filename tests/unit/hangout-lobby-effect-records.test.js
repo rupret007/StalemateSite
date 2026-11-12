@@ -45,12 +45,20 @@ describe('known lobby effects in one physical-record transaction', () => {
         expect(sessions.roomInvites).toEqual([metadata]);
         await f.write([['rooms', app.roomSnapshot()], ['sessions', sessions]]);
         expect((await f.read()).sessions.roomInvites).toEqual([metadata]);
+        const olderReaderSnapshot = await f.storage.transaction(tx => tx.get('sessions'));
+        expect(olderReaderSnapshot).not.toHaveProperty('roomInvites');
         for (const invalid of [{ ...metadata, guest: 'not-connected' }, { ...metadata, href: 'fixture-only' }]) {
             await expect(f.write([['sessions', { ...sessions, roomInvites: [invalid] }]])).rejects.toThrow('lobby-effects-unavailable');
         }
+        // Model a session write by the former release while its invite state is absent.
+        olderReaderSnapshot.connections[0].frames += 1;
+        await f.storage.transaction(tx => tx.put('sessions', olderReaderSnapshot));
+        expect((await f.read()).sessions).not.toHaveProperty('roomInvites');
+        await f.write([['sessions', sessions]]);
         send('guest', { t: 'room-invite-answer', request, accept: false });
         await f.write([['sessions', app.sessionSnapshot()]]);
         expect((await f.read()).sessions).not.toHaveProperty('roomInvites');
+        expect(await f.storage.transaction(tx => tx.get('room-invites:v1'))).toBeUndefined();
     });
 
     it('persists Game Night as an ordinary invite-only chat record without the call URL', async () => {
