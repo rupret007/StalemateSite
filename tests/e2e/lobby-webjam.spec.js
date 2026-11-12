@@ -328,10 +328,34 @@ for (const [hostSite, guestSite] of [['rad-dad', 'stalemate'], ['stalemate', 'ra
             const guestStatus = await expectExposedInviteStatus(guest, '[data-game-offer-status]');
             await guest.locator('[data-text]').focus();
             const offer = guest.locator('[data-game-offer]');
+            const dialog = host.getByRole('dialog', { name: 'Invite a guest' });
+            const bandmate = dialog.getByRole('group', { name: 'Online guests' })
+                .getByRole('button', { name: 'Invite Bandmate' });
+            await invite.press('Enter');
+            await expect(dialog).toHaveAccessibleDescription(
+                `Invite someone to ${room}. They choose whether to join.`
+            );
+            const error = await expectExposedInviteStatus(host, '[data-invite-quick-error]');
+            await expect(error).toBeEmpty();
+            await expect(bandmate).toBeFocused();
+            await host.evaluate(() => {
+                const socket = window.__lobby.ws;
+                const send = socket.send;
+                socket.send = function (raw) {
+                    if (JSON.parse(raw).t === 'room-invite-request') {
+                        socket.send = send;
+                        throw new Error('Synthetic invitation send failure');
+                    }
+                    return send.call(socket, raw);
+                };
+            });
+            await bandmate.press('Enter');
+            await expect(error).toHaveText('The invitation was not sent. Reconnect and try again.');
+            await expect(bandmate).toBeFocused();
+            await expect(offer).toBeHidden();
             async function send() {
-                await invite.click();
-                const list = host.getByRole('group', { name: 'Online guests' });
-                await list.getByRole('button', { name: 'Invite Bandmate' }).click();
+                if (!(await dialog.isVisible())) await invite.press('Enter');
+                await bandmate.press('Enter');
                 await expect(status).toHaveText('Invitation sent to Bandmate. Waiting for a reply.');
                 await expect(offer).toContainText(`RoomHost invited you to ${room}.`);
                 await expect(guestStatus).toHaveText(`RoomHost invited you to ${room}.`);
@@ -351,25 +375,36 @@ for (const [hostSite, guestSite] of [['rad-dad', 'stalemate'], ['stalemate', 'ra
     });
 }
 
-test('the crowded invite list scrolls on a 375px phone while Cancel stays visible', async ({ browser, baseURL }, testInfo) => {
-    const f = await browserRoom(browser, baseURL, true, { width: 375, height: 667 });
+const crowdedInviteViewports = [
+    { width: 375, height: 667, label: 'a 375px phone' },
+    { width: 320, height: 188, label: 'a short deep-zoom viewport' },
+];
+for (const { width, height, label } of crowdedInviteViewports) test(`the crowded invite list scrolls on ${label} while Cancel stays visible`, async ({ browser, baseURL }, testInfo) => {
+    const f = await browserRoom(browser, baseURL, true, { width, height });
     try {
         const host = await f.join('RoomHost', false, 'rad-dad');
         const busy = await f.join('BusyBandmate', false, 'stalemate');
-        await busy.click('[data-show="rooms"]');
+        await busy.click('.phonetabs [data-show="rooms"]');
         await busy.click('[data-start="jam"]');
         await expect(busy.locator('[data-jam]')).toBeVisible();
         for (let i = 1; i <= 11; i++) await f.join(`Bandmate${i}`, false, i % 2 ? 'stalemate' : 'rad-dad');
-        await host.click('[data-show="rooms"]');
+        await host.click('.phonetabs [data-show="rooms"]');
         await host.click('[data-start="jam"]');
-        await host.getByRole('button', { name: 'Invite bandmate to room' }).click();
+        await host.getByRole('button', { name: 'Invite bandmate to room' }).press('Enter');
         const list = host.getByRole('group', { name: 'Online guests' });
         const cancel = host.getByRole('button', { name: 'Cancel', exact: true });
         await expect(list.getByRole('button')).toHaveCount(12);
+        const firstGuest = list.getByRole('button').first();
+        await expect(firstGuest).toBeFocused();
+        expect(await firstGuest.evaluate(el => {
+            const style = getComputedStyle(el);
+            return style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) > 0
+                && parseFloat(style.outlineOffset) + parseFloat(style.outlineWidth) <= 0;
+        })).toBe(true);
         await expect(list.getByRole('button', { name: 'Invite BusyBandmate (busy)' })).toHaveText('BusyBandmate · Busy');
         expect(await list.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
         await expect(cancel).toBeInViewport({ ratio: 1 });
-        const file = testInfo.outputPath('invite-roster-375.png');
+        const file = testInfo.outputPath(`invite-roster-${width}.png`);
         await host.screenshot({ path: file, animations: 'disabled' });
         await testInfo.attach('crowded invite roster', { path: file, contentType: 'image/png' });
         await list.evaluate(el => { el.scrollTop = el.scrollHeight; });
