@@ -8,6 +8,7 @@ import { resolve, dirname } from 'node:path';
 const root = fileURLToPath(new URL('../../join/', import.meta.url));
 const provenance = JSON.parse(readFileSync(resolve(root, 'PROVENANCE.json')));
 const read = (name) => readFileSync(resolve(root, name), 'utf8');
+const handoffAssets = ['handoff.html', 'handoff.js'];
 
 describe('pinned WebJam browser assets', () => {
     it('ships the licensed, hash-bound runtime without development files or dependencies', () => {
@@ -15,12 +16,25 @@ describe('pinned WebJam browser assets', () => {
         expect(provenance.commit).toMatch(/^[a-f0-9]{40}$/);
         expect(provenance.license).toBe('MIT');
         expect(read('LICENSE')).toContain('Copyright (c) 2024 WebJam Contributors');
-        expect(readdirSync(root).sort()).toEqual([...Object.keys(provenance.files), 'PROVENANCE.json'].sort());
+        expect(readdirSync(root).sort()).toEqual([
+            ...Object.keys(provenance.files), 'PROVENANCE.json', ...handoffAssets,
+        ].sort());
         for (const [name, record] of Object.entries(provenance.files)) {
             const hash = createHash('sha256').update(readFileSync(resolve(root, name))).digest('hex');
             expect(hash, name).toBe(record.shippedSha256);
             if (name !== 'index.html') expect(hash, name).toBe(record.upstreamSha256);
         }
+    });
+
+    it('keeps the site-owned return page local and separate from the pinned runtime', () => {
+        const html = read('handoff.html');
+        const assets = [...html.matchAll(/<(?:script|link)\b[^>]*(?:src|href)="([^"]+)"/g)].map(match => match[1]);
+        expect(assets.sort()).toEqual(['handoff.js', 'style.css']);
+        expect(html).toContain('content="noindex, nofollow, noarchive, nosnippet"');
+        expect(html).toContain('name="referrer" content="no-referrer"');
+        expect(html).toContain("default-src 'none'; script-src 'self'; style-src 'self'");
+        expect(html).not.toMatch(/<script(?![^>]*\bsrc=)/i);
+        expect(read('handoff.js')).not.toMatch(/\bimport\b/);
     });
 
     it('resolves the entire static module and stylesheet graph within the packaged client', () => {

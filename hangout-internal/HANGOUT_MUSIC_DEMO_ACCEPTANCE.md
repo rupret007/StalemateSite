@@ -17,9 +17,11 @@ entitlement, usage/headroom and resource checks remain necessary before media.
 This permission does not enable AI, Hang Out's separate chat/media TURN, public
 navigation, purchases, signing enrollment or any trust/age/consent bypass.
 
-Use the [current private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
-to confirm the website and native revisions before a trial. The older
-package and deployment receipts below describe their own candidates.
+Use the [current website and package identities](HANGOUT_WEBSITE_INTEGRATION.md)
+for the current trial. The four verified archives come from source
+`67c7ef08e515c84eb2b0736c474ec2c4b0c21682`; only the ARM idle UI has current local
+execution evidence. Build labels alone are insufficient.
+Older package and deployment receipts below describe their own candidates.
 
 Each physical trial remains one native host and one browser guest for at most
 ten minutes, with capture consent, headphones and no recording. Retain the
@@ -30,15 +32,15 @@ to a bounded test.
 Only Jeff disposes moderation reports. Actual headphone and microphone use on
 Windows still needs the participant's confirmation.
 
-## Current listening sequence
+## Current listening sequence — November 10
 
 Use the [current private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
-for current delivery and device checks. The private site is serving the Arcade
-trial, which includes the current Jam invitation and Web Join changes. Both
-Mac Desktop shortcuts select verified `23cfae6` builds that passed idle
-startup. Installed Windows Chrome passed simulated microphone recovery,
-expired-invite and Retry checks. Both hosts still need an attended listening
-test with the current Windows browser guest.
+for the source and delivered version. Native packages are source `67c7ef0`;
+reviewed frontend `d53ff7f` / merged `11c9d1f8` now serves privately as version
+`2b205a24`, with the existing c83 backend and issuer `fd37578f` unchanged. The
+[delivery receipt](../pr-assets/private-readiness/20261110/private-delivery/README.md)
+qualifies 31 served static files and Chrome invitation/prejoin observations;
+it does not qualify physical listening on this runtime.
 
 The earlier generated Mac-to-Windows trial passed transport both ways,
 40-second synthetic WAV chord detection, a fresh invitation and shutdown at its
@@ -56,15 +58,13 @@ application delivery gate.
    built-in mic if instruments are not yet connected. On Windows, confirm the
    intended headset/interface and mic permission. Obtain fresh resource and
    account headroom checks before starting a bounded trial.
-2. Invite the Windows guest to the same private Jam room in Hang Out. The
-   guest selects **Join room** at the bottom of the lobby. Once both are in
-   the room, the **host** uses native WebJam: Music → Host → Start Session if
-   shown. Use **Copy browser invite**, wait for **Link copied**, paste the fresh
-   link into the Jam room's invitation field and click **Share**. The guest
-   opens **Join in browser** in Chrome, checks the selected microphone and
-   headphones, then chooses **Join with microphone**. The guest needs no
-   native WebJam or BlackHole installation. Keep private links out of logs,
-   documents and public channels.
+2. The **host** uses native WebJam: Music → Host → Start Session if shown.
+   Use the visible **Copy browser invite** control, wait for **Link copied**,
+   then paste the fresh browser invitation into
+   the private Jam room's invitation field, then Share. The **Windows guest**
+   uses Chrome, checks the selected microphone and headphones, then chooses
+   **Join with microphone**. The guest needs no native WebJam or BlackHole
+   installation. Keep private links out of logs, documents and public channels.
 3. Confirm speech in both directions, then a short musical passage. For the
    actual band setup, confirm the SSL 2+ guitar/vocal inputs and Che's actual
    Roland/interface route before testing them. Record setup time, audible
@@ -90,8 +90,9 @@ application delivery gate.
    bounded music trial from a second network when available. Keep these outcomes separate from same-household
    transport. Existing caps and all release/trust holds remain in force.
 
-The [overnight evidence note](HANGOUT_OVERNIGHT_CHECKS_20261107.md) records
-earlier hosted chat and layout tests separately from the attended music checks.
+The [overnight evidence note](HANGOUT_OVERNIGHT_CHECKS_20261107.md) separates new
+hosted chat/layout tests from these remaining attended music gates. No new
+question or physical capture is needed while Jeff is sleeping.
 
 ## Historical November 6 listening sequence
 

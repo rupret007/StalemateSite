@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
+import { packLobbyRoster, unpackLobbyRoster } from '../../r/45662413410ed051/lobby/lobby-roster.mjs';
 import { ENTRY_SITES, createEntrySiteRegistry, entrySitesFromConfig, normalizeEntrySource, entrySourceFromParams,
     entryBadge, entryReturn, entryHandoff, readEntryHandoff } from '../../r/45662413410ed051/entry-sites.mjs';
 
@@ -53,9 +54,9 @@ function boot(entrySites = ENTRY_SITES) {
     frames = [];
     engine = createLobby({ now: () => now, send: (id, msg) => frames.push({ recipient: id, ...msg }), limits: { defaultSlow: 0, entrySites } });
 }
-function guest(nick, source, extra = {}) {
+function guest(nick, source, extra = {}, compactLobbyRoster) {
     const identity = { id: `socket-${ids.length + 1}`, dev: `device-${nick}`, iph: `ip-${nick}`, account: '', role: 'fan', admin: false, ...extra };
-    ids.push(identity); engine.connect(identity); engine.message(identity.id, JSON.stringify({ t: 'hello', nick, age13: true, entrySource: source, role: 'owner', admin: true }));
+    ids.push(identity); engine.connect(identity); engine.message(identity.id, JSON.stringify({ t: 'hello', nick, age13: true, entrySource: source, role: 'owner', admin: true, compactLobbyRoster }));
     return identity.id;
 }
 beforeEach(() => { now = 1800000000000; ids = []; boot(); });
@@ -63,7 +64,7 @@ beforeEach(() => { now = 1800000000000; ids = []; boot(); });
 describe('one community with optional entry context', () => {
     it('shares rooms and messages across entry sites while keeping source separate from identity and authority', () => {
         const a = guest('Alice', 'stalemate'), b = guest('Bravo', 'rad-dad');
-        expect(frames.find((frame) => frame.recipient === a && frame.t === 'hello').features).toEqual({ entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1 });
+        expect(frames.find((frame) => frame.recipient === a && frame.t === 'hello').features).toEqual({ entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, roomInvites: 1, compactLobbyRoster: 1 });
         cmd(a, 'join', ['#our-room']); cmd(b, 'join', ['#our-room']);
         const room = frames.filter((f) => f.recipient === b && f.t === 'join').at(-1).ch;
         expect(room.names.map(({ nick, entrySource }) => ({ nick, entrySource }))).toEqual([
@@ -145,5 +146,51 @@ describe('one community with optional entry context', () => {
         const saved = engine.sessionSnapshot(); boot();
         expect(engine.restoreSessions(saved, ids).resumed).toEqual([a]);
         expect(engine._debug.conns.get(a).entrySource).toBe(''); expect(engine._debug.conns.get(a).role).toBe('fan');
+    });
+});
+
+describe('compact lobby roster snapshots', () => {
+    it('preserves every row flag, source and sort order and rejects invalid packed rows', () => {
+        const member = { id: 'connection', nick: 'Guest', entrySource: 'rad-dad', prefix: '@',
+            band: true, moderator: true, verified: true, owner: true, away: true, cam: true, busy: true };
+        const other = { id: 'second', nick: 'Another', entrySource: '', prefix: '',
+            band: false, moderator: false, verified: false, owner: false, away: false, cam: false };
+        expect(unpackLobbyRoster(packLobbyRoster([member, other]))).toEqual([member, other]);
+        for (const flag of ['band', 'moderator', 'verified', 'owner', 'away', 'cam']) {
+            const row = { ...other, [flag]: true };
+            expect(unpackLobbyRoster(packLobbyRoster([row]))).toEqual([row]);
+        }
+        const validRow = packLobbyRoster([member])[0];
+        for (const invalid of [null, Array(201).fill(validRow), [validRow.slice(1)],
+            [[...validRow.slice(0, 4), 128]], [[null, ...validRow.slice(1)]]])
+            expect(unpackLobbyRoster(invalid)).toBeNull();
+    });
+
+    it('sends the same current roster to both client versions and keeps fresh joins and rooms compatible', () => {
+        const alice = guest('Alice', 'rad-dad', {}, 1);
+        const bravo = guest('Bravo', 'stalemate', {}, '1');
+        const band = guest('Stage', 'stalemate', { role: 'band', account: 'verified-band' }, 1);
+        const last = (recipient, channel, type = 'chan') => frames.filter(f =>
+            f.recipient === recipient && f.t === type && f.ch.name === channel).at(-1).ch;
+        const verify = () => {
+            const packed = last(alice, '#stalemate');
+            const plain = last(bravo, '#stalemate');
+            expect(packed.rosterFormat).toBe(1);
+            expect(plain.rosterFormat).toBeUndefined();
+            expect(unpackLobbyRoster(packed.names)).toEqual(plain.names);
+            expect(JSON.stringify(packed).length).toBeLessThan(JSON.stringify(plain).length);
+            return plain.names;
+        };
+        expect(last(alice, '#stalemate', 'join').rosterFormat).toBeUndefined();
+        expect(verify().find(member => member.id === band)).toMatchObject({ band: true, verified: true, prefix: '@' });
+        cmd(band, 'join', ['#our-room']);
+        expect(verify().find(member => member.id === band).busy).toBe(true);
+        expect(last(band, '#our-room').rosterFormat).toBeUndefined();
+        cmd(band, 'part', ['#our-room'], '#our-room');
+        expect(verify().find(member => member.id === band).busy).toBeUndefined();
+        engine.message(band, JSON.stringify({ t: 'entry-source', source: '' }));
+        expect(verify().find(member => member.id === band).entrySource).toBe('');
+        engine.disconnect(band);
+        expect(verify().find(member => member.id === band)).toBeUndefined();
     });
 });

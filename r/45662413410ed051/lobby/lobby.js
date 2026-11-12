@@ -3,6 +3,7 @@
 import { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff, readEntryHandoff, KEEP_ROOM_INTENT_KEY, KEEP_ROOM_INTENT_TTL, keepRoomIntent, consumeKeepRoomIntent } from '../entry-sites.mjs';
 import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
+import { unpackLobbyRoster } from './lobby-roster.mjs';
 import { createIdleHeartbeat } from './idle-heartbeat.mjs';
 import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourWinningCells, gameNightRoomName } from './game-night.mjs';
 (() => {
@@ -459,6 +460,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let pendingJamShare = null;
     let jamShareResultsSupported = false, jamShareTimer;
     let jamInviteExpiryTimer;
+    let musicInvite = null;
+    let pendingMusicHandoff = null, directMusicInvitesSupported = false;
+    let sentMusicInvite = null, musicInviteOutcomesSupported = false;
+    const musicInviteFailed = 'Music invitation couldn’t be sent. Try again from your Jam room.';
+    const musicInviteConfirm = 'Confirm the invitation in WebJam.';
     const jamWaitingCopy = $('[data-jam-wait]').textContent;
     let gameNightSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
     let fourInARowSupported = false, fourRoom = null, fourPlayed = false;
@@ -466,6 +472,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const fourButtons = [], fourCells = [];
     const gameReturnKey = 'hangout-game-return';
     const gameInvites = new Map();
+    const sentRoomInvites = new Map();
+    let roomInvitesSupported = false;
     let gameReturn = null, gameReturnOffered = false, joiningGameRoom = '';
     // Jam rooms are invite-only like Game Night, so the directory cannot lead
     // an invited guest back. They share the same offer and return controls.
@@ -576,6 +584,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         connectionState = state;
         if (state !== 'connected') {
             gameInvites.clear(); gameReturnOffered = false; joiningGameRoom = ''; drawGameOffer();
+            for (const invite of sentRoomInvites.values()) clearTimeout(invite.timer);
+            sentRoomInvites.clear();
             clearGameLinks(); clearJamInvitations();
             if (pendingKeep) clearKeep(pendingKeep.stage === 'submitted' ? 'Keeping this room was not confirmed. Check Host tools after reconnecting.' : 'Your room return was interrupted. Nothing was kept.');
         }
@@ -915,6 +925,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             messageResultsSupported = m.features?.messageResults === 1;
             jamShareResultsSupported = m.features?.jamShareResults === 1;
             gameNightSupported = m.features?.gameNight === 1;
+            directMusicInvitesSupported = m.features?.directMusicInvites === 1;
+            musicInviteOutcomesSupported = m.features?.musicInviteOutcomes === 1;
             fourInARowSupported = m.features?.fourInARow === 1;
             discordLinksSupported = m.features?.discordLinks === true;
             shieldActive = m.shield === true;
@@ -923,6 +935,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             privateMessageContextSupported = m.features?.privateMessageContext === 1;
             privateMessagePeersSupported = m.features?.privateMessagePeers === 1;
             personTargetsSupported = m.features?.personTargets === 1; app.selfId = ''; personPreferencePending = null;
+            roomInvitesSupported = m.features?.roomInvites === 1;
             app.ignores.clear(); app.peerIgnores.clear();
             entrySharing.setSupported(entrySourcesSupported); drawEntryChoice();
             keepSupported = m.features?.roomKeep === 1;
@@ -949,7 +962,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 $('[data-pmreqs]').replaceChildren();
                 $('[data-text]').value = drafts.get('#stalemate') || '';
             }
-            send({ t: 'hello', nick, age13: true, entrySource: entrySharing.helloSource(), transport: 1 }); break;
+            send({ t: 'hello', nick, age13: true, entrySource: entrySharing.helloSource(), transport: 1,
+                ...(m.features?.compactLobbyRoster === 1 ? { compactLobbyRoster: 1 } : {}) }); break;
         case 'person-preferences': acknowledgePersonPreferences(m); break;
         case 'entry-source': entrySharing.acknowledge(m); break;
         case 'nick-error': setConnection('offline'); gateStatus(m.text); $('[data-gate]').hidden = false; $('[data-app]').hidden = true; break;
@@ -1032,7 +1046,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         case 'chan': {
             const c = app.chans.get(m.ch.name);
             if (c) {
-                Object.assign(c, m.ch);
+                const { rosterFormat, ...view } = m.ch;
+                if (rosterFormat !== undefined) {
+                    if (rosterFormat !== 1 || c.kind !== 'lobby') break;
+                    const names = unpackLobbyRoster(view.names);
+                    if (!names) break;
+                    view.names = names;
+                }
+                Object.assign(c, view);
                 const jamDraft = confirmJamShare(c, m.ch.jam);
                 if (app.active === c.name) drawChan();
                 // An own-share confirmation changes the room's invitation
@@ -1041,6 +1062,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 if (jamDraft && currentJam() === c && amOp(c)) $('[data-jam-link]').value = jamDraft;
                 const r = room();
                 if (r) r.onChan(c);
+                if (jamInviteOpener && (c.kind === 'lobby' || c === inviteContext)) drawQuickInvitePeople();
             }
             drawCommunity();
             break;
@@ -1059,6 +1081,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             const leavingGame = app.chans.get(m.ch)?.kind === 'game';
             const leavingFromButton = app.active === m.ch && document.activeElement === $('[data-leave]');
             forgetGameRoom(m.ch);
+            const sent = sentRoomInvites.get(m.ch);
+            if (sent) { clearTimeout(sent.timer); sentRoomInvites.delete(m.ch); }
             app.chans.delete(m.ch);
             if (m.t === 'closed') toast(`${m.ch} was ${m.reason}.`);
             if (app.active === m.ch) switchTo('#stalemate');
@@ -1111,13 +1135,54 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (view) pushLine(`pm:${view.ref}`, { ...m, ch: `pm:${view.ref}` }); break;
         }
         case 'pm-setting': $('[data-pm-off]').checked = m.off; toast(m.text); break;
+        case 'music-invite':
+        case 'music-invite-accepted':
+        case 'music-invite-ended':
+            receiveMusicInvite(m);
+            break;
+        case 'music-invite-result':
+            if (pendingMusicHandoff?.submitted && pendingMusicHandoff.request === m.request
+                && ['sent', 'unavailable'].includes(m.status)) finishMusicHandoff(m.status === 'sent');
+            break;
+        case 'music-invite-outcome':
+            if (sentMusicInvite?.request === m.request && sentMusicInvite.status === 'sent'
+                && ['accepted', 'declined', 'expired', 'unavailable'].includes(m.status)) {
+                sentMusicInvite.status = m.status;
+                drawMusicInviteOutcome();
+            }
+            break;
+        case 'room-invite-result': {
+            const sent = [...sentRoomInvites.values()].find(invite => invite.request === m.request);
+            if (!sent || !['sent', 'accepted', 'declined', 'expired', 'unavailable'].includes(m.status)) break;
+            if (m.status !== 'sent' || Number.isFinite(m.until)) updateSentRoomInvite(sent, m.status, m.until);
+            break;
+        }
+        case 'room-invite-ended': {
+            const offer = [...gameInvites.values()].find(invite => invite.request === m.request);
+            if (!offer) break;
+            if (joiningGameRoom === offer.room) {
+                joiningGameRoom = '';
+                if (m.status === 'expired') toast('That invitation expired. Ask your host to send another.');
+                if (m.status === 'unavailable') toast('The room is unavailable. Ask your host to try again.');
+            }
+            forgetGameRoom(offer.room);
+            break;
+        }
         case 'invite':
             if (jamRoomName(m.ch) || gameNightSupported && gameNightRoomName(m.ch) && roomNonce(m.roomInstance)) {
                 if (!app.chans.has(m.ch)) {
                     if (!gameInvites.has(m.ch) && gameInvites.size === 5 && !joiningGameRoom)
                         gameInvites.delete(gameInvites.keys().next().value);
-                    if (gameInvites.has(m.ch) || gameInvites.size < 5)
-                        gameInvites.set(m.ch, { room: m.ch, ref: roomNonce(m.roomInstance) ? m.roomInstance : undefined, by: m.by });
+                    if (gameInvites.has(m.ch) || gameInvites.size < 5) {
+                        const request = roomNonce(m.request) && Number.isFinite(m.until) ? m.request : '';
+                        const offer = { room: m.ch, ref: roomNonce(m.roomInstance) ? m.roomInstance : undefined, by: m.by, request };
+                        if (request) setTimeout(() => {
+                            if (gameInvites.get(m.ch) !== offer) return;
+                            if (joiningGameRoom === m.ch) joiningGameRoom = '';
+                            forgetGameRoom(m.ch);
+                        }, Math.max(0, Math.min(120000, m.until - Date.now())));
+                        if (request || !gameInvites.get(m.ch)?.request) gameInvites.set(m.ch, offer);
+                    }
                     drawGameOffer();
                 }
             } else toast(`${m.by} invited you to ${m.ch}`, [['Join', () => cmd('join', [m.ch])]]);
@@ -1269,6 +1334,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     });
 
     function switchTo(key, { freshJoin = false } = {}) {
+        const directoryRoom = document.activeElement?.closest('[data-roomlist] button[data-room]');
         const prev = app.active;
         if (prev !== key) { drafts.set(prev, $('[data-text]').value); $('[data-text]').value = drafts.get(key) || ''; }
         app.active = key;
@@ -1284,6 +1350,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         drawTabs(); drawChan(); drawMessageRecovery();
         drawCommunity(); drawRooms();
         show('chat');
+        if (directoryRoom?.dataset.room === key) focusChannelTab(key, { preventScroll: false });
         const buf = $('[data-buffer]'); buf.scrollTop = buf.scrollHeight;
         const r = room();
         if (r) {
@@ -1378,8 +1445,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-jam-invite-qr-toggle]').setAttribute('aria-expanded', 'false');
         $('[data-jam-invite-qr-toggle]').textContent = 'Show QR code';
         $('[data-jam-link]').value = ''; $('[data-jam-form]').hidden = true;
+        $('[data-jam-manual]').hidden = true;
         $('[data-jam-host-steps]').hidden = true;
         $('[data-jam-invite-room]').hidden = true;
+        $('[data-jam-invite-music]').hidden = true;
         $('[data-jam-wait]').hidden = false;
         const web = $('[data-jam-web]'); web.disabled = true; web.onclick = null; web.textContent = 'Browser join unavailable';
     }
@@ -1447,14 +1516,19 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function currentGameOffer() {
         return gameReturnOffered ? gameReturn : gameInvites.values().next().value;
     }
+    function updateOfferStatus(announcement, visible, message) {
+        if (announcement.textContent !== message) announcement.textContent = message;
+        if (visible.textContent !== message) visible.textContent = message;
+    }
     function drawGameOffer() {
         const offer = currentGameOffer();
         const panel = $('[data-game-offer]'), status = $('[data-game-offer-status]');
+        const visible = $('[data-game-offer-message]');
         const button = $('[data-game-offer-join]');
         const hadFocus = panel.contains(document.activeElement);
         panel.hidden = !offer;
         if (!offer) {
-            status.textContent = '';
+            updateOfferStatus(status, visible, '');
             if (hadFocus) focusChannelTab(app.active);
             return;
         }
@@ -1463,7 +1537,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             : gameReturnOffered ? jam ? `You were disconnected from ${offer.room}. Chat starts fresh.`
                 : 'Game Night disconnected. Any match you were playing ended.'
             : jam ? `${offer.by} invited you to ${offer.room}.` : `${offer.by} invited you to Game Night.`;
-        if (status.textContent !== message) status.textContent = message;
+        updateOfferStatus(status, visible, message);
         button.textContent = gameReturnOffered ? 'Return to room' : jam ? 'Join room' : 'Join Game Night';
         button.setAttribute('aria-disabled', String(!!joiningGameRoom));
         $('[data-game-offer-dismiss]').disabled = !!joiningGameRoom;
@@ -1471,13 +1545,19 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     $('[data-game-offer-join]').addEventListener('click', () => {
         const offer = currentGameOffer();
         if (!offer || joiningGameRoom || connectionState !== 'connected' || sessionEnded || app.sharingStopped) return;
-        if (!cmd('join', [offer.room], app.active, offer.ref)) return toast(jamRoomName(offer.room) ? 'Reconnect before joining the room.' : 'Reconnect before joining Game Night.');
+        const sent = offer.request
+            ? send({ t: 'room-invite-answer', request: offer.request, accept: true })
+            : cmd('join', [offer.room], app.active, offer.ref);
+        if (!sent) return toast(jamRoomName(offer.room) ? 'Reconnect before joining the room.' : 'Reconnect before joining Game Night.');
         joiningGameRoom = offer.room;
         drawGameOffer();
     });
     $('[data-game-offer-dismiss]').addEventListener('click', () => {
         const offer = currentGameOffer();
-        if (offer && !joiningGameRoom) forgetGameRoom(offer.room);
+        if (!offer || joiningGameRoom) return;
+        if (offer.request && !send({ t: 'room-invite-answer', request: offer.request, accept: false }))
+            return toast('Reconnect before declining the invitation.');
+        forgetGameRoom(offer.room);
     });
     window.addEventListener('pagehide', () => {
         const c = app.chans.get(gameReturn?.room);
@@ -1494,11 +1574,106 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (!link || !window.HangoutQrLite?.draw) { canvas.removeAttribute('data-invite-url'); return; }
         window.HangoutQrLite.draw(canvas, link);
     }
+    function receiveMusicInvite(frame) {
+        if (!roomNonce(frame.id) || connectionState !== 'connected' || app.sharingStopped || app.localMediaPaused) return;
+        if (frame.t === 'music-invite') {
+            if (!jamRoomName(frame.ch) || !roomNonce(frame.roomInstance) || typeof frame.by !== 'string'
+                || !Number.isSafeInteger(frame.expires) || frame.expires <= Date.now()) return;
+            clearMusicInviteTimers();
+            musicInvite = { id: frame.id, room: frame.ch, instance: frame.roomInstance, from: frame.by, expires: frame.expires, state: 'offer' };
+            musicInvite.expiryTimer = setTimeout(endMusicInvite, Math.min(frame.expires - Date.now(), 600000));
+        } else if (musicInvite?.id !== frame.id) return;
+        else if (frame.t === 'music-invite-ended') return endMusicInvite();
+        else if (!['joining', 'unconfirmed'].includes(musicInvite.state)) return;
+        else {
+            const current = currentJam();
+            const link = typeof frame.href === 'string' && browserInviteLink({ webReady: true, web: frame.href });
+            if (!link || musicInvite.expires <= Date.now() || current?.name !== musicInvite.room || current.keepRef !== musicInvite.instance
+                || frame.ch !== musicInvite.room || frame.roomInstance !== musicInvite.instance
+                || browserInviteDeadline(link) !== musicInvite.expires) return endMusicInvite();
+            clearTimeout(musicInvite.replyTimer);
+            musicInvite.href = link;
+            musicInvite.state = 'accepted';
+        }
+        drawMusicInvite();
+    }
+    function clearMusicInviteTimers() {
+        clearTimeout(musicInvite?.expiryTimer);
+        clearTimeout(musicInvite?.replyTimer);
+    }
+    function endMusicInvite() {
+        if (!musicInvite) return;
+        clearMusicInviteTimers();
+        musicInvite.state = 'ended';
+        delete musicInvite.href;
+        drawMusicInvite();
+    }
+    function drawMusicInvite() {
+        const panel = $('[data-music-invite]');
+        const action = $('[data-music-invite-action]');
+        const dismiss = $('[data-music-invite-dismiss]');
+        const accepted = musicInvite?.state === 'accepted';
+        const ended = musicInvite?.state === 'ended';
+        const joining = musicInvite?.state === 'joining';
+        const unconfirmed = musicInvite?.state === 'unconfirmed';
+        const current = currentJam();
+        panel.hidden = !musicInvite || (accepted && (current?.name !== musicInvite.room || current.keepRef !== musicInvite.instance));
+        if (current && !amOp(current) && !current.jam?.web && !current.jam?.desktop && !current.jam?.invitation)
+            $('[data-jam-actions]').hidden = accepted && !panel.hidden;
+        const message = panel.hidden ? '' : ended ? 'This music invitation ended. Ask the host for a fresh one.'
+            : accepted ? 'You’re in the Jam room. Open the audio check when you’re ready.'
+            : unconfirmed ? 'Hang Out hasn’t confirmed your Music invitation. Wait here or ask the host to send a fresh one.'
+            : joining ? 'Waiting for Hang Out to confirm you joined.'
+            : musicInvite.sendFailed ? 'Couldn’t send your reply. Check your connection and try again.'
+            : `${musicInvite.from} invited you to play in ${musicInvite.room}.`;
+        updateOfferStatus($('[data-music-invite-status]'), $('[data-music-invite-message]'), message);
+        if (panel.hidden) return;
+        dismiss.textContent = ended || unconfirmed ? 'Dismiss' : 'Not now';
+        if ((ended || unconfirmed) && document.activeElement === action) dismiss.focus();
+        action.hidden = ended || unconfirmed;
+        action.setAttribute('aria-disabled', String(joining));
+        action.textContent = accepted ? 'Open audio check' : joining ? 'Joining…' : 'Accept and join';
+    }
+    $('[data-music-invite-action]').addEventListener('click', () => {
+        const offer = musicInvite;
+        if (!offer || offer.expires <= Date.now()) return endMusicInvite();
+        if (offer.state === 'accepted' && !$('[data-music-invite]').hidden) {
+            window.open(offer.href, '_blank', 'noopener,noreferrer');
+        } else if (offer.state === 'offer') {
+            if (send({ t: 'music-invite-accept', ch: offer.room, roomInstance: offer.instance, id: offer.id })) {
+                offer.state = 'joining';
+                offer.replyTimer = setTimeout(() => {
+                    if (musicInvite !== offer || offer.state !== 'joining') return;
+                    offer.state = 'unconfirmed';
+                    drawMusicInvite();
+                }, 10000);
+            } else offer.sendFailed = true;
+            drawMusicInvite();
+        }
+    });
+    $('[data-music-invite-dismiss]').addEventListener('click', () => {
+        const offer = musicInvite;
+        if (musicInviteOutcomesSupported && offer?.state === 'offer' && offer.expires > Date.now()
+            && !send({ t: 'music-invite-decline', ch: offer.room, roomInstance: offer.instance, id: offer.id })) {
+            toast('Couldn’t send your reply. Check your connection and try again.');
+            return;
+        }
+        clearMusicInviteTimers();
+        musicInvite = null;
+        drawMusicInvite();
+        focusChannelTab(app.active);
+    });
     function clearJamInvitations() {
         // A disconnected tab has no current room admission. Purge cached
         // capabilities too, so selecting an old tab cannot reveal them again.
         for (const c of app.chans.values()) if (c.kind === 'jam') c.jam = null;
         jamContext = null;
+        closeMusicHandoff();
+        sentMusicInvite = null;
+        drawMusicInviteOutcome();
+        clearMusicInviteTimers();
+        musicInvite = null;
+        drawMusicInvite();
         resetJamControls();
     }
     function currentJam() {
@@ -1526,11 +1701,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     }
     function drawJam() {
         clearTimeout(jamInviteExpiryTimer);
+        drawMusicInviteOutcome();
         const focused = document.activeElement;
         if (app.sharingStopped || app.localMediaPaused) { resetJamControls(); $('[data-jam]').hidden = true; return; }
         const c = currentJam();
         const next = c ? { room: c, host: !!amOp(c), invitation: c.jam?.invitation || c.jam?.desktop || '',
             desktop: c.jam?.desktop || '', web: c.jam?.web || '', webReady: c.jam?.webReady === true } : null;
+        const roomChanged = next?.room !== jamContext?.room || next?.host !== jamContext?.host;
         const unchanged = jamContext && next && Object.keys(next).every(key => next[key] === jamContext[key]);
         const pending = pendingJamShare;
         const ownPublication = pending?.requestId && pending.room === c && pending.context === jamContext && next?.host
@@ -1549,18 +1726,29 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (!next) return;
         $('[data-jam]').hidden = false; $('[data-jam-form]').hidden = !next.host;
         $('[data-jam-invite-room]').hidden = !next.host;
+        const direct = next.host && directMusicInvitesSupported && personTargetsSupported
+            && roomNonce(c.keepRef) && typeof BroadcastChannel === 'function';
+        $('[data-jam-invite-music]').hidden = !direct;
+        const manual = $('[data-jam-manual]');
+        manual.hidden = !next.host;
+        $('[data-jam-manual-label]').hidden = !direct;
+        if (next.host && (!direct || roomChanged)) manual.open = !direct;
+        drawSentRoomInvite(c);
         const desktop = $('[data-jam-desktop]');
+        const desktopCopy = $('[data-jam-copy]');
         desktop.hidden = !next.desktop;
         if (/^webjam:\/\//.test(next.desktop)) desktop.setAttribute('href', next.desktop);
         else desktop.removeAttribute('href');
         const now = Date.now();
         const browserLink = browserInviteLink(next, now);
+        desktop.classList.toggle('btn--ghost', !!browserLink);
+        desktopCopy.classList.toggle('btn--ghost', !!browserLink);
         const deadline = next.webReady ? browserInviteDeadline(next.web) : 0;
         const expired = deadline > 0 && deadline <= now;
         const shared = !!(next.invitation || browserLink);
         $('[data-jam-host-steps]').hidden = !next.host || shared || expired;
         $('[data-jam-actions]').hidden = next.host && !shared && !expired;
-        $('[data-jam-copy]').hidden = !next.invitation;
+        desktopCopy.hidden = !next.invitation;
         const wait = $('[data-jam-wait]'), web = $('[data-jam-web]');
         const copy = $('[data-jam-invite-copy]'), qr = $('[data-jam-invite-qr-toggle]');
         const manualCopy = $('[data-jam-invite-copy-value]');
@@ -1579,6 +1767,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             qr.textContent = 'Show QR code';
         } else if (!$('[data-jam-invite-qr-panel]').hidden) drawJamInviteQr(browserLink);
         web.disabled = !browserLink;
+        web.classList.toggle('btn--ghost', web.disabled);
         web.hidden = expired;
         web.textContent = web.disabled ? 'Browser join unavailable' : 'Join in browser';
         web.title = web.disabled ? 'Your host has not shared an approved browser invite yet'
@@ -1781,8 +1970,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-topic]').textContent = isPm ? `Private chat with ${pmLabel}${c?.open ? '' : ' · replies unconfirmed; draft kept'} · not end-to-end encrypted · report shares selected text · tap their name to block` : c ? `${c.topic || ''}` : '';
         const room = !isPm && c && c.kind !== 'lobby';
         if (inviteContext && (inviteContext !== c || connectionState !== 'connected' || !amOp(c))) closeInviteDialog();
+        if (pendingMusicHandoff && (currentJam() !== pendingMusicHandoff.room || !amOp(c))) closeMusicHandoff();
         $('[data-roombar]').hidden = app.sharingStopped || app.localMediaPaused || !room;
         drawJam();
+        drawMusicInvite();
         drawGameNight();
         const showAct = !app.sharingStopped && !app.localMediaPaused && room && ['bobross', 'watch', 'art'].includes(c.kind);
         $('[data-activity]').hidden = !showAct;
@@ -1856,7 +2047,16 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             (filter === 'mine' ? r.mine : filter === 'registered' ? r.persistent : r.count > 0 || !r.persistent)
             && (!query || `${r.name} ${r.title}`.toLowerCase().includes(query))), [...app.chans.keys()]);
         $('[data-room-count]').textContent = String(rooms.length);
-        $('[data-rooms-empty]').hidden = rooms.length > 0;
+        const empty = $('[data-rooms-empty]');
+        empty.hidden = rooms.length > 0;
+        if (!empty.hidden) {
+            const message = connectionState !== 'connected' ? 'Connect to see current rooms.'
+                : query ? 'No rooms match your search. Try another name or clear the search.'
+                : filter === 'registered' ? 'No registered rooms to show.'
+                : filter === 'mine' ? 'You don’t have any registered rooms.'
+                : 'No rooms yet. Stay for a chat, or be the first to start one.';
+            if (empty.textContent !== message) empty.textContent = message;
+        }
         const rows = rooms.map(r => {
             const li = previous.get(r.name) || document.createElement('li');
             li.dataset.roomKey = r.name;
@@ -1989,9 +2189,16 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
         const kind = b.dataset.start;
         if (kind === 'game' && !gameNightSupported) return;
-        // Break up numeric runs so a random room code never looks like a phone number.
-        const code = kind === 'game' ? crypto.randomUUID().replaceAll('-', '') : '';
-        const suffix = code ? `${code.slice(0, 6)}x${code.slice(6, 12)}` : slug();
+        // Private activity names need a unique part even when their readable
+        // words match. Break up digits so the code won't look like a phone number.
+        const code = kind === 'game' || kind === 'jam' ? crypto.randomUUID().replaceAll('-', '') : '';
+        let suffix;
+        if (kind === 'game') {
+            suffix = `${code.slice(0, 6)}x${code.slice(6, 12)}`;
+        } else {
+            suffix = slug();
+            if (kind === 'jam') suffix += `-${code.slice(0, 4)}x${code.slice(4, 8)}`;
+        }
         count(`room-start-${kind}`); cmd('join', [`#${kind}-${suffix}`]);
     }));
     $('[data-channel-cancel]').addEventListener('click', () => $('[data-channel-dialog]').close());
@@ -2269,29 +2476,116 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     $('[data-palette]').addEventListener('close', () => { if (!$('[data-palette]').open) paletteContext = null; });
 
     let inviteInstance = '', invitePeople = new Map(), jamInviteOpener = null;
+    function drawSentRoomInvite(room) {
+        const invite = sentRoomInvites.get(room.name);
+        const status = $('[data-room-invite-status]');
+        const messages = invite && {
+            sending: `Sending invitation to ${invite.nick}…`,
+            sent: `Invitation sent to ${invite.nick}. Waiting for a reply.`,
+            accepted: `${invite.nick} accepted and joined.`,
+            declined: `${invite.nick} declined the invitation.`,
+            expired: `The invitation to ${invite.nick} expired.`,
+            unconfirmed: `We didn’t get a reply from the server for ${invite.nick}’s invitation. You can try again.`,
+            unavailable: `The invitation to ${invite.nick} couldn’t be completed. Try again when they’re online.`,
+        };
+        const text = amOp(room) && messages ? messages[invite.status] : '';
+        if (status.textContent !== text) status.textContent = text;
+        $('[data-jam-invite-room]').setAttribute('aria-disabled', String(
+            !!invite && ['sending', 'sent'].includes(invite.status)));
+    }
+    function updateSentRoomInvite(invite, status, until) {
+        clearTimeout(invite.timer);
+        invite.status = status;
+        if (status === 'sending' || status === 'sent') invite.timer = setTimeout(() => {
+            if (sentRoomInvites.get(invite.room.name) === invite)
+                updateSentRoomInvite(invite, status === 'sending' ? 'unconfirmed' : 'expired');
+        }, status === 'sending' ? 10000 : Math.max(0, Math.min(120000, until - Date.now())));
+        if (store(app.active) === invite.room) drawSentRoomInvite(invite.room);
+    }
     function closeInviteDialog() {
         inviteInstance = ''; invitePeople.clear();
         inviteContext = null; $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
+        $('[data-invite-people]').replaceChildren();
         if ($('[data-invite-dialog]').open) $('[data-invite-dialog]').close();
     }
-    function openInviteDialog(opener = null) {
+    function onlineInvitePeople(current, music = false) {
+        const online = new Map();
+        const members = new Set(current.names.map(member => member.id));
+        for (const room of app.chans.values()) if (room.kind === 'lobby') {
+            for (const person of room.names || []) {
+                if (!personId(person.id) || person.id === app.selfId) continue;
+                const alreadyHere = members.has(person.id);
+                if (music || !alreadyHere)
+                    online.set(person.id, alreadyHere && person.busy ? { ...person, busy: false } : person);
+            }
+        }
+        return online;
+    }
+    function drawQuickInvitePeople() {
+        if (!inviteContext || !jamInviteOpener || $('[data-invite-quick]').hidden) return;
+        const { music } = jamInviteOpener;
+        const list = $('[data-invite-people]');
+        const error = $('[data-invite-quick-error]');
+        const online = onlineInvitePeople(inviteContext, music);
+        for (const button of Array.from(list.children)) {
+            if (online.has(button.dataset.peer)) continue;
+            if (button === document.activeElement) $('[data-invite-quick-cancel]').focus({ preventScroll: true });
+            invitePeople.delete(button.dataset.peer);
+            button.remove();
+        }
+        const buttons = new Map(Array.from(list.children, button => [button.dataset.peer, button]));
+        for (const person of online.values()) {
+            let button = buttons.get(person.id);
+            if (!button) {
+                const context = personContext(person.id, inviteContext.name, inviteInstance, person.nick);
+                invitePeople.set(person.id, context);
+                button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'btn btn--ghost';
+                button.dataset.peer = person.id;
+                button.addEventListener('click', () => sendInviteToPerson(context, error, music));
+                list.append(button);
+            }
+            const label = person.busy ? `${person.nick} · Busy` : person.nick;
+            if (button.textContent !== label) {
+                button.textContent = label;
+                button.setAttribute('aria-label', `Invite ${person.nick}${person.busy ? ' (busy)' : ''}`);
+            }
+        }
+        $('[data-invite-empty]').hidden = online.size > 0;
+    }
+    function openInviteDialog(opener = null, music = false) {
         const current = store(app.active);
         if (connectionState !== 'connected' || !current || current.kind === 'lobby' || !amOp(current)) return;
-        jamInviteOpener = opener ? { button: opener, room: current } : null;
+        jamInviteOpener = opener ? { button: opener, room: current, music } : null;
         inviteContext = current; inviteInstance = current.keepRef; invitePeople.clear(); $('[data-invite-room]').textContent = current.name; $('[data-invite-error]').textContent = '';
-        $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
-        const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose a current person'; $('[data-invite-options]').append(placeholder);
-        for (const person of app.chans.get('#stalemate')?.names || []) {
-            if (!personId(person.id) || person.id === app.selfId || current.names.some(member => member.id === person.id)) continue;
-            const context = personContext(person.id, current.name, inviteInstance, person.nick);
-            invitePeople.set(person.id, context);
-            const option = document.createElement('option'); option.value = person.id; option.textContent = person.nick; $('[data-invite-options]').append(option);
+        const quick = !!opener && personTargetsSupported && roomNonce(inviteInstance);
+        const list = $('[data-invite-people]'), options = $('[data-invite-options]'), error = $('[data-invite-quick-error]');
+        $('[data-invite-quick]').hidden = !quick; $('[data-invite-form]').hidden = quick;
+        list.replaceChildren(); options.replaceChildren(); error.textContent = '';
+        $('[data-invite-nick]').value = '';
+        const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose someone online'; options.append(placeholder);
+        if (quick) drawQuickInvitePeople();
+        else {
+            for (const person of onlineInvitePeople(current).values()) {
+                invitePeople.set(person.id, personContext(person.id, current.name, inviteInstance, person.nick));
+                const option = document.createElement('option'); option.value = person.id;
+                option.textContent = person.busy ? `${person.nick} · Busy` : person.nick; options.append(option);
+            }
         }
         $('[data-invite-person-send]').disabled = !personTargetsSupported || !roomNonce(inviteInstance);
-        $('[data-invite-dialog]').showModal(); $('[data-invite-nick]').focus();
+        $('[data-invite-dialog]').showModal();
+        const first = quick ? list.querySelector('button') || $('[data-invite-quick-cancel]') : $('[data-invite-nick]');
+        first.focus();
     }
-    $('[data-jam-invite-room]').addEventListener('click', event => openInviteDialog(event.currentTarget));
+    $('[data-jam-invite-room]').addEventListener('click', event => {
+        if (event.currentTarget.getAttribute('aria-disabled') !== 'true') openInviteDialog(event.currentTarget);
+    });
+    $('[data-jam-invite-music]').addEventListener('click', event => {
+        if (!pendingMusicHandoff) openInviteDialog(event.currentTarget, true);
+    });
     $('[data-invite-cancel]').addEventListener('click', closeInviteDialog);
+    $('[data-invite-quick-cancel]').addEventListener('click', closeInviteDialog);
     $('[data-invite-dialog]').addEventListener('close', () => {
         if ($('[data-invite-dialog]').open) return;
         const opener = jamInviteOpener;
@@ -2304,17 +2598,121 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             ? opener.button : $(host ? '[data-roomtools]' : '[data-text]');
         target.focus({ preventScroll: true });
     });
-    $('[data-invite-person-send]').addEventListener('click', () => {
-        const current = store(app.active), context = invitePeople.get($('[data-invite-options]').value);
-        if (!inviteContext || inviteContext !== current || current.keepRef !== inviteInstance || !amOp(current) || !context) {
-            $('[data-invite-error]').textContent = 'Choose a current person in the original room.'; return;
+    function showMusicHandoffStatus(message, canCancel = false) {
+        const cancel = $('[data-music-handoff-cancel]');
+        if (!canCancel && document.activeElement === cancel
+            && currentJam() === pendingMusicHandoff?.room && amOp(pendingMusicHandoff.room)) {
+            $('[data-jam-invite-music]').focus({ preventScroll: true });
+        }
+        cancel.hidden = !canCancel;
+        $('[data-music-handoff-status]').textContent = message;
+    }
+    function closeMusicHandoff() {
+        if (!pendingMusicHandoff) return;
+        clearTimeout(pendingMusicHandoff.timer);
+        pendingMusicHandoff.channel.close();
+        showMusicHandoffStatus('');
+        pendingMusicHandoff = null;
+        $('[data-jam-invite-music]').removeAttribute('aria-disabled');
+    }
+    $('[data-music-handoff-cancel]').addEventListener('click', () => {
+        if (!pendingMusicHandoff || pendingMusicHandoff.submitted) return;
+        closeMusicHandoff();
+        toast('Music invite canceled in Hang Out. If WebJam still shows a confirmation, choose No.');
+    });
+    function drawMusicInviteOutcome() {
+        const output = $('[data-music-invite-outcome]');
+        const room = currentJam();
+        const invite = room && sentMusicInvite?.room === room && amOp(room) ? sentMusicInvite : null;
+        const message = invite ? {
+            sent: `Music invitation sent to ${invite.nick}. Waiting for a reply.`,
+            accepted: `${invite.nick} accepted and joined the Jam room.`,
+            declined: `${invite.nick} declined the Music invitation.`,
+            expired: `The Music invitation to ${invite.nick} expired.`,
+            unavailable: `The Music invitation to ${invite.nick} ended. You can send a new one.`
+        }[invite.status] : '';
+        if (output.textContent !== message) output.textContent = message;
+    }
+    function finishMusicHandoff(sent) {
+        const { room, request, nick } = pendingMusicHandoff;
+        pendingMusicHandoff.channel.postMessage({ returned: sent });
+        closeMusicHandoff();
+        if (sent && musicInviteOutcomesSupported) {
+            if ([musicInviteFailed, musicInviteConfirm].includes(toastRegion.textContent)) {
+                clearTimeout(toastTimer);
+                toastRegion.replaceChildren();
+                toastRegion.hidden = true;
+            }
+            sentMusicInvite = { room, request, nick, status: 'sent' };
+            drawMusicInviteOutcome();
+            return;
+        }
+        toast(sent ? 'Music invitation sent.' : musicInviteFailed);
+    }
+    function startMusicHandoff(room, context) {
+        const request = crypto.randomUUID().replaceAll('-', '');
+        const channel = new BroadcastChannel(`webjam-music-${request}`);
+        const handoff = {
+            room, channel, request, nick: context.label, submitted: false, timer: setTimeout(() => {
+                closeMusicHandoff();
+                toast(handoff.submitted
+                    ? 'Hang Out did not confirm delivery. Check with your bandmate before sending another invitation.'
+                    : 'WebJam did not return an invitation. Start a hosted Music session in the private app and try again.');
+            }, 90000)
+        };
+        pendingMusicHandoff = handoff;
+        $('[data-jam-invite-music]').setAttribute('aria-disabled', 'true');
+        channel.onmessage = ({ data }) => {
+            if (pendingMusicHandoff !== handoff || handoff.submitted || typeof data?.href !== 'string') return;
+            const current = currentJam();
+            const sent = current === room && current.keepRef === context.instance && amOp(current)
+                && findPerson(context.peer) && send({
+                    t: 'music-invite-offer', request, ch: context.channel, roomInstance: context.instance, peer: context.peer, href: data.href
+                });
+            if (!sent) return finishMusicHandoff(false);
+            handoff.submitted = true;
+            showMusicHandoffStatus('Waiting for Hang Out to confirm delivery…');
+        };
+        const launch = document.createElement('a');
+        launch.href = `webjam-beta://hangout-music/${request}`;
+        document.body.append(launch);
+        launch.click();
+        launch.remove();
+        showMusicHandoffStatus('Confirm in WebJam. If no prompt appears, cancel here, start a hosted Music session in WebJam, then try again.', true);
+    }
+    function sendInviteToPerson(context, error, music = false) {
+        const current = store(app.active);
+        if (!inviteContext || inviteContext !== current || current.keepRef !== inviteInstance || !amOp(current)
+            || !context || invitePeople.get(context.peer) !== context) {
+            error.textContent = 'Open the invite list from your room and choose someone online.'; return;
         }
         // Invitation target may be outside this room, but must remain the
         // original live connection in the shared lobby's current roster.
-        const person = findPerson(context.peer);
-        if (!person || !personContextValid(context)) { $('[data-invite-error]').textContent = 'That person is no longer confirmed.'; return; }
+        const person = onlineInvitePeople(current, music).get(context.peer);
+        if (!person || !personContextValid(context)) { error.textContent = 'That guest went offline. Choose someone else or try again when they’re back.'; return; }
+        if (music) {
+            if (!directMusicInvitesSupported || currentJam() !== current) {
+                error.textContent = 'Open the invite list again from your Jam room.'; return;
+            }
+            closeInviteDialog();
+            startMusicHandoff(current, context);
+            return;
+        }
+        if (jamInviteOpener && roomInvitesSupported) {
+            const request = crypto.randomUUID().replaceAll('-', '');
+            if (send({ t: 'room-invite-request', request, ch: current.name, roomInstance: context.instance, peer: context.peer })) {
+                const invite = { request, room: current, nick: person.nick };
+                sentRoomInvites.set(current.name, invite);
+                updateSentRoomInvite(invite, 'sending');
+                closeInviteDialog();
+            } else error.textContent = 'The invitation was not sent. Reconnect and try again.';
+            return;
+        }
         if (send({ t: 'cmd', name: 'invite', args: [person.nick, current.name], ch: context.channel, roomInstance: context.instance, personContext: 1, personPeer: context.peer })) closeInviteDialog();
-        else $('[data-invite-error]').textContent = 'The invitation was not sent. Reconnect before trying again.';
+        else error.textContent = 'The invitation was not sent. Reconnect before trying again.';
+    }
+    $('[data-invite-person-send]').addEventListener('click', () => {
+        sendInviteToPerson(invitePeople.get($('[data-invite-options]').value), $('[data-invite-error]'));
     });
     $('[data-invite-form]').addEventListener('submit', event => {
         event.preventDefault();

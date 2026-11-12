@@ -133,7 +133,11 @@ describe('real invitation-only beta boundary', () => {
         const entrance = await betaFetch(request('/join/'), config, deps);
         expect(entrance.headers.get('Content-Type')).toContain('text/html');
         expect(entrance.headers.get('Permissions-Policy')).toContain('microphone=()');
-        expect(await entrance.text()).toContain('href="/beta/" target="_blank" rel="noopener noreferrer"');
+        expect(entrance.headers.get('Content-Security-Policy')).toContain("form-action 'none'");
+        const entranceBody = await entrance.text();
+        expect(entranceBody).toContain('<form id="unlock">');
+        expect(entranceBody).toContain('src="/beta/client.js"');
+        expect(entranceBody).not.toContain('target="_blank"');
         expect(await (await betaFetch(request('/join/', { method: 'HEAD' }), config, deps)).text()).toBe('');
         expect((await betaFetch(request('/join/app.js'), config, deps)).headers.get('Content-Type')).toContain('text/plain');
         expect(config.ASSETS.fetch).not.toHaveBeenCalled();
