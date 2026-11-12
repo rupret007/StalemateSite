@@ -1,6 +1,6 @@
 // @vitest-environment node
 // Hang Out lobby engine: IRC commands, server-side permissions, filters, PMs, moderation, budget, stats.
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { createLobby, COMMANDS, LOBBY, validWebjamInvite, validWebJoin } from '../../hangout-worker/src/lobby-core.mjs';
 import { discordCallLink, dropFour, fourFinished, openFour } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import { checkText, checkNick, normalize } from '../../hangout-worker/src/filter.mjs';
@@ -896,6 +896,27 @@ describe('open-room paint + synced video (act frames)', () => {
 });
 
 describe('Game Night', () => {
+    it('replaces a generated room name rejected by moderation and acknowledges the original request', () => {
+        boot({}, true);
+        const host = join('GameHost');
+        const request = '#game-f468abxc9a4f0';
+        const replacement = '#game-1acbefx23acbe';
+        expect(checkText('game f468abxc9a4f0', undefined, { handles: false }).verdict).toBe('block');
+        cmd(host, 'join', [request]);
+        expect(notices(host)).toContain('Pick another room name');
+        const random = vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('1acbef23-acbe-4c49-bc32-550b4e03de23');
+        try {
+            cmd(host, 'gameopen', [request]);
+        } finally {
+            random.mockRestore();
+        }
+        const joined = got(host).findLast(frame => frame.t === 'join').ch;
+        expect(joined).toMatchObject({ name: replacement, kind: 'game', modes: { i: true } });
+        expect(got(host).findLast(frame => frame.t === 'game-room-open')).toEqual({
+            t: 'game-room-open', request, ok: true, room: replacement, ref: joined.keepRef
+        });
+    });
+
     it('reopens the founder’s existing private room while keeping the creation allowance', () => {
         boot({ roomsPerIpHour: 1 }, true);
         const host = join('GameHost');
