@@ -58,10 +58,10 @@ application delivery gate.
    built-in mic if instruments are not yet connected. On Windows, confirm the
    intended headset/interface and mic permission. Obtain fresh resource and
    account headroom checks before starting a bounded trial.
-2. The **host** uses native WebJam: Music → Host → Start Session if shown.
-   Invite the Windows guest to the same private Jam room in Hang Out. The
-   guest selects **Join room** at the bottom of the lobby. Then use **Copy
-   browser invite** in WebJam, wait for **Link copied**, paste the fresh
+2. Invite the Windows guest to the same private Jam room in Hang Out. The
+   guest selects **Join room** at the bottom of the lobby. Once both are in
+   the room, the **host** uses native WebJam: Music → Host → Start Session if
+   shown. Use **Copy browser invite**, wait for **Link copied**, paste the fresh
    link into the Jam room's invitation field and click **Share**. The guest
    opens **Join in browser** in Chrome, checks the selected microphone and
    headphones, then chooses **Join with microphone**. The guest needs no
