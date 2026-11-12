@@ -2272,6 +2272,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function closeInviteDialog() {
         inviteInstance = ''; invitePeople.clear();
         inviteContext = null; $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
+        $('[data-invite-people]').replaceChildren();
         if ($('[data-invite-dialog]').open) $('[data-invite-dialog]').close();
     }
     function openInviteDialog(opener = null) {
@@ -2279,19 +2280,37 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (connectionState !== 'connected' || !current || current.kind === 'lobby' || !amOp(current)) return;
         jamInviteOpener = opener ? { button: opener, room: current } : null;
         inviteContext = current; inviteInstance = current.keepRef; invitePeople.clear(); $('[data-invite-room]').textContent = current.name; $('[data-invite-error]').textContent = '';
-        $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
-        const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose a current person'; $('[data-invite-options]').append(placeholder);
+        const quick = !!opener && personTargetsSupported && roomNonce(inviteInstance);
+        const list = $('[data-invite-people]'), options = $('[data-invite-options]'), error = $('[data-invite-quick-error]');
+        $('[data-invite-quick]').hidden = !quick; $('[data-invite-form]').hidden = quick;
+        list.replaceChildren(); options.replaceChildren(); error.textContent = '';
+        $('[data-invite-nick]').value = '';
+        const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose a current person'; options.append(placeholder);
         for (const person of app.chans.get('#stalemate')?.names || []) {
             if (!personId(person.id) || person.id === app.selfId || current.names.some(member => member.id === person.id)) continue;
             const context = personContext(person.id, current.name, inviteInstance, person.nick);
             invitePeople.set(person.id, context);
-            const option = document.createElement('option'); option.value = person.id; option.textContent = person.nick; $('[data-invite-options]').append(option);
+            if (quick) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'btn btn--ghost';
+                button.textContent = person.nick;
+                button.setAttribute('aria-label', `Invite ${person.nick}`);
+                button.addEventListener('click', () => sendInviteToPerson(context, error));
+                list.append(button);
+            } else {
+                const option = document.createElement('option'); option.value = person.id; option.textContent = person.nick; options.append(option);
+            }
         }
+        $('[data-invite-empty]').hidden = invitePeople.size > 0;
         $('[data-invite-person-send]').disabled = !personTargetsSupported || !roomNonce(inviteInstance);
-        $('[data-invite-dialog]').showModal(); $('[data-invite-nick]').focus();
+        $('[data-invite-dialog]').showModal();
+        const first = quick ? list.querySelector('button') || $('[data-invite-quick-cancel]') : $('[data-invite-nick]');
+        first.focus();
     }
     $('[data-jam-invite-room]').addEventListener('click', event => openInviteDialog(event.currentTarget));
     $('[data-invite-cancel]').addEventListener('click', closeInviteDialog);
+    $('[data-invite-quick-cancel]').addEventListener('click', closeInviteDialog);
     $('[data-invite-dialog]').addEventListener('close', () => {
         if ($('[data-invite-dialog]').open) return;
         const opener = jamInviteOpener;
@@ -2304,17 +2323,21 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             ? opener.button : $(host ? '[data-roomtools]' : '[data-text]');
         target.focus({ preventScroll: true });
     });
-    $('[data-invite-person-send]').addEventListener('click', () => {
-        const current = store(app.active), context = invitePeople.get($('[data-invite-options]').value);
-        if (!inviteContext || inviteContext !== current || current.keepRef !== inviteInstance || !amOp(current) || !context) {
-            $('[data-invite-error]').textContent = 'Choose a current person in the original room.'; return;
+    function sendInviteToPerson(context, error) {
+        const current = store(app.active);
+        if (!inviteContext || inviteContext !== current || current.keepRef !== inviteInstance || !amOp(current)
+            || !context || invitePeople.get(context.peer) !== context) {
+            error.textContent = 'Choose a current person in the original room.'; return;
         }
         // Invitation target may be outside this room, but must remain the
         // original live connection in the shared lobby's current roster.
         const person = findPerson(context.peer);
-        if (!person || !personContextValid(context)) { $('[data-invite-error]').textContent = 'That person is no longer confirmed.'; return; }
+        if (!person || !personContextValid(context)) { error.textContent = 'That person is no longer confirmed.'; return; }
         if (send({ t: 'cmd', name: 'invite', args: [person.nick, current.name], ch: context.channel, roomInstance: context.instance, personContext: 1, personPeer: context.peer })) closeInviteDialog();
-        else $('[data-invite-error]').textContent = 'The invitation was not sent. Reconnect before trying again.';
+        else error.textContent = 'The invitation was not sent. Reconnect before trying again.';
+    }
+    $('[data-invite-person-send]').addEventListener('click', () => {
+        sendInviteToPerson(invitePeople.get($('[data-invite-options]').value), $('[data-invite-error]'));
     });
     $('[data-invite-form]').addEventListener('submit', event => {
         event.preventDefault();

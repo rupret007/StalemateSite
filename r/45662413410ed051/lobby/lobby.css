@@ -355,6 +355,8 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .sheet p { color: var(--muted); font-size: 13px; }
 .sheet-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 16px 0; }
 .sheet-buttons .btn { font-size: 12px; }
+.invite-people .btn { min-width: 0; text-align: left; overflow-wrap: anywhere; white-space: normal; }
+.invite-people:empty, [data-invite-quick-error]:empty { display: none; }
 .channel-label { display: block; margin: 16px 0 8px; font-size: 12px; }
 [data-channel-name], [data-invite-nick] { width: 100%; }
 .check { display: flex; align-items: center; gap: 10px; min-height: 44px; }

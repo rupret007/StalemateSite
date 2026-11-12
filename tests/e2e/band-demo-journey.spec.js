@@ -118,13 +118,15 @@ test('Stalemate entry through jam room to connected browser Web Join with few ba
         await expect(roomName).toMatch(/^#jam-/);
 
         const inviteBandmate = hostCtx.page.getByRole('button', { name: 'Invite bandmate to room', exact: true });
-        const guestNickname = hostCtx.page.getByLabel('Guest nickname', { exact: true });
+        const onlineBandmate = hostCtx.page.getByRole('button', { name: 'Invite DemoMate', exact: true });
         await expect(inviteBandmate).toBeInViewport({ ratio: 1 });
         await hostCtx.page.setViewportSize({ width: 375, height: 667 });
         await expect(inviteBandmate).toBeInViewport({ ratio: 1 });
         expect(await hostCtx.page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
         await inviteBandmate.press('Enter');
-        await expect(guestNickname).toBeFocused();
+        await expect(onlineBandmate).toBeFocused();
+        await expect(hostCtx.page.getByLabel('Guest nickname', { exact: true })).toBeHidden();
+        await hostCtx.page.screenshot({ path: testInfo.outputPath('jam-invite-online-bandmate-375.png') });
         await hostCtx.page.keyboard.press('Escape');
         await expect(inviteBandmate).toBeFocused();
         const outlineOverhang = await inviteBandmate.evaluate(button => {
@@ -134,8 +136,7 @@ test('Stalemate entry through jam room to connected browser Web Join with few ba
         });
         expect(outlineOverhang).toBeLessThanOrEqual(0);
         await inviteBandmate.press('Enter');
-        await guestNickname.fill('DemoMate');
-        await hostCtx.page.getByRole('button', { name: 'Send invitation', exact: true }).click();
+        await onlineBandmate.press('Enter');
         await mateCtx.page.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).click();
         await expect(mateCtx.page.locator('[data-chat-context]')).toHaveText(roomName);
         await expect(mateCtx.page.locator('[data-jam-invite-room]')).toBeHidden();

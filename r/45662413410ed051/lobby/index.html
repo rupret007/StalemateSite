@@ -44,6 +44,12 @@
     <dialog class="sheet" data-invite-dialog aria-labelledby="invite-dialog-title">
         <h3 id="invite-dialog-title">Invite a guest</h3>
         <p>Invite someone to <b data-invite-room></b>. They choose whether to join.</p>
+        <div data-invite-quick hidden>
+            <div class="sheet-buttons invite-people" data-invite-people role="group" aria-label="Online guests"></div>
+            <p data-invite-empty hidden>No one else is available to invite. Ask your bandmate to enter Hang Out, then open this list again.</p>
+            <p class="status" data-invite-quick-error role="status"></p>
+            <button class="btn btn--ghost" type="button" data-invite-quick-cancel>Cancel</button>
+        </div>
         <form data-invite-form>
             <label class="channel-label" for="invite-person">Choose a current person</label>
             <select id="invite-person" data-invite-options aria-describedby="invite-person-hint"></select>

@@ -124,8 +124,7 @@ test('a host can share a browser invite pasted with its surrounding message', as
         await host.click('[data-show="rooms"]');
         await host.click('[data-start="jam"]');
         await host.getByRole('button', { name: 'Invite bandmate to room' }).click();
-        await host.locator('[data-invite-options]').selectOption({ label: 'PasteGuest' });
-        await host.locator('[data-invite-person-send]').click();
+        await host.getByRole('button', { name: 'Invite PasteGuest', exact: true }).click();
         await guest.locator('[data-game-offer]').getByRole('button', { name: 'Join room' }).click();
         await expect(guest.locator('[data-jam-web]')).toBeDisabled();
 
