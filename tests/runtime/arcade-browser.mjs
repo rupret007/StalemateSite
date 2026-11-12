@@ -12,7 +12,8 @@ import '../../hangout-worker/arcade/games/turdrummy-rules.js';
 
 const runProcess = promisify(execFile);
 
-export async function runArcadeBrowser(engine, origin, invitation, evidence, entrances, media, relay = false, mixed = null) {
+export async function runArcadeBrowser(engine, origin, invitation, evidence, entrances, media, relay = false, options = {}) {
+    const mixed = options.previousClient || options.previousWorker ? options : null;
     const browser = await { chromium, webkit }[engine].launch({
         headless: true, ...(engine === 'chromium' ? { args: ['--enable-unsafe-swiftshader',
             ...(media ? ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] : [])] } : {})
@@ -170,9 +171,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(control).toBeInViewport({ ratio: 1 });
         assert.ok(await control.evaluate(button => {
             const rect = button.getBoundingClientRect();
-            const navigation = document.querySelector('.phonetabs').getBoundingClientRect();
+            const navigation = document.querySelector('.phonetabs')?.getBoundingClientRect();
             const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
-            return button.contains(hit) && (!navigation.height || rect.bottom <= navigation.top);
+            return button.contains(hit) && (!navigation?.height || rect.bottom <= navigation.top);
         }), 'the full control stays above the mobile sections and receives the pointer');
     }
     async function reopenGameNight(host, viewport, phone) {
@@ -626,6 +627,70 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             } finally { await context.close(); }
         }
     }
+    async function verifyBrandGuestEntry(source) {
+        const radDad = source === 'rad-dad';
+        const brand = radDad ? 'Rad Dad' : 'Stalemate';
+        const root = radDad ? '/site/rad-dad/' : '/site/';
+        for (const phone of [true, false]) {
+            const viewport = phone ? { width: 390, height: 844 } : { width: 1440, height: 900 };
+            async function openProfile() {
+                const context = await browser.newContext({ viewport, hasTouch: phone, reducedMotion: 'reduce',
+                    serviceWorkers: 'block', ignoreHTTPSErrors: true });
+                await context.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
+                const page = await context.newPage();
+                page.setDefaultTimeout(10000);
+                page.on('pageerror', error => errors.push(`${brand} guest entry: ${error.message}`));
+                return page;
+            }
+            const host = await openProfile();
+            const friend = await openProfile();
+            const step = label => `${source}-${label}`;
+            try {
+                await host.goto(origin + root);
+                await expect(host.getByRole('heading', { level: 1, name: new RegExp(brand) })).toBeVisible();
+                await host.getByRole('link', { name: radDad ? /Hit the arcade/ : /^Arcade$/ }).first().click();
+                assert.equal(new URL(host.url()).pathname, root + 'play/');
+                const online = host.getByRole('link', { name: /Play online with friends/ });
+                await expectUncoveredControl(online);
+                await captureArcadeInvite(host, viewport, step('00-arcade'));
+                await online.click();
+                assert.equal(new URL(host.url()).pathname, '/beta/');
+                await expect(host.getByLabel('Invitation code')).toBeVisible();
+                await host.getByLabel('Invitation code').fill(invitation);
+                await host.getByRole('button', { name: 'Enter the community' }).click();
+                await expect(host.getByRole('link', { name: /Enter Game Night/ })).toHaveCount(1);
+                await captureArcadeInvite(host, viewport, step('01-game-night-entry'));
+                await enterFromShell(host, radDad ? 'RadDadHost' : 'PreviewHost', true);
+                await expect(host.locator('[data-entry-label]').first()).toHaveText(`via ${brand}`);
+                await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
+                await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
+                await host.getByRole('button', { name: 'Open Chess match' }).click();
+                await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
+                const link = await shareGameNightLink(host, viewport, step('02-share'));
+                assert.equal((await friend.context().cookies()).length, 0, 'the invited profile is completely new');
+                await openGameNightLink(friend, link);
+                await expect(friend.getByRole('heading', { name: 'Royal Flush Chess' })).toBeVisible();
+                await expect(friend.getByRole('textbox')).toHaveCount(0);
+                await expect(friend.getByRole('button')).toHaveCount(1);
+                const joinGame = friend.getByRole('button', { name: 'Join game', exact: true });
+                await expectUncoveredControl(joinGame);
+                await captureArcadeInvite(friend, viewport, step('03-accept'));
+                await (phone ? joinGame.tap() : joinGame.click());
+                await expect(friend.locator('[data-chess-status]')).toContainText('You’re Black');
+                await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
+                await expect(friend.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                await tapSquare(friend, 'd7', phone);
+                await tapSquare(friend, 'd5', phone);
+                await expect(host.getByRole('button', { name: 'd5, Black pawn' })).toBeAttached();
+                await captureArcadeInvite(friend, viewport, step('04-playing'));
+                assert.equal((await friend.context().request.get(origin + '/beta/state')).status(), 401, 'the guest has only game access');
+                console.log(`Passed ${engine} ${viewport.width}x${viewport.height} ${brand} protected arcade, fresh guest seated and played.`);
+            } finally {
+                await friend.context().close();
+                await host.context().close();
+            }
+        }
+    }
     async function verifyTransportRecovery(host, player, matches, calls) {
         const interrupt = connection => Promise.all(connection.map(route => route.close({ code: 1011, reason: 'fixture connection interrupted' })));
         for (const page of [host, player]) {
@@ -706,12 +771,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         for (let n = 0; n < count; n++) await page.keyboard.press(arrow);
         await page.keyboard.press('Enter');
     }
-    async function tapSquare(page, square) {
+    async function tapSquare(page, square, touch = true) {
         const locator = page.locator(`[data-square="${square}"]`);
         await locator.scrollIntoViewIfNeeded();
         const box = await locator.boundingBox();
         assert.ok(box?.width > 22 && box?.height > 22);
-        await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+        const x = box.x + box.width / 2, y = box.y + box.height / 2;
+        if (touch) await page.touchscreen.tap(x, y);
+        else await page.mouse.click(x, y);
     }
     async function fitLandscape(page, scrollTarget, ...controls) {
         const portrait = page.viewportSize();
@@ -2108,6 +2175,11 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         console.log(`Passed ${engine} Turdanoid same wall, keyboard launch, ${media ? 'native phone drag with 220 ms delay and active call' : 'native phone tap and full reload'}, visible paddle and Launch, both scores, spectator and rematch.`);
     }
     try {
+        if (options.siteGuest) {
+            await verifyBrandGuestEntry(options.siteGuest);
+            assert.deepEqual(errors, []);
+            return;
+        }
         if (mixed) {
             await verifyMixedVersions(mixed);
             assert.deepEqual(errors, []);

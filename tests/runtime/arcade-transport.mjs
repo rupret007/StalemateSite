@@ -22,6 +22,7 @@ const nonce = randomBytes(16).toString('hex');
 const room = '#game-2ca9e1x1be34a';
 const browserName = process.argv.find(arg => arg.startsWith('--browser='))?.slice(10) || '';
 const browserMedia = process.argv.includes('--media');
+const siteGuest = process.argv.find(arg => arg.startsWith('--site-guest='))?.slice('--site-guest='.length);
 const relay = process.argv.includes('--relay');
 const rollback = process.argv.includes('--rollback');
 const rollbackRef = process.argv.find(arg => arg.startsWith('--rollback-ref='))?.slice(15);
@@ -42,6 +43,11 @@ const assets = fileURLToPath(new URL('../../.beta-assets/', import.meta.url));
 const sharedSource = process.env.ARCADE_TEST_SOURCE ? resolve(process.env.ARCADE_TEST_SOURCE) : null;
 const radDad = process.env.ARCADE_TEST_RAD_DAD ? resolve(process.env.ARCADE_TEST_RAD_DAD) : null;
 assert.equal(!!sharedSource, !!radDad, 'provide both arcade checkouts for the cross-site browser proof');
+const radDadRoot = process.env.ARCADE_PREVIEW_RAD_DAD ? resolve(process.env.ARCADE_PREVIEW_RAD_DAD) : radDad;
+const radDadPreview = radDadRoot && (browserName || serve) ? createArcadePreviewSite(radDadRoot, { radDad: true }) : null;
+assert.ok(siteGuest === undefined || browserName && !mixedRef && !relay &&
+    (siteGuest === 'stalemate' || siteGuest === 'rad-dad' && radDadPreview),
+    'choose a browser and --site-guest=stalemate or --site-guest=rad-dad (requires ARCADE_PREVIEW_RAD_DAD)');
 const previousAssets = new Map();
 if (mixedRef) {
     for (const file of ['entry-sites.mjs', 'lobby/index.html', 'lobby/lobby.js', 'lobby/lobby.css']) {
@@ -128,6 +134,7 @@ const pause = () => new Promise(resolve => setTimeout(resolve, 600));
 
 async function serveAsset(request) {
     const pathname = decodeURIComponent(new URL(request.url).pathname);
+    if (radDadPreview && pathname.startsWith('/site/rad-dad/')) return radDadPreview(request);
     if (previewSite && pathname.startsWith('/site/')) return previewSite(request);
     const name = pathname.endsWith('/') ? pathname + 'index.html' : pathname;
     const file = resolve(assets, '.' + name);
@@ -1044,6 +1051,7 @@ try {
     if (serve) {
         const { origin: localOrigin } = await mf.ready;
         console.log(`Stalemate private Game Night preview with all nine games: ${localOrigin}/site/`);
+        if (radDadPreview) console.log(`Rad Dad private Game Night preview: ${localOrigin}/site/rad-dad/`);
         await new Promise(resolve => {
             process.once('SIGINT', resolve);
             process.once('SIGTERM', resolve);
@@ -1058,7 +1066,8 @@ try {
             await runArcadeBrowser(browserName, (await mf.ready).origin, invite, evidence, null, browserMedia, false, { previousWorker: true });
             console.log(`Passed ${browserName} mixed lobby versions using source ${mixedRef}.`);
         } else {
-            await runArcadeBrowser(browserName, browserOrigin, invite, evidence, await previewEntrances(browserOrigin), browserMedia, relay);
+            await runArcadeBrowser(browserName, browserOrigin, invite, evidence,
+                siteGuest ? null : await previewEntrances(browserOrigin), browserMedia, relay, { siteGuest });
         }
     } else if (rollback) {
         await verifyRollback(async (bindings, revision) => {

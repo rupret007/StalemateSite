@@ -22,8 +22,14 @@ function insertBefore(html, marker, content) {
     return html.replace(marker, () => content + marker);
 }
 
-function previewHtml(name, html) {
+function previewHtml(name, html, radDad) {
     html = html.replace(/<script\b[^>]*data-goatcounter[^>]*>[\s\S]*?<\/script>/gi, '');
+    if (radDad) {
+        // This is the link produced by Rad Dad's optional private arcade build.
+        if (name === 'play/index.html') return insertBefore(insertBefore(html, '</head>', onlineAction), '<div class="arcade-grid-heading">',
+            '<p class="arcade-mode-shortcut"><a class="private-online" href="/beta/?via=rad-dad">Play online with friends →</a></p>');
+        return html;
+    }
     if (name === 'index.html') {
         html = html.replace('href="play/#hub-games"', 'href="play/"');
         return insertBefore(html, '<div class="hero-show">',
@@ -37,17 +43,20 @@ function previewHtml(name, html) {
 }
 
 // Keep the mirror in the loopback fixture. It serves only tracked public site files.
-export function createArcadePreviewSite(root) {
-    const names = new Set(execFileSync('git', ['ls-files', '-z', '--', 'index.html', 'styles.css', 'site-base.js', 'script.js',
-        'countdown.js', 'show-state.js', 'assets/', 'js/', 'play/', 'events/', 'tap/', 'qr/'], { cwd: root, encoding: 'utf8' }).split('\0'));
+export function createArcadePreviewSite(root, { radDad = false } = {}) {
+    const prefix = radDad ? '/site/rad-dad/' : '/site/';
+    const files = radDad ? ['index.html', 'raddad.css', 'styles.css', 'live-video.js', 'script.js', 'show-state.js',
+        'RadDad_Logo.jpg', 'raddad-festival-poster.jpg', 'wildflower-poster.jpg', 'assets/', 'play/']
+        : ['index.html', 'styles.css', 'site-base.js', 'script.js', 'countdown.js', 'show-state.js', 'assets/', 'js/', 'play/', 'events/', 'tap/', 'qr/'];
+    const names = new Set(execFileSync('git', ['ls-files', '-z', '--', ...files], { cwd: root, encoding: 'utf8' }).split('\0'));
     return async request => {
         if (!['GET', 'HEAD'].includes(request.method)) return new Response('Method not allowed.', { status: 405, headers });
-        const path = decodeURIComponent(new URL(request.url).pathname).slice('/site/'.length);
+        const path = decodeURIComponent(new URL(request.url).pathname).slice(prefix.length);
         const name = !path || path.endsWith('/') ? path + 'index.html' : path;
         if (!names.has(name)) return new Response('Not found.', { status: 404, headers });
         const type = TYPES[extname(name)] || 'application/octet-stream';
         const file = await readFile(join(root, name));
-        const body = type.startsWith('text/html') ? Buffer.from(previewHtml(name, file.toString('utf8'))) : file;
+        const body = type.startsWith('text/html') ? Buffer.from(previewHtml(name, file.toString('utf8'), radDad)) : file;
         const assetHeaders = { ...headers, 'Content-Type': type, 'Content-Length': String(body.length), 'Accept-Ranges': 'bytes' };
         const range = request.method === 'GET' && /^bytes=(\d+)-(\d*)$/.exec(request.headers.get('Range') || '');
         if (range) {
