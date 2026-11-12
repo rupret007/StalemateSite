@@ -439,6 +439,53 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         console.log(`Passed ${engine} protected Game Night launch, invite-only room link, stale instance refusal, shared Chess move and chat.`);
     }
+    async function verifyPrivateSiteEntry() {
+        for (const phone of [true, false]) {
+            const viewport = phone ? { width: 390, height: 844 } : { width: 1440, height: 900 };
+            const context = await browser.newContext({ viewport, hasTouch: phone, reducedMotion: 'reduce', ignoreHTTPSErrors: true });
+            try {
+                await context.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
+                const page = await context.newPage();
+                page.on('pageerror', error => errors.push(`Stalemate preview: ${error.message}`));
+                await page.goto(origin + '/site/');
+                await expect(page.getByRole('heading', { name: 'Stalemate', exact: true })).toBeVisible();
+                await expect(page.getByRole('link', { name: 'Play online with friends', exact: true })).toBeInViewport({ ratio: 1 });
+                await expect(page.locator('video[title="Manic lyric video"]')).toBeAttached();
+                await captureArcadeInvite(page, viewport, 'site-00-home');
+                await page.getByRole('link', { name: 'Arcade', exact: true }).first().click();
+                assert.equal(new URL(page.url()).pathname, '/site/play/');
+                const arcadeOnline = page.getByRole('link', { name: /Play online with friends/ });
+                await expect(arcadeOnline).toBeInViewport({ ratio: 1 });
+                assert.ok((await arcadeOnline.boundingBox()).height >= 44, 'the Arcade online action is a full touch target');
+                await expect(page.getByText('Your records stay on this device.')).toBeVisible();
+                await captureArcadeInvite(page, viewport, 'site-01-arcade');
+                await page.getByRole('link', { name: /Royal Flush Chess/ }).click();
+                assert.equal(new URL(page.url()).pathname, '/site/play/chess.html');
+                const shared = page.getByRole('link', { name: 'Play chess online with a friend' });
+                await expect(shared).toBeInViewport({ ratio: 1 });
+                assert.ok((await shared.boundingBox()).height >= 44, 'the Chess online action is a full touch target');
+                await expect(page.getByText('Share this device', { exact: true })).toBeVisible();
+                await captureArcadeInvite(page, viewport, 'site-02-chess');
+                const [entry] = await Promise.all([
+                    page.waitForRequest(request => request.isNavigationRequest() && new URL(request.url()).pathname === '/beta/'),
+                    phone ? shared.tap() : shared.click()
+                ]);
+                assert.equal(new URL(entry.url()).searchParams.get('table'), 'chess');
+                await expect(page.getByLabel('Invitation code')).toBeVisible();
+                if (!phone) {
+                    await page.getByLabel('Invitation code').fill(invitation);
+                    await page.getByRole('button', { name: 'Enter the community' }).click();
+                    await enterFromShell(page, 'PreviewHost', true);
+                    await expect(page.locator('[data-game-offer-status]')).toContainText('Royal Flush Chess');
+                    await page.getByRole('button', { name: 'Start Game Night', exact: true }).click();
+                    await page.getByRole('button', { name: 'Open Chess match' }).click();
+                    await expect(page.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
+                    await captureArcadeInvite(page, viewport, 'site-03-shared-chess');
+                }
+                console.log(`Passed ${engine} ${viewport.width}x${viewport.height} Stalemate preview home, Arcade, solo Chess and private shared Chess entrance.`);
+            } finally { await context.close(); }
+        }
+    }
     async function verifyTransportRecovery(host, player, matches, calls) {
         const interrupt = connection => Promise.all(connection.map(route => route.close({ code: 1011, reason: 'fixture connection interrupted' })));
         for (const page of [host, player]) {
@@ -2070,6 +2117,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(b.locator('[data-connection]')).toHaveText('Connected');
         await expect(b.locator('[data-game-night]')).toBeHidden();
         await verifyGameNightEntry();
+        await verifyPrivateSiteEntry();
         assert.deepEqual(errors, []);
         console.log(`Passed ${engine} ${entrances ? 'both generated arcade entry links' : 'protected entry with both brand contexts'}, invitation, keyboard/touch Chess, room chat, draw and rematch.`);
     } finally { await browser.close(); }
