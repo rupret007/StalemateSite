@@ -208,8 +208,13 @@ export function mountArcadeTurdJack(container, onMatch) {
             message = canOpen ? 'Open a shared dealer table for two to four players. Play chips only.' : 'Waiting for the host to open a table.';
             if (canOpen) { action = 'open'; label = 'Open Crapjack table'; }
         } else if (model?.waiting) {
-            message = `${occupied.length}/4 seated${seat ? ' · You’re ' + seatName(seat) : ''} · Play chips only`;
-            if (model.canStart && canOpen) { action = 'start'; label = 'Start table'; }
+            const seating = `${occupied.length}/4 seated${seat ? ' · You’re ' + seatName(seat) : ''}`;
+            if (model.canStart && canOpen) {
+                action = 'start'; label = 'Start table';
+                message = `${seating}. Ready to start with ${occupied.length} players.`;
+            } else {
+                message = seat && seat !== 'one' ? `${seating}. The host will start the round.` : `${seating} · Play chips only`;
+            }
         } else if (match?.result) {
             message = 'Session ended.';
             if (seat) {

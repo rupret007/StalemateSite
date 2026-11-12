@@ -1603,6 +1603,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const privateCards = page => page.locator('[data-jack-hands] .jack-face');
         await a.getByRole('button', { name: 'Open Crapjack table' }).click();
         await b.getByRole('button', { name: 'Join Seat 2' }).click();
+        await expect(b.locator('[data-jack-status]')).toHaveText('2/4 seated · You’re Seat 2. The host will start the round.');
+        await expect(a.locator('[data-jack-status]')).toHaveText('2/4 seated · You’re Seat 1. Ready to start with 2 players.');
         await a.getByRole('button', { name: 'Start table' }).click();
         await expect(b.locator('[data-jack-bank]')).toHaveText('1000 play chips');
         await b.getByLabel('Play chips').selectOption('20');
