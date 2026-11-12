@@ -328,10 +328,34 @@ for (const [hostSite, guestSite] of [['rad-dad', 'stalemate'], ['stalemate', 'ra
             const guestStatus = await expectExposedInviteStatus(guest, '[data-game-offer-status]');
             await guest.locator('[data-text]').focus();
             const offer = guest.locator('[data-game-offer]');
+            const dialog = host.getByRole('dialog', { name: 'Invite a guest' });
+            const bandmate = dialog.getByRole('group', { name: 'Online guests' })
+                .getByRole('button', { name: 'Invite Bandmate' });
+            await invite.press('Enter');
+            await expect(dialog).toHaveAccessibleDescription(
+                `Invite someone to ${room}. They choose whether to join.`
+            );
+            const error = await expectExposedInviteStatus(host, '[data-invite-quick-error]');
+            await expect(error).toBeEmpty();
+            await expect(bandmate).toBeFocused();
+            await host.evaluate(() => {
+                const socket = window.__lobby.ws;
+                const send = socket.send;
+                socket.send = function (raw) {
+                    if (JSON.parse(raw).t === 'room-invite-request') {
+                        socket.send = send;
+                        throw new Error('Synthetic invitation send failure');
+                    }
+                    return send.call(socket, raw);
+                };
+            });
+            await bandmate.press('Enter');
+            await expect(error).toHaveText('The invitation was not sent. Reconnect and try again.');
+            await expect(bandmate).toBeFocused();
+            await expect(offer).toBeHidden();
             async function send() {
-                await invite.click();
-                const list = host.getByRole('group', { name: 'Online guests' });
-                await list.getByRole('button', { name: 'Invite Bandmate' }).click();
+                if (!(await dialog.isVisible())) await invite.press('Enter');
+                await bandmate.press('Enter');
                 await expect(status).toHaveText('Invitation sent to Bandmate. Waiting for a reply.');
                 await expect(offer).toContainText(`RoomHost invited you to ${room}.`);
                 await expect(guestStatus).toHaveText(`RoomHost invited you to ${room}.`);
