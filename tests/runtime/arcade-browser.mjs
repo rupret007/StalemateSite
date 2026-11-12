@@ -315,12 +315,40 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(join).toBeInViewport({ ratio: 1 });
                 await expect(join).toHaveAccessibleDescription(/13\+ and agree to the house rules/);
                 assert.ok((await join.boundingBox()).height >= 44, 'the first action is a full touch target');
-                if (phone) await join.tap();
-                else {
-                    await expect(join).toBeFocused();
-                    await guest.keyboard.press('Enter');
+                let ticketRequested = false, releaseTicket;
+                const holdTicket = new Promise(resolve => { releaseTicket = resolve; });
+                await guest.route(url => url.pathname === '/beta/arcade-ticket' && url.searchParams.get('game-guest') === '1', async route => {
+                    ticketRequested = true;
+                    await holdTicket;
+                    await route.continue();
+                }, { times: 1 });
+                try {
+                    if (phone) await join.tap();
+                    else {
+                        await expect(join).toBeFocused();
+                        await guest.keyboard.press('Enter');
+                    }
+                    await expect.poll(() => ticketRequested).toBe(true);
+                    const joining = guest.locator('[data-game-guest-connecting]');
+                    await expect(joining.getByRole('heading', { name: 'Royal Flush Chess', exact: true })).toBeVisible();
+                    await expect(joining.getByRole('status')).toHaveText('Finding your seat…');
+                    await expect(guest.locator('[data-app]')).toBeHidden();
+                    await expect(guest.locator('.titlebar')).toBeHidden();
+                    const shell = await context.request.get(guest.url());
+                    assert.ok(shell.ok());
+                    const html = await shell.text();
+                    assert.match(html, /<main class="gate" data-gate hidden>/);
+                    assert.match(html, /<main class="gate" data-game-guest-connecting>/);
+                    assert.match(html, /<h1 data-game-guest-title>Royal Flush Chess<\/h1>/);
+                    await captureArcadeInvite(guest, viewport, 'first-visit-01-finding-seat');
+                } finally {
+                    releaseTicket();
                 }
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
+                await expect(guest.locator('[data-game-guest-connecting]')).toBeHidden();
+                const pieces = guest.locator('.arcade-chess cg-board piece');
+                await expect(pieces).toHaveCount(32);
+                await expect(pieces.first()).toBeVisible();
                 await expect(guest.getByLabel('Your nick')).toBeHidden();
                 await expect(guest.getByRole('combobox', { name: 'Switch game' })).toBeHidden();
                 await expect(guest.locator('[data-call-toggle]')).toBeHidden();

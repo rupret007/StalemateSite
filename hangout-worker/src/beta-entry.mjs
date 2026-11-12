@@ -7,6 +7,7 @@ import { BETA_TTL, BETA_COOKIE, BETA_IDENTITY_COOKIE, GAME_GUEST_COOKIE, BetaSes
 import { registryRequest } from './beta-session-client.mjs';
 import { betaHealth } from './beta-ops.mjs';
 import { entrySitesFromConfig } from '../../r/45662413410ed051/entry-sites.mjs';
+import { gameNightLabels } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import { lobbyParticipationMode, participationConfigurationValid } from './lobby-participation.mjs';
 import { incidentSourceConfigurationValid } from './lobby-incident-sources.mjs';
 import { publicBetaHelp } from './beta-public-help.mjs';
@@ -481,7 +482,12 @@ async function betaRequest(request, env, deps = {}) {
         .replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/gi, '').replace(/<script[^>]*goatcounter[^>]*><\/script>/gi, '')
         .replace(/<b data-contact>[\s\S]*?<\/b>/, contactHtml)
         .replace('<head>', `<head><script src="/beta/bootstrap.js${guest ? GAME_GUEST_QUERY : ''}"></script>`);
-    return reply(page, asset.status, 'text/html; charset=utf-8');
+    const content = guest && assetPath === LOBBY_PAGE ? page
+        .replace('<main class="gate" data-gate>', '<main class="gate" data-gate hidden>')
+        .replace('<main class="gate" data-game-guest-connecting hidden>', '<main class="gate" data-game-guest-connecting>')
+        .replace('<h1 data-game-guest-title>Game Night</h1>', `<h1 data-game-guest-title>${gameNightLabels[guest.game]}</h1>`)
+        : page;
+    return reply(content, asset.status, 'text/html; charset=utf-8');
 }
 export async function betaFetch(request, env, deps = {}) {
     try { return await betaRequest(request, env, deps); }
