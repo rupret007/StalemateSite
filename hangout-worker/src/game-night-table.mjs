@@ -1,7 +1,8 @@
 // The lobby supplies admitted subjects and authorizes every read and command.
 // This table assigns seats and preserves a distinct view for each viewer.
 export function createGameNightTable({
-    name, version, Match, sides, finished, project, create = (id, now) => new Match(id, now), manualStart = false, minSeats = sides.length
+    name, version, Match, sides, finished, project, create = (id, now) => new Match(id, now), manualStart = false, minSeats = sides.length,
+    mode, computerSeats = {}
 }) {
     const first = sides[0], twoSeats = sides.length === 2;
     const subjectValid = value => typeof value === 'string' && !!value;
@@ -20,7 +21,10 @@ export function createGameNightTable({
         }
 
         static restore(record) {
-            if (record?.version !== version || !record.seats) throw new TypeError('Invalid room match checkpoint');
+            if (record?.version !== version || record.mode !== mode || !record.seats
+                || Object.entries(computerSeats).some(([seat, subject]) => record.seats[seat] !== subject)) {
+                throw new TypeError('Invalid room match checkpoint');
+            }
             const game = new GameNightTable(record.id, record.seats[first]);
             for (const seat of sides.slice(1)) {
                 const subject = record.seats[seat];
@@ -48,7 +52,8 @@ export function createGameNightTable({
         }
 
         checkpoint() {
-            return { version, id: this.#id, seats: { ...this.#seats }, match: this.#match?.checkpoint() ?? null, ...this.#rematchView() };
+            return { version, id: this.#id, seats: { ...this.#seats, ...computerSeats }, match: this.#match?.checkpoint() ?? null,
+                ...this.#rematchView(), ...(mode ? { mode } : {}) };
         }
 
         get deadline() { return this.#match?.deadline ?? null; }
@@ -67,7 +72,7 @@ export function createGameNightTable({
             return {
                 version, game: name, id: this.#id, seat, waiting: !this.#match,
                 match: this.#match ? project(this.#match, seat, now) : null, ...this.#rematchView(),
-                ...(!twoSeats ? { occupied: this.#occupied() } : {}),
+                ...(!twoSeats || mode ? { occupied: this.#occupied() } : {}), ...(mode ? { mode } : {}),
                 ...(manualStart ? { canStart: !this.#match && seat === first && this.#occupied().length >= minSeats } : {})
             };
         }

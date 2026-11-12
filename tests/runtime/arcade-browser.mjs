@@ -206,7 +206,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             const label = phone ? 'Royal Flush Chess' : 'TurdSpades';
             try {
                 await host.getByRole('combobox', { name: 'Switch game' }).selectOption(game);
-                await host.getByRole('button', { name: phone ? 'Open Chess match' : 'Open Spades table' }).click();
+                await host.getByRole('button', { name: phone ? 'Open Chess match' : 'Open 4-player Spades' }).click();
                 await expect(host.locator(phone ? '[data-chess-status]' : '[data-spades-status]')).toContainText(phone ? 'Waiting for an opponent' : '1/4 seated');
                 const hostViewport = host.viewportSize();
                 await host.setViewportSize(viewport);
@@ -257,46 +257,53 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             }
         }
     }
+    async function shareGameNightLink(host, viewport, step) {
+        const original = host.viewportSize();
+        await host.evaluate(() => {
+            window.testGameInvitation = '';
+            Object.defineProperty(navigator, 'share', { configurable: true, value: async ({ url }) => { window.testGameInvitation = url; } });
+        });
+        try {
+            await host.setViewportSize(viewport);
+            await host.getByRole('button', { name: 'Invite players' }).click();
+            await host.getByRole('button', { name: 'Invite someone new' }).click();
+            await expect(host.getByRole('button', { name: 'Share invite' })).toBeVisible();
+            await captureArcadeInvite(host, viewport, step);
+            await host.getByRole('button', { name: 'Share invite' }).click();
+            const link = new URL(await host.evaluate(() => window.testGameInvitation));
+            assert.ok(link.origin === origin && link.pathname === '/beta/game-night/guest' && /^#invite=[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/.test(link.hash), 'the share sheet receives one private game invitation');
+            return link;
+        } finally {
+            await host.evaluate(() => { delete window.testGameInvitation; delete navigator.share; });
+            await host.setViewportSize(original);
+        }
+    }
+    async function openGameNightLink(page, link) {
+        // Keep the invitation out of browser automation navigation logs.
+        await page.addInitScript(({ path, hash }) => {
+            if (location.pathname === path) history.replaceState(null, '', path + hash);
+        }, { path: link.pathname, hash: link.hash });
+        await page.goto(origin + link.pathname);
+    }
     async function verifyFirstVisit(host) {
         for (const phone of [true, false]) {
             const viewport = phone ? { width: 390, height: 844 } : { width: 1440, height: 900 };
-            const original = host.viewportSize();
-            let link;
-            await host.evaluate(() => {
-                window.testGameInvitation = '';
-                Object.defineProperty(navigator, 'share', { configurable: true, value: async ({ url }) => { window.testGameInvitation = url; } });
-            });
-            try {
-                await host.setViewportSize(viewport);
-                await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
-                await host.getByRole('button', { name: 'Open Chess match' }).click();
-                await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
-                await host.getByRole('button', { name: 'Invite players' }).click();
-                await host.getByRole('button', { name: 'Invite someone new' }).click();
-                await expect(host.getByRole('button', { name: 'Share invite' })).toBeVisible();
-                await captureArcadeInvite(host, viewport, 'first-visit-00-host-share');
-                await host.getByRole('button', { name: 'Share invite' }).click();
-                link = new URL(await host.evaluate(() => window.testGameInvitation));
-                assert.ok(link.origin === origin && link.pathname === '/beta/game-night/guest' && /^#invite=[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/.test(link.hash), 'the share sheet receives one private game invitation');
-                await host.evaluate(() => { delete window.testGameInvitation; delete navigator.share; });
-            } finally {
-                await host.setViewportSize(original);
-            }
+            await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
+            await host.getByRole('button', { name: 'Open Chess match' }).click();
+            await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
+            const link = await shareGameNightLink(host, viewport, 'first-visit-00-host-share');
             const context = await browser.newContext({ viewport, hasTouch: phone, reducedMotion: 'reduce', ignoreHTTPSErrors: true });
             try {
                 const guest = await context.newPage();
                 guest.setDefaultTimeout(10000);
                 guest.on('pageerror', error => errors.push(`First visit: ${error.message}`));
-                await guest.addInitScript(({ path, hash }) => {
-                    if (location.pathname === path) history.replaceState(null, '', path + hash);
-                }, { path: link.pathname, hash: link.hash });
                 assert.equal((await context.cookies()).length, 0, 'guest starts with an empty browser profile');
                 const unconfirmed = await context.request.post(origin + '/beta/game-night/invitation/accept', {
                     headers: { Origin: origin }, data: { code: new URLSearchParams(link.hash.slice(1)).get('invite'), age13: false }
                 });
                 assert.equal(unconfirmed.status(), 400, 'the guest must confirm the age and house rules');
                 assert.equal((await context.cookies()).length, 0, 'an unconfirmed invitation grants no access');
-                await guest.goto(origin + link.pathname);
+                await openGameNightLink(guest, link);
                 await expect(guest.getByRole('heading', { name: 'Royal Flush Chess' })).toBeVisible();
                 await expect(guest.getByText('LinkHost invited you to play.')).toBeVisible();
                 await expect(guest.getByRole('textbox')).toHaveCount(0);
@@ -343,10 +350,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await guest.locator('[data-send]').click();
                 await expect(host.getByRole('log', { name: 'Conversation' })).toContainText('First visit from the game invite');
                 const reused = await context.newPage();
-                await reused.addInitScript(({ path, hash }) => {
-                    if (location.pathname === path) history.replaceState(null, '', path + hash);
-                }, { path: link.pathname, hash: link.hash });
-                await reused.goto(origin + link.pathname);
+                await openGameNightLink(reused, link);
                 await expect(reused.getByRole('status')).toContainText('was used');
                 await expect(reused.getByRole('button', { name: 'Join game' })).toBeHidden();
                 await reused.close();
@@ -356,11 +360,76 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             } finally { await context.close(); }
         }
     }
+    async function verifySpadesPartners(host) {
+        const desktop = { width: 1440, height: 900 }, phone = { width: 390, height: 844 };
+        const original = host.viewportSize();
+        const context = await browser.newContext({ viewport: phone, hasTouch: true, reducedMotion: 'reduce', ignoreHTTPSErrors: true });
+        const friend = await context.newPage();
+        friend.on('pageerror', error => errors.push(`Spades partners: ${error.message}`));
+        const status = page => page.locator('[data-spades-status]');
+        const cards = page => page.locator('[data-spades-card]');
+        const table = page => page.locator('[data-spades-table]');
+        try {
+            await host.setViewportSize(desktop);
+            await host.getByRole('combobox', { name: 'Switch game' }).selectOption('turdspades');
+            await host.getByRole('button', { name: 'Open 2-player Spades' }).click();
+            await expect(status(host)).toContainText('1/2 seated');
+            const link = await shareGameNightLink(host, desktop, 'spades-00-host-share');
+            await openGameNightLink(friend, link);
+            await expect(friend.getByRole('heading', { name: 'TurdSpades', exact: true })).toBeVisible();
+            await captureArcadeInvite(friend, phone, 'spades-01-guest-accept');
+            await friend.getByRole('button', { name: 'Join game', exact: true }).tap();
+            await expect(table(friend)).toHaveAttribute('data-mode', 'partners');
+            await expect(status(friend)).toHaveText('Round 1 · Your bid');
+            for (const player of [host, friend]) await expect(cards(player)).toHaveCount(13);
+            await friend.getByRole('button', { name: 'Lock bid' }).tap();
+            await host.getByRole('button', { name: 'Lock bid' }).click();
+            await expect(table(host)).toHaveAttribute('data-phase', 'play');
+            await expect(friend.locator('[data-spades-trick]')).toContainText('North (CPU)');
+            await expect(friend.locator('[data-spades-trick]')).toContainText('East (CPU)');
+            await captureArcadeInvite(host, desktop, 'spades-02-playing');
+            await captureArcadeInvite(friend, phone, 'spades-02-playing');
+
+            const players = [host, friend], remaining = [13, 13];
+            for (let play = 0; play < 26; play++) {
+                let turn;
+                await expect.poll(async () => {
+                    const messages = await Promise.all(players.map(page => status(page).textContent()));
+                    turn = messages.flatMap((message, index) => message.startsWith('Round 1 · Your play') ? [index] : []);
+                    return turn.length;
+                }).toBe(1);
+                const index = turn[0], page = players[index], card = page.locator('[data-spades-card]:enabled').first();
+                if (play === 0) await card.tap(); else await card.click();
+                await expect(cards(page)).toHaveCount(--remaining[index]);
+                if (play === 5) {
+                    await friend.reload();
+                    await expect(cards(friend)).toHaveCount(remaining[1]);
+                }
+            }
+            for (const page of players) await expect(table(page)).toHaveAttribute('data-phase', 'round-end');
+            assert.deepEqual(await host.locator('[data-spades-score]').allTextContents(), await friend.locator('[data-spades-score]').allTextContents());
+            await friend.locator('[data-spades-action="resign"]').click();
+            await friend.getByRole('dialog', { name: 'Resign for your team?' }).getByRole('button', { name: 'Resign', exact: true }).click();
+            await host.getByRole('button', { name: 'Request Spades rematch' }).click();
+            await expect(status(friend)).toContainText('1/2 ready for a rematch');
+            await friend.getByRole('button', { name: 'Accept Spades rematch' }).click();
+            await expect(cards(friend)).toHaveCount(13);
+            await friend.locator('[data-leave]').click();
+            await expect(friend.locator('[data-game-night]')).toBeHidden();
+            console.log(`Passed ${engine} 2-player TurdSpades, one tap to the original table, two computer partners, a scored round, reload and two-player rematch.`);
+        } finally {
+            await context.close();
+            await host.setViewportSize(original);
+        }
+    }
     async function verifyGameNightEntry() {
         const host = await guest('rad-dad', 'LinkHost', { width: 1280, height: 900 }, false, origin + '/beta/?game-night=1&via=rad-dad');
         await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
         await verifyArcadeInvites(host);
-        if (!mixed) await verifyFirstVisit(host);
+        if (!mixed) {
+            await verifyFirstVisit(host);
+            await verifySpadesPartners(host);
+        }
         await host.getByRole('button', { name: 'Share room link' }).click();
         const share = host.getByRole('dialog', { name: 'Share Game Night' });
         const link = new URL(await share.getByLabel('Game Night room link').inputValue());
@@ -1151,7 +1220,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(page.locator('[data-arcade-game] option[value="turdspades"]')).toBeEnabled();
             await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdspades');
         }
-        await a.getByRole('button', { name: 'Open Spades table' }).click();
+        await a.getByRole('button', { name: 'Open 4-player Spades' }).click();
         for (const [index, [page, seat]] of [[b, 'West'], [north, 'North'], [east, 'East']].entries()) {
             await page.getByRole('button', { name: 'Join ' + seat }).click();
             if (index < 2) await expect(a.locator('[data-spades-status]')).toContainText(`${index + 2}/4 seated`);
@@ -1235,7 +1304,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             assert.deepEqual(await ids(b), hand);
             await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
         }
-        for (const page of [north, east, a]) await page.locator('[data-spades-card]:enabled').first().click();
+        for (const page of [north, east, a]) {
+            await page.locator('[data-spades-card]:enabled').first().click();
+            await expect(page.locator('[data-spades-card]')).toHaveCount(12);
+        }
         await expect(a.locator('[data-spades-status]')).toContainText('won the last trick');
         await finishSpadesRound(players, commands);
         await b.locator('[data-spades-action="resign"]').click();
