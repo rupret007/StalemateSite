@@ -19,13 +19,32 @@ that setup. Private links and room numbers stay out of repository evidence.
 | Participant | Available behavior | Boundary |
 | --- | --- | --- |
 | Native Mac host | Conversation opens its panel. An explicit Join / Open Meeting action hands the saved validated meeting link to the operating system. | The meeting owns sign-in, camera, microphone, speakers and participant state. Opening a link does not prove the meeting was joined. |
-| Native Mac with verified Webex | Show Webex App and Open Webex to Mute bring the verified Cisco application forward for its own controls. | The participant must operate Webex's Mute control. WebJam cannot verify or change that external meeting's mute state. |
+| Native Mac with verified Webex | **Show Webex App** and **Open Webex for Audio** bring the verified Cisco application forward. | Each participant changes their audio connection in Webex. WebJam has no verification of the meeting's audio state. |
 | Browser Music guest | Web Join supplies music audio. A separately supplied meeting invitation can be opened in Webex's supported app or browser. | Web Join has no embedded meeting, camera, Webex SDK session or automatic cross-app audio switch. |
 
 The desired simple audio switch remains an implementation gap. Legacy
 Talkback, video-only or audience preferences do not establish automatic routing.
 The supported external path is documented in the native
 [meeting-platform guidance](https://github.com/rupret007/webjam/blob/76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c/WEBEX_AUDIO_MODES.md).
+
+## Two-person handoff
+
+1. Join the Personal Room on both ends. For video during Music, select
+   **Don't connect to audio** in Webex prejoin. Check that both people can see
+   video and that Webex audio is disconnected at each endpoint.
+   [Cisco prejoin guide](https://help.webex.com/en-us/article/ela6i8)
+2. Play and listen in WebJam. For conversation, the guest leaves WebJam
+   audio and the host ends Music. Verify Music has stopped at both ends,
+   then connect computer audio in Webex.
+3. To play again, disconnect Webex audio at both endpoints. If that option
+   is unavailable, leave Webex before restarting Music. Create a fresh
+   WebJam invite and confirm that both people can hear the new Music session.
+   [Cisco audio connection guide](https://help.webex.com/en-us/article/871cgu)
+
+Microphone mute stops your voice from going to the meeting. WebJam monitor
+mute changes what you hear in WebJam. Disconnecting Webex audio stops both
+meeting input and playback. Record the result of each step without saving
+any audio, video or meeting links.
 
 ## November 8 device readiness
 

@@ -29,6 +29,34 @@ test guests, 12 messages and 600 deliveries, along with slow-client isolation,
 revocation and cold recovery. Hosted capacity and live media still need
 their own trials. [Local runtime CI](https://github.com/rupret007/StalemateSite/actions/runs/43081753166)
 
+## In-app invitations under review
+
+**Room.** Open Hang Out from either band site. Once both people are online,
+the host opens their Jam room, chooses **Invite bandmate to room**, and picks
+the guest. The guest clicks **Join room**. The host sees whether the invite
+was sent, accepted, declined or expired. The invite lasts two minutes and
+survives lobby recovery for the same connected guest. The 375 px roster
+scrolls with Cancel visible. Both entrance directions passed in Chromium and
+WebKit. [Room invite PR](https://github.com/rupret007/StalemateSite/pull/293)
+
+**Music.** With Music running in the private beta Mac app, the host chooses
+**Invite bandmate to Music** in Hang Out and confirms in WebJam. The return
+tab needs the same browser profile as the host's admitted Hang Out tab.
+The guest clicks **Accept and join**, then **Open audio check** when ready.
+The guest confirms headphones and clicks **Join with microphone** to start
+browser audio.
+If the invite expired, ask the host to create a fresh one. The browser tests
+covered one chosen guest, rejected an expired handoff, and kept microphone
+access behind the guest's own action. The 390 × 844 and 1440 × 900 walkthrough
+used a simulated Mac handoff and audio transport.
+[Website PR](https://github.com/rupret007/StalemateSite/pull/295) ·
+[Mac handoff PR](https://github.com/rupret007/webjam/pull/483)
+
+These are source and local browser results. The private Mac package, actual
+Mac-to-Windows listening, the second-network trial and private delivery of
+this invite flow still need verification.
+[Private package run](https://github.com/rupret007/webjam/actions/runs/43168414538)
+
 ## Last verified private beta
 
 At 14:02 UTC, the private beta received the Web Join microphone-check update.
