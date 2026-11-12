@@ -843,7 +843,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             cams: new Set(), since: now(), lastNick: 0, tokens: L.burst, last: now(), frames: 0, lastSaid: {}, actTokens: L.actBurst, actLast: now() };
         conns.set(id, c);
         if (band) { net.lastBand = now(); if (net.shieldAuto || net.lockAuto) bot(c, 'A saved safety state needs review: fans can read but not talk while the lobby is read-only. Check the band panel; /lobby unlock and /shieldoff when you are ready.'); saveNet(); }
-        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, ...(gameNight ? { gameNight: 1, fourInARow: 1, discordLinks: !participationConfigured } : {}) } });
+        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, ...(directMusicInvites && !participationConfigured && L.webJoinOrigins?.length ? { directMusicInvites: 1 } : {}), ...(gameNight ? { gameNight: 1, fourInARow: 1, discordLinks: !participationConfigured } : {}) } });
         return { ok: true };
     }
 

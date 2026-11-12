@@ -1,6 +1,7 @@
 // The site relays the app's invitation unchanged. WebJam owns parsing and admission.
 const { test, expect } = require('@playwright/test');
 const { randomUUID } = require('node:crypto');
+const path = require('node:path');
 const jsQR = require('jsqr');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 // Full clipboard format from WebJam build_invite_message and direct_stun_invite.
@@ -116,6 +117,38 @@ const paste = async (page, value) => {
     await page.locator('[data-jam-form] button[type="submit"]').click();
 };
 
+test('the native return page clears the invitation fragment and returns it to its original tab', async ({ browser }) => {
+    const context = await browser.newContext();
+    const origin = 'https://webjam.example';
+    const request = 'b'.repeat(32);
+    const fragment = `k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=1800000000`;
+    try {
+        await context.route(`${origin}/**`, route => {
+            const file = new URL(route.request().url()).pathname;
+            if (file === '/') return route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Jam tab fixture</title>' });
+            if (['/join/handoff.html', '/join/handoff.js', '/join/style.css'].includes(file)) {
+                return route.fulfill({ path: path.resolve(__dirname, '../..', file.slice(1)) });
+            }
+            return route.abort();
+        });
+        const host = await context.newPage();
+        await host.goto(origin);
+        await host.evaluate(request => {
+            const channel = new BroadcastChannel(`webjam-music-${request}`);
+            channel.onmessage = ({ data }) => {
+                window.returnedInvite = data.href;
+                channel.postMessage({ returned: true });
+                channel.close();
+            };
+        }, request);
+        const callback = await context.newPage();
+        await callback.goto(`${origin}/join/handoff.html#${request}&${fragment}`);
+        await expect(callback.getByRole('status')).toHaveText('Return to your Jam room. You can close this tab.');
+        await expect(callback).toHaveURL(`${origin}/join/handoff.html`);
+        expect(await host.evaluate(() => window.returnedInvite)).toBe(`${origin}/join/#${fragment}`);
+    } finally { await context.close(); }
+});
+
 test('only the selected guest can accept a music invitation and open the audio check', async ({ browser, baseURL }) => {
     const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });
     try {
@@ -127,13 +160,28 @@ test('only the selected guest can accept a music invitation and open the audio c
         await expect(host.locator('[data-jam]')).toBeVisible();
         const room = await host.locator('[data-chat-context]').textContent();
         const invite = `https://webjam.example/join/#k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=${Math.floor(Date.now() / 1000) + 120}`;
-        // This supplies the app-issued test link at the host transport
-        // boundary. Native desktop pairing is covered separately.
-        await host.evaluate(({ room, href }) => {
-            const instance = __lobby.chans.get(room).keepRef;
-            const peer = __lobby.chans.get('#stalemate').names.find(person => person.nick === 'ChosenGuest').id;
-            __lobby.ws.send(JSON.stringify({ t: 'music-invite-offer', ch: room, roomInstance: instance, peer, href }));
-        }, { room, href: invite });
+        // Intercept the system app launch. The real lobby still binds the
+        // browser callback to the selected live guest and publishes it.
+        await host.evaluate(() => {
+            document.addEventListener('click', event => {
+                const link = event.target.closest('a[href^="webjam://hangout-music/"]');
+                if (!link) return;
+                event.preventDefault();
+                window.musicRequest = new URL(link.href).pathname.slice(1);
+            }, true);
+        });
+        await host.getByRole('button', { name: 'Invite bandmate to Music' }).click();
+        await host.getByRole('button', { name: 'Invite ChosenGuest', exact: true }).click();
+        const request = await host.evaluate(() => window.musicRequest);
+        expect(request).toMatch(/^[a-f0-9]{32}$/);
+        const callback = await host.context().newPage();
+        await callback.goto('/join/handoff.html');
+        const returned = await callback.evaluate(({ request, href }) => new Promise(resolve => {
+            const channel = new BroadcastChannel(`webjam-music-${request}`);
+            channel.onmessage = ({ data }) => { channel.close(); resolve(data.returned); };
+            channel.postMessage({ href });
+        }), { request, href: invite });
+        expect(returned).toBe(true);
         const panel = guest.locator('[data-music-invite]');
         await expect(panel).toContainText('MusicHost invited you to play');
         await expect(other.locator('[data-music-invite]')).toBeHidden();
