@@ -370,6 +370,38 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             } finally { await context.close(); }
         }
     }
+    async function verifyGuestJoinRetry(host) {
+        const message = 'The invitation could not be confirmed. Try again.';
+        for (const phone of [true, false]) {
+            const viewport = phone ? { width: 390, height: 844 } : { width: 1440, height: 900 };
+            await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
+            await host.getByRole('button', { name: 'Open Chess match' }).click();
+            await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
+            const link = await shareGameNightLink(host, viewport, 'guest-retry-00-share');
+            const context = await browser.newContext({ viewport, hasTouch: phone, reducedMotion: 'reduce', ignoreHTTPSErrors: true });
+            try {
+                const friend = await context.newPage();
+                await openGameNightLink(friend, link);
+                await friend.route('**/beta/game-night/invitation/accept', route => route.fulfill({
+                    status: 503, json: { error: message }
+                }), { times: 1 });
+                const join = friend.getByRole('button', { name: 'Join game', exact: true });
+                const activate = () => phone ? join.tap() : friend.keyboard.press('Enter');
+                if (!phone) await expect(join).toBeFocused();
+                await activate();
+                await expect(friend.locator('[data-guest-status]')).toHaveText(message);
+                await expect(join).toBeEnabled();
+                await captureArcadeInvite(friend, viewport, 'guest-retry-01-error');
+                if (!phone) await expect(join).toBeFocused();
+                await activate();
+                await expect(friend.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
+                await captureArcadeInvite(friend, viewport, 'guest-retry-02-seated');
+                await friend.locator('[data-leave]').click();
+                await expect(friend.locator('[data-game-night]')).toBeHidden();
+                console.log(`Passed ${engine} ${viewport.width}x${viewport.height} Game Night Join retry after a temporary server error.`);
+            } finally { await context.close(); }
+        }
+    }
     async function verifySpadesPartners(host) {
         const desktop = { width: 1440, height: 900 }, phone = { width: 390, height: 844 };
         const original = host.viewportSize();
@@ -438,6 +470,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await verifyArcadeInvites(host);
         if (!mixed) {
             await verifyFirstVisit(host);
+            await verifyGuestJoinRetry(host);
             await verifySpadesPartners(host);
         }
         await host.getByRole('button', { name: 'Share room link' }).click();
