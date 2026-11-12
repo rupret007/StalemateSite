@@ -142,9 +142,90 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         console.log(`Passed ${engine} ${previousWorker ? 'current client with previous Worker' : 'previous and current clients together'}, invitation, Four in a Row and two-way room chat.`);
     }
+    async function captureArcadeInvite(page, viewport, step) {
+        const output = process.env.ARCADE_INVITE_EVIDENCE || evidence;
+        if (!output) return;
+        await mkdir(output, { recursive: true });
+        const visible = await page.locator('body').innerText();
+        assert.ok(!visible.includes(invitation));
+        assert.doesNotMatch(visible, /(?:instance=[a-f0-9]+|\b[a-f0-9]{32,}\b)/i);
+        const textNodes = await page.evaluateHandle(() => {
+            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT), changes = [];
+            while (walker.nextNode()) {
+                const node = walker.currentNode, original = node.textContent;
+                const cleaned = original.replace(/#?game-[a-f0-9]{6}x[a-f0-9]{6}/gi, 'Game Night');
+                if (cleaned !== original) { changes.push([node, original]); node.textContent = cleaned; }
+            }
+            return changes;
+        });
+        try {
+            await page.screenshot({ path: join(output, `${engine}-${viewport.width}x${viewport.height}-${step}.png`), animations: 'disabled' });
+        } finally {
+            await textNodes.evaluate(changes => { for (const [node, original] of changes) node.textContent = original; });
+            await textNodes.dispose();
+        }
+    }
+    async function verifyArcadeInvites(host) {
+        for (const phone of [true, false]) {
+            const viewport = phone ? { width: 390, height: 844 } : { width: 1440, height: 900 };
+            const nick = phone ? 'InviteGuestPhone' : 'InviteGuestDesktop';
+            const friend = await guest(phone ? 'stalemate' : 'rad-dad', nick, viewport, phone);
+            const game = phone ? 'chess' : 'turdspades';
+            const label = phone ? 'Royal Flush Chess' : 'TurdSpades';
+            try {
+                await host.getByRole('combobox', { name: 'Switch game' }).selectOption(game);
+                await host.getByRole('button', { name: phone ? 'Open Chess match' : 'Open Spades table' }).click();
+                await expect(host.locator(phone ? '[data-chess-status]' : '[data-spades-status]')).toContainText(phone ? 'Waiting for an opponent' : '1/4 seated');
+                await sendGameInvite(host, nick);
+                const offer = friend.locator('[data-game-offer]');
+                await expect(offer).toContainText(`LinkHost invited you to play ${label}.`);
+                await expect(friend.locator('[data-game-night]')).toBeHidden();
+                await captureArcadeInvite(friend, viewport, '01-accept');
+                const accept = offer.getByRole('button', { name: 'Play ' + label, exact: true });
+                if (phone) await accept.tap(); else await accept.click();
+                await expect(offer).toBeHidden();
+                if (phone) {
+                    await expect(friend.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
+                    await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
+                    await expect(friend.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
+                    await expect(friend.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                    await fit(friend, 'direct invitation');
+                } else {
+                    await expect(friend.locator('[data-spades-status]')).toHaveText(/2\/4 seated · You’re West/);
+                    await expect(host.locator('[data-spades-status]')).toContainText('2/4 seated');
+                    await expect(friend.getByRole('button', { name: 'Join West' })).toBeHidden();
+                }
+                await captureArcadeInvite(friend, viewport, '02-seated');
+                console.log(`Passed ${engine} ${viewport.width}x${viewport.height} ${label} invitation, one guest tap to the same table.`);
+                await friend.locator('[data-leave]').click();
+                await expect(friend.locator('[data-game-night]')).toBeHidden();
+                if (phone) {
+                    await host.getByRole('button', { name: 'Open Chess match' }).click();
+                    await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
+                    await sendGameInvite(host, nick);
+                    await expect(accept).toBeVisible();
+                    await host.getByRole('button', { name: 'Close waiting match' }).click();
+                    await host.getByRole('button', { name: 'Open Chess match' }).click();
+                    await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
+                    await accept.tap();
+                    await expect(friend.getByText('This game invitation no longer has an open seat. Ask the host for a fresh invitation.')).toBeVisible();
+                    await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
+                    await friend.locator('[data-leave]').click();
+                    await expect(friend.locator('[data-game-night]')).toBeHidden();
+                    await host.getByRole('button', { name: 'Close waiting match' }).click();
+                } else {
+                    await expect(host.locator('[data-spades-status]')).toContainText('1/4 seated');
+                    await host.getByRole('button', { name: 'Close table', exact: true }).click();
+                }
+            } finally {
+                await friend.context().close();
+            }
+        }
+    }
     async function verifyGameNightEntry() {
         const host = await guest('rad-dad', 'LinkHost', { width: 1280, height: 900 }, false, origin + '/beta/?game-night=1&via=rad-dad');
         await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
+        await verifyArcadeInvites(host);
         await host.getByRole('button', { name: 'Share room link' }).click();
         const share = host.getByRole('dialog', { name: 'Share Game Night' });
         const link = new URL(await share.getByLabel('Game Night room link').inputValue());
@@ -152,7 +233,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         assert.equal(link.pathname, '/beta/');
         assert.equal(link.search, '?game-night=1&via=rad-dad');
         assert.match(link.hash, /^#game=game-[a-f0-9]{6}x[a-f0-9]{6}&instance=[a-f0-9]{32}$/);
-        if (evidence) await host.screenshot({ path: join(evidence, `webjam-room-link-${engine}.png`) });
+        if (evidence) await host.screenshot({ path: join(evidence, `webjam-room-link-${engine}.png`),
+            mask: [share.getByLabel('Game Night room link')] });
         await share.getByRole('button', { name: 'Done' }).click();
         const player = await guest('rad-dad', 'LinkGuest', { width: 390, height: 844 }, true, link.href);
         const joinOffer = player.locator('[data-game-offer]').getByRole('button', { name: 'Join Game Night', exact: true });

@@ -42,7 +42,7 @@ const markup = `
     </div>
 </dialog>`;
 
-export function mountArcadeTurdSpades(container) {
+export function mountArcadeTurdSpades(container, onMatch) {
     const document = container.ownerDocument, panel = document.createElement('details');
     panel.className = 'arcade-card-table arcade-spades';
     panel.hidden = true;
@@ -59,6 +59,7 @@ export function mountArcadeTurdSpades(container) {
     function clearPending() { clearTimeout(timer); pending = false; }
     function closeConfirmation() { confirmation = ''; if (confirm.open) confirm.close(); }
     const client = createGameNightMatchClient({
+        onMatch,
         prefix: '/beta/arcade-turdspades',
         onStatus(next, reason) {
             connection = next;

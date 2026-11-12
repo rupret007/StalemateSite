@@ -51,7 +51,7 @@ function appendStyle(document, href) {
     document.head.append(link);
 }
 
-export function mountArcadeChess(container) {
+export function mountArcadeChess(container, onMatch) {
     const document = container.ownerDocument;
     const panel = document.createElement('details');
     panel.className = 'arcade-chess';
@@ -74,6 +74,7 @@ export function mountArcadeChess(container) {
     let model = null, chess = null, board = null, selected = null, focused = 'e2';
     let receivedAt = 0, deadlineSynced = false, lastOrientation = null, choiceContext = null;
     const client = createGameNightMatchClient({
+        onMatch,
         prefix: '/beta/arcade',
         onStatus(next, reason) {
             connection = next;

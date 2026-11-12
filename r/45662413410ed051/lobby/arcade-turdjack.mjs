@@ -61,7 +61,7 @@ function face(document, card) {
     return label;
 }
 
-export function mountArcadeTurdJack(container) {
+export function mountArcadeTurdJack(container, onMatch) {
     const document = container.ownerDocument, panel = document.createElement('details');
     panel.className = 'arcade-card-table arcade-jack';
     panel.hidden = true;
@@ -77,6 +77,7 @@ export function mountArcadeTurdJack(container) {
     function clearPending() { clearTimeout(timer); pending = false; }
     function closeConfirmation() { confirmation = ''; if (confirm.open) confirm.close(); }
     const client = createGameNightMatchClient({
+        onMatch,
         prefix: '/beta/arcade-turdjack',
         onStatus(next, reason) {
             connection = next;

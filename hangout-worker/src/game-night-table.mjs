@@ -70,7 +70,7 @@ export function createGameNightTable({
 
         join(subject, id, now, requested) {
             if (id !== this.#id || this.#match || !subjectValid(subject) || this.seat(subject)) return false;
-            const seat = twoSeats ? sides[1] : requested;
+            const seat = twoSeats ? sides[1] : requested === 'next' ? sides.find(side => !this.#seats[side]) : requested;
             if (!sides.includes(seat) || this.#seats[seat]) return false;
             if (!manualStart && this.subjects.length === sides.length - 1) this.#match = create(id, now);
             this.#seats[seat] = subject;

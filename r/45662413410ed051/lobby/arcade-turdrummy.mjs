@@ -52,7 +52,7 @@ const markup = `
     </div>
 </dialog>`;
 
-export function mountArcadeTurdRummy(container) {
+export function mountArcadeTurdRummy(container, onMatch) {
     const panel = container.ownerDocument.createElement('details');
     const document = panel.ownerDocument;
     panel.className = 'arcade-card-table arcade-rummy';
@@ -74,6 +74,7 @@ export function mountArcadeTurdRummy(container) {
     }
 
     const client = createGameNightMatchClient({
+        onMatch,
         prefix: '/beta/arcade-turdrummy',
         onStatus(value, reason) {
             connection = value;
