@@ -431,14 +431,18 @@ describe('opt-in session authority through the actual beta gateway and Lobby', (
         const reached = deferred(), remote = deferred(); h.releases.push(remote.resolve); let signal, settled = false;
         h.env.ROOMS.get = () => ({ fetch: incoming => { signal = incoming.signal; reached.resolve(); return remote.promise; } });
         const startedAt = Date.now(), ending = logout(h, alice).then(result => { settled = true; return result; }); await reached.promise;
-        let checkDone = false, chatDone = false;
-        const checking = betaFetch(request('/beta/state', { cookie: bravo.cookie }), h.env).then(result => { checkDone = true; return result; });
-        const chatting = h.message(bravo, { t: 'say', ch: '#stalemate', text: 'The lobby continues during remote closure' }).then(() => { chatDone = true; });
-        await vi.waitFor(() => { expect(checkDone).toBe(true); expect(chatDone).toBe(true); }, { timeout: 100, interval: 1 });
-        expect((await checking).status).toBe(200); await chatting; expect(settled).toBe(false);
+        // Let SQLite and crypto finish while the fake clock and the Room reply
+        // are both held. If either operation waits for closure, the test times out.
+        const [checked] = await Promise.all([
+            betaFetch(request('/beta/state', { cookie: bravo.cookie }), h.env),
+            h.message(bravo, { t: 'say', ch: '#stalemate', text: 'The lobby continues during remote closure' })
+        ]);
+        expect(checked.status).toBe(200);
+        expect(settled).toBe(false);
         expect(bravo.socket.frames.some(frame => frame.t === 'line' && frame.text === 'The lobby continues during remote closure')).toBe(true);
         expect(alice.socket.frames.some(frame => frame.text === 'The lobby continues during remote closure')).toBe(false);
-        await vi.advanceTimersByTimeAsync(7999 - (Date.now() - startedAt)); expect(settled).toBe(false);
+        expect(Date.now()).toBe(startedAt);
+        await vi.advanceTimersByTimeAsync(7999); expect(settled).toBe(false);
         await vi.advanceTimersByTimeAsync(1); expect(settled).toBe(true);
         const result = await ending; expect(result.status).toBe(503); expect(result.headers.has('Set-Cookie')).toBe(false); expect(signal.aborted).toBe(true);
         expect(await h.lobby().authority.records.transaction(tx => tx.get(`authority-session:${alice.access.sid}`))).toMatchObject({ revoked: true, pending: true });
