@@ -1690,7 +1690,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             log(c.nick, 'ban', t.nick, reason, chan.name);
             for (const person of membersOf(chan)) if (!isStaff(person) && !owns(person, chan) && banned(chan.bans, person)) {
                 if (boundPeer) personDependency(person, chan);
-                out(person, { t: 'kicked', ch: chan.name, by: c.nick, reason }); leave(person, chan, 'banned');
+                out(person, { t: 'kicked', ch: chan.name, by: c.nick, reason, banned: true });
+                leave(person, chan, 'banned');
             }
             return undefined;
         },
