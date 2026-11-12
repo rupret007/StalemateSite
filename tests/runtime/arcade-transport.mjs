@@ -1011,6 +1011,7 @@ try {
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true },
             ...(relay ? { TURN_BUDGET: { className: 'HangoutTurnBudget', useSQLite: true } } : {}) },
         bindings: { FIXTURE_NONCE: nonce, FIXTURE_ARCADE_REPORTS: '1', HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', ...arcadeFlags,
+            HANGOUT_GAME_NIGHT_GUESTS: betaManifest.match(/^HANGOUT_GAME_NIGHT_GUESTS = "([01])"$/m)?.[1] || '0',
             ...(browserName || serve ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
             ...(!serve && (!browserName || browserMedia) ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
             ...(relay ? { HANGOUT_ARCADE_TURN: '1', HANGOUT_CF_ACCOUNT_ID: 'f'.repeat(32), HANGOUT_TURN_MONTHLY_GB: '1',

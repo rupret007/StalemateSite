@@ -58,6 +58,10 @@ export function createGameNightTable({
             return subjectValid(subject) ? sides.find(seat => this.#seats[seat] === subject) ?? null : null;
         }
 
+        hasGuestSeat(id, host) {
+            return id === this.#id && !this.#match && this.#seats[first] === host && this.#occupied().length < sides.length;
+        }
+
         view(subject, now) {
             const seat = this.seat(subject);
             return {

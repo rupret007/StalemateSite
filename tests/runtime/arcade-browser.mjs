@@ -226,10 +226,90 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             }
         }
     }
+    async function verifyFirstVisit(host) {
+        for (const phone of [true, false]) {
+            const viewport = phone ? { width: 390, height: 844 } : { width: 1440, height: 900 };
+            const original = host.viewportSize();
+            let link;
+            await host.evaluate(() => {
+                window.testGameInvitation = '';
+                Object.defineProperty(navigator, 'share', { configurable: true, value: async ({ url }) => { window.testGameInvitation = url; } });
+            });
+            try {
+                await host.setViewportSize(viewport);
+                await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
+                await host.getByRole('button', { name: 'Open Chess match' }).click();
+                await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
+                await host.getByRole('button', { name: 'Invite players' }).click();
+                await host.getByRole('button', { name: 'Invite someone new' }).click();
+                await expect(host.getByRole('button', { name: 'Share invite' })).toBeVisible();
+                await captureArcadeInvite(host, viewport, 'first-visit-00-host-share');
+                await host.getByRole('button', { name: 'Share invite' }).click();
+                link = new URL(await host.evaluate(() => window.testGameInvitation));
+                assert.ok(link.origin === origin && link.pathname === '/beta/game-night/guest' && /^#invite=[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/.test(link.hash), 'the share sheet receives one private game invitation');
+                await host.evaluate(() => { delete window.testGameInvitation; delete navigator.share; });
+            } finally {
+                await host.setViewportSize(original);
+            }
+            const context = await browser.newContext({ viewport, hasTouch: phone, reducedMotion: 'reduce', ignoreHTTPSErrors: true });
+            try {
+                const guest = await context.newPage();
+                guest.setDefaultTimeout(10000);
+                guest.on('pageerror', error => errors.push(`First visit: ${error.message}`));
+                await guest.addInitScript(({ path, hash }) => {
+                    if (location.pathname === path) history.replaceState(null, '', path + hash);
+                }, { path: link.pathname, hash: link.hash });
+                assert.equal((await context.cookies()).length, 0, 'guest starts with an empty browser profile');
+                const unconfirmed = await context.request.post(origin + '/beta/game-night/invitation/accept', {
+                    headers: { Origin: origin }, data: { code: new URLSearchParams(link.hash.slice(1)).get('invite'), age13: false }
+                });
+                assert.equal(unconfirmed.status(), 400, 'the guest must confirm the age and house rules');
+                assert.equal((await context.cookies()).length, 0, 'an unconfirmed invitation grants no access');
+                await guest.goto(origin + link.pathname);
+                await expect(guest.getByRole('heading', { name: 'Royal Flush Chess' })).toBeVisible();
+                await expect(guest.getByText('LinkHost invited you to play.')).toBeVisible();
+                await expect(guest.getByRole('textbox')).toHaveCount(0);
+                await expect(guest.getByRole('button')).toHaveCount(1);
+                assert.equal(new URL(guest.url()).hash, '');
+                await captureArcadeInvite(guest, viewport, 'first-visit-01-guest-accept');
+                const join = guest.getByRole('button', { name: 'Join game', exact: true });
+                if (phone) await join.tap(); else await join.click();
+                await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
+                await expect(guest.getByLabel('Your nick')).toBeHidden();
+                await expect(guest.getByRole('combobox', { name: 'Switch game' })).toBeHidden();
+                await expect(guest.getByRole('tab', { name: '#stalemate' })).toHaveCount(0);
+                assert.equal((await context.request.get(origin + '/beta/state')).status(), 401, 'room guest lacks community access');
+                assert.equal((await context.request.post(origin + '/beta/arcade-turdanoid-ticket?game-guest=1', {
+                    headers: { Origin: origin }, data: {}
+                })).status(), 403, 'room guest lacks permission for a different game');
+                await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
+                await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
+                await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                await captureArcadeInvite(guest, viewport, 'first-visit-02-seated');
+                await guest.reload();
+                await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                await guest.locator('[data-text]').fill('First visit from the game invite');
+                await guest.locator('[data-send]').click();
+                await expect(host.getByRole('log', { name: 'Conversation' })).toContainText('First visit from the game invite');
+                const reused = await context.newPage();
+                await reused.addInitScript(({ path, hash }) => {
+                    if (location.pathname === path) history.replaceState(null, '', path + hash);
+                }, { path: link.pathname, hash: link.hash });
+                await reused.goto(origin + link.pathname);
+                await expect(reused.getByRole('status')).toContainText('was used');
+                await expect(reused.getByRole('button', { name: 'Join game' })).toBeHidden();
+                await reused.close();
+                await guest.locator('[data-leave]').click();
+                await expect(guest.locator('[data-game-night]')).toBeHidden();
+                console.log(`Passed ${engine} ${viewport.width}x${viewport.height} first-visit Chess, one tap from invitation to the same game, move, reload, room chat and replay refusal.`);
+            } finally { await context.close(); }
+        }
+    }
     async function verifyGameNightEntry() {
         const host = await guest('rad-dad', 'LinkHost', { width: 1280, height: 900 }, false, origin + '/beta/?game-night=1&via=rad-dad');
         await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
         await verifyArcadeInvites(host);
+        if (!mixed) await verifyFirstVisit(host);
         await host.getByRole('button', { name: 'Share room link' }).click();
         const share = host.getByRole('dialog', { name: 'Share Game Night' });
         const link = new URL(await share.getByLabel('Game Night room link').inputValue());

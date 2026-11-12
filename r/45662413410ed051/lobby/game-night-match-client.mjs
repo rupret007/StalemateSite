@@ -10,6 +10,7 @@ export const matchConnectionErrors = Object.freeze({
 
 // A match connection can be replaced without changing room, chat or call.
 export function createGameNightMatchClient({ prefix, onStatus, onState, onError, onMatch }) {
+    const guestQuery = new URLSearchParams(location.search).get('game-guest') === '1' ? '?game-guest=1' : '';
     let scope, socket, controller, reconnectTimer, joinTimer, generation = 0, failures = 0, ready = false;
     function reset() {
         generation++;
@@ -47,7 +48,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         onStatus(failures ? 'reconnecting' : 'connecting');
         joinTimer = setTimeout(() => retry(attempt), 8000);
         try {
-            const response = await fetch(prefix + '-ticket', {
+            const response = await fetch(prefix + '-ticket' + guestQuery, {
                 method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(scope), signal: request.signal
             });
@@ -56,7 +57,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
             const grant = await response.json();
             if (attempt !== generation) return;
             if (!/^m[a-f0-9]{32}$/.test(grant.ticket) || grant.protocol !== 'game-night.v1') throw Error('Invalid match grant');
-            const url = new URL(prefix + '-match', location.href);
+            const url = new URL(prefix + '-match' + guestQuery, location.href);
             url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
             const connection = new WebSocket(url, [grant.protocol, grant.ticket]);
             socket = connection;

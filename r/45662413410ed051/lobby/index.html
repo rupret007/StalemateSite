@@ -56,6 +56,11 @@
         <h3 id="invite-dialog-title">Invite a guest</h3>
         <p data-invite-explainer>Invite someone to <b data-invite-room></b>. They choose whether to join.</p>
         <div data-game-invite-picker hidden>
+            <div data-game-invite-link hidden>
+                <button class="btn" type="button" data-game-invite-new>Invite someone new</button>
+                <button class="btn" type="button" data-game-invite-share hidden>Share invite</button>
+                <p class="small" data-game-invite-link-status role="status"></p>
+            </div>
             <div class="sheet-buttons" data-game-invite-people></div>
             <p class="small" data-game-invite-empty hidden>Nobody else is in the lobby yet.</p>
             <button class="btn btn--ghost" type="button" data-game-invite-cancel>Cancel</button>
@@ -118,6 +123,13 @@
             <p class="status" data-gate-status role="status"></p>
             <a class="btn btn--ghost" data-gate-private-entry href="/beta/" hidden>Open private entry</a>
           </div>
+        </div>
+    </main>
+
+    <main class="gate" data-game-guest-connecting hidden>
+        <div class="gate-card"><h1>Game Night</h1>
+            <p data-game-guest-status role="status">Joining the game…</p>
+            <button class="btn" type="button" data-game-guest-retry hidden>Try again</button>
         </div>
     </main>
 
