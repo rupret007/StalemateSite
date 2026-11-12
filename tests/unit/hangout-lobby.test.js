@@ -62,6 +62,28 @@ it('tracks a room invitation only between the original host and guest, and expir
     expect(got(guest).filter(m => m.t === 'join' && m.ch.name === ch)).toHaveLength(1);
 });
 
+it('lets the same live guest accept a pending room invitation after engine recovery', () => {
+    boot();
+    const host = join('InviteHost'), guest = join('InviteGuest');
+    const room = '#jam-garage', request = 'c'.repeat(32);
+    cmd(host, 'join', [room]);
+    const roomInstance = got(host).find(m => m.t === 'join' && m.ch.name === room).ch.keepRef;
+    L.message(host.id, JSON.stringify({ t: 'room-invite-request', request, ch: room, roomInstance, peer: guest.id }));
+    expect(got(host).at(-1)).toMatchObject({ status: 'sent' });
+    const sessions = structuredClone(L.sessionSnapshot());
+    const rooms = structuredClone(L.roomSnapshot());
+    const net = structuredClone(L.snapshot());
+    const live = sessions.connections.map(({ id, dev, iph, account, role, admin }) => ({ id, dev, iph, account, role, admin }));
+
+    boot();
+    L.restore(net);
+    L.restoreRooms(rooms);
+    expect(L.restoreSessions(sessions, live)).toEqual({ resumed: [host.id, guest.id], rejected: [] });
+    L.message(guest.id, JSON.stringify({ t: 'room-invite-answer', request, accept: true }));
+    expect(got(guest).some(m => m.t === 'join' && m.ch.name === room)).toBe(true);
+    expect(got(host)).toContainEqual({ t: 'room-invite-result', request, status: 'accepted' });
+});
+
 const lines = (u) => got(u).filter((m) => m.t === 'line').map((m) => m.text);
 const notices = (u) => got(u).filter((m) => m.t === 'notice' || m.t === 'denied').map((m) => m.text).join('\n');
 const later = (ms) => { clock += ms; };
