@@ -36,6 +36,14 @@
         <p class="small">Select and copy this text yourself. Nothing is sent again.</p>
         <button class="btn" type="button" data-message-copy-close>Done</button>
     </dialog>
+    <dialog class="sheet" data-pm-report-dialog aria-labelledby="pm-report-title" aria-describedby="pm-report-description">
+        <h3 id="pm-report-title">Report a private message?</h3>
+        <p id="pm-report-description">Send only this message to moderators for review.</p>
+        <div class="sheet-buttons">
+            <button class="btn btn--ghost" type="button" data-pm-report-cancel autofocus>Cancel</button>
+            <button class="btn" type="button" data-pm-report-send>Send report</button>
+        </div>
+    </dialog>
     <dialog class="sheet" data-sheet aria-labelledby="person-dialog-title">
         <h3 id="person-dialog-title" data-sheet-title></h3>
         <div class="sheet-buttons" data-sheet-buttons></div>
