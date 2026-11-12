@@ -1049,6 +1049,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 if (jamDraft && currentJam() === c && amOp(c)) $('[data-jam-link]').value = jamDraft;
                 const r = room();
                 if (r) r.onChan(c);
+                if (jamInviteOpener && (c.kind === 'lobby' || c === inviteContext)) drawQuickInvitePeople();
             }
             drawCommunity();
             break;
@@ -2409,6 +2410,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             accepted: `${invite.nick} accepted and joined.`,
             declined: `${invite.nick} declined the invitation.`,
             expired: `The invitation to ${invite.nick} expired.`,
+            unconfirmed: `We didn’t get a reply from the server for ${invite.nick}’s invitation. You can try again.`,
             unavailable: `The invitation to ${invite.nick} couldn’t be completed. Try again when they’re online.`,
         };
         const text = amOp(room) && messages ? messages[invite.status] : '';
@@ -2420,7 +2422,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         clearTimeout(invite.timer);
         invite.status = status;
         if (status === 'sending' || status === 'sent') invite.timer = setTimeout(() => {
-            if (sentRoomInvites.get(invite.room.name) === invite) updateSentRoomInvite(invite, 'expired');
+            if (sentRoomInvites.get(invite.room.name) === invite)
+                updateSentRoomInvite(invite, status === 'sending' ? 'unconfirmed' : 'expired');
         }, status === 'sending' ? 10000 : Math.max(0, Math.min(120000, until - Date.now())));
         if (store(app.active) === invite.room) drawSentRoomInvite(invite.room);
     }
@@ -2430,10 +2433,56 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-invite-people]').replaceChildren();
         if ($('[data-invite-dialog]').open) $('[data-invite-dialog]').close();
     }
+    function onlineInvitePeople(current, music = false) {
+        const online = new Map();
+        const members = new Set(current.names.map(member => member.id));
+        for (const room of app.chans.values()) if (room.kind === 'lobby') {
+            for (const person of room.names || []) {
+                if (!personId(person.id) || person.id === app.selfId) continue;
+                const alreadyHere = members.has(person.id);
+                if (music || !alreadyHere)
+                    online.set(person.id, alreadyHere && person.busy ? { ...person, busy: false } : person);
+            }
+        }
+        return online;
+    }
+    function drawQuickInvitePeople() {
+        if (!inviteContext || !jamInviteOpener || $('[data-invite-quick]').hidden) return;
+        const { music } = jamInviteOpener;
+        const list = $('[data-invite-people]');
+        const error = $('[data-invite-quick-error]');
+        const online = onlineInvitePeople(inviteContext, music);
+        for (const button of Array.from(list.children)) {
+            if (online.has(button.dataset.peer)) continue;
+            if (button === document.activeElement) $('[data-invite-quick-cancel]').focus({ preventScroll: true });
+            invitePeople.delete(button.dataset.peer);
+            button.remove();
+        }
+        const buttons = new Map(Array.from(list.children, button => [button.dataset.peer, button]));
+        for (const person of online.values()) {
+            let button = buttons.get(person.id);
+            if (!button) {
+                const context = personContext(person.id, inviteContext.name, inviteInstance, person.nick);
+                invitePeople.set(person.id, context);
+                button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'btn btn--ghost';
+                button.dataset.peer = person.id;
+                button.addEventListener('click', () => sendInviteToPerson(context, error, music));
+                list.append(button);
+            }
+            const label = person.busy ? `${person.nick} · Busy` : person.nick;
+            if (button.textContent !== label) {
+                button.textContent = label;
+                button.setAttribute('aria-label', `Invite ${person.nick}${person.busy ? ' (busy)' : ''}`);
+            }
+        }
+        $('[data-invite-empty]').hidden = online.size > 0;
+    }
     function openInviteDialog(opener = null, music = false) {
         const current = store(app.active);
         if (connectionState !== 'connected' || !current || current.kind === 'lobby' || !amOp(current)) return;
-        jamInviteOpener = opener ? { button: opener, room: current } : null;
+        jamInviteOpener = opener ? { button: opener, room: current, music } : null;
         inviteContext = current; inviteInstance = current.keepRef; invitePeople.clear(); $('[data-invite-room]').textContent = current.name; $('[data-invite-error]').textContent = '';
         const quick = !!opener && personTargetsSupported && roomNonce(inviteInstance);
         const list = $('[data-invite-people]'), options = $('[data-invite-options]'), error = $('[data-invite-quick-error]');
@@ -2441,28 +2490,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         list.replaceChildren(); options.replaceChildren(); error.textContent = '';
         $('[data-invite-nick]').value = '';
         const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose someone online'; options.append(placeholder);
-        const online = new Map();
-        for (const room of app.chans.values()) if (room.kind === 'lobby') {
-            for (const person of room.names || []) online.set(person.id, person);
-        }
-        for (const person of online.values()) {
-            if (!personId(person.id) || person.id === app.selfId || (!music && current.names.some(member => member.id === person.id))) continue;
-            const context = personContext(person.id, current.name, inviteInstance, person.nick);
-            invitePeople.set(person.id, context);
-            if (quick) {
-                const button = document.createElement('button');
-                button.type = 'button';
-                button.className = 'btn btn--ghost';
-                button.textContent = person.busy ? `${person.nick} · Busy` : person.nick;
-                button.setAttribute('aria-label', `Invite ${person.nick}${person.busy ? ' (busy)' : ''}`);
-                button.addEventListener('click', () => sendInviteToPerson(context, error, music));
-                list.append(button);
-            } else {
+        if (quick) drawQuickInvitePeople();
+        else {
+            for (const person of onlineInvitePeople(current).values()) {
+                invitePeople.set(person.id, personContext(person.id, current.name, inviteInstance, person.nick));
                 const option = document.createElement('option'); option.value = person.id;
                 option.textContent = person.busy ? `${person.nick} · Busy` : person.nick; options.append(option);
             }
         }
-        $('[data-invite-empty]').hidden = invitePeople.size > 0;
         $('[data-invite-person-send]').disabled = !personTargetsSupported || !roomNonce(inviteInstance);
         $('[data-invite-dialog]').showModal();
         const first = quick ? list.querySelector('button') || $('[data-invite-quick-cancel]') : $('[data-invite-nick]');
@@ -2533,7 +2568,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
         // Invitation target may be outside this room, but must remain the
         // original live connection in the shared lobby's current roster.
-        const person = findPerson(context.peer);
+        const person = onlineInvitePeople(current, music).get(context.peer);
         if (!person || !personContextValid(context)) { error.textContent = 'That guest went offline. Choose someone else or try again when they’re back.'; return; }
         if (music) {
             if (!directMusicInvitesSupported || currentJam() !== current) {
