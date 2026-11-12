@@ -478,6 +478,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let jamInviteExpiryTimer;
     let musicInvite = null;
     let pendingMusicHandoff = null, directMusicInvitesSupported = false;
+    let musicHandoffRecoveryRoom = null;
     let sentMusicInvite = null, musicInviteOutcomesSupported = false;
     const musicInviteFailed = 'Music invitation couldn’t be sent. Try again from your Jam room.';
     const musicInviteConfirm = 'Confirm the invitation in WebJam.';
@@ -1729,6 +1730,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         for (const c of app.chans.values()) if (c.kind === 'jam') c.jam = null;
         jamContext = null;
         closeMusicHandoff();
+        clearMusicHandoffRecovery();
         sentMusicInvite = null;
         drawMusicInviteOutcome();
         clearMusicInviteTimers();
@@ -2031,6 +2033,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const room = !isPm && c && c.kind !== 'lobby';
         if (inviteContext && (inviteContext !== c || connectionState !== 'connected' || !amOp(c))) closeInviteDialog();
         if (pendingMusicHandoff && (currentJam() !== pendingMusicHandoff.room || !amOp(c))) closeMusicHandoff();
+        if (musicHandoffRecoveryRoom && (currentJam() !== musicHandoffRecoveryRoom || !amOp(c))) clearMusicHandoffRecovery();
         $('[data-roombar]').hidden = app.sharingStopped || app.localMediaPaused || !room;
         drawJam();
         drawMusicInvite();
@@ -2675,6 +2678,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         pendingMusicHandoff = null;
         $('[data-jam-invite-music]').removeAttribute('aria-disabled');
     }
+    function clearMusicHandoffRecovery() {
+        if (!musicHandoffRecoveryRoom) return;
+        musicHandoffRecoveryRoom = null;
+        showMusicHandoffStatus('');
+    }
     $('[data-music-handoff-cancel]').addEventListener('click', () => {
         if (!pendingMusicHandoff || pendingMusicHandoff.submitted) return;
         closeMusicHandoff();
@@ -2710,14 +2718,16 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         toast(sent ? 'Music invitation sent.' : musicInviteFailed);
     }
     function startMusicHandoff(room, context) {
+        clearMusicHandoffRecovery();
         const request = crypto.randomUUID().replaceAll('-', '');
         const channel = new BroadcastChannel(`webjam-music-${request}`);
         const handoff = {
             room, channel, request, nick: context.label, submitted: false, timer: setTimeout(() => {
                 closeMusicHandoff();
-                toast(handoff.submitted
+                musicHandoffRecoveryRoom = room;
+                showMusicHandoffStatus(handoff.submitted
                     ? 'Hang Out did not confirm delivery. Check with your bandmate before sending another invitation.'
-                    : 'WebJam did not return an invitation. Start a hosted Music session in the private app and try again.');
+                    : 'WebJam did not return an invitation. If a tab opened in another browser profile, choose End browser invite in WebJam. Use the same browser profile for Hang Out and the return tab before retrying.');
             }, 90000)
         };
         pendingMusicHandoff = handoff;
@@ -2738,7 +2748,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         document.body.append(launch);
         launch.click();
         launch.remove();
-        showMusicHandoffStatus('Confirm in WebJam. If no prompt appears, cancel here, start a hosted Music session in WebJam, then try again.', true);
+        showMusicHandoffStatus('Confirm in WebJam. The return tab needs the browser profile you’re using for Hang Out. If no prompt appears, cancel here, start a hosted Music session, then try again.', true);
     }
     function sendInviteToPerson(context, error, music = false) {
         const current = store(app.active);
