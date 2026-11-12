@@ -136,6 +136,50 @@ test('IRC conversation leads into an existing room; drafts and mentions survive 
     } finally { await host.context().close(); await visitor.context().close(); }
 });
 
+test('a draft returns to the same room but stays out of a recreated room with the same name', async ({ browser }) => {
+    const host = await guest(browser, 'OriginalHost');
+    let visitor, newHost;
+    const name = '#rehearsal-notes';
+    const composer = page => page.locator('[data-text]');
+    const context = page => page.locator('[data-chat-context]');
+    const roomCard = page => page.locator('[data-roomlist] button').filter({ hasText: name });
+    async function hostRoom(page) {
+        await composer(page).fill('/join ' + name);
+        await composer(page).press('Enter');
+        await expect(context(page)).toHaveText(name);
+    }
+    try {
+        await hostRoom(host);
+        visitor = await guest(browser, 'DraftGuest');
+        await composer(visitor).fill('Draft for the lobby');
+        await roomCard(visitor).click();
+        await expect(context(visitor)).toHaveText(name);
+        await composer(visitor).fill('Draft for the original room');
+        await visitor.locator('[data-leave]').click();
+        await expect(context(visitor)).toHaveText('#stalemate');
+        await expect(composer(visitor)).toHaveValue('Draft for the lobby');
+        await roomCard(visitor).click();
+        await expect(context(visitor)).toHaveText(name);
+        await expect(composer(visitor)).toHaveValue('Draft for the original room');
+
+        await composer(host).fill('/close');
+        await composer(host).press('Enter');
+        await expect(context(visitor)).toHaveText('#stalemate');
+        await expect(roomCard(visitor)).toHaveCount(0);
+        await expect(composer(visitor)).toHaveValue('Draft for the lobby');
+        newHost = await guest(browser, 'NewHost');
+        await hostRoom(newHost);
+        await roomCard(visitor).click();
+        await expect(context(visitor)).toHaveText(name);
+        await expect(composer(visitor)).toHaveValue('');
+        await expect(visitor.locator('[data-buffer]')).not.toContainText('Draft for the original room');
+    } finally {
+        await newHost?.context().close();
+        await visitor?.context().close();
+        await host.context().close();
+    }
+});
+
 test('offline sends keep the draft; reconnect clears stale membership and preserves PM preference', async ({ browser }) => {
     const page = await guest(browser, 'ReturnGuest');
     try {
