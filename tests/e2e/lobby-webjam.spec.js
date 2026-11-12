@@ -65,7 +65,7 @@ const WEB_INVITE = 'https://webjam.example/join/#k=synthetic_browser_capability&
 async function browserRoom(browser, baseURL, configured, viewport) {
     const contexts = [], external = [];
     const relay = hangoutRelayWsBase(baseURL, `${configured ? 'webjam-browser-' : 'webjam-off-'}${randomUUID()}`);
-    const join = async (nick, controls = false, via = '') => {
+    const join = async (nick, controls = false, via = '', beforeConnect) => {
         const context = await browser.newContext({ viewport,
             ...(controls && browser.browserType().name() === 'chromium' ? { permissions: ['local-network-access'] } : {}) }); contexts.push(context);
         await context.route('**/*', route => {
@@ -96,6 +96,7 @@ async function browserRoom(browser, baseURL, configured, viewport) {
             };
         });
         const page = await context.newPage();
+        await beforeConnect?.(page, relay);
         await page.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}${via ? `&via=${via}` : ''}`);
         await page.fill('[data-nick]', nick); await page.click('[data-enter]');
         try { await expect(page.locator('[data-connection]')).toHaveText('Connected'); }
@@ -149,6 +150,76 @@ for (const [hostSite, guestSite] of [['rad-dad', 'stalemate'], ['stalemate', 'ra
         } finally { await f.close(); }
     });
 }
+
+test('an invite shows when the server has not replied and when a sent offer expires', async ({ browser, baseURL }) => {
+    const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });
+    let dropSent = true;
+    try {
+        const host = await f.join('RoomHost', false, 'rad-dad', async (page, relay) => {
+            await page.routeWebSocket(url => url.href.startsWith(relay), socket => {
+                const server = socket.connectToServer();
+                server.onMessage(raw => {
+                    const frame = JSON.parse(raw);
+                    if (dropSent && frame.t === 'room-invite-result' && frame.status === 'sent') return;
+                    socket.send(raw);
+                });
+            });
+        });
+        const guest = await f.join('Bandmate', false, 'stalemate');
+        await host.click('[data-show="rooms"]');
+        await host.click('[data-start="jam"]');
+        await host.clock.install();
+        const invite = host.getByRole('button', { name: 'Invite bandmate to room' });
+        const status = host.locator('[data-room-invite-status]');
+        const offer = guest.locator('[data-game-offer]');
+        async function send() {
+            await invite.click();
+            await host.getByRole('button', { name: 'Invite Bandmate', exact: true }).click();
+            await expect(offer).toBeVisible();
+        }
+        await send();
+        await expect(status).toHaveText('Sending invitation to Bandmate…');
+        await host.clock.fastForward(10_000);
+        await expect(status).toContainText('We didn’t get a reply from the server');
+        await offer.getByRole('button', { name: 'Not now' }).click();
+        await expect(status).toHaveText('Bandmate declined the invitation.');
+        dropSent = false;
+        await send();
+        await expect(status).toHaveText('Invitation sent to Bandmate. Waiting for a reply.');
+        await expect(invite).toHaveAttribute('aria-disabled', 'true');
+        await host.clock.fastForward(120_000);
+        await expect(status).toHaveText('The invitation to Bandmate expired.');
+        await expect(invite).toHaveAttribute('aria-disabled', 'false');
+    } finally { await f.close(); }
+});
+
+test('an open invite picker updates availability without moving keyboard focus', async ({ browser, baseURL }) => {
+    const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });
+    try {
+        const host = await f.join('RoomHost', false, 'rad-dad');
+        const guest = await f.join('Bandmate', false, 'stalemate');
+        await host.click('[data-show="rooms"]');
+        await host.click('[data-start="jam"]');
+        await host.getByRole('button', { name: 'Invite bandmate to room' }).press('Enter');
+        const list = host.getByRole('group', { name: 'Online guests' });
+        const available = list.getByRole('button', { name: 'Invite Bandmate', exact: true });
+        const busy = list.getByRole('button', { name: 'Invite Bandmate (busy)', exact: true });
+        await expect(available).toBeFocused();
+        await guest.click('[data-show="rooms"]');
+        await guest.click('[data-start="jam"]');
+        await expect(busy).toBeFocused();
+        await guest.locator('[data-leave]').click();
+        await expect(available).toBeFocused();
+        const newcomer = await f.join('NewBandmate', false, 'rad-dad');
+        await expect(list.getByRole('button', { name: 'Invite NewBandmate', exact: true })).toBeVisible();
+        await expect(available).toBeFocused();
+        await newcomer.close();
+        await expect(list.getByRole('button', { name: 'Invite NewBandmate', exact: true })).toHaveCount(0);
+        await guest.close();
+        await expect(host.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
+        await expect(host.locator('[data-invite-empty]')).toBeVisible();
+    } finally { await f.close(); }
+});
 
 test('the crowded invite list scrolls on a 375px phone while Cancel stays visible', async ({ browser, baseURL }, testInfo) => {
     const f = await browserRoom(browser, baseURL, true, { width: 375, height: 667 });
