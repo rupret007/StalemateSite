@@ -33,6 +33,14 @@ const LOBBY_ENTRANCE = `<!doctype html>
 </main>
 </body>
 </html>`;
+// The anonymous entry page can run only this exact reload handler. The
+// original music fragment stays in its tab and is never read by the gate.
+const WEB_JOIN_CONTINUE = `
+const continueButton = document.getElementById('continue-to-webjam');
+continueButton.addEventListener('click', () => window.location.reload());
+continueButton.hidden = false;
+`;
+const WEB_JOIN_ENTRANCE_CSP = "default-src 'none'; script-src 'sha256-4/KHztiflg6LmKBlsSZFuIJO4tjooDicegFDrXWGZOI='; style-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 const WEB_JOIN_ENTRANCE = `<!doctype html>
 <html lang="en">
 <head>
@@ -44,10 +52,15 @@ const WEB_JOIN_ENTRANCE = `<!doctype html>
 <body>
 <main>
 <h1>Enter Hang Out to join WebJam</h1>
-<p>Open Hang Out in a new tab and enter the invitation code from your host.</p>
-<p><a href="/beta/" target="_blank" rel="noopener noreferrer">Open Hang Out in a new tab</a></p>
-<p>When your invitation is accepted, return to this tab and reload to join the music session.</p>
+<ol>
+<li>Use the <strong>Hang Out community code</strong> from your host to enter.
+<p><a class="button" href="/beta/" target="_blank" rel="noopener noreferrer">Open Hang Out in a new tab</a></p></li>
+<li>When Hang Out accepts your code, return here for your audio check.
+<p><button id="continue-to-webjam" class="secondary" type="button" hidden>Continue to WebJam</button></p>
+<noscript><p>Reload this tab to continue.</p></noscript></li>
+</ol>
 </main>
+<script>${WEB_JOIN_CONTINUE}</script>
 </body>
 </html>`;
 const headers = { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow, noarchive, nosnippet', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': CSP };
@@ -278,7 +291,7 @@ async function betaRequest(request, env, deps = {}) {
         }
         if (['GET', 'HEAD'].includes(request.method) && ['/join', '/join/', '/join/index.html'].includes(assetPath)) {
             return reply(request.method === 'HEAD' ? null : WEB_JOIN_ENTRANCE, 401, 'text/html; charset=utf-8', {
-                'Content-Security-Policy': "default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+                'Content-Security-Policy': WEB_JOIN_ENTRANCE_CSP,
                 'Permissions-Policy': 'camera=(), geolocation=(), microphone=()',
             });
         }

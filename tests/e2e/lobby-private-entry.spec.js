@@ -2,8 +2,109 @@
 // the real loopback HTTP handler. This does not prove live cookie expiration.
 const { test, expect } = require('@playwright/test');
 const { randomUUID } = require('node:crypto');
+const { readFile } = require('node:fs/promises');
+const path = require('node:path');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 const ROOT = '/r/45662413410ed051/lobby/';
+
+for (const width of [375, 390]) {
+    test(`a cold Web Join tab continues to audio check after private admission at ${width}px`, async ({ browser }, testInfo) => {
+        const { betaFetch, BetaSessions } = await import('../../hangout-worker/src/beta-entry.mjs');
+        const origin = 'https://private-webjam.example.test';
+        const code = 'synthetic-beta-entry-test-invitation';
+        const values = new Map();
+        const storage = {
+            get: async key => values.get(key),
+            put: async (key, value) => values.set(key, structuredClone(value)),
+            list: async ({ prefix, limit }) => new Map([...values].filter(([key]) => key.startsWith(prefix)).slice(0, limit)),
+            delete: async keys => { for (const key of [keys].flat()) values.delete(key); },
+            setAlarm: async () => {}, deleteAlarm: async () => {}
+        };
+        storage.transaction = async fn => fn(storage);
+        const assets = [];
+        const env = {
+            HANGOUT_BETA_MODE: 'protected',
+            HANGOUT_BETA_INVITE_KEY: code,
+            HANGOUT_HMAC_KEY: 'synthetic-beta-entry-test-signature-key',
+            HANGOUT_PREVIEW_KEY: 'synthetic-beta-entry-test-preview',
+            LOBBY: {}, QUOTA: {}, ROOMS: {},
+            ASSETS: { fetch: async request => {
+                const pathname = new URL(request.url).pathname;
+                if (pathname === '/r/45662413410ed051/entry-sites.mjs') {
+                    return new Response(await readFile(path.join(__dirname, '../..', pathname.slice(1))), { headers: { 'Content-Type': 'text/javascript' } });
+                }
+                const filename = pathname === '/join/' ? 'index.html' : pathname.split('/').at(-1);
+                if (!/^\/join\/(?:[a-z-]+\.(?:js|css|html))?$/.test(pathname)) return new Response(null, { status: 404 });
+                assets.push(pathname);
+                const contentType = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }[path.extname(filename)];
+                return new Response(await readFile(path.join(__dirname, '../../join', filename)), { headers: { 'Content-Type': contentType } });
+            } }
+        };
+        const registry = new BetaSessions({ storage, blockConcurrencyWhile: fn => fn() }, env);
+        env.BETA_SESSIONS = { idFromName: name => name, get: () => registry };
+        const context = await browser.newContext({ viewport: { width, height: 667 } });
+        const network = [], external = [];
+        try {
+            await context.addInitScript(() => {
+                window.captureCalls = 0;
+                navigator.mediaDevices.getUserMedia = async () => { window.captureCalls++; throw new Error('Unexpected capture'); };
+            });
+            await context.route('**/*', async route => {
+                const request = route.request(), url = new URL(request.url());
+                if (url.origin !== origin) { external.push(url.origin); return route.abort(); }
+                network.push(url.pathname + url.search + url.hash);
+                const headers = new Headers(await request.allHeaders());
+                // WebKit's intercepted requests can omit the HttpOnly cookie
+                // that is already present in this isolated browser context.
+                if (!headers.has('Cookie')) {
+                    const cookies = await context.cookies(url.href);
+                    if (cookies.length) headers.set('Cookie', cookies.map(({ name, value }) => `${name}=${value}`).join('; '));
+                }
+                const result = await betaFetch(new Request(request.url(), {
+                    method: request.method(), headers, body: request.postData() ?? undefined
+                }), env);
+                await route.fulfill({ status: result.status, headers: Object.fromEntries(result.headers), body: Buffer.from(await result.arrayBuffer()) });
+            });
+            const invite = `${origin}/join/#k=${Buffer.alloc(32, 17).toString('base64url')}&s=${'22'.repeat(32)}&g=1&e=${Math.floor(Date.now() / 1000) + 480}`;
+            const page = await context.newPage();
+            expect((await page.goto(invite)).status()).toBe(401);
+            await expect(page.getByText('Hang Out community code', { exact: true })).toBeVisible();
+            const proceed = page.getByRole('button', { name: 'Continue to WebJam', exact: true });
+            await expect(proceed).toBeVisible();
+            await contained(page, proceed);
+            await page.screenshot({ path: testInfo.outputPath(`web-join-private-entry-${width}.png`) });
+            await proceed.focus();
+            const earlyReload = page.waitForResponse(response => new URL(response.url()).pathname === '/join/');
+            await proceed.press('Enter');
+            expect((await earlyReload).status()).toBe(401);
+            await expect(page).toHaveURL(invite);
+            expect(assets).toEqual([]);
+            const opened = context.waitForEvent('page');
+            await page.getByRole('link', { name: 'Open Hang Out in a new tab' }).click();
+            const entry = await opened;
+            await expect(entry).toHaveURL(origin + '/beta/');
+            expect(await entry.evaluate(() => window.opener)).toBeNull();
+            await entry.getByLabel('Invitation code').fill(code);
+            const accepted = entry.waitForResponse(response => new URL(response.url()).pathname === '/beta/unlock');
+            await entry.getByRole('button', { name: 'Enter the community' }).click();
+            expect((await accepted).status()).toBe(200);
+            await expect.poll(async () => (await context.cookies(origin)).some(cookie => cookie.name === '__Host-hangout-beta')).toBe(true);
+            await expect(entry.getByRole('heading', { name: 'You’re on the guest list.' })).toBeVisible();
+            await entry.close();
+            await proceed.focus();
+            const admittedReload = page.waitForResponse(response => new URL(response.url()).pathname === '/join/');
+            await proceed.press('Enter');
+            expect((await admittedReload).status()).toBe(200);
+            await expect(page).toHaveURL(invite);
+            await expect(page.getByRole('heading', { name: 'Check your audio' })).toBeVisible();
+            await expect(page.getByRole('button', { name: 'Join with microphone' })).toBeDisabled();
+            expect(await page.evaluate(() => window.captureCalls)).toBe(0);
+            expect(network.filter(url => url === '/join/')).toHaveLength(3);
+            expect(network.every(url => !url.includes('#'))).toBe(true);
+            expect(external).toEqual([]);
+        } finally { await context.close(); }
+    });
+}
 
 async function contained(page, locator) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
