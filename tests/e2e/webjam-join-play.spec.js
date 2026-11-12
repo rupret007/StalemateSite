@@ -267,6 +267,7 @@ async function openOwnedInvitation(page, width = 390, skipCheck = true) {
       configurable: true,
       value: async () => {
         // Synthetic audio only; never request the tester's microphone.
+        const { closeAudioContext } = await import(new URL('/join/audio.js', location.href).href);
         const context = new AudioContext();
         const output = context.createMediaStreamDestination();
         const { stream } = output;
@@ -280,7 +281,11 @@ async function openOwnedInvitation(page, width = 390, skipCheck = true) {
         }
         for (const track of stream.getTracks()) {
           const stop = track.stop.bind(track);
-          track.stop = () => { stop(); context.close().catch(() => {}); };
+          track.stop = () => {
+            if (track.readyState === 'ended') return;
+            stop();
+            void closeAudioContext(context);
+          };
           window.captureTracks.push(track);
         }
         return stream;
