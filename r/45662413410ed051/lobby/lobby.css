@@ -596,6 +596,21 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 [data-game-invite-link-status]:empty { display: none; }
 .game-guest [data-pane=rooms], .game-guest [data-show=rooms], .game-guest .chat .startroom,
 .game-guest .pmtoggle:has([data-pm-off]), .game-guest [data-four], .game-guest [data-game-arcade] { display: none !important; }
+body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: none; }
+[data-game-guest-connecting].gate {
+  place-items: start center; padding: 32px 20px; background: #101414;
+  color: #eeeeda; font: 16px/1.6 system-ui, sans-serif;
+}
+[data-game-guest-connecting] .gate-card {
+  display: block; width: min(680px, 100%); padding: 0; background: none; border: 0; box-shadow: none;
+}
+[data-game-guest-connecting] .eyebrow {
+  color: var(--lime); font: 11px/1.5 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase;
+}
+[data-game-guest-connecting] h1 {
+  margin: 24px 0; font: 700 clamp(2.6rem, 9vw, 4.5rem)/1 system-ui, sans-serif; letter-spacing: -.06em;
+}
+@media (max-width: 480px) { [data-game-guest-connecting].gate { padding: 24px 16px; } }
 .sheet-buttons .btn { font-size: 12px; }
 [data-call-report-reason] { display: block; width: 100%; margin: 6px 0 12px; padding: 8px;
   resize: vertical; color: var(--cream); background: var(--ink); border: 1px solid var(--control-line); border-radius: 4px; font: inherit; }

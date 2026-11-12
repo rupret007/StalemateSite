@@ -45,6 +45,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const gameGuestQuery = gameGuest ? '?game-guest=1' : '';
     const guestInvitationChanged = gameGuest && history.state?.gameSessionRef && history.state.gameSessionRef !== gameGuest.sessionRef;
     let gameGuestExit = gameGuest && ['left', 'closed', 'removed'].includes(history.state?.gameExit) ? history.state.gameExit : '';
+    let gameGuestSeated = false;
     if (gameGuest) document.body.classList.add('game-guest');
     let gameEntry = betaShell ? gameNightEntry?.(params, location.hash) : null;
 
@@ -682,7 +683,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         entrySourcesSupported = null; drawEntryChoice();
         clearTimeout(retryTimer);
         setConnection(app.me ? 'reconnecting' : 'connecting');
-        if (gameGuest && !app.me) {
+        if (gameGuest && !gameGuestSeated) {
             gateStatus('Joining the game…');
             $('[data-game-guest-retry]').hidden = true;
         }
@@ -833,6 +834,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-session-reason]').textContent = gameGuest ? `${gameGuestExitMessage(reason)} Ask your host for a fresh invitation.` : `${ended} ${next} Cameras are off.`;
         $('[data-session-reentry]').hidden = !betaShell || !!gameGuest;
         $('[data-session-reentry]').textContent = reason === 'left' ? 'Return to community' : 'Return to invitation';
+        if (gameGuest) $('[data-game-guest-connecting]').hidden = true;
         $('[data-session-ended]').hidden = false;
         show('chat'); $('#session-ended-title').focus({ preventScroll: true });
     }
@@ -1072,8 +1074,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             }
             followPendingRoomJoin();
             if (app.restorePmOff) { cmd('pm', ['off']); app.restorePmOff = false; }
-            $('[data-gate]').hidden = true; $('[data-app]').hidden = false;
-            $('[data-game-guest-connecting]').hidden = true;
+            $('[data-gate]').hidden = true;
+            if (gameGuest && !gameGuestSeated) gateStatus('Finding your seat…');
+            else {
+                $('[data-app]').hidden = false;
+                $('[data-game-guest-connecting]').hidden = true;
+            }
             if (!gameGuest && (!wasIn || app.resetSession)) {
                 gameReturn = readGameReturn();
                 gameReturnOffered = !!gameReturn;
@@ -1785,7 +1791,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         table.load().then(mount => {
             table.controller = mount($('[data-game-night]'), (room, state, sendMatch) => arcadeMatchState(game, table, room, state, sendMatch));
             drawArcadeTable(currentGameNight(), game, table);
-        }).catch(() => toast(`${table.label} could not load. Reopen Game Night to try again.`))
+        }).catch(() => {
+            if (gameGuest && !gameGuestSeated) finishArcadeInvitation(`${table.label} could not load. Refresh to try again.`);
+            else toast(`${table.label} could not load. Reopen Game Night to try again.`);
+        })
             .finally(() => { table.loading = false; });
     }
     function beginArcadeInvitation(room, target) {
@@ -1796,13 +1805,23 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function finishArcadeInvitation(message) {
         clearTimeout(arcadeInvitation?.timer);
         arcadeInvitation = null;
-        if (message) toast(message);
+        if (message) {
+            if (gameGuest && !gameGuestSeated) gateStatus(message);
+            else toast(message);
+        }
     }
     function arcadeMatchState(game, table, scope, state, sendMatch) {
         table.invite = scope && state?.seat && state.waiting ? gameNightInvite(game, state.id) : null;
         const invite = arcadeInvitation;
         if (!sendMatch || !invite || game !== invite.game || scope?.room !== invite.room || scope.ref !== invite.ref) return;
-        if (state?.seat && (state.id === invite.match || gameGuest)) return finishArcadeInvitation();
+        if (state?.seat && (state.id === invite.match || gameGuest)) {
+            if (gameGuest && !gameGuestSeated) {
+                gameGuestSeated = true;
+                $('[data-app]').hidden = false;
+                $('[data-game-guest-connecting]').hidden = true;
+            }
+            return finishArcadeInvitation();
+        }
         if (state?.id !== invite.match || !state.waiting) {
             return finishArcadeInvitation('This game invitation no longer has an open seat. Ask the host for a fresh invitation.');
         }
