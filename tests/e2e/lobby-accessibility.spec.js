@@ -7,11 +7,16 @@ const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 const ROOT = '/r/45662413410ed051/lobby/';
 
+// WebKit on macOS uses Option-Tab to include buttons in keyboard navigation.
+function tabKey(page, reverse = false) {
+    const option = process.platform === 'darwin' && page.context().browser()?.browserType().name() === 'webkit';
+    return `${option ? 'Alt+' : ''}${reverse ? 'Shift+' : ''}Tab`;
+}
 async function tabTo(page, target) {
     await expect(target).toBeVisible();
     for (let i = 0; i < 90; i += 1) {
         if (await target.evaluate(element => element === document.activeElement)) return;
-        await page.keyboard.press('Tab');
+        await page.keyboard.press(tabKey(page));
     }
     throw new Error('Visible control was not reachable through the actual Tab sequence');
 }
@@ -307,6 +312,67 @@ test('reduced-motion settings and user-controlled announcements survive keyboard
         await expect(page.locator('[data-buffer]')).toHaveAttribute('aria-live', 'polite');
         expect(visitor.errors).toEqual([]);
     } finally { await visitor.close(); }
+});
+
+test('new messages keep keyboard focus in the conversation when the catch-up button disappears', async ({ browser, baseURL }) => {
+    const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
+    const viewport = { width: 375, height: 667 };
+    const reader = await guest(browser, baseURL, 'CatchUpReader', viewport, relay);
+    let writer;
+    try {
+        writer = await guest(browser, baseURL, 'CatchUpWriter', viewport, relay);
+        const log = reader.page.getByRole('log', { name: 'Conversation' });
+        const composer = reader.page.getByRole('textbox', { name: 'Message', exact: true });
+        const writerInput = writer.page.getByRole('textbox', { name: 'Message', exact: true });
+        for (const [visitor, input] of [[reader, composer], [writer, writerInput]]) {
+            await input.fill('/join #catch-up');
+            await input.press('Enter');
+            await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#catch-up');
+        }
+        const jump = reader.page.getByRole('button', { name: /new message/ });
+        const write = async text => {
+            await writerInput.fill(text);
+            await writerInput.press('Enter');
+            await expect(log).toContainText(text);
+        };
+        const readHistory = async () => {
+            await expect.poll(() => log.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(60);
+            await log.evaluate(element => { element.scrollTop = 0; });
+        };
+        const focusJump = async () => {
+            await expect(jump).toBeVisible();
+            await composer.focus();
+            for (let i = 0; i < 20 && !await jump.evaluate(element => element === document.activeElement); i += 1) {
+                await reader.page.keyboard.press(tabKey(reader.page, true));
+            }
+            await expect(jump).toBeFocused();
+        };
+
+        for (const text of [
+            'The first arrangement starts with a quiet guitar part and adds the drums after the opening bars. I would like to leave space for the vocal before we bring the bass in. We can try an extra bar after the chorus to make the transition easier to hear.',
+            'For the next rehearsal we can check the drum levels first, especially the kick and snare. After that I will play the bridge so we can agree on where the fills should land. I can bring a short backing track to help us keep the same tempo.',
+            'I was listening to the older version and liked the ending where everybody leaves the last chord ringing. We could use that idea again and give the bass a little more room. It also makes a good place to stop and talk through the changes between takes.'
+        ]) await write(text);
+        await readHistory();
+        await write('Latest line after reading scrollback');
+        await focusJump();
+        await reader.page.keyboard.press('Enter');
+        const latest = log.getByRole('listitem').filter({ hasText: 'Latest line after reading scrollback' });
+        await expect(jump).toBeHidden();
+        await expect(latest).toBeFocused();
+        await expect(latest).toBeInViewport();
+
+        await readHistory();
+        await write('Another arrival while reading scrollback');
+        await focusJump();
+        await log.evaluate(element => { element.scrollTop = element.scrollHeight; });
+        await expect(jump).toBeHidden();
+        await expect(log).toBeFocused();
+        expect(reader.errors).toEqual([]);
+    } finally {
+        await writer?.close();
+        await reader.close();
+    }
 });
 
 test('People roster: live joins preserve focused connection identity', async ({ browser, baseURL }) => {

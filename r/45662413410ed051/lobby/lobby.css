@@ -191,6 +191,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .flag { display: inline-grid; place-items: center; vertical-align: middle; min-height: 32px; min-width: 32px; margin: -3px 0; padding: 0; border: 0; background: transparent; font-size: 11px; opacity: .55; }
 .buffer li:hover .flag, .flag:focus-visible { opacity: 1; }
 .jump-new { flex: none; min-height: 36px; background: #263a3d; color: var(--blue); border: 0; border-top: 1px solid #47696c; font: 600 11px var(--mono); }
+.buffer:focus-visible, .buffer li[tabindex="-1"]:focus-visible { outline: 2px solid var(--lime); outline-offset: -2px; }
 .pmreq .req { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; padding: 10px 16px; border-top: 1px solid #6b4053; background: #281c25; }
 .pmreq .req span { margin-right: auto; font-size: 12px; }
 .quick { display: flex; flex: none; gap: 5px; padding: 10px 20px 0; overflow-x: auto; scrollbar-width: none; }
