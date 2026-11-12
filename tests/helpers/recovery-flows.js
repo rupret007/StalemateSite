@@ -11,6 +11,15 @@ async function rummyWithoutStorage(page, url, touch) {
         } });
     });
     await page.goto(url);
+    // Give the storage recovery journey a repeatable opening deal. A random
+    // deal can let the bot knock before the player has a chance to draw.
+    await page.evaluate(() => {
+        let seed = 1;
+        Math.random = () => {
+            seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+            return seed / 0x100000000;
+        };
+    });
     await activate(page.locator('#startRoundBtn'), touch);
     if (await page.locator('#coachSkipBtn').isVisible()) await activate(page.locator('#coachSkipBtn'), touch);
     await expect(page.locator('#drawStockBtn')).toBeEnabled();
