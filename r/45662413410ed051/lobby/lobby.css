@@ -28,7 +28,8 @@ button, input, select { font: inherit; }
 button, summary { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .45; }
 button, input, select { border-radius: 4px; }
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, .toast:focus-visible, [data-people-title]:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, .toast:focus-visible,
+.rooms h2[tabindex="-1"]:focus-visible, [data-people-title]:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
 ::selection { background: var(--lime); color: var(--ink); }
 a { color: var(--blue); text-underline-offset: 3px; }
 h1, h2, h3, p { margin-top: 0; }
@@ -107,6 +108,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .presence h2 { margin: 0 0 5px; font-size: 12px; color: var(--cream); font-weight: 550; }
 .presence p { margin: 0; font-size: 11px; line-height: 1.65; color: var(--muted); }
 .rooms > h2 { display: flex; justify-content: space-between; align-items: center; margin: 0 0 8px; font: 600 10px var(--mono); text-transform: uppercase; letter-spacing: .09em; }
+.rooms h2[tabindex="-1"] { scroll-margin-block: 6px; }
 .count { display: inline-grid; place-items: center; min-width: 21px; min-height: 19px; padding: 1px 5px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); font: 10px var(--mono); }
 .directory-hint { margin: 0 0 12px; font-size: 11px; }
 .directory-controls { display: grid; grid-template-columns: 1fr; gap: 7px; }
@@ -250,6 +252,9 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .game-offer { display: flex; flex: none; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 6px 12px; border-block-end: 1px solid var(--line); background: var(--raised); }
 .game-offer p { flex: 1 1 180px; margin: 0; overflow-wrap: anywhere; color: var(--cream); font-size: 13px; }
 .game-offer .btn { flex: none; }
+/* A pending offer stays until answered. Let the transcript give up height so
+   the composer and Send remain visible above it on a phone. */
+@media (min-height: 451px) { .irc:has(.game-offer:not([hidden])) .buffer { min-height: 48px; } }
 .game-night:has(.four-match[open]) { max-height: 52dvh; }
 .game-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 12px; margin-bottom: 8px; }
 .game-heading .jam-title, .game-heading .game-note { margin: 0; }
@@ -770,10 +775,13 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
   .activity { min-height: 28px; }
   .activity-heading { padding-block: 8px; }
   .buffer { min-height: 0; padding-block: 1px; }
+  .buffer:has(:focus-visible),
   .chat:has(.four-match[open]) .buffer { min-height: 64px; flex-shrink: 0; }
   .game-night:has(.four-match[open]) { min-height: 108px; }
   .buffer li { padding-block: 0; }
+  .buffer .flag { scroll-margin-block: 4px; }
   .say { position: sticky; bottom: 0; z-index: 1; margin-block: 4px; }
+  .chat:has(.buffer :focus-visible) .say,
   .chat:has(.four-match[open]:not([hidden])) .say { position: static; }
   .say input { min-height: 36px; padding-block: 8px; scroll-margin-bottom: 8px; }
   /* Send is shorter than its input. Leave room for the entire composer when

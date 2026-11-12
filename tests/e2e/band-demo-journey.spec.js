@@ -136,7 +136,7 @@ test('Stalemate entry through jam room to connected browser Web Join with few ba
         await inviteBandmate.press('Enter');
         await guestNickname.fill('DemoMate');
         await hostCtx.page.getByRole('button', { name: 'Send invitation', exact: true }).click();
-        await mateCtx.page.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
+        await mateCtx.page.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).click();
         await expect(mateCtx.page.locator('[data-chat-context]')).toHaveText(roomName);
         await expect(mateCtx.page.locator('[data-jam-invite-room]')).toBeHidden();
         await expect.poll(mateCtx.clicks).toBeGreaterThanOrEqual(3);

@@ -33,7 +33,7 @@ test('two visitors can copy an unchanged app invite, with a fallback when clipbo
         await guest.evaluate((channel) => __lobby.cmd('join', [channel]), channel);
         await expect(guest.locator('[data-toast]')).toContainText('invite-only');
         await host.evaluate(() => __lobby.cmd('invite', ['InviteGuest']));
-        await guest.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
+        await guest.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).click();
         await expect(guest.locator('[data-jam]')).toBeVisible();
         await expect(guest.locator('[data-jam-copy]')).toBeHidden();
         await host.fill('[data-jam-link]', INVITE); await host.locator('[data-jam-form] button[type="submit"]').click();
@@ -124,7 +124,7 @@ test('first-invite guidance follows current host power without opening setup hel
         // Commands target the admitted active channel, not a pending room join.
         await expect(host.locator('[data-jam-host-steps]')).toBeVisible();
         await host.evaluate(() => __lobby.cmd('invite', ['SetupPeer']));
-        await peer.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
+        await peer.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).click();
         await expect(host.locator('[data-jam-host-steps]')).toBeInViewport();
         await expect(peer.locator('[data-jam-host-steps]')).toBeHidden();
         await host.evaluate(() => __lobby.cmd('op', ['SetupPeer']));
@@ -157,7 +157,7 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         await expect(host.locator('[data-jam-form] button[type="submit"]')).toBeInViewport();
         const channel = await host.evaluate(() => __lobby.active);
         await host.evaluate(() => __lobby.cmd('invite', ['BrowserGuest']));
-        await guest.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
+        await guest.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).click();
         await expect(guest.locator('[data-jam]')).toBeVisible();
         await expect(guest.locator('[data-jam-web]')).toBeDisabled();
         await expect(guest.locator('[data-jam-form]')).toBeHidden();
@@ -405,13 +405,15 @@ test('a bandmate reaches the jam room within three clicks of opening the copied 
             await bandmate.click('[data-enter]');
         }
         await expect(bandmate.locator('[data-connection]')).toHaveText('Connected');
-        await host.fill('[data-text]', '/invite LinkBandmate');
-        await host.press('[data-text]', 'Enter');
-        const joinToast = bandmate.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true });
-        await expect(joinToast).toBeVisible();
-        await joinToast.click();
+        // The room link and the earlier invitation already admit the bandmate.
+        // A repeated invitation must not ask someone in the room to join it.
         await expect(bandmate.locator('[data-jam]')).toBeVisible();
         await expect(bandmate.locator('[data-chat-context]')).toHaveText(channel);
+        await host.fill('[data-text]', '/invite LinkBandmate');
+        await host.press('[data-text]', 'Enter');
+        await expect(host.locator('[data-buffer]')).toContainText(`Invited LinkBandmate to ${channel}.`);
+        await expect(bandmate.locator('[data-game-offer]')).toBeHidden();
+        await expect(bandmate.locator('[data-toast] button')).toHaveCount(0);
         expect(await bandmate.evaluate(() => window.__bandmateClicks ?? 0)).toBeLessThanOrEqual(3);
         await bandmateContext.close();
     } finally { await f.close(); }
