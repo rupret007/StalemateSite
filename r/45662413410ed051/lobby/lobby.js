@@ -459,7 +459,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let pendingJamShare = null;
     let jamShareResultsSupported = false, jamShareTimer;
     let jamInviteExpiryTimer;
-    let musicInvite = null, musicInviteTimer;
+    let musicInvite = null;
     let pendingMusicHandoff = null, directMusicInvitesSupported = false;
     const jamWaitingCopy = $('[data-jam-wait]').textContent;
     let gameNightSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
@@ -1556,25 +1556,31 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (frame.t === 'music-invite') {
             if (!jamRoomName(frame.ch) || !roomNonce(frame.roomInstance) || typeof frame.by !== 'string'
                 || !Number.isSafeInteger(frame.expires) || frame.expires <= Date.now()) return;
+            clearMusicInviteTimers();
             musicInvite = { id: frame.id, room: frame.ch, instance: frame.roomInstance, from: frame.by, expires: frame.expires, state: 'offer' };
-            clearTimeout(musicInviteTimer);
-            musicInviteTimer = setTimeout(endMusicInvite, Math.min(frame.expires - Date.now(), 600000));
+            musicInvite.expiryTimer = setTimeout(endMusicInvite, Math.min(frame.expires - Date.now(), 600000));
         } else if (musicInvite?.id !== frame.id) return;
         else if (frame.t === 'music-invite-ended') return endMusicInvite();
-        else if (musicInvite.state !== 'joining') return;
+        else if (!['joining', 'unconfirmed'].includes(musicInvite.state)) return;
         else {
             const current = currentJam();
             const link = typeof frame.href === 'string' && browserInviteLink({ webReady: true, web: frame.href });
-            if (!link || current?.name !== musicInvite.room || current.keepRef !== musicInvite.instance
+            if (!link || musicInvite.expires <= Date.now() || current?.name !== musicInvite.room || current.keepRef !== musicInvite.instance
                 || frame.ch !== musicInvite.room || frame.roomInstance !== musicInvite.instance
                 || browserInviteDeadline(link) !== musicInvite.expires) return endMusicInvite();
+            clearTimeout(musicInvite.replyTimer);
             musicInvite.href = link;
             musicInvite.state = 'accepted';
         }
         drawMusicInvite();
     }
+    function clearMusicInviteTimers() {
+        clearTimeout(musicInvite?.expiryTimer);
+        clearTimeout(musicInvite?.replyTimer);
+    }
     function endMusicInvite() {
         if (!musicInvite) return;
+        clearMusicInviteTimers();
         musicInvite.state = 'ended';
         delete musicInvite.href;
         drawMusicInvite();
@@ -1585,33 +1591,45 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const dismiss = $('[data-music-invite-dismiss]');
         const accepted = musicInvite?.state === 'accepted';
         const ended = musicInvite?.state === 'ended';
+        const joining = musicInvite?.state === 'joining';
+        const unconfirmed = musicInvite?.state === 'unconfirmed';
         const current = currentJam();
         panel.hidden = !musicInvite || (accepted && (current?.name !== musicInvite.room || current.keepRef !== musicInvite.instance));
         if (current && !amOp(current) && !current.jam?.web && !current.jam?.desktop && !current.jam?.invitation)
             $('[data-jam-actions]').hidden = accepted && !panel.hidden;
         const message = panel.hidden ? '' : ended ? 'This music invitation ended. Ask the host for a fresh one.'
             : accepted ? 'You’re in the Jam room. Open the audio check when you’re ready.'
+            : unconfirmed ? 'Hang Out hasn’t confirmed your Music invitation. Wait here or ask the host to send a fresh one.'
+            : joining ? 'Waiting for Hang Out to confirm you joined.'
+            : musicInvite.sendFailed ? 'Couldn’t send your reply. Check your connection and try again.'
             : `${musicInvite.from} invited you to play in ${musicInvite.room}.`;
         updateOfferStatus($('[data-music-invite-status]'), $('[data-music-invite-message]'), message);
         if (panel.hidden) return;
-        if (ended && document.activeElement === action) dismiss.focus();
-        action.hidden = ended;
-        action.setAttribute('aria-disabled', String(musicInvite.state === 'joining'));
-        action.textContent = accepted ? 'Open audio check' : musicInvite.state === 'joining' ? 'Joining…' : 'Accept and join';
-        dismiss.textContent = ended ? 'Dismiss' : 'Not now';
+        dismiss.textContent = ended || unconfirmed ? 'Dismiss' : 'Not now';
+        if ((ended || unconfirmed) && document.activeElement === action) dismiss.focus();
+        action.hidden = ended || unconfirmed;
+        action.setAttribute('aria-disabled', String(joining));
+        action.textContent = accepted ? 'Open audio check' : joining ? 'Joining…' : 'Accept and join';
     }
     $('[data-music-invite-action]').addEventListener('click', () => {
         const offer = musicInvite;
         if (!offer || offer.expires <= Date.now()) return endMusicInvite();
         if (offer.state === 'accepted' && !$('[data-music-invite]').hidden) {
             window.open(offer.href, '_blank', 'noopener,noreferrer');
-        } else if (offer.state === 'offer' && send({ t: 'music-invite-accept', ch: offer.room, roomInstance: offer.instance, id: offer.id })) {
-            offer.state = 'joining';
+        } else if (offer.state === 'offer') {
+            if (send({ t: 'music-invite-accept', ch: offer.room, roomInstance: offer.instance, id: offer.id })) {
+                offer.state = 'joining';
+                offer.replyTimer = setTimeout(() => {
+                    if (musicInvite !== offer || offer.state !== 'joining') return;
+                    offer.state = 'unconfirmed';
+                    drawMusicInvite();
+                }, 10000);
+            } else offer.sendFailed = true;
             drawMusicInvite();
         }
     });
     $('[data-music-invite-dismiss]').addEventListener('click', () => {
-        clearTimeout(musicInviteTimer);
+        clearMusicInviteTimers();
         musicInvite = null;
         drawMusicInvite();
         focusChannelTab(app.active);
@@ -1622,7 +1640,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         for (const c of app.chans.values()) if (c.kind === 'jam') c.jam = null;
         jamContext = null;
         closeMusicHandoff();
-        clearTimeout(musicInviteTimer);
+        clearMusicInviteTimers();
         musicInvite = null;
         drawMusicInvite();
         resetJamControls();
