@@ -323,8 +323,10 @@ async function betaRequest(request, env, deps = {}) {
         return json({ error: 'Unknown request.' }, 404);
     }
     const gameGuestRequested = url.searchParams.get('game-guest') === '1';
+    const gameGuestsAvailable = gameGuestEnabled(env);
+    if (gameGuestRequested && !gameGuestsAvailable) return reply('Game invitations are unavailable.', 404);
     const session = await betaSession(request, env, Date.now(), { gameGuest: gameGuestRequested })
-        || !gameGuestRequested && ['GET', 'HEAD'].includes(request.method) && gameGuestAsset(assetPath)
+        || gameGuestsAvailable && !gameGuestRequested && ['GET', 'HEAD'].includes(request.method) && gameGuestAsset(assetPath)
             && await betaSession(request, env, Date.now(), { gameGuest: true });
     if (!session) {
         if (gameGuestRequested && assetPath === LOBBY_PAGE) return reply('Your Game Night access expired. Ask your host for a new invitation.', 401);
@@ -343,7 +345,8 @@ async function betaRequest(request, env, deps = {}) {
         }
         return reply('Private invitation required. Open your invitation link.', 401);
     }
-    const guest = session.access.gameGuest;
+    const guest = session.access.scope === 'game-night' && gameGuestScope(session.access.gameGuest);
+    if (session.access.scope === 'game-night' && !guest) return reply('This game invitation could not be confirmed.', 403);
     if (guest && !(url.pathname === '/lobby' || url.pathname === '/beta/bootstrap.js' || url.pathname === '/beta/state'
         || arcadePath(url.pathname) && arcadeGame(url.pathname) === guest.game
         || ['GET', 'HEAD'].includes(request.method) && (assetPath === LOBBY_PAGE || gameGuestAsset(assetPath)))) {

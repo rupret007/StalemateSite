@@ -1,7 +1,6 @@
 // Real beta admission is separate from the pilot's synthetic test identities.
 import { accountId, hmacKeyOk, roleForEmail } from './auth.mjs';
 import { BETA_TTL, registryRequest } from './beta-session-client.mjs';
-import { gameGuestEnabled, gameGuestScope } from './game-night-invitations.mjs';
 export { BETA_TTL } from './beta-session-client.mjs';
 
 const enc = new TextEncoder();
@@ -50,10 +49,8 @@ export class BetaSessionUnavailable extends Error {
     constructor(message, status = 503) { super(message); this.status = status; }
 }
 export async function betaSession(request, env, now = Date.now(), { allowRevoked = false, gameGuest = false } = {}) {
-    if (gameGuest && !gameGuestEnabled(env)) return null;
     const access = await readBeta('access', cookie(request, gameGuest ? GAME_GUEST_COOKIE : BETA_COOKIE), env.HANGOUT_HMAC_KEY, now);
-    if (!access || access.scope !== (gameGuest ? 'game-night' : 'guest') || access.version !== String(env.HANGOUT_BETA_INVITE_VERSION || '1')
-        || gameGuest && !gameGuestScope(access.gameGuest)) return null;
+    if (!access || access.scope !== (gameGuest ? 'game-night' : 'guest') || access.version !== String(env.HANGOUT_BETA_INVITE_VERSION || '1')) return null;
     let checked;
     try { checked = await registryRequest(env, 'check', { sid: access.sid, exp: access.exp, version: access.version, allowRevoked }); }
     catch { throw new BetaSessionUnavailable('Beta session registry is unavailable.'); }
