@@ -1352,13 +1352,20 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         else if (!replaying && !l.event) { belowFold += 1; drawNewMessages(); }
     }
 
-    function drawNewMessages() {
-        const b = $('[data-new-messages]'); b.hidden = belowFold === 0;
+    function drawNewMessages(focusTarget) {
+        const b = $('[data-new-messages]');
+        if (belowFold === 0 && document.activeElement === b) {
+            const target = focusTarget || $('[data-buffer]');
+            target.tabIndex = -1;
+            target.focus({ preventScroll: true });
+        }
+        b.hidden = belowFold === 0;
         b.textContent = `${belowFold} new message${belowFold === 1 ? '' : 's'} ↓`;
     }
     $('[data-new-messages]').addEventListener('click', () => {
-        const buf = $('[data-buffer]'); buf.scrollTop = buf.scrollHeight;
-        belowFold = 0; drawNewMessages();
+        const buf = $('[data-buffer]');
+        belowFold = 0; drawNewMessages(buf.querySelector('li:last-child'));
+        buf.scrollTop = buf.scrollHeight;
     });
     $('[data-buffer]').addEventListener('scroll', () => {
         const buf = $('[data-buffer]');
