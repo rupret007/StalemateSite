@@ -289,9 +289,10 @@
                         <p class="small" data-act-video-status role="status" hidden></p>
                         <button class="btn btn--small" type="button" data-act-tap hidden>Tap to play</button>
                         <form class="act-load op-only" data-act-load>
-                            <input data-act-url placeholder="Paste a YouTube link" aria-label="YouTube URL">
+                            <input data-act-url placeholder="Paste a YouTube link" aria-label="YouTube URL" aria-describedby="activity-lesson-status">
                             <button class="btn btn--small" type="submit">Load</button>
                         </form>
+                        <p class="small op-only act-load-status" data-act-load-status id="activity-lesson-status" role="status" aria-atomic="true"></p>
                         <div class="bob-picks op-only" data-bob-picks></div>
                         <details class="paint-start" data-paint-start hidden>
                             <summary>Getting started · kit and materials</summary>
