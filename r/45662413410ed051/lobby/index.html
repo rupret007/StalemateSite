@@ -212,19 +212,6 @@
                 <span class="modes" data-modes></span>
                 <button class="btn btn--small btn--ghost" type="button" data-cam aria-pressed="false">📷 Camera (18+)</button>
                 <button class="btn btn--small btn--ghost op-only" type="button" data-roomtools>@ Host tools</button>
-                <select class="btn btn--small btn--ghost arcade-game-picker" data-arcade-game aria-label="Switch game" hidden>
-                    <option value="">Games</option>
-                    <option value="four">Four in a Row</option>
-                    <option value="chess" hidden disabled>Royal Flush Chess</option>
-                    <option value="crapeights" hidden disabled>Crappy Eights</option>
-                    <option value="turdrummy" hidden disabled>TurdRummy</option>
-                    <option value="turdspades" hidden disabled>TurdSpades</option>
-                    <option value="turdjack" hidden disabled>Crapjack 21</option>
-                    <option value="turdtris" hidden disabled>Turdtris Sprint</option>
-                    <option value="turdomania" hidden disabled>Turdomania Duel</option>
-                    <option value="turdrush" hidden disabled>Turd Rush Race</option>
-                    <option value="turdanoid" hidden disabled>Turdanoid Brick Race</option>
-                </select>
                 <button class="btn btn--small btn--ghost" type="button" data-call-toggle aria-expanded="false" aria-controls="game-night-call" hidden>Call</button>
                 <button class="btn btn--small btn--ghost" type="button" data-leave>Leave</button>
                 <span class="small host-status" data-host-status></span>
@@ -241,6 +228,23 @@
                     <p class="sr-only" role="status" data-four-availability></p>
                 </div>
                 <div class="jam-actions game-actions">
+                    <select class="btn btn--small arcade-game-picker" data-arcade-game aria-label="Switch game" hidden>
+                        <option value="">Choose a game</option>
+                        <optgroup label="Games you can invite friends to">
+                            <option value="chess" hidden disabled>Royal Flush Chess</option>
+                            <option value="crapeights" hidden disabled>Crappy Eights</option>
+                            <option value="turdrummy" hidden disabled>TurdRummy</option>
+                            <option value="turdspades" hidden disabled>TurdSpades</option>
+                            <option value="turdjack" hidden disabled>Crapjack 21</option>
+                            <option value="turdtris" hidden disabled>Turdtris Sprint</option>
+                            <option value="turdomania" hidden disabled>Turdomania Duel</option>
+                            <option value="turdrush" hidden disabled>Turd Rush Race</option>
+                            <option value="turdanoid" hidden disabled>Turdanoid Brick Race</option>
+                        </optgroup>
+                        <optgroup label="For players already in the room">
+                            <option value="four">Four in a Row</option>
+                        </optgroup>
+                    </select>
                     <button class="btn btn--small" type="button" data-game-invite hidden>Invite players</button>
                     <button class="btn btn--small btn--ghost" type="button" data-game-share hidden>Room address</button>
                     <a class="btn btn--small btn--ghost" data-game-arcade href="https://stalemate.band/play/" target="_blank" rel="noopener noreferrer" aria-describedby="game-arcade-tab-note"><span data-game-arcade-label>Open Stalemate Arcade</span> <span aria-hidden="true">↗</span></a>
@@ -250,7 +254,7 @@
                 <details class="four-match" data-four hidden>
                     <summary>
                         <span class="four-summary">
-                            <span>Four in a Row</span>
+                            <span>Four in a Row <small class="four-room-only" hidden>Room game</small></span>
                             <span class="four-seats" data-four-seats hidden>
                                 <span class="four-seat" data-seat="X"><b>X</b><span data-four-player="X"></span></span>
                                 <span class="four-seat" data-seat="O"><b>O</b><span data-four-player="O"></span></span>

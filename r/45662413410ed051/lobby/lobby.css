@@ -262,6 +262,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .game-night .four-match summary { width: 100%; min-height: 34px; padding: 8px 2px; color: var(--cream); }
 .four-summary { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; width: calc(100% - 16px); vertical-align: middle; }
 .four-summary > :first-child { flex: none; font-weight: 650; }
+.four-room-only { margin-inline-start: 6px; color: var(--muted); font-weight: 400; }
 .four-seats { display: inline-flex; min-width: 0; gap: 6px; }
 .four-seat { display: inline-flex; align-items: center; gap: 4px; min-width: 0; color: var(--muted); font: 10px var(--mono); }
 .four-seat b { font-size: 12px; }
@@ -284,7 +285,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .four-board td[data-mark="O"] { color: var(--blue); background: #17282b; }
 .four-board td[data-last] { border-color: #7d8877; }
 .four-board td[data-winning] { border-color: currentColor; }
-.arcade-game-picker { max-width: 9.5rem; min-width: 0; }
+.game-actions .arcade-game-picker { min-height: 44px; padding-inline-end: 24px; font: inherit; font-weight: 700; }
 .game-night:has(.arcade-card-table[open]) { max-height: 68dvh; overscroll-behavior: contain; overflow-anchor: none; }
 .arcade-card-table { margin: 6px 0; border-block: 1px solid var(--line); padding: 4px 0 8px; }
 .arcade-card-table summary { display: list-item; min-height: 34px; padding: 6px 2px; font-weight: 650; color: var(--cream); }
@@ -331,8 +332,6 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .game-night:has(.arcade-card-table[open]) > .arcade-brick-race:not([open]) { grid-area: brick; }
 }
 @media (max-width: 900px) {
-  .roombar:has([data-arcade-game]:not([hidden])) .modes { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .roombar .arcade-game-picker { width: 5.1rem; padding-inline: 6px; font-size: 11px; }
   .chat:has(.arcade-card-table[open] [data-card-table]:not([hidden])) .buffer { min-height: 46px; padding-block: 4px; }
   .chat:has(.arcade-card-table[open] [data-card-table]:not([hidden])) .quick { display: none; }
   .chat:has(.arcade-card-table[open] [data-card-table]:not([hidden])) .roombar { padding: 4px 10px; }

@@ -680,6 +680,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await enterFromShell(host, radDad ? 'RadDadHost' : 'PreviewHost', true);
                 await expect(host.locator('[data-entry-label]').first()).toHaveText(`via ${brand}`);
                 await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
+                const gamePicker = host.locator('.game-actions').getByRole('combobox', { name: 'Switch game' });
+                await expectUncoveredControl(gamePicker);
+                await expect(gamePicker).toHaveValue('');
+                const inviteGames = gamePicker.locator('optgroup[label="Games you can invite friends to"]');
+                await expect(inviteGames.locator('option:enabled')).toHaveCount(9);
+                await expect(gamePicker.locator('optgroup[label="For players already in the room"] option')).toHaveText('Four in a Row');
+                await expect(host.locator('.four-room-only')).toBeVisible();
                 const invitePlayers = host.getByRole('button', { name: 'Invite players', exact: true });
                 await invitePlayers.click();
                 const invitePicker = host.locator('[data-invite-dialog]');
@@ -692,7 +699,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(address.getByText('Players with a room invitation can use this address.', { exact: false })).toBeVisible();
                 await captureArcadeInvite(host, viewport, step('02b-room-address'), [address.getByLabel('Room address')]);
                 await address.getByRole('button', { name: 'Done' }).click();
-                await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
+                await gamePicker.selectOption('chess');
                 await host.getByRole('button', { name: 'Open Chess match' }).click();
                 await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
                 const link = await shareGameNightLink(host, viewport, step('02-share'), async newGuest => {
