@@ -7,11 +7,16 @@ const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 const ROOT = '/r/45662413410ed051/lobby/';
 
+// WebKit on macOS uses Option-Tab to include buttons in keyboard navigation.
+function tabKey(page, reverse = false) {
+    const option = process.platform === 'darwin' && page.context().browser()?.browserType().name() === 'webkit';
+    return `${option ? 'Alt+' : ''}${reverse ? 'Shift+' : ''}Tab`;
+}
 async function tabTo(page, target) {
     await expect(target).toBeVisible();
     for (let i = 0; i < 90; i += 1) {
         if (await target.evaluate(element => element === document.activeElement)) return;
-        await page.keyboard.press('Tab');
+        await page.keyboard.press(tabKey(page));
     }
     throw new Error('Visible control was not reachable through the actual Tab sequence');
 }
@@ -337,9 +342,8 @@ test('new messages keep keyboard focus in the conversation when the catch-up but
         const focusJump = async () => {
             await expect(jump).toBeVisible();
             await composer.focus();
-            const previousTab = process.platform === 'darwin' && browser.browserType().name() === 'webkit' ? 'Alt+Shift+Tab' : 'Shift+Tab';
             for (let i = 0; i < 20 && !await jump.evaluate(element => element === document.activeElement); i += 1) {
-                await reader.page.keyboard.press(previousTab);
+                await reader.page.keyboard.press(tabKey(reader.page, true));
             }
             await expect(jump).toBeFocused();
         };
