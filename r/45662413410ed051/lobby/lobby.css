@@ -235,6 +235,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .jam-title { margin: 0 0 4px; font-size: 14px; }
 .jam-note { margin: 0 0 6px; }
 .jam-room-invite { margin-bottom: 8px; }
+.jam-room-invite[aria-disabled="true"] { color: var(--muted); cursor: default; }
 .jam-room-invite:focus-visible { outline-offset: -5px; }
 .jam-host-steps { margin: 0 0 8px; padding-left: 20px; overflow-wrap: anywhere; }
 .jam-host-steps strong { color: var(--cream); }

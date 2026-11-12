@@ -193,11 +193,16 @@ test('only the selected guest can accept a music invitation and open the audio c
         });
         const callback = await host.context().newPage();
         await callback.goto('/join/handoff.html');
+        const musicButton = host.getByRole('button', { name: 'Invite bandmate to Music' });
         async function returnInvite(href) {
-            await host.getByRole('button', { name: 'Invite bandmate to Music' }).click();
+            await musicButton.click();
             await host.getByRole('button', { name: 'Invite ChosenGuest', exact: true }).click();
             const request = await host.evaluate(() => window.musicRequest);
             expect(request).toMatch(/^[a-f0-9]{32}$/);
+            await musicButton.press('Enter');
+            await expect(host.getByRole('dialog', { name: 'Invite a guest' })).toBeHidden();
+            await expect(musicButton).toBeDisabled();
+            expect(await host.evaluate(() => window.musicRequest)).toBe(request);
             return callback.evaluate(({ request, href }) => new Promise(resolve => {
                 const channel = new BroadcastChannel(`webjam-music-${request}`);
                 const timer = setTimeout(() => { channel.close(); resolve('timed out'); }, 4000);
@@ -209,8 +214,10 @@ test('only the selected guest can accept a music invitation and open the audio c
         expect(await returnInvite(invite.replace(/&e=\d+$/, '&e=1'))).toBe(false);
         await expect(panel).toBeHidden();
         await expect(host.locator('[data-toast]')).toContainText('Music invitation couldn’t be sent.');
+        await expect(musicButton).toBeEnabled();
         expect(await returnInvite(invite)).toBe(true);
         await expect(host.locator('[data-toast]')).toContainText('Music invitation sent.');
+        await expect(musicButton).toBeEnabled();
         await expect(panel).toContainText('MusicHost invited you to play');
         await expect(guestStatus).toHaveText(`MusicHost invited you to play in ${room}.`);
         await expect(guest.locator('[data-text]')).toBeFocused();

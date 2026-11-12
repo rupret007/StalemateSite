@@ -2477,7 +2477,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     $('[data-jam-invite-room]').addEventListener('click', event => {
         if (event.currentTarget.getAttribute('aria-disabled') !== 'true') openInviteDialog(event.currentTarget);
     });
-    $('[data-jam-invite-music]').addEventListener('click', event => openInviteDialog(event.currentTarget, true));
+    $('[data-jam-invite-music]').addEventListener('click', event => {
+        if (!pendingMusicHandoff) openInviteDialog(event.currentTarget, true);
+    });
     $('[data-invite-cancel]').addEventListener('click', closeInviteDialog);
     $('[data-invite-quick-cancel]').addEventListener('click', closeInviteDialog);
     $('[data-invite-dialog]').addEventListener('close', () => {
@@ -2497,6 +2499,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         clearTimeout(pendingMusicHandoff.timer);
         pendingMusicHandoff.channel.close();
         pendingMusicHandoff = null;
+        $('[data-jam-invite-music]').removeAttribute('aria-disabled');
     }
     function finishMusicHandoff(sent) {
         pendingMusicHandoff.channel.postMessage({ returned: sent });
@@ -2504,7 +2507,6 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         toast(sent ? 'Music invitation sent.' : 'Music invitation couldn’t be sent. Try again from your Jam room.');
     }
     function startMusicHandoff(room, context) {
-        closeMusicHandoff();
         const request = crypto.randomUUID().replaceAll('-', '');
         const channel = new BroadcastChannel(`webjam-music-${request}`);
         const handoff = {
@@ -2514,6 +2516,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             }, 90000)
         };
         pendingMusicHandoff = handoff;
+        $('[data-jam-invite-music]').setAttribute('aria-disabled', 'true');
         channel.onmessage = ({ data }) => {
             if (pendingMusicHandoff !== handoff || handoff.submitted || typeof data?.href !== 'string') return;
             const current = currentJam();
