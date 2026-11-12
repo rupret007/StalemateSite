@@ -340,7 +340,11 @@ export function mountArcadeChess(container, onMatch) {
     });
     return {
         isOpen: () => panel.open,
-        open: () => { if (scope) panel.open = true; },
+        open() {
+            if (!scope) return;
+            panel.open = true;
+            return panel;
+        },
         setRoom(next) {
             if (scope?.room === next?.room && scope?.ref === next?.ref && scope?.actor === next?.actor) return;
             stop(); scope = next;

@@ -1831,8 +1831,29 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const game = event.target.value;
         event.target.value = '';
         if (!currentGameNight() || !game) return;
-        if (game === 'four' && !$('[data-four]').hidden) $('[data-four]').open = true;
-        else arcadeTables.get(game)?.controller?.open();
+        const four = game === 'four' ? $('[data-four]:not([hidden])') : null;
+        const controller = arcadeTables.get(game)?.controller;
+        const wasOpen = four?.open || controller?.isOpen();
+        const panel = four || controller?.open();
+        if (!panel) return;
+        if (four) four.open = true;
+        const heading = panel.querySelector('summary');
+        heading.focus({ preventScroll: true });
+        const reveal = () => {
+            const target = panel.offsetHeight < panel.parentElement.clientHeight ? panel : heading;
+            target.scrollIntoView({ block: 'center', behavior: 'instant' });
+        };
+        reveal();
+        // Some games reset the scroll position as their panel opens.
+        if (!wasOpen) panel.addEventListener('toggle', () => {
+            if (panel.open && document.activeElement === heading) reveal();
+        }, { once: true });
+        // The start controls can appear after the match service responds.
+        const resize = new ResizeObserver(() => {
+            if (panel.open && document.activeElement === heading) reveal();
+        });
+        resize.observe(panel);
+        heading.addEventListener('blur', () => resize.disconnect(), { once: true });
     });
     window.addEventListener('pagehide', () => {
         const current = currentGameNight();
