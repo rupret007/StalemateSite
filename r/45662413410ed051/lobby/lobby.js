@@ -1373,6 +1373,19 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function browserInviteLink(context) {
         return context?.webReady && /^https:\/\//.test(context.web) ? context.web : '';
     }
+    function browserInvitesInMessage(value) {
+        const links = new Set();
+        for (const word of value.split(/\s+/)) {
+            const candidate = word.replace(/^[<("'\x60]+|[>")'\x60.,;!?]+$/g, '');
+            if (!/^https:\/\//i.test(candidate)) continue;
+            try {
+                const url = new URL(candidate);
+                if (url.pathname === '/join/' && url.hash.startsWith('#k=')
+                    && !url.search && !url.username && !url.password) links.add(url.href);
+            } catch { /* The token is not an invite URL. */ }
+        }
+        return links;
+    }
     function followPendingRoomJoin() {
         const room = app.pendingRoomJoin;
         if (!room || connectionState !== 'connected' || sessionEnded || app.localMediaPaused || app.sharingStopped) return;
@@ -2341,12 +2354,21 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const c = currentJam(), input = $('[data-jam-link]');
         if (!c || jamContext?.room !== c || !jamContext.host || !amOp(c)) { clearPendingJamShare(); input.value = ''; return; }
         if (pendingJamShare?.requestId) return; // requestSubmit() must respect the same one-in-flight bound.
-        // Copy browser invite produces one HTTPS URL. Only route that explicit
-        // paste to the existing server-gated browser hook; keep complete
-        // desktop invitations, including sealed replies, byte-for-byte.
-        const value = input.value, web = /^https:\/\//i.test(value.trim());
-        if (!value) return;
-        let sharedValue = web ? value.trim() : value;
+        const value = input.value, trimmed = value.trim();
+        if (!trimmed) return;
+        let webLink = /^https:\/\//i.test(trimmed) && !/\s/.test(trimmed) ? trimmed : '';
+        // Leave complete desktop invitations and their sealed replies untouched.
+        if (!webLink && !/webjam:\/\//i.test(trimmed)) {
+            const links = browserInvitesInMessage(trimmed);
+            if (links.size > 1) {
+                $('[data-jam-share-status]').textContent = 'Paste just one browser invite link.';
+                input.focus();
+                return;
+            }
+            [webLink = ''] = links;
+        }
+        const web = !!webLink;
+        let sharedValue = webLink || value;
         // Match the server's URL spelling only for confirmation. This does
         // not approve an origin or rewrite an opaque desktop invitation.
         if (web) try { sharedValue = new URL(sharedValue).href; } catch { /* The server supplies the rejection. */ }
@@ -2358,7 +2380,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         pendingJamShare = { room: c, context: jamContext, value, sharedValue, web, requestId, confirmed: false, deadline: Date.now() + 8000 };
         // Retain the paste until current room state confirms it. Rejection
         // leaves it editable; disconnect/room/power/Stop fences still purge it.
-        const args = [web ? 'web' : 'invitation', web ? value.trim() : value];
+        const args = [web ? 'web' : 'invitation', webLink || value];
         const sent = requestId ? send({ t: 'cmd', name: 'jamlink', args, ch: c.name, roomInstance: c.keepRef, jamRequestId: requestId }) : cmd('jamlink', args, c.name);
         if (!sent) { clearPendingJamShare(); $('[data-jam-share-status]').textContent = 'Share was not sent. Your paste is kept.'; }
         else if (requestId && pendingJamShare?.requestId === requestId) waitForJamShare(pendingJamShare);

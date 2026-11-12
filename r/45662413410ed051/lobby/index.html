@@ -245,8 +245,8 @@
                 </ol>
                 <div class="jam-actions" data-jam-actions>
                     <a class="btn" data-jam-desktop href="#" hidden>Open in WebJam 🎸</a>
-                    <button class="btn" type="button" data-jam-copy hidden>Copy full invitation</button>
-                    <button class="btn" type="button" data-jam-invite-copy hidden>Copy invite link</button>
+                    <button class="btn" type="button" data-jam-copy hidden>Copy desktop invite</button>
+                    <button class="btn" type="button" data-jam-invite-copy hidden>Copy browser invite</button>
                     <span class="small" data-jam-wait>Waiting for the host’s invite. When it’s ready, choose Join in browser—no app needed.</span>
                     <button class="btn btn--ghost" type="button" data-jam-web disabled title="Your host has not shared an approved browser invite yet">Browser join unavailable</button>
                     <button class="btn btn--ghost" type="button" data-jam-invite-qr-toggle hidden aria-expanded="false">Show QR code</button>
@@ -262,7 +262,7 @@
                     <textarea data-jam-invite-copy-value readonly aria-label="Browser invite link to copy" autocomplete="off" spellcheck="false" rows="2"></textarea>
                 </label>
                 <form class="jam-paste op-only" data-jam-form>
-                    <textarea data-jam-link placeholder="Paste a full desktop invite or browser link" aria-label="WebJam invitation" aria-describedby="jam-host-steps jam-share-help" autocomplete="off" spellcheck="false" maxlength="8192" rows="2"></textarea>
+                    <textarea data-jam-link placeholder="Paste an invite link or the whole message" aria-label="WebJam invitation" aria-describedby="jam-host-steps jam-share-help" autocomplete="off" spellcheck="false" maxlength="8192" rows="2"></textarea>
                     <button class="btn btn--small" type="submit">Share</button>
                     <p class="small" id="jam-share-help">Paste that link here and click <strong>Share</strong>. Keep the Music session running. For a desktop guest, paste the full desktop invite instead.</p>
                     <p class="small" data-jam-share-status role="status"></p>

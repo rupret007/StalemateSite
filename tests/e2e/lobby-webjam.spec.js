@@ -116,6 +116,41 @@ const paste = async (page, value) => {
     await page.locator('[data-jam-form] button[type="submit"]').click();
 };
 
+test('a host can share a browser invite pasted with its surrounding message', async ({ browser, baseURL }) => {
+    const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });
+    try {
+        const host = await f.join('PasteHost');
+        const guest = await f.join('PasteGuest');
+        await host.click('[data-show="rooms"]');
+        await host.click('[data-start="jam"]');
+        await host.getByRole('button', { name: 'Invite bandmate to room' }).click();
+        await host.locator('[data-invite-options]').selectOption({ label: 'PasteGuest' });
+        await host.locator('[data-invite-person-send]').click();
+        await guest.locator('[data-game-offer]').getByRole('button', { name: 'Join room' }).click();
+        await expect(guest.locator('[data-jam-web]')).toBeDisabled();
+
+        const forwarded = `Join me for Music:\n<${WEB_INVITE}>\nSee you there.`;
+        await paste(host, forwarded);
+        await expect(guest.getByRole('button', { name: 'Join in browser' })).toBeEnabled();
+        await expect(host.locator('[data-jam-link]')).toHaveValue('');
+        await guest.getByRole('button', { name: 'Join in browser' }).click();
+        expect(await guest.evaluate(() => window.browserOpens)).toEqual([[WEB_INVITE, '_blank', 'noopener,noreferrer']]);
+        expect(await guest.evaluate(() => window.audioRequests)).toBe(0);
+
+        const other = WEB_INVITE.replace('synthetic_browser_capability', 'other_fixture');
+        const ambiguous = `Two invites:\n${WEB_INVITE}\n${other}`;
+        await paste(host, ambiguous);
+        await expect(host.locator('[data-jam-share-status]')).toHaveText('Paste just one browser invite link.');
+        await expect(host.locator('[data-jam-link]')).toHaveValue(ambiguous);
+        await expect(host.locator('[data-jam-link]')).toBeFocused();
+        await guest.getByRole('button', { name: 'Join in browser' }).click();
+        expect(await guest.evaluate(() => window.browserOpens)).toEqual([
+            [WEB_INVITE, '_blank', 'noopener,noreferrer'], [WEB_INVITE, '_blank', 'noopener,noreferrer']
+        ]);
+        expect(f.external).toEqual([]);
+    } finally { await f.close(); }
+});
+
 test('first-invite guidance follows current host power without opening setup help', async ({ browser, baseURL }) => {
     const f = await browserRoom(browser, baseURL, true, { width: 1440, height: 900 });
     try {
@@ -173,6 +208,8 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         await paste(host, ` \n${WEB_INVITE}\n `);
         await expect(host.locator('[data-jam-web]')).toBeEnabled();
         await expect(guest.locator('[data-jam-web]')).toBeEnabled();
+        await expect(host.getByRole('button', { name: 'Copy desktop invite', exact: true })).toBeVisible();
+        await expect(host.getByRole('button', { name: 'Copy browser invite', exact: true })).toBeVisible();
         await expect(guest.locator('[data-jam-web]')).toHaveAttribute('title', /headphones and audio consent/);
         await expect(guest.locator('[data-jam-wait]')).toBeHidden();
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
