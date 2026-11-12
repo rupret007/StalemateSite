@@ -973,7 +973,7 @@ const fixtureWorker = fileURLToPath(new URL('./lobby-session-authority/worker.mj
 async function bundleRollbackSource(revision) {
     const previous = join(directory, 'previous-source');
     await mkdir(previous);
-    const archive = execFileSync('git', ['archive', revision, 'hangout-worker/src', 'r/45662413410ed051', 'package-lock.json'],
+    const archive = execFileSync('git', ['archive', revision, 'hangout-worker', 'r/45662413410ed051', 'package-lock.json'],
         { cwd: app, maxBuffer: 32 * 1024 * 1024 });
     execFileSync('tar', ['-x', '-C', previous], { input: archive });
     assert.deepEqual(await readFile(join(previous, 'package-lock.json')), await readFile(join(app, 'package-lock.json')),
