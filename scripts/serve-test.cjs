@@ -100,6 +100,7 @@ async function main() {
             previewKey: 'local-preview-key-0001',
             devAdminKey: process.env.HANGOUT_DEV_ADMIN_KEY || 'local-dev-admin-key-0001',
             origins: origin,
+            directMusicInvites: namespace.startsWith('webjam-browser-music-'),
             lobbyLimits: { pmMinLobbyMs: 1500,
                 // Synthetic browser-invitation fixture on this loopback server
                 // only. No production origin or Web Join provider is enabled.
