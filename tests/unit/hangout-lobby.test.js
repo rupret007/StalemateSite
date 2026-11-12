@@ -57,9 +57,17 @@ it('tracks a room invitation only between the original host and guest, and expir
     send(guest, { t: 'room-invite-answer', request: accepted, accept: true });
     expect(got(guest).some(m => m.t === 'join' && m.ch.name === ch)).toBe(true);
     expect(got(host)).toContainEqual({ t: 'room-invite-result', request: accepted, status: 'accepted' });
-    cmd(guest, 'part', [], ch);
-    cmd(guest, 'join', [ch]);
-    expect(got(guest).filter(m => m.t === 'join' && m.ch.name === ch)).toHaveLength(1);
+    L.disconnect(guest.id);
+    const otherDevice = join(guest.nick, { dev: 'other-device' });
+    cmd(otherDevice, 'join', [ch]);
+    expect(got(otherDevice).some(m => m.t === 'join' && m.ch.name === ch)).toBe(false);
+    L.disconnect(otherDevice.id);
+    const returning = join(guest.nick);
+    cmd(returning, 'join', [ch]);
+    expect(got(returning).some(m => m.t === 'join' && m.ch.name === ch)).toBe(true);
+    cmd(returning, 'part', [], ch);
+    cmd(returning, 'join', [ch]);
+    expect(got(returning).filter(m => m.t === 'join' && m.ch.name === ch)).toHaveLength(1);
 });
 
 it('lets the same live guest accept a pending room invitation after engine recovery', () => {
