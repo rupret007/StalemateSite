@@ -1031,7 +1031,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             const c = app.chans.get(m.ch.name);
             if (c) {
                 Object.assign(c, m.ch);
-                const jamDraft = confirmJamShare(c);
+                const jamDraft = confirmJamShare(c, m.ch.jam);
                 if (app.active === c.name) drawChan();
                 // An own-share confirmation changes the room's invitation
                 // context. Keep a newer edit through that synchronous redraw,
@@ -1335,10 +1335,20 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         clearTimeout(jamShareTimer);
         $('[data-jam-form] button[type="submit"]').disabled = true;
         $('[data-jam-share-status]').textContent = 'Waiting for confirmation. You can edit the next paste.';
+        // If room state arrives late, give the following result frame a moment
+        // to arrive before using the observed state to unlock the editor.
+        const delay = Math.max(pending.roomStateObserved ? 250 : 0, pending.deadline - Date.now());
         jamShareTimer = setTimeout(() => {
-            if (pendingJamShare === pending && currentJam() === pending.room && amOp(pending.room))
-                $('[data-jam-share-status]').textContent = 'Still waiting. Your edit is kept; copy it before leaving or reconnecting.';
-        }, Math.max(0, pending.deadline - Date.now()));
+            if (pendingJamShare !== pending || pending.context !== jamContext
+                || currentJam() !== pending.room || !amOp(pending.room)) return;
+            const status = $('[data-jam-share-status]');
+            if (pending.roomStateObserved) {
+                clearPendingJamShare();
+                status.textContent = 'Invitation is available in the room. Your paste is kept.';
+            } else {
+                status.textContent = 'Still waiting. Your edit is kept; copy it before leaving or reconnecting.';
+            }
+        }, delay);
     }
     function jamShareResult(frame) {
         const pending = pendingJamShare;
@@ -1483,12 +1493,18 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         return connectionState === 'connected' && !app.localMediaPaused && !app.sharingStopped
             && c?.kind === 'jam' && c.names?.some(n => n.nick === app.me) ? c : null;
     }
-    function confirmJamShare(c) {
+    function confirmJamShare(c, observedJam) {
         const pending = pendingJamShare;
-        if (pending?.requestId) return; // Correlated feedback, not a state echo, completes this request.
         if (!pending || pending.room !== c || pending.context !== jamContext || currentJam() !== c || !amOp(c)) return;
-        const confirmed = pending.web ? c.jam?.web : c.jam?.invitation || c.jam?.desktop;
+        const confirmed = pending.web ? observedJam?.web : observedJam?.invitation || observedJam?.desktop;
         if (confirmed !== pending.sharedValue) return;
+        if (pending.requestId) {
+            if (!pending.roomStateObserved) {
+                pending.roomStateObserved = true;
+                if (Date.now() >= pending.deadline) waitForJamShare(pending);
+            }
+            return; // Keep the paste until a matching result arrives or the wait ends.
+        }
         const input = $('[data-jam-link]');
         const newerDraft = input.value === pending.value ? '' : input.value;
         if (input.value === pending.value) input.value = '';
@@ -2377,7 +2393,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             const bytes = new Uint8Array(16); crypto.getRandomValues(bytes);
             requestId = [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('');
         }
-        pendingJamShare = { room: c, context: jamContext, value, sharedValue, web, requestId, confirmed: false, deadline: Date.now() + 8000 };
+        pendingJamShare = { room: c, context: jamContext, value, sharedValue, web, requestId,
+            confirmed: false, roomStateObserved: false, deadline: Date.now() + 8000 };
         // Retain the paste until current room state confirms it. Rejection
         // leaves it editable; disconnect/room/power/Stop fences still purge it.
         const args = [web ? 'web' : 'invitation', webLink || value];
