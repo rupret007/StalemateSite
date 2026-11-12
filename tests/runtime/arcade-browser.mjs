@@ -456,7 +456,22 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await captureArcadeInvite(friend, viewport, 'guest-retry-02-seated');
                 await friend.locator('[data-leave]').click();
                 await expect(friend.locator('[data-game-night]')).toBeHidden();
-                console.log(`Passed ${engine} ${viewport.width}x${viewport.height} Game Night Join retry after a temporary server error.`);
+                await host.getByRole('button', { name: 'Open Chess match' }).click();
+                await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
+                const closingLink = await shareGameNightLink(host, viewport, 'guest-closed-00-share');
+                await openGameNightLink(friend, closingLink);
+                await expect(join).toBeVisible();
+                await host.getByRole('button', { name: 'Close waiting match' }).click();
+                await expect(host.getByRole('button', { name: 'Open Chess match' })).toBeVisible();
+                await activate();
+                const title = friend.getByRole('heading', { name: 'Royal Flush Chess' });
+                await expect(title).toBeFocused();
+                await expect(title).toHaveAccessibleDescription('This invite can’t open the game anymore. Ask your host for a new invite.');
+                await expect(friend.locator('[data-guest-inviter]')).toBeHidden();
+                await expect(join).toBeHidden();
+                assert.equal(await friend.evaluate(() => history.state), null, 'closed invitation was cleared');
+                await captureArcadeInvite(friend, viewport, 'guest-closed-01-explanation');
+                console.log(`Passed ${engine} ${viewport.width}x${viewport.height} Game Night Join retry and closed invitation recovery.`);
             } finally { await context.close(); }
         }
     }
