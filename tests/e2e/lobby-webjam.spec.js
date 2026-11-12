@@ -307,12 +307,23 @@ test('the host can cancel an unconfirmed Music invitation and retry with another
 
         await choose('FirstGuest');
         await host.clock.fastForward(90_000);
-        await expect(host.locator('[data-toast]')).toContainText('WebJam did not return an invitation.');
-        await expect(host.locator('[data-toast]')).toContainText('End browser invite in WebJam');
-        await expect(host.locator('[data-toast]')).toContainText('Use the same browser profile for Hang Out and the return tab');
-        await expect(status).toBeEmpty();
+        await expect(status).toContainText('WebJam did not return an invitation.');
+        await host.clock.fastForward(5_000);
+        await expect(status).toContainText('End browser invite in WebJam');
+        await expect(status).toContainText('Use the same browser profile for Hang Out and the return tab');
         await expect(cancel).toBeHidden();
         await expect(invite).toBeEnabled();
+        const roomName = await host.locator('[data-chat-context]').textContent();
+        const channels = host.locator('[data-tabs]').getByRole('tab');
+        await channels.filter({ hasText: '#stalemate' }).click();
+        await expect(host.locator('[data-music-handoff-status]')).toBeEmpty();
+        await channels.filter({ hasText: roomName }).click();
+        await expect(invite).toBeVisible();
+        await expect(status).toBeEmpty();
+        await choose('SecondGuest');
+        await expect(status).toContainText('Confirm in WebJam.');
+        await expect(status).not.toContainText('did not return');
+        await expect(cancel).toBeVisible();
     } finally { await f.close(); }
 });
 
