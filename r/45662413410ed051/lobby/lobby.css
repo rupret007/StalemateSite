@@ -502,6 +502,13 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .act-paint canvas { width: min(100%, 30dvh); }
 }
 @media (max-width: 480px) {
+  .titlebar { gap: 8px; padding: 6px 12px; }
+  .brand { flex: none; gap: 8px; }
+  .brand b { font-size: 12px; white-space: nowrap; }
+  .brand-caption { display: none; }
+  .brand-mark { width: 30px; height: 30px; font-size: 25px; }
+  .connection-tools { gap: 4px 8px; }
+  .entry-return { min-height: 36px; }
   input, select, textarea, .nickbox input, .directory-controls input, .directory-controls select, .act-load input, .jam-paste input { font-size: 16px; }
   .buffer, .who { font-size: 14px; }
   .ev { font-size: 12px; }

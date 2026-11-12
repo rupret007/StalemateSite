@@ -263,6 +263,36 @@ const viewports = [
     { label: 'phone375', width: 375, height: 844 }, { label: 'phone390', width: 390, height: 844 },
     { label: 'reflow200-equivalent', width: 640, height: 512 }, { label: 'reflow400-equivalent', width: 320, height: 256 }
 ];
+for (const viewport of viewports.slice(0, 2)) test(`${viewport.label}: the lobby title stays on one line beside fullscreen controls`, async ({ browser, baseURL }, testInfo) => {
+    const visitor = await guest(browser, baseURL, 'PhoneHeader', viewport);
+    const { page } = visitor;
+    try {
+        const header = page.locator('.titlebar');
+        await expect(header.getByRole('button', { name: 'Full screen', exact: true })).toBeVisible();
+        await expect(header.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+        await expect(header.getByRole('status')).toHaveText('Connected');
+        const layout = await header.evaluate(element => {
+            const title = element.querySelector('.brand b');
+            const titleBox = title.getBoundingClientRect();
+            const tools = element.querySelector('.connection-tools');
+            const controls = Array.from(tools.children).filter(control => !control.hidden);
+            const boxes = controls.map(control => control.getBoundingClientRect());
+            return {
+                titleLines: Math.round(titleBox.height / parseFloat(getComputedStyle(title).lineHeight)),
+                height: element.getBoundingClientRect().height,
+                controlsContained: boxes.every(box => box.width > 0 && box.left >= titleBox.right &&
+                    box.right <= innerWidth && box.top >= 0 && box.bottom <= innerHeight),
+            };
+        });
+        expect(layout.titleLines).toBe(1);
+        expect(layout.height).toBeLessThanOrEqual(94);
+        expect(layout.controlsContained).toBe(true);
+        contained(await composerGeometry(page));
+        expect(visitor.errors).toEqual([]);
+        await page.screenshot({ path: testInfo.outputPath('phone-chat-header.png') });
+    } finally { await visitor.close(); }
+});
+
 for (const viewport of viewports) test(`${viewport.label}: long chat, error and keyboard-focused composer stay contained`, async ({ browser, baseURL }, testInfo) => {
     const visitor = await guest(browser, baseURL, 'LongNickABCDEFGHIJKL', viewport), { page } = visitor;
     try {
