@@ -81,7 +81,7 @@ function paintFlat(ctx, run) {
     ctx.fillStyle = '#1d3441'; ctx.fillRect(x - 10, y - body - 3, 20, 5);
 }
 
-export function mountArcadeTurdRush(container) {
+export function mountArcadeTurdRush(container, onMatch) {
     const document = container.ownerDocument, panel = document.createElement('details');
     panel.className = 'arcade-card-table arcade-rush-race';
     panel.hidden = true;
@@ -112,6 +112,7 @@ export function mountArcadeTurdRush(container) {
         redraw = true;
     }
     const client = createGameNightMatchClient({
+        onMatch,
         prefix: '/beta/arcade-turdrush',
         onStatus(next, reason) {
             connection = next;

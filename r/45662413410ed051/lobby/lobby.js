@@ -4,7 +4,7 @@ import * as entrance from '../entry-sites.mjs';
 import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
 import { createIdleHeartbeat } from './idle-heartbeat.mjs';
-import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourWinningCells, gameNightRoomName } from './game-night.mjs';
+import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourWinningCells, gameNightInvite, gameNightRoomName } from './game-night.mjs';
 (() => {
     'use strict';
     const { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff,
@@ -483,7 +483,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let gameNightSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
     const gameShareButton = $('[data-game-share]'), gameShareDialog = $('[data-game-share-dialog]'), gameShareValue = $('[data-game-share-value]');
     const arcadeTables = new Map([
-        ['chess', { label: 'Chess', load: () => import('./arcade-chess.mjs').then(module => module.mountArcadeChess) }],
+        ['chess', { label: 'Royal Flush Chess', load: () => import('./arcade-chess.mjs').then(module => module.mountArcadeChess) }],
         ['crapeights', { label: 'Crappy Eights', load: () => import('./arcade-crapeights.mjs').then(module => module.mountArcadeCrapeights) }],
         ['turdrummy', { label: 'TurdRummy', load: () => import('./arcade-turdrummy.mjs').then(module => module.mountArcadeTurdRummy) }],
         ['turdspades', { label: 'TurdSpades', load: () => import('./arcade-turdspades.mjs').then(module => module.mountArcadeTurdSpades) }],
@@ -493,14 +493,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         ['turdrush', { label: 'Turd Rush Race', load: () => import('./arcade-turdrush.mjs').then(module => module.mountArcadeTurdRush) }],
         ['turdanoid', { label: 'Turdanoid Brick Race', load: () => import('./arcade-turdanoid.mjs').then(module => module.mountArcadeTurdanoid) }]
     ]);
-    let arcadeReturning = null;
+    let arcadeReturning = null, arcadeInvitation = null;
     let arcadeMediaSupported = false, arcadeMedia = null, arcadeMediaLoading = false;
     let fourInARowSupported = false, fourRoom = null, fourPlayed = false;
     let fourGameId = '', fourActionPending = false;
     const fourButtons = [], fourCells = [];
     const gameReturnKey = 'hangout-game-return';
     const gameInvites = new Map();
-    let gameReturn = null, gameReturnOffered = false, joiningGameRoom = '';
+    let gameReturn = null, gameReturnOffered = false, joiningGameRoom = '', joiningArcadeOffer = null;
     // Jam rooms are invite-only like Game Night, so the directory cannot lead
     // an invited guest back. They share the same offer and return controls.
     const jamRoomName = name => typeof name === 'string' && /^#jam(?:-[a-z0-9-]{1,26})?$/.test(name);
@@ -610,6 +610,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         connectionState = state;
         if (state !== 'connected') {
             gameInvites.clear(); gameReturnOffered = false; joiningGameRoom = ''; drawGameOffer();
+            joiningArcadeOffer = null;
+            finishArcadeInvitation();
             clearGameLinks(); clearJamInvitations();
             if (pendingKeep) clearKeep(pendingKeep.stage === 'submitted' ? 'Keeping this room was not confirmed. Check Host tools after reconnecting.' : 'Your room return was interrupted. Nothing was kept.');
         }
@@ -1036,10 +1038,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         case 'join': {
             const c = { ...m.ch, lines: [] };
             const gameOfferAccepted = joiningGameRoom === c.name;
+            const invite = gameOfferAccepted ? joiningArcadeOffer : null;
             const returningToGame = gameReturnOffered && gameReturn?.room === c.name;
             const joiningLinkedGame = gameEntry?.target?.room === c.name;
             if (joiningLinkedGame) gameEntry = null;
-            if (gameOfferAccepted) joiningGameRoom = '';
+            if (gameOfferAccepted) { joiningGameRoom = ''; joiningArcadeOffer = null; }
             if (returningToGame) gameReturnOffered = false;
             if (gameInvites.delete(c.name) || gameOfferAccepted || returningToGame || joiningLinkedGame) drawGameOffer();
             if (app.pendingChannel === m.ch.name) {
@@ -1047,6 +1050,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 $('[data-channel-dialog]').close();
             }
             app.chans.set(m.ch.name, c);
+            if (c.kind === 'game' && invite?.arcade && invite.ref === c.keepRef) beginArcadeInvitation(c, invite.arcade);
             if (pendingKeep?.stage === 'joining' && c.name === pendingKeep.room) {
                 if (c.keepRef === pendingKeep.ref) pendingKeep.stage = 'confirm';
                 else clearKeep('That room changed while you signed in. Nothing was kept.');
@@ -1054,7 +1058,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             // Classic IRC: joining begins a fresh buffer; never render pre-join backlog.
             if (activityRoom(c)) c.actSnap = activitySnapshot(m.act);
             switchTo(m.ch.name, { freshJoin: true });
-            if (gameOfferAccepted) focusChannelTab(c.name);
+            if (gameOfferAccepted && !arcadeInvitation) focusChannelTab(c.name);
             followPendingRoomJoin();
             break;
         }
@@ -1126,6 +1130,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 if (joiningGameRoom) {
                     const failedRoom = joiningGameRoom;
                     joiningGameRoom = '';
+                    joiningArcadeOffer = null;
                     forgetGameRoom(failedRoom);
                     toast(jamRoomName(failedRoom) ? `Couldn’t join ${failedRoom}. It may have closed. Ask the host to invite you again.`
                         : 'Couldn’t join Game Night. Ask the host for a fresh invitation.');
@@ -1167,8 +1172,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 if (!app.chans.has(m.ch)) {
                     if (!gameInvites.has(m.ch) && gameInvites.size === 5 && !joiningGameRoom)
                         gameInvites.delete(gameInvites.keys().next().value);
-                    if (gameInvites.has(m.ch) || gameInvites.size < 5)
-                        gameInvites.set(m.ch, { room: m.ch, ref: roomNonce(m.roomInstance) ? m.roomInstance : undefined, by: m.by });
+                    if (gameInvites.has(m.ch) || gameInvites.size < 5) {
+                        const arcade = gameNightRoomName(m.ch) && arcadeTables.get(m.arcade?.game)?.supported
+                            ? gameNightInvite(m.arcade.game, m.arcade.match) : null;
+                        gameInvites.set(m.ch, { room: m.ch, ref: roomNonce(m.roomInstance) ? m.roomInstance : undefined, by: m.by, arcade });
+                    }
                     drawGameOffer();
                 }
             } else toast(`${m.by} invited you to ${m.ch}`, [['Join', () => cmd('join', [m.ch])]]);
@@ -1480,16 +1488,18 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
         const jam = jamRoomName(offer?.room);
         const roomLabel = jam ? offer.room : 'Game Night';
+        const gameLabel = arcadeTables.get(offer?.arcade?.game)?.label;
         let message;
         if (start) message = 'Start a private Game Night or wait for your host’s invitation.';
         else if (joiningGameRoom === offer.room) message = `Joining ${roomLabel}…`;
         else if (gameReturnOffered) {
             message = jam ? `You were disconnected from ${offer.room}. Chat starts fresh.`
                 : 'Game Night disconnected. Return to the room to check your match.';
-        } else if (offer.by) message = `${offer.by} invited you to ${roomLabel}.`;
+        } else if (offer.by) message = gameLabel ? `${offer.by} invited you to play ${gameLabel}.` : `${offer.by} invited you to ${roomLabel}.`;
         else message = 'Your link points to a private Game Night. The host’s invitation is required.';
         if (status.textContent !== message) status.textContent = message;
-        button.textContent = start ? 'Start Game Night' : gameReturnOffered ? 'Return to room' : jam ? 'Join room' : 'Join Game Night';
+        button.textContent = start ? 'Start Game Night' : gameReturnOffered ? 'Return to room'
+            : gameLabel ? `Play ${gameLabel}` : jam ? 'Join room' : 'Join Game Night';
         button.setAttribute('aria-disabled', String(!!joiningGameRoom));
         $('[data-game-offer-dismiss]').disabled = !!joiningGameRoom;
     }
@@ -1507,6 +1517,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             return toast(jamRoomName(offer.room) ? 'Reconnect before joining the room.' : 'Reconnect before joining Game Night.');
         }
         joiningGameRoom = offer.room;
+        joiningArcadeOffer = offer.arcade ? offer : null;
         drawGameOffer();
     });
     $('[data-game-offer-dismiss]').addEventListener('click', () => {
@@ -1613,6 +1624,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     }
     function drawGameNight() {
         const c = currentGameNight();
+        if (arcadeInvitation && c?.keepRef !== arcadeInvitation.ref) finishArcadeInvitation();
         const canCall = discordLinksSupported && !shieldActive;
         const canManage = c && canCall && amOp(c) && roomNonce(c.keepRef);
         const editor = $('[data-game-editor]');
@@ -1671,6 +1683,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         option.hidden = option.disabled = !scope || !table.controller;
         if (table.controller) {
             table.controller.setRoom(scope);
+            if (scope && arcadeInvitation?.game === game && arcadeInvitation.ref === scope.ref) table.controller.open();
             if (scope && game === arcadeReturning?.game && scope.room === arcadeReturning.room && scope.ref === arcadeReturning.ref) {
                 arcadeReturning = null;
                 table.controller.open();
@@ -1680,10 +1693,30 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (!scope || table.loading) return;
         table.loading = true;
         table.load().then(mount => {
-            table.controller = mount($('[data-game-night]'));
+            table.controller = mount($('[data-game-night]'), (room, state, sendMatch) => arcadeMatchState(game, table, room, state, sendMatch));
             drawArcadeTable(currentGameNight(), game, table);
         }).catch(() => toast(`${table.label} could not load. Reopen Game Night to try again.`))
             .finally(() => { table.loading = false; });
+    }
+    function beginArcadeInvitation(room, target) {
+        finishArcadeInvitation();
+        arcadeInvitation = { ...target, room: room.name, ref: room.keepRef, sent: false,
+            timer: setTimeout(() => finishArcadeInvitation('The seat could not be confirmed. Ask the host for a fresh game invitation.'), 15000) };
+    }
+    function finishArcadeInvitation(message) {
+        clearTimeout(arcadeInvitation?.timer);
+        arcadeInvitation = null;
+        if (message) toast(message);
+    }
+    function arcadeMatchState(game, table, scope, state, sendMatch) {
+        table.invite = scope && state?.seat && state.waiting ? gameNightInvite(game, state.id) : null;
+        const invite = arcadeInvitation;
+        if (!sendMatch || !invite || game !== invite.game || scope?.room !== invite.room || scope.ref !== invite.ref) return;
+        if (state?.id === invite.match && state.seat) return finishArcadeInvitation();
+        if (state?.id !== invite.match || !state.waiting) {
+            return finishArcadeInvitation('This game invitation no longer has an open seat. Ask the host for a fresh invitation.');
+        }
+        if (!invite.sent) invite.sent = sendMatch({ action: 'join', id: invite.match, seat: 'next' });
     }
     $('[data-arcade-game]').addEventListener('change', event => {
         const game = event.target.value;
@@ -2385,6 +2418,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-invite-person-send]').disabled = !personTargetsSupported || !roomNonce(inviteInstance);
         $('[data-invite-dialog]').showModal(); $('[data-invite-nick]').focus();
     }
+    function roomInviteArgs(nick, room) {
+        const target = room.kind === 'game' && [...arcadeTables.values()].find(table => table.invite && table.controller?.isOpen())?.invite;
+        return target ? [nick, room.name, target.game, target.match] : [nick, room.name];
+    }
     $('[data-jam-invite-room]').addEventListener('click', event => openInviteDialog(event.currentTarget));
     $('[data-invite-cancel]').addEventListener('click', closeInviteDialog);
     $('[data-invite-dialog]').addEventListener('close', () => {
@@ -2408,7 +2445,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         // original live connection in the shared lobby's current roster.
         const person = findPerson(context.peer);
         if (!person || !personContextValid(context)) { $('[data-invite-error]').textContent = 'That person is no longer confirmed.'; return; }
-        if (send({ t: 'cmd', name: 'invite', args: [person.nick, current.name], ch: context.channel, roomInstance: context.instance, personContext: 1, personPeer: context.peer })) closeInviteDialog();
+        if (send({ t: 'cmd', name: 'invite', args: roomInviteArgs(person.nick, current), ch: context.channel, roomInstance: context.instance, personContext: 1, personPeer: context.peer })) closeInviteDialog();
         else $('[data-invite-error]').textContent = 'The invitation was not sent. Reconnect before trying again.';
     });
     $('[data-invite-form]').addEventListener('submit', event => {
@@ -2421,7 +2458,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
         // This is only an affordance. The server checks the current host,
         // recipient and room before granting an invitation.
-        if (namedCmd('invite', [nick], current.name, inviteInstance)) closeInviteDialog();
+        const args = roomInviteArgs(nick, current);
+        if (namedCmd('invite', args.length === 2 ? [nick] : args, current.name, inviteInstance)) closeInviteDialog();
         else $('[data-invite-error]').textContent = 'Reconnect before sending an invitation.';
     });
 

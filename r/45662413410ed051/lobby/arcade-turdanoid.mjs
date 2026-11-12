@@ -81,7 +81,7 @@ function createPainter(canvas) {
     };
 }
 
-export function mountArcadeTurdanoid(container) {
+export function mountArcadeTurdanoid(container, onMatch) {
     const document = container.ownerDocument, panel = document.createElement('details');
     panel.className = 'arcade-card-table arcade-brick-race';
     panel.hidden = true;
@@ -115,6 +115,7 @@ export function mountArcadeTurdanoid(container) {
         redraw = true;
     }
     const client = createGameNightMatchClient({
+        onMatch,
         prefix: '/beta/arcade-turdanoid',
         onStatus(next, reason) {
             connection = next;

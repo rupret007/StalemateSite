@@ -61,7 +61,7 @@ function paint(ctx, art, grid, piece, ghost = []) {
     for (const [row, col] of sprintCells(piece)) tile(row, col, piece.name);
 }
 
-export function mountArcadeTurdtris(container) {
+export function mountArcadeTurdtris(container, onMatch) {
     const document = container.ownerDocument, panel = document.createElement('details');
     panel.className = 'arcade-card-table arcade-tris';
     panel.hidden = true;
@@ -80,6 +80,7 @@ export function mountArcadeTurdtris(container) {
     const clearInputs = () => { buffer = []; inflight = null; clearRepeat(); gesture = null; };
     const clearPending = () => { clearTimeout(pending); pending = null; };
     const client = createGameNightMatchClient({
+        onMatch,
         prefix: '/beta/arcade-turdtris',
         onStatus(next, reason) {
             connection = next;

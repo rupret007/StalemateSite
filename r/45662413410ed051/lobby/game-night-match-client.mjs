@@ -9,10 +9,11 @@ export const matchConnectionErrors = Object.freeze({
 });
 
 // A match connection can be replaced without changing room, chat or call.
-export function createGameNightMatchClient({ prefix, onStatus, onState, onError }) {
+export function createGameNightMatchClient({ prefix, onStatus, onState, onError, onMatch }) {
     let scope, socket, controller, reconnectTimer, joinTimer, generation = 0, failures = 0, ready = false;
     function reset() {
         generation++;
+        onMatch?.(scope);
         clearTimeout(reconnectTimer);
         clearTimeout(joinTimer);
         controller?.abort();
@@ -22,7 +23,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError 
         if (prior && prior.readyState < WebSocket.CLOSING) prior.close(1000);
         ready = false;
     }
-    function stop() { scope = null; reset(); }
+    function stop() { reset(); scope = null; }
     function send(frame) {
         if (!ready || socket?.readyState !== WebSocket.OPEN) return false;
         try { socket.send(JSON.stringify({ version: 1, ...frame })); return true; }
@@ -71,6 +72,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError 
                     clearTimeout(joinTimer);
                     failures = 0;
                     onState(frame);
+                    if (attempt === generation) onMatch?.(scope, frame.state, send);
                 } else if (frame?.t === 'match-error') onError(frame.reason);
             });
         } catch {

@@ -5,7 +5,7 @@ import { ROOM_TTL, LOG_TTL, OWNER_TRANSFER_TTL, roomRecord, validRoom, createRat
 import { checkNick, checkText, defaultLists, normalize } from './filter.mjs';
 import { actSnapshot, applyClear, applyStroke, applyVideo, cleanRtc, parseActFrame, PAINT_KINDS, VIDEO_KINDS } from './lobby-act.mjs';
 import { messageReceipt, receiptDigest } from './message-receipts.mjs';
-import { discordCallLink, dropFour, fourFinished, fourMark, gameNightRoomName, openFour } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import { discordCallLink, dropFour, fourFinished, fourMark, gameNightInvite, gameNightRoomName, openFour } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import { personRoomProjection } from './lobby-effect-records.mjs';
 import { TRANSPORT_CONTROL_BLOCK } from './transport-budget.mjs';
 import { ENTRY_SITES, normalizeEntrySource } from '../../r/45662413410ed051/entry-sites.mjs';
@@ -1744,12 +1744,14 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             log(c.nick, 'unban', mask, '', chan.name);
             return undefined;
         },
-        invite(c, chan, [n], _roomInstance, _messageResult, boundPeer) {
+        invite(c, chan, [n, , game, match], roomInstance, _messageResult, boundPeer) {
             const t = boundPeer || target(c, n); if (!t) return undefined;
             if (chan.kind === 'lobby') return bot(c, '/invite nick #room', 'error');
             if (chan.invites.size >= 150 && !chan.invites.has(t.dev)) return bot(c, 'Room invitation list is full.', 'error');
             chan.invites.add(t.dev);
-            out(t, { t: 'invite', ch: chan.name, by: c.nick, ...(roomKind(chan) === 'game' ? { roomInstance: chan.keepRef } : {}) });
+            const gameRoom = roomKind(chan) === 'game';
+            const arcade = gameRoom && roomInstance === chan.keepRef ? gameNightInvite(game, match) : null;
+            out(t, { t: 'invite', ch: chan.name, by: c.nick, ...(gameRoom ? { roomInstance: chan.keepRef } : {}), ...(arcade ? { arcade } : {}) });
             return bot(c, `Invited ${t.nick} to ${chan.name}.`);
         },
         op(c, chan, [n], _r, _m, peer) { return setRank(c, chan, n, 'ops', true, '+o', peer); },

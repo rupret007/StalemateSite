@@ -47,7 +47,7 @@ const markup = `
     </div>
 </dialog>`;
 
-export function mountArcadeCrapeights(container) {
+export function mountArcadeCrapeights(container, onMatch) {
     const document = container.ownerDocument;
     const panel = document.createElement('details');
     panel.className = 'arcade-card-table arcade-eights';
@@ -81,6 +81,7 @@ export function mountArcadeCrapeights(container) {
     }
 
     const client = createGameNightMatchClient({
+        onMatch,
         prefix: '/beta/arcade-crapeights',
         onStatus(next, reason) {
             phase = next;
