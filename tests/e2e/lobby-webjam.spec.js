@@ -238,6 +238,95 @@ test('only the selected guest can accept a music invitation and open the audio c
     } finally { await f.close(); }
 });
 
+test('the host can cancel an unconfirmed Music invitation and retry with another guest', async ({ browser, baseURL }, testInfo) => {
+    const f = await browserRoom(browser, baseURL, true, { width: 375, height: 844 }, true);
+    try {
+        const host = await f.join('MusicHost', false, 'rad-dad');
+        const first = await f.join('FirstGuest', false, 'stalemate');
+        const second = await f.join('SecondGuest', false, 'rad-dad');
+        await host.click('[data-show="rooms"]');
+        await host.click('[data-start="jam"]');
+        await host.evaluate(() => {
+            document.addEventListener('click', event => {
+                const link = event.target.closest('a[href^="webjam-beta://hangout-music/"]');
+                if (link) {
+                    event.preventDefault();
+                    window.musicRequest = new URL(link.href).pathname.slice(1);
+                }
+            }, true);
+        });
+        await host.clock.install();
+        const invite = host.getByRole('button', { name: 'Invite bandmate to Music' });
+        const cancel = host.getByRole('button', { name: 'Cancel Music invite' });
+        const status = await expectExposedInviteStatus(host, '[data-music-handoff-status]');
+        async function choose(nick) {
+            await invite.click();
+            await host.getByRole('button', { name: `Invite ${nick}`, exact: true }).click();
+            return host.evaluate(() => window.musicRequest);
+        }
+        const retiredRequest = await choose('FirstGuest');
+        await host.clock.fastForward(15_000);
+        await expect(status).toContainText('start a hosted Music session');
+        await expect(status).toContainText('browser profile you’re using for Hang Out');
+        await expect(cancel).toBeInViewport({ ratio: 1 });
+        await host.screenshot({ path: testInfo.outputPath('music-invite-waiting-375.png') });
+        await cancel.press('Enter');
+        await expect(cancel).toBeHidden();
+        await expect(invite).toBeEnabled();
+        await expect(invite).toBeFocused();
+        await expect(host.locator('[data-toast]')).toContainText('Music invite canceled in Hang Out.');
+
+        const request = await choose('SecondGuest');
+        expect(request).not.toBe(retiredRequest);
+        const href = `https://webjam.example/join/#k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=${Math.floor(Date.now() / 1000) + 120}`;
+        await host.evaluate(({ retiredRequest, request, href }) => {
+            const socket = window.__lobby.ws;
+            const onMessage = socket.onmessage;
+            socket.onmessage = event => {
+                if (JSON.parse(event.data).t === 'music-invite-result') {
+                    window.releaseMusicResult = () => {
+                        socket.onmessage = onMessage;
+                        onMessage.call(socket, event);
+                    };
+                } else onMessage.call(socket, event);
+            };
+            for (const id of [retiredRequest, request]) {
+                const channel = new BroadcastChannel(`webjam-music-${id}`);
+                channel.postMessage({ href });
+                channel.close();
+            }
+        }, { retiredRequest, request, href });
+        await expect(second.locator('[data-music-invite]')).toContainText('MusicHost invited you to play');
+        await expect(first.locator('[data-music-invite]')).toBeHidden();
+        await expect(cancel).toBeHidden();
+        await expect(status).toHaveText('Waiting for Hang Out to confirm delivery…');
+        await expect(invite).toBeDisabled();
+        await host.waitForFunction(() => typeof window.releaseMusicResult === 'function');
+        await host.evaluate(() => window.releaseMusicResult());
+        await expect(invite).toBeEnabled();
+
+        await choose('FirstGuest');
+        await host.clock.fastForward(90_000);
+        await expect(status).toContainText('WebJam did not return an invitation.');
+        await host.clock.fastForward(5_000);
+        await expect(status).toContainText('End browser invite in WebJam');
+        await expect(status).toContainText('Use the same browser profile for Hang Out and the return tab');
+        await expect(cancel).toBeHidden();
+        await expect(invite).toBeEnabled();
+        const roomName = await host.locator('[data-chat-context]').textContent();
+        const channels = host.locator('[data-tabs]').getByRole('tab');
+        await channels.filter({ hasText: '#stalemate' }).click();
+        await expect(host.locator('[data-music-handoff-status]')).toBeEmpty();
+        await channels.filter({ hasText: roomName }).click();
+        await expect(invite).toBeVisible();
+        await expect(status).toBeEmpty();
+        await choose('SecondGuest');
+        await expect(status).toContainText('Confirm in WebJam.');
+        await expect(status).not.toContainText('did not return');
+        await expect(cancel).toBeVisible();
+    } finally { await f.close(); }
+});
+
 for (const [hostSite, guestSite] of [['rad-dad', 'stalemate'], ['stalemate', 'rad-dad']]) {
     test(`${hostSite} can invite someone from ${guestSite} with a single join action`, async ({ browser, baseURL }) => {
         const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });
