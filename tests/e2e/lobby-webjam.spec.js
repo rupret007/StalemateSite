@@ -239,8 +239,10 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         await expect(host.locator('[data-jam-help]')).not.toHaveAttribute('open');
         await expect(host.locator('[data-jam-host-steps]')).toBeVisible();
         await expect(host.locator('[data-jam-host-steps]')).toContainText('Music → Host');
-        await expect(host.getByRole('textbox', { name: 'WebJam invitation' })).toHaveAccessibleDescription(/Copy browser invite[\s\S]*Paste that link here and click Share/);
-        await expect(host.locator('[data-jam-form] button[type="submit"]')).toBeInViewport();
+        await expect(host.locator('[data-jam-host-steps]')).toContainText('Once your bandmate is in this room, click Copy browser invite in WebJam.');
+        await expect(host.getByRole('textbox', { name: 'WebJam invitation' })).toHaveAccessibleDescription(/Copy browser invite[\s\S]*Share with room[\s\S]*Join in browser/);
+        await expect(host.getByRole('button', { name: 'Share with room', exact: true })).toBeInViewport();
+        await host.screenshot({ path: testInfo.outputPath(`jam-host-before-sharing-${width}.png`), fullPage: true });
         const channel = await host.evaluate(() => __lobby.active);
         await host.evaluate(() => __lobby.cmd('invite', ['BrowserGuest']));
         await guest.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).click();
@@ -296,7 +298,7 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         const help = guest.locator('[data-jam-help]'), summary = help.locator('summary');
         await summary.focus(); await summary.press('Enter');
         await expect(help).toHaveAttribute('open'); await expect(summary).toBeFocused();
-        await expect(help).toContainText('click Copy browser invite. Wait for Link copied, then paste the link above and click Share.');
+        await expect(help).toContainText('click Copy browser invite. Wait for Link copied, then paste the link above and choose Share with room.');
         await expect(help).toContainText('Sharing an invite does not turn on your microphone');
         await expect(help.locator('p').first()).toBeInViewport({ ratio: 0.5, timeout: 1000 });
         expect(await summary.evaluate(element => {
