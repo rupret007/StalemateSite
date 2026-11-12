@@ -1,9 +1,8 @@
 # Shared Track: the next user check
 
-**Nothing needs to be done while Jeff is asleep.** The unattended hosted
-heartbeat observation has finished; its browser and awake assertion are closed. Generated audio already passed through the
-private WebJam service; playing a song through the desktop Shared Track control
-still needs its own setup and listening check.
+Use this during the attended private rehearsal. Generated audio has passed
+through the private WebJam service. The desktop Shared Track mix with live
+instruments still needs a listening check on both ends.
 
 ## What you need
 
@@ -25,7 +24,7 @@ wired External Headphones, both at 48 kHz. The exact staged native build and its
 strict signature matched. **Do not install BlackHole again.** These facts do not
 prove an active Jamulus process route or Shared Track playback.
 
-## When you are awake
+## Before playing
 
 1. Keep the MacBook awake with wired headphones connected and WebJam idle.
    The initial test can use its built-in mic; reconnect the SSL 2+ only for the
@@ -34,15 +33,31 @@ prove an active Jamulus process route or Shared Track playback.
    admission and cap checks. Keep the primary musician input/output physical;
    the backing-track client uses the separate BlackHole route. Collect actual
    process-route evidence without overriding certification.
-3. In the desktop Shared Track control, choose the short rights-cleared WAV.
-   Stop if the route check fails; repeated clicks cannot supply missing process
-   evidence. Keep the error and logs from that attempt for diagnosis.
+3. Open **Shared Track** in the Mac's verified `c6eecdc` build and choose
+   **Add Track…**. Start with the staged **Original Test Chords.wav**, then
+   repeat with **Original Test Chords.mp3**. Keep the error if the route
+   check fails and leave playback stopped.
 
-The listening session needs a short rights-cleared WAV, the Mac host, and a
-Windows browser guest. We need to hear the backing track through the session,
-confirm each endpoint can adjust/mute it independently, then verify pause,
-restart and End/Leave cleanup. Source decoding or moving meters alone cannot
-answer those questions. No recording is needed for the initial listening check.
+## Check each file with the Windows guest
+
+1. Choose **Play** and sing or play over the track. Ask the guest to confirm
+   that they hear both. Adjust **Source trim** in Shared Track and verify
+   that the backing level changes while the live input stays steady. The
+   Windows browser receives one combined mix. Its listening volume affects
+   the whole mix.
+2. Choose **Pause**. The guest should hear the live input while the backing
+   stops. Move the position slider while paused and choose **Play** to check
+   the new position. Choose **Restart** to check playback from the beginning.
+3. Use **Stop** and confirm the backing ends while live audio remains. Finish
+   with **Leave session** on Windows and **End Session** on the Mac. Keep a
+   short note of what each person heard for WAV and MP3, any dropout, and
+   whether playback and capture ended. Use no recording.
+
+The `c6eecdc` build uses **Pause** and **Stop** to silence the backing.
+The dedicated Shared Track **Mute** button is in the later [candidate PR 495](https://github.com/rupret007/webjam/pull/495).
+When the corresponding build is available, also check that **Mute** silences
+the backing for both ends while its position advances and live input remains
+audible. Unmute and verify the track returns at the current position.
 
 Keep Webex closed for that baseline. Its separate video/manual audio-handoff
 check comes afterward, with explicit microphone/camera choices. The current
