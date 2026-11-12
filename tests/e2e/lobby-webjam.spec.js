@@ -151,6 +151,57 @@ test('a host can share a browser invite pasted with its surrounding message', as
     } finally { await f.close(); }
 });
 
+test('an expired browser invite is retired in place and a fresh invite restores Join', async ({ browser, baseURL }, testInfo) => {
+    const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });
+    try {
+        const host = await f.join('ExpiryHost'), guest = await f.join('ExpiryGuest');
+        await host.click('[data-show="rooms"]');
+        await host.click('[data-start="jam"]');
+        await expect(host.locator('[data-jam]')).toBeVisible();
+        await host.evaluate(() => __lobby.cmd('invite', ['ExpiryGuest']));
+        await guest.locator('[data-game-offer]').getByRole('button', { name: 'Join room' }).click();
+        await expect(guest.locator('[data-jam]')).toBeVisible();
+        const room = await guest.locator('[data-chat-context]').textContent();
+        const now = Date.now();
+        await host.clock.install({ time: now });
+        await guest.clock.install({ time: now });
+        const expiry = Math.floor(now / 1000) + 60;
+        const oldLink = WEB_INVITE.replace(/e=\d+$/, `e=${expiry}`);
+        await paste(host, oldLink);
+        await expect(guest.locator('[data-jam-web]')).toBeEnabled();
+        await guest.getByRole('button', { name: 'Show QR code' }).click();
+        await expect(guest.locator('[data-jam-invite-qr-panel]')).toBeVisible();
+        await guest.evaluate(() => { navigator.clipboard.writeText = async () => { throw Error('Clipboard blocked'); }; });
+        await guest.getByRole('button', { name: 'Copy browser invite' }).click();
+        await expect(guest.locator('[data-jam-invite-copy-value]')).toBeFocused();
+        await guest.clock.fastForward(61_000);
+        await host.clock.fastForward(61_000);
+        await expect(guest.locator('[data-jam-web]')).toBeDisabled();
+        await expect(guest.locator('[data-jam-web]')).toBeHidden();
+        await expect(guest.locator('[data-jam-wait]')).toHaveText('Browser invite expired. Ask your host for a fresh invite here.');
+        await expect(guest.locator('[data-jam-wait]')).toBeFocused();
+        await expect(guest.locator('[data-jam-invite-qr-panel]')).toBeHidden();
+        await expect(guest.locator('[data-jam-invite-copy-value]')).toHaveValue('');
+        await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        await expect(guest.locator('[data-connection]')).toHaveText('Connected');
+        expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
+        await expect(host.locator('[data-jam-wait]')).toContainText('Copy a fresh browser invite');
+        await expect(host.locator('[data-jam-host-steps]')).toBeHidden();
+        await expect(host.locator('[data-jam-form] button[type="submit"]')).toBeEnabled();
+        await guest.screenshot({ path: testInfo.outputPath('expired-browser-invite-390.png') });
+
+        const freshLink = oldLink.replace('synthetic_browser_capability', 'replacement_fixture')
+            .replace(/e=\d+$/, `e=${expiry + 120}`);
+        await paste(host, freshLink);
+        await expect(guest.getByRole('button', { name: 'Join in browser' })).toBeFocused();
+        await guest.screenshot({ path: testInfo.outputPath('fresh-browser-invite-390.png') });
+        await guest.getByRole('button', { name: 'Join in browser' }).click();
+        expect(await guest.evaluate(() => window.browserOpens)).toEqual([[freshLink, '_blank', 'noopener,noreferrer']]);
+        expect(await guest.evaluate(() => window.audioRequests)).toBe(0);
+        expect(f.external).toEqual([]);
+    } finally { await f.close(); }
+});
+
 test('first-invite guidance follows current host power without opening setup help', async ({ browser, baseURL }) => {
     const f = await browserRoom(browser, baseURL, true, { width: 1440, height: 900 });
     try {

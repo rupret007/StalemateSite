@@ -458,6 +458,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let jamContext = null;
     let pendingJamShare = null;
     let jamShareResultsSupported = false, jamShareTimer;
+    let jamInviteExpiryTimer;
+    const jamWaitingCopy = $('[data-jam-wait]').textContent;
     let gameNightSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
     let fourInARowSupported = false, fourRoom = null, fourPlayed = false;
     let fourGameId = '', fourActionPending = false;
@@ -1362,6 +1364,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     }
     function resetJamControls() {
         clearPendingJamShare();
+        clearTimeout(jamInviteExpiryTimer);
         $('[data-jam-share-status]').textContent = '';
         $('[data-jam]').hidden = true;
         const desktop = $('[data-jam-desktop]'); desktop.hidden = true; desktop.removeAttribute('href');
@@ -1380,8 +1383,18 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-jam-wait]').hidden = false;
         const web = $('[data-jam-web]'); web.disabled = true; web.onclick = null; web.textContent = 'Browser join unavailable';
     }
-    function browserInviteLink(context) {
-        return context?.webReady && /^https:\/\//.test(context.web) ? context.web : '';
+    function browserInviteDeadline(link) {
+        const hashAt = link.indexOf('#');
+        if (hashAt < 0) return 0;
+        const values = new URLSearchParams(link.slice(hashAt + 1));
+        const seconds = values.get('e'), milliseconds = Number(seconds) * 1000;
+        return values.getAll('e').length === 1 && /^[1-9][0-9]*$/.test(seconds)
+            && Number.isSafeInteger(milliseconds) ? milliseconds : 0;
+    }
+    function browserInviteLink(context, now = Date.now()) {
+        if (!context?.webReady || !/^https:\/\//.test(context.web)) return '';
+        const deadline = browserInviteDeadline(context.web);
+        return deadline && deadline <= now ? '' : context.web;
     }
     function browserInvitesInMessage(value) {
         const links = new Set();
@@ -1512,6 +1525,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         return newerDraft;
     }
     function drawJam() {
+        clearTimeout(jamInviteExpiryTimer);
+        const focused = document.activeElement;
         if (app.sharingStopped || app.localMediaPaused) { resetJamControls(); $('[data-jam]').hidden = true; return; }
         const c = currentJam();
         const next = c ? { room: c, host: !!amOp(c), invitation: c.jam?.invitation || c.jam?.desktop || '',
@@ -1538,27 +1553,50 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         desktop.hidden = !next.desktop;
         if (/^webjam:\/\//.test(next.desktop)) desktop.setAttribute('href', next.desktop);
         else desktop.removeAttribute('href');
-        const shared = !!(next.invitation || next.webReady);
-        $('[data-jam-host-steps]').hidden = !next.host || shared;
-        $('[data-jam-actions]').hidden = next.host && !shared;
-        $('[data-jam-wait]').hidden = shared; $('[data-jam-copy]').hidden = !next.invitation;
-        const browserLink = browserInviteLink(next);
-        $('[data-jam-invite-copy]').hidden = !browserLink;
-        $('[data-jam-invite-qr-toggle]').hidden = !browserLink;
+        const now = Date.now();
+        const browserLink = browserInviteLink(next, now);
+        const deadline = next.webReady ? browserInviteDeadline(next.web) : 0;
+        const expired = deadline > 0 && deadline <= now;
+        const shared = !!(next.invitation || browserLink);
+        $('[data-jam-host-steps]').hidden = !next.host || shared || expired;
+        $('[data-jam-actions]').hidden = next.host && !shared && !expired;
+        $('[data-jam-copy]').hidden = !next.invitation;
+        const wait = $('[data-jam-wait]'), web = $('[data-jam-web]');
+        const copy = $('[data-jam-invite-copy]'), qr = $('[data-jam-invite-qr-toggle]');
+        const manualCopy = $('[data-jam-invite-copy-value]');
+        wait.hidden = shared && !expired;
+        const guidance = expired ? next.host
+            ? 'Browser invite expired. Copy a fresh browser invite from WebJam and share it here.'
+            : 'Browser invite expired. Ask your host for a fresh invite here.' : jamWaitingCopy;
+        if (wait.textContent !== guidance) wait.textContent = guidance;
+        copy.hidden = qr.hidden = !browserLink;
         if (!browserLink) {
+            $('[data-jam-invite-copy-fallback]').hidden = true;
+            manualCopy.value = '';
             clearJamInviteQr();
             $('[data-jam-invite-qr-panel]').hidden = true;
-            $('[data-jam-invite-qr-toggle]').setAttribute('aria-expanded', 'false');
-            $('[data-jam-invite-qr-toggle]').textContent = 'Show QR code';
+            qr.setAttribute('aria-expanded', 'false');
+            qr.textContent = 'Show QR code';
         } else if (!$('[data-jam-invite-qr-panel]').hidden) drawJamInviteQr(browserLink);
-        const web = $('[data-jam-web]'); web.disabled = !next.webReady;
+        web.disabled = !browserLink;
+        web.hidden = expired;
         web.textContent = web.disabled ? 'Browser join unavailable' : 'Join in browser';
-        web.title = web.disabled ? 'Your host has not shared an approved browser invite yet' : 'Open the host’s browser invitation; headphones and audio consent are required there';
+        web.title = web.disabled ? 'Your host has not shared an approved browser invite yet'
+            : 'Open the host’s browser invitation; headphones and audio consent are required there';
         const context = jamContext;
         web.onclick = () => {
-            if (jamContext === context && currentJam() === context.room && context.webReady && /^https:\/\//.test(context.web))
-                window.open(context.web, '_blank', 'noopener,noreferrer');
+            if (jamContext !== context || currentJam() !== context.room) return;
+            const link = browserInviteLink(context);
+            if (link) window.open(link, '_blank', 'noopener,noreferrer');
+            else drawJam();
         };
+        if (expired && [web, copy, qr, manualCopy].includes(focused)) wait.focus({ preventScroll: true });
+        else if (browserLink && focused === wait) web.focus({ preventScroll: true });
+        if (browserLink && deadline > now) {
+            jamInviteExpiryTimer = setTimeout(() => {
+                if (jamContext === context && currentJam() === context.room) drawJam();
+            }, Math.min(deadline - now, 2_147_483_647));
+        }
     }
     function currentGameNight() {
         const c = app.chans.get(app.active);
@@ -2424,9 +2462,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (!link) return;
         try {
             await navigator.clipboard.writeText(link);
-            if (jamContext === context && currentJam() === c) toast('Browser invite link copied. Send it to your bandmate.');
+            if (jamContext === context && currentJam() === c && browserInviteLink(context) === link)
+                toast('Browser invite link copied. Send it to your bandmate.');
         } catch (_) {
-            if (jamContext !== context || currentJam() !== c) return;
+            if (jamContext !== context || currentJam() !== c || browserInviteLink(context) !== link) return;
             $('[data-jam-invite-copy-fallback]').hidden = false;
             const input = $('[data-jam-invite-copy-value]');
             input.value = link; input.focus(); input.select();
