@@ -5,6 +5,7 @@
   "description": "Static site for Stalemate punk rock originals.",
   "scripts": {
     "dev:hangout": "node scripts/preview-hangout.cjs",
+    "dev:game-night": "npm run package:beta && node tests/runtime/arcade-transport.mjs --serve",
     "package:pilot": "node scripts/package-pilot.cjs",
     "package:beta": "node scripts/package-pilot.cjs beta",
     "package:pages": "node scripts/package-pages.cjs",

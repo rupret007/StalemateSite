@@ -1,4 +1,4 @@
-import { createGameNightMatchClient } from './game-night-match-client.mjs';
+import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 import { createTurdtrisArt } from '/play/games/turdtris-art.js';
 import { classifyGesture } from '/play/games/turdtris-presentation.js';
 import { formatRunTime } from '/play/games/turdtris-modes.js';
@@ -61,7 +61,7 @@ function paint(ctx, art, grid, piece, ghost = []) {
     for (const [row, col] of sprintCells(piece)) tile(row, col, piece.name);
 }
 
-export function mountArcadeTurdtris(container) {
+export function mountArcadeTurdtris(container, onMatch) {
     const document = container.ownerDocument, panel = document.createElement('details');
     panel.className = 'arcade-card-table arcade-tris';
     panel.hidden = true;
@@ -71,7 +71,7 @@ export function mountArcadeTurdtris(container) {
     const status = $('[data-tris-status]'), error = $('[data-tris-error]'), main = $('[data-tris-main]'),
         table = $('[data-tris-match]'), controls = $('[data-tris-controls]'), boardCanvas = $('.tris-primary canvas'),
         opponentCanvas = $('.tris-rival canvas'), confirm = $('[data-tris-confirm]'), leave = $('[data-tris-leave]');
-    let scope, model, canOpen, connection, receivedAt, raf = 0, lastDraw = 0, lastSent = -Infinity,
+    let scope, model, canOpen, connection, connectionError, receivedAt, raf = 0, lastDraw = 0, lastSent = -Infinity,
         lastSync = -Infinity, pending = null, art, drawKey = '', rivalDirty = true, retryAt = 0;
     let buffer = [], inflight = null, gesture = null, repeatTimer = 0, repeatInterval = 0;
     const serverTime = time => model.match.at + Math.max(0, time - receivedAt);
@@ -80,10 +80,12 @@ export function mountArcadeTurdtris(container) {
     const clearInputs = () => { buffer = []; inflight = null; clearRepeat(); gesture = null; };
     const clearPending = () => { clearTimeout(pending); pending = null; };
     const client = createGameNightMatchClient({
+        onMatch,
         prefix: '/beta/arcade-turdtris',
-        onStatus(next) {
+        onStatus(next, reason) {
             connection = next;
-            model = null;
+            connectionError = reason;
+            if (reason && reason !== 'rate-limited') model = null;
             clearInputs();
             clearPending();
             if (confirm.open) confirm.close();
@@ -104,6 +106,7 @@ export function mountArcadeTurdtris(container) {
             canOpen = host;
             receivedAt = performance.now();
             connection = 'ready';
+            connectionError = undefined;
             clearPending();
             rivalDirty = true;
             drawKey = '';
@@ -126,7 +129,7 @@ export function mountArcadeTurdtris(container) {
 
     function send(action) {
         if (action === 'retry') { client.start(scope); return; }
-        if (pending || !client.send({ action, id: model?.id })) return;
+        if (connection !== 'ready' || pending || !client.send({ action, id: model?.id })) return;
         error.textContent = '';
         pending = setTimeout(() => {
             pending = null;
@@ -137,7 +140,7 @@ export function mountArcadeTurdtris(container) {
     }
 
     function queue(action) {
-        if (!model?.match?.self || model.match.result || confirm.open || buffer.length >= 12) return;
+        if (connection !== 'ready' || !model?.match?.self || model.match.result || confirm.open || buffer.length >= 12) return;
         const tick = tickAt(performance.now());
         if (tick < 0 || serverTime(performance.now()) >= model.match.endsAt || model.match.self.board.status !== 'playing') return;
         buffer.push({ action, tick });
@@ -157,7 +160,7 @@ export function mountArcadeTurdtris(container) {
         raf = 0;
         const match = model?.match;
         if (!match || !panel.open || panel.hidden) return;
-        if (!match.result) {
+        if (connection === 'ready' && !match.result) {
             if (inflight && time - inflight.sent > 4000) {
                 client.start(scope);
                 return;
@@ -178,7 +181,7 @@ export function mountArcadeTurdtris(container) {
             const tick = Math.max(0, Math.min(tickAt(time), (match.endsAt - match.startsAt) / SPRINT_TICK_MS));
             const side = model.seat === 'b' ? 'b' : 'a';
             const rival = match.boards[side === 'a' ? 'b' : 'a'];
-            const projected = match.self && !match.result ? predict(match, tick) : match.boards[side];
+            const projected = match.self && !match.result && connection === 'ready' ? predict(match, tick) : match.boards[side];
             const shown = match.self?.board || projected;
             const clock = $('[data-tris-clock]'), overlay = $('[data-tris-countdown]');
             const clockText = formatRunTime(match.result ? match.result.tick * SPRINT_TICK_MS
@@ -186,7 +189,7 @@ export function mountArcadeTurdtris(container) {
             if (clock.textContent !== clockText) clock.textContent = clockText;
             overlay.hidden = !seconds || !!match.result;
             overlay.textContent = seconds || '';
-            const playable = !!match.self && !match.result && !seconds && shown.status === 'playing' && at < match.endsAt;
+            const playable = connection === 'ready' && !!match.self && !match.result && !seconds && shown.status === 'playing' && at < match.endsAt;
             table.dataset.phase = match.result ? 'finished' : seconds ? 'countdown' : 'play';
             table.dataset.sequence = match.self?.sequence ?? '';
             for (const button of controls.children) button.disabled = !playable;
@@ -214,9 +217,12 @@ export function mountArcadeTurdtris(container) {
     function render() {
         const match = model?.match, seat = model?.seat, result = match?.result;
         let message = 'Connecting to the race…', action = '', label = '';
-        if (connection === 'reconnecting') message = 'Reconnecting · race clock keeps running';
-        else if (connection === 'unavailable') { message = 'Race connection unavailable.'; action = 'retry'; label = 'Reconnect race'; }
-        else if (connection === 'ready' && !model) {
+        if (connection === 'unavailable') {
+            message = matchConnectionErrors[connectionError] || 'The race couldn’t reconnect. Try again from this room.';
+            if (!connectionError || connectionError === 'rate-limited') { action = 'retry'; label = 'Reconnect race'; }
+        } else if (connection !== 'ready') {
+            if (match) message = match.result ? 'Reconnecting to the race…' : 'Reconnecting · race clock keeps running';
+        } else if (!model) {
             message = 'Same pieces. First to 40 lines or best board after two minutes.';
             if (canOpen) { action = 'open'; label = 'Open Turdtris race'; }
         } else if (model?.waiting) {
@@ -238,9 +244,10 @@ export function mountArcadeTurdtris(container) {
         main.textContent = label;
         main.disabled = !!pending;
         leave.hidden = !seat || !!result;
-        leave.disabled = !!pending;
+        leave.disabled = connection !== 'ready' || !!pending;
         table.hidden = !match;
         controls.hidden = !match?.self || !!result;
+        if (connection !== 'ready') for (const button of controls.children) button.disabled = true;
         if (!raf && match && panel.open) raf = requestAnimationFrame(drawFrame);
     }
 
@@ -274,7 +281,7 @@ export function mountArcadeTurdtris(container) {
         for (const name of ['pointerup', 'pointercancel', 'lostpointercapture', 'blur']) button.addEventListener(name, clearRepeat);
     }
     boardCanvas.addEventListener('pointerdown', event => {
-        if (!event.isPrimary || event.pointerType === 'mouse') return;
+        if (connection !== 'ready' || !event.isPrimary || event.pointerType === 'mouse') return;
         boardCanvas.setPointerCapture(event.pointerId);
         gesture = { id: event.pointerId, x: event.clientX, y: event.clientY, at: performance.now() };
     });
@@ -294,6 +301,7 @@ export function mountArcadeTurdtris(container) {
         raf = 0;
         model = null;
         connection = 'connecting';
+        connectionError = undefined;
         error.textContent = '';
         if (confirm.open) confirm.close();
         render();

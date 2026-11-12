@@ -1,4 +1,4 @@
-import { createGameNightMatchClient } from './game-night-match-client.mjs';
+import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 import { classifyRushSwipe } from '/play/games/turdrush-core.js';
 import { advanceRushRacer, RUSH_LIMIT_TICKS, rushRaceTick, unpackRushRacer } from '/play/games/turdrush-race.js';
 import { TurdRushRenderer } from '/play/games/turdrush-renderer.js';
@@ -81,7 +81,7 @@ function paintFlat(ctx, run) {
     ctx.fillStyle = '#1d3441'; ctx.fillRect(x - 10, y - body - 3, 20, 5);
 }
 
-export function mountArcadeTurdRush(container) {
+export function mountArcadeTurdRush(container, onMatch) {
     const document = container.ownerDocument, panel = document.createElement('details');
     panel.className = 'arcade-card-table arcade-rush-race';
     panel.hidden = true;
@@ -91,7 +91,7 @@ export function mountArcadeTurdRush(container) {
     const status = $('[data-race-status]'), error = $('[data-race-error]'), main = $('[data-race-main]'), leave = $('[data-race-leave]'),
         table = $('[data-race-match]'), track = $('[data-race-track]'), controls = $('[data-race-controls]'), confirm = $('[data-race-confirm]'),
         canvas = $('[data-race-3d]'), flat = $('[data-race-2d]'), motion = matchMedia('(prefers-reduced-motion: reduce)');
-    let scope, model, canOpen, connection, visual, receivedAt, renderer, fallback = false, raf = 0, previous = 0,
+    let scope, model, canOpen, connection, connectionError, visual, receivedAt, renderer, fallback = false, raf = 0, previous = 0,
         lastSent = -Infinity, lastSync = -Infinity, retryAt = 0, pending, gesture, redraw = true;
     let buffer = [], flights = [];
     const serverNow = time => model.match.at + Math.max(0, time - receivedAt);
@@ -112,10 +112,12 @@ export function mountArcadeTurdRush(container) {
         redraw = true;
     }
     const client = createGameNightMatchClient({
+        onMatch,
         prefix: '/beta/arcade-turdrush',
-        onStatus(next) {
+        onStatus(next, reason) {
             connection = next;
-            model = visual = null;
+            connectionError = reason;
+            if (reason && reason !== 'rate-limited') model = visual = null;
             clearPending();
             clearInputs();
             if (confirm.open) confirm.close();
@@ -136,6 +138,7 @@ export function mountArcadeTurdRush(container) {
             canOpen = host;
             receivedAt = performance.now();
             connection = 'ready';
+            connectionError = undefined;
             clearPending();
             rebuild();
             render();
@@ -154,7 +157,7 @@ export function mountArcadeTurdRush(container) {
 
     function send(action) {
         if (action === 'retry') { client.start(scope); return; }
-        if (pending || !client.send({ action, id: model?.id })) return;
+        if (connection !== 'ready' || pending || !client.send({ action, id: model?.id })) return;
         put(error, '');
         pending = setTimeout(() => client.start(scope), 4000);
         render();
@@ -162,7 +165,7 @@ export function mountArcadeTurdRush(container) {
 
     function queue(action) {
         const match = model?.match;
-        if (!model?.seat || !match || match.result || pending || confirm.open || buffer.length >= 8 ||
+        if (connection !== 'ready' || !model?.seat || !match || match.result || pending || confirm.open || buffer.length >= 8 ||
             visual?.status !== 'running') return;
         const now = serverNow(performance.now());
         if (now < match.startsAt) return;
@@ -178,7 +181,7 @@ export function mountArcadeTurdRush(container) {
         raf = 0;
         const match = model?.match, seat = model?.seat;
         if (!match || !visual || !panel.open || panel.hidden) return;
-        if (!match.result) {
+        if (connection === 'ready' && !match.result) {
             if (flights.length && time - flights[0].sent > 4000) { client.start(scope); return; }
             if (buffer.length && flights.length < 4 && !pending && time >= retryAt && time - lastSent >= 85) {
                 const sequence = (flights.at(-1)?.sequence ?? match.runner.sequence) + 1, inputs = buffer.splice(0, 4);
@@ -190,7 +193,7 @@ export function mountArcadeTurdRush(container) {
             if (time - lastSync >= 950 && time - lastSent >= 350 && client.send({ action: 'sync' })) lastSync = time;
         }
         const at = serverNow(time), countdown = Math.ceil((match.startsAt - at) / 1000), oldTick = visual.tick;
-        if (!match.result && countdown <= 0) {
+        if (connection === 'ready' && !match.result && countdown <= 0) {
             advanceRushRacer(visual, seat ? rushRaceTick(match.startsAt, at) : match.tick);
         }
         const run = visual.run;
@@ -203,7 +206,7 @@ export function mountArcadeTurdRush(container) {
         table.dataset.lane = run.player.lane;
         table.dataset.sequence = seat ? match.runner.sequence : '';
         table.dataset.confirmedTick = match.runner.tick;
-        for (const button of controls.children) button.disabled = countdown > 0 || visual.status !== 'running';
+        for (const button of controls.children) button.disabled = connection !== 'ready' || countdown > 0 || visual.status !== 'running';
         for (const [index, position] of ['a', 'b'].entries()) {
             const score = $(`[data-race-score="${position}"]`);
             const data = match.players[position];
@@ -240,9 +243,12 @@ export function mountArcadeTurdRush(container) {
     function render() {
         const match = model?.match, seat = model?.seat, result = match?.result;
         let message = 'Connecting to the race…', action = '', label = '';
-        if (connection === 'reconnecting') message = 'Reconnecting · the course keeps moving';
-        else if (connection === 'unavailable') { message = 'Race connection unavailable.'; action = 'retry'; label = 'Reconnect race'; }
-        else if (connection === 'ready' && !model) {
+        if (connection === 'unavailable') {
+            message = matchConnectionErrors[connectionError] || 'The race couldn’t reconnect. Try again from this room.';
+            if (!connectionError || connectionError === 'rate-limited') { action = 'retry'; label = 'Reconnect race'; }
+        } else if (connection !== 'ready') {
+            if (match) message = match.result ? 'Reconnecting to the race…' : 'Reconnecting · the course keeps moving';
+        } else if (!model) {
             message = 'Same 480 m course. Go farther, then collect more picks to break a tie.';
             if (canOpen) { action = 'open'; label = 'Open Turd Rush race'; }
         } else if (model?.waiting) {
@@ -262,9 +268,10 @@ export function mountArcadeTurdRush(container) {
         put(main, label);
         main.disabled = !!pending;
         leave.hidden = !seat || !!result;
-        leave.disabled = !!pending;
+        leave.disabled = connection !== 'ready' || !!pending;
         table.hidden = !match;
         controls.hidden = !seat || !match || !!result;
+        if (connection !== 'ready') for (const button of controls.children) button.disabled = true;
         if (!raf && match && panel.open) raf = requestAnimationFrame(drawFrame);
     }
 
@@ -289,7 +296,7 @@ export function mountArcadeTurdRush(container) {
         button.addEventListener('click', event => { if (event.detail === 0) queue(action); });
     }
     track.addEventListener('pointerdown', event => {
-        if (!model?.seat || gesture || event.button !== 0 || event.isPrimary === false) return;
+        if (connection !== 'ready' || !model?.seat || gesture || event.button !== 0 || event.isPrimary === false) return;
         event.preventDefault();
         gesture = { id: event.pointerId, x: event.clientX, y: event.clientY, action: null };
         track.setPointerCapture?.(event.pointerId);
@@ -319,6 +326,7 @@ export function mountArcadeTurdRush(container) {
         renderer = null;
         model = visual = null;
         connection = 'connecting';
+        connectionError = undefined;
         put(error, '');
         if (confirm.open) confirm.close();
         render();

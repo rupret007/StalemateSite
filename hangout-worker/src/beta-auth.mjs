@@ -7,6 +7,7 @@ const enc = new TextEncoder();
 const encode = (value) => btoa(String.fromCharCode(...value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const decode = (value) => Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
 export const BETA_COOKIE = '__Host-hangout-beta';
+export const GAME_GUEST_COOKIE = '__Host-hangout-game-guest';
 export const BETA_IDENTITY_COOKIE = '__Host-hangout-beta-identity';
 
 export function equalInvite(given, expected) {
@@ -47,9 +48,9 @@ const cookie = (request, name) => (request.headers.get('Cookie') || '').split(';
 export class BetaSessionUnavailable extends Error {
     constructor(message, status = 503) { super(message); this.status = status; }
 }
-export async function betaSession(request, env, now = Date.now(), { allowRevoked = false } = {}) {
-    const access = await readBeta('access', cookie(request, BETA_COOKIE), env.HANGOUT_HMAC_KEY, now);
-    if (!access || access.scope !== 'guest' || access.version !== String(env.HANGOUT_BETA_INVITE_VERSION || '1')) return null;
+export async function betaSession(request, env, now = Date.now(), { allowRevoked = false, gameGuest = false } = {}) {
+    const access = await readBeta('access', cookie(request, gameGuest ? GAME_GUEST_COOKIE : BETA_COOKIE), env.HANGOUT_HMAC_KEY, now);
+    if (!access || access.scope !== (gameGuest ? 'game-night' : 'guest') || access.version !== String(env.HANGOUT_BETA_INVITE_VERSION || '1')) return null;
     let checked;
     try { checked = await registryRequest(env, 'check', { sid: access.sid, exp: access.exp, version: access.version, allowRevoked }); }
     catch { throw new BetaSessionUnavailable('Beta session registry is unavailable.'); }
@@ -57,6 +58,7 @@ export async function betaSession(request, env, now = Date.now(), { allowRevoked
     if (checked.status !== 200) throw new BetaSessionUnavailable('Beta session registry is unavailable.');
     const metadata = allowRevoked || env.HANGOUT_SESSION_AUTHORITY === 'lobby-v1' ? await checked.json() : null;
     const revoked = allowRevoked && metadata.reason === 'revoked';
+    if (gameGuest) return { access, identity: null, revoked };
     const identity = await readBeta('identity', cookie(request, BETA_IDENTITY_COOKIE), env.HANGOUT_HMAC_KEY, now);
     if (identity && identity.sid === access.sid && identity.exp <= access.exp && typeof identity.email === 'string' && identity.email.length <= 254) {
         if (env.HANGOUT_SESSION_AUTHORITY === 'lobby-v1') {

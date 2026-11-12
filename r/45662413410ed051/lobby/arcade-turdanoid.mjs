@@ -1,4 +1,4 @@
-import { createGameNightMatchClient } from './game-night-match-client.mjs';
+import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 import '/play/games/turdanoid-sprites-core.js';
 import { advanceBrickRacer, brickRaceWall, brickRacePaddle, brickRaceTick, BRICK_LIMIT_TICKS, BRICK_WIDTH, BRICK_HEIGHT } from '/play/games/turdanoid-race.js';
 
@@ -81,7 +81,7 @@ function createPainter(canvas) {
     };
 }
 
-export function mountArcadeTurdanoid(container) {
+export function mountArcadeTurdanoid(container, onMatch) {
     const document = container.ownerDocument, panel = document.createElement('details');
     panel.className = 'arcade-card-table arcade-brick-race';
     panel.hidden = true;
@@ -92,19 +92,20 @@ export function mountArcadeTurdanoid(container) {
         error = $('[data-brick-error]'), main = $('[data-brick-main]'), leave = $('[data-brick-leave]'),
         launch = $('[data-brick-serve]'), confirm = $('[data-brick-confirm]'), motion = matchMedia('(prefers-reduced-motion: reduce)');
     const paint = createPainter(board.querySelector('canvas'));
-    let scope, model, canOpen, connection, visual, wall, receivedAt, raf = 0, pending, pointer,
+    let scope, model, canOpen, connection, connectionError, visual, wall, receivedAt, raf = 0, pending, pointer,
         desiredAim = null, lastAim = -Infinity, lastSent = -Infinity, lastSync = -Infinity, retryAt = 0, redraw = true;
-    let launchPointer = null;
+    const inputBufferLimit = 8;
+    let launchPointer = null, desiredAxis = null, keyboardActive = false;
     let buffer = [], flights = [], keys = new Set();
     const serverNow = time => model.match.at + Math.max(0, time - receivedAt);
     function clearPending() { clearTimeout(pending); pending = null; }
-    function clearInputs() {
+    function clearInputs(keepKeyboard = false) {
         buffer = [];
         flights = [];
-        keys.clear();
+        if (!keepKeyboard) { keys.clear(); keyboardActive = false; }
         pointer = null;
         launchPointer = null;
-        desiredAim = null;
+        desiredAim = desiredAxis = null;
     }
     function rebuild() {
         visual = model?.match ? structuredClone(model.match.runner) : null;
@@ -114,10 +115,12 @@ export function mountArcadeTurdanoid(container) {
         redraw = true;
     }
     const client = createGameNightMatchClient({
+        onMatch,
         prefix: '/beta/arcade-turdanoid',
-        onStatus(next) {
+        onStatus(next, reason) {
             connection = next;
-            model = visual = null;
+            connectionError = reason;
+            if (reason && reason !== 'rate-limited') model = visual = null;
             clearPending();
             clearInputs();
             if (confirm.open) confirm.close();
@@ -125,6 +128,7 @@ export function mountArcadeTurdanoid(container) {
         },
         onState({ state, canOpen: host }) {
             if (state && (state.game !== 'turdanoid' || state.version !== 1)) return;
+            const reconnecting = connection !== 'ready';
             const changed = state?.id !== model?.id || state?.seat !== model?.seat;
             const reveal = state?.match && (!model?.match || changed);
             if (reveal) wall = brickRaceWall(state.match.seed);
@@ -136,17 +140,27 @@ export function mountArcadeTurdanoid(container) {
             canOpen = host;
             receivedAt = performance.now();
             connection = 'ready';
+            connectionError = undefined;
             clearPending();
             rebuild();
-            if (reveal && state.seat && visual.run.axis) queue('axis', 0);
+            if ((reveal || reconnecting) && state?.seat && visual?.run.axis) {
+                keyboardActive = true;
+                desiredAxis = 0;
+            }
             render();
             if (reveal) container.scrollTop = 0;
         },
         onError(reason) {
             clearPending();
-            clearInputs();
+            const retryKeyboard = keyboardActive && reason !== 'finished';
+            clearInputs(retryKeyboard);
             rebuild();
             retryAt = performance.now() + 175;
+            if (retryKeyboard) {
+                // A rejected batch can discard a release after the previous move was accepted.
+                desiredAxis = axis();
+                client.send({ action: 'sync' });
+            }
             if (reason !== 'finished') put(error, reason === 'late-input' ? 'A move arrived late. Resynced to the board.'
                 : reason === 'input-paced' ? 'Too many moves at once.' : 'The race could not confirm that action.');
             render();
@@ -155,7 +169,7 @@ export function mountArcadeTurdanoid(container) {
 
     function send(action) {
         if (action === 'retry') { client.start(scope); return; }
-        if (pending || !client.send({ action, id: model?.id })) return;
+        if (connection !== 'ready' || pending || !client.send({ action, id: model?.id })) return;
         put(error, '');
         pending = setTimeout(() => client.start(scope), 4000);
         render();
@@ -163,7 +177,7 @@ export function mountArcadeTurdanoid(container) {
 
     function queue(action, value, time = performance.now()) {
         const match = model?.match;
-        if (!model?.seat || !match || match.result || pending || confirm.open || buffer.length >= 8 ||
+        if (connection !== 'ready' || !model?.seat || !match || match.result || pending || confirm.open || buffer.length >= inputBufferLimit ||
             visual?.run.status !== 'play' || serverNow(time) < match.startsAt) return false;
         const tick = Math.max(visual.tick + 1, brickRaceTick(match.startsAt, serverNow(time)) + 1, visual.queue.at(-1)?.[0] || 1);
         if (tick > BRICK_LIMIT_TICKS) return false;
@@ -185,8 +199,9 @@ export function mountArcadeTurdanoid(container) {
         raf = 0;
         const match = model?.match, seat = model?.seat;
         if (!match || !visual || !panel.open || panel.hidden) return;
-        if (!match.result) {
+        if (connection === 'ready' && !match.result) {
             if (flights.length && time - flights[0].sent > 4000) { client.start(scope); return; }
+            if (desiredAxis !== null && time >= retryAt && queue('axis', desiredAxis, time)) desiredAxis = null;
             if (desiredAim !== null && time - lastAim >= 90 && queue('aim', desiredAim, time)) {
                 lastAim = time;
                 desiredAim = null;
@@ -201,7 +216,7 @@ export function mountArcadeTurdanoid(container) {
             if (time - lastSync >= 950 && time - lastSent >= 350 && client.send({ action: 'sync' })) lastSync = time;
         }
         const at = serverNow(time), countdown = Math.ceil((match.startsAt - at) / 1000), oldTick = visual.tick;
-        if (!match.result && countdown <= 0 && seat) advanceBrickRacer(visual, brickRaceTick(match.startsAt, at), wall, match.seed);
+        if (connection === 'ready' && !match.result && countdown <= 0 && seat) advanceBrickRacer(visual, brickRaceTick(match.startsAt, at), wall, match.seed);
         const run = visual.run;
         const overlay = $('[data-brick-overlay]');
         const label = match.result ? '' : countdown > 0 ? String(countdown) : run.status === 'out' ? 'Out of balls' : '';
@@ -211,7 +226,7 @@ export function mountArcadeTurdanoid(container) {
         table.dataset.sequence = seat ? match.runner.sequence : '';
         table.dataset.paddle = Math.round(run.paddleX);
         table.dataset.stuck = String(run.ball.stuck);
-        launch.disabled = countdown > 0 || !run.ball.stuck || run.status !== 'play' || !!pending;
+        launch.disabled = connection !== 'ready' || countdown > 0 || !run.ball.stuck || run.status !== 'play' || !!pending;
         const seconds = Math.max(0, Math.ceil((match.endsAt - Math.max(at, match.startsAt)) / 1000));
         put($('[data-brick-clock]'), match.result ? 'Final' : Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0'));
         const active = Object.keys(capsules).find(power => run.powers[power]);
@@ -230,9 +245,12 @@ export function mountArcadeTurdanoid(container) {
     function render() {
         const match = model?.match, seat = model?.seat, result = match?.result;
         let message = 'Connecting to the race…', action = '', label = '';
-        if (connection === 'reconnecting') message = 'Reconnecting · race clock keeps running';
-        else if (connection === 'unavailable') { message = 'Race connection unavailable.'; action = 'retry'; label = 'Reconnect race'; }
-        else if (connection === 'ready' && !model) {
+        if (connection === 'unavailable') {
+            message = matchConnectionErrors[connectionError] || 'The race couldn’t reconnect. Try again from this room.';
+            if (!connectionError || connectionError === 'rate-limited') { action = 'retry'; label = 'Reconnect race'; }
+        } else if (connection !== 'ready') {
+            if (match) message = match.result ? 'Reconnecting to the race…' : 'Reconnecting · race clock keeps running';
+        } else if (!model) {
             message = 'Same wall and three balls. Clear it first or break the most bricks in 75 seconds.';
             if (canOpen) { action = 'open'; label = 'Open Turdanoid race'; }
         } else if (model?.waiting) {
@@ -251,9 +269,10 @@ export function mountArcadeTurdanoid(container) {
         put(main, label);
         main.disabled = !!pending;
         leave.hidden = !seat || !!result;
-        leave.disabled = !!pending;
+        leave.disabled = connection !== 'ready' || !!pending;
         table.hidden = !match;
         launch.hidden = !seat || !match || !!result;
+        if (connection !== 'ready') launch.disabled = true;
         if (!raf && match && panel.open) raf = requestAnimationFrame(drawFrame);
     }
 
@@ -281,6 +300,15 @@ export function mountArcadeTurdanoid(container) {
     $('[data-brick-confirm-no]').addEventListener('click', () => confirm.close());
     $('[data-brick-confirm-yes]').addEventListener('click', () => { confirm.close(); send(model?.waiting ? 'leave' : 'resign'); });
     function axis() { return Number(keys.has('ArrowRight')) - Number(keys.has('ArrowLeft')); }
+    function updateAxis() {
+        const value = axis();
+        if (queue('axis', value)) { keyboardActive = true; desiredAxis = null; return true; }
+        if (!keyboardActive && buffer.length < inputBufferLimit) return false;
+        // Keep the latest keyboard intent when a release arrives between sends.
+        keyboardActive = true;
+        desiredAxis = value;
+        return true;
+    }
     board.addEventListener('keydown', event => {
         if (event.ctrlKey || event.altKey || event.metaKey || !['ArrowLeft', 'ArrowRight', ' '].includes(event.key)) return;
         event.preventDefault();
@@ -288,23 +316,25 @@ export function mountArcadeTurdanoid(container) {
         if (event.key === ' ') { requestServe(); return; }
         desiredAim = null;
         keys.add(event.key);
-        if (!queue('axis', axis())) keys.delete(event.key);
+        if (!updateAxis()) keys.delete(event.key);
     });
     board.addEventListener('keyup', event => {
         if (!keys.delete(event.key)) return;
         event.preventDefault();
-        queue('axis', axis());
+        updateAxis();
     });
-    board.addEventListener('blur', () => { if (keys.size) { keys.clear(); queue('axis', 0); } });
+    board.addEventListener('blur', () => { if (keys.size) { keys.clear(); updateAxis(); } });
     function aim(event) {
         if (pointer !== event.pointerId) return;
         const rect = board.getBoundingClientRect();
         if (rect.width > 0) desiredAim = Math.round(Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)) * 1000);
     }
     board.addEventListener('pointerdown', event => {
-        if (!model?.seat || pointer !== null && pointer !== undefined || event.isPrimary === false || event.button !== 0) return;
+        if (connection !== 'ready' || !model?.seat || pointer !== null && pointer !== undefined || event.isPrimary === false || event.button !== 0) return;
         event.preventDefault();
         keys.clear();
+        keyboardActive = false;
+        desiredAxis = null;
         pointer = event.pointerId;
         board.setPointerCapture?.(pointer);
         aim(event);
@@ -323,6 +353,7 @@ export function mountArcadeTurdanoid(container) {
         raf = 0;
         model = visual = wall = null;
         connection = 'connecting';
+        connectionError = undefined;
         put(error, '');
         if (confirm.open) confirm.close();
         render();
