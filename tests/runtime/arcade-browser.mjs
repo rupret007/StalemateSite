@@ -154,7 +154,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         assert.match(link.hash, /^#game=game-[a-f0-9]{6}x[a-f0-9]{6}&instance=[a-f0-9]{32}$/);
         if (evidence) await host.screenshot({ path: join(evidence, `webjam-room-link-${engine}.png`) });
         await share.getByRole('button', { name: 'Done' }).click();
-        const player = await guest('rad-dad', 'LinkGuest', { width: 375, height: 667 }, true, link.href);
+        const player = await guest('rad-dad', 'LinkGuest', { width: 390, height: 844 }, true, link.href);
         const joinOffer = player.locator('[data-game-offer]').getByRole('button', { name: 'Join Game Night', exact: true });
         async function expectRefusal() {
             await joinOffer.click();
@@ -179,14 +179,34 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const matches = [], calls = [];
         if (media && !relay) {
             for (const [path, connections] of [[/\/beta\/arcade-match$/, matches], [/\/beta\/game-night-media$/, calls]]) {
-                await player.routeWebSocket(path, route => { connections.push([route, route.connectToServer()]); });
+                await player.routeWebSocket(path, route => {
+                    const server = route.connectToServer();
+                    connections.push([route, server]);
+                    if (connections === matches && matches.length === 2) server.onMessage(message => {
+                        // Upgrade and deliver match-ready, but never confirm the board on this socket.
+                        if (typeof message !== 'string' || JSON.parse(message).t !== 'match-state') route.send(message);
+                    });
+                });
             }
         }
+        const playerGame = player.getByRole('combobox', { name: 'Switch game' });
         await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
-        await player.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
+        if (media && !relay) await player.route('**/beta/arcade-ticket', route => route.fulfill({ status: 403 }), { times: 1 });
+        await playerGame.selectOption('chess');
+        if (media && !relay) {
+            await expect(player.locator('[data-chess-status]')).toHaveText('Return to your Game Night room and try again.');
+            await expect(player.getByRole('button', { name: 'Reconnect to Chess' })).toBeHidden();
+            await playerGame.selectOption('four');
+            await playerGame.selectOption('chess');
+        }
         await host.getByRole('button', { name: 'Open Chess match' }).click();
+        await expect(host.locator('[data-chess-status]')).toContainText('You’re White · Waiting for an opponent');
+        await expect(player.locator('[data-chess-status]')).toHaveText('Black is open. Join to play.');
         await player.getByRole('button', { name: 'Join as Black' }).click();
         await expect(host.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
+        await expect(host.locator('[data-clock-side="w"] [data-clock-label]')).toHaveText('White · You');
+        await expect(player.locator('[data-clock-side="b"] [data-clock-label]')).toHaveText('Black · You');
+        await expect(host.locator('[data-clock-side="w"]')).toHaveAttribute('aria-current', 'true');
         await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
         await expect(player.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
         await player.locator('[data-text]').fill('Meet me at the chess board');
@@ -218,6 +238,11 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         assert.equal(calls.length, 1);
         await interrupt(matches[0]);
         await expect.poll(() => matches.length).toBe(2);
+        const recoveringStatus = await player.locator('[data-chess-status]').textContent();
+        const confirmedBoardVisible = await player.getByRole('button', { name: 'e4, White pawn' }).isVisible();
+        await expect.poll(() => matches.length, { timeout: 12000, message: 'Chess retries a socket that never confirms its board' }).toBe(3);
+        assert.match(recoveringStatus, /Reconnecting to Chess/);
+        assert.equal(confirmedBoardVisible, true);
         await expect(player.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
         await expect(player.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
         await expect(player.locator('[data-connection]')).toHaveText('Connected');
@@ -233,7 +258,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await tapSquare(player, 'd7');
         await tapSquare(player, 'd5');
         await expect(host.getByRole('button', { name: 'd5, Black pawn' })).toBeAttached();
-        assert.equal(matches.length, 2);
+        assert.equal(matches.length, 3);
         await player.locator('[data-text]').fill('The board and chat stayed connected');
         await player.locator('[data-send]').tap();
         await expect(host.getByRole('log', { name: 'Conversation' })).toContainText('The board and chat stayed connected');
@@ -250,8 +275,16 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(player.getByRole('button', { name: 'Mute mic' })).toBeVisible();
         await host.getByRole('button', { name: 'Allow room cameras' }).click();
         await player.getByLabel('I am 18 or older').check();
+        await player.evaluate(() => { window.testDenyDevice = true; });
+        await player.getByRole('button', { name: 'Turn camera on' }).click();
+        await expect(player.locator('[data-call-status]')).toContainText('Check browser permissions');
+        await expect(player.locator('[data-call-toggle]')).toHaveText('Call joined');
+        await host.getByRole('button', { name: 'Hide call controls' }).click();
+        await moveByKeyboard(host, 'e4', 'ArrowUp', 1);
+        await expect(player.getByRole('button', { name: 'e5, White pawn' })).toBeAttached();
         await player.getByRole('button', { name: 'Turn camera on' }).click();
         await waitForPackets(host, 'video');
+        await host.locator('[data-call-toggle]').click();
         await host.getByRole('button', { name: 'Actions for LinkGuest' }).click();
         await host.locator('[data-sheet]').getByRole('button', { name: 'Kick', exact: true }).click();
         await expect(player.locator('[data-game-night]')).toBeHidden();
@@ -288,6 +321,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         try {
             await expect(page.locator('.arcade-chess-board')).toBeInViewport({ ratio: 1 });
             await expect(page.locator('[data-send]')).toBeInViewport();
+            assert.ok(await page.locator('[data-clock-side]').evaluateAll(clocks =>
+                clocks.every(clock => clock.scrollWidth <= clock.clientWidth)), 'seat labels and times fit inside both clocks');
         } catch (error) {
             if (evidence) {
                 await mkdir(evidence, { recursive: true });
@@ -452,6 +487,23 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         });
         return () => current;
     }
+    async function holdMatchReconnect(page, game) {
+        const connections = [];
+        let heldState, released = false;
+        await page.routeWebSocket(url => url.pathname === `/beta/arcade-${game}-match`, route => {
+            const server = route.connectToServer();
+            connections.push([route, server]);
+            if (connections.length === 2) server.onMessage(message => {
+                if (!released && typeof message === 'string' && JSON.parse(message).t === 'match-state') heldState = message;
+                else route.send(message);
+            });
+        });
+        return async () => {
+            await Promise.all(connections[0].map(route => route.close({ code: 1011, reason: 'fixture connection interrupted' })));
+            await expect.poll(() => typeof heldState).toBe('string');
+            return () => { released = true; connections[1][0].send(heldState); };
+        };
+    }
     async function playEightsToTarget(players, views) {
         const suitLabels = { S: '♠ Spades', H: '♥ Hearts', D: '♦ Diamonds', C: '♣ Clubs' };
         const fastPoll = { intervals: [10, 25, 50, 100] };
@@ -527,6 +579,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     async function playEights(a, b) {
         const before = media ? await packetCount(b, 'audio') : 0;
         const views = process.env.ARCADE_EIGHTS_FULL_MATCH === '1' ? [a, b].map(page => watchCardMatch(page, 'crapeights')) : null;
+        const pauseReconnect = media && !relay ? await holdMatchReconnect(b, 'crapeights') : null;
         for (const page of [a, b]) await page.getByRole('combobox', { name: 'Switch game' }).selectOption('crapeights');
         await a.getByRole('button', { name: 'Open Eights table' }).click();
         await b.getByRole('button', { name: 'Join Eights table' }).click();
@@ -546,6 +599,15 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const aHand = await aCards.evaluateAll(buttons => buttons.map(button => button.dataset.eightsCard));
         const bHand = await bCards.evaluateAll(buttons => buttons.map(button => button.dataset.eightsCard));
         assert.ok(aHand.every(id => !bHand.includes(id)));
+        if (pauseReconnect) {
+            const returnHand = await pauseReconnect();
+            await expect(b.locator('[data-eights-status]')).toHaveText('Reconnecting to the table… Your hand is paused.');
+            await expect(b.locator('[data-eights-card]:enabled')).toHaveCount(0);
+            assert.deepEqual(await bCards.evaluateAll(buttons => buttons.map(button => button.dataset.eightsCard)), bHand);
+            returnHand();
+            await expect(b.locator('[data-eights-status]')).not.toContainText('Reconnecting');
+            assert.deepEqual(await bCards.evaluateAll(buttons => buttons.map(button => button.dataset.eightsCard)), bHand);
+        }
         const playable = a.locator('[data-eights-card]:enabled').first();
         if (await playable.count()) {
             const wild = (await playable.getAttribute('aria-label')).includes('Wild');
@@ -663,6 +725,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     async function playRummy(a, b) {
         const before = media ? await packetCount(b, 'audio') : 0;
         const views = process.env.ARCADE_RUMMY_FULL_MATCH === '1' ? [a, b].map(page => watchCardMatch(page, 'turdrummy')) : null;
+        const pauseReconnect = media && !relay ? await holdMatchReconnect(b, 'turdrummy') : null;
         for (const page of [a, b]) {
             await expect(page.locator('[data-arcade-game] option[value="turdrummy"]')).toBeEnabled();
             await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdrummy');
@@ -700,6 +763,17 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
         await expect(card).toHaveAttribute('aria-pressed', 'true');
         await expect(b.locator('[data-rummy-hand-label]')).toContainText('deadwood after discard');
+        if (pauseReconnect) {
+            const hand = await ids(bCards);
+            const returnHand = await pauseReconnect();
+            await expect(b.locator('[data-rummy-status]')).toHaveText('Reconnecting to the table… Your hand is paused.');
+            await expect(b.locator('[data-rummy-card]:enabled')).toHaveCount(0);
+            await expect(b.getByRole('button', { name: 'Discard', exact: true })).toBeDisabled();
+            assert.deepEqual(await ids(bCards), hand);
+            returnHand();
+            await expect(card).toHaveAttribute('aria-pressed', 'true');
+            await expect(drawn).toBeDisabled();
+        }
         await b.getByRole('button', { name: 'Discard', exact: true }).click();
         await expect(bCards).toHaveCount(10);
         await expect(a.getByRole('button', { name: `Take ${discarded}`, exact: true })).toBeEnabled();
@@ -736,7 +810,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             }).toBe(1);
             const index = turn[0], page = players[index];
             await page.locator('[data-spades-card]:enabled').first().click();
-            await expect(cards(page)).toHaveCount(--remaining[index]);
+            try {
+                await expect(cards(page)).toHaveCount(--remaining[index]);
+            } catch (error) {
+                console.error('Spades play was not confirmed:', { play, index,
+                    status: await status(page).textContent(), error: await page.locator('[data-spades-error]').textContent() });
+                throw error;
+            }
         }
         assert.deepEqual(remaining, [0, 0, 0, 0]);
         const host = players[0];
@@ -763,6 +843,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     async function playSpades(a, b) {
         const north = await guest('stalemate', 'SpadesNorth', { width: 1280, height: 900 });
         const east = await guest('rad-dad', 'SpadesEast', { width: 390, height: 844 }, true);
+        const pauseReconnect = media && !relay ? await holdMatchReconnect(b, 'turdspades') : null;
         await inviteToGame(a, north, 'SpadesNorth');
         await inviteToGame(a, east, 'SpadesEast');
         const players = [a, b, north, east];
@@ -798,6 +879,18 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             audioBeforeTrick = await Promise.all(players.map(page => packetCounts(page, 'audio')));
         }
         await b.getByLabel('Your bid').selectOption('0');
+        if (pauseReconnect) {
+            const cards = b.locator('[data-spades-card]');
+            const hand = await cards.evaluateAll(buttons => buttons.map(button => button.dataset.spadesCard));
+            const returnHand = await pauseReconnect();
+            await expect(b.locator('[data-spades-status]')).toHaveText('Reconnecting to the table… Your hand is paused.');
+            await expect(b.getByLabel('Your bid')).toBeDisabled();
+            await expect(b.getByRole('button', { name: 'Lock bid' })).toBeDisabled();
+            assert.deepEqual(await cards.evaluateAll(buttons => buttons.map(button => button.dataset.spadesCard)), hand);
+            returnHand();
+            await expect(b.getByLabel('Your bid')).toBeEnabled();
+            await expect(b.getByLabel('Your bid')).toHaveValue('0');
+        }
         for (const page of [b, north, east, a]) await page.getByRole('button', { name: 'Lock bid' }).click();
         await expect(a.locator('[data-spades-trick]')).toContainText('West · Nil');
         const lead = b.locator('[data-spades-card]:enabled').first();
@@ -925,6 +1018,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     }
     async function playJack(a, b, spectator) {
         const before = media ? await packetCount(b, 'audio') : 0;
+        const pauseReconnect = media && !relay ? await holdMatchReconnect(b, 'turdjack') : null;
         for (const page of [a, b, spectator]) {
             await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdjack');
         }
@@ -949,6 +1043,16 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(privateCards(spectator)).toHaveCount(0);
         if (await table.getAttribute('data-phase') !== 'settled') {
             await expect(spectator.locator('[data-jack-dealer] [aria-label="Hidden dealer card"]')).toBeVisible();
+        }
+        if (pauseReconnect) {
+            const hand = await privateCards(b).allTextContents();
+            const returnHand = await pauseReconnect();
+            await expect(b.locator('[data-jack-status]')).toHaveText('Reconnecting to the table… Your hand is paused.');
+            await expect(b.locator('[data-jack-table] button:visible:enabled')).toHaveCount(0);
+            assert.deepEqual(await privateCards(b).allTextContents(), hand);
+            returnHand();
+            await expect(b.locator('[data-jack-status]')).not.toContainText('Reconnecting');
+            assert.deepEqual(await privateCards(b).allTextContents(), hand);
         }
         if (!media) {
             const hand = await privateCards(b).allTextContents();
@@ -997,6 +1101,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     }
     async function playTurdtris(a, b, spectator) {
         const before = media ? await packetCount(b, 'audio') : 0;
+        const pauseReconnect = media && !relay ? await holdMatchReconnect(a, 'turdtris') : null;
         if (media) {
             await b.routeWebSocket(/\/beta\/arcade-turdtris-match$/, route => {
                 const server = route.connectToServer();
@@ -1029,6 +1134,16 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(b.locator('[data-tris-controls]')).toBeInViewport({ ratio: 1 });
         await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
         assert.equal(await b.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+        if (pauseReconnect) {
+            const returnBoard = await pauseReconnect();
+            await expect(a.locator('[data-tris-status]')).toHaveText('Reconnecting · race clock keeps running');
+            await expect(board(a)).toBeInViewport({ ratio: 1 });
+            await expect(a.getByRole('button', { name: 'Hard drop' })).toBeDisabled();
+            await board(a).press('Space');
+            returnBoard();
+            await expect(a.getByRole('button', { name: 'Hard drop' })).toBeEnabled();
+            await expect(table(a)).toHaveAttribute('data-sequence', '0');
+        }
         await board(a).focus();
         await a.keyboard.press('ArrowLeft');
         await a.keyboard.press('Space');
@@ -1082,6 +1197,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     }
     async function playTurdomania(a, b, spectator) {
         const before = media ? await packetCount(b, 'audio') : 0;
+        const pauseReconnect = media && !relay ? await holdMatchReconnect(a, 'turdomania') : null;
         if (media) {
             await b.routeWebSocket(/\/beta\/arcade-turdomania-match$/, route => {
                 const server = route.connectToServer();
@@ -1128,6 +1244,17 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
         assert.equal(await b.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
         const first = tile(a, path[0]);
+        if (pauseReconnect) {
+            const returnPuzzle = await pauseReconnect();
+            await expect(a.locator('[data-mania-status]')).toHaveText('Reconnecting · duel clock keeps running');
+            await expect(board(a)).toBeInViewport({ ratio: 1 });
+            await expect(first).toBeDisabled();
+            await first.press('Enter');
+            assert.deepEqual(await current(a), opening);
+            returnPuzzle();
+            await expect(first).toBeEnabled();
+            await expect(table(a)).toHaveAttribute('data-move', '0');
+        }
         await first.focus();
         const row = Number(await first.getAttribute('data-row'));
         await a.keyboard.press(row === 5 ? 'ArrowDown' : 'ArrowUp');
@@ -1188,6 +1315,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     }
     async function playTurdRush(a, b, spectator) {
         const before = media ? await packetCount(b, 'audio') : 0;
+        const pauseReconnect = media && !relay ? await holdMatchReconnect(a, 'turdrush') : null;
         if (media) {
             await b.routeWebSocket(/\/beta\/arcade-turdrush-match$/, route => {
                 const server = route.connectToServer();
@@ -1230,6 +1358,17 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await track(a).focus();
         await expect(race(a)).toHaveAttribute('data-phase', 'play');
         await expect(race(b)).toHaveAttribute('data-phase', 'play');
+        if (pauseReconnect) {
+            const returnTrack = await pauseReconnect();
+            await expect(a.locator('[data-race-status]')).toHaveText('Reconnecting · the course keeps moving');
+            await expect(track(a)).toBeInViewport({ ratio: 1 });
+            await expect(a.getByRole('button', { name: 'Move left' })).toBeDisabled();
+            await track(a).press('ArrowLeft');
+            returnTrack();
+            await expect(a.getByRole('button', { name: 'Move left' })).toBeEnabled();
+            await expect(race(a)).toHaveAttribute('data-lane', '1');
+            await expect(race(a)).toHaveAttribute('data-sequence', '0');
+        }
         const control = b.getByRole('button', { name: 'Move ' + direction });
         const controlBox = await control.boundingBox();
         assert.ok(controlBox?.width >= 44 && controlBox.height >= 44, 'phone-sized Turd Rush control');
@@ -1333,8 +1472,23 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     }
     async function playTurdanoid(a, b, spectator) {
         const before = media ? await packetCount(b, 'audio') : 0;
-        const launchFrames = [];
-        let sentServes = 0;
+        const pauseReconnect = media && !relay ? await holdMatchReconnect(a, 'turdanoid') : null;
+        const launchFrames = [], keyboardAxes = [];
+        let sentServes = 0, confirmedKeyboard;
+        function observeKeyboard(socket) {
+            if (!new URL(socket.url()).pathname.endsWith('/arcade-turdanoid-match')) return;
+            socket.on('framesent', ({ payload }) => {
+                const frame = JSON.parse(payload.toString());
+                if (frame.action === 'input') for (const [tick, action, value] of frame.inputs) {
+                    if (action === 'axis') keyboardAxes.push({ tick, value, sequence: frame.sequence });
+                }
+            });
+            socket.on('framereceived', ({ payload }) => {
+                const runner = JSON.parse(payload.toString()).state?.match?.runner;
+                if (runner) confirmedKeyboard = runner;
+            });
+        }
+        a.on('websocket', observeKeyboard);
         function observeLaunch(socket) {
             if (!new URL(socket.url()).pathname.endsWith('/arcade-turdanoid-match')) return;
             for (const direction of ['framesent', 'framereceived']) socket.on(direction, ({ payload }) => {
@@ -1380,6 +1534,17 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         assert.equal(await b.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
         await expect(serve(b)).toBeEnabled();
         await expect(serve(a)).toBeEnabled();
+        if (pauseReconnect) {
+            const returnBoard = await pauseReconnect();
+            await expect(a.locator('[data-brick-status]')).toHaveText('Reconnecting · race clock keeps running');
+            await expect(board(a)).toBeInViewport({ ratio: 1 });
+            await expect(serve(a)).toBeDisabled();
+            await board(a).press('Space');
+            returnBoard();
+            await expect(serve(a)).toBeEnabled();
+            await expect(match(a)).toHaveAttribute('data-stuck', 'true');
+            await expect(match(a)).toHaveAttribute('data-sequence', '0');
+        }
         const x = field.x + field.width * .5, y = field.y + field.height * .85;
         const prediction = media ? b.evaluate(async () => {
             const table = document.querySelector('[data-brick-match]');
@@ -1466,6 +1631,23 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.getByRole('button', { name: 'Accept Turdanoid rematch' }).click();
         await expect(match(b)).toHaveAttribute('data-phase', 'countdown');
         await expect(match(b)).toHaveAttribute('data-sequence', '0');
+        await expect(serve(a)).toBeEnabled();
+        const axesAt = keyboardAxes.length;
+        await board(a).evaluate(element => {
+            // Put one launch and seven axis changes in the same render frame.
+            // The last release arrives when the unsent input buffer is full.
+            for (const [type, key] of [
+                ['keydown', ' '], ['keydown', 'ArrowLeft'], ['keydown', 'ArrowRight'], ['keyup', 'ArrowLeft'],
+                ['keydown', 'ArrowLeft'], ['keyup', 'ArrowRight'], ['keydown', 'ArrowRight'],
+                ['keyup', 'ArrowLeft'], ['keyup', 'ArrowRight']
+            ]) element.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true, cancelable: true }));
+        });
+        await expect.poll(() => {
+            const final = keyboardAxes.length > axesAt ? keyboardAxes.at(-1) : null;
+            return final?.value === 0 && confirmedKeyboard?.sequence >= final.sequence &&
+                confirmedKeyboard.tick >= final.tick && confirmedKeyboard.run.axis === 0;
+        }, { message: 'Turdanoid confirms the final keyboard release after the input burst' }).toBe(true);
+        a.off('websocket', observeKeyboard);
         if (media) {
             await waitForPackets(b, 'audio', before);
             await expectOriginalPeer(b);

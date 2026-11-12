@@ -1,3 +1,13 @@
+const requestErrors = { 401: 'sign-in', 403: 'room', 404: 'disabled', 429: 'rate-limited' };
+const socketErrors = { 4403: 'room', 4409: 'room', 4429: 'rate-limited' };
+
+export const matchConnectionErrors = Object.freeze({
+    'sign-in': 'Sign in to the private beta again, then return to this room.',
+    'room': 'Return to your Game Night room and try again.',
+    'disabled': 'This game is unavailable in this room right now.',
+    'rate-limited': 'This match reached a connection or activity limit. Try again later.'
+});
+
 // A match connection can be replaced without changing room, chat or call.
 export function createGameNightMatchClient({ prefix, onStatus, onState, onError }) {
     let scope, socket, controller, reconnectTimer, joinTimer, generation = 0, failures = 0, ready = false;
@@ -18,11 +28,11 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError 
         try { socket.send(JSON.stringify({ version: 1, ...frame })); return true; }
         catch { socket.close(1000); return false; }
     }
-    function retry(attempt, terminal = false) {
+    function retry(attempt, reason) {
         if (attempt !== generation || !scope) return;
         reset();
-        if (terminal || failures >= 3) {
-            onStatus('unavailable');
+        if (reason || failures >= 3) {
+            onStatus('unavailable', reason);
             return;
         }
         onStatus('reconnecting');
@@ -33,7 +43,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError 
         const attempt = ++generation;
         const request = new AbortController();
         controller = request;
-        onStatus('connecting');
+        onStatus(failures ? 'reconnecting' : 'connecting');
         joinTimer = setTimeout(() => retry(attempt), 8000);
         try {
             const response = await fetch(prefix + '-ticket', {
@@ -41,7 +51,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError 
                 body: JSON.stringify(scope), signal: request.signal
             });
             if (attempt !== generation) return;
-            if (!response.ok) { retry(attempt, [401, 403, 404, 429].includes(response.status)); return; }
+            if (!response.ok) { retry(attempt, requestErrors[response.status]); return; }
             const grant = await response.json();
             if (attempt !== generation) return;
             if (!/^m[a-f0-9]{32}$/.test(grant.ticket) || grant.protocol !== 'game-night.v1') throw Error('Invalid match grant');
@@ -49,7 +59,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError 
             url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
             const connection = new WebSocket(url, [grant.protocol, grant.ticket]);
             socket = connection;
-            connection.addEventListener('close', event => retry(attempt, [4403, 4409, 4429].includes(event.code)));
+            connection.addEventListener('close', event => retry(attempt, socketErrors[event.code]));
             connection.addEventListener('message', event => {
                 if (attempt !== generation) return;
                 let frame;

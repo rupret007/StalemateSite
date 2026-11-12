@@ -1,4 +1,4 @@
-import { createGameNightMatchClient } from './game-night-match-client.mjs';
+import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 import { POOP_KINDS, findGroup, popGroup } from '/play/games/turdomania-core.js';
 
 const sprite = '/play/assets/turdomania-tiles.svg#';
@@ -155,16 +155,17 @@ export function mountArcadeTurdomania(container) {
     const $ = selector => panel.querySelector(selector);
     const status = $('[data-mania-status]'), error = $('[data-mania-error]'), main = $('[data-mania-main]'),
         table = $('[data-mania-match]'), leave = $('[data-mania-leave]'), confirm = $('[data-mania-confirm]');
-    const drawOwn = puzzle($('[data-mania-board="self"]'), choose);
+    const ownBoard = $('[data-mania-board="self"]'), drawOwn = puzzle(ownBoard, choose);
     const drawWatch = ['a', 'b'].map(seat => puzzle($(`[data-mania-board="${seat}"]`)));
-    let scope, model, canOpen, connection, receivedAt, busy = null, prediction = null, ticker, lastSync = -Infinity;
+    let scope, model, canOpen, connection, connectionError, receivedAt, busy = null, prediction = null, ticker, lastSync = -Infinity;
     const serverNow = () => model.match.at + Math.max(0, performance.now() - receivedAt);
     function clearPending() { clearTimeout(busy); busy = null; prediction = null; }
     const client = createGameNightMatchClient({
         prefix: '/beta/arcade-turdomania',
-        onStatus(next) {
+        onStatus(next, reason) {
             connection = next;
-            model = null;
+            connectionError = reason;
+            if (reason && reason !== 'rate-limited') model = null;
             clearPending();
             if (confirm.open) confirm.close();
             render();
@@ -182,6 +183,7 @@ export function mountArcadeTurdomania(container) {
             model = state;
             canOpen = host;
             connection = 'ready';
+            connectionError = undefined;
             receivedAt = performance.now();
             render();
             if (reveal) container.scrollTop = 0;
@@ -196,7 +198,7 @@ export function mountArcadeTurdomania(container) {
 
     function send(action, fields = {}, preview = null) {
         if (action === 'retry') { client.start(scope); return; }
-        if (busy || !client.send({ action, id: model?.id, ...fields })) return;
+        if (connection !== 'ready' || busy || !client.send({ action, id: model?.id, ...fields })) return;
         prediction = preview;
         error.textContent = '';
         busy = setTimeout(() => client.start(scope), 4000);
@@ -205,7 +207,7 @@ export function mountArcadeTurdomania(container) {
 
     function choose(id) {
         const match = model?.match, seat = model?.seat;
-        if (!seat || !match || match.result || match.players[seat].over || busy || confirm.open ||
+        if (connection !== 'ready' || !seat || !match || match.result || match.players[seat].over || busy || confirm.open ||
             serverNow() < match.startsAt || serverNow() >= match.endsAt) return;
         const board = match.self.board;
         const col = board.findIndex(stack => stack.some(tile => tile.id === id));
@@ -229,15 +231,18 @@ export function mountArcadeTurdomania(container) {
         const overlay = $('[data-mania-countdown]');
         overlay.hidden = !waiting;
         setText(overlay, waiting ? String(countdown) : '');
-        if (!match.result && seconds === 0 && now - lastSync >= 1500 && client.send({ action: 'sync' })) lastSync = now;
+        if (connection === 'ready' && !match.result && seconds === 0 && now - lastSync >= 1500 && client.send({ action: 'sync' })) lastSync = now;
     }
 
     function render() {
         const match = model?.match, seat = model?.seat, result = match?.result;
         let message = 'Connecting to the duel…', action = '', label = '';
-        if (connection === 'reconnecting') message = 'Reconnecting · duel clock keeps running';
-        else if (connection === 'unavailable') { message = 'Duel connection unavailable.'; action = 'retry'; label = 'Reconnect duel'; }
-        else if (connection === 'ready' && !model) {
+        if (connection === 'unavailable') {
+            message = matchConnectionErrors[connectionError] || 'The duel couldn’t reconnect. Try again from this room.';
+            if (!connectionError || connectionError === 'rate-limited') { action = 'retry'; label = 'Reconnect duel'; }
+        } else if (connection !== 'ready') {
+            if (match) message = match.result ? 'Reconnecting to the duel…' : 'Reconnecting · duel clock keeps running';
+        } else if (!model) {
             message = 'Same puzzle. Clear it or score the most in 90 seconds.';
             if (canOpen) { action = 'open'; label = 'Open Turdomania duel'; }
         } else if (model?.waiting) {
@@ -262,8 +267,9 @@ export function mountArcadeTurdomania(container) {
         setText(main, label);
         main.disabled = !!busy;
         leave.hidden = !seat || !!result;
-        leave.disabled = !!busy;
+        leave.disabled = connection !== 'ready' || !!busy;
         table.hidden = !match;
+        ownBoard.setAttribute('aria-disabled', String(connection !== 'ready'));
         if (!match) return;
         table.dataset.move = seat ? match.players[seat].moves : '';
         $('[data-mania-own]').hidden = !seat;
@@ -293,6 +299,7 @@ export function mountArcadeTurdomania(container) {
         clearPending();
         model = null;
         connection = 'connecting';
+        connectionError = undefined;
         error.textContent = '';
         if (confirm.open) confirm.close();
         render();

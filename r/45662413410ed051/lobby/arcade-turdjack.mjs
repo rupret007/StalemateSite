@@ -1,4 +1,4 @@
-import { createGameNightMatchClient } from './game-night-match-client.mjs';
+import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 
 const seats = ['one', 'two', 'three', 'four'];
 const seatName = seat => 'Seat ' + (seats.indexOf(seat) + 1);
@@ -71,15 +71,17 @@ export function mountArcadeTurdJack(container) {
     const status = $('[data-jack-status]'), feedback = $('[data-jack-error]'), main = $('[data-jack-main]');
     const table = $('[data-jack-table]'), seatsHost = $('[data-jack-seats]'), chips = $('#jack-chips'), confirm = $('[data-jack-confirm]');
     const controls = [...panel.querySelectorAll('[data-jack-action]')];
-    let scope = null, model = null, canOpen = false, connection = 'connecting', pending = false, timer, confirmation = '';
+    let scope = null, model = null, canOpen = false, connection = 'connecting', connectionError;
+    let pending = false, timer, confirmation = '';
 
     function clearPending() { clearTimeout(timer); pending = false; }
     function closeConfirmation() { confirmation = ''; if (confirm.open) confirm.close(); }
     const client = createGameNightMatchClient({
         prefix: '/beta/arcade-turdjack',
-        onStatus(next) {
+        onStatus(next, reason) {
             connection = next;
-            model = null;
+            connectionError = reason;
+            if (reason && reason !== 'rate-limited') model = null;
             clearPending();
             closeConfirmation();
             draw();
@@ -94,6 +96,7 @@ export function mountArcadeTurdJack(container) {
             model = state;
             canOpen = host;
             connection = 'ready';
+            connectionError = undefined;
             clearPending();
             draw();
             if (reveal) container.scrollTop = 0;
@@ -121,6 +124,7 @@ export function mountArcadeTurdJack(container) {
         model = null;
         canOpen = false;
         connection = 'connecting';
+        connectionError = undefined;
         feedback.textContent = '';
         clearPending();
         closeConfirmation();
@@ -178,11 +182,11 @@ export function mountArcadeTurdJack(container) {
                 chips.value = choices.includes(Number(prior)) && prior ? prior : String(choices[1] ?? 0);
             }
         }
-        chips.disabled = pending;
+        chips.disabled = connection !== 'ready' || pending;
         for (const button of controls) {
             const action = button.dataset.jackAction;
             button.hidden = action === 'leave' ? !seat : !actions.includes(action);
-            button.disabled = pending;
+            button.disabled = connection !== 'ready' || pending;
             if (action === 'wager') button.textContent = own?.wager === null ? 'Ready' : 'Update wager';
             if (action === 'cover') {
                 const evenMoney = own?.hands[0]?.total === 21;
@@ -194,8 +198,12 @@ export function mountArcadeTurdJack(container) {
     function draw() {
         const seat = model?.seat, match = model?.match, occupied = model?.occupied || [];
         let action = '', label = '', message = 'Connecting to the table…';
-        if (connection === 'unavailable') { message = 'The table is unavailable.'; action = 'retry'; label = 'Reconnect table'; }
-        else if (connection === 'ready' && !model) {
+        if (connection === 'unavailable') {
+            message = matchConnectionErrors[connectionError] || 'The table couldn’t reconnect. Try again from this room.';
+            if (!connectionError || connectionError === 'rate-limited') { action = 'retry'; label = 'Reconnect table'; }
+        } else if (connection !== 'ready') {
+            if (match) message = seat ? 'Reconnecting to the table… Your hand is paused.' : 'Reconnecting to the table…';
+        } else if (!model) {
             message = canOpen ? 'Open a shared dealer table for two to four players. Play chips only.' : 'Waiting for the host to open a table.';
             if (canOpen) { action = 'open'; label = 'Open Crapjack table'; }
         } else if (model?.waiting) {
@@ -222,13 +230,14 @@ export function mountArcadeTurdJack(container) {
         main.textContent = label;
         main.disabled = pending;
         const leave = $('[data-jack-lobby-leave]');
-        leave.hidden = !model?.waiting || !seat;
+        leave.hidden = connection !== 'ready' || !model?.waiting || !seat;
         leave.textContent = seat === 'one' ? 'Close table' : 'Release seat';
         leave.disabled = pending;
-        seatsHost.hidden = !model?.waiting || !!seat;
+        seatsHost.hidden = connection !== 'ready' || !model?.waiting || !!seat;
         seatButtons.forEach((button, index) => { button.hidden = occupied.includes(seats[index]); button.disabled = pending; });
         table.hidden = !match;
         if (match) renderMatch(match, seat);
+        else $('[data-jack-hands]').replaceChildren();
     }
 
     main.addEventListener('click', () => {
