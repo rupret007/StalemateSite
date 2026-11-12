@@ -1,6 +1,6 @@
 # WebJam / Hang Out: current private readiness
 
-As of November 11, 2026 (Central time), shared browser chat, guest-hosted creative
+As of November 12, 2026 (Central time), shared browser chat, guest-hosted creative
 rooms and private messaging have demonstrated useful live journeys. **The full
 band rehearsal is not yet qualified.** Music, actual Shared Track mixing and
 Webex video/audio handoff remain essential acceptance work, not optional extras.
@@ -52,9 +52,12 @@ used a simulated Mac handoff and audio transport.
 [Website PR](https://github.com/rupret007/StalemateSite/pull/295) ·
 [Mac handoff PR](https://github.com/rupret007/webjam/pull/483)
 
-These are source and local browser results. The private Mac package, actual
-Mac-to-Windows listening, the second-network trial and private delivery of
-this invite flow still need verification.
+The private package run completed for Mac, Windows and Linux at `c6eecdc`.
+Both Macs have a verified **WebJam Private Rehearsal (c6eecdc)** Desktop
+shortcut. The Mini passed its idle navigation check and the Intel MacBook
+passed offscreen startup. The private site still uses the delivered browser
+link handoff. The direct Music invite, attended Mac-to-Windows listening and
+second-network trials still need hosted verification.
 [Private package run](https://github.com/rupret007/webjam/actions/runs/43168414538)
 
 ## Last verified private beta
@@ -213,11 +216,12 @@ redistribution-license qualification remains explicitly unfinished.
 
 ## Remaining band journey
 
-1. On either Mac, open **WebJam Private Band Demo** from the Desktop and
-   confirm build `23cfae6`. Both archives, signatures and isolated idle
-   startup checks passed. The Mini's previous link was preserved. Its target
-   is missing, so restoring AE49 would also require a verified earlier copy.
-2. Before hosting or copying an invite, connect the dock Ethernet and SSL 2+.
+1. On either Mac, open **WebJam Private Rehearsal (c6eecdc)** from the Desktop.
+   From the workspace, **More → About WebJam** shows the build ID. Use the
+   shortcut named for this rehearsal. **WebJam Private Band Demo** still
+   points to the earlier `23cfae6` build.
+2. For the first voice check, use headphones and a working microphone on each
+   device. For the wired instrument check, connect the dock Ethernet and SSL 2+.
    Plug the guitar pedal into SSL input 1, the vocal mic into input 2 and wired
    headphones into the SSL. With Music idle, open macOS **Audio MIDI Setup**.
    In **Audio Devices**, select the **SSL 2+** and confirm **Format** is
@@ -245,11 +249,11 @@ redistribution-license qualification remains explicitly unfinished.
    the session mix in Chrome and the host sets the guitar-to-vocal balance.
    [Jamulus input controls](https://jamulus.app/wiki/Software-Manual#input-balance) · [Jamulus input mix](https://github.com/jamulussoftware/jamulus/blob/r3_12_2/src/client.cpp#L1342-L1390) · [Browser audio bridge](https://github.com/rupret007/webjam/blob/93497494dd0057a05282033b4208721b6061097c/docs/web-join-bridge.md#L17-L20)
 
-   In WebJam, choose **Copy browser invite**. Paste the fresh link into the Jam
-   room and click **Share**. On Windows, choose **Join in browser**, run
-   **Check microphone**, select the interface if the **Microphone** picker
-   appears, confirm headphones
-   and choose **Join with microphone**. Have Che listen to guitar alone, vocal
+   On the current private site, choose **Copy browser invite** in WebJam.
+   Paste the fresh link into the Jam room and click **Share**. On Windows,
+   open **Join in browser** in Chrome, choose **Check microphone**, select
+   the intended interface if the picker appears, confirm headphones and
+   choose **Join with microphone**. Have Che listen to guitar alone, vocal
    alone, then both together. Adjust the SSL gains or Jamulus **Input Balance**
    if needed. Then confirm Jeff hears Che’s drums. Verify speech and music both
    ways, leave/rejoin and cleanly end the session. If the link expires, the
@@ -257,10 +261,14 @@ redistribution-license qualification remains explicitly unfinished.
 
    Qualify Intel and Apple Silicon hosts separately. Note whether the browser
    shows **Direct connection**, **Relayed connection**, or no route label.
-   Web Join prefers direct and can fall back to TURN. Repeat on a second
-   network and note Wi-Fi or Ethernet for each run. The browser’s delay
-   estimate covers the network and playback, with capture and the host
-   bridge outside the estimate.
+   The November 12 readback showed all three devices on one home network,
+   with the Mini on Ethernet and the Intel MacBook and Windows on Wi-Fi.
+   After ending the home-network session, move Windows to a phone hotspot
+   and verify it has switched networks while the Mac stays on the home
+   network. Start a fresh session and check both directions. Return Windows
+   to its original network afterward. Web Join prefers direct and can fall
+   back to TURN. The browser’s delay estimate covers the network and playback,
+   with capture and the host bridge outside the estimate.
    [Browser connection setup](https://github.com/rupret007/webjam/blob/6e26c693c7d8b0160d8a9ea3434954df526e81bd/web/join/session.js#L55-L60)
 4. Through the desktop Shared Track sender, load **Original Test Chords.wav**,
    then **Original Test Chords.mp3**. Matching copies of both 40-second stereo
@@ -281,14 +289,17 @@ redistribution-license qualification remains explicitly unfinished.
    explains how to choose **Don't connect to audio** for video only. Older
    packages may still show the previous label. Use Webex's meeting controls
    to disconnect audio and verify the handoff with both participants.
-   Disconnect meeting audio at both ends before Music. Leave/end Music before
-   connecting meeting audio. Microphone or monitor mute alone is insufficient.
+   Leave or end Music before connecting meeting audio. To play again,
+   everyone disconnects meeting audio and the Music host sends a fresh
+   invitation. Use Webex's Disconnect audio control to stop meeting input
+   and playback.
 
 For a newcomer, send the community invitation privately. The fresh Music link
 is a separate, short-lived invitation created by the host. Never put either code
 or a private meeting link in a public document. A desktop install is needed for
-the current Mac Music host; Che’s planned PC route is the browser. Linux and
-Windows native Music hosting and trust still need qualification. The published
+the current Mac Music host. Che’s planned PC route is the browser. The current
+Windows and Linux desktop builds can join Music. Native Music hosting is Mac-only.
+Physical audio and Windows publisher trust still need qualification. The published
 v0.29.0 tag predates Web Join. Identify the private host build by its exact
 revision and archive receipt. [Published release](https://github.com/rupret007/webjam/releases/tag/v0.29.0)
 

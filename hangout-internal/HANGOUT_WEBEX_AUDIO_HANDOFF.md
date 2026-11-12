@@ -1,11 +1,10 @@
 # Webex companion: current behavior and acceptance
 
 WebJam carries the music through Jamulus and browser Web Join. An optional
-Webex meeting can provide video or conversation separately. The current qualified native
-candidate source is `ae49c915070f2951db9ff441c23c7f0a9d90ce1b`; existing Desktop
-selections were preserved and may still open older builds. Use the
-[current private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md) for actual package and
-website identities. This note does not qualify a real meeting.
+Webex meeting can provide video or conversation separately. The staged native
+rehearsal build is `c6eecdc` on both Macs. Use **WebJam Private Rehearsal
+(c6eecdc)** on the Desktop and check the [current private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
+for exact package and website identities. Real meeting acceptance remains open.
 
 **November 9 update:** the existing Personal Room was saved through normal
 Settings in the verified Mini build and remained correct after reopening, with
@@ -37,8 +36,8 @@ The supported external path is documented in the native
    audio and the host ends Music. Verify Music has stopped at both ends,
    then connect computer audio in Webex.
 3. To play again, disconnect Webex audio at both endpoints. If that option
-   is unavailable, leave Webex before restarting Music. Create a fresh
-   WebJam invite and confirm that both people can hear the new Music session.
+   is unavailable, leave Webex before restarting Music. The Music host sends
+   a fresh invitation and both people confirm they can hear the new session.
    [Cisco audio connection guide](https://help.webex.com/en-us/article/871cgu)
 
 Microphone mute stops your voice from going to the meeting. WebJam monitor
@@ -89,7 +88,7 @@ normal fresh resource and account-headroom checks.
    enabling the meeting's audio. Check speech in both directions and video.
 3. Before returning to Music, disconnect the meeting's audio using its own
    controls. If the available client or meeting cannot do this, leave the
-   meeting. Start Music explicitly and share a fresh browser invitation.
+   meeting. The Music host starts the next session and sends a fresh invitation.
    Confirm music works and meeting audio remains off.
 4. Verify normal Leave / End Session and meeting exit. Retain only revisions,
    client/device roles, timing, outcomes and sanitized errors. Do not put
