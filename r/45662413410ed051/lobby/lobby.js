@@ -2600,7 +2600,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
         // This is only an affordance. The server checks the current host,
         // recipient and room before granting an invitation.
-        if (namedCmd('invite', roomInviteArgs(nick, current), current.name, inviteInstance)) closeInviteDialog();
+        const args = roomInviteArgs(nick, current);
+        if (namedCmd('invite', args.length === 2 ? [nick] : args, current.name, inviteInstance)) closeInviteDialog();
         else $('[data-invite-error]').textContent = 'Reconnect before sending an invitation.';
     });
 
