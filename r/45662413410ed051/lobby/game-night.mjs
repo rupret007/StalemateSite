@@ -12,11 +12,16 @@ export function discordCallLink(value) {
 // readable by the previous Worker without a storage migration.
 export const gameNightRoomName = name => typeof name === 'string' && /^#game-[a-f0-9]{6}x[a-f0-9]{6}$/.test(name);
 
-const arcadeGames = new Set(['chess', 'crapeights', 'turdrummy', 'turdspades', 'turdjack', 'turdtris', 'turdomania', 'turdrush', 'turdanoid']);
+export const gameNightLabels = Object.freeze({
+    chess: 'Royal Flush Chess', crapeights: 'Crappy Eights', turdrummy: 'TurdRummy', turdspades: 'TurdSpades',
+    turdjack: 'Crapjack 21', turdtris: 'Turdtris Sprint', turdomania: 'Turdomania Duel',
+    turdrush: 'Turd Rush Race', turdanoid: 'Turdanoid Brick Race'
+});
 const matchId = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;
+export const gameInviteCode = value => typeof value === 'string' && /^[A-Za-z0-9_-]{20,200}\.[A-Za-z0-9_-]{43}$/.test(value);
 
 export function gameNightInvite(game, match) {
-    return arcadeGames.has(game) && typeof match === 'string' && matchId.test(match) ? { game, match } : null;
+    return typeof game === 'string' && Object.hasOwn(gameNightLabels, game) && typeof match === 'string' && matchId.test(match) ? { game, match } : null;
 }
 
 export const FOUR_COLUMNS = 7;
