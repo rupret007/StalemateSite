@@ -38,6 +38,23 @@ const LOBBY_ENTRANCE = `<!doctype html>
 </body>
 </html>`;
 const invitationForm = label => `<form id="unlock"><label>Invitation code<input id="code" type="password" autocomplete="off" required></label><button>${label}</button></form>`;
+const MUSIC_RETURN_ENTRANCE = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Return to Hang Out · WebJam</title>
+<link rel="stylesheet" href="/beta/style.css">
+</head>
+<body>
+<main>
+<h1>Open Hang Out first</h1>
+<p>This browser profile isn’t signed in to the private beta.</p>
+<p>Choose <strong>End browser invite</strong> in WebJam. Open Hang Out in this browser profile, enter your private invitation, then send a fresh Music invite from your Jam room.</p>
+<p><a class="button" href="/beta/">Open Hang Out</a></p>
+</main>
+</body>
+</html>`;
 const WEB_JOIN_ENTRANCE = `<!doctype html>
 <html lang="en">
 <head>
@@ -308,9 +325,11 @@ async function betaRequest(request, env, deps = {}) {
     const session = await betaSession(request, env);
     const webJoinPage = ['/join', '/join/', '/join/index.html'].includes(assetPath);
     if (!session) {
-        if (['GET', 'HEAD'].includes(request.method) && !request.headers.get('Upgrade')
-            && [`${ROOT}lobby`, `${ROOT}lobby/`, `${ROOT}lobby/index.html`].includes(assetPath)) {
-            return reply(request.method === 'HEAD' ? null : LOBBY_ENTRANCE, 401, 'text/html; charset=utf-8', READ_ONLY_PAGE);
+        const returnPage = assetPath === '/join/handoff.html';
+        const lobbyPage = [`${ROOT}lobby`, `${ROOT}lobby/`, `${ROOT}lobby/index.html`].includes(assetPath);
+        if (['GET', 'HEAD'].includes(request.method) && !request.headers.get('Upgrade') && (lobbyPage || returnPage)) {
+            const entrance = returnPage ? MUSIC_RETURN_ENTRANCE : LOBBY_ENTRANCE;
+            return reply(request.method === 'HEAD' ? null : entrance, 401, 'text/html; charset=utf-8', READ_ONLY_PAGE);
         }
         if (['GET', 'HEAD'].includes(request.method) && webJoinPage) {
             return reply(request.method === 'HEAD' ? null : WEB_JOIN_ENTRANCE, 401, 'text/html; charset=utf-8', {
