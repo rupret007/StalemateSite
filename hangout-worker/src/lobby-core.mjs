@@ -6,6 +6,7 @@ import { checkNick, checkText, defaultLists, normalize } from './filter.mjs';
 import { actSnapshot, applyClear, applyStroke, applyVideo, cleanRtc, parseActFrame, PAINT_KINDS, VIDEO_KINDS } from './lobby-act.mjs';
 import { messageReceipt, receiptDigest } from './message-receipts.mjs';
 import { discordCallLink, dropFour, fourFinished, fourMark, gameNightRoomName, openFour } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import { packLobbyRoster } from '../../r/45662413410ed051/lobby/lobby-roster.mjs';
 import { personRoomProjection } from './lobby-effect-records.mjs';
 import { TRANSPORT_CONTROL_BLOCK } from './transport-budget.mjs';
 import { ENTRY_SITES, normalizeEntrySource } from '../../r/45662413410ed051/entry-sites.mjs';
@@ -544,7 +545,13 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
         if (presence && typeof deferPresence === 'function') return queuePresence({ channel: chan.name, generation: chan.generation });
         const view = chanView(chan);
-        for (const member of membersOf(chan)) out(member, { t: 'chan', ch: { ...view, mediaBlocked: mediaBlocked(chan, member) } });
+        let compactView;
+        for (const member of membersOf(chan)) {
+            if (chan.kind === 'lobby' && member.compactLobbyRoster) {
+                compactView ||= { ...view, names: packLobbyRoster(view.names), rosterFormat: 1 };
+                out(member, { t: 'chan', ch: compactView });
+            } else out(member, { t: 'chan', ch: { ...view, mediaBlocked: mediaBlocked(chan, member) } });
+        }
         for (const c of membersOf(chan)) if (owns(c, chan)) out(c, { t: 'ownership', ch: chan.name,
             cohosts: [...chan.cohosts].map((id) => ({ id, label: chan.cohostLabels[id] || 'Verified co-host' })) });
     };
@@ -845,7 +852,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             cams: new Set(), since: now(), lastNick: 0, tokens: L.burst, last: now(), frames: 0, lastSaid: {}, actTokens: L.actBurst, actLast: now() };
         conns.set(id, c);
         if (band) { net.lastBand = now(); if (net.shieldAuto || net.lockAuto) bot(c, 'A saved safety state needs review: fans can read but not talk while the lobby is read-only. Check the band panel; /lobby unlock and /shieldoff when you are ready.'); saveNet(); }
-        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, roomInvites: 1, ...(gameNight ? { gameNight: 1, fourInARow: 1, discordLinks: !participationConfigured } : {}) } });
+        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, roomInvites: 1, compactLobbyRoster: 1, ...(gameNight ? { gameNight: 1, fourInARow: 1, discordLinks: !participationConfigured } : {}) } });
         return { ok: true };
     }
 
@@ -1154,6 +1161,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (!isBand(c) && banned(net.bans, { ...c, nick: v.nick })) { kill(c, 4403, 'banned'); return undefined; }
         requireParticipation(c, 'publicArtifact');
         c.nick = v.nick;
+        c.compactLobbyRoster = f.compactLobbyRoster === 1;
         c.entrySource = normalizeEntrySource(f.entrySource, entrySites);
         c.lastNick = now();
         statHour().joins += 1; statPeak();
