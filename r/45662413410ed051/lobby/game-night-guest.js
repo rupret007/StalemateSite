@@ -45,6 +45,7 @@ async function describe() {
         inviter.hidden = false;
         gameTitle.textContent = game;
         status.textContent = '';
+        invite.after(status);
         invite.hidden = false;
         if (document.activeElement === document.body) join.focus({ preventScroll: true });
     } catch (error) {
@@ -57,6 +58,7 @@ async function describe() {
 async function accept() {
     retry.hidden = true;
     join.disabled = true;
+    join.textContent = 'Joining…';
     status.textContent = 'Joining the game…';
     try {
         const { next } = await request('accept', { age13: true, attempt });
@@ -72,6 +74,7 @@ async function accept() {
             if (document.activeElement === document.body) retry.focus({ preventScroll: true });
         } else {
             join.disabled = false;
+            join.textContent = 'Join game';
             if (document.activeElement === document.body) join.focus({ preventScroll: true });
         }
     }
