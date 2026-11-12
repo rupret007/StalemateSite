@@ -285,6 +285,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         client.start(scope);
     });
     return {
+        panel,
         isOpen: () => panel.open,
         open: () => { if (scope) panel.open = true; },
         setRoom(next) {

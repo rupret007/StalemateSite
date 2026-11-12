@@ -1779,6 +1779,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         option.hidden = option.disabled = !scope || !table.controller;
         if (table.controller) {
             table.controller.setRoom(scope);
+            updateTableInvite(table, c);
             if (scope && arcadeInvitation?.game === game && arcadeInvitation.ref === scope.ref) table.controller.open();
             if (scope && game === arcadeReturning?.game && scope.room === arcadeReturning.room && scope.ref === arcadeReturning.ref) {
                 arcadeReturning = null;
@@ -1790,6 +1791,17 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         table.loading = true;
         table.load().then(mount => {
             table.controller = mount($('[data-game-night]'), (room, state, sendMatch) => arcadeMatchState(game, table, room, state, sendMatch));
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn btn--small arcade-invite-friend';
+            button.textContent = 'Invite a friend';
+            button.setAttribute('aria-haspopup', 'dialog');
+            button.hidden = true;
+            button.addEventListener('click', () => {
+                if (table.invite && arcadeInviteTarget() === table.invite) openInviteDialog(button);
+            });
+            table.controller.panel.querySelector('summary').nextElementSibling.after(button);
+            table.inviteButton = button;
             drawArcadeTable(currentGameNight(), game, table);
         }).catch(() => {
             if (gameGuest && !gameGuestSeated) finishArcadeInvitation(`${table.label} could not load. Refresh to try again.`);
@@ -1810,8 +1822,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             else toast(message);
         }
     }
+    function updateTableInvite(table, room) {
+        if (table.inviteButton)
+            table.inviteButton.hidden = !!gameGuest || !gameGuestInvitesSupported || !table.invite || !room || !amOp(room);
+    }
     function arcadeMatchState(game, table, scope, state, sendMatch) {
         table.invite = scope && state?.seat && state.waiting ? gameNightInvite(game, state.id) : null;
+        updateTableInvite(table, currentGameNight());
         const invite = arcadeInvitation;
         if (!sendMatch || !invite || game !== invite.game || scope?.room !== invite.room || scope.ref !== invite.ref) return;
         if (state?.seat && (state.id === invite.match || gameGuest)) {
