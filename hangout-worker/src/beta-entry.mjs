@@ -12,7 +12,7 @@ import { incidentSourceConfigurationValid } from './lobby-incident-sources.mjs';
 import { publicBetaHelp } from './beta-public-help.mjs';
 import { arcadeEnabled, arcadeGame, arcadePath, arcadeRoomRequest } from './arcade-transport.mjs';
 import { mediaEnabled, mediaPath } from './game-night-media.mjs';
-import { GAME_GUEST_PATH, GAME_INVITATION_PATH, gameGuestEnabled, gameGuestScope } from './game-night-invitations.mjs';
+import { GAME_GUEST_PATH, GAME_INVITATION_PATH, gameGuestEnabled, gameGuestScope, gameGuestSessionRef } from './game-night-invitations.mjs';
 export { BetaSessions } from './beta-sessions.mjs';
 export { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget };
 
@@ -238,6 +238,11 @@ async function newAccess(env, { exp = Date.now() + BETA_TTL, ip = '0.0.0.0', pro
 }
 
 async function gameInvitation(request, env, path, body) {
+    if (path === 'leave') {
+        const session = await betaSession(request, env, Date.now(), { gameGuest: true, allowRevoked: true });
+        if (session && body.sessionRef === await gameGuestSessionRef(session.access.sid)) await disconnect(env, session);
+        return json({ ok: true });
+    }
     if (!gameGuestEnabled(env) || !['issue', 'details', 'accept'].includes(path)) return json({ error: 'Game invitations are unavailable.' }, 404);
     const session = path === 'issue' ? await betaSession(request, env) : null;
     if (path === 'issue' && !session) return json({ error: 'Private invitation required.' }, 401);
@@ -340,7 +345,7 @@ async function betaRequest(request, env, deps = {}) {
         || gameGuestsAvailable && !gameGuestRequested && ['GET', 'HEAD'].includes(request.method) && gameGuestAsset(assetPath)
             && await betaSession(request, env, Date.now(), { gameGuest: true });
     if (!session) {
-        if (gameGuestRequested && assetPath === LOBBY_PAGE) return reply('Your Game Night access expired. Ask your host for a new invitation.', 401);
+        if (gameGuestRequested && assetPath === LOBBY_PAGE) return reply('Your Game Night access ended. Ask your host for a new invitation.', 401);
         if (['GET', 'HEAD'].includes(request.method) && !request.headers.get('Upgrade')
             && [`${ROOT}lobby`, `${ROOT}lobby/`, `${ROOT}lobby/index.html`].includes(assetPath)) {
             return reply(request.method === 'HEAD' ? null : LOBBY_ENTRANCE, 401, 'text/html; charset=utf-8', {
@@ -370,7 +375,11 @@ async function betaRequest(request, env, deps = {}) {
         return json(await result.json(), result.status);
     }
     if (url.pathname === '/beta/state') return json({ kind: session.identity?.kind || 'guest', role: session.identity?.role || 'fan', emailConfigured: betaAccessConfigured(env), staffConfigured: betaAccessConfigured(env) });
-    if (url.pathname === '/beta/bootstrap.js') return reply(`window.HangoutBootstrap=${JSON.stringify({ preview: env.HANGOUT_PREVIEW_KEY, owner: session.identity?.kind === 'owner', ...(guest ? { gameGuest: { room: guest.room, ref: guest.ref, game: guest.game, match: guest.match } } : {}) })};window.HangoutEntrySites=${JSON.stringify(Object.values(entrySitesFromConfig(env.HANGOUT_ENTRY_SITES)))};${lobbyParticipationMode(env) ? 'window.HangoutParticipationControls=true;' : ''}${guest ? '' : "try{sessionStorage.setItem('hangout-preview',window.HangoutBootstrap.preview);sessionStorage.setItem('hangout-owner',window.HangoutBootstrap.owner?'1':'0');}catch{}"}`, 200, 'text/javascript');
+    if (url.pathname === '/beta/bootstrap.js') {
+        const bootstrap = { preview: env.HANGOUT_PREVIEW_KEY, owner: session.identity?.kind === 'owner' };
+        if (guest) bootstrap.gameGuest = { room: guest.room, ref: guest.ref, game: guest.game, match: guest.match, sessionRef: await gameGuestSessionRef(session.access.sid) };
+        return reply(`window.HangoutBootstrap=${JSON.stringify(bootstrap)};window.HangoutEntrySites=${JSON.stringify(Object.values(entrySitesFromConfig(env.HANGOUT_ENTRY_SITES)))};${lobbyParticipationMode(env) ? 'window.HangoutParticipationControls=true;' : ''}${guest ? '' : "try{sessionStorage.setItem('hangout-preview',window.HangoutBootstrap.preview);sessionStorage.setItem('hangout-owner',window.HangoutBootstrap.owner?'1':'0');}catch{}"}`, 200, 'text/javascript');
+    }
     if (url.pathname === '/lobby-owner/login' || url.pathname === '/lobby-admin/login') {
         if (request.method !== 'GET') return reply('GET required.', 405);
         if (!betaAccessConfigured(env)) return reply('Email verification is not configured. Guest chat is still available from your invitation.', 503);

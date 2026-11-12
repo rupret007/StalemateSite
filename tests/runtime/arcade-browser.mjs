@@ -323,6 +323,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
                 await expect(guest.getByLabel('Your nick')).toBeHidden();
                 await expect(guest.getByRole('combobox', { name: 'Switch game' })).toBeHidden();
+                await expect(guest.locator('[data-call-toggle]')).toBeHidden();
                 await expect(guest.getByRole('tab', { name: '#stalemate' })).toHaveCount(0);
                 assert.equal((await context.request.get(origin + '/beta/state')).status(), 401, 'room guest lacks community access');
                 assert.equal((await context.request.post(origin + '/beta/arcade-turdanoid-ticket?game-guest=1', {
@@ -354,8 +355,17 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(reused.getByRole('status')).toContainText('was used');
                 await expect(reused.getByRole('button', { name: 'Join game' })).toBeHidden();
                 await reused.close();
+                await context.request.post(origin + '/beta/game-night/invitation/leave', { headers: { Origin: origin }, data: { sessionRef: '0'.repeat(64) } });
+                assert.equal((await context.request.get(origin + '/beta/state?game-guest=1')).status(), 200, 'an obsolete tab cannot close a different invitation');
+                if (!phone) await guest.route('**/beta/game-night/invitation/leave', route => route.fulfill({ status: 503 }), { times: 1 });
                 await guest.locator('[data-leave]').click();
                 await expect(guest.locator('[data-game-night]')).toBeHidden();
+                if (!phone) await guest.getByRole('button', { name: 'Retry closing invitation', exact: true }).click();
+                await expect.poll(async () => (await context.request.get(origin + '/beta/state?game-guest=1')).status()).toBe(401);
+                await expect(guest.locator('[data-session-reason]')).toHaveText('You left Game Night. Ask your host for a fresh invitation.');
+                await captureArcadeInvite(guest, viewport, 'first-visit-04-left');
+                await guest.reload();
+                await expect(guest.locator('[data-game-night]')).toHaveCount(0);
                 console.log(`Passed ${engine} ${viewport.width}x${viewport.height} first-visit Chess, host room reopened, one tap to the same game, move, reload, room chat and replay refusal.`);
             } finally { await context.close(); }
         }

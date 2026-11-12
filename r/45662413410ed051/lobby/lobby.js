@@ -43,7 +43,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const betaBootstrap = betaShell && window.HangoutBootstrap;
     const gameGuest = betaBootstrap?.gameGuest;
     const gameGuestQuery = gameGuest ? '?game-guest=1' : '';
-    const guestRoomChanged = gameGuest && history.state?.gameRoom && history.state.gameRoom !== gameGuest.ref;
+    const guestInvitationChanged = gameGuest && history.state?.gameSessionRef && history.state.gameSessionRef !== gameGuest.sessionRef;
+    let gameGuestExit = gameGuest && ['left', 'closed', 'removed'].includes(history.state?.gameExit) ? history.state.gameExit : '';
     if (gameGuest) document.body.classList.add('game-guest');
     let gameEntry = betaShell ? gameNightEntry?.(params, location.hash) : null;
 
@@ -94,7 +95,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const relayBase = ((isLocal && (params.get('relay') || readTab('hangout-relay'))) || $('meta[name="hangout-relay"]').content || '').replace(/\/$/, '');
     const turnUrl = ((isLocal && params.get('turn')) || $('meta[name="hangout-turn"]').content || '').trim();
     if (isLocal && params.get('relay')) writeTab('hangout-relay', params.get('relay'));
-    if (location.search) history.replaceState(gameGuest ? { gameRoom: history.state?.gameRoom || gameGuest.ref } : null, '', location.pathname + gameGuestQuery + location.hash);
+    if (location.search) history.replaceState(gameGuest ? { gameSessionRef: history.state?.gameSessionRef || gameGuest.sessionRef, gameExit: gameGuestExit } : null, '', location.pathname + gameGuestQuery + location.hash);
     const siteKey = $('meta[name="hangout-turnstile"]').content || '';
     const inviteHash = new URLSearchParams(location.hash.slice(1));
     const pendingRoomFromInvite = gameEntry ? '' : inviteHash.get('room') || '';
@@ -829,11 +830,37 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const next = reason === 'left' ? 'Return to the community to start a new chat session.' : betaShell
             ? wasVerified ? 'Return to your invitation, then verify your email again to recover your rooms.' : 'Return to your private invitation to join again.'
             : wasVerified ? 'Choose Try again to continue as a guest. Sign in again to recover your registered rooms.' : 'Choose Try again to start a fresh session.';
-        $('[data-session-reason]').textContent = `${ended} ${next} Cameras are off.`;
-        $('[data-session-reentry]').hidden = !betaShell;
+        $('[data-session-reason]').textContent = gameGuest ? `${gameGuestExitMessage(reason)} Ask your host for a fresh invitation.` : `${ended} ${next} Cameras are off.`;
+        $('[data-session-reentry]').hidden = !betaShell || !!gameGuest;
         $('[data-session-reentry]').textContent = reason === 'left' ? 'Return to community' : 'Return to invitation';
         $('[data-session-ended]').hidden = false;
         show('chat'); $('#session-ended-title').focus({ preventScroll: true });
+    }
+    function gameGuestExitMessage(reason) {
+        return { left: 'You left Game Night.', closed: 'This Game Night room closed.', removed: 'You were removed from Game Night.' }[reason] || 'Your Game Night access ended.';
+    }
+    function leaveGameGuest(reason) {
+        gameGuestExit = reason;
+        history.replaceState({ gameSessionRef: gameGuest.sessionRef, gameExit: reason }, '', location.pathname + gameGuestQuery);
+        endSession(reason);
+        void closeGameGuestAccess();
+    }
+    async function closeGameGuestAccess() {
+        const status = $('[data-session-reason]'), retry = $('[data-game-guest-exit-retry]');
+        const message = gameGuestExitMessage(gameGuestExit);
+        retry.hidden = true;
+        status.textContent = `${message} Closing the invitation…`;
+        try {
+            const response = await fetch('/beta/game-night/invitation/leave', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionRef: gameGuest.sessionRef }), keepalive: true,
+                signal: AbortSignal.timeout(10000)
+            });
+            if (!response.ok || (await response.json()).ok !== true) throw new Error('Invitation close unconfirmed');
+            status.textContent = `${message} Ask your host for a fresh invitation.`;
+        } catch {
+            status.textContent = `${message} The invitation could not be closed. Try again.`;
+            retry.hidden = false;
+        }
     }
     const send = (obj) => {
         const commandName = obj.t === 'cmd' ? String(obj.name || '').toLowerCase()
@@ -1137,6 +1164,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             break;
         }
         case 'part': case 'closed': {
+            if (gameGuest && m.ch === gameGuest.room) {
+                leaveGameGuest(m.t === 'closed' ? 'closed' : gameGuestExit === 'removed' ? 'removed' : 'left');
+                break;
+            }
             const leavingGame = app.chans.get(m.ch)?.kind === 'game';
             const leavingFromButton = app.active === m.ch && document.activeElement === $('[data-leave]');
             forgetGameRoom(m.ch);
@@ -1208,6 +1239,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             } else toast(`${m.by} invited you to ${m.ch}`, [['Join', () => cmd('join', [m.ch])]]);
             break;
         case 'kicked': {
+            if (gameGuest && m.ch === gameGuest.room) { gameGuestExit = 'removed'; break; }
             forgetGameRoom(m.ch);
             app.kicked = m.ch === '#stalemate';
             toast(`${m.banned ? 'Banned' : 'Kicked'} from ${m.ch} by ${m.by}: ${m.reason}`);
@@ -2783,9 +2815,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const toastRegion = $('[data-toast]');
     if (gameGuest) {
         $('[data-gate]').hidden = true;
-        $('[data-game-guest-connecting]').hidden = false;
-        if (guestRoomChanged) gateStatus('This browser accepted an invitation to a different room. Ask your host for a new invitation for this game.');
+        $('[data-game-guest-exit-retry]').addEventListener('click', () => void closeGameGuestAccess());
+        if (guestInvitationChanged) {
+            $('[data-game-guest-connecting]').hidden = false;
+            gateStatus('This browser accepted a different invitation. Ask your host for a new invitation for this game.');
+        } else if (gameGuestExit) leaveGameGuest(gameGuestExit);
         else {
+            $('[data-game-guest-connecting]').hidden = false;
             $('[data-game-guest-retry]').addEventListener('click', () => connect(''));
             void connect('');
         }
