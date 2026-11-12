@@ -1581,6 +1581,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const ended = musicInvite?.state === 'ended';
         const current = currentJam();
         panel.hidden = !musicInvite || (accepted && (current?.name !== musicInvite.room || current.keepRef !== musicInvite.instance));
+        if (current && !amOp(current) && !current.jam?.web && !current.jam?.desktop && !current.jam?.invitation)
+            $('[data-jam-actions]').hidden = accepted && !panel.hidden;
         if (panel.hidden) return;
         $('[data-music-invite-status]').textContent = ended ? 'This music invitation ended. Ask the host for a fresh one.'
             : accepted ? 'You’re in the Jam room. Open the audio check when you’re ready.'

@@ -191,6 +191,7 @@ test('only the selected guest can accept a music invitation and open the audio c
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
         const audio = panel.getByRole('button', { name: 'Open audio check' });
         await expect(audio).toBeFocused();
+        await expect(guest.locator('[data-jam-actions]')).toBeHidden();
         await audio.press('Enter');
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([[invite, '_blank', 'noopener,noreferrer']]);
         expect(await guest.evaluate(() => window.audioRequests)).toBe(0);
