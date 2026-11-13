@@ -19,7 +19,7 @@ export function newGameNightRoomName() {
 }
 
 export const gameNightLabels = Object.freeze({
-    chess: 'Royal Flush Chess', crapeights: 'Crappy Eights', turdrummy: 'TurdRummy', turdspades: 'TurdSpades',
+    chess: 'Royal Flush Chess', four: 'Four in a Row', crapeights: 'Crappy Eights', turdrummy: 'TurdRummy', turdspades: 'TurdSpades',
     turdjack: 'Crapjack 21', turdtris: 'Turdtris Sprint', turdomania: 'Turdomania Duel',
     turdrush: 'Turd Rush Race', turdanoid: 'Turdanoid Brick Race'
 });

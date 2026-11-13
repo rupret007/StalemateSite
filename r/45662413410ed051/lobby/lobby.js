@@ -5,7 +5,7 @@ import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
 import { unpackLobbyRoster } from './lobby-roster.mjs';
 import { createIdleHeartbeat } from './idle-heartbeat.mjs';
-import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourWinningCells, gameInviteCode, gameNightInvite, gameNightRoomName, newGameNightRoomName } from './game-night.mjs';
+import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourWinningCells, gameInviteCode, gameNightInvite, gameNightLabels, gameNightRoomName, newGameNightRoomName } from './game-night.mjs';
 (() => {
     'use strict';
     const { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff,
@@ -46,8 +46,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const gameGuestQuery = gameGuest ? '?game-guest=1' : '';
     const guestInvitationChanged = gameGuest && history.state?.gameSessionRef && history.state.gameSessionRef !== gameGuest.sessionRef;
     let gameGuestExit = gameGuest && ['left', 'closed', 'removed'].includes(history.state?.gameExit) ? history.state.gameExit : '';
-    let gameGuestSeated = false;
-    if (gameGuest) document.body.classList.add('game-guest');
+    let gameGuestSeated = false, gameGuestReloadOffered = false;
+    if (gameGuest) {
+        document.body.classList.add('game-guest');
+        if (gameGuest.game === 'four') document.body.classList.add('game-guest-four');
+    }
     let gameEntry = betaShell ? gameNightEntry?.(params, location.hash) : null;
 
     const entrySites = createEntrySiteRegistry(window.HangoutEntrySites);
@@ -524,10 +527,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         ['turdrush', { label: 'Turd Rush Race', load: () => import('./arcade-turdrush.mjs').then(module => module.mountArcadeTurdRush) }],
         ['turdanoid', { label: 'Turdanoid Brick Race', load: () => import('./arcade-turdanoid.mjs').then(module => module.mountArcadeTurdanoid) }]
     ]);
-    let arcadeReturning = null, arcadeInvitation = null;
+    const gameLabel = game => arcadeTables.get(game)?.label || gameNightLabels[game] || 'Game Night';
+    let arcadeReturning = null, arcadeInvitation = null, arcadeShareIntent = null;
     let arcadeMediaSupported = false, arcadeMedia = null, arcadeMediaLoading = false;
     let fourInARowSupported = false, fourRoom = null, fourPlayed = false;
-    let fourGameId = '', fourActionPending = false;
+    let fourGameId = '', fourActionPending = false, fourInvite = null;
     const fourButtons = [], fourCells = [];
     const gameReturnKey = 'hangout-game-return';
     const gameInvites = new Map();
@@ -677,7 +681,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-connection]').dataset.state = state;
         $('[data-send]').disabled = state !== 'connected';
         $('[data-enter]').disabled = state === 'connecting' || state === 'reconnecting' || state === 'ended' && betaShell;
-        if (gameGuest) $('[data-game-guest-retry]').hidden = state !== 'offline';
+        if (gameGuest) $('[data-game-guest-retry]').hidden = state !== 'offline' && !gameGuestReloadOffered;
         $('[data-reconnect]').hidden = !(state === 'offline' || state === 'ended' && !betaShell) || !app.me;
         $$('[data-start]').forEach((b) => { b.disabled = state !== 'connected'; });
         if (state === 'offline' && app.pendingChannel) {
@@ -730,6 +734,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         clearTimeout(retryTimer);
         setConnection(app.me ? 'reconnecting' : 'connecting');
         if (gameGuest && !gameGuestSeated) {
+            gameGuestReloadOffered = false;
             gateStatus('Joining the game…');
             $('[data-game-guest-retry]').hidden = true;
         }
@@ -1165,7 +1170,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             }
             app.chans.set(m.ch.name, c);
             if (c.kind === 'game' && invite?.arcade && invite.ref === c.keepRef) beginArcadeInvitation(c, invite.arcade);
-            if (gameGuest && c.name === gameGuest.room && c.keepRef === gameGuest.ref) beginArcadeInvitation(c, gameGuest);
+            if (gameGuest && gameGuest.game !== 'four' && c.name === gameGuest.room && c.keepRef === gameGuest.ref) beginArcadeInvitation(c, gameGuest);
             if (pendingKeep?.stage === 'joining' && c.name === pendingKeep.room) {
                 if (c.keepRef === pendingKeep.ref) pendingKeep.stage = 'confirm';
                 else clearKeep('That room changed while you signed in. Nothing was kept.');
@@ -1173,6 +1178,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             // Classic IRC: joining begins a fresh buffer; never render pre-join backlog.
             if (activityRoom(c)) c.actSnap = activitySnapshot(m.act);
             switchTo(m.ch.name, { freshJoin: true });
+            if (gameGuest?.game === 'four' && c.name === gameGuest.room && c.keepRef === gameGuest.ref) beginFourInvitation(c);
             if (gameOfferAccepted && !arcadeInvitation) focusChannelTab(c.name);
             followPendingRoomJoin();
             break;
@@ -1197,6 +1203,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             c.four = m.game;
             if (fourRoom === c) fourActionPending = false;
             if (app.active === c.name) drawGameNight();
+            if (gameGuest?.game === 'four' && c.name === gameGuest.room) settleFourGuest(c);
             break;
         }
         case 'chan': {
@@ -1266,13 +1273,15 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                         : 'Couldn’t join Game Night. Ask the host for a fresh invitation.');
                 }
                 if (fourActionPending) { fourActionPending = false; drawGameNight(); }
+                const fourInviteFailed = gameGuest && !gameGuestSeated && arcadeInvitation?.game === 'four';
+                if (fourInviteFailed) finishArcadeInvitation(m.text);
                 if (personPreferencePending) { personPreferencePending = null; personSheetStatus('That preference was not confirmed. Check the current person and try again.'); }
                 if (pendingKeep) clearKeep();
                 resetPendingReports();
                 if (app.pendingChannel && $('[data-channel-dialog]').open) {
                     $('[data-channel-error]').textContent = m.text;
                     app.pendingChannel = '';
-                } else if (!failedGameJoin) toast(m.text);
+                } else if (!failedGameJoin && !fourInviteFailed) toast(m.text);
             }
             break;
         case 'denied': if (personPreferencePending) { personPreferencePending = null; personSheetStatus('That preference was not confirmed. Check the current person and try again.'); } if (pendingKeep) clearKeep(); if (fourActionPending) { fourActionPending = false; drawGameNight(); } line(app.active, { notice: true, from: 'StaleBot', text: m.text, kind: 'error' }); break;
@@ -1734,7 +1743,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const room = result?.ok && store(result.room);
         if (room?.kind === 'game' && room.keepRef === result.ref) {
             const requestedGame = pending.fromEntry && gameEntry?.table;
-            if (arcadeTables.get(requestedGame)?.supported) arcadeReturning = { room: room.name, ref: room.keepRef, game: requestedGame };
+            if (arcadeTables.get(requestedGame)?.supported) {
+                arcadeReturning = { room: room.name, ref: room.keepRef, game: requestedGame };
+                arcadeShareIntent = gameEntry.prepareShare && gameGuestInvitesSupported ? arcadeReturning : null;
+            }
             if (pending.fromEntry) gameEntry = null;
             if (app.active !== room.name) switchTo(room.name);
             else if (arcadeReturning) drawGameNight();
@@ -2116,6 +2128,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         option.hidden = option.disabled = !scope || !table.controller;
         if (table.controller) {
             table.controller.setRoom(scope);
+            updateTableInvite(table, c);
             if (scope && arcadeInvitation?.game === game && arcadeInvitation.ref === scope.ref) table.controller.open();
             if (scope && game === arcadeReturning?.game && scope.room === arcadeReturning.room && scope.ref === arcadeReturning.ref) {
                 arcadeReturning = null;
@@ -2127,35 +2140,115 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         table.loading = true;
         table.load().then(mount => {
             table.controller = mount($('[data-game-night]'), (room, state, sendMatch) => arcadeMatchState(game, table, room, state, sendMatch));
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn btn--small arcade-invite-friend';
+            button.textContent = 'Invite a friend';
+            button.setAttribute('aria-haspopup', 'dialog');
+            button.hidden = true;
+            button.addEventListener('click', () => {
+                if (table.invite && arcadeInviteTarget() === table.invite) openInviteDialog(button);
+            });
+            table.controller.panel.querySelector('summary').nextElementSibling.after(button);
+            table.inviteButton = button;
             drawArcadeTable(currentGameNight(), game, table);
         }).catch(() => {
-            if (gameGuest && !gameGuestSeated) finishArcadeInvitation(`${table.label} could not load. Refresh to try again.`);
-            else toast(`${table.label} could not load. Reopen Game Night to try again.`);
+            if (gameGuest && !gameGuestSeated) {
+                finishArcadeInvitation();
+                offerGameGuestReload(`${table.label} could not load. Try again.`);
+            } else toast(`${table.label} could not load. Reopen Game Night to try again.`);
         })
             .finally(() => { table.loading = false; });
     }
     function beginArcadeInvitation(room, target) {
         finishArcadeInvitation();
         arcadeInvitation = { ...target, room: room.name, ref: room.keepRef, sent: false,
-            timer: setTimeout(() => finishArcadeInvitation('The seat could not be confirmed. Ask the host for a fresh game invitation.'), 15000) };
+            timer: setTimeout(() => {
+                if (gameGuest && !gameGuestSeated) offerGameGuestReload('Still waiting for your seat. Try again.');
+                else finishArcadeInvitation('The seat could not be confirmed. Ask the host for a fresh game invitation.');
+            }, 15000) };
+    }
+    function offerGameGuestReload(message) {
+        gateStatus(message);
+        const retryGame = $('[data-game-guest-retry]');
+        retryGame.hidden = false;
+        if (!gameGuestReloadOffered) retryGame.focus({ preventScroll: true });
+        gameGuestReloadOffered = true;
     }
     function finishArcadeInvitation(message) {
         clearTimeout(arcadeInvitation?.timer);
         arcadeInvitation = null;
         if (message) {
-            if (gameGuest && !gameGuestSeated) gateStatus(message);
-            else toast(message);
+            if (gameGuest && !gameGuestSeated) {
+                gameGuestReloadOffered = false;
+                $('[data-game-guest-retry]').hidden = true;
+                gateStatus(message);
+            } else toast(message);
         }
+    }
+    function revealFourGuest() {
+        gameGuestSeated = true;
+        gameGuestReloadOffered = false;
+        $('[data-game-guest-retry]').hidden = true;
+        $('[data-app]').hidden = false;
+        $('[data-game-guest-connecting]').hidden = true;
+        const detail = $('[data-four]');
+        detail.hidden = false;
+        detail.open = true;
+        detail.querySelector('summary')?.focus({ preventScroll: true });
+        requestAnimationFrame(() => {
+            $('[data-four-columns]')?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
+        });
+    }
+    function settleFourGuest(room) {
+        if (!gameGuest || gameGuest.game !== 'four' || gameGuestSeated) return;
+        const invite = arcadeInvitation;
+        if (!invite || invite.game !== 'four' || room?.name !== invite.room || room.keepRef !== invite.ref) return;
+        const game = room.four;
+        if (!game) return;
+        if (game.guest === app.selfId && game.id === gameGuest.match) {
+            revealFourGuest();
+            return finishArcadeInvitation();
+        }
+        if (game.id !== gameGuest.match || game.guest) {
+            return finishArcadeInvitation('This game invitation no longer has an open seat. Ask the host for a fresh invitation.');
+        }
+        if (!invite.sent) invite.sent = fourCommand('join') === true;
+    }
+    function beginFourInvitation(room) {
+        finishArcadeInvitation();
+        arcadeInvitation = { game: 'four', match: gameGuest.match, room: room.name, ref: room.keepRef, sent: false,
+            timer: setTimeout(() => {
+                if (gameGuest && !gameGuestSeated) offerGameGuestReload('Still waiting for your seat. Try again.');
+            }, 15000) };
+        settleFourGuest(room);
+    }
+    function updateTableInvite(table, room) {
+        if (table.inviteButton)
+            table.inviteButton.hidden = !!gameGuest || !gameGuestInvitesSupported || !table.invite || !room || !amOp(room);
     }
     function arcadeMatchState(game, table, scope, state, sendMatch) {
         table.invite = scope && state?.seat && state.waiting ? gameNightInvite(game, state.id) : null;
+        updateTableInvite(table, currentGameNight());
+        const share = arcadeShareIntent;
+        if (share && table.invite && table.controller?.isOpen() && scope.room === share.room && scope.ref === share.ref && game === share.game) {
+            arcadeShareIntent = null;
+            const room = currentGameNight();
+            if (room?.keepRef === share.ref && amOp(room) && !document.querySelector('dialog[open]')) {
+                openInviteDialog(null, { exactTable: table.invite });
+                if ($('[data-invite-dialog]').open) void prepareGuestLink(table.invite, true);
+            }
+        }
         const invite = arcadeInvitation;
         if (!sendMatch || !invite || game !== invite.game || scope?.room !== invite.room || scope.ref !== invite.ref) return;
         if (state?.seat && (state.id === invite.match || gameGuest)) {
             if (gameGuest && !gameGuestSeated) {
                 gameGuestSeated = true;
+                gameGuestReloadOffered = false;
+                $('[data-game-guest-retry]').hidden = true;
                 $('[data-app]').hidden = false;
                 $('[data-game-guest-connecting]').hidden = true;
+                table.controller.panel.querySelector('summary').focus({ preventScroll: true });
             }
             return finishArcadeInvitation();
         }
@@ -2168,8 +2261,29 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const game = event.target.value;
         event.target.value = '';
         if (!currentGameNight() || !game) return;
-        if (game === 'four' && !$('[data-four]').hidden) $('[data-four]').open = true;
-        else arcadeTables.get(game)?.controller?.open();
+        const four = game === 'four' ? $('[data-four]:not([hidden])') : null;
+        const controller = arcadeTables.get(game)?.controller;
+        const wasOpen = four?.open || controller?.isOpen();
+        const panel = four || controller?.open();
+        if (!panel) return;
+        if (four) four.open = true;
+        const heading = panel.querySelector('summary');
+        heading.focus({ preventScroll: true });
+        const reveal = () => {
+            const target = panel.offsetHeight < panel.parentElement.clientHeight ? panel : heading;
+            target.scrollIntoView({ block: 'center', behavior: 'instant' });
+        };
+        reveal();
+        // Some games reset the scroll position as their panel opens.
+        if (!wasOpen) panel.addEventListener('toggle', () => {
+            if (panel.open && document.activeElement === heading) reveal();
+        }, { once: true });
+        // The start controls can appear after the match service responds.
+        const resize = new ResizeObserver(() => {
+            if (panel.open && document.activeElement === heading) reveal();
+        });
+        resize.observe(panel);
+        heading.addEventListener('blur', () => resize.disconnect(), { once: true });
     });
     window.addEventListener('pagehide', () => {
         const current = currentGameNight();
@@ -2180,17 +2294,21 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     });
     function fourCommand(action, column) {
         const c = currentGameNight();
-        if (!c || c !== fourRoom || shieldActive || !roomNonce(c.keepRef)) return;
+        if (!c || c !== fourRoom || shieldActive || !roomNonce(c.keepRef)) return false;
         const primary = action === 'open' || action === 'join';
-        if (primary && fourActionPending) return;
+        if (primary && fourActionPending) return false;
         const game = c.four;
         const args = [action, game?.id || ''];
         if (action === 'drop') args.push(String(game.moves), String(column + 1));
-        if (!cmd('four', args, c.name, c.keepRef)) toast('Reconnect before playing.');
-        else if (primary) {
+        if (!cmd('four', args, c.name, c.keepRef)) {
+            toast('Reconnect before playing.');
+            return false;
+        }
+        if (primary) {
             fourActionPending = true;
             $('[data-four-action]').setAttribute('aria-disabled', 'true');
         }
+        return true;
     }
     function buildFourBoard() {
         for (let column = 0; column < FOUR_COLUMNS; column++) {
@@ -2223,12 +2341,23 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             fourRoom = c; detail.open = false; fourPlayed = false;
             fourGameId = ''; fourActionPending = false;
         }
-        detail.hidden = !c || !fourInARowSupported || shieldActive;
-        if (detail.hidden) { status.textContent = ''; availability.textContent = ''; board.hidden = true; return; }
+        detail.hidden = !c || !fourInARowSupported || shieldActive || (!!gameGuest && gameGuest.game !== 'four');
+        if (detail.hidden) {
+            fourInvite = null;
+            status.textContent = '';
+            availability.textContent = '';
+            board.hidden = true;
+            $('[data-four-invite]').hidden = true;
+            return;
+        }
         const game = c.four, seat = game?.host === app.selfId ? 'X' : game?.guest === app.selfId ? 'O' : '';
         const openSeat = !!game && !game.guest && !seat;
         if (openSeat && fourGameId !== game.id) detail.open = true;
+        if (gameGuest?.game === 'four' && game) detail.open = true;
         fourGameId = game?.id || '';
+        const hostWaiting = !!game && !game.guest && game.host === app.selfId && !fourFinished(game);
+        fourInvite = hostWaiting && gameGuestInvitesSupported && !gameGuest && amOp(c) ? gameNightInvite('four', game.id) : null;
+        $('[data-four-invite]').hidden = !fourInvite;
         const availabilityText = openSeat ? 'Four in a Row has an open seat. Choose Join match to play.' : '';
         if (availability.textContent !== availabilityText) availability.textContent = availabilityText;
         $('[data-four-seats]').hidden = !game;
@@ -2292,6 +2421,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     }
     $('[data-four-action]').addEventListener('click', event => fourCommand(event.currentTarget.dataset.fourAction));
     $('[data-four-leave]').addEventListener('click', () => fourCommand('leave'));
+    $('[data-four-invite]').addEventListener('click', () => {
+        const target = fourInvite;
+        if (!target) return;
+        openInviteDialog($('[data-four-invite]'), { exactTable: target });
+        if ($('[data-invite-dialog]').open) void prepareGuestLink(target, true, true);
+    });
     function changeGameLink(value) {
         const c = currentGameNight();
         return !!(c && c === gameEditorRoom && amOp(c) && cmd('discord', [value], c.name, c.keepRef));
@@ -2939,7 +3074,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
         $('[data-invite-empty]').hidden = online.size > 0;
     }
-    function openInviteDialog(opener = null, music = false) {
+    function openInviteDialog(opener = null, { music = false, exactTable = null } = {}) {
         const current = store(app.active);
         if (connectionState !== 'connected' || !current || current.kind === 'lobby' || !amOp(current)) return;
         jamInviteOpener = opener ? { button: opener, room: current, music } : null;
@@ -2977,12 +3112,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             }
         }
         const canInviteNew = isGame && gameGuestInvitesSupported;
-        const target = canInviteNew && arcadeInviteTarget();
+        const target = canInviteNew && (exactTable || arcadeInviteTarget());
         const inviteHint = $('[data-game-invite-empty]');
         inviteHint.hidden = !!target || (!canInviteNew && !!roster.childElementCount);
         inviteHint.textContent = canInviteNew ? 'Open a game with a free seat to invite a friend.' : 'Nobody else is in Hang Out yet.';
         $('[data-game-invite-link]').hidden = !target;
-        if (target) createGuestLink.textContent = `Invite a friend to ${arcadeTables.get(target.game).label}`;
+        if (target) createGuestLink.textContent = `Invite a friend to ${gameLabel(target.game)}`;
         $('[data-invite-person-send]').disabled = !personTargetsSupported || !roomNonce(inviteInstance);
         $('[data-invite-dialog]').showModal();
         const first = quick ? list.querySelector('button') || $('[data-invite-quick-cancel]') : $('[data-invite-nick]');
@@ -2993,7 +3128,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (event.currentTarget.getAttribute('aria-disabled') !== 'true') openInviteDialog(event.currentTarget);
     });
     $('[data-jam-invite-music]').addEventListener('click', event => {
-        if (!pendingMusicHandoff) openInviteDialog(event.currentTarget, true);
+        if (!pendingMusicHandoff) openInviteDialog(event.currentTarget, { music: true });
     });
     $('[data-invite-cancel]').addEventListener('click', closeInviteDialog);
     $('[data-invite-quick-cancel]').addEventListener('click', closeInviteDialog);
@@ -3002,22 +3137,56 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         return target ? [nick, room.name, target.game, target.match] : [nick, room.name];
     }
     function arcadeInviteTarget() {
-        return [...arcadeTables.values()].find(table => table.invite && table.controller?.isOpen())?.invite;
+        const detail = $('[data-four]');
+        if (fourInvite && detail?.open) return fourInvite;
+        return [...arcadeTables.values()].find(table => table.invite && table.controller?.isOpen())?.invite || fourInvite;
     }
-    const createGuestLink = $('[data-game-invite-new]'), shareGuestLink = $('[data-game-invite-share]'), guestLinkStatus = $('[data-game-invite-link-status]');
+    const createGuestLink = $('[data-game-invite-new]'), shareGuestLink = $('[data-game-invite-share]');
+    const copyGuestLink = $('[data-game-invite-copy]'), guestLinkStatus = $('[data-game-invite-link-status]');
     let pendingGuestLink = null;
     function resetGuestLink() {
         pendingGuestLink = null;
         createGuestLink.hidden = false; createGuestLink.disabled = false;
-        shareGuestLink.hidden = true; guestLinkStatus.textContent = '';
+        copyGuestLink.hidden = true; shareGuestLink.hidden = true; guestLinkStatus.textContent = '';
     }
-    createGuestLink.addEventListener('click', async () => {
-        const room = inviteContext, target = arcadeInviteTarget();
+    function readyGuestLink() {
+        const request = pendingGuestLink, target = arcadeInviteTarget();
+        if (request?.link && request.room === currentGameNight() &&
+            request.target.game === target?.game && request.target.match === target.match) return request;
+        resetGuestLink();
+        guestLinkStatus.textContent = 'The table changed. Prepare a new invitation.';
+    }
+    createGuestLink.addEventListener('click', () => void prepareGuestLink(arcadeInviteTarget()));
+    async function deliverPreparedLink(request) {
+        const title = `Join me for ${gameLabel(request.target.game)}`;
+        if (typeof navigator.share === 'function') {
+            try {
+                await navigator.share({ title, url: request.link });
+                if (pendingGuestLink === request) closeInviteDialog();
+                return true;
+            } catch (error) {
+                if (pendingGuestLink !== request || error.name === 'AbortError') return true;
+                return false;
+            }
+        }
+        if (typeof navigator.clipboard?.writeText === 'function') {
+            try {
+                await navigator.clipboard.writeText(request.link);
+                if (pendingGuestLink === request) guestLinkStatus.textContent = 'Invitation copied. Send it to your friend in a message.';
+                return true;
+            } catch {
+                return false;
+            }
+        }
+        return false;
+    }
+    async function prepareGuestLink(target, preferEmail = false, deliver = false) {
+        const room = inviteContext;
         if (!target || !room || room !== currentGameNight() || room.keepRef !== inviteInstance || !amOp(room)) {
             guestLinkStatus.textContent = 'Open a game table with a free seat first.';
             return;
         }
-        const request = { room, target };
+        const request = { room, target, preferEmail };
         pendingGuestLink = request;
         createGuestLink.disabled = true;
         guestLinkStatus.textContent = 'Preparing an invitation…';
@@ -3031,23 +3200,40 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (!response.ok || !gameInviteCode(value.code)) throw new Error(value.error || 'The invitation could not be prepared. Try again.');
             request.link = new URL('/beta/game-night/guest#invite=' + value.code, location.origin).href;
             createGuestLink.hidden = true;
+            const canShare = typeof navigator.share === 'function';
+            copyGuestLink.hidden = typeof navigator.clipboard?.writeText !== 'function';
             shareGuestLink.hidden = false;
-            shareGuestLink.textContent = typeof navigator.share === 'function' ? 'Share invite' : 'Email invite';
+            shareGuestLink.textContent = canShare ? 'Share invite' : 'Email invite';
+            const sharePrimary = canShare || preferEmail || copyGuestLink.hidden;
+            copyGuestLink.classList.toggle('btn--ghost', sharePrimary);
+            shareGuestLink.classList.toggle('btn--ghost', !sharePrimary);
             guestLinkStatus.textContent = 'One guest can use this invitation within 20 minutes.';
-            shareGuestLink.focus();
+            if (deliver && await deliverPreparedLink(request)) return;
+            if (pendingGuestLink !== request) return;
+            (sharePrimary ? shareGuestLink : copyGuestLink).focus();
         } catch (error) {
             if (pendingGuestLink !== request) return;
             guestLinkStatus.textContent = error.name === 'TimeoutError' ? 'The invitation took too long. Try again.' : error.message;
         } finally {
             if (pendingGuestLink === request) createGuestLink.disabled = false;
         }
+    }
+    copyGuestLink.addEventListener('click', async () => {
+        const request = readyGuestLink();
+        if (!request) return;
+        try {
+            await navigator.clipboard.writeText(request.link);
+            if (pendingGuestLink === request) guestLinkStatus.textContent = 'Invitation copied. Send it to your friend in a message.';
+        } catch {
+            if (pendingGuestLink !== request) return;
+            const fallback = shareGuestLink.textContent;
+            guestLinkStatus.textContent = `Couldn’t copy the invitation. You can still use ${fallback}.`;
+        }
     });
     shareGuestLink.addEventListener('click', async () => {
-        const request = pendingGuestLink;
-        if (!request?.link || request.room !== currentGameNight() || request.target.match !== arcadeInviteTarget()?.match) {
-            resetGuestLink(); guestLinkStatus.textContent = 'The table changed. Prepare a new invitation.'; return;
-        }
-        const title = `Join me for ${arcadeTables.get(request.target.game).label}`;
+        const request = readyGuestLink();
+        if (!request) return;
+        const title = `Join me for ${gameLabel(request.target.game)}`;
         if (shareGuestLink.textContent === 'Email invite') {
             location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(request.link)}`;
             guestLinkStatus.textContent = 'Choose a friend in the email draft.';
@@ -3059,7 +3245,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         } catch (error) {
             if (pendingGuestLink !== request || error.name === 'AbortError') return;
             shareGuestLink.textContent = 'Email invite';
-            guestLinkStatus.textContent = 'Sharing didn’t open. You can send the invitation by email.';
+            shareGuestLink.classList.toggle('btn--ghost', !request.preferEmail && !copyGuestLink.hidden);
+            copyGuestLink.classList.toggle('btn--ghost', request.preferEmail);
+            guestLinkStatus.textContent = copyGuestLink.hidden
+                ? 'Sharing didn’t open. You can send the invitation by email.'
+                : 'Sharing didn’t open. Copy or email the invitation.';
         }
     });
     $('[data-game-invite-cancel]').addEventListener('click', closeInviteDialog);
@@ -3404,7 +3594,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         } else if (gameGuestExit) leaveGameGuest(gameGuestExit);
         else {
             $('[data-game-guest-connecting]').hidden = false;
-            $('[data-game-guest-retry]').addEventListener('click', () => connect(''));
+            $('[data-game-guest-retry]').addEventListener('click', () => {
+                if (gameGuestReloadOffered) {
+                    $('[data-game-guest-retry]').disabled = true;
+                    gateStatus('Reloading the game…');
+                    location.reload();
+                } else void connect('');
+            });
             void connect('');
         }
     }
