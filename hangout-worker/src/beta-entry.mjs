@@ -104,10 +104,11 @@ const rememberEntry = () => { try { sessionStorage.setItem(ENTRY_HANDOFF_KEY, en
 const lobby = $('#inside .button');
 lobby.href = '${ROOT}lobby/?entry-return=1' + (game ? '&' + GAME_NIGHT_QUERY
     + (game.table ? '&table=' + encodeURIComponent(game.table) : '')
-    + (game.prepareShare ? '&deliver=share' : '') + gameNightFragment(game.target) : '');
+    + (game.prepareShare ? '&deliver=share' : '') + (game.webJamGrant ? '#grants=' + game.webJamGrant : gameNightFragment(game.target)) : '');
 if (game) {
-    lobby.textContent = 'Enter Game Night ↗';
-    $('.lede').textContent = 'Play and chat with friends in a private Game Night room.';
+    lobby.textContent = game.webJamGrant ? 'Continue to WebJam Chess ↗' : 'Enter Game Night ↗';
+    $('.lede').textContent = game.webJamGrant ? 'Open Chess in your private WebJam room and confirm the guest seat.'
+        : 'Play and chat with friends in a private Game Night room.';
 }
 $('#owner').href = '/lobby-owner/login?entry-return=1';
 lobby.addEventListener('click', rememberEntry);

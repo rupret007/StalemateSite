@@ -23,6 +23,19 @@ it('carries an exact Game Night room locator only from the explicit entrance', (
     expect(gameNightEntry(chess)).toEqual({ target: null });
 });
 
+it('accepts a single private WebJam Chess host digest in the fragment only', () => {
+    const digest = 'a'.repeat(64);
+    const host = 'game-night=1&table=chess';
+    const fragment = '#grants=' + digest;
+    expect(gameNightEntry(new URLSearchParams(host), fragment)).toEqual({ target: null, table: 'chess', webJamGrant: digest });
+    for (const query of [host + '&deliver=share', host + '&table=chess', host.replace('chess', 'turdtris')]) {
+        expect(gameNightEntry(new URLSearchParams(query), fragment)).not.toHaveProperty('webJamGrant');
+    }
+    for (const hash of ['', fragment + '&grants=' + digest, fragment + '&room=x', fragment + 'a']) {
+        expect(gameNightEntry(new URLSearchParams(host + '&grants=' + digest), hash)).not.toHaveProperty('webJamGrant');
+    }
+});
+
 describe('reviewed entry-site display configuration', () => {
     it('uses allowlisted names and fixed return links; unknown and duplicate sources stay neutral', () => {
         expect(entryBadge('stalemate')).toBe('via Stalemate');
