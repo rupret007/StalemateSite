@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { betaFetch, betaAccessConfigured } from '../src/beta-entry.mjs';
-import { BETA_COOKIE, BETA_IDENTITY_COOKIE, BETA_TTL, betaSession, readBeta, signBeta } from '../src/beta-auth.mjs';
+import { BETA_COOKIE, BETA_IDENTITY_COOKIE, BETA_TTL, betaSession, makeDemoInvite, readBeta, signBeta } from '../src/beta-auth.mjs';
 import { accountId } from '../src/auth.mjs';
 import { BetaSessions } from '../src/beta-sessions.mjs';
 
@@ -59,6 +59,25 @@ async function unlock(config = env()) {
 }
 
 describe('real invitation-only beta boundary', () => {
+
+    it('automatically expires signed demo admission at 72 hours and caps a late session', async () => {
+        const config = env();
+        const now = Date.now();
+        const send = key => betaFetch(request('/beta/unlock', { method: 'POST', body: { key } }), config, deps);
+        const ttl = 72 * 60 * 60_000;
+        const active = await send(await makeDemoInvite(secret, '1', now - ttl + 60_000));
+        expect(active.status).toBe(200);
+        const access = await readBeta('access', cookieOf(active).split('=')[1], secret);
+        expect(access.exp).toBe(now + 60_000);
+        const expired = await send(await makeDemoInvite(secret, '1', now - ttl));
+        expect(expired.status).toBe(410);
+        expect(expired.headers.has('Set-Cookie')).toBe(false);
+        expect((await send(await makeDemoInvite(secret, '2', now))).status).toBe(410);
+        expect((await send(await makeDemoInvite(invite, '1', now))).status).toBe(410);
+        expect((await send(await makeDemoInvite(secret, '1', now + 60_000))).status).toBe(410);
+        await unlock(config);
+    });
+
     it('protects every product page, static asset, room, TURN and socket before lookup, including HEAD', async () => {
         const config = env();
         for (const path of ['/r/45662413410ed051/lobby/', '/r/45662413410ed051/lobby/lobby.js', '/assets/favicon.svg', '/lobby', '/lobby-owner', '/lobby-admin', '/room', '/turn', '/beta/state', '/beta/bootstrap.js']) {

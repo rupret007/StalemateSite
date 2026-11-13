@@ -3,7 +3,7 @@ import worker, { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget } fr
 import { accountId, accessConfigured, hmacKeyOk, ipHash, newDeviceId, signDevice, verifyDevice } from './auth.mjs';
 import { adminGate, ownerGate } from './lobby-do.mjs';
 import { previewKeyOk } from './core.mjs';
-import { BETA_TTL, BETA_COOKIE, BETA_IDENTITY_COOKIE, GAME_GUEST_COOKIE, BetaSessionUnavailable, equalInvite, signBeta, readBeta, betaCookie, betaSession, readBetaBody } from './beta-auth.mjs';
+import { BETA_TTL, BETA_COOKIE, BETA_IDENTITY_COOKIE, GAME_GUEST_COOKIE, BetaSessionUnavailable, equalInvite, isDemoInvite, verifyDemoInvite, signBeta, readBeta, betaCookie, betaSession, readBetaBody } from './beta-auth.mjs';
 import { registryRequest } from './beta-session-client.mjs';
 import { betaHealth } from './beta-ops.mjs';
 import { entrySitesFromConfig } from '../../r/45662413410ed051/entry-sites.mjs';
@@ -199,6 +199,7 @@ async function unlock(key) {
     try {
         const result = await post('/beta/unlock', { key });
         if (attempt !== currentAttempt) return;
+        if (result.status === 410) return finish(attempt, 'invitation', 'This demo invite is no longer valid. Ask your host for a new one.');
         if (!result.ok) return finish(attempt, result.status === 401 || result.status === 403 ? 'invitation' : 'unavailable',
             result.status === 401 || result.status === 403 ? 'The invitation was not accepted. Check the code or the house rules before trying again.' : unavailable);
         $('#code').value = '';
@@ -236,8 +237,8 @@ async function disconnect(env, session) {
     catch { throw new BetaSessionUnavailable('Your current session could not be revoked. Please try again.'); }
     if (!result.ok) throw new BetaSessionUnavailable('Your session is revoked, but some connections could not be closed. A retry is queued; please try again.');
 }
-async function newAccess(env, { exp = Date.now() + BETA_TTL, ip = '0.0.0.0', profile = null, gameGuest, sid = crypto.randomUUID() } = {}) {
-    const access = { v: 1, sid, exp, scope: gameGuest ? 'game-night' : 'guest', version: String(env.HANGOUT_BETA_INVITE_VERSION || '1'), ...(gameGuest ? { gameGuest } : {}) };
+async function newAccess(env, { exp = Date.now() + BETA_TTL, ip = '0.0.0.0', profile = null, gameGuest, demo = false, sid = crypto.randomUUID() } = {}) {
+    const access = { v: 1, sid, exp, scope: gameGuest ? 'game-night' : 'guest', version: String(env.HANGOUT_BETA_INVITE_VERSION || '1'), ...(gameGuest ? { gameGuest } : {}), ...(demo ? { demo: true } : {}) };
     let result;
     try { result = await registryRequest(env, 'register', { sid: access.sid, exp: access.exp, version: access.version, iph: await ipHash(ip, env.HANGOUT_HMAC_KEY),
         ...(env.HANGOUT_SESSION_AUTHORITY === 'lobby-v1' ? { profile } : {}) }); }
@@ -273,7 +274,7 @@ async function gameInvitation(request, env, path, body) {
         body = { ...body, code: invitation.sid };
     }
     const response = await env.LOBBY.get(env.LOBBY.idFromName('stalemate')).fetch(`https://lobby${GAME_INVITATION_PATH}/${path}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body, session: session && { betaSid: session.access.sid } })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body, session: session && { betaSid: session.access.sid, demo: session.access.demo === true } })
     });
     const data = await response.json().catch(() => ({ error: 'Game invitations are temporarily unavailable.' }));
     if (path === 'issue' && response.ok) return json({ code: await signBeta('game-invitation', { v: 1, sid: data.code, exp: data.until }, env.HANGOUT_HMAC_KEY) });
@@ -339,11 +340,21 @@ async function betaRequest(request, env, deps = {}) {
         if (!body) return json({ error: 'Invalid or oversized request.' }, 400);
         if (url.pathname.startsWith(GAME_INVITATION_PATH + '/')) return gameInvitation(request, env, url.pathname.slice(GAME_INVITATION_PATH.length + 1), body);
         if (url.pathname === '/beta/unlock') {
-            if (!equalInvite(body.key, env.HANGOUT_BETA_INVITE_KEY)) return json({ error: 'Invitation was not accepted.' }, 403);
-            const previous = await betaSession(request, env, Date.now(), { allowRevoked: true });
+            const now = Date.now();
+            const version = String(env.HANGOUT_BETA_INVITE_VERSION || '1');
+            const demo = isDemoInvite(body.key);
+            const demoExpiry = demo && await verifyDemoInvite(body.key, env.HANGOUT_HMAC_KEY, version, now);
+            if (demo && !demoExpiry) return json({ error: 'This demo invite is no longer valid. Ask your host for a new one.' }, 410);
+            if (!demo && !equalInvite(body.key, env.HANGOUT_BETA_INVITE_KEY)) return json({ error: 'Invitation was not accepted.' }, 403);
+            const previous = await betaSession(request, env, now, { allowRevoked: true });
             if (previous && !previous.revoked) return json({ ok: true });
             if (previous) await disconnect(env, previous);
-            return json({ ok: true }, 200, { 'Set-Cookie': (await newAccess(env, { ip: request.headers.get('CF-Connecting-IP') || '0.0.0.0' })).cookie });
+            const access = await newAccess(env, {
+                exp: demo ? Math.min(now + BETA_TTL, demoExpiry) : now + BETA_TTL,
+                demo,
+                ip: request.headers.get('CF-Connecting-IP') || '0.0.0.0'
+            });
+            return json({ ok: true }, 200, { 'Set-Cookie': access.cookie });
         }
         const session = await betaSession(request, env, Date.now(), { allowRevoked: url.pathname === '/beta/logout' });
         if (!session) return json({ error: 'Private invitation required.' }, 401);
@@ -415,7 +426,7 @@ async function betaRequest(request, env, deps = {}) {
         await disconnect(env, session);
         const profile = { kind: owner ? 'owner' : 'staff', account: await accountId(gate.identity.email, env.HANGOUT_HMAC_KEY),
             role: owner ? 'fan' : gate.identity.role, admin: !owner, expiresAt: Math.min(session.access.exp, gate.identity.expiresAt) };
-        const next = await newAccess(env, { exp: session.access.exp, ip: request.headers.get('CF-Connecting-IP') || '0.0.0.0', profile });
+        const next = await newAccess(env, { exp: session.access.exp, demo: session.access.demo === true, ip: request.headers.get('CF-Connecting-IP') || '0.0.0.0', profile });
         const identity = { v: 1, sid: next.access.sid, exp: Math.min(next.access.exp, gate.identity.expiresAt), kind: owner ? 'owner' : 'staff', email: gate.identity.email, role: owner ? 'fan' : gate.identity.role };
         const token = await signBeta('identity', identity, env.HANGOUT_HMAC_KEY);
         const result = redirect(owner ? `${ROOT}lobby/?owner=1${url.searchParams.get('entry-return') === '1' ? '&entry-return=1' : ''}` : `${ROOT}admin/?signed-in=1`, { 'Set-Cookie': betaCookie(BETA_IDENTITY_COOKIE, token, identity.exp - Date.now()) });
