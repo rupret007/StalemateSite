@@ -45,7 +45,7 @@ function fixture() {
         await send(b, 'join', { id });
         return { id, revision: 0, move: 'e2e4' };
     };
-    return { a, b, board, send, start, storage, actors, transport, advance: ms => { now += ms; } };
+    return { a, b, board, send, start, storage, actors, transport, player, advance: ms => { now += ms; } };
 }
 
 describe('Game Night match transport', () => {
@@ -132,38 +132,55 @@ describe('Game Night match transport', () => {
         expect(f.board(f.b)).toMatchObject({ id, seat: 'b' });
     });
 
-    it('holds a seated player’s match when the room socket drops, then cleans it up', async () => {
+    it('keeps a seat through a dropped socket and returns it only to the same session', async () => {
         const f = fixture(), { id } = await f.start();
-        expect(f.board(f.b)).toMatchObject({ id, seat: 'b' });
-        await f.transport.revoke({ room, ref }, 'seat-black');
-        expect(f.board(f.a)).toMatchObject({ id, seat: 'w' });
-        expect((await f.storage.get(ARCADE_TAG + ':' + ref)).seatHolds).toEqual([{ subject: 'seat-black', until: 76_000 }]);
-        f.advance(74_999);
+        // The phone drops: its socket closes and its room connection is gone.
         f.b.readyState = 3;
-        await f.transport.maintain();
-        expect(await f.storage.get(ARCADE_TAG + ':' + ref)).toBeTruthy();
-        f.advance(1);
-        await f.transport.maintain();
-        expect(await f.storage.get(ARCADE_TAG + ':' + ref)).toBeUndefined();
-    });
-
-    it('gives the seat back when the same player returns during the hold', async () => {
-        const f = fixture();
-        await f.start();
-        await f.transport.revoke({ room, ref }, 'seat-black');
-        await f.send(f.b, 'sync');
-        f.b.readyState = 3;
+        f.actors.delete(guest);
         f.advance(90_000);
         await f.transport.maintain();
-        expect(f.board(f.a)).toMatchObject({ seat: 'w' });
-        expect((await f.storage.get(ARCADE_TAG + ':' + ref)).seatHolds).toBeUndefined();
+        f.transport.reconcile();
+        expect(f.board(f.a)).toMatchObject({ id, seat: 'w' });
         expect(f.board(f.a).match).toBeTruthy();
+        // Another session in the room watches. It cannot take or use the seat.
+        const stranger = f.player('c' + '3'.repeat(32), 'seat-stranger', false);
+        await f.send(stranger, 'sync');
+        expect(f.board(stranger)).toMatchObject({ id, seat: null });
+        await f.send(stranger, 'join', { id });
+        expect(stranger.frames.at(-1)).toEqual({ t: 'match-error', reason: 'seat-unavailable' });
+        await f.send(f.a, 'move', { id, revision: 0, move: 'e2e4' });
+        await f.send(stranger, 'move', { id, revision: 1, move: 'e7e5' });
+        expect(f.board(f.a).match.moves).toEqual(['e2e4']);
+        // The same session reloads on a new connection and sits back down.
+        const returned = f.player('c' + '4'.repeat(32), 'seat-black', false);
+        await f.send(returned, 'sync');
+        expect(f.board(returned)).toMatchObject({ id, seat: 'b' });
+        await f.send(returned, 'move', { id, revision: 1, move: 'e7e5' });
+        expect(f.board(f.a).match.moves).toEqual(['e2e4', 'e7e5']);
     });
 
-    it('still ends the match when a seated player leaves on purpose', async () => {
+    it('ends a two-player match at once when a seated player leaves the room or is removed', async () => {
         const f = fixture(), { id } = await f.start();
-        await f.transport.revoke({ room, ref }, 'seat-black');
+        expect(f.board(f.b)).toMatchObject({ id, seat: 'b' });
+        expect(await f.transport.revoke({ room, ref }, 'seat-black')).toBe(true);
+        expect(await f.storage.get(ARCADE_TAG + ':' + ref)).toBeUndefined();
+        expect(f.board(f.a)).toBeNull();
+        // The table is free again straight away, so the host is never stuck.
+        await f.send(f.a, 'open');
+        expect(f.board(f.a)).toMatchObject({ waiting: true, seat: 'w' });
+    });
+
+    it('does not leave a dropped player’s match open forever', async () => {
+        const f = fixture(), { id } = await f.start();
+        f.b.readyState = 3;
+        f.actors.delete(guest);
+        // The player still in the room can end it.
         await f.send(f.a, 'leave', { id });
+        expect(await f.storage.get(ARCADE_TAG + ':' + ref)).toBeUndefined();
+        // And an abandoned table is removed when the match lifetime runs out.
+        await f.send(f.a, 'open');
+        f.advance(40 * 60000);
+        await f.transport.maintain();
         expect(await f.storage.get(ARCADE_TAG + ':' + ref)).toBeUndefined();
         expect(f.board(f.a)).toBeNull();
     });
@@ -177,7 +194,7 @@ describe('Game Night match transport', () => {
         expect((await f.transport.upgrade(`${protocol}, ${ticket}`, session)).status).toBe(403);
     });
 
-    it('releases only the held Spades seat after the grace window', async () => {
+    it('frees only the departing Spades seat at once when a guest leaves the room', async () => {
         const records = new Map(), actors = new Map(), connections = [];
         let now = 1000;
         const storage = {
@@ -209,11 +226,6 @@ describe('Game Night match transport', () => {
         await send(west, 'join', { id, seat: 'west' });
         expect(board(west)).toMatchObject({ waiting: true, seat: 'west' });
         await transport.revoke({ room, ref }, 'seat-west');
-        expect(board(host)).toMatchObject({ waiting: true, seat: 'south' });
-        expect(board(host).occupied).toContain('west');
-        west.readyState = 3;
-        now += 75_000;
-        await transport.maintain();
         expect(board(host).occupied).not.toContain('west');
         expect(board(host)).toMatchObject({ id, waiting: true, seat: 'south' });
     });

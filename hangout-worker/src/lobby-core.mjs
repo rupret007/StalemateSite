@@ -586,10 +586,12 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         cast(chan, { t: 'four', ch: chan.name, roomInstance: chan.keepRef, game });
     };
     const FOUR_SEAT_HOLD_MS = 75_000;
-    const sameFourPlayer = (hold, c) => hold.dev === c.dev && hold.betaSid === (c.betaSid || '');
+    // Only the same signed device on the same signed-in session may sit back down.
+    const sameFourPlayer = (hold, c) => !!hold.dev && !!hold.betaSid && hold.dev === c.dev && hold.betaSid === c.betaSid;
     function rememberFourSeat(chan, c) {
         const role = chan.four?.host === c.id ? 'host' : chan.four?.guest === c.id ? 'guest' : '';
-        if (!role) return false;
+        // Without a session there is nothing safe to match a return against, so the board ends as before.
+        if (!role || !c.dev || !c.betaSid) return false;
         const holds = (chan.fourHolds || []).filter(hold => hold.role !== role);
         holds.push({ role, id: c.id, dev: c.dev, betaSid: c.betaSid || '', until: now() + FOUR_SEAT_HOLD_MS });
         chan.fourHolds = holds;
@@ -608,6 +610,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const hold = chan.fourHolds.find(item => item.until > now() && sameFourPlayer(item, c)
             && (item.role === 'host' ? chan.four.host === item.id : chan.four.guest === item.id));
         if (!hold) return;
+        // A block made while the player was away still ends the board, as it does when both are present.
+        const other = conns.get(hold.role === 'host' ? chan.four.guest : chan.four.host);
+        if (other && (c.blocks.has(other.dev) || other.blocks.has(c.dev))) return updateFour(chan, null);
         chan.fourHolds = chan.fourHolds.filter(item => item !== hold);
         if (!chan.fourHolds.length) chan.fourHolds = null;
         updateFour(chan, hold.role === 'host' ? { ...chan.four, host: c.id } : { ...chan.four, guest: c.id });

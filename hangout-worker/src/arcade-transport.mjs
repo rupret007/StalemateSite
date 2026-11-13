@@ -14,7 +14,6 @@ export const ARCADE_TAG = 'game-night-match';
 export const ARCADE_PROTOCOL = 'game-night.v1';
 const MATCH_TTL = 40 * 60000;
 const CONNECTED_CLAIM_TTL = 60_000;
-const SEAT_HOLD_MS = 75_000;
 const MATCH_CAP = 60;
 const adapters = new Map([
     ['chess', { flag: 'HANGOUT_ARCADE_CHESS', Table: GameNightChess }],
@@ -57,19 +56,18 @@ export function createArcadeTransport({ state, current, active, approve, charge,
     const key = scope => prefix + scope.ref;
     const restore = record => (record.mode === 'partners' && PartnerTable ? PartnerTable : Table).restore(record);
     const liveClaims = (claims, time) => (claims || []).filter(claim => claim.until > time);
-    const seatHolds = record => Array.isArray(record?.seatHolds)
-        ? record.seatHolds.filter(hold => hold && typeof hold.subject === 'string' && hold.subject && Number.isFinite(hold.until)).slice(0, 8)
-        : [];
-    function savedRecord(scope, game, expiresAt, claims, holds = []) {
-        return { room: scope.room, expiresAt, [name]: game.checkpoint(),
-            ...(claims.length ? { claims } : {}), ...(holds.length ? { seatHolds: holds } : {}) };
+    // A seat belongs to a session, not a socket. A dropped phone keeps its seat
+    // without any timer here and takes it back on its next sync; only a command
+    // or leaving the room (revoke) gives a seat up.
+    function savedRecord(scope, game, expiresAt, claims) {
+        return { room: scope.room, expiresAt, [name]: game.checkpoint(), ...(claims.length ? { claims } : {}) };
     }
     async function load(scope) {
         const record = await state.storage.get(key(scope));
         if (!record) return null;
         const time = now();
         if (record.expiresAt <= time) { await state.storage.delete(key(scope)); return null; }
-        return { expiresAt: record.expiresAt, game: restore(record[name]), claims: liveClaims(record.claims, time), seatHolds: seatHolds(record) };
+        return { expiresAt: record.expiresAt, game: restore(record[name]), claims: liveClaims(record.claims, time) };
     }
     async function hasGuestSeat(scope, match, host) {
         const record = await load(scope);
@@ -81,7 +79,7 @@ export function createArcadeTransport({ state, current, active, approve, charge,
         const claims = [...record.claims, { sid, until }];
         // Commit the invitation redemption and its temporary seat together.
         await state.storage.put({
-            [key(scope)]: savedRecord(scope, record.game, record.expiresAt, claims, record.seatHolds),
+            [key(scope)]: savedRecord(scope, record.game, record.expiresAt, claims),
             [invitationKey]: accepted
         });
         publish(scope, record.game, null, claims);
@@ -91,15 +89,8 @@ export function createArcadeTransport({ state, current, active, approve, charge,
         const record = await load(scope);
         if (!record || !record.claims.some(claim => claim.sid === sid)) return;
         const claims = record.claims.filter(claim => claim.sid !== sid);
-        await state.storage.put(key(scope), savedRecord(scope, record.game, record.expiresAt, claims, record.seatHolds));
+        await state.storage.put(key(scope), savedRecord(scope, record.game, record.expiresAt, claims));
         publish(scope, record.game, null, claims);
-    }
-    function playerBack(scope, subject) {
-        for (const socket of sockets()) {
-            const attachment = socket.deserializeAttachment();
-            if (attachment?.ref === scope.ref && attachment.room === scope.room && attachment.betaSid === subject && member(attachment)) return true;
-        }
-        return false;
     }
     function publish(scope, game, requester = null, claims = []) {
         for (const socket of requester ? [requester] : sockets()) {
@@ -138,15 +129,10 @@ export function createArcadeTransport({ state, current, active, approve, charge,
             let game = record?.game;
             const subject = binding.betaSid;
             let claims = record?.claims || [];
-            let holds = record?.seatHolds || [];
             if (game && !game.subjects.every(peer => binding.canSee(peer))) {
                 return send(socket, { t: 'match-error', reason: 'unavailable' });
             }
             let changed = game?.expire(now()) || false;
-            if (holds.some(hold => hold.subject === subject)) {
-                holds = holds.filter(hold => hold.subject !== subject);
-                changed = true;
-            }
             const resume = frame.action === 'sync' && game?.seat(subject) && !scope.synced;
             let expiresAt = record?.expiresAt;
             let error = '';
@@ -192,7 +178,7 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                 }
             }
             if (changed) {
-                if (game) await state.storage.put(key(scope), savedRecord(scope, game, expiresAt, claims, holds));
+                if (game) await state.storage.put(key(scope), savedRecord(scope, game, expiresAt, claims));
                 else await state.storage.delete(key(scope));
                 publish(scope, game, null, claims);
             } else publish(scope, game, resume ? null : socket, claims);
@@ -226,16 +212,16 @@ export function createArcadeTransport({ state, current, active, approve, charge,
             const released = !!record && claims.length < record.claims.length;
             let remaining = null;
             if (occupied) {
-                // A dropped room socket keeps the seat through the grace window.
-                // An explicit leave still ends the table on the command path.
-                const holds = seatHolds(record).filter(hold => hold.subject !== subject);
-                holds.push({ subject, until: now() + SEAT_HOLD_MS });
-                remaining = game;
-                await state.storage.put(key(scope), savedRecord(scope, game, record.expiresAt, record.claims, holds));
+                // This runs when a player leaves the room or is removed from it,
+                // never for a dropped socket, so the seat is given up at once.
+                if (game.releaseSeat(subject)) {
+                    remaining = game;
+                    await state.storage.put(key(scope), savedRecord(scope, game, record.expiresAt, claims));
+                } else await state.storage.delete(key(scope));
             }
             if (!occupied && released) {
                 remaining = game;
-                await state.storage.put(key(scope), savedRecord(scope, game, record.expiresAt, claims, seatHolds(record).filter(hold => hold.subject !== subject)));
+                await state.storage.put(key(scope), savedRecord(scope, game, record.expiresAt, claims));
             }
             pending.delete(subject);
             if (!pending.size) pendingRevocations.delete(scope.ref);
@@ -258,21 +244,8 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                 const game = restore(record[name]);
                 const time = now(), claims = liveClaims(record.claims, time);
                 const expiredClaim = claims.length < (record.claims?.length || 0);
-                const original = seatHolds(record);
-                const nextHolds = [];
-                let dropMatch = false;
-                for (const hold of original) {
-                    if (hold.until > time) { nextHolds.push(hold); continue; }
-                    if (!game.seat(hold.subject) || playerBack(scope, hold.subject)) continue;
-                    if (!game.releaseSeat(hold.subject)) { dropMatch = true; break; }
-                }
-                if (dropMatch) {
-                    await state.storage.delete(storageKey);
-                    publish(scope, null);
-                    continue;
-                }
-                if (!game.expire(time) && !expiredClaim && nextHolds.length === original.length) continue;
-                await state.storage.put(storageKey, savedRecord(scope, game, record.expiresAt, claims, nextHolds));
+                if (!game.expire(time) && !expiredClaim) continue;
+                await state.storage.put(storageKey, savedRecord(scope, game, record.expiresAt, claims));
                 publish(scope, game, null, claims);
             }
         }
