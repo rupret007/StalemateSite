@@ -3,10 +3,14 @@ import { createGameNightMatchClient, matchConnectionErrors } from './game-night-
 let Chess, claimReason, colorName, intendedClaims, pieceName, ChessBoard;
 let chessAssets;
 function loadChessAssets() {
+    // chess-core and chess-board import these next. Start them in the same turn
+    // so the phone does not wait a second round trip.
     chessAssets ??= Promise.all([
+        import('/play/assets/chess/chess.js'),
+        import('/play/assets/chess/chessground.js'),
         import('/play/games/chess-core.js'),
         import('/play/games/chess-board.js')
-    ]).then(([core, board]) => {
+    ]).then(([, , core, board]) => {
         ({ Chess, claimReason, colorName, intendedClaims, pieceName } = core);
         ChessBoard = board.ChessBoard;
     });

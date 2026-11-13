@@ -16,8 +16,16 @@ describe('Game Night loads another game’s engine only after that game opens', 
         const chess = lobby('arcade-chess.mjs');
         expect(staticImport(chess, '/play/games/chess-core.js')).toBe(false);
         expect(staticImport(chess, '/play/games/chess-board.js')).toBe(false);
-        expect(chess).toContain("import('/play/games/chess-core.js')");
-        expect(chess).toContain("import('/play/games/chess-board.js')");
+        expect(staticImport(chess, '/play/assets/chess/chess.js')).toBe(false);
+        expect(staticImport(chess, '/play/assets/chess/chessground.js')).toBe(false);
+        const rules = chess.indexOf("import('/play/assets/chess/chess.js')");
+        const art = chess.indexOf("import('/play/assets/chess/chessground.js')");
+        const core = chess.indexOf("import('/play/games/chess-core.js')");
+        const board = chess.indexOf("import('/play/games/chess-board.js')");
+        expect(rules).toBeGreaterThan(-1);
+        expect(art).toBeGreaterThan(rules);
+        expect(core).toBeGreaterThan(art);
+        expect(board).toBeGreaterThan(core);
         expect(chess).toContain('ready: () => loadChessAssets()');
 
         const rush = lobby('arcade-turdrush.mjs');
