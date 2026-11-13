@@ -54,6 +54,10 @@ export function entrySourceFromParams(params, registry = ENTRY_SITES) {
 // exact room instance independently when the visitor chooses to join.
 const gameNightRoomName = name => typeof name === 'string' && /^#game-[a-f0-9]{6}x[a-f0-9]{6}$/.test(name);
 export const GAME_NIGHT_QUERY = 'game-night=1';
+const GAME_NIGHT_TABLES = new Set([
+    'chess', 'crapeights', 'turdrummy', 'turdspades', 'turdjack',
+    'turdtris', 'turdomania', 'turdrush', 'turdanoid'
+]);
 
 export function gameNightEntry(params, hash = '') {
     const selected = params.getAll('game-night');
@@ -63,7 +67,7 @@ export function gameNightEntry(params, hash = '') {
     const target = [...fragment.keys()].sort().join(',') === 'game,instance'
         && gameNightRoomName(room) && /^[a-f0-9]{32}$/.test(ref || '') ? { room, ref } : null;
     const tables = params.getAll('table');
-    const table = !target && tables.length === 1 && /^[a-z][a-z0-9]{2,15}$/.test(tables[0]) ? tables[0] : '';
+    const table = !target && tables.length === 1 && GAME_NIGHT_TABLES.has(tables[0]) ? tables[0] : '';
     const deliveries = params.getAll('deliver');
     const prepareShare = table && !hash && deliveries.length === 1 && deliveries[0] === 'share';
     return { target, ...(table ? { table } : {}), ...(prepareShare ? { prepareShare: true } : {}) };

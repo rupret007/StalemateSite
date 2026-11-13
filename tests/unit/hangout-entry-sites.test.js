@@ -19,6 +19,10 @@ it('carries an exact Game Night room locator only from the explicit entrance', (
     const chess = new URLSearchParams('game-night=1&via=stalemate&table=chess');
     expect(gameNightEntry(chess)).toEqual({ target: null, table: 'chess' });
     expect(gameNightEntry(chess, hash)).toEqual({ target });
+    for (const brand of ['stalemate', 'rad-dad']) {
+        expect(gameNightEntry(new URLSearchParams({ 'game-night': '1', via: brand, table: 'four', deliver: 'share' })))
+            .toEqual({ target: null });
+    }
     chess.append('table', 'turdanoid');
     expect(gameNightEntry(chess)).toEqual({ target: null });
 });

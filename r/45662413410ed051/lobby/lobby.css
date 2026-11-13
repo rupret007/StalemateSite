@@ -458,6 +458,7 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 .rush-race-controls .btn { min-height: 44px; padding: 3px; font: bold 1rem var(--mono); touch-action: manipulation; user-select: none; }
 .rush-race-controls small { font-size: .7rem; text-transform: capitalize; }
 @media (max-height: 750px) {
+  .rush-race-track { height: clamp(132px, calc(100dvh - 509px), 275px); }
   .rush-race-status.rush-race-playing { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
 .arcade-brick-race { position: relative; }
@@ -483,6 +484,8 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 .brick-race-rail [data-brick-power] { order: 4; }
 .brick-race-help { margin: 4px 0 0; }
 @media (max-height: 750px) {
+  .brick-race-rail { gap: 3px; }
+  .brick-race-rail > :is(time, div) { padding-block: 3px; }
   .brick-race-board { max-width: min(100%, calc(clamp(150px, 100dvh - 435px, 285px) * 1.2)); justify-self: center; }
   .brick-race-help { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
