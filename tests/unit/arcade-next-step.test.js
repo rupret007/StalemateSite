@@ -109,6 +109,14 @@ describe('Spades next step', () => {
         expect(status.textContent).toContain('3/4 seated');
         expect(view.querySelector('[data-spades-seats]').hidden).toBe(false);
         expect([...view.querySelectorAll('[data-spades-seats] button')].find(item => !item.hidden).textContent).toBe('Join East');
+        for (const [occupied, expected] of [
+            [['south', 'west'], 'Waiting for 2 more players'],
+            [['south', 'west', 'north'], 'Waiting for 1 more player']
+        ]) {
+            state({ state: { version: 1, game: 'turdspades', id: 'spades-1', seat: 'west', waiting: true, occupied, match: null }, canOpen: false, partners: true });
+            expect(status.textContent).toContain(expected);
+            expect(button.textContent).toBe('Release seat');
+        }
         state({
             state: { version: 1, game: 'turdspades', id: 'spades-1', seat: null, waiting: false, occupied: ['south', 'west', 'north', 'east'], match: spadesMatch() },
             canOpen: false, partners: true

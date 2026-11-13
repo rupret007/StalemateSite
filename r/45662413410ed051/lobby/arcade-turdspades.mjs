@@ -195,7 +195,12 @@ export function mountArcadeTurdSpades(container, onMatch) {
             }
         } else if (model?.waiting) {
             message = `${occupied.length}/${people} seated${seat ? ` · You’re ${nameFor(seat)}` : ''} · ${teams.join(' vs ')}`;
-            if (seat) { command = 'leave'; label = seat === 'south' ? 'Close table' : 'Release seat'; }
+            if (seat) {
+                const remaining = people - occupied.length;
+                if (!paired && remaining > 0) message += ` · Waiting for ${remaining} more ${remaining === 1 ? 'player' : 'players'}`;
+                command = 'leave';
+                label = seat === 'south' ? 'Close table' : 'Release seat';
+            }
         } else if (match?.result) {
             if (!seat) {
                 message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}. You’re watching.`;
