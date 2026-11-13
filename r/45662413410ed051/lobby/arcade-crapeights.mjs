@@ -161,7 +161,13 @@ export function mountArcadeCrapeights(container, onMatch) {
         if (match.roundResult) return match.roundResult.winner
             ? `${win(match.roundResult.winner)} round ${match.round} for ${match.roundResult.points} points.`
             : 'No cards left to draw. Round tied.';
-        const turn = match.turn === model.seat ? 'Your turn' : side[match.turn] + ' to play';
+        let turn = model.seat ? 'Waiting for your opponent' : side[match.turn] + ' to play';
+        if (match.turn === model.seat) {
+            const playable = match.hand.some(card => card.playable);
+            const next = match.canPass ? 'pass' : 'draw';
+            turn = playable ? `Your turn. Play a highlighted card or ${next}.`
+                : match.canPass ? 'Your turn. Pass to your opponent.' : 'Your turn. Draw a card.';
+        }
         const action = match.action;
         const last = action?.kind === 'draw-two' ? ` · ${name(action.seat)} +${action.count} cards`
             : action?.kind === 'skip' ? ` · ${name(action.seat)} skipped` : '';
