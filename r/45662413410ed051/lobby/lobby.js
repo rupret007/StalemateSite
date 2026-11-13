@@ -4,7 +4,7 @@ import * as entrance from '../entry-sites.mjs';
 import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
 import { createIdleHeartbeat } from './idle-heartbeat.mjs';
-import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourWinningCells, gameInviteCode, gameNightInvite, gameNightLabels, gameNightRoomName, newGameNightRoomName } from './game-night.mjs';
+import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourWinningCells, gameInviteCode, gameNightInvite, gameNightLabels, gameNightRoomName, newGameNightRoomName, webJamRoomName } from './game-night.mjs';
 (() => {
     'use strict';
     const { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff,
@@ -515,7 +515,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let gameOpenPending = null, gameOpenError = '';
     // Jam rooms are invite-only like Game Night, so the directory cannot lead
     // an invited guest back. They share the same offer and return controls.
-    const jamRoomName = name => typeof name === 'string' && /^#jam(?:-[a-z0-9-]{1,26})?$/.test(name);
+    const jamRoomName = webJamRoomName;
     const offerRoomName = name => jamRoomName(name) || gameNightSupported && gameNightRoomName(name);
     let webJamReturn = null;
     function stopLocalCamera(channel) {
@@ -1684,7 +1684,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     }
     function currentJam() {
         const c = app.chans.get(app.active);
-        return connectionState === 'connected' && !app.localMediaPaused && !app.sharingStopped
+        return !gameGuest && connectionState === 'connected' && !app.localMediaPaused && !app.sharingStopped
             && c?.kind === 'jam' && c.names?.some(n => n.nick === app.me) ? c : null;
     }
     function confirmJamShare(c) {
@@ -1751,7 +1751,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function currentGameNight() {
         const c = app.chans.get(app.active);
         return gameNightSupported && connectionState === 'connected' && !app.sharingStopped && !app.localMediaPaused
-            && c?.kind === 'game' && c.names?.some(member => member.id === app.selfId) ? c : null;
+            && (c?.kind === 'game' || (gameGuest?.game === 'chess' && c?.kind === 'jam' && c.name === gameGuest.room))
+            && c.names?.some(member => member.id === app.selfId) ? c : null;
     }
     function clearGameLinks() {
         for (const c of app.chans.values()) if (c.kind === 'game') { c.gameCall = ''; c.four = null; }
@@ -1815,7 +1816,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function drawArcadeTable(c, game, table) {
         const jam = game === 'chess' && webJamChessSupported && !gameGuest ? currentJam() : null;
         if (jam?.modes.i) c = jam;
-        const inWebJam = c?.kind === 'jam';
+        const inWebJam = !!jam?.modes.i;
         const container = $(inWebJam ? '[data-jam-chess]' : '[data-game-night]');
         const scope = table.supported && (!gameGuest || gameGuest.game === game) && !shieldActive && c && roomNonce(c.keepRef)
             ? { actor: app.selfId, room: c.name, ref: c.keepRef } : null;

@@ -482,7 +482,7 @@ export class HangoutLobby {
         const socket = this.byId(scope.actor), a = socket?.deserializeAttachment();
         if (!a || socket.readyState !== 1 || this.closedSockets.has(socket) ||
             socketIdentityInvalid(a, this.env) || this.authorityMode && !this.bindingLive(a)) return null;
-        const member = this.engine.arcadeActor(scope, game === 'chess' && gameRoomGrantsEnabled(this.env) && !a.gameGuest);
+        const member = this.engine.arcadeActor(scope, game === 'chess' && gameRoomGrantsEnabled(this.env));
         return member ? { ...a, ...member, socket } : null;
     }
     arcadeAvailable(name) {

@@ -255,7 +255,7 @@ async function gameInvitation(request, env, path, body) {
         const session = await betaSession(request, env, Date.now(), { gameGuest: true, allowRevoked: true });
         if (session && body.sessionRef === await gameGuestSessionRef(session.access.sid)) {
             await disconnect(env, session);
-            const scope = gameGuestScope(session.access.gameGuest);
+            const scope = gameGuestScope(session.access.gameGuest, true);
             if (scope) {
                 const released = await env.LOBBY.get(env.LOBBY.idFromName('stalemate')).fetch(
                     `https://lobby${GAME_INVITATION_PATH}/release`, {
@@ -284,8 +284,8 @@ async function gameInvitation(request, env, path, body) {
     return gameGuestAccess(request, env, data);
 }
 
-async function gameGuestAccess(request, env, data) {
-    const scope = gameGuestScope(data.scope);
+async function gameGuestAccess(request, env, data, allowWebJamChess = false) {
+    const scope = gameGuestScope(data.scope, allowWebJamChess);
     if (!scope) return json({ error: 'This invitation could not be confirmed.' }, 503);
     const { cookie } = await newAccess(env, { gameGuest: scope, sid: data.sid, exp: data.exp, ip: request.headers.get('CF-Connecting-IP') || '0.0.0.0' });
     return json({ next: `${LOBBY_PAGE}${GAME_GUEST_QUERY}` }, 200, { 'Set-Cookie': cookie });
@@ -324,7 +324,7 @@ async function gameRoomGrant(request, env, operation, body) {
     });
     const data = await response.json().catch(() => ({ error: 'Game invitations are temporarily unavailable.' }));
     if (operation !== 'redeem' || !response.ok) return json(data, response.status);
-    return gameGuestAccess(request, env, data);
+    return gameGuestAccess(request, env, data, true);
 }
 
 function gameGuestAsset(path) {
@@ -442,7 +442,7 @@ async function betaRequest(request, env, deps = {}) {
         }
         return reply('Private invitation required. Open your invitation link.', 401);
     }
-    const guest = session.access.scope === 'game-night' && gameGuestScope(session.access.gameGuest);
+    const guest = session.access.scope === 'game-night' && gameGuestScope(session.access.gameGuest, gameRoomGrantsEnabled(env));
     if (session.access.scope === 'game-night' && !guest) return reply('This game invitation could not be confirmed.', 403);
     if (guest && !(url.pathname === '/lobby' || url.pathname === '/beta/bootstrap.js' || url.pathname === '/beta/state'
         || arcadePath(url.pathname) && arcadeGame(url.pathname) === guest.game
