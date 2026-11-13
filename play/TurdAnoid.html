@@ -343,7 +343,7 @@
       </div>
       <button id="btnResume">Resume</button>
       <div class="menu-secondary">
-        <button id="btnQuit">Leave</button>
+        <button id="btnQuit">Quit to menu</button>
       </div>
     </div>
 
@@ -383,9 +383,9 @@
         <div class="stat"><span class="l">Time</span><span class="v" id="endTime">0:00</span></div>
       </div>
       <p class="suite-progress-result" id="progressResult" role="status" hidden></p>
-      <button id="btnRestart">Rematch</button>
+      <button id="btnRestart">Play again</button>
       <div class="menu-secondary">
-        <button id="btnEndQuit">Leave</button>
+        <button id="btnEndQuit">Main menu</button>
       </div>
     </div>
     </div>
@@ -3758,7 +3758,7 @@ pickTitleQuip();
 updateSideStats();
 lastTime = performance.now();
 requestAnimationFrame(loop);
-$('btnStart').textContent = 'Open';
+$('btnStart').textContent = titleMode === 'boss' ? 'Start Boss Flush' : 'Start';
 $('btnBoss').textContent = titleMode === 'boss' ? 'Classic Flush' : 'Boss Flush';
 for (const id of ['btnStart', 'btnBoss', 'btnHowTo']) $(id).disabled = false;
 window.SuiteLoading?.ready();

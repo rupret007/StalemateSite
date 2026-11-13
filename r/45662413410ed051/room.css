@@ -10,7 +10,7 @@ h2{font-size:1.4rem;color:var(--blue);margin-bottom:8px}
 .btn{background:var(--lime);color:var(--ink);border:1px solid var(--lime);border-radius:0;padding:9px 13px;font-weight:700;font-family:var(--display);font-size:1.05rem;cursor:pointer;min-height:44px}
 .btn--big{font-size:1.4rem;padding:14px 22px}
 .btn--ghost{background:transparent;color:var(--cream);border-color:var(--line)}
-.btn[aria-pressed=true]{background:var(--lime);border-color:var(--lime);color:var(--ink)}
+.btn[aria-pressed=true]{background:var(--pink);border-color:var(--pink);color:var(--ink)}
 input{background:var(--ink);color:var(--cream);border:1px solid var(--line);border-radius:4px;padding:10px;font-size:1rem}
 .gate{display:grid;place-items:center;padding:48px 16px}
 .gate-card{background:var(--surface);padding:31px;max-width:28rem;display:grid;gap:14px;border:1px solid var(--line);border-radius:5px}
