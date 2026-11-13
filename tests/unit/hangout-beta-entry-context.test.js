@@ -101,6 +101,23 @@ describe('entry context through the private beta shell', () => {
             expect(link.href).toBe(`https://beta.example${root}lobby/?entry-return=1`);
         } finally { older.window.close(); }
     });
+    it('carries one private host share intent beside a selected table', async () => {
+        const base = 'https://beta.example/beta/?game-night=1';
+        const room = '#game=game-abc123x456def&instance=' + 'a'.repeat(32);
+        for (const [suffix, shouldPrepare] of [
+            ['&table=chess&deliver=share', true],
+            ['&table=chess&deliver=share&deliver=share', false],
+            ['&deliver=share', false],
+            ['&table=chess&deliver=share' + room, false]
+        ]) {
+            const dom = await shell(base + suffix);
+            try {
+                const href = new URL(click(dom, '#inside .button').href);
+                expect(href.searchParams.has('deliver')).toBe(shouldPrepare);
+                if (shouldPrepare) expect(href.searchParams.get('table')).toBe('chess');
+            } finally { dom.window.close(); }
+        }
+    });
     it.each(['rad-dad', 'stalemate'])('offers Game Night from the private arcade handoff for %s', async source => {
         const address = `https://beta.example/beta/?via=${source}`;
         const config = env({ HANGOUT_GAME_NIGHT_GUESTS: '1' });

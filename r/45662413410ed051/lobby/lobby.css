@@ -295,6 +295,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .arcade-card-status, .arcade-card-error, .arcade-card-hand-label { margin: 4px 0; }
 .arcade-card-error:empty { display: none; }
 .arcade-card-error { color: #ffc497; }
+.arcade-invite-friend { min-height: 44px; margin: 0 8px 8px 0; }
 .arcade-card-table [data-card-table] { max-width: 420px; }
 .arcade-card-score, .arcade-card-piles, .arcade-card-actions { display: flex; gap: 5px 8px; flex-wrap: wrap; align-items: center; }
 .arcade-card-score > span { background: var(--surface); border: 1px solid var(--line); padding: 4px 7px; border-radius: 5px; font-size: .78rem; }
@@ -601,7 +602,9 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 [data-game-invite-link] { margin-block: 12px 16px; }
 [data-game-invite-link-status]:empty { display: none; }
 .game-guest [data-pane=rooms], .game-guest [data-show=rooms], .game-guest .chat .startroom,
-.game-guest .pmtoggle:has([data-pm-off]), .game-guest [data-four], .game-guest [data-game-arcade] { display: none !important; }
+.game-guest .pmtoggle:has([data-pm-off]), .game-guest [data-game-arcade] { display: none !important; }
+.game-guest:not(.game-guest-four) [data-four] { display: none !important; }
+.game-guest-four .game-night:has(.four-match[open]) { max-height: none; }
 body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: none; }
 [data-game-guest-connecting].gate {
   place-items: start center; padding: 32px 20px; background: #101414;
@@ -715,6 +718,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .conversation-starters button, .quiet-action { flex: none; min-height: 36px; font-size: 9px; padding: 5px 8px; }
   .buffer { padding: 10px 12px; font-size: 12px; line-height: 1.75; }
   .jam { padding: 12px; max-height: 40dvh; }
+  .game-guest-four .jam.game-night:has(.four-match[open]) { max-height: none; flex: 1 1 auto; }
   .buffer li { padding-inline: 0; }
   .who { font-size: 12px; }
   .ts { font-size: 9px; }
