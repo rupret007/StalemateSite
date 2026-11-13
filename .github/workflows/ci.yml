@@ -68,7 +68,12 @@ jobs:
 
       - name: Exercise private WebJam room grants in workerd
         timeout-minutes: 4
-        run: node tests/runtime/arcade-transport.mjs --room-grants
+        env:
+          ARCADE_BROWSER_EVIDENCE: ${{ github.workspace }}/test-results/arcade-multiplayer
+        run: |
+          node tests/runtime/arcade-transport.mjs --room-grants
+          node tests/runtime/arcade-transport.mjs --room-grants --browser=chromium --webjam-guest=stalemate
+          node tests/runtime/arcade-transport.mjs --room-grants --browser=webkit --webjam-guest=rad-dad
 
       - name: Build the shared-community entry toolkit
         shell: bash

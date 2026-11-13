@@ -58,6 +58,7 @@ const WEB_JOIN_ENTRANCE = `<!doctype html>
 </main>
 </body>
 </html>`;
+const WEBJAM_GUEST_PATH = '/beta/game-night/webjam-guest';
 const GAME_GUEST_ENTRANCE = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Game Night invitation</title><link rel="stylesheet" href="/beta/style.css"><script type="module" src="${GAME_GUEST_PATH}.js"></script></head>
@@ -359,9 +360,15 @@ async function betaRequest(request, env, deps = {}) {
         .replace('STALEMATE / INVITATION ONLY', 'HANG OUT / INVITATION ONLY')
         .replace('<script defer src="/beta/client.js">', '<script type="module" src="/beta/client.js">'), 200, 'text/html; charset=utf-8');
     if (url.pathname === '/beta/style.css') return reply(STYLE + GAME_GUEST_STYLE, 200, 'text/css');
-    if (url.pathname === GAME_GUEST_PATH || url.pathname === GAME_GUEST_PATH + '.js') {
-        if (!gameGuestEnabled(env) || !['GET', 'HEAD'].includes(request.method)) return reply('Game invitations are unavailable.', 404);
-        if (url.pathname === GAME_GUEST_PATH) return reply(request.method === 'HEAD' ? null : GAME_GUEST_ENTRANCE, 200, 'text/html; charset=utf-8');
+    const webJamGuest = url.pathname === WEBJAM_GUEST_PATH;
+    if (webJamGuest || url.pathname === GAME_GUEST_PATH || url.pathname === GAME_GUEST_PATH + '.js') {
+        if (!(webJamGuest ? gameRoomGrantsEnabled(env) : gameGuestEnabled(env)) || !['GET', 'HEAD'].includes(request.method)) {
+            return reply('Game invitations are unavailable.', 404);
+        }
+        if (webJamGuest || url.pathname === GAME_GUEST_PATH) {
+            const page = webJamGuest ? GAME_GUEST_ENTRANCE.replace('<main ', '<main data-webjam-guest ') : GAME_GUEST_ENTRANCE;
+            return reply(request.method === 'HEAD' ? null : page, 200, 'text/html; charset=utf-8');
+        }
         const asset = await env.ASSETS.fetch(new Request(`${url.origin}${LOBBY_PAGE}game-night-guest.js`));
         return reply(request.method === 'HEAD' ? null : asset.body, asset.status, 'text/javascript');
     }
