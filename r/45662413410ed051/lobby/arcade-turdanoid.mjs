@@ -29,7 +29,7 @@ const markup = `
             <span class="small" data-brick-power></span>
         </div>
     </div>
-    <p class="small brick-race-help" id="brick-race-help">Drag or use the arrow keys to move. Space launches the ball.</p>
+    <p class="small brick-race-help" id="brick-race-help">Drag the paddle or use the arrow keys. Tap Launch ball or press Space to serve.</p>
 </div>
 <dialog class="sheet" aria-labelledby="brick-confirm-title" data-brick-confirm>
     <h3 id="brick-confirm-title">Leave this race?</h3>
@@ -219,7 +219,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
         if (connection === 'ready' && !match.result && countdown <= 0 && seat) advanceBrickRacer(visual, brickRaceTick(match.startsAt, at), wall, match.seed);
         const run = visual.run;
         const overlay = $('[data-brick-overlay]');
-        const label = match.result ? '' : countdown > 0 ? String(countdown) : run.status === 'out' ? 'Out of balls' : '';
+        const label = match.result ? '' : countdown > 0 ? 'Starts in ' + countdown : run.status === 'out' ? 'Out of balls' : '';
         overlay.hidden = !label;
         put(overlay, label);
         table.dataset.phase = match.result ? 'finished' : countdown > 0 ? 'countdown' : 'play';
@@ -227,6 +227,10 @@ export function mountArcadeTurdanoid(container, onMatch) {
         table.dataset.paddle = Math.round(run.paddleX);
         table.dataset.stuck = String(run.ball.stuck);
         launch.disabled = connection !== 'ready' || countdown > 0 || !run.ball.stuck || run.status !== 'play' || !!pending;
+        if (seat && connection === 'ready' && !match.result) {
+            const instruction = countdown > 0 ? 'Get ready to serve.' : !launch.disabled ? 'Tap Launch ball or press Space.' : match.wall.name;
+            put(status, instruction);
+        }
         const seconds = Math.max(0, Math.ceil((match.endsAt - Math.max(at, match.startsAt)) / 1000));
         put($('[data-brick-clock]'), match.result ? 'Final' : Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0'));
         const active = Object.keys(capsules).find(power => run.powers[power]);
@@ -262,8 +266,9 @@ export function mountArcadeTurdanoid(container, onMatch) {
             message += ' · ' + { clear: 'wall cleared', time: 'time limit', out: 'out of balls', resign: 'forfeit' }[result.reason];
             if (seat && seat !== model.rematch) { action = 'rematch'; label = model.rematch ? 'Accept Turdanoid rematch' : 'Request Turdanoid rematch'; }
             if (seat && seat === model.rematch) message += ' · Rematch requested';
-        } else if (match) message = match.wall.name;
-        put(status, message);
+        } else if (match) message = seat ? null : match.wall.name;
+        // The frame loop owns the active player's cue so a sync cannot reannounce it.
+        if (message !== null) put(status, message);
         main.hidden = !action;
         main.dataset.command = action;
         put(main, label);

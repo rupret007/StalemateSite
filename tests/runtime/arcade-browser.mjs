@@ -2099,6 +2099,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await a.getByRole('button', { name: 'Open Turdanoid race' }).click();
         await b.getByRole('button', { name: 'Join Turdanoid race' }).click();
         await expect(match(b)).toHaveAttribute('data-phase', 'countdown');
+        await expect(b.locator('[data-brick-overlay]')).toHaveText(/^Starts in [1-9]$/);
+        await expect(serve(b)).toBeDisabled();
         await expect(board(spectator)).toBeVisible();
         await expect(serve(spectator)).toBeHidden();
         await fitLandscape(b, b.locator('.brick-race-layout'), board(b), serve(b));
@@ -2112,6 +2114,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         assert.ok(launch.x >= field.x + field.width, 'Launch button does not cover the playfield or paddle');
         assert.equal(await b.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
         await expect(serve(b)).toBeEnabled();
+        await expect(b.locator('[data-brick-status]')).toHaveText('Tap Launch ball or press Space.');
         await expect(serve(a)).toBeEnabled();
         if (pauseReconnect) {
             const returnBoard = await pauseReconnect();
