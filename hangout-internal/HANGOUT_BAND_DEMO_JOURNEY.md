@@ -14,7 +14,8 @@ Keep the rehearsal private and use the build-specific invitation steps below.
 > If **Using** names the wrong input, select your drum interface under
 > **Microphone** when the picker appears, then play again. When you see
 > **Microphone detected.**, check the headphones box and click
-> **Join with microphone**. Chrome is all you need on the PC.
+> **Join with microphone**. Chrome is all you need on the PC. If the invite
+> expires, stay in Hang Out and I’ll send another.
 
 Send the private Hang Out invitation separately through the usual private
 channel. A guest opens it and reads the guest agreement before entering. A
@@ -38,23 +39,25 @@ the same lobby and can see each other in **People**.
 | Last verified private site, `8d76db40` | Choose **Invite bandmate to room** if shown. If the room shows **Invite guest** under host controls, select the guest there. Once both people are in the Jam room, choose **Invite a browser guest → Copy browser invite** in WebJam. Paste it in the Jam room and click **Share**. | Accept **Join room**, then choose **Join in browser** once the host has shared the Music invite. |
 | One-tap Music candidate, private fixture | Choose **Invite bandmate to Music**, select the guest's name, and confirm the invitation in WebJam. Wait for Hang Out to show that it was sent. | Choose **Accept and join**. If the audio check remains available in the room, choose **Open audio check**. The browser joins the Jam room and opens the audio check without exchanging a link. |
 
-The verified one-tap candidate used private website tree `5553434` and
-browser source `90331ff`. The isolated tests exercised native confirmation,
-Windows Chrome, fresh invites and mixer-loss recovery with generated audio.
-Use the one-tap instructions for an attended rehearsal once the corresponding
-site and native handoff are delivered and confirmed on the actual devices.
-The newer local `58c269b` Apple Silicon package is archived for testing.
-Both rehearsal shortcuts still point to `c6eecdc`.
+Use the `8d76db40` instructions for the staged rehearsal. The local
+`c770d43` website restore and `58c269b` desktop source passed one-tap
+invitation and recovery through native confirmation in Chromium and WebKit.
+The Windows Chrome generated-audio and mixer-loss checks used the earlier
+website tree `5553434` and browser source `90331ff`. The `58c269b` Apple
+Silicon package is archived for local testing. Both rehearsal shortcuts
+point to `c6eecdc`.
 
 ## Audio check, recovery and ending the session
 
 - Start with **Check microphone**. If **Microphone** appears, selecting an
   interface starts another check. Read **Using** and play a few hits to verify
   the input before checking the headphones box.
-- If the interface is missing or silent, check that Windows Sound sees it and
-  Chrome has microphone permission. Retry the check and wait for
+- If the interface is missing or silent, check **Windows Settings → System →
+  Sound → Input** and select the drum interface. Then confirm Chrome has
+  microphone permission. Use **Try again** if shown and wait for
   **Microphone detected.** before joining. If the invite expires or the host
   ends the session, return to Hang Out and ask for a fresh invite.
+  [Microsoft microphone setup](https://support.microsoft.com/en-us/windows/hardware/drivers/how-to-set-up-and-test-microphones-in-windows)
 - After joining, each person should say a few words and confirm hearing the
   other. Play a short passage and check guitar, vocal and drum levels by
   listening together. Finish with **Leave session** in Chrome and **End Session**
