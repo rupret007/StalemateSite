@@ -90,7 +90,7 @@ async function accept() {
             if (webJam) {
                 gameTitle.tabIndex = -1;
                 gameTitle.setAttribute('aria-describedby', status.id);
-                gameTitle.focus();
+                gameTitle.focus({ preventScroll: true });
             } else {
                 status.tabIndex = -1;
                 status.focus({ preventScroll: true });

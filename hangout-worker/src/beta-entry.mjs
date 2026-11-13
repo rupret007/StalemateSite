@@ -63,7 +63,7 @@ const GAME_GUEST_ENTRANCE = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Game Night invitation</title><link rel="stylesheet" href="/beta/style.css"><script type="module" src="${GAME_GUEST_PATH}.js"></script></head>
 <body><main class="game-invitation"><p class="eyebrow">PRIVATE GAME NIGHT</p><h1 data-guest-game>Game Night</h1>
-<p class="lede" data-guest-inviter hidden></p><p data-guest-status role="status">Checking your invitation…</p>
+<p class="lede" data-guest-inviter hidden></p><p id="guest-invitation-status" data-guest-status role="status">Checking your invitation…</p>
 <section data-guest-invite aria-label="Accept the invitation" hidden>
 <p id="guest-agreement">By joining, you confirm you’re 13+ and agree to the house rules.</p>
 <button type="button" aria-describedby="guest-agreement" data-guest-join>Join game</button>
