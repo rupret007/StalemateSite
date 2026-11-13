@@ -2109,7 +2109,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await connection.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
             } finally { await connection.detach(); }
         } else await b.touchscreen.tap(controlBox.x + controlBox.width / 2, controlBox.y + controlBox.height / 2);
-        await a.keyboard.press(danger === 0 ? 'ArrowLeft' : 'ArrowRight');
+        await track(a).press(danger === 0 ? 'ArrowLeft' : 'ArrowRight');
         if (prediction) assert.equal(await prediction, true, 'native phone swipe moves locally before delayed confirmation');
         for (const page of [a, b]) {
             await expect(race(page)).toHaveAttribute('data-sequence', '1');
