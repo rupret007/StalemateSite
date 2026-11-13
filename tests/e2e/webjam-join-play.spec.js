@@ -51,6 +51,45 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     });
 }
 
+test('choosing to listen stops a pending microphone check before playback resumes', async ({ page, baseURL }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript(() => {
+        let resumes = 0;
+        const track = Object.assign(new EventTarget(), {
+            readyState: 'live', getSettings: () => ({}), stop: () => { window.micStopped = true; },
+        });
+        navigator.mediaDevices.getUserMedia = () => new Promise(resolve => {
+            window.completeMicRequest = () => resolve({ getAudioTracks: () => [track], getTracks: () => [track] });
+        });
+        window.AudioContext = class {
+            resume() {
+                if (++resumes === 1) return Promise.resolve();
+                return new Promise(resolve => { window.completeListeningResume = resolve; });
+            }
+            close() { return Promise.resolve(); }
+        };
+    });
+    await page.route('**/*', route => new URL(route.request().url()).origin === baseURL ? route.continue() : route.abort());
+    await page.route('**/join/session.js', route => route.fulfill({ contentType: 'text/javascript', body: `
+        export class WebJoinSession {
+            constructor({ stream }) { if (stream) throw new Error('Unexpected microphone stream'); }
+            async join() { this.authorized = true; }
+            close() {}
+        }` }));
+    const expires = Math.floor(Date.now() / 1000) + 300;
+    await page.goto(`/join/#k=${Buffer.alloc(32, 17).toString('base64url')}&s=${'22'.repeat(32)}&g=1&e=${expires}`);
+    await page.getByRole('button', { name: 'Check microphone' }).click();
+    await page.waitForFunction(() => typeof window.completeMicRequest === 'function');
+    await page.getByRole('button', { name: 'Join to listen' }).press('Enter');
+    await page.waitForFunction(() => typeof window.completeListeningResume === 'function');
+    await page.evaluate(() => window.completeMicRequest());
+    await page.waitForFunction(() => window.micStopped === true);
+    await page.evaluate(() => window.completeListeningResume());
+    await expect(page.locator('#status')).toContainText('listening with your microphone off');
+    await page.getByRole('button', { name: 'Leave session' }).press('Enter');
+    await expect(page.locator('#status')).toBeFocused();
+});
+
 for (const width of [375, 390]) {
     for (const kind of ['missing', 'malformed', 'expired']) {
         test(`the packaged website gives ${kind} invites a usable fresh-link recovery at ${width}px without capture`, async ({ page, baseURL }) => {

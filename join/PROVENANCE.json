@@ -1,13 +1,13 @@
 {
   "repository": "https://github.com/rupret007/webjam",
-  "commit": "b5659c15e8cfcdd09ca6228dd82cb9fc46ac25fa",
+  "commit": "d29c5d8528a33130051f46f46a858cdb4454fa56",
   "license": "MIT",
   "modifications": {},
   "files": {
     "app.js": {
       "source": "web/join/app.js",
-      "upstreamSha256": "220eca08820632f1f0e7847a31a4cbd5f3625bad54914ba684d5d634ba193262",
-      "shippedSha256": "220eca08820632f1f0e7847a31a4cbd5f3625bad54914ba684d5d634ba193262"
+      "upstreamSha256": "b5b49c2425f1623ac7d9676a9ab7de68dbf8b5b9392ce82d7080944a6c86ce75",
+      "shippedSha256": "b5b49c2425f1623ac7d9676a9ab7de68dbf8b5b9392ce82d7080944a6c86ce75"
     },
     "audio.js": {
       "source": "web/join/audio.js",
