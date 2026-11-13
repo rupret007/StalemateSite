@@ -1984,7 +1984,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 const server = route.connectToServer();
                 route.onMessage(message => {
                     const action = typeof message === 'string' && JSON.parse(message).action === 'input';
-                    if (action) setTimeout(() => server.send(message), 220);
+                    if (action) setTimeout(() => server.send(message), 335);
                     else server.send(message);
                 });
             });
@@ -2091,7 +2091,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.getByRole('button', { name: 'Accept Turd Rush rematch' }).click();
         await expect(race(b)).toHaveAttribute('data-phase', 'countdown');
         await expect(race(b)).toHaveAttribute('data-sequence', '0');
-        console.log(`Passed ${engine} Turd Rush shared course and collision, keyboard, ${media ? 'native swipe with 220 ms delay and active call' : '44px phone touch and full reload'}, 2D fallback, spectator and rematch.`);
+        console.log(`Passed ${engine} Turd Rush shared course and collision, keyboard, ${media ? 'native swipe with 335 ms delay and active call' : '44px phone touch and full reload'}, 2D fallback, spectator and rematch.`);
     }
     async function verifyBrickRaceFinish(a, b, spectator) {
         const pages = [a, b, spectator];
