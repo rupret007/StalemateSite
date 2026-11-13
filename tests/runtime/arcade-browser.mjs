@@ -453,7 +453,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(host.getByRole('log', { name: 'Conversation' })).toContainText('First visit from the game invite');
                 const reused = await context.newPage();
                 await openGameNightLink(reused, link);
-                await expect(reused.getByRole('status')).toContainText('was used');
+                await expect(reused.getByRole('status')).toHaveText('This invite is no longer available. Ask your host for a new one.');
                 await expect(reused.getByRole('button', { name: 'Join game' })).toBeHidden();
                 await reused.close();
                 await context.request.post(origin + '/beta/game-night/invitation/leave', { headers: { Origin: origin }, data: { sessionRef: '0'.repeat(64) } });
@@ -821,6 +821,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await host.keyboard.press('Escape');
                 assert.equal(host.url(), roomUrl);
                 assert.equal(host.context().pages().length, tabs);
+                const closed = new URL('/beta/game-night/guest', origin);
+                closed.hash = 'invite=invalid-local-fixture';
+                await friend.goto(closed.href);
+                const unavailable = friend.locator('[data-guest-status]');
+                await expect(unavailable).toHaveText('This invite is no longer available. Ask your host for a new one.');
+                await expect(unavailable).toBeFocused();
+                await expect(friend.getByRole('button', { name: 'Join game', exact: true })).toBeHidden();
+                assert.equal(new URL(friend.url()).hash, '');
                 const invitePlayers = host.getByRole('button', { name: 'Invite players', exact: true });
                 await invitePlayers.click();
                 const invitePicker = host.locator('[data-invite-dialog]');
@@ -2417,7 +2425,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const b = await guest('rad-dad', 'ChessGuest', { width: 375, height: 667 }, true);
         await a.getByRole('button', { name: /Game Night/ }).click();
         await inviteToGame(a, b, 'ChessGuest');
-        await expect(b.getByRole('link', { name: 'Open Rad Dad Arcade' })).toHaveAttribute('href', 'https://raddadband.com/play/');
+        await expect(b.getByRole('button', { name: 'Open Rad Dad Arcade', exact: true })).toBeVisible();
+        await expect(b.locator('[data-game-arcade-external]')).not.toHaveAttribute('href', /./);
         for (const page of [a, b]) await page.locator('.arcade-chess summary').click();
         await a.getByRole('button', { name: 'Open Chess match' }).click();
         await b.getByRole('button', { name: 'Join as Black' }).click();

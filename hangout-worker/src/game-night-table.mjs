@@ -63,6 +63,11 @@ export function createGameNightTable({
             return subjectValid(subject) ? sides.find(seat => this.#seats[seat] === subject) ?? null : null;
         }
 
+        guestSeats(id, host) {
+            if (id !== this.#id || this.#match || this.#seats[first] !== host) return [];
+            return sides.filter(seat => !this.#seats[seat]);
+        }
+
         hasGuestSeat(id, host, reserved = 0) {
             return id === this.#id && !this.#match && this.#seats[first] === host && this.#occupied().length + reserved < sides.length;
         }
@@ -78,10 +83,10 @@ export function createGameNightTable({
             };
         }
 
-        join(subject, id, now, requested, reserved = 0) {
+        join(subject, id, now, requested, reserved = 0, heldSeats = []) {
             if (id !== this.#id || this.#match || !subjectValid(subject) || this.seat(subject) || this.#occupied().length + reserved >= sides.length) return false;
-            const seat = twoSeats ? sides[1] : requested === 'next' ? sides.find(side => !this.#seats[side]) : requested;
-            if (!sides.includes(seat) || this.#seats[seat]) return false;
+            const seat = twoSeats ? sides[1] : requested === 'next' ? sides.find(side => !this.#seats[side] && !heldSeats.includes(side)) : requested;
+            if (!sides.includes(seat) || this.#seats[seat] || heldSeats.includes(seat)) return false;
             if (!manualStart && this.subjects.length === sides.length - 1) this.#match = create(id, now);
             this.#seats[seat] = subject;
             return true;

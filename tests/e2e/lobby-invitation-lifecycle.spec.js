@@ -476,7 +476,7 @@ test('Game Night keeps invitations actionable and offers a safe return after a d
     const fixture = await community(browser, baseURL);
     try {
         const host = await fixture.visitor('ReturnHost', { width: 1280, height: 850 });
-        const guest = await fixture.visitor('ReturnGuest', { width: 375, height: 667 });
+        const guest = await fixture.visitor('ReturnGuest', { width: 390, height: 844 });
         await host.getByRole('button', { name: /Game Night/ }).click();
         const roomTab = guest.getByRole('tab', { name: 'Game Night' });
         const offer = guest.locator('[data-game-offer]');
@@ -500,6 +500,7 @@ test('Game Night keeps invitations actionable and offers a safe return after a d
         await expect(roomTab).toBeFocused();
         await expect(offer).toBeHidden();
         await expect(guest.locator('[data-four]')).not.toHaveAttribute('open', '');
+        await expect(guest.getByText('Wait for your host to open a game.', { exact: true })).toBeInViewport();
 
         await host.locator('[data-four] summary').click();
         await host.getByRole('button', { name: 'Open a match' }).dblclick();
@@ -515,9 +516,9 @@ test('Game Night keeps invitations actionable and offers a safe return after a d
 
         fixture.disconnect('ReturnGuest', 1012);
         await expect(host.locator('[data-four-status]')).toContainText('The other player disconnected. This match is over.');
-        await expect(offer).toContainText('Game Night disconnected. Return to the room to check your match.');
-        await offer.getByRole('button', { name: 'Return to room' }).click();
-        await expect(roomTab).toBeFocused();
+        await expect(offer).toContainText('Return to Four in a Row to check whether the match is still open.');
+        await offer.getByRole('button', { name: 'Back to Four in a Row' }).click();
+        await expect(guest.locator('[data-four] summary')).toBeFocused();
         await expect(guest.locator('[data-four-table]')).toBeHidden();
 
         await guest.reload();
