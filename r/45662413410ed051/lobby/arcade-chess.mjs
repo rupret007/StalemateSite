@@ -72,14 +72,18 @@ export function mountArcadeChess(container, onMatch) {
     let scope, pendingTimer, clockTimer;
     let pending = false, canOpen = false, connection = 'connecting', connectionError;
     let model = null, chess = null, board = null, selected = null, focused = 'e2';
+    let hadTable = false, hostLeft = false, leftVoluntarily = false, droppedSeat = null, resumedSeat = null;
     let receivedAt = 0, deadlineSynced = false, lastOrientation = null, choiceContext = null;
     const client = createGameNightMatchClient({
         onMatch,
         prefix: '/beta/arcade',
         onStatus(next, reason) {
+            if ((next === 'reconnecting' || next === 'unavailable') && model?.seat && model.match && !model.match.result && !model.waiting) {
+                droppedSeat = model.seat;
+            }
             connection = next;
             connectionError = reason;
-            if (reason && reason !== 'rate-limited') { model = null; chess = null; }
+            if (reason && reason !== 'rate-limited') { model = null; chess = null; droppedSeat = null; }
             clearPending();
             closeChoice();
             selected = null;
@@ -104,6 +108,7 @@ export function mountArcadeChess(container, onMatch) {
 
     function send(action, details) {
         if (connection !== 'ready' || pending || !client.send({ action, id: model?.id, revision: model?.match?.revision, ...details })) return;
+        if (action === 'leave') leftVoluntarily = true;
         if (action !== 'sync') {
             pending = true;
             feedback.textContent = '';
@@ -133,12 +138,19 @@ export function mountArcadeChess(container, onMatch) {
         clearPending(); closeChoice();
         connection = 'connecting'; connectionError = undefined;
         model = null; chess = null; selected = null; canOpen = false;
+        hadTable = false; hostLeft = false; leftVoluntarily = false; droppedSeat = null; resumedSeat = null;
         board?.cancel();
     }
 
     function applyState(frame) {
-        const prior = model?.match, next = frame.state?.match;
+        const prior = model?.match, next = frame.state?.match, nextState = frame.state;
         const enteringBoard = next && next.id !== prior?.id;
+        resumedSeat = droppedSeat && nextState?.seat === droppedSeat && nextState.match && !nextState.match.result && !nextState.waiting
+            ? nextState.seat : null;
+        droppedSeat = null;
+        if (nextState) { hostLeft = false; hadTable = true; leftVoluntarily = false; }
+        else if (hadTable && !leftVoluntarily) { hostLeft = true; hadTable = false; }
+        else { hostLeft = false; hadTable = false; leftVoluntarily = false; }
         if (model?.id !== frame.state?.id || prior?.revision !== next?.revision) {
             selected = null; closeChoice(); feedback.textContent = '';
         }
@@ -261,19 +273,24 @@ export function mountArcadeChess(container, onMatch) {
             status.textContent = match ? 'Reconnecting… Clocks keep running.'
                 : connection === 'reconnecting' ? 'Reconnecting…' : 'Connecting…';
         } else if (!model) {
-            status.textContent = canOpen ? 'Open a ten-minute match for two players.' : 'Waiting for the host to open a table.';
+            if (hostLeft) status.textContent = 'The host left. This game is over.';
+            else status.textContent = canOpen ? 'Open a ten-minute match for two players.' : 'Waiting for the host to open a table.';
             if (canOpen) button('Open', 'open');
         } else if (model.waiting) {
             status.textContent = seated ? 'You’re White · Waiting for an opponent.' : 'Black is open. Join to play.';
             button(seated ? 'Leave' : 'Join', seated ? 'leave' : 'join');
         } else if (match?.result) {
-            status.textContent = `${match.result.winner ? colorName(match.result.winner) + ' wins' : 'Draw'} · ${match.result.reason}`;
+            const result = `${match.result.winner ? colorName(match.result.winner) + ' wins' : 'Draw'} · ${match.result.reason}`;
+            status.textContent = seated ? result : `${result}. You’re up if they rematch.`;
             if (seated && model.rematch !== model.seat) button('Rematch', 'rematch');
             if (seated && model.rematch) status.textContent += model.rematch === model.seat
                 ? ' · Rematch requested. Waiting for your opponent.' : ' · Your opponent requested a rematch.';
+        } else if (!seated) {
+            status.textContent = 'Table full. You’re up next game.';
+        } else if (resumedSeat === model.seat) {
+            status.textContent = `You’re still ${colorName(model.seat)}.`;
         } else {
-            const who = seated ? `You’re ${colorName(model.seat)}` : 'Watching';
-            status.textContent = `${who} · ${model.seat === match?.turn ? 'Your turn' : colorName(match?.turn) + ' to move'}`;
+            status.textContent = `You’re ${colorName(model.seat)} · ${model.seat === match?.turn ? 'Your turn' : colorName(match?.turn) + ' to move'}`;
         }
         for (const control of actions) {
             const active = seated && match && !match.result;

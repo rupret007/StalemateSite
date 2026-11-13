@@ -471,7 +471,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(host.getByRole('log', { name: 'Conversation' })).toContainText('First visit from the game invite');
                 const reused = await context.newPage();
                 await openGameNightLink(reused, link);
-                await expect(reused.getByRole('status')).toContainText('was used');
+                await expect(reused.getByRole('status')).toHaveText('Ask your host for a new invite.');
                 await expect(reused.getByRole('button', { name: 'Join game' })).toBeHidden();
                 await reused.close();
                 await context.request.post(origin + '/beta/game-night/invitation/leave', { headers: { Origin: origin }, data: { sessionRef: '0'.repeat(64) } });
@@ -920,7 +920,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect.poll(() => matches.length, { timeout: 12000, message: 'Chess retries a socket that never confirms its board' }).toBe(3);
         assert.match(recoveringStatus, /Reconnecting…/);
         assert.equal(confirmedBoardVisible, true);
-        await expect(player.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+        await expect(player.locator('[data-chess-status]')).toHaveText('You’re still Black.');
         await expect(player.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
         await expect(player.locator('[data-connection]')).toHaveText('Connected');
         await expect(player.locator('[data-call-toggle]')).toHaveText('Call joined');
@@ -2189,15 +2189,18 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         assert.deepEqual(scores.map(score => score.seat), ['a', 'b']);
         const [first, second] = scores;
         const lead = parseInt(first.bricks, 10) - parseInt(second.bricks, 10) || parseInt(first.score, 10) - parseInt(second.score, 10);
-        const publicResult = await status(spectator).textContent();
+        const publicResult = await status(a).textContent();
         const [, reason] = publicResult.split(' · ');
         assert.ok(['time limit', 'wall cleared', 'out of balls'].includes(reason), publicResult);
-        const labels = lead > 0 ? ['You win', 'Rival wins', 'Player 1 wins']
-            : lead < 0 ? ['Rival wins', 'You win', 'Player 2 wins'] : ['Draw', 'Draw', 'Draw'];
-        for (const [index, page] of pages.entries()) {
+        const labels = lead > 0 ? ['You win', 'Rival wins'] : lead < 0 ? ['Rival wins', 'You win'] : ['Draw', 'Draw'];
+        for (const [index, page] of [a, b].entries()) {
             await expect(status(page)).toHaveText(`${labels[index]} · ${reason}`);
             assert.deepEqual(await scoreboard(page), scores);
         }
+        const watcher = lead > 0 ? 'Player 1 wins. You’re up if they rematch.'
+            : lead < 0 ? 'Player 2 wins. You’re up if they rematch.' : 'Draw. You’re up if they rematch.';
+        await expect(status(spectator)).toHaveText(watcher);
+        assert.deepEqual(await scoreboard(spectator), scores);
         await expect(brickMain(b)).toHaveText('Rematch');
         await expect(brickMain(b)).toBeInViewport({ ratio: 1 });
         await expect(brickMain(spectator)).toBeHidden();

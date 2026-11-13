@@ -125,6 +125,39 @@ describe('Turdanoid brick race phone friction', () => {
         expect(view.launch.hidden).toBe(true);
     });
 
+    it('tells a watcher the table is full and a finished watcher who won', () => {
+        const view = mount();
+        view.publish(54_000, null);
+        expect(view.status.textContent).toBe('Table full. You’re up next race.');
+        expect(view.main.hidden).toBe(true);
+        const finished = race.view('a', 80_000);
+        finished.result = { winner: 'a', reason: 'time' };
+        client.handlers.onState({
+            state: { version: 1, game: 'turdanoid', id: 'race-12345', seat: null, waiting: false, rematch: null, match: finished },
+            canOpen: false
+        });
+        expect(view.status.textContent).toBe('Player 1 wins. You’re up if they rematch.');
+        expect(view.main.hidden).toBe(true);
+    });
+
+    it('says the race is over when the table disappears', () => {
+        const view = mount();
+        view.publish(54_000, 'b');
+        client.handlers.onState({ state: null, canOpen: false });
+        expect(view.status.textContent).toBe('The host left. This race is over.');
+        expect(view.main.hidden).toBe(true);
+    });
+
+    it('tells a seated player to reconnect and keeps Retry', () => {
+        const view = mount();
+        view.publish(54_000, 'b');
+        client.handlers.onStatus('unavailable');
+        expect(view.status.textContent).toBe('Reconnecting to your seat.');
+        expect(view.main.hidden).toBe(false);
+        expect(view.main.textContent).toBe('Retry');
+        expect(view.main.dataset.command).toBe('retry');
+    });
+
     it('tells a touch player to drag and tap instead of using arrow keys and Space', () => {
         const touch = mount({ coarse: true });
         expect(touch.help.textContent).toBe('Drag to move. Tap the stuck ball or press Launch.');
@@ -164,6 +197,8 @@ function mount({ coarse = true } = {}) {
         help: container.querySelector('.brick-race-help'),
         launch: container.querySelector('[data-brick-serve]'),
         table: container.querySelector('[data-brick-match]'),
+        status: container.querySelector('[data-brick-status]'),
+        main: container.querySelector('[data-brick-main]'),
         publish(now, seat = 'b') {
             client.handlers.onState({
                 state: {

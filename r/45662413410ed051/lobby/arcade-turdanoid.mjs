@@ -97,6 +97,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
     }
     const paint = createPainter(board.querySelector('canvas'));
     let scope, model, canOpen, connection, connectionError, visual, wall, receivedAt, raf = 0, pending, pointer,
+        hadTable = false, hostLeft = false, leftVoluntarily = false,
         desiredAim = null, lastAim = -Infinity, lastSent = -Infinity, lastSync = -Infinity, retryAt = 0, redraw = true;
     const inputBufferLimit = 8;
     let launchPointer = null, desiredAxis = null, keyboardActive = false, pointerStart = null;
@@ -133,6 +134,9 @@ export function mountArcadeTurdanoid(container, onMatch) {
         },
         onState({ state, canOpen: host }) {
             if (state && (state.game !== 'turdanoid' || state.version !== 1)) return;
+            if (state) { hostLeft = false; hadTable = true; leftVoluntarily = false; }
+            else if (hadTable && !leftVoluntarily) { hostLeft = true; hadTable = false; }
+            else { hostLeft = false; hadTable = false; leftVoluntarily = false; }
             const reconnecting = connection !== 'ready';
             const changed = state?.id !== model?.id || state?.seat !== model?.seat;
             const reveal = state?.match && (!model?.match || changed);
@@ -175,6 +179,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
     function send(action) {
         if (action === 'retry') { client.start(scope); return; }
         if (connection !== 'ready' || pending || !client.send({ action, id: model?.id })) return;
+        if (action === 'leave') leftVoluntarily = true;
         put(error, '');
         pending = setTimeout(() => client.start(scope), 4000);
         render();
@@ -257,24 +262,30 @@ export function mountArcadeTurdanoid(container, onMatch) {
         const match = model?.match, seat = model?.seat, result = match?.result;
         let message = 'Connecting to the race…', action = '', label = '';
         if (connection === 'unavailable') {
-            message = matchConnectionErrors[connectionError] || 'Reconnecting… The clock keeps running.';
+            message = connectionError && matchConnectionErrors[connectionError] ? matchConnectionErrors[connectionError]
+                : seat ? 'Reconnecting to your seat.' : 'Reconnecting… The clock keeps running.';
             if (!connectionError || connectionError === 'rate-limited') { action = 'retry'; label = 'Retry'; }
         } else if (connection !== 'ready') {
             if (match) message = match.result ? 'Reconnecting…' : 'Reconnecting… The clock keeps running.';
         } else if (!model) {
-            message = canOpen ? 'Same wall and three balls. Clear it first or break the most bricks in 75 seconds.'
+            if (hostLeft) message = 'The host left. This race is over.';
+            else message = canOpen ? 'Same wall and three balls. Clear it first or break the most bricks in 75 seconds.'
                 : 'Waiting for the host to open a table.';
             if (canOpen) { action = 'open'; label = 'Open'; }
         } else if (model?.waiting) {
             message = seat ? 'Waiting for a second player.' : 'An opponent is ready.';
             if (!seat) { action = 'join'; label = 'Join'; }
         } else if (result) {
-            message = result.winner === null ? 'Draw' : seat ? (result.winner === seat ? 'You win' : 'Rival wins')
-                : (result.winner === 'a' ? 'Player 1 wins' : 'Player 2 wins');
-            message += ' · ' + { clear: 'wall cleared', time: 'time limit', out: 'out of balls', resign: 'forfeit' }[result.reason];
-            if (seat && seat !== model.rematch) { action = 'rematch'; label = 'Rematch'; }
-            if (seat && seat === model.rematch) message += ' · Rematch requested';
-        } else if (match) message = seat ? match.wall.name : `Watching · ${match.wall.name}`;
+            if (!seat) {
+                message = result.winner === null ? 'Draw. You’re up if they rematch.'
+                    : `${result.winner === 'a' ? 'Player 1' : 'Player 2'} wins. You’re up if they rematch.`;
+            } else {
+                message = result.winner === null ? 'Draw' : result.winner === seat ? 'You win' : 'Rival wins';
+                message += ' · ' + { clear: 'wall cleared', time: 'time limit', out: 'out of balls', resign: 'forfeit' }[result.reason];
+                if (seat !== model.rematch) { action = 'rematch'; label = 'Rematch'; }
+                if (seat === model.rematch) message += ' · Rematch requested';
+            }
+        } else if (match) message = seat ? match.wall.name : 'Table full. You’re up next race.';
         put(status, message);
         main.hidden = !action;
         main.dataset.command = action;
@@ -387,6 +398,9 @@ export function mountArcadeTurdanoid(container, onMatch) {
         cancelAnimationFrame(raf);
         raf = 0;
         model = visual = wall = null;
+        hadTable = false;
+        hostLeft = false;
+        leftVoluntarily = false;
         connection = 'connecting';
         connectionError = undefined;
         put(error, '');
