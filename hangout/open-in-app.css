@@ -46,7 +46,11 @@
 }
 
 .hoa__quiet {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    min-height: 44px;
+    min-width: 44px;
     margin-top: 10px;
     color: #c9bba9;
     font-size: 0.95rem;

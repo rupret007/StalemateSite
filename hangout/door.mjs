@@ -1,8 +1,18 @@
 import { HOST_ASK } from './open-in-app.mjs';
 
 // A door matches the row that opened it. The name field and the enter button stay visible.
+// This page has no public address for that room, so Jump in says so in one line.
 
 export const DOOR_KINDS = Object.freeze(['hangout', 'game-night', 'draw', 'watch', 'jam']);
+
+export const PLACE_KIND_LABEL = Object.freeze({
+    chat: 'Chat',
+    art: 'Draw together',
+    bobross: 'Paint-along',
+    watch: 'Watch together',
+    jam: 'WebJam',
+    game: 'Game Night'
+});
 
 const KIND = new Set(DOOR_KINDS);
 const TITLE = /^[A-Za-z0-9][A-Za-z0-9 .'-]{0,39}$/;
@@ -32,12 +42,26 @@ const STEP = Object.freeze({
     jam: HOST_ASK
 });
 
-export function placeHref(kind, title = '') {
+export function cannotOpenLine(heading) {
+    const name = String(heading || 'this room').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 40);
+    return `This visit can't open ${name || 'this room'}.`;
+}
+
+export function placeHref(kind, title = '', extra = {}) {
     const params = new URLSearchParams();
     params.set('kind', KIND.has(kind) ? kind : 'hangout');
     if (title) params.set('title', title);
+    const count = Number(extra.count);
+    if (Number.isSafeInteger(count) && count >= 1 && count <= 99) params.set('count', String(count));
+    if (Object.hasOwn(PLACE_KIND_LABEL, extra.via)) params.set('via', extra.via);
     if (params.get('kind') === 'game-night') params.set('game-night', '1');
     return `door.html?${params.toString()}`;
+}
+
+function oneValue(params, key, pattern) {
+    const values = params.getAll(key);
+    if (values.length !== 1 || !pattern.test(values[0])) return '';
+    return values[0];
 }
 
 export function parseDoor(search) {
@@ -46,11 +70,18 @@ export function parseDoor(search) {
     const kind = KIND.has(requested) ? requested : 'hangout';
     const rawTitle = params.get('title') || '';
     const title = TITLE.test(rawTitle) && !/invite|grant|token|preview/i.test(rawTitle) ? rawTitle : '';
+    const count = Number(oneValue(params, 'count', /^[1-9][0-9]?$/)) || 0;
+    const via = oneValue(params, 'via', /^[a-z]+$/);
+    const kindLabel = Object.hasOwn(PLACE_KIND_LABEL, via) ? PLACE_KIND_LABEL[via] : KICKER[kind];
     return {
         kind,
         title,
+        count,
+        via: Object.hasOwn(PLACE_KIND_LABEL, via) ? via : '',
         heading: title || FALLBACK[kind],
         kicker: KICKER[kind],
+        kindLabel,
+        meta: count ? `${count} here · ${kindLabel}` : '',
         step: STEP[kind],
         gameNight: kind === 'game-night'
     };
@@ -74,6 +105,10 @@ export function retainDoorQuery(currentHref, nextHref) {
     if (!next.searchParams.get('kind')) next.searchParams.set('kind', 'game-night');
     const title = current.searchParams.get('title');
     if (title && !next.searchParams.has('title')) next.searchParams.set('title', title);
+    const count = oneValue(current.searchParams, 'count', /^[1-9][0-9]?$/);
+    if (count && !next.searchParams.has('count')) next.searchParams.set('count', count);
+    const via = oneValue(current.searchParams, 'via', /^[a-z]+$/);
+    if (Object.hasOwn(PLACE_KIND_LABEL, via) && !next.searchParams.has('via')) next.searchParams.set('via', via);
     for (const key of [...next.searchParams.keys()]) {
         if (DROP.includes(key.toLowerCase())) next.searchParams.delete(key);
     }
@@ -105,6 +140,11 @@ export function mountDoor(doc, env = {}) {
     if (title) title.textContent = parsed.heading;
     if (kicker) kicker.textContent = parsed.kicker;
     if (step) step.textContent = parsed.step;
+    const meta = doc.querySelector('[data-door-meta]');
+    if (meta) {
+        meta.textContent = parsed.meta;
+        meta.hidden = !parsed.meta;
+    }
     if (typeof doc.title === 'string') doc.title = `${parsed.heading} · Hang Out`;
     const name = doc.querySelector('[data-name]');
     const enter = doc.querySelector('[data-enter]');
@@ -119,7 +159,7 @@ export function mountDoor(doc, env = {}) {
             return;
         }
         try { env.storage?.setItem('hangout-nick', typed); } catch { /* private mode */ }
-        if (status) status.textContent = parsed.kind === 'jam' ? parsed.step : 'Name saved on this device.';
+        if (status) status.textContent = cannotOpenLine(parsed.heading);
     };
     enter?.addEventListener('click', submit);
     name?.addEventListener('keydown', (event) => {

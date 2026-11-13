@@ -33,8 +33,25 @@
     cursor: pointer;
 }
 
+.door-meta {
+    margin: 10px 0 0;
+    color: var(--cream);
+    font-weight: 700;
+}
+
 .door-status {
     min-height: 1.5em;
     margin: 0;
     color: var(--cream);
+}
+
+.door-home {
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    min-height: 44px;
+    min-width: 44px;
+    color: var(--lime);
+    font-weight: 700;
+    text-decoration: underline;
 }

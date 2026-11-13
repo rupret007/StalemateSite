@@ -1,4 +1,4 @@
-import { placeHref } from './door.mjs';
+import { PLACE_KIND_LABEL, placeHref } from './door.mjs';
 import { safeChoiceHref } from './last-room.mjs';
 
 // Open rooms and tables from an existing GET. Personal fields are dropped.
@@ -6,14 +6,7 @@ import { safeChoiceHref } from './last-room.mjs';
 export const OPEN_PLACE_READS = Object.freeze(['/beta/state']);
 export const EMPTY_COPY = 'No open rooms right now.';
 
-const KIND_LABEL = Object.freeze({
-    chat: 'Chat',
-    art: 'Draw together',
-    bobross: 'Paint-along',
-    watch: 'Watch together',
-    jam: 'WebJam',
-    game: 'Game Night'
-});
+const KIND_LABEL = PLACE_KIND_LABEL;
 
 export function safeReadPath(value) {
     if (typeof value !== 'string' || value.length > 80) return false;
@@ -101,9 +94,10 @@ const DOOR_KIND = Object.freeze({
 export function hrefForPlace(place) {
     const kind = DOOR_KIND[place.kind] || 'hangout';
     if (kind === 'jam') return './?go=webjam';
-    const titled = place.title ? placeHref(kind, place.title) : '';
+    const extra = { count: place.count, via: place.kind };
+    const titled = place.title ? placeHref(kind, place.title, extra) : '';
     if (titled && safeChoiceHref(titled)) return titled;
-    const plain = placeHref(kind);
+    const plain = placeHref(kind, '', extra);
     return safeChoiceHref(plain) ? plain : '';
 }
 

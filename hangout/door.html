@@ -17,15 +17,18 @@
 <body data-door-page>
     <a class="skip" href="#door-name">Skip to your name</a>
     <main class="sheet">
+        <img class="brand-mark" src="../assets/hangout-app/webjam-mark.svg" alt="" width="72" height="72">
         <p class="eyebrow" data-door-kicker>Hang Out</p>
         <h1 data-door-title>Hang Out</h1>
         <p class="lede" data-door-step>Pick a name and jump in.</p>
+        <p class="door-meta" data-door-meta hidden></p>
         <div class="door-form" data-door-form>
             <label for="door-name">Your name
                 <input id="door-name" data-name maxlength="24" autocomplete="nickname" spellcheck="false">
             </label>
             <button class="door__enter" data-enter type="button">Jump in</button>
             <p class="door-status" data-door-status role="status"></p>
+            <a class="door-home" data-door-home href="./">Hang Out home</a>
         </div>
     </main>
     <script type="module" src="door.mjs"></script>

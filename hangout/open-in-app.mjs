@@ -99,10 +99,12 @@ export function safeHomeHref(value) {
     return value;
 }
 
-export function openInAppLines({ ios = false, action = 'home', place = '', led = false } = {}) {
+export function openInAppLines({ ios = false, action = 'home', place = '', led = false, alreadyHome = false } = {}) {
     const lines = [];
-    if (!led && place === 'webjam' && action === 'home') lines.push(HOST_ASK);
-    if (ios) lines.push(IPHONE_LIMIT);
+    const homeAsk = place === 'webjam' && action === 'home';
+    if (!led && homeAsk) lines.push(HOST_ASK);
+    // The WebJam ask on the home screen has no invite link, so it does not mention Safari.
+    if (ios && !(alreadyHome && homeAsk)) lines.push(IPHONE_LIMIT);
     return lines;
 }
 
@@ -141,8 +143,9 @@ export function jumpIn(doc) {
         return 'name';
     }
     const enter = doc.querySelector('[data-enter], #join');
-    if (enter && !enter.disabled && !enter.hidden) {
-        enter.focus();
+    const kept = enter && !enter.disabled && (!enter.hidden || enter.dataset.jumpDuplicate === 'hidden');
+    if (kept) {
+        if (!enter.hidden && typeof enter.focus === 'function') enter.focus();
         enter.click();
         return 'enter';
     }
@@ -184,13 +187,33 @@ export function fillOpenInApp(doc, { ios = false, installed = 'unknown', action 
         link.textContent = HOME_LABEL;
         region.append(link);
     }
-    for (const text of openInAppLines({ ios, action, place, led: webjamHome })) {
+    for (const text of openInAppLines({ ios, action, place, led: webjamHome, alreadyHome })) {
         const line = doc.createElement('p');
         line.className = 'hoa__line';
         line.textContent = text;
         region.append(line);
     }
     return region;
+}
+
+export function keepSingleJump(doc) {
+    const hideDuplicate = () => {
+        const lead = doc.querySelector('[data-open-in-app] button');
+        if (!lead || lead.textContent.trim() !== JUMP_LABEL) return;
+        for (const button of doc.querySelectorAll('button')) {
+            if (button === lead || button.closest('[data-open-in-app]')) continue;
+            if (button.textContent.trim() !== JUMP_LABEL || button.hidden) continue;
+            button.hidden = true;
+            button.dataset.jumpDuplicate = 'hidden';
+        }
+    };
+    hideDuplicate();
+    const enter = doc.querySelector('[data-enter]');
+    if (enter && typeof MutationObserver === 'function' && !enter.dataset.jumpWatch) {
+        enter.dataset.jumpWatch = '1';
+        const observer = new MutationObserver(hideDuplicate);
+        observer.observe(enter, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+    }
 }
 
 export async function mountOpenInApp(doc, env) {
@@ -217,6 +240,7 @@ export async function mountOpenInApp(doc, env) {
     });
     const parent = doc.body || doc.documentElement;
     parent.insertBefore(region, parent.firstChild);
+    if (decision.action === 'jump') keepSingleJump(doc);
     if (!env.installed) {
         const detected = await detectInstalled(env.navigator);
         if (detected === 'installed') region.dataset.openInApp = detected;

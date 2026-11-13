@@ -38,7 +38,7 @@ import {
     safeHomeHref
 } from '../../hangout/open-in-app.mjs';
 import { isOfflineAsset, offlineAssetUrls, offlineDocument } from '../../hangout/sw-policy.mjs';
-import { parseDoor, placeHref, mountDoor, retainDoorQuery, guardGameNightFlag } from '../../hangout/door.mjs';
+import { cannotOpenLine, parseDoor, placeHref, mountDoor, retainDoorQuery, guardGameNightFlag } from '../../hangout/door.mjs';
 import { repairAbsentJoin } from '../../hangout/join-absent.mjs';
 import { injectLobbyDoor, isLobbyNavigation, retainLobbyGameNight, revealClosedDoor } from '../../hangout/lobby-door.mjs';
 import {
@@ -107,6 +107,8 @@ describe('invite links open in the installed app', () => {
         expect(IPHONE_LIMIT).toMatch(/Safari/);
         expect(IPHONE_LIMIT).not.toMatch(/cannot take this link/);
         expect(openInAppLines({ ios: false, action: 'jump' })).toEqual([]);
+        expect(openInAppLines({ ios: true, action: 'home', place: 'webjam', led: true, alreadyHome: true })).toEqual([]);
+        expect(openInAppLines({ ios: true, action: 'home', place: 'webjam', led: true })).toEqual([IPHONE_LIMIT]);
         const jump = fillOpenInApp(document, { ios: true, installed: 'unknown', action: 'jump', place: 'hangout' });
         expect(jump.getAttribute('aria-label')).toBe(OPEN_IN_APP_TITLE);
         expect(jump.querySelector('button').textContent).toBe(JUMP_LABEL);
@@ -211,11 +213,11 @@ describe('who’s here', () => {
         expect(root.textContent).not.toContain('#game-');
         expect(root.textContent).not.toContain('hidden@example.test');
         expect(root.querySelectorAll('a')).toHaveLength(2);
-        expect(root.querySelector('a').getAttribute('href')).toBe('door.html?kind=draw&title=Drawing+room');
-        expect(root.querySelectorAll('a')[1].getAttribute('href')).toBe('door.html?kind=game-night&title=Royal+Flush+Chess&game-night=1');
-        expect(hrefForPlace({ kind: 'watch', title: 'Watch party' })).toBe('door.html?kind=watch&title=Watch+party');
+        expect(root.querySelector('a').getAttribute('href')).toBe('door.html?kind=draw&title=Drawing+room&count=2&via=art');
+        expect(root.querySelectorAll('a')[1].getAttribute('href')).toBe('door.html?kind=game-night&title=Royal+Flush+Chess&count=2&via=game&game-night=1');
+        expect(hrefForPlace({ kind: 'watch', title: 'Watch party', count: 3 })).toBe('door.html?kind=watch&title=Watch+party&count=3&via=watch');
         expect(hrefForPlace({ kind: 'jam', title: 'Friday jam' })).toBe('./?go=webjam');
-        expect(hrefForPlace({ kind: 'art', title: 'invite room' })).toBe('door.html?kind=draw');
+        expect(hrefForPlace({ kind: 'art', title: 'invite room' })).toBe('door.html?kind=draw&via=art');
         renderPlaces(root, [], safeChoiceHref);
         expect(root.querySelector('[data-here-status]').textContent).toBe(EMPTY_COPY);
         expect(root.querySelector('[data-here-list]').hidden).toBe(true);
@@ -437,6 +439,8 @@ describe('icon shortcuts and last room', () => {
         })).toBe(true);
         const guide = validDoc.querySelector('[data-open-in-app]');
         expect(guide.querySelector('button').textContent).toBe(JUMP_LABEL);
+        expect(validDoc.querySelector('[data-enter]').hidden).toBe(true);
+        expect(validDoc.querySelectorAll('button:not([hidden])')).toHaveLength(1);
         expect(guide.textContent).not.toContain(secret);
         expect(guide.textContent).not.toContain(host);
         expect(guide.querySelectorAll('p')).toHaveLength(0);
@@ -446,13 +450,21 @@ describe('icon shortcuts and last room', () => {
         guide.querySelector('button').click();
         expect(focused).toBe(1);
         expect(jumpIn(validDoc)).toBe('name');
+        name.value = 'Ada';
+        let clicked = 0;
+        validDoc.querySelector('[data-enter]').addEventListener('click', () => { clicked += 1; });
+        expect(jumpIn(validDoc)).toBe('enter');
+        expect(clicked).toBe(1);
         const slot = document.createElement('div');
         slot.hidden = true;
         expect(mountHostAsk(slot, { userAgent: IPHONE, maxTouchPoints: 0, homeHref: '/hangout/' })).toBe(true);
         expect(slot.hidden).toBe(false);
         expect(slot.textContent).toContain(HOST_ASK);
-        expect(slot.textContent).toContain(IPHONE_LIMIT);
+        expect(slot.textContent).not.toContain(IPHONE_LIMIT);
+        expect(slot.textContent).not.toContain('Safari');
         expect(slot.textContent).not.toContain(secret);
+        const quiet = readFileSync(join(repoRoot, 'hangout/open-in-app.css'), 'utf8');
+        expect(quiet).toMatch(/\.hoa__quiet\s*\{[^}]*min-height:\s*44px/s);
         const ask = slot.querySelector('[data-open-in-app]');
         expect(ask.firstElementChild.textContent).toBe(HOST_ASK);
         expect(ask.querySelector('a')).toBeNull();
@@ -485,9 +497,11 @@ describe('home screen doors', () => {
             '<p data-door-kicker></p>',
             '<h1 data-door-title>Hang Out</h1>',
             '<p data-door-step></p>',
+            '<p data-door-meta hidden></p>',
             '<input data-name>',
             '<button data-enter type="button">Jump in</button>',
-            '<p data-door-status role="status"></p>'
+            '<p data-door-status role="status"></p>',
+            '<a data-door-home href="./">Hang Out home</a>'
         ].join(''));
     }
 
@@ -497,9 +511,12 @@ describe('home screen doors', () => {
         expect(parseDoor('?kind=watch&title=Watch+party').heading).toBe('Watch party');
         expect(parseDoor('?kind=watch&title=Watch+party').step).toBe('Pick a name and watch together.');
         const draw = doorDoc();
-        mountDoor(draw, { search: '?kind=draw&title=Drawing+room', storage: memoryStorage() });
+        const storage = memoryStorage();
+        mountDoor(draw, { search: '?kind=draw&title=Drawing+room&count=2&via=art', storage });
         expect(draw.querySelector('h1').textContent).toBe('Drawing room');
         expect(draw.querySelector('[data-door-step]').textContent).toBe('Pick a name and draw together.');
+        expect(draw.querySelector('[data-door-meta]').hidden).toBe(false);
+        expect(draw.querySelector('[data-door-meta]').textContent).toBe('2 here · Draw together');
         expect(draw.querySelector('[data-name]').hidden).toBe(false);
         expect(draw.querySelector('[data-enter]').hidden).toBe(false);
         draw.querySelector('[data-enter]').click();
@@ -508,16 +525,24 @@ describe('home screen doors', () => {
         draw.querySelector('[data-enter]').click();
         expect(draw.querySelector('[data-name]').hidden).toBe(false);
         expect(draw.querySelector('[data-enter]').hidden).toBe(false);
-        expect(draw.querySelector('[data-door-status]').textContent).toBe('Name saved on this device.');
+        expect(draw.querySelector('[data-door-status]').textContent).toBe(cannotOpenLine('Drawing room'));
+        expect(draw.querySelector('[data-door-status]').textContent).not.toContain('\n');
+        expect(draw.body.textContent).not.toContain('Name saved on this device.');
+        expect(draw.querySelector('[data-door-home]').textContent).toBe('Hang Out home');
+        expect(storage.getItem('hangout-nick')).toBe('Ada');
         const html = readFileSync(join(repoRoot, 'hangout/door.html'), 'utf8');
         expect(html).toContain('data-name');
         expect(html).toContain('data-enter');
+        expect(html).toContain('webjam-mark.svg');
+        expect(html).toContain('Hang Out home');
+        expect(html).toContain('data-door-meta');
         expect(html).not.toMatch(/<(?:input|button)\b[^>]*\bhidden\b/);
+        expect(readFileSync(join(repoRoot, 'assets/hangout-app/webjam-mark.svg'), 'utf8')).toContain('#E87900');
     });
 
     it('puts game-night=1 back when the address bar is cleaned', () => {
         const location = {
-            href: 'https://hangout.example/hangout/door.html?kind=game-night&title=Royal+Flush+Chess&game-night=1'
+            href: 'https://hangout.example/hangout/door.html?kind=game-night&title=Royal+Flush+Chess&count=2&via=game&game-night=1'
         };
         const history = {
             replaceState(state, title, url) {
@@ -529,6 +554,8 @@ describe('home screen doors', () => {
         expect(new URL(location.href).searchParams.get('game-night')).toBe('1');
         expect(new URL(location.href).searchParams.get('kind')).toBe('game-night');
         expect(new URL(location.href).searchParams.get('title')).toBe('Royal Flush Chess');
+        expect(new URL(location.href).searchParams.get('count')).toBe('2');
+        expect(new URL(location.href).searchParams.get('via')).toBe('game');
         history.replaceState(null, '', '/hangout/door.html?preview=no');
         expect(new URL(location.href).searchParams.has('preview')).toBe(false);
         expect(new URL(location.href).searchParams.get('game-night')).toBe('1');

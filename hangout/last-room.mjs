@@ -72,14 +72,20 @@ export function safeChoiceHref(value) {
     return safeDoorSearch(url);
 }
 
+const VIA = new Set(['chat', 'art', 'bobross', 'watch', 'jam', 'game']);
+
 function safeDoorSearch(url) {
     const params = url.searchParams;
     const keys = [...params.keys()];
-    if (keys.some((key) => !['kind', 'title', 'game-night'].includes(key))) return false;
+    if (keys.some((key) => !['kind', 'title', 'game-night', 'count', 'via'].includes(key))) return false;
     const kind = params.get('kind') || '';
     if (!DOOR_KINDS.has(kind)) return false;
     const title = params.get('title');
     if (title !== null && (!SAFE_TITLE.test(title) || /invite|grant|token|preview/i.test(title))) return false;
+    const counts = params.getAll('count');
+    if (counts.length > 1 || (counts.length === 1 && !/^[1-9][0-9]?$/.test(counts[0]))) return false;
+    const vias = params.getAll('via');
+    if (vias.length > 1 || (vias.length === 1 && !VIA.has(vias[0]))) return false;
     const flags = params.getAll('game-night');
     if (kind === 'game-night') return flags.length === 1 && flags[0] === '1';
     return flags.length === 0;
