@@ -587,6 +587,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await expect(share).toBeVisible();
                     await share.click();
                     await expect(share).toBeHidden();
+                    await expect(host.locator('details.arcade-chess > summary')).toBeFocused();
                     assert.equal(await host.evaluate(() => window.testGameShares), 2, 'both share calls came from trusted clicks');
                 }
                 assert.equal(issues, 1, 'sharing an already prepared invitation issues no extra link');
