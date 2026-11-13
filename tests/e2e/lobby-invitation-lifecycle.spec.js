@@ -640,9 +640,22 @@ for (const width of [375, 390, 1280]) test(`a Jam room invitation stays actionab
     try {
         const host = await fixture.visitor('JamHost', { width: 1280, height: 850 });
         const guest = await fixture.visitor('JamGuest', { width, height: width > 500 ? 850 : 667 });
-        await host.locator('[data-start="jam"]').click();
+        const startJam = host.locator('[data-start="jam"]');
+        if (width === 375) {
+            await startJam.evaluate(button => {
+                // Reproduce the longer room name during the real click that creates the room.
+                button.addEventListener('click', () => {
+                    const random = Math.random;
+                    const choices = [0.53, 0.70]; // mighty, squirrel
+                    Math.random = () => choices.shift() ?? random();
+                    queueMicrotask(() => { Math.random = random; });
+                }, { capture: true, once: true });
+            });
+        }
+        await startJam.click();
         await expect(host.locator('[data-jam]')).toBeVisible();
         const room = await host.locator('[data-chat-context]').textContent();
+        if (width === 375) expect(room).toMatch(/^#jam-mighty-squirrel-/);
         const offer = guest.locator('[data-game-offer]'), roomTab = guest.getByRole('tab', { name: room });
         const context = guest.locator('[data-chat-context]');
         // The offer waits for an answer, so it must not cover the composer or
