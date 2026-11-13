@@ -149,12 +149,18 @@ describe('Spades next step', () => {
         expect(button.textContent).toBe('Request Spades rematch');
     });
 
-    it('tells partners and four-player guests when the host leaves', () => {
+    it.each([
+        ['partners', ['south', 'west'], { mode: 'partners' }],
+        ['four players', ['south', 'west', 'north', 'east'], {}]
+    ])('keeps the next step in focus when the %s table closes', (_label, occupied, tableMode) => {
         const view = mount(mountArcadeTurdSpades);
         const status = view.querySelector('[data-spades-status]');
         const button = view.querySelector('[data-spades-main]');
         state({
-            state: { version: 1, game: 'turdspades', id: 'spades-1', seat: 'west', mode: 'partners', waiting: false, occupied: ['south', 'west'], match: spadesMatch() },
+            state: {
+                version: 1, game: 'turdspades', id: 'spades-1', seat: 'west',
+                waiting: false, occupied, match: spadesMatch(), ...tableMode
+            },
             canOpen: false, partners: true
         });
         state({ state: null, canOpen: false, partners: true });
@@ -162,6 +168,7 @@ describe('Spades next step', () => {
         expect(button.textContent).toBe('Stay for the next game');
         button.click();
         expect(status.textContent).toBe('Waiting for the host to open a table.');
+        expect(view.ownerDocument.activeElement).toBe(status);
         expect(client.sent).toEqual([]);
     });
 });
