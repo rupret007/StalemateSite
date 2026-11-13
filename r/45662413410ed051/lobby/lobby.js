@@ -1056,7 +1056,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
                 // A rehearsal outlasts the return window. Restart it at the
                 // reconnect, not at the last time the room tab was opened.
                 const returning = app.chans.get(gameReturn?.room);
-                if (returning) rememberGameReturn(returning);
+                if (returning) rememberGameReturn(returning, gameReturn.game);
                 app.chans.clear();
                 for (const [ref, view] of app.pms) {
                     // A new socket starts a fresh received transcript. Only
@@ -1128,10 +1128,15 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             const gameOfferAccepted = joiningGameRoom === c.name;
             const invite = gameOfferAccepted ? joiningArcadeOffer : null;
             const returningToGame = gameReturnOffered && gameReturn?.room === c.name;
+            const returningGame = returningToGame && gameReturn.ref === c.keepRef ? gameReturn.game : null;
             const joiningLinkedGame = gameEntry?.target?.room === c.name;
             if (joiningLinkedGame) gameEntry = null;
             if (gameOfferAccepted) { joiningGameRoom = ''; joiningArcadeOffer = null; }
-            if (returningToGame) gameReturnOffered = false;
+            if (returningToGame) {
+                if (returningGame)
+                    arcadeReturning = { ...gameReturn, seat: true };
+                gameReturnOffered = false;
+            }
             if (gameInvites.delete(c.name) || gameOfferAccepted || returningToGame || joiningLinkedGame) drawGameOffer();
             if (app.pendingChannel === m.ch.name) {
                 app.pendingChannel = '';
@@ -1147,7 +1152,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             // Classic IRC: joining begins a fresh buffer; never render pre-join backlog.
             if (activityRoom(c)) c.actSnap = activitySnapshot(m.act);
             switchTo(m.ch.name, { freshJoin: true });
-            if (gameOfferAccepted && !arcadeInvitation) focusChannelTab(c.name);
+            if (gameOfferAccepted && !arcadeInvitation && !returningGame) focusChannelTab(c.name);
             followPendingRoomJoin();
             break;
         }
@@ -1539,10 +1544,13 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         removeTab(gameReturnKey);
         return null;
     }
-    function rememberGameReturn(room) {
+    function rememberGameReturn(room, previousGame) {
         if (!offerRoomName(room.name) || !roomNonce(room.keepRef)) return;
         // Tab-local room reference only. Admission, nicknames and match state stay elsewhere.
-        gameReturn = { room: room.name, ref: room.keepRef, until: Date.now() + 30 * 60 * 1000 };
+        const activeGame = room.kind === 'game' && (previousGame || (arcadeReturning?.ref === room.keepRef ? arcadeReturning.game : '')
+            || [...arcadeTables].find(([, table]) => table.seatRef === room.keepRef && table.controller?.isOpen())?.[0]);
+        gameReturn = { room: room.name, ref: room.keepRef, until: Date.now() + 30 * 60 * 1000,
+            ...(activeGame ? { game: activeGame } : {}) };
         writeTab(gameReturnKey, JSON.stringify(gameReturn));
     }
     function clearGameReturn() {
@@ -1616,11 +1624,12 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         else if (joiningGameRoom === offer.room) message = `Joining ${roomLabel}…`;
         else if (gameReturnOffered) {
             message = jam ? `You were disconnected from ${offer.room}. Chat starts fresh.`
-                : 'Game Night disconnected. Return to the room to check your match.';
+                : offer.game ? 'You disconnected. Return to your game to check your seat.'
+                    : 'Game Night disconnected. Return to the room to check your match.';
         } else if (offer.by) message = gameLabel ? `${offer.by} invited you to play ${gameLabel}.` : `${offer.by} invited you to ${roomLabel}.`;
         else message = 'Your link points to a private Game Night. The host’s invitation is required.';
         if (status.textContent !== message) status.textContent = message;
-        button.textContent = start ? 'Start Game Night' : gameReturnOffered ? 'Return to room'
+        button.textContent = start ? 'Start Game Night' : gameReturnOffered ? (offer.game ? 'Back to my seat' : 'Return to room')
             : gameLabel ? `Play ${gameLabel}` : jam ? 'Join room' : 'Join Game Night';
         const busy = !!joiningGameRoom || start && !!gameOpenPending;
         button.setAttribute('aria-disabled', String(busy));
@@ -1771,10 +1780,21 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         if (gameShareButton) gameShareButton.hidden = !canShare;
         if (gameShareDialog?.open && (!canShare || gameShareDialog.dataset.room !== c.keepRef)) gameShareDialog.close();
         $('[data-game-night]').hidden = !c;
+        drawGameWaiting(c);
         arcadePicker.hidden = !!gameGuest || !c || ![...arcadeTables.values()].some(table => table.supported);
         gameArcade.hidden = !betaShell || arcadePicker.hidden;
         for (const [game, table] of arcadeTables) drawArcadeTable(c, game, table);
         drawArcadeMedia(c);
+    }
+    function drawGameWaiting(room) {
+        const status = $('[data-game-waiting]');
+        const waiting = room && !gameGuest && !amOp(room)
+            && ![...arcadeTables.values()].some(table => table.matchRef === room.keepRef);
+        const message = waiting ? room.names.some(member => member.prefix === '@')
+            ? 'Wait for your host to open a game.'
+            : 'Your host is offline. Wait here for them to return.' : '';
+        if (status.textContent !== message) status.textContent = message;
+        status.hidden = !message;
     }
     function drawArcadeMedia(c) {
         const scope = arcadeMediaSupported && !shieldActive && c && roomNonce(c.keepRef)
@@ -1806,8 +1826,10 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             updateTableInvite(table, c);
             if (scope && arcadeInvitation?.game === game && arcadeInvitation.ref === scope.ref) table.controller.open();
             if (scope && game === arcadeReturning?.game && scope.room === arcadeReturning.room && scope.ref === arcadeReturning.ref) {
+                const returning = arcadeReturning;
                 arcadeReturning = null;
-                table.controller.open();
+                const panel = table.controller.open();
+                if (returning.seat && panel?.open) panel.querySelector('summary').focus();
             }
             return;
         }
@@ -1866,6 +1888,11 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             table.inviteButton.hidden = !!gameGuest || !gameGuestInvitesSupported || !table.invite || !room || !amOp(room);
     }
     function arcadeMatchState(game, table, scope, state, sendMatch) {
+        table.matchRef = scope && state?.id ? scope.ref : null;
+        table.seatRef = scope && state?.seat ? scope.ref : null;
+        const room = currentGameNight();
+        drawGameWaiting(room);
+        if (table.seatRef && room?.keepRef === table.seatRef) rememberGameReturn(room);
         table.invite = scope && state?.seat && state.waiting && state.hasOpenSeat !== false ? gameNightInvite(game, state.id) : null;
         updateTableInvite(table, currentGameNight());
         const share = arcadeShareIntent;

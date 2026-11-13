@@ -818,6 +818,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await host.keyboard.press('Escape');
                 assert.equal(host.url(), roomUrl);
                 assert.equal(host.context().pages().length, tabs);
+                const closed = new URL('/beta/game-night/guest', origin);
+                closed.hash = 'invite=invalid-local-fixture';
+                await friend.goto(closed.href);
+                const unavailable = friend.locator('[data-guest-status]');
+                await expect(unavailable).toHaveText('This invite is no longer available. Ask your host for a new one.');
+                await expect(unavailable).toBeFocused();
+                await expect(friend.getByRole('button', { name: 'Join game', exact: true })).toBeHidden();
+                assert.equal(new URL(friend.url()).hash, '');
                 const invitePlayers = host.getByRole('button', { name: 'Invite players', exact: true });
                 await invitePlayers.click();
                 const invitePicker = host.locator('[data-invite-dialog]');

@@ -272,7 +272,7 @@ async function gameInvitation(request, env, path, body) {
     if (path === 'issue' && !session) return json({ error: 'Private invitation required.' }, 401);
     if (path !== 'issue') {
         const invitation = await readBeta('game-invitation', body.code, env.HANGOUT_HMAC_KEY);
-        if (!invitation) return json({ error: 'This invitation is invalid or has expired. Ask your host for a new invite.' }, 410);
+        if (!invitation) return json({ error: 'This invite is no longer available. Ask your host for a new one.' }, 410);
         body = { ...body, code: invitation.sid };
     }
     const response = await env.LOBBY.get(env.LOBBY.idFromName('stalemate')).fetch(`https://lobby${GAME_INVITATION_PATH}/${path}`, {
