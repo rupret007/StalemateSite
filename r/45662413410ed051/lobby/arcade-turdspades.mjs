@@ -16,7 +16,7 @@ const errors = {
 };
 const markup = `
 <summary>TurdSpades</summary>
-<p class="small arcade-card-status" data-spades-status role="status"></p>
+<p class="small arcade-card-status" data-spades-status role="status" tabindex="-1"></p>
 <p class="small arcade-card-error" data-spades-error role="status"></p>
 <div class="arcade-card-actions">
     <button class="btn btn--small" type="button" data-spades-partners hidden>Open 2-player Spades</button>
@@ -25,7 +25,7 @@ const markup = `
 <div class="arcade-card-actions" data-spades-seats hidden></div>
 <div data-card-table data-spades-table hidden>
     <div class="arcade-card-score" aria-label="Partnership scores"><span data-spades-score="0"></span><span data-spades-score="1"></span></div>
-    <ul class="spades-trick" aria-label="Bids and trick cards" data-spades-trick></ul>
+    <ul class="spades-trick" aria-label="Bids and trick cards" tabindex="-1" data-spades-trick></ul>
     <div class="arcade-card-actions" data-spades-bid hidden>
         <label for="spades-bid">Your bid</label><select id="spades-bid"></select>
         <button class="btn btn--small" type="button" data-spades-action="bid">Bid for me</button>
@@ -58,7 +58,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
     const table = $('[data-spades-table]'), seatsHost = $('[data-spades-seats]'), hand = $('[data-spades-hand]');
     const bid = $('#spades-bid'), confirm = $('[data-spades-confirm]');
     const actions = [...panel.querySelectorAll('[data-spades-action]')];
-    let scope = null, model = null, canOpen = false, partnersSupported = false, connection = 'connecting', connectionError;
+    let scope = null, model = null, canOpen = false, partnersSupported = false, connection = 'connecting', connectionError, matchEnded = false;
     let pending = false, timer, confirmation = '';
     let suggestedBidKey = '', bidEdited = false, applyingBid = false;
 
@@ -77,6 +77,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         },
         onState({ state, canOpen: host, partners }) {
             if (state && (state.game !== 'turdspades' || state.version !== 1)) return;
+            const hadGame = !!model;
             const revealing = state?.match && (!model?.match || model.id !== state.id);
             if (state?.id !== model?.id || state?.match?.revision !== model?.match?.revision) {
                 closeConfirmation();
@@ -84,6 +85,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
             }
             model = state;
             canOpen = host;
+            if (model || canOpen) matchEnded = false;
+            else if (hadGame) matchEnded = true;
             partnersSupported = partners === true;
             connection = 'ready';
             connectionError = undefined;
@@ -110,6 +113,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         draw();
     }
     function reset() {
+        matchEnded = false;
         client.stop();
         model = null;
         canOpen = false;
@@ -180,15 +184,30 @@ export function mountArcadeTurdSpades(container, onMatch) {
         } else if (connection !== 'ready') {
             if (match) message = seat ? 'Reconnecting to the table… Your hand is paused.' : 'Reconnecting to the table…';
         } else if (!model) {
-            message = canOpen ? (partnersSupported ? 'Play with one friend and a CPU partner on each team, or fill all four seats with friends.'
-                : 'Open a partnership table for four players.') : 'Waiting for the host to open a table.';
-            if (canOpen) { command = 'open'; label = partnersSupported ? 'Open 4-player Spades' : 'Open Spades table'; }
+            if (matchEnded && !canOpen) {
+                message = 'This match ended. Wait here for the next game.';
+                command = 'stay';
+                label = 'Stay for the next game';
+            } else {
+                message = canOpen ? (partnersSupported ? 'Play with one friend and a CPU partner on each team, or fill all four seats with friends.'
+                    : 'Open a partnership table for four players.') : 'Waiting for the host to open a table.';
+                if (canOpen) { command = 'open'; label = partnersSupported ? 'Open 4-player Spades' : 'Open Spades table'; }
+            }
         } else if (model?.waiting) {
             message = `${occupied.length}/${people} seated${seat ? ` · You’re ${nameFor(seat)}` : ''} · ${teams.join(' vs ')}`;
-            if (seat) { command = 'leave'; label = seat === 'south' ? 'Close table' : 'Release seat'; }
-        } else if (match?.result) {
-            message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}.`;
             if (seat) {
+                const remaining = people - occupied.length;
+                if (!paired && remaining > 0) message += ` · Waiting for ${remaining} more ${remaining === 1 ? 'player' : 'players'}`;
+                command = 'leave';
+                label = seat === 'south' ? 'Close table' : 'Release seat';
+            }
+        } else if (match?.result) {
+            if (!seat) {
+                message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}. You’re watching.`;
+                command = 'watch';
+                label = 'Watch for the rematch';
+            } else {
+                message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}.`;
                 const votes = model.rematchVotes ?? (model.rematch ? [model.rematch] : []);
                 message += ` ${votes.length}/${people} ready for a rematch.`;
                 if (!votes.includes(seat)) { command = 'rematch'; label = votes.length ? 'Accept Spades rematch' : 'Request Spades rematch'; }
@@ -200,6 +219,11 @@ export function mountArcadeTurdSpades(container, onMatch) {
                 if (result.bagPenalties) nil.push('bag penalty');
                 return `${teams[team]} ${signed}${nil.length ? ' · ' + nil.join(', ') : ''}`;
             }).join(' / ');
+            if (!seat) {
+                message += ' · Waiting for the next round.';
+                command = 'watch';
+                label = 'Keep watching';
+            }
         } else if (match) {
             const yourTurn = seat === match.turn;
             if (paired && match.phase === 'bid' && yourTurn && seat === 'west') {
@@ -209,10 +233,21 @@ export function mountArcadeTurdSpades(container, onMatch) {
             } else if (paired && match.phase === 'bid' && seat === 'west') {
                 message = 'Waiting for the host to bid';
             } else {
-                const turn = yourTurn ? (match.phase === 'bid' ? 'Your bid' : 'Your play') : `${nameFor(match.turn)} to ${match.phase === 'bid' ? 'bid' : 'play'}`;
-                message = `Round ${match.round} · ${turn}`;
-                if (yourTurn && match.phase === 'play' && !match.trick.length && !match.lastTrick.length) message += ' · tap a card';
-                if (match.lastWinner && (paired || !match.trick.length)) message += ` · ${nameFor(match.lastWinner)} won the last trick`;
+                const turnName = `${nameFor(match.turn)} to ${match.phase === 'bid' ? 'bid' : 'play'}`;
+                if (!seat) {
+                    message = `Table full. You’re watching. ${turnName}`;
+                    command = 'watch';
+                    label = 'Keep watching';
+                } else {
+                    const turn = yourTurn ? (match.phase === 'bid' ? 'Your bid' : 'Your play') : turnName;
+                    message = `Round ${match.round} · ${turn}`;
+                    if (yourTurn && match.phase === 'play' && !match.trick.length && !match.lastTrick.length) message += ' · tap a card';
+                    if (match.lastWinner && (paired || !match.trick.length)) message += ` · ${nameFor(match.lastWinner)} won the last trick`;
+                    if (!paired) {
+                        message += ` · You’re ${nameFor(seat)}`;
+                        if (yourTurn && match.phase === 'bid') message += ' · choose a bid, then tap Bid for me';
+                    }
+                }
             }
         }
         if (status.textContent !== message) status.textContent = message;
@@ -238,7 +273,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
         trickSlots.forEach(({ row, label, card }, index) => {
             const position = seats[index], entry = shown.find(value => value.seat === position);
             const called = match.bids[position];
-            label.textContent = `${nameFor(position)}${seat === position ? ' (you)' : ''} · ${called === null ? '—' : called || 'Nil'}`;
+            const calledBid = called === null ? '—' : called || 'Nil';
+            label.textContent = `${nameFor(position)}${seat === position ? ' (you)' : ''} · ${!paired && called !== null ? 'bid ' : ''}${calledBid}`;
             card.textContent = entry ? face(entry) : '—';
             card.setAttribute('aria-label', entry ? cardLabel(entry) : 'No card played');
             row.dataset.active = String(!match.result && match.phase !== 'round-end' && match.turn === position);
@@ -281,6 +317,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
     main.addEventListener('click', () => {
         const action = main.dataset.command;
         if (action === 'retry') client.start(scope);
+        else if (action === 'stay') { matchEnded = false; draw(); status.focus(); }
+        else if (action === 'watch') $('[data-spades-trick]').focus();
         else if (action) send(action);
     });
     partnerButton.addEventListener('click', () => send('open', { mode: 'partners' }));
