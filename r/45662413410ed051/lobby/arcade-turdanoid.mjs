@@ -1,8 +1,19 @@
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
-import '/play/games/turdanoid-sprites-core.js';
-import { advanceBrickRacer, brickRaceWall, brickRacePaddle, brickRaceTick, BRICK_LIMIT_TICKS, BRICK_WIDTH, BRICK_HEIGHT } from '/play/games/turdanoid-race.js';
 
-const { paintWorldStageCached, paintBrickBevel, paintHpPips, paintPaddle, paintBall, roundRect } = globalThis.TurdanoidSprites;
+// Same field as BRICK_WIDTH and BRICK_HEIGHT in the race module. Local copies
+// keep the canvas markup from pulling that module in for every other game.
+const BRICK_WIDTH = 480, BRICK_HEIGHT = 400;
+let advanceBrickRacer, brickRaceWall, brickRacePaddle, brickRaceTick, BRICK_LIMIT_TICKS;
+let brickEngine;
+function loadBrickEngine() {
+    brickEngine ??= Promise.all([
+        import('/play/games/turdanoid-sprites-core.js'),
+        import('/play/games/turdanoid-race.js')
+    ]).then(([, race]) => {
+        ({ advanceBrickRacer, brickRaceWall, brickRacePaddle, brickRaceTick, BRICK_LIMIT_TICKS } = race);
+    });
+    return brickEngine;
+}
 const tileColors = [['#72efad', '#1f8b66'], ['#68d5ed', '#236c9b'], ['#f6d677', '#b48b2b'], ['#ffac87', '#be6151'],
     ['#f294d5', '#9c4383'], ['#b8a7ff', '#6d56be']];
 const capsules = { wide: ['Wide Load', 'W', '#9effc8'], sticky: ['Plunger Catch', 'C', '#ffd76a'], slow: ['Air Freshener', 'S', '#7ae6ff'] };
@@ -48,6 +59,9 @@ function createPainter(canvas) {
     const scenery = layer.getContext('2d');
     let field, pattern;
     return (run, wall, reducedMotion) => {
+        const sprites = globalThis.TurdanoidSprites;
+        if (!sprites || !wall || !brickRacePaddle) return;
+        const { paintWorldStageCached, paintBrickBevel, paintHpPips, paintPaddle, paintBall, roundRect } = sprites;
         const hp = run.hp.join(',');
         if (field !== wall || pattern !== hp) {
             field = wall;
@@ -140,7 +154,16 @@ export function mountArcadeTurdanoid(container, onMatch) {
             const reconnecting = connection !== 'ready';
             const changed = state?.id !== model?.id || state?.seat !== model?.seat;
             const reveal = state?.match && (!model?.match || changed);
-            if (reveal) wall = brickRaceWall(state.match.seed);
+            if (reveal) {
+                if (brickRaceWall) wall = brickRaceWall(state.match.seed);
+                else loadBrickEngine().then(() => {
+                    if (brickRaceWall && model?.id === state.id && model.match) {
+                        wall = brickRaceWall(model.match.seed);
+                        redraw = true;
+                        render();
+                    }
+                });
+            }
             if (changed || state?.match?.result) {
                 clearInputs();
                 if (confirm.open) confirm.close();
@@ -187,7 +210,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
 
     function queue(action, value, time = performance.now()) {
         const match = model?.match;
-        if (connection !== 'ready' || !model?.seat || !match || match.result || pending || confirm.open || buffer.length >= inputBufferLimit ||
+        if (!brickRaceTick || connection !== 'ready' || !model?.seat || !match || match.result || pending || confirm.open || buffer.length >= inputBufferLimit ||
             visual?.run.status !== 'play' || serverNow(time) < match.startsAt) return false;
         const tick = Math.max(visual.tick + 1, brickRaceTick(match.startsAt, serverNow(time)) + 1, visual.queue.at(-1)?.[0] || 1);
         if (tick > BRICK_LIMIT_TICKS) return false;
@@ -226,7 +249,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
             if (time - lastSync >= 950 && time - lastSent >= 350 && client.send({ action: 'sync' })) lastSync = time;
         }
         const at = serverNow(time), countdown = Math.ceil((match.startsAt - at) / 1000), oldTick = visual.tick;
-        if (connection === 'ready' && !match.result && countdown <= 0 && seat) advanceBrickRacer(visual, brickRaceTick(match.startsAt, at), wall, match.seed);
+        if (connection === 'ready' && !match.result && countdown <= 0 && seat && advanceBrickRacer && wall) advanceBrickRacer(visual, brickRaceTick(match.startsAt, at), wall, match.seed);
         const run = visual.run;
         const overlay = $('[data-brick-overlay]');
         const label = match.result ? '' : countdown > 0 ? String(countdown) : run.status === 'out' ? 'Out of balls' : '';
@@ -415,13 +438,16 @@ export function mountArcadeTurdanoid(container, onMatch) {
         if (!panel.open || !scope) { reset(); return; }
         for (const other of container.querySelectorAll(':scope > details[open]')) if (other !== panel) other.open = false;
         container.scrollTop = 0;
+        void loadBrickEngine();
         client.start(scope);
     });
     return {
         panel,
         isOpen: () => panel.open,
+        ready: () => loadBrickEngine(),
         open() {
             if (!scope) return;
+            void loadBrickEngine();
             panel.open = true;
             return panel;
         },

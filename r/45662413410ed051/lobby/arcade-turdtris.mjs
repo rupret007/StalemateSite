@@ -1,8 +1,21 @@
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
-import { createTurdtrisArt } from '/play/games/turdtris-art.js';
-import { classifyGesture } from '/play/games/turdtris-presentation.js';
-import { formatRunTime } from '/play/games/turdtris-modes.js';
-import { SPRINT_TICK_MS, advanceSprint, applySprintInput, sprintCells, sprintGhost, sprintNext } from '/play/games/turdtris-sprint.js';
+
+let createTurdtrisArt, classifyGesture, formatRunTime, SPRINT_TICK_MS, advanceSprint, applySprintInput, sprintCells, sprintGhost, sprintNext;
+let trisEngine;
+function loadTurdtrisEngine() {
+    trisEngine ??= Promise.all([
+        import('/play/games/turdtris-art.js'),
+        import('/play/games/turdtris-presentation.js'),
+        import('/play/games/turdtris-modes.js'),
+        import('/play/games/turdtris-sprint.js')
+    ]).then(([art, presentation, modes, sprint]) => {
+        createTurdtrisArt = art.createTurdtrisArt;
+        classifyGesture = presentation.classifyGesture;
+        formatRunTime = modes.formatRunTime;
+        ({ SPRINT_TICK_MS, advanceSprint, applySprintInput, sprintCells, sprintGhost, sprintNext } = sprint);
+    });
+    return trisEngine;
+}
 
 const inputs = [
     ['left', '←', 'Move left'], ['right', '→', 'Move right'], ['ccw', '↶', 'Rotate left'],
@@ -48,6 +61,7 @@ const markup = `
 </dialog>`;
 
 function paint(ctx, art, grid, piece, ghost = []) {
+    if (!sprintCells) return;
     const size = ctx.canvas.width / 10;
     art.drawBackground(ctx, { width: ctx.canvas.width, height: ctx.canvas.height, reducedMotion: true });
     const tile = (row, col, type, preview = false) => {
@@ -140,7 +154,7 @@ export function mountArcadeTurdtris(container, onMatch) {
     }
 
     function queue(action) {
-        if (connection !== 'ready' || !model?.match?.self || model.match.result || confirm.open || buffer.length >= 12) return;
+        if (!SPRINT_TICK_MS || connection !== 'ready' || !model?.match?.self || model.match.result || confirm.open || buffer.length >= 12) return;
         const tick = tickAt(performance.now());
         if (tick < 0 || serverTime(performance.now()) >= model.match.endsAt || model.match.self.board.status !== 'playing') return;
         buffer.push({ action, tick });
@@ -160,6 +174,10 @@ export function mountArcadeTurdtris(container, onMatch) {
         raf = 0;
         const match = model?.match;
         if (!match || !panel.open || panel.hidden) return;
+        if (!formatRunTime || !advanceSprint) {
+            loadTurdtrisEngine().then(() => { if (!raf && panel.open && !panel.hidden) raf = requestAnimationFrame(drawFrame); });
+            return;
+        }
         if (connection === 'ready' && !match.result) {
             if (inflight && time - inflight.sent > 4000) {
                 client.start(scope);
@@ -287,6 +305,7 @@ export function mountArcadeTurdtris(container, onMatch) {
     });
     boardCanvas.addEventListener('pointerup', event => {
         if (event.pointerId !== gesture?.id) return;
+        if (!classifyGesture) return;
         const action = classifyGesture({ dx: event.clientX - gesture.x, dy: event.clientY - gesture.y, elapsedMs: performance.now() - gesture.at });
         if (action) queue({ rotate: 'cw', hardDrop: 'drop', softDrop: 'soft' }[action] || action);
         gesture = null;
@@ -314,13 +333,16 @@ export function mountArcadeTurdtris(container, onMatch) {
         if (!panel.open || !scope) { reset(); return; }
         for (const other of container.querySelectorAll(':scope > details[open]')) if (other !== panel) other.open = false;
         container.scrollTop = 0;
+        void loadTurdtrisEngine();
         client.start(scope);
     });
     return {
         panel,
         isOpen: () => panel.open,
+        ready: () => loadTurdtrisEngine(),
         open() {
             if (!scope) return;
+            void loadTurdtrisEngine();
             panel.open = true;
             return panel;
         },

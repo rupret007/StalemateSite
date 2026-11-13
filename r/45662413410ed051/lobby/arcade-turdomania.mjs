@@ -1,5 +1,13 @@
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
-import { POOP_KINDS, findGroup, popGroup } from '/play/games/turdomania-core.js';
+
+let POOP_KINDS, findGroup, popGroup;
+let maniaEngine;
+function loadManiaEngine() {
+    maniaEngine ??= import('/play/games/turdomania-core.js').then(mod => {
+        ({ POOP_KINDS, findGroup, popGroup } = mod);
+    });
+    return maniaEngine;
+}
 
 const sprite = '/play/assets/turdomania-tiles.svg#';
 const symbols = ['swirl', 'corn', 'splat', 'paper', 'bean', 'cheese'];
@@ -64,6 +72,7 @@ function puzzle(root, select) {
         }
     }
     function highlight(node) {
+        if (!findGroup) return;
         const group = node ? findGroup(board, Number(node.dataset.col), Number(node.dataset.row)) : [];
         const marked = new Set(group.length > 1 ? group.map(([col, row]) => board[col][row].id) : []);
         for (const [id, tile] of buttons) tile.classList.toggle('mania-group', marked.has(id));
@@ -133,7 +142,7 @@ function puzzle(root, select) {
             node.style.setProperty('--row', 5 - row);
             if (interactive) {
                 node.setAttribute('aria-colindex', col + 1);
-                node.setAttribute('aria-label', `${POOP_KINDS[tile.kind].name}, row ${6 - row}, column ${col + 1}`);
+                if (POOP_KINDS) node.setAttribute('aria-label', `${POOP_KINDS[tile.kind].name}, row ${6 - row}, column ${col + 1}`);
             }
             const parent = interactive ? rows[5 - row] : root;
             if (node.parentNode !== parent) parent.append(node);
@@ -208,7 +217,7 @@ export function mountArcadeTurdomania(container, onMatch) {
 
     function choose(id) {
         const match = model?.match, seat = model?.seat;
-        if (connection !== 'ready' || !seat || !match || match.result || match.players[seat].over || busy || confirm.open ||
+        if (!popGroup || connection !== 'ready' || !seat || !match || match.result || match.players[seat].over || busy || confirm.open ||
             serverNow() < match.startsAt || serverNow() >= match.endsAt) return;
         const board = match.self.board;
         const col = board.findIndex(stack => stack.some(tile => tile.id === id));
@@ -313,14 +322,17 @@ export function mountArcadeTurdomania(container, onMatch) {
         if (!panel.open || !scope) { reset(); return; }
         for (const other of container.querySelectorAll(':scope > details[open]')) if (other !== panel) other.open = false;
         container.scrollTop = 0;
+        loadManiaEngine().then(() => { if (panel.open && scope) render(); });
         ticker = setInterval(clock, 200);
         client.start(scope);
     });
     return {
         panel,
         isOpen: () => panel.open,
+        ready: () => loadManiaEngine(),
         open() {
             if (!scope) return;
+            void loadManiaEngine();
             panel.open = true;
             return panel;
         },

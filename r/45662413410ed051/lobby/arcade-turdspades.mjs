@@ -1,5 +1,13 @@
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
-import { suggestSpadesBid } from '/play/games/turdspades-engine.js';
+
+let suggestSpadesBid;
+let spadesEngine;
+function loadSpadesEngine() {
+    spadesEngine ??= import('/play/games/turdspades-engine.js').then(mod => {
+        suggestSpadesBid = mod.suggestSpadesBid;
+    });
+    return spadesEngine;
+}
 
 const seats = ['south', 'west', 'north', 'east'];
 const names = { south: 'South', west: 'West', north: 'North', east: 'East' };
@@ -272,7 +280,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
                 bidEdited = false;
             }
             if (!bidEdited) {
-                const suggestion = String(suggestSpadesBid(match.hand));
+                if (!suggestSpadesBid) loadSpadesEngine().then(() => { if (panel.isConnected) draw(); });
+                const suggestion = suggestSpadesBid ? String(suggestSpadesBid(match.hand)) : bid.value;
                 if (bid.value !== suggestion) {
                     applyingBid = true;
                     bid.value = suggestion;
@@ -332,13 +341,16 @@ export function mountArcadeTurdSpades(container, onMatch) {
         if (!panel.open || !scope) { reset(); return; }
         for (const other of container.querySelectorAll(':scope > details[open]')) if (other !== panel) other.open = false;
         container.scrollTop = 0;
+        void loadSpadesEngine();
         client.start(scope);
     });
     return {
         panel,
         isOpen: () => panel.open,
+        ready: () => loadSpadesEngine(),
         open() {
             if (!scope) return;
+            void loadSpadesEngine();
             panel.open = true;
             return panel;
         },
