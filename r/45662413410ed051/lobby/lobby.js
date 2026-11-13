@@ -664,6 +664,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         connect(nickInput.value.trim());
     });
     $('[data-enter]').disabled = !previewKey || !relayBase;
+    if (!gameGuest) gateStatus(previewKey && !relayBase ? 'The chat server isn’t switched on yet.' : '');
     nickInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('[data-enter]').click(); });
 
     let retry = 0;
