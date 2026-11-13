@@ -295,7 +295,11 @@ if (webJoinEntry) {
 } else {
     const key = new URLSearchParams(location.hash.slice(1)).get('invite');
     if (location.hash || location.search) history.replaceState(null, '', location.pathname);
-    if (key) unlock(key); else draw();
+    if (key) {
+        // Keep the code in this tab so a guest can resubmit after an outage.
+        code.value = key;
+        unlock(key);
+    } else draw();
 }`;
 
 async function disconnect(env, session) {

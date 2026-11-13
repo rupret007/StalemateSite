@@ -363,11 +363,11 @@ describe('truthful invitation and service state in the actual private beta shell
 
 
 describe('explicit recovery and lifecycle fencing in the served invitation portal', () => {
-    async function portal(responder, prepare) {
+    async function portal(responder, prepare, address = 'https://beta.example/') {
         const config = env();
         const html = await (await betaFetch(new Request('https://beta.example/'), config)).text();
         const client = await (await betaFetch(new Request('https://beta.example/beta/client.js'), config)).text();
-        const dom = new JSDOM(html, { url: 'https://beta.example/', runScripts: 'outside-only' });
+        const dom = new JSDOM(html, { url: address, runScripts: 'outside-only' });
         dom.window.entryFunctions = entryFunctions;
         const calls = [];
         // Explicit HTTP/network seams around the actual served client. These
@@ -381,6 +381,34 @@ describe('explicit recovery and lifecycle fencing in the served invitation porta
         return { dom, calls };
     }
     const state = () => Response.json({ kind: 'guest', role: 'fan', emailConfigured: true, staffConfigured: true });
+
+    it('keeps a direct invitation available for explicit resubmission after an outage', async () => {
+        let unlocks = 0, admitted = false;
+        const fixtureCode = 'link fixture code';
+        const { dom, calls } = await portal((path, options) => {
+            if (path === '/beta/state') return admitted ? state() : new Response(null, { status: 401 });
+            expect(JSON.parse(options.body).key).toBe(fixtureCode);
+            if (++unlocks === 1) return new Response(null, { status: 503 });
+            admitted = true;
+            return Response.json({ ok: true });
+        }, undefined, 'https://beta.example/beta/#invite=' + encodeURIComponent(fixtureCode));
+        try {
+            const { document: doc, location } = dom.window;
+            const retry = doc.querySelector('#retry');
+            const code = doc.querySelector('#code');
+            await vi.waitFor(() => expect(retry.hidden).toBe(false));
+            expect(location.hash).toBe('');
+            retry.click();
+            await vi.waitFor(() => expect(doc.querySelector('#login').hidden).toBe(false));
+            expect(code.value).toBe(fixtureCode);
+            expect(calls.map(call => call.method)).toEqual(['POST', 'GET']);
+            doc.querySelector('#unlock button').click();
+            await vi.waitFor(() => expect(doc.querySelector('#inside').hidden).toBe(false));
+            expect(code.value).toBe('');
+            expect(location.hash).toBe('');
+            expect(calls.map(call => call.method)).toEqual(['POST', 'GET', 'POST', 'GET']);
+        } finally { dom.window.close(); }
+    });
 
     it('returns focus to a rejected private invitation code and lets the guest correct it', async () => {
         let admitted = false;
