@@ -618,6 +618,10 @@ test('People roster: a departed person dialog returns to the visible heading on 
         expect(await opener.evaluate(element => element.isConnected)).toBe(false);
         await expect(dialog).toBeVisible();
         await expect(dialogControl).toBeFocused();
+        const message = dialog.getByRole('button', { name: /PM/ });
+        await message.press('Enter');
+        await expect(dialog.getByRole('status')).toHaveText('RosterDeparting went offline. Close this window and choose someone who’s online.');
+        await expect(message).toBeFocused();
         await visitor.page.keyboard.press('Escape');
         await expect(dialog).toBeHidden();
         const heading = visitor.page.locator('[data-people-title]');
