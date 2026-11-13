@@ -238,6 +238,9 @@ export function mountArcadeTurdJack(container, onMatch, startShortcut) {
         main.textContent = label;
         main.disabled = pending;
         if (startShortcut) {
+            if (action !== 'start' && document.activeElement === shortcutButton && panel.open) {
+                $('summary').focus();
+            }
             startShortcut.hidden = action !== 'start';
             shortcutButton.disabled = pending;
             const notice = action === 'start' ? 'Crapjack 21 is ready.' : '';
