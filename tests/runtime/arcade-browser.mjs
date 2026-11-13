@@ -2214,9 +2214,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const match = page => page.locator('[data-brick-match]');
         const board = page => page.getByRole('region', { name: 'Turdanoid playfield' });
         const serve = page => page.getByRole('button', { name: 'Launch ball' });
+        const launchWait = page => page.locator('[data-brick-launch-wait]');
         await a.getByRole('button', { name: 'Open Turdanoid race' }).click();
         await b.getByRole('button', { name: 'Join Turdanoid race' }).click();
         await expect(match(b)).toHaveAttribute('data-phase', 'countdown');
+        await expect(serve(b)).toBeDisabled();
+        await expect(launchWait(b)).toHaveText('Launch is not active yet. The countdown is still running.');
+        await expect(launchWait(spectator)).toBeHidden();
         await expect(board(spectator)).toBeVisible();
         await expect(serve(spectator)).toBeHidden();
         await fitLandscape(b, b.locator('.brick-race-layout'), board(b), serve(b));
@@ -2231,6 +2235,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         assert.equal(await b.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
         await expect(serve(b)).toBeEnabled();
         await expect(serve(a)).toBeEnabled();
+        await expect(launchWait(b)).toBeHidden();
         if (pauseReconnect) {
             const returnBoard = await pauseReconnect();
             await expect(a.locator('[data-brick-status]')).toHaveText('Reconnecting · race clock keeps running');
@@ -2263,6 +2268,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         } else await b.touchscreen.tap(x + field.width * .075, y);
         if (prediction) assert.equal(await prediction, true, 'phone drag moves paddle before delayed server confirmation');
         await expect.poll(async () => Number(await match(b).getAttribute('data-paddle'))).toBeGreaterThan(260);
+        await expect(match(b)).toHaveAttribute('data-stuck', 'true');
         await expect(match(b)).toHaveAttribute('data-sequence', /^[1-9]\d*$/);
         await board(a).focus();
         await a.keyboard.down('ArrowRight');
@@ -2328,7 +2334,23 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.getByRole('button', { name: 'Accept Turdanoid rematch' }).click();
         await expect(match(b)).toHaveAttribute('data-phase', 'countdown');
         await expect(match(b)).toHaveAttribute('data-sequence', '0');
+        await expect(launchWait(b)).toHaveText('Launch is not active yet. The countdown is still running.');
         await expect(serve(a)).toBeEnabled();
+        await expect(launchWait(b)).toBeHidden();
+        await expect(match(b)).toHaveAttribute('data-stuck', 'true');
+        const beforeBallTap = Number(await match(b).getAttribute('data-sequence'));
+        const ballTap = await board(b).evaluate(element => {
+            const canvas = element.querySelector('canvas');
+            const rect = element.getBoundingClientRect();
+            const paddle = Number(element.closest('[data-brick-match]').dataset.paddle);
+            return {
+                x: rect.left + (paddle / canvas.width) * rect.width,
+                y: rect.top + ((canvas.height - 32) / canvas.height) * rect.height
+            };
+        });
+        await b.touchscreen.tap(ballTap.x, ballTap.y);
+        await expect(match(b)).toHaveAttribute('data-stuck', 'false');
+        await expect.poll(async () => Number(await match(b).getAttribute('data-sequence'))).toBeGreaterThan(beforeBallTap);
         const axesAt = keyboardAxes.length;
         await board(a).evaluate(element => {
             // Put one launch and seven axis changes in the same render frame.
