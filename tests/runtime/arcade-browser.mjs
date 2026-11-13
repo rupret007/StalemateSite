@@ -539,7 +539,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const viewport = { width: 1440, height: 900 };
         for (const webShare of [true, false]) {
             const host = await guest('stalemate', webShare ? 'ShareHost' : 'EmailHost', viewport, false,
-                origin + '/beta/?game-night=1&table=chess&deliver=share');
+                origin + '/beta/?game-night=1&table=chess&deliver=share&via=stalemate');
             let issues = 0;
             try {
                 host.on('request', request => {
