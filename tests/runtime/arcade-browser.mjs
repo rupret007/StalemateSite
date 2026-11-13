@@ -829,6 +829,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 const roomUrl = host.url();
                 const tabs = host.context().pages().length;
                 await expect(host.locator('[data-game-arcade-external]')).not.toHaveAttribute('href', /./);
+                await expect(host.locator('#game-arcade-tab-note')).toBeHidden();
                 await expectUncoveredControl(privateArcade);
                 if (phone) await privateArcade.tap();
                 else await privateArcade.click();
