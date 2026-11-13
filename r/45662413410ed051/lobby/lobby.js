@@ -3182,7 +3182,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             startMusicHandoff(current, context);
             return;
         }
-        if (jamInviteOpener && roomInvitesSupported) {
+        if (current.kind === 'jam' && jamInviteOpener && roomInvitesSupported) {
             const request = crypto.randomUUID().replaceAll('-', '');
             if (send({ t: 'room-invite-request', request, ch: current.name, roomInstance: context.instance, peer: context.peer })) {
                 const invite = { request, room: current, nick: person.nick };
