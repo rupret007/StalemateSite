@@ -36,6 +36,19 @@ function click(dom, selector) {
 }
 
 describe('entry context through the private beta shell', () => {
+    it('only serves the WebJam guest handoff when both private flags are enabled', async () => {
+        const path = '/beta/game-night/webjam-guest';
+        const request = () => new Request('https://beta.example' + path);
+        for (const settings of [{}, { HANGOUT_GAME_NIGHT_GUESTS: '1' }, { HANGOUT_GAME_NIGHT_ROOM_GRANTS: '1' }]) {
+            expect((await betaFetch(request(), env(settings))).status).toBe(404);
+        }
+        const response = await betaFetch(request(), env({ HANGOUT_GAME_NIGHT_GUESTS: '1', HANGOUT_GAME_NIGHT_ROOM_GRANTS: '1' }));
+        expect(response.status).toBe(200);
+        expect(response.headers.get('Cache-Control')).toBe('no-store');
+        expect(response.headers.get('Referrer-Policy')).toBe('no-referrer');
+        expect(await response.text()).toContain('data-webjam-guest');
+    });
+
     it('carries the selected entrance through invitation unlock and a deliberate join without keeping it in the address', async () => {
         const dom = await shell('https://beta.example/?via=rad-dad#invite=private-fixture');
         try {
