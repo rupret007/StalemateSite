@@ -410,6 +410,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(guest.getByLabel('Your nick')).toBeHidden();
                 await expect(guest.getByRole('combobox', { name: 'Switch game' })).toBeHidden();
                 await expect(guest.locator('[data-call-toggle]')).toBeHidden();
+                await expect(guest.locator('[data-game-call-status]')).toBeHidden();
                 await expect(guest.getByRole('tab', { name: '#stalemate' })).toHaveCount(0);
                 assert.equal((await context.request.get(origin + '/beta/state')).status(), 401, 'room guest lacks community access');
                 assert.equal((await context.request.post(origin + '/beta/arcade-turdanoid-ticket?game-guest=1', {
