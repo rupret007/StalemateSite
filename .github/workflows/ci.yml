@@ -66,6 +66,10 @@ jobs:
           node tests/runtime/arcade-transport.mjs --browser=chromium --webjam-share
           node tests/runtime/arcade-transport.mjs --browser=webkit --webjam-share
 
+      - name: Exercise private WebJam room grants in workerd
+        timeout-minutes: 4
+        run: node tests/runtime/arcade-transport.mjs --room-grants
+
       - name: Build the shared-community entry toolkit
         shell: bash
         run: |

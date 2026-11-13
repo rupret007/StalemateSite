@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { cp, mkdir, mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
@@ -26,6 +26,7 @@ const browserMedia = process.argv.includes('--media');
 const webJamShare = process.argv.includes('--webjam-share');
 const siteGuest = process.argv.find(arg => arg.startsWith('--site-guest='))?.slice('--site-guest='.length);
 const relay = process.argv.includes('--relay');
+const roomGrants = process.argv.includes('--room-grants');
 const rollback = process.argv.includes('--rollback');
 const rollbackRef = process.argv.find(arg => arg.startsWith('--rollback-ref='))?.slice(15);
 const mixedRef = process.argv.find(arg => arg.startsWith('--mixed-ref='))?.slice('--mixed-ref='.length);
@@ -134,6 +135,84 @@ function upgrade(cookie, { protocol, ticket }, path = '/beta/arcade-match') {
         'Sec-WebSocket-Protocol': `${protocol}, ${ticket}` } });
 }
 const pause = () => new Promise(resolve => setTimeout(resolve, 600));
+
+async function verifyRoomGrants() {
+    const host = await guest('FixtureHost', 'stalemate', '192.0.2.11');
+    host.lobby.send({ t: 'cmd', name: 'join', args: [room], ch: '#stalemate' });
+    const { ch } = await host.lobby.wait(frame => frame.t === 'join' && frame.ch.name === room, 'private game room');
+    const response = await upgrade(host.cookie, await grant(host, ch.keepRef));
+    assert.equal(response.status, 101);
+    const match = observe(response.webSocket);
+    await match.wait(frame => frame.t === 'match-ready', 'host match upgrade');
+    match.send({ version: 1, action: 'open' });
+    const { state } = await match.wait(frame => frame.state?.waiting, 'open Chess table');
+    const value = () => randomBytes(32).toString('base64url');
+    const path = '/beta/game-night/room-grant';
+    const register = values => call(path + '/register', host.cookie, { actor: host.id, room, ref: ch.keepRef,
+        game: 'chess', match: state.id, hashes: values.map(secret => createHash('sha256').update(secret).digest('hex')) });
+    const redeem = (secret, attempt, cookie = '', ip = '192.0.2.12') => call(path + '/redeem', cookie,
+        { value: secret, attempt, age13: true }, ip);
+
+    const expiring = value();
+    const expiry = await register([expiring]);
+    assert.equal(expiry.status, 200, await expiry.clone().text());
+    const { until } = await expiry.json();
+    await match.wait(frame => frame.state?.waiting && !frame.state.hasOpenSeat, 'reserved seat');
+    await new Promise(resolve => setTimeout(resolve, Math.max(0, until - Date.now()) + 50));
+    assert.equal((await redeem(expiring, value())).status, 410);
+    const expirySync = match.frames.length;
+    match.send({ version: 1, action: 'sync' });
+    await match.wait(frame => frame.state?.id === state.id && frame.state.waiting && frame.state.hasOpenSeat,
+        'expired hold leaves the original table waiting', expirySync);
+    console.log('PASS expired grant leaves the original table waiting with its seat available.');
+
+    const seated = value(), standby = value(), attempt = value();
+    const registered = await register([seated, standby]);
+    assert.equal(registered.status, 200, await registered.clone().text());
+    const { granted, standby: waiting } = await registered.json();
+    assert.deepEqual([granted, waiting], [1, 1]);
+
+    assert.equal((await redeem(seated, value(), host.cookie)).status, 403);
+    console.log('PASS a host receives 403 and the guest can still use the grant.');
+
+    const accepted = await redeem(seated, attempt);
+    assert.equal(accepted.status, 200, await accepted.clone().text());
+    const cookie = accepted.headers.get('Set-Cookie')?.split(';')[0];
+    assert.ok(cookie, 'a scoped guest cookie is issued');
+    const retry = await redeem(seated, attempt);
+    assert.equal(retry.status, 200);
+    assert.ok(retry.headers.get('Set-Cookie')?.split(';')[0] === cookie, 'retry recovers the same guest session');
+    assert.equal((await redeem(seated, value(), '', '192.0.2.13')).status, 410);
+    console.log('PASS reuse from a different attempt receives 410 and the original attempt can recover.');
+
+    const scoped = '?game-guest=1';
+    const lobbyUrl = new URL(origin + '/lobby' + scoped);
+    lobbyUrl.searchParams.set('preview', preview);
+    lobbyUrl.searchParams.set('game-room', ch.keepRef);
+    const admitted = await mf.dispatchFetch(lobbyUrl, { headers: { ...base(cookie, '192.0.2.12'), Upgrade: 'websocket' } });
+    assert.equal(admitted.status, 101);
+    const guestLobby = observe(admitted.webSocket);
+    await guestLobby.wait(frame => frame.t === 'hello', 'scoped guest hello');
+    guestLobby.send({ t: 'hello', age13: true });
+    const { id } = await guestLobby.wait(frame => frame.t === 'welcome', 'scoped guest identity');
+    await guestLobby.wait(frame => frame.t === 'join' && frame.ch.name === room, 'scoped guest room');
+    const ticket = await call('/beta/arcade-ticket' + scoped, cookie, { actor: id, room, ref: ch.keepRef }, '192.0.2.12');
+    assert.equal(ticket.status, 200, await ticket.clone().text());
+    const guestResponse = await upgrade(cookie, await ticket.json(), '/beta/arcade-match' + scoped);
+    assert.equal(guestResponse.status, 101);
+    const guestMatch = observe(guestResponse.webSocket);
+    await guestMatch.wait(frame => frame.t === 'match-ready', 'scoped guest match upgrade');
+    guestMatch.send({ version: 1, action: 'join', id: state.id, seat: 'next' });
+    await guestMatch.wait(frame => frame.state?.id === state.id && frame.state.seat === 'b' && frame.state.match,
+        'scoped guest takes the reserved seat');
+
+    const excess = await redeem(standby, value(), '', '192.0.2.13');
+    assert.equal(excess.status, 409);
+    assert.equal((await excess.json()).tableFull, true);
+    assert.ok(!excess.headers.has('Set-Cookie'));
+    console.log('PASS the standby guest receives 409 after the granted guest joins the exact table.');
+    for (const session of [guestMatch, guestLobby, match, host.lobby]) session.socket.close(1000, 'fixture complete');
+}
 
 async function serveAsset(request) {
     const pathname = decodeURIComponent(new URL(request.url).pathname);
@@ -1027,6 +1106,7 @@ try {
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true },
             ...(relay ? { TURN_BUDGET: { className: 'HangoutTurnBudget', useSQLite: true } } : {}) },
         bindings: { FIXTURE_NONCE: nonce, FIXTURE_ARCADE_REPORTS: '1', HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', ...arcadeFlags,
+            ...(roomGrants ? { HANGOUT_GAME_NIGHT_ROOM_GRANTS: '1' } : {}),
             HANGOUT_GAME_NIGHT_GUESTS: betaManifest.match(/^HANGOUT_GAME_NIGHT_GUESTS = "([01])"$/m)?.[1] || '0',
             ...(browserName || serve ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
             ...(!serve && (!browserName || browserMedia) ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
@@ -1075,6 +1155,8 @@ try {
             await runArcadeBrowser(browserName, browserOrigin, invite, evidence,
                 siteGuest || webJamShare ? null : await previewEntrances(browserOrigin), browserMedia, relay, { siteGuest, webJamShare, demoSigningKey: fixtureSigningKey });
         }
+    } else if (roomGrants) {
+        await verifyRoomGrants();
     } else if (rollback) {
         await verifyRollback(async (bindings, revision) => {
             Object.assign(options.bindings, bindings);

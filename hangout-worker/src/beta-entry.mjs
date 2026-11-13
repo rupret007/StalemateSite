@@ -14,6 +14,8 @@ import { publicBetaHelp } from './beta-public-help.mjs';
 import { arcadeEnabled, arcadeGame, arcadePath, arcadeRoomRequest } from './arcade-transport.mjs';
 import { mediaEnabled, mediaPath } from './game-night-media.mjs';
 import { GAME_GUEST_PATH, GAME_INVITATION_PATH, gameGuestEnabled, gameGuestScope, gameGuestSessionRef } from './game-night-invitations.mjs';
+import { GAME_ROOM_GRANT_PATH, gameRoomGrantsEnabled } from './game-night-room-grant-routes.mjs';
+import { validRoomGrantValue } from './game-night-room-grants.mjs';
 export { BetaSessions } from './beta-sessions.mjs';
 export { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget };
 
@@ -279,10 +281,50 @@ async function gameInvitation(request, env, path, body) {
     const data = await response.json().catch(() => ({ error: 'Game invitations are temporarily unavailable.' }));
     if (path === 'issue' && response.ok) return json({ code: await signBeta('game-invitation', { v: 1, sid: data.code, exp: data.until }, env.HANGOUT_HMAC_KEY) });
     if (path !== 'accept' || !response.ok) return json(data, response.status);
+    return gameGuestAccess(request, env, data);
+}
+
+async function gameGuestAccess(request, env, data) {
     const scope = gameGuestScope(data.scope);
     if (!scope) return json({ error: 'This invitation could not be confirmed.' }, 503);
     const { cookie } = await newAccess(env, { gameGuest: scope, sid: data.sid, exp: data.exp, ip: request.headers.get('CF-Connecting-IP') || '0.0.0.0' });
     return json({ next: `${LOBBY_PAGE}${GAME_GUEST_QUERY}` }, 200, { 'Set-Cookie': cookie });
+}
+
+const redeemHits = new Map();
+function allowRoomGrantRedeem(ip, now = Date.now()) {
+    for (const [key, slot] of redeemHits) if (slot.until <= now) redeemHits.delete(key);
+    const slot = redeemHits.get(ip);
+    if (slot) {
+        if (slot.count >= 30) return false;
+        slot.count += 1;
+    } else {
+        if (redeemHits.size >= 1000) return false;
+        redeemHits.set(ip, { count: 1, until: now + 60_000 });
+    }
+    return true;
+}
+
+async function gameRoomGrant(request, env, operation, body) {
+    if (!gameRoomGrantsEnabled(env) || !['register', 'redeem'].includes(operation)) {
+        return json({ error: 'Game invitations are unavailable.' }, 404);
+    }
+    if (operation === 'redeem') {
+        if (body.age13 !== true || !validRoomGrantValue(body.value) || !validRoomGrantValue(body.attempt)) {
+            return json({ error: 'Open the original invitation and confirm the age and house rules to join.' }, 400);
+        }
+        const ip = request.headers.get('CF-Connecting-IP') || '0.0.0.0';
+        if (!allowRoomGrantRedeem(ip)) return json({ error: 'Game invitation allowance reached. Try again in a few minutes.' }, 429);
+    }
+    const session = await betaSession(request, env);
+    if (operation === 'register' && !session) return json({ error: 'Private invitation required.' }, 401);
+    const response = await env.LOBBY.get(env.LOBBY.idFromName('stalemate')).fetch(`https://lobby${GAME_ROOM_GRANT_PATH}/${operation}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body, session: session && { betaSid: session.access.sid } })
+    });
+    const data = await response.json().catch(() => ({ error: 'Game invitations are temporarily unavailable.' }));
+    if (operation !== 'redeem' || !response.ok) return json(data, response.status);
+    return gameGuestAccess(request, env, data);
 }
 
 function gameGuestAsset(path) {
@@ -338,6 +380,7 @@ async function betaRequest(request, env, deps = {}) {
         if (Number(request.headers.get('Content-Length') || 0) > 2048) return json({ error: 'Request too large.' }, 413);
         const body = await readBetaBody(request);
         if (!body) return json({ error: 'Invalid or oversized request.' }, 400);
+        if (url.pathname.startsWith(GAME_ROOM_GRANT_PATH + '/')) return gameRoomGrant(request, env, url.pathname.slice(GAME_ROOM_GRANT_PATH.length + 1), body);
         if (url.pathname.startsWith(GAME_INVITATION_PATH + '/')) return gameInvitation(request, env, url.pathname.slice(GAME_INVITATION_PATH.length + 1), body);
         if (url.pathname === '/beta/unlock') {
             const now = Date.now();
