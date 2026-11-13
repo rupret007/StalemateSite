@@ -144,7 +144,7 @@ const PERSON_COMMANDS = new Set(['msg', 'query', 'whois', 'ignore', 'unignore', 
 const NAMED_PERSON_COMMANDS = new Set([...PERSON_COMMANDS, 'accept', 'decline', 'report', 'mode']);
 const PERSON_ROOM_COMMANDS = new Set(['slap', 'kick', 'ban', 'invite', 'op', 'deop', 'voice', 'devoice', 'cohost', 'transfer']);
 
-export function createLobby({ now = () => Date.now(), send: sendImpl = () => {}, close: closeImpl = () => {}, persist: persistImpl = () => {}, deferPresence: deferPresenceImpl = null, participation = null, effectCommit = null, incidentSources = false, gameNight = false, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
+export function createLobby({ now = () => Date.now(), send: sendImpl = () => {}, close: closeImpl = () => {}, persist: persistImpl = () => {}, deferPresence: deferPresenceImpl = null, participation = null, effectCommit = null, incidentSources = false, gameNight = false, webJamChess = false, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
     if (typeof incidentSources !== 'boolean') throw Error('incident-source-configuration');
     const L = { ...LOBBY_LIMITS, ...limits };
     const entrySites = L.entrySites || ENTRY_SITES;
@@ -1817,8 +1817,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (chan.invites.size >= 150 && !chan.invites.has(t.dev)) return bot(c, 'Room invitation list is full.', 'error');
             chan.invites.add(t.dev);
             const gameRoom = roomKind(chan) === 'game';
-            const arcade = gameRoom && roomInstance === chan.keepRef ? gameNightInvite(game, match) : null;
-            out(t, { t: 'invite', ch: chan.name, by: c.nick, ...(gameRoom ? { roomInstance: chan.keepRef } : {}), ...(arcade ? { arcade } : {}) });
+            const jamChess = webJamChess && privateWebJam(chan) && chan.modes.i && !!boundPeer && game === 'chess';
+            const arcade = (gameRoom || jamChess) && roomInstance === chan.keepRef ? gameNightInvite(game, match) : null;
+            out(t, { t: 'invite', ch: chan.name, by: c.nick, ...(gameRoom || jamChess && arcade ? { roomInstance: chan.keepRef } : {}), ...(arcade ? { arcade } : {}) });
             return bot(c, `Invited ${t.nick} to ${chan.name}.`);
         },
         op(c, chan, [n], _r, _m, peer) { return setRank(c, chan, n, 'ops', true, '+o', peer); },
