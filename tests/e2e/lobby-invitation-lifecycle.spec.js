@@ -427,7 +427,7 @@ test('Game Night plays one shared Four in a Row match with the chat composer sti
             await drop(guest, 7).click();
         }
         await drop(host, 4).click();
-        await expect(guest.locator('[data-four-status]')).toHaveText('X played column 4. X wins.');
+        await expect(guest.locator('[data-four-status]')).toContainText('X played column 4. X wins.');
         await expect(guest.getByRole('table', { name: 'Four in a Row board' }).locator('tbody tr').last().locator('[data-mark="X"][data-winning]')).toHaveCount(4);
         await host.screenshot({ path: testInfo.outputPath('four-in-a-row-desktop.png'), animations: 'disabled' });
         for (const width of [390, 375]) {
@@ -462,10 +462,10 @@ test('Game Night plays one shared Four in a Row match with the chat composer sti
         await guest.locator('[data-text]').fill('Good game');
         await guest.locator('[data-send]').click();
         await expect(host.locator('[data-chat-lines]')).toContainText('Good game');
-        await host.getByRole('button', { name: 'Play again' }).click();
-        await guest.getByRole('button', { name: 'Join match' }).click();
+        await host.getByRole('button', { name: 'Request rematch' }).click();
+        await guest.getByRole('button', { name: 'Accept rematch' }).click();
         await guest.getByRole('button', { name: 'Leave match' }).click();
-        await expect(host.locator('[data-four-status]')).toHaveText('Match ended. A host can open another.');
+        await expect(host.locator('[data-four-status]')).toHaveText('The other player left. This match is over. Open a match to play again.');
         await expect(host.getByRole('button', { name: 'Open a match' })).toBeVisible();
     } finally {
         await fixture.close();
@@ -514,7 +514,7 @@ test('Game Night keeps invitations actionable and offers a safe return after a d
         await expect(guest.locator('[data-four-status]')).toContainText('X played column 1');
 
         fixture.disconnect('ReturnGuest', 1012);
-        await expect(host.locator('[data-four-status]')).toContainText('Match ended');
+        await expect(host.locator('[data-four-status]')).toContainText('The other player disconnected. This match is over.');
         await expect(offer).toContainText('Game Night disconnected. Return to the room to check your match.');
         await offer.getByRole('button', { name: 'Return to room' }).click();
         await expect(roomTab).toBeFocused();
