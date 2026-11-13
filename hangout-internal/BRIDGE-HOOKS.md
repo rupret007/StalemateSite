@@ -468,9 +468,9 @@ Imported later. This slice does not edit `lobby.js`, `beta-entry.mjs`, `entry-si
 
 | Module | What the later import calls |
 |---|---|
-| `r/45662413410ed051/lobby/bridge-room-offer.mjs` | `createRoomOffer({ room, register }).confirmPlay(...)` once, from the host already in the WebJam room. `render(document, memberId)` is the one **Join Chess** button. `raiseInRoomOffer(button)` sets the existing `[data-game-offer-join]` control to 44px. |
-| `r/45662413410ed051/lobby/bridge-table-full.mjs` | `mapTakenSeats(...)` where the client would otherwise say "Ask the host for a fresh invitation" after both seats are taken. `redeemRequest(...)` is the call below. |
-| `r/45662413410ed051/lobby/bridge-offer-recovery.mjs` | `recoverPanel(...)` beside the chess panel. `renderExpiredRecovery(...)` on the expired link page. |
+| `r/<hidden-room>/lobby/bridge-room-offer.mjs` | `createRoomOffer({ room, register }).confirmPlay(...)` once, from the host already in the WebJam room. `render(document, memberId)` is the one **Join Chess** button. `raiseInRoomOffer(button)` sets the existing `[data-game-offer-join]` control to 44px. |
+| `r/<hidden-room>/lobby/bridge-table-full.mjs` | `mapTakenSeats(...)` where the client would otherwise say "Ask the host for a fresh invitation" after both seats are taken. `redeemRequest(...)` is the call below. |
+| `r/<hidden-room>/lobby/bridge-offer-recovery.mjs` | `recoverPanel(...)` beside the chess panel. `renderExpiredRecovery(...)` on the expired link page. |
 
 `confirmPlay` registers one Chess hash for the WebJam room the members are already in (`#jam` or `#jam-` plus 1–26 lowercase letters, digits, or hyphens). The host must be in that roster, and at least one other person must already be there. A second confirm does not register again. The answer carries `shareSheet: false` and `secondRoom: false`. People who were not in the room at that confirm do not get the button. The host does not get it either: the seat is the guest seat.
 
@@ -491,7 +491,7 @@ Content-Type: application/json
 
 | Status | Body | What the guest sees |
 |---|---|---|
-| 200 | `{ "next": "/r/45662413410ed051/lobby/?game-guest=1" }` plus the existing game-guest `Set-Cookie` | Seated. The `next` path is the lobby they already joined. |
+| 200 | `{ "next": "/r/<hidden-room>/lobby/?game-guest=1" }` plus the existing game-guest `Set-Cookie` | Seated. The `next` path is the lobby they already joined. |
 | 409 | `{ "tableFull": true, "message": "Table full, you're up next game" }` | That sentence on the offer they already have open. `mapTakenSeats` returns `stayInRoom: true`, `askHost: false`, and `next: null`. The guest stays in that room for the next match. |
 | 410 | `{ "error": "<the existing expired invitation copy>" }` | Not this mapper. |
 | 400 | age line, or the value failed the pattern | Not a full table. |
@@ -507,4 +507,4 @@ Same-origin JSON POST only. `register` is the other path under `/beta/game-night
 
 When the chess panel action is **Join as Black**, `recoverPanel` drops a toast that says "ask the host" and leaves that button as the only action. The status line stays "Black is open. Join to play." Any other toast stays.
 
-The expired link page keeps its heading and the sentence "This invite can’t open the game anymore. Ask your host for a new invite." A guest with a lobby session gets one action, **Return to room**, pointing at `/r/45662413410ed051/lobby/` or `/r/45662413410ed051/lobby/?game-guest=1`. Any other target becomes the lobby path. A guest without a lobby session gets no action.
+The expired link page keeps its heading and the sentence "This invite can’t open the game anymore. Ask your host for a new invite." A guest with a lobby session gets one action, **Return to room**, pointing at `/r/<hidden-room>/lobby/` or `/r/<hidden-room>/lobby/?game-guest=1`. Any other target becomes the lobby path. A guest without a lobby session gets no action.
