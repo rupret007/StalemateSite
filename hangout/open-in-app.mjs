@@ -99,9 +99,9 @@ export function safeHomeHref(value) {
     return value;
 }
 
-export function openInAppLines({ ios = false, action = 'home', place = '' } = {}) {
+export function openInAppLines({ ios = false, action = 'home', place = '', led = false } = {}) {
     const lines = [];
-    if (place === 'webjam' && action === 'home') lines.push(HOST_ASK);
+    if (!led && place === 'webjam' && action === 'home') lines.push(HOST_ASK);
     if (ios) lines.push(IPHONE_LIMIT);
     return lines;
 }
@@ -155,7 +155,7 @@ export function jumpIn(doc) {
     return 'focus';
 }
 
-export function fillOpenInApp(doc, { ios = false, installed = 'unknown', action = 'home', place = '', homeHref = '' } = {}) {
+export function fillOpenInApp(doc, { ios = false, installed = 'unknown', action = 'home', place = '', homeHref = '', alreadyHome = false } = {}) {
     const region = doc.createElement('aside');
     region.className = 'hoa';
     region.dataset.openInApp = installed;
@@ -163,6 +163,13 @@ export function fillOpenInApp(doc, { ios = false, installed = 'unknown', action 
     region.setAttribute('role', 'region');
     region.setAttribute('aria-label', OPEN_IN_APP_TITLE);
     const href = safeHomeHref(homeHref);
+    const webjamHome = place === 'webjam' && action === 'home';
+    if (webjamHome) {
+        const lead = doc.createElement('p');
+        lead.className = 'hoa__lead';
+        lead.textContent = HOST_ASK;
+        region.append(lead);
+    }
     if (action === 'jump') {
         const button = doc.createElement('button');
         button.type = 'button';
@@ -170,14 +177,14 @@ export function fillOpenInApp(doc, { ios = false, installed = 'unknown', action 
         button.textContent = JUMP_LABEL;
         button.addEventListener('click', () => { jumpIn(doc); });
         region.append(button);
-    } else if (href) {
+    } else if (href && !alreadyHome) {
         const link = doc.createElement('a');
-        link.className = 'hoa__go';
+        link.className = webjamHome ? 'hoa__quiet' : 'hoa__go';
         link.href = href;
         link.textContent = HOME_LABEL;
         region.append(link);
     }
-    for (const text of openInAppLines({ ios, action, place })) {
+    for (const text of openInAppLines({ ios, action, place, led: webjamHome })) {
         const line = doc.createElement('p');
         line.className = 'hoa__line';
         line.textContent = text;
@@ -191,6 +198,7 @@ export async function mountOpenInApp(doc, env) {
     if (mode !== 'always' && mode !== 'invite') return false;
     const place = doc.querySelector('meta[name="hangout-place"]')?.getAttribute('content') || '';
     if (place) rememberPlace(env.storage, place);
+    if (doc.querySelector('[data-open-in-app]')) return true;
     const link = env.link || classifyInvite(env.search, env.hash);
     const installed = env.installed || 'unknown';
     const decision = openInAppDecision({
@@ -224,7 +232,8 @@ export function mountHostAsk(slot, env) {
         installed: 'unknown',
         action: 'home',
         place: 'webjam',
-        homeHref: env.homeHref || ''
+        homeHref: env.homeHref || '',
+        alreadyHome: true
     });
     slot.replaceChildren(region);
     slot.hidden = false;

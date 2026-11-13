@@ -1,3 +1,4 @@
+import { placeHref } from './door.mjs';
 import { safeChoiceHref } from './last-room.mjs';
 
 // Open rooms and tables from an existing GET. Personal fields are dropped.
@@ -88,13 +89,25 @@ export async function loadOpenPlaces(fetchImpl, endpoints = OPEN_PLACE_READS) {
     return found.slice(0, 8);
 }
 
-function linkFor(place, links) {
-    if (place.kind === 'game') return links.game;
-    if (place.kind === 'jam') return links.jam;
-    return links.lobby;
+const DOOR_KIND = Object.freeze({
+    art: 'draw',
+    watch: 'watch',
+    game: 'game-night',
+    jam: 'jam',
+    chat: 'hangout',
+    bobross: 'draw'
+});
+
+export function hrefForPlace(place) {
+    const kind = DOOR_KIND[place.kind] || 'hangout';
+    if (kind === 'jam') return './?go=webjam';
+    const titled = place.title ? placeHref(kind, place.title) : '';
+    if (titled && safeChoiceHref(titled)) return titled;
+    const plain = placeHref(kind);
+    return safeChoiceHref(plain) ? plain : '';
 }
 
-export function renderPlaces(root, places, links, safeHref) {
+export function renderPlaces(root, places, safeHref) {
     const doc = root.ownerDocument;
     const status = root.querySelector('[data-here-status]');
     const list = root.querySelector('[data-here-list]');
@@ -115,7 +128,7 @@ export function renderPlaces(root, places, links, safeHref) {
         const meta = doc.createElement('span');
         meta.className = 'here__meta';
         meta.textContent = `${place.count} here · ${KIND_LABEL[place.kind]}`;
-        const href = linkFor(place, links);
+        const href = hrefForPlace(place);
         const row = safeHref(href) ? doc.createElement('a') : doc.createElement('div');
         row.className = 'here__place';
         if (row.tagName === 'A') row.setAttribute('href', href);
@@ -127,11 +140,6 @@ export function renderPlaces(root, places, links, safeHref) {
 
 export async function mountWhosHere(root, env, { load = loadOpenPlaces, safeHref = safeChoiceHref } = {}) {
     const check = safeHref;
-    const links = {
-        lobby: root.getAttribute('data-link-lobby') || '',
-        game: root.getAttribute('data-link-game') || '',
-        jam: root.getAttribute('data-link-jam') || ''
-    };
     const endpoints = readPaths(root.getAttribute('data-reads'));
     let places = [];
     try {
@@ -139,5 +147,5 @@ export async function mountWhosHere(root, env, { load = loadOpenPlaces, safeHref
     } catch {
         places = [];
     }
-    renderPlaces(root, Array.isArray(places) ? places.slice(0, 8) : [], links, check);
+    renderPlaces(root, Array.isArray(places) ? places.slice(0, 8) : [], check);
 }

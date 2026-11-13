@@ -104,6 +104,7 @@ test('a directory read shows open rooms and tables and hides personal fields', a
                 email: 'hidden@example.test',
                 rooms: [
                     { name: '#art-live', kind: 'art', title: 'Drawing room', count: 2, max: 8, locked: false, key: false, nick: 'SecretNick' },
+                    { name: '#watch-live', kind: 'watch', title: 'Watch party', count: 3, max: 8, locked: false, key: false },
                     { name: '#game-abc123xdef456', kind: 'game', title: 'Royal Flush Chess', count: 2, max: 8, locked: true, key: false },
                     { name: '#art-empty', kind: 'art', title: 'Empty room', count: 0, max: 8, locked: false, key: false },
                     { name: '#chat-private', kind: 'chat', title: 'Private chat', count: 3, max: 8, locked: true, key: false }
@@ -112,8 +113,9 @@ test('a directory read shows open rooms and tables and hides personal fields', a
         });
     });
     await page.goto('/hangout/');
-    await expect(page.getByRole('link', { name: /Drawing room/ })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Royal Flush Chess/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Drawing room/ })).toHaveAttribute('href', /kind=draw&title=Drawing\+room/);
+    await expect(page.getByRole('link', { name: /Watch party/ })).toHaveAttribute('href', /kind=watch&title=Watch\+party/);
+    await expect(page.getByRole('link', { name: /Royal Flush Chess/ })).toHaveAttribute('href', /kind=game-night&title=Royal\+Flush\+Chess&game-night=1/);
     const text = await page.locator('#whos-here').innerText();
     expect(text).not.toContain('SecretNick');
     expect(text).not.toContain('hidden@example.test');
@@ -136,7 +138,11 @@ test('WebJam join navigations get Open in Hang Out from the worker', async ({ br
     await page.goto('/join/');
     const guide = page.getByRole('region', { name: 'Open in Hang Out' });
     await expect(guide).toBeVisible();
+    await expect(guide.locator('.hoa__lead')).toHaveText('Ask your host to send the invite; tap it and you\'re in.');
+    await expect(guide.locator('.hoa__go')).toHaveCount(0);
     await expect(guide.getByRole('link', { name: 'Go to Hang Out home' })).toBeVisible();
+    await expect(page.locator('#status')).toHaveText('Ask your host to send the invite; tap it and you\'re in.');
+    await expect(page.locator('body')).not.toContainText('Invalid Web Join invite');
     await expect(guide).toContainText('Ask your host to send the invite; tap it and you\'re in.');
     await expect(guide).not.toContainText('cannot tell whether the app is installed');
     expect(await page.locator('[data-open-in-app]').innerText()).not.toMatch(/[?#]/);
@@ -147,7 +153,11 @@ test('WebJam join navigations get Open in Hang Out from the worker', async ({ br
 test('shortcuts open Game Night, ask for a WebJam invite, and repeat the stored last place', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'allow' });
     const page = await context.newPage();
-    const gameNightNavigation = (req) => req.isNavigationRequest() && new URL(req.url()).search === '?game-night=1';
+    const gameNightNavigation = (req) => {
+        if (!req.isNavigationRequest()) return false;
+        const url = new URL(req.url());
+        return url.pathname.endsWith('/door.html') && url.searchParams.get('kind') === 'game-night' && url.searchParams.get('game-night') === '1';
+    };
     const joined = [];
     page.on('request', (req) => {
         if (new URL(req.url()).pathname.endsWith('/join/') || new URL(req.url()).pathname.endsWith('/join')) joined.push(req.url());
@@ -155,7 +165,9 @@ test('shortcuts open Game Night, ask for a WebJam invite, and repeat the stored 
     await page.goto('/hangout/?go=webjam');
     const guide = page.getByRole('region', { name: 'Open in Hang Out' });
     await expect(guide).toBeVisible();
-    await expect(guide.getByRole('link', { name: 'Go to Hang Out home' })).toBeVisible();
+    await expect(guide.locator('.hoa__lead')).toHaveText('Ask your host to send the invite; tap it and you\'re in.');
+    await expect(guide.getByRole('link', { name: 'Go to Hang Out home' })).toHaveCount(0);
+    await expect(guide.locator('.hoa__go')).toHaveCount(0);
     await expect(guide).toContainText('Ask your host to send the invite; tap it and you\'re in.');
     await expect(page).toHaveURL(/\/hangout\/\?go=webjam$/);
     expect(page.url()).not.toMatch(/invite|grant|token/i);
@@ -171,13 +183,19 @@ test('shortcuts open Game Night, ask for a WebJam invite, and repeat the stored 
     const openedGameNight = page.waitForRequest(gameNightNavigation);
     await page.locator('.choice', { hasText: 'Game Night' }).click();
     const gameNight = await openedGameNight;
-    expect(new URL(gameNight.url()).pathname).toMatch(/\/lobby\/$/);
+    expect(new URL(gameNight.url()).pathname).toMatch(/\/door\.html$/);
+    expect(new URL(gameNight.url()).searchParams.get('game-night')).toBe('1');
     expect(gameNight.url()).not.toMatch(/invite|grant|token/i);
+    await expect(page.locator('h1')).toHaveText('Game Night');
+    await expect(page.locator('[data-name]')).toBeVisible();
+    await expect(page.locator('[data-enter]')).toBeVisible();
+    await page.evaluate(() => history.replaceState(null, '', location.pathname));
+    await expect.poll(() => new URL(page.url()).searchParams.get('game-night')).toBe('1');
     await expect.poll(() => page.evaluate(() => localStorage.getItem('hangout-last-room'))).toBe('game-night');
     const openedLast = page.waitForRequest(gameNightNavigation);
     await page.goto('/hangout/?go=last', { waitUntil: 'commit' });
     const last = await openedLast;
-    expect(new URL(last.url()).pathname).toMatch(/\/lobby\/$/);
+    expect(new URL(last.url()).pathname).toMatch(/\/door\.html$/);
     expect(last.url()).not.toMatch(/invite|grant|token/i);
     await context.close();
 });
@@ -214,5 +232,98 @@ test('the offline screen retries when the network returns', async ({ browser }) 
     expect(await page.locator('body').innerText()).not.toContain(MARKER);
     await context.setOffline(false);
     await expect(page.getByRole('heading', { name: 'Wrong song.' })).toBeVisible({ timeout: 12000 });
+    await context.close();
+});
+
+test('phone screens show each home-screen fix', async ({ browser }) => {
+    const fixShots = path.resolve(__dirname, '../../../shots');
+    fs.mkdirSync(fixShots, { recursive: true });
+    const phone = {
+        viewport: { width: 390, height: 844 },
+        userAgent: IPHONE,
+        isMobile: true,
+        hasTouch: true,
+        deviceScaleFactor: 1,
+        reducedMotion: 'reduce',
+        serviceWorkers: 'allow'
+    };
+    async function snap(page, name) {
+        const file = path.join(fixShots, name);
+        await page.screenshot({ path: file });
+        const bytes = fs.readFileSync(file);
+        expect(bytes.readUInt32BE(16)).toBe(390);
+        expect(bytes.readUInt32BE(20)).toBe(844);
+    }
+
+    const cold = await browser.newContext(phone);
+    const join = await cold.newPage();
+    await join.goto('/join/');
+    expect(await join.evaluate(() => navigator.serviceWorker.controller)).toBeNull();
+    await expect(join.locator('#status')).toHaveText('Ask your host to send the invite; tap it and you\'re in.');
+    await expect(join.locator('body')).not.toContainText('Invalid Web Join invite');
+    await expect(join.locator('.hoa__lead')).toHaveText('Ask your host to send the invite; tap it and you\'re in.');
+    await snap(join, 'iphone-join-absent.png');
+    await cold.close();
+
+    const context = await browser.newContext(phone);
+    const page = await context.newPage();
+    await page.goto('/hangout/?go=last');
+    await expect(page.getByText('No last room saved on this device.')).toBeVisible();
+    await expect(page).toHaveURL(/\/hangout\/\?go=last$/);
+    await snap(page, 'iphone-last-empty.png');
+
+    await page.goto('/hangout/?go=webjam');
+    await expect(page.locator('.hoa__lead')).toHaveText('Ask your host to send the invite; tap it and you\'re in.');
+    await expect(page.getByRole('link', { name: 'Go to Hang Out home' })).toHaveCount(0);
+    await snap(page, 'iphone-webjam-ask.png');
+
+    await page.goto('/hangout/door.html?kind=hangout');
+    await expect(page.locator('h1')).toHaveText('Hang Out');
+    await expect(page.locator('[data-door-step]')).toHaveText('Pick a name and jump in.');
+    await expect(page.locator('[data-name]')).toBeVisible();
+    await expect(page.locator('[data-enter]')).toBeVisible();
+    await snap(page, 'iphone-door-hangout.png');
+
+    await page.goto('/hangout/door.html?kind=game-night&game-night=1');
+    await expect(page.locator('h1')).toHaveText('Game Night');
+    await page.evaluate(() => history.replaceState(null, '', location.pathname));
+    await expect.poll(() => new URL(page.url()).searchParams.get('game-night')).toBe('1');
+    await expect(page.locator('[data-name]')).toBeVisible();
+    await expect(page.locator('[data-enter]')).toBeVisible();
+    await snap(page, 'iphone-door-game-night.png');
+
+    await page.route('**/beta/state', async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                rooms: [
+                    { kind: 'art', title: 'Drawing room', count: 2, max: 8, locked: false, key: false },
+                    { kind: 'watch', title: 'Watch party', count: 3, max: 8, locked: false, key: false },
+                    { kind: 'game', title: 'Royal Flush Chess', count: 2, max: 8, locked: true, key: false }
+                ]
+            })
+        });
+    });
+    await page.goto('/hangout/');
+    await page.getByRole('link', { name: /Drawing room/ }).click();
+    await expect(page.locator('h1')).toHaveText('Drawing room');
+    await expect(page.locator('[data-door-step]')).toHaveText('Pick a name and draw together.');
+    await expect(page.locator('[data-name]')).toBeVisible();
+    await expect(page.locator('[data-enter]')).toBeVisible();
+    await snap(page, 'iphone-door-draw.png');
+    await page.goto('/hangout/');
+    await page.getByRole('link', { name: /Watch party/ }).click();
+    await expect(page.locator('h1')).toHaveText('Watch party');
+    await expect(page.locator('[data-door-step]')).toHaveText('Pick a name and watch together.');
+    await snap(page, 'iphone-door-watch.png');
+    await page.goto('/hangout/');
+    await page.getByRole('link', { name: /Royal Flush Chess/ }).click();
+    await expect(page.locator('h1')).toHaveText('Royal Flush Chess');
+    await page.evaluate(() => history.replaceState(null, '', location.pathname));
+    await expect.poll(() => new URL(page.url()).searchParams.get('game-night')).toBe('1');
+    await expect(page.locator('[data-name]')).toBeVisible();
+    await expect(page.locator('[data-enter]')).toBeVisible();
+    await snap(page, 'iphone-door-game.png');
     await context.close();
 });

@@ -1,5 +1,5 @@
 import { mountInstallCard } from './install-card.mjs';
-import { mountShortcuts, placeFromShortcut } from './last-room.mjs';
+import { mountShortcuts, placeFromShortcut, showEmptyLast } from './last-room.mjs';
 import { hangoutHomePath, mountHostAsk } from './open-in-app.mjs';
 import { registerHomeScreenWorker } from './register-sw.mjs';
 import { mountWhosHere } from './whos-here.mjs';
@@ -18,6 +18,7 @@ const leaving = mountShortcuts(document, {
     search: location.search,
     storage: localStorage,
     replace: (href) => location.replace(href),
+    onEmptyLast() { showEmptyLast(document); },
     onWebjam() {
         const next = new URL(location.href);
         next.search = '?go=webjam';

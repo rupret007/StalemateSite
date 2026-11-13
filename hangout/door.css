@@ -1,0 +1,40 @@
+.door-form {
+    display: grid;
+    gap: 12px;
+    max-width: 28rem;
+    margin-top: 20px;
+}
+
+.door-form label {
+    display: grid;
+    gap: 6px;
+    font-weight: 700;
+}
+
+.door-form input {
+    min-height: 52px;
+    padding: 0 14px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--cream);
+    font: 1.05rem/1.4 var(--body);
+}
+
+.door__enter {
+    min-height: 52px;
+    border: 0;
+    background: var(--lime);
+    color: var(--ink);
+    font-family: var(--display);
+    font-size: 1.45rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    box-shadow: 3px 3px 0 #000;
+    cursor: pointer;
+}
+
+.door-status {
+    min-height: 1.5em;
+    margin: 0;
+    color: var(--cream);
+}

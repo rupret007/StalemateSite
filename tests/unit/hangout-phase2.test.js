@@ -3,13 +3,15 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { injectJoinGuide, isJoinNavigation, shouldGuideJoin } from '../../hangout/join-guide.mjs';
 import {
+    LAST_ROOM_EMPTY,
     LAST_ROOM_KEY,
     choiceHref,
     mountShortcuts,
     placeFromShortcut,
     readPlace,
     rememberPlace,
-    safeChoiceHref
+    safeChoiceHref,
+    showEmptyLast
 } from '../../hangout/last-room.mjs';
 import {
     RECONNECT_COPY,
@@ -36,8 +38,12 @@ import {
     safeHomeHref
 } from '../../hangout/open-in-app.mjs';
 import { isOfflineAsset, offlineAssetUrls, offlineDocument } from '../../hangout/sw-policy.mjs';
+import { parseDoor, placeHref, mountDoor, retainDoorQuery, guardGameNightFlag } from '../../hangout/door.mjs';
+import { repairAbsentJoin } from '../../hangout/join-absent.mjs';
+import { injectLobbyDoor, isLobbyNavigation, retainLobbyGameNight, revealClosedDoor } from '../../hangout/lobby-door.mjs';
 import {
     EMPTY_COPY,
+    hrefForPlace,
     loadOpenPlaces,
     placesFromPayload,
     publicPlace,
@@ -196,11 +202,7 @@ describe('who’s here', () => {
         ]);
         const root = document.createElement('section');
         root.innerHTML = '<p data-here-status role="status"></p><ul data-here-list hidden></ul>';
-        renderPlaces(root, places, {
-            lobby: '../r/45662413410ed051/lobby/',
-            game: '../r/45662413410ed051/lobby/?game-night=1',
-            jam: '../join/'
-        }, safeChoiceHref);
+        renderPlaces(root, places, safeChoiceHref);
         expect(root.textContent).toContain('Drawing room');
         expect(root.textContent).toContain('2 here · Draw together');
         expect(root.textContent).toContain('Royal Flush Chess');
@@ -209,9 +211,12 @@ describe('who’s here', () => {
         expect(root.textContent).not.toContain('#game-');
         expect(root.textContent).not.toContain('hidden@example.test');
         expect(root.querySelectorAll('a')).toHaveLength(2);
-        expect(root.querySelector('a').getAttribute('href')).toBe('../r/45662413410ed051/lobby/');
-        expect(root.querySelectorAll('a')[1].getAttribute('href')).toBe('../r/45662413410ed051/lobby/?game-night=1');
-        renderPlaces(root, [], { lobby: '', game: '', jam: '' }, safeChoiceHref);
+        expect(root.querySelector('a').getAttribute('href')).toBe('door.html?kind=draw&title=Drawing+room');
+        expect(root.querySelectorAll('a')[1].getAttribute('href')).toBe('door.html?kind=game-night&title=Royal+Flush+Chess&game-night=1');
+        expect(hrefForPlace({ kind: 'watch', title: 'Watch party' })).toBe('door.html?kind=watch&title=Watch+party');
+        expect(hrefForPlace({ kind: 'jam', title: 'Friday jam' })).toBe('./?go=webjam');
+        expect(hrefForPlace({ kind: 'art', title: 'invite room' })).toBe('door.html?kind=draw');
+        renderPlaces(root, [], safeChoiceHref);
         expect(root.querySelector('[data-here-status]').textContent).toBe(EMPTY_COPY);
         expect(root.querySelector('[data-here-list]').hidden).toBe(true);
     });
@@ -448,9 +453,17 @@ describe('icon shortcuts and last room', () => {
         expect(slot.textContent).toContain(HOST_ASK);
         expect(slot.textContent).toContain(IPHONE_LIMIT);
         expect(slot.textContent).not.toContain(secret);
+        const ask = slot.querySelector('[data-open-in-app]');
+        expect(ask.firstElementChild.textContent).toBe(HOST_ASK);
+        expect(ask.querySelector('a')).toBeNull();
+        expect(ask.querySelector('.hoa__go')).toBeNull();
         const entry = readFileSync(join(repoRoot, 'hangout/index.html'), 'utf8');
         expect(entry).toContain(HOST_ASK);
         expect(entry).toContain('href="../join/"');
+        expect(entry).toContain('href="door.html?kind=hangout"');
+        expect(entry).toContain('href="door.html?kind=game-night&amp;game-night=1"');
+        expect(entry).toContain('data-last-empty');
+        expect(entry).not.toContain('45662413410ed051');
     });
 
     it('does not log or cache an invite from the worker', () => {
@@ -462,5 +475,138 @@ describe('icon shortcuts and last room', () => {
         expect(source).not.toContain('cache.addAll');
         expect(source).not.toContain('console.');
         expect(source).not.toContain(MARKER);
+        expect(handler.indexOf('isJoinNavigation')).toBeLessThan(handler.indexOf('isLobbyNavigation'));
+    });
+});
+
+describe('home screen doors', () => {
+    function doorDoc() {
+        return page('', [
+            '<p data-door-kicker></p>',
+            '<h1 data-door-title>Hang Out</h1>',
+            '<p data-door-step></p>',
+            '<input data-name>',
+            '<button data-enter type="button">Jump in</button>',
+            '<p data-door-status role="status"></p>'
+        ].join(''));
+    }
+
+    it('opens a different page for drawing, watching, and a game, and keeps the name field', () => {
+        expect(placeHref('hangout')).toBe('door.html?kind=hangout');
+        expect(placeHref('game-night')).toBe('door.html?kind=game-night&game-night=1');
+        expect(parseDoor('?kind=watch&title=Watch+party').heading).toBe('Watch party');
+        expect(parseDoor('?kind=watch&title=Watch+party').step).toBe('Pick a name and watch together.');
+        const draw = doorDoc();
+        mountDoor(draw, { search: '?kind=draw&title=Drawing+room', storage: memoryStorage() });
+        expect(draw.querySelector('h1').textContent).toBe('Drawing room');
+        expect(draw.querySelector('[data-door-step]').textContent).toBe('Pick a name and draw together.');
+        expect(draw.querySelector('[data-name]').hidden).toBe(false);
+        expect(draw.querySelector('[data-enter]').hidden).toBe(false);
+        draw.querySelector('[data-enter]').click();
+        expect(draw.querySelector('[data-door-status]').textContent).toBe('Type a name to jump in.');
+        draw.querySelector('[data-name]').value = 'Ada';
+        draw.querySelector('[data-enter]').click();
+        expect(draw.querySelector('[data-name]').hidden).toBe(false);
+        expect(draw.querySelector('[data-enter]').hidden).toBe(false);
+        expect(draw.querySelector('[data-door-status]').textContent).toBe('Name saved on this device.');
+        const html = readFileSync(join(repoRoot, 'hangout/door.html'), 'utf8');
+        expect(html).toContain('data-name');
+        expect(html).toContain('data-enter');
+        expect(html).not.toMatch(/<(?:input|button)\b[^>]*\bhidden\b/);
+    });
+
+    it('puts game-night=1 back when the address bar is cleaned', () => {
+        const location = {
+            href: 'https://hangout.example/hangout/door.html?kind=game-night&title=Royal+Flush+Chess&game-night=1'
+        };
+        const history = {
+            replaceState(state, title, url) {
+                location.href = new URL(url, location.href).href;
+            }
+        };
+        guardGameNightFlag(history, location);
+        history.replaceState(null, '', '/hangout/door.html');
+        expect(new URL(location.href).searchParams.get('game-night')).toBe('1');
+        expect(new URL(location.href).searchParams.get('kind')).toBe('game-night');
+        expect(new URL(location.href).searchParams.get('title')).toBe('Royal Flush Chess');
+        history.replaceState(null, '', '/hangout/door.html?preview=no');
+        expect(new URL(location.href).searchParams.has('preview')).toBe(false);
+        expect(new URL(location.href).searchParams.get('game-night')).toBe('1');
+        expect(retainDoorQuery(location.href, '/hangout/door.html')).toContain('game-night=1');
+        const doc = doorDoc();
+        const parsed = mountDoor(doc, {
+            search: '?kind=game-night&game-night=1',
+            storage: memoryStorage(),
+            history,
+            location
+        });
+        expect(parsed.heading).toBe('Game Night');
+        expect(doc.querySelector('[data-name]').hidden).toBe(false);
+        expect(doc.querySelector('[data-enter]').hidden).toBe(false);
+    });
+
+    it('says when Last room has nothing saved', () => {
+        const doc = page('', '<p data-last-empty role="status" hidden></p><a data-place="hangout" href="door.html?kind=hangout">Hang Out</a>');
+        const replaced = [];
+        mountShortcuts(doc, {
+            search: '?go=last',
+            storage: memoryStorage(),
+            replace: (href) => replaced.push(href),
+            onEmptyLast: () => showEmptyLast(doc)
+        });
+        expect(replaced).toEqual([]);
+        expect(doc.querySelector('[data-last-empty]').hidden).toBe(false);
+        expect(doc.querySelector('[data-last-empty]').textContent).toBe(LAST_ROOM_EMPTY);
+        expect(showEmptyLast(page('', ''))).toBe(false);
+    });
+});
+
+describe('absent WebJam invite and lobby flag', () => {
+    it('asks for the host link instead of calling a missing invite invalid', async () => {
+        const doc = page('', '<p id="status">Open the invite link from your host.</p><p id="error-hint"></p><button id="retry">Retry</button>');
+        expect(repairAbsentJoin(doc, { search: '', hash: '', homeHref: '/hangout/', ios: false })).toBe(true);
+        expect(doc.body.firstElementChild.querySelector('.hoa__lead').textContent).toBe(HOST_ASK);
+        expect(doc.querySelector('.hoa__go')).toBeNull();
+        doc.getElementById('status').textContent = 'Invalid Web Join invite';
+        doc.getElementById('status').dataset.failure = 'true';
+        doc.getElementById('retry').hidden = false;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(doc.getElementById('status').textContent).toBe(HOST_ASK);
+        expect(doc.getElementById('status').hasAttribute('data-failure')).toBe(false);
+        expect(doc.getElementById('retry').hidden).toBe(true);
+        const kept = page('', '<p id="status">Your host invited you to join.</p>');
+        expect(repairAbsentJoin(kept, { search: '', hash: '#k=not-valid', homeHref: '/hangout/' })).toBe(false);
+        expect(kept.querySelector('[data-open-in-app]')).toBeNull();
+        expect(kept.getElementById('status').textContent).toBe('Your host invited you to join.');
+        const joinHtml = readFileSync(join(repoRoot, 'join/index.html'), 'utf8');
+        expect(joinHtml.indexOf('join-absent.mjs')).toBeLessThan(joinHtml.indexOf('src="app.js"'));
+        expect(joinHtml).toContain(HOST_ASK);
+    });
+
+    it('keeps the game-night flag on a lobby navigation and shows the name field', () => {
+        const current = 'https://hangout.example/community/lobby/?game-night=1';
+        expect(isLobbyNavigation(current)).toBe(true);
+        expect(isLobbyNavigation('https://hangout.example/join/')).toBe(false);
+        expect(retainLobbyGameNight(current, '/community/lobby/')).toBe('/community/lobby/?game-night=1');
+        expect(retainLobbyGameNight(current, '/community/lobby/?preview=no')).not.toContain('preview');
+        expect(retainLobbyGameNight(current, '/community/lobby/?preview=no')).toContain('game-night=1');
+        const doc = page('', [
+            '<h1>#stalemate</h1>',
+            '<p data-gate-copy>Not open yet. The band is still building this one.</p>',
+            '<label class="nickrow" hidden>Your nick <input data-nick></label>',
+            '<button data-enter type="button" hidden disabled>Enter</button>'
+        ].join(''));
+        expect(revealClosedDoor(doc, { gameNight: true })).toBe(true);
+        expect(doc.querySelector('h1').textContent).toBe('Game Night');
+        expect(doc.querySelector('[data-gate-copy]').textContent).toBe('Pick a name and jump in.');
+        expect(doc.querySelector('.nickrow').hidden).toBe(false);
+        expect(doc.querySelector('[data-enter]').hidden).toBe(false);
+        expect(doc.querySelector('[data-enter]').disabled).toBe(false);
+        const html = '<!doctype html><html><head><title>Lobby</title></head><body><p>Gate</p></body></html>';
+        const next = injectLobbyDoor(html, 'https://hangout.example/hangout/', 'https://hangout.example/community/lobby/?game-night=1');
+        expect(next).toContain('src="https://hangout.example/hangout/lobby-door.mjs"');
+        expect(next).toContain('name="hangout-lobby-door"');
+        expect(injectLobbyDoor(next, 'https://hangout.example/hangout/', 'https://hangout.example/community/lobby/')).toBe(next);
+        expect(injectLobbyDoor(html, 'https://evil.example/hangout/', 'https://hangout.example/community/lobby/')).toBe(html);
     });
 });

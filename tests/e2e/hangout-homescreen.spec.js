@@ -209,8 +209,8 @@ test('choices open the existing pages and the worker does not cache sensitive re
 
     const hrefs = await page.locator('.choice').evaluateAll((links) => links.map((link) => link.href));
     expect(hrefs.map((href) => new URL(href).pathname + new URL(href).search)).toEqual([
-        '/r/45662413410ed051/',
-        '/r/45662413410ed051/lobby/?game-night=1',
+        '/hangout/door.html?kind=hangout',
+        '/hangout/door.html?kind=game-night&game-night=1',
         '/join/'
     ]);
     for (const href of hrefs) {

@@ -26,7 +26,12 @@ describe('pinned WebJam browser assets', () => {
     it('resolves the entire static module and stylesheet graph within the packaged client', () => {
         const html = read('index.html');
         const assets = [...html.matchAll(/<(?:script|link)\b[^>]*(?:src|href)="([^"]+)"/g)].map(match => match[1]);
-        expect(assets.sort()).toEqual(['app.js', 'style.css']);
+        expect(assets.sort()).toEqual([
+            '../hangout/join-absent.mjs',
+            '../hangout/open-in-app.css',
+            'app.js',
+            'style.css'
+        ]);
         for (const name of Object.keys(provenance.files).filter(name => name.endsWith('.js'))) {
             for (const match of read(name).matchAll(/\bimport\s[^;]*?\bfrom\s+["']([^"']+)["']/g)) {
                 expect(match[1], name).toMatch(/^\.\/[a-z-]+\.js$/);

@@ -38,6 +38,22 @@
     font-size: 0.98rem;
 }
 
+.hoa p.hoa__lead {
+    margin: 0;
+    color: #f4f0e6;
+    font-size: 1.35rem;
+    font-weight: 700;
+}
+
+.hoa__quiet {
+    display: inline-block;
+    margin-top: 10px;
+    color: #c9bba9;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-decoration: underline;
+}
+
 .hoa :focus-visible {
     outline: 3px solid #b5dc08;
     outline-offset: 3px;

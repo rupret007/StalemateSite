@@ -3,7 +3,9 @@
   "commit": "0a502b752c72d907fa65c420e82234053d5759ca",
   "sourcePR": "https://github.com/rupret007/webjam/pull/480",
   "license": "MIT",
-  "modifications": {},
+  "modifications": {
+    "index.html": "When the page has no invite, ask for the host link before a service worker is installed."
+  },
   "files": {
     "app.js": {
       "source": "web/join/app.js",
@@ -33,7 +35,7 @@
     "index.html": {
       "source": "web/join/index.html",
       "upstreamSha256": "6b20e43bb8124a91eee43b573573826ef10c7d8e4a9adf8b14a6882b75bc6ef1",
-      "shippedSha256": "6b20e43bb8124a91eee43b573573826ef10c7d8e4a9adf8b14a6882b75bc6ef1"
+      "shippedSha256": "2114acd4ff41222f29a76dbc8d197dc88b5729143bc784d85955dc2850746b25"
     },
     "mailbox.js": {
       "source": "web/join/mailbox.js",

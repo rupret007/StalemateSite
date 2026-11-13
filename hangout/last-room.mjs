@@ -1,9 +1,13 @@
 // Last place on this device. The value is one of three names, never a URL or a token.
 
 export const LAST_ROOM_KEY = 'hangout-last-room';
+export const LAST_ROOM_EMPTY = 'No last room saved on this device.';
 export const PLACES = Object.freeze(['hangout', 'game-night', 'webjam']);
 
 const PLACE = new Set(PLACES);
+const DOOR_KINDS = new Set(['hangout', 'game-night', 'draw', 'watch', 'jam']);
+const SAFE_TITLE = /^[A-Za-z0-9][A-Za-z0-9 .'-]{0,39}$/;
+const DROPPED_QUERY = new Set(['preview', 'relay', 'turn', 'invite', 'grant', 'token']);
 
 export function rememberPlace(storage, place) {
     if (!PLACE.has(place)) return false;
@@ -24,15 +28,26 @@ export function readPlace(storage) {
     }
 }
 
-export function placeFromShortcut(search, storage) {
-    let go = '';
+export function shortcutName(search) {
     try {
-        go = new URLSearchParams(String(search || '').replace(/^\?/, '')).get('go') || '';
+        return new URLSearchParams(String(search || '').replace(/^\?/, '')).get('go') || '';
     } catch {
         return '';
     }
+}
+
+export function placeFromShortcut(search, storage) {
+    const go = shortcutName(search);
     if (go === 'last') return readPlace(storage);
     return PLACE.has(go) ? go : '';
+}
+
+export function showEmptyLast(doc) {
+    const note = doc.querySelector('[data-last-empty]');
+    if (!note) return false;
+    note.hidden = false;
+    note.textContent = LAST_ROOM_EMPTY;
+    return true;
 }
 
 export function safeChoiceHref(value) {
@@ -46,9 +61,28 @@ export function safeChoiceHref(value) {
     }
     if (url.origin !== 'https://hangout.example' || url.username || url.password || url.hash) return false;
     const keys = [...url.searchParams.keys()];
-    if (keys.length > 1) return false;
-    if (keys.length === 1 && !(keys[0] === 'game-night' && url.searchParams.get('game-night') === '1')) return false;
-    return true;
+    if (new Set(keys).size !== keys.length) return false;
+    if (keys.some((key) => DROPPED_QUERY.has(key.toLowerCase()))) return false;
+    if (keys.length === 0) return true;
+    if (keys.length === 1 && keys[0] === 'game-night' && url.searchParams.get('game-night') === '1') return true;
+    if (keys.length === 1 && keys[0] === 'go') {
+        const go = url.searchParams.get('go');
+        return PLACE.has(go) || go === 'last';
+    }
+    return safeDoorSearch(url);
+}
+
+function safeDoorSearch(url) {
+    const params = url.searchParams;
+    const keys = [...params.keys()];
+    if (keys.some((key) => !['kind', 'title', 'game-night'].includes(key))) return false;
+    const kind = params.get('kind') || '';
+    if (!DOOR_KINDS.has(kind)) return false;
+    const title = params.get('title');
+    if (title !== null && (!SAFE_TITLE.test(title) || /invite|grant|token|preview/i.test(title))) return false;
+    const flags = params.getAll('game-night');
+    if (kind === 'game-night') return flags.length === 1 && flags[0] === '1';
+    return flags.length === 0;
 }
 
 export function choiceHref(doc, place) {
@@ -61,6 +95,7 @@ export function choiceHref(doc, place) {
 export function mountShortcuts(doc, env) {
     const place = placeFromShortcut(env.search, env.storage);
     if (place) rememberPlace(env.storage, place);
+    else if (shortcutName(env.search) === 'last') env.onEmptyLast?.();
     // WebJam has no invite on this page. Stay here and ask for the host's link
     // instead of opening the join page, which treats a missing link as invalid.
     if (place && place !== 'webjam') {

@@ -90,6 +90,12 @@ h1 {
     color: var(--muted);
 }
 
+.last-empty {
+    margin: 12px 0 0;
+    color: var(--cream);
+    font-weight: 700;
+}
+
 .checker {
     height: 14px;
     margin: 16px 0 4px;

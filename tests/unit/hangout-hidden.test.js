@@ -36,10 +36,12 @@ describe('hidden hangout room', () => {
             // existing Hang Out and Game Night pages. It is noindex and is not
             // linked from the band homepage. Every other public file stays quiet.
             if (rel === 'hangout/index.html') {
-                expect(text, rel).toContain(`href="../r/${SLUG}/"`);
-                expect(text, rel).toContain(`href="../r/${SLUG}/lobby/?game-night=1"`);
+                expect(text, rel).toContain('href="door.html?kind=hangout"');
+                expect(text, rel).toContain('href="door.html?kind=game-night&amp;game-night=1"');
                 expect(text, rel).toContain('href="../join/"');
                 expect(text, rel).toContain('noindex');
+                expect(text, rel).not.toContain(SLUG);
+                expect(text, rel).not.toMatch(/href=["'][^"']*\/?r\/[0-9a-f]{8,}/i);
                 expect(text, rel).not.toMatch(/hang ?out room|data-hangout/i);
                 continue;
             }

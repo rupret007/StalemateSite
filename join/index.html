@@ -8,6 +8,9 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' https://webjam-turn-credentials.jeffstory007.workers.dev; media-src 'self' blob:; base-uri 'none'; form-action 'none'">
   <title>Web Join · WebJam</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="../hangout/open-in-app.css">
+  <meta name="hangout-join-absent" content="ask">
+  <script type="module" src="../hangout/join-absent.mjs"></script>
   <script type="module" src="app.js"></script>
 </head>
 <body>
@@ -15,7 +18,7 @@
     <p class="eyebrow">WebJam</p>
     <h1>Join a WebJam session</h1>
     <div class="join-card">
-      <p id="status" role="status" tabindex="-1" aria-describedby="error-hint">Open the invite link from your host.</p>
+      <p id="status" role="status" tabindex="-1" aria-describedby="error-hint">Ask your host to send the invite; tap it and you're in.</p>
       <p id="error-hint" class="error-hint" hidden></p>
       <section id="prejoin" hidden aria-labelledby="prejoin-heading">
         <h2 id="prejoin-heading">Check your audio</h2>

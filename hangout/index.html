@@ -38,9 +38,10 @@
             <p class="eyebrow">One home screen icon</p>
             <h1>Hang Out</h1>
             <p class="lede">Draw together, play a table, or join a jam.</p>
+            <p class="last-empty" data-last-empty role="status" hidden></p>
         </header>
         <div class="checker" aria-hidden="true"></div>
-        <section id="whos-here" class="here" data-whos-here data-reads="/beta/state" data-link-lobby="../r/45662413410ed051/lobby/" data-link-game="../r/45662413410ed051/lobby/?game-night=1" data-link-jam="../join/" aria-labelledby="whos-here-title">
+        <section id="whos-here" class="here" data-whos-here data-reads="/beta/state" aria-labelledby="whos-here-title">
             <h2 id="whos-here-title">Who’s here</h2>
             <p class="here__status" data-here-status role="status">No open rooms right now.</p>
             <ul class="here__list" data-here-list hidden></ul>
@@ -57,11 +58,11 @@
         <main id="choices">
             <h2 class="sr-only">Choose where to go</h2>
             <div class="choices">
-                <a class="choice" data-place="hangout" href="../r/45662413410ed051/">
+                <a class="choice" data-place="hangout" href="door.html?kind=hangout">
                     <span class="choice__name">Hang Out</span>
                     <span class="choice__detail">Draw, watch, and talk.</span>
                 </a>
-                <a class="choice" data-place="game-night" href="../r/45662413410ed051/lobby/?game-night=1">
+                <a class="choice" data-place="game-night" href="door.html?kind=game-night&amp;game-night=1">
                     <span class="choice__name">Game Night</span>
                     <span class="choice__detail">Play a game with friends.</span>
                 </a>

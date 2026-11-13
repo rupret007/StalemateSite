@@ -1,4 +1,5 @@
 import { injectJoinGuide, isJoinNavigation } from './hangout/join-guide.mjs';
+import { injectLobbyDoor, isLobbyNavigation } from './hangout/lobby-door.mjs';
 import { CACHE_NAME, isOfflineAsset, isSensitiveRequest, offlineAssetUrls, offlineDocument, offlineUrl } from './hangout/sw-policy.mjs';
 
 // Installability, one offline page, and its retry script. Successful responses
@@ -61,7 +62,8 @@ self.addEventListener('fetch', (event) => {
     event.respondWith((async () => {
         try {
             const response = await fetch(request);
-            if (!isJoinNavigation(url)) return response;
+            const guide = isJoinNavigation(url) ? 'join' : isLobbyNavigation(url) ? 'lobby' : '';
+            if (!guide) return response;
             const type = response.headers.get('content-type') || '';
             if (!response.ok || !type.includes('text/html')) return response;
             const headers = new Headers(response.headers);
@@ -69,7 +71,9 @@ self.addEventListener('fetch', (event) => {
             headers.delete('content-encoding');
             headers.set('cache-control', 'no-store');
             const assetBase = new URL('hangout/', self.registration.scope).href;
-            return new Response(injectJoinGuide(await response.text(), assetBase, url), {
+            const html = await response.text();
+            const body = guide === 'join' ? injectJoinGuide(html, assetBase, url) : injectLobbyDoor(html, assetBase, url);
+            return new Response(body, {
                 status: response.status,
                 headers
             });
