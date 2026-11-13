@@ -78,7 +78,6 @@
     }
     .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .game-heading { grid-area: heading; }
     .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .game-actions { grid-area: actions; }
-    .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .four-match { grid-area: other; }
     .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .arcade-eights { grid-area: eights; }
     .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .arcade-rummy { grid-area: rummy; }
     .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .arcade-spades { grid-area: spades; }

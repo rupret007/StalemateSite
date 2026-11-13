@@ -79,17 +79,10 @@ changed assets. Two-player room behavior and the optional external call link
 passed in Chromium and WebKit CI. A live two-person Game Night with voice and
 video still needs a trial. [Game Night evidence](../pr-assets/private-readiness/20261111/game-night/qualification.json)
 
-The private beta received Four in a Row and its guest-recovery follow-up at
-07:18 UTC. The follow-up improves keyboard invitations, returning to the same
-room after a disconnect, and playing while reading chat at short heights.
-The reviewed revision passed Chromium and WebKit checks and a local Chromium
-check at actual 200% page zoom. The private beta received the lobby join fixes
-at 09:29 UTC. Two hosted WebKit guests joined on the first attempt, accepted an
-invitation, played Four in a Row, chatted and returned after reload with fresh
-scrollback. Both logged out and lost protected access. Voice and video still
-need their own trial.
+The private beta received fixes for keyboard invitations and returning to the
+same room after a disconnect. Hosted WebKit guests accepted a room invitation,
+chatted, returned after reload and lost protected access after logout.
 [Hosted lobby evidence](../pr-assets/private-readiness/20261111/hosted-lobby/qualification.json)
-· [Game Night follow-up PR](https://github.com/rupret007/StalemateSite/pull/266)
 
 The private site received the Safari dialog fix on November 11 at 01:58 UTC.
 Native Safari exposed the member, command and channel controls in the local

@@ -384,89 +384,9 @@ test('Game Night invites players, publishes a Discord handoff and keeps chat usa
         await guest.locator('[data-text]').fill('Anyone up for a round?');
         await guest.locator('[data-send]').click();
         await expect(host.locator('[data-chat-lines]')).toContainText('Anyone up for a round?');
-        await guest.locator('[data-four] summary').click();
-        await expect(guest.locator('[data-game-call-status]')).toBeHidden();
         await expect(open).toBeVisible();
         await host.getByRole('button', { name: 'Remove link' }).click();
         await expect(guest.locator('[data-game-open]')).not.toHaveAttribute('href', /./);
-    } finally {
-        await fixture.close();
-    }
-});
-
-test('Game Night plays one shared Four in a Row match with the chat composer still visible', async ({ browser, baseURL }, testInfo) => {
-    const fixture = await community(browser, baseURL);
-    try {
-        const host = await fixture.visitor('FourHost', { width: 1280, height: 850 });
-        const guest = await fixture.visitor('FourGuest', { width: 390, height: 844 });
-        await host.getByRole('button', { name: /Game Night/ }).click();
-        await host.getByRole('button', { name: 'Invite players' }).click();
-        await host.getByRole('button', { name: 'Invite FourGuest', exact: true }).click();
-        await guest.getByRole('button', { name: 'Join Game Night' }).click();
-        await expect(guest.getByRole('tab', { name: 'Game Night' })).toHaveAttribute('aria-selected', 'true');
-        await host.locator('[data-four] summary').click();
-        await guest.locator('[data-four] summary').click();
-        await host.getByRole('button', { name: 'Open a match' }).click();
-        await expect(host.locator('[data-four-status]')).toContainText('Waiting');
-        await expect(host.locator('[data-four-player="O"]')).toHaveText('Open seat');
-        await guest.getByRole('button', { name: 'Join match' }).click();
-        await expect(guest.locator('[data-four-player="X"]')).toHaveText('FourHost');
-        await expect(guest.locator('[data-four-player="O"]')).toHaveText('FourGuest');
-        await expect(host.locator('[data-four-status]')).toHaveText('Your turn (X).');
-        await expect(guest.getByRole('button', { name: 'Drop in column 1' })).toHaveAttribute('aria-disabled', 'true');
-        const drop = (page, column) => page.getByRole('button', { name: `Drop in column ${column}` });
-        await drop(host, 1).press('Enter');
-        await expect(guest.locator('[data-four-status]')).toHaveText('X played column 1. Your turn (O).');
-        await expect(guest.locator('[data-four-table] [data-last]')).toHaveText('X');
-        await guest.setViewportSize({ width: 375, height: 844 });
-        await expect(guest.getByRole('table', { name: 'Four in a Row board' }).locator('tr').last()).toBeInViewport({ ratio: 1 });
-        await expect(guest.locator('[data-send]')).toBeInViewport();
-        await drop(guest, 7).click();
-        for (let column = 2; column <= 3; column++) {
-            await drop(host, column).click();
-            await drop(guest, 7).click();
-        }
-        await drop(host, 4).click();
-        await expect(guest.locator('[data-four-status]')).toHaveText('X played column 4. X wins.');
-        await expect(guest.getByRole('table', { name: 'Four in a Row board' }).locator('tbody tr').last().locator('[data-mark="X"][data-winning]')).toHaveCount(4);
-        await host.screenshot({ path: testInfo.outputPath('four-in-a-row-desktop.png'), animations: 'disabled' });
-        for (const width of [390, 375]) {
-            await guest.setViewportSize({ width, height: 844 });
-            await expect(guest.getByRole('table', { name: 'Four in a Row board' }).locator('tr').last()).toBeInViewport({ ratio: 1 });
-            await expect(guest.locator('[data-send]')).toBeInViewport();
-            expect(await guest.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
-            await guest.screenshot({ path: testInfo.outputPath(`four-in-a-row-${width}.png`), animations: 'disabled' });
-        }
-        await guest.setViewportSize({ width: 640, height: 356 });
-        await expect(guest.locator('[data-buffer]')).toHaveCSS('min-height', '64px');
-        expect((await guest.locator('[data-buffer]').boundingBox()).height).toBeGreaterThanOrEqual(64);
-        await guest.locator('[data-text]').scrollIntoViewIfNeeded();
-        await expect(guest.locator('[data-send]')).toBeInViewport();
-        await host.locator('[data-text]').fill('Can you read this while playing?');
-        await host.locator('[data-send]').click();
-        const reply = guest.locator('[data-chat-lines]').getByText('Can you read this while playing?');
-        await reply.scrollIntoViewIfNeeded();
-        expect(await reply.evaluate(line => {
-            const bounds = line.getBoundingClientRect();
-            return line.contains(document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2));
-        })).toBe(true);
-        await guest.setViewportSize({ width: 375, height: 667 });
-        const landingRow = guest.locator('[data-four-table] tbody tr').last();
-        await landingRow.evaluate(row => row.scrollIntoView({ block: 'nearest' }));
-        await expect(landingRow).toBeInViewport({ ratio: 1 });
-        const columns = guest.locator('[data-four-columns]');
-        await expect(columns).toBeInViewport({ ratio: 1 });
-        const rowBounds = await landingRow.boundingBox();
-        const columnBounds = await columns.boundingBox();
-        expect(rowBounds.y).toBeGreaterThanOrEqual(columnBounds.y + columnBounds.height);
-        await guest.locator('[data-text]').fill('Good game');
-        await guest.locator('[data-send]').click();
-        await expect(host.locator('[data-chat-lines]')).toContainText('Good game');
-        await host.getByRole('button', { name: 'Play again' }).click();
-        await guest.getByRole('button', { name: 'Join match' }).click();
-        await guest.getByRole('button', { name: 'Leave match' }).click();
-        await expect(host.locator('[data-four-status]')).toHaveText('Match ended. A host can open another.');
-        await expect(host.getByRole('button', { name: 'Open a match' })).toBeVisible();
     } finally {
         await fixture.close();
     }
@@ -499,26 +419,10 @@ test('Game Night keeps invitations actionable and offers a safe return after a d
         await join.press('Enter');
         await expect(roomTab).toBeFocused();
         await expect(offer).toBeHidden();
-        await expect(guest.locator('[data-four]')).not.toHaveAttribute('open', '');
-
-        await host.locator('[data-four] summary').click();
-        await host.getByRole('button', { name: 'Open a match' }).dblclick();
-        await expect(host.getByRole('button', { name: 'Close match' })).toBeVisible();
-        await expect(guest.locator('[data-four-availability]')).toContainText('has an open seat');
-        await guest.getByRole('button', { name: 'Join match' }).press('Enter');
-        await expect(guest.locator('[data-four-status]')).toBeFocused();
-        await guest.keyboard.press('Enter');
-        await expect(host.locator('[data-four-status]')).toHaveText('Your turn (X).');
-        await expect(guest.getByRole('button', { name: 'Leave match' })).toBeVisible();
-        await host.getByRole('button', { name: 'Drop in column 1' }).press('Enter');
-        await expect(guest.locator('[data-four-status]')).toContainText('X played column 1');
-
         fixture.disconnect('ReturnGuest', 1012);
-        await expect(host.locator('[data-four-status]')).toContainText('Match ended');
         await expect(offer).toContainText('Game Night disconnected. Return to the room to check your match.');
         await offer.getByRole('button', { name: 'Return to room' }).click();
         await expect(roomTab).toBeFocused();
-        await expect(guest.locator('[data-four-table]')).toBeHidden();
 
         await guest.reload();
         await guest.locator('[data-nick]').fill('ReturnGuest');

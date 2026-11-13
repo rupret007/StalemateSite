@@ -1,10 +1,8 @@
 # Game Night private beta
 
-Use **Rooms → Game Night → Invite players** while the other players are in Hang Out. Guests can choose **Join Game Night** or **Not now** in the invitation bar. To play in the room, open **Four in a Row** and choose **Open a match**. The guest sees **Join match** when a seat opens. X moves first. Choose a numbered column on your turn to drop a piece. Other invited guests can watch and keep chatting. The host can open another match after a win or draw.
+Start Game Night from either band's private Arcade entrance. Use **Games** to choose a shared table and open a match. **Invite a friend** shares an invitation to the exact table. For someone already in Hang Out, **Invite players** also lets you invite them into the room.
 
-If you lose your connection or reload, reconnect to Hang Out and choose **Return to room** if offered. The original room and your permission to join are checked again. A match ends when a player disconnects, and the host can open another. If the room closed or access changed, ask the host for a fresh invitation.
-
-**Open Stalemate Arcade** opens the existing arcade in a separate tab. For an external multiplayer game, use that game's controls to join the same match.
+If you lose your connection, use the return action when it is offered. The room and your permission to join are checked again. If the invitation expired or its table closed, ask the host for a new one.
 
 If the host already has a Discord voice channel, they can open **Manage Discord link** and paste an invite created from that channel. A channel link also works for people who already have access. Players choose **Open Discord call** and use Discord's microphone, camera, screen sharing and leave controls. Everyone can keep using Hang Out text chat during the call. Use an expiring invite for a private group. To close access to Discord itself, revoke the invite or adjust channel permissions in Discord. [Discord invitations](https://support.discord.com/hc/en-us/articles/208866998-Invites-101) · [Discord video calls](https://support.discord.com/hc/en-us/articles/360041721052-Video-Calls) · [Discord screen sharing](https://support.discord.com/hc/en-us/articles/360040816151-Go-Live-and-Screen-Share)
 
@@ -15,7 +13,6 @@ Discord's existing voice channels provide an immediately usable call handoff wit
 ## Access and delivery
 
 - The server advertises Game Night on the protected beta and the loopback preview. The new lobby UI hides the tile against an older server. The room uses the existing invite, host and moderation paths. Chat starts when a player joins.
-- The board is available when the protected server advertises it. The server owns the seats, turn order and results. Boards are visible only to current room members and clear when either player leaves the room or match, one player blocks the other, Shield is raised, or the server restarts. The board has no persistent scores or match history.
 - Only current room hosts can manage a link. It is sent only to current room members and kept in live room memory. It clears on removal, the publishing host's departure or loss of host permissions, a server restart, or Shield activation. A player who already opened the call leaves it in Discord. Hang Out has no visibility into call media or participant activity inside Discord.
 - Only official HTTPS Discord invite and server channel URL formats are accepted. The browser opens the destination on click with the referrer suppressed. Link validity, account eligibility, and voice-channel permissions are evaluated by Discord. [Discord minimum age guidance](https://support.discord.com/hc/en-us/articles/360040724612-Why-is-Discord-asking-for-my-birthday)
 - Deployments with the participation authority enabled keep Discord sharing unavailable pending separate qualification. Game Night remains usable for text and games there. The preview adds no call provider credential, microphone or camera capture, recording, or WebJam relay usage.

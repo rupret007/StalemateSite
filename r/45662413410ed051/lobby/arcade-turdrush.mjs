@@ -333,7 +333,7 @@ export function mountArcadeTurdRush(container, onMatch) {
     }
     container.addEventListener('toggle', event => {
         if (event.target !== panel && event.target.open &&
-            event.target.matches('.arcade-chess, .arcade-card-table, [data-four]')) panel.open = false;
+            event.target.matches('.arcade-chess, .arcade-card-table')) panel.open = false;
     }, true);
     panel.addEventListener('toggle', () => {
         if (!panel.open || !scope) { reset(); return; }
