@@ -177,6 +177,37 @@ test('the local preview can explicitly rejoin without sending an old private dra
     } finally { await Promise.all(pages.map(page => page.context().close())); }
 });
 
+test('rejoining a room dismisses the reconnect instructions and restores only that room’s draft', async ({ browser, baseURL }, testInfo) => {
+    const fixture = await closingFixture(); fixture.betaShell = false;
+    const relay = hangoutRelayWsBase(baseURL, `reconnect-room-${randomUUID()}`);
+    const pages = [];
+    try {
+        const host = await visitor(browser, baseURL, relay, 'ReconnectHost', 390, fixture); pages.push(host);
+        const guest = await visitor(browser, baseURL, relay, 'ReconnectGuest', 390, fixture); pages.push(guest);
+        await channel(host, 'reconnect-room');
+        const room = guest.locator('[data-roomlist] [data-room="#reconnect-room"]');
+        const showRooms = () => guest.locator('.phonetabs [data-show="rooms"]').press('Enter');
+        const composer = guest.locator('[data-text]');
+        const notice = guest.locator('[data-toast]');
+        await showRooms();
+        await room.press('Enter');
+        await expect(guest.locator('[data-chat-context]')).toHaveText('#reconnect-room');
+        await composer.fill('This draft belongs to the room.');
+        fixture.end('ReconnectGuest', 1012);
+        await expect(guest.locator('[data-chat-context]')).toHaveText('#stalemate');
+        await expect(notice).toContainText('Choose a room to rejoin.');
+        await expect(notice).toBeVisible();
+        await expect(composer).toBeEmpty();
+        await showRooms();
+        await room.press('Enter');
+        await expect(guest.getByRole('tab', { name: '#reconnect-room' })).toBeFocused();
+        await expect(composer).toHaveValue('This draft belongs to the room.');
+        await expect(notice).toBeHidden({ timeout: 500 });
+        await guest.screenshot({ path: testInfo.outputPath('room-draft-restored.png') });
+        expect(fixture.inbound.some(frame => frame.text === 'This draft belongs to the room.')).toBe(false);
+    } finally { await Promise.all(pages.map(page => page.context().close())); }
+});
+
 for (const owner of [false, true]) {
     test(`a ${owner ? 'verified owner' : 'guest'} sees visible recovery after a refused reconnect upgrade`, async ({ browser, baseURL }) => {
         const nick = owner ? 'ReconnectingOwner' : 'ReconnectingGuest';
