@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { expect, it, vi } from 'vitest';
-import { gameGuestScope, gameInvitationRequest } from '../../hangout-worker/src/game-night-invitations.mjs';
+import { GAME_INVITE_UNAVAILABLE, gameGuestScope, gameInvitationRequest } from '../../hangout-worker/src/game-night-invitations.mjs';
 
 it('closes legacy invitations for retired games, including previously accepted links', async () => {
     const code = 'a'.repeat(32);
@@ -21,7 +21,7 @@ it('closes legacy invitations for retired games, including previously accepted l
         for (const [operation, body] of [['details', { code }], ['accept', { code, age13: true, attempt }]]) {
             const result = await gameInvitationRequest(lobby, operation, body);
             expect(result.status).toBe(410);
-            expect((await result.json()).error).toContain('Ask your host for a new invite.');
+            expect((await result.json()).error).toBe(GAME_INVITE_UNAVAILABLE);
         }
     }
 });
