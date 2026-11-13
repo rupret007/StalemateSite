@@ -74,8 +74,23 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
     } catch { /* A blocked tab store must not prevent ordinary chat. */ }
     const entrySource = params.has('via') ? entrySourceFromParams(params, entrySites) : handoff?.source || resumeEntry?.source || '';
     const gameArcadeBrand = entrySource === 'rad-dad' ? entrySites['rad-dad'] : entrySites.stalemate;
-    $('[data-game-arcade]').href = new URL('play/', gameArcadeBrand.home).href;
-    $('[data-game-arcade-label]').textContent = `Open ${gameArcadeBrand.label} Arcade`;
+    const gameArcade = $('[data-game-arcade]');
+    const externalArcade = $('[data-game-arcade-external]');
+    const arcadePicker = $('[data-arcade-game]');
+    const arcadeLabel = `Open ${gameArcadeBrand.label} Arcade`;
+    if (betaShell) {
+        gameArcade.textContent = arcadeLabel;
+        gameArcade.addEventListener('click', () => {
+            if (arcadePicker.hidden) return;
+            arcadePicker.scrollIntoView({ block: 'nearest' });
+            arcadePicker.focus({ preventScroll: true });
+            try { arcadePicker.showPicker?.(); } catch { /* Focus keeps the picker usable in embedded browsers. */ }
+        });
+    } else {
+        externalArcade.href = new URL('play/', gameArcadeBrand.home).href;
+        $('[data-game-arcade-label]').textContent = arcadeLabel;
+        externalArcade.hidden = false;
+    }
     let shareEntry = (handoff || resumeEntry)?.share !== false;
     let entrySourcesSupported = null;
     let privateMessageContextSupported = false, privateMessagePeersSupported = false, personTargetsSupported = false;
@@ -1756,7 +1771,8 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         if (gameShareButton) gameShareButton.hidden = !canShare;
         if (gameShareDialog?.open && (!canShare || gameShareDialog.dataset.room !== c.keepRef)) gameShareDialog.close();
         $('[data-game-night]').hidden = !c;
-        $('[data-arcade-game]').hidden = !!gameGuest || !c || ![...arcadeTables.values()].some(table => table.supported);
+        arcadePicker.hidden = !!gameGuest || !c || ![...arcadeTables.values()].some(table => table.supported);
+        gameArcade.hidden = !betaShell || arcadePicker.hidden;
         for (const [game, table] of arcadeTables) drawArcadeTable(c, game, table);
         drawArcadeMedia(c);
     }

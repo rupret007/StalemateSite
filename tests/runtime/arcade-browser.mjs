@@ -795,6 +795,18 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     'Games', 'Royal Flush Chess', 'Crappy Eights', 'TurdRummy', 'TurdSpades', 'Crapjack 21',
                     'Turdtris Sprint', 'Turdomania Duel', 'Turd Rush Race', 'Turdanoid Brick Race'
                 ]);
+                const privateArcade = host.getByRole('button', { name: `Open ${brand} Arcade`, exact: true });
+                const roomUrl = host.url();
+                const tabs = host.context().pages().length;
+                await expect(host.locator('[data-game-arcade-external]')).not.toHaveAttribute('href', /./);
+                await expectUncoveredControl(privateArcade);
+                if (phone) await privateArcade.tap();
+                else await privateArcade.click();
+                const gamePicker = host.getByRole('combobox', { name: 'Switch game' });
+                await expect(gamePicker).toBeFocused();
+                await host.keyboard.press('Escape');
+                assert.equal(host.url(), roomUrl);
+                assert.equal(host.context().pages().length, tabs);
                 const invitePlayers = host.getByRole('button', { name: 'Invite players', exact: true });
                 await invitePlayers.click();
                 const invitePicker = host.locator('[data-invite-dialog]');
