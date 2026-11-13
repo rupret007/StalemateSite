@@ -3,6 +3,7 @@ const invite = document.querySelector('[data-guest-invite]');
 const join = document.querySelector('[data-guest-join]');
 const retry = document.querySelector('[data-guest-retry]');
 const gameTitle = document.querySelector('[data-guest-game]');
+const inviter = document.querySelector('[data-guest-inviter]');
 const restored = !location.hash && !location.search ? history.state?.gameNightInvite : null;
 const code = restored?.code ?? new URLSearchParams(location.hash.slice(1)).get('invite');
 const attempt = restored?.attempt ?? crypto.randomUUID().replaceAll('-', '');
@@ -21,10 +22,16 @@ function clearInvitation() {
 if (hasInvitation) retainInvitation(confirmedGame);
 else if (location.hash || location.search || restored) clearInvitation();
 
-async function request(action, data) {
-    const response = await fetch('/beta/game-night/invitation/' + action, {
+async function request(action, data, retryConnection = false) {
+    const send = () => fetch('/beta/game-night/invitation/' + action, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, ...data }),
         signal: AbortSignal.timeout(10000)
+    });
+    const response = await send().catch(error => {
+        if (!retryConnection || !(error instanceof TypeError || error.name === 'TimeoutError')) throw error;
+        // The server may already have accepted. Reuse the same confirmation.
+        status.textContent = 'Reconnecting to confirm your seat…';
+        return send();
     });
     const value = await response.json();
     if (!response.ok) throw Object.assign(new Error(value.error), { status: response.status });
@@ -40,11 +47,11 @@ async function describe() {
     status.textContent = 'Checking your invitation…';
     try {
         const { game, host } = await request('details');
-        const inviter = document.querySelector('[data-guest-inviter]');
         inviter.textContent = `${host} invited you to play.`;
         inviter.hidden = false;
         gameTitle.textContent = game;
         status.textContent = '';
+        invite.after(status);
         invite.hidden = false;
         if (document.activeElement === document.body) join.focus({ preventScroll: true });
     } catch (error) {
@@ -57,21 +64,30 @@ async function describe() {
 async function accept() {
     retry.hidden = true;
     join.disabled = true;
+    join.textContent = 'Joining…';
     status.textContent = 'Joining the game…';
     try {
-        const { next } = await request('accept', { age13: true, attempt });
+        const { next } = await request('accept', { age13: true, attempt }, true);
         if (next !== '/r/45662413410ed051/lobby/?game-guest=1') throw new Error('Unexpected destination');
         location.replace(next);
     } catch (error) {
-        status.textContent = [410, 429, 503].includes(error.status) ? error.message : 'Couldn’t join just now. Try again.';
         if (error.status === 410) {
             clearInvitation();
             invite.hidden = true;
-        } else if (invite.hidden) {
+            inviter.hidden = true;
+            status.textContent = 'This invite can’t open the game anymore. Ask your host for a new invite.';
+            gameTitle.tabIndex = -1;
+            gameTitle.setAttribute('aria-describedby', status.id);
+            gameTitle.focus();
+            return;
+        }
+        status.textContent = [429, 503].includes(error.status) ? error.message : 'Couldn’t join just now. Try again.';
+        if (invite.hidden) {
             retry.hidden = false;
             if (document.activeElement === document.body) retry.focus({ preventScroll: true });
         } else {
             join.disabled = false;
+            join.textContent = 'Join game';
             if (document.activeElement === document.body) join.focus({ preventScroll: true });
         }
     }

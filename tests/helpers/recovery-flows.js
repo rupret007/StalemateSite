@@ -13,8 +13,16 @@ async function rummyWithoutStorage(page, url, touch) {
     await page.goto(url);
     await activate(page.locator('#startRoundBtn'), touch);
     if (await page.locator('#coachSkipBtn').isVisible()) await activate(page.locator('#coachSkipBtn'), touch);
-    await expect(page.locator('#drawStockBtn')).toBeEnabled();
-    await activate(page.locator('#drawStockBtn'), touch);
+    const drawStock = page.locator('#drawStockBtn');
+    const nextRound = page.locator('#newRoundBtn');
+    await expect.poll(async () => await drawStock.isEnabled() || await nextRound.isEnabled()).toBe(true);
+    if (await nextRound.isEnabled()) {
+        // The bot can legally knock on the opening turn. The player draws first in round two.
+        if (!await nextRound.isVisible()) await activate(page.locator('.mobile-settings summary'), touch);
+        await activate(nextRound, touch);
+    }
+    await expect(drawStock).toBeEnabled();
+    await activate(drawStock, touch);
     await expect(page.locator('#playerHand [data-hand-id]')).toHaveCount(11);
     await activate(page.locator('#playerHand button[data-card-id]:visible').first(), touch);
     await activate(page.locator('#discardBtn'), touch);
