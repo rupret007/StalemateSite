@@ -1838,10 +1838,15 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         webJamHostSeatPending = webJamHostSeat.disabled = true;
         webJamHostSeatStatus.textContent = 'Reserving the Chess seat…';
         try {
-            const response = await fetch('/beta/game-night/room-grant/register', {
+            const register = recover => fetch('/beta/game-night/room-grant/register', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...table, hashes: [hash] }),
+                body: JSON.stringify({ ...table, hashes: [hash], recover }),
                 signal: AbortSignal.timeout(10000)
+            });
+            const response = await register(false).catch(error => {
+                if (!(error instanceof TypeError || error.name === 'TimeoutError')) throw error;
+                webJamHostSeatStatus.textContent = 'Reconnecting to confirm the Chess seat…';
+                return register(true);
             });
             const result = await response.json();
             if (!response.ok || result.granted !== 1) {

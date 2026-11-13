@@ -99,6 +99,19 @@ const kinds = () => [...storage.data.values()].map(record => record.kind).sort()
 beforeEach(() => setup());
 
 describe('registerGrants', () => {
+    it('acknowledges the exact existing reservation without renewing it', async () => {
+        const { body } = await register([1], { version: '1' });
+        const recovery = { now: NOW + 100, version: '1', recover: true };
+        expect((await register([1], recovery)).body).toEqual(body);
+        expect((await register([1], { ...recovery, ref: 'b'.repeat(32) })).body.granted).toBe(0);
+        expect((await register([1], { ...recovery, version: '2' })).body.granted).toBe(0);
+        const accepted = await grants.redeemGrant({ value: value(1), attempt: value(2), now: NOW + 200, version: '1' });
+        expect(accepted.status).toBe(200);
+        expect((await register([1], { ...recovery, now: NOW + 300 })).body).toEqual(body);
+        table.close();
+        expect((await register([1], recovery)).status).toBe(403);
+    });
+
     it('lets only the seated host register', async () => {
         expect((await register([1], { hostSubject: 'someone-else' })).status).toBe(403);
         expect((await register([1], { hostSubject: '' })).status).toBe(403);
