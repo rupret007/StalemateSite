@@ -1820,7 +1820,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             arcadeShareIntent = null;
             const room = currentGameNight();
             if (room?.keepRef === share.ref && amOp(room) && !document.querySelector('dialog[open]')) {
-                openInviteDialog(null, table.invite);
+                const heading = $$('[data-game-night] > details[open] > summary')
+                    .find(summary => summary.textContent.trim() === table.label);
+                openInviteDialog(heading, table.invite);
                 if ($('[data-invite-dialog]').open) void prepareGuestLink(table.invite, true);
             }
         }
