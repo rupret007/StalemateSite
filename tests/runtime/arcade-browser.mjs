@@ -1289,13 +1289,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(bCards).toHaveCount(10);
         const aHand = await ids(aCards), bHand = await ids(bCards);
         assert.ok(aHand.every(id => !bHand.includes(id)));
-        await expect(b.locator('[data-rummy-status]')).toContainText('Draw a card');
+        await expect(b.locator('[data-rummy-status]')).toHaveText('Round 1 · Draw a card from the deck or take the face-up card.');
         await expect(b.locator('[data-rummy-hand]')).toBeInViewport({ ratio: 1 });
         await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
         await b.locator('[data-rummy-action="draw-discard"]').click();
         await expect(bCards).toHaveCount(11);
         const drawn = b.locator('[data-rummy-card][data-drawn="true"]');
         await expect(drawn).toBeDisabled();
+        await expect(b.locator('[data-rummy-status]')).toContainText('Keep the card you took for this turn.');
         await expect(drawn).toHaveAttribute('aria-label', /taken from discard/);
         if (!media) {
             const hand = await ids(bCards);
