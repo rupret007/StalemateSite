@@ -24,18 +24,39 @@ function realTable(sides, options = {}) {
     const Table = createGameNightTable({ name: 'test', version: 1, Match, sides, finished: () => false, project: () => ({}), ...options });
     let game = new Table(MATCH, HOST);
     const released = [];
+    // Table-side holds as hook 1 keeps them: holder -> until. Only a live hold can be moved or seated.
+    const holdsByHolder = new Map();
+    const liveHold = (holder, now) => holdsByHolder.has(holder) && holdsByHolder.get(holder) > now;
+    const moves = [];
     return {
         released,
+        holdsByHolder,
+        moves,
         get game() { return game; },
         close() { game = null; },
+        // A walk-in outside the grants: a stranger link or Play tap before hook 1 blocks it.
         join: subject => game.join(subject, MATCH, NOW, 'next'),
         port: {
             status: async scope => game && game.view(HOST, NOW).id === scope.match ? {
                 waiting: game.view(HOST, NOW).waiting, host: game.checkpoint().seats[sides[0]], hostSeat: sides[0],
                 free: sides.length - game.subjects.length
             } : null,
-            seat: async (scope, { subject, seat }) => game.join(subject, scope.match, NOW, seat) ? game.seat(subject) : null,
-            releaseHold: async (scope, holder) => { released.push(holder); }
+            hold: async (scope, { holder, until, now }) => {
+                if (!game || holdsByHolder.has(holder) || !(until > now)) return false;
+                holdsByHolder.set(holder, until);
+                return true;
+            },
+            // Move the hold to the guest session, then let that session's join take the seat.
+            async seat(scope, { subject, holder, seat, until, now }) {
+                if (!liveHold(holder, now) || !(until > now)) return null;
+                holdsByHolder.delete(holder);
+                holdsByHolder.set(subject, until);
+                moves.push({ holder, subject, until });
+                if (!game.join(subject, scope.match, NOW, seat)) return null;
+                holdsByHolder.delete(subject);
+                return game.seat(subject);
+            },
+            releaseHold: async (scope, holder) => { released.push(holder); holdsByHolder.delete(holder); }
         }
     };
 }
@@ -48,7 +69,12 @@ function memoryStorage() {
         async get(key) { await pause(); return structuredClone(data.get(key)); },
         async put(key, record) { await pause(); data.set(key, structuredClone(record)); },
         async delete(keys) { await pause(); for (const key of [].concat(keys)) data.delete(key); },
-        async list({ prefix }) { await pause(); return new Map([...data].filter(([key]) => key.startsWith(prefix)).map(([key, record]) => [key, structuredClone(record)])); }
+        // Durable Object semantics: key order, `limit` and `startAfter` are honoured.
+        async list({ prefix, limit = Infinity, startAfter }) {
+            await pause();
+            const keys = [...data.keys()].filter(key => key.startsWith(prefix) && (startAfter === undefined || key > startAfter)).sort().slice(0, limit);
+            return new Map(keys.map(key => [key, structuredClone(data.get(key))]));
+        }
     };
 }
 
@@ -209,6 +235,68 @@ describe('redeemGrant', () => {
         expect((await grants.redeemGrant({ value: value(1), now: NOW + 2 })).seat).toBe('b');
     });
 
+    it('keeps the table-full line for the third person after the match has started', async () => {
+        await register([1, 2]);
+        expect((await grants.redeemGrant({ value: value(1), now: NOW + 1 })).ok).toBe(true);
+        expect(table.game.view(HOST, NOW).waiting).toBe(false);
+        for (const now of [NOW + 2, NOW + 3]) {
+            const third = await grants.redeemGrant({ value: value(2), now });
+            expect(third).toEqual({ ok: false, status: 409, reason: 'table-full', body: { tableFull: true, message: TABLE_FULL_COPY } });
+        }
+        // A closed table and an expired marker still read as expired.
+        expect((await grants.redeemGrant({ value: value(2), now: NOW + GRANT_TTL })).status).toBe(410);
+        setup();
+        await register([1, 2]);
+        table.close();
+        expect((await grants.redeemGrant({ value: value(2), now: NOW + 1 })).status).toBe(410);
+    });
+
+    it('places the hold at register and moves it to the guest in seat, without releasing it first', async () => {
+        await register([1]);
+        const hash = await grantHash(value(1));
+        expect([...table.holdsByHolder]).toEqual([[hash, NOW + GRANT_TTL]]);
+        const result = await grants.redeemGrant({ value: value(1), now: NOW + 5 });
+        expect(result).toMatchObject({ ok: true, seat: 'b' });
+        expect(table.moves).toEqual([{ holder: hash, subject: 'guest-session-1', until: NOW + 5 + CLAIM_WINDOW }]);
+        expect(table.released).toEqual([]);
+        expect(table.holdsByHolder.size).toBe(0);
+        expect(kinds()).toEqual(['burned']);
+    });
+
+    it('leaves the grant and its hold alone when seat throws, and burns on a definite no', async () => {
+        await register([1]);
+        const hash = await grantHash(value(1));
+        const seat = table.port.seat;
+        let fail = true;
+        grants = createRoomGrants({ storage, table: { ...table.port, seat(...args) { if (fail) throw new Error('storage hiccup'); return seat.apply(table.port, args); } }, uuid: () => `guest-session-${++sids}`, seed: () => 7 });
+        await expect(grants.redeemGrant({ value: value(1), now: NOW + 1 })).rejects.toThrow('storage hiccup');
+        expect(kinds()).toEqual(['grant']);
+        expect(table.holdsByHolder.has(hash)).toBe(true);
+        fail = false;
+        expect(await grants.redeemGrant({ value: value(1), now: NOW + 2 })).toMatchObject({ ok: true, seat: 'b' });
+
+        // The table lost the hold (hook 1 expired it): a definite no burns and frees.
+        setup();
+        await register([2]);
+        const lost = await grantHash(value(2));
+        table.holdsByHolder.delete(lost);
+        expect(await grants.redeemGrant({ value: value(2), now: NOW + 1 })).toMatchObject({ status: 409, reason: 'table-full' });
+        expect(kinds()).toEqual(['burned']);
+        expect(table.released).toEqual([lost]);
+        expect(table.game.subjects).toEqual([HOST]);
+    });
+
+    it('gives a surplus guest table-full, not expired, after the granted guest sits at a real two-seat table', async () => {
+        const [granted, surplus] = await register([1, 2]).then(() => [value(1), value(2)]);
+        expect((await grants.redeemGrant({ value: granted, now: NOW + 1 })).seat).toBe('b');
+        // Same table object, no reset: the match has started.
+        expect(table.game.view(HOST, NOW).waiting).toBe(false);
+        expect(await grants.redeemGrant({ value: surplus, now: NOW + 2 }))
+            .toEqual({ ok: false, status: 409, reason: 'table-full', body: { tableFull: true, message: TABLE_FULL_COPY } });
+        expect(table.game.subjects).toEqual([HOST, 'guest-session-1']);
+        expect(kinds()).toEqual(['burned', 'standby']);
+    });
+
     it('lets exactly one of two concurrent redeems win the last seat', async () => {
         setup(['a', 'b', 'c'], { manualStart: true, minSeats: 2 });
         await register([1, 2]);
@@ -262,6 +350,46 @@ describe('sweep and revokeAll', () => {
         expect((await grants.redeemGrant({ value: value(2), now: NOW + 1 })).status).toBe(410);
         expect(table.game.view(HOST, NOW).waiting).toBe(true);
         expect((await grants.redeemGrant({ value: value(3), now: NOW + 1 })).ok).toBe(true);
+    });
+});
+
+describe('more rows than one list page', () => {
+    // Keys that sort before any real grant hash in this file, so real rows land past the first page.
+    const filler = (count, room, extra = {}) => {
+        for (let index = 0; index < count; index++) {
+            const hash = '0'.repeat(60) + index.toString(16).padStart(4, '0');
+            storage.data.set(ROOM_GRANT_PREFIX + hash, { kind: 'burned', hash, scope: { room, game: 'chess', match: MATCH, ref: null, host: HOST }, until: NOW + GRANT_TTL, ...extra });
+        }
+    };
+
+    it('keeps a burned hash from being registered again past the first page', async () => {
+        // Three seats, so the table is still waiting (and registrable) after the first guest sits.
+        setup(['a', 'b', 'c'], { manualStart: true, minSeats: 2 });
+        filler(450, OTHER_ROOM);
+        expect((await grantHash(value(1))) > '0'.repeat(60) + 'ffff').toBe(true);
+        await register([1]);
+        expect((await grants.redeemGrant({ value: value(1), now: NOW + 1 })).ok).toBe(true);
+        expect((await register([1], { now: NOW + 2 })).body).toMatchObject({ granted: 0, standby: 0 });
+        expect(storage.data.get(ROOM_GRANT_PREFIX + await grantHash(value(1))).kind).toBe('burned');
+        expect((await grants.redeemGrant({ value: value(1), now: NOW + 3 })).status).toBe(410);
+    });
+
+    it('applies the room cap to rows past the first page', async () => {
+        filler(420, OTHER_ROOM);
+        for (let index = 0; index < 32; index++) {
+            const hash = 'f'.repeat(60) + index.toString(16).padStart(4, '0');
+            storage.data.set(ROOM_GRANT_PREFIX + hash, { kind: 'standby', hash, scope: { room: ROOM, game: 'chess', match: MATCH, ref: REF, host: HOST }, until: NOW + GRANT_TTL });
+        }
+        expect((await register([1])).status).toBe(429);
+    });
+
+    it('sweeps and revokes rows past the first page', async () => {
+        filler(450, OTHER_ROOM, { until: NOW });
+        expect(await grants.sweep(NOW)).toEqual({ expired: 450, released: 0 });
+        filler(450, OTHER_ROOM);
+        await register([1]);
+        expect(await grants.revokeAll(OTHER_ROOM)).toEqual({ revoked: 450 });
+        expect(kinds()).toEqual(['grant']);
     });
 });
 

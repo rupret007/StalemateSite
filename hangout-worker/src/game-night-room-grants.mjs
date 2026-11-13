@@ -6,11 +6,15 @@
 // raw value is never stored, returned or logged, and this module never logs.
 //
 // Storage and the table are injected:
-//   storage: { get(key), put(key, value), delete(key | key[]), list({ prefix, limit }) -> Map }
+//   storage: { get(key), put(key, value), delete(key | key[]), list({ prefix, limit, startAfter }) -> Map in key order }
 //   table:   { status(scope) -> null | { waiting, host, free, hostSeat? },
-//              seat(scope, { subject, holder, seat: 'next', until }) -> seat name | null,
+//              hold(scope, { holder, until, now }) -> boolean,
+//              seat(scope, { subject, holder, seat: 'next', until, now }) -> seat name | null,
 //              releaseHold?(scope, holder) }
 // `free` counts unoccupied non-host seats. Holds are never counted as occupied.
+// A grant's hold is placed on the table at register. `seat` moves it from the
+// grant hash to the new guest session. The grant is burned only once `seat` has
+// answered; if `seat` throws, the grant and its hold are left as they were.
 // See BRIDGE-HOOKS.md for the table hook this port maps onto.
 
 export const ROOM_GRANT_PREFIX = 'game-night-room-grant:';
@@ -20,7 +24,7 @@ export const RECONNECT_WINDOW = 60_000;
 export const GUEST_TTL = 2 * 60 * 60_000;
 export const HASHES_PER_REQUEST = 16;
 export const ROWS_PER_ROOM = 32;
-const ROW_CAP = 400;
+const LIST_PAGE = 400;
 
 // Same copy and status as game-night-invitations.mjs `unavailable()`.
 export const EXPIRED_COPY = 'This invitation has expired, was used, or the game is no longer waiting for a guest. Ask your host for a new invite.';
@@ -67,12 +71,24 @@ export function createRoomGrants({ storage, table, uuid = () => crypto.randomUUI
         return run;
     };
     const key = hash => ROOM_GRANT_PREFIX + hash;
-    const rows = async () => [...await storage.list({ prefix: ROOM_GRANT_PREFIX, limit: ROW_CAP })];
+    // Every row, a page at a time. Whether one hash is known is checked with `get`, not here.
+    const rows = async () => {
+        const all = [];
+        for (let after; ;) {
+            const page = [...await storage.list({ prefix: ROOM_GRANT_PREFIX, limit: LIST_PAGE, ...(after === undefined ? {} : { startAfter: after }) })];
+            all.push(...page);
+            if (page.length < LIST_PAGE) return all;
+            after = page[page.length - 1][0];
+        }
+    };
     const sameTable = (left, right) => left.room === right.room && left.game === right.game && left.match === right.match;
     const live = (record, now) => record.kind === 'grant' && record.hold.until > now;
+    // The same table, still run by the same host, waiting or playing.
+    const present = (state, scope) => !!state && state.host === scope.host && typeof state.waiting === 'boolean';
+    const waiting = (state, scope) => present(state, scope) && state.waiting === true && Number.isInteger(state.free);
     const tableState = async (scope) => {
         const state = await table.status(scope);
-        return state && state.waiting === true && state.host === scope.host && Number.isInteger(state.free) ? state : null;
+        return waiting(state, scope) ? state : null;
     };
     // Clears the hold only. The table and the host's seat are never touched.
     const release = async (record) => {
@@ -83,10 +99,7 @@ export function createRoomGrants({ storage, table, uuid = () => crypto.randomUUI
         if (entries.length) await storage.delete(entries.map(([name]) => name));
         return entries.length;
     };
-    const burn = async (name, record) => {
-        await release(record);
-        await storage.put(name, { kind: 'burned', hash: record.hash, scope: record.scope, until: record.until });
-    };
+    const burn = (name, record) => storage.put(name, { kind: 'burned', hash: record.hash, scope: record.scope, until: record.until });
 
     async function sweepNow(now) {
         const stale = (await rows()).filter(([, record]) => record.until <= now);
@@ -108,8 +121,9 @@ export function createRoomGrants({ storage, table, uuid = () => crypto.randomUUI
             if (!state) return refused();
             await sweepNow(now);
             const current = await rows();
-            const known = new Set(current.map(([, record]) => record.hash));
-            const fresh = hashes.filter(hash => !known.has(hash));
+            // A live grant, standby marker or burned tombstone keeps its hash out, wherever it sits in the list.
+            const fresh = [];
+            for (const hash of hashes) if (!await storage.get(key(hash))) fresh.push(hash);
             if (current.filter(([, record]) => record.scope.room === room).length + fresh.length > ROWS_PER_ROOM) {
                 return fail(429, 'limit', { error: LIMIT_COPY });
             }
@@ -119,9 +133,9 @@ export function createRoomGrants({ storage, table, uuid = () => crypto.randomUUI
             for (const hash of fresh) {
                 let slot = 1;
                 while (held.includes(slot)) slot++;
-                if (slot <= state.free) {
+                // One hold per seat, placed on the table now. The holder is the grant hash, never a value or a player.
+                if (slot <= state.free && await table.hold(scope, { holder: hash, until, now })) {
                     held.push(slot);
-                    // One hold per seat. The holder is the grant hash, never a value or a player.
                     await storage.put(key(hash), { kind: 'grant', hash, scope, until, hold: { slot, holder: hash, until } });
                     granted++;
                 } else {
@@ -147,18 +161,33 @@ export function createRoomGrants({ storage, table, uuid = () => crypto.randomUUI
             }
             const { scope } = record;
             if (subject === scope.host) return fail(403, 'host', { error: HOST_COPY });
-            const state = await tableState(scope);
+            const seen = await table.status(scope);
+            // Standby first. The usual order on a two-seat table is: the granted guest
+            // sits, the match starts, then the extra person taps. That is "table full",
+            // not "expired", for as long as the same host's table exists.
+            if (record.kind === 'standby') {
+                if (present(seen, scope)) return tableFull();
+                await drop([[name, record]]);
+                return expired();
+            }
+            const state = waiting(seen, scope) ? seen : null;
             if (!state) {
                 await drop([[name, record]]);
                 return expired();
             }
-            if (record.kind === 'standby') return tableFull();
             const sid = uuid();
-            // Burn first. A grant is never usable twice, whatever the table answers.
+            // The table answers before the burn. A throw leaves the grant and its hold for a retry;
+            // the queue (and the Durable Object's single thread) keeps a second caller out meanwhile.
+            const seat = sid === scope.host || state.free < 1 ? null
+                : await table.seat(scope, { subject: sid, holder: record.hold.holder, seat: 'next', until: now + CLAIM_WINDOW, now });
+            const usable = !!seat && !(state.hostSeat !== undefined && seat === state.hostSeat);
             await burn(name, record);
-            if (sid === scope.host || state.free < 1) return tableFull();
-            const seat = await table.seat(scope, { subject: sid, holder: record.hold.holder, seat: 'next', until: now + CLAIM_WINDOW });
-            if (!seat || state.hostSeat !== undefined && seat === state.hostSeat) return tableFull();
+            if (!usable) {
+                // A definite no. Free both possible holders; the grant stays burned.
+                await table.releaseHold?.(scope, record.hold.holder);
+                if (seat) await table.releaseHold?.(scope, sid);
+                return tableFull();
+            }
             const guest = { game: scope.game, match: scope.match, room: scope.room, ref: scope.ref, host: scope.host, nameSeed: seed() };
             return { ok: true, status: 200, seat, claimUntil: now + CLAIM_WINDOW, body: { scope: guest, sid, exp: now + GUEST_TTL } };
         });
