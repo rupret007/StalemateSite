@@ -1921,6 +1921,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await a.getByRole('button', { name: 'Open Turd Rush race' }).click();
         await b.getByRole('button', { name: 'Join Turd Rush race' }).click();
         await expect(race(b)).toHaveAttribute('data-phase', 'countdown');
+        await expect(b.locator('[data-race-overlay]')).toHaveText(/^Starts in [1-9]$/);
+        await expect(b.locator('[data-race-status]')).toContainText('Get ready.');
+        await expect(b.getByRole('button', { name: 'Move left' })).toBeDisabled();
         await expect(race(b)).toHaveAttribute('data-renderer', '2d');
         if (engine === 'chromium') await expect(race(a)).toHaveAttribute('data-renderer', '3d');
         await expect(spectator.locator('[data-race-controls]')).toBeHidden();
@@ -1936,6 +1939,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await track(a).focus();
         await expect(race(a)).toHaveAttribute('data-phase', 'play');
         await expect(race(b)).toHaveAttribute('data-phase', 'play');
+        await expect(b.locator('[data-race-status]')).toHaveText('Go! Swipe the track or tap a control.');
         if (pauseReconnect) {
             const returnTrack = await pauseReconnect();
             await expect(a.locator('[data-race-status]')).toHaveText('Reconnecting · the course keeps moving');
