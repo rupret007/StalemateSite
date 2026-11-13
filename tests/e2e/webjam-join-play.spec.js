@@ -1,5 +1,44 @@
 const { test, expect } = require('@playwright/test');
 
+for (const [width, height] of [[390, 844], [1440, 900]]) {
+    test(`a browser invite leads straight to listening without capture at ${width}px`, async ({ page, baseURL }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await page.addInitScript(() => {
+            window.captureRequests = 0;
+            navigator.mediaDevices.getUserMedia = async () => {
+                window.captureRequests++;
+                throw new Error('The listener did not request capture');
+            };
+        });
+        await page.route('**/*', route => new URL(route.request().url()).origin === baseURL ? route.continue() : route.abort());
+        await page.route('**/join/session.js', route => route.fulfill({ contentType: 'text/javascript', body: `
+            export class WebJoinSession {
+                constructor({ stream }) {
+                    if (stream) throw new Error('Unexpected capture stream');
+                }
+                async join() { this.authorized = true; }
+                close() {}
+            }` }));
+        const expires = Math.floor(Date.now() / 1000) + 300;
+        await page.goto(`/join/#k=${Buffer.alloc(32, 17).toString('base64url')}&s=${'22'.repeat(32)}&g=1&e=${expires}`);
+        const listen = page.getByRole('button', { name: 'Join to listen', exact: true });
+        await expect(listen).toBeInViewport();
+        await expect(listen).toHaveAccessibleDescription('Your microphone stays off.');
+        await expect(page.getByRole('button', { name: 'Join with microphone' })).toBeDisabled();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+        await page.screenshot({ path: testInfo.outputPath(`listen-ready-${width}x${height}.png`) });
+        await listen.press('Enter');
+        await expect(page.locator('#status')).toHaveText('Connected. You’re listening with your microphone off.');
+        const leave = page.getByRole('button', { name: 'Leave session' });
+        await expect(leave).toBeFocused();
+        await page.screenshot({ path: testInfo.outputPath(`listening-${width}x${height}.png`) });
+        await leave.press('Enter');
+        await expect(page.locator('#error-hint')).toHaveText('Ask your host for a new browser invite to rejoin.');
+        await expect(page.locator('#status')).toBeFocused();
+        expect(await page.evaluate(() => window.captureRequests)).toBe(0);
+    });
+}
+
 for (const width of [375, 390]) {
     for (const kind of ['missing', 'malformed', 'expired']) {
         test(`the packaged website gives ${kind} invites a usable fresh-link recovery at ${width}px without capture`, async ({ page, baseURL }) => {
