@@ -504,7 +504,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     ]);
     const gameLabel = game => arcadeTables.get(game)?.label || gameNightLabels[game] || 'Game Night';
     let arcadeReturning = null, arcadeInvitation = null, arcadeShareIntent = null;
-    let webJamChessSupported = false;
+    let webJamChessSupported = false, webJamHostSeatPending = false, webJamWaitingTable = null;
+    const webJamHostSeat = $('[data-webjam-host-seat]');
+    const webJamHostSeatStatus = $('[data-webjam-host-seat-status]');
     let arcadeMediaSupported = false, arcadeMedia = null, arcadeMediaLoading = false;
     let fourInARowSupported = false, fourRoom = null, fourPlayed = false;
     let fourGameId = '', fourActionPending = false, fourInvite = null;
@@ -1615,7 +1617,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const panel = $('[data-game-offer]'), status = $('[data-game-offer-status]');
         const button = $('[data-game-offer-join]');
         const hadFocus = panel.contains(document.activeElement);
-        panel.hidden = !offer && !start;
+        panel.hidden = (!offer && !start) || (!offer && !!gameEntry?.webJamGrant && !!currentJam());
         if (panel.hidden) {
             status.textContent = '';
             if (hadFocus) focusChannelTab(app.active);
@@ -1626,7 +1628,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const gameLabel = arcadeTables.get(offer?.arcade?.game)?.label;
         const selectedGame = arcadeTables.get(gameEntry?.table)?.label;
         let message;
-        if (start) message = gameOpenPending ? 'Opening Game Night…' : gameOpenError || (selectedGame
+        if (start && gameEntry.webJamGrant) message = webJamChessSupported
+            ? 'Open your WebJam room, then open a Chess match to reserve your guest’s seat.'
+            : 'WebJam Chess invitations are unavailable in this session.';
+        else if (start) message = gameOpenPending ? 'Opening Game Night…' : gameOpenError || (selectedGame
             ? `Start a private Game Night for ${selectedGame}.` : 'Start a private Game Night or wait for your host’s invitation.');
         else if (joiningGameRoom === offer.room) message = `Joining ${roomLabel}…`;
         else if (gameReturnOffered) {
@@ -1635,9 +1640,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         } else if (offer.by) message = gameLabel ? `${offer.by} invited you to play ${gameLabel}.` : `${offer.by} invited you to ${roomLabel}.`;
         else message = 'Your link points to a private Game Night. The host’s invitation is required.';
         if (status.textContent !== message) status.textContent = message;
-        button.textContent = start ? 'Start Game Night' : gameReturnOffered ? 'Return to room'
+        button.textContent = start ? gameEntry.webJamGrant ? 'Go to WebJam rooms' : 'Start Game Night' : gameReturnOffered ? 'Return to room'
             : gameLabel ? `Play ${gameLabel}` : jam ? 'Join room' : 'Join Game Night';
-        const busy = !!joiningGameRoom || start && !!gameOpenPending;
+        const busy = !!joiningGameRoom || start && (!!gameOpenPending || !!gameEntry.webJamGrant && !webJamChessSupported);
         button.setAttribute('aria-disabled', String(busy));
         $('[data-game-offer-dismiss]').disabled = busy;
     }
@@ -1646,6 +1651,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (joiningGameRoom || connectionState !== 'connected' || sessionEnded || app.sharingStopped) return;
         if (!offer) {
             if (!gameNightSupported || !gameEntry || gameEntry.target) return;
+            if (gameEntry.webJamGrant) {
+                if (webJamChessSupported) {
+                    show('rooms');
+                    $('[data-room-directory-title]').focus();
+                }
+                return;
+            }
             return openGameRoom(true);
         }
         if (!cmd('join', [offer.room], app.active, offer.ref)) {
@@ -1791,6 +1803,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-arcade-game]').hidden = !!gameGuest || !c || ![...arcadeTables.values()].some(table => table.supported);
         drawFour(c);
         for (const [game, table] of arcadeTables) drawArcadeTable(c, game, table);
+        drawWebJamHostSeat();
         drawArcadeMedia(c);
     }
     function drawArcadeMedia(c) {
@@ -1812,6 +1825,44 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             drawArcadeMedia(currentGameNight());
         }).catch(() => toast('Call controls could not load. Reopen Game Night to try again.'))
             .finally(() => { arcadeMediaLoading = false; });
+    }
+    function webJamHostTarget() {
+        const room = currentJam(), waiting = webJamWaitingTable;
+        return webJamChessSupported && !shieldActive && !!gameEntry?.webJamGrant && room?.modes.i && amOp(room)
+            && waiting?.room === room.name && waiting.ref === room.keepRef ? waiting : null;
+    }
+    webJamHostSeat?.addEventListener('click', async () => {
+        const table = webJamHostTarget();
+        if (webJamHostSeatPending || !table) return;
+        const hash = gameEntry.webJamGrant;
+        webJamHostSeatPending = webJamHostSeat.disabled = true;
+        webJamHostSeatStatus.textContent = 'Reserving the Chess seat…';
+        try {
+            const response = await fetch('/beta/game-night/room-grant/register', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...table, hashes: [hash] }),
+                signal: AbortSignal.timeout(10000)
+            });
+            const result = await response.json();
+            if (!response.ok || result.granted !== 1) {
+                webJamHostSeatStatus.textContent = response.status === 429 ? result.error
+                    : 'Couldn’t confirm the seat. Check the match or start a fresh offer in WebJam.';
+                return;
+            }
+            if (gameEntry?.webJamGrant === hash) gameEntry = null;
+            webJamHostSeatStatus.textContent = 'Chess seat reserved. Your guest can join now.';
+            drawGameOffer();
+        } catch {
+            webJamHostSeatStatus.textContent = 'Couldn’t confirm the seat. Check the match before sending a fresh offer.';
+        } finally {
+            webJamHostSeatPending = false;
+            drawWebJamHostSeat();
+        }
+    });
+    function drawWebJamHostSeat() {
+        if (!webJamHostSeat) return;
+        webJamHostSeat.hidden = !webJamHostSeatPending && !webJamHostTarget();
+        webJamHostSeat.disabled = webJamHostSeatPending;
     }
     function drawArcadeTable(c, game, table) {
         const jam = game === 'chess' && webJamChessSupported && !gameGuest ? currentJam() : null;
@@ -1930,6 +1981,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function arcadeMatchState(game, table, scope, state, sendMatch) {
         table.invite = scope && state?.seat && state.waiting && state.hasOpenSeat !== false ? gameNightInvite(game, state.id) : null;
         updateTableInvite(table, currentGameNight());
+        if (game === 'chess') {
+            webJamWaitingTable = table.invite && state.seat === 'w' && jamRoomName(scope.room) ? { ...scope, ...table.invite } : null;
+            drawWebJamHostSeat();
+        }
         const share = arcadeShareIntent;
         if (share && table.invite && table.controller?.isOpen() && scope.room === share.room && scope.ref === share.ref && game === share.game) {
             arcadeShareIntent = null;
