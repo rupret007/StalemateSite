@@ -647,8 +647,12 @@ for (const width of [375, 390, 1280]) test(`a Jam room invitation stays actionab
                 button.addEventListener('click', () => {
                     const random = Math.random;
                     const choices = [0.53, 0.70]; // mighty, squirrel
-                    Math.random = () => choices.shift() ?? random();
-                    queueMicrotask(() => { Math.random = random; });
+                    Math.random = () => {
+                        const value = choices.shift();
+                        if (!choices.length) Math.random = random;
+                        return value;
+                    };
+                    setTimeout(() => { Math.random = random; }, 0);
                 }, { capture: true, once: true });
             });
         }
