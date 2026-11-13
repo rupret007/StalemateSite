@@ -826,7 +826,7 @@ for (const width of [375, 390]) test(`short Jam instructions and manual invite c
         await tabTo(page, page.locator('[data-jam-form] button[type="submit"]')); await page.keyboard.press('Space');
         const copy = page.locator('[data-jam-copy]');
         await expect(copy).toBeVisible();
-        await expect(page.locator('[data-jam]')).toContainText('Windows and Linux require pasting private invites');
+        await expect(page.locator('[data-jam-help]')).toContainText('On supported Windows and Linux builds, paste the full invitation into Join in the app.');
         await expect(page.locator('[data-jam-web]')).toBeDisabled();
         await expect(page.locator('[data-jam-desktop]')).toBeHidden();
         const standard = await composerGeometry(page);

@@ -41,7 +41,7 @@ test('two visitors can copy an unchanged app invite, with a fallback when clipbo
         await expect.poll(() => guest.evaluate((expected) => __lobby.chans.get(__lobby.active).jam.invitation === expected, INVITE)).toBe(true);
         await expect(guest.locator('[data-jam-desktop]')).toBeHidden();
         await expect(guest.locator('[data-jam-web]')).toBeDisabled();
-        await expect(guest.locator('[data-jam]')).toContainText('Windows and Linux require pasting private invites');
+        await expect(guest.locator('[data-jam-help]')).toContainText('On supported Windows and Linux builds, paste the full invitation into Join in the app.');
         await guest.click('[data-jam-copy]');
         expect(await guest.evaluate(() => window.copiedInvite)).toBe(INVITE);
         await guest.evaluate(() => { navigator.clipboard.writeText = async () => { throw new Error('Clipboard blocked'); }; });
