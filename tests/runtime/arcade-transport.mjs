@@ -13,6 +13,7 @@ import { createArcadePreviewSite } from './arcade-preview-site.mjs';
 
 const origin = 'https://local-fixture.invalid';
 const serve = process.argv.includes('--serve');
+const fixtureSigningKey = 'owned-arcade-fixture-hmac-not-for-deployment-2026';
 const invite = serve ? process.env.ARCADE_PREVIEW_INVITATION : 'local-arcade-fixture-invitation-2026';
 if (serve && (typeof invite !== 'string' || invite.length < 32)) {
     throw new Error('Set ARCADE_PREVIEW_INVITATION to a local-only value with at least 32 characters.');
@@ -1108,7 +1109,7 @@ try {
             ...(!serve && (!browserName || browserMedia) ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
             ...(relay ? { HANGOUT_ARCADE_TURN: '1', HANGOUT_CF_ACCOUNT_ID: 'f'.repeat(32), HANGOUT_TURN_MONTHLY_GB: '1',
                 HANGOUT_TURN_KEY_ID: 'arcade-fixture-key', HANGOUT_TURN_API_TOKEN: 'fixture', HANGOUT_TURN_ANALYTICS_TOKEN: 'fixture' } : {}),
-            HANGOUT_HMAC_KEY: 'owned-arcade-fixture-hmac-not-for-deployment-2026', HANGOUT_BETA_INVITE_KEY: invite,
+            HANGOUT_HMAC_KEY: fixtureSigningKey, HANGOUT_BETA_INVITE_KEY: invite,
             HANGOUT_BETA_INVITE_VERSION: '1', HANGOUT_PREVIEW_KEY: preview, HANGOUT_OPEN: '1', HANGOUT_AI_ENABLED: '0', HANGOUT_TURN_ENABLED: '0' },
         ...(browserName || serve ? { serviceBindings: { ASSETS: serveAsset } } : {}),
         ...(rollback ? { durableObjectsPersist: join(directory, 'state') } : {}),
@@ -1149,7 +1150,7 @@ try {
             console.log(`Passed ${browserName} mixed lobby versions using source ${mixedRef}.`);
         } else {
             await runArcadeBrowser(browserName, browserOrigin, invite, evidence,
-                siteGuest || webJamShare ? null : await previewEntrances(browserOrigin), browserMedia, relay, { siteGuest, webJamShare });
+                siteGuest || webJamShare ? null : await previewEntrances(browserOrigin), browserMedia, relay, { siteGuest, webJamShare, demoSigningKey: fixtureSigningKey });
         }
     } else if (roomGrants) {
         await verifyRoomGrants();
