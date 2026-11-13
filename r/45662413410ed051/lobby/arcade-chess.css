@@ -71,7 +71,7 @@
 @media (min-width: 901px) {
     .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) {
         display: grid;
-        grid-template: "chess heading" auto "chess actions" auto "chess other" auto "chess eights" auto "chess rummy" auto "chess spades" auto "chess jack" auto "chess tris" auto "chess mania" auto "chess rush" auto "chess brick" auto "chess call" 1fr /
+        grid-template: "chess heading" auto "chess actions" auto "chess eights" auto "chess rummy" auto "chess spades" auto "chess jack" auto "chess tris" auto "chess mania" auto "chess rush" auto "chess brick" auto "chess call" 1fr /
             minmax(0, 30rem) minmax(0, 1fr);
         gap: .6rem 1rem;
         align-items: start;
@@ -131,7 +131,7 @@
     .arcade-chess-playing { gap: .35rem; justify-items: center; }
     .arcade-chess-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; }
     .arcade-chess-actions .btn { padding-inline: .25rem; overflow-wrap: anywhere; white-space: normal; }
-    .arcade-chess #board { width: min(100%, 25rem, max(13.25rem, calc(100dvh - 454px))); }
+    .arcade-chess #board { width: min(100%, 25rem, max(12.5rem, calc(100dvh - 465px))); }
     .arcade-chess-clocks { width: min(100%, 25rem, max(16.5rem, calc(100dvh - 454px))); }
     .arcade-chess-clocks > div { padding: .25rem .35rem; font-size: .8rem; white-space: nowrap; }
 }
