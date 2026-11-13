@@ -461,3 +461,50 @@ Client pages (not part of this slice, listed so the routes make sense):
 - Playwright for this slice needs `npm ci` in `tests/runtime/durable-records` before `npx playwright test -c tests/playwright.bridge.config.js`. That package's `node_modules` is gitignored. Do not install it from the repo root.
 - A burned tombstone lives as long as the grant would have (2 minutes from register). After the sweep removes it, the host could register the same hash again. The desktop app makes a fresh value per seat, so this needs a host who re-sends an old hash on purpose.
 - Grants are not tied to `HANGOUT_BETA_INVITE_VERSION` the way stranger invitations are. With a 2-minute TTL this is low risk. The route can call `revokeAll` on a version change if you want parity.
+
+## Room offer, full table, and stale offer
+
+Imported later. This slice does not edit `lobby.js`, `beta-entry.mjs`, `entry-sites.mjs`, `game-night-table.mjs`, `game-night-invitations.mjs`, or `lobby/index.html`. The three modules live next to the other lobby modules.
+
+| Module | What the later import calls |
+|---|---|
+| `r/45662413410ed051/lobby/bridge-room-offer.mjs` | `createRoomOffer({ room, register }).confirmPlay(...)` once, from the host already in the WebJam room. `render(document, memberId)` is the one **Join Chess** button. `raiseInRoomOffer(button)` sets the existing `[data-game-offer-join]` control to 44px. |
+| `r/45662413410ed051/lobby/bridge-table-full.mjs` | `mapTakenSeats(...)` where the client would otherwise say "Ask the host for a fresh invitation" after both seats are taken. `redeemRequest(...)` is the call below. |
+| `r/45662413410ed051/lobby/bridge-offer-recovery.mjs` | `recoverPanel(...)` beside the chess panel. `renderExpiredRecovery(...)` on the expired link page. |
+
+`confirmPlay` registers one Chess hash for the WebJam room the members are already in (`#jam` or `#jam-` plus 1–26 lowercase letters, digits, or hyphens). The host must be in that roster, and at least one other person must already be there. A second confirm does not register again. The answer carries `shareSheet: false` and `secondRoom: false`. People who were not in the room at that confirm do not get the button. The host does not get it either: the seat is the guest seat.
+
+The existing in-room offer control is `[data-game-offer-join]` in `lobby/index.html` (busy). Its height is `.btn--small { min-height: 38px }` in `lobby/lobby.css`, which is not one of those busy files. `.game-offer [data-game-offer-join] { min-height: 44px }` is the live size. The shared small-button rule is unchanged.
+
+## Redeem call contract
+
+Hook 2 owns the route. Codex registers it in `beta-entry.mjs`. This slice does not. The mapper calls this and nothing else.
+
+```
+POST /beta/game-night/room-grant/redeem
+Content-Type: application/json
+
+{ "value": "<32 to 128 URL-safe characters>", "attempt": "<32 to 128 URL-safe characters>", "age13": true }
+```
+
+`value` and `attempt` match `/^[A-Za-z0-9_-]{32,128}$/`. No session cookie is required. The Worker rejects a bad value before the lobby Durable Object, and it spends the per-IP budget (30 per 60 seconds) on that side of the fetch. The raw value is not logged and is not put in a URL.
+
+| Status | Body | What the guest sees |
+|---|---|---|
+| 200 | `{ "next": "/r/45662413410ed051/lobby/?game-guest=1" }` plus the existing game-guest `Set-Cookie` | Seated. The `next` path is the lobby they already joined. |
+| 409 | `{ "tableFull": true, "message": "Table full, you're up next game" }` | That sentence on the offer they already have open. `mapTakenSeats` returns `stayInRoom: true`, `askHost: false`, and `next: null`. The guest stays in that room for the next match. |
+| 410 | `{ "error": "<the existing expired invitation copy>" }` | Not this mapper. |
+| 400 | age line, or the value failed the pattern | Not a full table. |
+| 403 | host session | The grant stays valid for a guest. |
+| 429 | allowance line | Not a full table. |
+| 404 | `HANGOUT_GAME_NIGHT_ROOM_GRANTS` is not `'1'`, or the path is unknown | Not a full table. A taken seat is 409, not 404, and not the 410 copy. |
+
+Same-origin JSON POST only. `register` is the other path under `/beta/game-night/room-grant/register` and still requires the host session plus the Play confirm. A taken seat never uses "Ask the host for a fresh invitation".
+
+`gameGuestScope` still accepts only a `#game-` room name. The Play path registers the WebJam room the members are already in, so the route must accept that room id and must not mint a second room to satisfy the old check.
+
+## Stale offer
+
+When the chess panel action is **Join as Black**, `recoverPanel` drops a toast that says "ask the host" and leaves that button as the only action. The status line stays "Black is open. Join to play." Any other toast stays.
+
+The expired link page keeps its heading and the sentence "This invite can’t open the game anymore. Ask your host for a new invite." A guest with a lobby session gets one action, **Return to room**, pointing at `/r/45662413410ed051/lobby/` or `/r/45662413410ed051/lobby/?game-guest=1`. Any other target becomes the lobby path. A guest without a lobby session gets no action.
