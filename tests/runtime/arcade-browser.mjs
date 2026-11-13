@@ -1891,6 +1891,37 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(board(b).getByRole('gridcell')).toHaveCount(36);
         console.log(`Passed ${engine} Turdomania two complete puzzles, keyboard and 44px phone touch input, ${media ? 'local prediction with 220 ms input delay and the same call' : 'full reload mid-duel'}, spectator and rematch.`);
     }
+    async function verifyTurdRushSwipeAcrossGo(guestPhone) {
+        const viewport = guestPhone.viewportSize();
+        await guestPhone.setViewportSize({ width: 390, height: 844 });
+        const touch = await guestPhone.context().newCDPSession(guestPhone);
+        try {
+            const race = guestPhone.locator('[data-race-match]');
+            const track = guestPhone.getByRole('region', { name: 'Turd Rush race track' });
+            await track.scrollIntoViewIfNeeded();
+            await expect(track).toBeInViewport({ ratio: 1 });
+            await guestPhone.bringToFront();
+            const box = await track.boundingBox();
+            assert.ok(box);
+            const x = box.x + box.width / 2, y = box.y + box.height * .66;
+            await expect(race).toHaveAttribute('data-phase', 'countdown');
+            await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+            await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - 48, y }] });
+            await expect(race).toHaveAttribute('data-phase', 'countdown');
+            await expect(race).toHaveAttribute('data-sequence', '0');
+            await expect(race).toHaveAttribute('data-lane', '1');
+            await expect(race).toHaveAttribute('data-phase', 'play');
+            await expect(race).toHaveAttribute('data-sequence', '0');
+            await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - 75, y }] });
+            await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+            await expect(race).toHaveAttribute('data-sequence', '1');
+            await expect(race).toHaveAttribute('data-lane', '0');
+            console.log('Passed Chromium Turd Rush countdown swipe, zero early input and one confirmed lane change after Go.');
+        } finally {
+            await touch.detach();
+            await guestPhone.setViewportSize(viewport);
+        }
+    }
     async function playTurdRush(a, b, spectator) {
         const before = media ? await packetCount(b, 'audio') : 0;
         const pauseReconnect = media && !relay ? await holdMatchReconnect(a, 'turdrush') : null;
@@ -2320,6 +2351,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await playTurdtris(a, b, spectator);
         await playTurdomania(a, b, spectator);
         await playTurdRush(a, b, spectator);
+        if (engine === 'chromium') await verifyTurdRushSwipeAcrossGo(b);
         await playTurdanoid(a, b, spectator);
         if (relay) {
             const stats = (await Promise.all([selectedPairStats(a), selectedPairStats(b)])).flat();
