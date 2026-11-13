@@ -744,14 +744,16 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             uncertainMessages();
             setConnection('offline');
             if (roomApi) roomApi.onLeave();
-            if (timedOut) {
+            const retryGameGuest = gameGuestSeated && app.me && retry < 3 &&
+                (timedOut || !opened && [1006, 1011].includes(e.code));
+            if (timedOut && !retryGameGuest) {
                 const message = 'Hang Out took too long to respond. Try again.';
                 gateStatus(message);
                 if (app.me) line(app.active, { event: true, text: `* ${message}` });
                 return;
             }
             if (e.code === 4401) return endSession();
-            if (!opened && betaShell && !pageLeaving) {
+            if ((!opened || (timedOut && retryGameGuest)) && betaShell && !pageLeaving) {
                 const missing = await privateAccessMissing();
                 if (attempt !== connectionAttempt || app.ws !== ws || sessionEnded || pageLeaving) return;
                 if (missing) {
@@ -761,7 +763,6 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                     return;
                 }
             }
-            const retryGameGuest = !opened && gameGuestSeated && app.me && retry < 3 && [1006, 1011].includes(e.code);
             if (!opened && app.me && !retryGameGuest) return endSession('admission');
             if (ownerSession && !opened) {
                 $('[data-gate]').hidden = false; $('[data-app]').hidden = true;
@@ -781,7 +782,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 line(app.active, { event: true, text: `* ${message}` });
                 return;
             }
-            if ([4001, 4003, 4503, 4403].includes(e.code) || app.kicked || e.code === 1000) return;
+            if ([4001, 4003, 4503, 4403].includes(e.code) || app.kicked || (e.code === 1000 && !timedOut)) return;
             line(app.active, { event: true, text: '* Disconnected. Reconnecting…' });
             setConnection('reconnecting');
             retryTimer = setTimeout(() => connect(app.me || nick), Math.min(10000, 1000 * (2 ** Math.min(retry++, 4))) * (0.75 + Math.random() * 0.25));
