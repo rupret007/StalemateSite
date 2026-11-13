@@ -517,10 +517,19 @@ async function verifyWebJamChess() {
             await page.reload();
             await expect(page.locator('[data-guest-status]')).toHaveText('Waiting for your host to reserve your Chess seat…');
             await expect(page.getByRole('button', { name: 'Waiting for host…' })).toBeDisabled();
+            let firstRegistrationStatus;
+            await host.route('**/beta/game-night/room-grant/register', async route => {
+                if (firstRegistrationStatus !== undefined) return route.continue();
+                const response = await route.fetch();
+                firstRegistrationStatus = response.status();
+                await response.dispose();
+                await route.abort();
+            });
             await reserve.click();
             await expect(host.locator('[data-webjam-host-seat-status]')).toHaveText('Chess seat reserved. Your guest can join now.');
             await expect(reserve).toBeHidden();
-            assert.equal(registrations, 1, 'one host action registers one seat');
+            assert.equal(firstRegistrationStatus, 200, 'the first reservation committed before the response was lost');
+            assert.equal(registrations, 2, 'one host action retries the same reservation');
             await expect(page.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
             assert.ok(await page.evaluate(room => window.__lobby.active === room, hostRoom.room), 'the guest plays in the exact host room');
             for (const [player, squares] of [[host, ['e2', 'e4']], [page, ['d7', 'd5']]]) {
