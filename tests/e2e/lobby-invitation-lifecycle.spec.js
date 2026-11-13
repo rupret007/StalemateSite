@@ -590,7 +590,9 @@ test('Game Night keeps invitations actionable and offers a safe return after a d
             await expect(offer).toContainText('ReturnHost invited you to Game Night.');
         };
         await invitePlayer();
-        await guest.getByRole('button', { name: 'Not now', exact: true }).press('Enter');
+        const dismiss = offer.getByRole('button', { name: 'Not now', exact: true });
+        await expect(dismiss).toHaveAccessibleDescription('ReturnHost invited you to Game Night.', { timeout: 1500 });
+        await dismiss.press('Enter');
         await expect(offer).toBeHidden();
         await expect(roomSection).toBeFocused();
         await invitePlayer();
