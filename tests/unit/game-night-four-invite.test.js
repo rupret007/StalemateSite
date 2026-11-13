@@ -72,6 +72,21 @@ describe('Four guest seat on the room', () => {
         await play(guest, ['drop', id, '1', '2'], ref);
         expect(four(guest)).toMatchObject({ moves: 2, lastColumn: 1, guest });
         expect(four(guest).board.filter(Boolean)).toEqual(['X', 'O']);
+        for (let revision = 2; revision < 7; revision++) {
+            const next = revision % 2 ? guest : 'host';
+            await play(next, ['drop', id, String(revision), next === guest ? '2' : '1'], ref);
+        }
+        expect(four(guest).winner).toBe('X');
+        await play(guest, ['rematch', id], ref);
+        expect(four('host').rematch).toBe('O');
+        await play('host', ['rematch', id], ref);
+        expect(four(guest)).toMatchObject({ id, guest, moves: 0, round: 1 });
+        await play('host', ['drop', id, '0', '1'], ref);
+        expect(four(guest).moves).toBe(0);
+        await play('host', ['drop', id, '0', '1', '1'], ref);
+        expect(four(guest).moves).toBe(1);
+        await lobby.disconnect(guest);
+        expect(inbox.get('host').findLast(message => message.t === 'four')).toMatchObject({ game: null, ended: 'guest-disconnected' });
     });
 });
 

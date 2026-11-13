@@ -1175,6 +1175,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             const c = app.chans.get(m.ch);
             if (!fourInARowSupported || c?.kind !== 'game' || c.keepRef !== m.roomInstance) break;
             c.four = m.game;
+            c.fourEnded = m.ended || '';
             if (fourRoom === c) fourActionPending = false;
             if (app.active === c.name) drawGameNight();
             if (gameGuest?.game === 'four' && c.name === gameGuest.room) settleFourGuest(c);
@@ -1989,11 +1990,15 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function fourCommand(action, column) {
         const c = currentGameNight();
         if (!c || c !== fourRoom || shieldActive || !roomNonce(c.keepRef)) return false;
-        const primary = action === 'open' || action === 'join';
+        const primary = action === 'open' || action === 'join' || action === 'rematch';
         if (primary && fourActionPending) return false;
         const game = c.four;
         const args = [action, game?.id || ''];
-        if (action === 'drop') args.push(String(game.moves), String(column + 1));
+        if (action === 'drop') {
+            args.push(String(game.moves), String(column + 1));
+        }
+        if (action === 'rematch') args.push('', '');
+        if ((action === 'drop' || action === 'rematch') && game.round) args.push(String(game.round));
         if (!cmd('four', args, c.name, c.keepRef)) {
             toast('Reconnect before playing.');
             return false;
@@ -2062,23 +2067,42 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
         const playing = !!game?.guest && !fourFinished(game);
         const yourTurn = playing && seat === fourMark(game.moves);
-        let message = fourPlayed ? 'Match ended. A host can open another.' : 'Two players. Connect four pieces in any direction.';
-        let button = amOp(c) ? ['open', game ? 'Play again' : 'Open a match'] : null;
+        const canOpen = amOp(c) && !gameGuest;
+        const endedMessages = {
+            'host-left': 'The host left. This match is over.',
+            'host-disconnected': 'The host disconnected. This match is over.',
+            'guest-left': 'The other player left. This match is over.',
+            'guest-disconnected': 'The other player disconnected. This match is over.'
+        };
+        let message = endedMessages[c.fourEnded] || (fourPlayed ? 'This match ended.' : 'Two players. Connect four pieces in any direction.');
+        if (!game && (c.fourEnded || fourPlayed)) {
+            message += gameGuest ? ' Ask your host for a new invite.' : canOpen ? ' Open a match to play again.' : ' Wait for a host to open a new match.';
+        }
+        let button = canOpen && !game ? ['open', 'Open a match'] : null;
         let leaveLabel = '';
         if (game) {
             fourPlayed = true;
             if (!game.guest) {
-                message = seat ? 'Waiting for someone in the room to join.' : 'An open seat is available. X goes first.';
+                message = seat ? (fourInvite ? 'Invite a friend. You play first when they join.' : 'Waiting for another player. You play first.')
+                    : 'An open seat is available. X goes first.';
                 button = seat ? null : ['join', 'Join match'];
                 if (seat) leaveLabel = 'Close match';
             } else {
                 const lastMove = game.moves ? `${fourMark(game.moves - 1)} played column ${game.lastColumn + 1}. ` : '';
                 const turn = yourTurn ? `Your turn (${seat}).` : `${fourMark(game.moves)} to play.`;
-                message = lastMove + (game.winner ? `${game.winner} wins.` : playing ? turn : 'Draw.');
+                const result = lastMove + (game.winner ? `${game.winner} wins.` : 'Draw.');
                 if (playing) {
-                    button = null;
+                    message = lastMove + (seat ? turn : `Match full. You’re watching. ${turn}`);
                     if (seat) leaveLabel = 'Leave match';
+                } else if (!seat) {
+                    message = `${result} Watch for the next match.`;
+                } else if (game.rematch === seat) {
+                    message = `${result} Waiting for the other player to accept your rematch.`;
+                } else {
+                    message = game.rematch ? `${result} The other player asked for a rematch.` : `${result} Want to play again?`;
+                    button = ['rematch', game.rematch ? 'Accept rematch' : 'Request rematch'];
                 }
+                if (!playing && seat) leaveLabel = 'Leave match';
             }
         }
         if (status.textContent !== message) status.textContent = message;
