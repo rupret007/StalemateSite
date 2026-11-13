@@ -1891,6 +1891,44 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(board(b).getByRole('gridcell')).toHaveCount(36);
         console.log(`Passed ${engine} Turdomania two complete puzzles, keyboard and 44px phone touch input, ${media ? 'local prediction with 220 ms input delay and the same call' : 'full reload mid-duel'}, spectator and rematch.`);
     }
+    async function verifyTurdRushSwipeAcrossGo() {
+        const host = await guest('stalemate', 'RushStartHost', { width: 1440, height: 900 });
+        const guestPhone = await guest('rad-dad', 'RushStartGuest', { width: 390, height: 844 }, true);
+        const touch = await guestPhone.context().newCDPSession(guestPhone);
+        try {
+            await host.getByRole('button', { name: /Game Night/ }).click();
+            await inviteToGame(host, guestPhone, 'RushStartGuest');
+            for (const page of [host, guestPhone]) {
+                await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdrush');
+            }
+            await host.getByRole('button', { name: 'Open Turd Rush race' }).click();
+            await guestPhone.getByRole('button', { name: 'Join Turd Rush race' }).tap();
+            const race = guestPhone.locator('[data-race-match]');
+            const track = guestPhone.getByRole('region', { name: 'Turd Rush race track' });
+            await expect(track).toBeInViewport({ ratio: 1 });
+            await guestPhone.bringToFront();
+            const box = await track.boundingBox();
+            assert.ok(box);
+            const x = box.x + box.width / 2, y = box.y + box.height * .66;
+            await expect(race).toHaveAttribute('data-phase', 'countdown');
+            await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+            await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - 48, y }] });
+            await expect(race).toHaveAttribute('data-phase', 'countdown');
+            await expect(race).toHaveAttribute('data-sequence', '0');
+            await expect(race).toHaveAttribute('data-lane', '1');
+            await expect(race).toHaveAttribute('data-phase', 'play');
+            await expect(race).toHaveAttribute('data-sequence', '0');
+            await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - 75, y }] });
+            await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+            await expect(race).toHaveAttribute('data-sequence', '1');
+            await expect(race).toHaveAttribute('data-lane', '0');
+            console.log('Passed Chromium Turd Rush countdown swipe, zero early input and one confirmed lane change after Go.');
+        } finally {
+            await touch.detach();
+            await guestPhone.context().close();
+            await host.context().close();
+        }
+    }
     async function playTurdRush(a, b, spectator) {
         const before = media ? await packetCount(b, 'audio') : 0;
         const pauseReconnect = media && !relay ? await holdMatchReconnect(a, 'turdrush') : null;
@@ -1937,25 +1975,6 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
         assert.equal(await b.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
         await track(a).focus();
-        // The same phone swipe can cross the countdown without sending an early move.
-        const startSwipe = engine === 'chromium' && !media;
-        const touchDirection = danger === 0 ? -1 : 1;
-        const swipeBox = engine === 'chromium' ? await track(b).boundingBox() : null;
-        const swipeX = swipeBox ? swipeBox.x + swipeBox.width / 2 : 0;
-        const swipeY = swipeBox ? swipeBox.y + swipeBox.height * .66 : 0;
-        const touchSession = engine === 'chromium' ? await b.context().newCDPSession(b) : null;
-        const startTouch = async () => {
-            await touchSession.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: swipeX, y: swipeY }] });
-            await touchSession.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: swipeX + touchDirection * 48, y: swipeY }] });
-        };
-        if (startSwipe) {
-            await b.bringToFront();
-            await expect(race(b)).toHaveAttribute('data-phase', 'countdown');
-            await startTouch();
-            await expect(race(b)).toHaveAttribute('data-phase', 'countdown');
-            await expect(race(b)).toHaveAttribute('data-sequence', '0');
-            await expect(race(b)).toHaveAttribute('data-lane', '1');
-        }
         await expect(race(a)).toHaveAttribute('data-phase', 'play');
         await expect(race(b)).toHaveAttribute('data-phase', 'play');
         await expect(b.locator('[data-race-status]')).toHaveText('Go! Swipe the track or tap a control.');
@@ -1983,13 +2002,16 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             }
             return false;
         }, String(danger)) : null;
-        if (touchSession) {
+        if (engine === 'chromium') {
+            const connection = await b.context().newCDPSession(b);
             try {
-                if (!startSwipe) await startTouch();
-                await touchSession.send('Input.dispatchTouchEvent', { type: 'touchMove',
-                    touchPoints: [{ x: swipeX + touchDirection * 75, y: swipeY }] });
-                await touchSession.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-            } finally { await touchSession.detach(); }
+                const box = await track(b).boundingBox();
+                assert.ok(box);
+                const x = box.x + box.width / 2, y = box.y + box.height * .66;
+                await connection.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+                await connection.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + (danger === 0 ? -75 : 75), y }] });
+                await connection.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+            } finally { await connection.detach(); }
         } else await b.touchscreen.tap(controlBox.x + controlBox.width / 2, controlBox.y + controlBox.height / 2);
         await a.keyboard.press(danger === 0 ? 'ArrowLeft' : 'ArrowRight');
         if (prediction) assert.equal(await prediction, true, 'native phone swipe moves locally before delayed confirmation');
@@ -2336,6 +2358,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await playTurdtris(a, b, spectator);
         await playTurdomania(a, b, spectator);
         await playTurdRush(a, b, spectator);
+        if (engine === 'chromium' && !media) await verifyTurdRushSwipeAcrossGo();
         await playTurdanoid(a, b, spectator);
         if (relay) {
             const stats = (await Promise.all([selectedPairStats(a), selectedPairStats(b)])).flat();
