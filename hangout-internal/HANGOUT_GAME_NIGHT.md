@@ -20,4 +20,4 @@ Discord's existing voice channels provide an immediately usable call handoff wit
 
 ## Verification
 
-Loopback tests cover host publication, unauthorized updates, invite-only admission, link removal, host departure, restart, and a browser handoff to a synthetic Discord page. Chromium and WebKit tests play a complete match from two independent browser contexts, use the keyboard to make a move, keep the composer visible at 375 and 390 px, and start and leave a rematch. A private session with an existing Discord voice channel is needed to verify real microphone and camera exchange with two people.
+Loopback tests cover host publication, unauthorized updates, invite-only admission, link removal, host departure, restart, and a browser handoff to a synthetic Discord page. Chromium and WebKit cover both branded entrances, exact-seat game invitations, touch and keyboard play, and rematches. Phone checks cover the game controls and the chat composer. A private session with an existing Discord voice channel is needed to verify real microphone and camera exchange with two people.
