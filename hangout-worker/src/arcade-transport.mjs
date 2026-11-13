@@ -13,6 +13,7 @@ export { arcadeRoomRequest } from './game-night-sockets.mjs';
 export const ARCADE_TAG = 'game-night-match';
 export const ARCADE_PROTOCOL = 'game-night.v1';
 const MATCH_TTL = 40 * 60000;
+const CONNECTED_CLAIM_TTL = 60_000;
 const MATCH_CAP = 60;
 const adapters = new Map([
     ['chess', { flag: 'HANGOUT_ARCADE_CHESS', Table: GameNightChess }],
@@ -158,13 +159,22 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                 }
             }
             if (frame.action === 'sync' && !scope.synced) {
-                socket.serializeAttachment({ ...socket.deserializeAttachment(), synced: true });
+                const claim = claims.find(entry => entry.sid === subject && !entry.connected);
+                if (claim && binding.gameGuest?.game === name &&
+                    game.hasGuestSeat(binding.gameGuest.match, binding.gameGuest.host, claims.length - 1)) {
+                    claim.connected = true;
+                    claim.until = Math.max(claim.until, now() + CONNECTED_CLAIM_TTL);
+                    changed = true;
+                }
             }
             if (changed) {
                 if (game) await state.storage.put(key(scope), savedRecord(scope, game, expiresAt, claims));
                 else await state.storage.delete(key(scope));
                 publish(scope, game, null, claims);
             } else publish(scope, game, resume ? null : socket, claims);
+            if (frame.action === 'sync' && !scope.synced) {
+                socket.serializeAttachment({ ...socket.deserializeAttachment(), synced: true });
+            }
             if (error) send(socket, { t: 'match-error', reason: error });
         } catch {
             send(socket, { t: 'match-error', reason: 'storage-unavailable' });

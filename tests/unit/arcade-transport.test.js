@@ -98,6 +98,27 @@ describe('Game Night match transport', () => {
         expect((await f.storage.get(ARCADE_TAG + ':' + ref)).claims).toBeUndefined();
     });
 
+    it('extends an accepted seat once when the invited guest reaches the exact match', async () => {
+        const f = fixture();
+        await f.send(f.a, 'open');
+        const { id } = f.board(f.b);
+        const scope = { room, ref, host: sid, match: id };
+        const guestBinding = f.actors.get(guest);
+        guestBinding.gameGuest = { ...scope, game: 'chess' };
+        await f.transport.reserveGuestSeat(scope, guestBinding.betaSid, 61000, 'invite', {});
+        const saved = () => f.storage.get(ARCADE_TAG + ':' + ref);
+        f.advance(59000);
+        await f.send(f.b, 'sync');
+        expect((await saved()).claims).toEqual([{ sid: guestBinding.betaSid, until: 120000, connected: true }]);
+        f.advance(59000);
+        f.b.serializeAttachment({ ...f.b.deserializeAttachment(), synced: false });
+        await f.send(f.b, 'sync');
+        expect((await saved()).claims[0].until).toBe(120000);
+        await f.send(f.b, 'join', { id });
+        expect(f.board(f.b)).toMatchObject({ id, seat: 'b' });
+        expect((await saved()).claims).toBeUndefined();
+    });
+
     it('releases an unused seat after its deadline while keeping the host table', async () => {
         const f = fixture();
         await f.send(f.a, 'open');
