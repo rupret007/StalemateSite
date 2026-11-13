@@ -12,12 +12,12 @@ const KEY = 'local-preview-key-0001';
 let origin;
 let relayNamespace;
 test.beforeEach(async ({ baseURL }) => { origin = baseURL; relayNamespace = `discovery-${randomUUID()}`; });
-const url = () => `${ROOT}?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(origin, relayNamespace))}`;
+const url = (entry = '') => `${ROOT}?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(origin, relayNamespace))}${entry}`;
 
-async function guest(browser, nick, viewport) {
+async function guest(browser, nick, viewport, entry) {
     const context = await browser.newContext(viewport ? { viewport, isMobile: true, hasTouch: true } : {});
     const page = await context.newPage();
-    await page.goto(url());
+    await page.goto(url(entry));
     await page.fill('[data-nick]', nick);
     await page.click('[data-enter]');
     await expect(page.locator('[data-app]')).toBeVisible();
@@ -199,10 +199,11 @@ test('a quiet visit shows no invented gathering and drafts a prompt without send
 });
 
 test('phone chat, room discovery and composer fit without horizontal scrolling', async ({ browser }) => {
-    const page = await guest(browser, 'PocketGuest', { width: 375, height: 667 });
+    const page = await guest(browser, 'PocketGuest', { width: 375, height: 667 }, '&via=rad-dad');
     try {
-        await expect(page.locator('[data-text]')).toBeInViewport();
-        await expect(page.locator('[data-send]')).toBeInViewport();
+        await expect(page.locator('[data-entry-return]')).toHaveText('Back to Rad Dad');
+        await expect(page.locator('[data-text]')).toBeInViewport({ ratio: 1 });
+        await expect(page.locator('[data-send]')).toBeInViewport({ ratio: 1 });
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
         await page.click('[data-show="rooms"]');
         await expect(page.locator('[data-lobby-home]')).toBeVisible();
