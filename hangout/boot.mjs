@@ -1,16 +1,36 @@
 import { mountInstallCard } from './install-card.mjs';
-import { mountShortcuts } from './last-room.mjs';
+import { mountShortcuts, placeFromShortcut } from './last-room.mjs';
+import { hangoutHomePath, mountHostAsk } from './open-in-app.mjs';
 import { registerHomeScreenWorker } from './register-sw.mjs';
 import { mountWhosHere } from './whos-here.mjs';
 
-registerHomeScreenWorker(navigator, import.meta.url).catch(() => {
-    // The choices still work if this browser will not register a worker.
-});
+const homeHref = hangoutHomePath(import.meta.url);
+
+function showWebjamAsk() {
+    mountHostAsk(document.querySelector('[data-webjam-host]'), {
+        userAgent: navigator.userAgent,
+        maxTouchPoints: navigator.maxTouchPoints || 0,
+        homeHref
+    });
+}
 
 const leaving = mountShortcuts(document, {
     search: location.search,
     storage: localStorage,
-    replace: (href) => location.replace(href)
+    replace: (href) => location.replace(href),
+    onWebjam() {
+        const next = new URL(location.href);
+        next.search = '?go=webjam';
+        next.hash = '';
+        history.replaceState(null, '', `${next.pathname}${next.search}`);
+        showWebjamAsk();
+    }
+});
+
+if (!leaving && placeFromShortcut(location.search, localStorage) === 'webjam') showWebjamAsk();
+
+registerHomeScreenWorker(navigator, import.meta.url).catch(() => {
+    // The choices still work if this browser will not register a worker.
 });
 
 const here = document.querySelector('[data-whos-here]');

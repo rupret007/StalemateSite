@@ -49,7 +49,10 @@ const FILES = [
     'assets/hangout-app/icon-192.png',
     'assets/hangout-app/icon-512.png',
     'assets/hangout-app/icon-maskable-192.png',
-    'assets/hangout-app/icon-maskable-512.png'
+    'assets/hangout-app/icon-maskable-512.png',
+    'assets/hangout-app/shortcut-game-night.png',
+    'assets/hangout-app/shortcut-webjam.png',
+    'assets/hangout-app/shortcut-last-room.png'
 ];
 
 function emptyDir(dir) {

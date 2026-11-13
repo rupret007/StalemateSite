@@ -27,10 +27,12 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&amp;family=Source+Sans+3:wght@400;600;700&amp;display=swap" rel="stylesheet">
     <link rel="stylesheet" href="home.css">
+    <link rel="stylesheet" href="open-in-app.css">
 </head>
 <body>
     <a class="skip" href="#choices">Skip to choices</a>
     <div class="sheet">
+        <div data-webjam-host hidden></div>
         <header class="mast">
             <img class="brand-mark" src="../assets/hangout-app/webjam-mark.svg" alt="" width="72" height="72">
             <p class="eyebrow">One home screen icon</p>
@@ -48,7 +50,8 @@
             <aside class="install" role="region" aria-label="Add Hang Out to your home screen">
                 <h2>Add Hang Out to your home screen</h2>
                 <p class="install__hint">Tap Share, then Add to Home Screen.</p>
-                <p class="install__hint">On Android, open the browser menu and choose Install app.</p>
+                <p class="install__hint">Tap ⋮, then Add to Home screen or Install app.</p>
+                <p class="install__hint">Use the install icon in the address bar, or the browser menu.</p>
             </aside>
         </noscript>
         <main id="choices">
@@ -64,7 +67,7 @@
                 </a>
                 <a class="choice" data-place="webjam" href="../join/">
                     <span class="choice__name">WebJam</span>
-                    <span class="choice__detail">Join a music session.</span>
+                    <span class="choice__detail">Ask your host to send the invite; tap it and you're in.</span>
                 </a>
             </div>
         </main>

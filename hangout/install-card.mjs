@@ -1,6 +1,8 @@
 export const DISMISS_KEY = 'hangout-add-home-dismissed';
 export const INSTALLED_KEY = 'hangout-add-home-installed';
 export const SHARE_HINT = 'Tap Share, then Add to Home Screen.';
+export const ANDROID_HINT = 'Tap ⋮, then Add to Home screen or Install app.';
+export const DESKTOP_HINT = 'Use the install icon in the address bar, or the browser menu.';
 
 const DISPLAY_MODES = ['standalone', 'fullscreen', 'minimal-ui'];
 
@@ -57,8 +59,8 @@ export function installCardState({
     if (standalone || dismissed) return { visible: false, variant: 'hidden', installEnabled: false };
     if (isIos(userAgent, maxTouchPoints)) return { visible: true, variant: 'ios', installEnabled: false };
     if (deferredPrompt) return { visible: true, variant: 'install', installEnabled: true };
-    if (isAndroidInstallBrowser(userAgent)) return { visible: true, variant: 'install', installEnabled: false };
-    return { visible: false, variant: 'hidden', installEnabled: false };
+    if (isAndroidInstallBrowser(userAgent)) return { visible: true, variant: 'android', installEnabled: false };
+    return { visible: true, variant: 'desktop', installEnabled: false };
 }
 
 function icon(doc, paths) {
@@ -91,6 +93,23 @@ const ADD_PATHS = [
     'M8.5 12h7'
 ];
 
+function dots(doc) {
+    const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('width', '32');
+    svg.setAttribute('height', '32');
+    svg.setAttribute('aria-hidden', 'true');
+    for (const cy of ['6.5', '12', '17.5']) {
+        const circle = doc.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', '12');
+        circle.setAttribute('cy', cy);
+        circle.setAttribute('r', '1.6');
+        circle.setAttribute('fill', 'currentColor');
+        svg.append(circle);
+    }
+    return svg;
+}
+
 function step(doc, graphic, label) {
     const item = doc.createElement('li');
     item.append(graphic, Object.assign(doc.createElement('span'), { textContent: label }));
@@ -116,23 +135,28 @@ export function fillInstallCard(root, state, actions = {}) {
     title.textContent = 'Add Hang Out to your home screen';
     root.append(title);
 
-    if (state.variant === 'ios') {
+    if (state.variant === 'ios' || state.variant === 'android') {
         const hint = doc.createElement('p');
         hint.className = 'install__hint';
-        hint.textContent = SHARE_HINT;
+        hint.textContent = state.variant === 'ios' ? SHARE_HINT : ANDROID_HINT;
         const steps = doc.createElement('ol');
         steps.className = 'install__steps';
         steps.append(
-            step(doc, icon(doc, SHARE_PATHS), 'Share'),
-            step(doc, icon(doc, ADD_PATHS), 'Add to Home Screen')
+            state.variant === 'ios'
+                ? step(doc, icon(doc, SHARE_PATHS), 'Share')
+                : step(doc, dots(doc), '⋮'),
+            step(doc, icon(doc, ADD_PATHS), state.variant === 'ios' ? 'Add to Home Screen' : 'Add to Home screen')
         );
         root.append(hint, steps);
+    } else if (state.variant === 'desktop') {
+        const hint = doc.createElement('p');
+        hint.className = 'install__hint';
+        hint.textContent = DESKTOP_HINT;
+        root.append(hint);
     } else {
         const copy = doc.createElement('p');
         copy.className = 'install__hint';
-        copy.textContent = state.installEnabled
-            ? 'One tap puts Hang Out on your home screen.'
-            : 'Chrome will turn on Install in a moment.';
+        copy.textContent = 'One tap puts Hang Out on your home screen.';
         const install = doc.createElement('button');
         install.type = 'button';
         install.className = 'install__go';

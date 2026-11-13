@@ -3,6 +3,7 @@ const path = require('node:path');
 const { test, expect } = require('@playwright/test');
 
 const shots = path.resolve(__dirname, '../../../hangout-homescreen-shots/p2');
+const fix2 = path.resolve(__dirname, '../../../hangout-homescreen-shots/fix2');
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
 const ANDROID = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36';
 const MARKER = 'not-a-real-invite-value';
@@ -32,6 +33,7 @@ async function shot(page, name) {
 
 test.beforeAll(() => {
     fs.mkdirSync(shots, { recursive: true });
+    fs.mkdirSync(fix2, { recursive: true });
 });
 
 test('manifest asks Android to open in-scope invite links and lists the shortcuts', async ({ request, baseURL }) => {
@@ -76,10 +78,14 @@ test.describe('entry, offline, and invite guidance', () => {
             await page.goto(`${ROOM}#r=${MARKER}&h=${MARKER}`);
             const guide = page.getByRole('region', { name: 'Open in Hang Out' });
             await expect(guide).toBeVisible();
+            await expect(guide.getByRole('link', { name: 'Go to Hang Out home' })).toBeVisible();
+            await expect(guide.getByRole('button', { name: 'Jump in' })).toHaveCount(0);
             if (item.userAgent === IPHONE) await expect(guide).toContainText('Safari');
-            else await expect(guide).toContainText('cannot tell whether the app is installed');
+            else await expect(guide).not.toContainText('Safari');
+            await expect(guide).not.toContainText('cannot tell whether the app is installed');
             expect(await page.locator('body').innerText()).not.toContain(MARKER);
             await shot(page, `${item.name}-invite.png`);
+            await page.screenshot({ path: path.join(fix2, `${item.name}-invite.png`), fullPage: true });
             await context.close();
         });
     }
@@ -130,19 +136,37 @@ test('WebJam join navigations get Open in Hang Out from the worker', async ({ br
     await page.goto('/join/');
     const guide = page.getByRole('region', { name: 'Open in Hang Out' });
     await expect(guide).toBeVisible();
-    await expect(guide).toContainText('cannot tell whether the app is installed');
+    await expect(guide.getByRole('link', { name: 'Go to Hang Out home' })).toBeVisible();
+    await expect(guide).toContainText('Ask your host to send the invite; tap it and you\'re in.');
+    await expect(guide).not.toContainText('cannot tell whether the app is installed');
     expect(await page.locator('[data-open-in-app]').innerText()).not.toMatch(/[?#]/);
     await shot(page, 'android-join-invite.png');
     await context.close();
 });
 
-test('shortcuts open Game Night, WebJam, and the stored last place', async ({ browser }) => {
+test('shortcuts open Game Night, ask for a WebJam invite, and repeat the stored last place', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'allow' });
     const page = await context.newPage();
     const gameNightNavigation = (req) => req.isNavigationRequest() && new URL(req.url()).search === '?game-night=1';
-    await page.goto('/hangout/?go=webjam', { waitUntil: 'commit' });
-    await page.waitForURL(/\/join\/$/);
+    const joined = [];
+    page.on('request', (req) => {
+        if (new URL(req.url()).pathname.endsWith('/join/') || new URL(req.url()).pathname.endsWith('/join')) joined.push(req.url());
+    });
+    await page.goto('/hangout/?go=webjam');
+    const guide = page.getByRole('region', { name: 'Open in Hang Out' });
+    await expect(guide).toBeVisible();
+    await expect(guide.getByRole('link', { name: 'Go to Hang Out home' })).toBeVisible();
+    await expect(guide).toContainText('Ask your host to send the invite; tap it and you\'re in.');
+    await expect(page).toHaveURL(/\/hangout\/\?go=webjam$/);
     expect(page.url()).not.toMatch(/invite|grant|token/i);
+    expect(joined).toEqual([]);
+    await page.screenshot({ path: path.join(fix2, 'webjam-ask-390x844.png'), fullPage: true });
+    await page.goto('/hangout/');
+    joined.length = 0;
+    await page.locator('.choice', { hasText: 'WebJam' }).click();
+    await expect(page).toHaveURL(/\/hangout\/\?go=webjam$/);
+    await expect(page.getByRole('region', { name: 'Open in Hang Out' })).toContainText('Ask your host to send the invite; tap it and you\'re in.');
+    expect(joined).toEqual([]);
     await page.goto('/hangout/', { waitUntil: 'domcontentloaded' });
     const openedGameNight = page.waitForRequest(gameNightNavigation);
     await page.locator('.choice', { hasText: 'Game Night' }).click();
@@ -155,6 +179,22 @@ test('shortcuts open Game Night, WebJam, and the stored last place', async ({ br
     const last = await openedLast;
     expect(new URL(last.url()).pathname).toMatch(/\/lobby\/$/);
     expect(last.url()).not.toMatch(/invite|grant|token/i);
+    await context.close();
+});
+
+test('a valid room link leads with Jump in', async ({ browser }) => {
+    const context = await browser.newContext(contextOptions(VIEWPORTS[0]));
+    const page = await context.newPage();
+    const secret = 'c'.repeat(24);
+    const host = 'd'.repeat(80);
+    await page.goto(`${ROOM}#r=${secret}&h=${host}`);
+    const guide = page.getByRole('region', { name: 'Open in Hang Out' });
+    await expect(guide.getByRole('button', { name: 'Jump in' })).toBeVisible();
+    await expect(guide).toContainText('iPhone opens this link in Safari.');
+    const text = await page.locator('body').innerText();
+    expect(text).not.toContain(secret);
+    expect(text).not.toContain(host);
+    await page.screenshot({ path: path.join(fix2, 'iphone-390x844-jump.png'), fullPage: true });
     await context.close();
 });
 

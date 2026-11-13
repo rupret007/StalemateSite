@@ -18,13 +18,22 @@ import {
     startOfflineRetry
 } from '../../hangout/offline-retry.mjs';
 import {
+    HOME_LABEL,
+    HOST_ASK,
+    IPHONE_LIMIT,
+    JUMP_LABEL,
     OPEN_IN_APP_TITLE,
+    classifyInvite,
     detectInstalled,
     fillOpenInApp,
+    hangoutHomePath,
     inviteSignal,
+    jumpIn,
+    mountHostAsk,
     mountOpenInApp,
-    openInAppCopy,
-    openInAppDecision
+    openInAppDecision,
+    openInAppLines,
+    safeHomeHref
 } from '../../hangout/open-in-app.mjs';
 import { isOfflineAsset, offlineAssetUrls, offlineDocument } from '../../hangout/sw-policy.mjs';
 import {
@@ -79,19 +88,34 @@ describe('invite links open in the installed app', () => {
         expect(new URL(manifest.start_url, manifestUrl).href.startsWith(new URL(manifest.scope, manifestUrl).href)).toBe(true);
     });
 
-    it('states the iPhone limit and offers Open in Hang Out when installation is unknown', () => {
-        expect(openInAppDecision({ installed: 'unknown' })).toEqual({ show: true, installed: 'unknown' });
-        expect(openInAppDecision({ standalone: true, installed: 'unknown' }).show).toBe(false);
-        expect(openInAppDecision({ inviteOnly: true, invitePresent: false }).show).toBe(false);
-        expect(openInAppDecision({ inviteOnly: true, invitePresent: true, installed: 'unknown' }).show).toBe(true);
-        const ios = openInAppCopy({ ios: true, installed: 'unknown' });
-        expect(ios).toMatch(/Safari/);
-        expect(ios).toMatch(/cannot take this link/);
-        expect(ios).not.toMatch(/opens in the (app|Hang Out icon)/);
-        expect(openInAppCopy({ installed: 'unknown' })).toMatch(/cannot tell whether the app is installed/);
-        const region = fillOpenInApp(document, { ios: true, installed: 'unknown' });
-        expect(region.querySelector('h2').textContent).toBe(OPEN_IN_APP_TITLE);
-        expect(region.textContent).toContain(ios);
+    it('leads with one action and keeps the iPhone limit to one line', () => {
+        expect(openInAppDecision({ link: 'valid', installed: 'unknown' })).toEqual({
+            show: true, action: 'jump', installed: 'unknown'
+        });
+        expect(openInAppDecision({ link: 'invalid', installed: 'unknown' })).toEqual({
+            show: true, action: 'home', installed: 'unknown'
+        });
+        expect(openInAppDecision({ link: 'absent', hostPreview: true }).show).toBe(false);
+        expect(openInAppDecision({ standalone: true, link: 'valid' }).show).toBe(false);
+        expect(openInAppLines({ ios: true, action: 'jump', place: 'hangout' })).toEqual([IPHONE_LIMIT]);
+        expect(IPHONE_LIMIT).toMatch(/Safari/);
+        expect(IPHONE_LIMIT).not.toMatch(/cannot take this link/);
+        expect(openInAppLines({ ios: false, action: 'jump' })).toEqual([]);
+        const jump = fillOpenInApp(document, { ios: true, installed: 'unknown', action: 'jump', place: 'hangout' });
+        expect(jump.getAttribute('aria-label')).toBe(OPEN_IN_APP_TITLE);
+        expect(jump.querySelector('button').textContent).toBe(JUMP_LABEL);
+        expect(jump.querySelectorAll('p')).toHaveLength(1);
+        expect(jump.querySelector('p').textContent).toBe(IPHONE_LIMIT);
+        const home = fillOpenInApp(document, {
+            ios: false, action: 'home', place: 'webjam', homeHref: '/hangout/'
+        });
+        expect(home.querySelector('a').textContent).toBe(HOME_LABEL);
+        expect(home.querySelector('a').getAttribute('href')).toBe('/hangout/');
+        expect(home.querySelector('p').textContent).toBe(HOST_ASK);
+        expect(safeHomeHref('javascript:alert(1)')).toBe('');
+        expect(safeHomeHref('/hangout/?invite=1')).toBe('');
+        expect(hangoutHomePath('https://stalemate.band/hangout/open-in-app.mjs')).toBe('/hangout/');
+        expect(hangoutHomePath('https://jeffstory.github.io/StalemateSite/hangout/open-in-app.mjs')).toBe('/StalemateSite/hangout/');
     });
 
     it('does not copy an invite value into the guidance', async () => {
@@ -111,12 +135,14 @@ describe('invite links open in the installed app', () => {
             navigatorStandalone: false,
             installed: 'unknown',
             search: '',
-            hash: `#r=${MARKER}&h=${MARKER}`
+            hash: `#r=${MARKER}&h=${MARKER}`,
+            homeHref: '/hangout/'
         });
         expect(shown).toBe(true);
-        expect(doc.body.textContent).toContain(OPEN_IN_APP_TITLE);
+        expect(doc.body.textContent).toContain(HOME_LABEL);
         expect(doc.body.textContent).toContain('Safari');
         expect(doc.body.textContent).not.toContain(MARKER);
+        expect(doc.body.textContent).not.toContain('Jump');
         expect(readPlace(storage)).toBe('hangout');
         expect(await detectInstalled({})).toBe('unknown');
         expect(await detectInstalled({ getInstalledRelatedApps: async () => [] })).toBe('unknown');
@@ -322,9 +348,20 @@ describe('icon shortcuts and last room', () => {
             expect(JSON.stringify(shortcut)).not.toContain('45662413410ed051');
         }
         expect(manifest.shortcuts[2].url).toBe('hangout/?go=last');
+        const icons = manifest.shortcuts.map((item) => item.icons[0].src);
+        expect(new Set(icons).size).toBe(3);
+        const buffers = icons.map((src) => readFileSync(join(repoRoot, src)));
+        expect(buffers[0].equals(buffers[1])).toBe(false);
+        expect(buffers[1].equals(buffers[2])).toBe(false);
+        expect(buffers[0].equals(buffers[2])).toBe(false);
+        for (const buffer of buffers) {
+            expect(buffer.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+            expect(buffer.readUInt32BE(16)).toBe(192);
+            expect(buffer.readUInt32BE(20)).toBe(192);
+        }
     });
 
-    it('stores only a place name and opens that choice', () => {
+    it('stores only a place name and opens that choice', async () => {
         const storage = memoryStorage();
         expect(rememberPlace(storage, 'webjam')).toBe(true);
         expect(rememberPlace(storage, `../join/?invite=${MARKER}`)).toBe(false);
@@ -344,18 +381,76 @@ describe('icon shortcuts and last room', () => {
             '<a data-place="webjam" href="../join/">WebJam</a>'
         ].join(''));
         const replaced = [];
+        const asked = [];
         expect(mountShortcuts(doc, {
             search: `?go=last&invite=${MARKER}`,
             storage,
-            replace: (href) => replaced.push(href)
-        })).toBe(true);
-        expect(replaced).toEqual(['../join/']);
-        expect(replaced.join('')).not.toContain(MARKER);
+            replace: (href) => replaced.push(href),
+            onWebjam: () => asked.push('ask')
+        })).toBe(false);
+        expect(replaced).toEqual([]);
+        expect(asked).toEqual([]);
+        expect(readPlace(storage)).toBe('webjam');
         expect(choiceHref(doc, 'game-night')).toBe('../r/45662413410ed051/lobby/?game-night=1');
+        const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+        doc.querySelector('[data-place="webjam"]').dispatchEvent(event);
+        expect(event.defaultPrevented).toBe(true);
+        expect(asked).toEqual(['ask']);
         const fresh = memoryStorage();
         mountShortcuts(doc, { search: '', storage: fresh, replace: () => {} });
         doc.querySelector('[data-place="game-night"]').click();
         expect(readPlace(fresh)).toBe('game-night');
+        const secret = 'a'.repeat(24);
+        const host = 'b'.repeat(80);
+        expect(classifyInvite('', `#r=${secret}&h=${host}`)).toBe('valid');
+        expect(classifyInvite('', `#r=${MARKER}&h=${MARKER}`)).toBe('invalid');
+        expect(classifyInvite('', '')).toBe('absent');
+        const bytes = new Uint8Array(32);
+        bytes[0] = 1;
+        let binary = '';
+        bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+        const capability = btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+        const session = 'ab'.repeat(32);
+        const expires = Math.floor(Date.now() / 1000) + 120;
+        const webjam = `#k=${capability}&s=${session}&g=1&e=${expires}`;
+        expect(classifyInvite('', webjam, Date.now())).toBe('valid');
+        expect(classifyInvite('', `#k=${'A'.repeat(43)}&s=${session}&g=1&e=${expires}`)).toBe('invalid');
+        expect(inviteSignal('', webjam)).toBe(true);
+        const validDoc = page(
+            '<meta name="hangout-open-in-app" content="invite"><meta name="hangout-place" content="hangout">',
+            '<section data-gate><input data-name><button data-enter type="button">Jump in</button></section>'
+        );
+        expect(await mountOpenInApp(validDoc, {
+            userAgent: ANDROID,
+            storage: memoryStorage(),
+            matchMedia: () => ({ matches: false }),
+            navigatorStandalone: false,
+            installed: 'unknown',
+            search: '',
+            hash: `#r=${secret}&h=${host}`,
+            homeHref: '/hangout/'
+        })).toBe(true);
+        const guide = validDoc.querySelector('[data-open-in-app]');
+        expect(guide.querySelector('button').textContent).toBe(JUMP_LABEL);
+        expect(guide.textContent).not.toContain(secret);
+        expect(guide.textContent).not.toContain(host);
+        expect(guide.querySelectorAll('p')).toHaveLength(0);
+        const name = validDoc.querySelector('[data-name]');
+        let focused = 0;
+        name.focus = () => { focused += 1; };
+        guide.querySelector('button').click();
+        expect(focused).toBe(1);
+        expect(jumpIn(validDoc)).toBe('name');
+        const slot = document.createElement('div');
+        slot.hidden = true;
+        expect(mountHostAsk(slot, { userAgent: IPHONE, maxTouchPoints: 0, homeHref: '/hangout/' })).toBe(true);
+        expect(slot.hidden).toBe(false);
+        expect(slot.textContent).toContain(HOST_ASK);
+        expect(slot.textContent).toContain(IPHONE_LIMIT);
+        expect(slot.textContent).not.toContain(secret);
+        const entry = readFileSync(join(repoRoot, 'hangout/index.html'), 'utf8');
+        expect(entry).toContain(HOST_ASK);
+        expect(entry).toContain('href="../join/"');
     });
 
     it('does not log or cache an invite from the worker', () => {

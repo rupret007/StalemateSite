@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+    ANDROID_HINT,
+    DESKTOP_HINT,
     DISMISS_KEY,
     INSTALLED_KEY,
     SHARE_HINT,
@@ -74,21 +76,27 @@ describe('install card state', () => {
         const ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15';
         expect(isIos(ua, 5)).toBe(true);
         expect(installCardState({ userAgent: ua, maxTouchPoints: 5 }).variant).toBe('ios');
-        expect(installCardState({ userAgent: ua, maxTouchPoints: 0 }).variant).toBe('hidden');
-        expect(installCardState({ userAgent: DESKTOP, maxTouchPoints: 5 }).variant).toBe('hidden');
+        expect(installCardState({ userAgent: ua, maxTouchPoints: 0 }).variant).toBe('desktop');
+        expect(installCardState({ userAgent: DESKTOP, maxTouchPoints: 5 }).variant).toBe('desktop');
     });
 
     it('keeps an iPhone on the share hint even if a prompt object exists', () => {
         expect(installCardState({ userAgent: IPHONE, deferredPrompt: {} }).variant).toBe('ios');
     });
 
-    it('shows a disabled Install button on Android Chrome until the browser offers it', () => {
+    it('shows Android menu steps until the browser offers Install', () => {
         const state = installCardState({ userAgent: ANDROID });
-        expect(state).toEqual({ visible: true, variant: 'install', installEnabled: false });
+        expect(state).toEqual({ visible: true, variant: 'android', installEnabled: false });
         const root = document.createElement('aside');
         fillInstallCard(root, state);
-        expect(root.querySelector('.install__go').disabled).toBe(true);
-        expect(root.querySelector('.install__go').textContent).toBe('Install');
+        expect(root.querySelector('.install__go')).toBeNull();
+        expect(root.textContent).toContain(ANDROID_HINT);
+        expect(root.textContent).toContain('Install app');
+        expect([...root.querySelectorAll('.install__steps li')].map((item) => item.textContent)).toEqual([
+            '⋮',
+            'Add to Home screen'
+        ]);
+        expect(root.querySelectorAll('svg')).toHaveLength(2);
         expect(root.textContent).not.toContain(SHARE_HINT);
     });
 
@@ -99,10 +107,15 @@ describe('install card state', () => {
         });
     });
 
-    it('hides the card on desktop until Chrome offers install', () => {
-        expect(installCardState({ userAgent: DESKTOP })).toEqual({
-            visible: false, variant: 'hidden', installEnabled: false
-        });
+    it('shows a short desktop install hint until Chrome offers install', () => {
+        const state = installCardState({ userAgent: DESKTOP });
+        expect(state).toEqual({ visible: true, variant: 'desktop', installEnabled: false });
+        const root = document.createElement('aside');
+        fillInstallCard(root, state);
+        expect(root.hidden).toBe(false);
+        expect(root.textContent).toContain(DESKTOP_HINT);
+        expect(root.querySelector('.install__go')).toBeNull();
+        expect(root.textContent).not.toContain(SHARE_HINT);
     });
 
     it('hides the card when the app is already installed or the hint was dismissed', () => {
@@ -148,7 +161,8 @@ describe('install card behavior', () => {
         const storage = memoryStorage();
         const root = document.createElement('aside');
         const handlers = mount(root, { userAgent: ANDROID, storage });
-        expect(root.querySelector('.install__go').disabled).toBe(true);
+        expect(root.querySelector('.install__go')).toBeNull();
+        expect(root.textContent).toContain('⋮');
 
         let prompts = 0;
         const event = new Event('beforeinstallprompt', { cancelable: true });
@@ -181,14 +195,16 @@ describe('install card behavior', () => {
         for (let tick = 0; tick < 8; tick += 1) await Promise.resolve();
         expect(readFlag(storage, INSTALLED_KEY)).toBe(false);
         expect(root.hidden).toBe(false);
-        expect(root.querySelector('.install__go').disabled).toBe(true);
+        expect(root.querySelector('.install__go')).toBeNull();
+        expect(root.textContent).toContain(ANDROID_HINT);
     });
 
     it('hides when the browser reports the app was installed', () => {
         const storage = memoryStorage();
         const root = document.createElement('aside');
         const handlers = mount(root, { userAgent: DESKTOP, storage });
-        expect(root.hidden).toBe(true);
+        expect(root.hidden).toBe(false);
+        expect(root.textContent).toContain(DESKTOP_HINT);
         handlers.appinstalled();
         expect(readFlag(storage, INSTALLED_KEY)).toBe(true);
         expect(root.hidden).toBe(true);

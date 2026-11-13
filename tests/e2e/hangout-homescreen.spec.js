@@ -3,6 +3,7 @@ const path = require('node:path');
 const { test, expect } = require('@playwright/test');
 
 const shots = path.resolve(__dirname, '../../../hangout-homescreen-shots');
+const fix2 = path.resolve(__dirname, '../../../hangout-homescreen-shots/fix2');
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
 const ANDROID = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36';
 
@@ -35,6 +36,7 @@ async function offerInstall(page) {
 
 test.beforeAll(() => {
     fs.mkdirSync(shots, { recursive: true });
+    fs.mkdirSync(fix2, { recursive: true });
 });
 
 test('manifest is valid and every icon loads', async ({ request, baseURL }) => {
@@ -105,6 +107,7 @@ test('iPhone shows the share hint, and dismissing it sticks', async ({ browser }
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
     await page.screenshot({ path: path.join(shots, 'iphone-390x844.png'), fullPage: true });
+    await page.screenshot({ path: path.join(fix2, 'iphone-390x844.png'), fullPage: true });
 
     await card.getByRole('button', { name: 'Not now' }).click();
     await expect(card).toBeHidden();
@@ -129,19 +132,21 @@ test('Android Chrome shows a one-tap Install button', async ({ browser }) => {
     const card = page.locator('[data-install-card]');
     await expect(card).toBeVisible();
     await expect(card).not.toContainText('Tap Share, then Add to Home Screen.');
-    const install = card.getByRole('button', { name: 'Install' });
-    await expect(install).toBeDisabled();
+    await expect(card).toContainText('Tap ⋮, then Add to Home screen or Install app.');
+    await expect(card.getByRole('button', { name: 'Install' })).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+    await page.screenshot({ path: path.join(fix2, 'android-chrome.png'), fullPage: true });
     await offerInstall(page);
+    const install = card.getByRole('button', { name: 'Install' });
     await expect(install).toBeEnabled();
     await expect(card).toContainText('One tap puts Hang Out on your home screen.');
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
     await page.screenshot({ path: path.join(shots, 'android-chrome.png'), fullPage: true });
     await install.click();
     await expect.poll(() => page.evaluate(() => window.__hangoutInstallPrompts || 0)).toBe(1);
     await context.close();
 });
 
-test('desktop 1440 hides the card until Chrome offers install', async ({ browser }) => {
+test('desktop 1440 shows an install hint until Chrome offers install', async ({ browser }) => {
     const context = await browser.newContext({
         viewport: { width: 1440, height: 900 },
         reducedMotion: 'reduce',
@@ -151,11 +156,14 @@ test('desktop 1440 hides the card until Chrome offers install', async ({ browser
     await settle(page);
 
     const card = page.locator('[data-install-card]');
-    await expect(card).toBeHidden();
+    await expect(card).toBeVisible();
+    await expect(card).toContainText('Use the install icon in the address bar, or the browser menu.');
+    await expect(card.getByRole('button', { name: 'Install' })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Hang Out', exact: true })).toBeVisible();
     await expect(page.locator('.choice')).toHaveCount(3);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
     await page.screenshot({ path: path.join(shots, 'desktop-1440x900.png'), fullPage: true });
+    await page.screenshot({ path: path.join(fix2, 'desktop-1440x900.png'), fullPage: true });
 
     await offerInstall(page);
     await expect(card.getByRole('button', { name: 'Install' })).toBeEnabled();

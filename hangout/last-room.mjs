@@ -61,14 +61,23 @@ export function choiceHref(doc, place) {
 export function mountShortcuts(doc, env) {
     const place = placeFromShortcut(env.search, env.storage);
     if (place) rememberPlace(env.storage, place);
-    const href = place ? choiceHref(doc, place) : '';
-    if (href) {
-        env.replace(href);
-        return true;
+    // WebJam has no invite on this page. Stay here and ask for the host's link
+    // instead of opening the join page, which treats a missing link as invalid.
+    if (place && place !== 'webjam') {
+        const href = choiceHref(doc, place);
+        if (href) {
+            env.replace(href);
+            return true;
+        }
     }
     for (const link of doc.querySelectorAll('[data-place]')) {
-        link.addEventListener('click', () => {
-            rememberPlace(env.storage, link.getAttribute('data-place'));
+        link.addEventListener('click', (event) => {
+            const name = link.getAttribute('data-place');
+            rememberPlace(env.storage, name);
+            if (name !== 'webjam') return;
+            if (event.button > 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            event.preventDefault();
+            env.onWebjam?.();
         });
     }
     return false;

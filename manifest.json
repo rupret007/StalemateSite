@@ -53,7 +53,7 @@
       "url": "hangout/?go=game-night",
       "icons": [
         {
-          "src": "assets/hangout-app/icon-192.png",
+          "src": "assets/hangout-app/shortcut-game-night.png",
           "sizes": "192x192",
           "type": "image/png"
         }
@@ -66,7 +66,7 @@
       "url": "hangout/?go=webjam",
       "icons": [
         {
-          "src": "assets/hangout-app/icon-192.png",
+          "src": "assets/hangout-app/shortcut-webjam.png",
           "sizes": "192x192",
           "type": "image/png"
         }
@@ -79,7 +79,7 @@
       "url": "hangout/?go=last",
       "icons": [
         {
-          "src": "assets/hangout-app/icon-192.png",
+          "src": "assets/hangout-app/shortcut-last-room.png",
           "sizes": "192x192",
           "type": "image/png"
         }

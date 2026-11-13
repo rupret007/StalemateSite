@@ -49,6 +49,8 @@ export function shouldGuideJoin(url, request = {}) {
     return isJoinNavigation(url);
 }
 
+// The pinned join document has no slot for this module. A worker can insert
+// the note only after it is already controlling the page.
 export function injectJoinGuide(html, assetBase, pageUrl) {
     const base = trustedAssetBase(assetBase, pageUrl);
     if (typeof html !== 'string' || !base) return html;

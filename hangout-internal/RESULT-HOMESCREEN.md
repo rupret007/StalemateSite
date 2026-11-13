@@ -170,3 +170,57 @@ npx vitest run tests/unit/hangout-phase2.test.js tests/unit/hangout-install-card
  Test Files  6 passed (6)
       Tests  50 passed (50)
 ```
+
+## FIX2
+
+A stranger who already knows which choice to tap was landing on a closed door. The invite note now leads with one action. A valid room or WebJam link shows **Jump in**, and the iPhone limit is the single line “iPhone opens this link in Safari.” An invalid or missing link shows **Go to Hang Out home**. On iPhone that line still sits under the action.
+
+The WebJam choice and the `?go=webjam` shortcut stay on `/hangout/` and say “Ask your host to send the invite; tap it and you're in.” They do not open `/join/`. That join document is hash-pinned, so a cold visit with no controlling worker still shows its own invalid-invite headline. After the worker is in control, the same note is inserted there. The note is on the home screen before the worker installs.
+
+Android shows menu steps (⋮, then Add to Home screen or Install app) until Chrome fires `beforeinstallprompt`, then the one-tap Install button. Desktop shows “Use the install icon in the address bar, or the browser menu.” until that event. The iPhone Share steps are unchanged.
+
+The three shortcuts use different 192px icons made from the existing WebJam mark: `shortcut-game-night.png`, `shortcut-webjam.png`, and `shortcut-last-room.png`.
+
+`hangout-internal/HOMESCREEN-LOBBY-HOOKS.md` is the lobby work this branch must not do: keep `game-night=1` when `lobby.js` cleans the address bar, and replace the unpublished “Not open yet” gate once the lobby is public.
+
+```
+npx vitest run tests/unit/apache-public-boundary.test.js tests/unit/hangout-hidden.test.js
+```
+
+```
+ Test Files  2 passed (2)
+      Tests  49 passed (49)
+   Start at  01:17:40
+   Duration  897ms (transform 101ms, setup 85ms, import 100ms, tests 567ms, environment 0ms)
+```
+
+```
+npx vitest run tests/unit/hangout-phase2.test.js tests/unit/hangout-install-card.test.js tests/unit/hangout-hidden.test.js tests/unit/hangout-room-csp.test.js tests/unit/webjam-join-assets.test.js tests/unit/package-pages.test.js
+```
+
+```
+ Test Files  6 passed (6)
+      Tests  50 passed (50)
+   Start at  01:18:42
+   Duration  4.02s (transform 559ms, setup 316ms, import 671ms, tests 4.36s, environment 4.02s)
+```
+
+```
+npx playwright test tests/e2e/hangout-homescreen.spec.js tests/e2e/hangout-homescreen-phase2.spec.js --project=chromium
+```
+
+```
+  15 passed (20.0s)
+```
+
+Screenshots are outside the repo, in `../hangout-homescreen-shots/fix2/`:
+
+- `iphone-390x844.png` — Share steps and the WebJam host line
+- `android-chrome.png` — menu steps before Chrome offers Install
+- `desktop-1440x900.png` — address-bar install hint
+- `iphone-390x844-jump.png` — valid room link, Jump in, one Safari line
+- `iphone-390x844-invite.png` — invalid room link, Go to Hang Out home
+- `android-chrome-invite.png`, `desktop-1440x900-invite.png`
+- `webjam-ask-390x844.png` — shortcut stays on the home screen and asks for the host’s link
+
+0 failed. The full unit suite and the rest of the Playwright suite were not re-run.

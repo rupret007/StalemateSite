@@ -11,19 +11,31 @@
     line-height: 1.45;
 }
 
-.hoa h2 {
-    margin: 0;
-    color: #f4f0e6;
+.hoa__go {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 52px;
+    border: 0;
+    background: #b5dc08;
+    color: #171410;
     font-family: "Arial Narrow", "Barlow Condensed", Impact, sans-serif;
-    font-size: 1.7rem;
+    font-size: 1.45rem;
     font-weight: 800;
-    letter-spacing: -0.02em;
+    letter-spacing: 0.02em;
     line-height: 1;
+    text-align: center;
+    text-decoration: none;
+    box-shadow: 3px 3px 0 #000;
+    cursor: pointer;
 }
 
-.hoa p {
+.hoa p,
+.hoa__line {
     margin: 8px 0 0;
-    color: #f4f0e6;
+    color: #c9bba9;
+    font-size: 0.98rem;
 }
 
 .hoa :focus-visible {
