@@ -7,6 +7,12 @@ const target = (base, relative) => new URL(relative, base).href;
 test.beforeEach(async ({ context, page, baseURL }, info) => {
     const errors = [];
     await context.route('**/*goatcounter.com/**', route => route.abort());
+    if (new URL(baseURL).hostname === '127.0.0.1') {
+        // Exercise the site's local font fallback without relying on Google's DNS in CI.
+        await context.route('https://fonts.googleapis.com/**', route => route.fulfill({
+            contentType: 'text/css', body: '/* Offline font fallback. */'
+        }));
+    }
     page.on('pageerror', error => errors.push(error.message));
     page.on('response', response => {
         if (response.url().startsWith(baseURL) && response.status() >= 400) errors.push(`HTTP${response.status()} ${response.url()}`);
