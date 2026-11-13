@@ -44,7 +44,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const gameGuest = betaBootstrap?.gameGuest;
     const gameGuestQuery = gameGuest ? '?game-guest=1' : '';
     const guestInvitationChanged = gameGuest && history.state?.gameSessionRef && history.state.gameSessionRef !== gameGuest.sessionRef;
-    let gameGuestExit = gameGuest && ['left', 'closed', 'removed'].includes(history.state?.gameExit) ? history.state.gameExit : '';
+    let gameGuestExit = gameGuest && ['left', 'canceled', 'closed', 'removed'].includes(history.state?.gameExit) ? history.state.gameExit : '';
     let gameGuestSeated = false;
     if (gameGuest) document.body.classList.add('game-guest');
     let gameEntry = betaShell ? gameNightEntry?.(params, location.hash) : null;
@@ -641,6 +641,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         drawCommunity(); drawRooms(); drawMessageRecovery(); refreshPaletteCohosts();
     }
     const JOIN_TIMEOUT_MS = 20_000;
+    const GAME_GUEST_RETRY_DELAY_MS = 5_000;
     let cancelTransportAck = () => {};
     let cancelEntryCheck = () => {}, pageLeaving = false;
     window.addEventListener('pagehide', () => { pageLeaving = true; cancelEntryCheck(); });
@@ -701,9 +702,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const heartbeat = createIdleHeartbeat(ws, () => attempt === connectionAttempt && app.ws === ws);
         let opened = false;
         let sessionNick = nick;
-        let joinTimer, ackTimer, ackSeq = 0, ackFrames = 0, ackSentAt = -Infinity;
+        let joinTimer, guestRetryTimer, ackTimer, ackSeq = 0, ackFrames = 0, ackSentAt = -Infinity;
         cancelTransportAck = () => {
             clearTimeout(joinTimer);
+            clearTimeout(guestRetryTimer);
             clearTimeout(ackTimer); ackTimer = null; ackFrames = 0; heartbeat.stop();
         };
         const flushAck = () => {
@@ -725,7 +727,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (!m || typeof m !== 'object') return;
             heartbeat.received();
             if (m.t === 'hello') heartbeat.negotiate(m.features?.transportPing);
-            if (m.t === 'welcome' || m.t === 'nick-error') clearTimeout(joinTimer);
+            if (m.t === 'welcome' || m.t === 'nick-error') {
+                clearTimeout(joinTimer);
+                clearTimeout(guestRetryTimer);
+            }
             if (m.t === 'welcome') sessionNick = m.nick;
             if (m.t !== 'transport-pong') handle(m, sessionNick);
             if (Number.isSafeInteger(m.transportSeq) && m.transportSeq > 0) {
@@ -786,6 +791,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             retryTimer = setTimeout(() => connect(app.me || nick), Math.min(10000, 1000 * (2 ** Math.min(retry++, 4))) * (0.75 + Math.random() * 0.25));
         };
         ws.onclose = onClose;
+        if (gameGuest && !gameGuestSeated) guestRetryTimer = setTimeout(() => {
+            if (attempt !== connectionAttempt || app.ws !== ws) return;
+            gateStatus('Still connecting to your game…');
+            $('[data-game-guest-retry]').hidden = false;
+        }, GAME_GUEST_RETRY_DELAY_MS);
         joinTimer = setTimeout(() => {
             if (attempt !== connectionAttempt || app.ws !== ws) return;
             // An open socket alone does not confirm that the visitor joined.
@@ -839,9 +849,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         show('chat'); $('#session-ended-title').focus({ preventScroll: true });
     }
     function gameGuestExitMessage(reason) {
-        return { left: 'You left Game Night.', closed: 'This Game Night room closed.', removed: 'You were removed from Game Night.' }[reason] || 'Your Game Night access ended.';
+        return { left: 'You left Game Night.', canceled: 'You canceled joining Game Night.', closed: 'This Game Night room closed.', removed: 'You were removed from Game Night.' }[reason] || 'Your Game Night access ended.';
     }
     function leaveGameGuest(reason) {
+        if (reason === 'canceled' && app.ws) {
+            app.ws.onclose = null;
+            app.ws.onmessage = null;
+            if (app.ws.readyState < WebSocket.CLOSING) app.ws.close(1000);
+        }
         gameGuestExit = reason;
         history.replaceState({ gameSessionRef: gameGuest.sessionRef, gameExit: reason }, '', location.pathname + gameGuestQuery);
         endSession(reason);
@@ -1811,7 +1826,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
     }
     function arcadeMatchState(game, table, scope, state, sendMatch) {
-        table.invite = scope && state?.seat && state.waiting ? gameNightInvite(game, state.id) : null;
+        table.invite = scope && state?.seat && state.waiting && state.hasOpenSeat !== false ? gameNightInvite(game, state.id) : null;
         const invite = arcadeInvitation;
         if (!sendMatch || !invite || game !== invite.game || scope?.room !== invite.room || scope.ref !== invite.ref) return;
         if (state?.seat && (state.id === invite.match || gameGuest)) {
@@ -1822,7 +1837,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             }
             return finishArcadeInvitation();
         }
-        if (state?.id !== invite.match || !state.waiting) {
+        if (state?.id !== invite.match || !state.waiting || state.hasOpenSeat === false) {
             return finishArcadeInvitation('This game invitation no longer has an open seat. Ask the host for a fresh invitation.');
         }
         if (!invite.sent) invite.sent = sendMatch({ action: 'join', id: invite.match, seat: 'next' });
@@ -2844,6 +2859,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         } else if (gameGuestExit) leaveGameGuest(gameGuestExit);
         else {
             $('[data-game-guest-connecting]').hidden = false;
+            const cancel = $('[data-game-guest-cancel]');
+            cancel.hidden = false;
+            cancel.addEventListener('click', () => {
+                if (!gameGuestSeated && !sessionEnded) leaveGameGuest('canceled');
+            });
             $('[data-game-guest-retry]').addEventListener('click', () => connect(''));
             void connect('');
         }

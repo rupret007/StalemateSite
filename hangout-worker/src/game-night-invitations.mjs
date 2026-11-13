@@ -5,6 +5,7 @@ export const GAME_GUEST_PATH = '/beta/game-night/guest';
 export const GAME_INVITATION_PATH = '/beta/game-night/invitation';
 const STORAGE_PREFIX = 'game-night-invitation:';
 const LINK_TTL = 20 * 60_000;
+const CLAIM_TTL = 60_000;
 const GUEST_TTL = 2 * 60 * 60_000;
 const LINK_CAP = 100;
 const LINK_CAP_PER_HOST = 8;
@@ -30,6 +31,12 @@ export function gameGuestScope(value) {
 
 // Called within the lobby's serialized event path. Only the Worker sends a trusted session for issuance.
 export async function gameInvitationRequest(lobby, operation, body, session) {
+    if (operation === 'release') {
+        const scope = gameGuestScope(body.scope);
+        if (!scope || !sidPattern.test(body.sid || '')) return reply({ ok: false }, 400);
+        await lobby.arcade.get(scope.game).releaseGuestClaim(scope, body.sid);
+        return reply({ ok: true });
+    }
     if (!gameGuestEnabled(lobby.env)) return reply({ error: 'Game invitations are unavailable.' }, 404);
     const now = Date.now();
     const storage = lobby.state.storage;
@@ -72,11 +79,15 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
     const scope = gameGuestScope(record.scope);
     const actor = scope && lobby.engine.invitedGameHost(scope);
     const binding = actor && lobby.arcadeBinding({ actor, room: scope.room, ref: scope.ref });
-    if (!binding?.canPlay || !await lobby.sessionActive(binding) || !lobby.arcadeAvailable(scope.game)
-        || !await lobby.arcade.get(scope.game).hasGuestSeat(scope, scope.match, scope.host)) return unavailable();
-    if (operation === 'details') return reply({ game: gameNightLabels[scope.game], host: binding.nick });
+    if (!binding?.canPlay || !await lobby.sessionActive(binding) || !lobby.arcadeAvailable(scope.game)) return unavailable();
+    const table = lobby.arcade.get(scope.game);
+    if (operation === 'details') {
+        if (!await table.hasGuestSeat(scope, scope.match, scope.host)) return unavailable();
+        return reply({ game: gameNightLabels[scope.game], host: binding.nick });
+    }
     const sid = crypto.randomUUID();
     const exp = now + GUEST_TTL;
-    await storage.put(key, { ...record, sid, exp, redeemer: attempt });
+    const accepted = { ...record, sid, exp, redeemer: attempt };
+    if (!await table.reserveGuestSeat(scope, sid, now + CLAIM_TTL, key, accepted)) return unavailable();
     return reply({ scope, sid, exp });
 }
