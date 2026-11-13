@@ -439,6 +439,7 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 .mania-tile[data-kind="2"] { background: #294a2c; }
 .mania-tile svg { display: block; width: 92%; height: 92%; pointer-events: none; }
 .mania-tile.mania-group { border-color: #9cbe59; }
+[data-mania-match][data-phase="play"] .mania-starter { box-shadow: inset 0 0 0 2px var(--lime); }
 .mania-tile:focus-visible { z-index: 2; outline: 2px solid var(--lime); outline-offset: -2px; }
 .mania-countdown { position: absolute; inset: 0; display: grid; place-items: center; z-index: 2; border-radius: 8px;
   background: #121c16bb; color: var(--lime); pointer-events: none; font: bold 3rem var(--mono); }

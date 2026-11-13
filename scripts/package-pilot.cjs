@@ -20,7 +20,7 @@ if (target === 'beta') {
             'games/turdrummy-rules.js',
             'games/turdtris-sprint.js', 'games/turdtris_logic.js', 'games/turdtris-presentation.js',
             'games/turdtris-modes.js', 'games/turdtris-art.js',
-            'games/turdomania-core.js', 'assets/turdomania-tiles.svg',
+            'games/turdomania-core.js', 'games/turdomania-duel.js', 'assets/turdomania-tiles.svg',
             'games/turdrush-race.js', 'games/turdrush-core.js', 'games/turdrush-renderer.js',
             'games/arcade-action-clock.js', 'games/turdanoid-race.js', 'games/turdanoid-physics-core.js',
             'games/turdanoid-levels.js', 'games/turdanoid-levels-core.js', 'games/turdanoid-sprites-core.js',

@@ -1810,7 +1810,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(spectator.getByRole('img', { name: 'Player 1 puzzle' }).locator('[data-mania-tile]')).toHaveCount(36);
         await expect(spectator.getByRole('img', { name: 'Player 2 puzzle' }).locator('[data-mania-tile]')).toHaveCount(36);
         await expect(spectator.getByRole('grid')).toHaveCount(0);
+        await expect(board(b)).toHaveAttribute('aria-disabled', 'true');
         await expect(table(b)).toHaveAttribute('data-phase', 'play');
+        await expect(board(b)).toHaveAttribute('aria-disabled', 'false');
+        await expect(b.locator('[data-mania-status]')).toHaveText('Tap an outlined tile to pop its matching group.');
+        const highlighted = board(b).locator('.mania-starter');
+        assert.ok(await highlighted.count() >= 2);
+        await expect(tile(b, path[0])).toHaveClass(/mania-starter/);
+        assert.equal(new Set(await highlighted.evaluateAll(nodes => nodes.map(node => node.dataset.kind))).size, 1);
         if (evidence) {
             await mkdir(evidence, { recursive: true });
             await b.screenshot({ path: join(evidence, `mania-${engine}-phone.png`) });
@@ -1859,6 +1866,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
         if (prediction) assert.equal(await prediction, true, 'the local tile disappears before the delayed server confirmation');
         await expect(table(b)).toHaveAttribute('data-move', '1');
+        await expect(highlighted).toHaveCount(0);
         assert.deepEqual(await current(b), await current(a));
         if (!media) {
             const prior = await current(b);
