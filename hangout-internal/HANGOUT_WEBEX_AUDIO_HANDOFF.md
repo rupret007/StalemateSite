@@ -6,12 +6,12 @@ rehearsal build is `c6eecdc` on both Macs. Use **WebJam Private Rehearsal
 (c6eecdc)** on the Desktop and check the [current private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
 for exact package and website identities. Real meeting acceptance remains open.
 
-**November 9 update:** the existing Personal Room was saved through normal
-Settings in the verified Mini build and remained correct after reopening, with
-the musician name unchanged. Only the Mini preference was qualified; MacBook
-setup and the attended meeting checks remain pending. Do not recover the same
-private URL again merely because the historical readiness notes below predate
-that setup. Private links and room numbers stay out of repository evidence.
+**November 12 device check.** Both `c6eecdc` Macs have the same existing
+Personal Room saved. The Intel MacBook has Chrome and a listed camera. Use
+the browser option offered by Webex there. The Windows NucBox has Chrome
+and a Webex app, but the readback found no enabled camera. For a two-way
+video check, connect a camera to Windows and confirm its preview before
+joining. Keep the room link and number private.
 
 ## What the current application controls
 
@@ -60,16 +60,16 @@ Personal Room. The current vendor signature was valid. One HTTPS Webex Personal
 Room link was validated without saving its URL, room number or host fields to
 evidence; the client was quit normally. No meeting, camera or microphone started.
 
-That November 8 discovery did not configure WebJam or prove a meeting join.
-The November 9 Mini setup above supersedes its missing-preference state: do not
-recover or re-enter the Mini link again just because this dated section exists.
-MacBook setup remains unqualified; use normal existing-client/browser navigation
-and save only the validated existing meeting link when the device/resource gates
-permit. Do not ask Jeff to paste the private URL into chat. Do not create a new
-meeting, publish the link, enroll an SDK, or buy a license for this test. Use the
-supported external app/browser offered by the meeting; a native Show Webex App
-control requires a verified installed client. The read-only checks launched no
-meeting, microphone or camera and do not qualify video or audio switching.
+The November 12 setup above supersedes the earlier missing preferences.
+On the MacBook, choose **Join / Open Meeting** in Conversation. On a Mac
+with a verified Cisco client, **Show Webex App** brings that app forward.
+To undo the MacBook setup, clear its Webex meeting link in Settings. Its
+original meeting field was empty.
+
+The local Apple Silicon test candidate `58c269b` passed the Conversation
+layout, keyboard actions and audio-handoff instructions with the meeting
+launch intercepted. Use the staged `c6eecdc` build for the attended check.
+Joining, camera preview and exclusive audio still need that check.
 
 ## Attended manual handoff check
 
