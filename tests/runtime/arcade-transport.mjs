@@ -476,8 +476,17 @@ async function verifyWebJamChess() {
             await expect(reserve).toBeVisible();
             assert.equal(registrations, 0, 'opening a room and match does not reserve a guest seat');
             await capture(host, 'confirm-host');
+            const anonymous = await browser.newContext({ ignoreHTTPSErrors: true });
+            const unavailable = await anonymous.request.get(browserOrigin + '/join/game-offer.js');
+            assert.equal(unavailable.status(), 401, 'the protected offer module requires community admission');
+            await anonymous.close();
             const webJoin = await host.context().newPage();
-            await webJoin.goto(browserOrigin + '/join/');
+            const joinPage = await webJoin.goto(browserOrigin + '/join/');
+            assert.equal(joinPage.status(), 200);
+            const joinHeaders = joinPage.headers();
+            assert.match(joinHeaders['content-security-policy'], /script-src 'self'/);
+            assert.match(joinHeaders['x-robots-tag'], /noindex/);
+            assert.match(joinHeaders['permissions-policy'], /microphone=\(self\)/);
             const offerCard = await webJoin.evaluate(async raw => {
                 const { bindGameOfferChannel } = await import('/join/game-offer.js');
                 const channel = new EventTarget();
@@ -532,6 +541,8 @@ async function verifyWebJamChess() {
             assert.equal(registrations, 2, 'one host action retries the same reservation');
             await expect(page.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
             assert.ok(await page.evaluate(room => window.__lobby.active === room, hostRoom.room), 'the guest plays in the exact host room');
+            const scopedAsset = await page.request.get(browserOrigin + '/join/game-offer.js?game-guest=1');
+            assert.equal(scopedAsset.status(), 403, 'a Chess seat does not admit the guest to Web Join');
             for (const [player, squares] of [[host, ['e2', 'e4']], [page, ['d7', 'd5']]]) {
                 for (const square of squares) {
                     const target = player.locator('[data-square="' + square + '"]');
