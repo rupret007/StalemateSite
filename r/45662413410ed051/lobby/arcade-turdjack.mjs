@@ -61,7 +61,7 @@ function face(document, card) {
     return label;
 }
 
-export function mountArcadeTurdJack(container, onMatch) {
+export function mountArcadeTurdJack(container, onMatch, startShortcut) {
     const document = container.ownerDocument, panel = document.createElement('details');
     panel.className = 'arcade-card-table arcade-jack';
     panel.hidden = true;
@@ -71,6 +71,8 @@ export function mountArcadeTurdJack(container, onMatch) {
     const status = $('[data-jack-status]'), feedback = $('[data-jack-error]'), main = $('[data-jack-main]');
     const table = $('[data-jack-table]'), seatsHost = $('[data-jack-seats]'), chips = $('#jack-chips'), confirm = $('[data-jack-confirm]');
     const controls = [...panel.querySelectorAll('[data-jack-action]')];
+    const shortcutStatus = startShortcut?.querySelector('[role="status"]');
+    const shortcutButton = startShortcut?.querySelector('button');
     let scope = null, model = null, canOpen = false, connection = 'connecting', connectionError;
     let pending = false, timer, confirmation = '';
 
@@ -208,8 +210,13 @@ export function mountArcadeTurdJack(container, onMatch) {
             message = canOpen ? 'Open a shared dealer table for two to four players. Play chips only.' : 'Waiting for the host to open a table.';
             if (canOpen) { action = 'open'; label = 'Open Crapjack table'; }
         } else if (model?.waiting) {
-            message = `${occupied.length}/4 seated${seat ? ' · You’re ' + seatName(seat) : ''} · Play chips only`;
-            if (model.canStart && canOpen) { action = 'start'; label = 'Start table'; }
+            const seating = `${occupied.length}/4 seated${seat ? ' · You’re ' + seatName(seat) : ''}`;
+            if (model.canStart && canOpen) {
+                action = 'start'; label = 'Start table';
+                message = `${seating}. Ready to start with ${occupied.length} players.`;
+            } else {
+                message = seat && seat !== 'one' ? `${seating}. The host will start the round.` : `${seating} · Play chips only`;
+            }
         } else if (match?.result) {
             message = 'Session ended.';
             if (seat) {
@@ -230,6 +237,15 @@ export function mountArcadeTurdJack(container, onMatch) {
         main.dataset.command = action;
         main.textContent = label;
         main.disabled = pending;
+        if (startShortcut) {
+            if (action !== 'start' && document.activeElement === shortcutButton && panel.open) {
+                $('summary').focus();
+            }
+            startShortcut.hidden = action !== 'start';
+            shortcutButton.disabled = pending;
+            const notice = action === 'start' ? 'Crapjack 21 is ready.' : '';
+            if (shortcutStatus.textContent !== notice) shortcutStatus.textContent = notice;
+        }
         const leave = $('[data-jack-lobby-leave]');
         leave.hidden = connection !== 'ready' || !model?.waiting || !seat;
         leave.textContent = seat === 'one' ? 'Close table' : 'Release seat';
@@ -246,6 +262,7 @@ export function mountArcadeTurdJack(container, onMatch) {
         if (action === 'retry') client.start(scope);
         else if (action) send(action);
     });
+    shortcutButton?.addEventListener('click', () => { if (main.dataset.command === 'start') send('start'); });
     $('[data-jack-lobby-leave]').addEventListener('click', () => send('leave'));
     for (const button of controls) button.addEventListener('click', () => {
         const action = button.dataset.jackAction;
