@@ -1585,11 +1585,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const jam = jamRoomName(offer?.room);
         const roomLabel = jam ? offer.room : 'Game Night';
         const gameLabel = arcadeTables.get(offer?.arcade?.game)?.label;
+        const joiningArcade = !!gameLabel && joiningGameRoom === offer.room;
         const selectedGame = arcadeTables.get(gameEntry?.table)?.label;
         let message;
         if (start) message = gameOpenPending ? 'Opening Game Night…' : gameOpenError || (selectedGame
             ? `Start a private Game Night for ${selectedGame}.` : 'Start a private Game Night or wait for your host’s invitation.');
-        else if (joiningGameRoom === offer.room) message = `Joining ${roomLabel}…`;
+        else if (joiningGameRoom === offer.room) message = `Joining ${gameLabel || roomLabel}…`;
         else if (gameReturnOffered) {
             message = jam ? `You were disconnected from ${offer.room}. Chat starts fresh.`
                 : 'Game Night disconnected. Return to the room to check your match.';
@@ -1597,7 +1598,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         else message = 'Your link points to a private Game Night. The host’s invitation is required.';
         if (status.textContent !== message) status.textContent = message;
         button.textContent = start ? 'Start Game Night' : gameReturnOffered ? 'Return to room'
-            : gameLabel ? `Play ${gameLabel}` : jam ? 'Join room' : 'Join Game Night';
+            : joiningArcade ? 'Joining…' : gameLabel ? `Play ${gameLabel}` : jam ? 'Join room' : 'Join Game Night';
         const busy = !!joiningGameRoom || start && !!gameOpenPending;
         button.setAttribute('aria-disabled', String(busy));
         $('[data-game-offer-dismiss]').disabled = busy;
