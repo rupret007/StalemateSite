@@ -29,7 +29,8 @@ const markup = `
             <span class="small" data-brick-power></span>
         </div>
     </div>
-    <p class="small brick-race-help" id="brick-race-help">Drag or use the arrow keys to move. Space launches the ball.</p>
+    <p class="small" id="brick-race-launch-wait" data-brick-launch-wait hidden></p>
+    <p class="small brick-race-help" id="brick-race-help">Drag or use the arrow keys to move. Tap the stuck ball, press Launch, or press Space.</p>
 </div>
 <dialog class="sheet" aria-labelledby="brick-confirm-title" data-brick-confirm>
     <h3 id="brick-confirm-title">Leave this race?</h3>
@@ -91,11 +92,14 @@ export function mountArcadeTurdanoid(container, onMatch) {
     const table = $('[data-brick-match]'), board = $('[data-brick-board]'), status = $('[data-brick-status]'),
         error = $('[data-brick-error]'), main = $('[data-brick-main]'), leave = $('[data-brick-leave]'),
         launch = $('[data-brick-serve]'), confirm = $('[data-brick-confirm]'), motion = matchMedia('(prefers-reduced-motion: reduce)');
+    if (matchMedia('(pointer: coarse)').matches) {
+        $('.brick-race-help').textContent = 'Drag to move. Tap the stuck ball or press Launch.';
+    }
     const paint = createPainter(board.querySelector('canvas'));
     let scope, model, canOpen, connection, connectionError, visual, wall, receivedAt, raf = 0, pending, pointer,
         desiredAim = null, lastAim = -Infinity, lastSent = -Infinity, lastSync = -Infinity, retryAt = 0, redraw = true;
     const inputBufferLimit = 8;
-    let launchPointer = null, desiredAxis = null, keyboardActive = false;
+    let launchPointer = null, desiredAxis = null, keyboardActive = false, pointerStart = null;
     let buffer = [], flights = [], keys = new Set();
     const serverNow = time => model.match.at + Math.max(0, time - receivedAt);
     function clearPending() { clearTimeout(pending); pending = null; }
@@ -104,6 +108,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
         flights = [];
         if (!keepKeyboard) { keys.clear(); keyboardActive = false; }
         pointer = null;
+        pointerStart = null;
         launchPointer = null;
         desiredAim = desiredAxis = null;
     }
@@ -227,6 +232,12 @@ export function mountArcadeTurdanoid(container, onMatch) {
         table.dataset.paddle = Math.round(run.paddleX);
         table.dataset.stuck = String(run.ball.stuck);
         launch.disabled = connection !== 'ready' || countdown > 0 || !run.ball.stuck || run.status !== 'play' || !!pending;
+        const showLaunchWait = !!seat && !match.result && countdown > 0;
+        const launchWait = $('[data-brick-launch-wait]');
+        launchWait.hidden = !showLaunchWait;
+        put(launchWait, showLaunchWait ? 'Launch is not active yet. The countdown is still running.' : '');
+        if (showLaunchWait) launch.setAttribute('aria-describedby', 'brick-race-launch-wait');
+        else launch.removeAttribute('aria-describedby');
         const seconds = Math.max(0, Math.ceil((match.endsAt - Math.max(at, match.startsAt)) / 1000));
         put($('[data-brick-clock]'), match.result ? 'Final' : Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0'));
         const active = Object.keys(capsules).find(power => run.powers[power]);
@@ -329,6 +340,16 @@ export function mountArcadeTurdanoid(container, onMatch) {
         const rect = board.getBoundingClientRect();
         if (rect.width > 0) desiredAim = Math.round(Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)) * 1000);
     }
+    // A finger on the painted ball counts. The radius stays inside a nearby aim tap.
+    function hitsStuckBall(event) {
+        const ball = visual?.run?.ball;
+        const rect = board.getBoundingClientRect();
+        if (!ball?.stuck || visual.run.status !== 'play' || !(rect.width > 0) || !(rect.height > 0)) return false;
+        const x = (event.clientX - rect.left) / rect.width * BRICK_WIDTH;
+        const y = (event.clientY - rect.top) / rect.height * BRICK_HEIGHT;
+        const radius = Math.max(ball.r * 2.2, 16 * BRICK_WIDTH / rect.width);
+        return Math.hypot(x - ball.x, y - ball.y) <= radius;
+    }
     board.addEventListener('pointerdown', event => {
         if (connection !== 'ready' || !model?.seat || pointer !== null && pointer !== undefined || event.isPrimary === false || event.button !== 0) return;
         event.preventDefault();
@@ -336,13 +357,26 @@ export function mountArcadeTurdanoid(container, onMatch) {
         keyboardActive = false;
         desiredAxis = null;
         pointer = event.pointerId;
+        pointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY, ball: hitsStuckBall(event) };
         board.setPointerCapture?.(pointer);
         aim(event);
     });
     board.addEventListener('pointermove', aim);
-    board.addEventListener('pointerup', event => { aim(event); if (pointer === event.pointerId) pointer = null; });
+    board.addEventListener('pointerup', event => {
+        const start = pointerStart?.id === event.pointerId ? pointerStart : null;
+        aim(event);
+        if (pointer === event.pointerId) pointer = null;
+        if (!start) return;
+        pointerStart = null;
+        // A drag keeps aiming. A tap on the stuck ball is the only board serve.
+        if (!start.ball || Math.hypot(event.clientX - start.x, event.clientY - start.y) > 8) return;
+        requestServe();
+    });
     for (const name of ['pointercancel', 'lostpointercapture']) board.addEventListener(name, event => {
-        if (pointer === event.pointerId) { pointer = null; desiredAim = null; }
+        if (pointer !== event.pointerId) return;
+        pointer = null;
+        desiredAim = null;
+        if (name === 'pointercancel') pointerStart = null;
     });
 
     function reset() {

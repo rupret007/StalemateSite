@@ -17,7 +17,7 @@ if (target === 'beta') {
             throw Error('The protected match and arcade imports must use the same revision.');
         const files = [
             'games/chess-core.js', 'games/chess-board.js', 'assets/chess/chess.js',
-            'games/turdrummy-rules.js',
+            'games/turdrummy-rules.js', 'games/turdspades-engine.js',
             'games/turdtris-sprint.js', 'games/turdtris_logic.js', 'games/turdtris-presentation.js',
             'games/turdtris-modes.js', 'games/turdtris-art.js',
             'games/turdomania-core.js', 'assets/turdomania-tiles.svg',

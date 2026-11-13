@@ -1,6 +1,13 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { GameNightSpadesPartners, GameNightTurdSpades } from '../../hangout-worker/src/game-night-turdspades.mjs';
+import { suggestSpadesBid } from '../../hangout-worker/arcade/games/turdspades-engine.js';
+import { suggestSpadesBid as suggestPlayBid } from '../../play/games/turdspades-engine.js';
+
+const nilHand = ['2S', '3S', '4S', '2H', '3H', '4H', '5H', '2D', '3D', '4D', '5D', '2C', '3C']
+    .map(card => ({ rank: card.slice(0, -1), suit: card.slice(-1) }));
+const aceHand = ['AS', 'AH', 'AD', '2H', '3H', '4H', '5D', '6D', '7D', '2C', '3C', '4C', '5C']
+    .map(card => ({ rank: card.slice(0, -1), suit: card.slice(-1) }));
 
 const matchId = 'spades-partner-fixture';
 const human = { south: 'host', west: 'friend' };
@@ -62,5 +69,22 @@ describe('TurdSpades with computer partners', () => {
         const next = table.view(human.south);
         expect(next).toMatchObject({ id: 'spades-next-fixture', seat: 'west', match: { round: 1, phase: 'bid', scores: [0, 0] } });
         expect(next.match.hand).toHaveLength(13);
+    });
+
+    it('suggests Nil for a blank hand and a stable 1–9 bid for aces', () => {
+        expect(suggestSpadesBid(nilHand)).toBe(0);
+        expect(suggestPlayBid(nilHand)).toBe(0);
+        expect(suggestSpadesBid(aceHand)).toBe(suggestSpadesBid(aceHand));
+        expect(suggestSpadesBid(aceHand)).toBeGreaterThanOrEqual(1);
+        expect(suggestSpadesBid(aceHand)).toBeLessThanOrEqual(9);
+        expect(suggestPlayBid(aceHand)).toBe(suggestSpadesBid(aceHand));
+    });
+
+    it('accepts the suggested West bid', () => {
+        const table = joinedTable();
+        const friend = table.view(human.west).match;
+        const bid = suggestSpadesBid(friend.hand);
+        expect(table.command(human.west, request(friend, { action: 'bid', bid }))).toEqual({ ok: true });
+        expect(table.view(human.west).match.bids.west).toBe(bid);
     });
 });
