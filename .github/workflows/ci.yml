@@ -63,6 +63,8 @@ jobs:
           node tests/runtime/arcade-transport.mjs --rollback
           node tests/runtime/arcade-transport.mjs --browser=chromium --media
           node tests/runtime/arcade-transport.mjs --browser=webkit
+          node tests/runtime/arcade-transport.mjs --browser=chromium --webjam-share
+          node tests/runtime/arcade-transport.mjs --browser=webkit --webjam-share
 
       - name: Build the shared-community entry toolkit
         shell: bash

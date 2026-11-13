@@ -17,6 +17,13 @@ export const gameGuestSessionRef = sid => digest('game-guest-session:' + sid);
 const reply = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 const unavailable = () => reply({ error: 'This invitation has expired, was used, or the game is no longer waiting for a guest. Ask your host for a new invite.' }, 410);
 
+// Four lives on the Game Night room. The other tables use the arcade transport.
+async function waitingGuestSeat(lobby, roomScope, game, match, hostSid) {
+    if (game === 'four') return lobby.engine.fourGuestSeat?.({ room: roomScope.room, ref: roomScope.ref, match, host: hostSid }) === true;
+    if (!lobby.arcadeAvailable(game)) return false;
+    return lobby.arcade.get(game).hasGuestSeat(roomScope, match, hostSid);
+}
+
 export function gameGuestEnabled(env) {
     return env.HANGOUT_BETA_MODE === 'protected' && env.HANGOUT_OPEN !== '0' && env.HANGOUT_GAME_NIGHT_GUESTS === '1';
 }
@@ -40,8 +47,7 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
         const [nameSeed] = crypto.getRandomValues(new Uint32Array(1));
         const guest = gameGuestScope({ room, ref, game, match, host: host?.betaSid, nameSeed });
         if (!guest || !host.canOpen || !host.canPlay || host.gameGuest || session?.betaSid !== host.betaSid
-            || !await lobby.sessionActive(host) || !lobby.arcadeAvailable(game)
-            || !await lobby.arcade.get(game).hasGuestSeat(scope, match, host.betaSid)) {
+            || !await lobby.sessionActive(host) || !await waitingGuestSeat(lobby, scope, game, match, host.betaSid)) {
             return reply({ error: 'Open a game table with an available seat before inviting a friend.' }, 403);
         }
         if (!await lobby.controlBudget.take(host.socket, actor)) return reply({ error: 'Game invitation allowance reached. Try again in a few minutes.' }, 429);
@@ -72,8 +78,8 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
     const scope = gameGuestScope(record.scope);
     const actor = scope && lobby.engine.invitedGameHost(scope);
     const binding = actor && lobby.arcadeBinding({ actor, room: scope.room, ref: scope.ref });
-    if (!binding?.canPlay || !await lobby.sessionActive(binding) || !lobby.arcadeAvailable(scope.game)
-        || !await lobby.arcade.get(scope.game).hasGuestSeat(scope, scope.match, scope.host)) return unavailable();
+    if (!binding?.canPlay || !await lobby.sessionActive(binding)
+        || !await waitingGuestSeat(lobby, scope, scope.game, scope.match, scope.host)) return unavailable();
     if (operation === 'details') return reply({ game: gameNightLabels[scope.game], host: binding.nick });
     const sid = crypto.randomUUID();
     const exp = now + GUEST_TTL;

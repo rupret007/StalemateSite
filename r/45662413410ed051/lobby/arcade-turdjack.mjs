@@ -280,8 +280,13 @@ export function mountArcadeTurdJack(container, onMatch) {
         client.start(scope);
     });
     return {
+        panel,
         isOpen: () => panel.open,
-        open: () => { if (scope) panel.open = true; },
+        open() {
+            if (!scope) return;
+            panel.open = true;
+            return panel;
+        },
         setRoom(next) {
             if (scope?.room === next?.room && scope?.ref === next?.ref && scope?.actor === next?.actor) return;
             scope = next;
