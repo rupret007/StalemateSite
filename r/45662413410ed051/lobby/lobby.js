@@ -504,6 +504,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     ]);
     const gameLabel = game => arcadeTables.get(game)?.label || gameNightLabels[game] || 'Game Night';
     let arcadeReturning = null, arcadeInvitation = null, arcadeShareIntent = null;
+    let webJamChessSupported = false;
     let arcadeMediaSupported = false, arcadeMedia = null, arcadeMediaLoading = false;
     let fourInARowSupported = false, fourRoom = null, fourPlayed = false;
     let fourGameId = '', fourActionPending = false, fourInvite = null;
@@ -1018,6 +1019,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             gameNightSupported = m.features?.gameNight === 1;
             gameOpenSupported = m.features?.gameOpen === 1;
             gameGuestInvitesSupported = m.features?.gameGuestInvites === 1;
+            webJamChessSupported = m.features?.webJamChess === 1;
             arcadeTables.get('chess').supported = m.features?.arcadeChess === 1;
             arcadeTables.get('crapeights').supported = m.features?.arcadeCrapeights === 1;
             arcadeTables.get('turdrummy').supported = m.features?.arcadeTurdRummy === 1;
@@ -1808,12 +1810,20 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             .finally(() => { arcadeMediaLoading = false; });
     }
     function drawArcadeTable(c, game, table) {
+        const jam = game === 'chess' && webJamChessSupported && !gameGuest ? currentJam() : null;
+        if (jam?.modes.i) c = jam;
+        const inWebJam = c?.kind === 'jam';
+        const container = $(inWebJam ? '[data-jam-chess]' : '[data-game-night]');
         const scope = table.supported && (!gameGuest || gameGuest.game === game) && !shieldActive && c && roomNonce(c.keepRef)
             ? { actor: app.selfId, room: c.name, ref: c.keepRef } : null;
         const option = $(`[data-arcade-game] option[value="${game}"]`);
-        option.hidden = option.disabled = !scope || !table.controller;
+        option.hidden = option.disabled = inWebJam || !scope || !table.controller;
         if (table.controller) {
+            const moved = table.controller.panel.parentElement !== container;
+            if (moved) container.append(table.controller.panel);
             table.controller.setRoom(scope);
+            if (inWebJam && scope && (moved || table.webJamRef !== scope.ref)) table.controller.open();
+            table.webJamRef = inWebJam ? scope?.ref : undefined;
             updateTableInvite(table, c);
             if (scope && arcadeInvitation?.game === game && arcadeInvitation.ref === scope.ref) table.controller.open();
             if (scope && game === arcadeReturning?.game && scope.room === arcadeReturning.room && scope.ref === arcadeReturning.ref) {
@@ -1911,7 +1921,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     }
     function updateTableInvite(table, room) {
         if (table.inviteButton)
-            table.inviteButton.hidden = !!gameGuest || !gameGuestInvitesSupported || !table.invite || !room || !amOp(room);
+            table.inviteButton.hidden = room?.kind !== 'game' || !!gameGuest || !gameGuestInvitesSupported || !table.invite || !room || !amOp(room);
     }
     function arcadeMatchState(game, table, scope, state, sendMatch) {
         table.invite = scope && state?.seat && state.waiting && state.hasOpenSeat !== false ? gameNightInvite(game, state.id) : null;

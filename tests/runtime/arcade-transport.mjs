@@ -26,6 +26,9 @@ const webJamShare = process.argv.includes('--webjam-share');
 const siteGuest = process.argv.find(arg => arg.startsWith('--site-guest='))?.slice('--site-guest='.length);
 const relay = process.argv.includes('--relay');
 const roomGrants = process.argv.includes('--room-grants');
+const webJamChess = process.argv.find(arg => arg.startsWith('--webjam-chess='))?.slice('--webjam-chess='.length);
+assert.ok(webJamChess === undefined || browserName && ['stalemate', 'rad-dad'].includes(webJamChess),
+    'choose a browser and a WebJam Chess brand');
 const webJamGuest = process.argv.find(arg => arg.startsWith('--webjam-guest='))?.slice('--webjam-guest='.length);
 assert.ok(webJamGuest === undefined || browserName && roomGrants && ['stalemate', 'rad-dad'].includes(webJamGuest),
     'choose --room-grants, a browser and a WebJam guest brand');
@@ -343,6 +346,106 @@ async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavail
             await expect(member.locator('[data-jam]')).toBeVisible();
         }
         console.log('PASS synthetic WebJam handoff: consent, recovery, exact seat, first move, and room return after full or expired offers.');
+    } finally {
+        await browser.close();
+    }
+}
+
+async function verifyWebJamChess() {
+    const { chromium, webkit } = await import('playwright');
+    const { expect } = await import('@playwright/test');
+    const browserOrigin = (await mf.ready).origin;
+    const browser = await { chromium, webkit }[browserName].launch();
+    const privateLobby = browserOrigin + '/r/45662413410ed051/lobby/';
+    const scope = page => page.evaluate(() => {
+        const { selfId: actor, active: room, chans } = window.__lobby;
+        return { actor, room, ref: chans.get(room).keepRef };
+    });
+    if (evidence) await mkdir(evidence, { recursive: true });
+    const capture = async (page, step) => {
+        if (evidence) await page.screenshot({ path: join(evidence, webJamChess + '-' + browserName + '-' + step + '.png') });
+    };
+    async function open(nick, phone = false) {
+        const context = await browser.newContext({ ignoreHTTPSErrors: true, hasTouch: phone, reducedMotion: 'reduce',
+            viewport: phone ? { width: 390, height: 844 } : { width: 1440, height: 900 } });
+        const response = await context.request.post(browserOrigin + '/beta/unlock', {
+            headers: { Origin: browserOrigin }, data: { key: invite }
+        });
+        assert.equal(response.status(), 200);
+        await response.dispose();
+        const page = await context.newPage();
+        await page.goto(privateLobby + '?via=' + webJamChess);
+        await page.getByLabel('Your nick').fill(nick);
+        await page.locator('[data-enter]').click();
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        return page;
+    }
+    const ticket = (page, path, target) => page.evaluate(async ({ path, target }) =>
+        (await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(target) })).status,
+        { path, target });
+
+    try {
+        const host = await open('RoomChessHost');
+        const friend = await open('RoomChessFriend', true);
+        await host.locator('[data-start="jam"]').click();
+        await expect(host.locator('[data-jam]')).toBeVisible();
+        const hostRoom = await scope(host);
+        assert.ok(/^#jam-/.test(hostRoom.room));
+        const friendIdentity = await scope(friend);
+        assert.equal(await ticket(friend, '/beta/arcade-ticket', { ...hostRoom, actor: friendIdentity.actor }), 403,
+            'an admitted nonmember cannot open the private Chess table');
+        assert.equal(await ticket(host, '/beta/arcade-turdtris-ticket', hostRoom), 403, 'other games stay outside WebJam');
+        const hostTable = host.locator('[data-jam-chess]');
+        if (!roomGrants) {
+            await expect(hostTable.getByRole('button', { name: 'Open Chess match' })).toHaveCount(0);
+            assert.equal(await ticket(host, '/beta/arcade-ticket', hostRoom), 403, 'Chess remains disabled without the private flag');
+            console.log('PASS WebJam Chess stays disabled without the private flag.');
+            return;
+        }
+        const openMatch = hostTable.getByRole('button', { name: 'Open Chess match' });
+        await expect(openMatch).toBeVisible();
+        await capture(host, 'open');
+        await openMatch.click();
+        await expect(hostTable.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
+        assert.equal(await ticket(friend, '/beta/arcade-ticket', { ...hostRoom, actor: friendIdentity.actor }), 403,
+            'an open table still denies community members outside the private room');
+
+        await host.evaluate(() => window.__lobby.cmd('invite', ['RoomChessFriend']));
+        await friend.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).tap();
+        await expect.poll(() => friend.evaluate(room => window.__lobby.active === room, hostRoom.room)).toBe(true);
+        const guestTable = friend.locator('[data-jam-chess]');
+        const join = guestTable.getByRole('button', { name: 'Join Chess', exact: true });
+        await expect(join).toBeVisible();
+        assert.ok((await join.boundingBox()).height >= 44, 'the Chess offer is phone sized');
+        await capture(friend, 'join');
+        await join.tap();
+        await expect(guestTable.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
+        await expect(hostTable.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
+        for (const [page, squares] of [[host, ['e2', 'e4']], [friend, ['d7', 'd5']]]) {
+            for (const square of squares) {
+                const target = page.locator('[data-jam-chess] [data-square="' + square + '"]');
+                await target.scrollIntoViewIfNeeded();
+                const box = await target.boundingBox();
+                assert.ok(box && box.width > 22 && box.height > 22, 'the visible square is playable');
+                const x = box.x + box.width / 2, y = box.y + box.height / 2;
+                if (page === friend) await page.touchscreen.tap(x, y);
+                else await page.mouse.click(x, y);
+            }
+            if (page === host) await expect(guestTable.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+        }
+        await expect(hostTable.getByRole('button', { name: 'd5, Black pawn' })).toBeAttached();
+        assert.ok(await friend.evaluate(room => window.__lobby.active === room && ![...window.__lobby.chans.values()].some(c => c.kind === 'game'),
+            hostRoom.room), 'the guest plays in the existing WebJam room without another room');
+        await expect(friend.locator('[data-game-night]')).toBeHidden();
+        await capture(friend, 'playing');
+        await friend.locator('[data-text]').fill('Chess stays in this room');
+        await friend.locator('[data-send]').tap();
+        await expect(host.locator('[data-buffer]')).toContainText('Chess stays in this room');
+        const friendRoom = await scope(friend);
+        await friend.locator('[data-leave]').tap();
+        await expect.poll(() => friend.evaluate(() => window.__lobby.active)).toBe('#stalemate');
+        assert.equal(await ticket(friend, '/beta/arcade-ticket', friendRoom), 403, 'leaving retires room membership');
+        console.log('PASS in-room WebJam Chess: one Join Chess action, same room, first moves, and room chat.');
     } finally {
         await browser.close();
     }
@@ -1276,6 +1379,8 @@ try {
             process.once('SIGINT', resolve);
             process.once('SIGTERM', resolve);
         });
+    } else if (webJamChess) {
+        await verifyWebJamChess();
     } else if (webJamGuest) {
         await verifyRoomGrants();
     } else if (browserName) {
